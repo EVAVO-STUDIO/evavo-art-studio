@@ -1,0 +1,21 @@
+{
+  "name": "@evavo/art-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Governed art production system for game, digital and print assets.",
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @evavo/art-studio-web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "check": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
