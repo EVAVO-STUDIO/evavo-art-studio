@@ -15,10 +15,14 @@ import {
 } from "@evavo/art-quality";
 import { assertPathWithinAllowedRoots, inspectRepository } from "@evavo/art-repo-inspector";
 
+import { registerRuntimeTools } from "./runtime-tools.js";
+
 const server = new McpServer({
   name: "evavo-art-studio",
   version: "0.1.0",
 });
+
+registerRuntimeTools(server);
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
