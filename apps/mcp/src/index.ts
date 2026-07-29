@@ -15,6 +15,7 @@ import {
 } from "@evavo/art-quality";
 import { assertPathWithinAllowedRoots, inspectRepository } from "@evavo/art-repo-inspector";
 
+import { registerProviderTools } from "./provider-tools.js";
 import { registerRuntimeTools } from "./runtime-tools.js";
 
 const server = new McpServer({
@@ -23,6 +24,7 @@ const server = new McpServer({
 });
 
 registerRuntimeTools(server);
+registerProviderTools(server);
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
