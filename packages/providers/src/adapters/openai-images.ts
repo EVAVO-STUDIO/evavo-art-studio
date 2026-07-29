@@ -1,3 +1,5 @@
+import { normalizeJson } from "@evavo/art-artifacts";
+
 import {
   PROVIDER_PROTOCOL_VERSION,
   ProviderError,
@@ -6,6 +8,7 @@ import {
   type ProviderAdapterExecutionResult,
   type ProviderAdapterOutput,
   type ProviderAdapterDescriptor,
+  type ProviderCapability,
   type ResolvedProviderCandidateRequest,
   type ResolvedProviderReference,
 } from "../types.js";
@@ -20,6 +23,33 @@ const DEFAULT_MAXIMUM_RESPONSE_BYTES = 128 * 1024 * 1024;
 const MINIMUM_PIXELS = 655_360;
 const MAXIMUM_PIXELS = 8_294_400;
 const MAXIMUM_EDGE = 3_840;
+
+const OPENAI_IMAGE_CAPABILITIES = Object.freeze([
+  "generate",
+  "edit",
+  "inpaint",
+  "reference-images",
+  "multiple-reference-images",
+  "mask",
+  "custom-size",
+  "candidate-count",
+  "cancellation",
+] as const satisfies readonly ProviderCapability[]);
+
+const REFERENCE_ROLE_ORDER = Object.freeze([
+  "base-image",
+  "canonical-identity",
+  "direction-master",
+  "previous-key-pose",
+  "next-key-pose",
+  "pose-control",
+  "edge-control",
+  "depth-control",
+  "palette-reference",
+  "line-reference",
+  "material-reference",
+  "layer-context",
+] as const);
 
 export interface OpenAIImageProviderOptions {
   readonly apiKey: string;
@@ -97,7 +127,7 @@ function safeModels(
 
 function boundedBytes(value: number | undefined): number {
   const result = value ?? DEFAULT_MAXIMUM_RESPONSE_BYTES;
-  if (!Number.isInteger(result) || result < 1024 || result > 512 * 1024 * 1024) {
+  if (!Number.isInteger(result) || result < 1_024 || result > 512 * 1024 * 1024) {
     throw new ProviderError(
       "OPENAI_IMAGE_CONFIGURATION_INVALID",
       "OpenAI maximum response bytes must be between 1024 and 536870912.",
@@ -147,6 +177,7 @@ export function openAIImageSourceSize(
       "incompatible",
     );
   }
+
   const targetArea = 1_048_576;
   let width = round16(Math.sqrt(targetArea * ratio));
   let height = round16(Math.sqrt(targetArea / ratio));
@@ -171,12 +202,6 @@ function quality(value: "draft" | "standard" | "high"): "low" | "medium" | "high
   return "medium";
 }
 
-function outputFormat(
-  value: "png" | "webp" | "jpeg",
-): "png" | "webp" | "jpeg" {
-  return value;
-}
-
 function outputMediaType(
   value: "png" | "webp" | "jpeg",
 ): "image/png" | "image/webp" | "image/jpeg" {
@@ -187,11 +212,12 @@ function outputMediaType(
 
 function safeFileName(reference: ResolvedProviderReference, index: number): string {
   const declared = reference.artifact.fileName;
-  const extension = reference.artifact.mediaType === "image/png"
-    ? "png"
-    : reference.artifact.mediaType === "image/webp"
-      ? "webp"
-      : "jpg";
+  const extension =
+    reference.artifact.mediaType === "image/png"
+      ? "png"
+      : reference.artifact.mediaType === "image/webp"
+        ? "webp"
+        : "jpg";
   if (
     declared &&
     declared.length <= 255 &&
@@ -202,6 +228,30 @@ function safeFileName(reference: ResolvedProviderReference, index: number): stri
     return declared;
   }
   return `${String(index + 1).padStart(2, "0")}-${reference.role}.${extension}`;
+}
+
+function orderedImageReferences(
+  references: readonly ResolvedProviderReference[],
+): readonly ResolvedProviderReference[] {
+  const order = new Map<string, number>(
+    REFERENCE_ROLE_ORDER.map((role, index) => [role, index]),
+  );
+  return references
+    .filter((reference) => reference.role !== "mask")
+    .map((reference, index) => ({ reference, index }))
+    .sort(
+      (left, right) =>
+        (order.get(left.reference.role) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(right.reference.role) ?? Number.MAX_SAFE_INTEGER) ||
+        left.index - right.index,
+    )
+    .map((entry) => entry.reference);
+}
+
+function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 async function boundedResponseText(
@@ -241,8 +291,7 @@ async function boundedResponseText(
 
 function providerMessage(value: unknown): string | undefined {
   if (!value || typeof value !== "object") return undefined;
-  const record = value as Record<string, unknown>;
-  const error = record.error;
+  const error = (value as Record<string, unknown>).error;
   if (!error || typeof error !== "object") return undefined;
   const message = (error as Record<string, unknown>).message;
   return typeof message === "string"
@@ -260,7 +309,9 @@ function providerCode(value: unknown): string | undefined {
     : undefined;
 }
 
-function statusClassification(status: number): "transient" | "permanent" | "incompatible" {
+function statusClassification(
+  status: number,
+): "transient" | "permanent" | "incompatible" {
   if (status === 408 || status === 409 || status === 429 || status >= 500) {
     return "transient";
   }
@@ -279,7 +330,9 @@ function strictBase64(value: unknown, index: number): Buffer {
   const compact = value.replace(/\s+/g, "");
   if (
     compact.length % 4 !== 0 ||
-    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(compact)
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+      compact,
+    )
   ) {
     throw new ProviderError(
       "OPENAI_IMAGE_OUTPUT_INVALID",
@@ -303,8 +356,8 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
   readonly #apiKey: string;
   readonly #baseUrl: string;
   readonly #model: string;
-  readonly #organization?: string;
-  readonly #project?: string;
+  readonly #organization: string | undefined;
+  readonly #project: string | undefined;
   readonly #fetch: typeof fetch;
   readonly #maximumResponseBytes: number;
 
@@ -317,6 +370,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
         "permanent",
       );
     }
+
     const models = safeModels(options.model, options.allowedModels);
     this.#apiKey = apiKey;
     this.#baseUrl = safeBaseUrl(options.baseUrl);
@@ -331,17 +385,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
       label: "OpenAI GPT Image",
       version: "1.0.0",
       priority: options.priority ?? 1_000,
-      capabilities: Object.freeze([
-        "generate",
-        "edit",
-        "inpaint",
-        "reference-images",
-        "multiple-reference-images",
-        "mask",
-        "custom-size",
-        "candidate-count",
-        "cancellation",
-      ]),
+      capabilities: OPENAI_IMAGE_CAPABILITIES,
       models: Object.freeze(models),
       maximumCandidates: 8,
       maximumReferenceImages: 16,
@@ -365,6 +409,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
         "cancelled",
       );
     }
+
     const request = resolved.request;
     const model = request.selection.preferredModel ?? this.#model;
     if (!this.descriptor.models.includes(model)) {
@@ -383,8 +428,11 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
     }
 
     const size = openAIImageSourceSize(request);
-    const format = outputFormat(request.target.outputFormat);
-    const useEditEndpoint = resolved.references.length > 0 || request.operation !== "generate";
+    const format = request.target.outputFormat;
+    const useEditEndpoint =
+      resolved.references.length > 0 || request.operation !== "generate";
+    const background =
+      request.background.strategy === "provider-auto" ? "auto" : "opaque";
     let body: BodyInit;
     const headers: Record<string, string> = {
       authorization: `Bearer ${this.#apiKey}`,
@@ -392,6 +440,9 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
     };
     if (this.#organization) headers["openai-organization"] = this.#organization;
     if (this.#project) headers["openai-project"] = this.#project;
+
+    const imageReferences = orderedImageReferences(resolved.references);
+    const mask = resolved.references.find((reference) => reference.role === "mask");
 
     if (useEditEndpoint) {
       const form = new FormData();
@@ -401,19 +452,24 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
       form.append("size", size);
       form.append("quality", quality(request.quality));
       form.append("output_format", format);
-      form.append(
-        "background",
-        request.background.strategy === "provider-auto" ? "auto" : "opaque",
-      );
-      for (const [index, reference] of resolved.references.entries()) {
-        const blob = new Blob([reference.bytes], {
-          type: reference.artifact.mediaType,
-        });
-        if (reference.role === "mask") {
-          form.append("mask", blob, safeFileName(reference, index));
-        } else {
-          form.append("image[]", blob, safeFileName(reference, index));
-        }
+      form.append("background", background);
+      for (const [index, reference] of imageReferences.entries()) {
+        form.append(
+          "image[]",
+          new Blob([ownedArrayBuffer(reference.bytes)], {
+            type: reference.artifact.mediaType,
+          }),
+          safeFileName(reference, index),
+        );
+      }
+      if (mask) {
+        form.append(
+          "mask",
+          new Blob([ownedArrayBuffer(mask.bytes)], {
+            type: mask.artifact.mediaType,
+          }),
+          safeFileName(mask, imageReferences.length),
+        );
       }
       body = form;
     } else {
@@ -425,8 +481,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
         size,
         quality: quality(request.quality),
         output_format: format,
-        background:
-          request.background.strategy === "provider-auto" ? "auto" : "opaque",
+        background,
       });
     }
 
@@ -444,7 +499,10 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
         },
       );
     } catch (error: unknown) {
-      if (context.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+      if (
+        context.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
         throw new ProviderError(
           "PROVIDER_EXECUTION_CANCELLED",
           "OpenAI image execution was cancelled.",
@@ -477,7 +535,9 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
       const message = providerMessage(parsed);
       throw new ProviderError(
         code ? `OPENAI_${code}` : "OPENAI_IMAGE_REQUEST_FAILED",
-        message ? `OpenAI image request failed: ${message}` : "OpenAI image request failed.",
+        message
+          ? `OpenAI image request failed: ${message}`
+          : "OpenAI image request failed.",
         statusClassification(response.status),
         { status: response.status },
       );
@@ -491,6 +551,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
         "transient",
       );
     }
+
     const mediaType = outputMediaType(format);
     const outputs: ProviderAdapterOutput[] = payload.data.map((entry, index) => ({
       bytes: strictBase64(entry.b64_json, index),
@@ -502,10 +563,12 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
       metadata: {
         sourceSize: size,
         outputFormat: format,
-        background:
-          request.background.strategy === "provider-auto" ? "auto" : "opaque",
+        background,
       },
     }));
+    const usage =
+      payload.usage === undefined ? undefined : normalizeJson(payload.usage);
+
     return {
       adapterId: this.descriptor.id,
       model,
@@ -513,12 +576,13 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
         ? { externalId: response.headers.get("x-request-id")! }
         : {}),
       outputs,
-      ...(payload.usage === undefined ? {} : { usage: payload.usage as never }),
+      ...(usage === undefined ? {} : { usage }),
       metadata: {
         endpoint: useEditEndpoint ? "images/edits" : "images/generations",
         created: payload.created ?? null,
         sourceSize: size,
-        referenceRoles: resolved.references.map((entry) => entry.role),
+        referenceRoles: imageReferences.map((entry) => entry.role),
+        maskRole: mask?.role ?? null,
         inputFidelity: "high-automatic",
       },
     };
