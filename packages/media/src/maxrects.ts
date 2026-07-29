@@ -1,5 +1,5 @@
 import { SpriteAtlasInputError, type Rect } from "./types.js";
-import { nextPowerOfTwo } from "./math.js";
+import { clamp, nextPowerOfTwo } from "./math.js";
 
 export interface PackItem {
   readonly id: string;
@@ -146,8 +146,12 @@ function packAtWidth(
 
   return {
     placements,
-    usedWidth: Math.max(...placements.map((placement) => placement.x + placement.width)),
-    usedHeight: Math.max(...placements.map((placement) => placement.y + placement.height)),
+    usedWidth: Math.max(
+      ...placements.map((placement) => placement.x + placement.width),
+    ),
+    usedHeight: Math.max(
+      ...placements.map((placement) => placement.y + placement.height),
+    ),
   };
 }
 
@@ -160,6 +164,51 @@ export function sortPackItems(items: readonly PackItem[]): PackItem[] {
       right.width - left.width ||
       left.id.localeCompare(right.id),
   );
+}
+
+function nonPowerOfTwoCandidateWidths(
+  items: readonly PackItem[],
+  minimumWidth: number,
+  maximumWidth: number,
+): number[] {
+  const candidates = new Set<number>([minimumWidth, maximumWidth]);
+  const totalArea = items.reduce(
+    (total, item) => total + item.width * item.height,
+    0,
+  );
+  candidates.add(clamp(Math.ceil(Math.sqrt(totalArea)), minimumWidth, maximumWidth));
+
+  const uniformSamples = 256;
+  const range = maximumWidth - minimumWidth;
+  for (let index = 0; index <= uniformSamples; index += 1) {
+    candidates.add(
+      Math.round(minimumWidth + (range * index) / uniformSamples),
+    );
+  }
+
+  const stride = Math.max(1, Math.ceil(items.length / 128));
+  let cumulativeWidth = 0;
+  items.forEach((item, index) => {
+    cumulativeWidth += item.width;
+    if (index % stride === 0 || index === items.length - 1) {
+      candidates.add(clamp(cumulativeWidth, minimumWidth, maximumWidth));
+    }
+  });
+
+  let geometric = minimumWidth;
+  while (geometric < maximumWidth) {
+    candidates.add(Math.round(geometric));
+    geometric = Math.max(geometric + 1, geometric * 1.125);
+  }
+
+  for (const candidate of [...candidates]) {
+    candidates.add(clamp(candidate - 1, minimumWidth, maximumWidth));
+    candidates.add(clamp(candidate + 1, minimumWidth, maximumWidth));
+  }
+
+  return [...candidates]
+    .filter((width) => width >= minimumWidth && width <= maximumWidth)
+    .sort((left, right) => left - right);
 }
 
 export function createAtlasLayout(
@@ -198,8 +247,31 @@ export function createAtlasLayout(
       "At least one frame is required for atlas packing.",
     );
   }
+  if (
+    inputItems.some(
+      (item) =>
+        !Number.isInteger(item.width) ||
+        !Number.isInteger(item.height) ||
+        item.width <= 0 ||
+        item.height <= 0,
+    )
+  ) {
+    throw new SpriteAtlasInputError(
+      "SPRITE_ATLAS_PACK_ITEM_INVALID",
+      "Every packed frame must have positive integer dimensions.",
+    );
+  }
+
   const items = sortPackItems(inputItems);
   const minimumWidth = Math.max(...items.map((item) => item.width));
+  const minimumHeight = Math.max(...items.map((item) => item.height));
+  if (minimumWidth > maximumWidth || minimumHeight > maximumHeight) {
+    throw new SpriteAtlasInputError(
+      "SPRITE_ATLAS_PACK_FAILED",
+      `A frame exceeds the ${maximumWidth}×${maximumHeight} atlas limit.`,
+    );
+  }
+
   const widths: number[] = [];
   if (powerOfTwo === "required") {
     for (
@@ -210,9 +282,9 @@ export function createAtlasLayout(
       widths.push(width);
     }
   } else {
-    for (let width = minimumWidth; width <= maximumWidth; width += 1) {
-      widths.push(width);
-    }
+    widths.push(
+      ...nonPowerOfTwoCandidateWidths(items, minimumWidth, maximumWidth),
+    );
   }
 
   let best: CandidateLayout | undefined;
@@ -228,7 +300,12 @@ export function createAtlasLayout(
         ? nextPowerOfTwo(packed.usedHeight)
         : packed.usedHeight;
     if (width > maximumWidth || height > maximumHeight) continue;
-    const score = [width * height, Math.max(width, height), height, width] as const;
+    const score = [
+      width * height,
+      Math.max(width, height),
+      height,
+      width,
+    ] as const;
     const candidate: CandidateLayout = {
       width,
       height,
