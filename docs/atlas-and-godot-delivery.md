@@ -9,7 +9,7 @@ The delivery boundary has two deterministic stages:
 1. `@evavo/art-media` decodes source frames, trims transparent bounds, packs unique frames, renders padding and extrusion, compiles exact timing and writes a PNG atlas, atlas JSON and evidence JSON.
 2. `@evavo/art-godot` writes a Godot 4.6.2 descriptor and a reviewed headless importer. A local or authenticated engine worker can run that importer through Godot to save the native `SpriteFrames` resource.
 
-The hosted API and MCP surfaces may generate files only when `EVAVO_ART_ALLOW_WRITES=true`. They never execute Godot or another binary. Optional headless Godot execution is exposed only by the explicit local CLI command.
+The hosted API and MCP surfaces may generate files only when deliberately enabled. They never execute Godot or another binary. Optional headless Godot execution is exposed only by the explicit local CLI command.
 
 ## Source manifest
 
@@ -87,7 +87,7 @@ When trimming is enabled, the builder records:
 - source format and source-alpha state;
 - SHA-256 of the exact decoded RGBA pixels.
 
-A trim operation changes atlas storage, not the authored coordinate system. Original dimensions, trim offsets and pivots remain in the atlas data and Godot descriptor.
+A trim operation changes atlas storage, not the authored coordinate system. Original dimensions, trim offsets and pivots remain in the atlas data and Godot descriptor. Manifest-relative source references are retained instead of machine-specific absolute paths, so atlas data and hashes remain portable across equivalent workstations.
 
 ## Packing policy
 
@@ -103,7 +103,7 @@ Blocking rules:
 - the result must fit inside the declared maximum width and height;
 - `powerOfTwo: "required"` produces power-of-two dimensions;
 - `powerOfTwo: "preferred"` first tries a power-of-two result and falls back only when the maximum dimensions prevent one;
-- `powerOfTwo: "not-required"` uses the smallest successful integer dimensions found by the deterministic search.
+- `powerOfTwo: "not-required"` evaluates a bounded deterministic candidate set based on area, cumulative row widths, geometric growth and uniform samples rather than probing every integer width.
 
 The atlas PNG is encoded once from the lossless RGBA master. Runtime derivatives must never be made by recursively recompressing another derivative.
 
@@ -121,13 +121,13 @@ This reconstructs every authored duration exactly instead of rounding the sequen
 
 ## Artifact package
 
-The media package writes atomically:
+The media package writes replaceable files safely on Windows and POSIX systems:
 
 - `<atlas>.png` — transparent sRGB atlas;
 - `<atlas>.atlas.json` — packed regions, source sizes, trim offsets, pivots, settings and exact animation timing;
 - `<atlas>.evidence.json` — source-manifest hash, atlas-image hash, atlas-data hash, source-frame hashes and deterministic tool version.
 
-Generated data records unique packed frames separately from animation references, so deliberate linked-cel reuse remains visible and auditable.
+Generated data records unique packed frames separately from animation references, so deliberate linked-cel reuse remains visible and auditable. Re-running the same build replaces prior outputs rather than failing because a Windows target file already exists.
 
 ## Godot 4.6.2 delivery
 
@@ -177,15 +177,30 @@ The process uses `spawn` without a shell and passes only the generated importer 
 
 The standalone API exposes `POST /v1/atlases/build`.
 
-The MCP server exposes `build_sprite_atlas_package`.
-
-Both require:
+REST writes require both:
 
 ```text
 EVAVO_ART_ALLOW_WRITES=true
+EVAVO_ART_WRITE_TOKEN=<server-only random token of at least 32 bytes>
 ```
 
-Both remain restricted to `EVAVO_ART_ALLOWED_ROOTS`, generate files only, return hashes and paths, and report `executionAvailable: false`.
+Clients send the token as either:
+
+```text
+Authorization: Bearer <token>
+```
+
+or:
+
+```text
+x-evavo-art-write-token: <token>
+```
+
+The server hashes configured and supplied tokens with SHA-256 and compares fixed-size digests through `timingSafeEqual`. Tokens are never returned by health, capability or build responses.
+
+The local MCP server exposes `build_sprite_atlas_package`. It requires `EVAVO_ART_ALLOW_WRITES=true` and a trusted MCP process connection. Remote Streamable HTTP MCP is not yet enabled by this slice and must add its own authenticated transport boundary before file-generating tools are exposed remotely.
+
+REST and MCP remain restricted to `EVAVO_ART_ALLOWED_ROOTS`, generate files only, return hashes and paths, and report `executionAvailable: false`.
 
 ## Verification boundary
 
@@ -194,11 +209,15 @@ Automated tests prove:
 - manifest rejection and animation-reference integrity;
 - deterministic layout and PNG hashes;
 - source-frame reuse;
+- portable manifest-relative source metadata;
+- repeat builds over existing output files;
 - alpha-aware trim bounds;
 - transparent padding and real edge extrusion through decoded output pixels;
-- no-rotation packing;
+- bounded no-rotation packing;
 - exact duration reconstruction;
 - allowed-root and project-root rejection;
+- fail-closed and authenticated REST writes;
+- non-executing MCP write boundaries;
 - descriptor and importer source contracts.
 
 The repository CI does not claim that a Godot executable is installed on every runner. Native `.tres` production remains a local or authenticated engine-worker smoke gate. A release should run the generated importer through the target Godot 4.6.2 binary and open the resulting resource in a representative scene before declaring engine delivery complete.
