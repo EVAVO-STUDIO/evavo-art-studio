@@ -6,7 +6,7 @@ import type {
   StoredArtifact,
 } from "@evavo/art-artifacts";
 
-export const RUNTIME_PROTOCOL_VERSION = "2026-07-29.1" as const;
+export const RUNTIME_PROTOCOL_VERSION = "2026-07-29.2" as const;
 
 export type RuntimeJobState =
   | "waiting"
@@ -20,6 +20,8 @@ export type RuntimeJobState =
   | "cancelled"
   | "blocked"
   | "dead-letter";
+
+export type RuntimeResumableState = "waiting" | "queued" | "retry-wait";
 
 export type RuntimeFailureClassification =
   | "transient"
@@ -124,6 +126,7 @@ export interface RuntimeJobRecord {
   readonly nextAttemptAt?: string;
   readonly cancellationRequestedAt?: string;
   readonly pauseRequestedAt?: string;
+  readonly pausedFromState?: RuntimeResumableState;
   readonly finishedAt?: string;
   readonly outputArtifacts: readonly ArtifactId[];
   readonly failure?: RuntimeFailure;
@@ -302,6 +305,29 @@ export interface RuntimeWorkerRunResult {
   readonly succeeded: number;
   readonly failed: number;
   readonly cancelled: number;
+  readonly paused: number;
+}
+
+export interface RuntimeDeliveryMessage {
+  readonly schemaVersion: "1.0";
+  readonly jobId: string;
+  readonly queue: string;
+  readonly specHash: string;
+  readonly enqueuedAt: string;
+}
+
+export interface RuntimeDeliveryAdapter {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  publish(job: RuntimeJobRecord, now?: Date): Promise<string | null>;
+  subscribe(
+    queue: string,
+    handler: (message: RuntimeDeliveryMessage) => Promise<void>,
+  ): Promise<string>;
+  unsubscribe(queue: string): Promise<void>;
+  touch(queue: string, deliveryId: string): Promise<void>;
+  cancel(queue: string, deliveryId: string): Promise<void>;
+  retry(queue: string, deliveryId: string): Promise<void>;
 }
 
 export class RuntimeError extends Error {
