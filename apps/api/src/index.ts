@@ -1,5 +1,10 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,12 +28,16 @@ import {
   analyseSpriteSequenceManifestFile,
   decodeSpriteFrame,
 } from "@evavo/art-quality";
-import { assertPathWithinAllowedRoots, inspectRepository } from "@evavo/art-repo-inspector";
+import {
+  assertPathWithinAllowedRoots,
+  inspectRepository,
+} from "@evavo/art-repo-inspector";
 import {
   LocalRuntimeRepository,
   type RuntimeRepository,
 } from "@evavo/art-runtime";
 
+import { handleProviderApiRequest } from "./provider-api.js";
 import { handleRuntimeApiRequest } from "./runtime-api.js";
 
 export interface ArtStudioApiOptions {
@@ -108,7 +117,9 @@ function strictBase64(value: unknown, maximumBytes: number): Buffer {
   const compact = value.replace(/\s+/g, "");
   if (
     compact.length % 4 !== 0 ||
-    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(compact)
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+      compact,
+    )
   ) {
     throw new SpriteQualityInputError(
       "SPRITE_FRAME_BASE64_INVALID",
@@ -230,6 +241,20 @@ export function createArtStudioApiServer(
 
     try {
       const url = new URL(request.url ?? "/", "http://localhost");
+      if (
+        await handleProviderApiRequest({
+          request,
+          response,
+          url,
+          requestId,
+          maximumBodyBytes,
+          readJsonBody,
+          writeJson,
+        })
+      ) {
+        return;
+      }
+
       const controlAuthorized =
         writeToken !== undefined && writeTokenMatches(request, writeToken);
       if (
