@@ -6,11 +6,14 @@ import {
 import {
   ChromaKeyExtractionError,
   extractChromaKeyAlpha,
+  type ChromaKeyExtractionOptions,
+  type ChromaKeyExtractionResult,
 } from "@evavo/art-media";
 import {
   SpriteQualityInputError,
   analyseDecodedSpriteFrame,
   decodeSpriteFrame,
+  type SpriteFrameQualityReport,
 } from "@evavo/art-quality";
 import {
   PermanentRuntimeError,
@@ -62,6 +65,39 @@ function optionalNumber(
     );
   }
   return value;
+}
+
+function extractionOptions(
+  payload: Readonly<Record<string, JsonValue>>,
+  matteColour: string,
+): ChromaKeyExtractionOptions {
+  const connectionDistance = optionalNumber(
+    payload.connectionDistance,
+    "connectionDistance",
+  );
+  const opaqueSeedDistance = optionalNumber(
+    payload.opaqueSeedDistance,
+    "opaqueSeedDistance",
+  );
+  const edgeSearchRadius = optionalNumber(
+    payload.edgeSearchRadius,
+    "edgeSearchRadius",
+  );
+  const bleedRadius = optionalNumber(payload.bleedRadius, "bleedRadius");
+  const minimumBorderMatteFraction = optionalNumber(
+    payload.minimumBorderMatteFraction,
+    "minimumBorderMatteFraction",
+  );
+  return {
+    matteColour,
+    ...(connectionDistance === undefined ? {} : { connectionDistance }),
+    ...(opaqueSeedDistance === undefined ? {} : { opaqueSeedDistance }),
+    ...(edgeSearchRadius === undefined ? {} : { edgeSearchRadius }),
+    ...(bleedRadius === undefined ? {} : { bleedRadius }),
+    ...(minimumBorderMatteFraction === undefined
+      ? {}
+      : { minimumBorderMatteFraction }),
+  };
 }
 
 function safeFileStem(value: string): string {
@@ -171,59 +207,17 @@ export function createCandidateMasteringHandlers(): Readonly<
     }
 
     const candidateBytes = await context.artifacts.read(candidateId);
-    let extraction;
+    let extraction: ChromaKeyExtractionResult;
     try {
-      extraction = await extractChromaKeyAlpha(candidateBytes, {
-        matteColour,
-        ...(optionalNumber(payload.connectionDistance, "connectionDistance") ===
-        undefined
-          ? {}
-          : {
-              connectionDistance: optionalNumber(
-                payload.connectionDistance,
-                "connectionDistance",
-              ),
-            }),
-        ...(optionalNumber(payload.opaqueSeedDistance, "opaqueSeedDistance") ===
-        undefined
-          ? {}
-          : {
-              opaqueSeedDistance: optionalNumber(
-                payload.opaqueSeedDistance,
-                "opaqueSeedDistance",
-              ),
-            }),
-        ...(optionalNumber(payload.edgeSearchRadius, "edgeSearchRadius") ===
-        undefined
-          ? {}
-          : {
-              edgeSearchRadius: optionalNumber(
-                payload.edgeSearchRadius,
-                "edgeSearchRadius",
-              ),
-            }),
-        ...(optionalNumber(payload.bleedRadius, "bleedRadius") === undefined
-          ? {}
-          : {
-              bleedRadius: optionalNumber(payload.bleedRadius, "bleedRadius"),
-            }),
-        ...(optionalNumber(
-          payload.minimumBorderMatteFraction,
-          "minimumBorderMatteFraction",
-        ) === undefined
-          ? {}
-          : {
-              minimumBorderMatteFraction: optionalNumber(
-                payload.minimumBorderMatteFraction,
-                "minimumBorderMatteFraction",
-              ),
-            }),
-      });
+      extraction = await extractChromaKeyAlpha(
+        candidateBytes,
+        extractionOptions(payload, matteColour),
+      );
     } catch (error: unknown) {
       masteringError(error);
     }
 
-    let quality;
+    let quality: SpriteFrameQualityReport;
     try {
       const decoded = await decodeSpriteFrame(extraction.png);
       quality = analyseDecodedSpriteFrame(
