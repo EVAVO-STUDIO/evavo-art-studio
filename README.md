@@ -21,7 +21,7 @@ This repository is intentionally broader than an image generator. It is the shar
 - Godot 4.6.2 SpriteFrames descriptors and headless importers using AtlasTexture regions, trim margins, loop modes and exact relative durations;
 - safe local repository inspector with Godot project and existing-art detection;
 - JSON-first CLI for validation, planning, repository inspection, sprite QA and engine-ready atlas delivery;
-- versioned REST foundation for capabilities, plans, guarded repository inspection, sprite QA and fail-closed atlas writes;
+- versioned REST foundation for capabilities, plans, guarded repository inspection, sprite QA and authenticated fail-closed atlas writes;
 - Next.js control-plane workspace with an interactive continuity-aware production-plan compiler and browser QA workbenches;
 - MCP v2 stdio server exposing planning, repository inspection, sprite QA and explicitly enabled atlas delivery to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
@@ -73,7 +73,7 @@ The web workspace starts at `http://localhost:4200`. The standalone API starts o
 - `POST /v1/quality/sprite-sequence`
 - `POST /v1/atlases/build`
 
-Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. API and MCP file-generating tools fail closed unless `EVAVO_ART_ALLOW_WRITES=true`. They generate packages but never execute Godot or another binary. Provider secrets belong on workers and are never exposed to the browser or embedded in briefs.
+Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. The REST atlas route requires `EVAVO_ART_ALLOW_WRITES=true` plus a separate server-only `EVAVO_ART_WRITE_TOKEN` of at least 32 bytes supplied as a bearer token or `x-evavo-art-write-token`. The local MCP atlas tool requires the write flag and a trusted MCP process connection. Both generate packages but never execute Godot or another binary. Provider secrets belong on workers and are never exposed to the browser or embedded in briefs.
 
 ## Core rules
 
@@ -85,7 +85,7 @@ Later frames may not be unrelated text-only generations. They inherit the approv
 
 Non-zero RGB beneath fully transparent pixels is not automatically a defect. It is accepted only when it behaves like deliberate edge bleed that agrees with nearby approved subject colour; unrelated matte contamination remains blocking.
 
-Atlas generation consumes approved individual frames. It never rotates directional art, never recursively compresses derivatives, retains source dimensions and trim offsets, leaves transparent padding around packed regions, extrudes only the subject edge, and hashes every source and output.
+Atlas generation consumes approved individual frames. It never rotates directional art, never recursively compresses derivatives, retains source dimensions and trim offsets, leaves transparent padding around packed regions, extrudes only the subject edge, and hashes every source and output. Atlas metadata stores manifest-relative source references rather than machine-specific absolute paths.
 
 Godot delivery is two-stage by design: Art Studio deterministically emits the atlas, descriptor and reviewed importer source; a local or authenticated engine worker may then run Godot headlessly to save the native SpriteFrames resource. Hosted API and MCP surfaces do not execute arbitrary binaries.
 
