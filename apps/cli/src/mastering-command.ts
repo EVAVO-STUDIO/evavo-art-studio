@@ -1,0 +1,166 @@
+import { mkdir, readFile } from "node:fs/promises";
+import path from "node:path";
+
+import {
+  atomicWriteFile,
+  extractChromaKeyAlpha,
+  type ChromaKeyExtractionOptions,
+} from "@evavo/art-media";
+import {
+  analyseDecodedSpriteFrame,
+  decodeSpriteFrame,
+} from "@evavo/art-quality";
+
+export interface MasteringCommandValues {
+  readonly input?: string;
+  readonly output?: string;
+  readonly evidence?: string;
+  readonly expectations?: string;
+  readonly matte?: string;
+  readonly "connection-distance"?: string;
+  readonly "opaque-seed-distance"?: string;
+  readonly "edge-search-radius"?: string;
+  readonly "bleed-radius"?: string;
+  readonly "minimum-border-matte-fraction"?: string;
+}
+
+export type MasteringCommandResult =
+  | Readonly<{ handled: false }>
+  | Readonly<{ handled: true; value: unknown; exitCode?: number }>;
+
+function required(value: string | undefined, option: string): string {
+  const normalized = value?.trim();
+  if (!normalized) throw new Error(`${option} is required.`);
+  return normalized;
+}
+
+function optionalNumber(
+  value: string | undefined,
+  option: string,
+): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new Error(`${option} must be a finite number.`);
+  return parsed;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function jsonFile(filePath: string): Promise<unknown> {
+  return JSON.parse(await readFile(path.resolve(filePath), "utf8")) as unknown;
+}
+
+function extractionOptions(
+  values: MasteringCommandValues,
+  matteColour: string,
+): ChromaKeyExtractionOptions {
+  const connectionDistance = optionalNumber(
+    values["connection-distance"],
+    "--connection-distance",
+  );
+  const opaqueSeedDistance = optionalNumber(
+    values["opaque-seed-distance"],
+    "--opaque-seed-distance",
+  );
+  const edgeSearchRadius = optionalNumber(
+    values["edge-search-radius"],
+    "--edge-search-radius",
+  );
+  const bleedRadius = optionalNumber(values["bleed-radius"], "--bleed-radius");
+  const minimumBorderMatteFraction = optionalNumber(
+    values["minimum-border-matte-fraction"],
+    "--minimum-border-matte-fraction",
+  );
+  return {
+    matteColour,
+    ...(connectionDistance === undefined ? {} : { connectionDistance }),
+    ...(opaqueSeedDistance === undefined ? {} : { opaqueSeedDistance }),
+    ...(edgeSearchRadius === undefined ? {} : { edgeSearchRadius }),
+    ...(bleedRadius === undefined ? {} : { bleedRadius }),
+    ...(minimumBorderMatteFraction === undefined
+      ? {}
+      : { minimumBorderMatteFraction }),
+  };
+}
+
+export async function handleMasteringCommand(
+  command: string,
+  values: MasteringCommandValues,
+): Promise<MasteringCommandResult> {
+  if (command !== "master-alpha") return { handled: false };
+  const inputPath = path.resolve(required(values.input, "--input"));
+  const outputPath = path.resolve(required(values.output, "--output"));
+  const matteColour = required(values.matte, "--matte");
+  const evidencePath = path.resolve(
+    values.evidence?.trim() || `${outputPath}.evidence.json`,
+  );
+  const suppliedExpectations = values.expectations
+    ? await jsonFile(values.expectations)
+    : {};
+  if (!isRecord(suppliedExpectations)) {
+    throw new Error("--expectations must contain a JSON object.");
+  }
+
+  const extraction = await extractChromaKeyAlpha(
+    await readFile(inputPath),
+    extractionOptions(values, matteColour),
+  );
+  const decoded = await decodeSpriteFrame(extraction.png);
+  const existingMattes = Array.isArray(suppliedExpectations.knownMatteColours)
+    ? suppliedExpectations.knownMatteColours
+    : [];
+  const quality = analyseDecodedSpriteFrame(decoded, {
+    ...suppliedExpectations,
+    frameId:
+      typeof suppliedExpectations.frameId === "string"
+        ? suppliedExpectations.frameId
+        : path.basename(outputPath),
+    transparency: "alpha-required",
+    expectedWidth:
+      typeof suppliedExpectations.expectedWidth === "number"
+        ? suppliedExpectations.expectedWidth
+        : decoded.width,
+    expectedHeight:
+      typeof suppliedExpectations.expectedHeight === "number"
+        ? suppliedExpectations.expectedHeight
+        : decoded.height,
+    expectedFormat: "png",
+    safePadding:
+      typeof suppliedExpectations.safePadding === "number"
+        ? suppliedExpectations.safePadding
+        : 1,
+    knownMatteColours: [matteColour, ...existingMattes],
+  });
+  const evidence = {
+    schemaVersion: "1.0",
+    command: "master-alpha",
+    inputPath,
+    outputPath,
+    evidencePath,
+    approvalState: "unapproved",
+    promotionEligible: quality.passed,
+    extraction: extraction.evidence,
+    quality,
+  };
+
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await mkdir(path.dirname(evidencePath), { recursive: true });
+  await atomicWriteFile(outputPath, extraction.png);
+  await atomicWriteFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+
+  return {
+    handled: true,
+    value: {
+      schemaVersion: "1.0",
+      outputPath,
+      evidencePath,
+      outputSha256: extraction.evidence.outputSha256,
+      qualityPassed: quality.passed,
+      promotionEligible: quality.passed,
+      approvalState: "unapproved",
+    },
+    ...(quality.passed ? {} : { exitCode: 3 }),
+  };
+}
