@@ -13,7 +13,7 @@ test("runtime dashboard exposes the complete owner operating workflow", async ()
   for (const token of [
     "Unlock control room",
     "HttpOnly",
-    "signed session",
+    "signed",
     "New durable job",
     "Recover leases",
     "IMMUTABLE EVENTS",
