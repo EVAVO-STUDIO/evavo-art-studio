@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
-import { rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { SpriteAtlasPackageWriteResult } from "@evavo/art-media";
+import {
+  atomicWriteFile,
+  type SpriteAtlasPackageWriteResult,
+} from "@evavo/art-media";
 
 import { createGodotSpriteFramesDescriptor } from "./descriptor.js";
 import { GODOT_SPRITE_FRAMES_IMPORTER } from "./importer-script.js";
@@ -15,17 +16,6 @@ import type {
   GodotSpriteFramesWriteOptions,
   GodotSpriteFramesWriteResult,
 } from "./types.js";
-
-async function atomicWrite(target: string, content: string): Promise<void> {
-  const temporary = `${target}.tmp-${randomUUID()}`;
-  try {
-    await writeFile(temporary, content, "utf8");
-    await rename(temporary, target);
-  } catch (error: unknown) {
-    await rm(temporary, { force: true });
-    throw error;
-  }
-}
 
 export async function writeGodotSpriteFramesImporter(
   atlasPackage: SpriteAtlasPackageWriteResult,
@@ -62,8 +52,11 @@ export async function writeGodotSpriteFramesImporter(
     resourcePath,
   );
 
-  await atomicWrite(descriptorPath, `${JSON.stringify(descriptor, null, 2)}\n`);
-  await atomicWrite(importerPath, GODOT_SPRITE_FRAMES_IMPORTER);
+  await atomicWriteFile(
+    descriptorPath,
+    `${JSON.stringify(descriptor, null, 2)}\n`,
+  );
+  await atomicWriteFile(importerPath, GODOT_SPRITE_FRAMES_IMPORTER);
 
   return {
     descriptor,
