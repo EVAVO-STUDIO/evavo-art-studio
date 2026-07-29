@@ -23,14 +23,15 @@ This repository is intentionally broader than an image generator. It is the shar
 - crash-recoverable runtime transactions with idempotency, dependencies, capability claims, leases, heartbeats, retry, pause, cancellation, dead letter and redrive;
 - a capability-scoped local worker that builds atlas and Godot source packages and commits only verified artifact IDs;
 - an optional pg-boss transport adapter that keeps delivery separate from authoritative runtime and artifact evidence;
+- protected owner operations UI with signed HttpOnly sessions, bounded server-side API proxying, secret redaction and durable job controls;
 - safe local repository inspector with Godot project and existing-art detection;
 - JSON-first CLI for validation, planning, repository inspection, sprite QA, engine-ready delivery, runtime control and artifact governance;
 - versioned REST API for planning, QA, authenticated atlas writes and authenticated runtime or artifact operations;
-- Next.js control-plane workspace with an interactive continuity-aware production-plan compiler and browser QA workbenches;
+- Next.js control plane with the continuity-aware production compiler, browser QA workbenches and private operations control room;
 - MCP v2 stdio server exposing planning, repository inspection, sprite QA, atlas delivery, runtime control and artifact governance to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
-- architecture, technology, quality, sprite-continuity, atlas-delivery, durable-runtime and hub-integration decisions;
-- CI validation for type checks, tests and builds.
+- architecture, technology, quality, sprite-continuity, atlas-delivery, durable-runtime, operations and hub-integration decisions;
+- CI validation for `main`, automated `work/**` branches and pull requests.
 
 ## First commands
 
@@ -78,7 +79,31 @@ pnpm dev:mcp
 pnpm dev:worker
 ```
 
-The web workspace starts at `http://localhost:4200`. The standalone API starts on `127.0.0.1:4100` by default and exposes:
+The web workspace starts at `http://localhost:4200`. The private owner control room is at `http://localhost:4200/operations`. The standalone API starts on `127.0.0.1:4100` by default.
+
+## Protected owner operations
+
+Copy `.env.example` to the environment used by the API, web and worker processes, then provide three different random secrets of at least 32 bytes:
+
+```text
+EVAVO_ART_WRITE_TOKEN
+EVAVO_ART_OPERATOR_ACCESS_TOKEN
+EVAVO_ART_OPERATOR_SESSION_SECRET
+```
+
+The owner access token is submitted only to the same-origin Next.js session route and exchanged for an expiring HMAC-signed `HttpOnly`, `SameSite=Strict` cookie. Browser JavaScript never receives the standalone API token. The Next.js gateway accepts only the declared runtime and artifact routes, applies request and response limits, rejects cross-site requests and redirects, and recursively redacts lease tokens or secret-like fields before returning evidence to the browser.
+
+For a local operating stack:
+
+1. Set `EVAVO_ART_ALLOW_WRITES=true` and configure `EVAVO_ART_WRITE_TOKEN` for the standalone API.
+2. Set `EVAVO_ART_API_BASE_URL=http://127.0.0.1:4100` for the web process.
+3. Configure `EVAVO_ART_OPERATOR_ACCESS_TOKEN` and `EVAVO_ART_OPERATOR_SESSION_SECRET` only on the web server.
+4. Start `pnpm dev:api`, `pnpm dev:worker` and `pnpm dev` in separate processes.
+5. Open `/operations`, establish the owner session, submit or inspect work, and keep worker execution outside the web process.
+
+Do not add any operator or provider secret to a `NEXT_PUBLIC_` variable. Production remains fail-closed when either the owner-session boundary or server-side API link is incomplete.
+
+## API surface
 
 - `GET /health`
 - `GET /v1/capabilities`
@@ -95,7 +120,7 @@ The web workspace starts at `http://localhost:4200`. The standalone API starts o
 - `GET /v1/artifacts/:id[/verify]`
 - `GET|POST /v1/artifact-references`
 
-Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. REST atlas, runtime and artifact routes require `EVAVO_ART_ALLOW_WRITES=true` plus a server-only `EVAVO_ART_WRITE_TOKEN` of at least 32 bytes supplied as a bearer token or `x-evavo-art-write-token`. Operational reads are protected because job payloads may contain private repository paths. Local MCP operational tools require the write flag and a trusted MCP process connection. Provider secrets belong on workers and are never exposed to the browser, briefs, runtime payloads or artifact descriptors.
+Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. REST atlas, runtime and artifact routes require `EVAVO_ART_ALLOW_WRITES=true` plus the server-only `EVAVO_ART_WRITE_TOKEN`. Operational reads are protected because job payloads may contain private repository paths. Local MCP operational tools require the write flag and a trusted MCP process connection. Provider secrets belong on workers and are never exposed to the browser, briefs, runtime payloads or artifact descriptors.
 
 ## Core rules
 
@@ -113,4 +138,4 @@ Godot delivery is two-stage by design: Art Studio deterministically emits the at
 
 The runtime journal, artifact hashes and evidence records are authoritative. pg-boss may wake distributed workers, but a queue acknowledgement cannot approve an asset or replace attempt history. Workers commit success only with valid immutable artifact IDs.
 
-See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md` and `docs/hub-integration.md`.
+See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md`, `docs/runtime-operations-dashboard.md` and `docs/hub-integration.md`.
