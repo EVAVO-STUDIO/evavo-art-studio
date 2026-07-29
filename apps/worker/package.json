@@ -1,5 +1,5 @@
 {
-  "name": "@evavo/art-studio-api",
+  "name": "@evavo/art-studio-worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,17 +9,12 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build --silent && node --test test/*.test.mjs",
-    "dev": "node --watch dist/index.js",
     "start": "node dist/index.js"
   },
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",
-    "@evavo/art-contracts": "workspace:*",
-    "@evavo/art-core": "workspace:*",
     "@evavo/art-godot": "workspace:*",
     "@evavo/art-media": "workspace:*",
-    "@evavo/art-quality": "workspace:*",
-    "@evavo/art-repo-inspector": "workspace:*",
     "@evavo/art-runtime": "workspace:*"
   },
   "devDependencies": {

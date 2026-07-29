@@ -1,0 +1,25 @@
+{
+  "mediaType": "image/png",
+  "storageClass": "master",
+  "fileName": "hero-idle-down-frame-001.png",
+  "sourceArtifacts": [],
+  "labels": {
+    "project": "your-game",
+    "assetFamily": "hero-idle",
+    "direction": "down",
+    "frame": "001",
+    "approval": "approved"
+  },
+  "metadata": {
+    "purpose": "canonical lossless source frame",
+    "targetEngine": "godot-4.6.2",
+    "width": 96,
+    "height": 128,
+    "pivot": {
+      "x": 48,
+      "y": 120
+    },
+    "baseline": 120,
+    "transparency": "alpha-required"
+  }
+}

@@ -3,16 +3,13 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "composite": true
+    "composite": true,
+    "types": ["node"]
   },
   "references": [
     { "path": "../../packages/artifacts" },
-    { "path": "../../packages/contracts" },
-    { "path": "../../packages/core" },
-    { "path": "../../packages/quality" },
     { "path": "../../packages/media" },
     { "path": "../../packages/godot" },
-    { "path": "../../packages/repo-inspector" },
     { "path": "../../packages/runtime" }
   ],
   "include": ["src/**/*.ts"]

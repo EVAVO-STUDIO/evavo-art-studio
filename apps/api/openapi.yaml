@@ -1,0 +1,483 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio API
+  version: 0.1.0
+  description: >-
+    Governed planning, repository inspection, deterministic sprite QA, atlas
+    delivery, durable runtime and immutable artifact control for EVAVO Art Studio.
+    Provider output is never accepted as a final asset without the declared
+    production and evidence gates.
+servers:
+  - url: http://127.0.0.1:4100
+    description: Local standalone control plane
+security: []
+tags:
+  - name: System
+  - name: Planning
+  - name: Quality
+  - name: Delivery
+  - name: Runtime
+  - name: Artifacts
+paths:
+  /health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service and configured runtime boundary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /v1/capabilities:
+    get:
+      tags: [System]
+      operationId: listCapabilities
+      responses:
+        "200":
+          description: Declared worker and control capabilities.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schemaVersion, capabilities]
+                properties:
+                  schemaVersion: { const: "1.0" }
+                  capabilities:
+                    type: array
+                    items: { type: object, additionalProperties: true }
+  /v1/plans:
+    post:
+      tags: [Planning]
+      operationId: compileProductionPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "201":
+          description: Deterministic production plan.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/repositories/inspect:
+    post:
+      tags: [Planning]
+      operationId: inspectRepository
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Guarded repository art snapshot.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/quality/sprite-frame:
+    post:
+      tags: [Quality]
+      operationId: inspectSpriteFrame
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageBase64, expectations]
+              properties:
+                imageBase64: { type: string, contentEncoding: base64 }
+                expectations: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Decoded-pixel gate evidence.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/quality/sprite-sequence:
+    post:
+      tags: [Quality]
+      operationId: inspectSpriteSequence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [manifestPath]
+              properties:
+                manifestPath: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Sequence timing, anchor and frame evidence.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/atlases/build:
+    post:
+      tags: [Delivery]
+      operationId: buildSpriteAtlas
+      security: [{ ArtStudioControlToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [manifestPath, outputDirectory]
+              properties:
+                manifestPath: { type: string, minLength: 1 }
+                outputDirectory: { type: string, minLength: 1 }
+                godotProjectPath: { type: string, minLength: 1 }
+      responses:
+        "201":
+          description: Deterministic atlas and optional Godot source package.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/WritesDisabled" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/runtime/jobs:
+    get:
+      tags: [Runtime]
+      operationId: listRuntimeJobs
+      security: [{ ArtStudioControlToken: [] }]
+      parameters:
+        - { name: state, in: query, schema: { type: string }, description: Comma-separated runtime states. }
+        - { name: queue, in: query, schema: { type: string }, description: Comma-separated queues. }
+        - { name: kind, in: query, schema: { type: string }, description: Comma-separated job kinds. }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100000, default: 1000 } }
+      responses:
+        "200":
+          description: Filtered durable jobs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schemaVersion, jobs]
+                properties:
+                  schemaVersion: { const: "1.0" }
+                  jobs:
+                    type: array
+                    items: { $ref: "#/components/schemas/RuntimeJob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Runtime]
+      operationId: submitRuntimeJobs
+      security: [{ ArtStudioControlToken: [] }]
+      parameters:
+        - { name: x-evavo-actor, in: header, schema: { type: string, maxLength: 256 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { $ref: "#/components/schemas/RuntimeSubmission" }
+                - type: array
+                  minItems: 1
+                  maxItems: 10000
+                  items: { $ref: "#/components/schemas/RuntimeSubmission" }
+      responses:
+        "201":
+          description: Existing idempotent job or newly committed atomic batch.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/runtime/jobs/{jobId}:
+    get:
+      tags: [Runtime]
+      operationId: getRuntimeJob
+      security: [{ ArtStudioControlToken: [] }]
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Durable job and attempt evidence.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeJob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/runtime/jobs/{jobId}/cancel:
+    post:
+      tags: [Runtime]
+      operationId: cancelRuntimeJob
+      security: [{ ArtStudioControlToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { force: { type: boolean, default: false } }
+      responses:
+        "200": { $ref: "#/components/responses/RuntimeJob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/runtime/jobs/{jobId}/pause:
+    post:
+      tags: [Runtime]
+      operationId: pauseRuntimeJob
+      security: [{ ArtStudioControlToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { force: { type: boolean, default: false } }
+      responses:
+        "200": { $ref: "#/components/responses/RuntimeJob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/runtime/jobs/{jobId}/resume:
+    post:
+      tags: [Runtime]
+      operationId: resumeRuntimeJob
+      security: [{ ArtStudioControlToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      responses:
+        "200": { $ref: "#/components/responses/RuntimeJob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/runtime/jobs/{jobId}/redrive:
+    post:
+      tags: [Runtime]
+      operationId: redriveRuntimeJob
+      security: [{ ArtStudioControlToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                additionalAttempts: { type: integer, minimum: 1, maximum: 50, default: 1 }
+      responses:
+        "200": { $ref: "#/components/responses/RuntimeJob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/runtime/recover:
+    post:
+      tags: [Runtime]
+      operationId: recoverRuntimeLeases
+      security: [{ ArtStudioControlToken: [] }]
+      responses:
+        "200":
+          description: Recovered expired leases, deadlines and timeouts.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /v1/runtime/events:
+    get:
+      tags: [Runtime]
+      operationId: listRuntimeEvents
+      security: [{ ArtStudioControlToken: [] }]
+      parameters:
+        - { name: after, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Immutable runtime events.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /v1/artifacts/{artifactId}:
+    get:
+      tags: [Artifacts]
+      operationId: getArtifactDescriptor
+      security: [{ ArtStudioControlToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/ArtifactId" }]
+      responses:
+        "200":
+          description: Immutable descriptor without binary object content.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/artifacts/{artifactId}/verify:
+    get:
+      tags: [Artifacts]
+      operationId: verifyArtifact
+      security: [{ ArtStudioControlToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/ArtifactId" }]
+      responses:
+        "200":
+          description: Descriptor and content hash verification.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /v1/artifact-references:
+    get:
+      tags: [Artifacts]
+      operationId: resolveArtifactReference
+      security: [{ ArtStudioControlToken: [] }]
+      parameters:
+        - { name: namespace, in: query, required: true, schema: { type: string } }
+        - { name: name, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Named approved artifact reference or null.
+          content:
+            application/json:
+              schema: { type: [object, "null"], additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Artifacts]
+      operationId: updateArtifactReference
+      security: [{ ArtStudioControlToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace, name, artifactId]
+              properties:
+                namespace: { type: string }
+                name: { type: string }
+                artifactId: { type: string, pattern: "^artifact_[a-f0-9]{64}$" }
+                expectedGeneration: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: Updated compare-and-swap reference.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+components:
+  securitySchemes:
+    ArtStudioControlToken:
+      type: http
+      scheme: bearer
+      bearerFormat: server-only EVAVO_ART_WRITE_TOKEN
+      description: >-
+        Token must be at least 32 bytes. The implementation also accepts the
+        x-evavo-art-write-token header for controlled internal clients.
+  parameters:
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    ArtifactId:
+      name: artifactId
+      in: path
+      required: true
+      schema: { type: string, pattern: "^artifact_[a-f0-9]{64}$" }
+  schemas:
+    Health:
+      type: object
+      required: [status, service, version, writesEnabled, runtimeConfigured, artifactStoreConfigured]
+      properties:
+        status: { const: ok }
+        service: { const: evavo-art-studio-api }
+        version: { type: string }
+        writesEnabled: { type: boolean }
+        runtimeConfigured: { type: boolean }
+        artifactStoreConfigured: { type: boolean }
+    RuntimeSubmission:
+      type: object
+      required: [queue, kind, idempotencyKey, payload]
+      properties:
+        id: { type: string }
+        queue: { type: string, minLength: 1, maxLength: 128 }
+        kind: { type: string, minLength: 1, maxLength: 128 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 256 }
+        payload: true
+        requiredCapabilities:
+          type: array
+          items: { type: string }
+        dependencyJobIds:
+          type: array
+          items: { type: string }
+        inputArtifacts:
+          type: array
+          items: { type: string, pattern: "^artifact_[a-f0-9]{64}$" }
+        priority: { type: integer, minimum: -1000000, maximum: 1000000 }
+        maximumAttempts: { type: integer, minimum: 1, maximum: 100 }
+        leaseDurationMs: { type: integer, minimum: 1000 }
+        timeoutMs: { type: integer, minimum: 1000 }
+        notBefore: { type: string, format: date-time }
+        deadline: { type: string, format: date-time }
+      additionalProperties: true
+    RuntimeJob:
+      type: object
+      required: [schemaVersion, protocolVersion, id, specHash, spec, state, createdAt, updatedAt, attempts, outputArtifacts]
+      properties:
+        schemaVersion: { const: "1.0" }
+        protocolVersion: { type: string }
+        id: { type: string }
+        specHash: { type: string, pattern: "^[a-f0-9]{64}$" }
+        spec: { type: object, additionalProperties: true }
+        state:
+          enum: [waiting, queued, leased, running, retry-wait, paused, succeeded, failed, cancelled, blocked, dead-letter]
+        attempts:
+          type: array
+          items: { type: object, additionalProperties: true }
+        outputArtifacts:
+          type: array
+          items: { type: string, pattern: "^artifact_[a-f0-9]{64}$" }
+      additionalProperties: true
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+          additionalProperties: true
+  responses:
+    RuntimeJob:
+      description: Updated runtime job.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/RuntimeJob" }
+    ValidationError:
+      description: Invalid input or rejected state transition.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid Art Studio control token.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    WritesDisabled:
+      description: File-generating operations are disabled.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Idempotency, reference generation or state conflict.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Requested job or artifact was not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

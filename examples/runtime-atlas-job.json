@@ -1,0 +1,33 @@
+{
+  "queue": "media",
+  "kind": "sprite.atlas.build",
+  "idempotencyKey": "1871-hero-idle-atlas-v1",
+  "payload": {
+    "manifestPath": "C:\\GitRepos\\your-game\\art\\hero-idle.atlas.json",
+    "outputDirectory": "C:\\GitRepos\\your-game\\art\\generated\\hero-idle",
+    "godotProjectPath": "C:\\GitRepos\\your-game"
+  },
+  "requiredCapabilities": [
+    "atlas.pack",
+    "media.raster",
+    "godot.export",
+    "evidence.bundle"
+  ],
+  "dependencyJobIds": [],
+  "inputArtifacts": [],
+  "priority": 100,
+  "maximumAttempts": 3,
+  "retryPolicy": {
+    "baseDelayMs": 5000,
+    "maximumDelayMs": 120000,
+    "multiplier": 2,
+    "jitterFraction": 0.1
+  },
+  "leaseDurationMs": 60000,
+  "timeoutMs": 900000,
+  "labels": {
+    "project": "your-game",
+    "assetFamily": "hero-idle",
+    "target": "godot-4.6.2"
+  }
+}

@@ -19,13 +19,17 @@ This repository is intentionally broader than an image generator. It is the shar
 - executable sequence QA for canvas, frame order, exact duration, pivot, baseline, ground contact and declared linked-cel duplicates;
 - deterministic no-rotation MaxRects atlas production with transparent padding, edge extrusion, alpha-aware trim restoration and content hashes;
 - Godot 4.6.2 SpriteFrames descriptors and headless importers using AtlasTexture regions, trim margins, loop modes and exact relative durations;
+- immutable content-addressed artifact objects, descriptors, lineage, verification and compare-and-swap approved references;
+- crash-recoverable runtime transactions with idempotency, dependencies, capability claims, leases, heartbeats, retry, pause, cancellation, dead letter and redrive;
+- a capability-scoped local worker that builds atlas and Godot source packages and commits only verified artifact IDs;
+- an optional pg-boss transport adapter that keeps delivery separate from authoritative runtime and artifact evidence;
 - safe local repository inspector with Godot project and existing-art detection;
-- JSON-first CLI for validation, planning, repository inspection, sprite QA and engine-ready atlas delivery;
-- versioned REST foundation for capabilities, plans, guarded repository inspection, sprite QA and authenticated fail-closed atlas writes;
+- JSON-first CLI for validation, planning, repository inspection, sprite QA, engine-ready delivery, runtime control and artifact governance;
+- versioned REST API for planning, QA, authenticated atlas writes and authenticated runtime or artifact operations;
 - Next.js control-plane workspace with an interactive continuity-aware production-plan compiler and browser QA workbenches;
-- MCP v2 stdio server exposing planning, repository inspection, sprite QA and explicitly enabled atlas delivery to ChatGPT, Claude and compatible agents;
+- MCP v2 stdio server exposing planning, repository inspection, sprite QA, atlas delivery, runtime control and artifact governance to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
-- architecture, technology, quality, sprite-continuity, atlas-delivery and hub-integration decisions;
+- architecture, technology, quality, sprite-continuity, atlas-delivery, durable-runtime and hub-integration decisions;
 - CI validation for type checks, tests and builds.
 
 ## First commands
@@ -58,9 +62,20 @@ pnpm art -- atlas-build `
   --godot-project C:\GitRepos\your-game `
   --godot-executable "C:\Tools\Godot\Godot_v4.6.2-stable_mono_win64.exe"
 
+# Submit the same atlas work to the durable local runtime:
+pnpm art -- runtime-submit `
+  --input .\jobs\hero-atlas.job.json `
+  --runtime-root .\.art-studio\runtime `
+  --actor greg
+
+pnpm art -- runtime-list --state queued,running,retry-wait
+pnpm worker:until-idle
+pnpm art -- runtime-events --after 0
+
 pnpm dev
 pnpm dev:api
 pnpm dev:mcp
+pnpm dev:worker
 ```
 
 The web workspace starts at `http://localhost:4200`. The standalone API starts on `127.0.0.1:4100` by default and exposes:
@@ -72,8 +87,15 @@ The web workspace starts at `http://localhost:4200`. The standalone API starts o
 - `POST /v1/quality/sprite-frame`
 - `POST /v1/quality/sprite-sequence`
 - `POST /v1/atlases/build`
+- `GET|POST /v1/runtime/jobs`
+- `GET /v1/runtime/jobs/:id`
+- `POST /v1/runtime/jobs/:id/cancel|pause|resume|redrive`
+- `POST /v1/runtime/recover`
+- `GET /v1/runtime/events`
+- `GET /v1/artifacts/:id[/verify]`
+- `GET|POST /v1/artifact-references`
 
-Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. The REST atlas route requires `EVAVO_ART_ALLOW_WRITES=true` plus a separate server-only `EVAVO_ART_WRITE_TOKEN` of at least 32 bytes supplied as a bearer token or `x-evavo-art-write-token`. The local MCP atlas tool requires the write flag and a trusted MCP process connection. Both generate packages but never execute Godot or another binary. Provider secrets belong on workers and are never exposed to the browser or embedded in briefs.
+Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. REST atlas, runtime and artifact routes require `EVAVO_ART_ALLOW_WRITES=true` plus a server-only `EVAVO_ART_WRITE_TOKEN` of at least 32 bytes supplied as a bearer token or `x-evavo-art-write-token`. Operational reads are protected because job payloads may contain private repository paths. Local MCP operational tools require the write flag and a trusted MCP process connection. Provider secrets belong on workers and are never exposed to the browser, briefs, runtime payloads or artifact descriptors.
 
 ## Core rules
 
@@ -89,4 +111,6 @@ Atlas generation consumes approved individual frames. It never rotates direction
 
 Godot delivery is two-stage by design: Art Studio deterministically emits the atlas, descriptor and reviewed importer source; a local or authenticated engine worker may then run Godot headlessly to save the native SpriteFrames resource. Hosted API and MCP surfaces do not execute arbitrary binaries.
 
-See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md` and `docs/hub-integration.md`.
+The runtime journal, artifact hashes and evidence records are authoritative. pg-boss may wake distributed workers, but a queue acknowledgement cannot approve an asset or replace attempt history. Workers commit success only with valid immutable artifact IDs.
+
+See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md` and `docs/hub-integration.md`.
