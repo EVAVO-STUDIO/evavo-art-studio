@@ -17,6 +17,12 @@ function isWithin(base: string, candidate: string): boolean {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+function errorCode(error: unknown): string | undefined {
+  return error && typeof error === "object" && "code" in error
+    ? String((error as NodeJS.ErrnoException).code)
+    : undefined;
+}
+
 export async function resolveAllowedRoots(
   roots: readonly string[],
 ): Promise<readonly string[]> {
@@ -26,7 +32,11 @@ export async function resolveAllowedRoots(
       "At least one allowed root is required for file access.",
     );
   }
-  return [...new Set(await Promise.all(roots.map((root) => realpath(path.resolve(root)))))];
+  return [
+    ...new Set(
+      await Promise.all(roots.map((root) => realpath(path.resolve(root)))),
+    ),
+  ];
 }
 
 export async function resolveInputPath(
@@ -104,12 +114,48 @@ export async function atomicWriteFile(
   targetPath: string,
   content: Uint8Array | string,
 ): Promise<void> {
-  const temporaryPath = `${targetPath}.tmp-${randomUUID()}`;
+  const nonce = randomUUID();
+  const temporaryPath = `${targetPath}.tmp-${nonce}`;
+  const backupPath = `${targetPath}.bak-${nonce}`;
+  let existingMoved = false;
+
   try {
     await writeFile(temporaryPath, content);
-    await rename(temporaryPath, targetPath);
-  } catch (error: unknown) {
+    try {
+      await rename(temporaryPath, targetPath);
+      return;
+    } catch (error: unknown) {
+      if (!["EACCES", "EEXIST", "EPERM"].includes(errorCode(error) ?? "")) {
+        throw error;
+      }
+    }
+
+    try {
+      await rename(targetPath, backupPath);
+      existingMoved = true;
+    } catch (error: unknown) {
+      if (errorCode(error) !== "ENOENT") throw error;
+    }
+
+    try {
+      await rename(temporaryPath, targetPath);
+    } catch (writeError: unknown) {
+      if (existingMoved) {
+        try {
+          await rename(backupPath, targetPath);
+        } catch (restoreError: unknown) {
+          throw new AggregateError(
+            [writeError, restoreError],
+            `Failed to replace and restore ${targetPath}.`,
+          );
+        }
+      }
+      throw writeError;
+    }
+
+    if (existingMoved) await rm(backupPath, { force: true });
+  } finally {
     await rm(temporaryPath, { force: true });
-    throw error;
+    if (!existingMoved) await rm(backupPath, { force: true });
   }
 }
