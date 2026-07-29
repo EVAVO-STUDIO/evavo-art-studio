@@ -3,10 +3,11 @@ info:
   title: EVAVO Art Studio API
   version: 0.1.0
   description: >-
-    Governed planning, repository inspection, deterministic sprite QA, atlas
-    delivery, durable runtime and immutable artifact control for EVAVO Art Studio.
-    Provider output is never accepted as a final asset without the declared
-    production and evidence gates.
+    Governed planning, provider-candidate compilation, repository inspection,
+    deterministic sprite QA, atlas delivery, durable runtime and immutable
+    artifact control for EVAVO Art Studio. Provider output is always an
+    unapproved intermediate candidate until deterministic mastering and every
+    blocking evidence gate pass.
 servers:
   - url: http://127.0.0.1:4100
     description: Local standalone control plane
@@ -14,6 +15,7 @@ security: []
 tags:
   - name: System
   - name: Planning
+  - name: Providers
   - name: Quality
   - name: Delivery
   - name: Runtime
@@ -28,8 +30,7 @@ paths:
           description: Service and configured runtime boundary.
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Health"
+              schema: { $ref: "#/components/schemas/Health" }
   /v1/capabilities:
     get:
       tags: [System]
@@ -82,6 +83,61 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/provider-protocol:
+    get:
+      tags: [Providers]
+      operationId: getProviderCandidateProtocol
+      description: >-
+        Returns supported generation, edit and inpaint operations, continuity
+        phases, reference roles and non-final-output rules. This endpoint never
+        calls an external model.
+      responses:
+        "200":
+          description: Provider-neutral candidate protocol.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderProtocol" }
+  /v1/providers/validate:
+    post:
+      tags: [Providers]
+      operationId: validateProviderCandidateRequest
+      description: >-
+        Validates and normalizes one bounded provider candidate request.
+        Continuity-locked sprites require canonical identity evidence;
+        in-between frames require both neighbouring key poses; inpainting
+        requires a base image and exactly one mask. No model is called.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProviderCandidateRequest" }
+      responses:
+        "200":
+          description: Normalized deterministic provider candidate contract.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderCandidateRequest" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/providers/compile:
+    post:
+      tags: [Providers]
+      operationId: compileProviderCandidateRequest
+      description: >-
+        Compiles the validated request into a deterministic provider-neutral art
+        contract and hashes. Execution mode is durable-worker-only; the API does
+        not hold provider credentials or call a provider.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProviderCandidateRequest" }
+      responses:
+        "200":
+          description: Compiled prompt contract and request evidence.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderCompiledContract" }
         "422": { $ref: "#/components/responses/ValidationError" }
   /v1/quality/sprite-frame:
     post:
@@ -155,10 +211,21 @@ paths:
       operationId: listRuntimeJobs
       security: [{ ArtStudioControlToken: [] }]
       parameters:
-        - { name: state, in: query, schema: { type: string }, description: Comma-separated runtime states. }
-        - { name: queue, in: query, schema: { type: string }, description: Comma-separated queues. }
-        - { name: kind, in: query, schema: { type: string }, description: Comma-separated job kinds. }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100000, default: 1000 } }
+        - name: state
+          in: query
+          schema: { type: string }
+          description: Comma-separated runtime states.
+        - name: queue
+          in: query
+          schema: { type: string }
+          description: Comma-separated queues.
+        - name: kind
+          in: query
+          schema: { type: string }
+          description: Comma-separated job kinds.
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100000, default: 1000 }
       responses:
         "200":
           description: Filtered durable jobs.
@@ -178,7 +245,9 @@ paths:
       operationId: submitRuntimeJobs
       security: [{ ArtStudioControlToken: [] }]
       parameters:
-        - { name: x-evavo-actor, in: header, schema: { type: string, maxLength: 256 } }
+        - name: x-evavo-actor
+          in: header
+          schema: { type: string, maxLength: 256 }
       requestBody:
         required: true
         content:
@@ -291,7 +360,9 @@ paths:
       operationId: listRuntimeEvents
       security: [{ ArtStudioControlToken: [] }]
       parameters:
-        - { name: after, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - name: after
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
       responses:
         "200":
           description: Immutable runtime events.
@@ -332,8 +403,14 @@ paths:
       operationId: resolveArtifactReference
       security: [{ ArtStudioControlToken: [] }]
       parameters:
-        - { name: namespace, in: query, required: true, schema: { type: string } }
-        - { name: name, in: query, required: true, schema: { type: string } }
+        - name: namespace
+          in: query
+          required: true
+          schema: { type: string }
+        - name: name
+          in: query
+          required: true
+          schema: { type: string }
       responses:
         "200":
           description: Named approved artifact reference or null.
@@ -396,6 +473,134 @@ components:
         writesEnabled: { type: boolean }
         runtimeConfigured: { type: boolean }
         artifactStoreConfigured: { type: boolean }
+    ProviderProtocol:
+      type: object
+      required: [schemaVersion, protocolVersion, operations, assetKinds, continuityPhases, referenceRoles, rules]
+      properties:
+        schemaVersion: { const: "1.0" }
+        protocolVersion: { type: string }
+        operations:
+          type: array
+          items: { enum: [generate, edit, inpaint] }
+        assetKinds:
+          type: array
+          items: { enum: [sprite-frame, sprite-layer, environment, effect, ui, illustration, print] }
+        continuityPhases:
+          type: array
+          items: { enum: [identity-master, direction-master, key-pose, in-between, repair, independent] }
+        referenceRoles:
+          type: array
+          items:
+            enum:
+              - canonical-identity
+              - direction-master
+              - previous-key-pose
+              - next-key-pose
+              - base-image
+              - mask
+              - pose-control
+              - edge-control
+              - depth-control
+              - palette-reference
+              - line-reference
+              - material-reference
+              - layer-context
+        rules:
+          type: array
+          items: { type: string }
+    ProviderReference:
+      type: object
+      required: [artifactId, role]
+      properties:
+        artifactId: { type: string, pattern: "^artifact_[a-f0-9]{64}$" }
+        role:
+          enum:
+            - canonical-identity
+            - direction-master
+            - previous-key-pose
+            - next-key-pose
+            - base-image
+            - mask
+            - pose-control
+            - edge-control
+            - depth-control
+            - palette-reference
+            - line-reference
+            - material-reference
+            - layer-context
+        strength: { type: number, minimum: 0, maximum: 2, default: 1 }
+        required: { type: boolean, default: true }
+        note: { type: string, maxLength: 512 }
+      additionalProperties: false
+    ProviderCandidateRequest:
+      type: object
+      required:
+        - schemaVersion
+        - operation
+        - assetKind
+        - continuityPhase
+        - assetId
+        - candidateFamilyId
+        - creativeIntent
+        - style
+        - shot
+        - target
+      properties:
+        schemaVersion: { const: "1.0" }
+        requestId: { type: string, minLength: 1, maxLength: 128 }
+        operation: { enum: [generate, edit, inpaint] }
+        assetKind: { enum: [sprite-frame, sprite-layer, environment, effect, ui, illustration, print] }
+        continuityPhase: { enum: [identity-master, direction-master, key-pose, in-between, repair, independent] }
+        assetId: { type: string, minLength: 1, maxLength: 128 }
+        candidateFamilyId: { type: string, minLength: 1, maxLength: 128 }
+        frameId: { type: string, minLength: 1, maxLength: 128 }
+        layerId: { type: string, minLength: 1, maxLength: 128 }
+        creativeIntent: { type: string, minLength: 1, maxLength: 32000 }
+        negativeIntent: { type: string, minLength: 1, maxLength: 32000 }
+        style: { type: object, additionalProperties: true }
+        shot: { type: object, additionalProperties: true }
+        target:
+          type: object
+          required: [width, height, transparency]
+          properties:
+            width: { type: integer, minimum: 1, maximum: 8192 }
+            height: { type: integer, minimum: 1, maximum: 8192 }
+            transparency: { enum: [required, preferred, opaque] }
+            outputFormat: { enum: [png, webp, jpeg], default: png }
+          additionalProperties: false
+        sourceCanvas:
+          type: object
+          required: [width, height]
+          properties:
+            width: { type: integer, minimum: 1, maximum: 8192 }
+            height: { type: integer, minimum: 1, maximum: 8192 }
+          additionalProperties: false
+        background:
+          type: object
+          properties:
+            strategy: { enum: [native-alpha, chroma-key, opaque-source, provider-auto] }
+            matteColour: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+          additionalProperties: false
+        quality: { enum: [draft, standard, high], default: standard }
+        candidateCount: { type: integer, minimum: 1, maximum: 8, default: 4 }
+        seed: { type: integer, minimum: 0, maximum: 4294967295 }
+        references:
+          type: array
+          maxItems: 16
+          items: { $ref: "#/components/schemas/ProviderReference" }
+        selection: { type: object, additionalProperties: true }
+        metadata: true
+      additionalProperties: false
+    ProviderCompiledContract:
+      type: object
+      required: [schemaVersion, request, requestSha256, compiledPrompt, compiledPromptSha256, executionMode]
+      properties:
+        schemaVersion: { const: "1.0" }
+        request: { $ref: "#/components/schemas/ProviderCandidateRequest" }
+        requestSha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        compiledPrompt: { type: string }
+        compiledPromptSha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        executionMode: { const: durable-worker-only }
     RuntimeSubmission:
       type: object
       required: [queue, kind, idempotencyKey, payload]
@@ -403,7 +608,7 @@ components:
         id: { type: string }
         queue: { type: string, minLength: 1, maxLength: 128 }
         kind: { type: string, minLength: 1, maxLength: 128 }
-        idempotencyKey: { type: string, minLength: 1, maxLength: 256 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 512 }
         payload: true
         requiredCapabilities:
           type: array
@@ -414,10 +619,10 @@ components:
         inputArtifacts:
           type: array
           items: { type: string, pattern: "^artifact_[a-f0-9]{64}$" }
-        priority: { type: integer, minimum: -1000000, maximum: 1000000 }
-        maximumAttempts: { type: integer, minimum: 1, maximum: 100 }
-        leaseDurationMs: { type: integer, minimum: 1000 }
-        timeoutMs: { type: integer, minimum: 1000 }
+        priority: { type: integer, minimum: -1000, maximum: 1000 }
+        maximumAttempts: { type: integer, minimum: 1, maximum: 50 }
+        leaseDurationMs: { type: integer, minimum: 10000, maximum: 3600000 }
+        timeoutMs: { type: integer, minimum: 1000, maximum: 86400000 }
         notBefore: { type: string, format: date-time }
         deadline: { type: string, format: date-time }
       additionalProperties: true

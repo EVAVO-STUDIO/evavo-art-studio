@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { LocalArtifactStore, type ArtifactId, type JsonValue } from "@evavo/art-artifacts";
 import { writeGodotSpriteFramesImporter } from "@evavo/art-godot";
 import { buildSpriteAtlasPackage } from "@evavo/art-media";
+import type { ProviderRegistry } from "@evavo/art-providers";
 import {
   LocalRuntimeRepository,
   PermanentRuntimeError,
@@ -14,6 +15,12 @@ import {
   type RuntimeJobHandler,
   type RuntimeWorkerRunResult,
 } from "@evavo/art-runtime";
+
+import {
+  createProviderHandlers,
+  createProviderRegistryFromEnvironment,
+  providerWorkerCapabilities,
+} from "./provider-handlers.js";
 
 const isRecord = (value: unknown): value is Readonly<Record<string, JsonValue>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -93,6 +100,7 @@ async function ingestFile(
 
 export function createBuiltinHandlers(
   allowedRoots: readonly string[],
+  providerRegistry: ProviderRegistry = createProviderRegistryFromEnvironment({}),
 ): Readonly<Record<string, RuntimeJobHandler>> {
   const atlasBuild: RuntimeJobHandler = async (context) => {
     if (!isRecord(context.job.spec.payload)) {
@@ -185,6 +193,7 @@ export function createBuiltinHandlers(
 
   return Object.freeze({
     "sprite.atlas.build": atlasBuild,
+    ...createProviderHandlers(providerRegistry),
   });
 }
 
@@ -222,7 +231,13 @@ async function main(): Promise<void> {
   const workerId =
     process.env.EVAVO_ART_WORKER_ID?.trim() ||
     `${hostname().replace(/[^A-Za-z0-9._:-]+/g, "-")}:${process.pid}`;
-  const queues = envList("EVAVO_ART_WORKER_QUEUES");
+  const configuredQueues = envList("EVAVO_ART_WORKER_QUEUES");
+  const providerRegistry = createProviderRegistryFromEnvironment();
+  const providerCapabilities = providerWorkerCapabilities(providerRegistry);
+  const defaultQueues = [
+    "media",
+    ...(providerRegistry.list().length ? ["provider"] : []),
+  ];
   const runtime = new LocalRuntimeRepository({ root: runtimeRoot });
   const artifacts = new LocalArtifactStore({ root: artifactRoot });
   const worker = new RuntimeWorker({
@@ -235,10 +250,11 @@ async function main(): Promise<void> {
         "media.raster",
         "godot.export",
         "evidence.bundle",
+        ...providerCapabilities,
       ],
-      queues: queues.length ? queues : ["media"],
+      queues: configuredQueues.length ? configuredQueues : defaultQueues,
     },
-    handlers: createBuiltinHandlers(roots),
+    handlers: createBuiltinHandlers(roots, providerRegistry),
     concurrency,
   });
 
@@ -248,6 +264,12 @@ async function main(): Promise<void> {
         service: "evavo-art-studio-worker",
         workerId,
         command,
+        providerAdapters: providerRegistry.list().map((entry) => ({
+          id: entry.id,
+          version: entry.version,
+          models: entry.models,
+          capabilities: entry.capabilities,
+        })),
         ...result,
       })}\n`,
     );

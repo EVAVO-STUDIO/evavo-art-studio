@@ -12,6 +12,12 @@ import {
 } from "@evavo/art-godot";
 import { buildSpriteAtlasPackage } from "@evavo/art-media";
 import {
+  compileProviderCandidatePrompt,
+  providerProtocolSummary,
+  providerRequestSha256,
+  validateProviderCandidateRequest,
+} from "@evavo/art-providers";
+import {
   analyseDecodedSpriteFrame,
   analyseSpriteSequenceManifestFile,
   decodeSpriteFrame,
@@ -34,6 +40,10 @@ Usage:
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
   evavo-art atlas-build --manifest atlas.json --output-dir generated [--godot-project C:\\GitRepos\\game] [--godot-executable C:\\Path\\Godot_v4.6.2.exe]
 
+  evavo-art provider-protocol [--output provider-protocol.json]
+  evavo-art provider-validate --input candidate-request.json [--output normalized-request.json]
+  evavo-art provider-compile --input candidate-request.json [--output compiled-provider-contract.json]
+
   evavo-art runtime-submit --input job.json [--runtime-root .art-studio/runtime] [--actor cli]
   evavo-art runtime-list [--state queued,running] [--queue media] [--kind sprite.atlas.build] [--limit 100]
   evavo-art runtime-show --job job_id
@@ -51,8 +61,9 @@ Usage:
   evavo-art artifact-ref-resolve --namespace projects/demo --name approved-master
 
 All commands emit JSON so ChatGPT, Claude, CI and scripts can consume the same contract.
+Provider validation and compilation never call an external model. Candidate execution occurs only through a capability-matched durable worker job.
 A quality command exits with code 3 when deterministic blocking gates fail.
-Atlas and durable-runtime writes are explicit, local, root-scoped and never call a provider.
+Atlas and durable-runtime writes are explicit, local and root-scoped.
 `;
 
 async function readJson(filePath: string): Promise<unknown> {
@@ -117,6 +128,37 @@ async function main(): Promise<void> {
   if (command === "capabilities") {
     await emit(
       { schemaVersion: "1.0", capabilities: CAPABILITY_CATALOG },
+      parsed.values.output,
+    );
+    return;
+  }
+
+  if (command === "provider-protocol") {
+    await emit(providerProtocolSummary(), parsed.values.output);
+    return;
+  }
+
+  if (command === "provider-validate" || command === "provider-compile") {
+    if (!parsed.values.input) {
+      throw new Error(`--input is required for ${command}.`);
+    }
+    const request = validateProviderCandidateRequest(
+      await readJson(parsed.values.input),
+    );
+    if (command === "provider-validate") {
+      await emit(request, parsed.values.output);
+      return;
+    }
+    const prompt = compileProviderCandidatePrompt(request);
+    await emit(
+      {
+        schemaVersion: "1.0",
+        request,
+        requestSha256: providerRequestSha256(request),
+        compiledPrompt: prompt.text,
+        compiledPromptSha256: prompt.sha256,
+        executionMode: "durable-worker-only",
+      },
       parsed.values.output,
     );
     return;

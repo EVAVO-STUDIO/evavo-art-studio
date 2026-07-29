@@ -1,0 +1,139 @@
+{
+  "queue": "provider",
+  "kind": "art.candidate.generate",
+  "idempotencyKey": "your-game:hero-idle:down:key-pose:001:v1",
+  "payload": {
+    "schemaVersion": "1.0",
+    "operation": "generate",
+    "assetKind": "sprite-frame",
+    "continuityPhase": "key-pose",
+    "assetId": "hero-idle",
+    "candidateFamilyId": "hero-idle-down",
+    "frameId": "down-001",
+    "creativeIntent": "Author the first readable idle key pose with stable weight, restrained breathing and a clear game-scale silhouette.",
+    "negativeIntent": "Do not redesign the face, coat, handedness, proportions or equipment. Do not add scenery, UI, extra characters, text or unrelated effects.",
+    "style": {
+      "styleName": "Authentic 1990s adventure sprite",
+      "intent": "Deliberate hand-authored pixel clusters, era-authentic value grouping and consistent character construction.",
+      "mustHave": [
+        "stable identity",
+        "clear silhouette",
+        "readable game-scale pose"
+      ],
+      "mustAvoid": [
+        "generic AI rendering",
+        "modern glossy lighting",
+        "invented costume detail"
+      ],
+      "identityLocks": [
+        "same face and hair construction as canonical identity",
+        "same body proportions and height",
+        "same coat, boots and equipment scale",
+        "same handedness"
+      ],
+      "palette": [
+        "locked indexed project palette"
+      ],
+      "lineTreatment": [
+        "consistent one-pixel contour hierarchy"
+      ],
+      "cameraRules": [
+        "fixed down-facing three-quarter game projection"
+      ],
+      "compositionRules": [
+        "feet remain registered to the declared baseline"
+      ]
+    },
+    "shot": {
+      "subject": "The approved hero character only.",
+      "action": "Neutral idle contact pose with restrained breathing.",
+      "direction": "Down-facing three-quarter view.",
+      "include": [
+        "complete character silhouette",
+        "approved coat and boots"
+      ],
+      "exclude": [
+        "background scenery",
+        "UI",
+        "unrelated props",
+        "ambient particles",
+        "readable text"
+      ],
+      "separateAssets": [
+        "cast shadow",
+        "held weapon",
+        "action effect",
+        "collision and normal-map data"
+      ],
+      "framing": [
+        "minimum eight-pixel clear margin at final target scale",
+        "feet aligned to the approved baseline"
+      ]
+    },
+    "target": {
+      "width": 128,
+      "height": 128,
+      "transparency": "required",
+      "outputFormat": "png"
+    },
+    "sourceCanvas": {
+      "width": 1024,
+      "height": 1024
+    },
+    "background": {
+      "strategy": "chroma-key",
+      "matteColour": "#00ff00"
+    },
+    "quality": "high",
+    "candidateCount": 4,
+    "references": [
+      {
+        "artifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "role": "canonical-identity",
+        "strength": 1,
+        "required": true
+      }
+    ],
+    "selection": {
+      "preferredAdapterId": "openai-gpt-image",
+      "preferredModel": "gpt-image-2",
+      "allowedAdapterIds": [
+        "openai-gpt-image"
+      ],
+      "allowFallback": false,
+      "requireSeed": false
+    },
+    "metadata": {
+      "project": "your-game",
+      "animation": "idle",
+      "direction": "down",
+      "frameIndex": 0,
+      "approvalRequired": true
+    }
+  },
+  "requiredCapabilities": [
+    "provider.generate",
+    "provider.reference-lock",
+    "provider.candidate-store",
+    "evidence.bundle"
+  ],
+  "inputArtifacts": [
+    "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  ],
+  "priority": 10,
+  "maximumAttempts": 3,
+  "retryPolicy": {
+    "baseDelayMs": 15000,
+    "maximumDelayMs": 300000,
+    "multiplier": 2,
+    "jitterFraction": 0.15
+  },
+  "leaseDurationMs": 300000,
+  "timeoutMs": 1800000,
+  "labels": {
+    "project": "your-game",
+    "assetFamily": "hero-idle-down",
+    "continuityPhase": "key-pose",
+    "target": "godot-4.6.2"
+  }
+}

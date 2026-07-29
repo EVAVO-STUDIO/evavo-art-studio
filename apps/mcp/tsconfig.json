@@ -13,6 +13,7 @@
     { "path": "../../packages/quality" },
     { "path": "../../packages/media" },
     { "path": "../../packages/godot" },
+    { "path": "../../packages/providers" },
     { "path": "../../packages/repo-inspector" },
     { "path": "../../packages/runtime" }
   ],

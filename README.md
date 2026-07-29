@@ -14,6 +14,11 @@ This repository is intentionally broader than an image generator. It is the shar
 - per-layer bake, linked-cel, separate-frame, rigged-part, guide and engine-sidecar decisions;
 - exact Aseprite millisecond and Godot relative-duration timing;
 - individual lossless frames, editable source, layer manifests and packed derivatives;
+- provider-neutral generation, edit and inpaint contracts with immutable role-specific references;
+- deterministic provider prompt compilation for identity, style, shot, layer, target and alpha boundaries;
+- capability-matched provider selection with explicit allow-lists, bounded fallback and cancellation;
+- an OpenAI GPT Image 2 adapter using ordered references and masks, with chroma-key extraction required for transparent targets;
+- unapproved provider candidates stored as immutable intermediate artifacts with complete attempt and provenance evidence;
 - blocking identity, proportion, crop, layer-registration, occlusion and source-parity gates;
 - executable decoded-pixel QA for alpha, fake checkerboards, flat mattes, edge halos, hidden transparent colour and safe bounds;
 - executable sequence QA for canvas, frame order, exact duration, pivot, baseline, ground contact and declared linked-cel duplicates;
@@ -21,16 +26,16 @@ This repository is intentionally broader than an image generator. It is the shar
 - Godot 4.6.2 SpriteFrames descriptors and headless importers using AtlasTexture regions, trim margins, loop modes and exact relative durations;
 - immutable content-addressed artifact objects, descriptors, lineage, verification and compare-and-swap approved references;
 - crash-recoverable runtime transactions with idempotency, dependencies, capability claims, leases, heartbeats, retry, pause, cancellation, dead letter and redrive;
-- a capability-scoped local worker that builds atlas and Godot source packages and commits only verified artifact IDs;
+- a capability-scoped local worker that executes provider candidates and atlas or Godot source packages while committing only verified artifact IDs;
 - an optional pg-boss transport adapter that keeps delivery separate from authoritative runtime and artifact evidence;
 - protected owner operations UI with signed HttpOnly sessions, bounded server-side API proxying, secret redaction and durable job controls;
 - safe local repository inspector with Godot project and existing-art detection;
-- JSON-first CLI for validation, planning, repository inspection, sprite QA, engine-ready delivery, runtime control and artifact governance;
-- versioned REST API for planning, QA, authenticated atlas writes and authenticated runtime or artifact operations;
+- JSON-first CLI for planning, provider compilation, repository inspection, sprite QA, engine delivery, runtime control and artifact governance;
+- versioned REST API for planning, provider contracts, QA, authenticated atlas writes and authenticated runtime or artifact operations;
 - Next.js control plane with the continuity-aware production compiler, browser QA workbenches and private operations control room;
-- MCP v2 stdio server exposing planning, repository inspection, sprite QA, atlas delivery, runtime control and artifact governance to ChatGPT, Claude and compatible agents;
+- MCP v2 stdio server exposing planning, provider compilation, repository inspection, sprite QA, atlas delivery, runtime control and artifact governance to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
-- architecture, technology, quality, sprite-continuity, atlas-delivery, durable-runtime, operations and hub-integration decisions;
+- architecture, technology, quality, sprite-continuity, provider, atlas-delivery, durable-runtime, operations and hub-integration decisions;
 - CI validation for `main`, automated `work/**` branches and pull requests.
 
 ## First commands
@@ -41,6 +46,15 @@ pnpm check
 pnpm art -- validate --input examples/game-art-brief.json
 pnpm art -- plan --input examples/game-art-brief.json --output art-plan.json
 pnpm art -- inspect --repo C:\GitRepos\your-game --output repo-art-snapshot.json
+
+# Validate and compile a provider-neutral candidate without calling a model:
+pnpm art -- provider-protocol
+pnpm art -- provider-validate `
+  --input .\examples\provider-candidate-request.json `
+  --output .\provider-request.normalized.json
+pnpm art -- provider-compile `
+  --input .\examples\provider-candidate-request.json `
+  --output .\provider-request.compiled.json
 
 pnpm art -- quality-frame `
   --input .\source\hero\frames\down\frame-001.png `
@@ -63,9 +77,9 @@ pnpm art -- atlas-build `
   --godot-project C:\GitRepos\your-game `
   --godot-executable "C:\Tools\Godot\Godot_v4.6.2-stable_mono_win64.exe"
 
-# Submit the same atlas work to the durable local runtime:
+# Submit provider or atlas work to the durable local runtime:
 pnpm art -- runtime-submit `
-  --input .\jobs\hero-atlas.job.json `
+  --input .\examples\runtime-provider-job.json `
   --runtime-root .\.art-studio\runtime `
   --actor greg
 
@@ -80,6 +94,26 @@ pnpm dev:worker
 ```
 
 The web workspace starts at `http://localhost:4200`. The private owner control room is at `http://localhost:4200/operations`. The standalone API starts on `127.0.0.1:4100` by default.
+
+## Provider candidate execution
+
+CLI, REST and MCP can validate and compile the same provider-neutral contract, but they do not call an image model. Execution occurs only after a durable job reaches a worker with the required provider capability.
+
+For real GPT Image 2 candidate work, configure the worker process only:
+
+```text
+OPENAI_API_KEY=<server-only key>
+EVAVO_ART_OPENAI_IMAGE_MODEL=gpt-image-2
+EVAVO_ART_OPENAI_IMAGE_MODELS=gpt-image-2,gpt-image-2-2026-04-21
+EVAVO_ART_OPENAI_BASE_URL=https://api.openai.com/v1
+EVAVO_ART_WORKER_QUEUES=
+```
+
+Leaving `EVAVO_ART_WORKER_QUEUES` empty lets the worker add `provider` automatically when a provider adapter is configured. The deterministic fixture provider remains disabled unless `EVAVO_ART_ENABLE_FIXTURE_PROVIDER=true` is explicitly set for tests.
+
+A provider response is stored as an unapproved `intermediate`, never as a final master. Identity-locked sprite work requires a canonical identity artifact. In-between frames also require the approved previous and next key poses. Inpaint work requires an approved base image and exactly one mask.
+
+GPT Image 2 does not currently support transparent backgrounds, so transparency-required requests use a declared flat chroma matte, followed by deterministic alpha extraction, edge cleanup and hostile-matte QA. The chroma candidate is not the final transparent sprite.
 
 ## Protected owner operations
 
@@ -98,8 +132,9 @@ For a local operating stack:
 1. Set `EVAVO_ART_ALLOW_WRITES=true` and configure `EVAVO_ART_WRITE_TOKEN` for the standalone API.
 2. Set `EVAVO_ART_API_BASE_URL=http://127.0.0.1:4100` for the web process.
 3. Configure `EVAVO_ART_OPERATOR_ACCESS_TOKEN` and `EVAVO_ART_OPERATOR_SESSION_SECRET` only on the web server.
-4. Start `pnpm dev:api`, `pnpm dev:worker` and `pnpm dev` in separate processes.
-5. Open `/operations`, establish the owner session, submit or inspect work, and keep worker execution outside the web process.
+4. Configure provider credentials only on the worker process.
+5. Start `pnpm dev:api`, `pnpm dev:worker` and `pnpm dev` in separate processes.
+6. Open `/operations`, establish the owner session, submit or inspect work, and keep worker execution outside the web process.
 
 Do not add any operator or provider secret to a `NEXT_PUBLIC_` variable. Production remains fail-closed when either the owner-session boundary or server-side API link is incomplete.
 
@@ -109,6 +144,9 @@ Do not add any operator or provider secret to a `NEXT_PUBLIC_` variable. Product
 - `GET /v1/capabilities`
 - `POST /v1/plans`
 - `POST /v1/repositories/inspect`
+- `GET /v1/provider-protocol`
+- `POST /v1/providers/validate`
+- `POST /v1/providers/compile`
 - `POST /v1/quality/sprite-frame`
 - `POST /v1/quality/sprite-sequence`
 - `POST /v1/atlases/build`
@@ -120,11 +158,13 @@ Do not add any operator or provider secret to a `NEXT_PUBLIC_` variable. Product
 - `GET /v1/artifacts/:id[/verify]`
 - `GET|POST /v1/artifact-references`
 
-Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. REST atlas, runtime and artifact routes require `EVAVO_ART_ALLOW_WRITES=true` plus the server-only `EVAVO_ART_WRITE_TOKEN`. Operational reads are protected because job payloads may contain private repository paths. Local MCP operational tools require the write flag and a trusted MCP process connection. Provider secrets belong on workers and are never exposed to the browser, briefs, runtime payloads or artifact descriptors.
+Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. REST atlas, runtime and artifact routes require `EVAVO_ART_ALLOW_WRITES=true` plus the server-only `EVAVO_ART_WRITE_TOKEN`. Operational reads are protected because job payloads may contain private repository paths. Provider protocol routes are deterministic and do not hold or use provider credentials. Local MCP operational tools require the write flag and a trusted MCP process connection.
 
 ## Core rules
 
 A provider response is never a final asset. Every final asset must pass the declared production stages, deterministic mastering, blocking quality gates, metadata generation and evidence bundling.
+
+A provider receives one bounded frame or layer contract. It does not receive authority to create a whole sprite sheet, merge separate runtime layers, invent unrelated props or redesign an approved identity.
 
 A sprite sheet is never the sole source. The source package retains canonical and direction masters, individual lossless frames, exact timing, registered layers, editable cels, pivots, manifests and reproducibility evidence.
 
@@ -138,4 +178,4 @@ Godot delivery is two-stage by design: Art Studio deterministically emits the at
 
 The runtime journal, artifact hashes and evidence records are authoritative. pg-boss may wake distributed workers, but a queue acknowledgement cannot approve an asset or replace attempt history. Workers commit success only with valid immutable artifact IDs.
 
-See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md`, `docs/runtime-operations-dashboard.md` and `docs/hub-integration.md`.
+See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/governed-provider-candidates.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md`, `docs/runtime-operations-dashboard.md` and `docs/hub-integration.md`.
