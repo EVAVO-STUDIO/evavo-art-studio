@@ -14,6 +14,7 @@ import {
   type RuntimeFailureInput,
   type RuntimeHandlerContext,
   type RuntimeHandlerResult,
+  type RuntimeHeartbeatResult,
   type RuntimeWorkerOptions,
   type RuntimeWorkerRunResult,
 } from "./types.js";
@@ -172,7 +173,9 @@ export class RuntimeWorker {
     );
   }
 
-  async #execute(claimed: RuntimeClaimedJob): Promise<"succeeded" | "failed" | "cancelled" | "paused"> {
+  async #execute(
+    claimed: RuntimeClaimedJob,
+  ): Promise<"succeeded" | "failed" | "cancelled" | "paused"> {
     const runtime = this.#options.runtime;
     const workerId = this.#options.worker.id;
     const leaseToken = claimed.lease.token;
@@ -190,7 +193,7 @@ export class RuntimeWorker {
       ),
     );
 
-    const heartbeat = async (): Promise<void> => {
+    const heartbeat = async (): Promise<RuntimeHeartbeatResult> => {
       const result = await runtime.heartbeat(
         current.id,
         leaseToken,
@@ -199,16 +202,21 @@ export class RuntimeWorker {
       current = result.job;
       if (result.cancellationRequested) {
         control = "cancel";
-        controller.abort(abortError("Cancellation requested.", "RUNTIME_JOB_CANCELLED"));
+        controller.abort(
+          abortError("Cancellation requested.", "RUNTIME_JOB_CANCELLED"),
+        );
       } else if (result.pauseRequested) {
         control = "pause";
         controller.abort(abortError("Pause requested.", "RUNTIME_JOB_PAUSED"));
       }
+      return result;
     };
 
     const interval = setInterval(() => {
       heartbeatChain = heartbeatChain
-        .then(heartbeat)
+        .then(async () => {
+          await heartbeat();
+        })
         .catch((error: unknown) => {
           heartbeatError = error;
           controller.abort(error);
@@ -241,18 +249,19 @@ export class RuntimeWorker {
         job: current,
         signal: controller.signal,
         artifacts: this.#options.artifacts,
-        heartbeat: async () => {
-          await heartbeat();
-          return runtime.heartbeat(current.id, leaseToken, workerId);
-        },
+        heartbeat,
         cancellationRequested: () => runtime.cancellationRequested(current.id),
         putArtifact: (content, descriptor) =>
-          this.#options.artifacts.put(content, mergedDescriptor(claimed, descriptor)),
+          this.#options.artifacts.put(
+            content,
+            mergedDescriptor(claimed, descriptor),
+          ),
       };
       const handlerResult = await Promise.race([
         handler(context),
         executionTimeout,
       ]);
+      clearInterval(interval);
       await heartbeatChain;
       if (heartbeatError) throw heartbeatError;
       if (control === "cancel") {
@@ -285,18 +294,25 @@ export class RuntimeWorker {
       if (completed.state === "paused") return "paused";
       return "succeeded";
     } catch (error: unknown) {
+      clearInterval(interval);
       await heartbeatChain.catch(() => undefined);
       if (control === "cancel") {
-        await runtime.cancel(current.id, workerId, { force: true }).catch(() => undefined);
+        await runtime
+          .cancel(current.id, workerId, { force: true })
+          .catch(() => undefined);
         return "cancelled";
       }
       if (control === "pause") {
-        await runtime.pause(current.id, workerId, { force: true }).catch(() => undefined);
+        await runtime
+          .pause(current.id, workerId, { force: true })
+          .catch(() => undefined);
         return "paused";
       }
       const failure = failureFor(heartbeatError ?? error);
       if (failure.classification === "cancelled") {
-        await runtime.cancel(current.id, workerId, { force: true }).catch(() => undefined);
+        await runtime
+          .cancel(current.id, workerId, { force: true })
+          .catch(() => undefined);
         return "cancelled";
       }
       await runtime
@@ -346,7 +362,7 @@ export class RuntimeWorker {
       60_000,
       "idleDelayMs",
     );
-    const total: RuntimeWorkerRunResult = {
+    const total = {
       claimed: 0,
       succeeded: 0,
       failed: 0,
