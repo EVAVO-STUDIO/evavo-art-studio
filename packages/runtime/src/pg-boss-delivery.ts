@@ -65,6 +65,14 @@ function positiveInteger(
   return result;
 }
 
+function createClient(connection: string | ConstructorOptions): PgBossDeliveryClient {
+  const boss =
+    typeof connection === "string"
+      ? new PgBoss(connection)
+      : new PgBoss(connection);
+  return boss as unknown as PgBossDeliveryClient;
+}
+
 export class PgBossRuntimeDelivery implements RuntimeDeliveryAdapter {
   readonly #client: PgBossDeliveryClient;
   readonly #prefix: string;
@@ -82,9 +90,7 @@ export class PgBossRuntimeDelivery implements RuntimeDeliveryAdapter {
         "A pg-boss connection or client is required.",
       );
     }
-    this.#client =
-      options.client ??
-      (new PgBoss(options.connection!) as unknown as PgBossDeliveryClient);
+    this.#client = options.client ?? createClient(options.connection!);
     this.#prefix = safeRuntimeName(
       options.queuePrefix ?? "evavo-art",
       "queuePrefix",
