@@ -54,7 +54,10 @@ test("runtime API denies operational reads without the control token", async () 
     async (base) => {
       const response = await fetch(`${base}/v1/runtime/jobs`);
       assert.equal(response.status, 401);
-      assert.equal((await response.json()).error.code, "ART_STUDIO_RUNTIME_UNAUTHORIZED");
+      assert.equal(
+        (await response.json()).error.code,
+        "ART_STUDIO_RUNTIME_UNAUTHORIZED",
+      );
     },
   );
 });
@@ -85,8 +88,9 @@ test("runtime API submits, queries and controls durable jobs", async () => {
           timeoutMs: 900000,
         }),
       });
-      assert.equal(submittedResponse.status, 201, await submittedResponse.text());
-      const submitted = (await submittedResponse.json()).jobs;
+      const submittedText = await submittedResponse.text();
+      assert.equal(submittedResponse.status, 201, submittedText);
+      const submitted = JSON.parse(submittedText).jobs;
       assert.equal(submitted.state, "queued");
 
       const listResponse = await fetch(
