@@ -14,7 +14,14 @@
         "powerOfTwo": "preferred",
         "textureFiltering": "nearest",
         "compressionPolicy": "lossless",
-        "notes": ["Preserve pixel edges", "Generate SpriteFrames and atlas metadata"]
+        "notes": [
+          "Preserve pixel edges",
+          "Generate exact-duration SpriteFrames and atlas metadata"
+        ]
+      },
+      {
+        "kind": "source-master",
+        "compressionPolicy": "lossless"
       }
     ]
   },
@@ -26,7 +33,7 @@
       "period-correct clothing and equipment",
       "controlled hatching, stipple and dither",
       "front-on or side-stage composition",
-      "shared geometry across animation frames"
+      "shared identity, geometry and material logic across animation frames"
     ],
     "mustAvoid": [
       "fake transparency checkerboards",
@@ -34,43 +41,278 @@
       "photorealistic rendering",
       "glossy generic AI lighting",
       "random detail drift between frames",
-      "cropped limbs or weapons"
+      "cropped limbs, weapons, shadows or effects"
     ],
     "palette": {
-      "colours": ["#000000", "#ffffff", "#ff244e"],
+      "colours": [
+        "#000000",
+        "#ffffff",
+        "#ff244e"
+      ],
       "maxColours": 16,
       "colourSpace": "srgb"
     },
     "era": "1871",
-    "cameraRules": ["fixed front-on or side-stage", "clear horizontal floor lane", "no isometric camera"],
+    "cameraRules": [
+      "fixed front-on or side-stage",
+      "clear horizontal floor lane",
+      "no isometric camera"
+    ],
     "lineTreatment": "DOS-era engraved linework with purposeful one-pixel clusters",
-    "materialLanguage": ["weathered timber", "iron", "canvas", "wool", "leather"]
+    "materialLanguage": [
+      "weathered timber",
+      "iron",
+      "canvas",
+      "wool",
+      "leather"
+    ]
   },
   "assets": [
     {
       "id": "deckhand-idle",
       "name": "Deckhand idle animation",
       "kind": "sprite-sheet",
-      "purpose": "In-world crew character idle loop",
+      "purpose": "Canonical in-world crew identity and idle loop",
       "quantity": 4,
-      "dimensions": { "width": 96, "height": 128 },
+      "dimensions": {
+        "width": 96,
+        "height": 128
+      },
       "transparency": "alpha-required",
       "animation": {
         "name": "idle",
         "frameCount": 8,
         "framesPerSecond": 8,
         "loop": true,
+        "loopMode": "linear",
         "directions": 4,
-        "pivot": { "x": 48, "y": 120 },
-        "baseline": 120
+        "directionNames": [
+          "down",
+          "left",
+          "right",
+          "up"
+        ],
+        "frameDurationsMs": [
+          150,
+          100,
+          100,
+          100,
+          150,
+          100,
+          100,
+          100
+        ],
+        "keyPoseFrames": [
+          0,
+          2,
+          4,
+          6
+        ],
+        "frameOrder": "direction-major",
+        "pivot": {
+          "x": 48,
+          "y": 120
+        },
+        "baseline": 120,
+        "motionNotes": [
+          "keep both feet registered to the deck baseline",
+          "animate breathing and coat movement without redesigning the body"
+        ]
+      },
+      "sprite": {
+        "productionMethod": "hybrid",
+        "layers": [
+          {
+            "id": "body",
+            "role": "body",
+            "treatment": "baked-into-cel",
+            "zIndex": 10,
+            "reason": "Anatomy, clothing folds and engraved pixel clusters need authored cel continuity without puppet seams."
+          },
+          {
+            "id": "shadow",
+            "role": "shadow",
+            "treatment": "linked-cel",
+            "zIndex": 0,
+            "framePolicy": "linked-until-change",
+            "exportPolicy": "layer-frames",
+            "allowEmpty": true,
+            "reason": "The deck contact shadow is reusable and needs independent opacity and ground registration."
+          },
+          {
+            "id": "held-item",
+            "role": "held-item",
+            "treatment": "separate-frame",
+            "parentId": "body",
+            "zIndex": 20,
+            "framePolicy": "every-frame",
+            "exportPolicy": "layer-frames",
+            "interchangeable": true,
+            "allowEmpty": true,
+            "reason": "Tools and carried equipment are gameplay variants and must preserve registered hand attachment points."
+          }
+        ],
+        "shot": {
+          "include": [
+            "the complete deckhand silhouette and declared clothing",
+            "the complete held item when enabled",
+            "the deck contact shadow inside the safe bounds"
+          ],
+          "exclude": [
+            "ship scenery and decorative backgrounds",
+            "checkerboards, chroma mattes and labels",
+            "unrelated characters, particles and props",
+            "collision, normal and guide data in visible colour"
+          ],
+          "safePadding": 6,
+          "backgroundPolicy": "transparent",
+          "allowCrop": false,
+          "shadowPolicy": "separate"
+        },
+        "continuityLocks": [
+          "identity",
+          "proportions",
+          "silhouette-language",
+          "palette",
+          "line-treatment",
+          "camera",
+          "pivot",
+          "baseline",
+          "ground-contact",
+          "equipment",
+          "handedness",
+          "materials"
+        ],
+        "allowedChanges": [
+          "declared idle pose movement",
+          "coat and hair secondary motion",
+          "approved held-item visibility"
+        ],
+        "generation": {
+          "identityReferenceWeight": 0.94,
+          "structureReferenceWeight": 0.9,
+          "previousFrameWeight": 0.75,
+          "nextFrameWeight": 0.75,
+          "seedPolicy": "family-derived",
+          "requestUnit": "single-frame",
+          "allowIndependentTextOnlyFrames": false,
+          "structuralControls": [
+            "pose-map",
+            "silhouette-mask",
+            "edge-map"
+          ]
+        },
+        "source": {
+          "editableSource": "aseprite",
+          "retainIndividualFrames": true,
+          "retainLayerFrames": true,
+          "retainPackedDerivative": true,
+          "retainLinkedCels": true
+        }
       },
       "outputs": [
-        { "format": "png", "purpose": "runtime", "lossless": true, "colourSpace": "srgb" },
-        { "format": "json", "purpose": "manifest", "lossless": true },
-        { "format": "png", "purpose": "preview", "lossless": true, "colourSpace": "srgb" }
+        {
+          "format": "png",
+          "purpose": "runtime",
+          "lossless": true,
+          "colourSpace": "srgb"
+        },
+        {
+          "format": "json",
+          "purpose": "manifest",
+          "lossless": true
+        },
+        {
+          "format": "png",
+          "purpose": "preview",
+          "lossless": true,
+          "colourSpace": "srgb"
+        }
       ],
       "namingPrefix": "crew_deckhand_idle",
-      "tags": ["crew", "character", "idle", "historical"]
+      "tags": [
+        "crew",
+        "character",
+        "idle",
+        "historical",
+        "pixel-art"
+      ]
+    },
+    {
+      "id": "deckhand-walk",
+      "name": "Deckhand walk animation",
+      "kind": "sprite-sheet",
+      "purpose": "Walk cycle inherited from each approved deckhand identity",
+      "quantity": 4,
+      "dimensions": {
+        "width": 96,
+        "height": 128
+      },
+      "transparency": "alpha-required",
+      "animation": {
+        "name": "walk",
+        "frameCount": 8,
+        "framesPerSecond": 10,
+        "loop": true,
+        "loopMode": "linear",
+        "directions": 4,
+        "directionNames": [
+          "down",
+          "left",
+          "right",
+          "up"
+        ],
+        "keyPoseFrames": [
+          0,
+          2,
+          4,
+          6
+        ],
+        "frameOrder": "direction-major",
+        "pivot": {
+          "x": 48,
+          "y": 120
+        },
+        "baseline": 120
+      },
+      "sprite": {
+        "canonicalAssetId": "deckhand-idle",
+        "canonicalInstancePolicy": "index-matched",
+        "productionMethod": "authored-cel",
+        "allowedChanges": [
+          "walk pose and weight transfer",
+          "coat and hair secondary motion",
+          "declared held-item visibility and occlusion"
+        ],
+        "source": {
+          "editableSource": "aseprite",
+          "retainIndividualFrames": true,
+          "retainLayerFrames": false,
+          "retainPackedDerivative": true,
+          "retainLinkedCels": true
+        }
+      },
+      "outputs": [
+        {
+          "format": "png",
+          "purpose": "runtime",
+          "lossless": true,
+          "colourSpace": "srgb"
+        },
+        {
+          "format": "json",
+          "purpose": "manifest",
+          "lossless": true
+        }
+      ],
+      "namingPrefix": "crew_deckhand_walk",
+      "tags": [
+        "crew",
+        "character",
+        "walk",
+        "historical",
+        "pixel-art"
+      ]
     },
     {
       "id": "rain-particle",
@@ -78,18 +320,60 @@
       "kind": "particle",
       "purpose": "Godot GPUParticles2D rain texture and flipbook",
       "quantity": 1,
-      "dimensions": { "width": 64, "height": 64 },
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
       "transparency": "alpha-required",
       "animation": {
         "name": "rain_streak",
         "frameCount": 12,
         "framesPerSecond": 24,
         "loop": true,
-        "pivot": { "x": 32, "y": 32 }
+        "loopMode": "linear",
+        "keyPoseFrames": [
+          0,
+          3,
+          6,
+          9
+        ],
+        "pivot": {
+          "x": 32,
+          "y": 32
+        }
+      },
+      "sprite": {
+        "productionMethod": "authored-cel",
+        "shot": {
+          "safePadding": 2,
+          "backgroundPolicy": "transparent",
+          "allowCrop": false,
+          "shadowPolicy": "none"
+        },
+        "continuityLocks": [
+          "silhouette-language",
+          "palette",
+          "line-treatment",
+          "pivot"
+        ],
+        "allowedChanges": [
+          "streak length",
+          "droplet breakup",
+          "declared particle deformation"
+        ]
       },
       "outputs": [
-        { "format": "png", "purpose": "runtime", "lossless": true, "colourSpace": "srgb" },
-        { "format": "json", "purpose": "manifest", "lossless": true }
+        {
+          "format": "png",
+          "purpose": "runtime",
+          "lossless": true,
+          "colourSpace": "srgb"
+        },
+        {
+          "format": "json",
+          "purpose": "manifest",
+          "lossless": true
+        }
       ]
     }
   ],

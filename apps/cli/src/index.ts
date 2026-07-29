@@ -14,7 +14,7 @@ Usage:
   evavo-art plan --input brief.json [--output plan.json]
   evavo-art inspect --repo C:\\GitRepos\\my-game [--output snapshot.json]
 
-All commands emit JSON so ChatGPT, Claude, CI and scripts can consume the same contract.
+All commands emit JSON so ChatGPT, Claude, CI and scripts can consume the same continuity-aware contract.
 `;
 
 async function readJson(path: string): Promise<unknown> {

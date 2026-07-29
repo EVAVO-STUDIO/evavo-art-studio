@@ -1,15 +1,18 @@
 import type { CapabilityDefinition } from "@evavo/art-contracts";
 
 export const CAPABILITY_CATALOG: readonly CapabilityDefinition[] = Object.freeze([
-  { id: "brief.validate", label: "Brief validation", description: "Validate art direction, targets, assets and autonomy policy before any work begins.", deterministic: true, workerClass: "control" },
+  { id: "brief.validate", label: "Brief validation", description: "Validate art direction, targets, assets, sprite continuity and autonomy policy before any work begins.", deterministic: true, workerClass: "control" },
   { id: "repo.inspect", label: "Repository inspection", description: "Inventory a project repository and infer engine, art files, delivery constraints and likely asset gaps.", deterministic: true, workerClass: "control" },
   { id: "plan.compile", label: "Production planning", description: "Compile a deterministic work-order graph, quality gates, deliverables and dependency chain.", deterministic: true, workerClass: "control" },
-  { id: "provider.generate", label: "Provider-neutral generation", description: "Generate candidates through a capability-matched model adapter without binding the core to one provider.", deterministic: false, workerClass: "provider" },
+  { id: "sprite.plan", label: "Sprite continuity planning", description: "Compile canonical identity, direction masters, key poses, frame conditioning, layer treatment, source retention and repair scopes before provider work.", deterministic: true, workerClass: "control" },
+  { id: "provider.generate", label: "Provider-neutral generation", description: "Generate one bounded frame or layer candidate through a capability-matched adapter without allowing the provider to define the production contract.", deterministic: false, workerClass: "provider" },
   { id: "media.raster", label: "Raster mastering", description: "Resize, composite, crop, colour-convert and encode raster masters and delivery variants.", deterministic: true, workerClass: "media" },
-  { id: "media.animation", label: "Animation mastering", description: "Assemble, time, inspect and encode frame sequences, sprite animations and cinematics.", deterministic: true, workerClass: "media" },
+  { id: "media.animation", label: "Animation mastering", description: "Assemble, time, inspect and encode individual frames, layers, sprite animations and cinematics.", deterministic: true, workerClass: "media" },
+  { id: "source.package", label: "Editable source packaging", description: "Retain editable layers, cels, tags, frame durations, slices, pivots, individual frames and packed derivatives as one verifiable source package.", deterministic: true, workerClass: "media" },
   { id: "vision.alpha", label: "Transparency verification", description: "Verify real alpha, reject checkerboard or fake transparency, decontaminate edges and test multiple mattes.", deterministic: true, workerClass: "vision" },
-  { id: "vision.consistency", label: "Visual consistency", description: "Compare silhouettes, palettes, anchors, frame motion and reference adherence across an asset family.", deterministic: true, workerClass: "vision" },
-  { id: "atlas.pack", label: "Atlas packing", description: "Pack frames with governed padding, extrusion, rotation and engine-specific metadata.", deterministic: true, workerClass: "media" },
-  { id: "godot.export", label: "Godot delivery", description: "Produce Godot 4.6.2 import profiles, SpriteFrames resources, atlases, manifests and folder layouts.", deterministic: true, workerClass: "engine" },
-  { id: "evidence.bundle", label: "Evidence bundle", description: "Hash inputs and outputs and retain prompts, seeds, tool versions, QA readings and decisions.", deterministic: true, workerClass: "control" },
+  { id: "vision.identity", label: "Identity verification", description: "Compare face, body proportions, costume, defining marks, equipment scale and handedness against the canonical identity master.", deterministic: true, workerClass: "vision" },
+  { id: "vision.consistency", label: "Visual consistency", description: "Compare silhouettes, palettes, anchors, frame motion, layer registration, occlusion and reference adherence across an asset family.", deterministic: true, workerClass: "vision" },
+  { id: "atlas.pack", label: "Atlas packing", description: "Pack approved source frames with governed padding, extrusion, trim, rotation and engine-specific metadata.", deterministic: true, workerClass: "media" },
+  { id: "godot.export", label: "Godot delivery", description: "Produce Godot 4.6.2 import profiles, exact-duration SpriteFrames resources, atlases, manifests and folder layouts.", deterministic: true, workerClass: "engine" },
+  { id: "evidence.bundle", label: "Evidence bundle", description: "Hash inputs and outputs and retain prompts, conditioning references, seeds, tool versions, QA readings, repair decisions and approvals.", deterministic: true, workerClass: "control" },
 ]);
