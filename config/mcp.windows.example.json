@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "evavo-art-studio": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\apps\\mcp\\dist\\index.js"
+      ],
+      "env": {
+        "EVAVO_ART_ALLOWED_ROOTS": "C:\\GitRepos"
+      }
+    }
+  }
+}

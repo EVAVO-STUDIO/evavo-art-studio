@@ -5,5 +5,10 @@
     "rootDir": "src",
     "composite": true
   },
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/core" },
+    { "path": "../../packages/repo-inspector" }
+  ],
   "include": ["src/**/*.ts"]
 }

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "key": "art-studio",
+  "label": "EVAVO Art Studio",
+  "shortLabel": "AS",
+  "summary": "Governed art direction, asset planning, generation, editing, animation, sprite, atlas, texture and export production for game, digital and print work.",
+  "status": "preview",
+  "moduleId": "art-production-workspace",
+  "accent": "#ff244e",
+  "capabilities": [
+    "Repository-aware asset planning",
+    "Art-direction and reference governance",
+    "Sprites, sheets, atlases and frame sequences",
+    "Transparent-background verification",
+    "Animation, particle and cinematic production",
+    "Godot 4.6.2 delivery profiles",
+    "Digital and print mastering",
+    "Evidence-backed autonomous quality gates"
+  ],
+  "deployment": {
+    "strategy": "federated-candidate",
+    "repositoryFullName": "EVAVO-STUDIO/evavo-art-studio",
+    "recommendedHost": "art.evavo.com.au",
+    "requiresSignedLaunch": true,
+    "notes": "Heavy media processing remains in authenticated workers. The EVAVO hub provides a signed control-plane launch and must not expose local filesystem or provider credentials."
+  }
+}

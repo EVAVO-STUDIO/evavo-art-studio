@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "1.0",
+  "project": {
+    "projectName": "Brass and Brine",
+    "repositoryPath": "C:\\GitRepos\\brass-and-brine",
+    "gameGenre": "Historical maritime trading RPG",
+    "engine": "Godot 4.6.2 C#",
+    "audience": "Desktop and mobile players",
+    "targets": [
+      {
+        "kind": "godot-4.6.2",
+        "platform": "desktop-mobile",
+        "maximumTextureSize": 4096,
+        "powerOfTwo": "preferred",
+        "textureFiltering": "nearest",
+        "compressionPolicy": "lossless",
+        "notes": ["Preserve pixel edges", "Generate SpriteFrames and atlas metadata"]
+      }
+    ]
+  },
+  "artDirection": {
+    "styleName": "1871 monochrome DOS engraving",
+    "intent": "Historically plausible, deliberate black-and-white engraved sprite art with restrained cherry-red interface accents and no generic AI visual language.",
+    "mustHave": [
+      "strong readable silhouettes",
+      "period-correct clothing and equipment",
+      "controlled hatching, stipple and dither",
+      "front-on or side-stage composition",
+      "shared geometry across animation frames"
+    ],
+    "mustAvoid": [
+      "fake transparency checkerboards",
+      "modern objects or signage",
+      "photorealistic rendering",
+      "glossy generic AI lighting",
+      "random detail drift between frames",
+      "cropped limbs or weapons"
+    ],
+    "palette": {
+      "colours": ["#000000", "#ffffff", "#ff244e"],
+      "maxColours": 16,
+      "colourSpace": "srgb"
+    },
+    "era": "1871",
+    "cameraRules": ["fixed front-on or side-stage", "clear horizontal floor lane", "no isometric camera"],
+    "lineTreatment": "DOS-era engraved linework with purposeful one-pixel clusters",
+    "materialLanguage": ["weathered timber", "iron", "canvas", "wool", "leather"]
+  },
+  "assets": [
+    {
+      "id": "deckhand-idle",
+      "name": "Deckhand idle animation",
+      "kind": "sprite-sheet",
+      "purpose": "In-world crew character idle loop",
+      "quantity": 4,
+      "dimensions": { "width": 96, "height": 128 },
+      "transparency": "alpha-required",
+      "animation": {
+        "name": "idle",
+        "frameCount": 8,
+        "framesPerSecond": 8,
+        "loop": true,
+        "directions": 4,
+        "pivot": { "x": 48, "y": 120 },
+        "baseline": 120
+      },
+      "outputs": [
+        { "format": "png", "purpose": "runtime", "lossless": true, "colourSpace": "srgb" },
+        { "format": "json", "purpose": "manifest", "lossless": true },
+        { "format": "png", "purpose": "preview", "lossless": true, "colourSpace": "srgb" }
+      ],
+      "namingPrefix": "crew_deckhand_idle",
+      "tags": ["crew", "character", "idle", "historical"]
+    },
+    {
+      "id": "rain-particle",
+      "name": "Rain particle sequence",
+      "kind": "particle",
+      "purpose": "Godot GPUParticles2D rain texture and flipbook",
+      "quantity": 1,
+      "dimensions": { "width": 64, "height": 64 },
+      "transparency": "alpha-required",
+      "animation": {
+        "name": "rain_streak",
+        "frameCount": 12,
+        "framesPerSecond": 24,
+        "loop": true,
+        "pivot": { "x": 32, "y": 32 }
+      },
+      "outputs": [
+        { "format": "png", "purpose": "runtime", "lossless": true, "colourSpace": "srgb" },
+        { "format": "json", "purpose": "manifest", "lossless": true }
+      ]
+    }
+  ],
+  "autonomy": {
+    "mode": "fully-automatic",
+    "candidateCount": 8,
+    "maximumIterations": 5,
+    "autoApproveThreshold": 0.95,
+    "allowProviderFallback": true,
+    "requireEvidenceBundle": true
+  },
+  "outputRoot": "art-studio-output"
+}

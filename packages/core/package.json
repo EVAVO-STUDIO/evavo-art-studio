@@ -1,5 +1,5 @@
 {
-  "name": "@evavo/art-contracts",
+  "name": "@evavo/art-core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,6 +16,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build --silent && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@evavo/art-contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
