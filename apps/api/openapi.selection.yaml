@@ -1,0 +1,494 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Candidate Selection API
+  version: 0.1.0
+  description: >-
+    Deterministic contracts for candidate ranking and separate governed promotion.
+    These routes validate or compile capability-scoped durable jobs. They do not
+    decode candidate pixels, execute model evidence, create selected masters or
+    mutate approved artifact references inside the HTTP request handler.
+servers:
+  - url: http://127.0.0.1:4100
+    description: Local standalone Art Studio control plane
+security: []
+tags:
+  - name: Selection
+  - name: Promotion
+paths:
+  /v1/selection-protocol:
+    get:
+      tags: [Selection]
+      operationId: getCandidateSelectionProtocol
+      summary: List ranking, evidence and promotion rules
+      responses:
+        "200":
+          description: Deterministic metrics, model-evidence kinds and governance rules.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SelectionProtocol"
+  /v1/selections/validate:
+    post:
+      tags: [Selection]
+      operationId: validateCandidateSelection
+      summary: Validate and normalize a candidate selection request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidateSelectionRequest"
+      responses:
+        "200":
+          description: Normalized selection request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedCandidateSelectionRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/selections/compile:
+    post:
+      tags: [Selection]
+      operationId: compileCandidateSelectionJob
+      summary: Compile candidate selection into a durable worker job
+      description: >-
+        The resulting job requires selection.compare and evidence.bundle. Every
+        candidate, reference and external model-evidence artifact is declared in
+        inputArtifacts. The route does not read those artifacts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidateSelectionRequest"
+      responses:
+        "200":
+          description: Normalized request plus a capability-scoped runtime job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompiledSelectionJob"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/promotions/validate:
+    post:
+      tags: [Promotion]
+      operationId: validateCandidatePromotion
+      summary: Validate a separate promotion request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidatePromotionRequest"
+      responses:
+        "200":
+          description: Normalized promotion request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedCandidatePromotionRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/promotions/compile:
+    post:
+      tags: [Promotion]
+      operationId: compileCandidatePromotionJob
+      summary: Compile promotion into a compare-and-swap durable job
+      description: >-
+        The worker must reverify immutable selection evidence, the top-ranked
+        candidate, descriptor and content hashes, approval posture and current
+        named-reference generation. The route itself performs no promotion.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidatePromotionRequest"
+      responses:
+        "200":
+          description: Normalized request plus a capability-scoped runtime job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompiledPromotionJob"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  schemas:
+    ArtifactId:
+      type: string
+      pattern: "^artifact_[a-f0-9]{64}$"
+    SelectionProfile:
+      type: string
+      enum:
+        - sprite-identity
+        - sprite-motion
+        - environment
+        - ui
+        - custom
+    DeterministicMetricId:
+      type: string
+      enum:
+        - silhouette-iou
+        - silhouette-dice
+        - edge-similarity
+        - visible-area-similarity
+        - centroid-similarity
+        - bounds-aspect-similarity
+        - palette-similarity
+        - luminance-similarity
+        - edge-orientation-similarity
+        - overlap-colour-similarity
+    ExternalEvidenceKind:
+      type: string
+      enum:
+        - identity-similarity
+        - costume-similarity
+        - equipment-similarity
+        - pose-similarity
+        - style-similarity
+        - perceptual-similarity
+    SelectionMetricPolicy:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/DeterministicMetricId"
+        weight:
+          type: number
+          minimum: 0
+          maximum: 100
+        minimum:
+          type: number
+          minimum: 0
+          maximum: 1
+        blocking:
+          type: boolean
+    SelectionExternalEvidencePolicy:
+      type: object
+      required: [kind]
+      additionalProperties: false
+      properties:
+        kind:
+          $ref: "#/components/schemas/ExternalEvidenceKind"
+        weight:
+          type: number
+          minimum: 0
+          maximum: 100
+        minimum:
+          type: number
+          minimum: 0
+          maximum: 1
+        blocking:
+          type: boolean
+        required:
+          type: boolean
+        requiredForAutomatic:
+          type: boolean
+    CandidateSelectionPolicy:
+      type: object
+      required: [profile]
+      additionalProperties: false
+      properties:
+        profile:
+          $ref: "#/components/schemas/SelectionProfile"
+        allowAutomaticSelection:
+          type: boolean
+          default: false
+        requireReferenceLineage:
+          type: boolean
+          default: true
+        requireQualityPassed:
+          type: boolean
+          default: true
+        allowedCandidateRoles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+        alphaVisibleThreshold:
+          type: integer
+          minimum: 1
+          maximum: 255
+          default: 8
+        maximumTranslationPixels:
+          type: integer
+          minimum: 0
+          maximum: 64
+        maximumEdgeDistancePixels:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 256
+        minimumOverallScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        minimumWinnerMargin:
+          type: number
+          minimum: 0
+          maximum: 1
+        metrics:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/SelectionMetricPolicy"
+        externalEvidence:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/SelectionExternalEvidencePolicy"
+    CandidateSelectionRequest:
+      type: object
+      required:
+        - schemaVersion
+        - candidateArtifactIds
+        - referenceArtifactId
+        - policy
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "1.0"
+        selectionId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        candidateArtifactIds:
+          type: array
+          minItems: 2
+          maxItems: 32
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+        referenceArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        referenceRole:
+          type: string
+          minLength: 1
+          maxLength: 128
+          default: canonical-identity
+        externalEvidenceArtifactIds:
+          type: array
+          maxItems: 256
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+        policy:
+          $ref: "#/components/schemas/CandidateSelectionPolicy"
+        metadata: true
+    NormalizedCandidateSelectionRequest:
+      allOf:
+        - $ref: "#/components/schemas/CandidateSelectionRequest"
+        - type: object
+          required: [protocolVersion, selectionId, externalEvidenceArtifactIds]
+          properties:
+            protocolVersion:
+              const: "2026-07-30.1"
+    PromotionTarget:
+      type: object
+      required: [namespace, name, expectedGeneration]
+      additionalProperties: false
+      properties:
+        namespace:
+          type: string
+          minLength: 1
+          maxLength: 512
+        name:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        expectedGeneration:
+          type: integer
+          minimum: 0
+        expectedArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+    AutomaticApproval:
+      type: object
+      required: [mode]
+      additionalProperties: false
+      properties:
+        mode:
+          const: automatic
+    HumanApproval:
+      type: object
+      required: [mode, approver, reason]
+      additionalProperties: false
+      properties:
+        mode:
+          const: human
+        approver:
+          type: string
+          minLength: 1
+          maxLength: 256
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    CandidatePromotionRequest:
+      type: object
+      required:
+        - schemaVersion
+        - selectionEvidenceArtifactId
+        - candidateArtifactId
+        - target
+        - approval
+        - actor
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "1.0"
+        promotionId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        selectionEvidenceArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        candidateArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        target:
+          $ref: "#/components/schemas/PromotionTarget"
+        approval:
+          oneOf:
+            - $ref: "#/components/schemas/AutomaticApproval"
+            - $ref: "#/components/schemas/HumanApproval"
+        actor:
+          type: string
+          minLength: 1
+          maxLength: 256
+        metadata: true
+    NormalizedCandidatePromotionRequest:
+      allOf:
+        - $ref: "#/components/schemas/CandidatePromotionRequest"
+        - type: object
+          required: [protocolVersion, promotionId]
+          properties:
+            protocolVersion:
+              const: "2026-07-30.1"
+    RuntimeJob:
+      type: object
+      required:
+        - queue
+        - kind
+        - idempotencyKey
+        - payload
+        - inputArtifacts
+        - requiredCapabilities
+      properties:
+        queue:
+          const: selection
+        kind:
+          enum:
+            - art.candidate.select
+            - art.candidate.promote
+        idempotencyKey:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        inputArtifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+        requiredCapabilities:
+          type: array
+          items:
+            type: string
+        maximumAttempts:
+          type: integer
+          minimum: 1
+        leaseDurationMs:
+          type: integer
+          minimum: 1000
+        timeoutMs:
+          type: integer
+          minimum: 1000
+      additionalProperties: true
+    CompiledSelectionJob:
+      type: object
+      required: [schemaVersion, request, requestSha256, executionMode, runtimeJob]
+      properties:
+        schemaVersion:
+          const: "1.0"
+        request:
+          $ref: "#/components/schemas/NormalizedCandidateSelectionRequest"
+        requestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        executionMode:
+          const: durable-worker-only
+        runtimeJob:
+          $ref: "#/components/schemas/RuntimeJob"
+    CompiledPromotionJob:
+      type: object
+      required: [schemaVersion, request, requestSha256, executionMode, runtimeJob]
+      properties:
+        schemaVersion:
+          const: "1.0"
+        request:
+          $ref: "#/components/schemas/NormalizedCandidatePromotionRequest"
+        requestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        executionMode:
+          const: durable-worker-only
+        runtimeJob:
+          $ref: "#/components/schemas/RuntimeJob"
+    SelectionProtocol:
+      type: object
+      required:
+        - schemaVersion
+        - protocolVersion
+        - profiles
+        - deterministicMetrics
+        - externalEvidenceKinds
+        - decisions
+        - rules
+      properties:
+        schemaVersion:
+          const: "1.0"
+        protocolVersion:
+          const: "2026-07-30.1"
+        profiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/SelectionProfile"
+        deterministicMetrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeterministicMetricId"
+        externalEvidenceKinds:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExternalEvidenceKind"
+        decisions:
+          type: array
+          items:
+            enum: [selected, review-required, rejected]
+        rules:
+          type: array
+          items:
+            type: string
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details: true
+          additionalProperties: true
+  responses:
+    ValidationError:
+      description: Invalid selection, evidence or promotion contract.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
