@@ -6,6 +6,7 @@ import {
   type ProviderAdapterExecutionResult,
   type ProviderAdapterOutput,
   type ProviderAdapterDescriptor,
+  type ProviderCapability,
   type ResolvedProviderCandidateRequest,
 } from "../types.js";
 
@@ -14,25 +15,27 @@ const TRANSPARENT_FIXTURE = Buffer.from(
   "base64",
 );
 
+const FIXTURE_CAPABILITIES = Object.freeze([
+  "generate",
+  "edit",
+  "inpaint",
+  "reference-images",
+  "multiple-reference-images",
+  "mask",
+  "seed",
+  "native-alpha",
+  "custom-size",
+  "candidate-count",
+  "cancellation",
+] as const satisfies readonly ProviderCapability[]);
+
 export const FIXTURE_PROVIDER_DESCRIPTOR: ProviderAdapterDescriptor = Object.freeze({
   protocolVersion: PROVIDER_PROTOCOL_VERSION,
   id: "fixture-image",
   label: "Deterministic fixture image",
   version: "1.0.0",
   priority: -10_000,
-  capabilities: Object.freeze([
-    "generate",
-    "edit",
-    "inpaint",
-    "reference-images",
-    "multiple-reference-images",
-    "mask",
-    "seed",
-    "native-alpha",
-    "custom-size",
-    "candidate-count",
-    "cancellation",
-  ]),
+  capabilities: FIXTURE_CAPABILITIES,
   models: Object.freeze(["fixture-transparent-v1"]),
   maximumCandidates: 8,
   maximumReferenceImages: 16,
