@@ -17,13 +17,15 @@ This repository is intentionally broader than an image generator. It is the shar
 - blocking identity, proportion, crop, layer-registration, occlusion and source-parity gates;
 - executable decoded-pixel QA for alpha, fake checkerboards, flat mattes, edge halos, hidden transparent colour and safe bounds;
 - executable sequence QA for canvas, frame order, exact duration, pivot, baseline, ground contact and declared linked-cel duplicates;
+- deterministic no-rotation MaxRects atlas production with transparent padding, edge extrusion, alpha-aware trim restoration and content hashes;
+- Godot 4.6.2 SpriteFrames descriptors and headless importers using AtlasTexture regions, trim margins, loop modes and exact relative durations;
 - safe local repository inspector with Godot project and existing-art detection;
-- JSON-first CLI for validation, planning, repository inspection and sprite QA;
-- versioned REST foundation for capabilities, plans, guarded repository inspection and sprite QA;
-- Next.js control-plane workspace with an interactive continuity-aware production-plan compiler;
-- MCP v2 stdio server exposing planning, repository inspection and sprite QA to ChatGPT, Claude and compatible agents;
+- JSON-first CLI for validation, planning, repository inspection, sprite QA and engine-ready atlas delivery;
+- versioned REST foundation for capabilities, plans, guarded repository inspection, sprite QA and fail-closed atlas writes;
+- Next.js control-plane workspace with an interactive continuity-aware production-plan compiler and browser QA workbenches;
+- MCP v2 stdio server exposing planning, repository inspection, sprite QA and explicitly enabled atlas delivery to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
-- architecture, technology, quality, sprite-continuity and hub-integration decisions;
+- architecture, technology, quality, sprite-continuity, atlas-delivery and hub-integration decisions;
 - CI validation for type checks, tests and builds.
 
 ## First commands
@@ -44,6 +46,18 @@ pnpm art -- quality-sequence `
   --manifest .\source\hero\hero-idle.sequence.json `
   --output .\evidence\hero-idle.quality.json
 
+pnpm art -- atlas-build `
+  --manifest C:\GitRepos\your-game\art\hero.atlas.json `
+  --output-dir C:\GitRepos\your-game\art\generated `
+  --godot-project C:\GitRepos\your-game
+
+# Optional local finalisation through a reviewed Godot executable:
+pnpm art -- atlas-build `
+  --manifest C:\GitRepos\your-game\art\hero.atlas.json `
+  --output-dir C:\GitRepos\your-game\art\generated `
+  --godot-project C:\GitRepos\your-game `
+  --godot-executable "C:\Tools\Godot\Godot_v4.6.2-stable_mono_win64.exe"
+
 pnpm dev
 pnpm dev:api
 pnpm dev:mcp
@@ -57,8 +71,9 @@ The web workspace starts at `http://localhost:4200`. The standalone API starts o
 - `POST /v1/repositories/inspect`
 - `POST /v1/quality/sprite-frame`
 - `POST /v1/quality/sprite-sequence`
+- `POST /v1/atlases/build`
 
-Repository and sequence inspection are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. Provider secrets belong on workers and are never exposed to the browser or embedded in briefs.
+Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. API and MCP file-generating tools fail closed unless `EVAVO_ART_ALLOW_WRITES=true`. They generate packages but never execute Godot or another binary. Provider secrets belong on workers and are never exposed to the browser or embedded in briefs.
 
 ## Core rules
 
@@ -70,4 +85,8 @@ Later frames may not be unrelated text-only generations. They inherit the approv
 
 Non-zero RGB beneath fully transparent pixels is not automatically a defect. It is accepted only when it behaves like deliberate edge bleed that agrees with nearby approved subject colour; unrelated matte contamination remains blocking.
 
-See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/executable-sprite-quality.md` and `docs/hub-integration.md`.
+Atlas generation consumes approved individual frames. It never rotates directional art, never recursively compresses derivatives, retains source dimensions and trim offsets, leaves transparent padding around packed regions, extrudes only the subject edge, and hashes every source and output.
+
+Godot delivery is two-stage by design: Art Studio deterministically emits the atlas, descriptor and reviewed importer source; a local or authenticated engine worker may then run Godot headlessly to save the native SpriteFrames resource. Hosted API and MCP surfaces do not execute arbitrary binaries.
+
+See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md` and `docs/hub-integration.md`.
