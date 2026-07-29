@@ -1,10 +1,14 @@
 #!/usr/bin/env node
-import { hostname } from "node:os";
 import { readFile, realpath } from "node:fs/promises";
+import { hostname } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LocalArtifactStore, type ArtifactId, type JsonValue } from "@evavo/art-artifacts";
+import {
+  LocalArtifactStore,
+  type ArtifactId,
+  type JsonValue,
+} from "@evavo/art-artifacts";
 import { writeGodotSpriteFramesImporter } from "@evavo/art-godot";
 import { buildSpriteAtlasPackage } from "@evavo/art-media";
 import type { ProviderRegistry } from "@evavo/art-providers";
@@ -17,18 +21,21 @@ import {
 } from "@evavo/art-runtime";
 
 import {
+  candidateMasteringWorkerCapabilities,
+  createCandidateMasteringHandlers,
+} from "./mastering-handlers.js";
+import {
   createProviderHandlers,
   createProviderRegistryFromEnvironment,
   providerWorkerCapabilities,
 } from "./provider-handlers.js";
 
-const isRecord = (value: unknown): value is Readonly<Record<string, JsonValue>> =>
+const isRecord = (
+  value: unknown,
+): value is Readonly<Record<string, JsonValue>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-function requiredString(
-  value: JsonValue | undefined,
-  name: string,
-): string {
+function requiredString(value: JsonValue | undefined, name: string): string {
   if (typeof value !== "string" || !value.trim()) {
     throw new PermanentRuntimeError(
       "RUNTIME_HANDLER_PAYLOAD_INVALID",
@@ -62,7 +69,9 @@ function envList(name: string): string[] {
 
 function isWithin(root: string, candidate: string): boolean {
   const relative = path.relative(root, candidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  return (
+    relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
+  );
 }
 
 async function assertExistingPathWithinRoots(
@@ -71,7 +80,9 @@ async function assertExistingPathWithinRoots(
   name: string,
 ): Promise<string> {
   const resolved = await realpath(path.resolve(candidate));
-  const canonicalRoots = await Promise.all(roots.map((root) => realpath(path.resolve(root))));
+  const canonicalRoots = await Promise.all(
+    roots.map((root) => realpath(path.resolve(root))),
+  );
   if (!canonicalRoots.some((root) => isWithin(root, resolved))) {
     throw new PermanentRuntimeError(
       "RUNTIME_HANDLER_PATH_REJECTED",
@@ -111,39 +122,48 @@ export function createBuiltinHandlers(
     }
     const payload = context.job.spec.payload;
     const manifestPath = requiredString(payload.manifestPath, "manifestPath");
-    const outputDirectory = requiredString(payload.outputDirectory, "outputDirectory");
+    const outputDirectory = requiredString(
+      payload.outputDirectory,
+      "outputDirectory",
+    );
     const atlas = await buildSpriteAtlasPackage(manifestPath, outputDirectory, {
       allowedRoots,
     });
     const outputArtifacts: ArtifactId[] = [];
     outputArtifacts.push(
-      await ingestFile(
-        context,
-        atlas.imagePath,
-        "image/png",
-        "runtime",
-        { atlasId: atlas.packageData.atlasId, artifactRole: "atlas-image" },
-      ),
+      await ingestFile(context, atlas.imagePath, "image/png", "runtime", {
+        atlasId: atlas.packageData.atlasId,
+        artifactRole: "atlas-image",
+      }),
       await ingestFile(
         context,
         atlas.dataPath,
         "application/json",
         "manifest",
-        { atlasId: atlas.packageData.atlasId, artifactRole: "atlas-data" },
+        {
+          atlasId: atlas.packageData.atlasId,
+          artifactRole: "atlas-data",
+        },
       ),
       await ingestFile(
         context,
         atlas.evidencePath,
         "application/json",
         "evidence",
-        { atlasId: atlas.packageData.atlasId, artifactRole: "atlas-evidence" },
+        {
+          atlasId: atlas.packageData.atlasId,
+          artifactRole: "atlas-evidence",
+        },
       ),
     );
 
     let godot:
       | Awaited<ReturnType<typeof writeGodotSpriteFramesImporter>>
       | undefined;
-    if (typeof payload.godotProjectPath === "string" && payload.godotProjectPath.trim()) {
+    if (
+      typeof payload.godotProjectPath === "string" &&
+      payload.godotProjectPath.trim()
+    ) {
       const projectPath = await assertExistingPathWithinRoots(
         payload.godotProjectPath,
         allowedRoots,
@@ -156,14 +176,20 @@ export function createBuiltinHandlers(
           godot.descriptorPath,
           "application/json",
           "manifest",
-          { atlasId: atlas.packageData.atlasId, artifactRole: "godot-descriptor" },
+          {
+            atlasId: atlas.packageData.atlasId,
+            artifactRole: "godot-descriptor",
+          },
         ),
         await ingestFile(
           context,
           godot.importerPath,
           "text/x-gdscript",
           "source",
-          { atlasId: atlas.packageData.atlasId, artifactRole: "godot-importer" },
+          {
+            atlasId: atlas.packageData.atlasId,
+            artifactRole: "godot-importer",
+          },
         ),
       );
     }
@@ -194,6 +220,7 @@ export function createBuiltinHandlers(
   return Object.freeze({
     "sprite.atlas.build": atlasBuild,
     ...createProviderHandlers(providerRegistry),
+    ...createCandidateMasteringHandlers(),
   });
 }
 
@@ -234,6 +261,7 @@ async function main(): Promise<void> {
   const configuredQueues = envList("EVAVO_ART_WORKER_QUEUES");
   const providerRegistry = createProviderRegistryFromEnvironment();
   const providerCapabilities = providerWorkerCapabilities(providerRegistry);
+  const masteringCapabilities = candidateMasteringWorkerCapabilities();
   const defaultQueues = [
     "media",
     ...(providerRegistry.list().length ? ["provider"] : []),
@@ -250,6 +278,7 @@ async function main(): Promise<void> {
         "media.raster",
         "godot.export",
         "evidence.bundle",
+        ...masteringCapabilities,
         ...providerCapabilities,
       ],
       queues: configuredQueues.length ? configuredQueues : defaultQueues,

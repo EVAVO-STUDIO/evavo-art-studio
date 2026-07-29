@@ -11,6 +11,7 @@
     { "path": "../../packages/media" },
     { "path": "../../packages/godot" },
     { "path": "../../packages/providers" },
+    { "path": "../../packages/quality" },
     { "path": "../../packages/runtime" }
   ],
   "include": ["src/**/*.ts"]

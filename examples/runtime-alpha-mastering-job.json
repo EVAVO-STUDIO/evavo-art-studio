@@ -1,0 +1,37 @@
+{
+  "queue": "media",
+  "kind": "art.candidate.master-alpha",
+  "idempotencyKey": "hero-idle-down-001-alpha-v1",
+  "payload": {
+    "candidateArtifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "matteColour": "#00ff00",
+    "connectionDistance": 140,
+    "opaqueSeedDistance": 220,
+    "edgeSearchRadius": 12,
+    "bleedRadius": 2,
+    "minimumBorderMatteFraction": 0.7,
+    "frameId": "hero-idle-down-001",
+    "quality": {
+      "safePadding": 8,
+      "maximumHaloFraction": 0.02,
+      "maximumUnexpectedTransparentRgbFraction": 0.02
+    }
+  },
+  "requiredCapabilities": [
+    "media.chroma-extract",
+    "quality.sprite-frame",
+    "evidence.bundle"
+  ],
+  "inputArtifacts": [
+    "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  ],
+  "maximumAttempts": 2,
+  "leaseDurationMs": 60000,
+  "timeoutMs": 300000,
+  "labels": {
+    "project": "your-game",
+    "assetFamily": "hero-idle",
+    "frameId": "hero-idle-down-001",
+    "stage": "candidate-alpha-mastering"
+  }
+}

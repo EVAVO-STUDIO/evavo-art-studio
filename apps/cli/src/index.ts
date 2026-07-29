@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import path from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { parseArgs } from "node:util";
 
 import { validateArtBrief } from "@evavo/art-contracts";
@@ -25,6 +25,10 @@ import {
 import { inspectRepository } from "@evavo/art-repo-inspector";
 
 import {
+  handleMasteringCommand,
+  type MasteringCommandValues,
+} from "./mastering-command.js";
+import {
   handleLocalControlCommand,
   type LocalControlValues,
 } from "./runtime-commands.js";
@@ -38,6 +42,7 @@ Usage:
   evavo-art inspect --repo C:\\GitRepos\\my-game [--output snapshot.json]
   evavo-art quality-frame --input frame.png --expectations frame-quality.json [--output report.json]
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
+  evavo-art master-alpha --input candidate.png --matte #00ff00 --output candidate.alpha.png [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json]
   evavo-art atlas-build --manifest atlas.json --output-dir generated [--godot-project C:\\GitRepos\\game] [--godot-executable C:\\Path\\Godot_v4.6.2.exe]
 
   evavo-art provider-protocol [--output provider-protocol.json]
@@ -45,7 +50,7 @@ Usage:
   evavo-art provider-compile --input candidate-request.json [--output compiled-provider-contract.json]
 
   evavo-art runtime-submit --input job.json [--runtime-root .art-studio/runtime] [--actor cli]
-  evavo-art runtime-list [--state queued,running] [--queue media] [--kind sprite.atlas.build] [--limit 100]
+  evavo-art runtime-list [--state queued,running] [--queue media] [--kind art.candidate.master-alpha] [--limit 100]
   evavo-art runtime-show --job job_id
   evavo-art runtime-events [--after 0]
   evavo-art runtime-cancel --job job_id [--force]
@@ -62,7 +67,7 @@ Usage:
 
 All commands emit JSON so ChatGPT, Claude, CI and scripts can consume the same contract.
 Provider validation and compilation never call an external model. Candidate execution occurs only through a capability-matched durable worker job.
-A quality command exits with code 3 when deterministic blocking gates fail.
+Alpha mastering is deterministic and writes an unapproved PNG plus evidence. It exits with code 3 when blocking sprite QA fails.
 Atlas and durable-runtime writes are explicit, local and root-scoped.
 `;
 
@@ -85,6 +90,13 @@ async function main(): Promise<void> {
       output: { type: "string", short: "o" },
       repo: { type: "string", short: "r" },
       expectations: { type: "string", short: "e" },
+      evidence: { type: "string" },
+      matte: { type: "string" },
+      "connection-distance": { type: "string" },
+      "opaque-seed-distance": { type: "string" },
+      "edge-search-radius": { type: "string" },
+      "bleed-radius": { type: "string" },
+      "minimum-border-matte-fraction": { type: "string" },
       manifest: { type: "string", short: "m" },
       descriptor: { type: "string", short: "d" },
       "output-dir": { type: "string" },
@@ -122,6 +134,16 @@ async function main(): Promise<void> {
   );
   if (localControl.handled) {
     await emit(localControl.value, parsed.values.output);
+    return;
+  }
+
+  const mastering = await handleMasteringCommand(
+    command,
+    parsed.values as MasteringCommandValues,
+  );
+  if (mastering.handled) {
+    await emit(mastering.value);
+    if (mastering.exitCode !== undefined) process.exitCode = mastering.exitCode;
     return;
   }
 
@@ -171,7 +193,9 @@ async function main(): Promise<void> {
   }
 
   if (command === "quality-frame") {
-    if (!parsed.values.input) throw new Error("--input is required for quality-frame.");
+    if (!parsed.values.input) {
+      throw new Error("--input is required for quality-frame.");
+    }
     if (!parsed.values.expectations) {
       throw new Error("--expectations is required for quality-frame.");
     }
@@ -198,12 +222,16 @@ async function main(): Promise<void> {
   }
 
   if (command === "atlas-build") {
-    if (!parsed.values.manifest) throw new Error("--manifest is required for atlas-build.");
+    if (!parsed.values.manifest) {
+      throw new Error("--manifest is required for atlas-build.");
+    }
     if (!parsed.values["output-dir"]) {
       throw new Error("--output-dir is required for atlas-build.");
     }
     if (parsed.values["godot-executable"] && !parsed.values["godot-project"]) {
-      throw new Error("--godot-project is required when --godot-executable is supplied.");
+      throw new Error(
+        "--godot-project is required when --godot-executable is supplied.",
+      );
     }
 
     const manifestPath = path.resolve(parsed.values.manifest);

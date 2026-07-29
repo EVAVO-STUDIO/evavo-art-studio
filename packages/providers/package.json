@@ -18,7 +18,8 @@
     "test": "npm run build --silent && node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@evavo/art-artifacts": "workspace:*"
+    "@evavo/art-artifacts": "workspace:*",
+    "@evavo/art-media": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

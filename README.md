@@ -18,7 +18,10 @@ This repository is intentionally broader than an image generator. It is the shar
 - deterministic provider prompt compilation for identity, style, shot, layer, target and alpha boundaries;
 - capability-matched provider selection with explicit allow-lists, bounded fallback and cancellation;
 - an OpenAI GPT Image 2 adapter using ordered references and masks, with chroma-key extraction required for transparent targets;
+- decoded mask preflight that proves matching image format, dimensions, page count, alpha and editable coverage before remote inpaint;
 - unapproved provider candidates stored as immutable intermediate artifacts with complete attempt and provenance evidence;
+- border-connected chroma segmentation, matte colour unmixing, antialiased edge recovery and bounded transparent RGB bleed;
+- durable `art.candidate.master-alpha` work that emits only an unapproved alpha intermediate and immutable extraction or QA evidence;
 - blocking identity, proportion, crop, layer-registration, occlusion and source-parity gates;
 - executable decoded-pixel QA for alpha, fake checkerboards, flat mattes, edge halos, hidden transparent colour and safe bounds;
 - executable sequence QA for canvas, frame order, exact duration, pivot, baseline, ground contact and declared linked-cel duplicates;
@@ -26,16 +29,16 @@ This repository is intentionally broader than an image generator. It is the shar
 - Godot 4.6.2 SpriteFrames descriptors and headless importers using AtlasTexture regions, trim margins, loop modes and exact relative durations;
 - immutable content-addressed artifact objects, descriptors, lineage, verification and compare-and-swap approved references;
 - crash-recoverable runtime transactions with idempotency, dependencies, capability claims, leases, heartbeats, retry, pause, cancellation, dead letter and redrive;
-- a capability-scoped local worker that executes provider candidates and atlas or Godot source packages while committing only verified artifact IDs;
+- a capability-scoped local worker that executes provider candidates, alpha mastering and atlas or Godot source packages while committing only verified artifact IDs;
 - an optional pg-boss transport adapter that keeps delivery separate from authoritative runtime and artifact evidence;
 - protected owner operations UI with signed HttpOnly sessions, bounded server-side API proxying, secret redaction and durable job controls;
 - safe local repository inspector with Godot project and existing-art detection;
-- JSON-first CLI for planning, provider compilation, repository inspection, sprite QA, engine delivery, runtime control and artifact governance;
+- JSON-first CLI for planning, provider compilation, alpha mastering, repository inspection, sprite QA, engine delivery, runtime control and artifact governance;
 - versioned REST API for planning, provider contracts, QA, authenticated atlas writes and authenticated runtime or artifact operations;
 - Next.js control plane with the continuity-aware production compiler, browser QA workbenches and private operations control room;
 - MCP v2 stdio server exposing planning, provider compilation, repository inspection, sprite QA, atlas delivery, runtime control and artifact governance to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
-- architecture, technology, quality, sprite-continuity, provider, atlas-delivery, durable-runtime, operations and hub-integration decisions;
+- architecture, technology, quality, sprite-continuity, provider, alpha-mastering, atlas-delivery, durable-runtime, operations and hub-integration decisions;
 - CI validation for `main`, automated `work/**` branches and pull requests.
 
 ## First commands
@@ -55,6 +58,14 @@ pnpm art -- provider-validate `
 pnpm art -- provider-compile `
   --input .\examples\provider-candidate-request.json `
   --output .\provider-request.compiled.json
+
+# Deterministically turn one flat-matte candidate into an unapproved alpha master:
+pnpm art -- master-alpha `
+  --input .\candidate.png `
+  --matte "#00ff00" `
+  --output .\candidate.alpha.png `
+  --evidence .\candidate.alpha.evidence.json `
+  --expectations .\frame-quality.json
 
 pnpm art -- quality-frame `
   --input .\source\hero\frames\down\frame-001.png `
@@ -77,9 +88,14 @@ pnpm art -- atlas-build `
   --godot-project C:\GitRepos\your-game `
   --godot-executable "C:\Tools\Godot\Godot_v4.6.2-stable_mono_win64.exe"
 
-# Submit provider or atlas work to the durable local runtime:
+# Submit provider work, alpha mastering or atlas work to the durable runtime:
 pnpm art -- runtime-submit `
   --input .\examples\runtime-provider-job.json `
+  --runtime-root .\.art-studio\runtime `
+  --actor greg
+
+pnpm art -- runtime-submit `
+  --input .\examples\runtime-alpha-mastering-job.json `
   --runtime-root .\.art-studio\runtime `
   --actor greg
 
@@ -113,7 +129,31 @@ Leaving `EVAVO_ART_WORKER_QUEUES` empty lets the worker add `provider` automatic
 
 A provider response is stored as an unapproved `intermediate`, never as a final master. Identity-locked sprite work requires a canonical identity artifact. In-between frames also require the approved previous and next key poses. Inpaint work requires an approved base image and exactly one mask.
 
-GPT Image 2 does not currently support transparent backgrounds, so transparency-required requests use a declared flat chroma matte, followed by deterministic alpha extraction, edge cleanup and hostile-matte QA. The chroma candidate is not the final transparent sprite.
+The OpenAI adapter decodes the actual base and mask before transport. Mismatched formats or dimensions, multiple pages, missing alpha and masks with no editable pixels fail before a remote request is made.
+
+GPT Image 2 does not currently support transparent backgrounds, so transparency-required requests use a declared flat chroma matte. The chroma candidate remains an intermediate and must pass deterministic alpha mastering, edge cleanup and hostile-matte QA.
+
+## Candidate alpha mastering
+
+Art Studio never removes every pixel matching a key colour. The extractor flood-fills only matte-like pixels connected to the image border, preserving enclosed matching colours in the subject. It then estimates edge alpha against nearby confident foreground, removes matte contamination, writes bounded subject-colour bleed beneath nearby transparent pixels and runs the same decoded-pixel frame gates used elsewhere.
+
+The durable job kind is:
+
+```text
+art.candidate.master-alpha
+```
+
+It requires:
+
+```text
+media.chroma-extract
+quality.sprite-frame
+evidence.bundle
+```
+
+The source candidate must be an immutable, unapproved `provider-candidate` artifact and must also appear in `inputArtifacts`. The job emits an unapproved intermediate PNG plus evidence. A quality rejection remains visible and diagnosable, but cannot update an approved reference or become a final delivery.
+
+The direct `master-alpha` CLI command uses the same kernel, writes atomically and exits with code `3` when blocking sprite QA fails.
 
 ## Protected owner operations
 
@@ -178,4 +218,4 @@ Godot delivery is two-stage by design: Art Studio deterministically emits the at
 
 The runtime journal, artifact hashes and evidence records are authoritative. pg-boss may wake distributed workers, but a queue acknowledgement cannot approve an asset or replace attempt history. Workers commit success only with valid immutable artifact IDs.
 
-See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/governed-provider-candidates.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md`, `docs/runtime-operations-dashboard.md` and `docs/hub-integration.md`.
+See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/governed-provider-candidates.md`, `docs/candidate-alpha-mastering.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md`, `docs/runtime-operations-dashboard.md` and `docs/hub-integration.md`.
