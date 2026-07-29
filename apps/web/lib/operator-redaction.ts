@@ -1,8 +1,19 @@
 const REDACTED = "[REDACTED]" as const;
 const MAXIMUM_DEPTH = 32;
+const EXACT_SECRET_KEYS = new Set([
+  "leaseToken",
+  "accessToken",
+  "writeToken",
+  "apiKey",
+  "authorization",
+  "password",
+  "credential",
+  "secret",
+]);
 const SECRET_KEY = /(?:^|[_-])(?:api[_-]?key|authorization|bearer|credential|password|secret|token)(?:$|[_-])/i;
 
 function shouldRedact(key: string): boolean {
+  if (EXACT_SECRET_KEYS.has(key)) return true;
   const normalized = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2");
   return SECRET_KEY.test(normalized);
 }
