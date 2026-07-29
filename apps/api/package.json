@@ -21,7 +21,8 @@
     "@evavo/art-providers": "workspace:*",
     "@evavo/art-quality": "workspace:*",
     "@evavo/art-repo-inspector": "workspace:*",
-    "@evavo/art-runtime": "workspace:*"
+    "@evavo/art-runtime": "workspace:*",
+    "@evavo/art-selection": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
