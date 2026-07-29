@@ -28,7 +28,7 @@ export interface ArtStudioApiOptions {
   readonly maximumImageBytes?: number;
   readonly maximumImagePixels?: number;
   readonly allowWrites?: boolean;
-  readonly writeToken?: string;
+  readonly writeToken?: string | undefined;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
