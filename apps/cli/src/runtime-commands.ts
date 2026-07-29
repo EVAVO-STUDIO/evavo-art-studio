@@ -88,7 +88,9 @@ function integer(
   if (value === undefined) return fallback;
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
-    throw new Error(`${option} must be an integer between ${minimum} and ${maximum}.`);
+    throw new Error(
+      `${option} must be an integer between ${minimum} and ${maximum}.`,
+    );
   }
   return parsed;
 }
@@ -101,9 +103,18 @@ function artifactId(value: string | undefined): ArtifactId {
   return id as ArtifactId;
 }
 
-function states(value: string | undefined): readonly RuntimeJobState[] | undefined {
+function states(
+  value: string | undefined,
+): readonly RuntimeJobState[] | undefined {
   if (!value) return undefined;
-  const result = [...new Set(value.split(",").map((entry) => entry.trim()).filter(Boolean))];
+  const result = [
+    ...new Set(
+      value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  ];
   if (!result.length) return undefined;
   for (const entry of result) {
     if (!RUNTIME_STATES.has(entry as RuntimeJobState)) {
@@ -165,15 +176,24 @@ export async function handleLocalControlCommand(
       };
     }
     if (command === "artifact-show") {
-      return { handled: true, value: await store.get(artifactId(values.artifact)) };
+      return {
+        handled: true,
+        value: await store.get(artifactId(values.artifact)),
+      };
     }
     if (command === "artifact-verify") {
-      return { handled: true, value: await store.verify(artifactId(values.artifact)) };
+      return {
+        handled: true,
+        value: await store.verify(artifactId(values.artifact)),
+      };
     }
     const namespace = required(values.namespace, "--namespace");
     const name = required(values.name, "--name");
     if (command === "artifact-ref-resolve") {
-      return { handled: true, value: await store.resolveReference(namespace, name) };
+      return {
+        handled: true,
+        value: await store.resolveReference(namespace, name),
+      };
     }
     return {
       handled: true,
@@ -220,10 +240,11 @@ export async function handleLocalControlCommand(
     };
   }
   if (command === "runtime-list") {
+    const stateFilter = states(values.state);
     return {
       handled: true,
       value: await runtime.list({
-        ...(states(values.state) ? { states: states(values.state) } : {}),
+        ...(stateFilter ? { states: stateFilter } : {}),
         ...(values.queue ? { queues: [values.queue.trim()] } : {}),
         ...(values.kind ? { kinds: [values.kind.trim()] } : {}),
         limit: integer(values.limit, 1_000, 1, 100_000, "--limit"),
@@ -233,11 +254,16 @@ export async function handleLocalControlCommand(
   if (command === "runtime-events") {
     return {
       handled: true,
-      value: await runtime.events(integer(values.after, 0, 0, Number.MAX_SAFE_INTEGER, "--after")),
+      value: await runtime.events(
+        integer(values.after, 0, 0, Number.MAX_SAFE_INTEGER, "--after"),
+      ),
     };
   }
   if (command === "runtime-recover") {
-    return { handled: true, value: await runtime.recoverExpiredLeases(actor(values)) };
+    return {
+      handled: true,
+      value: await runtime.recoverExpiredLeases(actor(values)),
+    };
   }
 
   const jobId = required(values.job, "--job");
@@ -247,13 +273,17 @@ export async function handleLocalControlCommand(
   if (command === "runtime-cancel") {
     return {
       handled: true,
-      value: await runtime.cancel(jobId, actor(values), { force: values.force ?? false }),
+      value: await runtime.cancel(jobId, actor(values), {
+        force: values.force ?? false,
+      }),
     };
   }
   if (command === "runtime-pause") {
     return {
       handled: true,
-      value: await runtime.pause(jobId, actor(values), { force: values.force ?? false }),
+      value: await runtime.pause(jobId, actor(values), {
+        force: values.force ?? false,
+      }),
     };
   }
   if (command === "runtime-resume") {
@@ -270,5 +300,8 @@ export async function handleLocalControlCommand(
     };
   }
 
-  throw new RuntimeError("RUNTIME_COMMAND_UNREACHABLE", `Unhandled command: ${command}`);
+  throw new RuntimeError(
+    "RUNTIME_COMMAND_UNREACHABLE",
+    `Unhandled command: ${command}`,
+  );
 }
