@@ -8,6 +8,8 @@ import {
   validateProviderCandidateRequest,
 } from "@evavo/art-providers";
 
+import { handleSelectionApiRequest } from "./selection-api.js";
+
 export interface ProviderApiContext {
   readonly request: IncomingMessage;
   readonly response: ServerResponse;
@@ -37,6 +39,7 @@ function providerPath(pathname: string): boolean {
 export async function handleProviderApiRequest(
   context: ProviderApiContext,
 ): Promise<boolean> {
+  if (await handleSelectionApiRequest(context)) return true;
   if (!providerPath(context.url.pathname)) return false;
   const { request, response, url, requestId } = context;
   try {
