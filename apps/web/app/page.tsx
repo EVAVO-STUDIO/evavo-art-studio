@@ -32,7 +32,7 @@ export default function HomePage() {
           <a href="#compiler">Compiler</a>
           <a href="#frame-qa">Frame QA</a>
           <a href="#sequence-qa">Sequence QA</a>
-          <a href="#quality">System</a>
+          <a href="/operations">Operations</a>
         </nav>
         <span className="status"><i /> Foundation online</span>
       </header>
@@ -45,6 +45,7 @@ export default function HomePage() {
           <div className="hero__actions">
             <a className="button button--primary" href="#compiler">Compile a production plan</a>
             <a className="button" href="#frame-qa">Inspect source pixels</a>
+            <a className="button" href="/operations">Open runtime operations</a>
           </div>
         </div>
         <div className="hero__instrument" aria-label="Art Studio foundation status">
