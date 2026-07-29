@@ -8,13 +8,20 @@ This repository is intentionally broader than an image generator. It is the shar
 
 - portable art brief, work-order, quality-gate, deliverable and repository-snapshot contracts;
 - deterministic production-plan compiler with dependency, approval and capability assignment;
+- canonical sprite identities with index-matched or deliberately shared family inheritance;
+- direction masters, key poses and neighbour-conditioned in-between frame plans;
+- explicit authored-cel, layered-rig and hybrid production methods;
+- per-layer bake, linked-cel, separate-frame, rigged-part, guide and engine-sidecar decisions;
+- exact Aseprite millisecond and Godot relative-duration timing;
+- individual lossless frames, editable source, layer manifests and packed derivatives;
+- blocking identity, proportion, crop, layer-registration, occlusion and source-parity gates;
 - safe local repository inspector with Godot project and existing-art detection;
 - JSON-first CLI for validation, planning and repository inspection;
 - versioned REST foundation for capabilities, plans and guarded repository inspection;
-- Next.js control-plane workspace with an interactive production-plan compiler;
+- Next.js control-plane workspace with an interactive continuity-aware production-plan compiler;
 - MCP v2 stdio server exposing the same capabilities to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
-- architecture, technology, quality and hub-integration decisions;
+- architecture, technology, quality, sprite-continuity and hub-integration decisions;
 - CI validation for type checks, tests and builds.
 
 ## First commands
@@ -39,8 +46,12 @@ The web workspace starts at `http://localhost:4200`. The standalone API starts o
 
 Repository inspection is restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. Provider secrets belong on workers and are never exposed to the browser or embedded in briefs.
 
-## Core rule
+## Core rules
 
 A provider response is never a final asset. Every final asset must pass the declared production stages, deterministic mastering, blocking quality gates, metadata generation and evidence bundling.
 
-See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md` and `docs/hub-integration.md`.
+A sprite sheet is never the sole source. The source package retains canonical and direction masters, individual lossless frames, exact timing, registered layers, editable cels, pivots, manifests and reproducibility evidence.
+
+Later frames may not be unrelated text-only generations. They inherit the approved identity and direction references and are conditioned by neighbouring key poses and structural controls.
+
+See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md` and `docs/hub-integration.md`.
