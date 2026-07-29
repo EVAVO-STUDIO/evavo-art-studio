@@ -1,4 +1,3 @@
-
 import path from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/server";
@@ -7,6 +6,11 @@ import * as z from "zod/v4";
 
 import { validateArtBrief } from "@evavo/art-contracts";
 import { CAPABILITY_CATALOG, createProductionPlan } from "@evavo/art-core";
+import {
+  analyseDecodedSpriteFrame,
+  analyseSpriteSequenceManifestFile,
+  decodeSpriteFrame,
+} from "@evavo/art-quality";
 import { assertPathWithinAllowedRoots, inspectRepository } from "@evavo/art-repo-inspector";
 
 const server = new McpServer({
@@ -24,6 +28,16 @@ function allowedRoots(): readonly string[] {
     .map((entry) => entry.trim())
     .filter(Boolean);
   return configured.length > 0 ? configured : [process.cwd()];
+}
+
+function toolError(code: string, error: unknown) {
+  return {
+    isError: true,
+    content: [{
+      type: "text" as const,
+      text: JSON.stringify({ code, message: error instanceof Error ? error.message : String(error) }, null, 2),
+    }],
+  };
 }
 
 server.registerTool(
@@ -47,7 +61,7 @@ server.registerTool(
 server.registerTool(
   "compile_art_production_plan",
   {
-    description: "Compile a validated art brief into a deterministic work-order graph, quality gates and deliverables.",
+    description: "Compile a validated art brief into a deterministic work-order graph, sprite continuity blueprints, quality gates and deliverables.",
     inputSchema: z.object({ brief: z.unknown() }),
   },
   async ({ brief }) => {
@@ -73,10 +87,47 @@ server.registerTool(
       const safePath = assertPathWithinAllowedRoots(repositoryPath, allowedRoots());
       return textResult(await inspectRepository(safePath));
     } catch (error: unknown) {
-      return {
-        isError: true,
-        content: [{ type: "text" as const, text: JSON.stringify({ code: "REPOSITORY_INSPECTION_REJECTED", message: error instanceof Error ? error.message : String(error) }, null, 2) }],
-      };
+      return toolError("REPOSITORY_INSPECTION_REJECTED", error);
+    }
+  },
+);
+
+server.registerTool(
+  "inspect_sprite_frame_quality",
+  {
+    description: "Decode one local sprite frame and return deterministic alpha, fake-transparency, crop, edge-halo and transparent-RGB evidence. The path must remain inside EVAVO_ART_ALLOWED_ROOTS.",
+    inputSchema: z.object({
+      imagePath: z.string().min(1),
+      expectations: z.unknown(),
+    }),
+  },
+  async ({ imagePath, expectations }) => {
+    try {
+      const safePath = assertPathWithinAllowedRoots(imagePath, allowedRoots());
+      return textResult(
+        analyseDecodedSpriteFrame(await decodeSpriteFrame(safePath), expectations),
+      );
+    } catch (error: unknown) {
+      return toolError("SPRITE_FRAME_QUALITY_REJECTED", error);
+    }
+  },
+);
+
+server.registerTool(
+  "inspect_sprite_sequence_quality",
+  {
+    description: "Inspect a guarded local sprite sequence manifest and prove shared canvas, exact timing, pivots, baselines, ground contact, ordering and declared linked-cel duplicates.",
+    inputSchema: z.object({ manifestPath: z.string().min(1) }),
+  },
+  async ({ manifestPath }) => {
+    try {
+      const roots = allowedRoots();
+      const safePath = assertPathWithinAllowedRoots(manifestPath, roots);
+      return textResult(
+        await analyseSpriteSequenceManifestFile(safePath, { allowedRoots: roots }),
+      );
+    } catch (error: unknown) {
+      return toolError("SPRITE_SEQUENCE_QUALITY_REJECTED", error);
     }
   },
 );

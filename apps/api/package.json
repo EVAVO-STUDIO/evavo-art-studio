@@ -15,6 +15,7 @@
   "dependencies": {
     "@evavo/art-contracts": "workspace:*",
     "@evavo/art-core": "workspace:*",
+    "@evavo/art-quality": "workspace:*",
     "@evavo/art-repo-inspector": "workspace:*"
   },
   "devDependencies": {

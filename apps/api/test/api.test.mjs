@@ -47,29 +47,62 @@ const brief = {
   },
 };
 
-test("serves health and continuity-aware production plans", async (t) => {
+async function withServer(run) {
   const server = createArtStudioApiServer();
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  t.after(
-    () =>
-      new Promise((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      ),
-  );
-  const address = server.address();
-  assert.ok(address && typeof address === "object");
-  const base = `http://127.0.0.1:${address.port}`;
-  const health = await fetch(`${base}/health`);
-  assert.equal(health.status, 200);
-  const plan = await fetch(`${base}/v1/plans`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(brief),
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    await run(`http://127.0.0.1:${address.port}`);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+}
+
+test("serves health and continuity-aware production plans", async () => {
+  await withServer(async (base) => {
+    const health = await fetch(`${base}/health`);
+    assert.equal(health.status, 200);
+    const plan = await fetch(`${base}/v1/plans`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(brief),
+    });
+    assert.equal(plan.status, 201);
+    const payload = await plan.json();
+    assert.equal(payload.projectName, "API Test");
+    assert.equal(payload.spriteBlueprints.length, 1);
+    assert.equal(payload.spriteBlueprints[0].totalFrames, 8);
+    assert.ok(payload.workItems.some((entry) => entry.stage === "identity-master"));
   });
-  assert.equal(plan.status, 201);
-  const payload = await plan.json();
-  assert.equal(payload.projectName, "API Test");
-  assert.equal(payload.spriteBlueprints.length, 1);
-  assert.equal(payload.spriteBlueprints[0].totalFrames, 8);
-  assert.ok(payload.workItems.some((entry) => entry.stage === "identity-master"));
+});
+
+test("inspects a real transparent sprite frame", async () => {
+  await withServer(async (base) => {
+    const response = await fetch(`${base}/v1/quality/sprite-frame`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFklEQVR4nGNgoBo4YaPxHxkPhAKyAQDgPyKxKv0aXwAAAABJRU5ErkJggg==",
+        expectations: { frameId: "fixture", transparency: "alpha-required", expectedWidth: 8, expectedHeight: 8, safePadding: 1 },
+      }),
+    });
+    assert.equal(response.status, 200);
+    const report = await response.json();
+    assert.equal(report.passed, true);
+    assert.equal(report.source.hasAlpha, true);
+  });
+});
+
+test("rejects malformed base64 as a validation error", async () => {
+  await withServer(async (base) => {
+    const response = await fetch(`${base}/v1/quality/sprite-frame`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ imageBase64: "not-base64", expectations: { transparency: "alpha-required" } }),
+    });
+    assert.equal(response.status, 422);
+    const payload = await response.json();
+    assert.equal(payload.error.code, "SPRITE_FRAME_BASE64_INVALID");
+  });
 });

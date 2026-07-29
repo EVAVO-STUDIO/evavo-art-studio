@@ -15,11 +15,13 @@ This repository is intentionally broader than an image generator. It is the shar
 - exact Aseprite millisecond and Godot relative-duration timing;
 - individual lossless frames, editable source, layer manifests and packed derivatives;
 - blocking identity, proportion, crop, layer-registration, occlusion and source-parity gates;
+- executable decoded-pixel QA for alpha, fake checkerboards, flat mattes, edge halos, hidden transparent colour and safe bounds;
+- executable sequence QA for canvas, frame order, exact duration, pivot, baseline, ground contact and declared linked-cel duplicates;
 - safe local repository inspector with Godot project and existing-art detection;
-- JSON-first CLI for validation, planning and repository inspection;
-- versioned REST foundation for capabilities, plans and guarded repository inspection;
+- JSON-first CLI for validation, planning, repository inspection and sprite QA;
+- versioned REST foundation for capabilities, plans, guarded repository inspection and sprite QA;
 - Next.js control-plane workspace with an interactive continuity-aware production-plan compiler;
-- MCP v2 stdio server exposing the same capabilities to ChatGPT, Claude and compatible agents;
+- MCP v2 stdio server exposing planning, repository inspection and sprite QA to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
 - architecture, technology, quality, sprite-continuity and hub-integration decisions;
 - CI validation for type checks, tests and builds.
@@ -32,6 +34,16 @@ pnpm check
 pnpm art -- validate --input examples/game-art-brief.json
 pnpm art -- plan --input examples/game-art-brief.json --output art-plan.json
 pnpm art -- inspect --repo C:\GitRepos\your-game --output repo-art-snapshot.json
+
+pnpm art -- quality-frame `
+  --input .\source\hero\frames\down\frame-001.png `
+  --expectations .\source\hero\frame-quality.json `
+  --output .\evidence\frame-001.quality.json
+
+pnpm art -- quality-sequence `
+  --manifest .\source\hero\hero-idle.sequence.json `
+  --output .\evidence\hero-idle.quality.json
+
 pnpm dev
 pnpm dev:api
 pnpm dev:mcp
@@ -43,8 +55,10 @@ The web workspace starts at `http://localhost:4200`. The standalone API starts o
 - `GET /v1/capabilities`
 - `POST /v1/plans`
 - `POST /v1/repositories/inspect`
+- `POST /v1/quality/sprite-frame`
+- `POST /v1/quality/sprite-sequence`
 
-Repository inspection is restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. Provider secrets belong on workers and are never exposed to the browser or embedded in briefs.
+Repository and sequence inspection are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. Provider secrets belong on workers and are never exposed to the browser or embedded in briefs.
 
 ## Core rules
 
@@ -54,4 +68,6 @@ A sprite sheet is never the sole source. The source package retains canonical an
 
 Later frames may not be unrelated text-only generations. They inherit the approved identity and direction references and are conditioned by neighbouring key poses and structural controls.
 
-See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md` and `docs/hub-integration.md`.
+Non-zero RGB beneath fully transparent pixels is not automatically a defect. It is accepted only when it behaves like deliberate edge bleed that agrees with nearby approved subject colour; unrelated matte contamination remains blocking.
+
+See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/executable-sprite-quality.md` and `docs/hub-integration.md`.

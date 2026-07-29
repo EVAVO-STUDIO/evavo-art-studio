@@ -5,13 +5,24 @@ import { fileURLToPath } from "node:url";
 
 import { validateArtBrief } from "@evavo/art-contracts";
 import { CAPABILITY_CATALOG, createProductionPlan } from "@evavo/art-core";
+import {
+  SpriteQualityInputError,
+  analyseDecodedSpriteFrame,
+  analyseSpriteSequenceManifestFile,
+  decodeSpriteFrame,
+} from "@evavo/art-quality";
 import { assertPathWithinAllowedRoots, inspectRepository } from "@evavo/art-repo-inspector";
 
 export interface ArtStudioApiOptions {
   readonly allowedOrigins?: readonly string[];
   readonly allowedRepositoryRoots?: readonly string[];
   readonly maximumBodyBytes?: number;
+  readonly maximumImageBytes?: number;
+  readonly maximumImagePixels?: number;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const writeJson = (response: ServerResponse, status: number, body: unknown, requestId: string): void => {
   response.writeHead(status, {
@@ -32,7 +43,7 @@ async function readJsonBody(request: IncomingMessage, maximumBytes: number): Pro
     chunks.push(buffer);
   }
   if (chunks.length === 0) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
 }
 
 function applyCors(request: IncomingMessage, response: ServerResponse, allowedOrigins: readonly string[]): void {
@@ -45,10 +56,52 @@ function applyCors(request: IncomingMessage, response: ServerResponse, allowedOr
   }
 }
 
+function strictBase64(value: unknown, maximumBytes: number): Buffer {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new SpriteQualityInputError(
+      "SPRITE_FRAME_BASE64_REQUIRED",
+      "imageBase64 must be a non-empty base64 string.",
+    );
+  }
+  const compact = value.replace(/\s+/g, "");
+  if (
+    compact.length % 4 !== 0 ||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(compact)
+  ) {
+    throw new SpriteQualityInputError(
+      "SPRITE_FRAME_BASE64_INVALID",
+      "imageBase64 is not valid padded base64.",
+    );
+  }
+  const buffer = Buffer.from(compact, "base64");
+  if (buffer.length > maximumBytes) {
+    throw new SpriteQualityInputError(
+      "SPRITE_FRAME_INPUT_TOO_LARGE",
+      `Decoded image exceeds ${maximumBytes} bytes.`,
+    );
+  }
+  return buffer;
+}
+
+function qualityError(response: ServerResponse, requestId: string, error: unknown): void {
+  if (error instanceof SpriteQualityInputError) {
+    writeJson(
+      response,
+      422,
+      { error: { code: error.code, message: error.message } },
+      requestId,
+    );
+    return;
+  }
+  throw error;
+}
+
 export function createArtStudioApiServer(options: ArtStudioApiOptions = {}): Server {
   const allowedOrigins = options.allowedOrigins ?? [];
   const allowedRepositoryRoots = options.allowedRepositoryRoots ?? [process.cwd()];
-  const maximumBodyBytes = options.maximumBodyBytes ?? 1_048_576;
+  const maximumBodyBytes = options.maximumBodyBytes ?? 24 * 1024 * 1024;
+  const maximumImageBytes = options.maximumImageBytes ?? 16 * 1024 * 1024;
+  const maximumImagePixels = options.maximumImagePixels ?? 16_777_216;
 
   return createServer(async (request, response) => {
     const requestId = randomUUID();
@@ -81,12 +134,49 @@ export function createArtStudioApiServer(options: ArtStudioApiOptions = {}): Ser
       }
       if (request.method === "POST" && url.pathname === "/v1/repositories/inspect") {
         const body = await readJsonBody(request, maximumBodyBytes);
-        if (!body || typeof body !== "object" || !("path" in body) || typeof body.path !== "string") {
+        if (!isRecord(body) || typeof body.path !== "string") {
           writeJson(response, 422, { error: { code: "INVALID_REPOSITORY_REQUEST", message: "path is required." } }, requestId);
           return;
         }
         const repositoryPath = assertPathWithinAllowedRoots(body.path, allowedRepositoryRoots);
         writeJson(response, 200, await inspectRepository(repositoryPath), requestId);
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/v1/quality/sprite-frame") {
+        const body = await readJsonBody(request, maximumBodyBytes);
+        if (!isRecord(body) || !("expectations" in body)) {
+          writeJson(response, 422, { error: { code: "SPRITE_FRAME_REQUEST_INVALID", message: "imageBase64 and expectations are required." } }, requestId);
+          return;
+        }
+        try {
+          const image = strictBase64(body.imageBase64, maximumImageBytes);
+          const decoded = await decodeSpriteFrame(image, {
+            maximumInputBytes: maximumImageBytes,
+            maximumPixels: maximumImagePixels,
+          });
+          writeJson(response, 200, analyseDecodedSpriteFrame(decoded, body.expectations), requestId);
+        } catch (error: unknown) {
+          qualityError(response, requestId, error);
+        }
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/v1/quality/sprite-sequence") {
+        const body = await readJsonBody(request, maximumBodyBytes);
+        if (!isRecord(body) || typeof body.manifestPath !== "string") {
+          writeJson(response, 422, { error: { code: "SPRITE_SEQUENCE_REQUEST_INVALID", message: "manifestPath is required." } }, requestId);
+          return;
+        }
+        try {
+          const manifestPath = assertPathWithinAllowedRoots(body.manifestPath, allowedRepositoryRoots);
+          const report = await analyseSpriteSequenceManifestFile(manifestPath, {
+            allowedRoots: allowedRepositoryRoots,
+            maximumInputBytes: maximumImageBytes,
+            maximumPixels: maximumImagePixels,
+          });
+          writeJson(response, 200, report, requestId);
+        } catch (error: unknown) {
+          qualityError(response, requestId, error);
+        }
         return;
       }
       writeJson(response, 404, { error: { code: "NOT_FOUND", message: "Route not found." } }, requestId);
@@ -105,9 +195,10 @@ const isEntryPoint = process.argv[1] !== undefined && fileURLToPath(import.meta.
 if (isEntryPoint) {
   const port = Number(process.env.PORT ?? "4100");
   const host = process.env.HOST ?? "127.0.0.1";
+  const roots = envList("EVAVO_ART_ALLOWED_ROOTS");
   const server = createArtStudioApiServer({
     allowedOrigins: envList("EVAVO_ART_ALLOWED_ORIGINS"),
-    allowedRepositoryRoots: envList("EVAVO_ART_ALLOWED_ROOTS").length > 0 ? envList("EVAVO_ART_ALLOWED_ROOTS") : [process.cwd()],
+    allowedRepositoryRoots: roots.length > 0 ? roots : [process.cwd()],
   });
   server.listen(port, host, () => {
     process.stdout.write(`${JSON.stringify({ service: "evavo-art-studio-api", status: "listening", host, port })}\n`);

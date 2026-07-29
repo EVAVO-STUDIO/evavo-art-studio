@@ -1,4 +1,3 @@
-
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
@@ -10,6 +9,7 @@
   "references": [
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
+    { "path": "../../packages/quality" },
     { "path": "../../packages/repo-inspector" }
   ],
   "include": ["src/**/*.ts"]
