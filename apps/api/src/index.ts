@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +28,7 @@ export interface ArtStudioApiOptions {
   readonly maximumImageBytes?: number;
   readonly maximumImagePixels?: number;
   readonly allowWrites?: boolean;
+  readonly writeToken?: string;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -62,7 +63,10 @@ function applyCors(request: IncomingMessage, response: ServerResponse, allowedOr
     response.setHeader("access-control-allow-origin", origin);
     response.setHeader("vary", "origin");
     response.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
-    response.setHeader("access-control-allow-headers", "content-type,authorization,x-evavo-launch");
+    response.setHeader(
+      "access-control-allow-headers",
+      "content-type,authorization,x-evavo-launch,x-evavo-art-write-token",
+    );
   }
 }
 
@@ -119,6 +123,31 @@ function deliveryError(response: ServerResponse, requestId: string, error: unkno
   throw error;
 }
 
+function normalizeWriteToken(value: string | undefined): string | undefined {
+  const token = value?.trim();
+  if (!token) return undefined;
+  const bytes = Buffer.byteLength(token, "utf8");
+  return bytes >= 32 && bytes <= 1024 ? token : undefined;
+}
+
+function requestWriteToken(request: IncomingMessage): string | undefined {
+  const authorization = request.headers.authorization;
+  if (authorization?.startsWith("Bearer ")) {
+    return authorization.slice("Bearer ".length).trim();
+  }
+  const header = request.headers["x-evavo-art-write-token"];
+  if (Array.isArray(header)) return header[0]?.trim();
+  return header?.trim();
+}
+
+function writeTokenMatches(request: IncomingMessage, configured: string): boolean {
+  const supplied = requestWriteToken(request);
+  if (!supplied) return false;
+  const configuredDigest = createHash("sha256").update(configured, "utf8").digest();
+  const suppliedDigest = createHash("sha256").update(supplied, "utf8").digest();
+  return timingSafeEqual(configuredDigest, suppliedDigest);
+}
+
 export function createArtStudioApiServer(options: ArtStudioApiOptions = {}): Server {
   const allowedOrigins = options.allowedOrigins ?? [];
   const allowedRepositoryRoots = options.allowedRepositoryRoots ?? [process.cwd()];
@@ -126,6 +155,8 @@ export function createArtStudioApiServer(options: ArtStudioApiOptions = {}): Ser
   const maximumImageBytes = options.maximumImageBytes ?? 16 * 1024 * 1024;
   const maximumImagePixels = options.maximumImagePixels ?? 16_777_216;
   const allowWrites = options.allowWrites ?? false;
+  const writeToken = normalizeWriteToken(options.writeToken);
+  const writesReady = allowWrites && writeToken !== undefined;
 
   return createServer(async (request, response) => {
     const requestId = randomUUID();
@@ -139,7 +170,7 @@ export function createArtStudioApiServer(options: ArtStudioApiOptions = {}): Ser
     try {
       const url = new URL(request.url ?? "/", "http://localhost");
       if (request.method === "GET" && url.pathname === "/health") {
-        writeJson(response, 200, { status: "ok", service: "evavo-art-studio-api", version: "0.1.0", writesEnabled: allowWrites }, requestId);
+        writeJson(response, 200, { status: "ok", service: "evavo-art-studio-api", version: "0.1.0", writesEnabled: writesReady }, requestId);
         return;
       }
       if (request.method === "GET" && url.pathname === "/v1/capabilities") {
@@ -218,6 +249,35 @@ export function createArtStudioApiServer(options: ArtStudioApiOptions = {}): Ser
           );
           return;
         }
+        if (!writeToken) {
+          writeJson(
+            response,
+            503,
+            {
+              error: {
+                code: "ART_STUDIO_WRITE_AUTH_UNAVAILABLE",
+                message: "Atlas writes require a server-side write token of at least 32 bytes.",
+              },
+            },
+            requestId,
+          );
+          return;
+        }
+        if (!writeTokenMatches(request, writeToken)) {
+          writeJson(
+            response,
+            401,
+            {
+              error: {
+                code: "ART_STUDIO_WRITE_UNAUTHORIZED",
+                message: "A valid atlas write token is required.",
+              },
+            },
+            requestId,
+          );
+          return;
+        }
+
         const body = await readJsonBody(request, maximumBodyBytes);
         if (
           !isRecord(body) ||
@@ -302,6 +362,7 @@ if (isEntryPoint) {
     allowedOrigins: envList("EVAVO_ART_ALLOWED_ORIGINS"),
     allowedRepositoryRoots: roots.length > 0 ? roots : [process.cwd()],
     allowWrites: process.env.EVAVO_ART_ALLOW_WRITES === "true",
+    writeToken: process.env.EVAVO_ART_WRITE_TOKEN,
   });
   server.listen(port, host, () => {
     process.stdout.write(`${JSON.stringify({ service: "evavo-art-studio-api", status: "listening", host, port })}\n`);
