@@ -18,6 +18,7 @@
     "@evavo/art-core": "workspace:*",
     "@evavo/art-godot": "workspace:*",
     "@evavo/art-media": "workspace:*",
+    "@evavo/art-providers": "workspace:*",
     "@evavo/art-quality": "workspace:*",
     "@evavo/art-repo-inspector": "workspace:*",
     "@evavo/art-runtime": "workspace:*"
