@@ -28,7 +28,7 @@ test("selection OpenAPI extension covers ranking and separate promotion", async 
     "expectedGeneration",
     "expectedArtifactId",
     "selection.compare",
-    "selection.promote",
+    "compare-and-swap",
   ]) {
     assert.ok(source.includes(token), `missing selection OpenAPI token: ${token}`);
   }
