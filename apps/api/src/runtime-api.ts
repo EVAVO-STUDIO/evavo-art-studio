@@ -18,8 +18,8 @@ export interface RuntimeApiContext {
   readonly url: URL;
   readonly requestId: string;
   readonly maximumBodyBytes: number;
-  readonly runtime?: RuntimeRepository;
-  readonly artifacts?: ArtifactStore;
+  readonly runtime: RuntimeRepository | undefined;
+  readonly artifacts: ArtifactStore | undefined;
   readonly accessReady: boolean;
   readonly accessAuthorized: boolean;
   readonly readJsonBody: (
@@ -84,7 +84,14 @@ function integer(
 
 function csv(value: string | null): readonly string[] | undefined {
   if (!value) return undefined;
-  const result = [...new Set(value.split(",").map((entry) => entry.trim()).filter(Boolean))];
+  const result = [
+    ...new Set(
+      value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  ];
   return result.length ? result : undefined;
 }
 
@@ -93,7 +100,10 @@ function states(value: string | null): readonly RuntimeJobState[] | undefined {
   if (!entries) return undefined;
   for (const entry of entries) {
     if (!RUNTIME_STATES.has(entry as RuntimeJobState)) {
-      throw new RuntimeError("RUNTIME_QUERY_INVALID", `Unsupported runtime state: ${entry}`);
+      throw new RuntimeError(
+        "RUNTIME_QUERY_INVALID",
+        `Unsupported runtime state: ${entry}`,
+      );
     }
   }
   return entries as RuntimeJobState[];
@@ -155,7 +165,9 @@ function requireAccess(context: RuntimeApiContext): boolean {
 
 function statusFor(error: RuntimeError | ArtifactStoreError): number {
   if (/NOT_FOUND/.test(error.code)) return 404;
-  if (/CONFLICT|TERMINAL|INVALID_STATE|DEPENDENCY_FAILED/.test(error.code)) return 409;
+  if (/CONFLICT|TERMINAL|INVALID_STATE|DEPENDENCY_FAILED/.test(error.code)) {
+    return 409;
+  }
   return 422;
 }
 
@@ -172,7 +184,9 @@ function sendError(context: RuntimeApiContext, error: unknown): void {
   throw error;
 }
 
-function jobRoute(pathname: string): Readonly<{ jobId: string; action?: string }> | null {
+function jobRoute(
+  pathname: string,
+): Readonly<{ jobId: string; action?: string }> | null {
   const match = /^\/v1\/runtime\/jobs\/([^/]+)(?:\/([^/]+))?$/.exec(pathname);
   if (!match?.[1]) return null;
   return {
@@ -181,10 +195,17 @@ function jobRoute(pathname: string): Readonly<{ jobId: string; action?: string }
   };
 }
 
-function artifactRoute(pathname: string): Readonly<{ artifactId: ArtifactId; verify: boolean }> | null {
-  const match = /^\/v1\/artifacts\/(artifact_[a-f0-9]{64})(?:\/(verify))?$/.exec(pathname);
+function artifactRoute(
+  pathname: string,
+): Readonly<{ artifactId: ArtifactId; verify: boolean }> | null {
+  const match = /^\/v1\/artifacts\/(artifact_[a-f0-9]{64})(?:\/(verify))?$/.exec(
+    pathname,
+  );
   if (!match?.[1]) return null;
-  return { artifactId: artifactId(match[1]), verify: match[2] === "verify" };
+  return {
+    artifactId: artifactId(match[1]),
+    verify: match[2] === "verify",
+  };
 }
 
 export async function handleRuntimeApiRequest(
@@ -202,7 +223,8 @@ export async function handleRuntimeApiRequest(
         {
           error: {
             code: "ART_STUDIO_RUNTIME_NOT_CONFIGURED",
-            message: "A durable runtime repository is not configured for this API process.",
+            message:
+              "A durable runtime repository is not configured for this API process.",
           },
         },
         requestId,
@@ -220,7 +242,8 @@ export async function handleRuntimeApiRequest(
         {
           error: {
             code: "ART_STUDIO_ARTIFACT_STORE_NOT_CONFIGURED",
-            message: "An artifact store is not configured for this API process.",
+            message:
+              "An artifact store is not configured for this API process.",
           },
         },
         requestId,
@@ -241,7 +264,13 @@ export async function handleRuntimeApiRequest(
             ...(stateFilter ? { states: stateFilter } : {}),
             ...(queues ? { queues } : {}),
             ...(kinds ? { kinds } : {}),
-            limit: integer(url.searchParams.get("limit"), 1_000, 1, 100_000, "limit"),
+            limit: integer(
+              url.searchParams.get("limit"),
+              1_000,
+              1,
+              100_000,
+              "limit",
+            ),
           }),
         },
         requestId,
@@ -256,7 +285,13 @@ export async function handleRuntimeApiRequest(
         {
           schemaVersion: "1.0",
           events: await runtime!.events(
-            integer(url.searchParams.get("after"), 0, 0, Number.MAX_SAFE_INTEGER, "after"),
+            integer(
+              url.searchParams.get("after"),
+              0,
+              0,
+              Number.MAX_SAFE_INTEGER,
+              "after",
+            ),
           ),
         },
         requestId,
@@ -265,7 +300,10 @@ export async function handleRuntimeApiRequest(
     }
 
     if (request.method === "POST" && url.pathname === "/v1/runtime/jobs") {
-      const body = await context.readJsonBody(request, context.maximumBodyBytes);
+      const body = await context.readJsonBody(
+        request,
+        context.maximumBodyBytes,
+      );
       const jobs = Array.isArray(body)
         ? await runtime!.submitBatch(
             body as unknown as readonly RuntimeJobSubmission[],
@@ -275,13 +313,23 @@ export async function handleRuntimeApiRequest(
             body as unknown as RuntimeJobSubmission,
             actor(request),
           );
-      context.writeJson(response, 201, { schemaVersion: "1.0", jobs }, requestId);
+      context.writeJson(
+        response,
+        201,
+        { schemaVersion: "1.0", jobs },
+        requestId,
+      );
       return true;
     }
 
     if (request.method === "POST" && url.pathname === "/v1/runtime/recover") {
       const jobs = await runtime!.recoverExpiredLeases(actor(request));
-      context.writeJson(response, 200, { schemaVersion: "1.0", jobs }, requestId);
+      context.writeJson(
+        response,
+        200,
+        { schemaVersion: "1.0", jobs },
+        requestId,
+      );
       return true;
     }
 
@@ -299,7 +347,10 @@ export async function handleRuntimeApiRequest(
         return true;
       }
       if (request.method === "POST" && job.action) {
-        const body = await context.readJsonBody(request, context.maximumBodyBytes);
+        const body = await context.readJsonBody(
+          request,
+          context.maximumBodyBytes,
+        );
         const record = isRecord(body) ? body : {};
         const operator = actor(request);
         let value;
@@ -363,7 +414,10 @@ export async function handleRuntimeApiRequest(
         return true;
       }
       if (request.method === "POST") {
-        const body = await context.readJsonBody(request, context.maximumBodyBytes);
+        const body = await context.readJsonBody(
+          request,
+          context.maximumBodyBytes,
+        );
         if (
           !isRecord(body) ||
           typeof body.namespace !== "string" ||
