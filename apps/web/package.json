@@ -1,4 +1,3 @@
-
 {
   "name": "@evavo/art-studio-web",
   "version": "0.1.0",
@@ -14,6 +13,7 @@
   "dependencies": {
     "@evavo/art-contracts": "workspace:*",
     "@evavo/art-core": "workspace:*",
+    "@evavo/art-quality": "workspace:*",
     "next": "^16.2.12",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
