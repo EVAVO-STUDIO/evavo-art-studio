@@ -18,6 +18,11 @@ import {
 } from "@evavo/art-quality";
 import { inspectRepository } from "@evavo/art-repo-inspector";
 
+import {
+  handleLocalControlCommand,
+  type LocalControlValues,
+} from "./runtime-commands.js";
+
 const help = `EVAVO Art Studio CLI
 
 Usage:
@@ -29,9 +34,25 @@ Usage:
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
   evavo-art atlas-build --manifest atlas.json --output-dir generated [--godot-project C:\\GitRepos\\game] [--godot-executable C:\\Path\\Godot_v4.6.2.exe]
 
+  evavo-art runtime-submit --input job.json [--runtime-root .art-studio/runtime] [--actor cli]
+  evavo-art runtime-list [--state queued,running] [--queue media] [--kind sprite.atlas.build] [--limit 100]
+  evavo-art runtime-show --job job_id
+  evavo-art runtime-events [--after 0]
+  evavo-art runtime-cancel --job job_id [--force]
+  evavo-art runtime-pause --job job_id [--force]
+  evavo-art runtime-resume --job job_id
+  evavo-art runtime-redrive --job job_id [--attempts 1]
+  evavo-art runtime-recover
+
+  evavo-art artifact-put --input file.png --descriptor descriptor.json [--artifact-root .art-studio/artifacts]
+  evavo-art artifact-show --artifact artifact_sha256
+  evavo-art artifact-verify --artifact artifact_sha256
+  evavo-art artifact-ref-set --namespace projects/demo --name approved-master --artifact artifact_sha256 [--expected-generation 0]
+  evavo-art artifact-ref-resolve --namespace projects/demo --name approved-master
+
 All commands emit JSON so ChatGPT, Claude, CI and scripts can consume the same contract.
 A quality command exits with code 3 when deterministic blocking gates fail.
-Atlas writes are explicit, root-scoped and never call a provider.
+Atlas and durable-runtime writes are explicit, local, root-scoped and never call a provider.
 `;
 
 async function readJson(filePath: string): Promise<unknown> {
@@ -54,9 +75,25 @@ async function main(): Promise<void> {
       repo: { type: "string", short: "r" },
       expectations: { type: "string", short: "e" },
       manifest: { type: "string", short: "m" },
+      descriptor: { type: "string", short: "d" },
       "output-dir": { type: "string" },
       "godot-project": { type: "string" },
       "godot-executable": { type: "string" },
+      "runtime-root": { type: "string" },
+      "artifact-root": { type: "string" },
+      artifact: { type: "string" },
+      job: { type: "string" },
+      state: { type: "string" },
+      queue: { type: "string" },
+      kind: { type: "string" },
+      limit: { type: "string" },
+      actor: { type: "string" },
+      attempts: { type: "string" },
+      after: { type: "string" },
+      force: { type: "boolean" },
+      namespace: { type: "string" },
+      name: { type: "string" },
+      "expected-generation": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
     allowPositionals: false,
@@ -68,8 +105,20 @@ async function main(): Promise<void> {
     return;
   }
 
+  const localControl = await handleLocalControlCommand(
+    command,
+    parsed.values as LocalControlValues,
+  );
+  if (localControl.handled) {
+    await emit(localControl.value, parsed.values.output);
+    return;
+  }
+
   if (command === "capabilities") {
-    await emit({ schemaVersion: "1.0", capabilities: CAPABILITY_CATALOG }, parsed.values.output);
+    await emit(
+      { schemaVersion: "1.0", capabilities: CAPABILITY_CATALOG },
+      parsed.values.output,
+    );
     return;
   }
 
@@ -94,7 +143,9 @@ async function main(): Promise<void> {
   }
 
   if (command === "quality-sequence") {
-    if (!parsed.values.manifest) throw new Error("--manifest is required for quality-sequence.");
+    if (!parsed.values.manifest) {
+      throw new Error("--manifest is required for quality-sequence.");
+    }
     const manifestPath = path.resolve(parsed.values.manifest);
     const report = await analyseSpriteSequenceManifestFile(manifestPath, {
       allowedRoots: [path.dirname(manifestPath)],
@@ -106,7 +157,9 @@ async function main(): Promise<void> {
 
   if (command === "atlas-build") {
     if (!parsed.values.manifest) throw new Error("--manifest is required for atlas-build.");
-    if (!parsed.values["output-dir"]) throw new Error("--output-dir is required for atlas-build.");
+    if (!parsed.values["output-dir"]) {
+      throw new Error("--output-dir is required for atlas-build.");
+    }
     if (parsed.values["godot-executable"] && !parsed.values["godot-project"]) {
       throw new Error("--godot-project is required when --godot-executable is supplied.");
     }
@@ -129,7 +182,10 @@ async function main(): Promise<void> {
             godotExecutable: parsed.values["godot-executable"],
             projectPath,
             importerPath: toGodotResourcePath(projectPath, godot.importerPath),
-            descriptorResourcePath: toGodotResourcePath(projectPath, godot.descriptorPath),
+            descriptorResourcePath: toGodotResourcePath(
+              projectPath,
+              godot.descriptorPath,
+            ),
           })
         : undefined;
 
@@ -184,7 +240,11 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "EVAVO_ART_CLI_ERROR";
   const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${JSON.stringify({ error: { code: "EVAVO_ART_CLI_ERROR", message } })}\n`);
+  process.stderr.write(`${JSON.stringify({ error: { code, message } })}\n`);
   process.exitCode = 1;
 });
