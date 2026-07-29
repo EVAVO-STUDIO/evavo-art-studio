@@ -8,6 +8,14 @@ import {
   verifyOperatorSession,
   type OperatorSessionClaims,
 } from "./operator-auth";
+import {
+  containsUnredactedSecretKey,
+  redactOperatorValue,
+} from "./operator-redaction";
+import {
+  operatorUpstreamPathAllowed,
+  type OperatorUpstreamMethod,
+} from "./operator-upstream-policy";
 
 const DEFAULT_API_TIMEOUT_MS = 15_000;
 const DEFAULT_RESPONSE_LIMIT_BYTES = 8 * 1024 * 1024;
@@ -16,8 +24,8 @@ const RATE_WINDOW_MS = 60_000;
 const RATE_MAXIMUM_REQUESTS = 180;
 
 type Environment = Readonly<Record<string, string | undefined>>;
-
 type RateEntry = { count: number; resetsAt: number };
+
 const requestRates = new Map<string, RateEntry>();
 
 export interface OperatorApiConfiguration {
@@ -123,6 +131,7 @@ export async function readBoundedOperatorJson(
     );
   }
   if (!request.body) return {};
+
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -140,10 +149,13 @@ export async function readBoundedOperatorJson(
     }
     chunks.push(next.value);
   }
+
+  const text = Buffer.concat(chunks.map((entry) => Buffer.from(entry))).toString(
+    "utf8",
+  );
+  if (!text.trim()) return {};
   try {
-    return JSON.parse(
-      Buffer.concat(chunks.map((entry) => Buffer.from(entry))).toString("utf8"),
-    ) as unknown;
+    return JSON.parse(text) as unknown;
   } catch {
     throw new OperatorGatewayError(
       "OPERATOR_INVALID_JSON",
@@ -161,6 +173,7 @@ function rateAllowed(sessionId: string, now = Date.now()): boolean {
   }
   if (existing.count >= RATE_MAXIMUM_REQUESTS) return false;
   existing.count += 1;
+
   if (requestRates.size > 2_000) {
     for (const [key, entry] of requestRates) {
       if (entry.resetsAt <= now) requestRates.delete(key);
@@ -199,7 +212,16 @@ export function requireOperatorSession(
 }
 
 function safeSegment(value: string, name: string, pattern: RegExp): string {
-  const decoded = decodeURIComponent(value);
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    throw new OperatorGatewayError(
+      "OPERATOR_PATH_INVALID",
+      `${name} contains invalid percent encoding.`,
+      422,
+    );
+  }
   if (!pattern.test(decoded)) {
     throw new OperatorGatewayError(
       "OPERATOR_PATH_INVALID",
@@ -246,6 +268,7 @@ async function boundedResponseBody(
     );
   }
   if (!response.body) return "";
+
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -263,11 +286,13 @@ async function boundedResponseBody(
     }
     chunks.push(next.value);
   }
-  return Buffer.concat(chunks.map((entry) => Buffer.from(entry))).toString("utf8");
+  return Buffer.concat(chunks.map((entry) => Buffer.from(entry))).toString(
+    "utf8",
+  );
 }
 
 export interface OperatorApiRequestOptions {
-  readonly method?: "GET" | "POST";
+  readonly method?: OperatorUpstreamMethod;
   readonly body?: unknown;
   readonly actor?: string;
 }
@@ -288,6 +313,7 @@ export async function requestOperatorApi(
       403,
     );
   }
+
   try {
     const session = requireOperatorSession(request);
     const configuration = operatorApiConfiguration();
@@ -298,23 +324,28 @@ export async function requestOperatorApi(
         503,
       );
     }
-    if (!upstreamPath.startsWith("/v1/")) {
+
+    const method = options.method ?? "GET";
+    if (!operatorUpstreamPathAllowed(upstreamPath, method)) {
       throw new OperatorGatewayError(
         "OPERATOR_PATH_INVALID",
-        "Operator upstream path is not allowed.",
+        "Operator upstream path or method is not allowed.",
         422,
       );
     }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), configuration.timeoutMs);
     timeout.unref?.();
     try {
       const response = await fetch(`${configuration.baseUrl}${upstreamPath}`, {
-        method: options.method ?? "GET",
+        method,
         headers: {
           accept: "application/json",
           authorization: `Bearer ${configuration.token}`,
-          "content-type": "application/json",
+          ...(options.body === undefined
+            ? {}
+            : { "content-type": "application/json" }),
           "x-evavo-actor":
             options.actor ?? `web-operator:${session.sessionId.slice(0, 12)}`,
           "x-request-id": randomUUID(),
@@ -326,6 +357,7 @@ export async function requestOperatorApi(
         redirect: "error",
         signal: controller.signal,
       });
+
       const text = await boundedResponseBody(
         response,
         configuration.responseLimitBytes,
@@ -342,10 +374,20 @@ export async function requestOperatorApi(
           );
         }
       }
-      return operatorResponse(body, response.status, {
+
+      const redactedBody = redactOperatorValue(body);
+      if (containsUnredactedSecretKey(redactedBody)) {
+        throw new OperatorGatewayError(
+          "OPERATOR_REDACTION_FAILED",
+          "The operator response could not be safely redacted.",
+          502,
+        );
+      }
+      const upstreamRequestId = response.headers.get("x-request-id");
+      return operatorResponse(redactedBody, response.status, {
         "x-operator-upstream-status": String(response.status),
-        ...(response.headers.get("x-request-id")
-          ? { "x-operator-upstream-request-id": response.headers.get("x-request-id")! }
+        ...(upstreamRequestId
+          ? { "x-operator-upstream-request-id": upstreamRequestId }
           : {}),
       });
     } finally {
@@ -370,9 +412,7 @@ export function operatorErrorResponse(error: unknown): NextResponse {
         code: aborted ? "OPERATOR_API_TIMEOUT" : "OPERATOR_GATEWAY_ERROR",
         message: aborted
           ? "The Art Studio API did not respond before the operator timeout."
-          : error instanceof Error
-            ? error.message
-            : String(error),
+          : "The operator gateway could not complete the request.",
       },
     },
     aborted ? 504 : 500,
