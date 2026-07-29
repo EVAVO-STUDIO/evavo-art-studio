@@ -29,6 +29,28 @@ async function image(x, colour) {
   return sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
 
+async function artifactByRole(artifacts, artifactIds, role) {
+  for (const artifactId of artifactIds) {
+    const artifact = await artifacts.get(artifactId);
+    if (artifact?.labels.artifactRole === role) return artifact;
+  }
+  return null;
+}
+
+function runtimeDiagnostic(run, job) {
+  return JSON.stringify(
+    {
+      run,
+      state: job?.state,
+      failure: job?.failure,
+      attempts: job?.attempts,
+      outputArtifacts: job?.outputArtifacts,
+    },
+    null,
+    2,
+  );
+}
+
 test("durable worker selects and promotes only through separate governed jobs", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-selection-worker-"));
   const artifacts = new LocalArtifactStore({ root: path.join(root, "artifacts") });
@@ -99,11 +121,17 @@ test("durable worker selects and promotes only through separate governed jobs", 
     handlers: createBuiltinHandlers([root]),
   });
   const firstRun = await worker.runOnce();
-  assert.equal(firstRun.succeeded, 1);
   const selectedJob = await runtime.get(selectionJob.id);
-  assert.equal(selectedJob.state, "succeeded");
-  assert.equal(selectedJob.outputArtifacts.length, 1);
-  const selectionEvidenceId = selectedJob.outputArtifacts[0];
+  assert.equal(firstRun.succeeded, 1, runtimeDiagnostic(firstRun, selectedJob));
+  assert.equal(selectedJob.state, "succeeded", runtimeDiagnostic(firstRun, selectedJob));
+  assert.equal(selectedJob.outputArtifacts.length, 2);
+  const selectionEvidence = await artifactByRole(
+    artifacts,
+    selectedJob.outputArtifacts,
+    "candidate-selection-evidence",
+  );
+  assert.ok(selectionEvidence, "selection evidence artifact must be retained");
+  const selectionEvidenceId = selectionEvidence.artifactId;
   const selectionBody = JSON.parse(
     (await artifacts.read(selectionEvidenceId)).toString("utf8"),
   );
@@ -142,10 +170,10 @@ test("durable worker selects and promotes only through separate governed jobs", 
     timeoutMs: 60_000,
   });
   const secondRun = await worker.runOnce();
-  assert.equal(secondRun.succeeded, 1);
   const promotedJob = await runtime.get(promotionJob.id);
-  assert.equal(promotedJob.state, "succeeded");
-  assert.equal(promotedJob.outputArtifacts.length, 2);
+  assert.equal(secondRun.succeeded, 1, runtimeDiagnostic(secondRun, promotedJob));
+  assert.equal(promotedJob.state, "succeeded", runtimeDiagnostic(secondRun, promotedJob));
+  assert.equal(promotedJob.outputArtifacts.length, 3);
   const approved = await artifacts.resolveReference(
     "projects/worker",
     "approved-master",
@@ -156,4 +184,10 @@ test("durable worker selects and promotes only through separate governed jobs", 
   assert.equal(master.storageClass, "master");
   assert.equal(master.labels.artifactRole, "selected-art-master");
   assert.ok(master.sourceArtifacts.includes(selectionEvidenceId));
+  const authorization = await artifactByRole(
+    artifacts,
+    promotedJob.outputArtifacts,
+    "candidate-promotion-authorization",
+  );
+  assert.ok(authorization, "promotion authorization evidence must be retained");
 });
