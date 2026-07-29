@@ -16,7 +16,17 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
   const input = path.join(root, "candidate.png");
   const output = path.join(root, "candidate.alpha.png");
   const evidence = path.join(root, "candidate.alpha.evidence.json");
+  const expectations = path.join(root, "frame-quality.json");
   await writeFile(input, CHROMA_CANDIDATE);
+  await writeFile(
+    expectations,
+    JSON.stringify({
+      frameId: "hero-idle-down-001",
+      safePadding: 1,
+      maximumHaloFraction: 1,
+      maximumUnexpectedTransparentRgbFraction: 1,
+    }),
+  );
   const result = spawnSync(
     process.execPath,
     [
@@ -30,6 +40,8 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
       output,
       "--evidence",
       evidence,
+      "--expectations",
+      expectations,
       "--opaque-seed-distance",
       "300",
       "--edge-search-radius",
@@ -59,13 +71,7 @@ test("CLI fails closed when the declared matte is absent", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-master-cli-fail-"));
   const input = path.join(root, "candidate.png");
   const output = path.join(root, "candidate.alpha.png");
-  await writeFile(
-    input,
-    Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFklEQVR4nGP8z8DwnwEPYMInOXwUAADu2QIOK6/KzgAAAABJRU5ErkJggg==",
-      "base64",
-    ),
-  );
+  await writeFile(input, CHROMA_CANDIDATE);
   const result = spawnSync(
     process.execPath,
     [
@@ -74,7 +80,7 @@ test("CLI fails closed when the declared matte is absent", async () => {
       "--input",
       input,
       "--matte",
-      "#00ff00",
+      "#0000ff",
       "--output",
       output,
     ],
