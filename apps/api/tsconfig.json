@@ -9,6 +9,8 @@
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
     { "path": "../../packages/quality" },
+    { "path": "../../packages/media" },
+    { "path": "../../packages/godot" },
     { "path": "../../packages/repo-inspector" }
   ],
   "include": ["src/**/*.ts"]

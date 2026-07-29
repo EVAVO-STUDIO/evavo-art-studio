@@ -6,6 +6,12 @@ import { parseArgs } from "node:util";
 import { validateArtBrief } from "@evavo/art-contracts";
 import { CAPABILITY_CATALOG, createProductionPlan } from "@evavo/art-core";
 import {
+  runGodotSpriteFramesImport,
+  toGodotResourcePath,
+  writeGodotSpriteFramesImporter,
+} from "@evavo/art-godot";
+import { buildSpriteAtlasPackage } from "@evavo/art-media";
+import {
   analyseDecodedSpriteFrame,
   analyseSpriteSequenceManifestFile,
   decodeSpriteFrame,
@@ -21,9 +27,11 @@ Usage:
   evavo-art inspect --repo C:\\GitRepos\\my-game [--output snapshot.json]
   evavo-art quality-frame --input frame.png --expectations frame-quality.json [--output report.json]
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
+  evavo-art atlas-build --manifest atlas.json --output-dir generated [--godot-project C:\\GitRepos\\game] [--godot-executable C:\\Path\\Godot_v4.6.2.exe]
 
 All commands emit JSON so ChatGPT, Claude, CI and scripts can consume the same contract.
 A quality command exits with code 3 when deterministic blocking gates fail.
+Atlas writes are explicit, root-scoped and never call a provider.
 `;
 
 async function readJson(filePath: string): Promise<unknown> {
@@ -46,6 +54,9 @@ async function main(): Promise<void> {
       repo: { type: "string", short: "r" },
       expectations: { type: "string", short: "e" },
       manifest: { type: "string", short: "m" },
+      "output-dir": { type: "string" },
+      "godot-project": { type: "string" },
+      "godot-executable": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
     allowPositionals: false,
@@ -90,6 +101,67 @@ async function main(): Promise<void> {
     });
     await emit(report, parsed.values.output);
     if (!report.passed) process.exitCode = 3;
+    return;
+  }
+
+  if (command === "atlas-build") {
+    if (!parsed.values.manifest) throw new Error("--manifest is required for atlas-build.");
+    if (!parsed.values["output-dir"]) throw new Error("--output-dir is required for atlas-build.");
+    if (parsed.values["godot-executable"] && !parsed.values["godot-project"]) {
+      throw new Error("--godot-project is required when --godot-executable is supplied.");
+    }
+
+    const manifestPath = path.resolve(parsed.values.manifest);
+    const outputDirectory = path.resolve(parsed.values["output-dir"]);
+    const projectPath = parsed.values["godot-project"]
+      ? path.resolve(parsed.values["godot-project"])
+      : undefined;
+    const allowedRoots = [projectPath ?? path.dirname(manifestPath)];
+    const atlas = await buildSpriteAtlasPackage(manifestPath, outputDirectory, {
+      allowedRoots,
+    });
+    const godot = projectPath
+      ? await writeGodotSpriteFramesImporter(atlas, projectPath)
+      : undefined;
+    const execution =
+      godot && projectPath && parsed.values["godot-executable"]
+        ? await runGodotSpriteFramesImport({
+            godotExecutable: parsed.values["godot-executable"],
+            projectPath,
+            importerPath: toGodotResourcePath(projectPath, godot.importerPath),
+            descriptorResourcePath: toGodotResourcePath(projectPath, godot.descriptorPath),
+          })
+        : undefined;
+
+    await emit(
+      {
+        schemaVersion: "1.0",
+        atlasId: atlas.packageData.atlasId,
+        atlas: {
+          imagePath: atlas.imagePath,
+          dataPath: atlas.dataPath,
+          evidencePath: atlas.evidencePath,
+          width: atlas.packageData.width,
+          height: atlas.packageData.height,
+          frames: atlas.packageData.frames.length,
+          animations: atlas.packageData.animations.length,
+          imageSha256: atlas.packageData.atlasImage.sha256,
+          dataSha256: atlas.atlasDataSha256,
+        },
+        ...(godot
+          ? {
+              godot: {
+                descriptorPath: godot.descriptorPath,
+                importerPath: godot.importerPath,
+                resourcePath: godot.resourcePath,
+                headlessCommand: godot.headlessCommand,
+              },
+            }
+          : {}),
+        ...(execution ? { execution } : {}),
+      },
+      parsed.values.output,
+    );
     return;
   }
 

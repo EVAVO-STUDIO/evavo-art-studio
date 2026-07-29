@@ -11,7 +11,7 @@
     "dev": "pnpm run build:domain && pnpm --filter @evavo/art-studio-web dev",
     "dev:api": "pnpm run build:domain && pnpm --filter @evavo/art-studio-api dev",
     "dev:mcp": "pnpm run build:domain && pnpm --filter @evavo/art-studio-mcp dev",
-    "build:domain": "pnpm --filter @evavo/art-contracts build && pnpm --filter @evavo/art-core build && pnpm --filter @evavo/art-repo-inspector build && pnpm --filter @evavo/art-quality build",
+    "build:domain": "pnpm --filter @evavo/art-contracts build && pnpm --filter @evavo/art-core build && pnpm --filter @evavo/art-repo-inspector build && pnpm --filter @evavo/art-quality build && pnpm --filter @evavo/art-media build && pnpm --filter @evavo/art-godot build",
     "build": "pnpm -r --if-present run build",
     "typecheck": "pnpm -r --if-present run typecheck",
     "test": "pnpm -r --if-present run test",
