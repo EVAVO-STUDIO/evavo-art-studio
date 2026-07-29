@@ -6,6 +6,9 @@
     "composite": true,
     "types": ["node"]
   },
-  "references": [{ "path": "../artifacts" }],
+  "references": [
+    { "path": "../artifacts" },
+    { "path": "../media" }
+  ],
   "include": ["src/**/*.ts"]
 }
