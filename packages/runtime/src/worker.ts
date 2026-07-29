@@ -15,11 +15,12 @@ import {
   type RuntimeHandlerContext,
   type RuntimeHandlerResult,
   type RuntimeHeartbeatResult,
+  type RuntimeJobRecord,
   type RuntimeWorkerOptions,
   type RuntimeWorkerRunResult,
 } from "./types.js";
 
-function positiveInteger(
+function boundedInteger(
   value: number | undefined,
   fallback: number,
   minimum: number,
@@ -34,10 +35,6 @@ function positiveInteger(
     );
   }
   return result;
-}
-
-function abortError(message: string, code: string): RuntimeError {
-  return new RuntimeError(code, message);
 }
 
 function failureFor(error: unknown): RuntimeFailureInput {
@@ -58,11 +55,7 @@ function failureFor(error: unknown): RuntimeFailureInput {
     };
   }
   if (error instanceof CancelledRuntimeError) {
-    return {
-      classification: "cancelled",
-      code: error.code,
-      message: error.message,
-    };
+    return { classification: "cancelled", code: error.code, message: error.message };
   }
   if (error instanceof RuntimeError) {
     if (error.code === "RUNTIME_JOB_TIMEOUT") {
@@ -95,7 +88,7 @@ function failureFor(error: unknown): RuntimeFailureInput {
   };
 }
 
-function mergedDescriptor(
+function descriptorFor(
   claimed: RuntimeClaimedJob,
   descriptor: ArtifactDescriptorInput,
 ): ArtifactDescriptorInput {
@@ -121,29 +114,20 @@ function mergedDescriptor(
 export class RuntimeWorker {
   readonly #options: RuntimeWorkerOptions;
   readonly #concurrency: number;
-  readonly #configuredHeartbeatIntervalMs?: number;
+  readonly #heartbeatIntervalMs: number | undefined;
 
   public constructor(options: RuntimeWorkerOptions) {
     if (!options.worker.id.trim()) {
-      throw new RuntimeError(
-        "RUNTIME_WORKER_OPTIONS_INVALID",
-        "Worker id is required.",
-      );
+      throw new RuntimeError("RUNTIME_WORKER_OPTIONS_INVALID", "Worker id is required.");
     }
     this.#options = options;
-    this.#concurrency = positiveInteger(
-      options.concurrency,
-      1,
-      1,
-      64,
-      "concurrency",
-    );
-    this.#configuredHeartbeatIntervalMs = options.heartbeatIntervalMs;
+    this.#concurrency = boundedInteger(options.concurrency, 1, 1, 64, "concurrency");
+    this.#heartbeatIntervalMs = options.heartbeatIntervalMs;
     if (
-      this.#configuredHeartbeatIntervalMs !== undefined &&
-      (!Number.isInteger(this.#configuredHeartbeatIntervalMs) ||
-        this.#configuredHeartbeatIntervalMs < 1_000 ||
-        this.#configuredHeartbeatIntervalMs > 3_600_000)
+      this.#heartbeatIntervalMs !== undefined &&
+      (!Number.isInteger(this.#heartbeatIntervalMs) ||
+        this.#heartbeatIntervalMs < 1_000 ||
+        this.#heartbeatIntervalMs > 3_600_000)
     ) {
       throw new RuntimeError(
         "RUNTIME_WORKER_OPTIONS_INVALID",
@@ -152,14 +136,14 @@ export class RuntimeWorker {
     }
   }
 
-  async #putResultArtifact(
+  async #resultArtifact(
     claimed: RuntimeClaimedJob,
     result: RuntimeHandlerResult,
   ): Promise<StoredArtifact | null> {
     if (result.result === undefined) return null;
     return this.#options.artifacts.put(
       `${JSON.stringify(normalizeJson(result.result), null, 2)}\n`,
-      mergedDescriptor(claimed, {
+      descriptorFor(claimed, {
         mediaType: "application/json",
         storageClass: "evidence",
         fileName: `${claimed.job.id}.result.json`,
@@ -173,13 +157,37 @@ export class RuntimeWorker {
     );
   }
 
+  async #applyControl(
+    job: RuntimeJobRecord,
+    control: "cancel" | "pause",
+  ): Promise<"cancelled" | "paused"> {
+    if (control === "cancel") {
+      await this.#options.runtime.cancel(job.id, this.#options.worker.id, { force: true });
+      return "cancelled";
+    }
+    await this.#options.runtime.pause(job.id, this.#options.worker.id, { force: true });
+    return "paused";
+  }
+
   async #execute(
     claimed: RuntimeClaimedJob,
   ): Promise<"succeeded" | "failed" | "cancelled" | "paused"> {
     const runtime = this.#options.runtime;
     const workerId = this.#options.worker.id;
     const leaseToken = claimed.lease.token;
-    let current = await runtime.start(claimed.job.id, leaseToken, workerId);
+    let current = claimed.job;
+    try {
+      current = await runtime.start(current.id, leaseToken, workerId);
+    } catch (error: unknown) {
+      const latest = await runtime.get(current.id);
+      if (latest?.cancellationRequestedAt) return this.#applyControl(latest, "cancel");
+      if (latest?.pauseRequestedAt) return this.#applyControl(latest, "pause");
+      await runtime
+        .fail(current.id, leaseToken, failureFor(error), workerId)
+        .catch(() => undefined);
+      return "failed";
+    }
+
     const controller = new AbortController();
     let control: "cancel" | "pause" | null = null;
     let heartbeatError: unknown;
@@ -187,27 +195,20 @@ export class RuntimeWorker {
     const heartbeatIntervalMs = Math.max(
       1_000,
       Math.min(
-        this.#configuredHeartbeatIntervalMs ??
-          Math.floor(current.spec.leaseDurationMs / 3),
+        this.#heartbeatIntervalMs ?? Math.floor(current.spec.leaseDurationMs / 3),
         Math.floor(current.spec.leaseDurationMs / 2),
       ),
     );
 
     const heartbeat = async (): Promise<RuntimeHeartbeatResult> => {
-      const result = await runtime.heartbeat(
-        current.id,
-        leaseToken,
-        workerId,
-      );
+      const result = await runtime.heartbeat(current.id, leaseToken, workerId);
       current = result.job;
       if (result.cancellationRequested) {
         control = "cancel";
-        controller.abort(
-          abortError("Cancellation requested.", "RUNTIME_JOB_CANCELLED"),
-        );
+        controller.abort(new CancelledRuntimeError("Cancellation requested."));
       } else if (result.pauseRequested) {
         control = "pause";
-        controller.abort(abortError("Pause requested.", "RUNTIME_JOB_PAUSED"));
+        controller.abort(new RuntimeError("RUNTIME_JOB_PAUSED", "Pause requested."));
       }
       return result;
     };
@@ -225,11 +226,11 @@ export class RuntimeWorker {
     interval.unref?.();
 
     let timeout: NodeJS.Timeout | undefined;
-    const executionTimeout = new Promise<never>((_resolve, reject) => {
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
       timeout = setTimeout(() => {
-        const error = abortError(
-          `Execution exceeded ${current.spec.timeoutMs} milliseconds.`,
+        const error = new RuntimeError(
           "RUNTIME_JOB_TIMEOUT",
+          `Execution exceeded ${current.spec.timeoutMs} milliseconds.`,
         );
         controller.abort(error);
         reject(error);
@@ -252,32 +253,19 @@ export class RuntimeWorker {
         heartbeat,
         cancellationRequested: () => runtime.cancellationRequested(current.id),
         putArtifact: (content, descriptor) =>
-          this.#options.artifacts.put(
-            content,
-            mergedDescriptor(claimed, descriptor),
-          ),
+          this.#options.artifacts.put(content, descriptorFor(claimed, descriptor)),
       };
-      const handlerResult = await Promise.race([
-        handler(context),
-        executionTimeout,
-      ]);
+      const handlerResult = await Promise.race([handler(context), timeoutPromise]);
       clearInterval(interval);
       await heartbeatChain;
       if (heartbeatError) throw heartbeatError;
-      if (control === "cancel") {
-        await runtime.cancel(current.id, workerId, { force: true });
-        return "cancelled";
-      }
-      if (control === "pause") {
-        await runtime.pause(current.id, workerId, { force: true });
-        return "paused";
-      }
+      if (control) return this.#applyControl(current, control);
       if (controller.signal.aborted) {
         throw controller.signal.reason ?? new CancelledRuntimeError();
       }
 
       const result = handlerResult ?? {};
-      const resultArtifact = await this.#putResultArtifact(claimed, result);
+      const resultArtifact = await this.#resultArtifact(claimed, result);
       const outputArtifacts = [
         ...new Set([
           ...(result.outputArtifacts ?? []),
@@ -296,28 +284,13 @@ export class RuntimeWorker {
     } catch (error: unknown) {
       clearInterval(interval);
       await heartbeatChain.catch(() => undefined);
-      if (control === "cancel") {
-        await runtime
-          .cancel(current.id, workerId, { force: true })
-          .catch(() => undefined);
-        return "cancelled";
-      }
-      if (control === "pause") {
-        await runtime
-          .pause(current.id, workerId, { force: true })
-          .catch(() => undefined);
-        return "paused";
-      }
+      if (control) return this.#applyControl(current, control).catch(() => control === "cancel" ? "cancelled" : "paused");
       const failure = failureFor(heartbeatError ?? error);
       if (failure.classification === "cancelled") {
-        await runtime
-          .cancel(current.id, workerId, { force: true })
-          .catch(() => undefined);
+        await runtime.cancel(current.id, workerId, { force: true }).catch(() => undefined);
         return "cancelled";
       }
-      await runtime
-        .fail(current.id, leaseToken, failure, workerId)
-        .catch(() => undefined);
+      await runtime.fail(current.id, leaseToken, failure, workerId).catch(() => undefined);
       return "failed";
     } finally {
       clearInterval(interval);
@@ -333,9 +306,7 @@ export class RuntimeWorker {
       worker: this.#options.worker,
       maximumJobs: this.#concurrency,
     });
-    const outcomes = await Promise.all(
-      claimed.map((entry) => this.#execute(entry)),
-    );
+    const outcomes = await Promise.all(claimed.map((entry) => this.#execute(entry)));
     return {
       claimed: claimed.length,
       succeeded: outcomes.filter((entry) => entry === "succeeded").length,
@@ -348,27 +319,21 @@ export class RuntimeWorker {
   public async runUntilIdle(
     options: Readonly<{ maximumCycles?: number; idleDelayMs?: number }> = {},
   ): Promise<RuntimeWorkerRunResult> {
-    const maximumCycles = positiveInteger(
+    const maximumCycles = boundedInteger(
       options.maximumCycles,
       1_000,
       1,
       1_000_000,
       "maximumCycles",
     );
-    const idleDelayMs = positiveInteger(
+    const idleDelayMs = boundedInteger(
       options.idleDelayMs,
       250,
       1,
       60_000,
       "idleDelayMs",
     );
-    const total = {
-      claimed: 0,
-      succeeded: 0,
-      failed: 0,
-      cancelled: 0,
-      paused: 0,
-    };
+    const total = { claimed: 0, succeeded: 0, failed: 0, cancelled: 0, paused: 0 };
     for (let cycle = 0; cycle < maximumCycles; cycle += 1) {
       const result = await this.runOnce();
       total.claimed += result.claimed;
