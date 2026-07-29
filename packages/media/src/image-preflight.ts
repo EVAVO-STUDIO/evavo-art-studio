@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 
 const DEFAULT_MAXIMUM_INPUT_BYTES = 50 * 1024 * 1024;
 const DEFAULT_MAXIMUM_PIXELS = 16_777_216;
@@ -89,7 +89,7 @@ async function inspect(
   maximumPixels: number,
   name: string,
 ): Promise<RasterInputEvidence> {
-  let metadata: Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
+  let metadata: Metadata;
   try {
     metadata = await sharp(input, {
       failOn: "error",
