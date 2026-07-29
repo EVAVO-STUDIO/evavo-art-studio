@@ -1,5 +1,3 @@
-import { OperatorGatewayError } from "./operator-server-error";
-
 export type OperatorUpstreamMethod = "GET" | "POST";
 
 export const ALLOWED_UPSTREAM_PATHS = Object.freeze([
@@ -82,17 +80,4 @@ export function operatorUpstreamPathAllowed(
   }
 
   return false;
-}
-
-export function assertOperatorUpstreamPath(
-  upstreamPath: string,
-  method: OperatorUpstreamMethod,
-): void {
-  if (!operatorUpstreamPathAllowed(upstreamPath, method)) {
-    throw new OperatorGatewayError(
-      "OPERATOR_PATH_INVALID",
-      "Operator upstream path or method is not allowed.",
-      422,
-    );
-  }
 }
