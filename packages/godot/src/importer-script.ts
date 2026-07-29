@@ -46,7 +46,13 @@ func _init() -> void:
         var animation_name := StringName(String(animation["name"]))
         sprite_frames.add_animation(animation_name)
         sprite_frames.set_animation_speed(animation_name, float(animation["framesPerSecond"]))
-        sprite_frames.set_animation_loop_mode(animation_name, int(animation["loopModeValue"]))
+        match int(animation["loopModeValue"]):
+            1:
+                sprite_frames.set_animation_loop_mode(animation_name, SpriteFrames.LOOP_LINEAR)
+            2:
+                sprite_frames.set_animation_loop_mode(animation_name, SpriteFrames.LOOP_PINGPONG)
+            _:
+                sprite_frames.set_animation_loop_mode(animation_name, SpriteFrames.LOOP_NONE)
 
         for frame_entry in animation["frames"]:
             var frame_id := String(frame_entry["frameId"])
