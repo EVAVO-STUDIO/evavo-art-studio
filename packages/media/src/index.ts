@@ -5,4 +5,6 @@ export * from "./prepare.js";
 export * from "./render.js";
 export * from "./timing.js";
 export * from "./build.js";
+export * from "./image-preflight.js";
+export * from "./chroma-key.js";
 export { atomicWriteFile } from "./files.js";
