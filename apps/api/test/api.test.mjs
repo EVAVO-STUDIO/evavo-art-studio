@@ -8,6 +8,7 @@ import { createArtStudioApiServer } from "../dist/index.js";
 
 const transparentFixture =
   "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFklEQVR4nGNgoBo4YaPxHxkPhAKyAQDgPyKxKv0aXwAAAABJRU5ErkJggg==";
+const writeToken = "evavo-art-test-write-token-0123456789abcdef";
 
 const brief = {
   schemaVersion: "1.0",
@@ -187,20 +188,46 @@ test("atlas writes fail closed by default", async () => {
   });
 });
 
-test("builds an evidence-backed atlas only when writes are enabled", async () => {
-  const fixture = await atlasFixture();
+test("enabled atlas writes still require the separate write token", async () => {
   await withServer(
     async (base) => {
       const response = await fetch(`${base}/v1/atlases/build`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          manifestPath: "atlas.json",
+          outputDirectory: "generated",
+        }),
+      });
+      assert.equal(response.status, 401);
+      const payload = await response.json();
+      assert.equal(payload.error.code, "ART_STUDIO_WRITE_UNAUTHORIZED");
+    },
+    {
+      allowWrites: true,
+      writeToken,
+    },
+  );
+});
+
+test("builds an evidence-backed atlas only when writes are authenticated", async () => {
+  const fixture = await atlasFixture();
+  await withServer(
+    async (base) => {
+      const response = await fetch(`${base}/v1/atlases/build`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${writeToken}`,
+        },
+        body: JSON.stringify({
           manifestPath: fixture.manifestPath,
           outputDirectory: fixture.outputDirectory,
         }),
       });
-      assert.equal(response.status, 201, await response.text());
-      const payload = await response.json();
+      const responseBody = await response.text();
+      assert.equal(response.status, 201, responseBody);
+      const payload = JSON.parse(responseBody);
       assert.equal(payload.schemaVersion, "1.0");
       assert.equal(payload.atlas.packageData.atlasId, "api-atlas");
       assert.equal(payload.atlas.packageData.frames.length, 1);
@@ -212,6 +239,7 @@ test("builds an evidence-backed atlas only when writes are enabled", async () =>
     },
     {
       allowWrites: true,
+      writeToken,
       allowedRepositoryRoots: [fixture.root],
     },
   );
