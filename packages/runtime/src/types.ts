@@ -346,7 +346,7 @@ export class TransientRuntimeError extends RuntimeError {
   public constructor(code: string, message: string, details?: JsonValue) {
     super(code, message);
     this.name = "TransientRuntimeError";
-    this.details = details;
+    if (details !== undefined) this.details = details;
   }
 }
 
@@ -356,7 +356,7 @@ export class PermanentRuntimeError extends RuntimeError {
   public constructor(code: string, message: string, details?: JsonValue) {
     super(code, message);
     this.name = "PermanentRuntimeError";
-    this.details = details;
+    if (details !== undefined) this.details = details;
   }
 }
 
