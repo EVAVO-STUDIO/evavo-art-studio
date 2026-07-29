@@ -30,16 +30,22 @@ import { validateSpriteAtlasManifest } from "./validation.js";
 const sha256 = (value: Uint8Array | string): string =>
   createHash("sha256").update(value).digest("hex");
 
+function portableRelativePath(base: string, candidate: string): string {
+  const relative = path.relative(base, candidate).split(path.sep).join("/");
+  return relative || path.basename(candidate);
+}
+
 async function decodeSourceFrame(
   id: string,
-  sourcePath: string,
+  inputPath: string,
+  sourceReference: string,
   pivot: Readonly<{ x: number; y: number }> | undefined,
   allowEmpty: boolean,
   tags: readonly string[],
   maximumInputBytes: number,
   maximumPixels: number,
 ): Promise<DecodedAtlasSourceFrame> {
-  const input = await readBoundedFile(sourcePath, maximumInputBytes);
+  const input = await readBoundedFile(inputPath, maximumInputBytes);
   let metadata: sharp.Metadata;
   try {
     metadata = await sharp(input, {
@@ -88,7 +94,7 @@ async function decodeSourceFrame(
 
   return {
     id,
-    sourcePath,
+    sourcePath: sourceReference,
     data,
     width: info.width,
     height: info.height,
@@ -140,6 +146,7 @@ export async function buildSpriteAtlasPackage(
       await decodeSourceFrame(
         frame.id,
         sourcePath,
+        portableRelativePath(manifestDirectory, sourcePath),
         frame.pivot,
         frame.allowEmpty ?? false,
         frame.tags ?? [],
