@@ -42,9 +42,13 @@ test("OpenAPI contract covers governed production, provider compilation and dura
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
     "REPLICATE_API_TOKEN",
-    "provider credentials",
+    "providerCredentials:",
+    "apiKey:",
     "executionMode: provider-direct",
   ]) {
-    assert.ok(!source.includes(forbidden), `provider secret or execution shortcut leaked into OpenAPI: ${forbidden}`);
+    assert.ok(
+      !source.includes(forbidden),
+      `provider secret or execution shortcut leaked into OpenAPI: ${forbidden}`,
+    );
   }
 });
