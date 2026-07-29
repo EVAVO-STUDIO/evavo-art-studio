@@ -21,6 +21,7 @@
     "@evavo/art-quality": "workspace:*",
     "@evavo/art-repo-inspector": "workspace:*",
     "@evavo/art-runtime": "workspace:*",
+    "@evavo/art-selection": "workspace:*",
     "@modelcontextprotocol/server": "^2.0.0",
     "zod": "^4.4.3"
   },
