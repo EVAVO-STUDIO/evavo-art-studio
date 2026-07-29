@@ -94,6 +94,11 @@ type ArtifactState =
     }>
   | Readonly<{ status: "error"; artifactId: string; message: string }>;
 
+type ActiveArtifactState = Exclude<
+  ArtifactState,
+  Readonly<{ status: "idle" }>
+>;
+
 type PendingAction = Readonly<{
   jobId: string;
   action: OperatorJobAction;
@@ -979,7 +984,7 @@ function JobDetail({
         <div className={styles.attemptList}>
           {job.attempts.length ? (
             [...job.attempts].reverse().map((attempt) => (
-              <article key={`${attempt.attempt}-${attempt.leaseToken}`}>
+              <article key={`${attempt.attempt}-${attempt.leasedAt}-${attempt.workerId}`}>
                 <div>
                   <b>{String(attempt.attempt).padStart(2, "0")}</b>
                   <span>{attempt.outcome ?? "active"}</span>
@@ -1040,7 +1045,7 @@ function ArtifactList({
 function ArtifactInspector({
   artifact,
   onClose,
-}: Readonly<{ artifact: ArtifactState; onClose: () => void }>) {
+}: Readonly<{ artifact: ActiveArtifactState; onClose: () => void }>) {
   return (
     <div className={styles.modalBackdrop} role="presentation">
       <div className={styles.artifactDialog} role="dialog" aria-modal="true" aria-labelledby="artifact-title">
