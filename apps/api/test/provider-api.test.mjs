@@ -60,8 +60,9 @@ test("provider protocol and compilation are public deterministic contracts", asy
       headers: { "content-type": "application/json" },
       body: JSON.stringify(independentRequest),
     });
-    assert.equal(compiled.status, 200, await compiled.text());
-    const body = await compiled.json();
+    const compiledText = await compiled.text();
+    assert.equal(compiled.status, 200, compiledText);
+    const body = JSON.parse(compiledText);
     assert.equal(body.executionMode, "durable-worker-only");
     assert.equal(body.request.operation, "generate");
     assert.equal(body.requestSha256.length, 64);
