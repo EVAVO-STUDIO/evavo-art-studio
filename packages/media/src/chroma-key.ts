@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 
 const DEFAULT_MAXIMUM_INPUT_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAXIMUM_PIXELS = 8_294_400;
@@ -73,16 +73,17 @@ export class ChromaKeyExtractionError extends Error {
   }
 }
 
-interface NormalizedOptions {
-  readonly matte: Readonly<{ r: number; g: number; b: number; hex: string }>;
-  readonly connectionDistance: number;
-  readonly opaqueSeedDistance: number;
-  readonly edgeSearchRadius: number;
-  readonly bleedRadius: number;
-  readonly minimumBorderMatteFraction: number;
-  readonly maximumInputBytes: number;
-  readonly maximumPixels: number;
-}
+type Matte = Readonly<{ r: number; g: number; b: number; hex: string }>;
+type NormalizedOptions = Readonly<{
+  matte: Matte;
+  connectionDistance: number;
+  opaqueSeedDistance: number;
+  edgeSearchRadius: number;
+  bleedRadius: number;
+  minimumBorderMatteFraction: number;
+  maximumInputBytes: number;
+  maximumPixels: number;
+}>;
 
 function sha256(value: Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
@@ -122,7 +123,7 @@ function integer(
   return result;
 }
 
-function matte(value: string): Readonly<{ r: number; g: number; b: number; hex: string }> {
+function parseMatte(value: string): Matte {
   const normalized = value.trim().toLowerCase();
   if (!/^#[0-9a-f]{6}$/.test(normalized)) {
     throw new ChromaKeyExtractionError(
@@ -160,7 +161,7 @@ function normalize(options: ChromaKeyExtractionOptions): NormalizedOptions {
     );
   }
   return {
-    matte: matte(options.matteColour),
+    matte: parseMatte(options.matteColour),
     connectionDistance,
     opaqueSeedDistance,
     edgeSearchRadius: integer(
@@ -195,12 +196,7 @@ function normalize(options: ChromaKeyExtractionOptions): NormalizedOptions {
   };
 }
 
-function squaredDistance(
-  r: number,
-  g: number,
-  b: number,
-  colour: Readonly<{ r: number; g: number; b: number }>,
-): number {
+function squaredDistance(r: number, g: number, b: number, colour: Matte): number {
   const dr = r - colour.r;
   const dg = g - colour.g;
   const db = b - colour.b;
@@ -221,7 +217,7 @@ function borderIndices(width: number, height: number): number[] {
   return values;
 }
 
-function forEachNeighbour(
+function neighbours(
   index: number,
   width: number,
   height: number,
@@ -246,17 +242,17 @@ function projectionAlpha(
   foregroundR: number,
   foregroundG: number,
   foregroundB: number,
-  matteColour: Readonly<{ r: number; g: number; b: number }>,
+  matte: Matte,
 ): number {
-  const fr = foregroundR - matteColour.r;
-  const fg = foregroundG - matteColour.g;
-  const fb = foregroundB - matteColour.b;
+  const fr = foregroundR - matte.r;
+  const fg = foregroundG - matte.g;
+  const fb = foregroundB - matte.b;
   const denominator = fr * fr + fg * fg + fb * fb;
   if (denominator <= 1) return 0;
   const numerator =
-    (r - matteColour.r) * fr +
-    (g - matteColour.g) * fg +
-    (b - matteColour.b) * fb;
+    (r - matte.r) * fr +
+    (g - matte.g) * fg +
+    (b - matte.b) * fb;
   return Math.max(0, Math.min(1, numerator / denominator));
 }
 
@@ -268,6 +264,10 @@ function recoverColour(
 ): number {
   if (alpha <= 0.025) return fallback;
   return clampByte(matteChannel + (channel - matteChannel) / alpha);
+}
+
+function decodeError(message: string): ChromaKeyExtractionError {
+  return new ChromaKeyExtractionError("CHROMA_KEY_DECODE_FAILED", message);
 }
 
 export async function extractChromaKeyAlpha(
@@ -294,14 +294,11 @@ export async function extractChromaKeyAlpha(
     limitInputPixels: settings.maximumPixels,
     sequentialRead: true,
   };
-  let metadata: Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
+  let metadata: Metadata;
   try {
     metadata = await sharp(source, decoderOptions).metadata();
   } catch {
-    throw new ChromaKeyExtractionError(
-      "CHROMA_KEY_DECODE_FAILED",
-      "Chroma-key candidate could not be decoded.",
-    );
+    throw decodeError("Chroma-key candidate could not be decoded.");
   }
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
@@ -319,11 +316,18 @@ export async function extractChromaKeyAlpha(
     );
   }
 
-  const decoded = await sharp(source, decoderOptions)
-    .ensureAlpha()
-    .toColourspace("srgb")
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  let decoded: Awaited<
+    ReturnType<ReturnType<ReturnType<typeof sharp>["raw"]>["toBuffer"]>
+  >;
+  try {
+    decoded = await sharp(source, decoderOptions)
+      .ensureAlpha()
+      .toColourspace("srgb")
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+  } catch {
+    throw decodeError("Chroma-key candidate could not be decoded to RGBA.");
+  }
   if (decoded.info.channels !== 4) {
     throw new ChromaKeyExtractionError(
       "CHROMA_KEY_CHANNELS_INVALID",
@@ -371,7 +375,7 @@ export async function extractChromaKeyAlpha(
   }
   while (head < tail) {
     const pixel = queue[head++]!;
-    forEachNeighbour(pixel, width, height, (neighbour) => {
+    neighbours(pixel, width, height, (neighbour) => {
       if (
         !connectedBackground[neighbour] &&
         matteDistance[neighbour]! <= connectionSquared
@@ -399,7 +403,7 @@ export async function extractChromaKeyAlpha(
     if (!connectedBackground[pixel]) continue;
     backgroundDistance[pixel] = 0;
     let boundary = false;
-    forEachNeighbour(pixel, width, height, (neighbour) => {
+    neighbours(pixel, width, height, (neighbour) => {
       if (!connectedBackground[neighbour]) boundary = true;
     });
     if (boundary) queue[tail++] = pixel;
@@ -408,7 +412,7 @@ export async function extractChromaKeyAlpha(
     const pixel = queue[head++]!;
     const distance = backgroundDistance[pixel]!;
     if (distance >= settings.edgeSearchRadius) continue;
-    forEachNeighbour(pixel, width, height, (neighbour) => {
+    neighbours(pixel, width, height, (neighbour) => {
       if (backgroundDistance[neighbour] === UNREACHED) {
         backgroundDistance[neighbour] = distance + 1;
         queue[tail++] = neighbour;
@@ -424,10 +428,9 @@ export async function extractChromaKeyAlpha(
   tail = 0;
   let confidentForegroundSeeds = 0;
   for (let pixel = 0; pixel < pixels; pixel += 1) {
-    const alpha = sourceData[pixel * 4 + 3]!;
     if (
       !connectedBackground[pixel] &&
-      alpha > 0 &&
+      sourceData[pixel * 4 + 3]! > 0 &&
       matteDistance[pixel]! >= opaqueSquared
     ) {
       nearestForeground[pixel] = pixel;
@@ -448,7 +451,7 @@ export async function extractChromaKeyAlpha(
     const distance = foregroundDistance[pixel]!;
     if (distance >= settings.edgeSearchRadius) continue;
     const sourcePixel = nearestForeground[pixel]!;
-    forEachNeighbour(pixel, width, height, (neighbour) => {
+    neighbours(pixel, width, height, (neighbour) => {
       if (foregroundDistance[neighbour] === UNREACHED) {
         foregroundDistance[neighbour] = distance + 1;
         nearestForeground[neighbour] = sourcePixel;
@@ -470,17 +473,21 @@ export async function extractChromaKeyAlpha(
     const sourceB = sourceData[offset + 2]!;
     const sourceAlpha = sourceData[offset + 3]!;
     const background = connectedBackground[pixel] === 1;
-    const nearBackground =
-      !background && backgroundDistance[pixel]! <= settings.edgeSearchRadius;
+    const matteLike = matteDistance[pixel]! <= connectionSquared;
+    const edgeCandidate =
+      background ||
+      (!matteLike && backgroundDistance[pixel]! <= settings.edgeSearchRadius);
     const nearForeground =
       foregroundDistance[pixel]! <= settings.edgeSearchRadius &&
       nearestForeground[pixel]! >= 0;
+
+    if (!background && matteLike) preservedInteriorMatteLikePixels += 1;
 
     let alpha = background ? 0 : sourceAlpha / 255;
     let red = sourceR;
     let green = sourceG;
     let blue = sourceB;
-    if ((background || nearBackground) && nearForeground) {
+    if (edgeCandidate && nearForeground) {
       edgeBandPixels += 1;
       const seed = nearestForeground[pixel]! * 4;
       const matteAlpha = projectionAlpha(
@@ -516,12 +523,6 @@ export async function extractChromaKeyAlpha(
           decontaminatedPixels += 1;
         }
       }
-    } else if (
-      !background &&
-      matteDistance[pixel]! <= connectionSquared &&
-      backgroundDistance[pixel] === UNREACHED
-    ) {
-      preservedInteriorMatteLikePixels += 1;
     }
 
     let finalAlpha = clampByte(alpha * 255);
@@ -570,7 +571,7 @@ export async function extractChromaKeyAlpha(
       const distance = bleedDistance[pixel]!;
       if (distance >= settings.bleedRadius) continue;
       const sourcePixel = bleedSource[pixel]!;
-      forEachNeighbour(pixel, width, height, (neighbour) => {
+      neighbours(pixel, width, height, (neighbour) => {
         if (bleedDistance[neighbour] === UNREACHED) {
           bleedDistance[neighbour] = distance + 1;
           bleedSource[neighbour] = sourcePixel;
@@ -595,9 +596,7 @@ export async function extractChromaKeyAlpha(
     }
   }
 
-  const png = await sharp(output, {
-    raw: { width, height, channels: 4 },
-  })
+  const png = await sharp(output, { raw: { width, height, channels: 4 } })
     .png({ compressionLevel: 9, adaptiveFiltering: false, palette: false })
     .toBuffer();
 
