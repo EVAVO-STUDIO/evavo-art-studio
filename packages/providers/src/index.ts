@@ -4,4 +4,8 @@ export * from "./prompt.js";
 export * from "./registry.js";
 export * from "./orchestrator.js";
 export * from "./adapters/fixture.js";
-export * from "./adapters/openai-images.js";
+export {
+  OpenAIImageProviderAdapter,
+  openAIImageSourceSize,
+} from "./adapters/openai-images-governed.js";
+export type { OpenAIImageProviderOptions } from "./adapters/openai-images-governed.js";
