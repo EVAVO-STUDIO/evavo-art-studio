@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "1.0",
+  "operation": "generate",
+  "assetKind": "sprite-frame",
+  "continuityPhase": "key-pose",
+  "assetId": "hero-idle",
+  "candidateFamilyId": "hero-idle-down",
+  "frameId": "down-001",
+  "creativeIntent": "Author the first readable idle key pose with stable weight, restrained breathing and a clear game-scale silhouette.",
+  "negativeIntent": "Do not redesign the face, coat, handedness, proportions or equipment. Do not add scenery, UI, extra characters, text or unrelated effects.",
+  "style": {
+    "styleName": "Authentic 1990s adventure sprite",
+    "intent": "Deliberate hand-authored pixel clusters, era-authentic value grouping and consistent character construction.",
+    "mustHave": [
+      "stable identity",
+      "clear silhouette",
+      "readable game-scale pose",
+      "controlled pixel clusters"
+    ],
+    "mustAvoid": [
+      "generic AI rendering",
+      "modern glossy lighting",
+      "invented costume detail",
+      "decorative noise"
+    ],
+    "identityLocks": [
+      "same face and hair construction as canonical identity",
+      "same body proportions and height",
+      "same coat, boots and equipment scale",
+      "same handedness"
+    ],
+    "palette": [
+      "locked indexed project palette",
+      "preserve approved value hierarchy"
+    ],
+    "lineTreatment": [
+      "consistent one-pixel contour hierarchy",
+      "no soft painterly edge drift"
+    ],
+    "materials": [
+      "cloth, leather and metal remain visually distinct at game scale"
+    ],
+    "cameraRules": [
+      "fixed down-facing three-quarter game projection",
+      "no perspective or focal-length change"
+    ],
+    "compositionRules": [
+      "feet remain registered to the declared baseline",
+      "complete intended silhouette remains inside the safe bounds"
+    ],
+    "eraRules": [
+      "do not introduce modern costume, equipment or styling"
+    ]
+  },
+  "shot": {
+    "subject": "The approved hero character only.",
+    "action": "Neutral idle contact pose with restrained breathing.",
+    "direction": "Down-facing three-quarter view.",
+    "include": [
+      "complete character silhouette",
+      "approved coat and boots",
+      "declared body and costume details"
+    ],
+    "exclude": [
+      "background scenery",
+      "UI",
+      "unrelated props",
+      "ambient particles",
+      "readable text"
+    ],
+    "separateAssets": [
+      "cast shadow",
+      "held weapon",
+      "action effect",
+      "collision and normal-map data"
+    ],
+    "framing": [
+      "minimum eight-pixel clear margin at final target scale",
+      "feet aligned to the approved baseline",
+      "nothing important touches the canvas edge"
+    ]
+  },
+  "target": {
+    "width": 128,
+    "height": 128,
+    "transparency": "required",
+    "outputFormat": "png"
+  },
+  "sourceCanvas": {
+    "width": 1024,
+    "height": 1024
+  },
+  "background": {
+    "strategy": "chroma-key",
+    "matteColour": "#00ff00"
+  },
+  "quality": "high",
+  "candidateCount": 4,
+  "references": [
+    {
+      "artifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "role": "canonical-identity",
+      "strength": 1,
+      "required": true,
+      "note": "Replace this example ID with the approved canonical identity artifact."
+    },
+    {
+      "artifactId": "artifact_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "role": "direction-master",
+      "strength": 1,
+      "required": false,
+      "note": "Optional until a direction master has been approved."
+    },
+    {
+      "artifactId": "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "role": "palette-reference",
+      "strength": 0.8,
+      "required": false
+    }
+  ],
+  "selection": {
+    "preferredAdapterId": "openai-gpt-image",
+    "preferredModel": "gpt-image-2",
+    "allowedAdapterIds": [
+      "openai-gpt-image"
+    ],
+    "allowFallback": false,
+    "requireSeed": false
+  },
+  "metadata": {
+    "project": "your-game",
+    "animation": "idle",
+    "direction": "down",
+    "frameIndex": 0,
+    "approvalRequired": true
+  }
+}
