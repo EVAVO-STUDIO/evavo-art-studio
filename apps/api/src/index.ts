@@ -6,6 +6,14 @@ import { fileURLToPath } from "node:url";
 import { validateArtBrief } from "@evavo/art-contracts";
 import { CAPABILITY_CATALOG, createProductionPlan } from "@evavo/art-core";
 import {
+  GodotSpritePackageError,
+  writeGodotSpriteFramesImporter,
+} from "@evavo/art-godot";
+import {
+  SpriteAtlasInputError,
+  buildSpriteAtlasPackage,
+} from "@evavo/art-media";
+import {
   SpriteQualityInputError,
   analyseDecodedSpriteFrame,
   analyseSpriteSequenceManifestFile,
@@ -19,6 +27,7 @@ export interface ArtStudioApiOptions {
   readonly maximumBodyBytes?: number;
   readonly maximumImageBytes?: number;
   readonly maximumImagePixels?: number;
+  readonly allowWrites?: boolean;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -28,6 +37,7 @@ const writeJson = (response: ServerResponse, status: number, body: unknown, requ
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
     "x-request-id": requestId,
   });
   response.end(`${JSON.stringify(body)}\n`);
@@ -96,12 +106,26 @@ function qualityError(response: ServerResponse, requestId: string, error: unknow
   throw error;
 }
 
+function deliveryError(response: ServerResponse, requestId: string, error: unknown): void {
+  if (error instanceof SpriteAtlasInputError || error instanceof GodotSpritePackageError) {
+    writeJson(
+      response,
+      422,
+      { error: { code: error.code, message: error.message } },
+      requestId,
+    );
+    return;
+  }
+  throw error;
+}
+
 export function createArtStudioApiServer(options: ArtStudioApiOptions = {}): Server {
   const allowedOrigins = options.allowedOrigins ?? [];
   const allowedRepositoryRoots = options.allowedRepositoryRoots ?? [process.cwd()];
   const maximumBodyBytes = options.maximumBodyBytes ?? 24 * 1024 * 1024;
   const maximumImageBytes = options.maximumImageBytes ?? 16 * 1024 * 1024;
   const maximumImagePixels = options.maximumImagePixels ?? 16_777_216;
+  const allowWrites = options.allowWrites ?? false;
 
   return createServer(async (request, response) => {
     const requestId = randomUUID();
@@ -115,7 +139,7 @@ export function createArtStudioApiServer(options: ArtStudioApiOptions = {}): Ser
     try {
       const url = new URL(request.url ?? "/", "http://localhost");
       if (request.method === "GET" && url.pathname === "/health") {
-        writeJson(response, 200, { status: "ok", service: "evavo-art-studio-api", version: "0.1.0" }, requestId);
+        writeJson(response, 200, { status: "ok", service: "evavo-art-studio-api", version: "0.1.0", writesEnabled: allowWrites }, requestId);
         return;
       }
       if (request.method === "GET" && url.pathname === "/v1/capabilities") {
@@ -179,6 +203,84 @@ export function createArtStudioApiServer(options: ArtStudioApiOptions = {}): Ser
         }
         return;
       }
+      if (request.method === "POST" && url.pathname === "/v1/atlases/build") {
+        if (!allowWrites) {
+          writeJson(
+            response,
+            403,
+            {
+              error: {
+                code: "ART_STUDIO_WRITES_DISABLED",
+                message: "Atlas writes require EVAVO_ART_ALLOW_WRITES=true.",
+              },
+            },
+            requestId,
+          );
+          return;
+        }
+        const body = await readJsonBody(request, maximumBodyBytes);
+        if (
+          !isRecord(body) ||
+          typeof body.manifestPath !== "string" ||
+          typeof body.outputDirectory !== "string"
+        ) {
+          writeJson(
+            response,
+            422,
+            {
+              error: {
+                code: "SPRITE_ATLAS_BUILD_REQUEST_INVALID",
+                message: "manifestPath and outputDirectory are required.",
+              },
+            },
+            requestId,
+          );
+          return;
+        }
+        try {
+          const manifestPath = assertPathWithinAllowedRoots(
+            body.manifestPath,
+            allowedRepositoryRoots,
+          );
+          const outputDirectory = assertPathWithinAllowedRoots(
+            body.outputDirectory,
+            allowedRepositoryRoots,
+          );
+          const atlas = await buildSpriteAtlasPackage(
+            manifestPath,
+            outputDirectory,
+            {
+              allowedRoots: allowedRepositoryRoots,
+              maximumInputBytes: maximumImageBytes,
+              maximumPixels: maximumImagePixels,
+            },
+          );
+          const godotProjectPath =
+            typeof body.godotProjectPath === "string"
+              ? assertPathWithinAllowedRoots(
+                  body.godotProjectPath,
+                  allowedRepositoryRoots,
+                )
+              : undefined;
+          const godot = godotProjectPath
+            ? await writeGodotSpriteFramesImporter(atlas, godotProjectPath)
+            : undefined;
+          writeJson(
+            response,
+            201,
+            {
+              schemaVersion: "1.0",
+              atlas,
+              ...(godot ? { godot } : {}),
+              executionAvailable: false,
+            },
+            requestId,
+          );
+        } catch (error: unknown) {
+          deliveryError(response, requestId, error);
+        }
+        return;
+      }
       writeJson(response, 404, { error: { code: "NOT_FOUND", message: "Route not found." } }, requestId);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -199,6 +301,7 @@ if (isEntryPoint) {
   const server = createArtStudioApiServer({
     allowedOrigins: envList("EVAVO_ART_ALLOWED_ORIGINS"),
     allowedRepositoryRoots: roots.length > 0 ? roots : [process.cwd()],
+    allowWrites: process.env.EVAVO_ART_ALLOW_WRITES === "true",
   });
   server.listen(port, host, () => {
     process.stdout.write(`${JSON.stringify({ service: "evavo-art-studio-api", status: "listening", host, port })}\n`);
