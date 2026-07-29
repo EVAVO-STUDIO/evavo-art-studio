@@ -7,6 +7,7 @@ import test from "node:test";
 import { LocalArtifactStore } from "@evavo/art-artifacts";
 
 import {
+  FIXTURE_PROVIDER_DESCRIPTOR,
   FixtureImageProviderAdapter,
   OpenAIImageProviderAdapter,
   ProviderError,
@@ -222,7 +223,9 @@ test("fixture orchestration stores unapproved candidates and evidence with compl
   assert.deepEqual(candidate.sourceArtifacts, [fixture.canonical.artifactId]);
   const evidence = await fixture.store.get(result.evidenceArtifact);
   assert.equal(evidence.storageClass, "evidence");
-  const evidenceBody = JSON.parse((await fixture.store.read(result.evidenceArtifact)).toString("utf8"));
+  const evidenceBody = JSON.parse(
+    (await fixture.store.read(result.evidenceArtifact)).toString("utf8"),
+  );
   assert.equal(evidenceBody.outcome, "candidate-produced");
   assert.deepEqual(evidenceBody.candidateArtifacts, result.candidateArtifacts);
   assert.equal(evidenceBody.resolvedReferences[0].role, "canonical-identity");
@@ -232,10 +235,11 @@ test("fallback is bounded to explicitly allowed transient failures", async () =>
   const fixture = await artifactFixture();
   class FailingAdapter extends FixtureImageProviderAdapter {
     descriptor = Object.freeze({
-      ...super.descriptor,
+      ...FIXTURE_PROVIDER_DESCRIPTOR,
       id: "temporary-provider",
       priority: 1000,
     });
+
     async execute() {
       throw new ProviderError(
         "TEMPORARY_PROVIDER_BUSY",
@@ -261,7 +265,10 @@ test("fallback is bounded to explicitly allowed transient failures", async () =>
     },
   );
   assert.equal(fallback.adapterId, "fixture-image");
-  assert.deepEqual(fallback.attempts.map((entry) => entry.outcome), ["failed", "succeeded"]);
+  assert.deepEqual(
+    fallback.attempts.map((entry) => entry.outcome),
+    ["failed", "succeeded"],
+  );
 
   await assert.rejects(
     () =>
@@ -281,7 +288,8 @@ test("fallback is bounded to explicitly allowed transient failures", async () =>
           signal: new AbortController().signal,
         },
       ),
-    (error) => error instanceof ProviderError && error.code === "TEMPORARY_PROVIDER_BUSY",
+    (error) =>
+      error instanceof ProviderError && error.code === "TEMPORARY_PROVIDER_BUSY",
   );
 });
 
@@ -301,7 +309,13 @@ test("OpenAI generation uses bounded JSON with candidate count and flexible sour
           ],
           usage: { total_tokens: 100 },
         }),
-        { status: 200, headers: { "content-type": "application/json", "x-request-id": "req_fixture" } },
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "x-request-id": "req_fixture",
+          },
+        },
       );
     },
   });
@@ -309,7 +323,12 @@ test("OpenAI generation uses bounded JSON with candidate count and flexible sour
     request({
       assetKind: "illustration",
       continuityPhase: "independent",
-      target: { width: 1600, height: 900, transparency: "opaque", outputFormat: "png" },
+      target: {
+        width: 1600,
+        height: 900,
+        transparency: "opaque",
+        outputFormat: "png",
+      },
       background: { strategy: "opaque-source" },
       references: [],
     }),
@@ -323,7 +342,10 @@ test("OpenAI generation uses bounded JSON with candidate count and flexible sour
       compiledPromptSha256: compiled.sha256,
       references: [],
     },
-    { signal: new AbortController().signal, requestedAt: new Date("2026-07-29T00:00:00Z") },
+    {
+      signal: new AbortController().signal,
+      requestedAt: new Date("2026-07-29T00:00:00Z"),
+    },
   );
   assert.equal(captured.url, "https://example.test/v1/images/generations");
   const body = JSON.parse(captured.init.body);
@@ -339,7 +361,7 @@ test("OpenAI generation uses bounded JSON with candidate count and flexible sour
   assert.equal(result.externalId, "req_fixture");
 });
 
-test("OpenAI inpaint preserves ordered image roles and sends one mask", async () => {
+test("OpenAI inpaint puts the editable base first, preserves reference order and sends one mask", async () => {
   const fixture = await artifactFixture();
   let captured;
   const adapter = new OpenAIImageProviderAdapter({
@@ -348,7 +370,12 @@ test("OpenAI inpaint preserves ordered image roles and sends one mask", async ()
     fetch: async (url, init) => {
       captured = { url, init };
       return new Response(
-        JSON.stringify({ data: [{ b64_json: PNG_BASE64 }, { b64_json: PNG_BASE64 }] }),
+        JSON.stringify({
+          data: [
+            { b64_json: PNG_BASE64 },
+            { b64_json: PNG_BASE64 },
+          ],
+        }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
     },
@@ -359,8 +386,8 @@ test("OpenAI inpaint preserves ordered image roles and sends one mask", async ()
       continuityPhase: "repair",
       references: [
         ref(fixture.mask, "mask"),
-        ref(fixture.base, "base-image"),
         ref(fixture.canonical, "canonical-identity"),
+        ref(fixture.base, "base-image"),
       ],
     }),
   );
@@ -381,12 +408,20 @@ test("OpenAI inpaint preserves ordered image roles and sends one mask", async ()
       compiledPromptSha256: compiled.sha256,
       references: resolved,
     },
-    { signal: new AbortController().signal, requestedAt: new Date("2026-07-29T00:00:00Z") },
+    {
+      signal: new AbortController().signal,
+      requestedAt: new Date("2026-07-29T00:00:00Z"),
+    },
   );
   assert.equal(captured.url, "https://example.test/v1/images/edits");
   assert.ok(captured.init.body instanceof FormData);
-  assert.equal(captured.init.body.getAll("image[]").length, 2);
-  assert.ok(captured.init.body.get("mask") instanceof Blob);
+  const images = captured.init.body.getAll("image[]");
+  assert.equal(images.length, 2);
+  assert.equal(images[0].name, "base.png");
+  assert.equal(images[1].name, "canonical.png");
+  const mask = captured.init.body.get("mask");
+  assert.ok(mask instanceof Blob);
+  assert.equal(mask.name, "mask.png");
   assert.equal(captured.init.body.get("input_fidelity"), null);
   assert.equal(captured.init.body.get("model"), "gpt-image-2");
   assert.equal(captured.init.body.get("n"), "2");
