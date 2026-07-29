@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     "@evavo/art-core",
     "@evavo/art-quality",
   ],
+  serverExternalPackages: ["sharp"],
 };
 
 export default nextConfig;
