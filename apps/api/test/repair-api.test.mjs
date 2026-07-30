@@ -101,6 +101,68 @@ test("repair revision REST controls validate and compile without artifact access
   });
 });
 
+test("revision selection REST controls compile evidence-only preparation", async () => {
+  await withServer(async (base) => {
+    const protocol = await fetch(
+      `${base}/v1/repair-revision-selection-protocol`,
+    );
+    assert.equal(protocol.status, 200);
+    const protocolBody = await protocol.json();
+    assert.equal(
+      protocolBody.durablePreparationJob,
+      "art.repair.prepare-revision-selection",
+    );
+    assert.equal(protocolBody.enforcedSelectionPolicy.requireQualityPassed, true);
+
+    const request = {
+      schemaVersion: "1.0",
+      bridgeId: "api-revision-selection",
+      revisionEvidenceArtifactIds: [artifact("2"), artifact("1")],
+    };
+    const validated = await fetch(
+      `${base}/v1/repair-revision-selections/validate`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    );
+    assert.equal(validated.status, 200);
+    const normalized = await validated.json();
+    assert.deepEqual(normalized.revisionEvidenceArtifactIds, [
+      artifact("1"),
+      artifact("2"),
+    ]);
+    assert.equal(normalized.policy.allowAutomaticSelection, false);
+
+    const compiled = await fetch(
+      `${base}/v1/repair-revision-selections/compile`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    );
+    assert.equal(compiled.status, 200);
+    const body = await compiled.json();
+    assert.equal(body.executionMode, "durable-worker-or-deliberate-local-run");
+    assert.equal(
+      body.runtimeJob.kind,
+      "art.repair.prepare-revision-selection",
+    );
+    assert.equal(body.runtimeJob.queue, "selection");
+    assert.deepEqual(body.runtimeJob.inputArtifacts, [
+      artifact("1"),
+      artifact("2"),
+    ]);
+    assert.deepEqual(body.runtimeJob.requiredCapabilities, [
+      "repair.revision-selection",
+      "artifacts.store",
+      "evidence.bundle",
+    ]);
+  });
+});
+
 test("repair REST validation rejects invalid artifact ids without write access", async () => {
   await withServer(async (base) => {
     const response = await fetch(`${base}/v1/repairs/validate`, {
