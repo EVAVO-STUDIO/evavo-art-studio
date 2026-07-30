@@ -186,17 +186,28 @@ test("durable worker verifies a layered family without approving it", async () =
   const completed = await runtime.get(job.id);
   assert.equal(run.succeeded, 1, JSON.stringify(completed?.failure ?? null));
   assert.equal(completed.state, "succeeded");
-  assert.equal(completed.outputArtifacts.length, 3);
+  assert.equal(completed.outputArtifacts.length, 4);
+  const normalizedManifest = await artifactByRole(
+    artifacts,
+    completed.outputArtifacts,
+    "sprite-family-normalized-manifest",
+  );
+  assert.ok(normalizedManifest);
+  assert.equal(normalizedManifest.storageClass, "manifest");
+  assert.equal(normalizedManifest.labels.approvalState, "evidence-only");
   const evidence = await artifactByRole(
     artifacts,
     completed.outputArtifacts,
     "sprite-family-consistency-evidence",
   );
   assert.ok(evidence);
+  assert.equal(evidence.labels.evidenceEnvelope, "manifest-bound");
+  assert.ok(evidence.sourceArtifacts.includes(normalizedManifest.artifactId));
   const bodyEvidence = JSON.parse(
     (await artifacts.read(evidence.artifactId)).toString("utf8"),
   );
   assert.equal(bodyEvidence.passed, true);
+  assert.equal(bodyEvidence.manifestArtifactId, normalizedManifest.artifactId);
   const composite = await artifactByRole(
     artifacts,
     completed.outputArtifacts,

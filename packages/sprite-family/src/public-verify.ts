@@ -1,7 +1,8 @@
-import type {
-  ArtifactId,
-  ArtifactStore,
-  StoredArtifact,
+import {
+  normalizeJson,
+  type ArtifactId,
+  type ArtifactStore,
+  type StoredArtifact,
 } from "@evavo/art-artifacts";
 import {
   decodeSelectionImage,
@@ -15,7 +16,10 @@ import {
   type SpriteFamilyExecutionOptions,
   type SpriteFamilyRunResult,
 } from "./types.js";
-import { validateSpriteFamilyManifest } from "./validation.js";
+import {
+  spriteFamilyManifestSha256,
+  validateSpriteFamilyManifest,
+} from "./validation.js";
 import { verifySpriteFamily as verifySpriteFamilyInternal } from "./verify.js";
 
 const MAXIMUM_OCCLUSION_PIXEL_COMPARISONS = 50_000_000;
@@ -76,6 +80,14 @@ function declaredArtifacts(
     if (!unique.has(value.artifactId)) unique.set(value.artifactId, value.role);
   }
   return [...unique.entries()].map(([artifactId, role]) => ({ artifactId, role }));
+}
+
+function manifestSourceArtifactIds(
+  manifest: NormalizedSpriteFamilyManifest,
+): readonly ArtifactId[] {
+  return declaredArtifacts(manifest)
+    .map((entry) => entry.artifactId)
+    .sort();
 }
 
 async function assertStrictArtifactStates(
@@ -314,5 +326,74 @@ export async function verifySpriteFamily(
   const manifest = validateSpriteFamilyManifest(input);
   await assertStrictArtifactStates(manifest, options.artifacts);
   await assertOcclusionPolicy(manifest, options.artifacts);
-  return verifySpriteFamilyInternal(manifest, options);
+  const kernel = await verifySpriteFamilyInternal(manifest, options);
+  const manifestSha256 = spriteFamilyManifestSha256(manifest);
+  const sourceArtifactIds = manifestSourceArtifactIds(manifest);
+  const manifestArtifact = await options.artifacts.put(
+    `${JSON.stringify(normalizeJson(manifest), null, 2)}\n`,
+    {
+      mediaType: "application/json",
+      storageClass: "manifest",
+      fileName: `${manifest.familyId}.sprite-family.manifest.json`,
+      sourceArtifacts: sourceArtifactIds,
+      labels: {
+        artifactRole: "sprite-family-normalized-manifest",
+        approvalState: "evidence-only",
+        familyId: manifest.familyId,
+        manifestSha256,
+      },
+      metadata: normalizeJson({
+        schemaVersion: "1.0",
+        protocolVersion: manifest.protocolVersion,
+        manifestSha256,
+        frameCount: manifest.frames.length,
+        layerDefinitionCount: manifest.layerDefinitions.length,
+        sourceArtifactCount: sourceArtifactIds.length,
+      }),
+    },
+  );
+  const evidence = {
+    ...kernel.evidence,
+    manifestArtifactId: manifestArtifact.artifactId,
+    kernelEvidenceArtifactId: kernel.evidenceArtifactId,
+  };
+  const evidenceArtifact = await options.artifacts.put(
+    `${JSON.stringify(normalizeJson(evidence), null, 2)}\n`,
+    {
+      mediaType: "application/json",
+      storageClass: "evidence",
+      fileName: `${manifest.familyId}.sprite-family.evidence.json`,
+      sourceArtifacts: [
+        manifestArtifact.artifactId,
+        kernel.evidenceArtifactId,
+        ...sourceArtifactIds,
+        ...kernel.generatedCompositeArtifactIds,
+      ].sort() as readonly ArtifactId[],
+      labels: {
+        artifactRole: "sprite-family-consistency-evidence",
+        familyId: manifest.familyId,
+        qualityState: evidence.passed ? "passed" : "rejected",
+        approvalState: "evidence-only",
+        evidenceEnvelope: "manifest-bound",
+      },
+      metadata: normalizeJson({
+        schemaVersion: "1.0",
+        protocolVersion: manifest.protocolVersion,
+        manifestSha256,
+        manifestArtifactId: manifestArtifact.artifactId,
+        kernelEvidenceArtifactId: kernel.evidenceArtifactId,
+        frameCount: evidence.frameEvidence.length,
+        passedFrameCount: evidence.frameEvidence.filter((entry) => entry.passed)
+          .length,
+        familyGateCount: evidence.familyGates.length,
+      }),
+    },
+  );
+  return {
+    manifestArtifactId: manifestArtifact.artifactId,
+    kernelEvidenceArtifactId: kernel.evidenceArtifactId,
+    evidenceArtifactId: evidenceArtifact.artifactId,
+    generatedCompositeArtifactIds: kernel.generatedCompositeArtifactIds,
+    evidence,
+  };
 }

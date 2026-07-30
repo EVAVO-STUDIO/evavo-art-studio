@@ -70,11 +70,33 @@ export function createSpriteFamilyHandlers(): Readonly<
       const result = await verifySpriteFamily(manifest, {
         artifacts: context.artifacts,
       });
+      const manifestArtifactId = result.manifestArtifactId;
+      const kernelEvidenceArtifactId = result.kernelEvidenceArtifactId;
+      if (
+        manifestArtifactId === undefined ||
+        kernelEvidenceArtifactId === undefined ||
+        result.evidence.manifestArtifactId !== manifestArtifactId ||
+        result.evidence.kernelEvidenceArtifactId !== kernelEvidenceArtifactId
+      ) {
+        throw new PermanentRuntimeError(
+          "SPRITE_FAMILY_MANIFEST_EVIDENCE_MISSING",
+          "Public sprite-family verification did not return a manifest-bound evidence result.",
+          normalizeJson({
+            manifestArtifactId: manifestArtifactId ?? null,
+            kernelEvidenceArtifactId: kernelEvidenceArtifactId ?? null,
+            evidenceManifestArtifactId:
+              result.evidence.manifestArtifactId ?? null,
+            evidenceKernelArtifactId:
+              result.evidence.kernelEvidenceArtifactId ?? null,
+          }),
+        );
+      }
       if (!result.evidence.passed) {
         throw new PermanentRuntimeError(
           "SPRITE_FAMILY_BLOCKING_GATES_FAILED",
           "Layered sprite family failed one or more blocking consistency gates.",
           normalizeJson({
+            manifestArtifactId,
             evidenceArtifactId: result.evidenceArtifactId,
             generatedCompositeArtifactIds: result.generatedCompositeArtifactIds,
           }),
@@ -82,6 +104,7 @@ export function createSpriteFamilyHandlers(): Readonly<
       }
       return {
         outputArtifacts: [
+          manifestArtifactId,
           ...result.generatedCompositeArtifactIds,
           result.evidenceArtifactId,
         ],
