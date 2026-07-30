@@ -1,25 +1,26 @@
 {
-  "name": "@evavo/art-studio-worker",
+  "name": "@evavo/art-repair",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build --silent && node --test test/*.test.mjs",
-    "start": "node dist/index.js"
+    "test": "npm run build --silent && node --test test/*.test.mjs"
   },
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",
-    "@evavo/art-godot": "workspace:*",
     "@evavo/art-media": "workspace:*",
     "@evavo/art-providers": "workspace:*",
-    "@evavo/art-quality": "workspace:*",
-    "@evavo/art-repair": "workspace:*",
-    "@evavo/art-runtime": "workspace:*",
-    "@evavo/art-selection": "workspace:*",
     "@evavo/art-sprite-family": "workspace:*"
   },
   "devDependencies": {

@@ -1,0 +1,364 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Targeted Repair API
+  version: 0.1.0
+  description: >-
+    Compile-only contracts for converting failed layered sprite-family evidence
+    into one bounded frame or layer repair plan. HTTP handlers do not read
+    artifacts, execute providers, change source pixels, promote candidates, or
+    update approved references.
+servers:
+  - url: http://127.0.0.1:4100
+    description: Local standalone Art Studio control plane
+security: []
+tags:
+  - name: Targeted Repairs
+paths:
+  /v1/repair-protocol:
+    get:
+      tags: [Targeted Repairs]
+      operationId: getTargetedRepairProtocol
+      summary: List targeted repair strategies and safety rules
+      responses:
+        "200":
+          description: Targeted repair protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetedRepairProtocol"
+  /v1/repairs/validate:
+    post:
+      tags: [Targeted Repairs]
+      operationId: validateTargetedRepairRequest
+      summary: Validate and normalize one targeted repair request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TargetedRepairRequest"
+      responses:
+        "200":
+          description: Normalized repair request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedTargetedRepairRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/repairs/compile:
+    post:
+      tags: [Targeted Repairs]
+      operationId: compileTargetedRepairPlanningJob
+      summary: Compile a targeted repair into an evidence-only durable planning job
+      description: >-
+        The worker later verifies immutable family evidence, classifies actual
+        blocking gates, expands linked or static layer impact, verifies a mask
+        where needed, and stores a targeted-repair-packet. A blocked packet may
+        not expose a provider execution plan. This route is durable-worker-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TargetedRepairRequest"
+      responses:
+        "200":
+          description: Normalized request and durable planning job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompiledTargetedRepairJob"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  schemas:
+    ArtifactId:
+      type: string
+      pattern: "^artifact_[a-f0-9]{64}$"
+    TargetedRepairReferenceRole:
+      type: string
+      enum:
+        - canonical-identity
+        - direction-master
+        - previous-key-pose
+        - next-key-pose
+        - palette-reference
+        - line-reference
+        - material-reference
+    TargetedRepairReference:
+      type: object
+      required: [artifactId, role]
+      additionalProperties: false
+      properties:
+        artifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        role:
+          $ref: "#/components/schemas/TargetedRepairReferenceRole"
+        strength:
+          type: number
+          minimum: 0
+          maximum: 1
+        note:
+          type: string
+          maxLength: 1024
+    ProviderStyleEnvelope:
+      type: object
+      additionalProperties: true
+      properties:
+        styleName: { type: string }
+        intent: { type: string }
+        mustHave:
+          type: array
+          items: { type: string }
+        mustAvoid:
+          type: array
+          items: { type: string }
+        identityLocks:
+          type: array
+          items: { type: string }
+        palette:
+          type: array
+          items: { type: string }
+        lineTreatment:
+          type: array
+          items: { type: string }
+        cameraRules:
+          type: array
+          items: { type: string }
+    ProviderShot:
+      type: object
+      additionalProperties: true
+      properties:
+        subject: { type: string }
+        action: { type: string }
+        direction: { type: string }
+        include:
+          type: array
+          items: { type: string }
+        exclude:
+          type: array
+          items: { type: string }
+        separateAssets:
+          type: array
+          items: { type: string }
+        framing:
+          type: array
+          items: { type: string }
+    TargetedRepairProvider:
+      type: object
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        backgroundStrategy:
+          type: string
+          enum: [native-alpha, chroma-key, opaque-source, provider-auto]
+        matteColour:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+        candidateCount:
+          type: integer
+          minimum: 1
+          maximum: 8
+        seed:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        preferredAdapterId: { type: string }
+        preferredModel: { type: string }
+        allowedAdapterIds:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items: { type: string }
+        allowFallback: { type: boolean }
+    TargetedRepairPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        requireMaskForPixelRepair:
+          type: boolean
+          default: true
+        allowSharedLayerRepair:
+          type: boolean
+          default: false
+        allowWholeFramePixelRepair:
+          type: boolean
+          default: false
+        maximumImpactedFrames:
+          type: integer
+          minimum: 1
+          maximum: 512
+          default: 32
+    TargetedRepairRequest:
+      type: object
+      required:
+        - schemaVersion
+        - repairId
+        - familyEvidenceArtifactId
+        - target
+        - intent
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "1.0"
+        repairId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        familyEvidenceArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        target:
+          type: object
+          required: [frameId]
+          additionalProperties: false
+          properties:
+            frameId: { type: string }
+            layerId: { type: string }
+            gateIds:
+              type: array
+              maxItems: 64
+              uniqueItems: true
+              items: { type: string }
+        intent:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        preserve:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items: { type: string }
+        maskArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        references:
+          type: array
+          maxItems: 16
+          items:
+            $ref: "#/components/schemas/TargetedRepairReference"
+        style:
+          $ref: "#/components/schemas/ProviderStyleEnvelope"
+        shot:
+          $ref: "#/components/schemas/ProviderShot"
+        provider:
+          $ref: "#/components/schemas/TargetedRepairProvider"
+        policy:
+          $ref: "#/components/schemas/TargetedRepairPolicy"
+        metadata: true
+    NormalizedTargetedRepairRequest:
+      allOf:
+        - $ref: "#/components/schemas/TargetedRepairRequest"
+        - type: object
+          required: [protocolVersion, preserve, references, provider, policy]
+          properties:
+            protocolVersion:
+              const: "2026-07-30.1"
+    RuntimeJob:
+      type: object
+      required:
+        - queue
+        - kind
+        - idempotencyKey
+        - payload
+        - inputArtifacts
+        - requiredCapabilities
+      additionalProperties: true
+      properties:
+        queue:
+          const: selection
+        kind:
+          const: art.repair.plan
+        idempotencyKey: { type: string }
+        payload:
+          $ref: "#/components/schemas/NormalizedTargetedRepairRequest"
+        inputArtifacts:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+        requiredCapabilities:
+          type: array
+          minItems: 3
+          maxItems: 3
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - repair.plan
+              - artifacts.store
+              - evidence.bundle
+          example:
+            - repair.plan
+            - artifacts.store
+            - evidence.bundle
+        maximumAttempts:
+          const: 1
+        leaseDurationMs:
+          type: integer
+          minimum: 1000
+        timeoutMs:
+          type: integer
+          minimum: 1000
+    CompiledTargetedRepairJob:
+      type: object
+      required:
+        - schemaVersion
+        - request
+        - requestSha256
+        - executionMode
+        - runtimeJob
+      properties:
+        schemaVersion:
+          const: "1.0"
+        request:
+          $ref: "#/components/schemas/NormalizedTargetedRepairRequest"
+        requestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        executionMode:
+          const: durable-worker-only
+        runtimeJob:
+          $ref: "#/components/schemas/RuntimeJob"
+    TargetedRepairProtocol:
+      type: object
+      required: [schemaVersion, protocolVersion, strategies, rules]
+      properties:
+        schemaVersion:
+          const: "1.0"
+        protocolVersion:
+          const: "2026-07-30.1"
+        strategies:
+          type: array
+          items:
+            type: string
+            enum:
+              - source-replace
+              - metadata-adjustment
+              - layer-transform
+              - layer-recompose
+              - alpha-remaster
+              - masked-provider-inpaint
+              - manual-review
+        rules:
+          type: array
+          items: { type: string }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: true
+  responses:
+    ValidationError:
+      description: Invalid targeted repair request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

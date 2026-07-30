@@ -13,6 +13,10 @@ import {
 } from "@evavo/art-selection";
 
 import {
+  handleRepairCommand,
+  type RepairCommandValues,
+} from "./repair-commands.js";
+import {
   handleSpriteFamilyCommand,
   type SpriteFamilyCommandValues,
 } from "./sprite-family-commands.js";
@@ -45,6 +49,12 @@ export async function handleSelectionCommand(
   command: string,
   values: SelectionCommandValues,
 ): Promise<SelectionCommandResult> {
+  const repair = await handleRepairCommand(
+    command,
+    values as RepairCommandValues,
+  );
+  if (repair.handled) return repair;
+
   const spriteFamily = await handleSpriteFamilyCommand(
     command,
     values as SpriteFamilyCommandValues,

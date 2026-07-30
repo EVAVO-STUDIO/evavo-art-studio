@@ -1,0 +1,138 @@
+{
+  "queue": "selection",
+  "kind": "art.repair.plan",
+  "idempotencyKey": "hero-idle-down-body-repair-v1",
+  "payload": {
+    "schemaVersion": "1.0",
+    "repairId": "hero-idle-down-body-repair-v1",
+    "familyEvidenceArtifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "target": {
+      "frameId": "idle-down-003",
+      "layerId": "body",
+      "gateIds": [
+        "canonical-palette-similarity",
+        "canonical-centroid-similarity"
+      ]
+    },
+    "intent": "Restore the approved hero face, coat palette and body registration without changing the pose or any other retained layer.",
+    "preserve": [
+      "all pixels outside the supplied mask",
+      "shadow layer",
+      "weapon layer",
+      "normal and collision sidecars",
+      "canvas dimensions",
+      "pivot and baseline",
+      "approved motion timing"
+    ],
+    "maskArtifactId": "artifact_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "references": [
+      {
+        "artifactId": "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "role": "canonical-identity",
+        "strength": 1,
+        "note": "Authoritative identity, proportions, face and coat design."
+      },
+      {
+        "artifactId": "artifact_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "role": "previous-key-pose",
+        "strength": 0.9,
+        "note": "Preserve local motion continuity."
+      },
+      {
+        "artifactId": "artifact_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "role": "next-key-pose",
+        "strength": 0.9,
+        "note": "Preserve local motion continuity."
+      }
+    ],
+    "style": {
+      "styleName": "Authentic 1990s adventure sprite",
+      "intent": "Hand-authored pixel clusters, deliberate period palette and stable silhouette.",
+      "mustHave": [
+        "same approved face",
+        "same body proportions",
+        "same coat construction",
+        "same handedness"
+      ],
+      "mustAvoid": [
+        "generic AI smoothing",
+        "modern glossy rendering",
+        "extra detail",
+        "redesigned costume"
+      ],
+      "identityLocks": [
+        "face",
+        "proportions",
+        "coat",
+        "boots",
+        "handedness"
+      ],
+      "palette": ["locked project indexed palette"],
+      "lineTreatment": ["consistent one-pixel contour hierarchy"],
+      "cameraRules": ["fixed down-facing three-quarter projection"]
+    },
+    "shot": {
+      "subject": "The approved hero body layer only.",
+      "action": "Repair the masked face and coat pixels while retaining the approved pose.",
+      "direction": "Down-facing three-quarter view.",
+      "include": ["complete body layer inside the existing canvas"],
+      "exclude": [
+        "background",
+        "shadow",
+        "weapon",
+        "effects",
+        "normal map",
+        "collision data",
+        "UI",
+        "text"
+      ],
+      "separateAssets": [
+        "shadow",
+        "weapon",
+        "effects",
+        "normal",
+        "collision"
+      ],
+      "framing": ["retain the exact source canvas, pivot and transparent padding"]
+    },
+    "provider": {
+      "enabled": true,
+      "backgroundStrategy": "chroma-key",
+      "matteColour": "#ff00ff",
+      "candidateCount": 3,
+      "preferredAdapterId": "openai-gpt-image-2",
+      "allowedAdapterIds": ["openai-gpt-image-2"],
+      "allowFallback": false
+    },
+    "policy": {
+      "requireMaskForPixelRepair": true,
+      "allowSharedLayerRepair": false,
+      "allowWholeFramePixelRepair": false,
+      "maximumImpactedFrames": 8
+    },
+    "metadata": {
+      "project": "replace-with-project-id",
+      "asset": "hero-idle-down",
+      "note": "Replace placeholder artifact IDs with immutable artifacts from the configured store."
+    }
+  },
+  "inputArtifacts": [
+    "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "artifact_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "artifact_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "artifact_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  ],
+  "requiredCapabilities": [
+    "repair.plan",
+    "artifacts.store",
+    "evidence.bundle"
+  ],
+  "maximumAttempts": 1,
+  "leaseDurationMs": 60000,
+  "timeoutMs": 300000,
+  "labels": {
+    "repairId": "hero-idle-down-body-repair-v1",
+    "stage": "targeted-repair-planning"
+  }
+}
