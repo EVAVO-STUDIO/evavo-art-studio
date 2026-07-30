@@ -15,7 +15,8 @@
     { "path": "../../packages/providers" },
     { "path": "../../packages/repo-inspector" },
     { "path": "../../packages/runtime" },
-    { "path": "../../packages/selection" }
+    { "path": "../../packages/selection" },
+    { "path": "../../packages/sprite-family" }
   ],
   "include": ["src/**/*.ts"]
 }

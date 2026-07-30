@@ -33,6 +33,10 @@ import {
   candidateSelectionWorkerCapabilities,
   createCandidateSelectionHandlers,
 } from "./selection-handlers.js";
+import {
+  createSpriteFamilyHandlers,
+  spriteFamilyWorkerCapabilities,
+} from "./sprite-family-handlers.js";
 
 const isRecord = (
   value: unknown,
@@ -226,6 +230,7 @@ export function createBuiltinHandlers(
     ...createProviderHandlers(providerRegistry),
     ...createCandidateMasteringHandlers(),
     ...createCandidateSelectionHandlers(),
+    ...createSpriteFamilyHandlers(),
   });
 }
 
@@ -268,6 +273,7 @@ async function main(): Promise<void> {
   const providerCapabilities = providerWorkerCapabilities(providerRegistry);
   const masteringCapabilities = candidateMasteringWorkerCapabilities();
   const selectionCapabilities = candidateSelectionWorkerCapabilities();
+  const familyCapabilities = spriteFamilyWorkerCapabilities();
   const defaultQueues = [
     "media",
     "selection",
@@ -287,6 +293,7 @@ async function main(): Promise<void> {
         "evidence.bundle",
         ...masteringCapabilities,
         ...selectionCapabilities,
+        ...familyCapabilities,
         ...providerCapabilities,
       ],
       queues: configuredQueues.length ? configuredQueues : defaultQueues,

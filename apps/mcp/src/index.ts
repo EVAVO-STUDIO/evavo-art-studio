@@ -17,6 +17,8 @@ import { assertPathWithinAllowedRoots, inspectRepository } from "@evavo/art-repo
 
 import { registerProviderTools } from "./provider-tools.js";
 import { registerRuntimeTools } from "./runtime-tools.js";
+import { registerSelectionTools } from "./selection-tools.js";
+import { registerSpriteFamilyTools } from "./sprite-family-tools.js";
 
 const server = new McpServer({
   name: "evavo-art-studio",
@@ -25,6 +27,8 @@ const server = new McpServer({
 
 registerRuntimeTools(server);
 registerProviderTools(server);
+registerSelectionTools(server);
+registerSpriteFamilyTools(server);
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
