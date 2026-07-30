@@ -3,7 +3,10 @@ import { createHash } from "node:crypto";
 import { preflightInpaintMask } from "@evavo/art-media";
 import sharp from "sharp";
 
-import { deriveProviderCanvasSize, normalizePixelArtProviderCanvasOptions } from "./options.js";
+import {
+  deriveProviderCanvasSize,
+  normalizePixelArtProviderCanvasOptions,
+} from "./options.js";
 import {
   PROVIDER_CANVAS_PROTOCOL_VERSION,
   ProviderCanvasError,
@@ -33,7 +36,10 @@ function sourcePalette(
   rgba: Uint8Array,
   maximumColours: number,
 ): readonly Readonly<{ r: number; g: number; b: number; a: number }>[] {
-  const colours = new Map<string, Readonly<{ r: number; g: number; b: number; a: number }>>();
+  const colours = new Map<
+    string,
+    Readonly<{ r: number; g: number; b: number; a: number }>
+  >();
   for (let offset = 0; offset < rgba.length; offset += 4) {
     const a = rgba[offset + 3]!;
     if (a === 0) continue;
@@ -109,7 +115,10 @@ export async function preparePixelArtProviderCanvas(
       "Base image and mask must decode to RGBA.",
     );
   }
-  if (options.requireBinaryMask && preflight.mask.partiallyTransparentPixels > 0) {
+  if (
+    options.requireBinaryMask &&
+    preflight.mask.partiallyTransparentPixels > 0
+  ) {
     throw new ProviderCanvasError(
       "PROVIDER_CANVAS_MASK_NOT_BINARY",
       "Pixel-art provider preparation requires a binary mask: alpha must be exactly 0 for editable pixels or 255 for protected pixels.",
@@ -214,6 +223,7 @@ export async function preparePixelArtProviderCanvas(
       restoration: {
         sampling: options.restorationSampling,
         paletteMode: options.paletteMode,
+        alphaMode: options.alphaMode,
         palette,
         protectedSourceRgbaSha256: protectedRgbaHash(
           baseDecoded.data,
