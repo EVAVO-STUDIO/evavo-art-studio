@@ -1,0 +1,188 @@
+{
+  "queue": "selection",
+  "kind": "sprite.family.verify",
+  "idempotencyKey": "hero-idle-down-family-v1",
+  "payload": {
+    "schemaVersion": "1.0",
+    "familyId": "hero-idle-down",
+    "canvas": {
+      "width": 128,
+      "height": 128
+    },
+    "layerDefinitions": [
+      {
+        "id": "shadow",
+        "role": "shadow",
+        "sourcePolicy": "static-family",
+        "required": true,
+        "contributesToComposite": true,
+        "contributesToIdentity": false,
+        "mustRemainSeparate": true,
+        "zIndex": -10,
+        "blendMode": "multiply",
+        "minimumVisibleFraction": 0.2,
+        "registrationTolerancePixels": 0,
+        "allowedOccludedBy": ["body", "weapon"]
+      },
+      {
+        "id": "body",
+        "role": "identity-core",
+        "sourcePolicy": "per-frame",
+        "required": true,
+        "contributesToComposite": true,
+        "contributesToIdentity": true,
+        "mustRemainSeparate": false,
+        "zIndex": 0,
+        "blendMode": "normal",
+        "minimumVisibleFraction": 0.7,
+        "registrationTolerancePixels": 3,
+        "occludes": ["shadow"]
+      },
+      {
+        "id": "weapon",
+        "role": "weapon",
+        "sourcePolicy": "linked-cel",
+        "required": true,
+        "contributesToComposite": true,
+        "contributesToIdentity": true,
+        "mustRemainSeparate": true,
+        "zIndex": 10,
+        "blendMode": "normal",
+        "minimumVisibleFraction": 0.85,
+        "registrationTolerancePixels": 0,
+        "occludes": ["body", "shadow"]
+      },
+      {
+        "id": "normal",
+        "role": "normal",
+        "sourcePolicy": "engine-sidecar",
+        "required": true,
+        "contributesToComposite": false,
+        "contributesToIdentity": false,
+        "mustRemainSeparate": true,
+        "zIndex": 20,
+        "blendMode": "normal"
+      }
+    ],
+    "frames": [
+      {
+        "id": "idle-down-000",
+        "animation": "idle",
+        "direction": "down",
+        "frameIndex": 0,
+        "globalFrameIndex": 0,
+        "durationMs": 125,
+        "pivot": {
+          "x": 64,
+          "y": 112
+        },
+        "baseline": 112,
+        "groundContact": true,
+        "declaredCompositeArtifactId": "artifact_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "layers": [
+          {
+            "layerId": "shadow",
+            "artifactId": "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "layerId": "body",
+            "artifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "layerId": "weapon",
+            "artifactId": "artifact_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          {
+            "layerId": "normal",
+            "artifactId": "artifact_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          }
+        ]
+      },
+      {
+        "id": "idle-down-001",
+        "animation": "idle",
+        "direction": "down",
+        "frameIndex": 1,
+        "globalFrameIndex": 1,
+        "durationMs": 125,
+        "pivot": {
+          "x": 64,
+          "y": 112
+        },
+        "baseline": 112,
+        "groundContact": true,
+        "declaredCompositeArtifactId": "artifact_1111111111111111111111111111111111111111111111111111111111111111",
+        "layers": [
+          {
+            "layerId": "shadow",
+            "artifactId": "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "layerId": "body",
+            "artifactId": "artifact_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          {
+            "layerId": "weapon",
+            "artifactId": "artifact_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "linkedFromFrameId": "idle-down-000"
+          },
+          {
+            "layerId": "normal",
+            "artifactId": "artifact_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "identityReferenceFrameId": "idle-down-000",
+      "requireDeclaredComposite": true,
+      "requireReferenceLineage": true,
+      "requireQualityPassed": true,
+      "alphaVisibleThreshold": 8,
+      "maximumFrames": 64,
+      "decodeConcurrency": 4,
+      "maximumTranslationPixels": 4,
+      "maximumEdgeDistancePixels": 12,
+      "pivotTolerancePixels": 0,
+      "baselineTolerancePixels": 0,
+      "groundContactTolerancePixels": 0,
+      "minimumCanonicalVisibleAreaSimilarity": 0.75,
+      "minimumCanonicalPaletteSimilarity": 0.7,
+      "minimumCanonicalCentroidSimilarity": 0.7,
+      "minimumAdjacentVisibleAreaSimilarity": 0.72,
+      "minimumAdjacentPaletteSimilarity": 0.68,
+      "minimumAdjacentCentroidSimilarity": 0.68,
+      "minimumLoopClosureSimilarity": 0.7,
+      "compositeChannelTolerance": 1,
+      "maximumCompositeMeanError": 0.5,
+      "maximumCompositeMismatchFraction": 0.01
+    },
+    "metadata": {
+      "project": "replace-with-project-id",
+      "asset": "hero-idle-down",
+      "note": "Replace every placeholder artifact id with an immutable artifact from the configured store."
+    }
+  },
+  "inputArtifacts": [
+    "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "artifact_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "artifact_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "artifact_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "artifact_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "artifact_1111111111111111111111111111111111111111111111111111111111111111"
+  ],
+  "requiredCapabilities": [
+    "sprite.family.verify",
+    "media.layer-compose",
+    "selection.compare",
+    "evidence.bundle"
+  ],
+  "maximumAttempts": 1,
+  "leaseDurationMs": 120000,
+  "timeoutMs": 900000,
+  "labels": {
+    "familyId": "hero-idle-down",
+    "stage": "layered-family-verification"
+  }
+}
