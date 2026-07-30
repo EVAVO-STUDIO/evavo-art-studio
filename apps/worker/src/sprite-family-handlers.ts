@@ -1,4 +1,8 @@
 import {
+  normalizeJson,
+  type ArtifactId,
+} from "@evavo/art-artifacts";
+import {
   SpriteFamilyError,
   validateSpriteFamilyManifest,
   verifySpriteFamily,
@@ -15,7 +19,7 @@ const REQUIRED_CAPABILITIES = Object.freeze([
   "evidence.bundle",
 ] as const);
 
-function inputArtifactIds(input: unknown): readonly string[] {
+function inputArtifactIds(input: unknown): readonly ArtifactId[] {
   const manifest = validateSpriteFamilyManifest(input);
   return [
     ...new Set(
@@ -26,7 +30,7 @@ function inputArtifactIds(input: unknown): readonly string[] {
           : []),
       ]),
     ),
-  ].sort();
+  ].sort() as readonly ArtifactId[];
 }
 
 function familyFailure(error: SpriteFamilyError): PermanentRuntimeError {
@@ -52,9 +56,9 @@ export function createSpriteFamilyHandlers(): Readonly<
         );
       }
     }
-    const declaredInputs = new Set(context.job.spec.inputArtifacts);
+    const declaredInputs = new Set<ArtifactId>(context.job.spec.inputArtifacts);
     const missing = inputArtifactIds(manifest).filter(
-      (artifactId) => !declaredInputs.has(artifactId as never),
+      (artifactId) => !declaredInputs.has(artifactId),
     );
     if (missing.length) {
       throw new PermanentRuntimeError(
@@ -70,10 +74,10 @@ export function createSpriteFamilyHandlers(): Readonly<
         throw new PermanentRuntimeError(
           "SPRITE_FAMILY_BLOCKING_GATES_FAILED",
           "Layered sprite family failed one or more blocking consistency gates.",
-          {
+          normalizeJson({
             evidenceArtifactId: result.evidenceArtifactId,
             generatedCompositeArtifactIds: result.generatedCompositeArtifactIds,
-          },
+          }),
         );
       }
       return {
@@ -81,7 +85,7 @@ export function createSpriteFamilyHandlers(): Readonly<
           ...result.generatedCompositeArtifactIds,
           result.evidenceArtifactId,
         ],
-        result,
+        result: normalizeJson(result),
       };
     } catch (error: unknown) {
       if (error instanceof SpriteFamilyError) throw familyFailure(error);
