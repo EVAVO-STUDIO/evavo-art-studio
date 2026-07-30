@@ -211,7 +211,9 @@ function blockReading(
         candidate[offset + 3]!,
       ];
       values.push(pixel);
-      for (let channel = 0; channel < 4; channel += 1) sums[channel] += pixel[channel]!;
+      for (let channel = 0; channel < 4; channel += 1) {
+        sums[channel] = sums[channel]! + pixel[channel]!;
+      }
     }
   }
   const count = scale * scale;
