@@ -5,7 +5,8 @@
   "description": "Governed art production system for game, digital and print assets.",
   "packageManager": "pnpm@10.13.1",
   "engines": {
-    "node": ">=22.14.0"
+    "node": "22.14.0",
+    "pnpm": "10.13.1"
   },
   "scripts": {
     "dev": "pnpm run build:domain && pnpm --filter @evavo/art-studio-web dev",
@@ -14,11 +15,14 @@
     "dev:worker": "pnpm run build:domain && pnpm --filter @evavo/art-studio-worker start -- daemon",
     "worker:once": "pnpm run build:domain && pnpm --filter @evavo/art-studio-worker start -- once",
     "worker:until-idle": "pnpm run build:domain && pnpm --filter @evavo/art-studio-worker start -- until-idle",
+    "toolchain:check": "node scripts/check-repository-toolchain.mjs",
+    "toolchain:check:installed": "node scripts/check-repository-toolchain.mjs --allow-generated-lockfile",
+    "toolchain:test": "node scripts/test-repository-toolchain.mjs",
     "build:domain": "pnpm --filter @evavo/art-contracts build && pnpm --filter @evavo/art-core build && pnpm --filter @evavo/art-repo-inspector build && pnpm --filter @evavo/art-quality build && pnpm --filter @evavo/art-media build && pnpm --filter @evavo/art-provider-canvas build && pnpm --filter @evavo/art-godot build && pnpm --filter @evavo/art-artifacts build && pnpm --filter @evavo/art-providers build && pnpm --filter @evavo/art-selection build && pnpm --filter @evavo/art-sprite-family build && pnpm --filter @evavo/art-repair build && pnpm --filter @evavo/art-runtime build",
     "build": "pnpm -r --if-present run build",
     "typecheck": "pnpm -r --if-present run typecheck",
     "test": "pnpm -r --if-present run test",
-    "check": "pnpm run build:domain && pnpm typecheck && pnpm test && pnpm build",
+    "check": "pnpm run toolchain:check:installed && pnpm run toolchain:test && pnpm run build:domain && pnpm typecheck && pnpm test && pnpm build",
     "art": "pnpm --filter @evavo/art-studio-cli start --"
   },
   "workspaces": [
