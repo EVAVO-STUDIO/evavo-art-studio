@@ -2,7 +2,6 @@ import {
   normalizeJson,
   type ArtifactId,
   type ArtifactStore,
-  type JsonValue,
   type StoredArtifact,
 } from "@evavo/art-artifacts";
 import {
@@ -22,6 +21,8 @@ import {
   type NormalizedSpriteFamilyFrame,
   type NormalizedSpriteFamilyManifest,
   type ResolvedSpriteLayer,
+  type SpriteLayerRole,
+  type SpriteLayerSourcePolicy,
 } from "@evavo/art-sprite-family";
 
 import {
@@ -44,6 +45,18 @@ import {
 } from "./types.js";
 
 const IMAGE_MEDIA_TYPES = new Set(["image/png", "image/webp", "image/jpeg"]);
+
+interface LayerRepairPacket extends TargetedRepairPacket {
+  readonly target: Readonly<{
+    frameId: string;
+    layerId: string;
+    layerRole: SpriteLayerRole;
+    sourcePolicy: SpriteLayerSourcePolicy;
+    baseArtifactId: ArtifactId;
+  }>;
+  readonly sourceEvidence: TargetedRepairPacket["sourceEvidence"] &
+    Readonly<{ manifestArtifactId: ArtifactId }>;
+}
 
 interface RepairExecutionEvidence {
   readonly schemaVersion: "1.0";
@@ -116,7 +129,7 @@ async function readJson(
   }
 }
 
-function parsePacket(value: unknown): TargetedRepairPacket {
+function parsePacket(value: unknown): LayerRepairPacket {
   if (
     !isRecord(value) ||
     value.schemaVersion !== "1.0" ||
@@ -128,16 +141,19 @@ function parsePacket(value: unknown): TargetedRepairPacket {
     !isRecord(value.target) ||
     typeof value.target.frameId !== "string" ||
     typeof value.target.layerId !== "string" ||
+    typeof value.target.layerRole !== "string" ||
+    typeof value.target.sourcePolicy !== "string" ||
     typeof value.target.baseArtifactId !== "string" ||
     !Array.isArray(value.impactedFrameIds) ||
-    !isRecord(value.sourceEvidence)
+    !isRecord(value.sourceEvidence) ||
+    typeof value.sourceEvidence.manifestArtifactId !== "string"
   ) {
     throw new RepairedFamilyRevisionError(
       "REPAIRED_FAMILY_REVISION_PACKET_INVALID",
-      "Repair packet must be a ready, layer-targeted packet with immutable source evidence.",
+      "Repair packet must be a ready, manifest-bound, layer-targeted packet.",
     );
   }
-  return value as unknown as TargetedRepairPacket;
+  return value as unknown as LayerRepairPacket;
 }
 
 function parseExecutionEvidence(value: unknown): RepairExecutionEvidence {
@@ -189,7 +205,7 @@ function manifestBound(
   return result as ManifestBoundSpriteFamilyRunResult;
 }
 
-function targetLayerEvidence(packet: TargetedRepairPacket) {
+function targetLayerEvidence(packet: LayerRepairPacket) {
   const frame = packet.sourceEvidence.frameEvidence.find(
     (entry) => entry.frameId === packet.target.frameId,
   );
@@ -200,7 +216,7 @@ function targetLayerEvidence(packet: TargetedRepairPacket) {
       "Repair packet source evidence does not contain the target frame and layer.",
     );
   }
-  return { frame, layer };
+  return layer;
 }
 
 function exactSet(left: readonly string[], right: readonly string[]): boolean {
@@ -235,25 +251,22 @@ async function frameQuality(
   safePadding: number,
 ): Promise<SpriteFrameQualityReport> {
   try {
-    return analyseDecodedSpriteFrame(
-      await decodeSpriteFrame(bytes),
-      {
-        frameId,
-        transparency: request.quality.transparency,
-        expectedWidth: width,
-        expectedHeight: height,
-        expectedFormat: "png",
-        safePadding,
-        alphaVisibleThreshold: request.quality.alphaVisibleThreshold,
-        knownMatteColours: request.quality.knownMatteColours,
-        flatMatteBorderThreshold: request.quality.flatMatteBorderThreshold,
-        checkerboardConfidenceThreshold:
-          request.quality.checkerboardConfidenceThreshold,
-        maximumHaloFraction: request.quality.maximumHaloFraction,
-        maximumUnexpectedTransparentRgbFraction:
-          request.quality.maximumUnexpectedTransparentRgbFraction,
-      },
-    );
+    return analyseDecodedSpriteFrame(await decodeSpriteFrame(bytes), {
+      frameId,
+      transparency: request.quality.transparency,
+      expectedWidth: width,
+      expectedHeight: height,
+      expectedFormat: "png",
+      safePadding,
+      alphaVisibleThreshold: request.quality.alphaVisibleThreshold,
+      knownMatteColours: request.quality.knownMatteColours,
+      flatMatteBorderThreshold: request.quality.flatMatteBorderThreshold,
+      checkerboardConfidenceThreshold:
+        request.quality.checkerboardConfidenceThreshold,
+      maximumHaloFraction: request.quality.maximumHaloFraction,
+      maximumUnexpectedTransparentRgbFraction:
+        request.quality.maximumUnexpectedTransparentRgbFraction,
+    });
   } catch (error: unknown) {
     if (error instanceof SpriteQualityInputError) {
       throw new RepairedFamilyRevisionError(
@@ -387,13 +400,8 @@ export async function createRepairedFamilyRevision(
   const now = options.now ?? (() => new Date());
   const completedAt = nowIso(now);
   const requestSha256 = repairedFamilyRevisionRequestSha256(request);
-
   const [packetArtifact, executionArtifact, restoredArtifact] = await Promise.all([
-    verifiedArtifact(
-      options.artifacts,
-      request.repairPacketArtifactId,
-      "repair packet",
-    ),
+    verifiedArtifact(options.artifacts, request.repairPacketArtifactId, "repair packet"),
     verifiedArtifact(
       options.artifacts,
       request.repairExecutionEvidenceArtifactId,
@@ -436,7 +444,6 @@ export async function createRepairedFamilyRevision(
       "restoredCandidateArtifactId must reference an unapproved, non-final restored PNG candidate.",
     );
   }
-
   const packet = parsePacket(
     await readJson(options.artifacts, packetArtifact, "repair packet"),
   );
@@ -476,12 +483,6 @@ export async function createRepairedFamilyRevision(
   }
 
   const sourceManifestArtifactId = packet.sourceEvidence.manifestArtifactId;
-  if (!sourceManifestArtifactId) {
-    throw new RepairedFamilyRevisionError(
-      "REPAIRED_FAMILY_REVISION_MANIFEST_REQUIRED",
-      "Repair packet must be bound to an immutable normalized family manifest.",
-    );
-  }
   const sourceManifestArtifact = await verifiedArtifact(
     options.artifacts,
     sourceManifestArtifactId,
@@ -521,7 +522,7 @@ export async function createRepairedFamilyRevision(
     );
   }
 
-  const { layer: targetEvidence } = targetLayerEvidence(packet);
+  const targetEvidence = targetLayerEvidence(packet);
   const definition = sourceManifest.layerDefinitions.find(
     (entry) => entry.id === packet.target.layerId,
   );
@@ -770,7 +771,7 @@ export async function createRepairedFamilyRevision(
     ...sourceManifest,
     frames: revisedFrames,
   });
-  let familyResult;
+  let familyResult: ManifestBoundSpriteFamilyRunResult;
   try {
     familyResult = manifestBound(
       await verifySpriteFamily(revisedManifest, {
