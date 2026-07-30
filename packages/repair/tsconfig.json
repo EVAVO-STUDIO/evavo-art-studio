@@ -9,6 +9,7 @@
   "references": [
     { "path": "../artifacts" },
     { "path": "../media" },
+    { "path": "../provider-canvas" },
     { "path": "../providers" },
     { "path": "../sprite-family" }
   ],
