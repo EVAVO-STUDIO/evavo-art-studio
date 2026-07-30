@@ -3,9 +3,13 @@ import path from "node:path";
 
 import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
+  compileRepairedFamilyRevisionJob,
+  createRepairedFamilyRevision,
   planTargetedRepair,
+  repairedFamilyRevisionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
+  validateRepairedFamilyRevisionRequest,
   validateTargetedRepairRequest,
 } from "@evavo/art-repair";
 
@@ -25,6 +29,12 @@ async function readJson(filePath: string): Promise<unknown> {
 function inputPath(values: RepairCommandValues, command: string): string {
   if (!values.input) throw new Error(`--input is required for ${command}.`);
   return path.resolve(values.input);
+}
+
+function store(values: RepairCommandValues): LocalArtifactStore {
+  return new LocalArtifactStore({
+    root: path.resolve(values["artifact-root"] ?? ".art-studio/artifacts"),
+  });
 }
 
 function runtimeJob(request: ReturnType<typeof validateTargetedRepairRequest>) {
@@ -63,6 +73,37 @@ export async function handleRepairCommand(
   if (command === "repair-protocol") {
     return { handled: true, value: targetedRepairProtocolSummary() };
   }
+  if (command === "repair-revision-protocol") {
+    return {
+      handled: true,
+      value: repairedFamilyRevisionProtocolSummary(),
+    };
+  }
+  if (
+    new Set([
+      "repair-revision-validate",
+      "repair-revision-compile",
+      "repair-revision-run",
+    ]).has(command)
+  ) {
+    const input = await readJson(inputPath(values, command));
+    const request = validateRepairedFamilyRevisionRequest(input);
+    if (command === "repair-revision-validate") {
+      return { handled: true, value: request };
+    }
+    if (command === "repair-revision-compile") {
+      return {
+        handled: true,
+        value: compileRepairedFamilyRevisionJob(request),
+      };
+    }
+    return {
+      handled: true,
+      value: await createRepairedFamilyRevision(request, {
+        artifacts: store(values),
+      }),
+    };
+  }
   if (!new Set(["repair-validate", "repair-compile", "repair-run"]).has(command)) {
     return { handled: false };
   }
@@ -87,9 +128,7 @@ export async function handleRepairCommand(
   return {
     handled: true,
     value: await planTargetedRepair(request, {
-      artifacts: new LocalArtifactStore({
-        root: path.resolve(values["artifact-root"] ?? ".art-studio/artifacts"),
-      }),
+      artifacts: store(values),
     }),
   };
 }
