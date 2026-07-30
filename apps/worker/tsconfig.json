@@ -13,7 +13,8 @@
     { "path": "../../packages/providers" },
     { "path": "../../packages/quality" },
     { "path": "../../packages/runtime" },
-    { "path": "../../packages/selection" }
+    { "path": "../../packages/selection" },
+    { "path": "../../packages/sprite-family" }
   ],
   "include": ["src/**/*.ts"]
 }
