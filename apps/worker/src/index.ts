@@ -29,6 +29,10 @@ import {
   createProviderRegistryFromEnvironment,
   providerWorkerCapabilities,
 } from "./provider-handlers.js";
+import {
+  candidateSelectionWorkerCapabilities,
+  createCandidateSelectionHandlers,
+} from "./selection-handlers.js";
 
 const isRecord = (
   value: unknown,
@@ -221,6 +225,7 @@ export function createBuiltinHandlers(
     "sprite.atlas.build": atlasBuild,
     ...createProviderHandlers(providerRegistry),
     ...createCandidateMasteringHandlers(),
+    ...createCandidateSelectionHandlers(),
   });
 }
 
@@ -262,8 +267,10 @@ async function main(): Promise<void> {
   const providerRegistry = createProviderRegistryFromEnvironment();
   const providerCapabilities = providerWorkerCapabilities(providerRegistry);
   const masteringCapabilities = candidateMasteringWorkerCapabilities();
+  const selectionCapabilities = candidateSelectionWorkerCapabilities();
   const defaultQueues = [
     "media",
+    "selection",
     ...(providerRegistry.list().length ? ["provider"] : []),
   ];
   const runtime = new LocalRuntimeRepository({ root: runtimeRoot });
@@ -279,6 +286,7 @@ async function main(): Promise<void> {
         "godot.export",
         "evidence.bundle",
         ...masteringCapabilities,
+        ...selectionCapabilities,
         ...providerCapabilities,
       ],
       queues: configuredQueues.length ? configuredQueues : defaultQueues,

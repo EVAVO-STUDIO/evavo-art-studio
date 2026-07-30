@@ -9,6 +9,8 @@ import {
   validateProviderCandidateRequest,
 } from "@evavo/art-providers";
 
+import { registerSelectionTools } from "./selection-tools.js";
+
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
 });
@@ -70,6 +72,8 @@ function compiledValue(input: unknown) {
 }
 
 export function registerProviderTools(server: McpServer): void {
+  registerSelectionTools(server);
+
   server.registerTool(
     "provider_candidate_protocol",
     {

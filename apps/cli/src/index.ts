@@ -32,6 +32,10 @@ import {
   handleLocalControlCommand,
   type LocalControlValues,
 } from "./runtime-commands.js";
+import {
+  handleSelectionCommand,
+  type SelectionCommandValues,
+} from "./selection-commands.js";
 
 const help = `EVAVO Art Studio CLI
 
@@ -49,8 +53,16 @@ Usage:
   evavo-art provider-validate --input candidate-request.json [--output normalized-request.json]
   evavo-art provider-compile --input candidate-request.json [--output compiled-provider-contract.json]
 
+  evavo-art selection-protocol [--output selection-protocol.json]
+  evavo-art selection-validate --input selection.json [--output normalized-selection.json]
+  evavo-art selection-compile --input selection.json [--output selection-job.json]
+  evavo-art selection-run --input selection.json [--artifact-root .art-studio/artifacts] [--output result.json]
+  evavo-art promotion-validate --input promotion.json [--output normalized-promotion.json]
+  evavo-art promotion-compile --input promotion.json [--output promotion-job.json]
+  evavo-art promotion-run --input promotion.json [--artifact-root .art-studio/artifacts] [--output result.json]
+
   evavo-art runtime-submit --input job.json [--runtime-root .art-studio/runtime] [--actor cli]
-  evavo-art runtime-list [--state queued,running] [--queue media] [--kind art.candidate.master-alpha] [--limit 100]
+  evavo-art runtime-list [--state queued,running] [--queue selection] [--kind art.candidate.select] [--limit 100]
   evavo-art runtime-show --job job_id
   evavo-art runtime-events [--after 0]
   evavo-art runtime-cancel --job job_id [--force]
@@ -68,6 +80,7 @@ Usage:
 All commands emit JSON so ChatGPT, Claude, CI and scripts can consume the same contract.
 Provider validation and compilation never call an external model. Candidate execution occurs only through a capability-matched durable worker job.
 Alpha mastering is deterministic and writes an unapproved PNG plus evidence. It exits with code 3 when blocking sprite QA fails.
+Selection writes immutable ranking evidence. Promotion is a separate explicit compare-and-swap operation and cannot override blocking failures.
 Atlas and durable-runtime writes are explicit, local and root-scoped.
 `;
 
@@ -144,6 +157,15 @@ async function main(): Promise<void> {
   if (mastering.handled) {
     await emit(mastering.value);
     if (mastering.exitCode !== undefined) process.exitCode = mastering.exitCode;
+    return;
+  }
+
+  const selection = await handleSelectionCommand(
+    command,
+    parsed.values as SelectionCommandValues,
+  );
+  if (selection.handled) {
+    await emit(selection.value, parsed.values.output);
     return;
   }
 

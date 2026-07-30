@@ -14,7 +14,8 @@
     { "path": "../../packages/godot" },
     { "path": "../../packages/providers" },
     { "path": "../../packages/repo-inspector" },
-    { "path": "../../packages/runtime" }
+    { "path": "../../packages/runtime" },
+    { "path": "../../packages/selection" }
   ],
   "include": ["src/**/*.ts"]
 }

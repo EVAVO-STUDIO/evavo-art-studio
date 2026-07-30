@@ -1,0 +1,62 @@
+{
+  "queue": "selection",
+  "kind": "art.candidate.select",
+  "idempotencyKey": "hero-idle-down-selection-v1",
+  "payload": {
+    "schemaVersion": "1.0",
+    "selectionId": "hero-idle-down-selection-v1",
+    "candidateArtifactIds": [
+      "artifact_1111111111111111111111111111111111111111111111111111111111111111",
+      "artifact_2222222222222222222222222222222222222222222222222222222222222222",
+      "artifact_3333333333333333333333333333333333333333333333333333333333333333"
+    ],
+    "referenceArtifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "referenceRole": "canonical-identity",
+    "externalEvidenceArtifactIds": [
+      "artifact_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    ],
+    "policy": {
+      "profile": "sprite-identity",
+      "allowAutomaticSelection": true,
+      "requireReferenceLineage": true,
+      "requireQualityPassed": true,
+      "allowedCandidateRoles": [
+        "provider-candidate-alpha-master"
+      ],
+      "alphaVisibleThreshold": 8,
+      "maximumTranslationPixels": 6,
+      "maximumEdgeDistancePixels": 12,
+      "minimumOverallScore": 0.68,
+      "minimumWinnerMargin": 0.035
+    },
+    "metadata": {
+      "projectId": "1871",
+      "assetId": "hero-idle",
+      "direction": "down",
+      "frameId": "down-001",
+      "purpose": "Choose the most faithful QA-passed key-pose candidate without granting direct approval authority."
+    }
+  },
+  "inputArtifacts": [
+    "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "artifact_1111111111111111111111111111111111111111111111111111111111111111",
+    "artifact_2222222222222222222222222222222222222222222222222222222222222222",
+    "artifact_3333333333333333333333333333333333333333333333333333333333333333",
+    "artifact_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  ],
+  "requiredCapabilities": [
+    "selection.compare",
+    "evidence.bundle"
+  ],
+  "priority": 40,
+  "maximumAttempts": 1,
+  "leaseDurationMs": 120000,
+  "timeoutMs": 900000,
+  "labels": {
+    "projectId": "1871",
+    "assetId": "hero-idle",
+    "stage": "candidate-selection"
+  }
+}

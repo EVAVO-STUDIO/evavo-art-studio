@@ -17,10 +17,12 @@
     "@evavo/art-media": "workspace:*",
     "@evavo/art-providers": "workspace:*",
     "@evavo/art-quality": "workspace:*",
-    "@evavo/art-runtime": "workspace:*"
+    "@evavo/art-runtime": "workspace:*",
+    "@evavo/art-selection": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "sharp": "^0.35.3",
     "typescript": "^5.9.2"
   }
 }

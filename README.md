@@ -22,6 +22,10 @@ This repository is intentionally broader than an image generator. It is the shar
 - unapproved provider candidates stored as immutable intermediate artifacts with complete attempt and provenance evidence;
 - border-connected chroma segmentation, matte colour unmixing, antialiased edge recovery and bounded transparent RGB bleed;
 - durable `art.candidate.master-alpha` work that emits only an unapproved alpha intermediate and immutable extraction or QA evidence;
+- deterministic candidate ranking using bounded alignment, silhouettes, symmetric edge distance, area, anchors, palette, luminance, edge orientation and overlapping colour;
+- optional model-assisted identity, costume, equipment, pose, style and perceptual evidence bound to exact candidate, reference, model and preprocessing hashes;
+- explicit `selected`, `review-required` and `rejected` outcomes with winner-margin and hard-gate governance;
+- separate automatic or named-human promotion that re-verifies ranking evidence and compare-and-swaps the approved artifact reference;
 - blocking identity, proportion, crop, layer-registration, occlusion and source-parity gates;
 - executable decoded-pixel QA for alpha, fake checkerboards, flat mattes, edge halos, hidden transparent colour and safe bounds;
 - executable sequence QA for canvas, frame order, exact duration, pivot, baseline, ground contact and declared linked-cel duplicates;
@@ -29,16 +33,16 @@ This repository is intentionally broader than an image generator. It is the shar
 - Godot 4.6.2 SpriteFrames descriptors and headless importers using AtlasTexture regions, trim margins, loop modes and exact relative durations;
 - immutable content-addressed artifact objects, descriptors, lineage, verification and compare-and-swap approved references;
 - crash-recoverable runtime transactions with idempotency, dependencies, capability claims, leases, heartbeats, retry, pause, cancellation, dead letter and redrive;
-- a capability-scoped local worker that executes provider candidates, alpha mastering and atlas or Godot source packages while committing only verified artifact IDs;
+- a capability-scoped local worker that executes provider candidates, alpha mastering, candidate selection, promotion and atlas or Godot source packages while committing only verified artifact IDs;
 - an optional pg-boss transport adapter that keeps delivery separate from authoritative runtime and artifact evidence;
 - protected owner operations UI with signed HttpOnly sessions, bounded server-side API proxying, secret redaction and durable job controls;
 - safe local repository inspector with Godot project and existing-art detection;
-- JSON-first CLI for planning, provider compilation, alpha mastering, repository inspection, sprite QA, engine delivery, runtime control and artifact governance;
-- versioned REST API for planning, provider contracts, QA, authenticated atlas writes and authenticated runtime or artifact operations;
+- JSON-first CLI for planning, provider compilation, alpha mastering, candidate selection, promotion, repository inspection, sprite QA, engine delivery, runtime control and artifact governance;
+- versioned REST API for planning, provider and selection contracts, QA, authenticated atlas writes and authenticated runtime or artifact operations;
 - Next.js control plane with the continuity-aware production compiler, browser QA workbenches and private operations control room;
-- MCP v2 stdio server exposing planning, provider compilation, repository inspection, sprite QA, atlas delivery, runtime control and artifact governance to ChatGPT, Claude and compatible agents;
+- MCP v2 stdio server exposing planning, provider and selection compilation, repository inspection, sprite QA, atlas delivery, runtime control and artifact governance to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
-- architecture, technology, quality, sprite-continuity, provider, alpha-mastering, atlas-delivery, durable-runtime, operations and hub-integration decisions;
+- architecture, technology, quality, sprite-continuity, provider, alpha-mastering, selection, atlas-delivery, durable-runtime, operations and hub-integration decisions;
 - CI validation for `main`, automated `work/**` branches and pull requests.
 
 ## First commands
@@ -67,6 +71,18 @@ pnpm art -- master-alpha `
   --evidence .\candidate.alpha.evidence.json `
   --expectations .\frame-quality.json
 
+# Validate and compile ranking or promotion without executing a worker:
+pnpm art -- selection-protocol
+pnpm art -- selection-validate `
+  --input .\selection.json `
+  --output .\selection.normalized.json
+pnpm art -- selection-compile `
+  --input .\selection.json `
+  --output .\selection.job.json
+pnpm art -- promotion-compile `
+  --input .\promotion.json `
+  --output .\promotion.job.json
+
 pnpm art -- quality-frame `
   --input .\source\hero\frames\down\frame-001.png `
   --expectations .\source\hero\frame-quality.json `
@@ -88,7 +104,7 @@ pnpm art -- atlas-build `
   --godot-project C:\GitRepos\your-game `
   --godot-executable "C:\Tools\Godot\Godot_v4.6.2-stable_mono_win64.exe"
 
-# Submit provider work, alpha mastering or atlas work to the durable runtime:
+# Submit provider, mastering, selection, promotion or atlas work to the durable runtime:
 pnpm art -- runtime-submit `
   --input .\examples\runtime-provider-job.json `
   --runtime-root .\.art-studio\runtime `
@@ -96,6 +112,16 @@ pnpm art -- runtime-submit `
 
 pnpm art -- runtime-submit `
   --input .\examples\runtime-alpha-mastering-job.json `
+  --runtime-root .\.art-studio\runtime `
+  --actor greg
+
+pnpm art -- runtime-submit `
+  --input .\examples\runtime-selection-job.json `
+  --runtime-root .\.art-studio\runtime `
+  --actor greg
+
+pnpm art -- runtime-submit `
+  --input .\examples\runtime-promotion-job.json `
   --runtime-root .\.art-studio\runtime `
   --actor greg
 
@@ -155,6 +181,37 @@ The source candidate must be an immutable, unapproved `provider-candidate` artif
 
 The direct `master-alpha` CLI command uses the same kernel, writes atomically and exits with code `3` when blocking sprite QA fails.
 
+## Candidate selection and promotion
+
+Selection compares two to 32 immutable, QA-passed candidates with one immutable reference. It can use built-in `sprite-identity`, `sprite-motion`, `environment` or `ui` profiles, or a complete custom policy.
+
+The deterministic selector measures bounded translation, alpha-silhouette overlap, symmetric edge distance, visible area, centroid, visible-bounds aspect, palette, luminance, edge orientation and aligned colour. Missing source lineage, invalid artifact state, failed content verification, dimension mismatch and blocking thresholds cannot be offset by a strong score elsewhere.
+
+Optional model-assisted evidence is a separate immutable `selection-model-evidence` artifact. It is bound to one candidate, one reference, one evidence kind, model and preprocessing hashes. Identity, costume, equipment, pose, style and perceptual evidence can be weighted or required, but never update an approved reference directly.
+
+Selection writes a complete immutable ranking and returns:
+
+```text
+selected
+review-required
+rejected
+```
+
+`selected` requires every hard gate, overall threshold, winner margin and automatic-only evidence condition. `review-required` retains an eligible but ambiguous result instead of guessing. `rejected` means no candidate is hard-gate eligible.
+
+Selection itself never creates an approved master. Promotion is a separate transaction that re-verifies the evidence, the recommended candidate and the current named-reference generation. Automatic promotion requires an automatically selected result. A named human may resolve `review-required`, but cannot promote a rejected result, waive blocking failures or choose a lower-ranked candidate.
+
+The durable job kinds are:
+
+```text
+art.candidate.select
+art.candidate.promote
+```
+
+Promotion creates a traceable `selected-art-master`, writes immutable authorization evidence and compare-and-swaps the named reference. A stale generation leaves diagnostic artifacts but does not become approved.
+
+See `docs/candidate-selection-and-promotion.md` for the metric, evidence, review and promotion contracts.
+
 ## Protected owner operations
 
 Copy `.env.example` to the environment used by the API, web and worker processes, then provide three different random secrets of at least 32 bytes:
@@ -187,6 +244,11 @@ Do not add any operator or provider secret to a `NEXT_PUBLIC_` variable. Product
 - `GET /v1/provider-protocol`
 - `POST /v1/providers/validate`
 - `POST /v1/providers/compile`
+- `GET /v1/selection-protocol`
+- `POST /v1/selections/validate`
+- `POST /v1/selections/compile`
+- `POST /v1/promotions/validate`
+- `POST /v1/promotions/compile`
 - `POST /v1/quality/sprite-frame`
 - `POST /v1/quality/sprite-sequence`
 - `POST /v1/atlases/build`
@@ -198,13 +260,17 @@ Do not add any operator or provider secret to a `NEXT_PUBLIC_` variable. Product
 - `GET /v1/artifacts/:id[/verify]`
 - `GET|POST /v1/artifact-references`
 
-Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. REST atlas, runtime and artifact routes require `EVAVO_ART_ALLOW_WRITES=true` plus the server-only `EVAVO_ART_WRITE_TOKEN`. Operational reads are protected because job payloads may contain private repository paths. Provider protocol routes are deterministic and do not hold or use provider credentials. Local MCP operational tools require the write flag and a trusted MCP process connection.
+The core API is documented in `apps/api/openapi.yaml`; deterministic selection and promotion compilation are documented in `apps/api/openapi.selection.yaml`.
+
+Repository, sequence and atlas paths are restricted to `EVAVO_ART_ALLOWED_ROOTS`. On Windows, separate allowed roots with `;`. REST atlas, runtime and artifact routes require `EVAVO_ART_ALLOW_WRITES=true` plus the server-only `EVAVO_ART_WRITE_TOKEN`. Operational reads are protected because job payloads may contain private repository paths. Provider, selection and promotion contract routes are deterministic and do not hold provider credentials, decode candidate images or mutate references. Local MCP operational tools require the write flag and a trusted MCP process connection.
 
 ## Core rules
 
 A provider response is never a final asset. Every final asset must pass the declared production stages, deterministic mastering, blocking quality gates, metadata generation and evidence bundling.
 
 A provider receives one bounded frame or layer contract. It does not receive authority to create a whole sprite sheet, merge separate runtime layers, invent unrelated props or redesign an approved identity.
+
+A high candidate score is not approval. Selection writes evidence; promotion is a separate, exact-reference transaction.
 
 A sprite sheet is never the sole source. The source package retains canonical and direction masters, individual lossless frames, exact timing, registered layers, editable cels, pivots, manifests and reproducibility evidence.
 
@@ -218,4 +284,4 @@ Godot delivery is two-stage by design: Art Studio deterministically emits the at
 
 The runtime journal, artifact hashes and evidence records are authoritative. pg-boss may wake distributed workers, but a queue acknowledgement cannot approve an asset or replace attempt history. Workers commit success only with valid immutable artifact IDs.
 
-See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/governed-provider-candidates.md`, `docs/candidate-alpha-mastering.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md`, `docs/runtime-operations-dashboard.md` and `docs/hub-integration.md`.
+See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/governed-provider-candidates.md`, `docs/candidate-alpha-mastering.md`, `docs/candidate-selection-and-promotion.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md`, `docs/runtime-operations-dashboard.md` and `docs/hub-integration.md`.

@@ -1,0 +1,46 @@
+{
+  "queue": "selection",
+  "kind": "art.candidate.promote",
+  "idempotencyKey": "hero-idle-down-promotion-v1",
+  "payload": {
+    "schemaVersion": "1.0",
+    "promotionId": "hero-idle-down-promotion-v1",
+    "selectionEvidenceArtifactId": "artifact_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "candidateArtifactId": "artifact_1111111111111111111111111111111111111111111111111111111111111111",
+    "target": {
+      "namespace": "projects/1871/characters/hero/idle/down",
+      "name": "approved-master",
+      "expectedGeneration": 3,
+      "expectedArtifactId": "artifact_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "approval": {
+      "mode": "automatic"
+    },
+    "actor": "evavo-art-selection-worker",
+    "metadata": {
+      "projectId": "1871",
+      "assetId": "hero-idle",
+      "direction": "down",
+      "frameId": "down-001",
+      "releaseIntent": "Replace the current approved master only when selection evidence and reference generation still match."
+    }
+  },
+  "inputArtifacts": [
+    "artifact_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "artifact_1111111111111111111111111111111111111111111111111111111111111111"
+  ],
+  "requiredCapabilities": [
+    "selection.promote",
+    "artifacts.store",
+    "evidence.bundle"
+  ],
+  "priority": 50,
+  "maximumAttempts": 1,
+  "leaseDurationMs": 60000,
+  "timeoutMs": 300000,
+  "labels": {
+    "projectId": "1871",
+    "assetId": "hero-idle",
+    "stage": "candidate-promotion"
+  }
+}
