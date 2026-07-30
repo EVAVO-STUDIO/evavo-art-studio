@@ -83,7 +83,13 @@ function policy(
   if (!isRecord(value)) fail("policy must be an object when supplied.");
   const normalized = optionalJson(value, "policy");
   if (!isRecord(normalized)) fail("policy must normalize to a JSON object.");
-  return normalized as unknown as Omit<
+  const {
+    requireReferenceLineage: _requireReferenceLineage,
+    requireQualityPassed: _requireQualityPassed,
+    allowedCandidateRoles: _allowedCandidateRoles,
+    ...callerPolicy
+  } = normalized;
+  return callerPolicy as unknown as Omit<
     CandidateSelectionPolicyInput,
     "requireReferenceLineage" | "requireQualityPassed" | "allowedCandidateRoles"
   >;
@@ -107,7 +113,9 @@ export function validateRepairedFamilySelectionRequest(
     32,
   );
   const externalEvidenceArtifactIds =
-    input.externalEvidenceArtifactIds === undefined
+    input.externalEvidenceArtifactIds === undefined ||
+    (Array.isArray(input.externalEvidenceArtifactIds) &&
+      input.externalEvidenceArtifactIds.length === 0)
       ? []
       : artifactIds(
           input.externalEvidenceArtifactIds,
