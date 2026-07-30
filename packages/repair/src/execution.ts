@@ -17,7 +17,6 @@ import {
   executeProviderCandidateRequest,
   validateProviderCandidateRequest,
   type NormalizedProviderCandidateRequest,
-  type ProviderCandidateReferenceInput,
 } from "@evavo/art-providers";
 
 import {
@@ -33,7 +32,7 @@ import {
 } from "./types.js";
 
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
-const EXECUTION_OPTION_KEYS = new Set([
+const OPTION_KEYS = new Set([
   "providerWidth",
   "providerHeight",
   "contentMarginPixels",
@@ -51,71 +50,63 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function fail(message: string, details?: JsonValue): never {
+function requestFailure(message: string): never {
   throw new TargetedRepairError(
     "TARGETED_REPAIR_EXECUTION_REQUEST_INVALID",
     message,
-    details,
   );
 }
 
 function artifactId(value: unknown, name: string): ArtifactId {
   if (typeof value !== "string" || !ARTIFACT_ID.test(value)) {
-    fail(`${name} must use artifact_<sha256> format.`);
+    requestFailure(`${name} must use artifact_<sha256> format.`);
   }
   return value as ArtifactId;
 }
 
-function optionalInteger(
-  value: unknown,
-  name: string,
-): number | undefined {
+function optionalInteger(value: unknown, name: string): number | undefined {
   if (value === undefined) return undefined;
-  if (!Number.isInteger(value)) fail(`${name} must be an integer.`);
+  if (!Number.isInteger(value)) requestFailure(`${name} must be an integer.`);
   return value as number;
 }
 
-function providerCanvasOptions(value: unknown): TargetedRepairProviderCanvasOptions {
+function canvasOptions(value: unknown): TargetedRepairProviderCanvasOptions {
   if (value === undefined) return {};
-  if (!isRecord(value)) fail("providerCanvas must be an object when supplied.");
-  const unknownKeys = Object.keys(value).filter(
-    (key) => !EXECUTION_OPTION_KEYS.has(key),
-  );
+  if (!isRecord(value)) requestFailure("providerCanvas must be an object.");
+  const unknownKeys = Object.keys(value).filter((key) => !OPTION_KEYS.has(key));
   if (unknownKeys.length) {
-    fail(`providerCanvas contains unsupported keys: ${unknownKeys.sort().join(", ")}.`);
+    requestFailure(
+      `providerCanvas contains unsupported keys: ${unknownKeys.sort().join(", ")}.`,
+    );
   }
-  const requireBinaryMask = value.requireBinaryMask;
   if (
-    requireBinaryMask !== undefined &&
-    typeof requireBinaryMask !== "boolean"
+    value.requireBinaryMask !== undefined &&
+    typeof value.requireBinaryMask !== "boolean"
   ) {
-    fail("providerCanvas.requireBinaryMask must be boolean.");
+    requestFailure("providerCanvas.requireBinaryMask must be boolean.");
   }
-  const restorationSampling = value.restorationSampling;
   if (
-    restorationSampling !== undefined &&
-    restorationSampling !== "nearest-center" &&
-    restorationSampling !== "block-average"
+    value.restorationSampling !== undefined &&
+    value.restorationSampling !== "nearest-center" &&
+    value.restorationSampling !== "block-average"
   ) {
-    fail(
+    requestFailure(
       "providerCanvas.restorationSampling must be nearest-center or block-average.",
     );
   }
-  const paletteMode = value.paletteMode;
   if (
-    paletteMode !== undefined &&
-    paletteMode !== "source" &&
-    paletteMode !== "none"
+    value.paletteMode !== undefined &&
+    value.paletteMode !== "source" &&
+    value.paletteMode !== "none"
   ) {
-    fail("providerCanvas.paletteMode must be source or none.");
+    requestFailure("providerCanvas.paletteMode must be source or none.");
   }
-  const alphaMode = value.alphaMode;
   if (
-    alphaMode !== undefined &&
-    alphaMode !== "source" &&
-    alphaMode !== "candidate"
+    value.alphaMode !== undefined &&
+    value.alphaMode !== "source" &&
+    value.alphaMode !== "candidate"
   ) {
-    fail("providerCanvas.alphaMode must be source or candidate.");
+    requestFailure("providerCanvas.alphaMode must be source or candidate.");
   }
   const providerWidth = optionalInteger(
     value.providerWidth,
@@ -149,24 +140,30 @@ function providerCanvasOptions(value: unknown): TargetedRepairProviderCanvasOpti
     ...(providerWidth === undefined ? {} : { providerWidth }),
     ...(providerHeight === undefined ? {} : { providerHeight }),
     ...(contentMarginPixels === undefined ? {} : { contentMarginPixels }),
-    ...(requireBinaryMask === undefined ? {} : { requireBinaryMask }),
-    ...(restorationSampling === undefined ? {} : { restorationSampling }),
-    ...(paletteMode === undefined ? {} : { paletteMode }),
-    ...(alphaMode === undefined ? {} : { alphaMode }),
+    ...(value.requireBinaryMask === undefined
+      ? {}
+      : { requireBinaryMask: value.requireBinaryMask }),
+    ...(value.restorationSampling === undefined
+      ? {}
+      : { restorationSampling: value.restorationSampling }),
+    ...(value.paletteMode === undefined
+      ? {}
+      : { paletteMode: value.paletteMode }),
+    ...(value.alphaMode === undefined ? {} : { alphaMode: value.alphaMode }),
     ...(maximumPaletteColours === undefined
       ? {}
       : { maximumPaletteColours }),
     ...(maximumInputBytes === undefined ? {} : { maximumInputBytes }),
     ...(maximumSourcePixels === undefined ? {} : { maximumSourcePixels }),
     ...(maximumProviderPixels === undefined ? {} : { maximumProviderPixels }),
-  };
+  } as TargetedRepairProviderCanvasOptions;
 }
 
 export function validateTargetedRepairExecutionRequest(
   input: TargetedRepairExecutionRequestInput | unknown,
 ): NormalizedTargetedRepairExecutionRequest {
-  if (!isRecord(input)) fail("Targeted repair execution request must be an object.");
-  if (input.schemaVersion !== "1.0") fail('schemaVersion must be "1.0".');
+  if (!isRecord(input)) requestFailure("Execution request must be an object.");
+  if (input.schemaVersion !== "1.0") requestFailure('schemaVersion must be "1.0".');
   return {
     schemaVersion: "1.0",
     protocolVersion: TARGETED_REPAIR_PROTOCOL_VERSION,
@@ -174,7 +171,7 @@ export function validateTargetedRepairExecutionRequest(
       input.repairPacketArtifactId,
       "repairPacketArtifactId",
     ),
-    providerCanvas: providerCanvasOptions(input.providerCanvas),
+    providerCanvas: canvasOptions(input.providerCanvas),
   };
 }
 
@@ -209,7 +206,6 @@ function parsePacket(value: unknown): TargetedRepairPacket {
     value.protocolVersion !== TARGETED_REPAIR_PROTOCOL_VERSION ||
     typeof value.repairId !== "string" ||
     typeof value.familyId !== "string" ||
-    typeof value.disposition !== "string" ||
     !isRecord(value.target) ||
     !Array.isArray(value.mutableArtifactIds) ||
     !Array.isArray(value.protectedArtifactIds)
@@ -225,7 +221,7 @@ function parsePacket(value: unknown): TargetedRepairPacket {
 async function readPacket(
   artifacts: ArtifactStore,
   id: ArtifactId,
-): Promise<Readonly<{ artifact: StoredArtifact; packet: TargetedRepairPacket }>> {
+): Promise<TargetedRepairPacket> {
   const artifact = await verifiedArtifact(artifacts, id, "repair packet");
   if (
     artifact.mediaType !== "application/json" ||
@@ -251,19 +247,16 @@ async function readPacket(
     throw new TargetedRepairError(
       "TARGETED_REPAIR_EXECUTION_PACKET_NOT_READY",
       "Only a ready repair packet with a provider plan may execute.",
-      normalizeJson({
-        disposition: packet.disposition,
-        blockers: packet.blockers,
-      }),
+      normalizeJson({ disposition: packet.disposition, blockers: packet.blockers }),
     );
   }
-  return { artifact, packet };
+  return packet;
 }
 
 function requiredReference(
   request: NormalizedProviderCandidateRequest,
   role: "base-image" | "mask",
-): ProviderCandidateReferenceInput {
+) {
   const reference = request.references.find((entry) => entry.role === role);
   if (!reference) {
     throw new TargetedRepairError(
@@ -274,19 +267,9 @@ function requiredReference(
   return reference;
 }
 
-function nowIso(now: () => Date): string {
-  const value = now();
-  if (!Number.isFinite(value.getTime())) {
-    throw new TargetedRepairError(
-      "TARGETED_REPAIR_EXECUTION_CLOCK_INVALID",
-      "Repair execution clock returned an invalid date.",
-    );
-  }
-  return value.toISOString();
-}
-
 function providerRequestForCanvas(
   packet: TargetedRepairPacket,
+  repairPacketArtifactId: ArtifactId,
   providerBaseArtifactId: ArtifactId,
   providerMaskArtifactId: ArtifactId,
   providerManifestArtifactId: ArtifactId,
@@ -294,15 +277,13 @@ function providerRequestForCanvas(
   height: number,
 ): NormalizedProviderCandidateRequest {
   const original = packet.providerPlan!.request;
-  const references = original.references.map((reference) => {
-    if (reference.role === "base-image") {
-      return { ...reference, artifactId: providerBaseArtifactId };
-    }
-    if (reference.role === "mask") {
-      return { ...reference, artifactId: providerMaskArtifactId };
-    }
-    return reference;
-  });
+  const references = original.references.map((reference) =>
+    reference.role === "base-image"
+      ? { ...reference, artifactId: providerBaseArtifactId }
+      : reference.role === "mask"
+        ? { ...reference, artifactId: providerMaskArtifactId }
+        : reference,
+  );
   return validateProviderCandidateRequest({
     schemaVersion: "1.0",
     requestId: `${packet.repairId}:provider-canvas`,
@@ -313,7 +294,7 @@ function providerRequestForCanvas(
     candidateFamilyId: `${original.candidateFamilyId}:provider-canvas`,
     ...(original.frameId === undefined ? {} : { frameId: original.frameId }),
     ...(original.layerId === undefined ? {} : { layerId: original.layerId }),
-    creativeIntent: `${original.creativeIntent} Work on the integer-scaled provider canvas. Preserve hard pixel-block boundaries and do not alter protected mask regions.`,
+    creativeIntent: `${original.creativeIntent} Work on the integer-scaled provider canvas and do not alter protected mask regions.`,
     ...(original.negativeIntent === undefined
       ? {}
       : { negativeIntent: original.negativeIntent }),
@@ -329,8 +310,8 @@ function providerRequestForCanvas(
     selection: original.selection,
     metadata: {
       ...(isRecord(original.metadata) ? original.metadata : {}),
-      targetedRepairPacketArtifactId: packet.familyEvidenceArtifactId,
-      providerCanvasManifestArtifactId,
+      targetedRepairPacketArtifactId: repairPacketArtifactId,
+      providerCanvasManifestArtifactId: providerManifestArtifactId,
       providerCanvasSourceWidth: original.target.width,
       providerCanvasSourceHeight: original.target.height,
       providerCanvasWidth: width,
@@ -339,13 +320,18 @@ function providerRequestForCanvas(
   });
 }
 
-function executionRequestSha256(
-  request: NormalizedTargetedRepairExecutionRequest,
-): string {
-  return sha256(stableStringify(normalizeJson(request)));
+function nowIso(now: () => Date): string {
+  const value = now();
+  if (!Number.isFinite(value.getTime())) {
+    throw new TargetedRepairError(
+      "TARGETED_REPAIR_EXECUTION_CLOCK_INVALID",
+      "Repair execution clock returned an invalid date.",
+    );
+  }
+  return value.toISOString();
 }
 
-function wrapExecutionError(error: unknown): never {
+function wrap(error: unknown): never {
   if (
     error instanceof TargetedRepairError ||
     error instanceof ProviderError ||
@@ -374,33 +360,32 @@ export async function executeTargetedRepairProviderCanvas(
     const request = validateTargetedRepairExecutionRequest(input);
     const now = options.now ?? (() => new Date());
     const startedAt = nowIso(now);
-    const packetRecord = await readPacket(
+    const packet = await readPacket(
       options.artifacts,
       request.repairPacketArtifactId,
     );
-    const packet = packetRecord.packet;
-    const originalProviderRequest = packet.providerPlan!.request;
-    if (originalProviderRequest.operation !== "inpaint") {
+    const original = packet.providerPlan!.request;
+    if (original.operation !== "inpaint") {
       throw new TargetedRepairError(
         "TARGETED_REPAIR_EXECUTION_OPERATION_INVALID",
         "Pixel-safe repair execution requires an inpaint provider plan.",
       );
     }
     if (
-      originalProviderRequest.background.strategy !== "chroma-key" ||
-      !originalProviderRequest.background.matteColour
+      original.background.strategy !== "chroma-key" ||
+      !original.background.matteColour
     ) {
       throw new TargetedRepairError(
         "TARGETED_REPAIR_EXECUTION_MATTE_REQUIRED",
         "Pixel-safe repair execution requires a declared chroma-key matte.",
       );
     }
-    const baseReference = requiredReference(originalProviderRequest, "base-image");
-    const maskReference = requiredReference(originalProviderRequest, "mask");
-    const declaredInputs = new Set(packet.providerPlan!.inputArtifacts);
+    const baseReference = requiredReference(original, "base-image");
+    const maskReference = requiredReference(original, "mask");
+    const declared = new Set(packet.providerPlan!.inputArtifacts);
     if (
-      !declaredInputs.has(baseReference.artifactId) ||
-      !declaredInputs.has(maskReference.artifactId)
+      !declared.has(baseReference.artifactId) ||
+      !declared.has(maskReference.artifactId)
     ) {
       throw new TargetedRepairError(
         "TARGETED_REPAIR_EXECUTION_INPUT_LINEAGE_MISSING",
@@ -420,7 +405,7 @@ export async function executeTargetedRepairProviderCanvas(
       sourceBase,
       sourceMask,
       {
-        matteColour: originalProviderRequest.background.matteColour,
+        matteColour: original.background.matteColour,
         alphaMode: "source",
         ...request.providerCanvas,
       },
@@ -462,9 +447,9 @@ export async function executeTargetedRepairProviderCanvas(
         mask: prepared.manifest.mask,
       }),
     });
-    const manifestBody = normalizeJson(prepared.manifest);
+    const manifestJson = normalizeJson(prepared.manifest);
     const providerManifest = await options.artifacts.put(
-      `${JSON.stringify(manifestBody, null, 2)}\n`,
+      `${JSON.stringify(manifestJson, null, 2)}\n`,
       {
         mediaType: "application/json",
         storageClass: "manifest",
@@ -480,7 +465,7 @@ export async function executeTargetedRepairProviderCanvas(
           repairId: packet.repairId,
         },
         metadata: normalizeJson({
-          manifestSha256: sha256(stableStringify(manifestBody)),
+          manifestSha256: sha256(stableStringify(manifestJson)),
           providerSize: prepared.manifest.provider.size,
           alphaMode: prepared.manifest.restoration.alphaMode,
         }),
@@ -488,6 +473,7 @@ export async function executeTargetedRepairProviderCanvas(
     );
     const providerRequest = providerRequestForCanvas(
       packet,
+      request.repairPacketArtifactId,
       providerBase.artifactId,
       providerMask.artifactId,
       providerManifest.artifactId,
@@ -555,9 +541,7 @@ export async function executeTargetedRepairProviderCanvas(
           repairId: packet.repairId,
           candidateIndex: String(index + 1),
           frameId: packet.target.frameId,
-          ...(packet.target.layerId
-            ? { layerId: packet.target.layerId }
-            : {}),
+          ...(packet.target.layerId ? { layerId: packet.target.layerId } : {}),
         },
         metadata: normalizeJson({
           providerCandidateArtifactId,
@@ -601,14 +585,15 @@ export async function executeTargetedRepairProviderCanvas(
         restoration: restoration.evidence,
       });
     }
-    const completedAt = nowIso(now);
-    const executionEvidenceBody = normalizeJson({
+    const executionRequestSha = sha256(
+      stableStringify(normalizeJson(request)),
+    );
+    const executionBody = normalizeJson({
       schemaVersion: "1.0",
       protocolVersion: TARGETED_REPAIR_PROTOCOL_VERSION,
       repairId: packet.repairId,
       request,
-      requestSha256: executionRequestSha256(request),
-      repairPacketArtifactId: request.repairPacketArtifactId,
+      requestSha256: executionRequestSha,
       providerRequest,
       providerCanvasBaseArtifactId: providerBase.artifactId,
       providerCanvasMaskArtifactId: providerMask.artifactId,
@@ -616,7 +601,7 @@ export async function executeTargetedRepairProviderCanvas(
       providerEvidenceArtifactId: providerRun.evidenceArtifact,
       restoredCandidates,
       startedAt,
-      completedAt,
+      completedAt: nowIso(now),
       approvalState: "unapproved",
       finalDeliverable: false,
       nextRequiredStages: [
@@ -627,7 +612,7 @@ export async function executeTargetedRepairProviderCanvas(
       ],
     });
     const executionEvidence = await options.artifacts.put(
-      `${JSON.stringify(executionEvidenceBody, null, 2)}\n`,
+      `${JSON.stringify(executionBody, null, 2)}\n`,
       {
         mediaType: "application/json",
         storageClass: "evidence",
@@ -651,7 +636,7 @@ export async function executeTargetedRepairProviderCanvas(
           outcome: "candidates-restored",
         },
         metadata: normalizeJson({
-          requestSha256: executionRequestSha256(request),
+          requestSha256: executionRequestSha,
           candidateCount: restoredCandidates.length,
           allProtectedExact: restoredCandidates.every(
             (candidate) => candidate.restoration.protectedExact,
@@ -673,6 +658,6 @@ export async function executeTargetedRepairProviderCanvas(
       executionEvidenceArtifactId: executionEvidence.artifactId,
     };
   } catch (error: unknown) {
-    wrapExecutionError(error);
+    wrap(error);
   }
 }
