@@ -55,6 +55,52 @@ test("repair protocol and compiler expose planning-only durable governance", asy
   });
 });
 
+test("repair revision REST controls validate and compile without artifact access", async () => {
+  await withServer(async (base) => {
+    const protocol = await fetch(`${base}/v1/repair-revision-protocol`);
+    assert.equal(protocol.status, 200);
+    const protocolBody = await protocol.json();
+    assert.equal(protocolBody.kind, "art.repair.revise-family");
+    assert.ok(
+      protocolBody.requiredCapabilities.includes("quality.sprite-frame"),
+    );
+
+    const request = {
+      schemaVersion: "1.0",
+      revisionId: "api-family-revision-01",
+      repairPacketArtifactId: artifact("a"),
+      repairExecutionEvidenceArtifactId: artifact("b"),
+      restoredCandidateArtifactId: artifact("c"),
+    };
+    const validated = await fetch(`${base}/v1/repair-revisions/validate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    assert.equal(validated.status, 200);
+    const normalized = await validated.json();
+    assert.equal(normalized.revisionId, request.revisionId);
+    assert.equal(normalized.quality.transparency, "alpha-required");
+
+    const compiled = await fetch(`${base}/v1/repair-revisions/compile`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    assert.equal(compiled.status, 200);
+    const body = await compiled.json();
+    assert.equal(body.executionMode, "durable-worker-or-deliberate-local-run");
+    assert.equal(body.runtimeJob.kind, "art.repair.revise-family");
+    assert.equal(body.runtimeJob.queue, "selection");
+    assert.deepEqual(body.runtimeJob.inputArtifacts, [
+      artifact("a"),
+      artifact("b"),
+      artifact("c"),
+    ]);
+    assert.ok(body.runtimeJob.requiredCapabilities.includes("sprite.family.verify"));
+  });
+});
+
 test("repair REST validation rejects invalid artifact ids without write access", async () => {
   await withServer(async (base) => {
     const response = await fetch(`${base}/v1/repairs/validate`, {
