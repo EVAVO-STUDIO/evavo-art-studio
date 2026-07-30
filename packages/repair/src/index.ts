@@ -6,4 +6,5 @@ export * from "./jobs.js";
 export * from "./revision-types.js";
 export * from "./revision-validation.js";
 export * from "./revision.js";
+export * from "./revision-jobs.js";
 export { planTargetedRepair } from "./public-planner.js";
