@@ -1,0 +1,449 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Layered Sprite Family API
+  version: 0.1.0
+  description: >-
+    Deterministic contracts for validating and compiling layered sprite-family
+    verification. These routes do not read image artifacts, reconstruct frames,
+    update approved references or perform atlas delivery inside the HTTP request.
+servers:
+  - url: http://127.0.0.1:4100
+    description: Local standalone Art Studio control plane
+security: []
+tags:
+  - name: Sprite Families
+paths:
+  /v1/sprite-family-protocol:
+    get:
+      tags: [Sprite Families]
+      operationId: getSpriteFamilyProtocol
+      summary: List layer roles, source policies, blend modes and family rules
+      responses:
+        "200":
+          description: Layered sprite-family protocol.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpriteFamilyProtocol"
+  /v1/sprite-families/validate:
+    post:
+      tags: [Sprite Families]
+      operationId: validateSpriteFamilyManifest
+      summary: Validate and normalize a layered sprite-family manifest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpriteFamilyManifest"
+      responses:
+        "200":
+          description: Normalized layered sprite-family manifest.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedSpriteFamilyManifest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/sprite-families/compile:
+    post:
+      tags: [Sprite Families]
+      operationId: compileSpriteFamilyVerificationJob
+      summary: Compile a layered family into a capability-scoped durable job
+      description: >-
+        Every layer artifact and declared composite is copied into inputArtifacts.
+        The worker re-verifies immutable content, reconstructs composites and
+        writes evidence. The route itself does not read or write those artifacts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpriteFamilyManifest"
+      responses:
+        "200":
+          description: Normalized manifest plus durable worker job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompiledSpriteFamilyJob"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  schemas:
+    ArtifactId:
+      type: string
+      pattern: "^artifact_[a-f0-9]{64}$"
+    SpriteLayerRole:
+      type: string
+      enum:
+        - identity-core
+        - costume
+        - hair
+        - shadow
+        - equipment
+        - weapon
+        - effect
+        - emission
+        - normal
+        - collision
+        - occlusion
+        - guide
+    SpriteLayerSourcePolicy:
+      type: string
+      enum:
+        - per-frame
+        - linked-cel
+        - static-family
+        - engine-sidecar
+        - guide-only
+    SpriteLayerBlendMode:
+      type: string
+      enum: [normal, add, multiply, screen]
+    Point:
+      type: object
+      required: [x, y]
+      additionalProperties: false
+      properties:
+        x: { type: number }
+        y: { type: number }
+    SpriteLayerDefinition:
+      type: object
+      required: [id, role, sourcePolicy, zIndex]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        role:
+          $ref: "#/components/schemas/SpriteLayerRole"
+        sourcePolicy:
+          $ref: "#/components/schemas/SpriteLayerSourcePolicy"
+        required: { type: boolean }
+        contributesToComposite: { type: boolean }
+        contributesToIdentity: { type: boolean }
+        mustRemainSeparate: { type: boolean }
+        zIndex:
+          type: integer
+          minimum: -10000
+          maximum: 10000
+        blendMode:
+          $ref: "#/components/schemas/SpriteLayerBlendMode"
+        minimumVisibleFraction:
+          type: number
+          minimum: 0
+          maximum: 1
+        registrationTolerancePixels:
+          type: number
+          minimum: 0
+          maximum: 256
+        allowedOccludedBy:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+        occludes:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+    SpriteFrameLayer:
+      type: object
+      required: [layerId, artifactId]
+      additionalProperties: false
+      properties:
+        layerId: { type: string }
+        artifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        offset:
+          $ref: "#/components/schemas/Point"
+        opacity:
+          type: number
+          minimum: 0
+          maximum: 1
+        linkedFromFrameId:
+          type: string
+        variantId:
+          type: string
+    SpriteFamilyFrame:
+      type: object
+      required:
+        - id
+        - animation
+        - direction
+        - frameIndex
+        - globalFrameIndex
+        - durationMs
+        - pivot
+        - layers
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        animation: { type: string }
+        direction: { type: string }
+        frameIndex:
+          type: integer
+          minimum: 0
+        globalFrameIndex:
+          type: integer
+          minimum: 0
+        durationMs:
+          type: number
+          exclusiveMinimum: 0
+        pivot:
+          $ref: "#/components/schemas/Point"
+        baseline:
+          type: number
+        groundContact:
+          type: boolean
+        layers:
+          type: array
+          minItems: 1
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/SpriteFrameLayer"
+        declaredCompositeArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        intentionalDuplicateOf:
+          type: string
+    SpriteFamilyPolicy:
+      type: object
+      required: [identityReferenceFrameId]
+      additionalProperties: true
+      properties:
+        identityReferenceFrameId:
+          type: string
+        requireDeclaredComposite:
+          type: boolean
+          default: true
+        requireReferenceLineage:
+          type: boolean
+          default: true
+        requireQualityPassed:
+          type: boolean
+          default: true
+        alphaVisibleThreshold:
+          type: integer
+          minimum: 1
+          maximum: 255
+        maximumFrames:
+          type: integer
+          minimum: 1
+          maximum: 4096
+        decodeConcurrency:
+          type: integer
+          minimum: 1
+          maximum: 16
+        maximumTranslationPixels:
+          type: integer
+          minimum: 0
+          maximum: 64
+        maximumEdgeDistancePixels:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 256
+        pivotTolerancePixels:
+          type: number
+          minimum: 0
+        baselineTolerancePixels:
+          type: number
+          minimum: 0
+        groundContactTolerancePixels:
+          type: number
+          minimum: 0
+        minimumCanonicalVisibleAreaSimilarity:
+          type: number
+          minimum: 0
+          maximum: 1
+        minimumCanonicalPaletteSimilarity:
+          type: number
+          minimum: 0
+          maximum: 1
+        minimumCanonicalCentroidSimilarity:
+          type: number
+          minimum: 0
+          maximum: 1
+        minimumAdjacentVisibleAreaSimilarity:
+          type: number
+          minimum: 0
+          maximum: 1
+        minimumAdjacentPaletteSimilarity:
+          type: number
+          minimum: 0
+          maximum: 1
+        minimumAdjacentCentroidSimilarity:
+          type: number
+          minimum: 0
+          maximum: 1
+        minimumLoopClosureSimilarity:
+          type: number
+          minimum: 0
+          maximum: 1
+        compositeChannelTolerance:
+          type: integer
+          minimum: 0
+          maximum: 255
+        maximumCompositeMeanError:
+          type: number
+          minimum: 0
+          maximum: 255
+        maximumCompositeMismatchFraction:
+          type: number
+          minimum: 0
+          maximum: 1
+    SpriteFamilyManifest:
+      type: object
+      required:
+        - schemaVersion
+        - familyId
+        - canvas
+        - layerDefinitions
+        - frames
+        - policy
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "1.0"
+        familyId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        canvas:
+          type: object
+          required: [width, height]
+          additionalProperties: false
+          properties:
+            width:
+              type: integer
+              minimum: 1
+              maximum: 8192
+            height:
+              type: integer
+              minimum: 1
+              maximum: 8192
+        layerDefinitions:
+          type: array
+          minItems: 1
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/SpriteLayerDefinition"
+        frames:
+          type: array
+          minItems: 1
+          maxItems: 4096
+          items:
+            $ref: "#/components/schemas/SpriteFamilyFrame"
+        policy:
+          $ref: "#/components/schemas/SpriteFamilyPolicy"
+        metadata: true
+    NormalizedSpriteFamilyManifest:
+      allOf:
+        - $ref: "#/components/schemas/SpriteFamilyManifest"
+        - type: object
+          required: [protocolVersion]
+          properties:
+            protocolVersion:
+              const: "2026-07-30.1"
+    RuntimeJob:
+      type: object
+      required:
+        - queue
+        - kind
+        - idempotencyKey
+        - payload
+        - inputArtifacts
+        - requiredCapabilities
+      properties:
+        queue:
+          const: selection
+        kind:
+          const: sprite.family.verify
+        idempotencyKey:
+          type: string
+        payload:
+          $ref: "#/components/schemas/NormalizedSpriteFamilyManifest"
+        inputArtifacts:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+        requiredCapabilities:
+          type: array
+          contains: { const: sprite.family.verify }
+          minContains: 1
+        maximumAttempts:
+          type: integer
+          minimum: 1
+        leaseDurationMs:
+          type: integer
+          minimum: 1000
+        timeoutMs:
+          type: integer
+          minimum: 1000
+      additionalProperties: true
+    CompiledSpriteFamilyJob:
+      type: object
+      required:
+        - schemaVersion
+        - manifest
+        - manifestSha256
+        - executionMode
+        - runtimeJob
+      properties:
+        schemaVersion:
+          const: "1.0"
+        manifest:
+          $ref: "#/components/schemas/NormalizedSpriteFamilyManifest"
+        manifestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        executionMode:
+          const: durable-worker-only
+        runtimeJob:
+          $ref: "#/components/schemas/RuntimeJob"
+    SpriteFamilyProtocol:
+      type: object
+      required:
+        - schemaVersion
+        - protocolVersion
+        - layerRoles
+        - sourcePolicies
+        - blendModes
+        - rules
+      properties:
+        schemaVersion:
+          const: "1.0"
+        protocolVersion:
+          const: "2026-07-30.1"
+        layerRoles:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpriteLayerRole"
+        sourcePolicies:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpriteLayerSourcePolicy"
+        blendModes:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpriteLayerBlendMode"
+        rules:
+          type: array
+          items: { type: string }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: true
+          additionalProperties: true
+  responses:
+    ValidationError:
+      description: Invalid layered sprite-family manifest.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
