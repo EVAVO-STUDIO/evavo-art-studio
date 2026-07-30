@@ -9,6 +9,7 @@ import {
   validateCandidateSelectionRequest,
 } from "@evavo/art-selection";
 
+import { handleRepairApiRequest } from "./repair-api.js";
 import { handleSpriteFamilyApiRequest } from "./sprite-family-api.js";
 
 export interface SelectionApiContext {
@@ -42,6 +43,7 @@ function selectionPath(pathname: string): boolean {
 export async function handleSelectionApiRequest(
   context: SelectionApiContext,
 ): Promise<boolean> {
+  if (await handleRepairApiRequest(context)) return true;
   if (await handleSpriteFamilyApiRequest(context)) return true;
   if (!selectionPath(context.url.pathname)) return false;
   const { request, response, url, requestId } = context;
