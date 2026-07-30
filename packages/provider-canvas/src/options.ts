@@ -46,9 +46,17 @@ function matteColour(value: string): Readonly<{
   };
 }
 
-function optionalProviderEdge(value: number | undefined, name: string): number | undefined {
+function optionalProviderEdge(
+  value: number | undefined,
+  name: string,
+): number | undefined {
   if (value === undefined) return undefined;
-  if (!Number.isInteger(value) || value < 16 || value > 3_840 || value % 16 !== 0) {
+  if (
+    !Number.isInteger(value) ||
+    value < 16 ||
+    value > 3_840 ||
+    value % 16 !== 0
+  ) {
     throw new ProviderCanvasError(
       "PROVIDER_CANVAS_SIZE_INVALID",
       `${name} must be a multiple of 16 between 16 and 3840.`,
@@ -61,7 +69,10 @@ export function normalizePixelArtProviderCanvasOptions(
   input: PixelArtProviderCanvasOptions,
 ): NormalizedPixelArtProviderCanvasOptions {
   const providerWidth = optionalProviderEdge(input.providerWidth, "providerWidth");
-  const providerHeight = optionalProviderEdge(input.providerHeight, "providerHeight");
+  const providerHeight = optionalProviderEdge(
+    input.providerHeight,
+    "providerHeight",
+  );
   if ((providerWidth === undefined) !== (providerHeight === undefined)) {
     throw new ProviderCanvasError(
       "PROVIDER_CANVAS_SIZE_INVALID",
@@ -94,6 +105,13 @@ export function normalizePixelArtProviderCanvasOptions(
       "paletteMode must be source or none.",
     );
   }
+  const alphaMode = input.alphaMode ?? "source";
+  if (alphaMode !== "source" && alphaMode !== "candidate") {
+    throw new ProviderCanvasError(
+      "PROVIDER_CANVAS_OPTIONS_INVALID",
+      "alphaMode must be source or candidate.",
+    );
+  }
   return {
     matteColour: matteColour(input.matteColour),
     ...(providerWidth === undefined ? {} : { providerWidth }),
@@ -108,6 +126,7 @@ export function normalizePixelArtProviderCanvasOptions(
     requireBinaryMask: input.requireBinaryMask !== false,
     restorationSampling: sampling,
     paletteMode,
+    alphaMode,
     maximumPaletteColours: integer(
       input.maximumPaletteColours,
       256,
@@ -143,7 +162,11 @@ function round16(value: number): number {
   return Math.max(16, Math.ceil(value / 16) * 16);
 }
 
-function validProviderSize(width: number, height: number, maximumPixels: number): boolean {
+function validProviderSize(
+  width: number,
+  height: number,
+  maximumPixels: number,
+): boolean {
   const pixels = width * height;
   const ratio = Math.max(width, height) / Math.min(width, height);
   return (
@@ -161,7 +184,13 @@ export function deriveProviderCanvasSize(
   sourceWidth: number,
   sourceHeight: number,
   options: NormalizedPixelArtProviderCanvasOptions,
-): Readonly<{ width: number; height: number; scale: number; offsetX: number; offsetY: number }> {
+): Readonly<{
+  width: number;
+  height: number;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+}> {
   let width = options.providerWidth;
   let height = options.providerHeight;
   if (width === undefined || height === undefined) {
@@ -175,8 +204,14 @@ export function deriveProviderCanvasSize(
       height = round16(height * factor);
     }
     while (!validProviderSize(width, height, options.maximumProviderPixels)) {
-      if (width > 3_840 || height > 3_840 || width * height > options.maximumProviderPixels) {
-        const factor = Math.sqrt(options.maximumProviderPixels / (width * height));
+      if (
+        width > 3_840 ||
+        height > 3_840 ||
+        width * height > options.maximumProviderPixels
+      ) {
+        const factor = Math.sqrt(
+          options.maximumProviderPixels / (width * height),
+        );
         width = Math.max(16, Math.floor((width * factor) / 16) * 16);
         height = Math.max(16, Math.floor((height * factor) / 16) * 16);
       } else {
