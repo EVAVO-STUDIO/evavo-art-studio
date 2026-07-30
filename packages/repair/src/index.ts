@@ -3,4 +3,7 @@ export * from "./validation.js";
 export * from "./classify.js";
 export * from "./execution.js";
 export * from "./jobs.js";
+export * from "./revision-types.js";
+export * from "./revision-validation.js";
+export * from "./revision.js";
 export { planTargetedRepair } from "./public-planner.js";
