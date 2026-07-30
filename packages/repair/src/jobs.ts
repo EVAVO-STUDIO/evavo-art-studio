@@ -2,12 +2,10 @@ import {
   normalizeJson,
   sha256,
   stableStringify,
-  type JsonValue,
+  type ArtifactId,
 } from "@evavo/art-artifacts";
 
-import {
-  validateTargetedRepairExecutionRequest,
-} from "./execution.js";
+import { validateTargetedRepairExecutionRequest } from "./execution.js";
 import type {
   NormalizedTargetedRepairExecutionRequest,
   TargetedRepairExecutionRequestInput,
@@ -23,6 +21,28 @@ export const TARGETED_REPAIR_EXECUTION_CAPABILITIES = Object.freeze([
   "evidence.bundle",
 ] as const);
 
+export interface CompiledTargetedRepairExecutionJob {
+  readonly schemaVersion: "1.0";
+  readonly request: NormalizedTargetedRepairExecutionRequest;
+  readonly requestSha256: string;
+  readonly executionMode: "durable-worker-only";
+  readonly runtimeJob: Readonly<{
+    queue: "provider";
+    kind: "art.repair.execute-provider-canvas";
+    idempotencyKey: string;
+    payload: NormalizedTargetedRepairExecutionRequest;
+    inputArtifacts: readonly ArtifactId[];
+    requiredCapabilities: typeof TARGETED_REPAIR_EXECUTION_CAPABILITIES;
+    maximumAttempts: 2;
+    leaseDurationMs: 600_000;
+    timeoutMs: 2_400_000;
+    labels: Readonly<{
+      repairPacketArtifactId: ArtifactId;
+      stage: "pixel-safe-provider-repair";
+    }>;
+  }>;
+}
+
 export function targetedRepairExecutionRequestSha256(
   request: NormalizedTargetedRepairExecutionRequest,
 ): string {
@@ -31,7 +51,7 @@ export function targetedRepairExecutionRequestSha256(
 
 export function compileTargetedRepairExecutionJob(
   input: TargetedRepairExecutionRequestInput | unknown,
-): JsonValue {
+): CompiledTargetedRepairExecutionJob {
   const request = validateTargetedRepairExecutionRequest(input);
   const requestSha256 = targetedRepairExecutionRequestSha256(request);
   return {
