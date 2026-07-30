@@ -1,0 +1,29 @@
+{
+  "queue": "selection",
+  "kind": "art.repair.prepare-revision-selection",
+  "idempotencyKey": "revision-selection:hero-body-repair-candidates",
+  "payload": {
+    "schemaVersion": "1.0",
+    "bridgeId": "hero-body-repair-candidates",
+    "revisionEvidenceArtifactIds": [
+      "artifact_1111111111111111111111111111111111111111111111111111111111111111",
+      "artifact_2222222222222222222222222222222222222222222222222222222222222222"
+    ],
+    "policy": {
+      "profile": "sprite-identity",
+      "allowAutomaticSelection": false
+    }
+  },
+  "inputArtifacts": [
+    "artifact_1111111111111111111111111111111111111111111111111111111111111111",
+    "artifact_2222222222222222222222222222222222222222222222222222222222222222"
+  ],
+  "requiredCapabilities": [
+    "repair.revision-selection",
+    "artifacts.store",
+    "evidence.bundle"
+  ],
+  "maximumAttempts": 1,
+  "leaseDurationMs": 120000,
+  "timeoutMs": 900000
+}
