@@ -283,11 +283,20 @@ export interface SpriteFamilyConsistencyEvidence {
 }
 
 export interface SpriteFamilyRunResult {
-  readonly manifestArtifactId: ArtifactId;
-  readonly kernelEvidenceArtifactId: ArtifactId;
   readonly evidenceArtifactId: ArtifactId;
   readonly generatedCompositeArtifactIds: readonly ArtifactId[];
   readonly evidence: SpriteFamilyConsistencyEvidence;
+}
+
+export interface ManifestBoundSpriteFamilyRunResult
+  extends SpriteFamilyRunResult {
+  readonly manifestArtifactId: ArtifactId;
+  readonly kernelEvidenceArtifactId: ArtifactId;
+  readonly evidence: SpriteFamilyConsistencyEvidence &
+    Readonly<{
+      manifestArtifactId: ArtifactId;
+      kernelEvidenceArtifactId: ArtifactId;
+    }>;
 }
 
 export interface SpriteFamilyExecutionOptions {
