@@ -11,11 +11,6 @@ import {
   type RuntimeJobHandler,
 } from "@evavo/art-runtime";
 
-import {
-  createTargetedRepairHandlers,
-  targetedRepairWorkerCapabilities,
-} from "./repair-handlers.js";
-
 const SELECT_CAPABILITIES = Object.freeze([
   "selection.compare",
   "evidence.bundle",
@@ -56,7 +51,9 @@ function ensureInputs(
   }
 }
 
-function selectionFailure(error: CandidateSelectionError): PermanentRuntimeError {
+function selectionFailure(
+  error: CandidateSelectionError,
+): PermanentRuntimeError {
   return new PermanentRuntimeError(error.code, error.message, error.details);
 }
 
@@ -137,16 +134,9 @@ export function createCandidateSelectionHandlers(): Readonly<
   return Object.freeze({
     "art.candidate.select": select,
     "art.candidate.promote": promote,
-    ...createTargetedRepairHandlers(),
   });
 }
 
 export function candidateSelectionWorkerCapabilities(): readonly string[] {
-  return [
-    ...new Set([
-      ...SELECT_CAPABILITIES,
-      ...PROMOTE_CAPABILITIES,
-      ...targetedRepairWorkerCapabilities(),
-    ]),
-  ].sort();
+  return [...new Set([...SELECT_CAPABILITIES, ...PROMOTE_CAPABILITIES])].sort();
 }
