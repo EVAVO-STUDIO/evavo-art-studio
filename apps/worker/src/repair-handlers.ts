@@ -1,21 +1,41 @@
-import type { ArtifactId } from "@evavo/art-artifacts";
+import type { ArtifactId, JsonValue } from "@evavo/art-artifacts";
+import {
+  ProviderError,
+  type ProviderRegistry,
+} from "@evavo/art-providers";
 import {
   TargetedRepairError,
+  executeTargetedRepairProviderCanvas,
   planTargetedRepair,
+  validateTargetedRepairExecutionRequest,
   validateTargetedRepairRequest,
+  type TargetedRepairPacket,
 } from "@evavo/art-repair";
 import {
+  CancelledRuntimeError,
   PermanentRuntimeError,
+  TransientRuntimeError,
   type RuntimeJobHandler,
 } from "@evavo/art-runtime";
 
-const REQUIRED_CAPABILITIES = Object.freeze([
+const PLAN_CAPABILITIES = Object.freeze([
   "repair.plan",
   "artifacts.store",
   "evidence.bundle",
 ] as const);
+const EXECUTE_CAPABILITIES = Object.freeze([
+  "repair.execute",
+  "media.provider-canvas",
+  "provider.inpaint",
+  "provider.reference-lock",
+  "provider.mask",
+  "provider.candidate-store",
+  "evidence.bundle",
+] as const);
 
-function declaredInputs(input: ReturnType<typeof validateTargetedRepairRequest>) {
+function declaredPlanningInputs(
+  input: ReturnType<typeof validateTargetedRepairRequest>,
+) {
   return [
     input.familyEvidenceArtifactId,
     ...(input.maskArtifactId ? [input.maskArtifactId] : []),
@@ -23,39 +43,176 @@ function declaredInputs(input: ReturnType<typeof validateTargetedRepairRequest>)
   ];
 }
 
+function requireCapabilities(
+  required: readonly string[],
+  declared: readonly string[],
+  kind: string,
+): void {
+  for (const capability of required) {
+    if (!declared.includes(capability)) {
+      throw new PermanentRuntimeError(
+        "TARGETED_REPAIR_RUNTIME_CAPABILITY_MISSING",
+        `${kind} job must require ${capability}.`,
+      );
+    }
+  }
+}
+
+function requireInputs(
+  required: readonly ArtifactId[],
+  declared: readonly ArtifactId[],
+  kind: string,
+): void {
+  const available = new Set(declared);
+  const missing = [...new Set(required)].filter(
+    (artifactId) => !available.has(artifactId),
+  );
+  if (missing.length) {
+    throw new PermanentRuntimeError(
+      "TARGETED_REPAIR_RUNTIME_INPUT_LINEAGE_MISSING",
+      `${kind} inputArtifacts is missing: ${missing.join(", ")}`,
+    );
+  }
+}
+
 function repairFailure(error: TargetedRepairError): PermanentRuntimeError {
   return new PermanentRuntimeError(error.code, error.message, error.details);
 }
 
-export function createTargetedRepairHandlers(): Readonly<
-  Record<string, RuntimeJobHandler>
-> {
+function providerFailure(error: ProviderError): Error {
+  if (error.classification === "transient") {
+    return new TransientRuntimeError(error.code, error.message, error.details);
+  }
+  if (error.classification === "cancelled") {
+    return new CancelledRuntimeError(error.message);
+  }
+  return new PermanentRuntimeError(error.code, error.message, error.details);
+}
+
+function runtimeFailure(error: unknown): Error {
+  if (error instanceof TargetedRepairError) return repairFailure(error);
+  if (error instanceof ProviderError) return providerFailure(error);
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "string"
+  ) {
+    return new PermanentRuntimeError(
+      (error as { code: string }).code,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+  return error instanceof Error
+    ? error
+    : new PermanentRuntimeError(
+        "TARGETED_REPAIR_RUNTIME_UNEXPECTED",
+        String(error),
+      );
+}
+
+function parsePacket(value: unknown): TargetedRepairPacket {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    !("providerPlan" in value) ||
+    !("disposition" in value)
+  ) {
+    throw new PermanentRuntimeError(
+      "TARGETED_REPAIR_RUNTIME_PACKET_INVALID",
+      "Repair packet is missing provider execution fields.",
+    );
+  }
+  return value as TargetedRepairPacket;
+}
+
+async function packetExecutionInputs(
+  context: Parameters<RuntimeJobHandler>[0],
+  packetArtifactId: ArtifactId,
+): Promise<readonly ArtifactId[]> {
+  const artifact = await context.artifacts.get(packetArtifactId);
+  if (!artifact) {
+    throw new PermanentRuntimeError(
+      "TARGETED_REPAIR_RUNTIME_PACKET_NOT_FOUND",
+      `Repair packet artifact was not found: ${packetArtifactId}`,
+    );
+  }
+  let packet: TargetedRepairPacket;
+  try {
+    packet = parsePacket(
+      JSON.parse((await context.artifacts.read(packetArtifactId)).toString("utf8")),
+    );
+  } catch (error: unknown) {
+    if (error instanceof PermanentRuntimeError) throw error;
+    throw new PermanentRuntimeError(
+      "TARGETED_REPAIR_RUNTIME_PACKET_INVALID",
+      `Repair packet could not be parsed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  return [
+    packetArtifactId,
+    ...(packet.providerPlan?.inputArtifacts ?? []),
+  ];
+}
+
+function executionJob(
+  packetArtifactId: ArtifactId,
+  packet: TargetedRepairPacket,
+): JsonValue | null {
+  if (packet.disposition !== "ready" || !packet.providerPlan) return null;
+  return {
+    queue: "provider",
+    kind: "art.repair.execute-provider-canvas",
+    idempotencyKey: `repair-execute:${packet.repairId}:${packet.requestSha256}`,
+    payload: {
+      schemaVersion: "1.0",
+      repairPacketArtifactId: packetArtifactId,
+      providerCanvas: {
+        restorationSampling: "nearest-center",
+        paletteMode: "source",
+        alphaMode: "source",
+        requireBinaryMask: true,
+      },
+    },
+    inputArtifacts: [
+      packetArtifactId,
+      ...packet.providerPlan.inputArtifacts,
+    ],
+    requiredCapabilities: EXECUTE_CAPABILITIES,
+    maximumAttempts: 2,
+    leaseDurationMs: 600_000,
+    timeoutMs: 2_400_000,
+    labels: {
+      repairId: packet.repairId,
+      familyId: packet.familyId,
+      frameId: packet.target.frameId,
+      ...(packet.target.layerId ? { layerId: packet.target.layerId } : {}),
+      stage: "pixel-safe-provider-repair",
+    },
+  };
+}
+
+export function createTargetedRepairHandlers(
+  providerRegistry: ProviderRegistry,
+): Readonly<Record<string, RuntimeJobHandler>> {
   const plan: RuntimeJobHandler = async (context) => {
     let request;
     try {
       request = validateTargetedRepairRequest(context.job.spec.payload);
     } catch (error: unknown) {
-      if (error instanceof TargetedRepairError) throw repairFailure(error);
-      throw error;
+      throw runtimeFailure(error);
     }
-    for (const capability of REQUIRED_CAPABILITIES) {
-      if (!context.job.spec.requiredCapabilities.includes(capability)) {
-        throw new PermanentRuntimeError(
-          "TARGETED_REPAIR_RUNTIME_CAPABILITY_MISSING",
-          `art.repair.plan job must require ${capability}.`,
-        );
-      }
-    }
-    const declared = new Set(context.job.spec.inputArtifacts);
-    const missing = declaredInputs(request).filter(
-      (artifactId) => !declared.has(artifactId),
+    requireCapabilities(
+      PLAN_CAPABILITIES,
+      context.job.spec.requiredCapabilities,
+      "art.repair.plan",
     );
-    if (missing.length) {
-      throw new PermanentRuntimeError(
-        "TARGETED_REPAIR_RUNTIME_INPUT_LINEAGE_MISSING",
-        `art.repair.plan inputArtifacts is missing: ${missing.join(", ")}`,
-      );
-    }
+    requireInputs(
+      declaredPlanningInputs(request),
+      context.job.spec.inputArtifacts,
+      "art.repair.plan",
+    );
     try {
       const result = await planTargetedRepair(request, {
         artifacts: context.artifacts,
@@ -88,18 +245,85 @@ export function createTargetedRepairHandlers(): Readonly<
           providerPlanReady:
             result.packet.disposition === "ready" &&
             result.packet.providerPlan !== undefined,
+          executionJob: executionJob(
+            result.packetArtifactId,
+            result.packet,
+          ),
         },
       };
     } catch (error: unknown) {
-      if (error instanceof TargetedRepairError) throw repairFailure(error);
-      throw error;
+      throw runtimeFailure(error);
     }
   };
+
+  const execute: RuntimeJobHandler = async (context) => {
+    let request;
+    try {
+      request = validateTargetedRepairExecutionRequest(
+        context.job.spec.payload,
+      );
+    } catch (error: unknown) {
+      throw runtimeFailure(error);
+    }
+    requireCapabilities(
+      EXECUTE_CAPABILITIES,
+      context.job.spec.requiredCapabilities,
+      "art.repair.execute-provider-canvas",
+    );
+    requireInputs(
+      await packetExecutionInputs(
+        context,
+        request.repairPacketArtifactId,
+      ),
+      context.job.spec.inputArtifacts,
+      "art.repair.execute-provider-canvas",
+    );
+    try {
+      const result = await executeTargetedRepairProviderCanvas(request, {
+        artifacts: context.artifacts,
+        registry: providerRegistry,
+        signal: context.signal,
+      });
+      const outputArtifacts = [
+        result.providerCanvasBaseArtifactId,
+        result.providerCanvasMaskArtifactId,
+        result.providerCanvasManifestArtifactId,
+        result.providerEvidenceArtifactId,
+        ...result.restoredCandidates.flatMap((candidate) => [
+          candidate.providerCandidateArtifactId,
+          candidate.restoredCandidateArtifactId,
+          candidate.restorationEvidenceArtifactId,
+        ]),
+        result.executionEvidenceArtifactId,
+      ] as readonly ArtifactId[];
+      return {
+        outputArtifacts,
+        result: result as unknown as JsonValue,
+      };
+    } catch (error: unknown) {
+      throw runtimeFailure(error);
+    }
+  };
+
   return Object.freeze({
     "art.repair.plan": plan,
+    "art.repair.execute-provider-canvas": execute,
   });
 }
 
-export function targetedRepairWorkerCapabilities(): readonly string[] {
-  return [...REQUIRED_CAPABILITIES];
+export function targetedRepairWorkerCapabilities(
+  providerRegistry?: ProviderRegistry,
+): readonly string[] {
+  const capabilities = new Set<string>(PLAN_CAPABILITIES);
+  const providerReady = providerRegistry?.list().some(
+    (adapter) =>
+      adapter.capabilities.includes("inpaint") &&
+      adapter.capabilities.includes("mask") &&
+      adapter.capabilities.includes("custom-size"),
+  );
+  if (providerReady) {
+    capabilities.add("repair.execute");
+    capabilities.add("media.provider-canvas");
+  }
+  return [...capabilities].sort();
 }
