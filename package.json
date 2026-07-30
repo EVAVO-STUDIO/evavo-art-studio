@@ -14,7 +14,7 @@
     "dev:worker": "pnpm run build:domain && pnpm --filter @evavo/art-studio-worker start -- daemon",
     "worker:once": "pnpm run build:domain && pnpm --filter @evavo/art-studio-worker start -- once",
     "worker:until-idle": "pnpm run build:domain && pnpm --filter @evavo/art-studio-worker start -- until-idle",
-    "build:domain": "pnpm --filter @evavo/art-contracts build && pnpm --filter @evavo/art-core build && pnpm --filter @evavo/art-repo-inspector build && pnpm --filter @evavo/art-quality build && pnpm --filter @evavo/art-media build && pnpm --filter @evavo/art-godot build && pnpm --filter @evavo/art-artifacts build && pnpm --filter @evavo/art-providers build && pnpm --filter @evavo/art-selection build && pnpm --filter @evavo/art-sprite-family build && pnpm --filter @evavo/art-repair build && pnpm --filter @evavo/art-runtime build",
+    "build:domain": "pnpm --filter @evavo/art-contracts build && pnpm --filter @evavo/art-core build && pnpm --filter @evavo/art-repo-inspector build && pnpm --filter @evavo/art-quality build && pnpm --filter @evavo/art-media build && pnpm --filter @evavo/art-provider-canvas build && pnpm --filter @evavo/art-godot build && pnpm --filter @evavo/art-artifacts build && pnpm --filter @evavo/art-providers build && pnpm --filter @evavo/art-selection build && pnpm --filter @evavo/art-sprite-family build && pnpm --filter @evavo/art-repair build && pnpm --filter @evavo/art-runtime build",
     "build": "pnpm -r --if-present run build",
     "typecheck": "pnpm -r --if-present run typecheck",
     "test": "pnpm -r --if-present run test",
