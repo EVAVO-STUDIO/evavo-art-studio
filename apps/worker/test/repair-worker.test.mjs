@@ -171,28 +171,16 @@ test("durable repair worker stores planning evidence without mutating approved r
   const completed = await runtime.get(job.id);
   assert.equal(completed.state, "succeeded");
   assert.equal(completed.outputArtifacts.length, 2);
-  const packetArtifact = await artifacts.get(completed.outputArtifacts[0]);
-  assert.ok(
-    completed.outputArtifacts.some(
-      async (artifactId) =>
-        (await artifacts.get(artifactId))?.labels.artifactRole ===
-        "targeted-repair-packet",
-    ),
-  );
-  const packetId = completed.outputArtifacts.find(async (artifactId) =>
-    (await artifacts.get(artifactId))?.labels.artifactRole ===
-    "targeted-repair-packet",
-  );
-  const packetCandidates = await Promise.all(
+  const outputRecords = await Promise.all(
     completed.outputArtifacts.map(async (artifactId) => ({
       artifactId,
       artifact: await artifacts.get(artifactId),
     })),
   );
-  const packet = packetCandidates.find(
+  const packet = outputRecords.find(
     (entry) => entry.artifact?.labels.artifactRole === "targeted-repair-packet",
   );
-  assert.ok(packet);
+  assert.ok(packet, "worker output must include targeted-repair-packet evidence");
   const bodyResult = JSON.parse(
     (await artifacts.read(packet.artifactId)).toString("utf8"),
   );
