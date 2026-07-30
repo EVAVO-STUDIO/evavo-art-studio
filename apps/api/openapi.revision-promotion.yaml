@@ -1,0 +1,261 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Revision-Bound Promotion API
+  version: 0.1.0
+  description: >-
+    Compile-only contracts for promoting the highest-ranked repaired-family
+    candidate from immutable revision-bound ranking evidence. HTTP routes do
+    not read artifacts, create masters or update references.
+servers:
+  - url: http://127.0.0.1:4100
+security: []
+tags:
+  - name: Revision-Bound Promotion
+paths:
+  /v1/repair-revision-promotion-protocol:
+    get:
+      tags: [Revision-Bound Promotion]
+      operationId: getRevisionBoundPromotionProtocol
+      responses:
+        "200":
+          description: Promotion protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromotionProtocol"
+  /v1/repair-revision-promotions/validate:
+    post:
+      tags: [Revision-Bound Promotion]
+      operationId: validateRevisionBoundPromotion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PromotionRequest"
+      responses:
+        "200":
+          description: Normalized promotion request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedPromotionRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/repair-revision-promotions/compile:
+    post:
+      tags: [Revision-Bound Promotion]
+      operationId: compileRevisionBoundPromotionJob
+      description: >-
+        Compile one capability-scoped durable promotion job. The worker later
+        verifies ranking evidence and performs compare-and-swap promotion; this
+        route performs neither operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PromotionRequest"
+      responses:
+        "200":
+          description: Compiled durable promotion job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompiledPromotionJob"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  schemas:
+    ArtifactId:
+      type: string
+      pattern: "^artifact_[a-f0-9]{64}$"
+    PromotionTarget:
+      type: object
+      required: [namespace, name, expectedGeneration, expectedArtifactId]
+      additionalProperties: false
+      properties:
+        namespace:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        expectedGeneration:
+          type: integer
+          minimum: 0
+        expectedArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+    PromotionApproval:
+      oneOf:
+        - type: object
+          required: [mode]
+          additionalProperties: false
+          properties:
+            mode:
+              const: automatic
+        - type: object
+          required: [mode, approver, reason]
+          additionalProperties: false
+          properties:
+            mode:
+              const: human
+            approver:
+              type: string
+              minLength: 1
+              maxLength: 256
+            reason:
+              type: string
+              minLength: 1
+              maxLength: 4096
+    PromotionRequest:
+      type: object
+      required:
+        - schemaVersion
+        - promotionId
+        - rankingEvidenceArtifactId
+        - target
+        - approval
+        - actor
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "1.0"
+        promotionId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        rankingEvidenceArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        target:
+          $ref: "#/components/schemas/PromotionTarget"
+        approval:
+          $ref: "#/components/schemas/PromotionApproval"
+        actor:
+          type: string
+          minLength: 1
+          maxLength: 256
+        metadata: true
+    NormalizedPromotionRequest:
+      allOf:
+        - $ref: "#/components/schemas/PromotionRequest"
+        - type: object
+          required: [protocolVersion]
+          properties:
+            protocolVersion:
+              const: "2026-07-30.1"
+    RuntimeJob:
+      type: object
+      required:
+        - queue
+        - kind
+        - idempotencyKey
+        - payload
+        - inputArtifacts
+        - requiredCapabilities
+      additionalProperties: true
+      properties:
+        queue:
+          const: selection
+        kind:
+          const: art.repair.promote-revision
+        idempotencyKey:
+          type: string
+        payload:
+          $ref: "#/components/schemas/NormalizedPromotionRequest"
+        inputArtifacts:
+          type: array
+          minItems: 1
+          maxItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+        requiredCapabilities:
+          type: array
+          minItems: 4
+          maxItems: 4
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - repair.revision-promote
+              - selection.promote
+              - artifacts.store
+              - evidence.bundle
+          example:
+            - repair.revision-promote
+            - selection.promote
+            - artifacts.store
+            - evidence.bundle
+        maximumAttempts:
+          const: 1
+        leaseDurationMs:
+          type: integer
+          minimum: 1000
+        timeoutMs:
+          type: integer
+          minimum: 1000
+    CompiledPromotionJob:
+      type: object
+      required:
+        - schemaVersion
+        - request
+        - requestSha256
+        - executionMode
+        - runtimeJob
+      properties:
+        schemaVersion:
+          const: "1.0"
+        request:
+          $ref: "#/components/schemas/NormalizedPromotionRequest"
+        requestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        executionMode:
+          const: durable-worker-or-deliberate-local-run
+        runtimeJob:
+          $ref: "#/components/schemas/RuntimeJob"
+    PromotionProtocol:
+      type: object
+      required:
+        - schemaVersion
+        - protocolVersion
+        - inputArtifactRole
+        - outputArtifactRole
+        - kind
+        - requiredCapabilities
+        - rules
+      properties:
+        schemaVersion:
+          const: "1.0"
+        protocolVersion:
+          const: "2026-07-30.1"
+        inputArtifactRole:
+          const: revision-bound-candidate-selection-evidence
+        outputArtifactRole:
+          const: revision-bound-promotion-evidence
+        kind:
+          const: art.repair.promote-revision
+        requiredCapabilities:
+          type: array
+          items: { type: string }
+        rules:
+          type: array
+          items: { type: string }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: true
+  responses:
+    ValidationError:
+      description: Invalid revision-bound promotion request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
