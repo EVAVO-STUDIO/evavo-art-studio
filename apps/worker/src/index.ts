@@ -30,6 +30,10 @@ import {
   providerWorkerCapabilities,
 } from "./provider-handlers.js";
 import {
+  createTargetedRepairHandlers,
+  targetedRepairWorkerCapabilities,
+} from "./repair-handlers.js";
+import {
   candidateSelectionWorkerCapabilities,
   createCandidateSelectionHandlers,
 } from "./selection-handlers.js";
@@ -231,6 +235,7 @@ export function createBuiltinHandlers(
     ...createCandidateMasteringHandlers(),
     ...createCandidateSelectionHandlers(),
     ...createSpriteFamilyHandlers(),
+    ...createTargetedRepairHandlers(providerRegistry),
   });
 }
 
@@ -274,6 +279,7 @@ async function main(): Promise<void> {
   const masteringCapabilities = candidateMasteringWorkerCapabilities();
   const selectionCapabilities = candidateSelectionWorkerCapabilities();
   const familyCapabilities = spriteFamilyWorkerCapabilities();
+  const repairCapabilities = targetedRepairWorkerCapabilities(providerRegistry);
   const defaultQueues = [
     "media",
     "selection",
@@ -294,6 +300,7 @@ async function main(): Promise<void> {
         ...masteringCapabilities,
         ...selectionCapabilities,
         ...familyCapabilities,
+        ...repairCapabilities,
         ...providerCapabilities,
       ],
       queues: configuredQueues.length ? configuredQueues : defaultQueues,
