@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.evavo.dev/art-studio/repository-owned-reliability-profile.schema.json",
+  "title": "EVAVO Art Studio repository-owned reliability profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "repository",
+    "defaultBranch",
+    "authority",
+    "stack",
+    "packageManager",
+    "runtime",
+    "workspace",
+    "validation",
+    "executedBaseline",
+    "capabilityBoundary",
+    "notes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "id": {
+      "const": "evavo-art-studio"
+    },
+    "repository": {
+      "const": "EVAVO-STUDIO/evavo-art-studio"
+    },
+    "defaultBranch": {
+      "const": "main"
+    },
+    "authority": {
+      "const": "canonical-art-production-studio"
+    },
+    "stack": {
+      "const": "node-pnpm-creative-workspace"
+    },
+    "packageManager": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "exactVersion",
+        "lockfilePath",
+        "lockfilePolicy",
+        "lockfilePresent",
+        "install"
+      ],
+      "properties": {
+        "name": {
+          "const": "pnpm"
+        },
+        "exactVersion": {
+          "const": "10.13.1"
+        },
+        "lockfilePath": {
+          "const": "pnpm-lock.yaml"
+        },
+        "lockfilePolicy": {
+          "const": "review-first"
+        },
+        "lockfilePresent": {
+          "const": false
+        },
+        "install": {
+          "const": "pnpm install --no-frozen-lockfile"
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "pnpm",
+        "next",
+        "react",
+        "typescript"
+      ],
+      "properties": {
+        "node": {
+          "const": "22.14.0"
+        },
+        "pnpm": {
+          "const": "10.13.1"
+        },
+        "next": {
+          "const": "^16.2.12"
+        },
+        "react": {
+          "const": "^19.2.8"
+        },
+        "typescript": {
+          "const": "^5.9.2"
+        }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest",
+        "packages"
+      ],
+      "properties": {
+        "manifest": {
+          "const": "pnpm-workspace.yaml"
+        },
+        "packages": {
+          "const": [
+            "apps/*",
+            "packages/*"
+          ]
+        }
+      }
+    },
+    "validation": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "executedBaseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflow",
+        "runId",
+        "headSha",
+        "conclusion",
+        "installedWithoutCommittedLockfile"
+      ],
+      "properties": {
+        "workflow": {
+          "const": ".github/workflows/ci.yml"
+        },
+        "runId": {
+          "const": "30544861146"
+        },
+        "headSha": {
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "conclusion": {
+          "const": "success"
+        },
+        "installedWithoutCommittedLockfile": {
+          "const": true
+        }
+      }
+    },
+    "capabilityBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validationMay",
+        "validationDoesNotAuthorize"
+      ],
+      "properties": {
+        "validationMay": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "validationDoesNotAuthorize": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
