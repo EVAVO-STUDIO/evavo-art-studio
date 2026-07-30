@@ -5,12 +5,15 @@ import test from "node:test";
 const read = (relativePath) =>
   readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
-test("MCP compiles targeted repair planning and family revisions without artifact access", async () => {
-  const repair = await read("src/repair-tools.ts");
-  const selection = await read("src/selection-tools.ts");
+test("MCP compiles repair, revision and revision-selection jobs without artifact access", async () => {
+  const [repair, selection, revisionSelectionJobs] = await Promise.all([
+    read("src/repair-tools.ts"),
+    read("src/selection-tools.ts"),
+    read("../../packages/repair/src/revision-selection-jobs.ts"),
+  ]);
   const packageJson = JSON.parse(await read("package.json"));
   const tsconfig = JSON.parse(await read("tsconfig.json"));
-  const combined = `${repair}\n${selection}`;
+  const combined = `${repair}\n${selection}\n${revisionSelectionJobs}`;
   for (const token of [
     "targeted_repair_protocol",
     "validate_targeted_repair_request",
@@ -26,6 +29,12 @@ test("MCP compiles targeted repair planning and family revisions without artifac
     "validate_repaired_family_revision_request",
     "compile_repaired_family_revision_job",
     "compileRepairedFamilyRevisionJob(request)",
+    "repaired_family_revision_selection_protocol",
+    "validate_repaired_family_revision_selection_request",
+    "compile_repaired_family_revision_selection_job",
+    "compileRepairedFamilySelectionJob(request)",
+    'kind: "art.repair.prepare-revision-selection"',
+    '"repair.revision-selection"',
   ]) {
     assert.ok(combined.includes(token), `missing repair MCP invariant: ${token}`);
   }
@@ -36,6 +45,8 @@ test("MCP compiles targeted repair planning and family revisions without artifac
   for (const forbidden of [
     "planTargetedRepair(",
     "createRepairedFamilyRevision(",
+    "prepareRepairedFamilySelection(",
+    "executeCandidateSelection(",
     "LocalArtifactStore",
     "OPENAI_API_KEY",
     "EVAVO_ART_WRITE_TOKEN",

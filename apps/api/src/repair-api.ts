@@ -2,12 +2,16 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import {
   RepairedFamilyRevisionError,
+  RepairedFamilySelectionError,
   TargetedRepairError,
   compileRepairedFamilyRevisionJob,
+  compileRepairedFamilySelectionJob,
   repairedFamilyRevisionProtocolSummary,
+  repairedFamilySelectionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
   validateRepairedFamilyRevisionRequest,
+  validateRepairedFamilySelectionRequest,
   validateTargetedRepairRequest,
 } from "@evavo/art-repair";
 
@@ -37,6 +41,9 @@ function pathHandled(pathname: string): boolean {
     "/v1/repair-revision-protocol",
     "/v1/repair-revisions/validate",
     "/v1/repair-revisions/compile",
+    "/v1/repair-revision-selection-protocol",
+    "/v1/repair-revision-selections/validate",
+    "/v1/repair-revision-selections/compile",
   ]).has(pathname);
 }
 
@@ -87,6 +94,36 @@ export async function handleRepairApiRequest(
         response,
         200,
         repairedFamilyRevisionProtocolSummary(),
+        requestId,
+      );
+      return true;
+    }
+    if (
+      request.method === "GET" &&
+      url.pathname === "/v1/repair-revision-selection-protocol"
+    ) {
+      context.writeJson(
+        response,
+        200,
+        repairedFamilySelectionProtocolSummary(),
+        requestId,
+      );
+      return true;
+    }
+    if (
+      request.method === "POST" &&
+      (url.pathname === "/v1/repair-revision-selections/validate" ||
+        url.pathname === "/v1/repair-revision-selections/compile")
+    ) {
+      const bridge = validateRepairedFamilySelectionRequest(
+        await context.readJsonBody(request, context.maximumBodyBytes),
+      );
+      context.writeJson(
+        response,
+        200,
+        url.pathname === "/v1/repair-revision-selections/validate"
+          ? bridge
+          : compileRepairedFamilySelectionJob(bridge),
         requestId,
       );
       return true;
@@ -152,7 +189,8 @@ export async function handleRepairApiRequest(
   } catch (error: unknown) {
     if (
       error instanceof TargetedRepairError ||
-      error instanceof RepairedFamilyRevisionError
+      error instanceof RepairedFamilyRevisionError ||
+      error instanceof RepairedFamilySelectionError
     ) {
       context.writeJson(
         response,

@@ -89,3 +89,50 @@ test("CLI exposes and compiles immutable family revisions", async () => {
   assert.ok(body.runtimeJob.requiredCapabilities.includes("quality.sprite-frame"));
   assert.ok(body.runtimeJob.requiredCapabilities.includes("sprite.family.verify"));
 });
+
+test("CLI compiles revision selection preparation through the real dispatcher", async () => {
+  const protocol = run(["repair-revision-selection-protocol"]);
+  assert.equal(protocol.status, 0, protocol.stderr);
+  const protocolBody = JSON.parse(protocol.stdout);
+  assert.equal(protocolBody.protocolVersion, "2026-07-30.1");
+  assert.equal(
+    protocolBody.durablePreparationJob,
+    "art.repair.prepare-revision-selection",
+  );
+  assert.equal(protocolBody.enforcedSelectionPolicy.automaticSelectionDefault, false);
+
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "evavo-revision-selection-cli-"),
+  );
+  const input = path.join(root, "bridge.json");
+  const first = `artifact_${"1".repeat(64)}`;
+  const second = `artifact_${"2".repeat(64)}`;
+  await writeFile(
+    input,
+    JSON.stringify({
+      schemaVersion: "1.0",
+      bridgeId: "cli-revision-selection",
+      revisionEvidenceArtifactIds: [second, first],
+    }),
+  );
+  const result = run([
+    "repair-revision-selection-compile",
+    "--input",
+    input,
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.executionMode, "durable-worker-or-deliberate-local-run");
+  assert.equal(
+    body.runtimeJob.kind,
+    "art.repair.prepare-revision-selection",
+  );
+  assert.equal(body.runtimeJob.queue, "selection");
+  assert.deepEqual(body.runtimeJob.inputArtifacts, [first, second]);
+  assert.deepEqual(body.runtimeJob.requiredCapabilities, [
+    "repair.revision-selection",
+    "artifacts.store",
+    "evidence.bundle",
+  ]);
+  assert.equal(body.runtimeJob.payload.policy.allowAutomaticSelection, false);
+});
