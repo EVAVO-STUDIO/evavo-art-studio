@@ -59,7 +59,7 @@
         "required": true,
         "contributesToComposite": false,
         "contributesToIdentity": false,
-        "mustRemainSeparate": true,
+        "mustRemainSeparate": false,
         "zIndex": 20,
         "blendMode": "normal"
       }
@@ -160,7 +160,7 @@
     "metadata": {
       "project": "replace-with-project-id",
       "asset": "hero-idle-down",
-      "note": "Replace every placeholder artifact id with an immutable artifact from the configured store."
+      "note": "Replace every placeholder artifact id with an immutable artifact from the configured store. Engine sidecars are retained separately by sourcePolicy and do not enter colour composites."
     }
   },
   "inputArtifacts": [
