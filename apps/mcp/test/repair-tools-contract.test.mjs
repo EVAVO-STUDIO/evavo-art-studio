@@ -5,7 +5,7 @@ import test from "node:test";
 const read = (relativePath) =>
   readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
-test("MCP compiles targeted repair planning without reading or mutating artifacts", async () => {
+test("MCP compiles targeted repair planning and family revisions without artifact access", async () => {
   const repair = await read("src/repair-tools.ts");
   const selection = await read("src/selection-tools.ts");
   const packageJson = JSON.parse(await read("package.json"));
@@ -22,8 +22,12 @@ test("MCP compiles targeted repair planning without reading or mutating artifact
     '"evidence.bundle"',
     'executionMode: "durable-worker-only"',
     "registerRepairTools(server)",
+    "repaired_family_revision_protocol",
+    "validate_repaired_family_revision_request",
+    "compile_repaired_family_revision_job",
+    "compileRepairedFamilyRevisionJob(request)",
   ]) {
-    assert.ok(combined.includes(token), `missing targeted repair MCP invariant: ${token}`);
+    assert.ok(combined.includes(token), `missing repair MCP invariant: ${token}`);
   }
   assert.equal(packageJson.dependencies["@evavo/art-repair"], "workspace:*");
   assert.ok(
@@ -31,16 +35,18 @@ test("MCP compiles targeted repair planning without reading or mutating artifact
   );
   for (const forbidden of [
     "planTargetedRepair(",
+    "createRepairedFamilyRevision(",
     "LocalArtifactStore",
     "OPENAI_API_KEY",
     "EVAVO_ART_WRITE_TOKEN",
     "promoteSelectedCandidate",
     "child_process",
     "shell: true",
+    "updateReference(",
   ]) {
     assert.ok(
       !repair.includes(forbidden),
-      `targeted repair MCP contains execution shortcut: ${forbidden}`,
+      `repair MCP contains execution shortcut: ${forbidden}`,
     );
   }
 });
