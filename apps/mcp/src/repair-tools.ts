@@ -2,18 +2,22 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 import {
+  RepairedFamilyPromotionError,
   RepairedFamilyRankingError,
   RepairedFamilyRevisionError,
   RepairedFamilySelectionError,
   TargetedRepairError,
+  compileRepairedFamilyPromotionJob,
   compileRepairedFamilyRankingJob,
   compileRepairedFamilyRevisionJob,
   compileRepairedFamilySelectionJob,
+  repairedFamilyPromotionProtocolSummary,
   repairedFamilyRankingProtocolSummary,
   repairedFamilyRevisionProtocolSummary,
   repairedFamilySelectionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
+  validateRepairedFamilyPromotionRequest,
   validateRepairedFamilyRankingRequest,
   validateRepairedFamilyRevisionRequest,
   validateRepairedFamilySelectionRequest,
@@ -29,7 +33,8 @@ function toolError(error: unknown) {
     error instanceof TargetedRepairError ||
     error instanceof RepairedFamilyRevisionError ||
     error instanceof RepairedFamilySelectionError ||
-    error instanceof RepairedFamilyRankingError;
+    error instanceof RepairedFamilyRankingError ||
+    error instanceof RepairedFamilyPromotionError;
   return {
     isError: true,
     content: [
@@ -244,6 +249,48 @@ export function registerRepairTools(server: McpServer): void {
     async ({ request }) => {
       try {
         return textResult(compileRepairedFamilyRankingJob(request));
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "repaired_family_revision_promotion_protocol",
+    {
+      description:
+        "Describe promotion of the highest-ranked repaired candidate through revision-bound evidence and stale-generation compare-and-swap governance.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(repairedFamilyPromotionProtocolSummary()),
+  );
+
+  server.registerTool(
+    "validate_repaired_family_revision_promotion_request",
+    {
+      description:
+        "Validate a revision-bound promotion request without reading ranking evidence or changing an approved reference.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(validateRepairedFamilyPromotionRequest(request));
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_repaired_family_revision_promotion_job",
+    {
+      description:
+        "Compile a revision-bound promotion request into a capability-scoped durable job. The later worker verifies ranking evidence and uses the existing compare-and-swap promotion transaction; this tool does not read artifacts or update references.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(compileRepairedFamilyPromotionJob(request));
       } catch (error: unknown) {
         return toolError(error);
       }
