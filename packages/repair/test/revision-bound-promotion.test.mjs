@@ -57,8 +57,8 @@ async function fixture(allowAutomaticSelection) {
     [
       [205, 48, 62],
       [190, 60, 75],
-    ].map((colour, index) =>
-      artifacts.put(png(16, 16, colour), {
+    ].map(async (colour, index) =>
+      artifacts.put(await png(16, 16, colour), {
         mediaType: "image/png",
         storageClass: "intermediate",
         fileName: `repair-candidate-${index + 1}.png`,
