@@ -22,6 +22,8 @@
     "@evavo/art-media": "workspace:*",
     "@evavo/art-provider-canvas": "workspace:*",
     "@evavo/art-providers": "workspace:*",
+    "@evavo/art-quality": "workspace:*",
+    "@evavo/art-selection": "workspace:*",
     "@evavo/art-sprite-family": "workspace:*"
   },
   "devDependencies": {

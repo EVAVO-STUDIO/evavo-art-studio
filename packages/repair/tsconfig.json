@@ -11,6 +11,8 @@
     { "path": "../media" },
     { "path": "../provider-canvas" },
     { "path": "../providers" },
+    { "path": "../quality" },
+    { "path": "../selection" },
     { "path": "../sprite-family" }
   ],
   "include": ["src/**/*.ts"]
