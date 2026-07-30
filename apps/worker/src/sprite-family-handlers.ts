@@ -75,6 +75,7 @@ export function createSpriteFamilyHandlers(): Readonly<
           "SPRITE_FAMILY_BLOCKING_GATES_FAILED",
           "Layered sprite family failed one or more blocking consistency gates.",
           normalizeJson({
+            manifestArtifactId: result.manifestArtifactId,
             evidenceArtifactId: result.evidenceArtifactId,
             generatedCompositeArtifactIds: result.generatedCompositeArtifactIds,
           }),
@@ -82,6 +83,7 @@ export function createSpriteFamilyHandlers(): Readonly<
       }
       return {
         outputArtifacts: [
+          result.manifestArtifactId,
           ...result.generatedCompositeArtifactIds,
           result.evidenceArtifactId,
         ],
