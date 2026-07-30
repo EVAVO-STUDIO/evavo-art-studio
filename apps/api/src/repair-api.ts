@@ -1,15 +1,19 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import {
+  RepairedFamilyRankingError,
   RepairedFamilyRevisionError,
   RepairedFamilySelectionError,
   TargetedRepairError,
+  compileRepairedFamilyRankingJob,
   compileRepairedFamilyRevisionJob,
   compileRepairedFamilySelectionJob,
+  repairedFamilyRankingProtocolSummary,
   repairedFamilyRevisionProtocolSummary,
   repairedFamilySelectionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
+  validateRepairedFamilyRankingRequest,
   validateRepairedFamilyRevisionRequest,
   validateRepairedFamilySelectionRequest,
   validateTargetedRepairRequest,
@@ -44,6 +48,9 @@ function pathHandled(pathname: string): boolean {
     "/v1/repair-revision-selection-protocol",
     "/v1/repair-revision-selections/validate",
     "/v1/repair-revision-selections/compile",
+    "/v1/repair-revision-ranking-protocol",
+    "/v1/repair-revision-rankings/validate",
+    "/v1/repair-revision-rankings/compile",
   ]).has(pathname);
 }
 
@@ -106,6 +113,36 @@ export async function handleRepairApiRequest(
         response,
         200,
         repairedFamilySelectionProtocolSummary(),
+        requestId,
+      );
+      return true;
+    }
+    if (
+      request.method === "GET" &&
+      url.pathname === "/v1/repair-revision-ranking-protocol"
+    ) {
+      context.writeJson(
+        response,
+        200,
+        repairedFamilyRankingProtocolSummary(),
+        requestId,
+      );
+      return true;
+    }
+    if (
+      request.method === "POST" &&
+      (url.pathname === "/v1/repair-revision-rankings/validate" ||
+        url.pathname === "/v1/repair-revision-rankings/compile")
+    ) {
+      const ranking = validateRepairedFamilyRankingRequest(
+        await context.readJsonBody(request, context.maximumBodyBytes),
+      );
+      context.writeJson(
+        response,
+        200,
+        url.pathname === "/v1/repair-revision-rankings/validate"
+          ? ranking
+          : compileRepairedFamilyRankingJob(ranking),
         requestId,
       );
       return true;
@@ -190,7 +227,8 @@ export async function handleRepairApiRequest(
     if (
       error instanceof TargetedRepairError ||
       error instanceof RepairedFamilyRevisionError ||
-      error instanceof RepairedFamilySelectionError
+      error instanceof RepairedFamilySelectionError ||
+      error instanceof RepairedFamilyRankingError
     ) {
       context.writeJson(
         response,
