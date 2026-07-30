@@ -11,7 +11,6 @@ import {
   TargetedRepairError,
   type NormalizedTargetedRepairReference,
   type NormalizedTargetedRepairRequest,
-  type TargetedRepairReferenceInput,
   type TargetedRepairReferenceRole,
   type TargetedRepairRequestInput,
 } from "./types.js";
@@ -213,6 +212,7 @@ export function validateTargetedRepairRequest(
     fail("provider.matteColour is accepted only with chroma-key repair.");
   }
 
+  const metadata = optionalJson(input.metadata);
   return {
     schemaVersion: "1.0",
     protocolVersion: TARGETED_REPAIR_PROTOCOL_VERSION,
@@ -236,10 +236,18 @@ export function validateTargetedRepairRequest(
     references,
     ...(input.style === undefined
       ? {}
-      : { style: input.style as unknown as TargetedRepairRequestInput["style"] }),
+      : {
+          style: input.style as unknown as NonNullable<
+            TargetedRepairRequestInput["style"]
+          >,
+        }),
     ...(input.shot === undefined
       ? {}
-      : { shot: input.shot as unknown as TargetedRepairRequestInput["shot"] }),
+      : {
+          shot: input.shot as unknown as NonNullable<
+            TargetedRepairRequestInput["shot"]
+          >,
+        }),
     provider: {
       enabled: provider.enabled !== false,
       ...(backgroundStrategy === undefined
@@ -303,7 +311,7 @@ export function validateTargetedRepairRequest(
         "policy.maximumImpactedFrames",
       ),
     },
-    ...(input.metadata === undefined ? {} : { metadata: optionalJson(input.metadata)! }),
+    ...(metadata === undefined ? {} : { metadata }),
   };
 }
 
