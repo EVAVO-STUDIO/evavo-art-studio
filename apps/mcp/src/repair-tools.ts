@@ -3,12 +3,16 @@ import * as z from "zod/v4";
 
 import {
   RepairedFamilyRevisionError,
+  RepairedFamilySelectionError,
   TargetedRepairError,
   compileRepairedFamilyRevisionJob,
+  compileRepairedFamilySelectionJob,
   repairedFamilyRevisionProtocolSummary,
+  repairedFamilySelectionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
   validateRepairedFamilyRevisionRequest,
+  validateRepairedFamilySelectionRequest,
   validateTargetedRepairRequest,
 } from "@evavo/art-repair";
 
@@ -19,7 +23,8 @@ const textResult = (value: unknown) => ({
 function toolError(error: unknown) {
   const governed =
     error instanceof TargetedRepairError ||
-    error instanceof RepairedFamilyRevisionError;
+    error instanceof RepairedFamilyRevisionError ||
+    error instanceof RepairedFamilySelectionError;
   return {
     isError: true,
     content: [
@@ -150,6 +155,48 @@ export function registerRepairTools(server: McpServer): void {
     async ({ request }) => {
       try {
         return textResult(compileRepairedFamilyRevisionJob(request));
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "repaired_family_revision_selection_protocol",
+    {
+      description:
+        "Describe how multiple passed repaired-family revisions are converted into one later candidate-selection job without ranking or approval.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(repairedFamilySelectionProtocolSummary()),
+  );
+
+  server.registerTool(
+    "validate_repaired_family_revision_selection_request",
+    {
+      description:
+        "Validate a revision-selection bridge request without reading revision evidence or selecting images.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(validateRepairedFamilySelectionRequest(request));
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_repaired_family_revision_selection_job",
+    {
+      description:
+        "Compile a revision-selection bridge into a capability-scoped durable preparation job. The later worker verifies revision evidence and emits a separate selection job; this tool does not read artifacts or rank candidates.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(compileRepairedFamilySelectionJob(request));
       } catch (error: unknown) {
         return toolError(error);
       }
