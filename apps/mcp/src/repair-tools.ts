@@ -2,15 +2,19 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 import {
+  RepairedFamilyRankingError,
   RepairedFamilyRevisionError,
   RepairedFamilySelectionError,
   TargetedRepairError,
+  compileRepairedFamilyRankingJob,
   compileRepairedFamilyRevisionJob,
   compileRepairedFamilySelectionJob,
+  repairedFamilyRankingProtocolSummary,
   repairedFamilyRevisionProtocolSummary,
   repairedFamilySelectionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
+  validateRepairedFamilyRankingRequest,
   validateRepairedFamilyRevisionRequest,
   validateRepairedFamilySelectionRequest,
   validateTargetedRepairRequest,
@@ -24,7 +28,8 @@ function toolError(error: unknown) {
   const governed =
     error instanceof TargetedRepairError ||
     error instanceof RepairedFamilyRevisionError ||
-    error instanceof RepairedFamilySelectionError;
+    error instanceof RepairedFamilySelectionError ||
+    error instanceof RepairedFamilyRankingError;
   return {
     isError: true,
     content: [
@@ -197,6 +202,48 @@ export function registerRepairTools(server: McpServer): void {
     async ({ request }) => {
       try {
         return textResult(compileRepairedFamilySelectionJob(request));
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "repaired_family_revision_ranking_protocol",
+    {
+      description:
+        "Describe how a verified revision-selection bridge is ranked and wrapped in immutable revision-bound evidence without promotion authority.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(repairedFamilyRankingProtocolSummary()),
+  );
+
+  server.registerTool(
+    "validate_repaired_family_revision_ranking_request",
+    {
+      description:
+        "Validate a revision-bound ranking request without reading bridge evidence or comparing images.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(validateRepairedFamilyRankingRequest(request));
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_repaired_family_revision_ranking_job",
+    {
+      description:
+        "Compile a revision-bound ranking request into a capability-scoped durable job. The worker later verifies bridge provenance and runs deterministic selection; this tool does not read artifacts, rank images or promote results.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(compileRepairedFamilyRankingJob(request));
       } catch (error: unknown) {
         return toolError(error);
       }
