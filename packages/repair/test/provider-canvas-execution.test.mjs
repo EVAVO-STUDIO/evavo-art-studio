@@ -160,7 +160,7 @@ async function fixture() {
     occludedFraction: 0,
     centroid: { x: 3.5, y: 3.5 },
     centroidRelativeToPivot: { x: -0.5, y: -3.5 },
-    gates: [gate("identity-reference-lineage", "fail")],
+    gates: [gate("identity-silhouette", "fail")],
   };
   const evidence = {
     schemaVersion: "1.0",
@@ -238,7 +238,7 @@ async function fixture() {
       target: {
         frameId: "idle-down-000",
         layerId: "body",
-        gateIds: ["identity-reference-lineage"],
+        gateIds: ["identity-silhouette"],
       },
       intent: "Repair only the failed identity pixels while retaining the pose.",
       preserve: ["all pixels outside the mask", "pivot", "canvas"],
@@ -320,7 +320,9 @@ test("pixel-safe repair execution restores source-sized unapproved candidates", 
     assert.equal(stored.labels.artifactRole, "targeted-repair-restored-candidate");
     assert.equal(stored.labels.approvalState, "unapproved");
     assert.equal(stored.labels.finalDeliverable, "false");
-    const output = await raw(await data.artifacts.read(candidate.restoredCandidateArtifactId));
+    const output = await raw(
+      await data.artifacts.read(candidate.restoredCandidateArtifactId),
+    );
     assert.equal(output.info.width, 8);
     assert.equal(output.info.height, 8);
     assert.equal(output.data[data.editableOffset + 1], 90);
