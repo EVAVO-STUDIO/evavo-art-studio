@@ -4,12 +4,16 @@ import path from "node:path";
 import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
   compileRepairedFamilyRevisionJob,
+  compileRepairedFamilySelectionJob,
   createRepairedFamilyRevision,
   planTargetedRepair,
+  prepareRepairedFamilySelection,
   repairedFamilyRevisionProtocolSummary,
+  repairedFamilySelectionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
   validateRepairedFamilyRevisionRequest,
+  validateRepairedFamilySelectionRequest,
   validateTargetedRepairRequest,
 } from "@evavo/art-repair";
 
@@ -100,6 +104,37 @@ export async function handleRepairCommand(
     return {
       handled: true,
       value: await createRepairedFamilyRevision(request, {
+        artifacts: store(values),
+      }),
+    };
+  }
+  if (command === "repair-revision-selection-protocol") {
+    return {
+      handled: true,
+      value: repairedFamilySelectionProtocolSummary(),
+    };
+  }
+  if (
+    new Set([
+      "repair-revision-selection-validate",
+      "repair-revision-selection-compile",
+      "repair-revision-selection-run",
+    ]).has(command)
+  ) {
+    const input = await readJson(inputPath(values, command));
+    const request = validateRepairedFamilySelectionRequest(input);
+    if (command === "repair-revision-selection-validate") {
+      return { handled: true, value: request };
+    }
+    if (command === "repair-revision-selection-compile") {
+      return {
+        handled: true,
+        value: compileRepairedFamilySelectionJob(request),
+      };
+    }
+    return {
+      handled: true,
+      value: await prepareRepairedFamilySelection(request, {
         artifacts: store(values),
       }),
     };
