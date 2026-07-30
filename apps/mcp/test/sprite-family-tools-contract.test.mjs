@@ -8,9 +8,10 @@ const read = (relativePath) =>
 test("MCP compiles layered sprite-family verification without executing it", async () => {
   const family = await read("src/sprite-family-tools.ts");
   const selection = await read("src/selection-tools.ts");
+  const index = await read("src/index.ts");
   const packageJson = JSON.parse(await read("package.json"));
   const tsconfig = JSON.parse(await read("tsconfig.json"));
-  const combined = `${family}\n${selection}`;
+  const combined = `${family}\n${selection}\n${index}`;
   for (const token of [
     "sprite_family_protocol",
     "validate_sprite_family_manifest",
@@ -21,6 +22,7 @@ test("MCP compiles layered sprite-family verification without executing it", asy
     '"media.layer-compose"',
     'executionMode: "durable-worker-only"',
     "registerSpriteFamilyTools(server)",
+    "registerSelectionTools(server)",
   ]) {
     assert.ok(combined.includes(token), `missing sprite-family MCP invariant: ${token}`);
   }
