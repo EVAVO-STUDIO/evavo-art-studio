@@ -3,15 +3,19 @@ import path from "node:path";
 
 import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
+  compileRepairedFamilyRankingJob,
   compileRepairedFamilyRevisionJob,
   compileRepairedFamilySelectionJob,
   createRepairedFamilyRevision,
+  executeRepairedFamilyRanking,
   planTargetedRepair,
   prepareRepairedFamilySelection,
+  repairedFamilyRankingProtocolSummary,
   repairedFamilyRevisionProtocolSummary,
   repairedFamilySelectionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
+  validateRepairedFamilyRankingRequest,
   validateRepairedFamilyRevisionRequest,
   validateRepairedFamilySelectionRequest,
   validateTargetedRepairRequest,
@@ -135,6 +139,37 @@ export async function handleRepairCommand(
     return {
       handled: true,
       value: await prepareRepairedFamilySelection(request, {
+        artifacts: store(values),
+      }),
+    };
+  }
+  if (command === "repair-revision-ranking-protocol") {
+    return {
+      handled: true,
+      value: repairedFamilyRankingProtocolSummary(),
+    };
+  }
+  if (
+    new Set([
+      "repair-revision-ranking-validate",
+      "repair-revision-ranking-compile",
+      "repair-revision-ranking-run",
+    ]).has(command)
+  ) {
+    const input = await readJson(inputPath(values, command));
+    const request = validateRepairedFamilyRankingRequest(input);
+    if (command === "repair-revision-ranking-validate") {
+      return { handled: true, value: request };
+    }
+    if (command === "repair-revision-ranking-compile") {
+      return {
+        handled: true,
+        value: compileRepairedFamilyRankingJob(request),
+      };
+    }
+    return {
+      handled: true,
+      value: await executeRepairedFamilyRanking(request, {
         artifacts: store(values),
       }),
     };

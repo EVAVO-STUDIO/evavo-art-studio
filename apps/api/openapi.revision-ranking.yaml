@@ -1,0 +1,209 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Revision-Bound Ranking API
+  version: 0.1.0
+  description: >-
+    Compile-only contracts for ranking candidate repairs from immutable
+    repaired-family selection bridge evidence. HTTP routes do not read
+    artifacts, compare images, promote candidates or update references.
+servers:
+  - url: http://127.0.0.1:4100
+security: []
+tags:
+  - name: Revision-Bound Ranking
+paths:
+  /v1/repair-revision-ranking-protocol:
+    get:
+      tags: [Revision-Bound Ranking]
+      operationId: getRevisionBoundRankingProtocol
+      responses:
+        "200":
+          description: Ranking protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankingProtocol"
+  /v1/repair-revision-rankings/validate:
+    post:
+      tags: [Revision-Bound Ranking]
+      operationId: validateRevisionBoundRanking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RankingRequest"
+      responses:
+        "200":
+          description: Normalized ranking request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedRankingRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/repair-revision-rankings/compile:
+    post:
+      tags: [Revision-Bound Ranking]
+      operationId: compileRevisionBoundRankingJob
+      description: >-
+        Compile one capability-scoped durable job. The worker later verifies
+        bridge evidence and runs deterministic selection; this route performs
+        neither operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RankingRequest"
+      responses:
+        "200":
+          description: Compiled durable ranking job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompiledRankingJob"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  schemas:
+    ArtifactId:
+      type: string
+      pattern: "^artifact_[a-f0-9]{64}$"
+    RankingRequest:
+      type: object
+      required: [schemaVersion, rankingId, bridgeEvidenceArtifactId]
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          const: "1.0"
+        rankingId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        bridgeEvidenceArtifactId:
+          $ref: "#/components/schemas/ArtifactId"
+        metadata: true
+    NormalizedRankingRequest:
+      allOf:
+        - $ref: "#/components/schemas/RankingRequest"
+        - type: object
+          required: [protocolVersion]
+          properties:
+            protocolVersion:
+              const: "2026-07-30.1"
+    RuntimeJob:
+      type: object
+      required:
+        - queue
+        - kind
+        - idempotencyKey
+        - payload
+        - inputArtifacts
+        - requiredCapabilities
+      additionalProperties: true
+      properties:
+        queue:
+          const: selection
+        kind:
+          const: art.repair.rank-revisions
+        idempotencyKey:
+          type: string
+        payload:
+          $ref: "#/components/schemas/NormalizedRankingRequest"
+        inputArtifacts:
+          type: array
+          minItems: 1
+          maxItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+        requiredCapabilities:
+          type: array
+          minItems: 4
+          maxItems: 4
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - repair.revision-ranking
+              - selection.compare
+              - artifacts.store
+              - evidence.bundle
+          example:
+            - repair.revision-ranking
+            - selection.compare
+            - artifacts.store
+            - evidence.bundle
+        maximumAttempts:
+          const: 1
+        leaseDurationMs:
+          type: integer
+          minimum: 1000
+        timeoutMs:
+          type: integer
+          minimum: 1000
+    CompiledRankingJob:
+      type: object
+      required:
+        - schemaVersion
+        - request
+        - requestSha256
+        - executionMode
+        - runtimeJob
+      properties:
+        schemaVersion:
+          const: "1.0"
+        request:
+          $ref: "#/components/schemas/NormalizedRankingRequest"
+        requestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        executionMode:
+          const: durable-worker-or-deliberate-local-run
+        runtimeJob:
+          $ref: "#/components/schemas/RuntimeJob"
+    RankingProtocol:
+      type: object
+      required:
+        - schemaVersion
+        - protocolVersion
+        - inputArtifactRole
+        - outputArtifactRole
+        - kind
+        - requiredCapabilities
+        - rules
+      properties:
+        schemaVersion:
+          const: "1.0"
+        protocolVersion:
+          const: "2026-07-30.1"
+        inputArtifactRole:
+          const: repaired-family-selection-bridge-evidence
+        outputArtifactRole:
+          const: revision-bound-candidate-selection-evidence
+        kind:
+          const: art.repair.rank-revisions
+        requiredCapabilities:
+          type: array
+          items: { type: string }
+        rules:
+          type: array
+          items: { type: string }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: true
+  responses:
+    ValidationError:
+      description: Invalid revision-bound ranking request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
