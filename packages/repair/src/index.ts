@@ -11,4 +11,5 @@ export * from "./revision-selection-types.js";
 export * from "./revision-selection-validation.js";
 export * from "./revision-selection.js";
 export * from "./revision-selection-jobs.js";
+export * from "./revision-selection-protocol.js";
 export { planTargetedRepair } from "./public-planner.js";
