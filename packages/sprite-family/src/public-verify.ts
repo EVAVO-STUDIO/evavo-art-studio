@@ -18,6 +18,8 @@ import {
 import { validateSpriteFamilyManifest } from "./validation.js";
 import { verifySpriteFamily as verifySpriteFamilyInternal } from "./verify.js";
 
+const MAXIMUM_OCCLUSION_PIXEL_COMPARISONS = 50_000_000;
+
 async function verifiedArtifact(
   artifacts: ArtifactStore,
   artifactId: ArtifactId,
@@ -113,6 +115,60 @@ function allowedOccluders(
   return allowed;
 }
 
+function isAbove(
+  candidate: NormalizedSpriteFamilyLayerDefinition,
+  target: NormalizedSpriteFamilyLayerDefinition,
+): boolean {
+  return (
+    candidate.zIndex > target.zIndex ||
+    (candidate.zIndex === target.zIndex &&
+      candidate.id.localeCompare(target.id) > 0)
+  );
+}
+
+interface OcclusionLayer {
+  readonly definition: NormalizedSpriteFamilyLayerDefinition;
+  readonly instance: NormalizedSpriteFamilyManifest["frames"][number]["layers"][number];
+  readonly features: SelectionImageFeatures;
+}
+
+function placedBounds(layer: OcclusionLayer): Readonly<{
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}> | null {
+  if (layer.features.visiblePixels <= 0) return null;
+  return {
+    minX: layer.features.bounds.minX + layer.instance.offset.x,
+    minY: layer.features.bounds.minY + layer.instance.offset.y,
+    maxX: layer.features.bounds.maxX + layer.instance.offset.x,
+    maxY: layer.features.bounds.maxY + layer.instance.offset.y,
+  };
+}
+
+function visibleAlphaAt(
+  layer: OcclusionLayer,
+  canvasX: number,
+  canvasY: number,
+  alphaVisibleThreshold: number,
+): boolean {
+  const sourceX = canvasX - layer.instance.offset.x;
+  const sourceY = canvasY - layer.instance.offset.y;
+  if (
+    sourceX < 0 ||
+    sourceY < 0 ||
+    sourceX >= layer.features.width ||
+    sourceY >= layer.features.height
+  ) {
+    return false;
+  }
+  const sourcePixel = sourceY * layer.features.width + sourceX;
+  const alpha =
+    layer.features.rgba[sourcePixel * 4 + 3]! * layer.instance.opacity;
+  return alpha >= alphaVisibleThreshold;
+}
+
 async function assertOcclusionPolicy(
   manifest: NormalizedSpriteFamilyManifest,
   artifacts: ArtifactStore,
@@ -153,8 +209,9 @@ async function assertOcclusionPolicy(
     return created;
   };
 
+  let comparedPixels = 0;
   for (const frame of manifest.frames) {
-    const layers = await Promise.all(
+    const layers: readonly OcclusionLayer[] = await Promise.all(
       frame.layers.map(async (instance) => {
         const definition = definitions.get(instance.layerId);
         if (!definition) {
@@ -173,71 +230,78 @@ async function assertOcclusionPolicy(
         };
       }),
     );
-    const ordered = layers
-      .filter((layer) => layer.definition.contributesToComposite)
-      .sort(
-        (left, right) =>
-          right.definition.zIndex - left.definition.zIndex ||
-          right.definition.id.localeCompare(left.definition.id),
-      );
-    const topLayer = new Int16Array(canvasPixels);
-    topLayer.fill(-1);
-    for (let layerIndex = 0; layerIndex < ordered.length; layerIndex += 1) {
-      const layer = ordered[layerIndex]!;
+    const rendered = layers.filter(
+      (layer) => layer.definition.contributesToComposite,
+    );
+    for (const lower of rendered) {
+      const lowerBounds = placedBounds(lower);
+      if (!lowerBounds) continue;
       const allowed = allowedOccluders(
-        layer.definition,
+        lower.definition,
         manifest.layerDefinitions,
       );
-      const unexpected = new Map<string, number>();
-      for (let y = 0; y < layer.features.height; y += 1) {
-        for (let x = 0; x < layer.features.width; x += 1) {
-          const sourcePixel = y * layer.features.width + x;
-          const sourceAlpha =
-            (layer.features.rgba[sourcePixel * 4 + 3]! / 255) *
-            layer.instance.opacity;
-          if (
-            sourceAlpha * 255 < manifest.policy.alphaVisibleThreshold
-          ) {
-            continue;
-          }
-          const targetX = x + layer.instance.offset.x;
-          const targetY = y + layer.instance.offset.y;
-          if (
-            targetX < 0 ||
-            targetY < 0 ||
-            targetX >= manifest.canvas.width ||
-            targetY >= manifest.canvas.height
-          ) {
-            continue;
-          }
-          const targetPixel = targetY * manifest.canvas.width + targetX;
-          const occluderIndex = topLayer[targetPixel]!;
-          if (occluderIndex >= 0) {
-            const occluderId = ordered[occluderIndex]!.definition.id;
-            if (!allowed.has(occluderId)) {
-              unexpected.set(
-                occluderId,
-                (unexpected.get(occluderId) ?? 0) + 1,
+      for (const higher of rendered) {
+        if (
+          higher.definition.id === lower.definition.id ||
+          !isAbove(higher.definition, lower.definition) ||
+          allowed.has(higher.definition.id)
+        ) {
+          continue;
+        }
+        const higherBounds = placedBounds(higher);
+        if (!higherBounds) continue;
+        const minX = Math.max(lowerBounds.minX, higherBounds.minX, 0);
+        const minY = Math.max(lowerBounds.minY, higherBounds.minY, 0);
+        const maxX = Math.min(
+          lowerBounds.maxX,
+          higherBounds.maxX,
+          manifest.canvas.width - 1,
+        );
+        const maxY = Math.min(
+          lowerBounds.maxY,
+          higherBounds.maxY,
+          manifest.canvas.height - 1,
+        );
+        if (minX > maxX || minY > maxY) continue;
+        for (let y = minY; y <= maxY; y += 1) {
+          for (let x = minX; x <= maxX; x += 1) {
+            comparedPixels += 1;
+            if (comparedPixels > MAXIMUM_OCCLUSION_PIXEL_COMPARISONS) {
+              throw new SpriteFamilyError(
+                "SPRITE_FAMILY_OCCLUSION_PREFLIGHT_LIMIT_EXCEEDED",
+                `Occlusion preflight exceeded ${MAXIMUM_OCCLUSION_PIXEL_COMPARISONS} pixel-pair comparisons. Reduce canvas or layer complexity, or declare intended occlusion relationships explicitly.`,
+                { frameId: frame.id, comparedPixels },
               );
             }
-          } else {
-            topLayer[targetPixel] = layerIndex;
+            if (
+              visibleAlphaAt(
+                lower,
+                x,
+                y,
+                manifest.policy.alphaVisibleThreshold,
+              ) &&
+              visibleAlphaAt(
+                higher,
+                x,
+                y,
+                manifest.policy.alphaVisibleThreshold,
+              )
+            ) {
+              throw new SpriteFamilyError(
+                "SPRITE_FAMILY_OCCLUSION_POLICY_VIOLATION",
+                `${frame.id}.${lower.definition.id} is overlapped by undeclared higher layer ${higher.definition.id}. Declare allowedOccludedBy or the higher layer's occludes relationship explicitly.`,
+                {
+                  frameId: frame.id,
+                  layerId: lower.definition.id,
+                  occluderLayerId: higher.definition.id,
+                  firstOverlappingPixel: { x, y },
+                  allowedOccludedBy: [...allowed].sort(),
+                  comparedPixels,
+                },
+              );
+            }
           }
         }
-      }
-      if (unexpected.size) {
-        throw new SpriteFamilyError(
-          "SPRITE_FAMILY_OCCLUSION_POLICY_VIOLATION",
-          `${frame.id}.${layer.definition.id} is overlapped by undeclared higher layers. Declare allowedOccludedBy or the higher layer's occludes relationship explicitly.`,
-          {
-            frameId: frame.id,
-            layerId: layer.definition.id,
-            allowedOccludedBy: [...allowed].sort(),
-            unexpectedOccluders: [...unexpected.entries()]
-              .sort(([left], [right]) => left.localeCompare(right))
-              .map(([layerId, pixels]) => ({ layerId, pixels })),
-          },
-        );
       }
     }
   }
