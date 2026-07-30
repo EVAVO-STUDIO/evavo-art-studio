@@ -19,7 +19,7 @@ test("CLI exposes targeted repair protocol through the real dispatcher", () => {
   const result = run(["repair-protocol"]);
   assert.equal(result.status, 0, result.stderr);
   const body = JSON.parse(result.stdout);
-  assert.equal(body.protocolVersion, "2026-07-30.1");
+  assert.equal(body.protocolVersion, "2026-07-30.2");
   assert.ok(body.strategies.includes("masked-provider-inpaint"));
   assert.ok(body.rules.some((rule) => rule.includes("may not be regenerated")));
 });

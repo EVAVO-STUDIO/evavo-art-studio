@@ -4,8 +4,14 @@ import type {
   JsonValue,
 } from "@evavo/art-artifacts";
 import type {
+  PixelArtProviderCanvasManifest,
+  PixelArtProviderCanvasOptions,
+  PixelArtProviderCanvasRestorationEvidence,
+} from "@evavo/art-provider-canvas";
+import type {
   NormalizedProviderCandidateRequest,
   ProviderBackgroundStrategy,
+  ProviderRegistryLike,
   ProviderShotContractInput,
   ProviderStyleEnvelopeInput,
 } from "@evavo/art-providers";
@@ -16,7 +22,7 @@ import type {
   SpriteLayerSourcePolicy,
 } from "@evavo/art-sprite-family";
 
-export const TARGETED_REPAIR_PROTOCOL_VERSION = "2026-07-30.1" as const;
+export const TARGETED_REPAIR_PROTOCOL_VERSION = "2026-07-30.2" as const;
 
 export type TargetedRepairStrategy =
   | "source-replace"
@@ -198,6 +204,7 @@ export interface TargetedRepairPacket {
   readonly blockers: readonly string[];
   readonly continuation: readonly Readonly<{
     stage:
+      | "provider-canvas-restore"
       | "alpha-master"
       | "manifest-update"
       | "family-reverify"
@@ -215,8 +222,54 @@ export interface TargetedRepairRunResult {
   readonly packet: TargetedRepairPacket;
 }
 
+export type TargetedRepairProviderCanvasOptions = Omit<
+  PixelArtProviderCanvasOptions,
+  "matteColour"
+>;
+
+export interface TargetedRepairExecutionRequestInput {
+  readonly schemaVersion: "1.0";
+  readonly repairPacketArtifactId: ArtifactId;
+  readonly providerCanvas?: TargetedRepairProviderCanvasOptions;
+}
+
+export interface NormalizedTargetedRepairExecutionRequest {
+  readonly schemaVersion: "1.0";
+  readonly protocolVersion: typeof TARGETED_REPAIR_PROTOCOL_VERSION;
+  readonly repairPacketArtifactId: ArtifactId;
+  readonly providerCanvas: TargetedRepairProviderCanvasOptions;
+}
+
+export interface TargetedRepairRestoredCandidate {
+  readonly providerCandidateArtifactId: ArtifactId;
+  readonly restoredCandidateArtifactId: ArtifactId;
+  readonly restorationEvidenceArtifactId: ArtifactId;
+  readonly restoration: PixelArtProviderCanvasRestorationEvidence;
+}
+
+export interface TargetedRepairExecutionResult {
+  readonly schemaVersion: "1.0";
+  readonly protocolVersion: typeof TARGETED_REPAIR_PROTOCOL_VERSION;
+  readonly repairId: string;
+  readonly repairPacketArtifactId: ArtifactId;
+  readonly providerCanvasBaseArtifactId: ArtifactId;
+  readonly providerCanvasMaskArtifactId: ArtifactId;
+  readonly providerCanvasManifestArtifactId: ArtifactId;
+  readonly providerCanvasManifest: PixelArtProviderCanvasManifest;
+  readonly providerEvidenceArtifactId: ArtifactId;
+  readonly restoredCandidates: readonly TargetedRepairRestoredCandidate[];
+  readonly executionEvidenceArtifactId: ArtifactId;
+}
+
 export interface PlanTargetedRepairOptions {
   readonly artifacts: ArtifactStore;
+  readonly now?: () => Date;
+}
+
+export interface ExecuteTargetedRepairOptions {
+  readonly artifacts: ArtifactStore;
+  readonly registry: ProviderRegistryLike;
+  readonly signal: AbortSignal;
   readonly now?: () => Date;
 }
 

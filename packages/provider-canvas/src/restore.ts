@@ -70,7 +70,8 @@ function validateManifest(input: PixelArtProviderCanvasManifest): void {
     input.provider.height <= 0 ||
     input.provider.scale <= 0 ||
     input.provider.contentWidth !== input.source.width * input.provider.scale ||
-    input.provider.contentHeight !== input.source.height * input.provider.scale ||
+    input.provider.contentHeight !==
+      input.source.height * input.provider.scale ||
     input.provider.offsetX + input.provider.contentWidth > input.provider.width ||
     input.provider.offsetY + input.provider.contentHeight > input.provider.height
   ) {
@@ -85,6 +86,15 @@ function validateManifest(input: PixelArtProviderCanvasManifest): void {
       "Pixel-art restoration requires the binary mask recorded during preparation.",
     );
   }
+  if (
+    input.restoration.alphaMode !== "source" &&
+    input.restoration.alphaMode !== "candidate"
+  ) {
+    throw new ProviderCanvasError(
+      "PROVIDER_CANVAS_MANIFEST_INVALID",
+      "Provider canvas restoration alpha mode is invalid.",
+    );
+  }
 }
 
 async function decodeRgba(
@@ -92,14 +102,16 @@ async function decodeRgba(
   maximumInputBytes: number,
   maximumPixels: number,
   role: string,
-): Promise<Readonly<{
-  data: Buffer;
-  width: number;
-  height: number;
-  format: string;
-  pages: number;
-  hasAlpha: boolean;
-}>> {
+): Promise<
+  Readonly<{
+    data: Buffer;
+    width: number;
+    height: number;
+    format: string;
+    pages: number;
+    hasAlpha: boolean;
+  }>
+> {
   const bytes = Buffer.from(input);
   if (!bytes.byteLength || bytes.byteLength > maximumInputBytes) {
     throw new ProviderCanvasError(
@@ -124,7 +136,12 @@ async function decodeRgba(
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
   const pages = metadata.pages ?? 1;
-  if (width <= 0 || height <= 0 || width * height > maximumPixels || pages !== 1) {
+  if (
+    width <= 0 ||
+    height <= 0 ||
+    width * height > maximumPixels ||
+    pages !== 1
+  ) {
     throw new ProviderCanvasError(
       "PROVIDER_CANVAS_DIMENSIONS_INVALID",
       `${role} has invalid, excessive, or multipage dimensions.`,
@@ -155,7 +172,9 @@ function protectedRgbaHash(base: Uint8Array, mask: Uint8Array): string {
   const hash = createHash("sha256");
   for (let pixel = 0; pixel < base.length / 4; pixel += 1) {
     const offset = pixel * 4;
-    if (mask[offset + 3] === 255) hash.update(base.subarray(offset, offset + 4));
+    if (mask[offset + 3] === 255) {
+      hash.update(base.subarray(offset, offset + 4));
+    }
   }
   return hash.digest("hex");
 }
@@ -328,6 +347,7 @@ export async function restorePixelArtProviderCanvas(
   let protectedPixels = 0;
   let editablePixels = 0;
   let paletteMapped = 0;
+  let editableAlphaChangesFromSource = 0;
   let totalBlockDeviation = 0;
   let maximumBlockDeviation = 0;
   for (let sourceY = 0; sourceY < manifest.source.height; sourceY += 1) {
@@ -370,15 +390,25 @@ export async function restorePixelArtProviderCanvas(
       ) {
         paletteMapped += 1;
       }
+      const sourceAlpha = base.data[sourceOffset + 3]!;
+      const restoredAlpha =
+        manifest.restoration.alphaMode === "source"
+          ? sourceAlpha
+          : restored[3];
+      if (restoredAlpha !== sourceAlpha) editableAlphaChangesFromSource += 1;
       output[sourceOffset] = restored[0];
       output[sourceOffset + 1] = restored[1];
       output[sourceOffset + 2] = restored[2];
-      output[sourceOffset + 3] = restored[3];
+      output[sourceOffset + 3] = restoredAlpha;
     }
   }
   let protectedChannelComparisons = 0;
   let protectedChannelMismatches = 0;
-  for (let pixel = 0; pixel < manifest.source.width * manifest.source.height; pixel += 1) {
+  for (
+    let pixel = 0;
+    pixel < manifest.source.width * manifest.source.height;
+    pixel += 1
+  ) {
     const offset = pixel * 4;
     if (mask.data[offset + 3] !== 255) continue;
     for (let channel = 0; channel < 4; channel += 1) {
@@ -417,6 +447,7 @@ export async function restorePixelArtProviderCanvas(
     scale: manifest.provider.scale,
     sampling: manifest.restoration.sampling,
     paletteMode: manifest.restoration.paletteMode,
+    alphaMode: manifest.restoration.alphaMode,
     paletteColours: manifest.restoration.palette.length,
     protectedPixels,
     editablePixels,
@@ -424,6 +455,7 @@ export async function restorePixelArtProviderCanvas(
     protectedChannelMismatches,
     protectedExact: protectedChannelMismatches === 0,
     editablePixelsPaletteMapped: paletteMapped,
+    editableAlphaChangesFromSource,
     averageEditableBlockDeviation:
       editablePixels > 0 ? totalBlockDeviation / editablePixels : 0,
     maximumEditableBlockDeviation: maximumBlockDeviation,

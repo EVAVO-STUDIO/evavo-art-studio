@@ -20,6 +20,7 @@
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",
     "@evavo/art-media": "workspace:*",
+    "@evavo/art-provider-canvas": "workspace:*",
     "@evavo/art-providers": "workspace:*",
     "@evavo/art-sprite-family": "workspace:*"
   },

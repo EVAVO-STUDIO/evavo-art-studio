@@ -1,10 +1,11 @@
-export const PROVIDER_CANVAS_PROTOCOL_VERSION = "2026-07-30.1" as const;
+export const PROVIDER_CANVAS_PROTOCOL_VERSION = "2026-07-30.2" as const;
 
 export type ProviderCanvasRestorationSampling =
   | "nearest-center"
   | "block-average";
 
 export type ProviderCanvasPaletteMode = "source" | "none";
+export type ProviderCanvasAlphaMode = "source" | "candidate";
 
 export interface PixelArtProviderCanvasOptions {
   readonly matteColour: string;
@@ -14,6 +15,7 @@ export interface PixelArtProviderCanvasOptions {
   readonly requireBinaryMask?: boolean;
   readonly restorationSampling?: ProviderCanvasRestorationSampling;
   readonly paletteMode?: ProviderCanvasPaletteMode;
+  readonly alphaMode?: ProviderCanvasAlphaMode;
   readonly maximumPaletteColours?: number;
   readonly maximumInputBytes?: number;
   readonly maximumSourcePixels?: number;
@@ -33,6 +35,7 @@ export interface NormalizedPixelArtProviderCanvasOptions {
   readonly requireBinaryMask: boolean;
   readonly restorationSampling: ProviderCanvasRestorationSampling;
   readonly paletteMode: ProviderCanvasPaletteMode;
+  readonly alphaMode: ProviderCanvasAlphaMode;
   readonly maximumPaletteColours: number;
   readonly maximumInputBytes: number;
   readonly maximumSourcePixels: number;
@@ -73,6 +76,7 @@ export interface PixelArtProviderCanvasManifest {
   readonly restoration: Readonly<{
     sampling: ProviderCanvasRestorationSampling;
     paletteMode: ProviderCanvasPaletteMode;
+    alphaMode: ProviderCanvasAlphaMode;
     palette: readonly Readonly<{
       r: number;
       g: number;
@@ -108,6 +112,7 @@ export interface PixelArtProviderCanvasRestorationEvidence {
   readonly scale: number;
   readonly sampling: ProviderCanvasRestorationSampling;
   readonly paletteMode: ProviderCanvasPaletteMode;
+  readonly alphaMode: ProviderCanvasAlphaMode;
   readonly paletteColours: number;
   readonly protectedPixels: number;
   readonly editablePixels: number;
@@ -115,6 +120,7 @@ export interface PixelArtProviderCanvasRestorationEvidence {
   readonly protectedChannelMismatches: number;
   readonly protectedExact: boolean;
   readonly editablePixelsPaletteMapped: number;
+  readonly editableAlphaChangesFromSource: number;
   readonly averageEditableBlockDeviation: number;
   readonly maximumEditableBlockDeviation: number;
 }
