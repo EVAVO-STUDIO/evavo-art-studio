@@ -1,0 +1,34 @@
+{
+  "queue": "selection",
+  "kind": "art.repair.promote-revision",
+  "idempotencyKey": "revision-promotion:hero-body-approved-repair",
+  "payload": {
+    "schemaVersion": "1.0",
+    "promotionId": "hero-body-approved-repair",
+    "rankingEvidenceArtifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "target": {
+      "namespace": "projects/hero",
+      "name": "approved-body",
+      "expectedGeneration": 4,
+      "expectedArtifactId": "artifact_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "approval": {
+      "mode": "human",
+      "approver": "Greg Parker",
+      "reason": "Approved the highest-ranked evidence-backed repaired candidate."
+    },
+    "actor": "greg"
+  },
+  "inputArtifacts": [
+    "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  ],
+  "requiredCapabilities": [
+    "repair.revision-promote",
+    "selection.promote",
+    "artifacts.store",
+    "evidence.bundle"
+  ],
+  "maximumAttempts": 1,
+  "leaseDurationMs": 120000,
+  "timeoutMs": 600000
+}

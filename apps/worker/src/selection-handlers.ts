@@ -12,6 +12,10 @@ import {
 } from "@evavo/art-runtime";
 
 import {
+  createRepairedFamilyPromotionHandlers,
+  repairedFamilyPromotionWorkerCapabilities,
+} from "./revision-promotion-handlers.js";
+import {
   createRepairedFamilyRankingHandlers,
   repairedFamilyRankingWorkerCapabilities,
 } from "./revision-ranking-handlers.js";
@@ -140,6 +144,7 @@ export function createCandidateSelectionHandlers(): Readonly<
     "art.candidate.select": select,
     "art.candidate.promote": promote,
     ...createRepairedFamilyRankingHandlers(),
+    ...createRepairedFamilyPromotionHandlers(),
   });
 }
 
@@ -149,6 +154,7 @@ export function candidateSelectionWorkerCapabilities(): readonly string[] {
       ...SELECT_CAPABILITIES,
       ...PROMOTE_CAPABILITIES,
       ...repairedFamilyRankingWorkerCapabilities(),
+      ...repairedFamilyPromotionWorkerCapabilities(),
     ]),
   ].sort();
 }

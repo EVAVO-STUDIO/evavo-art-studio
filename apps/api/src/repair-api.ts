@@ -1,18 +1,22 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import {
+  RepairedFamilyPromotionError,
   RepairedFamilyRankingError,
   RepairedFamilyRevisionError,
   RepairedFamilySelectionError,
   TargetedRepairError,
+  compileRepairedFamilyPromotionJob,
   compileRepairedFamilyRankingJob,
   compileRepairedFamilyRevisionJob,
   compileRepairedFamilySelectionJob,
+  repairedFamilyPromotionProtocolSummary,
   repairedFamilyRankingProtocolSummary,
   repairedFamilyRevisionProtocolSummary,
   repairedFamilySelectionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
+  validateRepairedFamilyPromotionRequest,
   validateRepairedFamilyRankingRequest,
   validateRepairedFamilyRevisionRequest,
   validateRepairedFamilySelectionRequest,
@@ -51,6 +55,9 @@ function pathHandled(pathname: string): boolean {
     "/v1/repair-revision-ranking-protocol",
     "/v1/repair-revision-rankings/validate",
     "/v1/repair-revision-rankings/compile",
+    "/v1/repair-revision-promotion-protocol",
+    "/v1/repair-revision-promotions/validate",
+    "/v1/repair-revision-promotions/compile",
   ]).has(pathname);
 }
 
@@ -125,6 +132,36 @@ export async function handleRepairApiRequest(
         response,
         200,
         repairedFamilyRankingProtocolSummary(),
+        requestId,
+      );
+      return true;
+    }
+    if (
+      request.method === "GET" &&
+      url.pathname === "/v1/repair-revision-promotion-protocol"
+    ) {
+      context.writeJson(
+        response,
+        200,
+        repairedFamilyPromotionProtocolSummary(),
+        requestId,
+      );
+      return true;
+    }
+    if (
+      request.method === "POST" &&
+      (url.pathname === "/v1/repair-revision-promotions/validate" ||
+        url.pathname === "/v1/repair-revision-promotions/compile")
+    ) {
+      const promotion = validateRepairedFamilyPromotionRequest(
+        await context.readJsonBody(request, context.maximumBodyBytes),
+      );
+      context.writeJson(
+        response,
+        200,
+        url.pathname === "/v1/repair-revision-promotions/validate"
+          ? promotion
+          : compileRepairedFamilyPromotionJob(promotion),
         requestId,
       );
       return true;
@@ -228,7 +265,8 @@ export async function handleRepairApiRequest(
       error instanceof TargetedRepairError ||
       error instanceof RepairedFamilyRevisionError ||
       error instanceof RepairedFamilySelectionError ||
-      error instanceof RepairedFamilyRankingError
+      error instanceof RepairedFamilyRankingError ||
+      error instanceof RepairedFamilyPromotionError
     ) {
       context.writeJson(
         response,
