@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-art-studio",
+  "repository": "EVAVO-STUDIO/evavo-art-studio",
+  "defaultBranch": "main",
+  "authority": "canonical-art-production-studio",
+  "stack": "node-pnpm-creative-workspace",
+  "packageManager": {
+    "name": "pnpm",
+    "exactVersion": "10.13.1",
+    "lockfilePath": "pnpm-lock.yaml",
+    "lockfilePolicy": "review-first",
+    "lockfilePresent": false,
+    "install": "pnpm install --no-frozen-lockfile"
+  },
+  "runtime": {
+    "node": "22.14.0",
+    "pnpm": "10.13.1",
+    "next": "^16.2.12",
+    "react": "^19.2.8",
+    "typescript": "^5.9.2"
+  },
+  "workspace": {
+    "manifest": "pnpm-workspace.yaml",
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ]
+  },
+  "validation": [
+    "node scripts/check-repository-toolchain.mjs",
+    "node scripts/test-repository-toolchain.mjs",
+    "pnpm install --no-frozen-lockfile",
+    "pnpm run build:domain",
+    "pnpm typecheck",
+    "pnpm test",
+    "pnpm build"
+  ],
+  "executedBaseline": {
+    "workflow": ".github/workflows/ci.yml",
+    "runId": "30544861146",
+    "headSha": "52b6f0707f52a8c04e707cb521456f342d881d62",
+    "conclusion": "success",
+    "installedWithoutCommittedLockfile": true
+  },
+  "capabilityBoundary": {
+    "validationMay": [
+      "compile repository-owned protocols",
+      "validate real media fixtures",
+      "build packages and applications",
+      "retain bounded source-validation evidence"
+    ],
+    "validationDoesNotAuthorize": [
+      "live provider requests",
+      "artifact promotion",
+      "named reference mutation",
+      "production deployment",
+      "credential mutation",
+      "external communication"
+    ]
+  },
+  "notes": [
+    "The successful baseline proves the complete source chain at one exact head, not a frozen dependency graph.",
+    "A committed pnpm lockfile requires a separate generated, reviewed and fully validated change before frozen installation can be activated.",
+    "Provider execution, promotion and production effects remain separately authorised operations."
+  ]
+}
