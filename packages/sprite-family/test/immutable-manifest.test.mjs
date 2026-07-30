@@ -78,8 +78,8 @@ async function fixture() {
         frameIndex: 0,
         globalFrameIndex: 0,
         durationMs: 125,
-        pivot: { x: 4, y: 7 },
-        baseline: 7,
+        pivot: { x: 4, y: 6 },
+        baseline: 6,
         groundContact: true,
         declaredCompositeArtifactId: declared.artifactId,
         layers: [{ layerId: "body", artifactId: layer.artifactId }],
@@ -124,12 +124,14 @@ test("family verification publishes a normalized manifest and manifest-bound evi
     "sprite-family-normalized-manifest",
   );
   assert.equal(manifestArtifact.storageClass, "manifest");
-  assert.deepEqual(manifestArtifact.sourceArtifacts, [
-    data.layer.artifactId,
-    data.declared.artifactId,
-  ].sort());
+  assert.deepEqual(
+    manifestArtifact.sourceArtifacts,
+    [data.layer.artifactId, data.declared.artifactId].sort(),
+  );
   const storedManifest = validateSpriteFamilyManifest(
-    JSON.parse((await data.artifacts.read(result.manifestArtifactId)).toString("utf8")),
+    JSON.parse(
+      (await data.artifacts.read(result.manifestArtifactId)).toString("utf8"),
+    ),
   );
   assert.equal(
     spriteFamilyManifestSha256(storedManifest),
