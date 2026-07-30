@@ -186,7 +186,7 @@ export interface TargetedRepairPacket {
     frameId: string;
     layerId?: string;
     layerRole?: SpriteLayerRole;
-    sourcePolicy?: SpriteLayerSourcePolicy;
+    sourcePolicy?: SpriteLayerSourcePolicy | undefined;
     baseArtifactId?: ArtifactId;
   }>;
   readonly impactedFrameIds: readonly string[];
