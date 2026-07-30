@@ -1,9 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import {
+  RepairedFamilyRevisionError,
   TargetedRepairError,
+  compileRepairedFamilyRevisionJob,
+  repairedFamilyRevisionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
+  validateRepairedFamilyRevisionRequest,
   validateTargetedRepairRequest,
 } from "@evavo/art-repair";
 
@@ -30,6 +34,9 @@ function pathHandled(pathname: string): boolean {
     "/v1/repair-protocol",
     "/v1/repairs/validate",
     "/v1/repairs/compile",
+    "/v1/repair-revision-protocol",
+    "/v1/repair-revisions/validate",
+    "/v1/repair-revisions/compile",
   ]).has(pathname);
 }
 
@@ -73,6 +80,38 @@ export async function handleRepairApiRequest(
       return true;
     }
     if (
+      request.method === "GET" &&
+      url.pathname === "/v1/repair-revision-protocol"
+    ) {
+      context.writeJson(
+        response,
+        200,
+        repairedFamilyRevisionProtocolSummary(),
+        requestId,
+      );
+      return true;
+    }
+    if (
+      request.method === "POST" &&
+      (url.pathname === "/v1/repair-revisions/validate" ||
+        url.pathname === "/v1/repair-revisions/compile")
+    ) {
+      const body = await context.readJsonBody(
+        request,
+        context.maximumBodyBytes,
+      );
+      const revision = validateRepairedFamilyRevisionRequest(body);
+      context.writeJson(
+        response,
+        200,
+        url.pathname === "/v1/repair-revisions/validate"
+          ? revision
+          : compileRepairedFamilyRevisionJob(revision),
+        requestId,
+      );
+      return true;
+    }
+    if (
       request.method === "POST" &&
       (url.pathname === "/v1/repairs/validate" ||
         url.pathname === "/v1/repairs/compile")
@@ -111,7 +150,10 @@ export async function handleRepairApiRequest(
     );
     return true;
   } catch (error: unknown) {
-    if (error instanceof TargetedRepairError) {
+    if (
+      error instanceof TargetedRepairError ||
+      error instanceof RepairedFamilyRevisionError
+    ) {
       context.writeJson(
         response,
         422,

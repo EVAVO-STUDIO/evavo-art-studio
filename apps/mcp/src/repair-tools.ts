@@ -2,9 +2,13 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 import {
+  RepairedFamilyRevisionError,
   TargetedRepairError,
+  compileRepairedFamilyRevisionJob,
+  repairedFamilyRevisionProtocolSummary,
   targetedRepairProtocolSummary,
   targetedRepairRequestSha256,
+  validateRepairedFamilyRevisionRequest,
   validateTargetedRepairRequest,
 } from "@evavo/art-repair";
 
@@ -13,6 +17,9 @@ const textResult = (value: unknown) => ({
 });
 
 function toolError(error: unknown) {
+  const governed =
+    error instanceof TargetedRepairError ||
+    error instanceof RepairedFamilyRevisionError;
   return {
     isError: true,
     content: [
@@ -20,12 +27,9 @@ function toolError(error: unknown) {
         type: "text" as const,
         text: JSON.stringify(
           {
-            code:
-              error instanceof TargetedRepairError
-                ? error.code
-                : "TARGETED_REPAIR_TOOL_REJECTED",
+            code: governed ? error.code : "TARGETED_REPAIR_TOOL_REJECTED",
             message: error instanceof Error ? error.message : String(error),
-            ...(error instanceof TargetedRepairError && error.details !== undefined
+            ...(governed && error.details !== undefined
               ? { details: error.details }
               : {}),
           },
@@ -104,6 +108,48 @@ export function registerRepairTools(server: McpServer): void {
           executionMode: "durable-worker-only",
           runtimeJob: runtimeJob(repair),
         });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "repaired_family_revision_protocol",
+    {
+      description:
+        "Describe the immutable repaired-family revision boundary, quality gates and complete layered-family reverification requirements.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(repairedFamilyRevisionProtocolSummary()),
+  );
+
+  server.registerTool(
+    "validate_repaired_family_revision_request",
+    {
+      description:
+        "Validate a repaired-family revision request without reading artifacts, rebuilding composites or changing a family.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(validateRepairedFamilyRevisionRequest(request));
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_repaired_family_revision_job",
+    {
+      description:
+        "Compile a repaired-family revision into a capability-scoped durable job. This tool does not read artifacts, run frame QA, rebuild composites or approve a result.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(compileRepairedFamilyRevisionJob(request));
       } catch (error: unknown) {
         return toolError(error);
       }
