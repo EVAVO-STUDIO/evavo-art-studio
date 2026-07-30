@@ -12,6 +12,11 @@ import {
   validateCandidateSelectionRequest,
 } from "@evavo/art-selection";
 
+import {
+  handleSpriteFamilyCommand,
+  type SpriteFamilyCommandValues,
+} from "./sprite-family-commands.js";
+
 export interface SelectionCommandValues {
   readonly input?: string;
   readonly "artifact-root"?: string;
@@ -40,6 +45,17 @@ export async function handleSelectionCommand(
   command: string,
   values: SelectionCommandValues,
 ): Promise<SelectionCommandResult> {
+  const spriteFamily = await handleSpriteFamilyCommand(
+    command,
+    values as SpriteFamilyCommandValues,
+  );
+  if (spriteFamily.handled) {
+    if (spriteFamily.exitCode !== undefined) {
+      process.exitCode = spriteFamily.exitCode;
+    }
+    return { handled: true, value: spriteFamily.value };
+  }
+
   if (command === "selection-protocol") {
     return { handled: true, value: selectionProtocolSummary() };
   }
