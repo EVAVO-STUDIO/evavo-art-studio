@@ -4,6 +4,7 @@ import type {
   JsonValue,
 } from "@evavo/art-artifacts";
 import type {
+  RgbaColour,
   SpriteFrameQualityExpectations,
   SpriteFrameQualityReport,
 } from "@evavo/art-quality";
@@ -41,7 +42,7 @@ export interface NormalizedRepairedFamilyRevisionRequest {
     transparency: "alpha-required" | "alpha-preferred";
     safePadding: number;
     alphaVisibleThreshold: number;
-    knownMatteColours: readonly string[];
+    knownMatteColours: readonly RgbaColour[];
     flatMatteBorderThreshold: number;
     checkerboardConfidenceThreshold: number;
     maximumHaloFraction: number;
@@ -59,6 +60,7 @@ export interface RepairedFamilyRevisionReplacement {
   readonly replacementArtifactId: ArtifactId;
   readonly originalDeclaredCompositeArtifactId?: ArtifactId;
   readonly revisedDeclaredCompositeArtifactId: ArtifactId;
+  readonly revisedDeclaredCompositeQualityEvidenceArtifactId: ArtifactId;
 }
 
 export interface RepairedFamilyRevisionEvidence {
@@ -93,6 +95,7 @@ export interface RepairedFamilyRevisionResult {
   readonly qualityEvidenceArtifactId: ArtifactId;
   readonly qualityCandidateArtifactId: ArtifactId;
   readonly revisedDeclaredCompositeArtifactIds: readonly ArtifactId[];
+  readonly revisedDeclaredCompositeQualityEvidenceArtifactIds: readonly ArtifactId[];
   readonly family: ManifestBoundSpriteFamilyRunResult;
   readonly evidence: RepairedFamilyRevisionEvidence;
   readonly revisedManifest: NormalizedSpriteFamilyManifest;
