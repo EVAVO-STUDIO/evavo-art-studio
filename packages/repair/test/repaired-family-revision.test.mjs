@@ -36,7 +36,7 @@ async function fixture() {
   const width = 16;
   const height = 16;
   const sourceRgba = Buffer.alloc(width * height * 4);
-  for (let y = 3; y < 13; y += 1) {
+  for (let y = 3; y < 14; y += 1) {
     for (let x = 5; x < 11; x += 1) {
       const offset = (y * width + x) * 4;
       sourceRgba[offset] = 205;
