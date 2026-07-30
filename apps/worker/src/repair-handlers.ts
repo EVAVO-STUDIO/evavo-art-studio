@@ -1,10 +1,16 @@
-import type { ArtifactId, JsonValue } from "@evavo/art-artifacts";
+import {
+  normalizeJson,
+  type ArtifactId,
+  type JsonValue,
+} from "@evavo/art-artifacts";
 import {
   ProviderError,
   type ProviderRegistry,
 } from "@evavo/art-providers";
 import {
+  TARGETED_REPAIR_EXECUTION_CAPABILITIES,
   TargetedRepairError,
+  compileTargetedRepairExecutionJob,
   executeTargetedRepairProviderCanvas,
   planTargetedRepair,
   validateTargetedRepairExecutionRequest,
@@ -23,19 +29,10 @@ const PLAN_CAPABILITIES = Object.freeze([
   "artifacts.store",
   "evidence.bundle",
 ] as const);
-const EXECUTE_CAPABILITIES = Object.freeze([
-  "repair.execute",
-  "media.provider-canvas",
-  "provider.inpaint",
-  "provider.reference-lock",
-  "provider.mask",
-  "provider.candidate-store",
-  "evidence.bundle",
-] as const);
 
 function declaredPlanningInputs(
   input: ReturnType<typeof validateTargetedRepairRequest>,
-) {
+): readonly ArtifactId[] {
   return [
     input.familyEvidenceArtifactId,
     ...(input.maskArtifactId ? [input.maskArtifactId] : []),
@@ -127,15 +124,34 @@ function parsePacket(value: unknown): TargetedRepairPacket {
   return value as TargetedRepairPacket;
 }
 
-async function packetExecutionInputs(
+async function readVerifiedPacket(
   context: Parameters<RuntimeJobHandler>[0],
   packetArtifactId: ArtifactId,
-): Promise<readonly ArtifactId[]> {
-  const artifact = await context.artifacts.get(packetArtifactId);
-  if (!artifact) {
+): Promise<TargetedRepairPacket> {
+  const [artifact, verification] = await Promise.all([
+    context.artifacts.get(packetArtifactId),
+    context.artifacts.verify(packetArtifactId),
+  ]);
+  if (!artifact || !verification.exists) {
     throw new PermanentRuntimeError(
       "TARGETED_REPAIR_RUNTIME_PACKET_NOT_FOUND",
       `Repair packet artifact was not found: ${packetArtifactId}`,
+    );
+  }
+  if (!verification.descriptorValid || !verification.contentValid) {
+    throw new PermanentRuntimeError(
+      "TARGETED_REPAIR_RUNTIME_PACKET_VERIFICATION_FAILED",
+      "Repair packet failed immutable descriptor or content verification.",
+    );
+  }
+  if (
+    artifact.mediaType !== "application/json" ||
+    artifact.storageClass !== "evidence" ||
+    artifact.labels.artifactRole !== "targeted-repair-packet"
+  ) {
+    throw new PermanentRuntimeError(
+      "TARGETED_REPAIR_RUNTIME_PACKET_ROLE_INVALID",
+      "Execution input must be a targeted-repair-packet evidence artifact.",
     );
   }
   let packet: TargetedRepairPacket;
@@ -150,10 +166,31 @@ async function packetExecutionInputs(
       `Repair packet could not be parsed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  return [
-    packetArtifactId,
-    ...(packet.providerPlan?.inputArtifacts ?? []),
-  ];
+  if (packet.disposition !== "ready" || !packet.providerPlan) {
+    throw new PermanentRuntimeError(
+      "TARGETED_REPAIR_RUNTIME_PACKET_NOT_READY",
+      "Only a ready repair packet with a provider plan may execute.",
+      normalizeJson({
+        disposition: packet.disposition,
+        blockers: packet.blockers,
+      }),
+    );
+  }
+  const packetSources = new Set(artifact.sourceArtifacts);
+  const missingClosure = packet.providerPlan.inputArtifacts.filter(
+    (artifactId) => !packetSources.has(artifactId),
+  );
+  if (missingClosure.length) {
+    throw new PermanentRuntimeError(
+      "TARGETED_REPAIR_RUNTIME_PACKET_CLOSURE_INCOMPLETE",
+      `Repair packet descriptor is missing provider dependencies: ${missingClosure.join(", ")}`,
+      normalizeJson({
+        packetArtifactId,
+        missingArtifactIds: missingClosure,
+      }),
+    );
+  }
+  return packet;
 }
 
 function executionJob(
@@ -161,11 +198,8 @@ function executionJob(
   packet: TargetedRepairPacket,
 ): JsonValue | null {
   if (packet.disposition !== "ready" || !packet.providerPlan) return null;
-  return {
-    queue: "provider",
-    kind: "art.repair.execute-provider-canvas",
-    idempotencyKey: `repair-execute:${packet.repairId}:${packet.requestSha256}`,
-    payload: {
+  return normalizeJson(
+    compileTargetedRepairExecutionJob({
       schemaVersion: "1.0",
       repairPacketArtifactId: packetArtifactId,
       providerCanvas: {
@@ -174,23 +208,8 @@ function executionJob(
         alphaMode: "source",
         requireBinaryMask: true,
       },
-    },
-    inputArtifacts: [
-      packetArtifactId,
-      ...packet.providerPlan.inputArtifacts,
-    ],
-    requiredCapabilities: EXECUTE_CAPABILITIES,
-    maximumAttempts: 2,
-    leaseDurationMs: 600_000,
-    timeoutMs: 2_400_000,
-    labels: {
-      repairId: packet.repairId,
-      familyId: packet.familyId,
-      frameId: packet.target.frameId,
-      ...(packet.target.layerId ? { layerId: packet.target.layerId } : {}),
-      stage: "pixel-safe-provider-repair",
-    },
-  };
+    }).runtimeJob,
+  );
 }
 
 export function createTargetedRepairHandlers(
@@ -266,18 +285,16 @@ export function createTargetedRepairHandlers(
       throw runtimeFailure(error);
     }
     requireCapabilities(
-      EXECUTE_CAPABILITIES,
+      TARGETED_REPAIR_EXECUTION_CAPABILITIES,
       context.job.spec.requiredCapabilities,
       "art.repair.execute-provider-canvas",
     );
     requireInputs(
-      await packetExecutionInputs(
-        context,
-        request.repairPacketArtifactId,
-      ),
+      [request.repairPacketArtifactId],
       context.job.spec.inputArtifacts,
       "art.repair.execute-provider-canvas",
     );
+    await readVerifiedPacket(context, request.repairPacketArtifactId);
     try {
       const result = await executeTargetedRepairProviderCanvas(request, {
         artifacts: context.artifacts,
@@ -322,8 +339,9 @@ export function targetedRepairWorkerCapabilities(
       adapter.capabilities.includes("custom-size"),
   );
   if (providerReady) {
-    capabilities.add("repair.execute");
-    capabilities.add("media.provider-canvas");
+    for (const capability of TARGETED_REPAIR_EXECUTION_CAPABILITIES) {
+      capabilities.add(capability);
+    }
   }
   return [...capabilities].sort();
 }
