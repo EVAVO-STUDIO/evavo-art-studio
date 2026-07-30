@@ -12,6 +12,7 @@
     { "path": "../../packages/godot" },
     { "path": "../../packages/providers" },
     { "path": "../../packages/quality" },
+    { "path": "../../packages/repair" },
     { "path": "../../packages/runtime" },
     { "path": "../../packages/selection" },
     { "path": "../../packages/sprite-family" }
