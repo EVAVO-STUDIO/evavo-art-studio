@@ -17,6 +17,7 @@
     "@evavo/art-media": "workspace:*",
     "@evavo/art-providers": "workspace:*",
     "@evavo/art-quality": "workspace:*",
+    "@evavo/art-repair": "workspace:*",
     "@evavo/art-runtime": "workspace:*",
     "@evavo/art-selection": "workspace:*",
     "@evavo/art-sprite-family": "workspace:*"
