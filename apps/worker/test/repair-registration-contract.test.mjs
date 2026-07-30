@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const read = (relativePath) =>
+  readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
+
+test("worker registers repair planning and execution independently from selection", async () => {
+  const [index, repair, selection] = await Promise.all([
+    read("src/index.ts"),
+    read("src/repair-handlers.ts"),
+    read("src/selection-handlers.ts"),
+  ]);
+  for (const token of [
+    "createTargetedRepairHandlers(providerRegistry)",
+    "targetedRepairWorkerCapabilities(providerRegistry)",
+    '"art.repair.plan"',
+    '"art.repair.execute-provider-canvas"',
+    '"repair.execute"',
+    '"media.provider-canvas"',
+    '"provider.inpaint"',
+    '"provider.mask"',
+  ]) {
+    assert.ok(
+      `${index}\n${repair}`.includes(token),
+      `missing repair worker invariant: ${token}`,
+    );
+  }
+  assert.ok(!selection.includes("createTargetedRepairHandlers"));
+  assert.ok(!selection.includes("targetedRepairWorkerCapabilities"));
+  assert.ok(!repair.includes("updateReference("));
+  assert.ok(!repair.includes("resolveReference("));
+});
