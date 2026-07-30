@@ -10,6 +10,8 @@ import {
   validateCandidateSelectionRequest,
 } from "@evavo/art-selection";
 
+import { registerRepairTools } from "./repair-tools.js";
+
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
 });
@@ -42,6 +44,8 @@ function toolError(error: unknown) {
 }
 
 export function registerSelectionTools(server: McpServer): void {
+  registerRepairTools(server);
+
   server.registerTool(
     "candidate_selection_protocol",
     {
