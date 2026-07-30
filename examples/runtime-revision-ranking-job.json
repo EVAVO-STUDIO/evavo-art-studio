@@ -1,0 +1,22 @@
+{
+  "queue": "selection",
+  "kind": "art.repair.rank-revisions",
+  "idempotencyKey": "revision-ranking:hero-body-repair-ranking",
+  "payload": {
+    "schemaVersion": "1.0",
+    "rankingId": "hero-body-repair-ranking",
+    "bridgeEvidenceArtifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "inputArtifacts": [
+    "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  ],
+  "requiredCapabilities": [
+    "repair.revision-ranking",
+    "selection.compare",
+    "artifacts.store",
+    "evidence.bundle"
+  ],
+  "maximumAttempts": 1,
+  "leaseDurationMs": 180000,
+  "timeoutMs": 1200000
+}
