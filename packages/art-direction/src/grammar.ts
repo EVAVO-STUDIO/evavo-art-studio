@@ -20,7 +20,7 @@ function layer(
     role,
     treatment,
     required,
-    contributesToColour: options.contributesToColour ?? !new Set(["normal", "collision", "guide", "tile-mask", "depth"]).has(role),
+    contributesToColour: options.contributesToColour ?? !new Set(["normal", "collision", "occlusion", "guide", "tile-mask", "depth"]).has(role),
     contributesToIdentity: options.contributesToIdentity ?? new Set(["identity-core", "costume", "hair", "face", "equipment", "weapon"]).has(role),
     interchangeable: options.interchangeable ?? false,
     timingIndependent: options.timingIndependent ?? false,
@@ -67,7 +67,8 @@ function baseLayers(request: NormalizedArtDirectionCompileRequest, method: ArtPr
   if (asset.needsCollision) layers.push(layer("collision", "engine-sidecar", true, 0, "Collision belongs to deterministic engine metadata, never visible artwork.", { contributesToColour: false, contributesToIdentity: false, exportPolicy: "runtime-only" }));
   if (asset.family === "tile" || asset.family === "terrain") {
     layers.push(layer("background", "static-family", true, 0, "The visual tile cell is retained untrimmed on the declared grid.", { contributesToIdentity: false }));
-    layers.push(layer("tile-mask", "engine-sidecar", false, 0, "Terrain peering, navigation and collision masks remain engine sidecars.", { contributesToColour: false, contributesToIdentity: false, exportPolicy: "runtime-only" }));
+    layers.push(layer("tile-mask", "engine-sidecar", false, 0, "Terrain peering, navigation and transition masks remain engine sidecars.", { contributesToColour: false, contributesToIdentity: false, exportPolicy: "runtime-only" }));
+    layers.push(layer("occlusion", "engine-sidecar", false, 0, "Tile occlusion polygons and height ownership remain engine metadata rather than visible colour pixels.", { contributesToColour: false, contributesToIdentity: false, exportPolicy: "runtime-only" }));
   }
   if (asset.family === "particle") layers.push(layer("effect", "separate-per-frame", true, 0, "Every effect frame uses the same fixed canvas and declared blend mode.", { contributesToIdentity: false }));
   if (asset.family === "cinematic") {
@@ -83,7 +84,7 @@ function applyOverrides(layers: readonly CompiledArtLayerDecision[], request: No
   for (const override of request.layerOverrides) {
     const current = result.get(override.role);
     if (!current) throw new ArtDirectionError("ART_DIRECTION_LAYER_OVERRIDE_INVALID", `Layer override ${override.role} is not justified by the asset contract.`);
-    if (new Set(["normal", "collision", "depth", "emission", "tile-mask"]).has(override.role) && override.treatment !== "engine-sidecar") {
+    if (new Set(["normal", "collision", "occlusion", "depth", "emission", "tile-mask"]).has(override.role) && override.treatment !== "engine-sidecar") {
       throw new ArtDirectionError("ART_DIRECTION_LAYER_OVERRIDE_INVALID", `${override.role} must remain an engine sidecar.`);
     }
     if (override.role === "guide" && override.treatment !== "guide-only") throw new ArtDirectionError("ART_DIRECTION_LAYER_OVERRIDE_INVALID", "Guide pixels cannot enter production artwork.");
