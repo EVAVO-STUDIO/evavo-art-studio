@@ -66,6 +66,7 @@
     "The successful baseline proves the complete source chain at one exact head, not a frozen dependency graph.",
     "A committed pnpm lockfile requires a separate generated, reviewed and fully validated change before frozen installation can be activated.",
     "The generated review-first lockfile is temporary installed state, must remain untracked and is removed before CI completes.",
+    "Validation is manual exact-current-main only; ordinary pushes and pull requests must not allocate hosted runners.",
     "Provider execution, promotion and production effects remain separately authorised operations."
   ]
 }
