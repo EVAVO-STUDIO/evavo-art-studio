@@ -9,6 +9,7 @@ import {
   validateProviderCandidateRequest,
 } from "@evavo/art-providers";
 
+import { registerArtDirectionTools } from "./art-direction-tools.js";
 import { registerSelectionTools } from "./selection-tools.js";
 
 const textResult = (value: unknown) => ({
@@ -72,6 +73,7 @@ function compiledValue(input: unknown) {
 }
 
 export function registerProviderTools(server: McpServer): void {
+  registerArtDirectionTools(server);
   registerSelectionTools(server);
 
   server.registerTool(
