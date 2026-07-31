@@ -10,6 +10,11 @@ import {
   validateArtDirectionCompileRequest,
 } from "@evavo/art-direction";
 
+import {
+  handleSpritePlanCommand,
+  type SpritePlanCommandValues,
+} from "./sprite-plan-commands.js";
+
 export interface ArtDirectionCommandValues {
   readonly input?: string;
 }
@@ -31,6 +36,12 @@ export async function handleArtDirectionCommand(
   command: string,
   values: ArtDirectionCommandValues,
 ): Promise<ArtDirectionCommandResult> {
+  const spritePlan = await handleSpritePlanCommand(
+    command,
+    values as SpritePlanCommandValues,
+  );
+  if (spritePlan.handled) return spritePlan;
+
   if (command === "art-direction-protocol") {
     return { handled: true, value: artDirectionProtocolSummary() };
   }
@@ -43,12 +54,7 @@ export async function handleArtDirectionCommand(
       value: { schemaVersion: "1.0", outputProfiles: listArtDirectionOutputProfiles() },
     };
   }
-  if (
-    !new Set([
-      "art-direction-validate",
-      "art-direction-compile",
-    ]).has(command)
-  ) {
+  if (!new Set(["art-direction-validate", "art-direction-compile"]).has(command)) {
     return { handled: false };
   }
   const input = await readJson(inputPath(values, command));

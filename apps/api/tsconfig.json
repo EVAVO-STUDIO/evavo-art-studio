@@ -10,6 +10,7 @@
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
     { "path": "../../packages/art-direction" },
+    { "path": "../../packages/sprite-planner" },
     { "path": "../../packages/quality" },
     { "path": "../../packages/media" },
     { "path": "../../packages/godot" },

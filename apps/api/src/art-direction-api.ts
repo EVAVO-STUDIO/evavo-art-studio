@@ -9,6 +9,7 @@ import {
 } from "@evavo/art-direction";
 
 import type { ProviderApiContext } from "./provider-api.js";
+import { handleSpritePlanApiRequest } from "./sprite-plan-api.js";
 
 const PATHS = new Set([
   "/v1/art-direction-protocol",
@@ -21,6 +22,7 @@ const PATHS = new Set([
 export async function handleArtDirectionApiRequest(
   context: ProviderApiContext,
 ): Promise<boolean> {
+  if (await handleSpritePlanApiRequest(context)) return true;
   if (!PATHS.has(context.url.pathname)) return false;
   const { request, response, url, requestId } = context;
   try {
@@ -30,24 +32,11 @@ export async function handleArtDirectionApiRequest(
         return true;
       }
       if (url.pathname === "/v1/art-direction-presets") {
-        context.writeJson(
-          response,
-          200,
-          { schemaVersion: "1.0", presets: listArtDirectionPresets() },
-          requestId,
-        );
+        context.writeJson(response, 200, { schemaVersion: "1.0", presets: listArtDirectionPresets() }, requestId);
         return true;
       }
       if (url.pathname === "/v1/art-direction-output-profiles") {
-        context.writeJson(
-          response,
-          200,
-          {
-            schemaVersion: "1.0",
-            outputProfiles: listArtDirectionOutputProfiles(),
-          },
-          requestId,
-        );
+        context.writeJson(response, 200, { schemaVersion: "1.0", outputProfiles: listArtDirectionOutputProfiles() }, requestId);
         return true;
       }
     }
@@ -56,17 +45,9 @@ export async function handleArtDirectionApiRequest(
       (url.pathname === "/v1/art-directions/validate" ||
         url.pathname === "/v1/art-directions/compile")
     ) {
-      const body = await context.readJsonBody(
-        request,
-        context.maximumBodyBytes,
-      );
+      const body = await context.readJsonBody(request, context.maximumBodyBytes);
       if (url.pathname === "/v1/art-directions/validate") {
-        context.writeJson(
-          response,
-          200,
-          validateArtDirectionCompileRequest(body),
-          requestId,
-        );
+        context.writeJson(response, 200, validateArtDirectionCompileRequest(body), requestId);
         return true;
       }
       context.writeJson(
@@ -83,30 +64,14 @@ export async function handleArtDirectionApiRequest(
       );
       return true;
     }
-    context.writeJson(
-      response,
-      405,
-      {
-        error: {
-          code: "METHOD_NOT_ALLOWED",
-          message: "Method is not allowed for this art-direction route.",
-        },
-      },
-      requestId,
-    );
+    context.writeJson(response, 405, { error: { code: "METHOD_NOT_ALLOWED", message: "Method is not allowed for this art-direction route." } }, requestId);
     return true;
   } catch (error: unknown) {
     if (error instanceof ArtDirectionError) {
       context.writeJson(
         response,
         422,
-        {
-          error: {
-            code: error.code,
-            message: error.message,
-            ...(error.details === undefined ? {} : { details: error.details }),
-          },
-        },
+        { error: { code: error.code, message: error.message, ...(error.details === undefined ? {} : { details: error.details }) } },
         requestId,
       );
       return true;
