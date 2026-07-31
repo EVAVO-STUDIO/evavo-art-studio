@@ -28,14 +28,40 @@ GitHub Actions run `30544861146` completed both commands successfully at exact h
 
 That evidence proves the complete source validation chain at one dependency-resolution point. It does not prove a frozen dependency graph. A lockfile must be generated, reviewed, committed and validated in a separate change before CI may switch to frozen installation.
 
-`pnpm install --no-frozen-lockfile` creates an untracked working lockfile. The pre-install toolchain guard rejects any lockfile in the checked-out source. The installed-state guard accepts only this generated, untracked review-first file while the profile still declares `lockfilePresent: false`. CI deletes it after validation and requires a clean tracked and untracked source tree.
+`pnpm install --no-frozen-lockfile` creates an untracked working lockfile. The pre-install toolchain guard rejects any lockfile in the checked-out source. The installed-state guard accepts only this generated, untracked review-first file while the profile still declares `lockfilePresent: false`. The validation workflow deletes it after validation and requires a clean tracked and untracked source tree.
 
 Neither installed-state validation nor a generated lockfile authorises committing it. A tracked lockfile still fails until the separately reviewed transition updates the profile, schema, guard, workflow and evidence.
+
+## Release-only operating model
+
+Art Studio no longer validates automatically on `main`, `work/**` or pull-request activity.
+
+```text
+develop locally
+→ run the dependency-free toolchain and adversarial checks
+→ commit and push to main
+→ no automatic GitHub Actions run
+→ select one exact current main SHA
+→ dispatch the governed Art Studio validation gate
+→ retain the bounded exact-SHA receipt
+→ perform any provider execution, promotion or deployment through a separate authority
+```
+
+A dispatch must use:
+
+```text
+request_source = evavo-development-studio
+expected_sha   = the exact dispatched current main SHA
+runner         = ubuntu-24.04
+```
+
+The workflow proves the candidate belongs to `origin/main`, checks a completely clean source tree, and refuses branch, stale-SHA or ungoverned-dispatcher execution.
 
 ## Validation order
 
 ```text
-strict pre-install repository toolchain guard
+governed dispatch and exact-main proof
+→ strict pre-install repository toolchain guard
 → adversarial drift fixtures
 → review-first dependency installation
 → installed-state toolchain guard
@@ -46,30 +72,54 @@ strict pre-install repository toolchain guard
 → every package and application build
 → generated-lockfile removal
 → clean-source verification
+→ bounded validation receipt
 ```
 
 The existing Art Studio domain, typecheck, test and build chain remains the complete source gate. Strict toolchain validation runs before installation. The normal `pnpm check` command uses installed-state validation so the generated untracked lockfile can exist only for the duration of the validated install.
 
 ## Workflow safety
 
-CI uses:
+The manual exact-SHA workflow uses:
 
 - read-only repository permissions;
+- one exact-current-`main` dispatch only;
 - immutable full-SHA action references;
 - checkout with persisted credentials disabled;
+- full history for ancestry verification;
 - exact Node.js and pnpm versions;
 - dependency-free toolchain checks before installation;
-- generated-lockfile removal and clean-source proof after validation; and
-- no deployment or provider credential.
+- generated-lockfile removal and clean-source proof after validation;
+- fourteen-day bounded receipt retention; and
+- no secret, provider, promotion, publication, release or deployment authority.
+
+The repository-owned guard rejects automatic events, floating action tags, mutable cancellation, latest runners, write permissions, secrets, forceful installation, publication, release and deployment commands. Its adversarial fixtures prove that push-trigger, dispatcher, action, lockfile and capability drift fail closed.
 
 The workflow may compile provider jobs and validate real media, artifact, selection, repair, atlas, Godot and production-build contracts. It does not make live provider requests, promote artifacts, update named references, deploy production, mutate credentials or communicate externally.
+
+## Bounded receipt
+
+A successful governed run retains one receipt containing:
+
+```text
+repository
+candidate SHA
+Node.js and pnpm versions
+review-first lockfile policy
+installedWithoutCommittedLockfile = true
+validation = passed
+liveProviderRequest = false
+artifactPromotion = false
+deployment = disabled
+```
+
+The receipt proves only the exact candidate and dependency resolution used by that run. It is not a frozen dependency graph and does not authorise a live provider or production action.
 
 ## Future lockfile transition
 
 A lockfile activation change must:
 
 1. generate `pnpm-lock.yaml` from the exact reviewed workspace;
-2. review all importers and resolved dependency changes;
+2. review every importer and resolved dependency change;
 3. run the complete `pnpm check` chain from a clean install;
 4. update `evavo.reliability.json` and the repository-owned schema;
 5. update the toolchain guard and adversarial fixtures;
