@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "types": ["node"]
+  },
+  "references": [
+    { "path": "../artifacts" },
+    { "path": "../runtime" },
+    { "path": "../sprite-planner" }
+  ],
+  "include": ["src/**/*.ts"]
+}
