@@ -1,0 +1,557 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Art Direction API
+  version: 0.1.0
+  description: >-
+    Deterministic, compile-only contracts for project style bibles, sprite-shot
+    grammar, layer ownership, 1990s production presets and Godot 4.6.2 output
+    profiles. These routes do not call a provider, inspect artifacts, execute a
+    worker, generate media, approve an asset or update a named reference.
+servers:
+  - url: http://127.0.0.1:4100
+security: []
+tags:
+  - name: Art Direction
+paths:
+  /v1/art-direction-protocol:
+    get:
+      tags: [Art Direction]
+      operationId: getArtDirectionProtocol
+      summary: List governed style, layer and delivery rules
+      responses:
+        "200":
+          description: Art-direction protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtDirectionProtocol"
+  /v1/art-direction-presets:
+    get:
+      tags: [Art Direction]
+      operationId: listArtDirectionPresets
+      summary: List production-method presets
+      responses:
+        "200":
+          description: Governed presets
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schemaVersion, presets]
+                properties:
+                  schemaVersion: { const: "1.0" }
+                  presets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ArtDirectionPreset"
+  /v1/art-direction-output-profiles:
+    get:
+      tags: [Art Direction]
+      operationId: listArtDirectionOutputProfiles
+      summary: List Godot, web, cinematic and print delivery profiles
+      responses:
+        "200":
+          description: Governed output profiles
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schemaVersion, outputProfiles]
+                properties:
+                  schemaVersion: { const: "1.0" }
+                  outputProfiles:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OutputProfile"
+  /v1/art-directions/validate:
+    post:
+      tags: [Art Direction]
+      operationId: validateArtDirectionRequest
+      summary: Validate and normalise one art-direction request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtDirectionRequest"
+      responses:
+        "200":
+          description: Normalised request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalisedArtDirectionRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/art-directions/compile:
+    post:
+      tags: [Art Direction]
+      operationId: compileArtDirectionContract
+      summary: Compile a style bible and durable control job
+      description: >-
+        Compiles one immutable production contract containing style locks,
+        camera and lighting rules, shot ownership, layer decisions, anti-generic
+        constraints, blocking quality gates and output requirements. It does not
+        call a model or grant approval authority.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtDirectionRequest"
+      responses:
+        "200":
+          description: Compiled contract and compile-only job
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - schemaVersion
+                  - compiledContract
+                  - compiledJob
+                  - executionBoundary
+                properties:
+                  schemaVersion: { const: "1.0" }
+                  compiledContract:
+                    $ref: "#/components/schemas/CompiledArtDirectionContract"
+                  compiledJob:
+                    $ref: "#/components/schemas/CompiledArtDirectionJob"
+                  executionBoundary: { type: string }
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  schemas:
+    PresetId:
+      type: string
+      enum:
+        - dos-rpg-1992
+        - dos-strategy-1994
+        - point-and-click-1993
+        - console-platformer-16bit
+        - isometric-rpg-1997
+        - prerendered-2.5d-1996
+        - dark-fantasy-pc-1998
+        - engraved-monochrome-1871
+    OutputProfileId:
+      type: string
+      enum:
+        - godot-4.6.2-character-sprite
+        - godot-4.6.2-isometric-character
+        - godot-4.6.2-tile-atlas
+        - godot-4.6.2-particle-flipbook
+        - godot-4.6.2-ui-pixel
+        - godot-4.6.2-2.5d-billboard
+        - web-game-raster
+        - cinematic-frame-sequence
+        - print-illustration-master
+    AssetFamily:
+      type: string
+      enum:
+        - character
+        - creature
+        - prop
+        - tile
+        - terrain
+        - environment
+        - ui
+        - icon
+        - portrait
+        - particle
+        - cinematic
+        - background
+        - decal
+        - font
+    RenderingMode:
+      type: string
+      enum:
+        - pixel-art
+        - indexed-raster
+        - painted-raster
+        - isometric-pixel
+        - pre-rendered-2.5d
+        - engraved-monochrome
+        - vector-flat
+        - painterly-illustration
+    Projection:
+      type: string
+      enum:
+        - front
+        - side
+        - top-down
+        - three-quarter
+        - isometric-2:1
+        - dimetric
+        - orthographic-billboard
+        - perspective-2.5d
+        - screen-space-ui
+    Reference:
+      type: object
+      required: [id, role, uri]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        role:
+          type: string
+          enum: [style, palette, camera, lighting, material, identity, motion, historical, composition]
+        uri: { type: string, minLength: 1, maxLength: 2048 }
+        weight: { type: number, minimum: 0, maximum: 1 }
+        note: { type: string, maxLength: 1024 }
+        rights: { type: string, maxLength: 1024 }
+    Style:
+      type: object
+      additionalProperties: true
+      properties:
+        title: { type: string }
+        intent: { type: string }
+        renderingMode:
+          $ref: "#/components/schemas/RenderingMode"
+        projection:
+          $ref: "#/components/schemas/Projection"
+        era: { type: string }
+        mustHave:
+          type: array
+          items: { type: string }
+        mustAvoid:
+          type: array
+          items: { type: string }
+        palette:
+          type: object
+          additionalProperties: true
+        pixelGrid:
+          type: object
+          additionalProperties: true
+        camera:
+          type: object
+          additionalProperties: true
+        lighting:
+          type: object
+          additionalProperties: true
+        motion:
+          type: object
+          additionalProperties: true
+        antiGeneric:
+          type: object
+          additionalProperties: true
+        references:
+          type: array
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/Reference"
+    Project:
+      type: object
+      required: [projectId, title]
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        title: { type: string, minLength: 1, maxLength: 512 }
+        engine: { type: string }
+        engineVersion: { type: string }
+        gameGenre: { type: string }
+        targetPlatform: { type: string }
+        viewport:
+          type: object
+          required: [width, height]
+          properties:
+            width: { type: integer, minimum: 1, maximum: 32768 }
+            height: { type: integer, minimum: 1, maximum: 32768 }
+        worldScale:
+          type: object
+          additionalProperties: false
+          properties:
+            pixelsPerTile: { type: integer, minimum: 1 }
+            characterHeightPixels: { type: integer, minimum: 1 }
+            tileWidthPixels: { type: integer, minimum: 1 }
+            tileHeightPixels: { type: integer, minimum: 1 }
+    Asset:
+      type: object
+      required: [assetId, family, purpose, dimensions]
+      additionalProperties: false
+      properties:
+        assetId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        family:
+          $ref: "#/components/schemas/AssetFamily"
+        purpose: { type: string, minLength: 1 }
+        dimensions:
+          type: object
+          required: [width, height]
+          properties:
+            width: { type: integer, minimum: 1, maximum: 32768 }
+            height: { type: integer, minimum: 1, maximum: 32768 }
+        transparency:
+          type: string
+          enum: [required, preferred, opaque]
+        animated: { type: boolean }
+        frameCount: { type: integer, minimum: 1, maximum: 4096 }
+        framesPerSecond: { type: number, exclusiveMinimum: 0, maximum: 240 }
+        loop: { type: boolean }
+        directionCount: { type: integer, minimum: 1, maximum: 32 }
+        directionNames:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+        asymmetric: { type: boolean }
+        hasHeldItems: { type: boolean }
+        runtimeEquipmentSwaps: { type: boolean }
+        runtimeCostumeVariants: { type: boolean }
+        independentEffects: { type: boolean }
+        independentShadow: { type: boolean }
+        needsCollision: { type: boolean }
+        needsNormalMap: { type: boolean }
+        needsEmissionMap: { type: boolean }
+        largeDeformations: { type: boolean }
+        secondaryMotion:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [hair, cloak, tail, equipment]
+        tileFootprint:
+          type: object
+          required: [width, height]
+          properties:
+            width: { type: integer, minimum: 1, maximum: 64 }
+            height: { type: integer, minimum: 1, maximum: 64 }
+        notes:
+          type: array
+          items: { type: string }
+    LayerOverride:
+      type: object
+      required: [role, treatment, reason]
+      additionalProperties: false
+      properties:
+        role: { type: string }
+        treatment:
+          type: string
+          enum: [baked, separate-per-frame, linked-cel, static-family, engine-sidecar, guide-only, runtime-rig]
+        reason: { type: string, minLength: 1 }
+    ArtDirectionRequest:
+      type: object
+      required:
+        - schemaVersion
+        - contractId
+        - project
+        - asset
+        - outputProfileIds
+      additionalProperties: false
+      properties:
+        schemaVersion: { const: "1.0" }
+        contractId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        presetId:
+          $ref: "#/components/schemas/PresetId"
+        project:
+          $ref: "#/components/schemas/Project"
+        style:
+          $ref: "#/components/schemas/Style"
+        asset:
+          $ref: "#/components/schemas/Asset"
+        outputProfileIds:
+          type: array
+          minItems: 1
+          maxItems: 16
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/OutputProfileId"
+        layerOverrides:
+          type: array
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/LayerOverride"
+        metadata: true
+    NormalisedArtDirectionRequest:
+      allOf:
+        - $ref: "#/components/schemas/ArtDirectionRequest"
+        - type: object
+          required: [protocolVersion, style, layerOverrides]
+          properties:
+            protocolVersion: { const: "2026-07-31.1" }
+    ArtDirectionPreset:
+      type: object
+      required: [id, title, description, lockedFields, compatibleFamilies, style, defaultDirections, defaultOutputProfileIds]
+      properties:
+        id:
+          $ref: "#/components/schemas/PresetId"
+        title: { type: string }
+        description: { type: string }
+        lockedFields:
+          type: array
+          items: { type: string }
+        compatibleFamilies:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetFamily"
+        style:
+          $ref: "#/components/schemas/Style"
+        defaultDirections:
+          type: array
+          items: { type: string }
+        defaultOutputProfileIds:
+          type: array
+          items:
+            $ref: "#/components/schemas/OutputProfileId"
+    OutputProfile:
+      type: object
+      required: [id, title, target, compatibleFamilies, requiresTransparency, masterFormats, derivativeFormats, textureFiltering, atlas, sourceRetention, engineMetadata, importRecommendations]
+      properties:
+        id:
+          $ref: "#/components/schemas/OutputProfileId"
+        title: { type: string }
+        target:
+          type: string
+          enum: [godot-4.6.2, web, print, generic]
+        compatibleFamilies:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetFamily"
+        requiresTransparency: { type: boolean }
+        masterFormats:
+          type: array
+          items: { type: string }
+        derivativeFormats:
+          type: array
+          items: { type: string }
+        textureFiltering:
+          type: string
+          enum: [nearest, linear, mixed, not-applicable]
+        atlas:
+          type: object
+          additionalProperties: true
+        sourceRetention:
+          type: array
+          items: { type: string }
+        engineMetadata:
+          type: array
+          items: { type: string }
+        importRecommendations:
+          type: array
+          items: { type: string }
+    CompiledArtDirectionContract:
+      type: object
+      required:
+        - schemaVersion
+        - protocolVersion
+        - contractId
+        - requestSha256
+        - contractSha256
+        - preset
+        - project
+        - style
+        - asset
+        - production
+        - provider
+        - outputs
+        - qualityGates
+        - delivery
+        - warnings
+      properties:
+        schemaVersion: { const: "1.0" }
+        protocolVersion: { const: "2026-07-31.1" }
+        contractId: { type: string }
+        requestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        contractSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        preset: { type: object, additionalProperties: true }
+        project: { type: object, additionalProperties: true }
+        style: { type: object, additionalProperties: true }
+        asset: { type: object, additionalProperties: true }
+        production: { type: object, additionalProperties: true }
+        provider: { type: object, additionalProperties: true }
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/OutputProfile"
+        qualityGates:
+          type: array
+          items: { type: object, additionalProperties: true }
+        delivery: { type: object, additionalProperties: true }
+        warnings:
+          type: array
+          items: { type: string }
+    CompiledArtDirectionJob:
+      type: object
+      required: [schemaVersion, protocolVersion, request, requestSha256, executionMode, runtimeJob]
+      properties:
+        schemaVersion: { const: "1.0" }
+        protocolVersion: { const: "2026-07-31.1" }
+        request:
+          $ref: "#/components/schemas/NormalisedArtDirectionRequest"
+        requestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        executionMode: { const: deterministic-compile-only }
+        runtimeJob:
+          type: object
+          required: [queue, kind, idempotencyKey, payload, inputArtifacts, requiredCapabilities]
+          properties:
+            queue: { const: control }
+            kind: { const: art.direction.compile }
+            idempotencyKey: { type: string }
+            payload:
+              $ref: "#/components/schemas/NormalisedArtDirectionRequest"
+            inputArtifacts:
+              type: array
+              maxItems: 0
+            requiredCapabilities:
+              type: array
+              minItems: 4
+              maxItems: 4
+              uniqueItems: true
+              items:
+                type: string
+                enum:
+                  - art-direction.compile
+                  - style.preset.resolve
+                  - output-profile.compile
+                  - evidence.bundle
+    ArtDirectionProtocol:
+      type: object
+      required: [schemaVersion, protocolVersion, purpose, presets, outputProfiles, layerDecisionRules, historicalRules, godotRules, executionBoundary]
+      properties:
+        schemaVersion: { const: "1.0" }
+        protocolVersion: { const: "2026-07-31.1" }
+        purpose: { type: string }
+        presets:
+          type: array
+          items: { type: object, additionalProperties: true }
+        outputProfiles:
+          type: array
+          items: { type: object, additionalProperties: true }
+        layerDecisionRules:
+          type: array
+          items: { type: string }
+        historicalRules:
+          type: array
+          items: { type: string }
+        godotRules:
+          type: array
+          items: { type: string }
+        executionBoundary: { type: string }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: true
+  responses:
+    ValidationError:
+      description: Invalid art-direction request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
