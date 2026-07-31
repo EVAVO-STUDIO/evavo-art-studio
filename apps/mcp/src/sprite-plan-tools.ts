@@ -9,6 +9,8 @@ import {
   validateSpritePlanCompileRequest,
 } from "@evavo/art-sprite-planner";
 
+import { registerSpriteSupervisorTools } from "./sprite-supervisor-tools.js";
+
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
 });
@@ -39,6 +41,8 @@ function toolError(error: unknown) {
 }
 
 export function registerSpritePlanTools(server: McpServer): void {
+  registerSpriteSupervisorTools(server);
+
   server.registerTool(
     "sprite_plan_protocol",
     {
