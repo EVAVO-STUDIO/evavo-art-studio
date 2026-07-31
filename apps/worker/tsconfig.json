@@ -15,7 +15,8 @@
     { "path": "../../packages/repair" },
     { "path": "../../packages/runtime" },
     { "path": "../../packages/selection" },
-    { "path": "../../packages/sprite-family" }
+    { "path": "../../packages/sprite-family" },
+    { "path": "../../packages/sprite-supervisor" }
   ],
   "include": ["src/**/*.ts"]
 }
