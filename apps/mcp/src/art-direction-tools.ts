@@ -11,6 +11,8 @@ import {
   validateArtDirectionCompileRequest,
 } from "@evavo/art-direction";
 
+import { registerSpritePlanTools } from "./sprite-plan-tools.js";
+
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
 });
@@ -41,6 +43,8 @@ function toolError(error: unknown) {
 }
 
 export function registerArtDirectionTools(server: McpServer): void {
+  registerSpritePlanTools(server);
+
   server.registerTool(
     "art_direction_protocol",
     {
