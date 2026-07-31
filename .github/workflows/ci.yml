@@ -1,29 +1,59 @@
-name: CI
+name: Art Studio exact mainline validation
 
 on:
-  push:
-    branches:
-      - main
-      - "work/**"
-  pull_request:
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact 40-character current main commit SHA
+        required: true
+        type: string
+      request_source:
+        description: Governed dispatcher identity
+        required: true
+        default: evavo-development-studio
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: art-studio-ci-${{ inputs.expected_sha }}
+  cancel-in-progress: false
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     steps:
-      - name: Check out repository
+      - name: Validate governed dispatch
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          REQUEST_SOURCE: ${{ inputs.request_source }}
+        run: |
+          set -euo pipefail
+          [[ "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid expected_sha" >&2; exit 1; }
+          [[ "${REQUEST_SOURCE}" == "evavo-development-studio" ]] || { echo "Unsupported request_source" >&2; exit 1; }
+          [[ "${GITHUB_REF}" == "refs/heads/main" ]] || { echo "Validation must be dispatched from main" >&2; exit 1; }
+          [[ "${EXPECTED_SHA}" == "${GITHUB_SHA}" ]] || { echo "expected_sha must equal the dispatched main SHA" >&2; exit 1; }
+
+      - name: Check out exact mainline candidate
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify exact mainline candidate and clean source
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${EXPECTED_SHA}" ]]
+          git show-ref --verify --quiet refs/remotes/origin/main
+          git merge-base --is-ancestor "${EXPECTED_SHA}" origin/main
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -49,8 +79,46 @@ jobs:
         run: pnpm check
 
       - name: Remove generated lockfile and verify clean source
+        if: always()
         shell: bash
         run: |
+          set -euo pipefail
           rm -f pnpm-lock.yaml
           git diff --exit-code
           test -z "$(git status --porcelain)"
+
+      - name: Write bounded validation receipt
+        if: success()
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const receipt = {
+            schemaVersion: "1.0",
+            repository: "EVAVO-STUDIO/evavo-art-studio",
+            candidateSha: process.env.EXPECTED_SHA,
+            node: "22.14.0",
+            pnpm: "10.13.1",
+            lockfilePolicy: "review-first",
+            installedWithoutCommittedLockfile: true,
+            validation: "passed",
+            liveProviderRequest: false,
+            artifactPromotion: false,
+            deployment: "disabled",
+          };
+          const target = path.join(process.env.RUNNER_TEMP, "art-studio-validation-receipt.json");
+          fs.writeFileSync(target, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+          NODE
+
+      - name: Upload bounded validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: art-studio-validation-${{ inputs.expected_sha }}
+          path: ${{ runner.temp }}/art-studio-validation-receipt.json
+          if-no-files-found: warn
+          retention-days: 14
