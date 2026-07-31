@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "1.0",
+  "contractId": "brass-brine-new-orleans-arrival-cinematic",
+  "presetId": "engraved-monochrome-1871",
+  "project": {
+    "projectId": "brass-brine",
+    "title": "Brass & Brine",
+    "engine": "Godot",
+    "engineVersion": "4.6.2",
+    "gameGenre": "historical maritime trading role-playing game",
+    "targetPlatform": "desktop and mobile",
+    "viewport": { "width": 1280, "height": 720 }
+  },
+  "style": {
+    "intent": "Create an authored 1871 New Orleans arrival cinematic in pure black-and-white engraved linework, retaining one fixed room-and-wharf language across the full shot.",
+    "mustHave": [
+      "historically plausible Reconstruction-era levee",
+      "Mississippi steamboat and cotton-wharf construction",
+      "front-on or restrained side-stage composition",
+      "controlled hatching, stipple and hard silhouettes",
+      "clear foreground, action lane and background separation"
+    ],
+    "mustAvoid": [
+      "tourist postcard composition",
+      "modern containers, forklifts or electric lighting",
+      "fantasy pirate decoration",
+      "grayscale airbrush gradients",
+      "photoreal rendering",
+      "different geometry between frames"
+    ],
+    "compositionRules": [
+      "retain one stable camera and horizon across the shot",
+      "separate weather, river movement, smoke and foreground occlusion where useful",
+      "leave readable negative space for optional runtime captions rather than drawing text into the art"
+    ],
+    "antiGeneric": {
+      "requiredDistinctiveMotifs": [
+        "1871 New Orleans cotton-wharf labour",
+        "project-specific steamboat and levee silhouettes",
+        "humid Reconstruction-era maritime atmosphere"
+      ],
+      "prohibitedGenericMotifs": [
+        "pirate flags",
+        "modern skyline",
+        "random cinematic lens flare",
+        "AI-like decorative scrollwork",
+        "unrequested readable signage"
+      ],
+      "prohibitUnrequestedProps": true,
+      "prohibitReadableText": true,
+      "prohibitWatermarks": true,
+      "prohibitModernGloss": true,
+      "prohibitRandomMicrodetail": true,
+      "prohibitStyleDrift": true,
+      "requireHistoricalPlausibility": true
+    },
+    "references": [
+      {
+        "id": "new-orleans-wharf-layout",
+        "role": "composition",
+        "uri": "artifact://projects/brass-brine/new-orleans/wharf-layout-master",
+        "weight": 1,
+        "rights": "EVAVO project-owned composition source."
+      },
+      {
+        "id": "brass-brine-engraving-language",
+        "role": "style",
+        "uri": "artifact://projects/brass-brine/style/engraving-master",
+        "weight": 1,
+        "rights": "EVAVO project-owned style source."
+      },
+      {
+        "id": "new-orleans-1871-research",
+        "role": "historical",
+        "uri": "reference://brass-brine/research/new-orleans-1871-levee",
+        "weight": 1,
+        "rights": "Curated historical research; do not reproduce protected images."
+      },
+      {
+        "id": "arrival-shot-motion",
+        "role": "motion",
+        "uri": "artifact://projects/brass-brine/cinematics/new-orleans-arrival-blockout",
+        "weight": 0.9,
+        "rights": "EVAVO project-owned motion blockout."
+      }
+    ]
+  },
+  "asset": {
+    "assetId": "new-orleans-arrival-shot-01",
+    "family": "cinematic",
+    "purpose": "Six-second opening arrival shot with restrained river, smoke, rain and foreground activity layers.",
+    "dimensions": { "width": 1280, "height": 720 },
+    "transparency": "opaque",
+    "animated": true,
+    "frameCount": 72,
+    "framesPerSecond": 12,
+    "loop": false,
+    "directionCount": 1,
+    "directionNames": ["shot"],
+    "asymmetric": true,
+    "independentEffects": true,
+    "independentShadow": false,
+    "largeDeformations": false,
+    "notes": [
+      "Author key compositions before in-between frames.",
+      "Keep runtime text outside the image sequence."
+    ]
+  },
+  "outputProfileIds": ["cinematic-frame-sequence"],
+  "layerOverrides": [
+    {
+      "role": "effect",
+      "treatment": "separate-per-frame",
+      "reason": "Rain, smoke and river accents remain independently timed and repairable."
+    },
+    {
+      "role": "foreground",
+      "treatment": "separate-per-frame",
+      "reason": "Foreground labour and passing occlusion remain separate from the locked wharf geometry."
+    },
+    {
+      "role": "background",
+      "treatment": "static-family",
+      "reason": "The approved wharf and skyline geometry remains immutable across the shot unless explicitly revised."
+    }
+  ]
+}
