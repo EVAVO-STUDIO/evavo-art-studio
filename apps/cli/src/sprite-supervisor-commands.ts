@@ -5,7 +5,6 @@ import { LocalRuntimeRepository } from "@evavo/art-runtime";
 import {
   compileSpriteSupervisorWorkflow,
   spriteSupervisorProtocolSummary,
-  validateSpriteSupervisorCompileRequest,
 } from "@evavo/art-sprite-supervisor";
 
 export interface SpriteSupervisorCommandValues {
@@ -64,13 +63,13 @@ export async function handleSpriteSupervisorCommand(
     return { handled: false };
   }
   const input = await readJson(requiredInput(values, command));
+  const workflow = compileSpriteSupervisorWorkflow(input);
   if (command === "sprite-supervisor-validate") {
     return {
       handled: true,
-      value: validateSpriteSupervisorCompileRequest(input),
+      value: workflow.request,
     };
   }
-  const workflow = compileSpriteSupervisorWorkflow(input);
   if (command === "sprite-supervisor-compile") {
     return {
       handled: true,
