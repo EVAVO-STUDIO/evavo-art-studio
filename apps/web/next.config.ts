@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     "@evavo/art-contracts",
     "@evavo/art-core",
+    "@evavo/art-direction",
     "@evavo/art-quality",
   ],
   serverExternalPackages: ["sharp"],
