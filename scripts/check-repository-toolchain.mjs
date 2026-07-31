@@ -9,6 +9,10 @@ const EXPECTED_PNPM = "10.13.1";
 const CHECKOUT_SHA = "de0fac2e4500dabe0009e67214ff5f5447ce83dd";
 const PNPM_SETUP_SHA = "fc06bc1257f339d1d5d8b3a19a8cae5388b55320";
 const SETUP_NODE_SHA = "6044e13b5dc448c55e2357c09f80417699197238";
+const UPLOAD_ARTIFACT_SHA = "ea165f8d65b6e75b540449e92b4886f43607fa02";
+const MANUAL_VALIDATION_NOTE =
+  "Validation is manual exact-current-main only; ordinary pushes and pull requests must not allocate hosted runners.";
+
 const args = new Set(process.argv.slice(2));
 const allowGeneratedLockfile = args.delete("--allow-generated-lockfile");
 const skipRuntime = args.delete("--skip-runtime");
@@ -68,6 +72,32 @@ const canonicalJson = (relativePath) => {
   return value;
 };
 
+const workflowEvents = (source) => {
+  const lines = source.split(/\r?\n/);
+  const starts = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index] === "on:") starts.push(index);
+  }
+  if (starts.length !== 1) return [];
+  const events = [];
+  for (let index = starts[0] + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line && !/^\s/.test(line)) break;
+    const match = line.match(/^  ([A-Za-z_][A-Za-z0-9_-]*):/);
+    if (match) events.push(match[1]);
+  }
+  return [...new Set(events)].sort();
+};
+
+const workflowActions = (source) => {
+  const actions = [];
+  for (const line of source.split(/\r?\n/)) {
+    const match = line.match(/^\s*uses:\s*([^\s#]+)\s*/);
+    if (match) actions.push(match[1].replace(/^['"]|['"]$/g, ""));
+  }
+  return actions;
+};
+
 if (read(".nvmrc", 64) !== `${EXPECTED_NODE}\n`) {
   errors.push(`.nvmrc must contain exactly ${EXPECTED_NODE}`);
 }
@@ -112,6 +142,7 @@ for (const token of ["pnpm run build:domain", "pnpm typecheck", "pnpm test", "pn
 if (read("pnpm-workspace.yaml", 512) !== 'packages:\n  - "apps/*"\n  - "packages/*"\n') {
   errors.push("pnpm-workspace.yaml workspace roots changed");
 }
+
 const lockfilePath = resolveInside("pnpm-lock.yaml");
 if (fs.existsSync(lockfilePath)) {
   if (!allowGeneratedLockfile) {
@@ -165,6 +196,9 @@ if (
 ) {
   errors.push("executed baseline evidence changed");
 }
+if (!profile.notes?.includes(MANUAL_VALIDATION_NOTE)) {
+  errors.push("reliability profile is missing the manual exact-main validation note");
+}
 for (const prohibited of [
   "live provider requests",
   "artifact promotion",
@@ -188,10 +222,29 @@ if (
 }
 
 const workflow = read(".github/workflows/ci.yml");
+const events = workflowEvents(workflow);
+if (events.length !== 1 || events[0] !== "workflow_dispatch") {
+  errors.push(`CI workflow must be workflow_dispatch only; found ${JSON.stringify(events)}`);
+}
+
 const requiredWorkflowTokens = [
+  "name: Art Studio exact mainline validation",
+  "expected_sha:",
+  "request_source:",
+  "default: evavo-development-studio",
   "permissions:\n  contents: read",
+  "group: art-studio-ci-${{ inputs.expected_sha }}",
+  "cancel-in-progress: false",
+  "runs-on: ubuntu-24.04",
+  '[[ "${REQUEST_SOURCE}" == "evavo-development-studio" ]]',
+  '[[ "${GITHUB_REF}" == "refs/heads/main" ]]',
+  '[[ "${EXPECTED_SHA}" == "${GITHUB_SHA}" ]]',
   `actions/checkout@${CHECKOUT_SHA} # v6.0.2`,
+  "ref: ${{ inputs.expected_sha }}",
+  "fetch-depth: 0",
   "persist-credentials: false",
+  "git show-ref --verify --quiet refs/remotes/origin/main",
+  "git merge-base --is-ancestor",
   `pnpm/action-setup@${PNPM_SETUP_SHA} # v4.4.0`,
   `actions/setup-node@${SETUP_NODE_SHA} # v6.2.0`,
   `node-version: \"${EXPECTED_NODE}\"`,
@@ -204,29 +257,65 @@ const requiredWorkflowTokens = [
   "rm -f pnpm-lock.yaml",
   "git diff --exit-code",
   'test -z "$(git status --porcelain)"',
+  '"installedWithoutCommittedLockfile": true',
+  '"deployment": "disabled"',
+  `actions/upload-artifact@${UPLOAD_ARTIFACT_SHA} # v4.6.2`,
+  "retention-days: 14",
 ];
 for (const token of requiredWorkflowTokens) {
   if (!workflow.includes(token)) errors.push(`CI workflow is missing: ${token}`);
 }
+
 for (const forbidden of [
+  "push:",
+  "pull_request:",
+  "schedule:",
+  "workflow_run:",
+  "repository_dispatch:",
+  "cancel-in-progress: true",
+  "ubuntu-latest",
   "actions/checkout@v",
   "actions/setup-node@v",
+  "actions/upload-artifact@v",
   "pnpm/action-setup@v",
   "persist-credentials: true",
   "contents: write",
   "permissions: write-all",
+  "statuses: write",
+  "checks: write",
+  "actions: write",
+  "deployments: write",
+  "id-token: write",
+  "packages: write",
+  "secrets.",
+  "GITHUB_TOKEN",
+  "Authorization: Bearer",
   "pnpm install --frozen-lockfile",
+  "pnpm install --force",
+  "git push",
+  "git reset --hard",
+  "git clean -",
+  "npm publish",
+  "pnpm publish",
+  "vercel deploy",
+  "wrangler deploy",
+  "gh release create",
 ]) {
   if (workflow.includes(forbidden)) errors.push(`CI workflow contains prohibited material: ${forbidden}`);
 }
+
 const orderedWorkflowTokens = [
+  '[[ "${REQUEST_SOURCE}" == "evavo-development-studio" ]]',
+  `actions/checkout@${CHECKOUT_SHA}`,
+  "git merge-base --is-ancestor",
   "node scripts/check-repository-toolchain.mjs",
   "node scripts/test-repository-toolchain.mjs",
   "pnpm install --no-frozen-lockfile",
   "pnpm check",
   "rm -f pnpm-lock.yaml",
   "git diff --exit-code",
-  'test -z "$(git status --porcelain)"',
+  '"installedWithoutCommittedLockfile": true',
+  `actions/upload-artifact@${UPLOAD_ARTIFACT_SHA}`,
 ];
 let previousIndex = -1;
 for (const token of orderedWorkflowTokens) {
@@ -236,8 +325,8 @@ for (const token of orderedWorkflowTokens) {
   }
   previousIndex = index;
 }
-for (const match of workflow.matchAll(/^\s*uses:\s*([^\s#]+)(?:\s+#.*)?$/gm)) {
-  const action = match[1];
+
+for (const action of workflowActions(workflow)) {
   const at = action.lastIndexOf("@");
   const reference = at >= 0 ? action.slice(at + 1) : "";
   if (!/^[a-f0-9]{40}$/i.test(reference)) {
@@ -274,4 +363,5 @@ console.log(
     ? "- the generated review-first lockfile is accepted only as untracked installed state"
     : "- the pre-install source tree contains no unreviewed lockfile",
 );
-console.log("- CI actions, validation order and capability boundaries agree");
+console.log("- CI is manual, exact-current-main, immutable and read-only");
+console.log("- validation order and capability boundaries agree");
