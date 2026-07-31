@@ -12,6 +12,7 @@
     { "path": "../../packages/core" },
     { "path": "../../packages/art-direction" },
     { "path": "../../packages/sprite-planner" },
+    { "path": "../../packages/sprite-supervisor" },
     { "path": "../../packages/quality" },
     { "path": "../../packages/media" },
     { "path": "../../packages/godot" },
