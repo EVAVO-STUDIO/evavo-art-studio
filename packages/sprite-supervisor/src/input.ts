@@ -1,6 +1,22 @@
-import { compileSpriteProductionPlan } from "@evavo/art-sprite-planner";
+import {
+  compileSpriteProductionPlan,
+  type SpritePlanCompileRequestInput,
+} from "@evavo/art-sprite-planner";
 
-import { SpriteSupervisorError } from "./types.js";
+import {
+  SpriteSupervisorError,
+  type SpriteSupervisorCompileRequestInput,
+} from "./types.js";
+
+export interface SpriteSupervisorSourcePlanCompileRequestInput
+  extends Omit<SpriteSupervisorCompileRequestInput, "spritePlan"> {
+  readonly spritePlan?: never;
+  readonly spritePlanRequest: SpritePlanCompileRequestInput | unknown;
+}
+
+export type SpriteSupervisorWorkflowInput =
+  | SpriteSupervisorCompileRequestInput
+  | SpriteSupervisorSourcePlanCompileRequestInput;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
