@@ -92,6 +92,7 @@ function request(overrides = {}) {
     spritePlan: spritePlan(),
     initialArtifactBindings: [
       { role: "canonical-identity", artifactIds: [IDENTITY] },
+      { role: "release-master", artifactIds: [CANDIDATE] },
     ],
     tasks: [
       {
@@ -174,7 +175,7 @@ function request(overrides = {}) {
     ],
     policy: {
       requireAllPlanStagesCovered: false,
-      requiredReleaseArtifactRoles: ["idle-key-pose"],
+      requiredReleaseArtifactRoles: ["release-master"],
       defaultMaximumRedrives: 1,
       defaultMaximumRepairCycles: 1,
       requireFinalHumanApproval: true,
@@ -196,6 +197,7 @@ test("compiles deterministic root supervision jobs", () => {
     "evidence.bundle",
   ]);
   assert.ok(first.rootJob.inputArtifacts.includes(IDENTITY));
+  assert.ok(first.rootJob.inputArtifacts.includes(CANDIDATE));
 });
 
 test("materialises plan, run and artifact placeholders without losing lineage", () => {
