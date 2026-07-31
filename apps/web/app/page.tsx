@@ -7,7 +7,9 @@ import { CAPABILITY_CATALOG } from "@evavo/art-core";
 
 import { DEFAULT_ART_DIRECTION_REQUEST } from "../lib/defaultArtDirection";
 import { DEFAULT_ART_BRIEF } from "../lib/defaultBrief";
+import { DEFAULT_SPRITE_PLAN_REQUEST } from "../lib/defaultSpritePlan";
 import ArtDirectionWorkbench from "./art-direction-workbench";
+import SpritePlannerWorkbench from "./sprite-planner-workbench";
 import SpriteQualityWorkbench from "./sprite-quality-workbench";
 import SpriteSequenceWorkbench from "./sprite-sequence-workbench";
 import StudioWorkspace from "./studio-workspace";
@@ -22,12 +24,12 @@ const principles = [
     "Canonical identity, direction masters, key poses, layers, pivots and exact timing are compiled before provider work.",
   ],
   [
-    "Evidence-backed",
-    "Decoded pixels, hashes, parameters, source lineage, deterministic tool versions and every quality result travel with the asset.",
+    "Coverage-complete",
+    "Role, genre and gameplay features expand into every required direction, clip, frame, variant, layer and delivery output.",
   ],
   [
-    "More, correctly",
-    "The planner calculates the complete asset family and world coverage rather than stopping at a few showcase images.",
+    "Evidence-backed",
+    "Decoded pixels, hashes, parameters, source lineage, deterministic tool versions and every quality result travel with the asset.",
   ],
 ] as const;
 
@@ -51,9 +53,9 @@ export default function HomePage() {
         </a>
         <nav aria-label="Studio sections">
           <a href="#art-direction">Art direction</a>
+          <a href="#sprite-planner">Sprite family</a>
           <a href="#compiler">Production</a>
           <a href="#frame-qa">Frame QA</a>
-          <a href="#sequence-qa">Sequence QA</a>
           <a href="/operations">Operations</a>
         </nav>
         <span className="status">
@@ -68,17 +70,17 @@ export default function HomePage() {
             Craft the whole visual system. <em>Prove every asset.</em>
           </h1>
           <p className="lede">
-            A project-aware studio for sprites, animation, environments,
-            particles, cinematics, interfaces, print masters and engine-ready
-            delivery. It treats model output as raw material, never as finished
-            art.
+            A project-aware studio for complete sprite families, animation,
+            environments, particles, cinematics, interfaces, print masters and
+            engine-ready delivery. It treats model output as raw material, never
+            as finished art.
           </p>
           <div className="hero__actions">
             <a className="button button--primary" href="#art-direction">
               Lock the art direction
             </a>
-            <a className="button" href="#compiler">
-              Compile production work
+            <a className="button" href="#sprite-planner">
+              Plan every sprite
             </a>
             <a className="button" href="#frame-qa">
               Inspect source pixels
@@ -99,8 +101,8 @@ export default function HomePage() {
           <div className="instrument__readout">
             <span>ART DIRECTION</span>
             <b>LOCKED</b>
-            <span>CONTINUITY</span>
-            <b>CANONICAL</b>
+            <span>SPRITE COVERAGE</span>
+            <b>COMPLETE</b>
             <span>PIXEL QA</span>
             <b>EXECUTABLE</b>
             <span>AUTONOMY</span>
@@ -144,9 +146,9 @@ export default function HomePage() {
           <p className="eyebrow">Operating model</p>
           <h2>Not another prompt box.</h2>
           <p>
-            The control plane compiles explicit work and delegates only bounded
-            frame or layer capabilities. The production record stays stable even
-            when providers, machines or models change.
+            The control plane locks style, calculates the complete asset family,
+            and delegates only bounded frame or layer capabilities. The production
+            record stays stable even when providers, machines or models change.
           </p>
         </div>
         <div className="principles__grid">
@@ -165,6 +167,7 @@ export default function HomePage() {
         presets={presets}
         outputProfiles={outputProfiles}
       />
+      <SpritePlannerWorkbench initialRequest={DEFAULT_SPRITE_PLAN_REQUEST} />
       <StudioWorkspace
         capabilities={CAPABILITY_CATALOG}
         initialBrief={DEFAULT_ART_BRIEF}
@@ -175,20 +178,20 @@ export default function HomePage() {
       <section className="quality" id="quality">
         <div className="section-heading">
           <p className="eyebrow">Quality contract</p>
-          <h2>Transparent means transparent.</h2>
+          <h2>Complete means complete.</h2>
           <p>
-            Final approval requires measured evidence, not a convincing thumbnail
-            or a provider claim.
+            Final approval requires every declared direction, animation, frame,
+            layer, timing record and engine binding, plus measured visual evidence.
           </p>
         </div>
         <div className="quality__grid">
           <article>
-            <span className="quality__code">ALPHA / 01</span>
-            <h3>Real channel proof</h3>
+            <span className="quality__code">COVERAGE / 01</span>
+            <h3>Every required state</h3>
             <p>
-              Alpha presence, coverage, hidden transparent colour, fake
-              checkerboards, flat mattes and edge contamination are decoded
-              independently.
+              Role, genre, gameplay and feature profiles compile locomotion,
+              combat, interaction, damage, prop, particle, UI and portrait states
+              before generation begins.
             </p>
           </article>
           <article>
@@ -196,26 +199,25 @@ export default function HomePage() {
             <h3>Stable animation</h3>
             <p>
               Canvas, pivot, baseline, ground contact, exact timing, frame order,
-              declared holds and gross area drift are checked across the full
-              sequence.
+              key poses, declared holds and loop closure are checked across the
+              complete family.
             </p>
           </article>
           <article>
-            <span className="quality__code">ATLAS / 03</span>
-            <h3>Source before packing</h3>
+            <span className="quality__code">SOURCE / 03</span>
+            <h3>Frames before sheets</h3>
             <p>
-              Individual lossless frames and editable layers remain authoritative.
-              Packed sheets and atlases are reproducible derivatives with governed
-              padding and manifests.
+              Individual lossless frames, editable layers, tags and slices remain
+              authoritative. Sheets and atlases are deterministic derivatives.
             </p>
           </article>
           <article>
-            <span className="quality__code">STYLE / 04</span>
-            <h3>Family consistency</h3>
+            <span className="quality__code">ENGINE / 04</span>
+            <h3>Godot-ready delivery</h3>
             <p>
-              Silhouette, palette, line, material, composition, camera and identity
-              rules remain blocking until dedicated vision workers emit measured
-              evidence.
+              SpriteFrames names, exact duration multipliers, layer nodes, atlas
+              regions, pivots, Y-sort origins and sidecar bindings remain complete
+              and reproducible.
             </p>
           </article>
         </div>
