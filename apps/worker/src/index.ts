@@ -17,6 +17,7 @@ import {
   PermanentRuntimeError,
   RuntimeWorker,
   type RuntimeJobHandler,
+  type RuntimeRepository,
   type RuntimeWorkerRunResult,
 } from "@evavo/art-runtime";
 
@@ -49,6 +50,10 @@ import {
   createSpriteFamilyHandlers,
   spriteFamilyWorkerCapabilities,
 } from "./sprite-family-handlers.js";
+import {
+  createSpriteSupervisorHandlers,
+  spriteSupervisorWorkerCapabilities,
+} from "./sprite-supervisor-handlers.js";
 
 const isRecord = (
   value: unknown,
@@ -132,6 +137,7 @@ async function ingestFile(
 export function createBuiltinHandlers(
   allowedRoots: readonly string[],
   providerRegistry: ProviderRegistry = createProviderRegistryFromEnvironment({}),
+  runtime?: RuntimeRepository,
 ): Readonly<Record<string, RuntimeJobHandler>> {
   const atlasBuild: RuntimeJobHandler = async (context) => {
     if (!isRecord(context.job.spec.payload)) {
@@ -246,6 +252,7 @@ export function createBuiltinHandlers(
     ...createTargetedRepairHandlers(providerRegistry),
     ...createRepairedFamilyRevisionHandlers(),
     ...createRepairedFamilySelectionHandlers(),
+    ...(runtime ? createSpriteSupervisorHandlers(runtime) : {}),
   });
 }
 
@@ -293,7 +300,9 @@ async function main(): Promise<void> {
   const revisionCapabilities = repairedFamilyRevisionWorkerCapabilities();
   const revisionSelectionCapabilities =
     repairedFamilySelectionWorkerCapabilities();
+  const supervisorCapabilities = spriteSupervisorWorkerCapabilities();
   const defaultQueues = [
+    "control",
     "media",
     "selection",
     ...(providerRegistry.list().length ? ["provider"] : []),
@@ -310,6 +319,7 @@ async function main(): Promise<void> {
         "media.raster",
         "godot.export",
         "evidence.bundle",
+        ...supervisorCapabilities,
         ...masteringCapabilities,
         ...selectionCapabilities,
         ...familyCapabilities,
@@ -320,7 +330,7 @@ async function main(): Promise<void> {
       ],
       queues: configuredQueues.length ? configuredQueues : defaultQueues,
     },
-    handlers: createBuiltinHandlers(roots, providerRegistry),
+    handlers: createBuiltinHandlers(roots, providerRegistry, runtime),
     concurrency,
   });
 
