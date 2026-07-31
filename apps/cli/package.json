@@ -25,7 +25,8 @@
     "@evavo/art-repo-inspector": "workspace:*",
     "@evavo/art-runtime": "workspace:*",
     "@evavo/art-selection": "workspace:*",
-    "@evavo/art-sprite-family": "workspace:*"
+    "@evavo/art-sprite-family": "workspace:*",
+    "@evavo/art-sprite-planner": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
