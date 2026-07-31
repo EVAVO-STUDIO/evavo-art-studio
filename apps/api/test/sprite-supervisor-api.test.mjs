@@ -84,7 +84,11 @@ async function supervisorRequest() {
           {
             role: "direction-master",
             source: "output-artifact-labels",
-            labels: { artifactRole: "provider-candidate" },
+            labels: {
+              artifactRole: "selected-art-master",
+              approvalState: "selected",
+              qualityState: "passed",
+            },
             cardinality: "one",
           },
         ],
