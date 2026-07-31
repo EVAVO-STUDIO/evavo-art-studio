@@ -1,0 +1,556 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Complete Sprite Planning API
+  version: 0.1.0
+  description: >-
+    Deterministic compile-only contracts that expand one governed art-direction
+    contract into the complete role-aware direction, animation, frame, layer,
+    variant, sprite-sheet, atlas, Aseprite and Godot SpriteFrames production
+    inventory. These routes do not generate images, inspect artifacts, execute
+    workers, promote assets or update references.
+servers:
+  - url: http://127.0.0.1:4100
+security: []
+tags:
+  - name: Sprite Planning
+paths:
+  /v1/sprite-plan-protocol:
+    get:
+      tags: [Sprite Planning]
+      operationId: getSpritePlanProtocol
+      summary: List governed direction, clip, source and Godot planning rules
+      responses:
+        "200":
+          description: Sprite planning protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpritePlanProtocol"
+  /v1/sprite-plans/validate:
+    post:
+      tags: [Sprite Planning]
+      operationId: validateSpritePlan
+      summary: Validate and normalize one complete sprite planning request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpritePlanRequest"
+      responses:
+        "200":
+          description: Normalized sprite planning request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedSpritePlanRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/sprite-plans/compile:
+    post:
+      tags: [Sprite Planning]
+      operationId: compileCompleteSpritePlan
+      summary: Compile complete sprite coverage and engine delivery
+      description: >-
+        Infers role and game-profile animation coverage, authored and safely
+        derived directions, exact frame timing, key poses, layer workloads,
+        variant strategies, paged sheets, deterministic no-rotation atlases,
+        Aseprite source metadata and Godot SpriteFrames bindings. It grants no
+        provider or approval authority.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpritePlanRequest"
+      responses:
+        "200":
+          description: Complete sprite production plan and compile-only job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompiledSpritePlanResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  schemas:
+    Role:
+      type: string
+      enum:
+        - playable-character
+        - npc
+        - enemy
+        - boss
+        - companion
+        - vehicle
+        - animated-prop
+        - destructible-prop
+        - particle-effect
+        - ui-sprite
+        - portrait-character
+    GameplayProfile:
+      type: string
+      enum:
+        - platformer
+        - action-rpg
+        - tactical-rpg
+        - strategy
+        - adventure
+        - fighting
+        - shooter
+        - simulation
+        - visual-novel
+        - custom
+    Coverage:
+      type: string
+      enum: [core, complete, cinematic]
+    Fidelity:
+      type: string
+      enum: [economical, standard, premium]
+    Feature:
+      type: string
+      enum:
+        - walk
+        - run
+        - turn
+        - crouch
+        - jump
+        - climb
+        - swim
+        - fly
+        - melee
+        - heavy-melee
+        - ranged
+        - aim
+        - reload
+        - block
+        - parry
+        - dodge
+        - cast
+        - interact
+        - use-item
+        - pickup
+        - push-pull
+        - talk
+        - gesture
+        - work-loop
+        - alert
+        - hit-react
+        - stun
+        - knockdown
+        - death
+        - spawn
+        - despawn
+        - phase-transition
+        - special
+        - open-close
+        - activate
+        - damage-states
+        - hover-press
+        - portrait-emotes
+        - particle-loop
+        - particle-impact
+        - particle-trail
+    ClipOverride:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        include: { type: boolean }
+        framesPerDirection:
+          type: integer
+          minimum: 1
+          maximum: 4096
+        framesPerSecond:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 240
+        loopMode:
+          type: string
+          enum: [none, linear, ping-pong]
+        directionNames:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items: { type: string, minLength: 1, maxLength: 128 }
+        keyPoseFrames:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items: { type: integer, minimum: 0, maximum: 4095 }
+        reason: { type: string, minLength: 1, maxLength: 2048 }
+    Variants:
+      type: object
+      additionalProperties: false
+      properties:
+        costumeVariants: { type: integer, minimum: 1, maximum: 128 }
+        equipmentVariants: { type: integer, minimum: 1, maximum: 128 }
+        weaponVariants: { type: integer, minimum: 1, maximum: 128 }
+        teamColourVariants: { type: integer, minimum: 1, maximum: 128 }
+        damageVariants: { type: integer, minimum: 1, maximum: 32 }
+    Output:
+      type: object
+      additionalProperties: false
+      properties:
+        sheetStrategy:
+          type: string
+          enum:
+            - per-clip-layer-grid
+            - per-clip-composite-grid
+            - atlas-only
+            - individual-frames-only
+        maximumSheetSize:
+          type: integer
+          minimum: 256
+          maximum: 16384
+        includeAsepriteExport: { type: boolean }
+        includePerClipSheets: { type: boolean }
+        includeFamilyAtlas: { type: boolean }
+        includeGodotResources: { type: boolean }
+    SpritePlanRequest:
+      type: object
+      required:
+        - schemaVersion
+        - planId
+        - role
+        - gameplayProfile
+      additionalProperties: false
+      properties:
+        schemaVersion: { const: "1.0" }
+        planId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        artDirectionRequest:
+          type: object
+          description: Uncompiled governed art-direction request. Exactly one art-direction input is required.
+        artDirectionContract:
+          type: object
+          description: Complete compiled art-direction contract with a valid contractSha256.
+        artDirectionContractArtifactId:
+          type: string
+          pattern: "^artifact_[a-f0-9]{64}$"
+        role:
+          $ref: "#/components/schemas/Role"
+        gameplayProfile:
+          $ref: "#/components/schemas/GameplayProfile"
+        coverage:
+          $ref: "#/components/schemas/Coverage"
+        fidelity:
+          $ref: "#/components/schemas/Fidelity"
+        includeFeatures:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Feature"
+        excludeFeatures:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Feature"
+        allowDerivedMirrors: { type: boolean }
+        variants:
+          $ref: "#/components/schemas/Variants"
+        clipOverrides:
+          type: array
+          maxItems: 128
+          items:
+            $ref: "#/components/schemas/ClipOverride"
+        output:
+          $ref: "#/components/schemas/Output"
+        metadata: true
+    NormalizedSpritePlanRequest:
+      allOf:
+        - $ref: "#/components/schemas/SpritePlanRequest"
+        - type: object
+          required:
+            - protocolVersion
+            - artDirectionContract
+            - coverage
+            - fidelity
+            - features
+            - allowDerivedMirrors
+            - variants
+            - clipOverrides
+            - output
+          properties:
+            protocolVersion: { const: "2026-07-31.1" }
+    PlannedDirection:
+      type: object
+      required: [name, index, authored, masterId, reason]
+      properties:
+        name: { type: string }
+        index: { type: integer, minimum: 0 }
+        authored: { type: boolean }
+        masterId: { type: string }
+        mirrorOf: { type: string }
+        reason: { type: string }
+    PlannedClip:
+      type: object
+      required:
+        - id
+        - category
+        - directionNames
+        - authoredDirectionNames
+        - framesPerDirection
+        - framesPerSecond
+        - frameDurationsMs
+        - loopMode
+        - keyPoseFrames
+        - runtimeFrameCount
+        - authoredFrameCount
+      properties:
+        id: { type: string }
+        category: { type: string }
+        directionNames:
+          type: array
+          items: { type: string }
+        authoredDirectionNames:
+          type: array
+          items: { type: string }
+        framesPerDirection: { type: integer, minimum: 1 }
+        framesPerSecond: { type: number, exclusiveMinimum: 0 }
+        frameDurationsMs:
+          type: array
+          items: { type: integer, minimum: 16 }
+        loopMode:
+          type: string
+          enum: [none, linear, ping-pong]
+        keyPoseFrames:
+          type: array
+          items: { type: integer, minimum: 0 }
+        runtimeFrameCount: { type: integer, minimum: 1 }
+        authoredFrameCount: { type: integer, minimum: 1 }
+    Totals:
+      type: object
+      required:
+        - clips
+        - runtimeFrames
+        - authoredFrames
+        - layerSourceUnits
+        - runtimeLayerBindings
+        - sheets
+        - estimatedAtlasPages
+      properties:
+        clips: { type: integer, minimum: 1 }
+        runtimeFrames: { type: integer, minimum: 1, maximum: 32768 }
+        authoredFrames: { type: integer, minimum: 1 }
+        layerSourceUnits: { type: integer, minimum: 0, maximum: 250000 }
+        runtimeLayerBindings: { type: integer, minimum: 0 }
+        sheets: { type: integer, minimum: 0 }
+        estimatedAtlasPages: { type: integer, minimum: 0 }
+    CompiledSpriteProductionPlan:
+      type: object
+      required:
+        - schemaVersion
+        - protocolVersion
+        - planId
+        - requestSha256
+        - planSha256
+        - artDirectionBinding
+        - directions
+        - clips
+        - frames
+        - layers
+        - variants
+        - sheets
+        - atlas
+        - aseprite
+        - godot
+        - workItems
+        - qualityGates
+        - totals
+        - sourceOfTruth
+        - warnings
+      properties:
+        schemaVersion: { const: "1.0" }
+        protocolVersion: { const: "2026-07-31.1" }
+        planId: { type: string }
+        requestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        planSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        artDirectionBinding:
+          type: object
+          required: [contractId, contractSha256, protocolVersion]
+          properties:
+            contractId: { type: string }
+            contractSha256:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            protocolVersion: { type: string }
+            artifactId:
+              type: string
+              pattern: "^artifact_[a-f0-9]{64}$"
+        directions:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/PlannedDirection"
+        clips:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/PlannedClip"
+        frames:
+          type: array
+          minItems: 1
+          maxItems: 32768
+          items: { type: object }
+        layers:
+          type: array
+          items: { type: object }
+        variants: { type: object }
+        sheets:
+          type: array
+          items: { type: object }
+        atlas: { type: object }
+        aseprite: { type: object }
+        godot: { type: object }
+        workItems:
+          type: array
+          items: { type: object }
+        qualityGates:
+          type: array
+          items: { type: object }
+        totals:
+          $ref: "#/components/schemas/Totals"
+        sourceOfTruth:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+    RuntimeJob:
+      type: object
+      required:
+        - queue
+        - kind
+        - idempotencyKey
+        - payload
+        - inputArtifacts
+        - requiredCapabilities
+      properties:
+        queue: { const: control }
+        kind: { const: art.sprite-plan.compile }
+        idempotencyKey: { type: string }
+        payload:
+          $ref: "#/components/schemas/NormalizedSpritePlanRequest"
+        inputArtifacts:
+          type: array
+          maxItems: 1
+          items:
+            type: string
+            pattern: "^artifact_[a-f0-9]{64}$"
+        requiredCapabilities:
+          type: array
+          minItems: 5
+          maxItems: 5
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - sprite.inventory.compile
+              - sprite.animation-matrix.compile
+              - sprite.sheet-plan.compile
+              - godot.spriteframes-plan
+              - evidence.bundle
+    CompiledSpritePlanResponse:
+      type: object
+      required: [schemaVersion, compiledPlan, compiledJob, executionBoundary]
+      properties:
+        schemaVersion: { const: "1.0" }
+        compiledPlan:
+          $ref: "#/components/schemas/CompiledSpriteProductionPlan"
+        compiledJob:
+          type: object
+          required: [schemaVersion, protocolVersion, request, requestSha256, executionMode, runtimeJob]
+          properties:
+            schemaVersion: { const: "1.0" }
+            protocolVersion: { const: "2026-07-31.1" }
+            request:
+              $ref: "#/components/schemas/NormalizedSpritePlanRequest"
+            requestSha256:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            executionMode: { const: deterministic-compile-only }
+            runtimeJob:
+              $ref: "#/components/schemas/RuntimeJob"
+        executionBoundary: { type: string }
+    SpritePlanProtocol:
+      type: object
+      required:
+        - schemaVersion
+        - protocolVersion
+        - purpose
+        - roles
+        - gameplayProfiles
+        - coverageLevels
+        - fidelityLevels
+        - clipCatalogue
+        - directionRules
+        - coverageRules
+        - sourceRules
+        - godotRules
+        - executionBoundary
+      properties:
+        schemaVersion: { const: "1.0" }
+        protocolVersion: { const: "2026-07-31.1" }
+        purpose: { type: string }
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        gameplayProfiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/GameplayProfile"
+        coverageLevels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Coverage"
+        fidelityLevels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Fidelity"
+        clipCatalogue:
+          type: array
+          items: { type: object }
+        directionRules:
+          type: array
+          items: { type: string }
+        coverageRules:
+          type: array
+          items: { type: string }
+        sourceRules:
+          type: array
+          items: { type: string }
+        godotRules:
+          type: array
+          items: { type: string }
+        executionBoundary: { type: string }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: true
+  responses:
+    ValidationError:
+      description: Invalid or incompatible sprite planning request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
