@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "1.0",
+  "contractId": "gothic-horror-creature-2-5d",
+  "presetId": "prerendered-2.5d-1996",
+  "project": {
+    "projectId": "gothic-horror",
+    "title": "Gothic Horror Prototype",
+    "engine": "Godot",
+    "engineVersion": "4.6.2",
+    "gameGenre": "fixed-camera survival horror",
+    "targetPlatform": "desktop",
+    "viewport": { "width": 1280, "height": 720 },
+    "worldScale": { "characterHeightPixels": 220 }
+  },
+  "style": {
+    "intent": "Produce a pre-rendered creature family from one immutable model, rig, camera and lighting setup, then reduce it into stable transparent gameplay sprites.",
+    "mustHave": [
+      "one recognisable creature anatomy across every direction",
+      "stable material response and shadow direction",
+      "strong silhouette at gameplay distance",
+      "late-1990s pre-rendered reduction rather than modern photoreal polish"
+    ],
+    "mustAvoid": [
+      "frame-specific anatomy redesign",
+      "camera drift",
+      "different light rigs between animations",
+      "modern subsurface or glossy presentation",
+      "uncontrolled denoising or sharpening"
+    ],
+    "materialLanguage": [
+      "matte aged skin",
+      "dull iron restraint",
+      "worn cloth",
+      "restrained specular response"
+    ],
+    "antiGeneric": {
+      "requiredDistinctiveMotifs": [
+        "project-specific elongated shoulder silhouette",
+        "asymmetric iron restraint on the left forearm"
+      ],
+      "prohibitedGenericMotifs": [
+        "random horns",
+        "unmotivated glowing wounds",
+        "generic demon spikes",
+        "cinematic fog baked into the sprite"
+      ],
+      "prohibitUnrequestedProps": true,
+      "prohibitReadableText": true,
+      "prohibitWatermarks": true,
+      "prohibitModernGloss": true,
+      "prohibitRandomMicrodetail": true,
+      "prohibitStyleDrift": true
+    },
+    "references": [
+      {
+        "id": "creature-model-master",
+        "role": "identity",
+        "uri": "artifact://projects/gothic-horror/creature/source-model",
+        "weight": 1,
+        "rights": "Project-owned model and rig."
+      },
+      {
+        "id": "creature-material-master",
+        "role": "material",
+        "uri": "artifact://projects/gothic-horror/creature/materials",
+        "weight": 1,
+        "rights": "Project-owned material source."
+      },
+      {
+        "id": "creature-camera-rig",
+        "role": "camera",
+        "uri": "artifact://projects/gothic-horror/render/camera-rig",
+        "weight": 1,
+        "rights": "Project-owned render scene."
+      },
+      {
+        "id": "creature-motion-reference",
+        "role": "motion",
+        "uri": "artifact://projects/gothic-horror/creature/approved-motion-blockout",
+        "weight": 0.9,
+        "rights": "Project-owned animation blockout."
+      }
+    ]
+  },
+  "asset": {
+    "assetId": "restrained-creature-walk",
+    "family": "creature",
+    "purpose": "Eight-direction pre-rendered walk family with normal, depth and emission sidecars.",
+    "dimensions": { "width": 256, "height": 256 },
+    "transparency": "required",
+    "animated": true,
+    "frameCount": 12,
+    "framesPerSecond": 12,
+    "loop": true,
+    "directionCount": 8,
+    "directionNames": [
+      "south",
+      "south-west",
+      "west",
+      "north-west",
+      "north",
+      "north-east",
+      "east",
+      "south-east"
+    ],
+    "asymmetric": true,
+    "independentEffects": true,
+    "independentShadow": true,
+    "needsCollision": true,
+    "needsNormalMap": true,
+    "needsEmissionMap": true,
+    "largeDeformations": true,
+    "secondaryMotion": ["equipment"]
+  },
+  "outputProfileIds": ["godot-4.6.2-2.5d-billboard"],
+  "layerOverrides": [
+    {
+      "role": "normal",
+      "treatment": "engine-sidecar",
+      "reason": "Normal information remains bound engine metadata and never contaminates visible colour frames."
+    },
+    {
+      "role": "depth",
+      "treatment": "engine-sidecar",
+      "reason": "Depth is retained as a reproducible sidecar for ordering and effects."
+    },
+    {
+      "role": "emission",
+      "treatment": "engine-sidecar",
+      "reason": "Any authored emission remains independently adjustable in Godot."
+    }
+  ]
+}
