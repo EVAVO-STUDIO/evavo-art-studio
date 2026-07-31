@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "1.0",
+  "contractId": "brass-brine-port-tile-atlas",
+  "presetId": "isometric-rpg-1997",
+  "project": {
+    "projectId": "brass-brine",
+    "title": "Brass & Brine",
+    "engine": "Godot",
+    "engineVersion": "4.6.2",
+    "gameGenre": "historical maritime trading role-playing game",
+    "targetPlatform": "desktop and mobile",
+    "worldScale": {
+      "pixelsPerTile": 64,
+      "characterHeightPixels": 96,
+      "tileWidthPixels": 64,
+      "tileHeightPixels": 32
+    }
+  },
+  "style": {
+    "intent": "Create a coherent 2:1 isometric port tileset whose terrain, props and buildings share one palette, light direction, material language and tile-edge logic.",
+    "mustHave": [
+      "exact 64 by 32 diamond geometry",
+      "seam-safe tile edges",
+      "clear walkable and blocked silhouettes",
+      "project-specific maritime timber, stone and iron",
+      "consistent height and Y-sort conventions"
+    ],
+    "mustAvoid": [
+      "rotated or perspective-skewed tiles",
+      "modern dock equipment",
+      "random decorative clutter",
+      "lighting changes between tile variants",
+      "collision shapes baked into visible colour"
+    ],
+    "antiGeneric": {
+      "requiredDistinctiveMotifs": [
+        "1871 maritime freight and wharf construction",
+        "port-specific weathering and material wear"
+      ],
+      "prohibitedGenericMotifs": [
+        "fantasy market clutter",
+        "modern road markings",
+        "neon signage",
+        "unmotivated barrels in every tile"
+      ],
+      "prohibitUnrequestedProps": true,
+      "prohibitReadableText": true,
+      "prohibitWatermarks": true,
+      "prohibitModernGloss": true,
+      "prohibitRandomMicrodetail": true,
+      "prohibitStyleDrift": true,
+      "requireHistoricalPlausibility": true
+    },
+    "references": [
+      {
+        "id": "port-tile-palette",
+        "role": "palette",
+        "uri": "artifact://projects/brass-brine/tiles/port-palette",
+        "weight": 1,
+        "rights": "EVAVO project-owned palette."
+      },
+      {
+        "id": "port-material-language",
+        "role": "material",
+        "uri": "artifact://projects/brass-brine/tiles/port-material-master",
+        "weight": 1,
+        "rights": "EVAVO project-owned material source."
+      },
+      {
+        "id": "port-1871-research",
+        "role": "historical",
+        "uri": "reference://brass-brine/research/port-construction-1871",
+        "weight": 0.9,
+        "rights": "Curated historical research; do not copy protected artwork."
+      }
+    ]
+  },
+  "asset": {
+    "assetId": "port-ground-and-wharf-tiles",
+    "family": "tile",
+    "purpose": "Godot TileSet atlas cells, alternatives and terrain transitions for port environments.",
+    "dimensions": { "width": 64, "height": 32 },
+    "transparency": "preferred",
+    "animated": false,
+    "directionCount": 1,
+    "directionNames": ["tile"],
+    "asymmetric": true,
+    "needsCollision": true,
+    "tileFootprint": { "width": 1, "height": 1 },
+    "notes": [
+      "Retain each untrimmed tile cell as authoritative source.",
+      "Author terrain transitions and alternatives explicitly rather than relying on arbitrary rotations."
+    ]
+  },
+  "outputProfileIds": ["godot-4.6.2-tile-atlas"],
+  "layerOverrides": [
+    {
+      "role": "collision",
+      "treatment": "engine-sidecar",
+      "reason": "Physics polygons remain separate deterministic TileSet metadata."
+    },
+    {
+      "role": "occlusion",
+      "treatment": "engine-sidecar",
+      "reason": "Occlusion polygons remain separate from visible colour pixels."
+    },
+    {
+      "role": "tile-mask",
+      "treatment": "engine-sidecar",
+      "reason": "Terrain peering and transition masks remain machine-readable metadata."
+    }
+  ]
+}
