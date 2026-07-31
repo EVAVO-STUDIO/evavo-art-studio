@@ -1,9 +1,14 @@
-import { normalizeJson, type ArtifactId } from "@evavo/art-artifacts";
+import {
+  normalizeJson,
+  type ArtifactId,
+} from "@evavo/art-artifacts";
 
 import { prepareSpriteSupervisorCompileInput } from "./input.js";
 import {
   SPRITE_SUPERVISOR_PROTOCOL_VERSION,
+  SpriteSupervisorError,
   type CompiledSpriteSupervisorWorkflow,
+  type NormalizedSpriteSupervisorCompileRequest,
   type SpriteSupervisorCompileRequestInput,
 } from "./types.js";
 import {
@@ -19,12 +24,31 @@ export const SPRITE_SUPERVISOR_CAPABILITIES = Object.freeze([
   "evidence.bundle",
 ] as const);
 
+function normalizedRequest(
+  input: SpriteSupervisorCompileRequestInput | unknown,
+): NormalizedSpriteSupervisorCompileRequest {
+  try {
+    return validateSpriteSupervisorCompileRequest(
+      prepareSpriteSupervisorCompileInput(input),
+    );
+  } catch (error: unknown) {
+    if (error instanceof SpriteSupervisorError) throw error;
+    const sourceCode =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code: unknown }).code)
+        : "UNKNOWN";
+    throw new SpriteSupervisorError(
+      "SPRITE_SUPERVISOR_INPUT_INVALID",
+      error instanceof Error ? error.message : String(error),
+      normalizeJson({ sourceCode }),
+    );
+  }
+}
+
 export function compileSpriteSupervisorWorkflow(
   input: SpriteSupervisorCompileRequestInput | unknown,
 ): CompiledSpriteSupervisorWorkflow {
-  const request = validateSpriteSupervisorCompileRequest(
-    prepareSpriteSupervisorCompileInput(input),
-  );
+  const request = normalizedRequest(input);
   const requestSha256 = spriteSupervisorRequestSha256(request);
   const initialArtifacts = request.initialArtifactBindings.flatMap(
     (binding) => binding.artifactIds,
