@@ -1,8 +1,10 @@
 export * from "./types.js";
 export * from "./presets.js";
 export * from "./output-profiles.js";
-export * from "./validation.js";
+export { artDirectionSha256 } from "./validation.js";
+export { validateArtDirectionCompileRequest } from "./strict-validation.js";
 export * from "./grammar.js";
-export * from "./compiler.js";
+export { compileArtDirectionContract } from "./public-compiler.js";
 export * from "./protocol.js";
-export * from "./jobs.js";
+export { ART_DIRECTION_COMPILE_CAPABILITIES } from "./jobs.js";
+export { compileArtDirectionJob } from "./public-jobs.js";
