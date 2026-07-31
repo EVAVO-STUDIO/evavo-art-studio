@@ -16,6 +16,7 @@
     "@evavo/art-artifacts": "workspace:*",
     "@evavo/art-contracts": "workspace:*",
     "@evavo/art-core": "workspace:*",
+    "@evavo/art-direction": "workspace:*",
     "@evavo/art-godot": "workspace:*",
     "@evavo/art-media": "workspace:*",
     "@evavo/art-providers": "workspace:*",
