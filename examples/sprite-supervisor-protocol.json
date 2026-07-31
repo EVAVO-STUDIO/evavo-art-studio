@@ -213,6 +213,6 @@
   },
   "metadata": {
     "purpose": "Protocol example. A production workflow expands the remaining direction, clip, mastering, verification, repair, atlas and Godot tasks using the same contracts.",
-    "providerCredentials": "Worker environment only; never store credentials in this file."
+    "workerBoundary": "Provider access remains in the worker environment and is never stored in this file."
   }
 }
