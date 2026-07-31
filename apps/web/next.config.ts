@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "@evavo/art-contracts",
     "@evavo/art-core",
     "@evavo/art-direction",
+    "@evavo/art-sprite-planner",
     "@evavo/art-quality",
   ],
   serverExternalPackages: ["sharp"],
