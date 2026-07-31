@@ -170,10 +170,14 @@
       "requiredArtifactRoles": ["canonical-identity"],
       "outputBindings": [
         {
-          "role": "south-direction-candidates",
+          "role": "south-direction-master",
           "source": "output-artifact-labels",
-          "labels": { "artifactRole": "provider-candidate" },
-          "cardinality": "many",
+          "labels": {
+            "artifactRole": "selected-art-master",
+            "approvalState": "selected",
+            "qualityState": "passed"
+          },
+          "cardinality": "one",
           "required": true
         }
       ],
@@ -208,7 +212,7 @@
     "requireAllPlanStagesCovered": false,
     "requireFinalHumanApproval": true,
     "requiredReleaseArtifactRoles": [
-      "south-direction-candidates"
+      "south-direction-master"
     ]
   },
   "metadata": {
