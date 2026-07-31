@@ -1,5 +1,6 @@
 import { normalizeJson, type ArtifactId } from "@evavo/art-artifacts";
 
+import { prepareSpriteSupervisorCompileInput } from "./input.js";
 import {
   SPRITE_SUPERVISOR_PROTOCOL_VERSION,
   type CompiledSpriteSupervisorWorkflow,
@@ -21,7 +22,9 @@ export const SPRITE_SUPERVISOR_CAPABILITIES = Object.freeze([
 export function compileSpriteSupervisorWorkflow(
   input: SpriteSupervisorCompileRequestInput | unknown,
 ): CompiledSpriteSupervisorWorkflow {
-  const request = validateSpriteSupervisorCompileRequest(input);
+  const request = validateSpriteSupervisorCompileRequest(
+    prepareSpriteSupervisorCompileInput(input),
+  );
   const requestSha256 = spriteSupervisorRequestSha256(request);
   const initialArtifacts = request.initialArtifactBindings.flatMap(
     (binding) => binding.artifactIds,
