@@ -25,6 +25,10 @@ import {
 import { inspectRepository } from "@evavo/art-repo-inspector";
 
 import {
+  handleArtDirectionCommand,
+  type ArtDirectionCommandValues,
+} from "./art-direction-commands.js";
+import {
   handleMasteringCommand,
   type MasteringCommandValues,
 } from "./mastering-command.js";
@@ -44,6 +48,13 @@ Usage:
   evavo-art validate --input brief.json
   evavo-art plan --input brief.json [--output plan.json]
   evavo-art inspect --repo C:\\GitRepos\\my-game [--output snapshot.json]
+
+  evavo-art art-direction-protocol [--output art-direction-protocol.json]
+  evavo-art art-direction-presets [--output art-direction-presets.json]
+  evavo-art art-direction-outputs [--output art-direction-output-profiles.json]
+  evavo-art art-direction-validate --input art-direction.json [--output normalized-art-direction.json]
+  evavo-art art-direction-compile --input art-direction.json [--output compiled-art-direction.json]
+
   evavo-art quality-frame --input frame.png --expectations frame-quality.json [--output report.json]
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
   evavo-art master-alpha --input candidate.png --matte #00ff00 --output candidate.alpha.png [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json]
@@ -78,6 +89,7 @@ Usage:
   evavo-art artifact-ref-resolve --namespace projects/demo --name approved-master
 
 All commands emit JSON so ChatGPT, Claude, CI and scripts can consume the same contract.
+Art-direction compilation locks style, projection, shot ownership, layers, QA and output requirements before any provider call.
 Provider validation and compilation never call an external model. Candidate execution occurs only through a capability-matched durable worker job.
 Alpha mastering is deterministic and writes an unapproved PNG plus evidence. It exits with code 3 when blocking sprite QA fails.
 Selection writes immutable ranking evidence. Promotion is a separate explicit compare-and-swap operation and cannot override blocking failures.
@@ -138,6 +150,15 @@ async function main(): Promise<void> {
 
   if (!command || parsed.values.help) {
     process.stdout.write(help);
+    return;
+  }
+
+  const artDirection = await handleArtDirectionCommand(
+    command,
+    parsed.values as ArtDirectionCommandValues,
+  );
+  if (artDirection.handled) {
+    await emit(artDirection.value, parsed.values.output);
     return;
   }
 
