@@ -98,17 +98,17 @@ jobs:
           import path from "node:path";
 
           const receipt = {
-            schemaVersion: "1.0",
-            repository: "EVAVO-STUDIO/evavo-art-studio",
-            candidateSha: process.env.EXPECTED_SHA,
-            node: "22.14.0",
-            pnpm: "10.13.1",
-            lockfilePolicy: "review-first",
-            installedWithoutCommittedLockfile: true,
-            validation: "passed",
-            liveProviderRequest: false,
-            artifactPromotion: false,
-            deployment: "disabled",
+            "schemaVersion": "1.0",
+            "repository": "EVAVO-STUDIO/evavo-art-studio",
+            "candidateSha": process.env.EXPECTED_SHA,
+            "node": "22.14.0",
+            "pnpm": "10.13.1",
+            "lockfilePolicy": "review-first",
+            "installedWithoutCommittedLockfile": true,
+            "validation": "passed",
+            "liveProviderRequest": false,
+            "artifactPromotion": false,
+            "deployment": "disabled",
           };
           const target = path.join(process.env.RUNNER_TEMP, "art-studio-validation-receipt.json");
           fs.writeFileSync(target, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
