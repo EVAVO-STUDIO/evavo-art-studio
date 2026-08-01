@@ -6,7 +6,7 @@ import type {
 } from "@evavo/art-runtime";
 import type { CompiledSpriteProductionPlan } from "@evavo/art-sprite-planner";
 
-export const SPRITE_SUPERVISOR_PROTOCOL_VERSION = "2026-08-01.1" as const;
+export const SPRITE_SUPERVISOR_PROTOCOL_VERSION = "2026-08-01.2" as const;
 
 export const SPRITE_SUPERVISOR_RUN_STATUSES = [
   "pending",
@@ -88,6 +88,8 @@ export interface SpriteSupervisorTaskInput {
 }
 
 export interface SpriteSupervisorReviewResolutionInput {
+  readonly resolutionId: string;
+  readonly expectedStateTick: number;
   readonly taskId: string;
   readonly action: "retry" | "skip" | "abort" | "approve-release";
   readonly approver: string;
@@ -167,6 +169,8 @@ export interface NormalizedSpriteSupervisorTask {
 }
 
 export interface NormalizedSpriteSupervisorReviewResolution {
+  readonly resolutionId: string;
+  readonly expectedStateTick: number;
   readonly taskId: string;
   readonly action: "retry" | "skip" | "abort" | "approve-release";
   readonly approver: string;
@@ -283,6 +287,16 @@ export interface SpriteSupervisorDecision {
   readonly data?: JsonValue;
 }
 
+export interface SpriteSupervisorAppliedReviewResolution {
+  readonly resolutionId: string;
+  readonly resolutionSha256: string;
+  readonly expectedStateTick: number;
+  readonly taskId: string;
+  readonly action: NormalizedSpriteSupervisorReviewResolution["action"];
+  readonly approver: string;
+  readonly appliedAt: string;
+}
+
 export interface SpriteSupervisorState {
   readonly schemaVersion: "1.0";
   readonly protocolVersion: typeof SPRITE_SUPERVISOR_PROTOCOL_VERSION;
@@ -295,6 +309,8 @@ export interface SpriteSupervisorState {
   readonly startedAt: string;
   readonly updatedAt: string;
   readonly releaseApprovedBy?: Readonly<{
+    readonly resolutionId: string;
+    readonly expectedStateTick: number;
     readonly approver: string;
     readonly reason: string;
     readonly at: string;
@@ -302,6 +318,7 @@ export interface SpriteSupervisorState {
   readonly taskStates: Readonly<Record<string, SpriteSupervisorTaskState>>;
   readonly artifactBindings: Readonly<Record<string, readonly ArtifactId[]>>;
   readonly decisions: readonly SpriteSupervisorDecision[];
+  readonly appliedReviewResolutions: readonly SpriteSupervisorAppliedReviewResolution[];
   readonly releaseEvidenceArtifactId?: ArtifactId;
   readonly metadata?: JsonValue;
 }
