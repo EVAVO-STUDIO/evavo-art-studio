@@ -25,6 +25,7 @@ import {
   adaptiveFinalizerWorkerCapabilities,
   createAdaptiveFinalizerHandlers,
 } from "./adaptive-finalizer-handlers.js";
+import { createAdaptiveSpriteFamilyHandlers } from "./adaptive-sprite-family-handlers.js";
 import {
   candidateMasteringWorkerCapabilities,
   createCandidateMasteringHandlers,
@@ -254,6 +255,7 @@ export function createBuiltinHandlers(
     ...createAdaptiveFinalizerHandlers(),
     ...createCandidateSelectionHandlers(),
     ...createSpriteFamilyHandlers(),
+    ...createAdaptiveSpriteFamilyHandlers(),
     ...createTargetedRepairHandlers(providerRegistry),
     ...createRepairedFamilyRevisionHandlers(),
     ...createRepairedFamilySelectionHandlers(),
