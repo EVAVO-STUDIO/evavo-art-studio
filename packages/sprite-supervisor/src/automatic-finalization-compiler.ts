@@ -52,6 +52,25 @@ function binding(
     : { role: roleName, artifactIds: [artifactId] };
 }
 
+function threeDArtifactIds(
+  threeD: NormalizedAutomaticSpriteThreeDReference | undefined,
+): readonly ArtifactId[] {
+  if (!threeD) return [];
+  return [
+    ...new Set(
+      [
+        threeD.renderRigArtifactId,
+        threeD.cameraManifestArtifactId,
+        threeD.materialReferenceArtifactId,
+        ...threeD.turntableArtifactIds,
+        ...Object.values(threeD.directionReferenceArtifactIds),
+        ...Object.values(threeD.depthReferenceArtifactIds),
+        ...Object.values(threeD.normalReferenceArtifactIds),
+      ].filter((entry): entry is ArtifactId => entry !== undefined),
+    ),
+  ].sort();
+}
+
 function threeDBindings(
   threeD: NormalizedAutomaticSpriteThreeDReference | undefined,
 ): readonly SpriteSupervisorArtifactBindingInput[] {
@@ -73,10 +92,12 @@ function threeDBindings(
         binding(role(`direction.${direction}`), artifactId),
     ),
     ...Object.entries(threeD.depthReferenceArtifactIds).map(
-      ([direction, artifactId]) => binding(role(`depth.${direction}`), artifactId),
+      ([direction, artifactId]) =>
+        binding(role(`depth.${direction}`), artifactId),
     ),
     ...Object.entries(threeD.normalReferenceArtifactIds).map(
-      ([direction, artifactId]) => binding(role(`normal.${direction}`), artifactId),
+      ([direction, artifactId]) =>
+        binding(role(`normal.${direction}`), artifactId),
     ),
   ];
   return values.filter(
@@ -96,7 +117,10 @@ function providerBackground(
   return normalizeJson({ strategy: background.providerStrategy });
 }
 
-function appendUnique<T>(values: readonly T[], additions: readonly T[]): readonly T[] {
+function appendUnique<T>(
+  values: readonly T[],
+  additions: readonly T[],
+): readonly T[] {
   return [...new Set([...values, ...additions])];
 }
 
@@ -152,7 +176,9 @@ function threeDRequiredRoles(
   return [
     ...(threeD.renderRigArtifactId ? [role("render-rig")] : []),
     ...(threeD.cameraManifestArtifactId ? [role("camera-manifest")] : []),
-    ...(threeD.materialReferenceArtifactId ? [role("material-reference")] : []),
+    ...(threeD.materialReferenceArtifactId
+      ? [role("material-reference")]
+      : []),
     ...(direction && threeD.directionReferenceArtifactIds[direction]
       ? [role(`direction.${direction}`)]
       : []),
@@ -172,21 +198,28 @@ function transformCandidateTask(
 ): SpriteSupervisorTaskInput {
   const payload = record(task.payloadTemplate);
   const shot =
-    typeof payload.shot === "object" && payload.shot !== null && !Array.isArray(payload.shot)
+    typeof payload.shot === "object" &&
+    payload.shot !== null &&
+    !Array.isArray(payload.shot)
       ? (payload.shot as Readonly<Record<string, JsonValue>>)
       : {};
-  const direction = typeof shot.direction === "string" ? shot.direction : undefined;
+  const direction =
+    typeof shot.direction === "string" ? shot.direction : undefined;
   const existingReferences = Array.isArray(payload.references)
     ? payload.references
     : [];
   const existingNegative =
     typeof payload.negativeIntent === "string" ? payload.negativeIntent : "";
   const metadata =
-    typeof payload.metadata === "object" && payload.metadata !== null && !Array.isArray(payload.metadata)
+    typeof payload.metadata === "object" &&
+    payload.metadata !== null &&
+    !Array.isArray(payload.metadata)
       ? (payload.metadata as Readonly<Record<string, JsonValue>>)
       : {};
   const target =
-    typeof payload.target === "object" && payload.target !== null && !Array.isArray(payload.target)
+    typeof payload.target === "object" &&
+    payload.target !== null &&
+    !Array.isArray(payload.target)
       ? (payload.target as Readonly<Record<string, JsonValue>>)
       : {};
   return {
@@ -223,9 +256,11 @@ function transformCandidateTask(
           backgroundMode: background.resolvedMode,
           providerStrategy: background.providerStrategy,
           matteColour: background.matteColour ?? null,
-          fakeTransparencyBlocking: background.requireFakeTransparencyRejection,
+          fakeTransparencyBlocking:
+            background.requireFakeTransparencyRejection,
           threeDRepository: threeD?.repository ?? null,
           threeDRevision: threeD?.revision ?? null,
+          threeDArtifactIds: threeDArtifactIds(threeD),
         },
       },
     }),
@@ -239,7 +274,9 @@ function transformMasteringTask(
 ): SpriteSupervisorTaskInput {
   const payload = record(task.payloadTemplate);
   const quality =
-    typeof payload.quality === "object" && payload.quality !== null && !Array.isArray(payload.quality)
+    typeof payload.quality === "object" &&
+    payload.quality !== null &&
+    !Array.isArray(payload.quality)
       ? (payload.quality as Readonly<Record<string, JsonValue>>)
       : {};
   return {
@@ -282,8 +319,10 @@ function finalizationMetadata(
     protocolVersion: AUTOMATIC_SPRITE_FINALIZATION_PROTOCOL_VERSION,
     background,
     deliveryProfileId: request.finalization.deliveryProfileId,
-    requireHostileMatteProof: request.finalization.requireHostileMatteProof,
-    requireNoRejectedArtifacts: request.finalization.requireNoRejectedArtifacts,
+    requireHostileMatteProof:
+      request.finalization.requireHostileMatteProof,
+    requireNoRejectedArtifacts:
+      request.finalization.requireNoRejectedArtifacts,
     requireExactDimensions: request.finalization.requireExactDimensions,
     threeD: threeD
       ? {
@@ -311,11 +350,17 @@ function transformFamilyTask(
 ): SpriteSupervisorTaskInput {
   const payload = record(task.payloadTemplate);
   const metadata =
-    typeof payload.metadata === "object" && payload.metadata !== null && !Array.isArray(payload.metadata)
+    typeof payload.metadata === "object" &&
+    payload.metadata !== null &&
+    !Array.isArray(payload.metadata)
       ? (payload.metadata as Readonly<Record<string, JsonValue>>)
       : {};
   return {
     ...task,
+    staticInputArtifacts: appendUnique(
+      task.staticInputArtifacts ?? [],
+      threeDArtifactIds(request.threeDReference),
+    ),
     payloadTemplate: normalizeJson({
       ...payload,
       metadata: {
@@ -347,7 +392,11 @@ function transformTasks(
 ): readonly SpriteSupervisorTaskInput[] {
   return base.supervisorRequest.tasks.map((task) => {
     if (task.kind === "art.candidate.generate") {
-      return transformCandidateTask(task, background, request.threeDReference);
+      return transformCandidateTask(
+        task,
+        background,
+        request.threeDReference,
+      );
     }
     if (task.kind === "art.candidate.master-alpha") {
       return transformMasteringTask(task, request, background);
@@ -376,27 +425,20 @@ function analyseThreeD(
     .filter((entry) => entry.authored)
     .map((entry) => entry.name);
   const directionCoverage = directions.filter(
-    (direction) => threeD.directionReferenceArtifactIds[direction] !== undefined,
+    (direction) =>
+      threeD.directionReferenceArtifactIds[direction] !== undefined,
   );
   const missingDirectionReferences = directions.filter(
-    (direction) => threeD.directionReferenceArtifactIds[direction] === undefined,
+    (direction) =>
+      threeD.directionReferenceArtifactIds[direction] === undefined,
   );
-  const artifactIds = [
-    threeD.renderRigArtifactId,
-    threeD.cameraManifestArtifactId,
-    threeD.materialReferenceArtifactId,
-    ...threeD.turntableArtifactIds,
-    ...Object.values(threeD.directionReferenceArtifactIds),
-    ...Object.values(threeD.depthReferenceArtifactIds),
-    ...Object.values(threeD.normalReferenceArtifactIds),
-  ].filter((entry): entry is ArtifactId => entry !== undefined);
   return {
     enabled: true,
     repository: threeD.repository,
     revision: threeD.revision,
     directionCoverage,
     missingDirectionReferences,
-    artifactCount: new Set(artifactIds).size,
+    artifactCount: threeDArtifactIds(threeD).length,
   };
 }
 
@@ -405,8 +447,10 @@ export function compileAutomaticSpriteFinalizationWorkflow(
 ): CompiledAutomaticSpriteFinalizationWorkflow {
   const compiled = compileAutomaticSpriteFinalizationBase(input);
   const { request, baseWorkflow, background } = compiled;
-  const blockers: AutomaticSpriteFinalizationAnalysis["blockers"][number][] = [];
-  const warnings: AutomaticSpriteFinalizationAnalysis["warnings"][number][] = [];
+  const blockers: AutomaticSpriteFinalizationAnalysis["blockers"][number][] =
+    [];
+  const warnings: AutomaticSpriteFinalizationAnalysis["warnings"][number][] =
+    [];
   const threeD = analyseThreeD(request, baseWorkflow);
   const contract = baseWorkflow.request.artDirectionContract;
   const requiresThreeD =
@@ -461,7 +505,11 @@ export function compileAutomaticSpriteFinalizationWorkflow(
       normalizeJson({ blockers }),
     );
   }
-  const transformedTasks = transformTasks(baseWorkflow, request, background);
+  const transformedTasks = transformTasks(
+    baseWorkflow,
+    request,
+    background,
+  );
   const supervisorRequest: SpriteSupervisorCompileRequestInput = {
     ...baseWorkflow.supervisorRequest,
     initialArtifactBindings: [
@@ -470,14 +518,14 @@ export function compileAutomaticSpriteFinalizationWorkflow(
     ],
     tasks: transformedTasks,
     policy: {
-      ...baseWorkflow.supervisorRequest.policy,
+      ...(baseWorkflow.supervisorRequest.policy ?? {}),
       requiredReleaseArtifactRoles: [
         "automatic.family-manifest",
         FAMILY_FINALIZATION_ROLE,
       ],
       requireFinalHumanApproval:
-        baseWorkflow.supervisorRequest.policy?.requireFinalHumanApproval === true ||
-        warnings.length > 0,
+        baseWorkflow.supervisorRequest.policy?.requireFinalHumanApproval ===
+          true || warnings.length > 0,
     },
     metadata: normalizeJson({
       ...(typeof baseWorkflow.supervisorRequest.metadata === "object" &&
@@ -490,7 +538,8 @@ export function compileAutomaticSpriteFinalizationWorkflow(
       automaticFinalization: finalizationMetadata(request, background),
     }),
   };
-  const supervisorWorkflow = compileSpriteSupervisorWorkflow(supervisorRequest);
+  const supervisorWorkflow =
+    compileSpriteSupervisorWorkflow(supervisorRequest);
   const analysis: AutomaticSpriteFinalizationAnalysis = {
     base: baseWorkflow.analysis,
     background,
