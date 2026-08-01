@@ -36,6 +36,22 @@ Existing Website records use `book-cover-artifact://` and `book-publication-arti
 
 The canonical migration form is used only for validation and routing. It does not silently rename an approved object or allow a different reference to pass as the same artwork.
 
+## Legacy Website evidence import
+
+`importLegacyWebsiteBookArtState()` accepts exact Website quality, candidate-set and selection-binding records. It verifies their project, art-direction, candidate, artifact, checksum, rights and authority identities before producing a new handoff receipt.
+
+The importer deliberately maps:
+
+```text
+eligible legacy quality only        -> candidate
+complete legacy selection evidence  -> review_required
+blocked or inconsistent evidence    -> blocked
+```
+
+It never maps a Website shortlist, composition approval or selected scene binding directly to `approved`. A new Art Studio promotion remains mandatory. Unknown provenance, absent rights evidence, generated-text uncertainty, mismatched bytes, stale art direction, partial identities and retained blockers fail closed or remain explicit risks.
+
+The importer does not read, copy, regenerate or rewrite the image bytes. It imports evidence about the exact legacy artifact reference and checksum so later workers can resolve and verify those bytes through the governed artifact boundary.
+
 ## Transport
 
 Large image files use immutable artifact references or bounded binary upload. They are not embedded as large JSON/base64 request fields.
