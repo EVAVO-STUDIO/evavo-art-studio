@@ -24,6 +24,20 @@ import {
 
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
 const MIRROR_OPERATION = "mirror-horizontal";
+const MIRROR_PAIRS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  right: ["left"],
+  left: ["right"],
+  east: ["west"],
+  west: ["east"],
+  "south-east": ["south-west"],
+  "south-west": ["south-east"],
+  "north-east": ["north-west"],
+  "north-west": ["north-east"],
+  southeast: ["southwest"],
+  southwest: ["southeast"],
+  northeast: ["northwest"],
+  northwest: ["northeast"],
+});
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -72,6 +86,80 @@ function artifactId(value: unknown, name: string): ArtifactId {
     );
   }
   return value as ArtifactId;
+}
+
+function assertMirrorContract(
+  payload: Record<string, unknown>,
+  sourceDirection: string,
+  targetDirection: string,
+  unitKind: string,
+  sourceFrameId: string | undefined,
+  targetFrameId: string | undefined,
+  expectedWidth: number,
+  expectedHeight: number,
+): void {
+  if (!MIRROR_PAIRS[sourceDirection]?.includes(targetDirection)) {
+    throw new PermanentRuntimeError(
+      "DETERMINISTIC_MIRROR_DIRECTION_PAIR_INVALID",
+      `${sourceDirection} cannot be horizontally reflected into ${targetDirection}.`,
+    );
+  }
+  if (!new Set(["direction-master", "frame", "layer"]).has(unitKind)) {
+    throw new PermanentRuntimeError(
+      "DETERMINISTIC_MIRROR_UNIT_KIND_INVALID",
+      "unitKind must be direction-master, frame, or layer.",
+    );
+  }
+  if (unitKind === "direction-master") {
+    if (sourceFrameId !== undefined || targetFrameId !== undefined) {
+      throw new PermanentRuntimeError(
+        "DETERMINISTIC_MIRROR_FRAME_BINDING_INVALID",
+        "Direction-master reflection must not declare source or target frame IDs.",
+      );
+    }
+  } else if (!sourceFrameId || !targetFrameId) {
+    throw new PermanentRuntimeError(
+      "DETERMINISTIC_MIRROR_FRAME_BINDING_INVALID",
+      "Frame and layer reflection require both sourceFrameId and targetFrameId.",
+    );
+  }
+  const policy = isRecord(payload.policy) ? payload.policy : null;
+  if (
+    !policy ||
+    policy.axis !== "full-canvas-horizontal" ||
+    policy.preserveCanvas !== true ||
+    policy.preserveAlpha !== true ||
+    policy.preserveTransparentRgb !== true ||
+    policy.prohibitTrim !== true ||
+    policy.prohibitResample !== true ||
+    policy.requireExactRoundTrip !== true
+  ) {
+    throw new PermanentRuntimeError(
+      "DETERMINISTIC_MIRROR_POLICY_INVALID",
+      "Mirror policy must require full-canvas, alpha- and RGB-preserving, no-trim, no-resample, exact-round-trip reflection.",
+    );
+  }
+  const pivot = isRecord(payload.pivot) ? payload.pivot : null;
+  const pivotX = pivot?.x;
+  const pivotY = pivot?.y;
+  const baseline = payload.baseline;
+  if (
+    typeof pivotX !== "number" ||
+    !Number.isInteger(pivotX) ||
+    pivotX * 2 !== expectedWidth ||
+    typeof pivotY !== "number" ||
+    !Number.isInteger(pivotY) ||
+    pivotY < 0 ||
+    pivotY >= expectedHeight ||
+    typeof baseline !== "number" ||
+    !Number.isInteger(baseline) ||
+    baseline !== pivotY
+  ) {
+    throw new PermanentRuntimeError(
+      "DETERMINISTIC_MIRROR_REGISTRATION_INVALID",
+      "Mirror payload must retain a centred integer pivot and matching in-canvas baseline.",
+    );
+  }
 }
 
 function safeFileStem(value: string): string {
@@ -217,6 +305,16 @@ async function executeMirror(
     payload.sourceFrameId === null || payload.sourceFrameId === undefined
       ? undefined
       : requiredString(payload.sourceFrameId, "sourceFrameId", 256);
+  assertMirrorContract(
+    payload,
+    sourceDirection,
+    targetDirection,
+    unitKind,
+    sourceFrameId,
+    targetFrameId,
+    expectedWidth,
+    expectedHeight,
+  );
   const qualityInput = isRecord(payload.quality) ? payload.quality : {};
   const source = await verifiedSource(sourceArtifactId, context);
   const sourceBytes = await context.artifacts.read(sourceArtifactId);
