@@ -112,9 +112,12 @@ test("sprite supervisor protocol and compiler remain provider-free", async () =>
     const protocol = await fetch(`${base}/v1/sprite-supervisor-protocol`);
     assert.equal(protocol.status, 200);
     const protocolBody = await protocol.json();
-    assert.equal(protocolBody.protocolVersion, "2026-08-01.1");
+    assert.equal(protocolBody.protocolVersion, "2026-08-01.2");
     assert.ok(
       protocolBody.failureRules.some((entry) => entry.includes("redriven")),
+    );
+    assert.ok(
+      protocolBody.reviewRules.some((entry) => entry.includes("expectedStateTick")),
     );
     assert.match(protocolBody.executionBoundary, /compile/i);
 
@@ -128,6 +131,7 @@ test("sprite supervisor protocol and compiler remain provider-free", async () =>
     assert.equal(body.workflow.rootJob.kind, "art.sprite-production.supervise");
     assert.equal(body.workflow.request.spritePlan.directions.length, 8);
     assert.equal(body.workflow.request.tasks[0].kind, "art.candidate.generate");
+    assert.equal(body.workflow.rootJob.payload.requestSha256, body.workflow.requestSha256);
     assert.deepEqual(body.workflow.rootJob.requiredCapabilities, [
       "sprite.supervisor.run",
       "runtime.jobs",
@@ -138,7 +142,7 @@ test("sprite supervisor protocol and compiler remain provider-free", async () =>
   });
 });
 
-test("sprite supervisor API rejects secrets and quality bypasses", async () => {
+test("sprite supervisor API rejects secrets, quality bypasses and incomplete reviews", async () => {
   await withServer(async (base) => {
     const input = await supervisorRequest();
     input.tasks[0].payloadTemplate.apiKey = "not-allowed";
@@ -150,5 +154,23 @@ test("sprite supervisor API rejects secrets and quality bypasses", async () => {
     assert.equal(response.status, 422);
     const body = await response.json();
     assert.equal(body.error.code, "SPRITE_SUPERVISOR_SECRET_FIELD_REJECTED");
+
+    const reviewInput = await supervisorRequest();
+    reviewInput.reviewResolutions = [
+      {
+        taskId: "$release",
+        action: "approve-release",
+        approver: "Greg Parker",
+        reason: "Missing one-time state binding.",
+      },
+    ];
+    const reviewResponse = await fetch(`${base}/v1/sprite-supervisors/validate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(reviewInput),
+    });
+    assert.equal(reviewResponse.status, 422);
+    const reviewBody = await reviewResponse.json();
+    assert.equal(reviewBody.error.code, "SPRITE_SUPERVISOR_REQUEST_INVALID");
   });
 });
