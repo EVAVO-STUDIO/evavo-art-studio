@@ -1,19 +1,9 @@
 import { normalizeJson } from "@evavo/art-artifacts";
 
-import {
-  analyseAutomaticSpriteWorkflow,
-  compileAutomaticSpriteWorkflow as compileBaseAutomaticSpriteWorkflow,
-} from "./automatic-compiler.js";
+import { analyseAutomaticSpriteWorkflow, compileAutomaticSpriteWorkflow as compileBaseAutomaticSpriteWorkflow } from "./automatic-compiler.js";
 import { applyDeterministicMirroring } from "./automatic-mirror-graph.js";
-import {
-  DERIVED_DIRECTION_CODE,
-  assertMirrorSafety,
-  mirrorInput,
-} from "./automatic-mirror-policy.js";
-import type {
-  AutomaticSpriteWorkflowCompileRequestInput,
-  CompiledAutomaticSpriteWorkflow,
-} from "./automatic-types.js";
+import { DERIVED_DIRECTION_CODE, assertMirrorSafety, mirrorInput } from "./automatic-mirror-policy.js";
+import type { AutomaticSpriteWorkflowCompileRequestInput, CompiledAutomaticSpriteWorkflow } from "./automatic-types.js";
 import { automaticSpriteWorkflowRequestSha256 } from "./automatic-validation.js";
 import { compileSpriteSupervisorWorkflow } from "./compiler.js";
 import type { SpriteSupervisorCompileRequestInput } from "./types.js";
