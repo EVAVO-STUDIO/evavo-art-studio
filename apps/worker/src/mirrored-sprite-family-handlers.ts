@@ -254,12 +254,28 @@ async function verifyUnit(
     verifiedArtifact(unit.targetArtifactId, context),
     verifiedArtifact(unit.evidenceArtifactId, context),
   ]);
-  if (source.mediaType !== "image/png" || target.mediaType !== "image/png") {
+  if (
+    source.mediaType !== "image/png" ||
+    source.storageClass !== "master" ||
+    source.labels.qualityState !== "passed" ||
+    !new Set(["selected", "approved"]).has(
+      source.labels.approvalState ?? "",
+    ) ||
+    target.mediaType !== "image/png"
+  ) {
     throw new PermanentRuntimeError(
       "MIRRORED_FAMILY_IMAGE_FORMAT_INVALID",
-      `Mirror unit ${unit.id} requires PNG source and target artifacts.`,
+      `Mirror unit ${unit.id} requires a quality-passed selected source PNG master and PNG target.`,
     );
   }
+  const sourceFrameLabelMatches =
+    unit.sourceFrameId === undefined
+      ? target.labels.sourceFrameId === undefined
+      : target.labels.sourceFrameId === unit.sourceFrameId;
+  const targetFrameLabelMatches =
+    unit.targetFrameId === undefined
+      ? target.labels.targetFrameId === undefined
+      : target.labels.targetFrameId === unit.targetFrameId;
   if (
     target.storageClass !== "master" ||
     target.labels.artifactRole !== "deterministic-mirrored-sprite-master" ||
@@ -268,17 +284,17 @@ async function verifyUnit(
     target.labels.deterministicMirror !== "true" ||
     target.labels.sourceArtifactId !== source.artifactId ||
     target.labels.mirrorEvidenceArtifactId !== evidence.artifactId ||
+    target.labels.sourceDirection !== unit.sourceDirection ||
+    target.labels.targetDirection !== unit.targetDirection ||
+    target.labels.unitKind !== unit.unitKind ||
+    target.labels.layerRole !== unit.layerRole ||
+    !sourceFrameLabelMatches ||
+    !targetFrameLabelMatches ||
     !target.sourceArtifacts.includes(evidence.artifactId)
   ) {
     throw new PermanentRuntimeError(
       "MIRRORED_FAMILY_TARGET_STATE_INVALID",
-      `Mirror target has an invalid immutable role, state, or ancestry: ${target.artifactId}`,
-    );
-  }
-  if (!evidence.sourceArtifacts.includes(source.artifactId)) {
-    throw new PermanentRuntimeError(
-      "MIRRORED_FAMILY_EVIDENCE_ANCESTRY_INVALID",
-      `Mirror evidence does not descend from its source: ${evidence.artifactId}`,
+      `Mirror target has an invalid immutable role, state, binding, or ancestry: ${target.artifactId}`,
     );
   }
   const body = await parsedEvidence(evidence, context);
@@ -289,18 +305,98 @@ async function verifyUnit(
     ? body.mirroredBaseArtifact
     : null;
   const proof = isRecord(body.proof) ? body.proof : null;
+  const transform = isRecord(body.transform) ? body.transform : null;
+  if (!bodySource || !bodyBase || !proof || !transform) {
+    throw new PermanentRuntimeError(
+      "MIRRORED_FAMILY_EVIDENCE_BODY_MISMATCH",
+      `Mirror evidence body is incomplete for unit ${unit.id}.`,
+    );
+  }
+  const baseArtifactId = artifactId(
+    bodyBase.artifactId,
+    "mirror evidence mirroredBaseArtifact.artifactId",
+  );
+  const base = await verifiedArtifact(baseArtifactId, context);
+  const evidenceSourceFrameMatches =
+    unit.sourceFrameId === undefined
+      ? evidence.labels.sourceFrameId === undefined
+      : evidence.labels.sourceFrameId === unit.sourceFrameId;
+  const evidenceTargetFrameMatches =
+    unit.targetFrameId === undefined
+      ? evidence.labels.targetFrameId === undefined
+      : evidence.labels.targetFrameId === unit.targetFrameId;
+  if (
+    evidence.labels.sourceArtifactId !== source.artifactId ||
+    evidence.labels.mirroredBaseArtifactId !== base.artifactId ||
+    evidence.labels.sourceDirection !== unit.sourceDirection ||
+    evidence.labels.targetDirection !== unit.targetDirection ||
+    evidence.labels.unitKind !== unit.unitKind ||
+    evidence.labels.layerRole !== unit.layerRole ||
+    !evidenceSourceFrameMatches ||
+    !evidenceTargetFrameMatches ||
+    !evidence.sourceArtifacts.includes(source.artifactId) ||
+    !evidence.sourceArtifacts.includes(base.artifactId)
+  ) {
+    throw new PermanentRuntimeError(
+      "MIRRORED_FAMILY_EVIDENCE_ANCESTRY_INVALID",
+      `Mirror evidence labels or ancestry do not match unit ${unit.id}.`,
+    );
+  }
+  const baseSourceFrameMatches =
+    unit.sourceFrameId === undefined
+      ? base.labels.sourceFrameId === undefined
+      : base.labels.sourceFrameId === unit.sourceFrameId;
+  const baseTargetFrameMatches =
+    unit.targetFrameId === undefined
+      ? base.labels.targetFrameId === undefined
+      : base.labels.targetFrameId === unit.targetFrameId;
+  if (
+    base.mediaType !== "image/png" ||
+    base.storageClass !== "intermediate" ||
+    base.labels.artifactRole !== "deterministic-horizontal-mirror-base" ||
+    base.labels.approvalState !== "unapproved" ||
+    base.labels.qualityState !== "passed" ||
+    base.labels.deterministicMirror !== "true" ||
+    base.labels.sourceArtifactId !== source.artifactId ||
+    base.labels.sourceDirection !== unit.sourceDirection ||
+    base.labels.targetDirection !== unit.targetDirection ||
+    base.labels.unitKind !== unit.unitKind ||
+    base.labels.layerRole !== unit.layerRole ||
+    !baseSourceFrameMatches ||
+    !baseTargetFrameMatches ||
+    !base.sourceArtifacts.includes(source.artifactId) ||
+    target.contentSha256 !== base.contentSha256 ||
+    !target.sourceArtifacts.includes(base.artifactId)
+  ) {
+    throw new PermanentRuntimeError(
+      "MIRRORED_FAMILY_BASE_STATE_INVALID",
+      `Mirror base has an invalid immutable role, binding, content, or ancestry for unit ${unit.id}.`,
+    );
+  }
   if (
     body.operation !== MIRROR_OPERATION ||
     body.sourceDirection !== unit.sourceDirection ||
     body.targetDirection !== unit.targetDirection ||
+    body.unitKind !== unit.unitKind ||
+    body.sourceFrameId !== (unit.sourceFrameId ?? null) ||
+    body.targetFrameId !== (unit.targetFrameId ?? null) ||
     body.layerRole !== unit.layerRole ||
-    bodySource?.artifactId !== source.artifactId ||
-    typeof bodyBase?.artifactId !== "string" ||
-    !target.sourceArtifacts.includes(bodyBase.artifactId as ArtifactId) ||
-    proof?.roundTripExact !== true ||
-    proof?.encodedPixelsExact !== true ||
-    proof?.qualityPassed !== true ||
-    proof?.qualityThresholdsRelaxed !== false
+    bodySource.artifactId !== source.artifactId ||
+    bodySource.descriptorSha256 !== source.descriptorSha256 ||
+    bodySource.contentSha256 !== source.contentSha256 ||
+    bodyBase.artifactId !== base.artifactId ||
+    bodyBase.descriptorSha256 !== base.descriptorSha256 ||
+    bodyBase.contentSha256 !== base.contentSha256 ||
+    transform.axis !== "full-canvas-horizontal" ||
+    transform.pixelMapping !== "targetX=width-1-sourceX" ||
+    transform.trim !== false ||
+    transform.resample !== false ||
+    transform.preserveAlpha !== true ||
+    transform.preserveTransparentRgb !== true ||
+    proof.roundTripExact !== true ||
+    proof.encodedPixelsExact !== true ||
+    proof.qualityPassed !== true ||
+    proof.qualityThresholdsRelaxed !== false
   ) {
     throw new PermanentRuntimeError(
       "MIRRORED_FAMILY_EVIDENCE_BODY_MISMATCH",
