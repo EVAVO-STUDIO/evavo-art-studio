@@ -5,3 +5,8 @@ export * from "./queue-policy.js";
 export * from "./engine.js";
 export * from "./compiler.js";
 export * from "./protocol.js";
+export * from "./automatic-types.js";
+export * from "./automatic-validation.js";
+export * from "./automatic-art-direction.js";
+export * from "./automatic-compiler.js";
+export * from "./automatic-protocol.js";
