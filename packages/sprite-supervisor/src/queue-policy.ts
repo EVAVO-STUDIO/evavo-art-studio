@@ -1,10 +1,16 @@
-import { SpriteSupervisorError, type NormalizedSpriteSupervisorCompileRequest } from "./types.js";
+import {
+  SpriteSupervisorError,
+  type NormalizedSpriteSupervisorCompileRequest,
+} from "./types.js";
 
-const CHILD_KIND_QUEUE: Readonly<Record<string, "provider" | "media" | "selection">> = Object.freeze({
+const CHILD_KIND_QUEUE: Readonly<
+  Record<string, "provider" | "media" | "selection">
+> = Object.freeze({
   "art.candidate.generate": "provider",
   "art.candidate.edit": "provider",
   "art.candidate.inpaint": "provider",
   "art.candidate.master-alpha": "media",
+  "art.candidate.finalize-adaptive": "media",
   "art.candidate.select": "selection",
   "art.candidate.promote": "selection",
   "art.repair.plan": "selection",

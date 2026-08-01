@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: EVAVO Art Studio Automatic Sprite Finalization API
-  version: 0.1.0
+  version: 0.2.0
   description: >-
-    Compile-only contracts for background-aware and 3D-reference-aware sprite
-    production. These routes never call an image provider, read image artifacts,
-    submit runtime work, mutate approved references, execute a shell, or deploy.
+    Compile-only contracts for background-aware, 3D-reference-aware and
+    adaptively repaired sprite production. These routes never call an image
+    provider, read image artifacts, submit runtime work, mutate approved
+    references, execute a shell, or deploy.
 servers:
   - url: http://127.0.0.1:4100
 security: []
@@ -18,7 +19,7 @@ paths:
       operationId: getAutomaticSpriteFinalizationProtocol
       responses:
         "200":
-          description: Background, 3D bridge, QA, and finalization rules
+          description: Background, 3D bridge, adaptive repair, QA, and finalization rules
           content:
             application/json:
               schema:
@@ -151,6 +152,26 @@ components:
         requireHostileMatteProof: { type: boolean }
         requireNoRejectedArtifacts: { type: boolean }
         requireExactDimensions: { type: boolean }
+        maximumDeterministicRepairPasses:
+          type: integer
+          minimum: 0
+          maximum: 8
+          default: 2
+        transparentBleedRadius:
+          type: integer
+          minimum: 0
+          maximum: 16
+          default: 2
+        matteSearchRadius:
+          type: integer
+          minimum: 1
+          maximum: 32
+          default: 6
+        matteDistanceThreshold:
+          type: integer
+          minimum: 1
+          maximum: 441
+          default: 72
     AutomaticSpriteFinalizationRequest:
       type: object
       required: [schemaVersion, workflow]

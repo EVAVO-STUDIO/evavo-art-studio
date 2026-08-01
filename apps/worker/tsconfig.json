@@ -9,6 +9,7 @@
   "references": [
     { "path": "../../packages/artifacts" },
     { "path": "../../packages/delivery-optimizer" },
+    { "path": "../../packages/finalizer" },
     { "path": "../../packages/media" },
     { "path": "../../packages/godot" },
     { "path": "../../packages/providers" },

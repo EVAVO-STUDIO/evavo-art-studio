@@ -8,7 +8,7 @@ const source = () =>
     "utf8",
   );
 
-test("automatic sprite finalization OpenAPI remains compile-only and fail-closed", async () => {
+test("automatic sprite finalization OpenAPI remains adaptive, compile-only, and fail-closed", async () => {
   const openapi = await source();
   for (const token of [
     "openapi: 3.1.0",
@@ -26,6 +26,11 @@ test("automatic sprite finalization OpenAPI remains compile-only and fail-closed
     "directionReferenceArtifactIds",
     "requireFakeTransparencyRejection",
     "requireFamilyVerification",
+    "maximumDeterministicRepairPasses",
+    "transparentBleedRadius",
+    "matteSearchRadius",
+    "matteDistanceThreshold",
+    "adaptively repaired sprite production",
   ]) {
     assert.ok(openapi.includes(token), `missing OpenAPI invariant: ${token}`);
   }
@@ -37,6 +42,8 @@ test("automatic sprite finalization OpenAPI remains compile-only and fail-closed
     "promoteSelectedCandidate",
     "shell: true",
     "git push",
+    "relaxThresholds",
+    "acceptFailed",
   ]) {
     assert.ok(
       !openapi.includes(forbidden),

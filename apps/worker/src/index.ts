@@ -22,6 +22,11 @@ import {
 } from "@evavo/art-runtime";
 
 import {
+  createGuardedAdaptiveFinalizerHandlers,
+  guardedAdaptiveFinalizerWorkerCapabilities,
+} from "./adaptive-finalizer-guarded-handlers.js";
+import { createAdaptiveSpriteFamilyHandlers } from "./adaptive-sprite-family-handlers.js";
+import {
   candidateMasteringWorkerCapabilities,
   createCandidateMasteringHandlers,
 } from "./mastering-handlers.js";
@@ -247,8 +252,10 @@ export function createBuiltinHandlers(
     "sprite.atlas.build": atlasBuild,
     ...createProviderHandlers(providerRegistry),
     ...createCandidateMasteringHandlers(),
+    ...createGuardedAdaptiveFinalizerHandlers(),
     ...createCandidateSelectionHandlers(),
     ...createSpriteFamilyHandlers(),
+    ...createAdaptiveSpriteFamilyHandlers(),
     ...createTargetedRepairHandlers(providerRegistry),
     ...createRepairedFamilyRevisionHandlers(),
     ...createRepairedFamilySelectionHandlers(),
@@ -294,6 +301,7 @@ async function main(): Promise<void> {
   const providerRegistry = createProviderRegistryFromEnvironment();
   const providerCapabilities = providerWorkerCapabilities(providerRegistry);
   const masteringCapabilities = candidateMasteringWorkerCapabilities();
+  const adaptiveCapabilities = guardedAdaptiveFinalizerWorkerCapabilities();
   const selectionCapabilities = candidateSelectionWorkerCapabilities();
   const familyCapabilities = spriteFamilyWorkerCapabilities();
   const repairCapabilities = targetedRepairWorkerCapabilities(providerRegistry);
@@ -321,6 +329,7 @@ async function main(): Promise<void> {
         "evidence.bundle",
         ...supervisorCapabilities,
         ...masteringCapabilities,
+        ...adaptiveCapabilities,
         ...selectionCapabilities,
         ...familyCapabilities,
         ...repairCapabilities,
