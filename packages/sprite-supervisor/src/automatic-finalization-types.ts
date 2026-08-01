@@ -11,7 +11,7 @@ import type {
 } from "./types.js";
 
 export const AUTOMATIC_SPRITE_FINALIZATION_PROTOCOL_VERSION =
-  "2026-08-01.1" as const;
+  "2026-08-02.1" as const;
 
 export type AutomaticSpriteBackgroundMode =
   | "auto"
