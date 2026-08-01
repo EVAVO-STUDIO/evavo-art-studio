@@ -149,3 +149,34 @@ test("directional lighting cannot be mirrored without explicit style-owner revie
       ),
   );
 });
+
+test("readable text blocks deterministic reflection", async () => {
+  const input = await automaticRequest();
+  input.spritePlanRequest.artDirectionRequest.style.antiGeneric.prohibitReadableText =
+    false;
+  assert.throws(
+    () => compileAutomaticSpriteWorkflow(input),
+    (error) =>
+      error instanceof SpriteSupervisorError &&
+      error.code === "AUTOMATIC_SPRITE_MIRROR_BLOCKED" &&
+      error.details.blockers.some(
+        (entry) =>
+          entry.code === "AUTOMATIC_SPRITE_MIRROR_READABLE_TEXT_UNSAFE",
+      ),
+  );
+});
+
+test("centred odd-width canvases retain an exact integer mirror pivot", async () => {
+  const input = await automaticRequest();
+  input.spritePlanRequest.artDirectionRequest.asset.dimensions.width = 63;
+  const compiled = compileAutomaticSpriteWorkflow(input);
+  const mirrors = tasksOf(compiled, "mirror-horizontal");
+  assert.ok(mirrors.length > 0);
+  assert.ok(
+    mirrors.every(
+      (task) =>
+        task.payloadTemplate.expectedWidth === 63 &&
+        task.payloadTemplate.pivot.x === 31,
+    ),
+  );
+});
