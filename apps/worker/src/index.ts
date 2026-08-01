@@ -53,7 +53,7 @@ import {
 import {
   createSpriteSupervisorHandlers,
   spriteSupervisorWorkerCapabilities,
-} from "./sprite-supervisor-handlers.js";
+} from "./sprite-supervisor-guarded-handlers.js";
 
 const isRecord = (
   value: unknown,
