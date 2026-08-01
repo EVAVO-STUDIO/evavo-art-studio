@@ -1,0 +1,50 @@
+{
+  "schema": "evavo/book-studio-and-art-migration-compatibility-landing",
+  "version": 1,
+  "migrationRunId": "book-studio-and-art-migration-20260802",
+  "landedAt": "2026-08-02",
+  "status": "legacy_artifact_reference_compatibility_landed",
+  "repositories": {
+    "website": {
+      "repository": "EVAVO-STUDIO/Website",
+      "commit": "0107020cc3e03074cb505e1e5cf55e9f2dfaf947",
+      "role": "active_compatibility_runtime_and_inventory_authority"
+    },
+    "docsSuite": {
+      "repository": "EVAVO-STUDIO/evavo-docs-suite",
+      "commit": "28dec510c83a81fdf536d44686cb5186238e97f0",
+      "compatibilityPath": "packages/core/src/book-studio-art-legacy-compat.ts"
+    },
+    "artStudio": {
+      "repository": "EVAVO-STUDIO/evavo-art-studio",
+      "commit": "e2e1a548cea61e8f30e734c06c7735885b8b64b7",
+      "compatibilityPath": "packages/contracts/src/book-production-legacy-compat.ts"
+    }
+  },
+  "acceptedLegacySchemes": [
+    "book-cover-artifact",
+    "book-publication-artifact"
+  ],
+  "compatibilityRules": [
+    "retain the exact legacy artifact reference in source evidence",
+    "derive a canonical migration routing reference only for validation and transport",
+    "do not rewrite image or publication artifact bytes",
+    "require exact reference equality between approved artifact receipt and book-use binding",
+    "retain selection, promotion, rights, checksum and renderer-byte-verification gates"
+  ],
+  "validation": {
+    "artStudioHostedWorkflow": "passed",
+    "artStudioContractTests": 6,
+    "docsSuiteStrictTypeScript": "passed_locally",
+    "docsSuiteHostedRunner": "failed_before_checkout_no_steps"
+  },
+  "currentFlags": {
+    "websiteRuntimeStillAuthoritative": true,
+    "runtimeCutoverApproved": false,
+    "websiteSourceDeletionApproved": false,
+    "legacyReferencesRenamed": false,
+    "artifactBytesRewritten": false,
+    "publicationPerformed": false
+  },
+  "recordFingerprint": "c518a63a96aaa22500a5c09699dd32b2ddd20234a6ac4e303cf2b97962b114a6"
+}
