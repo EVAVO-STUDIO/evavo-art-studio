@@ -8,7 +8,7 @@ import { LocalArtifactStore } from "@evavo/art-artifacts";
 import { decodeSpriteFrame } from "@evavo/art-quality";
 import sharp from "sharp";
 
-import { createAdaptiveFinalizerHandlers } from "../dist/adaptive-finalizer-handlers.js";
+import { createGuardedAdaptiveFinalizerHandlers } from "../dist/adaptive-finalizer-guarded-handlers.js";
 
 async function fixture(bytes) {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-adaptive-finalizer-"));
@@ -30,7 +30,7 @@ async function fixture(bytes) {
 }
 
 async function execute(fx, payload = {}) {
-  const handler = createAdaptiveFinalizerHandlers()[
+  const handler = createGuardedAdaptiveFinalizerHandlers()[
     "art.candidate.finalize-adaptive"
   ];
   return handler({
@@ -124,30 +124,68 @@ async function checkerboardFixture() {
     .toBuffer();
 }
 
-test("adaptive finalization repairs hidden transparent RGB and emits proof", async () => {
+test("adaptive finalization repairs hidden RGB and binds proof through an immutable envelope", async () => {
   const fx = await fixture(await hiddenRgbFixture());
   try {
     const result = await execute(fx);
     assert.equal(result.result.releaseReady, true);
     assert.equal(result.result.changed, true);
     assert.ok(result.result.changedPixels > 0);
+    assert.equal(result.result.provenanceNormalized, true);
+
     const finalized = await fx.artifacts.get(result.outputArtifacts[0]);
     const proof = await fx.artifacts.get(result.outputArtifacts[1]);
     const evidence = await fx.artifacts.get(result.outputArtifacts[2]);
+    const envelope = await fx.artifacts.get(result.outputArtifacts[3]);
+    assert.ok(finalized && proof && evidence && envelope);
+
     assert.equal(finalized.labels.adaptiveFinalized, "true");
     assert.equal(finalized.labels.finalizationReady, "true");
+    assert.equal(finalized.labels.provenanceNormalized, "true");
     assert.equal(finalized.labels.proofArtifactId, proof.artifactId);
+    assert.equal(
+      finalized.labels.finalizationEnvelopeArtifactId,
+      envelope.artifactId,
+    );
+    assert.ok(finalized.sourceArtifacts.includes(fx.candidate.artifactId));
+    assert.ok(finalized.sourceArtifacts.includes(envelope.artifactId));
+    assert.ok(!finalized.sourceArtifacts.includes(proof.artifactId));
+
     assert.equal(proof.labels.artifactRole, "candidate-hostile-background-proof");
     assert.equal(proof.labels.qualityState, "passed");
     assert.equal(
       evidence.labels.artifactRole,
       "candidate-adaptive-finalization-evidence",
     );
+    assert.equal(
+      envelope.labels.artifactRole,
+      "candidate-adaptive-finalization-envelope",
+    );
+    assert.equal(envelope.labels.proofArtifactId, proof.artifactId);
+    assert.equal(
+      envelope.labels.baseEvidenceArtifactId,
+      evidence.artifactId,
+    );
+    assert.ok(envelope.sourceArtifacts.includes(fx.candidate.artifactId));
+    assert.ok(envelope.sourceArtifacts.includes(proof.artifactId));
+    assert.ok(envelope.sourceArtifacts.includes(evidence.artifactId));
+    assert.equal(result.result.evidenceArtifactId, envelope.artifactId);
+
+    const envelopeBody = JSON.parse(
+      (await fx.artifacts.read(envelope.artifactId)).toString("utf8"),
+    );
+    assert.equal(
+      envelopeBody.sourceCandidateArtifactId,
+      fx.candidate.artifactId,
+    );
+    assert.equal(envelopeBody.proofArtifactId, proof.artifactId);
+    assert.equal(envelopeBody.baseEvidenceArtifactId, evidence.artifactId);
+    assert.equal(envelopeBody.qualityThresholdsRelaxed, false);
+
     const decoded = await decodeSpriteFrame(
       await fx.artifacts.read(finalized.artifactId),
     );
-    const corner = 0;
-    assert.deepEqual([...decoded.data.slice(corner, corner + 4)], [0, 0, 0, 0]);
+    assert.deepEqual([...decoded.data.slice(0, 4)], [0, 0, 0, 0]);
   } finally {
     await rm(fx.root, { recursive: true, force: true });
   }
