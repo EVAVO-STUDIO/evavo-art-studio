@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",
+    "@evavo/art-direction": "workspace:*",
     "@evavo/art-runtime": "workspace:*",
     "@evavo/art-sprite-planner": "workspace:*"
   },
