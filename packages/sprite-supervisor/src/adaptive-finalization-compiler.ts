@@ -20,6 +20,9 @@ import type {
 import { SpriteSupervisorError } from "./types.js";
 import { spriteSupervisorSha256 } from "./validation.js";
 
+const FAMILY_ADAPTIVE_PROOF_ROLE =
+  "automatic.family-adaptive-proof-evidence";
+
 interface AdaptiveFinalizationOptions {
   readonly maximumRepairPasses: number;
   readonly transparentBleedRadius: number;
@@ -280,6 +283,32 @@ function transformTasks(
   };
 }
 
+function requireAdaptiveFamilyProof(
+  tasks: readonly SpriteSupervisorTaskInput[],
+): readonly SpriteSupervisorTaskInput[] {
+  return tasks.map((task) =>
+    task.kind !== "sprite.family.verify"
+      ? task
+      : {
+          ...task,
+          outputBindings: [
+            ...(task.outputBindings ?? []),
+            {
+              role: FAMILY_ADAPTIVE_PROOF_ROLE,
+              source: "output-artifact-labels" as const,
+              labels: {
+                artifactRole: "sprite-family-adaptive-proof-evidence",
+                qualityState: "passed",
+                releaseReady: "true",
+              },
+              cardinality: "one" as const,
+              required: true,
+            },
+          ],
+        },
+  );
+}
+
 function normalizedRequestWithOptions(
   request: NormalizedAutomaticSpriteFinalizationRequest,
   options: AdaptiveFinalizationOptions,
@@ -300,15 +329,16 @@ export function compileAutomaticSpriteFinalizationWorkflow(
   const base = compileBaseAutomaticSpriteFinalizationWorkflow(input);
   const options = adaptiveOptions(input);
   const transformed = transformTasks(base.supervisorRequest.tasks, options);
+  const tasks = requireAdaptiveFamilyProof(transformed.tasks);
   const maximumTasks = base.baseWorkflow.request.policy.maximumTasks;
-  if (transformed.tasks.length > maximumTasks) {
+  if (tasks.length > maximumTasks) {
     throw new SpriteSupervisorError(
       "ADAPTIVE_FINALIZATION_TASK_LIMIT_EXCEEDED",
-      `Adaptive finalization requires ${transformed.tasks.length} tasks; the configured maximum is ${maximumTasks}.`,
+      `Adaptive finalization requires ${tasks.length} tasks; the configured maximum is ${maximumTasks}.`,
       normalizeJson({
         baseTasks: base.supervisorRequest.tasks.length,
         adaptiveTasks: transformed.adaptiveTaskIds.size,
-        totalTasks: transformed.tasks.length,
+        totalTasks: tasks.length,
         maximumTasks,
       }),
     );
@@ -320,19 +350,26 @@ export function compileAutomaticSpriteFinalizationWorkflow(
   const existingPolicy = base.supervisorRequest.policy ?? {};
   const supervisorRequest: SpriteSupervisorCompileRequestInput = {
     ...base.supervisorRequest,
-    tasks: transformed.tasks,
+    tasks,
     policy: {
       ...existingPolicy,
       maximumTicks: Math.max(
         existingPolicy.maximumTicks ?? 1_000,
-        transformed.tasks.length * 8,
+        tasks.length * 8,
       ),
+      requiredReleaseArtifactRoles: [
+        ...new Set([
+          ...(existingPolicy.requiredReleaseArtifactRoles ?? []),
+          FAMILY_ADAPTIVE_PROOF_ROLE,
+        ]),
+      ],
     },
     metadata: normalizeJson({
       ...existingMetadata,
       adaptiveFinalization: {
         ...options,
         adaptiveTaskCount: transformed.adaptiveTaskIds.size,
+        familyProofRole: FAMILY_ADAPTIVE_PROOF_ROLE,
         qualityThresholdsRelaxed: false,
       },
     }),
@@ -348,7 +385,7 @@ export function compileAutomaticSpriteFinalizationWorkflow(
         ...base.analysis.base,
         totals: {
           ...base.analysis.base.totals,
-          tasks: transformed.tasks.length,
+          tasks: tasks.length,
         },
       },
       finalization: {
