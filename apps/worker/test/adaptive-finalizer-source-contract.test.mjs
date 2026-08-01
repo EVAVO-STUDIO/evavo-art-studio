@@ -8,7 +8,7 @@ const read = (relativePath) =>
 const readRepository = (relativePath) =>
   readFile(new URL(`../../../${relativePath}`, import.meta.url), "utf8");
 
-test("worker registers adaptive finalization and proof-backed family verification", async () => {
+test("worker registers adaptive finalization and envelope-backed family verification", async () => {
   const [index, handler, guard, family, packageSource, tsconfigSource] =
     await Promise.all([
       read("src/index.ts"),
@@ -44,6 +44,8 @@ test("worker registers adaptive finalization and proof-backed family verificatio
     'deliveryProfileId: "godot-sprite-lossless"',
     "normalizeSuccessfulLineage(",
     '"candidate-adaptive-finalization-envelope"',
+    "finalizationEnvelopeArtifactId: envelope.artifactId",
+    "sourceArtifacts: [sourceId, envelope.artifactId]",
     "provenanceNormalized: true",
     "return base(guardedContext(context, payload))",
   ]) {
@@ -52,6 +54,10 @@ test("worker registers adaptive finalization and proof-backed family verificatio
   for (const token of [
     '"sprite-family-adaptive-proof-evidence"',
     '"candidate-hostile-background-proof"',
+    '"candidate-adaptive-finalization-envelope"',
+    "finalizationEnvelopeArtifactId",
+    "ADAPTIVE_FAMILY_ENVELOPE_BODY_MISMATCH",
+    "everyEnvelopeVerified: true",
     "MAXIMUM_LINEAGE_DEPTH = 10",
     "qualityThresholdsRelaxed: false",
   ]) {
