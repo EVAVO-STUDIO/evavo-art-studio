@@ -184,6 +184,41 @@ function request(overrides = {}) {
   };
 }
 
+function finalReviewState(workflow, tick = 4) {
+  const initial = createInitialSpriteSupervisorState(
+    workflow.request,
+    workflow.workflowSha256,
+    new Date("2026-08-01T00:00:00.000Z"),
+  );
+  return {
+    ...initial,
+    status: "review-required",
+    tick,
+    taskStates: {
+      ...initial.taskStates,
+      "generate-idle": {
+        ...initial.taskStates["generate-idle"],
+        status: "succeeded",
+      },
+    },
+  };
+}
+
+function releaseResolution(expectedStateTick = 4, overrides = {}) {
+  return {
+    resolutionId: "release-review-001",
+    expectedStateTick,
+    taskId: "$release",
+    action: "approve-release",
+    approver: "Greg Parker",
+    reason: "Reviewed complete release evidence.",
+    artifactBindings: [
+      { role: "idle-key-pose", artifactIds: [CANDIDATE] },
+    ],
+    ...overrides,
+  };
+}
+
 test("compiles deterministic root supervision jobs", () => {
   const first = compileSpriteSupervisorWorkflow(request());
   const second = compileSpriteSupervisorWorkflow(request());
@@ -198,6 +233,17 @@ test("compiles deterministic root supervision jobs", () => {
   ]);
   assert.ok(first.rootJob.inputArtifacts.includes(IDENTITY));
   assert.ok(first.rootJob.inputArtifacts.includes(CANDIDATE));
+});
+
+test("review submissions retain workflow identity but receive a new request identity", () => {
+  const base = compileSpriteSupervisorWorkflow(request());
+  const reviewed = compileSpriteSupervisorWorkflow(
+    request({ reviewResolutions: [releaseResolution()] }),
+  );
+  assert.equal(reviewed.workflowSha256, base.workflowSha256);
+  assert.notEqual(reviewed.requestSha256, base.requestSha256);
+  assert.notEqual(reviewed.rootJob.idempotencyKey, base.rootJob.idempotencyKey);
+  assert.equal(reviewed.rootJob.payload.requestSha256, reviewed.requestSha256);
 });
 
 test("materialises plan, run and artifact placeholders without losing lineage", () => {
@@ -257,32 +303,81 @@ test("redrives transient work, then routes repair, then requires review", () => 
   );
 });
 
-test("applies named review approval and artifact bindings", () => {
+test("applies a one-time release approval only to the exact final review state", () => {
   const reviewedRequest = request({
-    reviewResolutions: [
-      {
-        taskId: "$release",
-        action: "approve-release",
-        approver: "Greg Parker",
-        reason: "Reviewed complete release evidence.",
-        artifactBindings: [
-          { role: "idle-key-pose", artifactIds: [CANDIDATE] },
-        ],
-      },
-    ],
+    reviewResolutions: [releaseResolution()],
   });
   const workflow = compileSpriteSupervisorWorkflow(reviewedRequest);
-  const state = createInitialSpriteSupervisorState(
-    workflow.request,
-    workflow.workflowSha256,
-  );
+  const state = finalReviewState(workflow);
   const applied = applySpriteSupervisorReviewResolutions(
     workflow.request,
     state,
     new Date("2026-08-01T01:00:00.000Z"),
   );
+  assert.equal(applied.status, "running");
   assert.equal(applied.releaseApprovedBy?.approver, "Greg Parker");
+  assert.equal(applied.releaseApprovedBy?.resolutionId, "release-review-001");
   assert.ok(applied.artifactBindings["idle-key-pose"].includes(CANDIDATE));
+  assert.equal(applied.appliedReviewResolutions.length, 1);
+
+  const replayed = applySpriteSupervisorReviewResolutions(
+    workflow.request,
+    applied,
+    new Date("2026-08-01T01:01:00.000Z"),
+  );
+  assert.equal(replayed.appliedReviewResolutions.length, 1);
+  assert.equal(
+    replayed.decisions.filter((entry) => entry.action === "apply-review").length,
+    1,
+  );
+});
+
+test("rejects premature, stale and conflicting review commands", () => {
+  const reviewed = compileSpriteSupervisorWorkflow(
+    request({ reviewResolutions: [releaseResolution()] }),
+  );
+  const initial = createInitialSpriteSupervisorState(
+    reviewed.request,
+    reviewed.workflowSha256,
+  );
+  assert.throws(
+    () => applySpriteSupervisorReviewResolutions(reviewed.request, initial),
+    (error) =>
+      error instanceof SpriteSupervisorError &&
+      error.code === "SPRITE_SUPERVISOR_REVIEW_STATE_STALE",
+  );
+
+  const staleWorkflow = compileSpriteSupervisorWorkflow(
+    request({ reviewResolutions: [releaseResolution(3)] }),
+  );
+  assert.throws(
+    () =>
+      applySpriteSupervisorReviewResolutions(
+        staleWorkflow.request,
+        finalReviewState(staleWorkflow, 4),
+      ),
+    (error) =>
+      error instanceof SpriteSupervisorError &&
+      error.code === "SPRITE_SUPERVISOR_REVIEW_STATE_STALE",
+  );
+
+  const applied = applySpriteSupervisorReviewResolutions(
+    reviewed.request,
+    finalReviewState(reviewed),
+  );
+  const conflicting = compileSpriteSupervisorWorkflow(
+    request({
+      reviewResolutions: [
+        releaseResolution(4, { reason: "Different command content." }),
+      ],
+    }),
+  );
+  assert.throws(
+    () => applySpriteSupervisorReviewResolutions(conflicting.request, applied),
+    (error) =>
+      error instanceof SpriteSupervisorError &&
+      error.code === "SPRITE_SUPERVISOR_REVIEW_ID_CONFLICT",
+  );
 });
 
 test("rejects secrets and attempts to weaken quality policy", () => {
@@ -310,6 +405,25 @@ test("rejects uncovered production stages when completeness is required", () => 
     (error) =>
       error instanceof SpriteSupervisorError &&
       error.code === "SPRITE_SUPERVISOR_PLAN_STAGE_UNCOVERED",
+  );
+});
+
+test("rejects incomplete review command contracts", () => {
+  const unsafe = request({
+    reviewResolutions: [
+      {
+        taskId: "$release",
+        action: "approve-release",
+        approver: "Greg Parker",
+        reason: "Missing state binding.",
+      },
+    ],
+  });
+  assert.throws(
+    () => validateSpriteSupervisorCompileRequest(unsafe),
+    (error) =>
+      error instanceof SpriteSupervisorError &&
+      error.code === "SPRITE_SUPERVISOR_REQUEST_INVALID",
   );
 });
 
