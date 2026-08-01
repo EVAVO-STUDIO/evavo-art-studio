@@ -1,18 +1,7 @@
 import { normalizeJson, type JsonValue } from "@evavo/art-artifacts";
 
-import {
-  AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION,
-  type AutomaticSpriteProductionUnit,
-  type AutomaticSpriteWorkflowAnalysis,
-  type CompiledAutomaticSpriteWorkflow,
-} from "./automatic-types.js";
-import {
-  FAMILY_MIRROR_PROOF_ROLE,
-  MIRROR_OPERATION,
-  mirrorManifestUnits,
-  mirrorTaskId,
-  type MirrorDraft,
-} from "./automatic-mirror-drafts.js";
+import { AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION, type AutomaticSpriteProductionUnit, type AutomaticSpriteWorkflowAnalysis, type CompiledAutomaticSpriteWorkflow } from "./automatic-types.js";
+import { FAMILY_MIRROR_PROOF_ROLE, MIRROR_OPERATION, mirrorManifestUnits, mirrorTaskId, type MirrorDraft } from "./automatic-mirror-drafts.js";
 import { DERIVED_DIRECTION_CODE } from "./automatic-mirror-policy.js";
 import type { SpriteSupervisorTaskInput } from "./types.js";
 import { SpriteSupervisorError } from "./types.js";
@@ -106,14 +95,12 @@ export function transformMirrorFamilyTask(
     payloadTemplate: normalizeJson({
       ...payload,
       frames: [...existingFrames, ...appendedFrames].sort((left, right) => {
-        const leftIndex =
-          isRecord(left) && typeof left.globalFrameIndex === "number"
-            ? left.globalFrameIndex
-            : 0;
-        const rightIndex =
-          isRecord(right) && typeof right.globalFrameIndex === "number"
-            ? right.globalFrameIndex
-            : 0;
+        const leftIndex = isRecord(left) && typeof left.globalFrameIndex === "number"
+          ? left.globalFrameIndex
+          : 0;
+        const rightIndex = isRecord(right) && typeof right.globalFrameIndex === "number"
+          ? right.globalFrameIndex
+          : 0;
         return leftIndex - rightIndex;
       }),
       metadata: {
