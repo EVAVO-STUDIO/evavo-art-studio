@@ -14,7 +14,12 @@ import {
 import type {
   AutomaticSpriteFinalizationCompileRequestInput,
   CompiledAutomaticSpriteFinalizationWorkflow,
+  NormalizedAutomaticSpriteFinalizationRequest,
 } from "./automatic-finalization-types.js";
+import {
+  automaticSpriteFinalizationRequestSha256,
+  validateAutomaticSpriteFinalizationRequest,
+} from "./automatic-finalization-validation.js";
 import { compileSpriteSupervisorWorkflow } from "./compiler.js";
 import type { SpriteSupervisorCompileRequestInput } from "./types.js";
 import { SpriteSupervisorError } from "./types.js";
@@ -70,6 +75,7 @@ export function compileAutomaticSpriteFinalizationWorkflow(
   }
   assertMirrorSafety(initial, derivedDirections);
 
+  const publicValidated = validateAutomaticSpriteFinalizationRequest(input);
   const compiled = compileBaseAutomaticSpriteFinalizationWorkflow(
     mirrorFinalizationInput(input),
   );
@@ -89,6 +95,10 @@ export function compileAutomaticSpriteFinalizationWorkflow(
       automaticRequestSha256: mirroredBase.requestSha256,
     }),
   };
+  const publicRequest: NormalizedAutomaticSpriteFinalizationRequest = {
+    ...compiled.request,
+    workflow: publicValidated.workflow,
+  };
   const baseAnalysis = {
     ...applied.analysis,
     totals: {
@@ -98,6 +108,8 @@ export function compileAutomaticSpriteFinalizationWorkflow(
   };
   return {
     ...compiled,
+    request: publicRequest,
+    requestSha256: automaticSpriteFinalizationRequestSha256(publicRequest),
     baseWorkflow: mirroredBase,
     analysis: {
       ...compiled.analysis,
