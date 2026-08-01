@@ -67,7 +67,10 @@ function payloadWorkflow(value: unknown) {
       "Supervisor payload must be a schemaVersion 1.0 object.",
     );
   }
-  if (typeof value.workflowSha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.workflowSha256)) {
+  if (
+    typeof value.workflowSha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(value.workflowSha256)
+  ) {
     throw new PermanentRuntimeError(
       "SPRITE_SUPERVISOR_PAYLOAD_INVALID",
       "workflowSha256 must be a 64-character lowercase SHA-256.",
@@ -140,7 +143,9 @@ async function readVerifiedJson(
   }
   let value: unknown;
   try {
-    value = JSON.parse((await context.artifacts.read(artifactId)).toString("utf8")) as unknown;
+    value = JSON.parse(
+      (await context.artifacts.read(artifactId)).toString("utf8"),
+    ) as unknown;
   } catch (error: unknown) {
     throw new PermanentRuntimeError(
       "SPRITE_SUPERVISOR_ARTIFACT_JSON_INVALID",
@@ -221,7 +226,9 @@ async function selectorArtifactIds(
     );
   }
   const descriptors = (
-    await Promise.all(job.outputArtifacts.map((artifactId) => context.artifacts.get(artifactId)))
+    await Promise.all(
+      job.outputArtifacts.map((artifactId) => context.artifacts.get(artifactId)),
+    )
   ).filter((entry): entry is StoredArtifact => entry !== null);
   if (selector.source === "output-artifact-labels") {
     return descriptors
@@ -240,7 +247,9 @@ async function selectorArtifactIds(
       const value = JSON.parse(
         (await context.artifacts.read(artifact.artifactId)).toString("utf8"),
       ) as unknown;
-      output.push(...artifactIdsFromUnknown(valueAtJsonPointer(value, selector.pointer)));
+      output.push(
+        ...artifactIdsFromUnknown(valueAtJsonPointer(value, selector.pointer)),
+      );
     } catch {
       continue;
     }
@@ -250,7 +259,10 @@ async function selectorArtifactIds(
 
 function mergeArtifactBindings(
   state: SpriteSupervisorState,
-  additions: readonly Readonly<{ role: string; artifactIds: readonly ArtifactId[] }>[],
+  additions: readonly Readonly<{
+    role: string;
+    artifactIds: readonly ArtifactId[];
+  }>[],
 ): SpriteSupervisorState["artifactBindings"] {
   const result: Record<string, readonly ArtifactId[]> = {
     ...state.artifactBindings,
@@ -315,7 +327,10 @@ function taskAttempt(
 
 function taskWithoutCurrent(
   taskState: SpriteSupervisorTaskState,
-): Omit<SpriteSupervisorTaskState, "currentChildJobId" | "lastFailure" | "reviewReason"> {
+): Omit<
+  SpriteSupervisorTaskState,
+  "currentChildJobId" | "lastFailure" | "reviewReason"
+> {
   const {
     currentChildJobId: _currentChildJobId,
     lastFailure: _lastFailure,
@@ -334,7 +349,10 @@ async function bindTaskSelectors(
   state: SpriteSupervisorState;
   boundRoles: readonly string[];
 }> {
-  const additions: Array<{ role: string; artifactIds: readonly ArtifactId[] }> = [];
+  const additions: Array<{
+    role: string;
+    artifactIds: readonly ArtifactId[];
+  }> = [];
   for (const selector of task.outputBindings) {
     if (
       selector.source === "failure-details" &&
@@ -365,7 +383,9 @@ async function bindTaskSelectors(
         }),
       );
     }
-    if (artifactIds.length) additions.push({ role: selector.role, artifactIds });
+    if (artifactIds.length) {
+      additions.push({ role: selector.role, artifactIds });
+    }
   }
   if (!additions.length) return { state, boundRoles: [] };
   const at = new Date().toISOString();
@@ -463,7 +483,8 @@ async function observeTask(
   }
 
   const alreadyRecorded = currentState.attempts.some(
-    (attempt) => attempt.childJobId === job.id && attempt.childState === job.state,
+    (attempt) =>
+      attempt.childJobId === job.id && attempt.childState === job.state,
   );
   const attempts = alreadyRecorded
     ? currentState.attempts
@@ -517,10 +538,12 @@ async function observeTask(
   }
 
   const failure = job.failure ?? {
-    classification: job.state === "cancelled" ? "cancelled" as const : "permanent" as const,
-    code: job.state === "cancelled"
-      ? "RUNTIME_JOB_CANCELLED"
-      : "SPRITE_SUPERVISOR_CHILD_TERMINAL_WITHOUT_FAILURE",
+    classification:
+      job.state === "cancelled" ? ("cancelled" as const) : ("permanent" as const),
+    code:
+      job.state === "cancelled"
+        ? "RUNTIME_JOB_CANCELLED"
+        : "SPRITE_SUPERVISOR_CHILD_TERMINAL_WITHOUT_FAILURE",
     message: `Child job reached ${job.state}.`,
   };
   const taskWithFailure: SpriteSupervisorTaskState = {
@@ -725,10 +748,24 @@ async function verifyReleaseArtifacts(
         context.artifacts.get(artifactId),
         context.artifacts.verify(artifactId),
       ]);
-      if (!artifact || !verification.exists || !verification.descriptorValid || !verification.contentValid) {
+      if (
+        !artifact ||
+        !verification.exists ||
+        !verification.descriptorValid ||
+        !verification.contentValid
+      ) {
         throw new SpriteSupervisorError(
           "SPRITE_SUPERVISOR_RELEASE_ARTIFACT_INVALID",
           `Release artifact failed immutable verification: ${artifactId}`,
+        );
+      }
+      if (
+        artifact.storageClass === "intermediate" ||
+        artifact.labels.approvalState === "unapproved"
+      ) {
+        throw new SpriteSupervisorError(
+          "SPRITE_SUPERVISOR_RELEASE_ARTIFACT_UNAPPROVED",
+          `Intermediate or unapproved artifact cannot satisfy release role ${role}: ${artifactId}`,
         );
       }
       if (artifact.labels.qualityState === "rejected") {
@@ -870,7 +907,7 @@ async function submitNextTick(
   runtime: RuntimeRepository,
   now: Date,
 ): Promise<string> {
-  const nextTick = state.tick + 1;
+  const nextTick = state.tick;
   const next = await runtime.submit(
     {
       queue: "control",
@@ -887,7 +924,9 @@ async function submitNextTick(
       maximumAttempts: 3,
       leaseDurationMs: 120_000,
       timeoutMs: 300_000,
-      notBefore: new Date(now.getTime() + request.policy.tickDelayMs).toISOString(),
+      notBefore: new Date(
+        now.getTime() + request.policy.tickDelayMs,
+      ).toISOString(),
       labels: {
         runId: request.runId,
         spritePlanId: request.spritePlan.planId,
@@ -1105,7 +1144,15 @@ export function createSpriteSupervisorHandlers(
         }),
       };
     } catch (error: unknown) {
-      if (error instanceof SpriteSupervisorError) throw supervisorFailure(error);
+      if (
+        error instanceof TransientRuntimeError ||
+        error instanceof PermanentRuntimeError
+      ) {
+        throw error;
+      }
+      if (error instanceof SpriteSupervisorError) {
+        throw supervisorFailure(error);
+      }
       if (error instanceof RuntimeError || error instanceof ArtifactStoreError) {
         throw new PermanentRuntimeError(error.code, error.message);
       }
