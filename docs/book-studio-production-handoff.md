@@ -30,6 +30,12 @@ A provider response, high score, shortlist or selection result is not an approve
 
 Docs Suite creates `BookArtworkUseBindingV1` only for an approved promoted artifact. The binding identifies the exact scene or illustration placement, crop/placement digest, source brief, artifact bytes and promotion receipt. The canonical renderer must resolve and verify the artifact bytes rather than trusting a mutable local path.
 
+## Legacy Website artifacts
+
+Existing Website records use `book-cover-artifact://` and `book-publication-artifact://` references. The compatibility contract accepts those exact identities through an explicit translation record. The legacy reference remains retained, no art bytes are rewritten, and both the artifact receipt and book-use binding must name the same original reference.
+
+The canonical migration form is used only for validation and routing. It does not silently rename an approved object or allow a different reference to pass as the same artwork.
+
 ## Transport
 
 Large image files use immutable artifact references or bounded binary upload. They are not embedded as large JSON/base64 request fields.
