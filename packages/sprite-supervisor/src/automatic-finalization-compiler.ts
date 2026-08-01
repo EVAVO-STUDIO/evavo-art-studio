@@ -124,6 +124,85 @@ function appendUnique<T>(
   return [...new Set([...values, ...additions])];
 }
 
+function correctedLayerReferences(
+  task: SpriteSupervisorTaskInput,
+  payload: Readonly<Record<string, JsonValue>>,
+): readonly JsonValue[] {
+  const references = Array.isArray(payload.references)
+    ? [...payload.references]
+    : [];
+  if (payload.assetKind !== "sprite-layer") return references;
+  const frameId = typeof payload.frameId === "string" ? payload.frameId : undefined;
+  const identityRoles = (task.requiredArtifactRoles ?? []).filter(
+    (entry) =>
+      entry.startsWith("automatic.frame-master.") &&
+      entry.endsWith(".identity-core"),
+  );
+  const currentIdentityRole = frameId
+    ? identityRoles.find((entry) =>
+        entry.includes(`.${frameId}.identity-core`),
+      )
+    : identityRoles[0];
+  if (!currentIdentityRole) {
+    throw new SpriteSupervisorError(
+      "AUTOMATIC_SPRITE_LAYER_BASE_FRAME_MISSING",
+      `Layer task ${task.id} has no current selected identity frame binding.`,
+    );
+  }
+  const output = references.filter((entry) => {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      return true;
+    }
+    const referenceRole = (entry as Readonly<Record<string, JsonValue>>).role;
+    return (
+      referenceRole !== "base-image" &&
+      referenceRole !== "previous-key-pose" &&
+      referenceRole !== "next-key-pose"
+    );
+  });
+  output.push(
+    normalizeJson({
+      artifactId: { $artifact: currentIdentityRole },
+      role: "base-image",
+      strength: 1,
+      required: true,
+    }),
+  );
+  if (payload.continuityPhase === "in-between") {
+    const neighbours = identityRoles.filter(
+      (entry) => entry !== currentIdentityRole,
+    );
+    if (neighbours.length !== 2) {
+      throw new SpriteSupervisorError(
+        "AUTOMATIC_SPRITE_LAYER_NEIGHBOUR_BINDING_INVALID",
+        `Layer in-between task ${task.id} requires exactly two neighbouring key-pose masters; found ${neighbours.length}.`,
+        normalizeJson({
+          taskId: task.id,
+          frameId: frameId ?? null,
+          identityRoles,
+          currentIdentityRole,
+          neighbours,
+        }),
+      );
+    }
+    output.push(
+      normalizeJson({
+        artifactId: { $artifact: neighbours[0]! },
+        role: "previous-key-pose",
+        strength: 1,
+        required: true,
+      }),
+      normalizeJson({
+        artifactId: { $artifact: neighbours[1]! },
+        role: "next-key-pose",
+        strength: 1,
+        required: true,
+      }),
+    );
+  }
+  return output;
+}
+
 function threeDReferenceObjects(
   threeD: NormalizedAutomaticSpriteThreeDReference | undefined,
   direction: string | undefined,
@@ -205,9 +284,7 @@ function transformCandidateTask(
       : {};
   const direction =
     typeof shot.direction === "string" ? shot.direction : undefined;
-  const existingReferences = Array.isArray(payload.references)
-    ? payload.references
-    : [];
+  const existingReferences = correctedLayerReferences(task, payload);
   const existingNegative =
     typeof payload.negativeIntent === "string" ? payload.negativeIntent : "";
   const metadata =
