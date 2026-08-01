@@ -565,8 +565,15 @@ export function applySpriteSupervisorReviewResolutions(
     const unresolved = Object.values(taskStates).some(
       (entry) => entry.status === "review-required",
     );
-    if (!unresolved && releaseApprovedBy) status = "running";
-    else if (!unresolved && !request.policy.requireFinalHumanApproval) status = "running";
+    const requiredComplete = request.tasks
+      .filter((task) => task.required)
+      .every((task) => taskStates[task.id]?.status === "succeeded");
+    if (
+      !unresolved &&
+      (!requiredComplete || releaseApprovedBy || !request.policy.requireFinalHumanApproval)
+    ) {
+      status = "running";
+    }
   }
   return {
     ...state,
@@ -581,8 +588,11 @@ export function applySpriteSupervisorReviewResolutions(
 }
 
 export function supervisorActiveTaskCount(state: SpriteSupervisorState): number {
-  return Object.values(state.taskStates).filter((entry) =>
-    ["submitted", "waiting", "running"].includes(entry.status),
+  return Object.values(state.taskStates).filter(
+    (entry) =>
+      entry.status === "submitted" ||
+      entry.status === "running" ||
+      (entry.status === "waiting" && entry.currentChildJobId !== undefined),
   ).length;
 }
 
