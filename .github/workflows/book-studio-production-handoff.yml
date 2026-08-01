@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/book-studio-production-handoff.yml"
       - "packages/contracts/src/book-production.ts"
+      - "packages/contracts/src/book-production-legacy-compat.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-production.test.mjs"
       - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
@@ -16,6 +17,7 @@ on:
     paths:
       - ".github/workflows/book-studio-production-handoff.yml"
       - "packages/contracts/src/book-production.ts"
+      - "packages/contracts/src/book-production-legacy-compat.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-production.test.mjs"
       - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
@@ -47,7 +49,7 @@ jobs:
           package-manager-cache: false
       - name: Verify migration authority
         run: node scripts/check-book-studio-production-handoff.mjs
-      - name: Compile dependency-light Book Art contract
+      - name: Compile dependency-light Book Art contracts
         run: |
           rm -rf packages/contracts/dist
           mkdir -p packages/contracts/dist
@@ -58,7 +60,11 @@ jobs:
             --strict \
             --skipLibCheck \
             --outDir packages/contracts/dist \
-            packages/contracts/src/book-production.ts
-          cp packages/contracts/dist/book-production.js packages/contracts/dist/index.js
+            packages/contracts/src/book-production.ts \
+            packages/contracts/src/book-production-legacy-compat.ts
+          printf '%s\n' \
+            'export * from "./book-production.js";' \
+            'export * from "./book-production-legacy-compat.js";' \
+            > packages/contracts/dist/index.js
       - name: Run Book Art contract attacks
         run: node --test packages/contracts/test/book-production.test.mjs
