@@ -118,12 +118,15 @@ test("automatic workflow compiles every authored frame into executable branches"
 
 test("automatic protocol states its provider-free and fail-closed boundaries", () => {
   const protocol = automaticSpriteWorkflowProtocolSummary();
-  assert.equal(protocol.protocolVersion, "2026-08-01.1");
+  assert.equal(protocol.protocolVersion, "2026-08-02.1");
   assert.ok(
     protocol.productionRules.some((entry) => entry.includes("target-size")),
   );
   assert.ok(
-    protocol.failClosedRules.some((entry) => entry.includes("Derived mirrored")),
+    protocol.mirrorRules.some((entry) => entry.includes("RGBA")),
+  );
+  assert.ok(
+    protocol.failClosedRules.some((entry) => entry.includes("Derived directions")),
   );
   assert.match(protocol.executionBoundary, /never call a provider/i);
 });

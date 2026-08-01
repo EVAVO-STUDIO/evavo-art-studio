@@ -59,7 +59,7 @@ test("CLI exposes automatic sprite finalization protocol", () => {
   const result = run(["automatic-sprite-finalization-protocol"]);
   assert.equal(result.status, 0, result.stderr);
   const body = JSON.parse(result.stdout);
-  assert.equal(body.protocolVersion, "2026-08-01.1");
+  assert.equal(body.protocolVersion, "2026-08-02.1");
   assert.ok(body.backgroundModes.includes("black-additive"));
   assert.ok(body.backgroundRules.some((entry) => entry.includes("checkerboards")));
   assert.ok(body.adaptiveRepairRules.some((entry) => entry.includes("bounded")));

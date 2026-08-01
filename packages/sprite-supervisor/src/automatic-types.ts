@@ -11,7 +11,7 @@ import type {
 } from "./types.js";
 
 export const AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION =
-  "2026-08-01.1" as const;
+  "2026-08-02.1" as const;
 
 export type AutomaticSpriteWorkflowDisposition =
   | "ready"
@@ -146,6 +146,13 @@ export interface AutomaticSpriteProductionUnit {
   readonly masterArtifactRole: string;
   readonly dependencyMasterRoles: readonly string[];
   readonly dependencyTaskIds: readonly string[];
+  readonly derivation?: Readonly<{
+    readonly kind: "horizontal-mirror";
+    readonly sourceDirection: string;
+    readonly sourceFrameId?: string;
+    readonly sourceMasterArtifactRole: string;
+    readonly evidenceArtifactRole: string;
+  }>;
 }
 
 export interface AutomaticSpriteWorkflowAnalysis {
@@ -165,6 +172,9 @@ export interface AutomaticSpriteWorkflowAnalysis {
     readonly promotionJobs: number;
     readonly familyVerificationJobs: number;
     readonly tasks: number;
+    readonly derivedDirections?: number;
+    readonly derivedFrames?: number;
+    readonly mirrorJobs?: number;
   }>;
 }
 
