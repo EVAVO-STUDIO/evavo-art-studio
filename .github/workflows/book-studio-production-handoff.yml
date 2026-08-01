@@ -1,0 +1,64 @@
+name: Book Studio Production Handoff
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/book-studio-production-handoff.yml"
+      - "packages/contracts/src/book-production.ts"
+      - "packages/contracts/src/index.ts"
+      - "packages/contracts/test/book-production.test.mjs"
+      - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
+      - "docs/book-studio-production-handoff.md"
+      - "scripts/check-book-studio-production-handoff.mjs"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/book-studio-production-handoff.yml"
+      - "packages/contracts/src/book-production.ts"
+      - "packages/contracts/src/index.ts"
+      - "packages/contracts/test/book-production.test.mjs"
+      - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
+      - "docs/book-studio-production-handoff.md"
+      - "scripts/check-book-studio-production-handoff.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: book-studio-production-handoff-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Use governed Node.js runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      - name: Verify migration authority
+        run: node scripts/check-book-studio-production-handoff.mjs
+      - name: Compile dependency-light Book Art contract
+        run: |
+          rm -rf packages/contracts/dist
+          mkdir -p packages/contracts/dist
+          npm exec --yes --package=typescript@5.9.3 -- tsc \
+            --target ES2022 \
+            --module NodeNext \
+            --moduleResolution NodeNext \
+            --strict \
+            --skipLibCheck \
+            --outDir packages/contracts/dist \
+            packages/contracts/src/book-production.ts
+          cp packages/contracts/dist/book-production.js packages/contracts/dist/index.js
+      - name: Run Book Art contract attacks
+        run: node --test packages/contracts/test/book-production.test.mjs

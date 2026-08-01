@@ -1,3 +1,4 @@
+export * from "./book-production.js";
 export * from "./constants.js";
 export * from "./models.js";
 export * from "./sprite-models.js";

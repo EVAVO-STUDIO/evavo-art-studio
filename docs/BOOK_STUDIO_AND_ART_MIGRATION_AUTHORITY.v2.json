@@ -1,0 +1,38 @@
+{
+  "schema": "evavo/book-studio-and-art-migration-authority",
+  "version": 2,
+  "migrationRunId": "book-studio-and-art-migration-20260802",
+  "reviewedAt": "2026-08-02",
+  "status": "contract_extraction_started_no_runtime_cutover",
+  "sourceHeads": {
+    "website": { "repository": "EVAVO-STUDIO/Website", "commit": "01dc0f36635c77e94d852e5691f0047bc7e275c0", "path": "tools/evavo-doc-studio", "role": "active_compatibility_source" },
+    "docsSuite": { "repository": "EVAVO-STUDIO/evavo-docs-suite", "commit": "8ad88ced58f90ade1f9f48ab491ece446c07697c", "role": "target_book_and_document_product_home" },
+    "artStudio": { "repository": "EVAVO-STUDIO/evavo-art-studio", "commit": "6a8bec366c8e9695012e51a863a630648f83d501", "role": "target_art_production_authority" },
+    "writingStudio": { "repository": "EVAVO-STUDIO/evavo-writing-studio", "commit": "72415fd14f44b3350ff70c238822a029e5b81bc9", "role": "reusable_writing_intelligence_authority" }
+  },
+  "ownership": [
+    { "capability": "book_domain_manuscript_story_review_orchestration", "current": "EVAVO-STUDIO/Website:tools/evavo-doc-studio", "target": "EVAVO-STUDIO/evavo-docs-suite", "moveMode": "port_with_golden_parity" },
+    { "capability": "book_visual_canon_art_direction_cover_composition_layout_publication", "current": "EVAVO-STUDIO/Website:tools/evavo-doc-studio", "target": "EVAVO-STUDIO/evavo-docs-suite", "moveMode": "port_and_split_visual_execution" },
+    { "capability": "cover_and_illustration_candidate_generation_mastering_quality_selection_promotion", "current": "EVAVO-STUDIO/Website:tools/evavo-doc-studio plus EVAVO-STUDIO/evavo-art-studio", "target": "EVAVO-STUDIO/evavo-art-studio", "moveMode": "converge_on_art_studio_contracts" },
+    { "capability": "reusable_voice_fact_drafting_critique_evaluation", "current": "EVAVO-STUDIO/evavo-writing-studio", "target": "EVAVO-STUDIO/evavo-writing-studio", "moveMode": "versioned_service_adapter" }
+  ],
+  "visualBoundary": {
+    "docsSuiteOwns": ["exact manuscript, book, series and edition identity", "visual manuscript coverage, canon, spoiler and continuity state", "manuscript-grounded art direction and concept territories", "cover scene, typography, spine, back copy, ISBN and barcode layout", "illustration inventory, placement, captions, alt text and text relationships", "rendered edition evidence, Previewer, proof and publication packages", "binding an approved Art Studio artifact to one exact book use"],
+    "artStudioOwns": ["provider-neutral image generation, editing and inpaint execution", "immutable source, provider and rights provenance", "technical raster inspection, mastering, repair and retouch evidence", "candidate comparison, near-duplicate detection and ranking evidence", "separate named or automatic promotion to an approved art master", "immutable approved artifact references and art delivery variants"],
+    "writingStudioOwns": ["reusable identity, voice, fact, source and uncertainty services", "general drafting, alternatives, critique and writing evaluation"],
+    "forbiddenTransfers": ["manuscript or series canon into Art Studio", "cover typography, ISBN, barcode, KDP geometry or publication authority into Art Studio", "provider credentials or raw provider responses into Docs Suite browser code", "canonical manuscript mutation into Writing Studio", "cross-repository runtime source imports"]
+  },
+  "contractExtraction": { "docsSuiteContract": "evavo_book_art_handoff_v1", "artStudioContract": "evavo_book_art_handoff_v1", "candidateIsFinal": false, "approvedArtifactRequiresPromotionReceipt": true, "bookUseRequiresApprovedArtifact": true, "generatedArtworkTextFreeWhenEditableTypographyRequired": true, "binaryTransport": "artifact_reference_or_bounded_binary_upload_not_json_base64", "singleAuthoritativeWriter": true },
+  "phases": [
+    { "id": "phase_0_exact_inventory", "state": "active", "completion": "blocked_until_compiler_output_is_reviewed" },
+    { "id": "phase_1_contract_extraction", "state": "active", "completion": "started_by_this_change" },
+    { "id": "phase_2_art_studio_convergence", "state": "planned", "completion": "blocked_until_contract_and_fixture_parity" },
+    { "id": "phase_3_docs_suite_service_port", "state": "planned", "completion": "blocked_until_inventory_and_contracts_pass" },
+    { "id": "phase_4_shadow_dual_run", "state": "blocked", "completion": "requires_success_and_failure_parity" },
+    { "id": "phase_5_controlled_cutover", "state": "blocked", "completion": "requires_named_approval_and_rollback_proof" },
+    { "id": "phase_6_website_source_retirement", "state": "blocked", "completion": "requires_observation_period_and_exact_deletion_manifest" }
+  ],
+  "gates": { "exactTrackedFileInventoryRequired": true, "symbolLevelSplitInventoryRequired": true, "goldenSuccessAndFailureFixturesRequired": true, "apiCliMcpCompatibilityRequired": true, "artifactByteAndHashPreservationRequired": true, "stateImportAndRollbackProofRequired": true, "noDualAuthoritativeWrites": true, "websiteSourceDeletionAllowed": false, "runtimeCutoverApproved": false, "publicationPerformed": false },
+  "currentFlags": { "websiteRuntimeStillActive": true, "docsSuiteBookRuntimeAuthoritative": false, "artStudioBookProfileAuthoritative": false, "writingStudioAdapterCutoverComplete": false, "sourceFilesDeleted": false, "publicationPerformed": false },
+  "recordFingerprint": "0554e3df525fe746c92d362551af18520c2b6d18a87b88b6f4c0ff4c77f543df"
+}
