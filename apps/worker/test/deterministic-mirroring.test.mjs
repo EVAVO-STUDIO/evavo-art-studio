@@ -237,19 +237,32 @@ test("worker mirrors the complete RGBA canvas and emits family-level proof", asy
     const familyHandler = createMirroredSpriteFamilyHandlers()[
       "sprite.family.verify"
     ];
+    const requiredCapabilities = [
+      "sprite.family.verify",
+      "media.layer-compose",
+      "selection.compare",
+      "evidence.bundle",
+      "media.sprite-mirror",
+    ];
+    const inputArtifacts = [source.artifactId, masterId, evidenceId];
+    const tamperedManifest = structuredClone(manifest);
+    tamperedManifest.metadata.deterministicMirroring.units[0].targetDirection =
+      "right";
+    await assert.rejects(
+      () =>
+        familyHandler(
+          context(
+            store,
+            tamperedManifest,
+            inputArtifacts,
+            requiredCapabilities,
+          ),
+        ),
+      (error) => error?.code === "MIRRORED_FAMILY_TARGET_STATE_INVALID",
+    );
+
     const familyResult = await familyHandler(
-      context(
-        store,
-        manifest,
-        [source.artifactId, masterId, evidenceId],
-        [
-          "sprite.family.verify",
-          "media.layer-compose",
-          "selection.compare",
-          "evidence.bundle",
-          "media.sprite-mirror",
-        ],
-      ),
+      context(store, manifest, inputArtifacts, requiredCapabilities),
     );
     const proofId = familyResult.result.horizontalMirrorProofEvidenceArtifactId;
     const proof = await store.get(proofId);
@@ -261,6 +274,69 @@ test("worker mirrors the complete RGBA canvas and emits family-level proof", asy
     assert.ok(proof.sourceArtifacts.includes(source.artifactId));
     assert.ok(proof.sourceArtifacts.includes(masterId));
     assert.ok(proof.sourceArtifacts.includes(evidenceId));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("worker rejects any weakened exact-mirror policy", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-mirror-policy-"));
+  const store = new LocalArtifactStore({ root });
+  try {
+    const source = await store.put(await sourcePng(), {
+      mediaType: "image/png",
+      storageClass: "master",
+      fileName: "right-selected-master.png",
+      labels: {
+        artifactRole: "selected-art-master",
+        approvalState: "selected",
+        qualityState: "passed",
+      },
+    });
+    const mirrorHandler = createDeterministicMirrorAwareFinalizerHandlers()[
+      "art.candidate.finalize-adaptive"
+    ];
+    await assert.rejects(
+      () =>
+        mirrorHandler(
+          context(
+            store,
+            {
+              schemaVersion: "1.0",
+              operation: "mirror-horizontal",
+              sourceArtifactId: source.artifactId,
+              sourceDirection: "right",
+              targetDirection: "left",
+              unitKind: "frame",
+              layerRole: "identity-core",
+              sourceFrameId: "idle:right:0000",
+              targetFrameId: "idle:left:0000",
+              expectedWidth: WIDTH,
+              expectedHeight: HEIGHT,
+              pivot: { x: WIDTH / 2, y: HEIGHT - 1 },
+              baseline: HEIGHT - 1,
+              policy: {
+                axis: "full-canvas-horizontal",
+                preserveCanvas: true,
+                preserveAlpha: true,
+                preserveTransparentRgb: false,
+                prohibitTrim: true,
+                prohibitResample: true,
+                requireExactRoundTrip: true,
+              },
+            },
+            [source.artifactId],
+            [
+              "media.adaptive-finalize",
+              "media.sprite-mirror",
+              "media.raster",
+              "quality.sprite-frame",
+              "evidence.bundle",
+            ],
+          ),
+        ),
+      (error) => error?.code === "DETERMINISTIC_MIRROR_POLICY_INVALID",
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
