@@ -1,4 +1,9 @@
-export const GODOT_SPRITE_PACKAGE_VERSION = "2026-07-29.1" as const;
+import type {
+  PackedAtlasAnimation,
+  SpriteAtlasPackageData,
+} from "@evavo/art-media";
+
+export const GODOT_SPRITE_PACKAGE_VERSION = "2026-08-01.1" as const;
 
 export interface GodotSpriteFramesDescriptor {
   readonly schemaVersion: "1.0";
@@ -6,10 +11,12 @@ export interface GodotSpriteFramesDescriptor {
   readonly targetEngine: "Godot 4.6.2";
   readonly atlasId: string;
   readonly atlasTexturePath: string;
+  readonly atlasTexturePaths?: readonly string[];
   readonly outputResourcePath: string;
   readonly textureFiltering: "nearest" | "linear";
   readonly frames: readonly Readonly<{
     id: string;
+    atlasPage?: number;
     region: Readonly<{ x: number; y: number; width: number; height: number }>;
     trim: Readonly<{ x: number; y: number; width: number; height: number }>;
     sourceSize: Readonly<{ width: number; height: number }>;
@@ -28,6 +35,18 @@ export interface GodotSpriteFramesDescriptor {
       relativeDuration: number;
     }>[];
   }>[];
+}
+
+export interface GodotSpriteAtlasPageInput {
+  readonly texturePath: string;
+  readonly packageData: SpriteAtlasPackageData;
+}
+
+export interface GodotSpriteFramesArtifactDescriptorInput {
+  readonly atlasId: string;
+  readonly pages: readonly GodotSpriteAtlasPageInput[];
+  readonly animations: readonly PackedAtlasAnimation[];
+  readonly outputResourcePath: string;
 }
 
 export interface GodotSpriteFramesWriteOptions {
