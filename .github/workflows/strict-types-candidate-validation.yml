@@ -1,0 +1,170 @@
+name: Disposable strict-runtime candidate validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+concurrency:
+  group: disposable-strict-runtime-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      BASE_MAIN_SHA: 6a8bec366c8e9695012e51a863a630648f83d501
+      VALIDATED_CANDIDATE_SHA: 8f54467e701a5f6bc1c209a4c5bfb18bb5681231
+      VALIDATION_WORKFLOW_PATH: .github/workflows/strict-types-candidate-validation.yml
+    steps:
+      - name: Check out exact validation head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact candidate and disposable workflow scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${BASE_MAIN_SHA}" ]] || { echo "Current main changed before validation" >&2; exit 1; }
+          [[ "$(git rev-parse HEAD^)" == "${VALIDATED_CANDIDATE_SHA}" ]] || { echo "Validation workflow is not directly based on the candidate" >&2; exit 1; }
+          git merge-base --is-ancestor "${BASE_MAIN_SHA}" "${VALIDATED_CANDIDATE_SHA}"
+          expected=(
+            ".github/workflows/ci.yml"
+            "apps/worker/src/adaptive-finalizer-guarded-handlers.ts"
+            "apps/worker/src/adaptive-sprite-family-handlers.ts"
+            "packages/audio-delivery-optimizer/test/audio.test.mjs"
+            "packages/sprite-supervisor/src/automatic-compiler.ts"
+          )
+          mapfile -t candidate_changed < <(git diff --name-only "${BASE_MAIN_SHA}".."${VALIDATED_CANDIDATE_SHA}")
+          [[ "${candidate_changed[*]}" == "${expected[*]}" ]] || { printf 'Unexpected candidate files:\n%s\n' "${candidate_changed[*]}" >&2; exit 1; }
+          mapfile -t workflow_changed < <(git diff --name-only "${VALIDATED_CANDIDATE_SHA}"..HEAD)
+          [[ "${#workflow_changed[@]}" -eq 1 ]] || { printf 'Unexpected validation files:\n%s\n' "${workflow_changed[*]}" >&2; exit 1; }
+          [[ "${workflow_changed[0]}" == "${VALIDATION_WORKFLOW_PATH}" ]] || { printf 'Unexpected validation file: %s\n' "${workflow_changed[0]}" >&2; exit 1; }
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Install and identify audio media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          FFMPEG_PATH="$(command -v ffmpeg)"
+          FFPROBE_PATH="$(command -v ffprobe)"
+          test -x "${FFMPEG_PATH}"
+          test -x "${FFPROBE_PATH}"
+          FFMPEG_VERSION="$(${FFMPEG_PATH} -version | head -n 1)"
+          FFPROBE_VERSION="$(${FFPROBE_PATH} -version | head -n 1)"
+          FFMPEG_SHA256="$(sha256sum "${FFMPEG_PATH}" | awk '{print $1}')"
+          FFPROBE_SHA256="$(sha256sum "${FFPROBE_PATH}" | awk '{print $1}')"
+          echo "FFMPEG_BIN=${FFMPEG_PATH}" >> "${GITHUB_ENV}"
+          echo "FFPROBE_BIN=${FFPROBE_PATH}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_FFMPEG_VERSION=${FFMPEG_VERSION}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_FFPROBE_VERSION=${FFPROBE_VERSION}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_FFMPEG_SHA256=${FFMPEG_SHA256}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_FFPROBE_SHA256=${FFPROBE_SHA256}" >> "${GITHUB_ENV}"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Verify exact repository toolchain
+        run: node scripts/check-repository-toolchain.mjs
+
+      - name: Run adversarial toolchain fixtures
+        run: node scripts/test-repository-toolchain.mjs
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Remove generated lockfile and verify clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Re-prove exact unchanged main and candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${BASE_MAIN_SHA}" ]] || { echo "Current main changed before receipt creation" >&2; exit 1; }
+          [[ "$(git rev-parse HEAD^)" == "${VALIDATED_CANDIDATE_SHA}" ]] || { echo "Candidate changed before receipt creation" >&2; exit 1; }
+
+      - name: Write bounded validation receipt
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const receipt = {
+            schemaVersion: "1.0",
+            repository: "EVAVO-STUDIO/evavo-art-studio",
+            baseMainSha: process.env.BASE_MAIN_SHA,
+            validatedCandidateSha: process.env.VALIDATED_CANDIDATE_SHA,
+            validationHeadSha: process.env.GITHUB_SHA,
+            candidateDifference: [
+              ".github/workflows/ci.yml",
+              "apps/worker/src/adaptive-finalizer-guarded-handlers.ts",
+              "apps/worker/src/adaptive-sprite-family-handlers.ts",
+              "packages/audio-delivery-optimizer/test/audio.test.mjs",
+              "packages/sprite-supervisor/src/automatic-compiler.ts"
+            ],
+            validationDifference: [process.env.VALIDATION_WORKFLOW_PATH],
+            node: "22.14.0",
+            pnpm: "10.13.1",
+            mediaTools: {
+              ffmpeg: {
+                path: process.env.FFMPEG_BIN,
+                version: process.env.VALIDATION_FFMPEG_VERSION,
+                sha256: process.env.VALIDATION_FFMPEG_SHA256
+              },
+              ffprobe: {
+                path: process.env.FFPROBE_BIN,
+                version: process.env.VALIDATION_FFPROBE_VERSION,
+                sha256: process.env.VALIDATION_FFPROBE_SHA256
+              }
+            },
+            validation: "passed",
+            completeWorkspaceCheck: true,
+            liveProviderRequest: false,
+            artifactPromotion: false,
+            deployment: "disabled"
+          };
+          const target = path.join(process.env.RUNNER_TEMP, "strict-runtime-candidate-validation.json");
+          fs.writeFileSync(target, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+          NODE
+
+      - name: Upload bounded validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: strict-runtime-candidate-validation-${{ env.VALIDATED_CANDIDATE_SHA }}
+          path: ${{ runner.temp }}/strict-runtime-candidate-validation.json
+          if-no-files-found: warn
+          retention-days: 14
