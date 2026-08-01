@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   SpriteSupervisorError,
+  automaticSpriteFinalizationRequestSha256,
   compileAutomaticSpriteFinalizationWorkflow,
   compileAutomaticSpriteWorkflow,
 } from "../dist/index.js";
@@ -121,6 +122,14 @@ test("adaptive finalization retains both adaptive and mirror family proof roles"
   assert.equal(
     compiled.analysis.base.totals.tasks,
     compiled.supervisorRequest.tasks.length,
+  );
+  assert.equal(
+    compiled.request.workflow.policy.failOnDerivedDirections,
+    true,
+  );
+  assert.equal(
+    compiled.requestSha256,
+    automaticSpriteFinalizationRequestSha256(compiled.request),
   );
   assert.ok(tasksOf(compiled, "mirror-horizontal").length > 0);
 });
