@@ -55,6 +55,10 @@ export interface AutomaticSpriteFinalizationPolicyInput {
   readonly requireHostileMatteProof?: boolean;
   readonly requireNoRejectedArtifacts?: boolean;
   readonly requireExactDimensions?: boolean;
+  readonly maximumDeterministicRepairPasses?: number;
+  readonly transparentBleedRadius?: number;
+  readonly matteSearchRadius?: number;
+  readonly matteDistanceThreshold?: number;
 }
 
 export interface AutomaticSpriteFinalizationCompileRequestInput {
