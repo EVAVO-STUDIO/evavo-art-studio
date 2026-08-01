@@ -607,6 +607,14 @@ function normalizeResolution(
 ): NormalizedSpriteSupervisorReviewResolution {
   const name = `reviewResolutions[${index}]`;
   const item = record(value, name);
+  const resolutionId = identifier(item.resolutionId, `${name}.resolutionId`);
+  const expectedStateTick = integer(
+    item.expectedStateTick,
+    `${name}.expectedStateTick`,
+    -1,
+    0,
+    1_000_000,
+  );
   const taskId = item.taskId === "$release"
     ? "$release"
     : identifier(item.taskId, `${name}.taskId`);
@@ -632,6 +640,8 @@ function normalizeResolution(
     );
   }
   return {
+    resolutionId,
+    expectedStateTick,
     taskId,
     action,
     approver: text(item.approver, `${name}.approver`, undefined, 256),
@@ -860,16 +870,24 @@ export function validateSpriteSupervisorCompileRequest(
           normalizeResolution(resolution, index),
         );
       })();
-  const resolutionKeys = new Set<string>();
+  const resolutionIds = new Set<string>();
+  const resolutionTargets = new Set<string>();
   for (const resolution of reviewResolutions) {
-    const key = `${resolution.taskId}:${resolution.action}`;
-    if (resolutionKeys.has(key)) {
+    if (resolutionIds.has(resolution.resolutionId)) {
       fail(
         "SPRITE_SUPERVISOR_REQUEST_INVALID",
-        `Duplicate review resolution ${key}.`,
+        `Duplicate review resolution ID ${resolution.resolutionId}.`,
       );
     }
-    resolutionKeys.add(key);
+    resolutionIds.add(resolution.resolutionId);
+    const targetKey = `${resolution.taskId}:${resolution.action}`;
+    if (resolutionTargets.has(targetKey)) {
+      fail(
+        "SPRITE_SUPERVISOR_REQUEST_INVALID",
+        `Duplicate review resolution target ${targetKey}.`,
+      );
+    }
+    resolutionTargets.add(targetKey);
     if (
       resolution.taskId !== "$release" &&
       !tasks.some((task) => task.id === resolution.taskId)
