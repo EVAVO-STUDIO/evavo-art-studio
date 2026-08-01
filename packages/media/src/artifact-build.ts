@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 
 import sharp from "sharp";
 
-import { createAtlasLayout, sortPackItems, type AtlasLayout } from "./maxrects.js";
+import {
+  createAtlasLayout,
+  sortPackItems,
+  type AtlasLayout,
+} from "./maxrects.js";
 import { stableStringify } from "./math.js";
 import { prepareAtlasFrame } from "./prepare.js";
 import { renderAtlasRgba } from "./render.js";
@@ -132,7 +136,10 @@ async function decodeFrame(
       `Encoded frame is not declared by the atlas manifest: ${encoded.id}`,
     );
   }
-  if (encoded.bytes.byteLength < 1 || encoded.bytes.byteLength > maximumInputBytes) {
+  if (
+    encoded.bytes.byteLength < 1 ||
+    encoded.bytes.byteLength > maximumInputBytes
+  ) {
     throw new SpriteAtlasInputError(
       "SPRITE_ATLAS_FRAME_BYTE_LIMIT_EXCEEDED",
       `${encoded.id} contains ${encoded.bytes.byteLength} bytes; limit is ${maximumInputBytes}.`,
@@ -212,7 +219,9 @@ function exactFrameSet(
     .sort();
   const declared = new Set(manifest.frames.map((frame) => frame.id));
   const missing = [...declared].filter((id) => !supplied.has(id)).sort();
-  const extra = [...supplied.keys()].filter((id) => !declared.has(id)).sort();
+  const extra = [...supplied.keys()]
+    .filter((id) => !declared.has(id))
+    .sort();
   if (duplicates.length || missing.length || extra.length) {
     throw new SpriteAtlasInputError(
       "SPRITE_ATLAS_FRAME_SET_INVALID",
@@ -298,12 +307,17 @@ function partitionPages(
   prepared: readonly PreparedAtlasFrame[],
   manifest: NormalizedSpriteAtlasManifest,
   maximumPages: number,
-): readonly Readonly<{ frames: readonly PreparedAtlasFrame[]; layout: AtlasLayout }>[] {
+): readonly Readonly<{
+  frames: readonly PreparedAtlasFrame[];
+  layout: AtlasLayout;
+}>[] {
   const byId = new Map(prepared.map((frame) => [frame.id, frame]));
   let remaining = sortPackItems(packItems(prepared, manifest)).map((item) =>
     byId.get(item.id)!,
   );
-  const pages: Array<Readonly<{ frames: readonly PreparedAtlasFrame[]; layout: AtlasLayout }>> = [];
+  const pages: Array<
+    Readonly<{ frames: readonly PreparedAtlasFrame[]; layout: AtlasLayout }>
+  > = [];
   while (remaining.length) {
     if (pages.length >= maximumPages) {
       throw new SpriteAtlasInputError(
@@ -317,6 +331,26 @@ function partitionPages(
     remaining = remaining.filter((frame) => !packedIds.has(frame.id));
   }
   return pages;
+}
+
+function packageEvidence(
+  packageData: SpriteAtlasPackageData,
+  atlasDataSha256: string,
+): SpriteAtlasPackageEvidence {
+  return {
+    schemaVersion: "1.0",
+    atlasId: packageData.atlasId,
+    sourceManifestSha256: packageData.sourceManifestSha256,
+    atlasImageSha256: packageData.atlasImage.sha256,
+    atlasDataSha256,
+    frameSourceHashes: Object.fromEntries(
+      packageData.frames.map((frame) => [frame.id, frame.sourceRgbaSha256]),
+    ),
+    deterministicTool: {
+      name: "@evavo/art-media",
+      version: SPRITE_ATLAS_BUILDER_VERSION,
+    },
+  };
 }
 
 async function renderPage(
@@ -375,20 +409,7 @@ async function renderPage(
   };
   const dataJson = `${JSON.stringify(packageData, null, 2)}\n`;
   const atlasDataSha256 = sha256(dataJson);
-  const evidence: SpriteAtlasPackageEvidence = {
-    schemaVersion: "1.0",
-    atlasId: pageAtlasId,
-    sourceManifestSha256,
-    atlasImageSha256: packageData.atlasImage.sha256,
-    atlasDataSha256,
-    frameSourceHashes: Object.fromEntries(
-      packageData.frames.map((frame) => [frame.id, frame.sourceRgbaSha256]),
-    ),
-    deterministicTool: {
-      name: "@evavo/art-media",
-      version: SPRITE_ATLAS_BUILDER_VERSION,
-    },
-  };
+  const evidence = packageEvidence(packageData, atlasDataSha256);
   return {
     pageIndex,
     pageCount,
@@ -457,7 +478,8 @@ export async function buildSpriteAtlasPagesFromEncodedFrames(
   const decoded = await mapLimit(
     encodedFrames,
     decodeConcurrency,
-    (frame) => decodeFrame(manifest, frame, maximumInputBytes, maximumPixels),
+    (frame) =>
+      decodeFrame(manifest, frame, maximumInputBytes, maximumPixels),
   );
   const prepared = decoded.map((frame) =>
     prepareAtlasFrame(
@@ -483,7 +505,9 @@ export async function buildSpriteAtlasPagesFromEncodedFrames(
   );
   const framePageById: Record<string, number> = {};
   for (const page of pages) {
-    for (const frameId of page.frameIds) framePageById[frameId] = page.pageIndex;
+    for (const frameId of page.frameIds) {
+      framePageById[frameId] = page.pageIndex;
+    }
   }
   return {
     schemaVersion: "1.0",
@@ -504,7 +528,7 @@ export async function buildSpriteAtlasPackageFromEncodedFrames(
   const result = await buildSpriteAtlasPagesFromEncodedFrames(
     manifestInput,
     encodedFrames,
-    { ...options, maximumPages: 1 },
+    { ...options, maximumPages: 1_024 },
   );
   const page = result.pages[0];
   if (!page || result.pages.length !== 1) {
@@ -513,19 +537,19 @@ export async function buildSpriteAtlasPackageFromEncodedFrames(
       "Frames require multiple atlas pages; use buildSpriteAtlasPagesFromEncodedFrames().",
     );
   }
+  const packageData: SpriteAtlasPackageData = {
+    ...page.packageData,
+    animations: result.animations,
+  };
+  const dataJson = `${JSON.stringify(packageData, null, 2)}\n`;
+  const atlasDataSha256 = sha256(dataJson);
+  const evidence = packageEvidence(packageData, atlasDataSha256);
   return {
-    packageData: {
-      ...page.packageData,
-      animations: result.animations,
-    },
+    packageData,
     atlasImage: page.atlasImage,
-    dataJson: `${JSON.stringify(
-      { ...page.packageData, animations: result.animations },
-      null,
-      2,
-    )}\n`,
-    evidence: page.evidence,
-    evidenceJson: page.evidenceJson,
-    atlasDataSha256: page.atlasDataSha256,
+    dataJson,
+    evidence,
+    evidenceJson: `${JSON.stringify(evidence, null, 2)}\n`,
+    atlasDataSha256,
   };
 }
