@@ -129,7 +129,7 @@ jobs:
           import path from "node:path";
 
           const receipt = {
-            "schemaVersion": "1.2",
+            "schemaVersion": "1.1",
             "repository": "EVAVO-STUDIO/evavo-art-studio",
             "candidateSha": process.env.ART_STUDIO_EXPECTED_SHA,
             "trigger": process.env.GITHUB_EVENT_NAME,
