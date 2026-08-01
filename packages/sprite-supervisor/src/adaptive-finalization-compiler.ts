@@ -198,7 +198,7 @@ function adaptiveTask(
       {
         ...selector,
         labels: {
-          ...selector.labels,
+          ...(selector.labels ?? {}),
           qualityState: "passed",
           finalizationReady: "true",
           adaptiveFinalized: "true",
@@ -261,12 +261,16 @@ function transformTasks(
     adaptiveTaskIds.set(task.id, adaptive.id);
   }
   return {
-    tasks: output.map((task) => ({
-      ...task,
-      dependencyTaskIds: (task.dependencyTaskIds ?? []).map(
-        (dependency) => adaptiveTaskIds.get(dependency) ?? dependency,
-      ),
-    })),
+    tasks: output.map((task) =>
+      task.kind === "art.candidate.finalize-adaptive"
+        ? task
+        : {
+            ...task,
+            dependencyTaskIds: (task.dependencyTaskIds ?? []).map(
+              (dependency) => adaptiveTaskIds.get(dependency) ?? dependency,
+            ),
+          },
+    ),
     adaptiveTaskIds,
   };
 }
