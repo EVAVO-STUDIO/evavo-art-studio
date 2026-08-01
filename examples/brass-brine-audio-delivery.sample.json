@@ -1,0 +1,30 @@
+{
+  "schema": "evavo.art-audio-delivery.v1",
+  "batchId": "brass-brine-audio-sample",
+  "project": {
+    "id": "brass-brine",
+    "title": "Brass & Brine",
+    "engine": "Godot",
+    "engineVersion": "4.6.2"
+  },
+  "items": [
+    {
+      "id": "ui-page-turn",
+      "sourcePath": "sfx/ui/page-turn-master.wav",
+      "targetPath": "assets/audio/sfx/ui/page-turn.wav",
+      "sourceSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "sourceBytes": 1,
+      "profileId": "godot-ui-sfx-wav",
+      "loop": { "enabled": false }
+    },
+    {
+      "id": "harbour-night",
+      "sourcePath": "ambience/harbour-night-master.wav",
+      "targetPath": "assets/audio/ambience/harbour-night.ogg",
+      "sourceSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "sourceBytes": 1,
+      "profileId": "godot-ambience-ogg",
+      "loop": { "enabled": true, "beginSamples": 0 }
+    }
+  ]
+}

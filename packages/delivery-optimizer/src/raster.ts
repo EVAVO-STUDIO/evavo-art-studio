@@ -7,6 +7,7 @@ import {
   type DeliveryColourPolicy,
   type DeliveryImageSourceEvidence,
   type DeliveryPixelMetrics,
+  type DeliveryPngStorageEvidence,
 } from "./types.js";
 
 export const MAXIMUM_INPUT_BYTES = 64 * 1024 * 1024;
@@ -14,6 +15,22 @@ export const MAXIMUM_PIXELS = 67_108_864;
 
 export function sha256(value: Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+export function inspectPngStorage(bytes: Buffer): DeliveryPngStorageEvidence | null {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (bytes.byteLength < 29 || !bytes.subarray(0, 8).equals(signature)) return null;
+  if (bytes.readUInt32BE(8) !== 13 || bytes.toString("ascii", 12, 16) !== "IHDR") {
+    throw new DeliveryOptimizerError(
+      "DELIVERY_PNG_IHDR_INVALID",
+      "PNG candidate does not begin with a canonical IHDR chunk.",
+    );
+  }
+  return {
+    bitDepth: bytes[24]!,
+    colourType: bytes[25]!,
+    interlace: bytes[28]!,
+  };
 }
 
 export function exactImageBytes(value: Buffer | Uint8Array): Buffer {
@@ -233,6 +250,7 @@ export async function inspectEncodedRaster(bytes: Buffer): Promise<{
   readonly raw: Buffer;
   readonly width: number;
   readonly height: number;
+  readonly pngStorage: DeliveryPngStorageEvidence | null;
 }> {
   const options = {
     failOn: "error" as const,
@@ -253,5 +271,6 @@ export async function inspectEncodedRaster(bytes: Buffer): Promise<{
     ),
     width: decoded.info.width,
     height: decoded.info.height,
+    pngStorage: inspectPngStorage(bytes),
   };
 }
