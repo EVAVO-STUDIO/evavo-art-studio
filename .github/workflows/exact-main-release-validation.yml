@@ -1,0 +1,117 @@
+name: Disposable exact-main release validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+concurrency:
+  group: disposable-exact-main-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      VALIDATED_MAIN_SHA: 6a8bec366c8e9695012e51a863a630648f83d501
+      VALIDATION_WORKFLOW_PATH: .github/workflows/exact-main-release-validation.yml
+    steps:
+      - name: Check out exact validation head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove branch differs from exact current main only by this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${VALIDATED_MAIN_SHA}" ]] || { echo "Current main changed before validation" >&2; exit 1; }
+          git merge-base --is-ancestor "${VALIDATED_MAIN_SHA}" HEAD
+          mapfile -t changed < <(git diff --name-only "${VALIDATED_MAIN_SHA}"..HEAD)
+          [[ "${#changed[@]}" -eq 1 ]] || { printf 'Unexpected validation-branch files:\n%s\n' "${changed[*]}" >&2; exit 1; }
+          [[ "${changed[0]}" == "${VALIDATION_WORKFLOW_PATH}" ]] || { printf 'Unexpected validation-branch file: %s\n' "${changed[0]}" >&2; exit 1; }
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Verify exact repository toolchain
+        run: node scripts/check-repository-toolchain.mjs
+
+      - name: Run adversarial toolchain fixtures
+        run: node scripts/test-repository-toolchain.mjs
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Remove generated lockfile and verify clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Re-prove exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${VALIDATED_MAIN_SHA}" ]] || { echo "Current main changed before receipt creation" >&2; exit 1; }
+
+      - name: Write bounded validation receipt
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const receipt = {
+            schemaVersion: "1.0",
+            repository: "EVAVO-STUDIO/evavo-art-studio",
+            validatedMainSha: process.env.VALIDATED_MAIN_SHA,
+            validationHeadSha: process.env.GITHUB_SHA,
+            sourceDifference: [process.env.VALIDATION_WORKFLOW_PATH],
+            node: "22.14.0",
+            pnpm: "10.13.1",
+            validation: "passed",
+            completeWorkspaceCheck: true,
+            liveProviderRequest: false,
+            artifactPromotion: false,
+            deployment: "disabled"
+          };
+          const target = path.join(process.env.RUNNER_TEMP, "exact-main-release-validation.json");
+          fs.writeFileSync(target, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+          NODE
+
+      - name: Upload bounded validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: exact-main-release-validation-${{ env.VALIDATED_MAIN_SHA }}
+          path: ${{ runner.temp }}/exact-main-release-validation.json
+          if-no-files-found: warn
+          retention-days: 14
