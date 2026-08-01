@@ -1,0 +1,209 @@
+{
+  "schemaVersion": "1.0",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "runId": "automatic-isometric-deckhand-finalization-v1",
+    "spritePlanRequest": {
+      "schemaVersion": "1.0",
+      "planId": "automatic-isometric-deckhand-family",
+      "artDirectionRequest": {
+        "schemaVersion": "1.0",
+        "contractId": "automatic-isometric-deckhand-style",
+        "presetId": "isometric-rpg-1997",
+        "project": {
+          "projectId": "brass-brine",
+          "title": "Brass & Brine",
+          "engine": "Godot",
+          "engineVersion": "4.6.2",
+          "gameGenre": "historical maritime trading action role-playing game",
+          "targetPlatform": "desktop and mobile",
+          "worldScale": {
+            "tileWidthPixels": 64,
+            "tileHeightPixels": 32,
+            "characterHeightPixels": 96
+          }
+        },
+        "style": {
+          "intent": "Create a stable late-1990s isometric deckhand family with historically plausible 1871 clothing, deliberate sprite clusters, fixed camera and fixed lighting.",
+          "palette": {
+            "mode": "indexed",
+            "colours": [
+              "#121212",
+              "#373737",
+              "#6f6f6f",
+              "#b0b0b0",
+              "#f2f2f2",
+              "#5f281f"
+            ],
+            "maxColours": 32,
+            "preserveIndices": true
+          },
+          "mustHave": [
+            "readable eight-direction silhouette",
+            "stable cap, jacket, trousers and boots",
+            "fixed feet and Y-sort registration"
+          ],
+          "mustAvoid": [
+            "modern equipment",
+            "random straps or pouches",
+            "glowing trim",
+            "independent frame redesign"
+          ],
+          "references": [
+            {
+              "id": "deckhand-identity",
+              "role": "identity",
+              "uri": "artifact://brass-brine/deckhand/canonical",
+              "weight": 1,
+              "rights": "EVAVO project-owned source art."
+            },
+            {
+              "id": "deckhand-history",
+              "role": "historical",
+              "uri": "reference://brass-brine/1871-workwear",
+              "weight": 0.9,
+              "rights": "Research reference only."
+            }
+          ]
+        },
+        "asset": {
+          "assetId": "deckhand",
+          "family": "character",
+          "purpose": "Complete playable deckhand sprite family.",
+          "dimensions": {
+            "width": 96,
+            "height": 128
+          },
+          "transparency": "required",
+          "animated": true,
+          "frameCount": 8,
+          "framesPerSecond": 8,
+          "loop": true,
+          "directionCount": 8,
+          "directionNames": [
+            "south",
+            "south-west",
+            "west",
+            "north-west",
+            "north",
+            "north-east",
+            "east",
+            "south-east"
+          ],
+          "asymmetric": true,
+          "independentShadow": true,
+          "needsCollision": true,
+          "tileFootprint": {
+            "width": 1,
+            "height": 1
+          }
+        },
+        "outputProfileIds": [
+          "godot-4.6.2-isometric-character"
+        ]
+      },
+      "role": "playable-character",
+      "gameplayProfile": "action-rpg",
+      "coverage": "core",
+      "fidelity": "economical",
+      "allowDerivedMirrors": false,
+      "variants": {
+        "costumeVariants": 1,
+        "equipmentVariants": 1,
+        "weaponVariants": 1,
+        "teamColourVariants": 1,
+        "damageVariants": 1
+      },
+      "output": {
+        "sheetStrategy": "per-clip-composite-grid",
+        "maximumSheetSize": 4096,
+        "includeAsepriteExport": true,
+        "includePerClipSheets": true,
+        "includeFamilyAtlas": true,
+        "includeGodotResources": true
+      }
+    },
+    "references": {
+      "canonicalIdentityArtifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "provider": {
+      "candidatesPerUnit": 2,
+      "preferredAdapterId": "openai-gpt-image",
+      "allowedAdapterIds": [
+        "openai-gpt-image"
+      ],
+      "allowFallback": false,
+      "matteColour": "#00ff00",
+      "quality": "high",
+      "resampling": "nearest"
+    },
+    "promotion": {
+      "namespace": "projects/brass-brine/characters",
+      "referencePrefix": "deckhand",
+      "expectedGeneration": 0,
+      "actor": "automatic-sprite-finalizer",
+      "automatic": true
+    },
+    "policy": {
+      "maximumTasks": 10000,
+      "maximumProductionUnits": 2000,
+      "includeDirectionMasters": true,
+      "includeKeyPoses": true,
+      "includeInBetweens": true,
+      "includeSeparateVisibleLayers": true,
+      "includeFamilyVerification": true,
+      "requireFinalHumanApproval": false,
+      "failOnDerivedDirections": true,
+      "failOnMissingLayerReferences": false
+    }
+  },
+  "background": {
+    "mode": "auto",
+    "nativeAlphaAdapterIds": [],
+    "greenMatteColour": "#00ff00",
+    "magentaMatteColour": "#ff00ff",
+    "requireFakeTransparencyRejection": true,
+    "requireMeaningfulAlpha": true,
+    "proofBackgrounds": [
+      "#000000",
+      "#ffffff",
+      "#808080",
+      "#00ff00",
+      "#ff00ff"
+    ]
+  },
+  "threeDReference": {
+    "repository": "EVAVO-STUDIO/evavo-3d-studio",
+    "revision": "4b765f9acd97b36e0ae2c5aef2ea9db1c1134a6b",
+    "renderRigArtifactId": "artifact_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "cameraManifestArtifactId": "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "materialReferenceArtifactId": "artifact_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "directionReferenceArtifactIds": {
+      "south": "artifact_1111111111111111111111111111111111111111111111111111111111111111",
+      "south-west": "artifact_2222222222222222222222222222222222222222222222222222222222222222",
+      "west": "artifact_3333333333333333333333333333333333333333333333333333333333333333",
+      "north-west": "artifact_4444444444444444444444444444444444444444444444444444444444444444",
+      "north": "artifact_5555555555555555555555555555555555555555555555555555555555555555",
+      "north-east": "artifact_6666666666666666666666666666666666666666666666666666666666666666",
+      "east": "artifact_7777777777777777777777777777777777777777777777777777777777777777",
+      "south-east": "artifact_8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "depthReferenceArtifactIds": {
+      "south": "artifact_9999999999999999999999999999999999999999999999999999999999999999",
+      "north": "artifact_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "notes": [
+      "The orthographic camera, model scale, skeleton, materials and light rig remain fixed across all directions."
+    ]
+  },
+  "finalization": {
+    "deliveryProfileId": "godot-sprite-lossless",
+    "requireFamilyVerification": true,
+    "requireHostileMatteProof": true,
+    "requireNoRejectedArtifacts": true,
+    "requireExactDimensions": true
+  },
+  "metadata": {
+    "purpose": "Compile a complete background-aware, 3D-reference-aware, fake-transparency-blocking sprite production run."
+  }
+}
