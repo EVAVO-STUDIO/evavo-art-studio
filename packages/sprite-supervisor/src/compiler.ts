@@ -4,6 +4,7 @@ import {
 } from "@evavo/art-artifacts";
 
 import { prepareSpriteSupervisorCompileInput } from "./input.js";
+import { assertSpriteSupervisorQueuePolicy } from "./queue-policy.js";
 import {
   SPRITE_SUPERVISOR_PROTOCOL_VERSION,
   SpriteSupervisorError,
@@ -98,6 +99,7 @@ export function compileSpriteSupervisorWorkflow(
   input: SpriteSupervisorCompileRequestInput | unknown,
 ): CompiledSpriteSupervisorWorkflow {
   const request = normalizedRequest(input);
+  assertSpriteSupervisorQueuePolicy(request);
   assertReleaseBindings(request);
   const requestSha256 = spriteSupervisorRequestSha256(request);
   const initialArtifacts = request.initialArtifactBindings.flatMap(
