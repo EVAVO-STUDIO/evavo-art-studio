@@ -9,7 +9,6 @@ import {
   AUTOMATIC_SPRITE_FINALIZATION_PROTOCOL_VERSION,
   type AutomaticSpriteBackgroundMode,
   type AutomaticSpriteFinalizationCompileRequestInput,
-  type CompiledAutomaticSpriteFinalizationWorkflow,
   type NormalizedAutomaticSpriteFinalizationRequest,
   type NormalizedAutomaticSpriteThreeDReference,
   type ResolvedAutomaticSpriteBackgroundPolicy,
@@ -120,10 +119,7 @@ function artifactMap(
   return Object.freeze(output);
 }
 
-function artifactArray(
-  value: unknown,
-  name: string,
-): readonly ArtifactId[] {
+function artifactArray(value: unknown, name: string): readonly ArtifactId[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > 64) {
     fail(
@@ -136,7 +132,11 @@ function artifactArray(
   ].sort();
 }
 
-function strings(value: unknown, name: string, defaults: readonly string[]): readonly string[] {
+function strings(
+  value: unknown,
+  name: string,
+  defaults: readonly string[],
+): readonly string[] {
   if (value === undefined) return defaults;
   if (!Array.isArray(value) || value.length > 32) {
     fail(
@@ -145,7 +145,9 @@ function strings(value: unknown, name: string, defaults: readonly string[]): rea
     );
   }
   return [
-    ...new Set(value.map((entry, index) => text(entry, `${name}[${index}]`, undefined, 128))),
+    ...new Set(
+      value.map((entry, index) => text(entry, `${name}[${index}]`, undefined, 128)),
+    ),
   ];
 }
 
@@ -160,7 +162,28 @@ function hex(value: unknown, name: string, fallback: string): string {
   return result;
 }
 
-function normalizeThreeD(value: unknown): NormalizedAutomaticSpriteThreeDReference | undefined {
+function hexList(
+  value: unknown,
+  name: string,
+  defaults: readonly string[],
+): readonly string[] {
+  if (value === undefined) return defaults;
+  if (!Array.isArray(value) || value.length < 1 || value.length > 16) {
+    fail(
+      "AUTOMATIC_SPRITE_FINALIZATION_REQUEST_INVALID",
+      `${name} must contain 1 to 16 #RRGGBB colours.`,
+    );
+  }
+  return [
+    ...new Set(
+      value.map((entry, index) => hex(entry, `${name}[${index}]`, "#000000")),
+    ),
+  ];
+}
+
+function normalizeThreeD(
+  value: unknown,
+): NormalizedAutomaticSpriteThreeDReference | undefined {
   if (value === undefined) return undefined;
   const source = record(value, "threeDReference");
   const repository = text(
@@ -182,42 +205,28 @@ function normalizeThreeD(value: unknown): NormalizedAutomaticSpriteThreeDReferen
       "threeDReference.revision must be a 40 to 64 character lowercase commit or content hash.",
     );
   }
+  const renderRigArtifactId = optionalArtifactId(
+    source.renderRigArtifactId,
+    "threeDReference.renderRigArtifactId",
+  );
+  const cameraManifestArtifactId = optionalArtifactId(
+    source.cameraManifestArtifactId,
+    "threeDReference.cameraManifestArtifactId",
+  );
+  const materialReferenceArtifactId = optionalArtifactId(
+    source.materialReferenceArtifactId,
+    "threeDReference.materialReferenceArtifactId",
+  );
   return {
     repository,
     revision,
-    ...(optionalArtifactId(
-      source.renderRigArtifactId,
-      "threeDReference.renderRigArtifactId",
-    ) === undefined
+    ...(renderRigArtifactId === undefined ? {} : { renderRigArtifactId }),
+    ...(cameraManifestArtifactId === undefined
       ? {}
-      : {
-          renderRigArtifactId: optionalArtifactId(
-            source.renderRigArtifactId,
-            "threeDReference.renderRigArtifactId",
-          )!,
-        }),
-    ...(optionalArtifactId(
-      source.cameraManifestArtifactId,
-      "threeDReference.cameraManifestArtifactId",
-    ) === undefined
+      : { cameraManifestArtifactId }),
+    ...(materialReferenceArtifactId === undefined
       ? {}
-      : {
-          cameraManifestArtifactId: optionalArtifactId(
-            source.cameraManifestArtifactId,
-            "threeDReference.cameraManifestArtifactId",
-          )!,
-        }),
-    ...(optionalArtifactId(
-      source.materialReferenceArtifactId,
-      "threeDReference.materialReferenceArtifactId",
-    ) === undefined
-      ? {}
-      : {
-          materialReferenceArtifactId: optionalArtifactId(
-            source.materialReferenceArtifactId,
-            "threeDReference.materialReferenceArtifactId",
-          )!,
-        }),
+      : { materialReferenceArtifactId }),
     turntableArtifactIds: artifactArray(
       source.turntableArtifactIds,
       "threeDReference.turntableArtifactIds",
@@ -248,11 +257,23 @@ export function validateAutomaticSpriteFinalizationRequest(
       'schemaVersion must be "1.0".',
     );
   }
-  const background = root.background === undefined ? {} : record(root.background, "background");
+  if (root.workflow === undefined) {
+    fail(
+      "AUTOMATIC_SPRITE_FINALIZATION_REQUEST_INVALID",
+      "workflow is required.",
+    );
+  }
+  const background =
+    root.background === undefined ? {} : record(root.background, "background");
   const finalization =
-    root.finalization === undefined ? {} : record(root.finalization, "finalization");
+    root.finalization === undefined
+      ? {}
+      : record(root.finalization, "finalization");
   const mode = background.mode === undefined ? "auto" : background.mode;
-  if (typeof mode !== "string" || !BACKGROUND_MODES.has(mode as AutomaticSpriteBackgroundMode)) {
+  if (
+    typeof mode !== "string" ||
+    !BACKGROUND_MODES.has(mode as AutomaticSpriteBackgroundMode)
+  ) {
     fail(
       "AUTOMATIC_SPRITE_FINALIZATION_REQUEST_INVALID",
       "background.mode is unsupported.",
@@ -268,7 +289,9 @@ export function validateAutomaticSpriteFinalizationRequest(
       "finalization.deliveryProfileId is unsupported.",
     );
   }
-  const metadata = root.metadata === undefined ? undefined : normalizeJson(root.metadata);
+  const threeDReference = normalizeThreeD(root.threeDReference);
+  const metadata =
+    root.metadata === undefined ? undefined : normalizeJson(root.metadata);
   return {
     schemaVersion: "1.0",
     protocolVersion: AUTOMATIC_SPRITE_FINALIZATION_PROTOCOL_VERSION,
@@ -278,7 +301,7 @@ export function validateAutomaticSpriteFinalizationRequest(
       nativeAlphaAdapterIds: strings(
         background.nativeAlphaAdapterIds,
         "background.nativeAlphaAdapterIds",
-        ["openai-gpt-image"],
+        [],
       ),
       greenMatteColour: hex(
         background.greenMatteColour,
@@ -290,7 +313,11 @@ export function validateAutomaticSpriteFinalizationRequest(
         "background.magentaMatteColour",
         "#ff00ff",
       ),
-      blackColour: hex(background.blackColour, "background.blackColour", "#000000"),
+      blackColour: hex(
+        background.blackColour,
+        "background.blackColour",
+        "#000000",
+      ),
       requireFakeTransparencyRejection: booleanValue(
         background.requireFakeTransparencyRejection,
         "background.requireFakeTransparencyRejection",
@@ -301,25 +328,16 @@ export function validateAutomaticSpriteFinalizationRequest(
         "background.requireMeaningfulAlpha",
         true,
       ),
-      proofBackgrounds: strings(
+      proofBackgrounds: hexList(
         background.proofBackgrounds,
         "background.proofBackgrounds",
         ["#000000", "#ffffff", "#808080", "#00ff00", "#ff00ff"],
-      ).map((entry) => {
-        if (!HEX.test(entry)) {
-          fail(
-            "AUTOMATIC_SPRITE_FINALIZATION_REQUEST_INVALID",
-            "background.proofBackgrounds entries must use #RRGGBB format.",
-          );
-        }
-        return entry.toLowerCase();
-      }),
+      ),
     },
-    ...(normalizeThreeD(root.threeDReference) === undefined
-      ? {}
-      : { threeDReference: normalizeThreeD(root.threeDReference)! }),
+    ...(threeDReference === undefined ? {} : { threeDReference }),
     finalization: {
-      deliveryProfileId: profile as NormalizedAutomaticSpriteFinalizationRequest["finalization"]["deliveryProfileId"],
+      deliveryProfileId:
+        profile as NormalizedAutomaticSpriteFinalizationRequest["finalization"]["deliveryProfileId"],
       requireFamilyVerification: booleanValue(
         finalization.requireFamilyVerification,
         "finalization.requireFamilyVerification",
@@ -375,7 +393,9 @@ export function resolveAutomaticSpriteBackgroundPolicy(
 ): ResolvedAutomaticSpriteBackgroundPolicy {
   const contract = base.request.artDirectionContract;
   const asset = contract.asset;
-  const palette = contract.style.palette.colours.map((entry) => entry.toLowerCase());
+  const palette = contract.style.palette.colours.map((entry) =>
+    entry.toLowerCase(),
+  );
   const collisionScores = {
     green: collisionScore(palette, request.background.greenMatteColour),
     magenta: collisionScore(palette, request.background.magentaMatteColour),
@@ -389,10 +409,12 @@ export function resolveAutomaticSpriteBackgroundPolicy(
       mode = "opaque-preserve";
       reason = "The compiled art direction requires an opaque delivery.";
     } else if (
-      request.background.nativeAlphaAdapterIds.includes(preferredAdapter ?? "")
+      preferredAdapter !== undefined &&
+      request.background.nativeAlphaAdapterIds.includes(preferredAdapter)
     ) {
       mode = "native-alpha";
-      reason = "The preferred adapter is explicitly allowed for native-alpha delivery.";
+      reason =
+        "The preferred adapter was explicitly allow-listed for verified native-alpha delivery.";
     } else if (collisionScores.green <= collisionScores.magenta) {
       mode = "green-matte";
       reason = "Green has the lower approved-palette collision score.";
@@ -451,6 +473,15 @@ export function resolveAutomaticSpriteBackgroundPolicy(
         "native-alpha cannot be used for an opaque art-direction target.",
       );
     }
+    if (
+      preferredAdapter === undefined ||
+      !request.background.nativeAlphaAdapterIds.includes(preferredAdapter)
+    ) {
+      fail(
+        "AUTOMATIC_SPRITE_BACKGROUND_ALPHA_ADAPTER_UNVERIFIED",
+        "native-alpha requires the exact preferred adapter to be explicitly allow-listed after decoded transparency verification.",
+      );
+    }
     return {
       requestedMode: request.background.mode,
       resolvedMode: "native-alpha",
@@ -475,7 +506,10 @@ export function resolveAutomaticSpriteBackgroundPolicy(
     providerStrategy: "chroma-key",
     matteColour,
     transparencyExpectation: "alpha-required",
-    deliveryBackground: { mode: "remove-border-matte", matteColour },
+    deliveryBackground: {
+      mode: "remove-border-matte",
+      matteColour,
+    },
     proofBackgrounds: request.background.proofBackgrounds,
     requireFakeTransparencyRejection:
       request.background.requireFakeTransparencyRejection,
