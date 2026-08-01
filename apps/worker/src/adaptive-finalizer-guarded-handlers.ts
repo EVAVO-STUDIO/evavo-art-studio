@@ -199,52 +199,27 @@ async function normalizeSuccessfulLineage(
     );
   }
 
-  const normalizedCandidate = await context.putArtifact(
-    await context.artifacts.read(finalized.artifactId),
-    {
-      mediaType: finalized.mediaType,
-      storageClass: "intermediate",
-      ...(finalized.fileName === undefined
-        ? {}
-        : { fileName: finalized.fileName }),
-      sourceArtifacts: [sourceId],
-      labels: {
-        ...finalized.labels,
-        proofArtifactId: proof.artifactId,
-        provenanceNormalized: "true",
-      },
-      metadata: normalizeJson({
-        ...(isRecord(finalized.metadata) ? finalized.metadata : {}),
-        baseFinalizedArtifactId: finalized.artifactId,
-        proofArtifactId: proof.artifactId,
-        baseEvidenceArtifactId: baseEvidence.artifactId,
-        provenanceRule:
-          "The finalized candidate descends from the mastered source. The proof and evidence are sibling derivatives bound by this envelope rather than parents of the image.",
-      }),
-    },
-  );
-
   const envelopeBody = normalizeJson({
     schemaVersion: "1.0",
     sourceCandidateArtifactId: sourceId,
-    normalizedFinalizedCandidateArtifactId:
-      normalizedCandidate.artifactId,
     baseFinalizedCandidateArtifactId: finalized.artifactId,
     proofArtifactId: proof.artifactId,
     baseEvidenceArtifactId: baseEvidence.artifactId,
     qualityState: "passed",
     finalizationReady: true,
     qualityThresholdsRelaxed: false,
+    provenanceRule:
+      "The envelope binds the mastered source, base finalized image, hostile-background proof, and base evidence. The normalized selected candidate points to this immutable envelope from its own ancestry.",
   });
   const envelope = await context.putArtifact(
     `${JSON.stringify(envelopeBody, null, 2)}\n`,
     {
       mediaType: "application/json",
       storageClass: "evidence",
-      fileName: `${normalizedCandidate.artifactId}.adaptive-finalization-envelope.json`,
+      fileName: `${finalized.artifactId}.adaptive-finalization-envelope.json`,
       sourceArtifacts: [
         sourceId,
-        normalizedCandidate.artifactId,
+        finalized.artifactId,
         proof.artifactId,
         baseEvidence.artifactId,
       ],
@@ -254,13 +229,40 @@ async function normalizeSuccessfulLineage(
         qualityState: "passed",
         finalizationReady: "true",
         sourceCandidateArtifactId: sourceId,
-        finalizedCandidateArtifactId: normalizedCandidate.artifactId,
+        baseFinalizedCandidateArtifactId: finalized.artifactId,
         proofArtifactId: proof.artifactId,
         baseEvidenceArtifactId: baseEvidence.artifactId,
       },
       metadata: normalizeJson({
         qualityThresholdsRelaxed: false,
         provenanceNormalized: true,
+      }),
+    },
+  );
+
+  const normalizedCandidate = await context.putArtifact(
+    await context.artifacts.read(finalized.artifactId),
+    {
+      mediaType: finalized.mediaType,
+      storageClass: "intermediate",
+      ...(finalized.fileName === undefined
+        ? {}
+        : { fileName: finalized.fileName }),
+      sourceArtifacts: [sourceId, envelope.artifactId],
+      labels: {
+        ...finalized.labels,
+        proofArtifactId: proof.artifactId,
+        finalizationEnvelopeArtifactId: envelope.artifactId,
+        provenanceNormalized: "true",
+      },
+      metadata: normalizeJson({
+        ...(isRecord(finalized.metadata) ? finalized.metadata : {}),
+        baseFinalizedArtifactId: finalized.artifactId,
+        proofArtifactId: proof.artifactId,
+        baseEvidenceArtifactId: baseEvidence.artifactId,
+        finalizationEnvelopeArtifactId: envelope.artifactId,
+        provenanceRule:
+          "The finalized candidate descends from the mastered source and an immutable envelope that binds its base finalized pixels, proof, and evidence.",
       }),
     },
   );
@@ -276,8 +278,10 @@ async function normalizeSuccessfulLineage(
       ...(isRecord(baseResult.result) ? baseResult.result : {}),
       sourceCandidateArtifactId: sourceId,
       finalizedCandidateArtifactId: normalizedCandidate.artifactId,
+      baseFinalizedCandidateArtifactId: finalized.artifactId,
       proofArtifactId: proof.artifactId,
       baseEvidenceArtifactId: baseEvidence.artifactId,
+      finalizationEnvelopeArtifactId: envelope.artifactId,
       evidenceArtifactId: envelope.artifactId,
       provenanceNormalized: true,
     }),
