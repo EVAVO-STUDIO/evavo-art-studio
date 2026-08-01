@@ -43,5 +43,5 @@ test("sprite supervisor OpenAPI documents bounded closed-loop control", async ()
   }
   assert.match(openapi, /do not submit runtime jobs/i);
   assert.match(openapi, /quality-bypass fields are rejected/i);
-  assert.match(openapi, /exact immutable supervisor-state tick/i);
+  assert.match(openapi, /exact immutable supervisor-state\s+tick/i);
 });
