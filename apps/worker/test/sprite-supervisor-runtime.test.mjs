@@ -13,7 +13,7 @@ import {
 import { compileSpriteSupervisorWorkflow } from "@evavo/art-sprite-supervisor";
 
 import { createBuiltinHandlers } from "../dist/index.js";
-import { spriteSupervisorWorkerCapabilities } from "../dist/sprite-supervisor-handlers.js";
+import { spriteSupervisorWorkerCapabilities } from "../dist/sprite-supervisor-guarded-handlers.js";
 
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -207,9 +207,12 @@ function request(identityArtifactId, options = {}) {
       maximumTicks: 50,
       maximumActiveChildren: 4,
       requireAllPlanStagesCovered: false,
-      requireFinalHumanApproval: false,
+      requireFinalHumanApproval: options.requireFinalHumanApproval ?? false,
       requiredReleaseArtifactRoles: ["selected-master"],
     },
+    ...(options.reviewResolutions
+      ? { reviewResolutions: options.reviewResolutions }
+      : {}),
   };
 }
 
@@ -241,6 +244,26 @@ async function stateFor(artifacts, runId) {
   return JSON.parse((await artifacts.read(reference.artifactId)).toString("utf8"));
 }
 
+async function runUntilState(worker, artifacts, runId, expectedStatus) {
+  for (let cycle = 0; cycle < 40; cycle += 1) {
+    await worker.runOnce();
+    const reference = await artifacts.resolveReference(
+      "sprite-supervisor/runtime-demo",
+      runId,
+    );
+    if (reference) {
+      const state = JSON.parse(
+        (await artifacts.read(reference.artifactId)).toString("utf8"),
+      );
+      if (state.status === expectedStatus) return state;
+    }
+    await delay(275);
+  }
+  assert.fail(
+    `Supervisor ${runId} did not reach ${expectedStatus} within the fixture budget.`,
+  );
+}
+
 function workerFor(runtime, artifacts, childHandlers) {
   return new RuntimeWorker({
     runtime,
@@ -266,31 +289,34 @@ function workerFor(runtime, artifacts, childHandlers) {
   });
 }
 
+function selectedMasterHandler(counter) {
+  return async (context) => {
+    counter.calls += 1;
+    const master = await context.putArtifact("selected-master", {
+      mediaType: "image/png",
+      storageClass: "master",
+      fileName: "runtime-hero.selected-master.png",
+      labels: {
+        artifactRole: "selected-art-master",
+        approvalState: "selected",
+        qualityState: "passed",
+        finalDeliverable: "false",
+      },
+    });
+    return {
+      outputArtifacts: [master.artifactId],
+      result: { masterArtifactId: master.artifactId },
+    };
+  };
+}
+
 test("supervisor persists state, schedules a child and emits verified release evidence", async () => {
   const fx = await fixture();
   try {
     const workflow = compileSpriteSupervisorWorkflow(request(fx.identity.artifactId));
-    let childCalls = 0;
-    const generate = async (context) => {
-      childCalls += 1;
-      const master = await context.putArtifact("selected-master", {
-        mediaType: "image/png",
-        storageClass: "master",
-        fileName: "runtime-hero.selected-master.png",
-        labels: {
-          artifactRole: "selected-art-master",
-          approvalState: "selected",
-          qualityState: "passed",
-          finalDeliverable: "false",
-        },
-      });
-      return {
-        outputArtifacts: [master.artifactId],
-        result: { masterArtifactId: master.artifactId },
-      };
-    };
+    const counter = { calls: 0 };
     const worker = workerFor(fx.runtime, fx.artifacts, {
-      "art.candidate.generate": generate,
+      "art.candidate.generate": selectedMasterHandler(counter),
     });
     await fx.runtime.submit(workflow.rootJob, "test");
     await runUntilSupervisorTerminal(worker, fx.runtime, workflow.runId);
@@ -298,7 +324,7 @@ test("supervisor persists state, schedules a child and emits verified release ev
     const state = await stateFor(fx.artifacts, workflow.runId);
     assert.equal(state.status, "succeeded");
     assert.equal(state.taskStates["produce-master"].status, "succeeded");
-    assert.equal(childCalls, 1);
+    assert.equal(counter.calls, 1);
     assert.match(state.releaseEvidenceArtifactId, /^artifact_[a-f0-9]{64}$/);
     const releaseVerification = await fx.artifacts.verify(
       state.releaseEvidenceArtifactId,
@@ -306,6 +332,67 @@ test("supervisor persists state, schedules a child and emits verified release ev
     assert.equal(releaseVerification.descriptorValid, true);
     assert.equal(releaseVerification.contentValid, true);
     assert.ok(state.decisions.some((entry) => entry.action === "complete"));
+  } finally {
+    await rm(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("supervisor resumes the exact final review state without regenerating completed work", async () => {
+  const fx = await fixture();
+  try {
+    const runId = "runtime-supervisor-reviewed-release";
+    const baseWorkflow = compileSpriteSupervisorWorkflow(
+      request(fx.identity.artifactId, {
+        runId,
+        requireFinalHumanApproval: true,
+      }),
+    );
+    const counter = { calls: 0 };
+    const worker = workerFor(fx.runtime, fx.artifacts, {
+      "art.candidate.generate": selectedMasterHandler(counter),
+    });
+    await fx.runtime.submit(baseWorkflow.rootJob, "test");
+    const waiting = await runUntilState(
+      worker,
+      fx.artifacts,
+      runId,
+      "review-required",
+    );
+    assert.equal(waiting.taskStates["produce-master"].status, "succeeded");
+    assert.equal(counter.calls, 1);
+    assert.equal(waiting.releaseEvidenceArtifactId, undefined);
+
+    const reviewedWorkflow = compileSpriteSupervisorWorkflow(
+      request(fx.identity.artifactId, {
+        runId,
+        requireFinalHumanApproval: true,
+        reviewResolutions: [
+          {
+            resolutionId: "runtime-release-review-001",
+            expectedStateTick: waiting.tick,
+            taskId: "$release",
+            action: "approve-release",
+            approver: "Greg Parker",
+            reason: "Reviewed the complete immutable sprite release evidence.",
+          },
+        ],
+      }),
+    );
+    assert.equal(reviewedWorkflow.workflowSha256, baseWorkflow.workflowSha256);
+    assert.notEqual(reviewedWorkflow.requestSha256, baseWorkflow.requestSha256);
+    await fx.runtime.submit(reviewedWorkflow.rootJob, "reviewer");
+    await runUntilSupervisorTerminal(worker, fx.runtime, runId);
+
+    const completed = await stateFor(fx.artifacts, runId);
+    assert.equal(completed.status, "succeeded");
+    assert.equal(counter.calls, 1);
+    assert.equal(completed.releaseApprovedBy.approver, "Greg Parker");
+    assert.equal(
+      completed.releaseApprovedBy.resolutionId,
+      "runtime-release-review-001",
+    );
+    assert.equal(completed.appliedReviewResolutions.length, 1);
+    assert.match(completed.releaseEvidenceArtifactId, /^artifact_[a-f0-9]{64}$/);
   } finally {
     await rm(fx.root, { recursive: true, force: true });
   }
