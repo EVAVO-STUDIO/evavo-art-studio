@@ -13,6 +13,7 @@ const C = `artifact_${"c".repeat(64)}`;
 const D = `artifact_${"d".repeat(64)}`;
 const E = `artifact_${"e".repeat(64)}`;
 const F = `artifact_${"f".repeat(64)}`;
+const S = `artifact_${"0".repeat(64)}`;
 
 async function automaticWorkflow() {
   return JSON.parse(
@@ -119,6 +120,18 @@ test("black additive is rejected for ordinary character sprites", async () => {
   );
 });
 
+test("automatic release rejects partial key-pose or in-between coverage", async () => {
+  const input = await request();
+  input.workflow.policy.includeInBetweens = false;
+  assert.throws(
+    () => compileAutomaticSpriteFinalizationWorkflow(input),
+    (error) =>
+      error instanceof SpriteSupervisorError &&
+      error.code ===
+        "AUTOMATIC_SPRITE_WORKFLOW_COMPLETE_FRAME_COVERAGE_REQUIRED",
+  );
+});
+
 test("3d direction, depth, rig and camera references are bound immutably", async () => {
   const input = await request({
     threeDReference: {
@@ -166,6 +179,40 @@ test("3d direction, depth, rig and camera references are bound immutably", async
   assert.equal(
     family.payloadTemplate.metadata.automaticFinalization.threeD.repository,
     "EVAVO-STUDIO/evavo-3d-studio",
+  );
+  assert.ok(family.staticInputArtifacts.includes(A));
+  assert.ok(family.staticInputArtifacts.includes(B));
+  assert.ok(family.staticInputArtifacts.includes(E));
+});
+
+test("layer in-betweens keep current body separate from neighbouring key poses", async () => {
+  const input = await request();
+  input.workflow.spritePlanRequest.artDirectionRequest.asset.independentShadow = true;
+  input.workflow.references.layerReferenceArtifactIds = { shadow: S };
+  const compiled = compileAutomaticSpriteFinalizationWorkflow(input);
+  const task = candidateTasks(compiled).find(
+    (entry) =>
+      entry.payloadTemplate.assetKind === "sprite-layer" &&
+      entry.payloadTemplate.continuityPhase === "in-between",
+  );
+  assert.ok(task);
+  const references = Object.fromEntries(
+    task.payloadTemplate.references
+      .filter((entry) =>
+        ["base-image", "previous-key-pose", "next-key-pose"].includes(
+          entry.role,
+        ),
+      )
+      .map((entry) => [entry.role, entry.artifactId.$artifact]),
+  );
+  assert.ok(references["base-image"]);
+  assert.ok(references["previous-key-pose"]);
+  assert.ok(references["next-key-pose"]);
+  assert.notEqual(references["base-image"], references["previous-key-pose"]);
+  assert.notEqual(references["base-image"], references["next-key-pose"]);
+  assert.notEqual(
+    references["previous-key-pose"],
+    references["next-key-pose"],
   );
 });
 
