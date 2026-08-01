@@ -204,9 +204,13 @@
     "requireFamilyVerification": true,
     "requireHostileMatteProof": true,
     "requireNoRejectedArtifacts": true,
-    "requireExactDimensions": true
+    "requireExactDimensions": true,
+    "maximumDeterministicRepairPasses": 2,
+    "transparentBleedRadius": 2,
+    "matteSearchRadius": 6,
+    "matteDistanceThreshold": 72
   },
   "metadata": {
-    "purpose": "Compile a complete background-aware, 3D-reference-aware, fake-transparency-blocking sprite production run."
+    "purpose": "Compile a complete background-aware, 3D-reference-aware, fake-transparency-blocking and adaptively repaired sprite production run."
   }
 }
