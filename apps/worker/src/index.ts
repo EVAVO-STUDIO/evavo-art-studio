@@ -22,14 +22,17 @@ import {
 } from "@evavo/art-runtime";
 
 import {
-  createGuardedAdaptiveFinalizerHandlers,
-  guardedAdaptiveFinalizerWorkerCapabilities,
-} from "./adaptive-finalizer-guarded-handlers.js";
-import { createAdaptiveSpriteFamilyHandlers } from "./adaptive-sprite-family-handlers.js";
+  createDeterministicMirrorAwareFinalizerHandlers,
+  deterministicMirrorAwareFinalizerWorkerCapabilities,
+} from "./deterministic-mirror-handlers.js";
 import {
   candidateMasteringWorkerCapabilities,
   createCandidateMasteringHandlers,
 } from "./mastering-handlers.js";
+import {
+  createMirroredSpriteFamilyHandlers,
+  mirroredSpriteFamilyWorkerCapabilities,
+} from "./mirrored-sprite-family-handlers.js";
 import {
   createProviderHandlers,
   createProviderRegistryFromEnvironment,
@@ -51,10 +54,6 @@ import {
   candidateSelectionWorkerCapabilities,
   createCandidateSelectionHandlers,
 } from "./selection-handlers.js";
-import {
-  createSpriteFamilyHandlers,
-  spriteFamilyWorkerCapabilities,
-} from "./sprite-family-handlers.js";
 import {
   createSpriteSupervisorHandlers,
   spriteSupervisorWorkerCapabilities,
@@ -252,10 +251,9 @@ export function createBuiltinHandlers(
     "sprite.atlas.build": atlasBuild,
     ...createProviderHandlers(providerRegistry),
     ...createCandidateMasteringHandlers(),
-    ...createGuardedAdaptiveFinalizerHandlers(),
+    ...createDeterministicMirrorAwareFinalizerHandlers(),
     ...createCandidateSelectionHandlers(),
-    ...createSpriteFamilyHandlers(),
-    ...createAdaptiveSpriteFamilyHandlers(),
+    ...createMirroredSpriteFamilyHandlers(),
     ...createTargetedRepairHandlers(providerRegistry),
     ...createRepairedFamilyRevisionHandlers(),
     ...createRepairedFamilySelectionHandlers(),
@@ -301,9 +299,10 @@ async function main(): Promise<void> {
   const providerRegistry = createProviderRegistryFromEnvironment();
   const providerCapabilities = providerWorkerCapabilities(providerRegistry);
   const masteringCapabilities = candidateMasteringWorkerCapabilities();
-  const adaptiveCapabilities = guardedAdaptiveFinalizerWorkerCapabilities();
+  const adaptiveCapabilities =
+    deterministicMirrorAwareFinalizerWorkerCapabilities();
   const selectionCapabilities = candidateSelectionWorkerCapabilities();
-  const familyCapabilities = spriteFamilyWorkerCapabilities();
+  const familyCapabilities = mirroredSpriteFamilyWorkerCapabilities();
   const repairCapabilities = targetedRepairWorkerCapabilities(providerRegistry);
   const revisionCapabilities = repairedFamilyRevisionWorkerCapabilities();
   const revisionSelectionCapabilities =
