@@ -10,3 +10,7 @@ export * from "./automatic-validation.js";
 export * from "./automatic-art-direction.js";
 export * from "./automatic-compiler.js";
 export * from "./automatic-protocol.js";
+export * from "./automatic-finalization-types.js";
+export * from "./automatic-finalization-validation.js";
+export * from "./automatic-finalization-compiler.js";
+export * from "./automatic-finalization-protocol.js";
