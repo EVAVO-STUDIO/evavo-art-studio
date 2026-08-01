@@ -6,12 +6,14 @@ const read = (relativePath) =>
   readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
 test("MCP exposes closed-loop supervision without runtime authority", async () => {
-  const [tools, spritePlan, packageSource, tsconfigSource] = await Promise.all([
-    read("src/sprite-supervisor-tools.ts"),
-    read("src/sprite-plan-tools.ts"),
-    read("package.json"),
-    read("tsconfig.json"),
-  ]);
+  const [tools, spritePlan, packageSource, tsconfigSource, protocolSource] =
+    await Promise.all([
+      read("src/sprite-supervisor-tools.ts"),
+      read("src/sprite-plan-tools.ts"),
+      read("package.json"),
+      read("tsconfig.json"),
+      read("../../packages/sprite-supervisor/src/protocol.ts"),
+    ]);
   const packageJson = JSON.parse(packageSource);
   const tsconfig = JSON.parse(tsconfigSource);
   const combined = `${tools}\n${spritePlan}`;
@@ -31,6 +33,8 @@ test("MCP exposes closed-loop supervision without runtime authority", async () =
     );
   }
 
+  assert.ok(protocolSource.includes("resolutionId"));
+  assert.ok(protocolSource.includes("expectedStateTick"));
   assert.equal(
     packageJson.dependencies["@evavo/art-sprite-supervisor"],
     "workspace:*",
