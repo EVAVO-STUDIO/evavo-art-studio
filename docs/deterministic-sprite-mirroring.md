@@ -28,12 +28,15 @@ Mirroring fails closed when any of the following applies:
 - held items or runtime equipment swaps are present;
 - runtime costume variants require directional construction;
 - a normal map would require X-channel inversion;
+- readable text, labels, glyphs or logos are allowed in the art contract;
 - the camera is movable, rolled, or forbids mirroring;
 - lighting varies between frames;
 - screen-space key light or baked cast-shadow handedness has not received explicit style-owner review;
 - historically constrained construction has not received explicit symmetry review;
-- the pivot is not on the exact full-canvas horizontal axis; or
+- the pivot is not on the centred integer column `floor(width / 2)`; or
 - a derived direction, frame, or retained visible layer lacks an authored source master.
+
+The centred integer pivot supports both even- and odd-width canvases. For an odd width, the centre column remains fixed while every other column swaps with its exact partner.
 
 Explicit reviews are recorded under `metadata.deterministicMirroring`:
 
@@ -46,7 +49,7 @@ Explicit reviews are recorded under `metadata.deterministicMirroring`:
 }
 ```
 
-Those flags authorise only the declared symmetry decision. They do not relax transparency, frame, family, lineage, task-budget, approval, or release gates.
+Those flags authorise only the declared symmetry decision. They do not relax transparency, frame, family, lineage, task-budget, approval, or release gates. Readable text is not review-overridable in this protocol because a reflected glyph sequence is a different visible asset.
 
 ## Pixel transform
 
