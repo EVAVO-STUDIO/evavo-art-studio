@@ -95,6 +95,20 @@ function assertReleaseBindings(
   }
 }
 
+function stableWorkflowIdentity(
+  request: NormalizedSpriteSupervisorCompileRequest,
+): unknown {
+  return {
+    schemaVersion: "1.0",
+    protocolVersion: SPRITE_SUPERVISOR_PROTOCOL_VERSION,
+    runId: request.runId,
+    request: {
+      ...request,
+      reviewResolutions: [],
+    },
+  };
+}
+
 export function compileSpriteSupervisorWorkflow(
   input: SpriteSupervisorCompileRequestInput | unknown,
 ): CompiledSpriteSupervisorWorkflow {
@@ -102,6 +116,9 @@ export function compileSpriteSupervisorWorkflow(
   assertSpriteSupervisorQueuePolicy(request);
   assertReleaseBindings(request);
   const requestSha256 = spriteSupervisorRequestSha256(request);
+  const workflowSha256 = spriteSupervisorSha256(
+    stableWorkflowIdentity(request),
+  );
   const initialArtifacts = request.initialArtifactBindings.flatMap(
     (binding) => binding.artifactIds,
   );
@@ -110,24 +127,21 @@ export function compileSpriteSupervisorWorkflow(
     ...initialArtifacts,
     ...(artDirectionArtifact ? [artDirectionArtifact as ArtifactId] : []),
   ];
-  const workflowBody = {
-    schemaVersion: "1.0" as const,
+  return {
+    schemaVersion: "1.0",
     protocolVersion: SPRITE_SUPERVISOR_PROTOCOL_VERSION,
     runId: request.runId,
     requestSha256,
-    request,
-  };
-  const workflowSha256 = spriteSupervisorSha256(workflowBody);
-  return {
-    ...workflowBody,
     workflowSha256,
+    request,
     rootJob: {
       queue: "control",
       kind: "art.sprite-production.supervise",
-      idempotencyKey: `${request.runId}:supervisor:${workflowSha256}:tick-0`,
+      idempotencyKey: `${request.runId}:supervisor:${workflowSha256}:request-${requestSha256}:tick-0`,
       payload: normalizeJson({
         schemaVersion: "1.0",
         workflowSha256,
+        requestSha256,
         request,
       }),
       inputArtifacts: [...new Set(inputArtifacts)].sort(),
