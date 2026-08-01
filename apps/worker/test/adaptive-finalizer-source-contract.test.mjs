@@ -42,7 +42,9 @@ test("worker registers adaptive finalization and proof-backed family verificatio
   }
   for (const token of [
     'deliveryProfileId: "godot-sprite-lossless"',
-    "if (result.ready) return base(context)",
+    "normalizeSuccessfulLineage(",
+    '"candidate-adaptive-finalization-envelope"',
+    "provenanceNormalized: true",
     "return base(guardedContext(context, payload))",
   ]) {
     assert.ok(guard.includes(token), `missing guarded evidence path: ${token}`);
