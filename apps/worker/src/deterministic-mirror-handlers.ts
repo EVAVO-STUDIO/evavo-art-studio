@@ -146,7 +146,7 @@ function assertMirrorContract(
   if (
     typeof pivotX !== "number" ||
     !Number.isInteger(pivotX) ||
-    pivotX * 2 !== expectedWidth ||
+    pivotX !== Math.floor(expectedWidth / 2) ||
     typeof pivotY !== "number" ||
     !Number.isInteger(pivotY) ||
     pivotY < 0 ||
@@ -157,7 +157,7 @@ function assertMirrorContract(
   ) {
     throw new PermanentRuntimeError(
       "DETERMINISTIC_MIRROR_REGISTRATION_INVALID",
-      "Mirror payload must retain a centred integer pivot and matching in-canvas baseline.",
+      "Mirror payload must retain the centred integer column as pivot and a matching in-canvas baseline.",
     );
   }
 }
