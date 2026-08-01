@@ -36,6 +36,7 @@ test("published eight-direction 3d finalization example compiles completely", as
     [
       "automatic.family-manifest",
       "automatic.family-finalization-evidence",
+      "automatic.family-adaptive-proof-evidence",
     ],
   );
 });
