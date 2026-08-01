@@ -8,6 +8,7 @@
   },
   "references": [
     { "path": "../artifacts" },
+    { "path": "../art-direction" },
     { "path": "../runtime" },
     { "path": "../sprite-planner" }
   ],
