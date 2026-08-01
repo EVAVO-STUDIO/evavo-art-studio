@@ -41,6 +41,10 @@ async function wrapper(root) {
           requireHostileMatteProof: true,
           requireNoRejectedArtifacts: true,
           requireExactDimensions: true,
+          maximumDeterministicRepairPasses: 2,
+          transparentBleedRadius: 2,
+          matteSearchRadius: 6,
+          matteDistanceThreshold: 72,
         },
       },
       null,
@@ -58,9 +62,11 @@ test("CLI exposes automatic sprite finalization protocol", () => {
   assert.equal(body.protocolVersion, "2026-08-01.1");
   assert.ok(body.backgroundModes.includes("black-additive"));
   assert.ok(body.backgroundRules.some((entry) => entry.includes("checkerboards")));
+  assert.ok(body.adaptiveRepairRules.some((entry) => entry.includes("bounded")));
+  assert.ok(body.proofRules.some((entry) => entry.includes("proof artifact")));
 });
 
-test("CLI compiles background-aware finalization without executing work", async () => {
+test("CLI compiles background-aware adaptive finalization without executing work", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-finalization-cli-"));
   try {
     const input = await wrapper(root);
@@ -78,6 +84,16 @@ test("CLI compiles background-aware finalization without executing work", async 
     assert.ok(
       body.workflow.supervisorRequest.policy.requiredReleaseArtifactRoles.includes(
         "automatic.family-finalization-evidence",
+      ),
+    );
+    assert.ok(
+      body.workflow.supervisorRequest.policy.requiredReleaseArtifactRoles.includes(
+        "automatic.family-adaptive-proof-evidence",
+      ),
+    );
+    assert.ok(
+      body.workflow.supervisorRequest.tasks.some(
+        (task) => task.kind === "art.candidate.finalize-adaptive",
       ),
     );
     assert.match(body.executionBoundary, /does not call providers/i);
