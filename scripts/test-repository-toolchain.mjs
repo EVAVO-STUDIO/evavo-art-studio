@@ -63,7 +63,14 @@ const mutateJson = (relativePath, operation) => {
 const mutateText = (relativePath, operation) => {
   const absolutePath = path.join(fixtureRoot, relativePath);
   const value = readFileSync(absolutePath, "utf8");
-  writeFileSync(absolutePath, operation(value), "utf8");
+  const next = operation(value);
+  assert.notEqual(next, value, `mutation must change ${relativePath}`);
+  writeFileSync(absolutePath, next, "utf8");
+};
+
+const replaceRequired = (value, from, to) => {
+  assert.ok(value.includes(from), `fixture must contain ${from}`);
+  return value.replace(from, to);
 };
 
 try {
@@ -112,7 +119,8 @@ try {
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
-    value.replace(
+    replaceRequired(
+      value,
       "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
       "actions/checkout@v6",
     ),
@@ -121,40 +129,94 @@ try {
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
-    value.replace("persist-credentials: false", "persist-credentials: true"),
+    replaceRequired(value, "persist-credentials: false", "persist-credentials: true"),
   );
   assert.notEqual(run().status, 0, "persisted checkout credentials must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
-    value.replace('node-version: "22.14.0"', 'node-version: "22"'),
+    replaceRequired(value, 'node-version: "22.14.0"', 'node-version: "22"'),
   );
   assert.notEqual(run().status, 0, "floating workflow Node.js must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
-    value.replace("on:\n  workflow_dispatch:", "on:\n  push:\n  workflow_dispatch:"),
+    replaceRequired(
+      value,
+      "  push:\n    branches:\n      - main\n  workflow_dispatch:",
+      "  workflow_dispatch:",
+    ),
   );
-  assert.notEqual(run().status, 0, "automatic push validation must fail");
+  assert.notEqual(run().status, 0, "missing automatic main validation must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
-    value.replace(
+    replaceRequired(value, "      - main\n", "      - main\n      - work/**\n"),
+  );
+  assert.notEqual(run().status, 0, "non-main push scope must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
+      "  workflow_dispatch:\n",
+      "  pull_request:\n  workflow_dispatch:\n",
+    ),
+  );
+  assert.notEqual(run().status, 0, "pull-request validation must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
       "default: evavo-development-studio",
       "default: ungoverned-dispatcher",
     ),
   );
-  assert.notEqual(run().status, 0, "dispatcher identity drift must fail");
+  assert.notEqual(run().status, 0, "manual dispatcher identity drift must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
-    value.replace("cancel-in-progress: false", "cancel-in-progress: true"),
+    replaceRequired(value, "'github-main-push'", "'untrusted-main-push'"),
   );
-  assert.notEqual(run().status, 0, "mutable cancellation policy must fail");
+  assert.notEqual(run().status, 0, "automatic dispatcher identity drift must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
-    value.replace(
+    replaceRequired(value, "cancel-in-progress: true", "cancel-in-progress: false"),
+  );
+  assert.notEqual(run().status, 0, "superseded-run cancellation drift must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
+      '[[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]',
+      'git merge-base --is-ancestor "${ART_STUDIO_EXPECTED_SHA}" origin/main',
+    ),
+  );
+  assert.notEqual(run().status, 0, "initial current-main equality weakening must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
+      "git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main",
+      "git show-ref --verify --quiet refs/remotes/origin/main",
+    ),
+  );
+  assert.notEqual(run().status, 0, "final current-main refresh removal must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(value, '"currentMainAtReceipt": true', '"currentMainAtReceipt": false'),
+  );
+  assert.notEqual(run().status, 0, "current-main receipt assertion drift must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
       "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
       "actions/upload-artifact@v4",
     ),
@@ -164,10 +226,18 @@ try {
   reset();
   mutateJson("evavo.reliability.json", (value) => {
     value.notes = value.notes.filter(
-      (item) => !item.startsWith("Validation is manual exact-current-main only"),
+      (item) => !item.startsWith("Validation runs automatically on pushes to main"),
     );
   });
-  assert.notEqual(run().status, 0, "manual workflow policy note drift must fail");
+  assert.notEqual(run().status, 0, "automatic workflow policy note drift must fail");
+
+  reset();
+  mutateJson("evavo.reliability.json", (value) => {
+    value.notes = value.notes.filter(
+      (item) => !item.startsWith("Superseded mainline validations are cancelled"),
+    );
+  });
+  assert.notEqual(run().status, 0, "current-main receipt policy note drift must fail");
 
   reset();
   mutateJson("evavo.reliability.json", (value) => {
@@ -180,7 +250,7 @@ try {
 
   console.log("Art Studio repository toolchain adversarial tests passed.");
   console.log(
-    "- Node.js, pnpm, lockfile mode, exact manual workflow and capability drift fail closed",
+    "- Node.js, pnpm, lockfile, exact-main triggers, current-main receipts and capability drift fail closed",
   );
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });
