@@ -14,6 +14,7 @@
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",
     "@evavo/art-delivery-optimizer": "workspace:*",
+    "@evavo/art-finalizer": "workspace:*",
     "@evavo/art-godot": "workspace:*",
     "@evavo/art-media": "workspace:*",
     "@evavo/art-providers": "workspace:*",
