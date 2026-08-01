@@ -24,10 +24,23 @@ interface AdaptiveProofLineage {
   readonly selectedSourceArtifactId: ArtifactId;
   readonly finalizedCandidateArtifactId: ArtifactId;
   readonly proofArtifactId: ArtifactId;
+  readonly envelopeArtifactId: ArtifactId;
+  readonly baseFinalizedCandidateArtifactId: ArtifactId;
+  readonly baseEvidenceArtifactId: ArtifactId;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requiredArtifactLabel(value: string | undefined, name: string): ArtifactId {
+  if (value === undefined || !ARTIFACT_ID.test(value)) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FAMILY_ENVELOPE_LABEL_INVALID",
+      `${name} must use artifact_<sha256> format.`,
+    );
+  }
+  return value as ArtifactId;
 }
 
 function adaptiveRequired(
@@ -80,6 +93,135 @@ async function assertProofArtifact(
   return proof;
 }
 
+async function assertEnvelopeArtifact(
+  envelopeArtifactId: ArtifactId,
+  candidate: StoredArtifact,
+  proofArtifactId: ArtifactId,
+  context: Parameters<RuntimeJobHandler>[0],
+): Promise<Readonly<{
+  baseFinalizedCandidateArtifactId: ArtifactId;
+  baseEvidenceArtifactId: ArtifactId;
+}>> {
+  const envelope = await verifiedArtifact(envelopeArtifactId, context);
+  if (
+    envelope.mediaType !== "application/json" ||
+    envelope.storageClass !== "evidence" ||
+    envelope.labels.artifactRole !== "candidate-adaptive-finalization-envelope" ||
+    envelope.labels.qualityState !== "passed" ||
+    envelope.labels.finalizationReady !== "true"
+  ) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FAMILY_ENVELOPE_ROLE_INVALID",
+      `Adaptive finalization envelope has an invalid immutable role or state: ${envelopeArtifactId}`,
+    );
+  }
+  if (
+    candidate.labels.finalizationEnvelopeArtifactId !== envelopeArtifactId ||
+    !candidate.sourceArtifacts.includes(envelopeArtifactId)
+  ) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FAMILY_ENVELOPE_ANCESTRY_INVALID",
+      "The normalized candidate must name the exact finalization envelope and retain it in source ancestry.",
+    );
+  }
+
+  const sourceCandidateArtifactId = requiredArtifactLabel(
+    envelope.labels.sourceCandidateArtifactId,
+    "envelope.labels.sourceCandidateArtifactId",
+  );
+  const baseFinalizedCandidateArtifactId = requiredArtifactLabel(
+    envelope.labels.baseFinalizedCandidateArtifactId,
+    "envelope.labels.baseFinalizedCandidateArtifactId",
+  );
+  const labelledProofArtifactId = requiredArtifactLabel(
+    envelope.labels.proofArtifactId,
+    "envelope.labels.proofArtifactId",
+  );
+  const baseEvidenceArtifactId = requiredArtifactLabel(
+    envelope.labels.baseEvidenceArtifactId,
+    "envelope.labels.baseEvidenceArtifactId",
+  );
+  if (labelledProofArtifactId !== proofArtifactId) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FAMILY_ENVELOPE_PROOF_MISMATCH",
+      "The candidate proof label and finalization envelope proof label do not match.",
+    );
+  }
+  for (const artifactId of [
+    sourceCandidateArtifactId,
+    baseFinalizedCandidateArtifactId,
+    proofArtifactId,
+    baseEvidenceArtifactId,
+  ]) {
+    if (!envelope.sourceArtifacts.includes(artifactId)) {
+      throw new PermanentRuntimeError(
+        "ADAPTIVE_FAMILY_ENVELOPE_CLOSURE_INCOMPLETE",
+        `The finalization envelope source closure is missing ${artifactId}.`,
+      );
+    }
+  }
+
+  const [baseFinalized, baseEvidence] = await Promise.all([
+    verifiedArtifact(baseFinalizedCandidateArtifactId, context),
+    verifiedArtifact(baseEvidenceArtifactId, context),
+  ]);
+  if (
+    baseFinalized.mediaType !== "image/png" ||
+    baseFinalized.labels.artifactRole !== "provider-candidate-alpha-master" ||
+    baseFinalized.labels.qualityState !== "passed" ||
+    baseFinalized.labels.finalizationReady !== "true"
+  ) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FAMILY_BASE_FINALIZED_INVALID",
+      "The envelope does not bind one passed finalization-ready base image.",
+    );
+  }
+  if (
+    baseEvidence.mediaType !== "application/json" ||
+    baseEvidence.storageClass !== "evidence" ||
+    baseEvidence.labels.artifactRole !==
+      "candidate-adaptive-finalization-evidence" ||
+    baseEvidence.labels.qualityState !== "passed"
+  ) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FAMILY_BASE_EVIDENCE_INVALID",
+      "The envelope does not bind one passed adaptive-finalization evidence artifact.",
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(
+      (await context.artifacts.read(envelopeArtifactId)).toString("utf8"),
+    ) as unknown;
+  } catch (error: unknown) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FAMILY_ENVELOPE_JSON_INVALID",
+      `The finalization envelope could not be parsed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (
+    !isRecord(body) ||
+    body.sourceCandidateArtifactId !== sourceCandidateArtifactId ||
+    body.baseFinalizedCandidateArtifactId !==
+      baseFinalizedCandidateArtifactId ||
+    body.proofArtifactId !== proofArtifactId ||
+    body.baseEvidenceArtifactId !== baseEvidenceArtifactId ||
+    body.finalizationReady !== true ||
+    body.qualityThresholdsRelaxed !== false
+  ) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FAMILY_ENVELOPE_BODY_MISMATCH",
+      "The finalization envelope body does not match its immutable labels and release policy.",
+    );
+  }
+
+  return {
+    baseFinalizedCandidateArtifactId,
+    baseEvidenceArtifactId,
+  };
+}
+
 async function findAdaptiveFinalization(
   sourceArtifactId: ArtifactId,
   context: Parameters<RuntimeJobHandler>[0],
@@ -94,20 +236,35 @@ async function findAdaptiveFinalization(
     visited.add(current.artifactId);
     const artifact = await verifiedArtifact(current.artifactId, context);
     const proofValue = artifact.labels.proofArtifactId;
+    const envelopeValue = artifact.labels.finalizationEnvelopeArtifactId;
     if (
       artifact.labels.adaptiveFinalized === "true" &&
       artifact.labels.finalizationReady === "true" &&
       artifact.labels.qualityState === "passed" &&
       artifact.labels.approvalState === "unapproved" &&
+      artifact.labels.provenanceNormalized === "true" &&
       proofValue !== undefined &&
-      ARTIFACT_ID.test(proofValue)
+      ARTIFACT_ID.test(proofValue) &&
+      envelopeValue !== undefined &&
+      ARTIFACT_ID.test(envelopeValue)
     ) {
       const proofArtifactId = proofValue as ArtifactId;
+      const envelopeArtifactId = envelopeValue as ArtifactId;
       await assertProofArtifact(proofArtifactId, context);
+      const envelope = await assertEnvelopeArtifact(
+        envelopeArtifactId,
+        artifact,
+        proofArtifactId,
+        context,
+      );
       return {
         selectedSourceArtifactId: sourceArtifactId,
         finalizedCandidateArtifactId: artifact.artifactId,
         proofArtifactId,
+        envelopeArtifactId,
+        baseFinalizedCandidateArtifactId:
+          envelope.baseFinalizedCandidateArtifactId,
+        baseEvidenceArtifactId: envelope.baseEvidenceArtifactId,
       };
     }
     if (current.depth >= MAXIMUM_LINEAGE_DEPTH) continue;
@@ -117,7 +274,7 @@ async function findAdaptiveFinalization(
   }
   throw new PermanentRuntimeError(
     "ADAPTIVE_FAMILY_FINALIZATION_LINEAGE_MISSING",
-    `Selected family source has no proof-backed adaptive finalization in bounded lineage: ${sourceArtifactId}`,
+    `Selected family source has no envelope-bound adaptive finalization in bounded lineage: ${sourceArtifactId}`,
   );
 }
 
@@ -165,15 +322,21 @@ export function createAdaptiveSpriteFamilyHandlers(): Readonly<
     const proofArtifactIds = [
       ...new Set(lineage.map((entry) => entry.proofArtifactId)),
     ].sort();
+    const envelopeArtifactIds = [
+      ...new Set(lineage.map((entry) => entry.envelopeArtifactId)),
+    ].sort();
     const evidenceBody = normalizeJson({
       schemaVersion: "1.0",
       familyId: manifest.familyId,
       adaptiveFinalizationPassed: true,
       selectedSourceCount: sourceIds.length,
       proofArtifactCount: proofArtifactIds.length,
+      envelopeArtifactCount: envelopeArtifactIds.length,
       lineage,
       proofArtifactIds,
+      envelopeArtifactIds,
       baseOutputArtifactIds: baseResult.outputArtifacts,
+      everyEnvelopeVerified: true,
       qualityThresholdsRelaxed: false,
     });
     const evidence = await context.putArtifact(
@@ -186,7 +349,12 @@ export function createAdaptiveSpriteFamilyHandlers(): Readonly<
           ...new Set([
             ...sourceIds,
             ...lineage.map((entry) => entry.finalizedCandidateArtifactId),
+            ...lineage.map(
+              (entry) => entry.baseFinalizedCandidateArtifactId,
+            ),
+            ...lineage.map((entry) => entry.baseEvidenceArtifactId),
             ...proofArtifactIds,
+            ...envelopeArtifactIds,
             ...baseResult.outputArtifacts,
           ]),
         ].sort(),
@@ -200,6 +368,8 @@ export function createAdaptiveSpriteFamilyHandlers(): Readonly<
         metadata: normalizeJson({
           selectedSourceCount: sourceIds.length,
           proofArtifactCount: proofArtifactIds.length,
+          envelopeArtifactCount: envelopeArtifactIds.length,
+          everyEnvelopeVerified: true,
           qualityThresholdsRelaxed: false,
         }),
       },
