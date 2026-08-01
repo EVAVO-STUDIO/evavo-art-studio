@@ -15,9 +15,10 @@ test("published eight-direction 3d finalization example compiles completely", as
     ),
   );
   const compiled = compileAutomaticSpriteFinalizationWorkflow(input);
-  assert.equal(compiled.request.spritePlan.directions.length, 8);
+  const plan = compiled.baseWorkflow.request.spritePlan;
+  assert.equal(plan.directions.length, 8);
   assert.equal(
-    compiled.request.spritePlan.directions.every((direction) => direction.authored),
+    plan.directions.every((direction) => direction.authored),
     true,
   );
   assert.equal(compiled.analysis.threeD.directionCoverage.length, 8);
