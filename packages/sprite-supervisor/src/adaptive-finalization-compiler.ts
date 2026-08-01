@@ -118,8 +118,7 @@ function labelsWithoutQuality(
 function masteredSelector(
   task: SpriteSupervisorTaskInput,
 ): SpriteSupervisorArtifactSelectorInput {
-  const values = task.outputBindings ?? [];
-  const selector = values.find(
+  const selector = (task.outputBindings ?? []).find(
     (entry) =>
       entry.source === "output-artifact-labels" &&
       entry.labels?.artifactRole === "provider-candidate-alpha-master",
@@ -138,8 +137,13 @@ function transformedMasterTask(
   preAdaptiveRole: string,
 ): SpriteSupervisorTaskInput {
   const target = masteredSelector(task);
+  const payload = record(task.payloadTemplate);
   return {
     ...task,
+    payloadTemplate: normalizeJson({
+      ...payload,
+      deliveryProfileId: "godot-sprite-lossless",
+    }),
     outputBindings: (task.outputBindings ?? []).map((selector) =>
       selector === target
         ? {
@@ -159,9 +163,10 @@ function adaptiveTask(
   options: AdaptiveFinalizationOptions,
 ): SpriteSupervisorTaskInput {
   const payload = record(task.payloadTemplate);
-  const adaptiveId = `${task.id}-adaptive`;
-  const proofRole = `${selector.role}.proof.${shortHash(task.id)}`;
-  const repairPlanRole = `${selector.role}.repair-plan.${shortHash(task.id)}`;
+  const hash = shortHash(task.id);
+  const adaptiveId = `auto-adaptive-${hash}`;
+  const proofRole = `automatic.adaptive-proof.${hash}`;
+  const repairPlanRole = `automatic.adaptive-repair-plan.${hash}`;
   return {
     id: adaptiveId,
     stage: task.stage,
@@ -254,7 +259,7 @@ function transformTasks(
       continue;
     }
     const selector = masteredSelector(task);
-    const preAdaptiveRole = `${selector.role}.pre-adaptive.${shortHash(task.id)}`;
+    const preAdaptiveRole = `automatic.pre-adaptive.${shortHash(task.id)}`;
     output.push(transformedMasterTask(task, preAdaptiveRole));
     const adaptive = adaptiveTask(task, selector, preAdaptiveRole, options);
     output.push(adaptive);
@@ -295,13 +300,34 @@ export function compileAutomaticSpriteFinalizationWorkflow(
   const base = compileBaseAutomaticSpriteFinalizationWorkflow(input);
   const options = adaptiveOptions(input);
   const transformed = transformTasks(base.supervisorRequest.tasks, options);
+  const maximumTasks = base.baseWorkflow.request.policy.maximumTasks;
+  if (transformed.tasks.length > maximumTasks) {
+    throw new SpriteSupervisorError(
+      "ADAPTIVE_FINALIZATION_TASK_LIMIT_EXCEEDED",
+      `Adaptive finalization requires ${transformed.tasks.length} tasks; the configured maximum is ${maximumTasks}.`,
+      normalizeJson({
+        baseTasks: base.supervisorRequest.tasks.length,
+        adaptiveTasks: transformed.adaptiveTaskIds.size,
+        totalTasks: transformed.tasks.length,
+        maximumTasks,
+      }),
+    );
+  }
   const request = normalizedRequestWithOptions(base.request, options);
   const existingMetadata = isRecord(base.supervisorRequest.metadata)
     ? base.supervisorRequest.metadata
     : {};
+  const existingPolicy = base.supervisorRequest.policy ?? {};
   const supervisorRequest: SpriteSupervisorCompileRequestInput = {
     ...base.supervisorRequest,
     tasks: transformed.tasks,
+    policy: {
+      ...existingPolicy,
+      maximumTicks: Math.max(
+        existingPolicy.maximumTicks ?? 1_000,
+        transformed.tasks.length * 8,
+      ),
+    },
     metadata: normalizeJson({
       ...existingMetadata,
       adaptiveFinalization: {
@@ -318,6 +344,13 @@ export function compileAutomaticSpriteFinalizationWorkflow(
     requestSha256: automaticSpriteFinalizationRequestSha256(request),
     analysis: {
       ...base.analysis,
+      base: {
+        ...base.analysis.base,
+        totals: {
+          ...base.analysis.base.totals,
+          tasks: transformed.tasks.length,
+        },
+      },
       finalization: {
         ...base.analysis.finalization,
         candidateFinalizationTasks: transformed.adaptiveTaskIds.size,
