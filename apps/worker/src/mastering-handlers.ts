@@ -14,7 +14,6 @@ import {
   ChromaKeyExtractionError,
   extractChromaKeyAlpha,
   type ChromaKeyExtractionOptions,
-  type ChromaKeyExtractionResult,
 } from "@evavo/art-media";
 import {
   SpriteQualityInputError,
@@ -30,10 +29,6 @@ import {
 
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
 const HEX = /^#[0-9a-f]{6}$/i;
-const REQUIRED_CAPABILITIES = Object.freeze([
-  "quality.sprite-frame",
-  "evidence.bundle",
-] as const);
 const DELIVERY_PROFILES = new Set<DeliveryProfileId>([
   "retro-standing-character-576",
   "retro-ui-icon-256",
@@ -130,9 +125,7 @@ function booleanValue(
   return value;
 }
 
-function backgroundMode(
-  value: JsonValue | undefined,
-): MasteringBackgroundMode {
+function backgroundMode(value: JsonValue | undefined): MasteringBackgroundMode {
   const mode = value ?? "chroma-key";
   if (
     mode !== "chroma-key" &&
@@ -150,55 +143,16 @@ function backgroundMode(
 
 function profileId(value: JsonValue | undefined): DeliveryProfileId {
   const profile = value ?? "godot-sprite-lossless";
-  if (typeof profile !== "string" || !DELIVERY_PROFILES.has(profile as DeliveryProfileId)) {
+  if (
+    typeof profile !== "string" ||
+    !DELIVERY_PROFILES.has(profile as DeliveryProfileId)
+  ) {
     throw new PermanentRuntimeError(
       "MASTERING_PAYLOAD_INVALID",
       "deliveryProfileId is not supported by automatic candidate finalization.",
     );
   }
   return profile as DeliveryProfileId;
-}
-
-function extractionOptions(
-  payload: Readonly<Record<string, JsonValue>>,
-  matteColour: string,
-): ChromaKeyExtractionOptions {
-  const connectionDistance = optionalNumber(
-    payload.connectionDistance,
-    "connectionDistance",
-  );
-  const opaqueSeedDistance = optionalNumber(
-    payload.opaqueSeedDistance,
-    "opaqueSeedDistance",
-  );
-  const edgeSearchRadius = optionalNumber(
-    payload.edgeSearchRadius,
-    "edgeSearchRadius",
-  );
-  const bleedRadius = optionalNumber(payload.bleedRadius, "bleedRadius");
-  const minimumBorderMatteFraction = optionalNumber(
-    payload.minimumBorderMatteFraction,
-    "minimumBorderMatteFraction",
-  );
-  return {
-    matteColour,
-    ...(connectionDistance === undefined ? {} : { connectionDistance }),
-    ...(opaqueSeedDistance === undefined ? {} : { opaqueSeedDistance }),
-    ...(edgeSearchRadius === undefined ? {} : { edgeSearchRadius }),
-    ...(bleedRadius === undefined ? {} : { bleedRadius }),
-    ...(minimumBorderMatteFraction === undefined
-      ? {}
-      : { minimumBorderMatteFraction }),
-  };
-}
-
-function safeFileStem(value: string): string {
-  const normalized = value
-    .replace(/\.[^.]+$/, "")
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 160);
-  return normalized || "candidate";
 }
 
 function targetDimensions(
@@ -255,7 +209,99 @@ function proofBackgrounds(value: JsonValue | undefined): readonly string[] {
   ];
 }
 
-async function pngSource(
+function safeFileStem(value: string): string {
+  return (
+    value
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 160) || "candidate"
+  );
+}
+
+function extractionOptions(
+  payload: Readonly<Record<string, JsonValue>>,
+  matteColour: string,
+  black: boolean,
+): ChromaKeyExtractionOptions {
+  const connectionDistance = optionalNumber(
+    payload.connectionDistance,
+    "connectionDistance",
+  );
+  const opaqueSeedDistance = optionalNumber(
+    payload.opaqueSeedDistance,
+    "opaqueSeedDistance",
+  );
+  const edgeSearchRadius = optionalNumber(
+    payload.edgeSearchRadius,
+    "edgeSearchRadius",
+  );
+  const bleedRadius = optionalNumber(payload.bleedRadius, "bleedRadius");
+  const minimumBorderMatteFraction = optionalNumber(
+    payload.minimumBorderMatteFraction,
+    "minimumBorderMatteFraction",
+  );
+  return {
+    matteColour,
+    connectionDistance: connectionDistance ?? (black ? 24 : 140),
+    opaqueSeedDistance: opaqueSeedDistance ?? (black ? 64 : 220),
+    edgeSearchRadius: edgeSearchRadius ?? 12,
+    bleedRadius: bleedRadius ?? 2,
+    minimumBorderMatteFraction:
+      minimumBorderMatteFraction ?? (black ? 0.85 : 0.65),
+  };
+}
+
+function hasNonOpaqueAlpha(frame: DecodedSpriteFrame): boolean {
+  for (let offset = 3; offset < frame.data.length; offset += 4) {
+    if (frame.data[offset]! < 255) return true;
+  }
+  return false;
+}
+
+function blackStageEvidence(frame: DecodedSpriteFrame): Readonly<{
+  borderPixels: number;
+  blackBorderPixels: number;
+  blackBorderFraction: number;
+  nonBlackPixels: number;
+  passed: boolean;
+}> {
+  let borderPixels = 0;
+  let blackBorderPixels = 0;
+  let nonBlackPixels = 0;
+  for (let y = 0; y < frame.height; y += 1) {
+    for (let x = 0; x < frame.width; x += 1) {
+      const offset = (y * frame.width + x) * 4;
+      const maximum = Math.max(
+        frame.data[offset]!,
+        frame.data[offset + 1]!,
+        frame.data[offset + 2]!,
+      );
+      if (maximum > 12) nonBlackPixels += 1;
+      if (
+        x === 0 ||
+        y === 0 ||
+        x === frame.width - 1 ||
+        y === frame.height - 1
+      ) {
+        borderPixels += 1;
+        if (maximum <= 12) blackBorderPixels += 1;
+      }
+    }
+  }
+  const blackBorderFraction = borderPixels
+    ? blackBorderPixels / borderPixels
+    : 0;
+  return {
+    borderPixels,
+    blackBorderPixels,
+    blackBorderFraction,
+    nonBlackPixels,
+    passed: blackBorderFraction >= 0.85 && nonBlackPixels > 0,
+  };
+}
+
+async function prepareSource(
   candidateBytes: Buffer,
   mode: MasteringBackgroundMode,
   payload: Readonly<Record<string, JsonValue>>,
@@ -263,54 +309,77 @@ async function pngSource(
   png: Buffer;
   extraction: JsonValue | null;
   sourceDecoded: DecodedSpriteFrame;
+  blackEvidence: ReturnType<typeof blackStageEvidence> | null;
+  effectiveMatteColour?: string;
 }>> {
   const sourceDecoded = await decodeSpriteFrame(candidateBytes);
   if (mode === "native-alpha") {
-    if (
-      !sourceDecoded.sourceHasAlpha ||
-      !sourceDecoded.data.some((_, index) => index % 4 === 3 && sourceDecoded.data[index]! < 255)
-    ) {
+    if (!sourceDecoded.sourceHasAlpha || !hasNonOpaqueAlpha(sourceDecoded)) {
       throw new PermanentRuntimeError(
         "MASTERING_NATIVE_ALPHA_MISSING",
-        "Native-alpha mastering requires a decoded source alpha channel with at least one non-opaque pixel.",
+        "Native-alpha mastering requires a decoded alpha channel with at least one non-opaque pixel.",
       );
     }
     return {
-      png: await sharp(candidateBytes).rotate().png({ compressionLevel: 9 }).toBuffer(),
+      png: await sharp(candidateBytes)
+        .rotate()
+        .png({ compressionLevel: 9, palette: false })
+        .toBuffer(),
       extraction: null,
       sourceDecoded,
+      blackEvidence: null,
     };
   }
-  if (mode === "chroma-key") {
-    const matteColour = requiredString(payload.matteColour, "matteColour");
-    let extraction: ChromaKeyExtractionResult;
-    try {
-      extraction = await extractChromaKeyAlpha(
-        candidateBytes,
-        extractionOptions(payload, matteColour),
+
+  if (mode === "opaque-preserve") {
+    if (sourceDecoded.sourceHasAlpha && hasNonOpaqueAlpha(sourceDecoded)) {
+      throw new PermanentRuntimeError(
+        "MASTERING_OPAQUE_SOURCE_HAS_TRANSPARENCY",
+        "Opaque-preserve requires an already opaque provider result and never flattens transparency against black.",
       );
-    } catch (error: unknown) {
-      if (error instanceof ChromaKeyExtractionError) {
-        throw new PermanentRuntimeError(error.code, error.message);
-      }
-      throw error;
     }
+    return {
+      png: await sharp(candidateBytes)
+        .rotate()
+        .png({ compressionLevel: 9, palette: false })
+        .toBuffer(),
+      extraction: null,
+      sourceDecoded,
+      blackEvidence: null,
+    };
+  }
+
+  const matteColour =
+    mode === "black-additive"
+      ? "#000000"
+      : requiredString(payload.matteColour, "matteColour").toLowerCase();
+  const blackEvidence =
+    mode === "black-additive" ? blackStageEvidence(sourceDecoded) : null;
+  if (blackEvidence && !blackEvidence.passed) {
+    throw new PermanentRuntimeError(
+      "MASTERING_BLACK_STAGE_INVALID",
+      "Black-additive mastering requires a predominantly black border and measurable non-black effect content.",
+      normalizeJson(blackEvidence),
+    );
+  }
+  try {
+    const extraction = await extractChromaKeyAlpha(
+      candidateBytes,
+      extractionOptions(payload, matteColour, mode === "black-additive"),
+    );
     return {
       png: Buffer.from(extraction.png),
       extraction: normalizeJson(extraction.evidence),
       sourceDecoded,
+      blackEvidence,
+      effectiveMatteColour: matteColour,
     };
+  } catch (error: unknown) {
+    if (error instanceof ChromaKeyExtractionError) {
+      throw new PermanentRuntimeError(error.code, error.message);
+    }
+    throw error;
   }
-  const flatten = mode === "black-additive" ? "#000000" : "#000000";
-  return {
-    png: await sharp(candidateBytes)
-      .rotate()
-      .flatten({ background: flatten })
-      .png({ compressionLevel: 9, palette: false })
-      .toBuffer(),
-    extraction: null,
-    sourceDecoded,
-  };
 }
 
 async function resizePng(
@@ -363,41 +432,6 @@ async function resizePng(
   };
 }
 
-function blackBackgroundEvidence(frame: DecodedSpriteFrame): Readonly<{
-  borderPixels: number;
-  blackBorderPixels: number;
-  blackBorderFraction: number;
-  nonBlackPixels: number;
-  passed: boolean;
-}> {
-  let borderPixels = 0;
-  let blackBorderPixels = 0;
-  let nonBlackPixels = 0;
-  for (let y = 0; y < frame.height; y += 1) {
-    for (let x = 0; x < frame.width; x += 1) {
-      const offset = (y * frame.width + x) * 4;
-      const r = frame.data[offset]!;
-      const g = frame.data[offset + 1]!;
-      const b = frame.data[offset + 2]!;
-      if (Math.max(r, g, b) > 12) nonBlackPixels += 1;
-      if (x === 0 || y === 0 || x === frame.width - 1 || y === frame.height - 1) {
-        borderPixels += 1;
-        if (Math.max(r, g, b) <= 12) blackBorderPixels += 1;
-      }
-    }
-  }
-  const blackBorderFraction = borderPixels
-    ? blackBorderPixels / borderPixels
-    : 0;
-  return {
-    borderPixels,
-    blackBorderPixels,
-    blackBorderFraction,
-    nonBlackPixels,
-    passed: blackBorderFraction >= 0.85 && nonBlackPixels > 0,
-  };
-}
-
 function qualityExpectations(
   payload: Readonly<Record<string, JsonValue>>,
   width: number,
@@ -410,10 +444,7 @@ function qualityExpectations(
   const existingMattes = Array.isArray(supplied.knownMatteColours)
     ? supplied.knownMatteColours
     : [];
-  const transparency =
-    mode === "chroma-key" || mode === "native-alpha"
-      ? "alpha-required"
-      : "opaque";
+  const transparency = mode === "opaque-preserve" ? "opaque" : "alpha-required";
   return {
     ...supplied,
     frameId,
@@ -438,7 +469,6 @@ function qualityExpectations(
 
 function masteringError(error: unknown): never {
   if (
-    error instanceof ChromaKeyExtractionError ||
     error instanceof DeliveryOptimizerError ||
     error instanceof SpriteQualityInputError
   ) {
@@ -460,7 +490,6 @@ export function createCandidateMasteringHandlers(): Readonly<
     const payload = context.job.spec.payload;
     const candidateId = artifactId(payload.candidateArtifactId);
     const mode = backgroundMode(payload.backgroundMode);
-    const matteColour = optionalString(payload.matteColour, "matteColour");
     const target = targetDimensions(payload);
     const deliveryProfileId = profileId(payload.deliveryProfileId);
     const matteProofs = proofBackgrounds(payload.proofBackgrounds);
@@ -474,7 +503,7 @@ export function createCandidateMasteringHandlers(): Readonly<
       "requireMeaningfulAlpha",
       true,
     );
-    for (const capability of REQUIRED_CAPABILITIES) {
+    for (const capability of ["quality.sprite-frame", "evidence.bundle"]) {
       if (!context.job.spec.requiredCapabilities.includes(capability)) {
         throw new PermanentRuntimeError(
           "MASTERING_CAPABILITY_MISSING",
@@ -483,21 +512,19 @@ export function createCandidateMasteringHandlers(): Readonly<
       }
     }
     if (
-      mode === "chroma-key" &&
+      mode !== "native-alpha" &&
+      mode !== "opaque-preserve" &&
       !context.job.spec.requiredCapabilities.includes("media.chroma-extract")
     ) {
       throw new PermanentRuntimeError(
         "MASTERING_CAPABILITY_MISSING",
-        "Chroma-key mastering must require media.chroma-extract.",
+        "Matte-backed mastering must require media.chroma-extract.",
       );
     }
-    if (
-      (target.width !== undefined || payload.deliveryProfileId !== undefined) &&
-      !context.job.spec.requiredCapabilities.includes("media.raster")
-    ) {
+    if (!context.job.spec.requiredCapabilities.includes("media.raster")) {
       throw new PermanentRuntimeError(
         "MASTERING_CAPABILITY_MISSING",
-        "Resize or delivery finalization must require media.raster.",
+        "Candidate finalization must require media.raster.",
       );
     }
     if (!context.job.spec.inputArtifacts.includes(candidateId)) {
@@ -541,13 +568,12 @@ export function createCandidateMasteringHandlers(): Readonly<
     }
 
     const candidateBytes = await context.artifacts.read(candidateId);
-    let prepared: Awaited<ReturnType<typeof pngSource>>;
+    let prepared: Awaited<ReturnType<typeof prepareSource>>;
     let resized: Awaited<ReturnType<typeof resizePng>>;
     let optimization: Awaited<ReturnType<typeof optimizeDeliveryImage>>;
     let quality: SpriteFrameQualityReport;
-    let blackEvidence: ReturnType<typeof blackBackgroundEvidence> | null = null;
     try {
-      prepared = await pngSource(candidateBytes, mode, payload);
+      prepared = await prepareSource(candidateBytes, mode, payload);
       resized = await resizePng(prepared.png, target);
       optimization = await optimizeDeliveryImage(resized.png, {
         profileId: deliveryProfileId,
@@ -564,31 +590,21 @@ export function createCandidateMasteringHandlers(): Readonly<
             ? payload.frameId
             : candidate.labels.frameId ?? candidate.artifactId,
           mode,
-          matteColour,
+          prepared.effectiveMatteColour,
         ),
       );
-      if (mode === "black-additive") {
-        blackEvidence = blackBackgroundEvidence(decoded);
-      }
     } catch (error: unknown) {
       masteringError(error);
     }
 
     const alphaPixels = quality.alpha.transparentPixels + quality.alpha.partialPixels;
     const meaningfulAlphaPassed =
-      mode !== "chroma-key" && mode !== "native-alpha"
-        ? true
-        : !requireMeaningfulAlpha || alphaPixels > 0;
+      mode === "opaque-preserve" || !requireMeaningfulAlpha || alphaPixels > 0;
     const fakeTransparencyPassed =
       !requireFakeTransparencyRejection ||
       (!quality.fakeTransparency.checkerboardDetected &&
         !quality.fakeTransparency.flatMatteDetected);
-    const blackBackgroundPassed = blackEvidence?.passed ?? true;
-    const passed =
-      quality.passed &&
-      meaningfulAlphaPassed &&
-      fakeTransparencyPassed &&
-      blackBackgroundPassed;
+    const passed = quality.passed && meaningfulAlphaPassed && fakeTransparencyPassed;
 
     const stem = safeFileStem(
       candidate.fileName ?? candidate.labels.candidateFamilyId ?? candidate.artifactId,
@@ -615,11 +631,9 @@ export function createCandidateMasteringHandlers(): Readonly<
         schemaVersion: "1.0",
         jobId: context.job.id,
         stage: "candidate-finalization",
-        requiresApproval: true,
-        requiresBlockingQa: true,
         qualityPassed: passed,
-        backgroundMode: mode,
         deliveryProfileId,
+        backgroundMode: mode,
         proofBackgrounds: matteProofs,
         geometry: {
           sourceWidth: resized.sourceWidth,
@@ -649,10 +663,10 @@ export function createCandidateMasteringHandlers(): Readonly<
       },
       background: {
         mode,
-        matteColour: matteColour ?? null,
+        matteColour: prepared.effectiveMatteColour ?? null,
         proofBackgrounds: matteProofs,
         extraction: prepared.extraction,
-        blackEvidence,
+        blackEvidence: prepared.blackEvidence,
       },
       geometry: {
         sourceWidth: resized.sourceWidth,
@@ -668,7 +682,6 @@ export function createCandidateMasteringHandlers(): Readonly<
         qualityPassed: quality.passed,
         meaningfulAlphaPassed,
         fakeTransparencyPassed,
-        blackBackgroundPassed,
       },
       promotionEligible: passed,
       approvalState: "unapproved",
