@@ -3,9 +3,12 @@ import test from "node:test";
 
 import {
   BOOK_ART_HANDOFF_CONTRACT,
+  translateLegacyBookArtArtifactReference,
   validateBookArtArtifactReceipt,
   validateBookArtBrief,
   validateBookArtworkUseBinding,
+  validateLegacyCompatibleBookArtArtifactReceipt,
+  validateLegacyCompatibleBookArtworkUseBinding,
 } from "../dist/index.js";
 
 const sha = (character) => character.repeat(64);
@@ -38,6 +41,9 @@ function approvedArtifact() {
     generatedTextDetected: false, unresolvedRisks: [], artifactFingerprint: sha("5"), publicationPerformed: false,
   };
 }
+function bindingFor(artifact) {
+  return { outputKind: "evavo_book_artwork_use_binding", schemaVersion: 1, contract: BOOK_ART_HANDOFF_CONTRACT, identity: artifact.identity, purpose: "front_cover_art", sourceBriefFingerprint: artifact.sourceBriefFingerprint, approvedArtifactId: artifact.artifactId, approvedArtifactReference: artifact.artifactReference, approvedArtifactSha256: artifact.contentSha256, promotionReceiptSha256: artifact.promotionReceiptSha256, sceneOrPlacementId: "cover-scene-1", cropOrPlacementSha256: sha("6"), boundAt: "2026-08-02T02:00:00.000Z", boundBy: "book-designer", useFingerprint: sha("7"), canonicalRendererMustVerifyBytes: true, publicationPerformed: false };
+}
 
 test("accepts an exact manuscript-bound, text-free cover brief", () => {
   assert.deepEqual(validateBookArtBrief(brief()), { valid: true, issues: [] });
@@ -55,9 +61,35 @@ test("requires selection and promotion before an artifact is approved", () => {
 });
 test("allows book use only for the exact approved promoted artifact", () => {
   const artifact = approvedArtifact();
-  const binding = { outputKind: "evavo_book_artwork_use_binding", schemaVersion: 1, contract: BOOK_ART_HANDOFF_CONTRACT, identity: artifact.identity, purpose: "front_cover_art", sourceBriefFingerprint: artifact.sourceBriefFingerprint, approvedArtifactId: artifact.artifactId, approvedArtifactReference: artifact.artifactReference, approvedArtifactSha256: artifact.contentSha256, promotionReceiptSha256: artifact.promotionReceiptSha256, sceneOrPlacementId: "cover-scene-1", cropOrPlacementSha256: sha("6"), boundAt: "2026-08-02T02:00:00.000Z", boundBy: "book-designer", useFingerprint: sha("7"), canonicalRendererMustVerifyBytes: true, publicationPerformed: false };
+  const binding = bindingFor(artifact);
   assert.deepEqual(validateBookArtworkUseBinding(binding, artifact), { valid: true, issues: [] });
   const candidate = { ...artifact, status: "candidate", promotionReceiptSha256: undefined };
   const rejected = validateBookArtworkUseBinding(binding, candidate); assert.equal(rejected.valid, false);
   assert.ok(rejected.issues.some((entry) => entry.includes("approved Art Studio artifact")));
+});
+test("preserves legacy Website cover and publication artifact references without rewriting bytes", () => {
+  for (const artifactReference of [
+    "book-cover-artifact://project/art/source-artwork-abc.png",
+    "book-publication-artifact://project/illustration/final-plate-def.tiff",
+  ]) {
+    const artifact = { ...approvedArtifact(), artifactReference };
+    const translation = translateLegacyBookArtArtifactReference(artifactReference);
+    assert.match(translation.canonicalReference, /^book-artifact:\/\/legacy\/(?:cover|publication)\//);
+    assert.equal(translation.translation?.legacyReference, artifactReference);
+    assert.equal(translation.translation?.sourceReferenceRetained, true);
+    assert.equal(translation.translation?.bytesRewritten, false);
+    const receipt = validateLegacyCompatibleBookArtArtifactReceipt(artifact);
+    assert.equal(receipt.valid, true, receipt.issues.join("\n"));
+    assert.equal(receipt.referenceTranslations.length, 1);
+    const use = validateLegacyCompatibleBookArtworkUseBinding(bindingFor(artifact), artifact);
+    assert.equal(use.valid, true, use.issues.join("\n"));
+    assert.equal(use.referenceTranslations.length, 2);
+  }
+});
+test("rejects a legacy use binding that silently changes the approved reference", () => {
+  const artifact = { ...approvedArtifact(), artifactReference: "book-cover-artifact://project/art/source-artwork-abc.png" };
+  const binding = { ...bindingFor(artifact), approvedArtifactReference: "book-cover-artifact://project/art/different.png" };
+  const result = validateLegacyCompatibleBookArtworkUseBinding(binding, artifact);
+  assert.equal(result.valid, false);
+  assert.ok(result.issues.some((entry) => entry.includes("differs from the exact approved artifact reference")));
 });
