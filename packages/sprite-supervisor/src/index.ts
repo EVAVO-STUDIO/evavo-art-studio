@@ -8,9 +8,14 @@ export * from "./protocol.js";
 export * from "./automatic-types.js";
 export * from "./automatic-validation.js";
 export * from "./automatic-art-direction.js";
-export * from "./automatic-compiler.js";
+export { analyseAutomaticSpriteWorkflow } from "./automatic-compiler.js";
+export {
+  applyDeterministicMirroring,
+  assertMirrorSafety,
+  compileAutomaticSpriteWorkflow,
+} from "./automatic-mirror-compiler.js";
 export * from "./automatic-protocol.js";
 export * from "./automatic-finalization-types.js";
 export * from "./automatic-finalization-validation.js";
-export { compileAutomaticSpriteFinalizationWorkflow } from "./adaptive-finalization-compiler.js";
+export { compileAutomaticSpriteFinalizationWorkflow } from "./mirrored-finalization-compiler.js";
 export * from "./automatic-finalization-protocol.js";
