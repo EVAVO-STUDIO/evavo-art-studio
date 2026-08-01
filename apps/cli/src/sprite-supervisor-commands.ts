@@ -3,6 +3,10 @@ import path from "node:path";
 
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 import {
+  automaticSpriteFinalizationProtocolSummary,
+  automaticSpriteWorkflowProtocolSummary,
+  compileAutomaticSpriteFinalizationWorkflow,
+  compileAutomaticSpriteWorkflow,
   compileSpriteSupervisorWorkflow,
   spriteSupervisorProtocolSummary,
 } from "@evavo/art-sprite-supervisor";
@@ -46,6 +50,26 @@ function actor(values: SpriteSupervisorCommandValues): string {
   );
 }
 
+async function submit(
+  values: SpriteSupervisorCommandValues,
+  workflow: Readonly<{
+    runId: string;
+    workflowSha256: string;
+    rootJob: Parameters<LocalRuntimeRepository["submit"]>[0];
+  }>,
+) {
+  const runtime = new LocalRuntimeRepository({ root: runtimeRoot(values) });
+  const rootJob = await runtime.submit(workflow.rootJob, actor(values));
+  return {
+    schemaVersion: "1.0",
+    runId: workflow.runId,
+    workflowSha256: workflow.workflowSha256,
+    rootJob,
+    executionBoundary:
+      "Only the root durable supervisor job was submitted. Provider credentials remain worker-only and all child quality, repair, selection, family verification and finalization gates remain active.",
+  };
+}
+
 export async function handleSpriteSupervisorCommand(
   command: string,
   values: SpriteSupervisorCommandValues,
@@ -53,22 +77,88 @@ export async function handleSpriteSupervisorCommand(
   if (command === "sprite-supervisor-protocol") {
     return { handled: true, value: spriteSupervisorProtocolSummary() };
   }
-  if (
-    !new Set([
-      "sprite-supervisor-validate",
-      "sprite-supervisor-compile",
-      "sprite-supervisor-start",
-    ]).has(command)
-  ) {
-    return { handled: false };
+  if (command === "automatic-sprite-workflow-protocol") {
+    return { handled: true, value: automaticSpriteWorkflowProtocolSummary() };
   }
-  const input = await readJson(requiredInput(values, command));
-  const workflow = compileSpriteSupervisorWorkflow(input);
-  if (command === "sprite-supervisor-validate") {
+  if (command === "automatic-sprite-finalization-protocol") {
     return {
       handled: true,
-      value: workflow.request,
+      value: automaticSpriteFinalizationProtocolSummary(),
     };
+  }
+  const commands = new Set([
+    "sprite-supervisor-validate",
+    "sprite-supervisor-compile",
+    "sprite-supervisor-start",
+    "automatic-sprite-workflow-validate",
+    "automatic-sprite-workflow-compile",
+    "automatic-sprite-workflow-start",
+    "automatic-sprite-finalization-validate",
+    "automatic-sprite-finalization-compile",
+    "automatic-sprite-finalization-start",
+  ]);
+  if (!commands.has(command)) return { handled: false };
+
+  const input = await readJson(requiredInput(values, command));
+  if (command.startsWith("automatic-sprite-finalization-")) {
+    const compiled = compileAutomaticSpriteFinalizationWorkflow(input);
+    if (command.endsWith("-validate")) {
+      return {
+        handled: true,
+        value: {
+          request: compiled.request,
+          analysis: compiled.analysis,
+        },
+      };
+    }
+    if (command.endsWith("-compile")) {
+      return {
+        handled: true,
+        value: {
+          schemaVersion: "1.0",
+          workflow: compiled,
+          executionBoundary:
+            "Compilation chooses background and 3D reference policy but does not call providers, inspect artifacts, promote assets, or deploy a project.",
+        },
+      };
+    }
+    return {
+      handled: true,
+      value: await submit(values, compiled.supervisorWorkflow),
+    };
+  }
+
+  if (command.startsWith("automatic-sprite-workflow-")) {
+    const compiled = compileAutomaticSpriteWorkflow(input);
+    if (command.endsWith("-validate")) {
+      return {
+        handled: true,
+        value: {
+          request: compiled.request,
+          analysis: compiled.analysis,
+        },
+      };
+    }
+    if (command.endsWith("-compile")) {
+      return {
+        handled: true,
+        value: {
+          schemaVersion: "1.0",
+          workflow: compiled,
+          executionBoundary:
+            "Compilation does not call a provider or execute any child job.",
+        },
+      };
+    }
+    return {
+      handled: true,
+      value: await submit(values, compiled.supervisorWorkflow),
+    };
+  }
+
+  const workflow = compileSpriteSupervisorWorkflow(input);
+  if (command === "sprite-supervisor-validate") {
+    return { handled: true, value: workflow.request };
   }
   if (command === "sprite-supervisor-compile") {
     return {
@@ -81,17 +171,8 @@ export async function handleSpriteSupervisorCommand(
       },
     };
   }
-  const runtime = new LocalRuntimeRepository({ root: runtimeRoot(values) });
-  const rootJob = await runtime.submit(workflow.rootJob, actor(values));
   return {
     handled: true,
-    value: {
-      schemaVersion: "1.0",
-      runId: workflow.runId,
-      workflowSha256: workflow.workflowSha256,
-      rootJob,
-      executionBoundary:
-        "The root durable supervisor job was submitted. Capability workers execute all child provider, media, verification, repair, selection, atlas and Godot work.",
-    },
+    value: await submit(values, workflow),
   };
 }
