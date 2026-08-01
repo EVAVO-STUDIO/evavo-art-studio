@@ -12,12 +12,14 @@ import {
   SPRITE_SUPERVISOR_PROTOCOL_VERSION,
   SpriteSupervisorError,
   type NormalizedSpriteSupervisorCompileRequest,
+  type NormalizedSpriteSupervisorReviewResolution,
   type NormalizedSpriteSupervisorTask,
   type SpriteSupervisorDecision,
   type SpriteSupervisorFailureAction,
   type SpriteSupervisorState,
   type SpriteSupervisorTaskState,
 } from "./types.js";
+import { spriteSupervisorSha256 } from "./validation.js";
 
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
 
@@ -189,6 +191,7 @@ export function createInitialSpriteSupervisorState(
         }),
       },
     ],
+    appliedReviewResolutions: [],
     ...(request.metadata === undefined ? {} : { metadata: request.metadata }),
   };
 }
@@ -360,6 +363,26 @@ function decision(
   };
 }
 
+function resolutionSha256(
+  resolution: NormalizedSpriteSupervisorReviewResolution,
+): string {
+  return spriteSupervisorSha256(resolution);
+}
+
+function releaseReviewReady(
+  request: NormalizedSpriteSupervisorCompileRequest,
+  state: SpriteSupervisorState,
+): boolean {
+  if (state.status !== "review-required" || !request.policy.requireFinalHumanApproval) {
+    return false;
+  }
+  if (!supervisorRequiredTasksComplete(request, state)) return false;
+  if (supervisorActiveTaskCount(state) > 0) return false;
+  return !Object.values(state.taskStates).some(
+    (taskState) => taskState.status === "review-required",
+  );
+}
+
 export function applySpriteSupervisorReviewResolutions(
   request: NormalizedSpriteSupervisorCompileRequest,
   state: SpriteSupervisorState,
@@ -374,15 +397,54 @@ export function applySpriteSupervisorReviewResolutions(
     ...state.taskStates,
   };
   const decisions = [...state.decisions];
+  const appliedReviewResolutions = [...state.appliedReviewResolutions];
 
   for (const resolution of request.reviewResolutions) {
-    artifactBindings = mergeBindings(
-      artifactBindings,
-      resolution.artifactBindings,
+    const hash = resolutionSha256(resolution);
+    const existing = appliedReviewResolutions.find(
+      (entry) => entry.resolutionId === resolution.resolutionId,
     );
+    if (existing) {
+      if (existing.resolutionSha256 !== hash) {
+        throw new SpriteSupervisorError(
+          "SPRITE_SUPERVISOR_REVIEW_ID_CONFLICT",
+          `Review resolution ${resolution.resolutionId} was already applied with different content.`,
+        );
+      }
+      continue;
+    }
+    if (resolution.expectedStateTick !== state.tick) {
+      throw new SpriteSupervisorError(
+        "SPRITE_SUPERVISOR_REVIEW_STATE_STALE",
+        `Review resolution ${resolution.resolutionId} expected state tick ${resolution.expectedStateTick}, but the current state is tick ${state.tick}.`,
+        normalizeJson({
+          resolutionId: resolution.resolutionId,
+          expectedStateTick: resolution.expectedStateTick,
+          currentStateTick: state.tick,
+        }),
+      );
+    }
+
     if (resolution.taskId === "$release") {
-      if (resolution.action !== "approve-release") continue;
+      if (resolution.action !== "approve-release" || !releaseReviewReady(request, state)) {
+        throw new SpriteSupervisorError(
+          "SPRITE_SUPERVISOR_RELEASE_REVIEW_NOT_READY",
+          "Final release approval is accepted only from the exact review-required state reached after every required task succeeds and no child work remains active.",
+        );
+      }
+      if (releaseApprovedBy) {
+        throw new SpriteSupervisorError(
+          "SPRITE_SUPERVISOR_RELEASE_ALREADY_APPROVED",
+          "Final release approval has already been recorded for this run.",
+        );
+      }
+      artifactBindings = mergeBindings(
+        artifactBindings,
+        resolution.artifactBindings,
+      );
       releaseApprovedBy = {
+        resolutionId: resolution.resolutionId,
+        expectedStateTick: resolution.expectedStateTick,
         approver: resolution.approver,
         reason: resolution.reason,
         at,
@@ -393,13 +455,34 @@ export function applySpriteSupervisorReviewResolutions(
           at,
           "apply-review",
           `Final release approved by ${resolution.approver}: ${resolution.reason}`,
+          undefined,
+          normalizeJson({ resolutionId: resolution.resolutionId }),
         ),
       );
+      appliedReviewResolutions.push({
+        resolutionId: resolution.resolutionId,
+        resolutionSha256: hash,
+        expectedStateTick: resolution.expectedStateTick,
+        taskId: resolution.taskId,
+        action: resolution.action,
+        approver: resolution.approver,
+        appliedAt: at,
+      });
       continue;
     }
+
     const task = request.tasks.find((entry) => entry.id === resolution.taskId);
     const taskState = taskStates[resolution.taskId];
-    if (!task || !taskState || taskState.status !== "review-required") continue;
+    if (!task || !taskState || taskState.status !== "review-required") {
+      throw new SpriteSupervisorError(
+        "SPRITE_SUPERVISOR_TASK_REVIEW_NOT_READY",
+        `Task ${resolution.taskId} is not currently waiting for review.`,
+      );
+    }
+    artifactBindings = mergeBindings(
+      artifactBindings,
+      resolution.artifactBindings,
+    );
     if (resolution.action === "abort") {
       taskStates[task.id] = {
         ...taskState,
@@ -414,11 +497,10 @@ export function applySpriteSupervisorReviewResolutions(
           "abort",
           `Task aborted by ${resolution.approver}: ${resolution.reason}`,
           task.id,
+          normalizeJson({ resolutionId: resolution.resolutionId }),
         ),
       );
-      continue;
-    }
-    if (resolution.action === "skip") {
+    } else if (resolution.action === "skip") {
       if (task.required) {
         throw new SpriteSupervisorError(
           "SPRITE_SUPERVISOR_REQUIRED_TASK_SKIP_REJECTED",
@@ -437,11 +519,10 @@ export function applySpriteSupervisorReviewResolutions(
           "skip",
           `Optional task skipped by ${resolution.approver}: ${resolution.reason}`,
           task.id,
+          normalizeJson({ resolutionId: resolution.resolutionId }),
         ),
       );
-      continue;
-    }
-    if (resolution.action === "retry") {
+    } else if (resolution.action === "retry") {
       const {
         currentChildJobId: _currentChildJobId,
         lastFailure: _lastFailure,
@@ -460,16 +541,32 @@ export function applySpriteSupervisorReviewResolutions(
           "apply-review",
           `Task retry authorised by ${resolution.approver}: ${resolution.reason}`,
           task.id,
+          normalizeJson({ resolutionId: resolution.resolutionId }),
         ),
       );
+    } else {
+      throw new SpriteSupervisorError(
+        "SPRITE_SUPERVISOR_TASK_REVIEW_ACTION_INVALID",
+        `Action ${resolution.action} is not valid for task ${task.id}.`,
+      );
     }
+    appliedReviewResolutions.push({
+      resolutionId: resolution.resolutionId,
+      resolutionSha256: hash,
+      expectedStateTick: resolution.expectedStateTick,
+      taskId: resolution.taskId,
+      action: resolution.action,
+      approver: resolution.approver,
+      appliedAt: at,
+    });
   }
 
   if (status === "review-required") {
     const unresolved = Object.values(taskStates).some(
       (entry) => entry.status === "review-required",
     );
-    if (!unresolved) status = "running";
+    if (!unresolved && releaseApprovedBy) status = "running";
+    else if (!unresolved && !request.policy.requireFinalHumanApproval) status = "running";
   }
   return {
     ...state,
@@ -478,13 +575,14 @@ export function applySpriteSupervisorReviewResolutions(
     taskStates,
     artifactBindings,
     decisions,
+    appliedReviewResolutions,
     ...(releaseApprovedBy === undefined ? {} : { releaseApprovedBy }),
   };
 }
 
 export function supervisorActiveTaskCount(state: SpriteSupervisorState): number {
   return Object.values(state.taskStates).filter((entry) =>
-    ["submitted", "running"].includes(entry.status),
+    ["submitted", "waiting", "running"].includes(entry.status),
   ).length;
 }
 
