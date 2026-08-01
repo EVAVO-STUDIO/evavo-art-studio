@@ -1,4 +1,8 @@
-import type { ArtifactId, StoredArtifact } from "@evavo/art-artifacts";
+import {
+  normalizeJson,
+  type ArtifactId,
+  type StoredArtifact,
+} from "@evavo/art-artifacts";
 import {
   SpriteFamilyError,
   validateSpriteFamilyManifest,
@@ -15,6 +19,12 @@ import {
 
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
 const MAXIMUM_LINEAGE_DEPTH = 10;
+
+interface AdaptiveProofLineage {
+  readonly selectedSourceArtifactId: ArtifactId;
+  readonly finalizedCandidateArtifactId: ArtifactId;
+  readonly proofArtifactId: ArtifactId;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -54,7 +64,7 @@ async function verifiedArtifact(
 async function assertProofArtifact(
   proofArtifactId: ArtifactId,
   context: Parameters<RuntimeJobHandler>[0],
-): Promise<void> {
+): Promise<StoredArtifact> {
   const proof = await verifiedArtifact(proofArtifactId, context);
   if (
     proof.mediaType !== "image/png" ||
@@ -67,12 +77,13 @@ async function assertProofArtifact(
       `Adaptive proof artifact is not one passed hostile-background PNG: ${proofArtifactId}`,
     );
   }
+  return proof;
 }
 
 async function findAdaptiveFinalization(
   sourceArtifactId: ArtifactId,
   context: Parameters<RuntimeJobHandler>[0],
-): Promise<void> {
+): Promise<AdaptiveProofLineage> {
   const queue: Array<Readonly<{ artifactId: ArtifactId; depth: number }>> = [
     { artifactId: sourceArtifactId, depth: 0 },
   ];
@@ -91,8 +102,13 @@ async function findAdaptiveFinalization(
       proofValue !== undefined &&
       ARTIFACT_ID.test(proofValue)
     ) {
-      await assertProofArtifact(proofValue as ArtifactId, context);
-      return;
+      const proofArtifactId = proofValue as ArtifactId;
+      await assertProofArtifact(proofArtifactId, context);
+      return {
+        selectedSourceArtifactId: sourceArtifactId,
+        finalizedCandidateArtifactId: artifact.artifactId,
+        proofArtifactId,
+      };
     }
     if (current.depth >= MAXIMUM_LINEAGE_DEPTH) continue;
     for (const parent of artifact.sourceArtifacts) {
@@ -137,14 +153,66 @@ export function createAdaptiveSpriteFamilyHandlers(): Readonly<
       }
       throw error;
     }
-    if (adaptiveRequired(manifest)) {
-      await Promise.all(
-        sourceArtifactIds(manifest).map((artifactId) =>
-          findAdaptiveFinalization(artifactId, context),
-        ),
-      );
-    }
-    return base(context);
+    if (!adaptiveRequired(manifest)) return base(context);
+
+    const sourceIds = sourceArtifactIds(manifest);
+    const lineage = await Promise.all(
+      sourceIds.map((artifactId) =>
+        findAdaptiveFinalization(artifactId, context),
+      ),
+    );
+    const baseResult = await base(context);
+    const proofArtifactIds = [
+      ...new Set(lineage.map((entry) => entry.proofArtifactId)),
+    ].sort();
+    const evidenceBody = normalizeJson({
+      schemaVersion: "1.0",
+      familyId: manifest.familyId,
+      adaptiveFinalizationPassed: true,
+      selectedSourceCount: sourceIds.length,
+      proofArtifactCount: proofArtifactIds.length,
+      lineage,
+      proofArtifactIds,
+      baseOutputArtifactIds: baseResult.outputArtifacts,
+      qualityThresholdsRelaxed: false,
+    });
+    const evidence = await context.putArtifact(
+      `${JSON.stringify(evidenceBody, null, 2)}\n`,
+      {
+        mediaType: "application/json",
+        storageClass: "evidence",
+        fileName: `${manifest.familyId}.adaptive-family-proof.json`,
+        sourceArtifacts: [
+          ...new Set([
+            ...sourceIds,
+            ...lineage.map((entry) => entry.finalizedCandidateArtifactId),
+            ...proofArtifactIds,
+            ...baseResult.outputArtifacts,
+          ]),
+        ].sort(),
+        labels: {
+          artifactRole: "sprite-family-adaptive-proof-evidence",
+          approvalState: "evidence-only",
+          qualityState: "passed",
+          releaseReady: "true",
+          familyId: manifest.familyId,
+        },
+        metadata: normalizeJson({
+          selectedSourceCount: sourceIds.length,
+          proofArtifactCount: proofArtifactIds.length,
+          qualityThresholdsRelaxed: false,
+        }),
+      },
+    );
+    return {
+      outputArtifacts: [...baseResult.outputArtifacts, evidence.artifactId],
+      result: normalizeJson({
+        ...(isRecord(baseResult.result)
+          ? baseResult.result
+          : { baseResult: baseResult.result ?? null }),
+        adaptiveProofEvidenceArtifactId: evidence.artifactId,
+      }),
+    };
   };
   return Object.freeze({ "sprite.family.verify": verify });
 }
