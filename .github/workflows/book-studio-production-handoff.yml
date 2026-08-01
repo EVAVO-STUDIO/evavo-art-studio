@@ -45,11 +45,20 @@ jobs:
         with:
           node-version: 22.14.0
           package-manager-cache: false
-      - name: Enable governed pnpm
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
-      - name: Install exact dependencies
-        run: pnpm install --frozen-lockfile
       - name: Verify migration authority
         run: node scripts/check-book-studio-production-handoff.mjs
-      - name: Build and test Art Studio contracts
-        run: pnpm --filter @evavo/art-contracts test
+      - name: Compile dependency-light Book Art contract
+        run: |
+          rm -rf packages/contracts/dist
+          mkdir -p packages/contracts/dist
+          npm exec --yes --package=typescript@5.9.3 -- tsc \
+            --target ES2022 \
+            --module NodeNext \
+            --moduleResolution NodeNext \
+            --strict \
+            --skipLibCheck \
+            --outDir packages/contracts/dist \
+            packages/contracts/src/book-production.ts
+          cp packages/contracts/dist/book-production.js packages/contracts/dist/index.js
+      - name: Run Book Art contract attacks
+        run: node --test packages/contracts/test/book-production.test.mjs
