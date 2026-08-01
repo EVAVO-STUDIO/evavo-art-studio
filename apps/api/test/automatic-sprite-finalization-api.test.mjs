@@ -67,7 +67,7 @@ test("automatic finalization API compiles adaptive proof without executing work"
     );
     assert.equal(protocol.status, 200);
     const protocolBody = await protocol.json();
-    assert.equal(protocolBody.protocolVersion, "2026-08-01.1");
+    assert.equal(protocolBody.protocolVersion, "2026-08-02.1");
     assert.ok(protocolBody.backgroundModes.includes("magenta-matte"));
     assert.ok(
       protocolBody.backgroundRules.some((entry) =>
