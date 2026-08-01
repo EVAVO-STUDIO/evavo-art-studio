@@ -1,10 +1,7 @@
 import { normalizeJson, type JsonValue } from "@evavo/art-artifacts";
 import type { SpritePlannedFrame } from "@evavo/art-sprite-planner";
 
-import {
-  AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION,
-  type CompiledAutomaticSpriteWorkflow,
-} from "./automatic-types.js";
+import { AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION, type CompiledAutomaticSpriteWorkflow } from "./automatic-types.js";
 import type { SpriteSupervisorTaskInput } from "./types.js";
 import { SpriteSupervisorError } from "./types.js";
 import { spriteSupervisorSha256 } from "./validation.js";
@@ -293,9 +290,7 @@ export function createMirrorTask(
   };
 }
 
-export function mirrorManifestUnits(
-  drafts: readonly MirrorDraft[],
-): readonly JsonValue[] {
+export function mirrorManifestUnits(drafts: readonly MirrorDraft[]): readonly JsonValue[] {
   return drafts.map((draft) =>
     normalizeJson({
       id: draft.id,
