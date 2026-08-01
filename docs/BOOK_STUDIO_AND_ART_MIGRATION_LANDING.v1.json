@@ -1,0 +1,60 @@
+{
+  "schema": "evavo/book-studio-and-art-migration-landing",
+  "version": 1,
+  "migrationRunId": "book-studio-and-art-migration-20260802",
+  "landedAt": "2026-08-02",
+  "status": "contract_foundation_landed_runtime_not_cut_over",
+  "landings": {
+    "website": {
+      "repository": "EVAVO-STUDIO/Website",
+      "commit": "49b6871e471808454cc007904721f62ec8b6dd87",
+      "contractPath": "tools/evavo-doc-studio/data/migration/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json",
+      "inventoryCompilerPath": "tools/evavo-doc-studio/scripts/compile-book-studio-migration-inventory.mjs",
+      "rollbackRef": "archive/book-studio-full-migration-preland-20260802"
+    },
+    "docsSuite": {
+      "repository": "EVAVO-STUDIO/evavo-docs-suite",
+      "commit": "5b82de3a4066f18a0b78539ca90f239791ffdc10",
+      "contractPath": "packages/core/src/book-studio-art-contracts.ts",
+      "authorityPath": "docs/migrations/book-studio/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json",
+      "rollbackRef": "archive/book-studio-art-migration-v2-preland-20260802"
+    },
+    "artStudio": {
+      "repository": "EVAVO-STUDIO/evavo-art-studio",
+      "commit": "8009bc8597a1bec263c1e867dd72f7071ab84056",
+      "contractPath": "packages/contracts/src/book-production.ts",
+      "authorityPath": "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json",
+      "rollbackRef": "archive/book-studio-art-migration-v2-preland-20260802"
+    },
+    "writingStudio": {
+      "repository": "EVAVO-STUDIO/evavo-writing-studio",
+      "commit": "72415fd14f44b3350ff70c238822a029e5b81bc9",
+      "role": "reusable_writing_intelligence_no_runtime_move_in_this_slice"
+    }
+  },
+  "contract": "evavo_book_art_handoff_v1",
+  "landedCapabilities": [
+    "exact Website migration inventory compiler and classification policy",
+    "Docs Suite manuscript-bound Book Art brief and book-use binding contract",
+    "Art Studio immutable artifact receipt, selection and promotion boundary",
+    "shared source-head, no-dual-write, no-deletion and no-publication authority"
+  ],
+  "notYetPerformed": [
+    "Website runtime source port",
+    "Art Studio Website implementation convergence",
+    "Docs Suite Book Studio service port",
+    "shadow dual-run parity",
+    "production cutover",
+    "Website source retirement",
+    "book publication"
+  ],
+  "currentFlags": {
+    "websiteRuntimeStillAuthoritative": true,
+    "docsSuiteRuntimeCutoverApproved": false,
+    "artStudioBookProfileCutoverApproved": false,
+    "dualAuthoritativeWritesAllowed": false,
+    "websiteSourceDeletionApproved": false,
+    "publicationPerformed": false
+  },
+  "recordFingerprint": "31579872148956a63ba1e648a47e7b575bea50c6c6a2d232f4471eb53279c202"
+}
