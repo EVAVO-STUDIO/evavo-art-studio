@@ -1,14 +1,14 @@
 openapi: 3.1.0
 info:
   title: EVAVO Art Studio Sprite Supervisor API
-  version: 0.1.0
+  version: 0.2.0
   description: >-
     Compile-only contracts for closed-loop sprite-production supervision. The API
     validates a complete sprite plan or source sprite-plan request, bounded child
-    jobs, artifact bindings, retry and repair budgets, review policy and release
-    requirements. These routes do not submit runtime jobs, call image providers,
-    inspect project artifacts, mutate approved references, execute a shell or
-    deploy a project.
+    jobs, artifact bindings, retry and repair budgets, state-bound review commands
+    and release requirements. These routes do not submit runtime jobs, call image
+    providers, inspect project artifacts, mutate approved references, execute a
+    shell or deploy a project.
 servers:
   - url: http://127.0.0.1:4100
 security: []
@@ -252,10 +252,27 @@ components:
           uniqueItems: true
           items: { type: string }
     ReviewResolution:
+      description: >-
+        One replay-safe review command bound to an exact immutable supervisor-state
+        tick. Identical resolution IDs are idempotent; the same ID with changed
+        content is rejected.
       type: object
-      required: [taskId, action, approver, reason]
+      required:
+        - resolutionId
+        - expectedStateTick
+        - taskId
+        - action
+        - approver
+        - reason
       additionalProperties: false
       properties:
+        resolutionId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        expectedStateTick:
+          type: integer
+          minimum: 0
+          maximum: 1000000
         taskId: { type: string }
         action:
           type: string
@@ -356,7 +373,7 @@ components:
       additionalProperties: false
       properties:
         schemaVersion: { const: "1.0" }
-        protocolVersion: { const: "2026-08-01.1" }
+        protocolVersion: { const: "2026-08-01.2" }
         runId: { type: string }
         requestSha256:
           type: string
@@ -378,12 +395,13 @@ components:
         - placeholderRules
         - schedulingRules
         - failureRules
+        - reviewRules
         - releaseRules
         - childJobKinds
         - executionBoundary
       properties:
         schemaVersion: { const: "1.0" }
-        protocolVersion: { const: "2026-08-01.1" }
+        protocolVersion: { const: "2026-08-01.2" }
         purpose: { type: string }
         placeholderRules:
           type: array
@@ -392,6 +410,9 @@ components:
           type: array
           items: { type: string }
         failureRules:
+          type: array
+          items: { type: string }
+        reviewRules:
           type: array
           items: { type: string }
         releaseRules:
