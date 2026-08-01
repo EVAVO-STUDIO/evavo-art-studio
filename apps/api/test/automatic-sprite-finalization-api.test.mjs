@@ -13,7 +13,7 @@ async function withServer(run) {
     await run(`http://127.0.0.1:${address.port}`);
   } finally {
     await new Promise((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
+      server.close((error) => (error ? reject(error) : resolve()),
     );
   }
 }
@@ -52,11 +52,15 @@ async function request() {
       requireHostileMatteProof: true,
       requireNoRejectedArtifacts: true,
       requireExactDimensions: true,
+      maximumDeterministicRepairPasses: 2,
+      transparentBleedRadius: 2,
+      matteSearchRadius: 6,
+      matteDistanceThreshold: 72,
     },
   };
 }
 
-test("automatic finalization API compiles without executing work", async () => {
+test("automatic finalization API compiles adaptive proof without executing work", async () => {
   await withServer(async (base) => {
     const protocol = await fetch(
       `${base}/v1/automatic-sprite-finalization-protocol`,
@@ -69,6 +73,12 @@ test("automatic finalization API compiles without executing work", async () => {
       protocolBody.backgroundRules.some((entry) =>
         entry.includes("checkerboards"),
       ),
+    );
+    assert.ok(
+      protocolBody.adaptiveRepairRules.some((entry) => entry.includes("bounded")),
+    );
+    assert.ok(
+      protocolBody.proofRules.some((entry) => entry.includes("proof artifact")),
     );
 
     const compiled = await fetch(
@@ -94,6 +104,16 @@ test("automatic finalization API compiles without executing work", async () => {
         "automatic.family-finalization-evidence",
       ),
     );
+    assert.ok(
+      body.workflow.supervisorRequest.policy.requiredReleaseArtifactRoles.includes(
+        "automatic.family-adaptive-proof-evidence",
+      ),
+    );
+    assert.ok(
+      body.workflow.supervisorRequest.tasks.some(
+        (task) => task.kind === "art.candidate.finalize-adaptive",
+      ),
+    );
     assert.match(body.executionBoundary, /Compile-only/i);
   });
 });
@@ -113,5 +133,23 @@ test("automatic finalization API rejects unsafe black background use", async () 
     assert.equal(response.status, 422);
     const body = await response.json();
     assert.equal(body.error.code, "AUTOMATIC_SPRITE_BACKGROUND_BLACK_INVALID");
+  });
+});
+
+test("automatic finalization API rejects unbounded repair options", async () => {
+  await withServer(async (base) => {
+    const input = await request();
+    input.finalization.maximumDeterministicRepairPasses = 99;
+    const response = await fetch(
+      `${base}/v1/automatic-sprite-finalizations/validate`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    assert.equal(response.status, 422);
+    const body = await response.json();
+    assert.equal(body.error.code, "ADAPTIVE_FINALIZATION_OPTION_INVALID");
   });
 });
