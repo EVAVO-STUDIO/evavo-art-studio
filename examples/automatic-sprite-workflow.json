@@ -1,0 +1,172 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "automatic-hero-production-v1",
+  "spritePlanRequest": {
+    "schemaVersion": "1.0",
+    "planId": "automatic-hero-complete-family",
+    "artDirectionRequest": {
+      "schemaVersion": "1.0",
+      "contractId": "automatic-hero-art-direction",
+      "presetId": "console-platformer-16bit",
+      "project": {
+        "projectId": "automatic-demo-game",
+        "title": "Automatic Demo Game",
+        "engine": "Godot",
+        "engineVersion": "4.6.2",
+        "gameGenre": "side-view action platform game",
+        "targetPlatform": "desktop and mobile",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        }
+      },
+      "style": {
+        "intent": "Create one authored mid-1990s console character family with deliberate pixel clusters, a readable gameplay silhouette, stable identity and consistent lighting across every clip and frame.",
+        "mustHave": [
+          "clear silhouette at gameplay scale",
+          "stable face, hair, body proportions and costume",
+          "deliberate indexed-palette value ramps",
+          "exact foot registration"
+        ],
+        "mustAvoid": [
+          "generic AI ornament",
+          "modern glossy lighting",
+          "random straps or pouches",
+          "different costume details between frames"
+        ],
+        "materialLanguage": [
+          "simple readable cloth",
+          "restrained leather",
+          "limited metal highlights"
+        ],
+        "lineTreatment": [
+          "deliberate pixel clusters",
+          "selective dark contour",
+          "no accidental smoothing"
+        ],
+        "compositionRules": [
+          "full motion remains inside the transparent canvas",
+          "feet remain on the fixed baseline"
+        ],
+        "antiGeneric": {
+          "requiredDistinctiveMotifs": [
+            "project-specific angular jacket",
+            "project-specific swept hair silhouette"
+          ],
+          "prohibitedGenericMotifs": [
+            "random fantasy armour",
+            "glowing trim",
+            "decorative clutter"
+          ],
+          "prohibitUnrequestedProps": true,
+          "prohibitReadableText": true,
+          "prohibitWatermarks": true,
+          "prohibitModernGloss": true,
+          "prohibitRandomMicrodetail": true,
+          "prohibitStyleDrift": true,
+          "requireHistoricalPlausibility": false
+        },
+        "references": [
+          {
+            "id": "hero-identity-reference",
+            "role": "identity",
+            "uri": "artifact://automatic-demo-game/hero/canonical-identity",
+            "weight": 1,
+            "rights": "Project-owned source art."
+          }
+        ]
+      },
+      "asset": {
+        "assetId": "hero",
+        "family": "character",
+        "purpose": "Complete playable hero sprite family.",
+        "dimensions": {
+          "width": 64,
+          "height": 64
+        },
+        "transparency": "required",
+        "animated": true,
+        "frameCount": 6,
+        "framesPerSecond": 10,
+        "loop": true,
+        "directionCount": 2,
+        "directionNames": [
+          "left",
+          "right"
+        ],
+        "asymmetric": true,
+        "hasHeldItems": false,
+        "runtimeEquipmentSwaps": false,
+        "runtimeCostumeVariants": false,
+        "independentEffects": false,
+        "independentShadow": false,
+        "needsCollision": false,
+        "needsNormalMap": false,
+        "needsEmissionMap": false,
+        "largeDeformations": true,
+        "secondaryMotion": []
+      },
+      "outputProfileIds": [
+        "godot-4.6.2-character-sprite"
+      ]
+    },
+    "role": "playable-character",
+    "gameplayProfile": "platformer",
+    "coverage": "core",
+    "fidelity": "economical",
+    "allowDerivedMirrors": false,
+    "variants": {
+      "costumeVariants": 1,
+      "equipmentVariants": 1,
+      "weaponVariants": 1,
+      "teamColourVariants": 1,
+      "damageVariants": 1
+    },
+    "output": {
+      "sheetStrategy": "individual-frames-only",
+      "maximumSheetSize": 2048,
+      "includeAsepriteExport": true,
+      "includePerClipSheets": false,
+      "includeFamilyAtlas": false,
+      "includeGodotResources": false
+    }
+  },
+  "references": {
+    "canonicalIdentityArtifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "provider": {
+    "candidatesPerUnit": 2,
+    "preferredAdapterId": "openai-gpt-image",
+    "preferredModel": "gpt-image-2",
+    "allowedAdapterIds": [
+      "openai-gpt-image"
+    ],
+    "allowFallback": false,
+    "matteColour": "#00ff00",
+    "quality": "high",
+    "resampling": "nearest"
+  },
+  "promotion": {
+    "namespace": "projects/automatic-demo-game/art",
+    "referencePrefix": "hero-v1",
+    "expectedGeneration": 0,
+    "actor": "evavo-art-studio-supervisor",
+    "automatic": true
+  },
+  "policy": {
+    "maximumTasks": 10000,
+    "maximumProductionUnits": 2000,
+    "includeDirectionMasters": true,
+    "includeKeyPoses": true,
+    "includeInBetweens": true,
+    "includeSeparateVisibleLayers": true,
+    "includeFamilyVerification": true,
+    "requireFinalHumanApproval": false,
+    "failOnDerivedDirections": true,
+    "failOnMissingLayerReferences": true
+  },
+  "metadata": {
+    "owner": "EVAVO Studio",
+    "purpose": "Executable automatic sprite workflow compiler fixture"
+  }
+}

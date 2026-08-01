@@ -3,6 +3,10 @@ import * as z from "zod/v4";
 
 import {
   SpriteSupervisorError,
+  automaticSpriteFinalizationProtocolSummary,
+  automaticSpriteWorkflowProtocolSummary,
+  compileAutomaticSpriteFinalizationWorkflow,
+  compileAutomaticSpriteWorkflow,
   compileSpriteSupervisorWorkflow,
   spriteSupervisorProtocolSummary,
 } from "@evavo/art-sprite-supervisor";
@@ -49,6 +53,26 @@ export function registerSpriteSupervisorTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "automatic_sprite_workflow_protocol",
+    {
+      description:
+        "Describe automatic expansion of complete sprite plans into direction, frame, layer, mastering, selection, promotion and family-verification tasks.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(automaticSpriteWorkflowProtocolSummary()),
+  );
+
+  server.registerTool(
+    "automatic_sprite_finalization_protocol",
+    {
+      description:
+        "Describe governed background selection, fake-transparency rejection, exact-size delivery mastering, optional EVAVO 3D Studio reference binding and family release evidence.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(automaticSpriteFinalizationProtocolSummary()),
+  );
+
+  server.registerTool(
     "validate_sprite_production_supervisor",
     {
       description:
@@ -78,6 +102,88 @@ export function registerSpriteSupervisorTools(server: McpServer): void {
           workflow: compileSpriteSupervisorWorkflow(request),
           executionBoundary:
             "Compile-only: no runtime submission, provider call, artifact read, shell execution, reference mutation, promotion or deployment.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "validate_automatic_sprite_workflow",
+    {
+      description:
+        "Validate complete automatic direction, frame, retained-layer, selection, promotion and family-verification coverage without executing a worker.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        const workflow = compileAutomaticSpriteWorkflow(request);
+        return textResult({
+          request: workflow.request,
+          analysis: workflow.analysis,
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_automatic_sprite_workflow",
+    {
+      description:
+        "Compile the automatic sprite task matrix and durable supervisor root job without calling an image provider.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult({
+          schemaVersion: "1.0",
+          workflow: compileAutomaticSpriteWorkflow(request),
+          executionBoundary:
+            "Compile-only: no provider, artifact-store, runtime, promotion, shell or deployment authority.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "validate_automatic_sprite_finalization",
+    {
+      description:
+        "Validate background policy, hostile-matte proof, exact delivery profile, 3D repository revision and full family release requirements.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        const workflow = compileAutomaticSpriteFinalizationWorkflow(request);
+        return textResult({
+          request: workflow.request,
+          analysis: workflow.analysis,
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_automatic_sprite_finalization",
+    {
+      description:
+        "Compile a background-aware, 3D-reference-aware sprite finalization workflow with fake-transparency rejection and release-ready family evidence. No work is executed.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult({
+          schemaVersion: "1.0",
+          workflow: compileAutomaticSpriteFinalizationWorkflow(request),
+          executionBoundary:
+            "Compile-only: no runtime submission, provider call, artifact read, repository mutation, promotion, shell execution or deployment.",
         });
       } catch (error: unknown) {
         return toolError(error);

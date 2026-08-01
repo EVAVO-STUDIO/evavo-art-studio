@@ -1,0 +1,183 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Automatic Sprite Finalization API
+  version: 0.1.0
+  description: >-
+    Compile-only contracts for background-aware and 3D-reference-aware sprite
+    production. These routes never call an image provider, read image artifacts,
+    submit runtime work, mutate approved references, execute a shell, or deploy.
+servers:
+  - url: http://127.0.0.1:4100
+security: []
+tags:
+  - name: Automatic Sprite Finalization
+paths:
+  /v1/automatic-sprite-finalization-protocol:
+    get:
+      tags: [Automatic Sprite Finalization]
+      operationId: getAutomaticSpriteFinalizationProtocol
+      responses:
+        "200":
+          description: Background, 3D bridge, QA, and finalization rules
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /v1/automatic-sprite-finalizations/validate:
+    post:
+      tags: [Automatic Sprite Finalization]
+      operationId: validateAutomaticSpriteFinalization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutomaticSpriteFinalizationRequest"
+      responses:
+        "200":
+          description: Normalized request and complete analysis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request, analysis]
+                additionalProperties: false
+                properties:
+                  request: { type: object, additionalProperties: true }
+                  analysis: { type: object, additionalProperties: true }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/automatic-sprite-finalizations/compile:
+    post:
+      tags: [Automatic Sprite Finalization]
+      operationId: compileAutomaticSpriteFinalization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutomaticSpriteFinalizationRequest"
+      responses:
+        "200":
+          description: Compiled durable supervisor workflow
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schemaVersion, workflow, executionBoundary]
+                additionalProperties: false
+                properties:
+                  schemaVersion: { const: "1.0" }
+                  workflow: { type: object, additionalProperties: true }
+                  executionBoundary: { type: string }
+        "422": { $ref: "#/components/responses/ValidationError" }
+components:
+  schemas:
+    ArtifactId:
+      type: string
+      pattern: "^artifact_[a-f0-9]{64}$"
+    BackgroundPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        mode:
+          type: string
+          enum:
+            - auto
+            - native-alpha
+            - green-matte
+            - magenta-matte
+            - black-additive
+            - opaque-preserve
+        nativeAlphaAdapterIds:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items: { type: string }
+        greenMatteColour: { type: string, pattern: "^#[0-9A-Fa-f]{6}$" }
+        magentaMatteColour: { type: string, pattern: "^#[0-9A-Fa-f]{6}$" }
+        blackColour: { type: string, pattern: "^#[0-9A-Fa-f]{6}$" }
+        requireFakeTransparencyRejection: { type: boolean }
+        requireMeaningfulAlpha: { type: boolean }
+        proofBackgrounds:
+          type: array
+          minItems: 1
+          maxItems: 16
+          uniqueItems: true
+          items: { type: string, pattern: "^#[0-9A-Fa-f]{6}$" }
+    ThreeDReference:
+      type: object
+      required: [revision]
+      additionalProperties: false
+      properties:
+        repository:
+          type: string
+          pattern: "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+          default: EVAVO-STUDIO/evavo-3d-studio
+        revision:
+          type: string
+          pattern: "^[a-f0-9]{40,64}$"
+        renderRigArtifactId: { $ref: "#/components/schemas/ArtifactId" }
+        cameraManifestArtifactId: { $ref: "#/components/schemas/ArtifactId" }
+        materialReferenceArtifactId: { $ref: "#/components/schemas/ArtifactId" }
+        turntableArtifactIds:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/ArtifactId" }
+        directionReferenceArtifactIds:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/ArtifactId" }
+        depthReferenceArtifactIds:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/ArtifactId" }
+        normalReferenceArtifactIds:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/ArtifactId" }
+        notes:
+          type: array
+          items: { type: string }
+    FinalizationPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        deliveryProfileId:
+          type: string
+          enum:
+            - retro-standing-character-576
+            - retro-ui-icon-256
+            - retro-overlay-720p
+            - godot-sprite-lossless
+        requireFamilyVerification: { type: boolean }
+        requireHostileMatteProof: { type: boolean }
+        requireNoRejectedArtifacts: { type: boolean }
+        requireExactDimensions: { type: boolean }
+    AutomaticSpriteFinalizationRequest:
+      type: object
+      required: [schemaVersion, workflow]
+      additionalProperties: false
+      properties:
+        schemaVersion: { const: "1.0" }
+        workflow:
+          description: Existing complete automatic sprite-workflow request.
+          type: object
+          additionalProperties: true
+        background: { $ref: "#/components/schemas/BackgroundPolicy" }
+        threeDReference: { $ref: "#/components/schemas/ThreeDReference" }
+        finalization: { $ref: "#/components/schemas/FinalizationPolicy" }
+        metadata: true
+  responses:
+    ValidationError:
+      description: Contract validation or fail-closed analysis failed
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: object
+                required: [code, message]
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  details: true

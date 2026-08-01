@@ -1,18 +1,25 @@
+import sharp from "sharp";
+
 import {
   normalizeJson,
   type ArtifactId,
   type JsonValue,
 } from "@evavo/art-artifacts";
 import {
+  DeliveryOptimizerError,
+  optimizeDeliveryImage,
+  type DeliveryProfileId,
+} from "@evavo/art-delivery-optimizer";
+import {
   ChromaKeyExtractionError,
   extractChromaKeyAlpha,
   type ChromaKeyExtractionOptions,
-  type ChromaKeyExtractionResult,
 } from "@evavo/art-media";
 import {
   SpriteQualityInputError,
   analyseDecodedSpriteFrame,
   decodeSpriteFrame,
+  type DecodedSpriteFrame,
   type SpriteFrameQualityReport,
 } from "@evavo/art-quality";
 import {
@@ -21,11 +28,19 @@ import {
 } from "@evavo/art-runtime";
 
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
-const REQUIRED_CAPABILITIES = Object.freeze([
-  "media.chroma-extract",
-  "quality.sprite-frame",
-  "evidence.bundle",
-] as const);
+const HEX = /^#[0-9a-f]{6}$/i;
+const DELIVERY_PROFILES = new Set<DeliveryProfileId>([
+  "retro-standing-character-576",
+  "retro-ui-icon-256",
+  "retro-overlay-720p",
+  "godot-sprite-lossless",
+]);
+
+type MasteringBackgroundMode =
+  | "chroma-key"
+  | "native-alpha"
+  | "black-additive"
+  | "opaque-preserve";
 
 const isRecord = (
   value: JsonValue | undefined,
@@ -40,6 +55,13 @@ function requiredString(value: JsonValue | undefined, name: string): string {
     );
   }
   return value.trim();
+}
+
+function optionalString(
+  value: JsonValue | undefined,
+  name: string,
+): string | undefined {
+  return value === undefined ? undefined : requiredString(value, name);
 }
 
 function artifactId(value: JsonValue | undefined): ArtifactId {
@@ -67,9 +89,140 @@ function optionalNumber(
   return value;
 }
 
+function optionalInteger(
+  value: JsonValue | undefined,
+  name: string,
+  minimum: number,
+  maximum: number,
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < minimum ||
+    value > maximum
+  ) {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      `${name} must be an integer between ${minimum} and ${maximum}.`,
+    );
+  }
+  return value;
+}
+
+function booleanValue(
+  value: JsonValue | undefined,
+  name: string,
+  fallback: boolean,
+): boolean {
+  if (value === undefined) return fallback;
+  if (typeof value !== "boolean") {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      `${name} must be a boolean.`,
+    );
+  }
+  return value;
+}
+
+function backgroundMode(value: JsonValue | undefined): MasteringBackgroundMode {
+  const mode = value ?? "chroma-key";
+  if (
+    mode !== "chroma-key" &&
+    mode !== "native-alpha" &&
+    mode !== "black-additive" &&
+    mode !== "opaque-preserve"
+  ) {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      "backgroundMode must be chroma-key, native-alpha, black-additive or opaque-preserve.",
+    );
+  }
+  return mode;
+}
+
+function profileId(value: JsonValue | undefined): DeliveryProfileId {
+  const profile = value ?? "godot-sprite-lossless";
+  if (
+    typeof profile !== "string" ||
+    !DELIVERY_PROFILES.has(profile as DeliveryProfileId)
+  ) {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      "deliveryProfileId is not supported by automatic candidate finalization.",
+    );
+  }
+  return profile as DeliveryProfileId;
+}
+
+function targetDimensions(
+  payload: Readonly<Record<string, JsonValue>>,
+): Readonly<{
+  width?: number;
+  height?: number;
+  resampling: "nearest" | "lanczos3";
+}> {
+  const width = optionalInteger(payload.targetWidth, "targetWidth", 1, 8_192);
+  const height = optionalInteger(payload.targetHeight, "targetHeight", 1, 8_192);
+  if ((width === undefined) !== (height === undefined)) {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      "targetWidth and targetHeight must be supplied together.",
+    );
+  }
+  const resampling = payload.resampling === undefined ? "nearest" : payload.resampling;
+  if (resampling !== "nearest" && resampling !== "lanczos3") {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      "resampling must be nearest or lanczos3.",
+    );
+  }
+  return {
+    ...(width === undefined ? {} : { width }),
+    ...(height === undefined ? {} : { height }),
+    resampling,
+  };
+}
+
+function proofBackgrounds(value: JsonValue | undefined): readonly string[] {
+  if (value === undefined) {
+    return ["#000000", "#ffffff", "#808080", "#00ff00", "#ff00ff"];
+  }
+  if (!Array.isArray(value) || value.length < 1 || value.length > 16) {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      "proofBackgrounds must contain 1 to 16 #RRGGBB colours.",
+    );
+  }
+  return [
+    ...new Set(
+      value.map((entry, index) => {
+        if (typeof entry !== "string" || !HEX.test(entry)) {
+          throw new PermanentRuntimeError(
+            "MASTERING_PAYLOAD_INVALID",
+            `proofBackgrounds[${index}] must use #RRGGBB format.`,
+          );
+        }
+        return entry.toLowerCase();
+      }),
+    ),
+  ];
+}
+
+function safeFileStem(value: string): string {
+  return (
+    value
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 160) || "candidate"
+  );
+}
+
 function extractionOptions(
   payload: Readonly<Record<string, JsonValue>>,
   matteColour: string,
+  black: boolean,
 ): ChromaKeyExtractionOptions {
   const connectionDistance = optionalNumber(
     payload.connectionDistance,
@@ -90,23 +243,193 @@ function extractionOptions(
   );
   return {
     matteColour,
-    ...(connectionDistance === undefined ? {} : { connectionDistance }),
-    ...(opaqueSeedDistance === undefined ? {} : { opaqueSeedDistance }),
-    ...(edgeSearchRadius === undefined ? {} : { edgeSearchRadius }),
-    ...(bleedRadius === undefined ? {} : { bleedRadius }),
-    ...(minimumBorderMatteFraction === undefined
-      ? {}
-      : { minimumBorderMatteFraction }),
+    connectionDistance: connectionDistance ?? (black ? 24 : 140),
+    opaqueSeedDistance: opaqueSeedDistance ?? (black ? 64 : 220),
+    edgeSearchRadius: edgeSearchRadius ?? 12,
+    bleedRadius: bleedRadius ?? 2,
+    minimumBorderMatteFraction:
+      minimumBorderMatteFraction ?? (black ? 0.85 : 0.65),
   };
 }
 
-function safeFileStem(value: string): string {
-  const normalized = value
-    .replace(/\.[^.]+$/, "")
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 160);
-  return normalized || "candidate";
+function hasNonOpaqueAlpha(frame: DecodedSpriteFrame): boolean {
+  for (let offset = 3; offset < frame.data.length; offset += 4) {
+    if (frame.data[offset]! < 255) return true;
+  }
+  return false;
+}
+
+function blackStageEvidence(frame: DecodedSpriteFrame): Readonly<{
+  borderPixels: number;
+  blackBorderPixels: number;
+  blackBorderFraction: number;
+  nonBlackPixels: number;
+  passed: boolean;
+}> {
+  let borderPixels = 0;
+  let blackBorderPixels = 0;
+  let nonBlackPixels = 0;
+  for (let y = 0; y < frame.height; y += 1) {
+    for (let x = 0; x < frame.width; x += 1) {
+      const offset = (y * frame.width + x) * 4;
+      const maximum = Math.max(
+        frame.data[offset]!,
+        frame.data[offset + 1]!,
+        frame.data[offset + 2]!,
+      );
+      if (maximum > 12) nonBlackPixels += 1;
+      if (
+        x === 0 ||
+        y === 0 ||
+        x === frame.width - 1 ||
+        y === frame.height - 1
+      ) {
+        borderPixels += 1;
+        if (maximum <= 12) blackBorderPixels += 1;
+      }
+    }
+  }
+  const blackBorderFraction = borderPixels
+    ? blackBorderPixels / borderPixels
+    : 0;
+  return {
+    borderPixels,
+    blackBorderPixels,
+    blackBorderFraction,
+    nonBlackPixels,
+    passed: blackBorderFraction >= 0.85 && nonBlackPixels > 0,
+  };
+}
+
+async function prepareSource(
+  candidateBytes: Buffer,
+  mode: MasteringBackgroundMode,
+  payload: Readonly<Record<string, JsonValue>>,
+): Promise<Readonly<{
+  png: Buffer;
+  extraction: JsonValue | null;
+  sourceDecoded: DecodedSpriteFrame;
+  blackEvidence: ReturnType<typeof blackStageEvidence> | null;
+  effectiveMatteColour?: string;
+}>> {
+  const sourceDecoded = await decodeSpriteFrame(candidateBytes);
+  if (mode === "native-alpha") {
+    if (!sourceDecoded.sourceHasAlpha || !hasNonOpaqueAlpha(sourceDecoded)) {
+      throw new PermanentRuntimeError(
+        "MASTERING_NATIVE_ALPHA_MISSING",
+        "Native-alpha mastering requires a decoded alpha channel with at least one non-opaque pixel.",
+      );
+    }
+    return {
+      png: await sharp(candidateBytes)
+        .rotate()
+        .png({ compressionLevel: 9, palette: false })
+        .toBuffer(),
+      extraction: null,
+      sourceDecoded,
+      blackEvidence: null,
+    };
+  }
+
+  if (mode === "opaque-preserve") {
+    if (sourceDecoded.sourceHasAlpha && hasNonOpaqueAlpha(sourceDecoded)) {
+      throw new PermanentRuntimeError(
+        "MASTERING_OPAQUE_SOURCE_HAS_TRANSPARENCY",
+        "Opaque-preserve requires an already opaque provider result and never flattens transparency against black.",
+      );
+    }
+    return {
+      png: await sharp(candidateBytes)
+        .rotate()
+        .png({ compressionLevel: 9, palette: false })
+        .toBuffer(),
+      extraction: null,
+      sourceDecoded,
+      blackEvidence: null,
+    };
+  }
+
+  const matteColour =
+    mode === "black-additive"
+      ? "#000000"
+      : requiredString(payload.matteColour, "matteColour").toLowerCase();
+  const blackEvidence =
+    mode === "black-additive" ? blackStageEvidence(sourceDecoded) : null;
+  if (blackEvidence && !blackEvidence.passed) {
+    throw new PermanentRuntimeError(
+      "MASTERING_BLACK_STAGE_INVALID",
+      "Black-additive mastering requires a predominantly black border and measurable non-black effect content.",
+      normalizeJson(blackEvidence),
+    );
+  }
+  try {
+    const extraction = await extractChromaKeyAlpha(
+      candidateBytes,
+      extractionOptions(payload, matteColour, mode === "black-additive"),
+    );
+    return {
+      png: Buffer.from(extraction.png),
+      extraction: normalizeJson(extraction.evidence),
+      sourceDecoded,
+      blackEvidence,
+      effectiveMatteColour: matteColour,
+    };
+  } catch (error: unknown) {
+    if (error instanceof ChromaKeyExtractionError) {
+      throw new PermanentRuntimeError(error.code, error.message);
+    }
+    throw error;
+  }
+}
+
+async function resizePng(
+  input: Buffer,
+  target: ReturnType<typeof targetDimensions>,
+): Promise<Readonly<{
+  png: Buffer;
+  sourceWidth: number;
+  sourceHeight: number;
+  targetWidth: number;
+  targetHeight: number;
+  resized: boolean;
+  resampling: "nearest" | "lanczos3";
+}>> {
+  const source = await decodeSpriteFrame(input);
+  const width = target.width ?? source.width;
+  const height = target.height ?? source.height;
+  const resized = width !== source.width || height !== source.height;
+  if (!resized) {
+    return {
+      png: Buffer.from(input),
+      sourceWidth: source.width,
+      sourceHeight: source.height,
+      targetWidth: width,
+      targetHeight: height,
+      resized: false,
+      resampling: target.resampling,
+    };
+  }
+  const kernel =
+    target.resampling === "nearest" ? sharp.kernel.nearest : sharp.kernel.lanczos3;
+  return {
+    png: await sharp(input, {
+      animated: false,
+      limitInputPixels: 64 * 1024 * 1024,
+    })
+      .resize(width, height, {
+        fit: "fill",
+        kernel,
+        withoutEnlargement: false,
+      })
+      .png({ compressionLevel: 9, adaptiveFiltering: false, palette: false })
+      .toBuffer(),
+    sourceWidth: source.width,
+    sourceHeight: source.height,
+    targetWidth: width,
+    targetHeight: height,
+    resized: true,
+    resampling: target.resampling,
+  };
 }
 
 function qualityExpectations(
@@ -114,30 +437,39 @@ function qualityExpectations(
   width: number,
   height: number,
   frameId: string,
-  matteColour: string,
+  mode: MasteringBackgroundMode,
+  matteColour: string | undefined,
 ): Readonly<Record<string, JsonValue>> {
   const supplied = isRecord(payload.quality) ? payload.quality : {};
   const existingMattes = Array.isArray(supplied.knownMatteColours)
     ? supplied.knownMatteColours
     : [];
+  const transparency = mode === "opaque-preserve" ? "opaque" : "alpha-required";
   return {
     ...supplied,
     frameId,
-    transparency: "alpha-required",
+    transparency,
     expectedWidth:
       typeof supplied.expectedWidth === "number" ? supplied.expectedWidth : width,
     expectedHeight:
       typeof supplied.expectedHeight === "number" ? supplied.expectedHeight : height,
     expectedFormat: "png",
     safePadding:
-      typeof supplied.safePadding === "number" ? supplied.safePadding : 1,
-    knownMatteColours: [matteColour, ...existingMattes],
+      typeof supplied.safePadding === "number"
+        ? supplied.safePadding
+        : transparency === "opaque"
+          ? 0
+          : 1,
+    knownMatteColours: [
+      ...(matteColour ? [matteColour] : []),
+      ...existingMattes,
+    ],
   };
 }
 
 function masteringError(error: unknown): never {
   if (
-    error instanceof ChromaKeyExtractionError ||
+    error instanceof DeliveryOptimizerError ||
     error instanceof SpriteQualityInputError
   ) {
     throw new PermanentRuntimeError(error.code, error.message);
@@ -157,14 +489,43 @@ export function createCandidateMasteringHandlers(): Readonly<
     }
     const payload = context.job.spec.payload;
     const candidateId = artifactId(payload.candidateArtifactId);
-    const matteColour = requiredString(payload.matteColour, "matteColour");
-    for (const capability of REQUIRED_CAPABILITIES) {
+    const mode = backgroundMode(payload.backgroundMode);
+    const target = targetDimensions(payload);
+    const deliveryProfileId = profileId(payload.deliveryProfileId);
+    const matteProofs = proofBackgrounds(payload.proofBackgrounds);
+    const requireFakeTransparencyRejection = booleanValue(
+      payload.requireFakeTransparencyRejection,
+      "requireFakeTransparencyRejection",
+      true,
+    );
+    const requireMeaningfulAlpha = booleanValue(
+      payload.requireMeaningfulAlpha,
+      "requireMeaningfulAlpha",
+      true,
+    );
+    for (const capability of ["quality.sprite-frame", "evidence.bundle"]) {
       if (!context.job.spec.requiredCapabilities.includes(capability)) {
         throw new PermanentRuntimeError(
           "MASTERING_CAPABILITY_MISSING",
           `Mastering job must require ${capability}.`,
         );
       }
+    }
+    if (
+      mode !== "native-alpha" &&
+      mode !== "opaque-preserve" &&
+      !context.job.spec.requiredCapabilities.includes("media.chroma-extract")
+    ) {
+      throw new PermanentRuntimeError(
+        "MASTERING_CAPABILITY_MISSING",
+        "Matte-backed mastering must require media.chroma-extract.",
+      );
+    }
+    if (!context.job.spec.requiredCapabilities.includes("media.raster")) {
+      throw new PermanentRuntimeError(
+        "MASTERING_CAPABILITY_MISSING",
+        "Candidate finalization must require media.raster.",
+      );
     }
     if (!context.job.spec.inputArtifacts.includes(candidateId)) {
       throw new PermanentRuntimeError(
@@ -202,24 +563,23 @@ export function createCandidateMasteringHandlers(): Readonly<
     ) {
       throw new PermanentRuntimeError(
         "MASTERING_CANDIDATE_STATE_INVALID",
-        "Alpha mastering accepts only unapproved provider-candidate intermediates.",
+        "Finalization accepts only unapproved provider-candidate intermediates.",
       );
     }
 
     const candidateBytes = await context.artifacts.read(candidateId);
-    let extraction: ChromaKeyExtractionResult;
-    try {
-      extraction = await extractChromaKeyAlpha(
-        candidateBytes,
-        extractionOptions(payload, matteColour),
-      );
-    } catch (error: unknown) {
-      masteringError(error);
-    }
-
+    let prepared: Awaited<ReturnType<typeof prepareSource>>;
+    let resized: Awaited<ReturnType<typeof resizePng>>;
+    let optimization: Awaited<ReturnType<typeof optimizeDeliveryImage>>;
     let quality: SpriteFrameQualityReport;
     try {
-      const decoded = await decodeSpriteFrame(extraction.png);
+      prepared = await prepareSource(candidateBytes, mode, payload);
+      resized = await resizePng(prepared.png, target);
+      optimization = await optimizeDeliveryImage(resized.png, {
+        profileId: deliveryProfileId,
+        background: { mode: "preserve" },
+      });
+      const decoded = await decodeSpriteFrame(optimization.bytes);
       quality = analyseDecodedSpriteFrame(
         decoded,
         qualityExpectations(
@@ -229,26 +589,38 @@ export function createCandidateMasteringHandlers(): Readonly<
           typeof payload.frameId === "string"
             ? payload.frameId
             : candidate.labels.frameId ?? candidate.artifactId,
-          matteColour,
+          mode,
+          prepared.effectiveMatteColour,
         ),
       );
     } catch (error: unknown) {
       masteringError(error);
     }
 
+    const alphaPixels = quality.alpha.transparentPixels + quality.alpha.partialPixels;
+    const meaningfulAlphaPassed =
+      mode === "opaque-preserve" || !requireMeaningfulAlpha || alphaPixels > 0;
+    const fakeTransparencyPassed =
+      !requireFakeTransparencyRejection ||
+      (!quality.fakeTransparency.checkerboardDetected &&
+        !quality.fakeTransparency.flatMatteDetected);
+    const passed = quality.passed && meaningfulAlphaPassed && fakeTransparencyPassed;
+
     const stem = safeFileStem(
       candidate.fileName ?? candidate.labels.candidateFamilyId ?? candidate.artifactId,
     );
-    const mastered = await context.putArtifact(extraction.png, {
+    const mastered = await context.putArtifact(optimization.bytes, {
       mediaType: "image/png",
       storageClass: "intermediate",
-      fileName: `${stem}.alpha-master.png`,
+      fileName: `${stem}.finalized.png`,
       sourceArtifacts: [candidateId],
       labels: {
         artifactRole: "provider-candidate-alpha-master",
         approvalState: "unapproved",
-        qualityState: quality.passed ? "passed" : "rejected",
+        qualityState: passed ? "passed" : "rejected",
         finalDeliverable: "false",
+        finalizationReady: passed ? "true" : "false",
+        backgroundMode: mode,
         sourceCandidateArtifactId: candidateId,
         ...(candidate.labels.candidateFamilyId
           ? { candidateFamilyId: candidate.labels.candidateFamilyId }
@@ -258,11 +630,19 @@ export function createCandidateMasteringHandlers(): Readonly<
       metadata: normalizeJson({
         schemaVersion: "1.0",
         jobId: context.job.id,
-        stage: "chroma-alpha-mastering",
-        requiresApproval: true,
-        requiresBlockingQa: true,
-        qualityPassed: quality.passed,
-        extractionSha256: extraction.evidence.outputSha256,
+        stage: "candidate-finalization",
+        qualityPassed: passed,
+        deliveryProfileId,
+        backgroundMode: mode,
+        proofBackgrounds: matteProofs,
+        geometry: {
+          sourceWidth: resized.sourceWidth,
+          sourceHeight: resized.sourceHeight,
+          targetWidth: resized.targetWidth,
+          targetHeight: resized.targetHeight,
+          resized: resized.resized,
+          resampling: resized.resampling,
+        },
       }),
     });
 
@@ -281,9 +661,29 @@ export function createCandidateMasteringHandlers(): Readonly<
         descriptorSha256: mastered.descriptorSha256,
         contentSha256: mastered.contentSha256,
       },
-      extraction: extraction.evidence,
+      background: {
+        mode,
+        matteColour: prepared.effectiveMatteColour ?? null,
+        proofBackgrounds: matteProofs,
+        extraction: prepared.extraction,
+        blackEvidence: prepared.blackEvidence,
+      },
+      geometry: {
+        sourceWidth: resized.sourceWidth,
+        sourceHeight: resized.sourceHeight,
+        targetWidth: resized.targetWidth,
+        targetHeight: resized.targetHeight,
+        resized: resized.resized,
+        resampling: resized.resampling,
+      },
+      optimization: optimization.evidence,
       quality,
-      promotionEligible: quality.passed,
+      blockingProof: {
+        qualityPassed: quality.passed,
+        meaningfulAlphaPassed,
+        fakeTransparencyPassed,
+      },
+      promotionEligible: passed,
       approvalState: "unapproved",
     });
     const evidence = await context.putArtifact(
@@ -291,20 +691,25 @@ export function createCandidateMasteringHandlers(): Readonly<
       {
         mediaType: "application/json",
         storageClass: "evidence",
-        fileName: `${stem}.alpha-master.evidence.json`,
+        fileName: `${stem}.finalization.evidence.json`,
         sourceArtifacts: [candidateId, mastered.artifactId],
         labels: {
-          artifactRole: "candidate-alpha-mastering-evidence",
+          artifactRole: "candidate-finalization-evidence",
           approvalState: "evidence-only",
-          qualityState: quality.passed ? "passed" : "rejected",
+          qualityState: passed ? "passed" : "rejected",
+          backgroundMode: mode,
           sourceCandidateArtifactId: candidateId,
           masteredCandidateArtifactId: mastered.artifactId,
         },
         metadata: normalizeJson({
           schemaVersion: "1.0",
           jobId: context.job.id,
-          extractionSha256: extraction.evidence.outputSha256,
           qualityReportSha256: quality.rawRgbaSha256,
+          deliveryProfileId,
+          resized: resized.resized,
+          targetWidth: resized.targetWidth,
+          targetHeight: resized.targetHeight,
+          resampling: resized.resampling,
         }),
       },
     );
@@ -316,9 +721,15 @@ export function createCandidateMasteringHandlers(): Readonly<
         sourceCandidateArtifactId: candidateId,
         masteredCandidateArtifactId: mastered.artifactId,
         evidenceArtifactId: evidence.artifactId,
-        qualityPassed: quality.passed,
-        promotionEligible: quality.passed,
+        qualityPassed: passed,
+        promotionEligible: passed,
         approvalState: "unapproved",
+        backgroundMode: mode,
+        deliveryProfileId,
+        resized: resized.resized,
+        targetWidth: resized.targetWidth,
+        targetHeight: resized.targetHeight,
+        resampling: resized.resampling,
       }),
     };
   };
@@ -329,5 +740,10 @@ export function createCandidateMasteringHandlers(): Readonly<
 }
 
 export function candidateMasteringWorkerCapabilities(): readonly string[] {
-  return [...REQUIRED_CAPABILITIES];
+  return [
+    "media.chroma-extract",
+    "media.raster",
+    "quality.sprite-frame",
+    "evidence.bundle",
+  ];
 }

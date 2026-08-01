@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",
+    "@evavo/art-delivery-optimizer": "workspace:*",
     "@evavo/art-godot": "workspace:*",
     "@evavo/art-media": "workspace:*",
     "@evavo/art-providers": "workspace:*",
@@ -21,11 +22,11 @@
     "@evavo/art-runtime": "workspace:*",
     "@evavo/art-selection": "workspace:*",
     "@evavo/art-sprite-family": "workspace:*",
-    "@evavo/art-sprite-supervisor": "workspace:*"
+    "@evavo/art-sprite-supervisor": "workspace:*",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "sharp": "^0.35.3",
     "typescript": "^5.9.2"
   }
 }
