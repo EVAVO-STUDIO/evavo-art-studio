@@ -9,9 +9,11 @@ export function automaticSpriteWorkflowProtocolSummary() {
     productionRules: [
       "Every authored direction receives an approved direction master before clip frames.",
       "Every clip key pose depends on the approved direction master.",
-      "Every in-between frame depends on approved previous and next key poses.",
+      "Every authored in-between depends on approved previous and next key poses.",
+      "Automatic release requires direction masters, every key pose and every authored in-between; partial frame families use a separate planning workflow.",
+      "Layer frames use the selected current body frame as base-image while retaining distinct previous and next key-pose controls for in-betweens.",
       "Every provider task produces exactly one candidate; ranking compares two to eight independently retained candidates.",
-      "Provider source canvases are chroma-mastered and deterministically resized to the exact sprite dimensions before selection.",
+      "Provider source canvases are mastered and deterministically resized to the exact sprite dimensions before selection.",
       "Every selected candidate is promoted through an immutable selection record and a fresh compare-and-swap reference.",
       "Every selected frame and retained visible layer is reconstructed and verified as one complete family before release evidence.",
     ],
@@ -25,7 +27,7 @@ export function automaticSpriteWorkflowProtocolSummary() {
       "The art-direction contract is rehashed and must match the sprite plan binding exactly.",
       "Derived mirrored directions are blocked until a deterministic geometry-preserving mirror worker is available or every direction is authored.",
       "Existing named-reference generations are not overwritten; revisions use the existing repair and compare-and-swap workflow.",
-      "Missing required layer references, unsupported family roles, missing neighbour key poses, task ceilings and non-transparent targets block compilation.",
+      "Missing required layer references, unsupported family roles, missing neighbour key poses, partial frame coverage, task ceilings and incompatible targets block compilation.",
       "Ambiguous deterministic selection or promotion becomes supervisor review-required rather than accepting the highest score blindly.",
     ],
     taskKinds: [
