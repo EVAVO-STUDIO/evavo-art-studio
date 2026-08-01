@@ -77,7 +77,6 @@ export interface NormalizedAutomaticSpriteWorkflowCompileRequest {
   readonly protocolVersion: typeof AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION;
   readonly runId: string;
   readonly spritePlan: CompiledSpriteProductionPlan;
-  readonly artDirectionContract: CompiledArtDirectionContract;
   readonly references: Readonly<{
     readonly canonicalIdentityArtifactId: ArtifactId;
     readonly paletteReferenceArtifactId?: ArtifactId;
@@ -115,6 +114,11 @@ export interface NormalizedAutomaticSpriteWorkflowCompileRequest {
     readonly failOnMissingLayerReferences: boolean;
   }>;
   readonly metadata?: JsonValue;
+}
+
+export interface ResolvedAutomaticSpriteWorkflowCompileRequest
+  extends NormalizedAutomaticSpriteWorkflowCompileRequest {
+  readonly artDirectionContract: CompiledArtDirectionContract;
 }
 
 export interface AutomaticSpriteWorkflowBlocker {
@@ -167,7 +171,7 @@ export interface AutomaticSpriteWorkflowAnalysis {
 export interface CompiledAutomaticSpriteWorkflow {
   readonly schemaVersion: "1.0";
   readonly protocolVersion: typeof AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION;
-  readonly request: NormalizedAutomaticSpriteWorkflowCompileRequest;
+  readonly request: ResolvedAutomaticSpriteWorkflowCompileRequest;
   readonly requestSha256: string;
   readonly analysis: AutomaticSpriteWorkflowAnalysis;
   readonly supervisorRequest: SpriteSupervisorCompileRequestInput;
