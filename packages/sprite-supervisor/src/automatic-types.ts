@@ -1,4 +1,8 @@
 import type { ArtifactId, JsonValue } from "@evavo/art-artifacts";
+import type {
+  ArtDirectionCompileRequestInput,
+  CompiledArtDirectionContract,
+} from "@evavo/art-direction";
 import type { CompiledSpriteProductionPlan } from "@evavo/art-sprite-planner";
 
 import type {
@@ -59,6 +63,8 @@ export interface AutomaticSpriteWorkflowCompileRequestInput {
   readonly runId: string;
   readonly spritePlan?: CompiledSpriteProductionPlan | unknown;
   readonly spritePlanRequest?: unknown;
+  readonly artDirectionContract?: CompiledArtDirectionContract | unknown;
+  readonly artDirectionRequest?: ArtDirectionCompileRequestInput | unknown;
   readonly references: AutomaticSpriteWorkflowReferenceInput;
   readonly provider?: AutomaticSpriteWorkflowProviderInput;
   readonly promotion: AutomaticSpriteWorkflowPromotionInput;
@@ -71,6 +77,7 @@ export interface NormalizedAutomaticSpriteWorkflowCompileRequest {
   readonly protocolVersion: typeof AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION;
   readonly runId: string;
   readonly spritePlan: CompiledSpriteProductionPlan;
+  readonly artDirectionContract: CompiledArtDirectionContract;
   readonly references: Readonly<{
     readonly canonicalIdentityArtifactId: ArtifactId;
     readonly paletteReferenceArtifactId?: ArtifactId;
