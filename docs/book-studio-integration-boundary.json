@@ -1,0 +1,50 @@
+{
+  "schema": "evavo/art-studio-book-integration",
+  "version": 1,
+  "reviewedAt": "2026-08-02",
+  "status": "active_independent_art_authority",
+  "artStudio": {
+    "repository": "EVAVO-STUDIO/evavo-art-studio",
+    "observedMainCommit": "81320a966740a54e364167893fa23ab7913bcaae",
+    "owns": [
+      "provider-neutral cover and illustration candidate execution",
+      "immutable source and model provenance",
+      "candidate selection, repair, promotion and approved artifact references",
+      "image mastering and evidence-backed delivery packages"
+    ],
+    "doesNotOwn": [
+      "canonical manuscript or series state",
+      "book interior or publication layout",
+      "KDP metadata, ISBN, barcode, Previewer or proof authority",
+      "automatic approval of provider output"
+    ]
+  },
+  "bookStudio": {
+    "activeCompatibilitySource": "EVAVO-STUDIO/Website:tools/evavo-doc-studio",
+    "intendedCanonicalProductHome": "EVAVO-STUDIO/evavo-docs-suite",
+    "owns": [
+      "manuscript and edition identity",
+      "manuscript-grounded visual briefs and route requirements",
+      "cover and illustration inventory, placement, captions and accessibility",
+      "publication dependencies and approval requirements"
+    ]
+  },
+  "contractRules": [
+    "No cross-repository runtime source imports.",
+    "Use versioned HTTP, OpenAPI, job, artifact, event and receipt contracts.",
+    "Book Studio must bind requests to exact manuscript, edition and art-brief fingerprints.",
+    "Art Studio provider output remains an unapproved candidate until selection and promotion pass.",
+    "Book Studio consumes immutable Art Studio artifact references rather than raw provider responses.",
+    "Generated artwork remains text-free when editable book typography is required.",
+    "Art Studio does not assign ISBNs, approve KDP files or publish books."
+  ],
+  "currentFlags": {
+    "websiteBookStudioStillActive": true,
+    "docsSuiteCutoverApproved": false,
+    "runtimeSourceMoved": false,
+    "artAuthorityTransferred": false,
+    "providerCandidateIsFinal": false,
+    "publicationPerformed": false
+  },
+  "recordFingerprint": "1cac2c0b0b8ebc951e3a4b1bb6f5682fce831787a5758ec893faf6614bab1dff"
+}
