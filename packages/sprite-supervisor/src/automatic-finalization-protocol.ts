@@ -5,7 +5,7 @@ export function automaticSpriteFinalizationProtocolSummary() {
     schemaVersion: "1.0" as const,
     protocolVersion: AUTOMATIC_SPRITE_FINALIZATION_PROTOCOL_VERSION,
     purpose:
-      "Compile a complete sprite-production workflow that chooses a governed provider background, rejects fake transparency, binds optional 3D rig and direction references, finalizes every candidate at exact runtime dimensions, verifies the complete family, and emits release-ready evidence.",
+      "Compile a complete sprite-production workflow that chooses a governed provider background, rejects fake transparency, binds optional 3D rig and direction references, applies bounded deterministic pixel repair, proves every selected source over hostile backgrounds, verifies the complete family, and emits release-ready evidence.",
     backgroundModes: [
       "auto",
       "native-alpha",
@@ -21,6 +21,19 @@ export function automaticSpriteFinalizationProtocolSummary() {
       "Opaque preserve mode may not silently flatten a transparent candidate into a black plate.",
       "Checkerboards, transparency grids, flat mattes, halos, and unrelated RGB beneath alpha remain blocking failures.",
     ],
+    adaptiveRepairRules: [
+      "Ordinary mastering writes a tolerant pre-adaptive source so diagnostic evidence is retained even when quality gates fail.",
+      "Fully transparent RGB and matte-contaminated partial-alpha edge RGB receive at most the configured bounded deterministic repair passes.",
+      "The repair kernel preserves visible opaque pixels, alpha, silhouette, canvas, pivots, timing, identity, and style locks.",
+      "Missing alpha, fake checkerboards, baked mattes, crop failures, and pipeline geometry drift are never painted over by the local repair kernel.",
+      "Unresolved failures emit an immutable machine-readable repair plan and stop for provider repair or named review without lowering thresholds.",
+    ],
+    proofRules: [
+      "Every adaptive candidate emits a PNG proof sheet over black, white, grey, green, magenta, and any additional declared hostile backgrounds.",
+      "Every selected family source must retain immutable lineage to a passed adaptive candidate and its passed proof artifact.",
+      "The family verifier emits a separate adaptive proof evidence artifact containing every selected source, finalized candidate, and hostile-background proof ID.",
+      "Adaptive family proof evidence is a required release role, not optional diagnostic output.",
+    ],
     threeDBridgeRules: [
       "3D references are bound by repository, exact revision hash, and immutable artifact IDs rather than by mutable filesystem paths.",
       "Pre-rendered 2.5D work requires a render-rig artifact, camera manifest, and full authored direction coverage.",
@@ -29,10 +42,10 @@ export function automaticSpriteFinalizationProtocolSummary() {
     ],
     finalizationRules: [
       "Every candidate is resized and optimized from the mastered source before deterministic selection.",
-      "Every selected family source must retain lineage to a finalization-ready candidate.",
       "Every declared 3D artifact must pass descriptor and content verification.",
       "Complete family verification remains mandatory and cannot be replaced by a strong individual-frame score.",
-      "Release evidence is emitted only when all blocking frame, layer, family, transparency, and provenance gates pass.",
+      "Release evidence is emitted only when all blocking frame, layer, family, transparency, adaptive-proof, and provenance gates pass.",
+      "Task and tick budgets are recalculated after adaptive jobs are inserted so the workflow cannot outgrow its declared limits silently.",
     ],
     executionBoundary:
       "REST and MCP validate and compile only. Explicit CLI or authenticated runtime submission starts the durable supervisor. Provider credentials remain worker-only, and finalization does not deploy or mutate unrelated repositories.",
