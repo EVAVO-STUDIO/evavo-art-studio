@@ -1,4 +1,9 @@
-import { normalizeJson, type ArtifactId, type JsonValue } from "@evavo/art-artifacts";
+import {
+  normalizeJson,
+  type ArtifactId,
+  type JsonValue,
+  type StoredArtifact,
+} from "@evavo/art-artifacts";
 import {
   finalizeDecodedSpriteFrame,
   type SpriteFinalizationRepairOptions,
@@ -121,6 +126,164 @@ function guardedContext(
   };
 }
 
+async function verifiedOutput(
+  artifactId: ArtifactId,
+  context: Parameters<RuntimeJobHandler>[0],
+): Promise<StoredArtifact> {
+  const [artifact, verification] = await Promise.all([
+    context.artifacts.get(artifactId),
+    context.artifacts.verify(artifactId),
+  ]);
+  if (
+    !artifact ||
+    !verification.exists ||
+    !verification.descriptorValid ||
+    !verification.contentValid
+  ) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FINALIZER_OUTPUT_VERIFICATION_FAILED",
+      `Adaptive finalization output failed immutable verification: ${artifactId}`,
+    );
+  }
+  return artifact;
+}
+
+function outputByRole(
+  artifacts: readonly StoredArtifact[],
+  role: string,
+): StoredArtifact {
+  const matches = artifacts.filter(
+    (artifact) => artifact.labels.artifactRole === role,
+  );
+  if (matches.length !== 1) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FINALIZER_OUTPUT_CARDINALITY_INVALID",
+      `Adaptive finalization expected exactly one ${role} artifact; found ${matches.length}.`,
+    );
+  }
+  return matches[0]!;
+}
+
+async function normalizeSuccessfulLineage(
+  context: Parameters<RuntimeJobHandler>[0],
+  sourceId: ArtifactId,
+  baseResult: Awaited<ReturnType<RuntimeJobHandler>>,
+): Promise<Awaited<ReturnType<RuntimeJobHandler>>> {
+  const artifacts = await Promise.all(
+    baseResult.outputArtifacts.map((artifactId) =>
+      verifiedOutput(artifactId, context),
+    ),
+  );
+  const finalized = outputByRole(
+    artifacts,
+    "provider-candidate-alpha-master",
+  );
+  const proof = outputByRole(
+    artifacts,
+    "candidate-hostile-background-proof",
+  );
+  const baseEvidence = outputByRole(
+    artifacts,
+    "candidate-adaptive-finalization-evidence",
+  );
+  if (
+    finalized.labels.finalizationReady !== "true" ||
+    finalized.labels.adaptiveFinalized !== "true" ||
+    finalized.labels.qualityState !== "passed" ||
+    proof.labels.qualityState !== "passed" ||
+    baseEvidence.labels.qualityState !== "passed"
+  ) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FINALIZER_SUCCESS_STATE_INVALID",
+      "A successful adaptive result did not contain passed candidate, proof, and evidence artifacts.",
+    );
+  }
+
+  const normalizedCandidate = await context.putArtifact(
+    await context.artifacts.read(finalized.artifactId),
+    {
+      mediaType: finalized.mediaType,
+      storageClass: "intermediate",
+      ...(finalized.fileName === undefined
+        ? {}
+        : { fileName: finalized.fileName }),
+      sourceArtifacts: [sourceId],
+      labels: {
+        ...finalized.labels,
+        proofArtifactId: proof.artifactId,
+        provenanceNormalized: "true",
+      },
+      metadata: normalizeJson({
+        ...(isRecord(finalized.metadata) ? finalized.metadata : {}),
+        baseFinalizedArtifactId: finalized.artifactId,
+        proofArtifactId: proof.artifactId,
+        baseEvidenceArtifactId: baseEvidence.artifactId,
+        provenanceRule:
+          "The finalized candidate descends from the mastered source. The proof and evidence are sibling derivatives bound by this envelope rather than parents of the image.",
+      }),
+    },
+  );
+
+  const envelopeBody = normalizeJson({
+    schemaVersion: "1.0",
+    sourceCandidateArtifactId: sourceId,
+    normalizedFinalizedCandidateArtifactId:
+      normalizedCandidate.artifactId,
+    baseFinalizedCandidateArtifactId: finalized.artifactId,
+    proofArtifactId: proof.artifactId,
+    baseEvidenceArtifactId: baseEvidence.artifactId,
+    qualityState: "passed",
+    finalizationReady: true,
+    qualityThresholdsRelaxed: false,
+  });
+  const envelope = await context.putArtifact(
+    `${JSON.stringify(envelopeBody, null, 2)}\n`,
+    {
+      mediaType: "application/json",
+      storageClass: "evidence",
+      fileName: `${normalizedCandidate.artifactId}.adaptive-finalization-envelope.json`,
+      sourceArtifacts: [
+        sourceId,
+        normalizedCandidate.artifactId,
+        proof.artifactId,
+        baseEvidence.artifactId,
+      ],
+      labels: {
+        artifactRole: "candidate-adaptive-finalization-envelope",
+        approvalState: "evidence-only",
+        qualityState: "passed",
+        finalizationReady: "true",
+        sourceCandidateArtifactId: sourceId,
+        finalizedCandidateArtifactId: normalizedCandidate.artifactId,
+        proofArtifactId: proof.artifactId,
+        baseEvidenceArtifactId: baseEvidence.artifactId,
+      },
+      metadata: normalizeJson({
+        qualityThresholdsRelaxed: false,
+        provenanceNormalized: true,
+      }),
+    },
+  );
+
+  return {
+    outputArtifacts: [
+      normalizedCandidate.artifactId,
+      proof.artifactId,
+      baseEvidence.artifactId,
+      envelope.artifactId,
+    ],
+    result: normalizeJson({
+      ...(isRecord(baseResult.result) ? baseResult.result : {}),
+      sourceCandidateArtifactId: sourceId,
+      finalizedCandidateArtifactId: normalizedCandidate.artifactId,
+      proofArtifactId: proof.artifactId,
+      baseEvidenceArtifactId: baseEvidence.artifactId,
+      evidenceArtifactId: envelope.artifactId,
+      provenanceNormalized: true,
+    }),
+  };
+}
+
 export function createGuardedAdaptiveFinalizerHandlers(): Readonly<
   Record<string, RuntimeJobHandler>
 > {
@@ -161,7 +324,13 @@ export function createGuardedAdaptiveFinalizerHandlers(): Readonly<
       repairOptions(payload),
     );
 
-    if (result.ready) return base(context);
+    if (result.ready) {
+      return normalizeSuccessfulLineage(
+        context,
+        sourceId,
+        await base(context),
+      );
+    }
 
     // A strict runtime delivery profile may reject the still-failing image before
     // the base handler can persist its proof and repair-plan artifacts. Re-run
