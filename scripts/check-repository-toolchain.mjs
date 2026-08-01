@@ -10,8 +10,10 @@ const CHECKOUT_SHA = "de0fac2e4500dabe0009e67214ff5f5447ce83dd";
 const PNPM_SETUP_SHA = "fc06bc1257f339d1d5d8b3a19a8cae5388b55320";
 const SETUP_NODE_SHA = "6044e13b5dc448c55e2357c09f80417699197238";
 const UPLOAD_ARTIFACT_SHA = "ea165f8d65b6e75b540449e92b4886f43607fa02";
-const MANUAL_VALIDATION_NOTE =
-  "Validation is manual exact-current-main only; ordinary pushes and pull requests must not allocate hosted runners.";
+const AUTOMATIC_VALIDATION_NOTE =
+  "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.";
+const CURRENT_MAIN_RECEIPT_NOTE =
+  "Superseded mainline validations are cancelled; a receipt is written only after the candidate is re-proven as current origin/main.";
 
 const args = new Set(process.argv.slice(2));
 const allowGeneratedLockfile = args.delete("--allow-generated-lockfile");
@@ -87,6 +89,33 @@ const workflowEvents = (source) => {
     if (match) events.push(match[1]);
   }
   return [...new Set(events)].sort();
+};
+
+const workflowPushBranches = (source) => {
+  const lines = source.split(/\r?\n/);
+  const pushIndex = lines.indexOf("  push:");
+  if (pushIndex < 0) return [];
+  let branchesIndex = -1;
+  for (let index = pushIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^  [A-Za-z_][A-Za-z0-9_-]*:/.test(line)) break;
+    if (line === "    branches:") {
+      branchesIndex = index;
+      break;
+    }
+  }
+  if (branchesIndex < 0) return [];
+  const branches = [];
+  for (let index = branchesIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^  [A-Za-z_][A-Za-z0-9_-]*:/.test(line)) break;
+    if (/^    [A-Za-z_][A-Za-z0-9_-]*:/.test(line)) break;
+    const match = line.match(/^      -\s+(.+?)\s*$/);
+    if (match) {
+      branches.push(match[1].replace(/^['"]|['"]$/g, ""));
+    }
+  }
+  return branches;
 };
 
 const workflowActions = (source) => {
@@ -196,8 +225,11 @@ if (
 ) {
   errors.push("executed baseline evidence changed");
 }
-if (!profile.notes?.includes(MANUAL_VALIDATION_NOTE)) {
-  errors.push("reliability profile is missing the manual exact-main validation note");
+if (!profile.notes?.includes(AUTOMATIC_VALIDATION_NOTE)) {
+  errors.push("reliability profile is missing the automatic exact-main validation note");
+}
+if (!profile.notes?.includes(CURRENT_MAIN_RECEIPT_NOTE)) {
+  errors.push("reliability profile is missing the current-main receipt note");
 }
 for (const prohibited of [
   "live provider requests",
@@ -223,31 +255,45 @@ if (
 
 const workflow = read(".github/workflows/ci.yml");
 const events = workflowEvents(workflow);
-if (events.length !== 1 || events[0] !== "workflow_dispatch") {
-  errors.push(`CI workflow must be workflow_dispatch only; found ${JSON.stringify(events)}`);
+if (JSON.stringify(events) !== JSON.stringify(["push", "workflow_dispatch"])) {
+  errors.push(
+    `CI workflow must use only main push and workflow_dispatch; found ${JSON.stringify(events)}`,
+  );
+}
+const pushBranches = workflowPushBranches(workflow);
+if (JSON.stringify(pushBranches) !== JSON.stringify(["main"])) {
+  errors.push(
+    `CI push validation must target exactly main; found ${JSON.stringify(pushBranches)}`,
+  );
 }
 
 const requiredWorkflowTokens = [
   "name: Art Studio exact mainline validation",
+  "on:\n  push:\n    branches:\n      - main\n  workflow_dispatch:",
   "expected_sha:",
   "request_source:",
   "default: evavo-development-studio",
   "permissions:\n  contents: read",
-  "group: art-studio-ci-${{ inputs.expected_sha }}",
-  "cancel-in-progress: false",
+  "group: art-studio-ci-main",
+  "cancel-in-progress: true",
   "runs-on: ubuntu-24.04",
-  '[[ "${REQUEST_SOURCE}" == "evavo-development-studio" ]]',
+  "ART_STUDIO_EXPECTED_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_sha || github.sha }}",
+  "ART_STUDIO_REQUEST_SOURCE: ${{ github.event_name == 'workflow_dispatch' && inputs.request_source || 'github-main-push' }}",
   '[[ "${GITHUB_REF}" == "refs/heads/main" ]]',
-  '[[ "${EXPECTED_SHA}" == "${GITHUB_SHA}" ]]',
+  '[[ "${ART_STUDIO_EXPECTED_SHA}" == "${GITHUB_SHA}" ]]',
+  '[[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]',
+  '[[ "${ART_STUDIO_REQUEST_SOURCE}" == "evavo-development-studio" ]]',
+  '[[ "${GITHUB_EVENT_NAME}" == "push" ]]',
+  '[[ "${ART_STUDIO_REQUEST_SOURCE}" == "github-main-push" ]]',
   `actions/checkout@${CHECKOUT_SHA} # v6.0.2`,
-  "ref: ${{ inputs.expected_sha }}",
+  "ref: ${{ env.ART_STUDIO_EXPECTED_SHA }}",
   "fetch-depth: 0",
   "persist-credentials: false",
   "git show-ref --verify --quiet refs/remotes/origin/main",
-  "git merge-base --is-ancestor",
+  '[[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]',
   `pnpm/action-setup@${PNPM_SETUP_SHA} # v4.4.0`,
   `actions/setup-node@${SETUP_NODE_SHA} # v6.2.0`,
-  `node-version: \"${EXPECTED_NODE}\"`,
+  `node-version: "${EXPECTED_NODE}"`,
   `version: ${EXPECTED_PNPM}`,
   "package-manager-cache: false",
   "node scripts/check-repository-toolchain.mjs",
@@ -257,6 +303,12 @@ const requiredWorkflowTokens = [
   "rm -f pnpm-lock.yaml",
   "git diff --exit-code",
   'test -z "$(git status --porcelain)"',
+  "git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main",
+  "Candidate was superseded before receipt creation",
+  '"schemaVersion": "1.1"',
+  '"trigger": process.env.GITHUB_EVENT_NAME',
+  '"requestSource": process.env.ART_STUDIO_REQUEST_SOURCE',
+  '"currentMainAtReceipt": true',
   '"installedWithoutCommittedLockfile": true',
   '"deployment": "disabled"',
   `actions/upload-artifact@${UPLOAD_ARTIFACT_SHA} # v4.6.2`,
@@ -267,12 +319,12 @@ for (const token of requiredWorkflowTokens) {
 }
 
 for (const forbidden of [
-  "push:",
   "pull_request:",
   "schedule:",
   "workflow_run:",
   "repository_dispatch:",
-  "cancel-in-progress: true",
+  "branches-ignore:",
+  "cancel-in-progress: false",
   "ubuntu-latest",
   "actions/checkout@v",
   "actions/setup-node@v",
@@ -305,16 +357,16 @@ for (const forbidden of [
 }
 
 const orderedWorkflowTokens = [
-  '[[ "${REQUEST_SOURCE}" == "evavo-development-studio" ]]',
+  '[[ "${GITHUB_EVENT_NAME}" == "push" ]]',
   `actions/checkout@${CHECKOUT_SHA}`,
-  "git merge-base --is-ancestor",
+  '[[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]',
   "node scripts/check-repository-toolchain.mjs",
   "node scripts/test-repository-toolchain.mjs",
   "pnpm install --no-frozen-lockfile",
   "pnpm check",
   "rm -f pnpm-lock.yaml",
-  "git diff --exit-code",
-  '"installedWithoutCommittedLockfile": true',
+  "git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main",
+  '"currentMainAtReceipt": true',
   `actions/upload-artifact@${UPLOAD_ARTIFACT_SHA}`,
 ];
 let previousIndex = -1;
@@ -363,5 +415,5 @@ console.log(
     ? "- the generated review-first lockfile is accepted only as untracked installed state"
     : "- the pre-install source tree contains no unreviewed lockfile",
 );
-console.log("- CI is manual, exact-current-main, immutable and read-only");
-console.log("- validation order and capability boundaries agree");
+console.log("- CI validates only exact current main, automatically or by governed replay");
+console.log("- validation order, current-main receipt proof and capability boundaries agree");

@@ -1,6 +1,9 @@
 name: Art Studio exact mainline validation
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -17,42 +20,45 @@ permissions:
   contents: read
 
 concurrency:
-  group: art-studio-ci-${{ inputs.expected_sha }}
-  cancel-in-progress: false
+  group: art-studio-ci-main
+  cancel-in-progress: true
 
 jobs:
   validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    env:
+      ART_STUDIO_EXPECTED_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_sha || github.sha }}
+      ART_STUDIO_REQUEST_SOURCE: ${{ github.event_name == 'workflow_dispatch' && inputs.request_source || 'github-main-push' }}
     steps:
-      - name: Validate governed dispatch
+      - name: Validate governed mainline trigger
         shell: bash
-        env:
-          EXPECTED_SHA: ${{ inputs.expected_sha }}
-          REQUEST_SOURCE: ${{ inputs.request_source }}
         run: |
           set -euo pipefail
-          [[ "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid expected_sha" >&2; exit 1; }
-          [[ "${REQUEST_SOURCE}" == "evavo-development-studio" ]] || { echo "Unsupported request_source" >&2; exit 1; }
-          [[ "${GITHUB_REF}" == "refs/heads/main" ]] || { echo "Validation must be dispatched from main" >&2; exit 1; }
-          [[ "${EXPECTED_SHA}" == "${GITHUB_SHA}" ]] || { echo "expected_sha must equal the dispatched main SHA" >&2; exit 1; }
+          [[ "${ART_STUDIO_EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid expected SHA" >&2; exit 1; }
+          [[ "${GITHUB_REF}" == "refs/heads/main" ]] || { echo "Validation must run from main" >&2; exit 1; }
+          [[ "${ART_STUDIO_EXPECTED_SHA}" == "${GITHUB_SHA}" ]] || { echo "Expected SHA must equal the triggered main SHA" >&2; exit 1; }
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            [[ "${ART_STUDIO_REQUEST_SOURCE}" == "evavo-development-studio" ]] || { echo "Unsupported manual request_source" >&2; exit 1; }
+          else
+            [[ "${GITHUB_EVENT_NAME}" == "push" ]] || { echo "Unsupported workflow event" >&2; exit 1; }
+            [[ "${ART_STUDIO_REQUEST_SOURCE}" == "github-main-push" ]] || { echo "Invalid automatic request source" >&2; exit 1; }
+          fi
 
       - name: Check out exact mainline candidate
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ inputs.expected_sha }}
+          ref: ${{ env.ART_STUDIO_EXPECTED_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify exact mainline candidate and clean source
+      - name: Verify exact current mainline candidate and clean source
         shell: bash
-        env:
-          EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           set -euo pipefail
-          [[ "$(git rev-parse HEAD)" == "${EXPECTED_SHA}" ]]
+          [[ "$(git rev-parse HEAD)" == "${ART_STUDIO_EXPECTED_SHA}" ]]
           git show-ref --verify --quiet refs/remotes/origin/main
-          git merge-base --is-ancestor "${EXPECTED_SHA}" origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
       - name: Set up pnpm 10.13.1
@@ -87,20 +93,27 @@ jobs:
           git diff --exit-code
           test -z "$(git status --porcelain)"
 
-      - name: Write bounded validation receipt
-        if: success()
+      - name: Re-prove candidate is still current main
         shell: bash
-        env:
-          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]] || { echo "Candidate was superseded before receipt creation" >&2; exit 1; }
+
+      - name: Write bounded validation receipt
+        shell: bash
         run: |
           node --input-type=module - <<'NODE'
           import fs from "node:fs";
           import path from "node:path";
 
           const receipt = {
-            "schemaVersion": "1.0",
+            "schemaVersion": "1.1",
             "repository": "EVAVO-STUDIO/evavo-art-studio",
-            "candidateSha": process.env.EXPECTED_SHA,
+            "candidateSha": process.env.ART_STUDIO_EXPECTED_SHA,
+            "trigger": process.env.GITHUB_EVENT_NAME,
+            "requestSource": process.env.ART_STUDIO_REQUEST_SOURCE,
+            "currentMainAtReceipt": true,
             "node": "22.14.0",
             "pnpm": "10.13.1",
             "lockfilePolicy": "review-first",
@@ -108,7 +121,7 @@ jobs:
             "validation": "passed",
             "liveProviderRequest": false,
             "artifactPromotion": false,
-            "deployment": "disabled",
+            "deployment": "disabled"
           };
           const target = path.join(process.env.RUNNER_TEMP, "art-studio-validation-receipt.json");
           fs.writeFileSync(target, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
@@ -118,7 +131,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: art-studio-validation-${{ inputs.expected_sha }}
+          name: art-studio-validation-${{ env.ART_STUDIO_EXPECTED_SHA }}
           path: ${{ runner.temp }}/art-studio-validation-receipt.json
           if-no-files-found: warn
           retention-days: 14
