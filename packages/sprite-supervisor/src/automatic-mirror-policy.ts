@@ -75,6 +75,12 @@ export function assertMirrorSafety(
       "Normal-map X-channel inversion is not yet part of the deterministic mirror worker.",
     );
   }
+  if (!contract.style.antiGeneric.prohibitReadableText) {
+    add(
+      "AUTOMATIC_SPRITE_MIRROR_READABLE_TEXT_UNSAFE",
+      "Horizontal derivation requires readable text, labels, glyphs, and logos to be prohibited because reflection reverses them.",
+    );
+  }
   if (
     contract.style.camera.mirroring === "forbidden" ||
     !contract.style.camera.fixed ||
@@ -112,12 +118,14 @@ export function assertMirrorSafety(
       "Historically constrained clothing and equipment require explicit symmetry review before mirroring.",
     );
   }
-  if (contract.production.pivot.x * 2 !== contract.asset.dimensions.width) {
+  const expectedPivotX = Math.floor(contract.asset.dimensions.width / 2);
+  if (contract.production.pivot.x !== expectedPivotX) {
     add(
       "AUTOMATIC_SPRITE_MIRROR_PIVOT_OFF_AXIS",
-      "The declared pivot must lie on the exact full-canvas horizontal reflection axis.",
+      "The declared pivot must use the centred integer column for the full-canvas horizontal reflection axis.",
       normalizeJson({
         pivotX: contract.production.pivot.x,
+        expectedPivotX,
         width: contract.asset.dimensions.width,
       }),
     );
