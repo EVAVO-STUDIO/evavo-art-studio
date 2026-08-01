@@ -17,7 +17,9 @@ export function spriteSupervisorProtocolSummary() {
       "Repair tasks start only when their declared source task enters repairing state.",
       "Child idempotency keys include the run, task and repair cycle so repeated ticks converge.",
       "A supervisor tick schedules at most the configured number of active child jobs.",
+      "Dormant failure-triggered repair tasks are not counted as active until a child job is actually submitted.",
       "Every tick writes immutable state evidence and advances a compare-and-swap named reference.",
+      "Concurrent state-reference conflicts remain transient and are retried against the newest immutable state.",
     ],
     failureRules: [
       "Transient, lease-expired and timeout failures are redriven only inside a bounded budget.",
@@ -27,11 +29,18 @@ export function spriteSupervisorProtocolSummary() {
       "Required tasks cannot be skipped through review resolution.",
       "Quality thresholds and verification gates cannot be disabled or relaxed through supervisor input.",
     ],
+    reviewRules: [
+      "Every review command has a unique resolutionId and is bound to one exact expectedStateTick.",
+      "A repeated identical resolution is idempotent; reuse of its ID with different content is rejected.",
+      "Task retry, skip or abort commands are accepted only while that exact task is review-required.",
+      "Final release approval is accepted only after every required task succeeds and no child job remains active.",
+      "The stable workflow identity excludes review commands, while each review submission receives its own request SHA-256 and root-job idempotency key.",
+    ],
     releaseRules: [
       "Every required task must succeed.",
       "Every required release artifact role must be bound to verified immutable content.",
       "Artifacts labelled qualityState=rejected are release blockers.",
-      "Optional final human approval is recorded with approver, reason and time.",
+      "Optional final human approval is recorded with resolution ID, expected state tick, approver, reason and time.",
       "The supervisor does not invent provider credentials, bypass promotion, execute a shell or deploy a project.",
     ],
     childJobKinds: [
