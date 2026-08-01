@@ -1,3 +1,5 @@
+import sharp from "sharp";
+
 import {
   normalizeJson,
   type ArtifactId,
@@ -62,6 +64,27 @@ function optionalNumber(
     throw new PermanentRuntimeError(
       "MASTERING_PAYLOAD_INVALID",
       `${name} must be a finite number.`,
+    );
+  }
+  return value;
+}
+
+function optionalInteger(
+  value: JsonValue | undefined,
+  name: string,
+  minimum: number,
+  maximum: number,
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < minimum ||
+    value > maximum
+  ) {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      `${name} must be an integer between ${minimum} and ${maximum}.`,
     );
   }
   return value;
@@ -145,6 +168,86 @@ function masteringError(error: unknown): never {
   throw error;
 }
 
+function targetDimensions(
+  payload: Readonly<Record<string, JsonValue>>,
+): Readonly<{ width?: number; height?: number; resampling: "nearest" | "lanczos3" }> {
+  const width = optionalInteger(payload.targetWidth, "targetWidth", 1, 8_192);
+  const height = optionalInteger(payload.targetHeight, "targetHeight", 1, 8_192);
+  if ((width === undefined) !== (height === undefined)) {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      "targetWidth and targetHeight must be supplied together.",
+    );
+  }
+  const resampling = payload.resampling === undefined ? "nearest" : payload.resampling;
+  if (resampling !== "nearest" && resampling !== "lanczos3") {
+    throw new PermanentRuntimeError(
+      "MASTERING_PAYLOAD_INVALID",
+      "resampling must be nearest or lanczos3.",
+    );
+  }
+  return {
+    ...(width === undefined ? {} : { width }),
+    ...(height === undefined ? {} : { height }),
+    resampling,
+  };
+}
+
+async function resizeExtractedPng(
+  extraction: ChromaKeyExtractionResult,
+  target: ReturnType<typeof targetDimensions>,
+): Promise<Readonly<{
+  png: Buffer;
+  sourceWidth: number;
+  sourceHeight: number;
+  targetWidth: number;
+  targetHeight: number;
+  resized: boolean;
+  resampling: "nearest" | "lanczos3";
+}>> {
+  const source = await decodeSpriteFrame(extraction.png);
+  const width = target.width ?? source.width;
+  const height = target.height ?? source.height;
+  const resized = width !== source.width || height !== source.height;
+  if (!resized) {
+    return {
+      png: Buffer.from(extraction.png),
+      sourceWidth: source.width,
+      sourceHeight: source.height,
+      targetWidth: width,
+      targetHeight: height,
+      resized: false,
+      resampling: target.resampling,
+    };
+  }
+  const kernel =
+    target.resampling === "nearest" ? sharp.kernel.nearest : sharp.kernel.lanczos3;
+  const png = await sharp(extraction.png, {
+    animated: false,
+    limitInputPixels: 64 * 1024 * 1024,
+  })
+    .resize(width, height, {
+      fit: "fill",
+      kernel,
+      withoutEnlargement: false,
+    })
+    .png({
+      compressionLevel: 9,
+      adaptiveFiltering: false,
+      palette: false,
+    })
+    .toBuffer();
+  return {
+    png,
+    sourceWidth: source.width,
+    sourceHeight: source.height,
+    targetWidth: width,
+    targetHeight: height,
+    resized: true,
+    resampling: target.resampling,
+  };
+}
+
 export function createCandidateMasteringHandlers(): Readonly<
   Record<string, RuntimeJobHandler>
 > {
@@ -158,6 +261,7 @@ export function createCandidateMasteringHandlers(): Readonly<
     const payload = context.job.spec.payload;
     const candidateId = artifactId(payload.candidateArtifactId);
     const matteColour = requiredString(payload.matteColour, "matteColour");
+    const target = targetDimensions(payload);
     for (const capability of REQUIRED_CAPABILITIES) {
       if (!context.job.spec.requiredCapabilities.includes(capability)) {
         throw new PermanentRuntimeError(
@@ -165,6 +269,15 @@ export function createCandidateMasteringHandlers(): Readonly<
           `Mastering job must require ${capability}.`,
         );
       }
+    }
+    if (
+      target.width !== undefined &&
+      !context.job.spec.requiredCapabilities.includes("media.raster")
+    ) {
+      throw new PermanentRuntimeError(
+        "MASTERING_CAPABILITY_MISSING",
+        "Target-size mastering must require media.raster.",
+      );
     }
     if (!context.job.spec.inputArtifacts.includes(candidateId)) {
       throw new PermanentRuntimeError(
@@ -217,9 +330,11 @@ export function createCandidateMasteringHandlers(): Readonly<
       masteringError(error);
     }
 
+    let masteredImage: Awaited<ReturnType<typeof resizeExtractedPng>>;
     let quality: SpriteFrameQualityReport;
     try {
-      const decoded = await decodeSpriteFrame(extraction.png);
+      masteredImage = await resizeExtractedPng(extraction, target);
+      const decoded = await decodeSpriteFrame(masteredImage.png);
       quality = analyseDecodedSpriteFrame(
         decoded,
         qualityExpectations(
@@ -239,7 +354,7 @@ export function createCandidateMasteringHandlers(): Readonly<
     const stem = safeFileStem(
       candidate.fileName ?? candidate.labels.candidateFamilyId ?? candidate.artifactId,
     );
-    const mastered = await context.putArtifact(extraction.png, {
+    const mastered = await context.putArtifact(masteredImage.png, {
       mediaType: "image/png",
       storageClass: "intermediate",
       fileName: `${stem}.alpha-master.png`,
@@ -263,6 +378,14 @@ export function createCandidateMasteringHandlers(): Readonly<
         requiresBlockingQa: true,
         qualityPassed: quality.passed,
         extractionSha256: extraction.evidence.outputSha256,
+        geometry: {
+          sourceWidth: masteredImage.sourceWidth,
+          sourceHeight: masteredImage.sourceHeight,
+          targetWidth: masteredImage.targetWidth,
+          targetHeight: masteredImage.targetHeight,
+          resized: masteredImage.resized,
+          resampling: masteredImage.resampling,
+        },
       }),
     });
 
@@ -282,6 +405,14 @@ export function createCandidateMasteringHandlers(): Readonly<
         contentSha256: mastered.contentSha256,
       },
       extraction: extraction.evidence,
+      geometry: {
+        sourceWidth: masteredImage.sourceWidth,
+        sourceHeight: masteredImage.sourceHeight,
+        targetWidth: masteredImage.targetWidth,
+        targetHeight: masteredImage.targetHeight,
+        resized: masteredImage.resized,
+        resampling: masteredImage.resampling,
+      },
       quality,
       promotionEligible: quality.passed,
       approvalState: "unapproved",
@@ -305,6 +436,10 @@ export function createCandidateMasteringHandlers(): Readonly<
           jobId: context.job.id,
           extractionSha256: extraction.evidence.outputSha256,
           qualityReportSha256: quality.rawRgbaSha256,
+          resized: masteredImage.resized,
+          targetWidth: masteredImage.targetWidth,
+          targetHeight: masteredImage.targetHeight,
+          resampling: masteredImage.resampling,
         }),
       },
     );
@@ -319,6 +454,10 @@ export function createCandidateMasteringHandlers(): Readonly<
         qualityPassed: quality.passed,
         promotionEligible: quality.passed,
         approvalState: "unapproved",
+        resized: masteredImage.resized,
+        targetWidth: masteredImage.targetWidth,
+        targetHeight: masteredImage.targetHeight,
+        resampling: masteredImage.resampling,
       }),
     };
   };
@@ -329,5 +468,5 @@ export function createCandidateMasteringHandlers(): Readonly<
 }
 
 export function candidateMasteringWorkerCapabilities(): readonly string[] {
-  return [...REQUIRED_CAPABILITIES];
+  return [...new Set([...REQUIRED_CAPABILITIES, "media.raster"])].sort();
 }
