@@ -1,0 +1,197 @@
+{
+  "schema": "evavo.art-delivery-optimization.v1",
+  "batchId": "brass-brine-character-art-2026-08-01",
+  "project": {
+    "id": "brass-brine",
+    "title": "Brass & Brine",
+    "engine": "Godot",
+    "engineVersion": "4.6.2",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "rendering": "engraved-monochrome-1871"
+  },
+  "items": [
+    {
+      "id": "assets_art_characters_dialogue_visual_dock_worker_1871_visual_dock_worker_1871_dialogue_blink",
+      "sourcePath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_blink.png",
+      "targetPath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_blink.png",
+      "sourceSha256": "97aed9fa25c92cf3887a148a1819edf7803c5aa60745e033351adccc54d15bbe",
+      "sourceBytes": 26203,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_dock_worker_1871_visual_dock_worker_1871_dialogue_frown",
+      "sourcePath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_frown.png",
+      "targetPath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_frown.png",
+      "sourceSha256": "b5c4db35d65b1ac0ccac5ec0ef96dee8e23cb496093b50e3673495366ef4cd6b",
+      "sourceBytes": 26848,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_dock_worker_1871_visual_dock_worker_1871_dialogue_idle",
+      "sourcePath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_idle.png",
+      "targetPath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_idle.png",
+      "sourceSha256": "8035f14149c7ba84b055ab7b5b522ab563d645dee0d0533a013366a1338eb3e7",
+      "sourceBytes": 27145,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_dock_worker_1871_visual_dock_worker_1871_dialogue_laugh",
+      "sourcePath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_laugh.png",
+      "targetPath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_laugh.png",
+      "sourceSha256": "e43972fc02e0071cfb0cac846177b5de81e70e570814989e7ed4a979335ae2af",
+      "sourceBytes": 26221,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_dock_worker_1871_visual_dock_worker_1871_dialogue_smile",
+      "sourcePath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_smile.png",
+      "targetPath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_smile.png",
+      "sourceSha256": "9d2031e8f6c46f28547d1861dd52f32d7a78493cbfc20cce9da8cfeeab3068d9",
+      "sourceBytes": 26083,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_dock_worker_1871_visual_dock_worker_1871_dialogue_talk_01",
+      "sourcePath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_talk_01.png",
+      "targetPath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_talk_01.png",
+      "sourceSha256": "1f70c81e21abac7b9a0b4097fb2029b4d63f57a02bdacd1023b7f1c9b3e073b0",
+      "sourceBytes": 25089,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_dock_worker_1871_visual_dock_worker_1871_dialogue_talk_02",
+      "sourcePath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_talk_02.png",
+      "targetPath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_talk_02.png",
+      "sourceSha256": "dab553e8c2f49a4fb9043ae184fc62de2ef84ec5240467863bde60730bc468d9",
+      "sourceBytes": 25541,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_dock_worker_1871_visual_dock_worker_1871_dialogue_yell",
+      "sourcePath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_yell.png",
+      "targetPath": "assets/art/characters/dialogue/visual_dock_worker_1871/visual_dock_worker_1871_dialogue_yell.png",
+      "sourceSha256": "732f6af2c4d73d5df2bf39f1490fa590dcb8965b609da19949e63b2b43347e6a",
+      "sourceBytes": 25264,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_middle_class_man_1871_visual_middle_class_man_1871_dialogue_blink",
+      "sourcePath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_blink.png",
+      "targetPath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_blink.png",
+      "sourceSha256": "f47643d6abe3071c16dd9b1ab38c0e9895847f7e1e4b4211f17e790f4b7cf44f",
+      "sourceBytes": 24910,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_middle_class_man_1871_visual_middle_class_man_1871_dialogue_frown",
+      "sourcePath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_frown.png",
+      "targetPath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_frown.png",
+      "sourceSha256": "d042647ace5c5c52c62bcc0693ba25be09d0f4ab6570a1165516e97055312c7a",
+      "sourceBytes": 24447,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_middle_class_man_1871_visual_middle_class_man_1871_dialogue_idle",
+      "sourcePath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_idle.png",
+      "targetPath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_idle.png",
+      "sourceSha256": "2da64dd75172bc43f5dd2989329bf62b5a57a9d63d008087dc93b47fe94249e2",
+      "sourceBytes": 24742,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_middle_class_man_1871_visual_middle_class_man_1871_dialogue_laugh",
+      "sourcePath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_laugh.png",
+      "targetPath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_laugh.png",
+      "sourceSha256": "46ba210bf3710379adb08250cbeaa12ca35bad1f818c8a8b258a63bee196c26a",
+      "sourceBytes": 23152,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_middle_class_man_1871_visual_middle_class_man_1871_dialogue_smile",
+      "sourcePath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_smile.png",
+      "targetPath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_smile.png",
+      "sourceSha256": "ac23ac229dfd62c98645017826564a67c027ca1657581f558410032f6ae9a471",
+      "sourceBytes": 22175,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_middle_class_man_1871_visual_middle_class_man_1871_dialogue_talk_01",
+      "sourcePath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_talk_01.png",
+      "targetPath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_talk_01.png",
+      "sourceSha256": "761163cd14bcfd95483ca420d2946749f220fe7e3f61a06716b316e01f575a15",
+      "sourceBytes": 21887,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_middle_class_man_1871_visual_middle_class_man_1871_dialogue_talk_02",
+      "sourcePath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_talk_02.png",
+      "targetPath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_talk_02.png",
+      "sourceSha256": "d1b69eaa21c4514fd982e2acfc2713e8464974134256ed4e285b93d603f5ad62",
+      "sourceBytes": 20736,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_dialogue_visual_middle_class_man_1871_visual_middle_class_man_1871_dialogue_yell",
+      "sourcePath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_yell.png",
+      "targetPath": "assets/art/characters/dialogue/visual_middle_class_man_1871/visual_middle_class_man_1871_dialogue_yell.png",
+      "sourceSha256": "aa2ac45cb8077f37beb956775aa7ec587287a51b573a45093fb3663c7bbffff5",
+      "sourceBytes": 19666,
+      "profileId": "retro-dialogue-portrait-384",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_visual_dock_worker_1871_standing_front",
+      "sourcePath": "assets/art/characters/visual_dock_worker_1871_standing_front.png",
+      "targetPath": "assets/art/characters/visual_dock_worker_1871_standing_front.png",
+      "sourceSha256": "2f0aea93866233717b4c4a8f417e618671e3343236e94c75c7a34ae9c0080389",
+      "sourceBytes": 45526,
+      "profileId": "retro-standing-character-576",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_visual_dock_worker_1871_standing_side",
+      "sourcePath": "assets/art/characters/visual_dock_worker_1871_standing_side.png",
+      "targetPath": "assets/art/characters/visual_dock_worker_1871_standing_side.png",
+      "sourceSha256": "4dcea25a4075c1dc9e394c9f4ca4baf9106a6a1b8284e1a122899ef757710d15",
+      "sourceBytes": 36376,
+      "profileId": "retro-standing-character-576",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_visual_middle_class_man_1871_standing_front",
+      "sourcePath": "assets/art/characters/visual_middle_class_man_1871_standing_front.png",
+      "targetPath": "assets/art/characters/visual_middle_class_man_1871_standing_front.png",
+      "sourceSha256": "8a3e58dc2771817df9925baffa38373465ed2cba4bf159086acc60012857d714",
+      "sourceBytes": 33024,
+      "profileId": "retro-standing-character-576",
+      "background": { "mode": "preserve" }
+    },
+    {
+      "id": "assets_art_characters_visual_middle_class_man_1871_standing_side",
+      "sourcePath": "assets/art/characters/visual_middle_class_man_1871_standing_side.png",
+      "targetPath": "assets/art/characters/visual_middle_class_man_1871_standing_side.png",
+      "sourceSha256": "e7a2716210fcfbf68344a1ccdd96d7cc6b439311a24f2bd8e44368e794edff6e",
+      "sourceBytes": 24293,
+      "profileId": "retro-standing-character-576",
+      "background": { "mode": "preserve" }
+    }
+  ]
+}
