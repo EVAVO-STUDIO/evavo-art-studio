@@ -1,0 +1,23 @@
+{
+  "schema": "evavo.art-godot-sprite-effect-pack.v1",
+  "packId": "brass-brine-sprite-effects-2026-08-01",
+  "project": {
+    "id": "brass-brine",
+    "title": "Brass & Brine",
+    "engine": "Godot",
+    "engineVersion": "4.6.2",
+    "renderer": "gl_compatibility"
+  },
+  "effects": [
+    "sprite_feedback",
+    "sprite_dissolve",
+    "sprite_ghost",
+    "sprite_sway",
+    "sprite_engraved_ink",
+    "sprite_additive_pulse"
+  ],
+  "targetRoot": ".",
+  "csharpNamespace": "BrassAndBrine.UI",
+  "binderClassName": "SpriteEffectShaderParameters",
+  "binderPath": "src/UI/SpriteEffectShaderParameters.cs"
+}

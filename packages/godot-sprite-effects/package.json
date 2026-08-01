@@ -1,5 +1,5 @@
 {
-  "name": "@evavo/art-delivery-optimizer",
+  "name": "@evavo/art-godot-sprite-effects",
   "version": "0.2.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     }
   },
   "bin": {
-    "evavo-art-optimize": "./dist/cli.js"
+    "evavo-godot-sprite-effects": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -22,10 +22,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build --silent && node --test test/*.test.mjs",
     "start": "node dist/cli.js"
-  },
-  "dependencies": {
-    "@evavo/art-media": "workspace:*",
-    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

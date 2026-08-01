@@ -111,12 +111,14 @@ function baseCandidateEvidence(
   bytes: Buffer,
   raw: Buffer,
   reference: Buffer,
+  pngStorage: DeliveryCandidateEvidence["pngStorage"],
 ): Omit<DeliveryCandidateEvidence, "passed" | "failures"> {
   return {
     id,
     format,
     bytes: bytes.byteLength,
     sha256: sha256(bytes),
+    pngStorage,
     metrics: comparePixels(reference, raw),
     alpha: alphaCounts(raw),
   };
@@ -211,6 +213,7 @@ export async function optimizeDeliveryImage(
         original,
         inspected.raw,
         referenceData,
+        inspected.pngStorage,
       );
       const failures = candidateFailures(base, request.profileId);
       candidates.push({
@@ -236,6 +239,7 @@ export async function optimizeDeliveryImage(
       height,
       includeAlpha,
       encoding,
+      request.profileId,
     );
     const inspected = await inspectEncodedRaster(encoded);
     if (inspected.width !== width || inspected.height !== height) {
@@ -246,11 +250,12 @@ export async function optimizeDeliveryImage(
     }
     const base = {
       ...baseCandidateEvidence(
-        candidateId(encoding),
+        candidateId(encoding, request.profileId),
         encoding.format,
         encoded,
         inspected.raw,
         referenceData,
+        inspected.pngStorage,
       ),
       ...(encoding.format === "png"
         ? {
@@ -317,6 +322,7 @@ export async function optimizeDeliveryImage(
         width,
         height,
         hasAlpha: selected.hasAlpha,
+        pngStorage: selected.evidence.pngStorage,
       },
       transformations: selected.transformations,
       background: {

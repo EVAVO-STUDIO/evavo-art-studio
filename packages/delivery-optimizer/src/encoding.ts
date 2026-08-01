@@ -6,10 +6,33 @@ import {
   type DeliveryCandidateEvidence,
   type DeliveryEncodingCandidate,
   type DeliveryImageRequest,
+  type DeliveryProfileId,
 } from "./types.js";
 
-export function candidateId(candidate: DeliveryEncodingCandidate): string {
+const pngStorageId = (colourType: number): string => {
+  switch (colourType) {
+    case 0:
+      return "png-grayscale8";
+    case 2:
+      return "png-rgb8";
+    case 4:
+      return "png-grayscale-alpha8";
+    case 6:
+      return "png-rgba8";
+    default:
+      return `png-colour-type-${colourType}`;
+  }
+};
+
+export function candidateId(
+  candidate: DeliveryEncodingCandidate,
+  profileId?: DeliveryProfileId,
+): string {
   if (candidate.format === "png") {
+    const storage = profileId
+      ? resolveDeliveryImageProfile(profileId).pngStorage
+      : null;
+    if (storage) return pngStorageId(storage.colourType);
     return candidate.paletteColours === undefined
       ? "png-truecolour"
       : `png-palette-${candidate.paletteColours}-dither-${candidate.dither}`;
@@ -23,23 +46,44 @@ export async function encodeCandidate(
   height: number,
   includeAlpha: boolean,
   candidate: DeliveryEncodingCandidate,
+  profileId: DeliveryProfileId,
 ): Promise<Buffer> {
+  const profile = resolveDeliveryImageProfile(profileId);
   let pipeline = sharp(raw, {
     raw: { width, height, channels: 4 },
     failOn: "error",
     limitInputPixels: MAXIMUM_PIXELS,
     sequentialRead: true,
   });
-  if (!includeAlpha) pipeline = pipeline.removeAlpha();
+
+  if (candidate.format === "png" && profile.pngStorage) {
+    switch (profile.pngStorage.colourType) {
+      case 0:
+        pipeline = pipeline.toColourspace("b-w").removeAlpha();
+        break;
+      case 2:
+        pipeline = pipeline.toColourspace("srgb").removeAlpha();
+        break;
+      case 4:
+        pipeline = pipeline.toColourspace("b-w").ensureAlpha();
+        break;
+      case 6:
+        pipeline = pipeline.toColourspace("srgb").ensureAlpha();
+        break;
+    }
+  } else if (!includeAlpha) {
+    pipeline = pipeline.removeAlpha();
+  }
 
   if (candidate.format === "png") {
+    const governedStorage = profile.pngStorage !== null;
     return pipeline
       .png({
         compressionLevel: 9,
         adaptiveFiltering: true,
         effort: 10,
-        palette: candidate.paletteColours !== undefined,
-        ...(candidate.paletteColours === undefined
+        palette: governedStorage ? false : candidate.paletteColours !== undefined,
+        ...(governedStorage || candidate.paletteColours === undefined
           ? {}
           : {
               colours: candidate.paletteColours,
@@ -97,6 +141,27 @@ export function candidateFailures(
     failures.push(
       `alpha-max:${evidence.metrics.alphaMaximumDifference}>${profile.quality.maximumAlphaDifference}`,
     );
+  }
+  if (profile.pngStorage) {
+    if (!evidence.pngStorage) {
+      failures.push("png-storage-missing");
+    } else {
+      if (evidence.pngStorage.bitDepth !== profile.pngStorage.bitDepth) {
+        failures.push(
+          `png-bit-depth:${evidence.pngStorage.bitDepth}!=${profile.pngStorage.bitDepth}`,
+        );
+      }
+      if (evidence.pngStorage.colourType !== profile.pngStorage.colourType) {
+        failures.push(
+          `png-colour-type:${evidence.pngStorage.colourType}!=${profile.pngStorage.colourType}`,
+        );
+      }
+      if (evidence.pngStorage.interlace !== profile.pngStorage.interlace) {
+        failures.push(
+          `png-interlace:${evidence.pngStorage.interlace}!=${profile.pngStorage.interlace}`,
+        );
+      }
+    }
   }
   if (
     profile.transparencyPolicy === "required" &&

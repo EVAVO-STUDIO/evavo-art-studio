@@ -1,14 +1,26 @@
 export const DELIVERY_OPTIMIZER_SCHEMA = "evavo.art-delivery-optimization.v1" as const;
 export const DELIVERY_OPTIMIZER_RECEIPT_SCHEMA =
   "evavo.art-delivery-optimization-receipt.v1" as const;
-export const DELIVERY_OPTIMIZER_VERSION = "0.1.0" as const;
-export const PROFILE_CATALOG_VERSION = "2026-08-01.1" as const;
+export const DELIVERY_OPTIMIZER_VERSION = "0.2.0" as const;
+export const PROFILE_CATALOG_VERSION = "2026-08-01.2" as const;
 
 export type DeliveryImageFormat = "png" | "webp";
 export type DeliveryColourPolicy = "preserve" | "grayscale";
 export type DeliveryTransparencyPolicy = "preserve" | "required" | "opaque";
 export type DeliveryResizePolicy = "none" | "fit-inside";
 export type DeliveryKernel = "nearest" | "lanczos3";
+
+export interface DeliveryPngStorageContract {
+  readonly bitDepth: 8;
+  readonly colourType: 0 | 2 | 4 | 6;
+  readonly interlace: 0;
+}
+
+export interface DeliveryPngStorageEvidence {
+  readonly bitDepth: number;
+  readonly colourType: number;
+  readonly interlace: number;
+}
 
 export type DeliveryProfileId =
   | "retro-dialogue-portrait-384"
@@ -58,6 +70,7 @@ export interface DeliveryImageProfile {
   readonly requireMeaningfulTransparency: boolean;
   readonly flattenColour: string;
   readonly outputFormat: DeliveryImageFormat;
+  readonly pngStorage: DeliveryPngStorageContract | null;
   readonly candidates: readonly DeliveryEncodingCandidate[];
   readonly quality: DeliveryQualityThresholds;
   readonly maximumOutputBytes: number;
@@ -116,6 +129,7 @@ export interface DeliveryCandidateEvidence {
   readonly quality?: number;
   readonly nearLossless?: boolean;
   readonly dither?: number;
+  readonly pngStorage: DeliveryPngStorageEvidence | null;
   readonly metrics: DeliveryPixelMetrics;
   readonly alpha: Readonly<{
     transparentPixels: number;
@@ -140,6 +154,7 @@ export interface DeliveryImageEvidence {
     width: number;
     height: number;
     hasAlpha: boolean;
+    pngStorage: DeliveryPngStorageEvidence | null;
   }>;
   readonly transformations: readonly string[];
   readonly background: Readonly<{

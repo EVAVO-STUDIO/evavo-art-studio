@@ -23,6 +23,17 @@ function rgba(width, height, painter) {
   return data;
 }
 
+
+function pngStorage(bytes) {
+  assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(bytes.toString("ascii", 12, 16), "IHDR");
+  return {
+    bitDepth: bytes[24],
+    colourType: bytes[25],
+    interlace: bytes[28],
+  };
+}
+
 async function uncompressedPng(width, height, painter) {
   return sharp(rgba(width, height, painter), {
     raw: { width, height, channels: 4 },
@@ -57,6 +68,8 @@ test("optimizes an opaque dialogue portrait at its actual display size", async (
   assert.equal(metadata.width, 384);
   assert.equal(metadata.height, 384);
   assert.equal(metadata.hasAlpha, false);
+  assert.deepEqual(pngStorage(result.bytes), { bitDepth: 8, colourType: 0, interlace: 0 });
+  assert.equal(result.evidence.prepared.pngStorage.colourType, 0);
   assert.ok(result.bytes.length < input.length / 10);
   assert.equal(result.evidence.background.mode, "preserve");
   assert.equal(result.evidence.candidates.some((candidate) => candidate.passed), true);
@@ -88,6 +101,8 @@ test("removes only border-connected black for a standing sprite", async () => {
     .toBuffer({ resolveWithObject: true });
   assert.equal(decoded.info.width, 384);
   assert.equal(decoded.info.height, 576);
+  assert.deepEqual(pngStorage(result.bytes), { bitDepth: 8, colourType: 4, interlace: 0 });
+  assert.equal(result.evidence.prepared.pngStorage.colourType, 4);
   let transparent = 0;
   let opaqueBlack = 0;
   for (let offset = 0; offset < decoded.data.length; offset += 4) {
@@ -106,6 +121,7 @@ test("removes only border-connected black for a standing sprite", async () => {
   assert.ok(opaqueBlack > 1000, "enclosed black subject detail should remain opaque");
   assert.equal(result.evidence.background.mode, "remove-border-matte");
 });
+
 
 test("uses conservative border-connected defaults for black matte removal", async () => {
   const input = await uncompressedPng(256, 384, (x, y) => {
@@ -128,6 +144,7 @@ test("uses conservative border-connected defaults for black matte removal", asyn
   assert.ok(evidence.segmentation.preservedInteriorMatteLikePixels > 0);
 });
 
+
 test("reuses already compliant delivery bytes instead of growing the file", async () => {
   const source = await uncompressedPng(384, 576, (x, y) => {
     const body = x > 90 && x < 294 && y > 30 && y < 550;
@@ -144,6 +161,24 @@ test("reuses already compliant delivery bytes instead of growing the file", asyn
   assert.equal(second.evidence.selectedCandidateId, "source-original");
   assert.equal(second.evidence.savings.bytes, 0);
   assert.deepEqual(second.bytes, first.bytes);
+});
+
+test("preserves red UI accents in canonical RGBA8 storage", async () => {
+  const input = await uncompressedPng(128, 128, (x, y) => {
+    const inside = x > 20 && x < 108 && y > 20 && y < 108;
+    return inside ? [255, 36, 78, 255] : [0, 0, 0, 0];
+  });
+  const result = await optimizeDeliveryImage(input, {
+    profileId: "retro-ui-icon-256",
+    background: { mode: "preserve" },
+  });
+  assert.deepEqual(pngStorage(result.bytes), { bitDepth: 8, colourType: 6, interlace: 0 });
+  const decoded = await sharp(result.bytes).ensureAlpha().raw().toBuffer();
+  let redPixels = 0;
+  for (let offset = 0; offset < decoded.length; offset += 4) {
+    if (decoded[offset] > 240 && decoded[offset + 1] < 60 && decoded[offset + 2] < 100 && decoded[offset + 3] === 255) redPixels += 1;
+  }
+  assert.ok(redPixels > 1000);
 });
 
 test("lossless source profile retains decoded pixels exactly", async () => {
