@@ -32,6 +32,8 @@ export function automaticSpriteFinalizationProtocolSummary() {
       "Only directions already marked safely derived by the sprite plan may enter deterministic horizontal reflection.",
       "The exact selected authored master is reflected only after adaptive finalization, selection and immutable promotion evidence.",
       "The worker preserves canvas size, alpha and transparent RGB and performs no trim or resampling.",
+      "Readable text, labels, glyphs and logos must be prohibited because horizontal reflection reverses them.",
+      "Even- and odd-width canvases use the centred integer pivot floor(width/2).",
       "Double reflection must reconstruct the exact source RGBA bytes, and the complete family worker repeats that proof independently.",
       "Derived masters remain connected through bounded ancestry to the selected authored source and its adaptive hostile-background proof.",
       "A family horizontal-mirror proof artifact is mandatory for release whenever derived directions exist.",
