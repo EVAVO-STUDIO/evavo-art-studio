@@ -1,7 +1,6 @@
 import {
   normalizeJson,
   type ArtifactId,
-  type JsonValue,
   type StoredArtifact,
 } from "@evavo/art-artifacts";
 import {
@@ -141,6 +140,17 @@ async function storeFinalizationEvidence(
   );
   const threeD = isRecord(metadata.threeD) ? metadata.threeD : null;
   const declaredThreeDArtifactIds = artifactIdsFromUnknown(threeD);
+  const declaredInputs = new Set<ArtifactId>(context.job.spec.inputArtifacts);
+  const undeclaredThreeD = declaredThreeDArtifactIds.filter(
+    (artifactId) => !declaredInputs.has(artifactId),
+  );
+  if (undeclaredThreeD.length) {
+    throw new PermanentRuntimeError(
+      "SPRITE_FAMILY_FINALIZATION_3D_INPUT_LINEAGE_MISSING",
+      `sprite.family.verify inputArtifacts is missing declared 3D provenance: ${undeclaredThreeD.join(", ")}`,
+      normalizeJson({ artifactIds: undeclaredThreeD }),
+    );
+  }
   const verifiedThreeD = await Promise.all(
     declaredThreeDArtifactIds.map(async (artifactId) => {
       const artifact = await verifiedArtifact(artifactId, context);
@@ -198,6 +208,7 @@ async function storeFinalizationEvidence(
       blockingFailureCount: blockingFamilyFailures.length,
       everySelectedSourceFinalized: true,
       everyDeclaredThreeDArtifactVerified: true,
+      everyDeclaredThreeDArtifactWasAJobInput: true,
       fakeTransparencyRemainsBlocking: true,
       qualityThresholdsRelaxed: false,
     },
