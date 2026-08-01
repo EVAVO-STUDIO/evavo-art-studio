@@ -22,6 +22,10 @@ test("sprite supervisor OpenAPI documents bounded closed-loop control", async ()
     "requireFinalHumanApproval",
     "requiredReleaseArtifactRoles",
     "spritePlanRequest",
+    "resolutionId",
+    "expectedStateTick",
+    'protocolVersion: { const: "2026-08-01.2" }',
+    "reviewRules",
   ]) {
     assert.ok(openapi.includes(token), `missing OpenAPI invariant: ${token}`);
   }
@@ -39,4 +43,5 @@ test("sprite supervisor OpenAPI documents bounded closed-loop control", async ()
   }
   assert.match(openapi, /do not submit runtime jobs/i);
   assert.match(openapi, /quality-bypass fields are rejected/i);
+  assert.match(openapi, /exact immutable supervisor-state tick/i);
 });
