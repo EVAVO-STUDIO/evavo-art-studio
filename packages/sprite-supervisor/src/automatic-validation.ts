@@ -143,7 +143,13 @@ function safeNamespace(value: unknown): string {
   const segments = normalized.split("/");
   if (
     !segments.length ||
-    segments.some((segment) => !segment || segment === "." || segment === ".." || !SAFE_ID.test(segment))
+    segments.some(
+      (segment) =>
+        !segment ||
+        segment === "." ||
+        segment === ".." ||
+        !SAFE_ID.test(segment),
+    )
   ) {
     fail(
       "AUTOMATIC_SPRITE_WORKFLOW_REQUEST_INVALID",
@@ -249,9 +255,11 @@ export function validateAutomaticSpriteWorkflowRequest(
     );
   }
   const references = record(root.references, "references");
-  const provider = root.provider === undefined ? {} : record(root.provider, "provider");
+  const provider =
+    root.provider === undefined ? {} : record(root.provider, "provider");
   const promotion = record(root.promotion, "promotion");
-  const policy = root.policy === undefined ? {} : record(root.policy, "policy");
+  const policyInput =
+    root.policy === undefined ? {} : record(root.policy, "policy");
   const matteColour = text(
     provider.matteColour,
     "provider.matteColour",
@@ -316,6 +324,45 @@ export function validateAutomaticSpriteWorkflowRequest(
       "promotion.referencePrefix must normalize to one safe identifier.",
     );
   }
+
+  const includeDirectionMasters = booleanValue(
+    policyInput.includeDirectionMasters,
+    "policy.includeDirectionMasters",
+    true,
+  );
+  const includeKeyPoses = booleanValue(
+    policyInput.includeKeyPoses,
+    "policy.includeKeyPoses",
+    true,
+  );
+  const includeInBetweens = booleanValue(
+    policyInput.includeInBetweens,
+    "policy.includeInBetweens",
+    true,
+  );
+  const includeFamilyVerification = booleanValue(
+    policyInput.includeFamilyVerification,
+    "policy.includeFamilyVerification",
+    true,
+  );
+  if (!includeDirectionMasters || !includeKeyPoses || !includeInBetweens) {
+    fail(
+      "AUTOMATIC_SPRITE_WORKFLOW_COMPLETE_FRAME_COVERAGE_REQUIRED",
+      "Automatic release requires direction masters, every key pose, and every authored in-between. Partial frame families may be planned separately but cannot enter the automatic release compiler.",
+      normalizeJson({
+        includeDirectionMasters,
+        includeKeyPoses,
+        includeInBetweens,
+      }),
+    );
+  }
+  if (!includeFamilyVerification) {
+    fail(
+      "AUTOMATIC_SPRITE_WORKFLOW_FAMILY_VERIFICATION_REQUIRED",
+      "Automatic release requires complete layered-family verification.",
+    );
+  }
+
   const metadata =
     root.metadata === undefined ? undefined : normalizeJson(root.metadata);
   return {
@@ -395,56 +442,40 @@ export function validateAutomaticSpriteWorkflowRequest(
     },
     policy: {
       maximumTasks: integer(
-        policy.maximumTasks,
+        policyInput.maximumTasks,
         "policy.maximumTasks",
         10_000,
         1,
         10_000,
       ),
       maximumProductionUnits: integer(
-        policy.maximumProductionUnits,
+        policyInput.maximumProductionUnits,
         "policy.maximumProductionUnits",
         2_000,
         1,
         10_000,
       ),
-      includeDirectionMasters: booleanValue(
-        policy.includeDirectionMasters,
-        "policy.includeDirectionMasters",
-        true,
-      ),
-      includeKeyPoses: booleanValue(
-        policy.includeKeyPoses,
-        "policy.includeKeyPoses",
-        true,
-      ),
-      includeInBetweens: booleanValue(
-        policy.includeInBetweens,
-        "policy.includeInBetweens",
-        true,
-      ),
+      includeDirectionMasters,
+      includeKeyPoses,
+      includeInBetweens,
       includeSeparateVisibleLayers: booleanValue(
-        policy.includeSeparateVisibleLayers,
+        policyInput.includeSeparateVisibleLayers,
         "policy.includeSeparateVisibleLayers",
         true,
       ),
-      includeFamilyVerification: booleanValue(
-        policy.includeFamilyVerification,
-        "policy.includeFamilyVerification",
-        true,
-      ),
+      includeFamilyVerification,
       requireFinalHumanApproval: booleanValue(
-        policy.requireFinalHumanApproval,
+        policyInput.requireFinalHumanApproval,
         "policy.requireFinalHumanApproval",
         false,
       ),
       failOnDerivedDirections: booleanValue(
-        policy.failOnDerivedDirections,
+        policyInput.failOnDerivedDirections,
         "policy.failOnDerivedDirections",
         true,
       ),
       failOnMissingLayerReferences: booleanValue(
-        policy.failOnMissingLayerReferences,
+        policyInput.failOnMissingLayerReferences,
         "policy.failOnMissingLayerReferences",
         true,
       ),
