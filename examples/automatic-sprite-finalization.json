@@ -124,7 +124,10 @@
       }
     },
     "references": {
-      "canonicalIdentityArtifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "canonicalIdentityArtifactId": "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "layerReferenceArtifactIds": {
+        "shadow": "artifact_0000000000000000000000000000000000000000000000000000000000000000"
+      }
     },
     "provider": {
       "candidatesPerUnit": 2,
@@ -154,7 +157,7 @@
       "includeFamilyVerification": true,
       "requireFinalHumanApproval": false,
       "failOnDerivedDirections": true,
-      "failOnMissingLayerReferences": false
+      "failOnMissingLayerReferences": true
     }
   },
   "background": {
