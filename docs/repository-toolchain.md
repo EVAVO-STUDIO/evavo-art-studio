@@ -32,22 +32,22 @@ That evidence proves the complete source validation chain at one dependency-reso
 
 Neither installed-state validation nor a generated lockfile authorises committing it. A tracked lockfile still fails until the separately reviewed transition updates the profile, schema, guard, workflow and evidence.
 
-## Release-only operating model
+## Automatic exact-main operating model
 
-Art Studio no longer validates automatically on `main`, `work/**` or pull-request activity.
+Art Studio validates every push to `main`. It does not allocate hosted runners for pull requests, work branches, schedules, workflow chains or repository dispatches.
 
 ```text
-develop locally
-→ run the dependency-free toolchain and adversarial checks
-→ commit and push to main
-→ no automatic GitHub Actions run
-→ select one exact current main SHA
-→ dispatch the governed Art Studio validation gate
-→ retain the bounded exact-SHA receipt
-→ perform any provider execution, promotion or deployment through a separate authority
+develop and validate locally
+→ commit the coherent change
+→ merge or push it to main
+→ automatically validate the exact triggered main SHA
+→ cancel any superseded older mainline run
+→ re-prove the candidate is still origin/main after the full check
+→ retain a bounded exact-SHA receipt
+→ perform provider execution, promotion or deployment through separate authority
 ```
 
-A dispatch must use:
+The same workflow remains available for a deliberate manual replay. A manual dispatch must use:
 
 ```text
 request_source = evavo-development-studio
@@ -55,12 +55,13 @@ expected_sha   = the exact dispatched current main SHA
 runner         = ubuntu-24.04
 ```
 
-The workflow proves the candidate belongs to `origin/main`, checks a completely clean source tree, and refuses branch, stale-SHA or ungoverned-dispatcher execution.
+Automatic pushes use the fixed internal source `github-main-push`. Both trigger paths require `refs/heads/main`, bind the expected SHA to `GITHUB_SHA`, use the same read-only job, and reject any other event or dispatcher identity.
 
 ## Validation order
 
 ```text
-governed dispatch and exact-main proof
+governed main trigger and exact-SHA proof
+→ exact current origin/main proof
 → strict pre-install repository toolchain guard
 → adversarial drift fixtures
 → review-first dependency installation
@@ -72,6 +73,7 @@ governed dispatch and exact-main proof
 → every package and application build
 → generated-lockfile removal
 → clean-source verification
+→ refresh origin/main and reject a superseded candidate
 → bounded validation receipt
 ```
 
@@ -79,30 +81,35 @@ The existing Art Studio domain, typecheck, test and build chain remains the comp
 
 ## Workflow safety
 
-The manual exact-SHA workflow uses:
+The exact-main workflow uses:
 
+- automatic `main` push validation plus guarded manual exact-SHA replay;
+- one fixed mainline concurrency group with superseded-run cancellation;
 - read-only repository permissions;
-- one exact-current-`main` dispatch only;
 - immutable full-SHA action references;
 - checkout with persisted credentials disabled;
-- full history for ancestry verification;
+- full history and an exact `origin/main` equality check;
 - exact Node.js and pnpm versions;
 - dependency-free toolchain checks before installation;
 - generated-lockfile removal and clean-source proof after validation;
+- a second `origin/main` equality check immediately before receipt creation;
 - fourteen-day bounded receipt retention; and
 - no secret, provider, promotion, publication, release or deployment authority.
 
-The repository-owned guard rejects automatic events, floating action tags, mutable cancellation, latest runners, write permissions, secrets, forceful installation, publication, release and deployment commands. Its adversarial fixtures prove that push-trigger, dispatcher, action, lockfile and capability drift fail closed.
+The repository-owned guard rejects non-main push scope, pull requests, schedules, workflow chains, repository dispatch, floating action tags, latest runners, write permissions, secrets, forceful installation, publication, release and deployment commands. Its adversarial fixtures prove that trigger, branch scope, dispatcher, action, cancellation, current-main proof, lockfile and capability drift fail closed.
 
 The workflow may compile provider jobs and validate real media, artifact, selection, repair, atlas, Godot and production-build contracts. It does not make live provider requests, promote artifacts, update named references, deploy production, mutate credentials or communicate externally.
 
 ## Bounded receipt
 
-A successful governed run retains one receipt containing:
+A successful run retains one receipt containing:
 
 ```text
 repository
 candidate SHA
+trigger event
+request source
+currentMainAtReceipt = true
 Node.js and pnpm versions
 review-first lockfile policy
 installedWithoutCommittedLockfile = true
@@ -112,7 +119,7 @@ artifactPromotion = false
 deployment = disabled
 ```
 
-The receipt proves only the exact candidate and dependency resolution used by that run. It is not a frozen dependency graph and does not authorise a live provider or production action.
+A receipt is never written for a candidate that has been superseded before the final mainline proof. The receipt proves only the exact candidate and dependency resolution used by that run. It is not a frozen dependency graph and does not authorise a live provider or production action.
 
 ## Future lockfile transition
 
