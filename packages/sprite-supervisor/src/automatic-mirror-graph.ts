@@ -1,19 +1,8 @@
 import { normalizeJson } from "@evavo/art-artifacts";
 
-import type {
-  AutomaticSpriteWorkflowAnalysis,
-  CompiledAutomaticSpriteWorkflow,
-} from "./automatic-types.js";
-import {
-  FAMILY_MIRROR_PROOF_ROLE,
-  MIRROR_OPERATION,
-  createMirrorDrafts,
-  createMirrorTask,
-} from "./automatic-mirror-drafts.js";
-import {
-  transformMirrorFamilyTask,
-  updatedMirrorAnalysis,
-} from "./automatic-mirror-family.js";
+import type { AutomaticSpriteWorkflowAnalysis, CompiledAutomaticSpriteWorkflow } from "./automatic-types.js";
+import { FAMILY_MIRROR_PROOF_ROLE, MIRROR_OPERATION, createMirrorDrafts, createMirrorTask } from "./automatic-mirror-drafts.js";
+import { transformMirrorFamilyTask, updatedMirrorAnalysis } from "./automatic-mirror-family.js";
 import { compileSpriteSupervisorWorkflow } from "./compiler.js";
 import type { SpriteSupervisorCompileRequestInput } from "./types.js";
 import { SpriteSupervisorError } from "./types.js";
