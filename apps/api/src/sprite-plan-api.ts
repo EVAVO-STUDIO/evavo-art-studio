@@ -7,6 +7,7 @@ import {
 } from "@evavo/art-sprite-planner";
 
 import type { ProviderApiContext } from "./provider-api.js";
+import { handleSpriteSupervisorApiRequest } from "./sprite-supervisor-api.js";
 
 const PATHS = new Set([
   "/v1/sprite-plan-protocol",
@@ -17,6 +18,7 @@ const PATHS = new Set([
 export async function handleSpritePlanApiRequest(
   context: ProviderApiContext,
 ): Promise<boolean> {
+  if (await handleSpriteSupervisorApiRequest(context)) return true;
   if (!PATHS.has(context.url.pathname)) return false;
   const { request, response, url, requestId } = context;
   try {

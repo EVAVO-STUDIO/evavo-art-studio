@@ -1,0 +1,440 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Sprite Supervisor API
+  version: 0.2.0
+  description: >-
+    Compile-only contracts for closed-loop sprite-production supervision. The API
+    validates a complete sprite plan or source sprite-plan request, bounded child
+    jobs, artifact bindings, retry and repair budgets, state-bound review commands
+    and release requirements. These routes do not submit runtime jobs, call image
+    providers, inspect project artifacts, mutate approved references, execute a
+    shell or deploy a project.
+servers:
+  - url: http://127.0.0.1:4100
+security: []
+tags:
+  - name: Sprite Supervisor
+paths:
+  /v1/sprite-supervisor-protocol:
+    get:
+      tags: [Sprite Supervisor]
+      operationId: getSpriteSupervisorProtocol
+      summary: Describe closed-loop scheduling and review rules
+      responses:
+        "200":
+          description: Supervisor protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpriteSupervisorProtocol"
+  /v1/sprite-supervisors/validate:
+    post:
+      tags: [Sprite Supervisor]
+      operationId: validateSpriteSupervisor
+      summary: Validate and normalize a supervisor workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpriteSupervisorRequest"
+      responses:
+        "200":
+          description: Normalized workflow request with a compiled sprite plan
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/sprite-supervisors/compile:
+    post:
+      tags: [Sprite Supervisor]
+      operationId: compileSpriteSupervisor
+      summary: Compile the durable root supervisor job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpriteSupervisorRequest"
+      responses:
+        "200":
+          description: Compiled workflow and root job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schemaVersion, workflow, executionBoundary]
+                additionalProperties: false
+                properties:
+                  schemaVersion: { const: "1.0" }
+                  workflow:
+                    $ref: "#/components/schemas/CompiledSpriteSupervisorWorkflow"
+                  executionBoundary: { type: string }
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  schemas:
+    ArtifactId:
+      type: string
+      pattern: "^artifact_[a-f0-9]{64}$"
+    ArtifactBinding:
+      type: object
+      required: [role, artifactIds]
+      additionalProperties: false
+      properties:
+        role:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$"
+        artifactIds:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+    ArtifactSelector:
+      type: object
+      required: [role, source]
+      additionalProperties: false
+      properties:
+        role:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$"
+        source:
+          type: string
+          enum:
+            - output-artifact-labels
+            - runtime-result-json
+            - failure-details
+        labels:
+          type: object
+          additionalProperties: { type: string, minLength: 1, maxLength: 512 }
+        pointer:
+          type: string
+          pattern: "^/"
+        cardinality:
+          type: string
+          enum: [one, many]
+        required: { type: boolean }
+    RetryPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        baseDelayMs: { type: integer, minimum: 0, maximum: 86400000 }
+        maximumDelayMs: { type: integer, minimum: 0, maximum: 604800000 }
+        multiplier: { type: number, minimum: 1, maximum: 100 }
+        jitterFraction: { type: number, minimum: 0, maximum: 1 }
+    FailurePolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        redriveClassifications:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - transient
+              - permanent
+              - cancelled
+              - lease-expired
+              - deadline-exceeded
+              - dependency-failed
+              - timeout
+        redriveCodePrefixes:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+        maxRedrives: { type: integer, minimum: 0, maximum: 100 }
+        repairTaskId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        maxRepairCycles: { type: integer, minimum: 0, maximum: 100 }
+        reviewCodePrefixes:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+        abortCodePrefixes:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+        reviewOnUnclassified: { type: boolean }
+    SupervisorTask:
+      type: object
+      required:
+        - id
+        - stage
+        - title
+        - queue
+        - kind
+        - payloadTemplate
+        - requiredCapabilities
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        stage: { type: string, minLength: 1, maxLength: 256 }
+        title: { type: string, minLength: 1, maxLength: 512 }
+        queue: { type: string, minLength: 1, maxLength: 256 }
+        kind:
+          type: string
+          enum:
+            - art.candidate.generate
+            - art.candidate.edit
+            - art.candidate.inpaint
+            - art.candidate.master-alpha
+            - art.candidate.select
+            - art.candidate.promote
+            - art.repair.plan
+            - art.repair.execute-provider-canvas
+            - art.repair.revise-family
+            - art.repair.prepare-revision-selection
+            - art.repair.rank-revisions
+            - art.repair.promote-revision
+            - sprite.family.verify
+            - sprite.atlas.build
+        payloadTemplate:
+          description: >-
+            JSON template supporting $artifact, $artifacts, $plan and $run
+            placeholder objects. Secret-like and quality-bypass fields are rejected.
+        requiredCapabilities:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string }
+        dependencyTaskIds:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+        requiredArtifactRoles:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+        staticInputArtifacts:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+        outputBindings:
+          type: array
+          maxItems: 256
+          items:
+            $ref: "#/components/schemas/ArtifactSelector"
+        triggeredByFailureOfTaskId: { type: string }
+        required: { type: boolean }
+        priority: { type: integer }
+        maximumAttempts: { type: integer, minimum: 1, maximum: 100 }
+        retryPolicy:
+          $ref: "#/components/schemas/RetryPolicy"
+        leaseDurationMs: { type: integer, minimum: 1000, maximum: 86400000 }
+        timeoutMs: { type: integer, minimum: 1000, maximum: 86400000 }
+        failurePolicy:
+          $ref: "#/components/schemas/FailurePolicy"
+    SupervisorPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        tickDelayMs: { type: integer, minimum: 250, maximum: 3600000 }
+        maximumTicks: { type: integer, minimum: 1, maximum: 1000000 }
+        maximumActiveChildren: { type: integer, minimum: 1, maximum: 1000 }
+        defaultMaximumRedrives: { type: integer, minimum: 0, maximum: 100 }
+        defaultMaximumRepairCycles: { type: integer, minimum: 0, maximum: 100 }
+        cancelChildrenOnAbort: { type: boolean }
+        reviewOnUnclassifiedFailure: { type: boolean }
+        requireAllPlanStagesCovered: { type: boolean }
+        requireFinalHumanApproval: { type: boolean }
+        requiredReleaseArtifactRoles:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+    ReviewResolution:
+      description: >-
+        One replay-safe review command bound to an exact immutable supervisor-state
+        tick. Identical resolution IDs are idempotent; the same ID with changed
+        content is rejected.
+      type: object
+      required:
+        - resolutionId
+        - expectedStateTick
+        - taskId
+        - action
+        - approver
+        - reason
+      additionalProperties: false
+      properties:
+        resolutionId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        expectedStateTick:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        taskId: { type: string }
+        action:
+          type: string
+          enum: [retry, skip, abort, approve-release]
+        approver: { type: string, minLength: 1, maxLength: 256 }
+        reason: { type: string, minLength: 1, maxLength: 2048 }
+        artifactBindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactBinding"
+    SpriteSupervisorRequest:
+      type: object
+      required: [schemaVersion, runId, tasks]
+      additionalProperties: false
+      properties:
+        schemaVersion: { const: "1.0" }
+        runId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        spritePlan:
+          description: A complete compiled sprite-production plan with a valid planSha256.
+          type: object
+          additionalProperties: true
+        spritePlanRequest:
+          description: A source sprite-plan request compiled before supervision.
+          type: object
+          additionalProperties: true
+        initialArtifactBindings:
+          type: array
+          maxItems: 2048
+          items:
+            $ref: "#/components/schemas/ArtifactBinding"
+        tasks:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            $ref: "#/components/schemas/SupervisorTask"
+        policy:
+          $ref: "#/components/schemas/SupervisorPolicy"
+        reviewResolutions:
+          type: array
+          maxItems: 10000
+          items:
+            $ref: "#/components/schemas/ReviewResolution"
+        metadata: true
+      oneOf:
+        - required: [spritePlan]
+        - required: [spritePlanRequest]
+    RootJob:
+      type: object
+      required:
+        - queue
+        - kind
+        - idempotencyKey
+        - payload
+        - inputArtifacts
+        - requiredCapabilities
+        - maximumAttempts
+        - leaseDurationMs
+        - timeoutMs
+        - labels
+      additionalProperties: false
+      properties:
+        queue: { const: control }
+        kind: { const: art.sprite-production.supervise }
+        idempotencyKey: { type: string }
+        payload: true
+        inputArtifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactId"
+        requiredCapabilities:
+          type: array
+          prefixItems:
+            - { const: sprite.supervisor.run }
+            - { const: runtime.jobs }
+            - { const: artifacts.store }
+            - { const: evidence.bundle }
+          minItems: 4
+          maxItems: 4
+        maximumAttempts: { type: integer }
+        leaseDurationMs: { type: integer }
+        timeoutMs: { type: integer }
+        labels:
+          type: object
+          additionalProperties: { type: string }
+    CompiledSpriteSupervisorWorkflow:
+      type: object
+      required:
+        - schemaVersion
+        - protocolVersion
+        - runId
+        - requestSha256
+        - workflowSha256
+        - request
+        - rootJob
+      additionalProperties: false
+      properties:
+        schemaVersion: { const: "1.0" }
+        protocolVersion: { const: "2026-08-01.2" }
+        runId: { type: string }
+        requestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        workflowSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        request:
+          type: object
+          additionalProperties: true
+        rootJob:
+          $ref: "#/components/schemas/RootJob"
+    SpriteSupervisorProtocol:
+      type: object
+      required:
+        - schemaVersion
+        - protocolVersion
+        - purpose
+        - placeholderRules
+        - schedulingRules
+        - failureRules
+        - reviewRules
+        - releaseRules
+        - childJobKinds
+        - executionBoundary
+      properties:
+        schemaVersion: { const: "1.0" }
+        protocolVersion: { const: "2026-08-01.2" }
+        purpose: { type: string }
+        placeholderRules:
+          type: array
+          items: { type: string }
+        schedulingRules:
+          type: array
+          items: { type: string }
+        failureRules:
+          type: array
+          items: { type: string }
+        reviewRules:
+          type: array
+          items: { type: string }
+        releaseRules:
+          type: array
+          items: { type: string }
+        childJobKinds:
+          type: array
+          items: { type: string }
+        executionBoundary: { type: string }
+  responses:
+    ValidationError:
+      description: Workflow validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: object
+                required: [code, message]
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  details: true

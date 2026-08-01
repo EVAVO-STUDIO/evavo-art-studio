@@ -40,6 +40,10 @@ import {
   handleSelectionCommand,
   type SelectionCommandValues,
 } from "./selection-commands.js";
+import {
+  handleSpriteSupervisorCommand,
+  type SpriteSupervisorCommandValues,
+} from "./sprite-supervisor-commands.js";
 
 const help = `EVAVO Art Studio CLI
 
@@ -54,6 +58,15 @@ Usage:
   evavo-art art-direction-outputs [--output art-direction-output-profiles.json]
   evavo-art art-direction-validate --input art-direction.json [--output normalized-art-direction.json]
   evavo-art art-direction-compile --input art-direction.json [--output compiled-art-direction.json]
+
+  evavo-art sprite-plan-protocol [--output sprite-plan-protocol.json]
+  evavo-art sprite-plan-validate --input sprite-plan.json [--output normalized-sprite-plan.json]
+  evavo-art sprite-plan-compile --input sprite-plan.json [--output compiled-sprite-plan.json]
+
+  evavo-art sprite-supervisor-protocol [--output sprite-supervisor-protocol.json]
+  evavo-art sprite-supervisor-validate --input sprite-supervisor.json [--output normalized-supervisor.json]
+  evavo-art sprite-supervisor-compile --input sprite-supervisor.json [--output compiled-supervisor.json]
+  evavo-art sprite-supervisor-start --input sprite-supervisor.json [--runtime-root .art-studio/runtime] [--actor cli]
 
   evavo-art quality-frame --input frame.png --expectations frame-quality.json [--output report.json]
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
@@ -90,6 +103,8 @@ Usage:
 
 All commands emit JSON so ChatGPT, Claude, CI and scripts can consume the same contract.
 Art-direction compilation locks style, projection, shot ownership, layers, QA and output requirements before any provider call.
+Sprite planning calculates complete clip, direction, frame, layer, variant, sheet, atlas and Godot coverage.
+Sprite supervision submits bounded durable jobs, observes immutable evidence, redrives transient failures, routes authorised repair and stops for review without weakening quality gates.
 Provider validation and compilation never call an external model. Candidate execution occurs only through a capability-matched durable worker job.
 Alpha mastering is deterministic and writes an unapproved PNG plus evidence. It exits with code 3 when blocking sprite QA fails.
 Selection writes immutable ranking evidence. Promotion is a separate explicit compare-and-swap operation and cannot override blocking failures.
@@ -150,6 +165,15 @@ async function main(): Promise<void> {
 
   if (!command || parsed.values.help) {
     process.stdout.write(help);
+    return;
+  }
+
+  const supervisor = await handleSpriteSupervisorCommand(
+    command,
+    parsed.values as SpriteSupervisorCommandValues,
+  );
+  if (supervisor.handled) {
+    await emit(supervisor.value, parsed.values.output);
     return;
   }
 

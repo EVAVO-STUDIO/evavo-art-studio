@@ -1,0 +1,222 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "brass-brine-deckhand-direction-master-run",
+  "spritePlanRequest": {
+    "schemaVersion": "1.0",
+    "planId": "brass-brine-deckhand-supervised-plan",
+    "artDirectionRequest": {
+      "schemaVersion": "1.0",
+      "contractId": "brass-brine-deckhand-supervised-style",
+      "presetId": "isometric-rpg-1997",
+      "project": {
+        "projectId": "brass-brine",
+        "title": "Brass & Brine",
+        "engine": "Godot",
+        "engineVersion": "4.6.2",
+        "gameGenre": "historical maritime trading action role-playing game",
+        "targetPlatform": "desktop and mobile",
+        "worldScale": {
+          "tileWidthPixels": 64,
+          "tileHeightPixels": 32,
+          "characterHeightPixels": 96
+        }
+      },
+      "style": {
+        "intent": "Produce one stable late-1990s isometric deckhand family with historically plausible 1871 clothing and fixed camera, palette and lighting.",
+        "mustHave": [
+          "clear gameplay silhouette",
+          "stable coat, cap, boots and proportions",
+          "eight independently readable facings"
+        ],
+        "mustAvoid": [
+          "generic fantasy costume",
+          "modern equipment",
+          "random straps, glow or ornamental clutter",
+          "independent frame redesign"
+        ],
+        "references": [
+          {
+            "id": "deckhand-identity-reference",
+            "role": "identity",
+            "uri": "artifact://projects/brass-brine/deckhand/canonical-identity",
+            "weight": 1,
+            "rights": "EVAVO project-owned source art."
+          },
+          {
+            "id": "deckhand-historical-reference",
+            "role": "historical",
+            "uri": "reference://brass-brine/1871-maritime-workwear",
+            "weight": 0.9,
+            "rights": "Research reference only."
+          }
+        ]
+      },
+      "asset": {
+        "assetId": "deckhand",
+        "family": "character",
+        "purpose": "Complete eight-direction playable deckhand sprite family.",
+        "dimensions": { "width": 96, "height": 128 },
+        "transparency": "required",
+        "animated": true,
+        "frameCount": 8,
+        "framesPerSecond": 8,
+        "loop": true,
+        "directionCount": 8,
+        "directionNames": [
+          "south",
+          "south-west",
+          "west",
+          "north-west",
+          "north",
+          "north-east",
+          "east",
+          "south-east"
+        ],
+        "asymmetric": true,
+        "runtimeEquipmentSwaps": true,
+        "runtimeCostumeVariants": true,
+        "independentShadow": true,
+        "needsCollision": true,
+        "tileFootprint": { "width": 1, "height": 1 }
+      },
+      "outputProfileIds": ["godot-4.6.2-isometric-character"]
+    },
+    "role": "playable-character",
+    "gameplayProfile": "action-rpg",
+    "coverage": "core",
+    "fidelity": "standard",
+    "allowDerivedMirrors": false,
+    "variants": {
+      "costumeVariants": 1,
+      "equipmentVariants": 1,
+      "weaponVariants": 1,
+      "teamColourVariants": 1,
+      "damageVariants": 1
+    },
+    "output": {
+      "sheetStrategy": "per-clip-composite-grid",
+      "maximumSheetSize": 4096,
+      "includeAsepriteExport": true,
+      "includePerClipSheets": true,
+      "includeFamilyAtlas": true,
+      "includeGodotResources": true
+    }
+  },
+  "initialArtifactBindings": [
+    {
+      "role": "canonical-identity",
+      "artifactIds": [
+        "artifact_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "generate-south-direction-master",
+      "stage": "direction-masters",
+      "title": "Generate the south direction master",
+      "queue": "provider",
+      "kind": "art.candidate.generate",
+      "payloadTemplate": {
+        "schemaVersion": "1.0",
+        "operation": "generate",
+        "assetKind": "sprite-frame",
+        "continuityPhase": "direction-master",
+        "assetId": { "$plan": "/asset/assetId" },
+        "candidateFamilyId": "deckhand-direction-south",
+        "frameId": "direction-south-master",
+        "creativeIntent": "Author one south-facing direction master that locks identity, costume, proportions, palette, camera, lighting, feet and Y-sort registration.",
+        "negativeIntent": "Do not generate a sheet, extra character, background, text, UI, collision data or unrelated effect.",
+        "style": {
+          "styleName": "compiled art-direction contract",
+          "intent": "Follow the exact bound 2:1 isometric style and historical constraints."
+        },
+        "shot": {
+          "subject": "The approved deckhand only.",
+          "action": "Neutral contact pose.",
+          "direction": "south",
+          "separateAssets": [
+            "cast shadow",
+            "equipment variants",
+            "collision metadata"
+          ]
+        },
+        "target": {
+          "width": { "$plan": "/asset/dimensions/width" },
+          "height": { "$plan": "/asset/dimensions/height" },
+          "transparency": "required",
+          "outputFormat": "png"
+        },
+        "references": [
+          {
+            "artifactId": { "$artifact": "canonical-identity" },
+            "role": "canonical-identity",
+            "strength": 1,
+            "required": true
+          }
+        ],
+        "candidateCount": 4,
+        "selection": {
+          "allowFallback": false,
+          "requireSeed": false
+        }
+      },
+      "requiredCapabilities": [
+        "provider.generate",
+        "provider.reference-lock",
+        "provider.candidate-store",
+        "evidence.bundle"
+      ],
+      "requiredArtifactRoles": ["canonical-identity"],
+      "outputBindings": [
+        {
+          "role": "south-direction-master",
+          "source": "output-artifact-labels",
+          "labels": {
+            "artifactRole": "selected-art-master",
+            "approvalState": "selected",
+            "qualityState": "passed"
+          },
+          "cardinality": "one",
+          "required": true
+        }
+      ],
+      "maximumAttempts": 3,
+      "failurePolicy": {
+        "redriveClassifications": [
+          "transient",
+          "lease-expired",
+          "timeout"
+        ],
+        "maxRedrives": 2,
+        "reviewCodePrefixes": [
+          "PROVIDER_INCOMPATIBLE",
+          "PROVIDER_REFERENCE"
+        ],
+        "abortCodePrefixes": [
+          "SPRITE_SUPERVISOR_PLAN_HASH",
+          "ARTIFACT_CONTENT_CORRUPT"
+        ],
+        "reviewOnUnclassified": true
+      }
+    }
+  ],
+  "policy": {
+    "tickDelayMs": 5000,
+    "maximumTicks": 10000,
+    "maximumActiveChildren": 16,
+    "defaultMaximumRedrives": 2,
+    "defaultMaximumRepairCycles": 2,
+    "cancelChildrenOnAbort": true,
+    "reviewOnUnclassifiedFailure": true,
+    "requireAllPlanStagesCovered": false,
+    "requireFinalHumanApproval": true,
+    "requiredReleaseArtifactRoles": [
+      "south-direction-master"
+    ]
+  },
+  "metadata": {
+    "purpose": "Protocol example. A production workflow expands the remaining direction, clip, mastering, verification, repair, atlas and Godot tasks using the same contracts.",
+    "workerBoundary": "Provider access remains in the worker environment and is never stored in this file."
+  }
+}
