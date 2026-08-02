@@ -1,6 +1,9 @@
 name: Bootstrap exact full-validation repair
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - agent/fix-art-studio-full-validation-20260802
