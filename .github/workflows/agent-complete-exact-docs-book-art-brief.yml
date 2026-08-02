@@ -1,0 +1,403 @@
+name: Agent Complete Exact Docs Book Art Brief
+
+on:
+  push:
+    branches:
+      - agent/exact-docs-book-art-brief-20260803
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-complete-exact-docs-book-art-brief
+  cancel-in-progress: false
+
+jobs:
+  complete:
+    if: >-
+      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
+      github.ref == 'refs/heads/agent/exact-docs-book-art-brief-20260803'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact branch and clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
+          [[ "$(git merge-base origin/main HEAD)" == "c3712705ddcf16fe46395182de11d706f8d5c51d" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Apply exact receiver verification and seal every fixture
+        id: patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q 'export async function fingerprintBookArtBrief' packages/contracts/src/book-production-profile.ts; then
+            echo 'changed=false' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(path: Path, before: str, after: str, label: str) -> None:
+              text = path.read_text(encoding="utf-8")
+              count = text.count(before)
+              if count != 1:
+                  raise SystemExit(
+                      f"{label}: expected exactly one source block in {path}, found {count}"
+                  )
+              path.write_text(text.replace(before, after, 1), encoding="utf-8")
+
+          def add_fingerprint_import(path: Path) -> None:
+              text = path.read_text(encoding="utf-8")
+              if "  fingerprintBookArtBrief,\n" in text:
+                  return
+              anchor = "  compileBookArtProductionWorkOrder,\n"
+              if text.count(anchor) != 1:
+                  raise SystemExit(f"Expected one work-order import anchor in {path}")
+              path.write_text(
+                  text.replace(
+                      anchor,
+                      anchor + "  fingerprintBookArtBrief,\n",
+                      1,
+                  ),
+                  encoding="utf-8",
+              )
+
+          def seal_brief_function(path: Path) -> None:
+              add_fingerprint_import(path)
+              text = path.read_text(encoding="utf-8")
+              matches = list(re.finditer(r"(?m)^function brief(\([^\n]*\)) \{\n", text))
+              if len(matches) != 1:
+                  raise SystemExit(
+                      f"Expected one synchronous brief fixture in {path}, found {len(matches)}"
+                  )
+              match = matches[0]
+              text = (
+                  text[: match.start()]
+                  + "async function brief"
+                  + match.group(1)
+                  + " {\n"
+                  + text[match.end() :]
+              )
+              start = match.start()
+              return_index = text.find("  return {\n", start)
+              if return_index < 0:
+                  raise SystemExit(f"Expected brief return object in {path}")
+              text = (
+                  text[:return_index]
+                  + "  const value = {\n"
+                  + text[return_index + len("  return {\n") :]
+              )
+              placeholder = '    briefFingerprint: sha("e"),\n'
+              fingerprint_index = text.find(placeholder, start)
+              if fingerprint_index < 0:
+                  raise SystemExit(f"Expected placeholder brief fingerprint in {path}")
+              text = (
+                  text[:fingerprint_index]
+                  + '    briefFingerprint: "",\n'
+                  + text[fingerprint_index + len(placeholder) :]
+              )
+              tail = "    publicationPerformed: false,\n  };\n}\n"
+              tail_index = text.find(tail, start)
+              if tail_index < 0:
+                  raise SystemExit(f"Expected brief fixture tail in {path}")
+              sealed_tail = (
+                  "    publicationPerformed: false,\n"
+                  "  };\n"
+                  "  value.briefFingerprint = await fingerprintBookArtBrief(value);\n"
+                  "  return value;\n"
+                  "}\n"
+              )
+              text = text[:tail_index] + sealed_tail + text[tail_index + len(tail) :]
+              replacements = {
+                  "compileBookArtProductionWorkOrder(brief(":
+                      "compileBookArtProductionWorkOrder(await brief(",
+                  "const value = brief(": "const value = await brief(",
+                  "brief: brief(": "brief: await brief(",
+                  "structuredClone(brief(": "structuredClone(await brief(",
+              }
+              for before, after in replacements.items():
+                  text = text.replace(before, after)
+              unawaited = []
+              for number, line in enumerate(text.splitlines(), start=1):
+                  if (
+                      "brief(" in line
+                      and "function brief(" not in line
+                      and "await brief(" not in line
+                  ):
+                      unawaited.append(f"{number}: {line.strip()}")
+              if unawaited:
+                  raise SystemExit(
+                      f"Unawaited brief fixture calls remain in {path}:\n"
+                      + "\n".join(unawaited)
+                  )
+              path.write_text(text, encoding="utf-8")
+
+          profile = Path("packages/contracts/src/book-production-profile.ts")
+          marker = "export async function compileBookArtProductionWorkOrder(\n"
+          helper = '''export async function fingerprintBookArtBrief(\n  value: Omit<BookArtBriefV1, "briefFingerprint"> | BookArtBriefV1,\n): Promise<string> {\n  const { briefFingerprint: _discarded, ...unsigned } =\n    value as BookArtBriefV1;\n  return `sha256:${await sha256(canonicalJson(unsigned))}`;\n}\n\n'''
+          source = profile.read_text(encoding="utf-8")
+          if source.count(marker) != 1:
+              raise SystemExit("Expected one work-order compiler marker.")
+          profile.write_text(source.replace(marker, helper + marker, 1), encoding="utf-8")
+          replace_once(
+              profile,
+              '''  blockers.push(...validation.issues);\n  validateProfileFields(brief, blockers);\n''',
+              '''  blockers.push(...validation.issues);\n  if (validation.valid) {\n    const expectedBriefFingerprint = await fingerprintBookArtBrief(brief);\n    if (\n      normalizeSha(brief.briefFingerprint) !==\n      normalizeSha(expectedBriefFingerprint)\n    ) {\n      blockers.push(\n        "Book Art production brief fingerprint differs from its exact canonical contents.",\n      );\n    }\n  }\n  validateProfileFields(brief, blockers);\n''',
+              "receiver fingerprint verification",
+          )
+          replace_once(
+              profile,
+              '''    sourceBriefFingerprint: brief.briefFingerprint,\n    providerRequest,\n''',
+              '''    sourceBriefFingerprint: normalizeSha(brief.briefFingerprint)!,\n    providerRequest,\n''',
+              "normalized work-order brief fingerprint",
+          )
+          replace_once(
+              profile,
+              '''      artDirectionSha256: brief.manuscript.artDirectionSha256,\n      sourceBriefFingerprint: brief.briefFingerprint,\n      conceptTerritoryId: brief.conceptTerritoryId,\n''',
+              '''      artDirectionSha256: brief.manuscript.artDirectionSha256,\n      sourceBriefFingerprint: sourceSha,\n      conceptTerritoryId: brief.conceptTerritoryId,\n''',
+              "normalized provider brief fingerprint",
+          )
+
+          contracts_test = Path("packages/contracts/test/book-production-profile.test.mjs")
+          add_fingerprint_import(contracts_test)
+          replace_once(
+              contracts_test,
+              '''function brief(purpose = "front_cover_art") {\n''',
+              '''function unsignedBrief(purpose = "front_cover_art") {\n''',
+              "profile unsigned fixture",
+          )
+          replace_once(
+              contracts_test,
+              '''    briefFingerprint: sha("e"),\n''',
+              '''    briefFingerprint: "",\n''',
+              "profile placeholder fingerprint",
+          )
+          replace_once(
+              contracts_test,
+              '''}\nfunction legacyPlan() {\n''',
+              '''}\nasync function brief(purpose = "front_cover_art") {\n  const value = unsignedBrief(purpose);\n  value.briefFingerprint = await fingerprintBookArtBrief(value);\n  return value;\n}\nfunction legacyPlan() {\n''',
+              "profile sealed fixture",
+          )
+          source = contracts_test.read_text(encoding="utf-8")
+          source = source.replace(
+              "compileBookArtProductionWorkOrder(brief())",
+              "compileBookArtProductionWorkOrder(await brief())",
+          )
+          source = source.replace(
+              'compileBookArtProductionWorkOrder(brief("interior_full_page_illustration"))',
+              'compileBookArtProductionWorkOrder(await brief("interior_full_page_illustration"))',
+          )
+          source = source.replace(
+              'compileBookArtProductionWorkOrder(brief("ornament"))',
+              'compileBookArtProductionWorkOrder(await brief("ornament"))',
+          )
+          source = source.replace("const value = brief();", "const value = await brief();")
+          source = source.replace("brief: brief(),", "brief: await brief(),")
+          contracts_test.write_text(source, encoding="utf-8")
+          replace_once(
+              contracts_test,
+              '''  assert.equal(result.workOrder?.assetClass, "cover_background");\n''',
+              '''  assert.equal(result.workOrder?.assetClass, "cover_background");\n  assert.match(result.workOrder?.sourceBriefFingerprint ?? "", /^[a-f0-9]{64}$/);\n  assert.equal(\n    result.workOrder?.providerRequest.metadata.sourceBriefFingerprint,\n    result.workOrder?.sourceBriefFingerprint,\n  );\n''',
+              "normalized fingerprint assertion",
+          )
+          insert_before = 'test("blocks Docs Suite-owned typography and publication fields at the Art Studio boundary", async () => {\n'
+          stale_test = '''test("rejects a structurally valid Book Art brief whose exact fingerprint is stale", async () => {\n  const value = await brief();\n  value.creativeThesis += " Tampered after sealing.";\n  const result = await compileBookArtProductionWorkOrder(value);\n  assert.equal(result.status, "blocked");\n  assert.ok(\n    result.blockers.some((item) =>\n      item.includes("fingerprint differs from its exact canonical contents"),\n    ),\n  );\n  assert.equal(result.workOrder, undefined);\n});\n\n'''
+          source = contracts_test.read_text(encoding="utf-8")
+          if source.count(insert_before) != 1:
+              raise SystemExit("Expected contracts test insertion marker once.")
+          contracts_test.write_text(
+              source.replace(insert_before, stale_test + insert_before, 1),
+              encoding="utf-8",
+          )
+
+          legacy_test = Path("packages/contracts/test/book-production-legacy-illustration-plan.test.mjs")
+          add_fingerprint_import(legacy_test)
+          replace_once(
+              legacy_test,
+              '''function brief(purpose = "interior_full_page_illustration") {\n  return {\n''',
+              '''async function brief(purpose = "interior_full_page_illustration") {\n  const value = {\n''',
+              "legacy illustration async fixture",
+          )
+          replace_once(
+              legacy_test,
+              '''    briefFingerprint: sha("e"),\n''',
+              '''    briefFingerprint: "",\n''',
+              "legacy illustration placeholder fingerprint",
+          )
+          replace_once(
+              legacy_test,
+              '''  };\n}\n\nasync function styleAuthority''',
+              '''  };\n  value.briefFingerprint = await fingerprintBookArtBrief(value);\n  return value;\n}\n\nasync function styleAuthority''',
+              "legacy illustration sealed fixture",
+          )
+          replace_once(
+              legacy_test,
+              '''  return { brief: brief(purpose), candidateId, plan: await seal(without, "planDigestSha256") };\n''',
+              '''  return { brief: await brief(purpose), candidateId, plan: await seal(without, "planDigestSha256") };\n''',
+              "legacy illustration awaited fixture",
+          )
+
+          runtime_test = Path("packages/book-art-runtime/test/runtime.test.mjs")
+          add_fingerprint_import(runtime_test)
+          replace_once(
+              runtime_test,
+              '''function brief() {\n  return {\n''',
+              '''async function brief() {\n  const value = {\n''',
+              "runtime async fixture",
+          )
+          replace_once(
+              runtime_test,
+              '''      approvedEvidenceIds: ["evidence-1"],\n''',
+              '''      approvedEvidenceIds: [\n        "docs-main-966e240f03a0912a0ff0c0c890bf0fe0e9a6dd77",\n        "docs-writing-art-link-evidence",\n        "docs-website-mutation-receipt-evidence",\n      ],\n''',
+              "runtime Docs evidence",
+          )
+          replace_once(
+              runtime_test,
+              '''    briefFingerprint: sha("e"),\n''',
+              '''    briefFingerprint: "",\n''',
+              "runtime placeholder fingerprint",
+          )
+          replace_once(
+              runtime_test,
+              '''    publicationPerformed: false,\n  };\n}\n\nasync function shadowInput() {\n  const compiled = await compileBookArtProductionWorkOrder(brief());\n''',
+              '''    publicationPerformed: false,\n  };\n  value.briefFingerprint = await fingerprintBookArtBrief(value);\n  return value;\n}\n\nasync function shadowInput() {\n  const compiled = await compileBookArtProductionWorkOrder(await brief());\n''',
+              "runtime sealed fixture",
+          )
+          marker = 'test("shared Book Art runtime compiles the exact no-fallback one-attempt contract", async () => {\n'
+          attack = '''test("rejects a tampered final Docs Suite brief before work-order or provider-job compilation", async () => {\n  const value = await brief();\n  value.primarySubject += " altered after Docs release";\n  const compiled = await compileBookArtProductionWorkOrder(value);\n  assert.equal(compiled.status, "blocked");\n  assert.ok(\n    compiled.blockers.some((item) =>\n      item.includes("fingerprint differs from its exact canonical contents"),\n    ),\n  );\n  assert.equal(compiled.workOrder, undefined);\n});\n\n'''
+          source = runtime_test.read_text(encoding="utf-8")
+          if source.count(marker) != 1:
+              raise SystemExit("Expected runtime test insertion marker once.")
+          runtime_test.write_text(source.replace(marker, attack + marker, 1), encoding="utf-8")
+
+          fixture_paths = [
+              Path("packages/book-art-runtime/test/parity.test.mjs"),
+              Path("apps/worker/test/book-art-provider-jobs.test.mjs"),
+              Path("apps/worker/test/book-art-provider-inspection.test.mjs"),
+              Path("apps/worker/test/book-art-provider-parity.test.mjs"),
+              Path("apps/api/test/book-art-api.test.mjs"),
+              Path("apps/api/test/book-art-api-inspection.test.mjs"),
+              Path("apps/api/test/book-art-api-parity.test.mjs"),
+              Path("apps/cli/test/book-art-cli.test.mjs"),
+              Path("apps/cli/test/book-art-cli-parity.test.mjs"),
+          ]
+          for fixture_path in fixture_paths:
+              seal_brief_function(fixture_path)
+
+          inline_fixture = Path("apps/cli/test/book-art-cli-inspection.test.mjs")
+          add_fingerprint_import(inline_fixture)
+          replace_once(
+              inline_fixture,
+              '''    briefFingerprint: sha("e"),\n''',
+              '''    briefFingerprint: "",\n''',
+              "CLI inspection placeholder fingerprint",
+          )
+          replace_once(
+              inline_fixture,
+              '''  const compiled = await compileBookArtProductionWorkOrder(brief);\n''',
+              '''  brief.briefFingerprint = await fingerprintBookArtBrief(brief);\n  const compiled = await compileBookArtProductionWorkOrder(brief);\n''',
+              "CLI inspection sealed fixture",
+          )
+
+          leftovers = []
+          for root in (Path("packages"), Path("apps")):
+              for path in root.rglob("*.test.mjs"):
+                  source = path.read_text(encoding="utf-8")
+                  if (
+                      "compileBookArtProductionWorkOrder" in source
+                      and 'briefFingerprint: sha("e")' in source
+                  ):
+                      leftovers.append(str(path))
+          if leftovers:
+              raise SystemExit(
+                  "Unsealed Book Art work-order fixtures remain:\n" + "\n".join(leftovers)
+              )
+          PY
+          git diff --check
+          echo 'changed=true' >> "${GITHUB_OUTPUT}"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build complete Art Studio domain
+        run: pnpm run build:domain
+
+      - name: Run exact Book Art regressions
+        run: |
+          pnpm --filter @evavo/art-contracts test
+          pnpm --filter @evavo/art-book-runtime test
+          pnpm --filter @evavo/art-studio-worker test
+          pnpm --filter @evavo/art-studio-api test
+          pnpm --filter @evavo/art-studio-cli test
+          pnpm --filter @evavo/art-studio-mcp test
+
+      - name: Run complete repository validation
+        run: pnpm check
+
+      - name: Commit and push validated source
+        if: steps.patch.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --check
+          mapfile -t changed < <(git diff --name-only)
+          [[ "${#changed[@]}" -eq 14 ]]
+          git add \
+            packages/contracts/src/book-production-profile.ts \
+            packages/contracts/test/book-production-profile.test.mjs \
+            packages/contracts/test/book-production-legacy-illustration-plan.test.mjs \
+            packages/book-art-runtime/test/runtime.test.mjs \
+            packages/book-art-runtime/test/parity.test.mjs \
+            apps/worker/test/book-art-provider-jobs.test.mjs \
+            apps/worker/test/book-art-provider-inspection.test.mjs \
+            apps/worker/test/book-art-provider-parity.test.mjs \
+            apps/api/test/book-art-api.test.mjs \
+            apps/api/test/book-art-api-inspection.test.mjs \
+            apps/api/test/book-art-api-parity.test.mjs \
+            apps/cli/test/book-art-cli.test.mjs \
+            apps/cli/test/book-art-cli-inspection.test.mjs \
+            apps/cli/test/book-art-cli-parity.test.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(book-art): verify exact Docs briefs before runtime'
+          git push origin HEAD:refs/heads/agent/exact-docs-book-art-brief-20260803
+
+      - name: Verify clean generated state
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --check
