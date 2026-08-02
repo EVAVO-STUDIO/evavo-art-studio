@@ -62,6 +62,7 @@ test("mastering worker converts a chroma candidate into an unapproved QA-backed 
     inputArtifacts: [candidate.artifactId],
     requiredCapabilities: [
       "media.chroma-extract",
+      "media.raster",
       "quality.sprite-frame",
       "evidence.bundle",
     ],
@@ -77,6 +78,7 @@ test("mastering worker converts a chroma candidate into an unapproved QA-backed 
       queues: ["media"],
       capabilities: [
         "media.chroma-extract",
+        "media.raster",
         "quality.sprite-frame",
         "evidence.bundle",
       ],
@@ -144,6 +146,7 @@ test("mastering worker rejects candidates that are not declared as immutable inp
     inputArtifacts: [],
     requiredCapabilities: [
       "media.chroma-extract",
+      "media.raster",
       "quality.sprite-frame",
       "evidence.bundle",
     ],
@@ -157,6 +160,7 @@ test("mastering worker rejects candidates that are not declared as immutable inp
       queues: ["media"],
       capabilities: [
         "media.chroma-extract",
+        "media.raster",
         "quality.sprite-frame",
         "evidence.bundle",
       ],
