@@ -1,12 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { sealBookArtBrief } from "./src/book-studio-art-brief-exact.ts";
 import {
-  sealBookArtBrief,
-} from "./src/book-studio-art-brief-exact.ts";
+  fingerprintBookCanonicalMutationPlan,
+} from "./src/book-studio-canonical-mutation-plan-validate.ts";
 import {
-  sealWebsiteBookManuscriptCompareAndSwapReceipt,
-} from "./src/book-studio-website-manuscript-cas.ts";
+  fingerprintWebsiteCanonicalMutationReceipt,
+} from "./src/book-studio-canonical-mutation-receipt-parse.ts";
+import {
+  importWebsiteCanonicalMutationReceipt,
+} from "./src/book-studio-canonical-mutation-receipt-import.ts";
+import {
+  canonicalJson,
+  sha256Text,
+} from "./src/book-studio-canonical-mutation-shared.ts";
+import {
+  fingerprintBookCanonicalSnapshot,
+} from "./src/book-studio-canonical-mutation-snapshot.ts";
 import {
   compileBookWritingArtLink,
 } from "./src/book-studio-writing-art-link.ts";
@@ -16,56 +27,99 @@ import {
 
 const sha = (character) => `sha256:${character.repeat(64)}`;
 const WRITING_MAIN = "c776a9e7f856815dbb92ffec08426cd12f176bea";
-const ART_RUNTIME_MAIN = "2f804d8ec4bd3067d72f114a4d4ed8242c3fa585";
+const ART_MAIN = "2e16bcf338174681ef5e4d2a5abdb4ebd9b4e057";
 const unique = (values) => [...new Set(values)];
 
-async function fixture() {
+async function snapshot({
+  snapshotId,
+  revisionNumber,
+  manuscriptRevisionId,
+  parentRevisionId,
+  manuscriptObjectId,
+  storageVersion,
+  manuscriptSha256,
+  textSha256,
+}) {
+  const orderedUnits = [
+    { unitId: "unit:001", ordinal: 1, textSha256 },
+  ];
+  const unsigned = {
+    snapshotId,
+    projectId: "project:wren",
+    programmeId: "programme:wren",
+    volumeId: "volume:wren-1",
+    revisionNumber,
+    manuscriptRevisionId,
+    ...(parentRevisionId === undefined ? {} : { parentRevisionId }),
+    manuscriptObjectId,
+    manuscriptStorageVersion: storageVersion,
+    manuscriptByteLength: 2500 + revisionNumber,
+    manuscriptSha256,
+    orderedUnits,
+    unitSequenceSha256: await sha256Text(canonicalJson(orderedUnits)),
+    sourceCoverageFingerprint: sha("9"),
+  };
+  return {
+    ...unsigned,
+    stateFingerprint: await fingerprintBookCanonicalSnapshot(unsigned),
+  };
+}
+
+async function buildScenario() {
   const packet = {
     projectId: "project:wren",
-    volumeId: "volume:wren:1",
-    manuscriptRevisionId: "revision:wren:7",
+    programmeId: "programme:wren",
+    volumeId: "volume:wren-1",
+    manuscriptRevisionId: "revision:wren-1:7",
     manuscriptSha256: sha("a"),
-    contextEvidenceIds: ["evidence:packet:1"],
+    contextEvidenceIds: ["evidence:context:1"],
   };
-  const request = {
+  const writingRequest = {
     manuscriptRevisionId: packet.manuscriptRevisionId,
     requestFingerprint: sha("1"),
-    requiredEvidenceIds: ["evidence:request:1"],
+    requiredEvidenceIds: ["evidence:writing:1"],
   };
-  const response = {
-    candidateObjectId: "candidate:wren:1",
+  const writingResponse = {
+    candidateObjectId: "candidate:wren:001",
     candidateSha256: sha("b"),
-    candidateByteLength: 2400,
-    voiceEvidenceIds: ["evidence:voice:1"],
-    factEvidenceIds: ["evidence:fact:1"],
-    qualityReceiptIds: ["evidence:quality:1"],
-    completedAt: "2026-08-02T00:20:00.000Z",
+    candidateByteLength: 2500,
+    voiceEvidenceIds: ["voice-evidence:1"],
+    factEvidenceIds: ["fact-evidence:1"],
+    qualityReceiptIds: ["quality-receipt:1"],
+    completedAt: "2026-08-02T00:10:00.000Z",
     responseFingerprint: sha("2"),
   };
-  const result = {
-    candidateObjectId: response.candidateObjectId,
-    candidateTextSha256: response.candidateSha256,
-    candidateByteLength: response.candidateByteLength,
-    completedAt: "2026-08-02T00:25:00.000Z",
+  const authoringResult = {
+    candidateObjectId: writingResponse.candidateObjectId,
+    candidateTextSha256: writingResponse.candidateSha256,
+    candidateByteLength: writingResponse.candidateByteLength,
+    completedAt: "2026-08-02T00:20:00.000Z",
     producedEvidenceIds: [
       "evidence:result:1",
-      ...response.voiceEvidenceIds,
-      ...response.factEvidenceIds,
-      ...response.qualityReceiptIds,
+      ...writingResponse.voiceEvidenceIds,
+      ...writingResponse.factEvidenceIds,
+      ...writingResponse.qualityReceiptIds,
     ],
     manuscriptSha256After: sha("c"),
+    changedUnits: [
+      {
+        unitId: "unit:001",
+        beforeSha256: sha("d"),
+        afterSha256: sha("e"),
+      },
+    ],
     resultFingerprint: sha("3"),
   };
   const admissionEvidence = {
     outputKind: "evavo_docs_book_authoring_admission_evidence",
     schemaVersion: 1,
     packetFingerprint: sha("4"),
-    resultFingerprint: result.resultFingerprint,
+    resultFingerprint: authoringResult.resultFingerprint,
     phraseOverlapReceiptFingerprint: sha("5"),
     continuityReceiptFingerprint: sha("6"),
     factualIntegrityReceiptFingerprint: sha("7"),
     antiGenericityReceiptFingerprint: sha("8"),
-    independentReviewReceiptFingerprint: sha("9"),
+    independentReviewReceiptFingerprint: sha("f"),
     phraseOverlapPassed: true,
     continuityPassed: true,
     factualIntegrityPassed: true,
@@ -74,32 +128,92 @@ async function fixture() {
     humanReviewRequired: true,
     humanReviewRecorded: true,
     beforeManuscriptSha256: packet.manuscriptSha256,
-    proposedAfterManuscriptSha256: result.manuscriptSha256After,
+    proposedAfterManuscriptSha256: authoringResult.manuscriptSha256After,
     evidenceIds: ["evidence:admission:1"],
-    evidenceFingerprint: sha("d"),
+    evidenceFingerprint: sha("0"),
   };
-  const proposedRevision = {
-    revisionId: "revision:wren:8",
+
+  const currentSnapshot = await snapshot({
+    snapshotId: "snapshot:wren:7",
+    revisionNumber: 7,
+    manuscriptRevisionId: packet.manuscriptRevisionId,
+    parentRevisionId: "revision:wren-1:6",
+    manuscriptObjectId: "object/manuscript/wren/7",
+    storageVersion: "v7",
+    manuscriptSha256: packet.manuscriptSha256,
+    textSha256: authoringResult.changedUnits[0].beforeSha256,
+  });
+  const proposedSnapshot = await snapshot({
+    snapshotId: "snapshot:wren:8",
+    revisionNumber: 8,
+    manuscriptRevisionId: "revision:wren-1:8",
     parentRevisionId: packet.manuscriptRevisionId,
+    manuscriptObjectId: "object/manuscript/wren/8",
+    storageVersion: "v8",
+    manuscriptSha256: authoringResult.manuscriptSha256After,
+    textSha256: authoringResult.changedUnits[0].afterSha256,
+  });
+  const unsignedPlan = {
+    outputKind: "evavo_docs_book_canonical_mutation_plan",
+    schemaVersion: 1,
+    contract: "evavo_docs_book_canonical_mutation_v1",
+    status: "ready_for_website_compare_and_swap",
+    mutationId: "mutation:wren:8",
+    idempotencyKey: "idempotency:wren:8",
+    mutationKind: "text_only",
     projectId: packet.projectId,
+    programmeId: packet.programmeId,
     volumeId: packet.volumeId,
-    manuscriptObjectId: "object:manuscript:wren:8",
-    manuscriptStorageVersion: "version:8",
-    manuscriptByteLength: 5000,
-    manuscriptSha256: result.manuscriptSha256After,
-    unitSequenceSha256: sha("e"),
-    orderedUnitIds: ["unit:wren:1", "unit:wren:2"],
-    createdAt: "2026-08-02T00:35:00.000Z",
-    createdBy: "docs-suite-shadow",
-    canonical: false,
+    currentSnapshot,
+    proposedSnapshot,
+    changedUnits: [
+      {
+        unitId: "unit:001",
+        beforeSha256: authoringResult.changedUnits[0].beforeSha256,
+        afterSha256: authoringResult.changedUnits[0].afterSha256,
+        changeKind: "modified",
+        actionIds: ["revise-manuscript-text"],
+        evidenceIds: ["evidence:change:1"],
+      },
+    ],
+    authoringAdmissionFingerprint: admissionEvidence.evidenceFingerprint,
+    authoringAdmissionObjectId: "object/admission/authoring/wren/8",
+    reviewCraftAdmissionFingerprint: sha("1"),
+    reviewCraftAdmissionObjectId: "object/admission/review/wren/8",
+    executionTaskId: "task:wren:8",
+    executionTaskFingerprint: sha("2"),
+    executionReceiptId: "receipt:wren:8",
+    executionReceiptFingerprint: sha("3"),
+    structuralChangeEvidenceIds: [],
+    expectedWebsiteStateRevision: currentSnapshot.revisionNumber,
+    expectedWebsiteStateFingerprint: currentSnapshot.stateFingerprint,
+    requestedAt: "2026-08-02T00:30:00.000Z",
+    requestedBy: "docs-suite-shadow",
+    evidenceIds: ["evidence:canonical-plan:1"],
+    rollbackSnapshotObjectId: currentSnapshot.manuscriptObjectId,
+    rollbackSnapshotSha256: currentSnapshot.manuscriptSha256,
+    blockers: [],
+    warnings: [],
+    websiteCompatibilityWriterRequired: true,
+    docsSuiteCanonicalWriterEnabled: false,
+    canonicalAdmissionAllowed: false,
+    canonicalManuscriptMutationPerformed: false,
+    dualAuthoritativeWritesAllowed: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
   };
-  const requiredEvidence = unique([
+  const canonicalMutationPlan = {
+    ...unsignedPlan,
+    planFingerprint: await fingerprintBookCanonicalMutationPlan(unsignedPlan),
+  };
+
+  const linkEvidence = unique([
     ...packet.contextEvidenceIds,
-    ...request.requiredEvidenceIds,
-    ...result.producedEvidenceIds,
-    ...response.voiceEvidenceIds,
-    ...response.factEvidenceIds,
-    ...response.qualityReceiptIds,
+    ...writingRequest.requiredEvidenceIds,
+    ...authoringResult.producedEvidenceIds,
+    ...writingResponse.voiceEvidenceIds,
+    ...writingResponse.factEvidenceIds,
+    ...writingResponse.qualityReceiptIds,
     ...admissionEvidence.evidenceIds,
     admissionEvidence.evidenceFingerprint,
     admissionEvidence.phraseOverlapReceiptFingerprint,
@@ -107,8 +221,14 @@ async function fixture() {
     admissionEvidence.factualIntegrityReceiptFingerprint,
     admissionEvidence.antiGenericityReceiptFingerprint,
     admissionEvidence.independentReviewReceiptFingerprint,
+    canonicalMutationPlan.planFingerprint,
+    canonicalMutationPlan.authoringAdmissionFingerprint,
+    canonicalMutationPlan.reviewCraftAdmissionFingerprint,
+    canonicalMutationPlan.executionTaskFingerprint,
+    canonicalMutationPlan.executionReceiptFingerprint,
+    ...canonicalMutationPlan.evidenceIds,
   ]);
-  const draftBrief = await sealBookArtBrief({
+  const draftArtBrief = await sealBookArtBrief({
     outputKind: "evavo_book_art_brief",
     schemaVersion: 1,
     contract: "evavo_book_art_handoff_v1",
@@ -117,42 +237,35 @@ async function fixture() {
       projectId: packet.projectId,
       bookId: packet.volumeId,
       editionId: "edition:wren:paperback",
-      requestId: "art-request:wren:1",
+      requestId: "art-request:wren:cover:1",
     },
     purpose: "front_cover_art",
     manuscript: {
-      manuscriptRevisionId: proposedRevision.revisionId,
-      manuscriptSha256: proposedRevision.manuscriptSha256,
-      extractedTextSha256: sha("f"),
-      visualCanonSha256: sha("0"),
-      artDirectionSha256: sha("1"),
-      approvedEvidenceIds: requiredEvidence,
+      manuscriptRevisionId: proposedSnapshot.manuscriptRevisionId,
+      manuscriptSha256: proposedSnapshot.manuscriptSha256,
+      extractedTextSha256: sha("4"),
+      visualCanonSha256: sha("5"),
+      artDirectionSha256: sha("6"),
+      approvedEvidenceIds: linkEvidence,
     },
-    conceptTerritoryId: "territory:wren:1",
+    conceptTerritoryId: "territory:wren:cover:1",
     conceptTerritoryLabel: "Weathered coastal memory",
     creativeThesis:
-      "A restrained maritime image binds the revised manuscript to a durable, text-free cover field.",
+      "A restrained maritime image binds the revised manuscript to a durable text-free cover field.",
     primarySubject: "A weathered coastal signal tower",
-    supportingSubjects: ["low winter sea", "distant working vessel"],
-    compositionRequirements: [
-      "Keep the principal silhouette in the lower-left third.",
-      "Reserve calm negative space for editable title typography.",
-    ],
-    mustShow: ["historically credible maritime materials"],
-    mustNotShow: ["generated title text", "modern navigation equipment"],
-    spoilerRestrictions: ["Do not reveal the final harbour confrontation."],
-    continuityRequirements: [
-      "Match the approved tower and vessel descriptions in the visual canon.",
-    ],
-    historicalAndMaterialRequirements: [
-      "Use period-correct timber, iron and masonry construction.",
-    ],
+    supportingSubjects: ["low winter sea"],
+    compositionRequirements: ["Reserve quiet upper space for editable typography."],
+    mustShow: ["period-correct working harbour materials"],
+    mustNotShow: ["generated title text"],
+    spoilerRestrictions: ["Do not reveal the final confrontation."],
+    continuityRequirements: ["Match the approved visual canon."],
+    historicalAndMaterialRequirements: ["Use period-correct timber and iron."],
     negativeSpaceRequirements: ["Keep the upper third visually quiet."],
     output: {
       widthPx: 1800,
       heightPx: 2700,
       minimumPpi: 300,
-      allowedMimeTypes: ["image/png", "image/tiff"],
+      allowedMimeTypes: ["image/png"],
       colourIntent: "cmyk_conversion_required",
       alpha: "forbidden",
       textPolicy: "text_free",
@@ -160,28 +273,28 @@ async function fixture() {
       digitalUse: true,
     },
     rightsEvidenceIds: ["rights:wren:commercial:1"],
-    createdAt: "2026-08-02T00:45:00.000Z",
+    createdAt: "2026-08-02T00:35:00.000Z",
     providerCandidateMayBeFinal: false,
     publicationPerformed: false,
   });
-  const linkInput = {
+  const link = {
     outputKind: "evavo_docs_book_writing_art_link_input",
     schemaVersion: 1,
     contract: "evavo_docs_book_writing_art_link_v1",
-    linkId: "link:wren:1",
+    linkId: "writing-art-link:wren:1",
+    canonicalMutationPlan,
     authoringPacket: packet,
-    writingRequest: request,
-    writingResponse: response,
-    authoringResult: result,
+    writingRequest,
+    writingResponse,
+    authoringResult,
     admissionEvidence,
-    proposedManuscriptRevision: proposedRevision,
-    proposedExtractedTextSha256: draftBrief.manuscript.extractedTextSha256,
-    visualCanonSha256: draftBrief.manuscript.visualCanonSha256,
-    artDirectionSha256: draftBrief.manuscript.artDirectionSha256,
-    artBrief: draftBrief,
+    proposedExtractedTextSha256: draftArtBrief.manuscript.extractedTextSha256,
+    visualCanonSha256: draftArtBrief.manuscript.visualCanonSha256,
+    artDirectionSha256: draftArtBrief.manuscript.artDirectionSha256,
+    draftArtBrief,
     writingStudioMainCommit: WRITING_MAIN,
-    artStudioMainCommit: ART_RUNTIME_MAIN,
-    linkedAt: "2026-08-02T00:46:00.000Z",
+    artStudioMainCommit: ART_MAIN,
+    linkedAt: "2026-08-02T00:36:00.000Z",
     linkedBy: "docs-suite-shadow",
     crossRepositoryRuntimeSourceImportAllowed: false,
     writingStudioMayCallArtStudioDirectly: false,
@@ -190,87 +303,123 @@ async function fixture() {
     runtimeCutoverApproved: false,
     publicationPerformed: false,
   };
-  const linkReceipt = await compileBookWritingArtLink(linkInput);
+  const linkReceipt = await compileBookWritingArtLink(link);
   assert.equal(
     linkReceipt.status,
     "ready_for_website_compare_and_swap",
     linkReceipt.blockers.join("\n"),
   );
-  const casReceipt = await sealWebsiteBookManuscriptCompareAndSwapReceipt({
-    outputKind: "evavo_website_book_manuscript_compare_and_swap_receipt",
+
+  const unsignedWebsiteReceipt = {
+    outputKind: "evavo_website_book_canonical_mutation_receipt",
     schemaVersion: 1,
-    contract: "evavo_website_book_manuscript_cas_v1",
+    mutationId: canonicalMutationPlan.mutationId,
+    idempotencyKey: canonicalMutationPlan.idempotencyKey,
+    planFingerprint: canonicalMutationPlan.planFingerprint,
+    transactionId: "transaction:wren:8",
     sourceRepository: "EVAVO-STUDIO/Website",
-    writerMode: "website_compatibility",
-    operationId: "website-cas:wren:8",
-    projectId: packet.projectId,
-    volumeId: packet.volumeId,
-    priorRevisionId: packet.manuscriptRevisionId,
-    nextRevisionId: proposedRevision.revisionId,
-    beforeManuscriptSha256: packet.manuscriptSha256,
-    afterManuscriptSha256: proposedRevision.manuscriptSha256,
-    compareAndSwapRequestFingerprint: linkReceipt.linkFingerprint,
-    status: "committed",
-    evidenceIds: ["evidence:website-cas:1"],
-    committedAt: "2026-08-02T00:50:00.000Z",
-    committedBy: "website-compatibility-writer",
+    sourceCommit: "a".repeat(40),
+    sourcePath: "tools/evavo-doc-studio/storage/book-studio/mutations/wren-8.json",
+    sourceBlobSha1: "b".repeat(40),
+    expectedStateRevision: canonicalMutationPlan.expectedWebsiteStateRevision,
+    observedStateRevisionBefore:
+      canonicalMutationPlan.expectedWebsiteStateRevision,
+    observedStateRevisionAfter:
+      canonicalMutationPlan.expectedWebsiteStateRevision + 1,
+    expectedStateFingerprint:
+      canonicalMutationPlan.expectedWebsiteStateFingerprint,
+    observedStateFingerprintBefore:
+      canonicalMutationPlan.expectedWebsiteStateFingerprint,
+    observedStateFingerprintAfter: proposedSnapshot.stateFingerprint,
+    manuscriptRevisionIdBefore: currentSnapshot.manuscriptRevisionId,
+    manuscriptRevisionIdAfter: proposedSnapshot.manuscriptRevisionId,
+    manuscriptSha256Before: currentSnapshot.manuscriptSha256,
+    manuscriptSha256After: proposedSnapshot.manuscriptSha256,
+    compareAndSwapSucceeded: true,
+    idempotentReplay: false,
+    persistedAt: "2026-08-02T00:40:00.000Z",
+    persistedBy: "website-compatibility-writer",
+    rollbackSnapshotObjectId: currentSnapshot.manuscriptObjectId,
+    rollbackSnapshotSha256: currentSnapshot.manuscriptSha256,
     canonicalManuscriptMutationPerformed: true,
-    docsSuiteCanonicalWriterEnabled: false,
-    runtimeCutoverApproved: false,
     publicationPerformed: false,
+  };
+  const websiteMutationReceipt = {
+    ...unsignedWebsiteReceipt,
+    receiptFingerprint: await fingerprintWebsiteCanonicalMutationReceipt(
+      unsignedWebsiteReceipt,
+    ),
+  };
+  const websiteImport = await importWebsiteCanonicalMutationReceipt({
+    outputKind: "evavo_docs_website_canonical_mutation_receipt_import_input",
+    schemaVersion: 1,
+    plan: canonicalMutationPlan,
+    receipt: websiteMutationReceipt,
+    importedAt: "2026-08-02T00:42:00.000Z",
+    importedBy: "docs-suite-shadow",
   });
-  const { briefFingerprint: _discarded, ...draftUnsigned } = draftBrief;
-  const finalBrief = await sealBookArtBrief({
+  assert.equal(
+    websiteImport.status,
+    "ready_for_shadow_observation",
+    websiteImport.blockers.join("\n"),
+  );
+
+  const { briefFingerprint: _discarded, ...draftUnsigned } = draftArtBrief;
+  const finalArtBrief = await sealBookArtBrief({
     ...draftUnsigned,
     manuscript: {
-      ...draftBrief.manuscript,
+      ...draftArtBrief.manuscript,
       approvedEvidenceIds: unique([
-        ...draftBrief.manuscript.approvedEvidenceIds,
-        ...casReceipt.evidenceIds,
-        casReceipt.receiptFingerprint,
+        ...draftArtBrief.manuscript.approvedEvidenceIds,
+        linkReceipt.linkFingerprint,
+        draftArtBrief.briefFingerprint,
+        canonicalMutationPlan.planFingerprint,
+        ...canonicalMutationPlan.evidenceIds,
+        websiteImport.importFingerprint,
+        websiteMutationReceipt.receiptFingerprint,
       ]),
     },
-    createdAt: "2026-08-02T00:55:00.000Z",
+    createdAt: "2026-08-02T00:45:00.000Z",
   });
-  return {
-    packet,
-    request,
-    response,
-    result,
-    admissionEvidence,
-    proposedRevision,
-    draftBrief,
-    finalBrief,
-    linkInput,
-    linkReceipt,
-    casReceipt,
-  };
-}
-
-function releaseInput(fixture, overrides = {}) {
-  return {
+  const release = {
     outputKind: "evavo_docs_book_writing_art_release_input",
     schemaVersion: 1,
     contract: "evavo_docs_book_writing_art_release_v1",
-    link: fixture.linkInput,
-    websiteCompareAndSwapReceipt: fixture.casReceipt,
-    artBrief: fixture.finalBrief,
-    releasedAt: "2026-08-02T01:00:00.000Z",
+    link,
+    websiteMutationReceipt,
+    receiptImportedAt: "2026-08-02T00:42:00.000Z",
+    receiptImportedBy: "docs-suite-shadow",
+    finalArtBrief,
+    releasedAt: "2026-08-02T00:50:00.000Z",
     releasedBy: "docs-suite-shadow",
     writingStudioMayCallArtStudioDirectly: false,
     docsSuiteCanonicalWriterEnabled: false,
     runtimeCutoverApproved: false,
     publicationPerformed: false,
-    ...overrides,
+  };
+  return {
+    packet,
+    writingResponse,
+    authoringResult,
+    canonicalMutationPlan,
+    draftArtBrief,
+    link,
+    linkReceipt,
+    websiteMutationReceipt,
+    websiteImport,
+    finalArtBrief,
+    release,
   };
 }
 
-test("mirrored exact production chain reaches only Art shadow readiness", async () => {
-  const value = await fixture();
-  const release = await compileBookWritingArtRelease(releaseInput(value));
+test("canonical moved-Writing chain reaches only Art shadow readiness", async () => {
+  const value = await buildScenario();
+  const release = await compileBookWritingArtRelease(value.release);
   assert.equal(release.status, "ready_for_art_shadow", release.blockers.join("\n"));
-  assert.equal(release.websiteCompareAndSwapVerified, true);
-  assert.equal(release.exactArtBriefVerified, true);
+  assert.equal(release.writingStudioMainCommit, WRITING_MAIN);
+  assert.equal(release.artStudioMainCommit, ART_MAIN);
+  assert.equal(release.websiteCanonicalMutationVerified, true);
+  assert.equal(release.exactFinalArtBriefVerified, true);
   assert.equal(release.artStudioCandidateMayBeFinal, false);
   assert.equal(release.selectionRequired, true);
   assert.equal(release.promotionRequired, true);
@@ -279,143 +428,122 @@ test("mirrored exact production chain reaches only Art shadow readiness", async 
   assert.equal(release.publicationPerformed, false);
 });
 
-test("mirrored exact source blocks stale brief fingerprints and hidden fields", async () => {
-  const value = await fixture();
-  const stale = {
-    ...value.linkInput,
-    artBrief: {
-      ...value.draftBrief,
-      primarySubject: "Tampered subject without resealing",
+test("canonical link blocks Writing candidate and commit drift", async () => {
+  const value = await buildScenario();
+  for (const attack of [
+    {
+      ...value.link,
+      writingResponse: {
+        ...value.writingResponse,
+        candidateSha256: sha("f"),
+      },
     },
+    { ...value.link, writingStudioMainCommit: "f".repeat(40) },
+    { ...value.link, artStudioMainCommit: "e".repeat(40) },
+    { ...value.link, writingStudioMayCallArtStudioDirectly: true },
+  ]) {
+    const result = await compileBookWritingArtLink(attack);
+    assert.equal(result.status, "blocked");
+  }
+});
+
+test("canonical link blocks stale and hidden Book Art brief state", async () => {
+  const value = await buildScenario();
+  const stale = await compileBookWritingArtLink({
+    ...value.link,
+    draftArtBrief: {
+      ...value.draftArtBrief,
+      creativeThesis: `${value.draftArtBrief.creativeThesis} Tampered.`,
+    },
+  });
+  assert.equal(stale.status, "blocked");
+  assert.ok(stale.blockers.some((entry) => entry.includes("fingerprint differs")));
+
+  const hidden = await compileBookWritingArtLink({
+    ...value.link,
+    draftArtBrief: {
+      ...value.draftArtBrief,
+      adapterPolicy: { allowedAdapterIds: ["unreviewed"] },
+    },
+  });
+  assert.equal(hidden.status, "blocked");
+  assert.ok(hidden.blockers.some((entry) => entry.includes("unsupported fields")));
+});
+
+test("canonical release blocks failed and substituted Website receipts", async () => {
+  const value = await buildScenario();
+  const failed = {
+    ...value.websiteMutationReceipt,
+    compareAndSwapSucceeded: false,
   };
-  assert.equal((await compileBookWritingArtLink(stale)).status, "blocked");
-
-  await assert.rejects(
-    () =>
-      sealBookArtBrief({
-        ...value.draftBrief,
-        briefFingerprint: undefined,
-        providerCredential: "must-not-enter-brief",
-      }),
-    /unsupported fields: providerCredential/,
+  failed.receiptFingerprint = await fingerprintWebsiteCanonicalMutationReceipt(
+    failed,
   );
-});
-
-test("mirrored exact source blocks incompatible commits and direct Writing-to-Art authority", async () => {
-  const value = await fixture();
-  assert.equal(
-    (
-      await compileBookWritingArtLink({
-        ...value.linkInput,
-        artStudioMainCommit: "f".repeat(40),
-      })
-    ).status,
-    "blocked",
-  );
-  assert.equal(
-    (
-      await compileBookWritingArtLink({
-        ...value.linkInput,
-        writingStudioMayCallArtStudioDirectly: true,
-      })
-    ).status,
-    "blocked",
-  );
-});
-
-test("mirrored exact source binds Website CAS to the exact link", async () => {
-  const value = await fixture();
-  const { receiptFingerprint: _discarded, ...unsigned } = value.casReceipt;
-  const unbound = await sealWebsiteBookManuscriptCompareAndSwapReceipt({
-    ...unsigned,
-    compareAndSwapRequestFingerprint: sha("f"),
+  const failedResult = await compileBookWritingArtRelease({
+    ...value.release,
+    websiteMutationReceipt: failed,
   });
-  const release = await compileBookWritingArtRelease(
-    releaseInput(value, { websiteCompareAndSwapReceipt: unbound }),
-  );
-  assert.equal(release.status, "blocked");
+  assert.equal(failedResult.status, "blocked");
   assert.ok(
-    release.blockers.some((entry) => entry.includes("request fingerprint differs")),
+    failedResult.blockers.some((entry) =>
+      entry.includes("does not prove a successful"),
+    ),
+  );
+
+  const substituted = {
+    ...value.websiteMutationReceipt,
+    planFingerprint: sha("f"),
+  };
+  substituted.receiptFingerprint =
+    await fingerprintWebsiteCanonicalMutationReceipt(substituted);
+  const substitutedResult = await compileBookWritingArtRelease({
+    ...value.release,
+    websiteMutationReceipt: substituted,
+  });
+  assert.equal(substitutedResult.status, "blocked");
+  assert.ok(
+    substitutedResult.blockers.some((entry) =>
+      entry.includes("does not belong to the exact canonical mutation plan"),
+    ),
   );
 });
 
-test("mirrored exact source blocks missing CAS evidence and creative-intent drift", async () => {
-  const value = await fixture();
-  const missing = new Set([
-    ...value.casReceipt.evidenceIds,
-    value.casReceipt.receiptFingerprint,
-  ]);
-  const { briefFingerprint: _finalFingerprint, ...finalUnsigned } = value.finalBrief;
-  const missingBrief = await sealBookArtBrief({
-    ...finalUnsigned,
+test("canonical release requires post-mutation evidence and unchanged intent", async () => {
+  const value = await buildScenario();
+  const { briefFingerprint: _fingerprint, ...unsigned } = value.finalArtBrief;
+  const missingEvidence = await sealBookArtBrief({
+    ...unsigned,
     manuscript: {
-      ...value.finalBrief.manuscript,
-      approvedEvidenceIds: value.finalBrief.manuscript.approvedEvidenceIds.filter(
-        (entry) => !missing.has(entry),
-      ),
+      ...value.finalArtBrief.manuscript,
+      approvedEvidenceIds:
+        value.finalArtBrief.manuscript.approvedEvidenceIds.filter(
+          (entry) => entry !== value.websiteImport.importFingerprint,
+        ),
     },
   });
-  const missingRelease = await compileBookWritingArtRelease(
-    releaseInput(value, { artBrief: missingBrief }),
-  );
-  assert.equal(missingRelease.status, "blocked");
-
-  const changedBrief = await sealBookArtBrief({
-    ...finalUnsigned,
-    primarySubject: "A different unrelated subject",
+  const missingResult = await compileBookWritingArtRelease({
+    ...value.release,
+    finalArtBrief: missingEvidence,
   });
-  const changedRelease = await compileBookWritingArtRelease(
-    releaseInput(value, { artBrief: changedBrief }),
-  );
-  assert.equal(changedRelease.status, "blocked");
+  assert.equal(missingResult.status, "blocked");
   assert.ok(
-    changedRelease.blockers.some((entry) => entry.includes("creative intent differs")),
+    missingResult.blockers.some((entry) =>
+      entry.includes("missing approved release evidence"),
+    ),
   );
-});
 
-test("mirrored exact source blocks impossible revision, brief and release chronology", async () => {
-  const value = await fixture();
-  const earlyRevision = await compileBookWritingArtLink({
-    ...value.linkInput,
-    proposedManuscriptRevision: {
-      ...value.proposedRevision,
-      createdAt: "2026-08-02T00:19:00.000Z",
-    },
-  });
-  assert.equal(earlyRevision.status, "blocked");
-
-  const { briefFingerprint: _fingerprint, ...unsigned } = value.finalBrief;
-  const earlyBrief = await sealBookArtBrief({
+  const changedIntent = await sealBookArtBrief({
     ...unsigned,
-    createdAt: "2026-08-02T00:49:00.000Z",
+    primarySubject: "An unrelated modern city skyline",
   });
-  assert.equal(
-    (
-      await compileBookWritingArtRelease(
-        releaseInput(value, { artBrief: earlyBrief }),
-      )
-    ).status,
-    "blocked",
-  );
-  assert.equal(
-    (
-      await compileBookWritingArtRelease(
-        releaseInput(value, { releasedAt: "2026-08-02T00:54:00.000Z" }),
-      )
-    ).status,
-    "blocked",
-  );
-});
-
-test("mirrored CAS sealing rejects unknown fields and authority escalation", async () => {
-  const value = await fixture();
-  const { receiptFingerprint: _discarded, ...unsigned } = value.casReceipt;
-  await assert.rejects(
-    () =>
-      sealWebsiteBookManuscriptCompareAndSwapReceipt({
-        ...unsigned,
-        providerCredential: "must-not-enter-receipt",
-      }),
-    /unsupported fields: providerCredential/,
+  const changedResult = await compileBookWritingArtRelease({
+    ...value.release,
+    finalArtBrief: changedIntent,
+  });
+  assert.equal(changedResult.status, "blocked");
+  assert.ok(
+    changedResult.blockers.some((entry) =>
+      entry.includes("creative intent differs"),
+    ),
   );
 });
