@@ -1,0 +1,112 @@
+name: Diagnose exact patched Art Studio worker concisely
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact production candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/fix-art-studio-full-validation-20260802
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact candidate head
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "234e912bb8223f132d2d79205ee968e4fd8bdaa6" ]]
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Apply the exact reviewed patch script
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show origin/automation/fix-residual-worker-234e912-20260802:.github/scripts/apply-residual-worker-fixes.py > /tmp/apply-residual-worker-fixes.py
+          python /tmp/apply-residual-worker-fixes.py
+          git diff --check
+
+      - name: Build worker and domain dependencies
+        run: pnpm run build:domain && pnpm --filter @evavo/art-studio-worker build
+
+      - name: Run worker suite and emit only actionable failures
+        shell: bash
+        run: |
+          set +e
+          (
+            cd apps/worker
+            node --test test/*.test.mjs
+          ) > /tmp/worker-test.log 2>&1
+          status=$?
+          set -e
+
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("/tmp/worker-test.log")
+          lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+          print(f"worker-test-lines={len(lines)}")
+          print("--- concise failing TAP blocks ---")
+          windows: list[tuple[int, int]] = []
+          for index, line in enumerate(lines):
+              if "not ok " in line:
+                  windows.append((max(0, index - 3), min(len(lines), index + 30)))
+          if not windows:
+              for index, line in enumerate(lines):
+                  if any(token in line for token in (
+                      "AssertionError",
+                      "ERR_",
+                      "SPRITE_",
+                      "MASTERING_",
+                      "SyntaxError",
+                      "TypeError",
+                  )):
+                      windows.append((max(0, index - 5), min(len(lines), index + 20)))
+          merged: list[tuple[int, int]] = []
+          for start, end in sorted(windows):
+              if merged and start <= merged[-1][1]:
+                  merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+              else:
+                  merged.append((start, end))
+          if merged:
+              for start, end in merged:
+                  print(f"--- lines {start + 1}-{end} ---")
+                  for number in range(start, end):
+                      print(f"{number + 1}: {lines[number]}")
+          else:
+              print("no failing TAP block detected")
+          print("--- test summary tail ---")
+          for number in range(max(0, len(lines) - 45), len(lines)):
+              print(f"{number + 1}: {lines[number]}")
+          PY
+
+          exit "$status"
+
+      - name: Restore source and prove no diagnostic mutation
+        if: always()
+        shell: bash
+        run: |
+          git reset --hard HEAD
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
