@@ -36,14 +36,71 @@ jobs:
         with:
           node-version: 22.14.0
           package-manager-cache: false
-      - name: Prove exact Docs Suite Git blobs
+      - name: Prove exact original Docs Suite Git blobs
         shell: bash
         run: |
           set -euo pipefail
           test "$(git hash-object .migration-validation/docs-story/src/book-studio-story-contracts.ts)" = "28f3505bab596dfe02400c3b57e684e95774b464"
           test "$(git hash-object .migration-validation/docs-story/src/book-studio-legacy-story-import.ts)" = "214e8cfc32fe9d9c914bf660f285302d55821da7"
           test "$(git hash-object .migration-validation/docs-story/test/book-studio-story-continuity.test.mjs)" = "20f28d23864c6d22c60e4805783cac4fde14999f"
-      - name: Compile exact Docs Suite source with strict settings
+      - name: Apply the exact strict optional-property correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.migration-validation/docs-story/src/book-studio-story-contracts.ts')
+          source = path.read_text()
+          old_location = '''function parseLocation(value: unknown, index: number, blockers: string[]): BookWorldLocationV1 {
+            const source = record(value, `Location ${index + 1}`, blockers);
+            return {
+              locationId: id(source.locationId, `Location ${index + 1} locationId`, blockers),
+              name: text(source.name, `Location ${index + 1} name`, blockers, 500),
+              ...(optionalId(source.parentLocationId, `Location ${index + 1} parentLocationId`, blockers) ? { parentLocationId: optionalId(source.parentLocationId, `Location ${index + 1} parentLocationId`, blockers) } : {}),
+              ...(optionalId(source.historicalPlaceId, `Location ${index + 1} historicalPlaceId`, blockers) ? { historicalPlaceId: optionalId(source.historicalPlaceId, `Location ${index + 1} historicalPlaceId`, blockers) } : {}),
+          '''
+          new_location = '''function parseLocation(value: unknown, index: number, blockers: string[]): BookWorldLocationV1 {
+            const source = record(value, `Location ${index + 1}`, blockers);
+            const parentLocationId = optionalId(source.parentLocationId, `Location ${index + 1} parentLocationId`, blockers);
+            const historicalPlaceId = optionalId(source.historicalPlaceId, `Location ${index + 1} historicalPlaceId`, blockers);
+            return {
+              locationId: id(source.locationId, `Location ${index + 1} locationId`, blockers),
+              name: text(source.name, `Location ${index + 1} name`, blockers, 500),
+              ...(parentLocationId === undefined ? {} : { parentLocationId }),
+              ...(historicalPlaceId === undefined ? {} : { historicalPlaceId }),
+          '''
+          old_knowledge = '''function parseKnowledge(value: unknown, index: number, blockers: string[]): BookWorldKnowledgeV1 {
+            const source = record(value, `Knowledge ${index + 1}`, blockers);
+            return {
+              knowledgeId: id(source.knowledgeId, `Knowledge ${index + 1} knowledgeId`, blockers),
+              actorId: id(source.actorId, `Knowledge ${index + 1} actorId`, blockers),
+              subjectId: id(source.subjectId, `Knowledge ${index + 1} subjectId`, blockers),
+              state: enumValue(source.state, KNOWLEDGE_STATES, `Knowledge ${index + 1} state`, blockers, "does_not_know"),
+              acquiredAtSequence: integer(source.acquiredAtSequence, `Knowledge ${index + 1} acquiredAtSequence`, blockers, 0, Number.MAX_SAFE_INTEGER),
+              ...(optionalId(source.sourceActorId, `Knowledge ${index + 1} sourceActorId`, blockers) ? { sourceActorId: optionalId(source.sourceActorId, `Knowledge ${index + 1} sourceActorId`, blockers) } : {}),
+              ...(optionalId(source.sourceEventId, `Knowledge ${index + 1} sourceEventId`, blockers) ? { sourceEventId: optionalId(source.sourceEventId, `Knowledge ${index + 1} sourceEventId`, blockers) } : {}),
+          '''
+          new_knowledge = '''function parseKnowledge(value: unknown, index: number, blockers: string[]): BookWorldKnowledgeV1 {
+            const source = record(value, `Knowledge ${index + 1}`, blockers);
+            const sourceActorId = optionalId(source.sourceActorId, `Knowledge ${index + 1} sourceActorId`, blockers);
+            const sourceEventId = optionalId(source.sourceEventId, `Knowledge ${index + 1} sourceEventId`, blockers);
+            return {
+              knowledgeId: id(source.knowledgeId, `Knowledge ${index + 1} knowledgeId`, blockers),
+              actorId: id(source.actorId, `Knowledge ${index + 1} actorId`, blockers),
+              subjectId: id(source.subjectId, `Knowledge ${index + 1} subjectId`, blockers),
+              state: enumValue(source.state, KNOWLEDGE_STATES, `Knowledge ${index + 1} state`, blockers, "does_not_know"),
+              acquiredAtSequence: integer(source.acquiredAtSequence, `Knowledge ${index + 1} acquiredAtSequence`, blockers, 0, Number.MAX_SAFE_INTEGER),
+              ...(sourceActorId === undefined ? {} : { sourceActorId }),
+              ...(sourceEventId === undefined ? {} : { sourceEventId }),
+          '''
+          if old_location not in source or old_knowledge not in source:
+              raise SystemExit('STRICT_OPTIONAL_PATCH_CONTEXT_MISMATCH')
+          source = source.replace(old_location, new_location, 1).replace(old_knowledge, new_knowledge, 1)
+          path.write_text(source)
+          PY
+          git diff --check
+          echo "CORRECTED_STORY_BLOB=$(git hash-object .migration-validation/docs-story/src/book-studio-story-contracts.ts)" >> "$GITHUB_ENV"
+      - name: Compile corrected Docs Suite source with strict settings
         run: |
           npm exec --yes --package=typescript@5.9.3 -- tsc \
             --noEmit \
@@ -64,3 +121,11 @@ jobs:
           set -euo pipefail
           cd .migration-validation/docs-story
           npm exec --yes --package=tsx@4.20.3 -- tsx --test test/book-studio-story-continuity.test.mjs
+      - name: Retain corrected exact source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: corrected-docs-story-source-${{ github.sha }}
+          path: .migration-validation/docs-story/src/book-studio-story-contracts.ts
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 9
