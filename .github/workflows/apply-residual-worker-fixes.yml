@@ -52,6 +52,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
+          import re
           from pathlib import Path
 
           def replace_once(path: Path, old: str, new: str, label: str) -> None:
@@ -60,6 +61,18 @@ jobs:
               if count != 1:
                   raise SystemExit(f"{label}: expected exactly one source block, found {count}")
               path.write_text(source.replace(old, new), encoding="utf-8")
+
+          def replace_regex_once(
+              path: Path,
+              pattern: str,
+              replacement: str,
+              label: str,
+          ) -> None:
+              source = path.read_text(encoding="utf-8")
+              updated, count = re.subn(pattern, replacement, source, count=1)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one source block, found {count}")
+              path.write_text(updated, encoding="utf-8")
 
           validation = Path("packages/sprite-supervisor/src/validation-core.ts")
           replace_once(
@@ -173,14 +186,9 @@ jobs:
           )
 
           mirroring = Path("apps/worker/test/deterministic-mirroring.test.mjs")
-          replace_once(
+          replace_regex_once(
               mirroring,
-              '''  const hidden = (1 * WIDTH + 1) * 4;
-              data[hidden] = 17;
-              data[hidden + 1] = 43;
-              data[hidden + 2] = 91;
-              data[hidden + 3] = 0;
-          ''',
+              r'''  const hidden = \(1 \* WIDTH \+ 1\) \* 4;\n  data\[hidden\] = 17;\n  data\[hidden \+ 1\] = 43;\n  data\[hidden \+ 2\] = 91;\n  data\[hidden \+ 3\] = 0;\n''',
               "",
               "clean family release fixture",
           )
