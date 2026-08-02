@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",
+    "@evavo/art-book-runtime": "workspace:*",
     "@evavo/art-contracts": "workspace:*",
     "@evavo/art-core": "workspace:*",
     "@evavo/art-direction": "workspace:*",
