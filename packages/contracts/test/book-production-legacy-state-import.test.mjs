@@ -152,3 +152,23 @@ test("blocks a legacy blocked quality authority", () => {
   assert.ok(result.blockers.some((entry) => entry.includes("not eligible")));
   assert.ok(result.blockers.some((entry) => entry.includes("Generated lettering")));
 });
+
+test("blocks rights-blocked legacy artwork even when the old status says approved", () => {
+  const value = input();
+  value.qualityAuthority.candidate.provenance.rightsStatus = "blocked";
+  const result = importLegacyWebsiteBookArtState(value);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.receipt, undefined);
+  assert.ok(result.blockers.some((entry) => entry.includes("rights status is blocked")));
+});
+
+test("blocks internally inconsistent legacy approval records", () => {
+  const value = input();
+  value.qualityAuthority.humanReview.decision = "revise";
+  value.qualityAuthority.requiredRevisions = ["Repair the remaining hand anatomy defect."];
+  const result = importLegacyWebsiteBookArtState(value);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.receipt, undefined);
+  assert.ok(result.blockers.some((entry) => entry.includes("unresolved required revision")));
+  assert.ok(result.blockers.some((entry) => entry.includes("does not match human review decision")));
+});
