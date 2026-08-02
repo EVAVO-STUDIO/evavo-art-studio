@@ -1,0 +1,97 @@
+name: Validate exact Book Art inspection main 2e16bcf
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-exact-book-art-inspection-main-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact validation branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: validation/exact-main-book-art-inspection-2e16bcf-20260802
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact current-main ancestry and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_main='2e16bcf338174681ef5e4d2a5abdb4ebd9b4e057'
+          workflow='.github/workflows/validate-exact-main-book-art-inspection.yml'
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse origin/main)" == "$expected_main" ]]
+          [[ "$(git rev-parse HEAD^)" == "$expected_main" ]]
+          mapfile -t parent_changes < <(git diff --name-only HEAD^ HEAD)
+          [[ "${#parent_changes[@]}" -eq 1 ]]
+          [[ "${parent_changes[0]}" == "$workflow" ]]
+          mapfile -t main_changes < <(git diff --name-only origin/main HEAD)
+          [[ "${#main_changes[@]}" -eq 1 ]]
+          [[ "${main_changes[0]}" == "$workflow" ]]
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Verify Book Art runtime and inspection authority boundaries
+        run: |
+          node scripts/check-book-art-provider-runtime.mjs
+          node scripts/check-book-art-provider-inspection.mjs
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete repository validation
+        run: pnpm check
+
+      - name: Verify clean tracked source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Record exact-main validation summary
+        if: success()
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Exact Book Art inspection release validation
+
+          - production main: `2e16bcf338174681ef5e4d2a5abdb4ebd9b4e057`
+          - direct workflow-only validation child: proven
+          - Book Art runtime authority checker: passed
+          - Book Art inspection authority checker: passed
+          - complete `pnpm check`: passed
+          - clean tracked source: passed
+          - provider request performed by validation: no
+          - artifact promotion or publication performed: no
+          EOF
