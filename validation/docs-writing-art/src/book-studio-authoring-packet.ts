@@ -1,5 +1,6 @@
 export interface StubAuthoringPacket {
   projectId: string;
+  programmeId: string;
   volumeId: string;
   manuscriptRevisionId: string;
   manuscriptSha256: string;
@@ -18,6 +19,7 @@ export async function validateAndNormalizeBookAuthoringPacket(
     !packet ||
     typeof packet !== "object" ||
     !packet.projectId ||
+    !packet.programmeId ||
     !packet.volumeId ||
     !packet.manuscriptRevisionId ||
     !packet.manuscriptSha256 ||
