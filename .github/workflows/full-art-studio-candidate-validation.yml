@@ -1,0 +1,178 @@
+name: Disposable exact full Art Studio validation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: disposable-exact-full-art-studio-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BASE_MAIN_SHA: 5d13b9c24d21c5277ea111c99c6e6aa4bc064055
+      VALIDATED_CANDIDATE_SHA: 6658be8f44d1a0567d13186b879675c90d660644
+      VALIDATION_BRANCH: validation/full-art-studio-15ef51a-20260802
+      CANDIDATE_BRANCH: agent/fix-art-studio-full-validation-20260802
+      VALIDATION_WORKFLOW_PATH: .github/workflows/full-art-studio-candidate-validation.yml
+    steps:
+      - name: Check out exact validation head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ env.VALIDATION_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact current main, candidate and workflow-only validation scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/${CANDIDATE_BRANCH}:refs/remotes/origin/${CANDIDATE_BRANCH}
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${BASE_MAIN_SHA}" ]] || { echo "Current main changed before validation" >&2; exit 1; }
+          [[ "$(git rev-parse refs/remotes/origin/${CANDIDATE_BRANCH})" == "${VALIDATED_CANDIDATE_SHA}" ]] || { echo "Candidate changed before validation" >&2; exit 1; }
+          [[ "$(git rev-parse HEAD^)" == "${VALIDATED_CANDIDATE_SHA}" ]] || { echo "Validation workflow is not directly based on the candidate" >&2; exit 1; }
+          git merge-base --is-ancestor "${BASE_MAIN_SHA}" "${VALIDATED_CANDIDATE_SHA}"
+          cat > /tmp/expected-candidate-files <<'FILES'
+          .github/workflows/ci.yml
+          apps/mcp/src/art-direction-tools.ts
+          apps/mcp/src/sprite-plan-tools.ts
+          apps/mcp/src/sprite-supervisor-tools.ts
+          apps/worker/src/adaptive-finalizer-guarded-handlers.ts
+          apps/worker/src/adaptive-sprite-family-handlers.ts
+          packages/audio-delivery-optimizer/test/audio.test.mjs
+          packages/sprite-supervisor/src/automatic-compiler.ts
+          packages/sprite-supervisor/src/automatic-finalization-compiler-core.ts
+          packages/sprite-supervisor/src/automatic-finalization-compiler.ts
+          packages/sprite-supervisor/src/automatic-finalization-validation-core.ts
+          packages/sprite-supervisor/src/automatic-finalization-validation.ts
+          packages/sprite-supervisor/src/automatic-mirror-compiler.ts
+          packages/sprite-supervisor/src/automatic-protocol.ts
+          packages/sprite-supervisor/src/mirrored-finalization-compiler.ts
+          packages/sprite-supervisor/src/validation-core.ts
+          packages/sprite-supervisor/src/validation.ts
+          FILES
+          sort -o /tmp/expected-candidate-files /tmp/expected-candidate-files
+          git diff --name-only "${BASE_MAIN_SHA}".."${VALIDATED_CANDIDATE_SHA}" | sort > /tmp/actual-candidate-files
+          diff -u /tmp/expected-candidate-files /tmp/actual-candidate-files
+          mapfile -t workflow_changed < <(git diff --name-only "${VALIDATED_CANDIDATE_SHA}"..HEAD)
+          [[ "${#workflow_changed[@]}" -eq 1 ]] || { printf 'Unexpected validation files:\n%s\n' "${workflow_changed[*]}" >&2; exit 1; }
+          [[ "${workflow_changed[0]}" == "${VALIDATION_WORKFLOW_PATH}" ]] || { printf 'Unexpected validation file: %s\n' "${workflow_changed[0]}" >&2; exit 1; }
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Install and identify audio media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          FFMPEG_PATH="$(command -v ffmpeg)"
+          FFPROBE_PATH="$(command -v ffprobe)"
+          test -x "${FFMPEG_PATH}"
+          test -x "${FFPROBE_PATH}"
+          FFMPEG_VERSION="$(${FFMPEG_PATH} -version | head -n 1)"
+          FFPROBE_VERSION="$(${FFPROBE_PATH} -version | head -n 1)"
+          FFMPEG_SHA256="$(sha256sum "${FFMPEG_PATH}" | awk '{print $1}')"
+          FFPROBE_SHA256="$(sha256sum "${FFPROBE_PATH}" | awk '{print $1}')"
+          echo "FFMPEG_BIN=${FFMPEG_PATH}" >> "${GITHUB_ENV}"
+          echo "FFPROBE_BIN=${FFPROBE_PATH}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_FFMPEG_VERSION=${FFMPEG_VERSION}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_FFPROBE_VERSION=${FFPROBE_VERSION}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_FFMPEG_SHA256=${FFMPEG_SHA256}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_FFPROBE_SHA256=${FFPROBE_SHA256}" >> "${GITHUB_ENV}"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Verify exact repository toolchain
+        run: node scripts/check-repository-toolchain.mjs
+
+      - name: Run adversarial toolchain fixtures
+        run: node scripts/test-repository-toolchain.mjs
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Remove generated lockfile and verify clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Re-prove exact unchanged main and candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/${CANDIDATE_BRANCH}:refs/remotes/origin/${CANDIDATE_BRANCH}
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${BASE_MAIN_SHA}" ]] || { echo "Main changed before validation receipt" >&2; exit 1; }
+          [[ "$(git rev-parse refs/remotes/origin/${CANDIDATE_BRANCH})" == "${VALIDATED_CANDIDATE_SHA}" ]] || { echo "Candidate changed before validation receipt" >&2; exit 1; }
+
+      - name: Write bounded validation receipt
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const receipt = {
+            schemaVersion: "1.0",
+            repository: "EVAVO-STUDIO/evavo-art-studio",
+            baseMainSha: process.env.BASE_MAIN_SHA,
+            candidateSha: process.env.VALIDATED_CANDIDATE_SHA,
+            candidateStillExact: true,
+            currentMainAtReceipt: true,
+            node: "22.14.0",
+            pnpm: "10.13.1",
+            ffmpeg: {
+              version: process.env.VALIDATION_FFMPEG_VERSION,
+              sha256: process.env.VALIDATION_FFMPEG_SHA256,
+            },
+            ffprobe: {
+              version: process.env.VALIDATION_FFPROBE_VERSION,
+              sha256: process.env.VALIDATION_FFPROBE_SHA256,
+            },
+            lockfilePolicy: "review-first",
+            installedWithoutCommittedLockfile: true,
+            validation: "passed",
+            liveProviderRequest: false,
+            artifactPromotion: false,
+            namedReferenceMutation: false,
+            packagePublication: false,
+            deployment: "disabled",
+          };
+          const target = path.join(process.env.RUNNER_TEMP, "full-art-studio-candidate-validation.json");
+          fs.writeFileSync(target, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+          NODE
+
+      - name: Upload bounded validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: full-art-studio-candidate-validation-${{ env.VALIDATED_CANDIDATE_SHA }}
+          path: ${{ runner.temp }}/full-art-studio-candidate-validation.json
+          if-no-files-found: warn
+          retention-days: 14
