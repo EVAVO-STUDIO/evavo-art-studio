@@ -20,6 +20,7 @@ on:
       - "docs/book-studio-production-handoff.md"
       - "docs/book-art-immutable-promotion-receipts.md"
       - "scripts/check-book-studio-production-handoff.mjs"
+      - "scripts/check-book-illustration-plan-parity.mjs"
   pull_request:
     branches: [main]
     paths:
@@ -39,6 +40,7 @@ on:
       - "docs/book-studio-production-handoff.md"
       - "docs/book-art-immutable-promotion-receipts.md"
       - "scripts/check-book-studio-production-handoff.mjs"
+      - "scripts/check-book-illustration-plan-parity.mjs"
   workflow_dispatch:
 
 permissions:
@@ -65,6 +67,8 @@ jobs:
           package-manager-cache: false
       - name: Verify migration authority
         run: node scripts/check-book-studio-production-handoff.mjs
+      - name: Verify Book Illustration parity boundary
+        run: node scripts/check-book-illustration-plan-parity.mjs
       - name: Compile dependency-light Book Art contracts
         run: |
           rm -rf packages/contracts/dist
