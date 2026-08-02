@@ -1,0 +1,75 @@
+name: Finalize Book Art parity from branch-local trigger
+
+on:
+  pull_request:
+    branches:
+      - agent/book-art-shadow-parity-20260803
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-book-art-parity-branch
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - name: Check out exact parity candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/book-art-shadow-parity-20260803
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact PR base candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${EXPECTED_BASE_SHA}" ]]
+
+      - name: Apply and remove bounded integration helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/finalize-book-art-parity.py
+          rm -f \
+            .github/scripts/finalize-book-art-parity.py \
+            .github/workflows/finalize-book-art-parity-on-branch.yml
+          git diff --check
+          node scripts/check-book-art-provider-runtime.mjs
+          node scripts/check-book-art-provider-inspection.mjs
+          node scripts/check-book-art-provider-parity.mjs
+
+      - name: Verify exact source scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git diff --name-only)
+          [[ "${#changed[@]}" -eq 7 ]]
+          for path in \
+            .github/scripts/finalize-book-art-parity.py \
+            .github/workflows/book-art-provider-runtime.yml \
+            .github/workflows/finalize-book-art-parity-on-branch.yml \
+            apps/api/openapi.book-art-provider.yaml \
+            apps/api/test/book-art-openapi-contract.test.mjs \
+            apps/cli/src/index.ts \
+            docs/book-art-provider-runtime.md
+          do
+            printf '%s\n' "${changed[@]}" | grep -Fx "${path}"
+          done
+          git diff --check
+
+      - name: Commit and push exact integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO validation automation"
+          git config user.email "174633320+EVAVO-STUDIO@users.noreply.github.com"
+          git add -A
+          git commit -m "docs(book-art): complete shadow parity integration"
+          git push origin HEAD:agent/book-art-shadow-parity-20260803
