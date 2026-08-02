@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
   title: EVAVO Art Studio Book Art Provider Runtime API
-  version: 0.2.0
+  version: 0.3.0
   description: >-
-    Shadow-only Book Art provider job compilation, durable submission and
-    immutable inspection. The Art Studio host owns the adapter allow-list.
+    Shadow-only Book Art provider job compilation, durable submission,
+    immutable inspection and structural Website parity. The Art Studio host owns the adapter allow-list.
     Compilation, submission and inspection do not themselves call an image
     provider, create candidate artifacts, select artwork, promote a master,
     bind artwork into a book, approve runtime cutover or publish an edition.
@@ -163,6 +163,10 @@ components:
         - submitPerformsProviderCall
         - inspectPerformsProviderCall
         - inspectionWritesArtifacts
+        - parityPerformsProviderCall
+        - parityWritesArtifacts
+        - visualSimilarityEvaluated
+        - cutoverEligible
         - candidateApprovalState
         - candidateStorageClass
         - selectionPerformed
@@ -182,6 +186,10 @@ components:
         submitPerformsProviderCall: { const: false }
         inspectPerformsProviderCall: { const: false }
         inspectionWritesArtifacts: { const: false }
+        parityPerformsProviderCall: { const: false }
+        parityWritesArtifacts: { const: false }
+        visualSimilarityEvaluated: { const: false }
+        cutoverEligible: { const: false }
         candidateApprovalState: { const: unapproved }
         candidateStorageClass: { const: intermediate }
         selectionPerformed: { const: false }
