@@ -43,6 +43,40 @@ publicationPerformed: false
 
 `translateLegacyWebsiteBookArtGenerationPlan()` validates one exact ready Website cover-generation task against the canonical Book Art brief. It retains the old plan, input, scene, art-direction and prompt digests for shadow comparison, but does not retain or trust the raw legacy provider prompt as the new authority. Translation is shadow-only and performs no provider call, artifact write, selection, promotion, cutover or publication.
 
+## Legacy Book Illustration plan parity
+
+`translateLegacyWebsiteBookIllustrationGenerationPlan()` validates one exact ready Website Book Illustration task against the canonical Art Studio work order. It verifies:
+
+- deterministic plan and input fingerprints;
+- approved style-authority identity and exact digest;
+- ready page-authority identity and exact digest;
+- exact style-to-page binding;
+- current art direction;
+- manuscript and visual-manuscript authority digests;
+- page role versus canonical illustration, diagram, map or ornament purpose;
+- live-text pages retaining at least one protected text zone;
+- exact candidate identity, next-task state, prompt digest and idempotency key;
+- transparent ink-layer requirements for ornaments;
+- absence of retained hard errors, unresolved revisions or human decisions.
+
+The translator retains the old style, page, layout, prompt, input and plan evidence only as small identities, counts and SHA-256 digests. It deliberately does not carry legacy page rectangles, trim, bleed, gutters, margins, text blocks, captions, chapter titles, running heads, folios or other publication layout into Art Studio. Those remain Docs Suite authority. The raw Website prompt is also not trusted as the new Art Studio authority.
+
+Translation remains shadow-only:
+
+```text
+rawLegacyPromptTrustedAsAuthority: false
+legacyLayoutTrustedAsArtAuthority: false
+layoutGeometryRetained: false
+authoritativeWritesPerformed: false
+providerCandidateMayBeFinal: false
+promotionRequired: true
+bookUseBindingRequired: true
+artifactBytesRead: false
+artifactBytesRewritten: false
+runtimeCutoverApproved: false
+publicationPerformed: false
+```
+
 ## Outputs owned by Art Studio
 
 A `BookArtArtifactReceiptV1` represents one immutable candidate or approved artifact. Approval requires:
@@ -91,4 +125,4 @@ Large image files use immutable artifact references or bounded binary upload. Th
 
 ## Migration posture
 
-Website remains the active compatibility runtime. The production profile makes Art Studio capable of compiling the Art-owned generation boundary for cover and illustration work, but it does not switch the active Website provider path. Provider execution wiring, exact shadow parity, immutable storage registration and controlled candidate-lifecycle cutover remain separately gated. No production cutover, source deletion or publication is approved by this contract.
+Website remains the active compatibility runtime. The production profile and exact cover/illustration shadow translators make Art Studio capable of compiling the Art-owned generation boundary without absorbing Book Design authority. Provider execution wiring, immutable storage registration, production shadow calls and controlled candidate-lifecycle cutover remain separately gated. No production cutover, source deletion or publication is approved by this contract.
