@@ -13,6 +13,13 @@ import {
 
 import { registerSpritePlanTools } from "./sprite-plan-tools.js";
 
+const ART_DIRECTION_COMPILE_JOB_KINDS = [
+  "art.direction.compile",
+  "art-direction.compile",
+  "style.preset.resolve",
+  "output-profile.compile",
+] as const;
+
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
 });
@@ -109,6 +116,7 @@ export function registerArtDirectionTools(server: McpServer): void {
           schemaVersion: "1.0",
           compiledContract: compileArtDirectionContract(request),
           compiledJob: compileArtDirectionJob(request),
+          compileJobKinds: ART_DIRECTION_COMPILE_JOB_KINDS,
           executionBoundary:
             "Compile-only: no artifact reads, provider execution, media generation, worker execution, approval or named-reference mutation.",
         });
