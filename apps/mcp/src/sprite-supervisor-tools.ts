@@ -74,11 +74,7 @@ export function registerSpriteSupervisorTools(server: McpServer): void {
         "Describe governed background selection, fake-transparency rejection, exact-size delivery mastering, optional EVAVO 3D Studio reference binding and family release evidence.",
       inputSchema: z.object({}),
     },
-    async () =>
-      textResult({
-        protocol: automaticSpriteFinalizationProtocolSummary(),
-        inputSections: AUTOMATIC_FINALIZATION_INPUT_SECTIONS,
-      }),
+    async () => textResult(automaticSpriteFinalizationProtocolSummary()),
   );
 
   server.registerTool(
