@@ -9,9 +9,12 @@ const contract = readFileSync(path.join(root, "packages/contracts/src/book-produ
 const legacy = readFileSync(path.join(root, "packages/contracts/src/book-production-legacy-compat.ts"), "utf8");
 const importer = readFileSync(path.join(root, "packages/contracts/src/book-production-legacy-state-import.ts"), "utf8");
 const safeImporter = readFileSync(path.join(root, "packages/contracts/src/book-production-legacy-state-import-safe.ts"), "utf8");
+const batch = readFileSync(path.join(root, "packages/contracts/src/book-production-legacy-state-batch.ts"), "utf8");
+const safeBatch = readFileSync(path.join(root, "packages/contracts/src/book-production-legacy-state-batch-safe.ts"), "utf8");
 const index = readFileSync(path.join(root, "packages/contracts/src/index.ts"), "utf8");
 const test = readFileSync(path.join(root, "packages/contracts/test/book-production.test.mjs"), "utf8");
 const importTest = readFileSync(path.join(root, "packages/contracts/test/book-production-legacy-state-import.test.mjs"), "utf8");
+const batchTest = readFileSync(path.join(root, "packages/contracts/test/book-production-legacy-state-batch.test.mjs"), "utf8");
 const problems = [];
 const requiredHeads = {
   website: "01dc0f36635c77e94d852e5691f0047bc7e275c0",
@@ -49,16 +52,21 @@ for (const token of ["evavo_book_art_handoff_v1", "providerCandidateMayBeFinal: 
 for (const token of ["book-cover-artifact", "book-publication-artifact", "sourceReferenceRetained: true", "bytesRewritten: false", "validateLegacyCompatibleBookArtArtifactReceipt", "validateLegacyCompatibleBookArtworkUseBinding"]) assert(legacy.includes(token), `legacy Book art compatibility is missing ${token}`);
 for (const token of ["book_cover_artwork_quality_authority_v1", "book_cover_artwork_candidate_set_authority_v1", "book_cover_artwork_selection_binding_v1", "promotionRequired: true", "legacyApprovalPromotedAutomatically: false", "artifactBytesRewritten: false", "status: candidateSet && binding ? \"review_required\" : \"candidate\""]) assert(importer.includes(token), `legacy Website state importer is missing ${token}`);
 for (const token of ["rights status is blocked", "source_artwork kind", "unresolved required revision", "does not match human review decision", "importLegacyWebsiteBookArtStateUnchecked"]) assert(safeImporter.includes(token), `fail-closed legacy importer is missing ${token}`);
+for (const token of ["expectedMigrationItemIds", "missingMigrationItemIds", "unexpectedMigrationItemIds", "duplicateMigrationItemIds", "ready_for_promotion_review", "authoritativeWritesPerformed: false"]) assert(batch.includes(token), `batch migration contract is missing ${token}`);
+for (const token of ["source record fingerprint does not match its exact canonical input", "fingerprintLegacyWebsiteBookArtSourceRecord", "importLegacyWebsiteBookArtStateBatchUnchecked"]) assert(safeBatch.includes(token), `source-bound batch migration is missing ${token}`);
 assert(index.includes('export * from "./book-production.js";'), "book-production contract must be publicly exported");
 assert(index.includes('export * from "./book-production-legacy-compat.js";'), "legacy book-production compatibility must be publicly exported");
 assert(index.includes('export * from "./book-production-legacy-state-import-safe.js";'), "fail-closed legacy Website state importer must be publicly exported");
+assert(index.includes('export * from "./book-production-legacy-state-batch-safe.js";'), "source-bound batch importer must be publicly exported");
 assert(!index.includes('export * from "./book-production-legacy-state-import.js";'), "unchecked legacy state importer must not be publicly exported");
+assert(!index.includes('export * from "./book-production-legacy-state-batch.js";'), "unchecked batch importer must not be publicly exported");
 for (const token of ["accepts an exact manuscript-bound", "requires selection and promotion", "allows book use only", "preserves legacy Website cover", "rejects a legacy use binding"]) assert(test.includes(token), `book-production tests are missing ${token}`);
 for (const token of ["imports exact Website selection evidence as review-required", "imports quality-only evidence as a candidate", "blocks mismatched legacy binding bytes", "blocks unknown origin", "blocks a legacy blocked quality authority", "blocks rights-blocked legacy artwork", "blocks internally inconsistent legacy approval records"]) assert(importTest.includes(token), `legacy state-import tests are missing ${token}`);
+for (const token of ["processes every expected item once", "blocks duplicate item identities", "blocks missing or unexpected state", "blocks a tampered source-record fingerprint", "retains item-level failures as needs-resolution"]) assert(batchTest.includes(token), `legacy batch tests are missing ${token}`);
 
 if (problems.length) {
   console.error("Book Studio production handoff check failed.");
   for (const problem of problems) console.error(`- ${problem}`);
   process.exit(1);
 }
-console.log(JSON.stringify({ status: "PASS", migrationRunId: authority.migrationRunId, contract: authority.contractExtraction.artStudioContract, sourceHeads: requiredHeads, legacyReferencesRetained: true, legacyStateImporter: true, failClosedLegacyApprovalBoundary: true, legacyApprovalPromotedAutomatically: false, bytesRewritten: false, providerCandidateIsFinal: false, runtimeCutoverApproved: false, publicationPerformed: false }, null, 2));
+console.log(JSON.stringify({ status: "PASS", migrationRunId: authority.migrationRunId, contract: authority.contractExtraction.artStudioContract, sourceHeads: requiredHeads, legacyReferencesRetained: true, legacyStateImporter: true, exactBatchCoverage: true, sourceRecordFingerprintsVerified: true, failClosedLegacyApprovalBoundary: true, legacyApprovalPromotedAutomatically: false, authoritativeWritesPerformed: false, bytesRewritten: false, providerCandidateIsFinal: false, runtimeCutoverApproved: false, publicationPerformed: false }, null, 2));
