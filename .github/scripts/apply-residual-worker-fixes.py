@@ -12,6 +12,22 @@ def replace_once(path: Path, old: str, new: str, label: str) -> None:
     path.write_text(source.replace(old, new), encoding="utf-8")
 
 
+def replace_count(
+    path: Path,
+    old: str,
+    new: str,
+    expected: int,
+    label: str,
+) -> None:
+    source = path.read_text(encoding="utf-8")
+    count = source.count(old)
+    if count != expected:
+        raise SystemExit(
+            f"{label}: expected exactly {expected} source blocks, found {count}"
+        )
+    path.write_text(source.replace(old, new), encoding="utf-8")
+
+
 def replace_regex_once(
     path: Path,
     pattern: str,
@@ -180,4 +196,70 @@ replace_once(
 ''',
     "",
     "remove dirty RGB from family release assertion",
+)
+replace_once(
+    mirroring,
+    '''          clipId: "idle",
+          frameIndex: 0,
+          expectedWidth: WIDTH,
+          expectedHeight: HEIGHT,
+          pivot: { x: WIDTH / 2, y: HEIGHT - 1 },
+          baseline: HEIGHT - 1,
+''',
+    '''          clipId: "idle",
+          frameIndex: 0,
+          expectedWidth: WIDTH,
+          expectedHeight: HEIGHT,
+          pivot: { x: WIDTH / 2, y: 12 },
+          baseline: 12,
+''',
+    "mirror payload ground baseline",
+)
+replace_count(
+    mirroring,
+    '''          durationMs: 100,
+          pivot: { x: WIDTH / 2, y: HEIGHT - 1 },
+          baseline: HEIGHT - 1,
+          groundContact: true,
+''',
+    '''          durationMs: 100,
+          pivot: { x: WIDTH / 2, y: 12 },
+          baseline: 12,
+          groundContact: true,
+''',
+    2,
+    "family frame ground baselines",
+)
+
+mastering = Path("apps/worker/test/mastering-worker.test.mjs")
+replace_once(
+    mastering,
+    '    "candidate-alpha-mastering-evidence",\n',
+    '    "candidate-finalization-evidence",\n',
+    "mastering evidence role",
+)
+replace_count(
+    mastering,
+    "proof.extraction",
+    "proof.background.extraction",
+    3,
+    "mastering evidence extraction nesting",
+)
+
+supervisor = Path("apps/worker/src/sprite-supervisor-handlers.ts")
+replace_once(
+    supervisor,
+    '''    states[task.id] = {
+      ...taskWithFailure,
+      status: "repairing",
+      repairCycles: taskWithFailure.repairCycles + 1,
+    };
+''',
+    '''    states[task.id] = {
+      ...taskWithoutCurrent(taskWithFailure),
+      status: "repairing",
+      repairCycles: taskWithFailure.repairCycles + 1,
+    };
+''',
+    "clear completed source child while repair is active",
 )
