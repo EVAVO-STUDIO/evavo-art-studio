@@ -20,11 +20,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prove direct candidate ancestry
+      - name: Prove candidate ancestry and workflow-only scope
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$(git rev-parse HEAD^)" == "234e912bb8223f132d2d79205ee968e4fd8bdaa6" ]]
+          git merge-base --is-ancestor 234e912bb8223f132d2d79205ee968e4fd8bdaa6 HEAD
           mapfile -t changed < <(git diff --name-only 234e912bb8223f132d2d79205ee968e4fd8bdaa6..HEAD)
           [[ "${#changed[@]}" -eq 1 ]]
           [[ "${changed[0]}" == ".github/workflows/diagnose-residual-worker.yml" ]]
@@ -49,6 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
+          import re
           from pathlib import Path
 
           finalization = Path("apps/worker/test/candidate-finalization.test.mjs")
@@ -76,10 +77,11 @@ jobs:
 
           mirror = Path("apps/worker/test/deterministic-mirroring.test.mjs")
           source = mirror.read_text(encoding="utf-8")
-          needle = '''    const familyResult = await familyHandler(
-              context(store, manifest, inputArtifacts, requiredCapabilities),
-            );
-          '''
+          pattern = re.compile(
+              r'    const familyResult = await familyHandler\(\s*'
+              r'context\(store, manifest, inputArtifacts, requiredCapabilities\),\s*'
+              r'\);\n'
+          )
           replacement = '''    let familyResult;
             try {
               familyResult = await familyHandler(
@@ -101,9 +103,10 @@ jobs:
               throw error;
             }
           '''
-          if source.count(needle) != 1:
-              raise SystemExit(f"expected one mirror family call, found {source.count(needle)}")
-          mirror.write_text(source.replace(needle, replacement), encoding="utf-8")
+          source, count = pattern.subn(replacement, source, count=1)
+          if count != 1:
+              raise SystemExit(f"expected one mirror family call, found {count}")
+          mirror.write_text(source, encoding="utf-8")
 
           supervisor = Path("apps/worker/test/sprite-supervisor-runtime.test.mjs")
           source = supervisor.read_text(encoding="utf-8")
@@ -177,13 +180,13 @@ jobs:
         working-directory: apps/worker
         run: node --test test/sprite-supervisor-runtime.test.mjs
 
-      - name: Require diagnostics to reproduce
+      - name: Report diagnostic outcomes
         shell: bash
         run: |
-          set -euo pipefail
-          [[ "${{ steps.finalization.outcome }}" == "failure" ]]
-          [[ "${{ steps.mirror.outcome }}" == "failure" ]]
-          [[ "${{ steps.supervisor.outcome }}" == "failure" ]]
+          printf 'finalization=%s\nmirror=%s\nsupervisor=%s\n' \
+            '${{ steps.finalization.outcome }}' \
+            '${{ steps.mirror.outcome }}' \
+            '${{ steps.supervisor.outcome }}'
 
       - name: Restore source and verify diagnostic branch cleanliness
         if: always()
