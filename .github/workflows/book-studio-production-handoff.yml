@@ -7,6 +7,7 @@ on:
       - ".github/workflows/book-studio-production-handoff.yml"
       - "packages/contracts/src/book-production.ts"
       - "packages/contracts/src/book-production-profile.ts"
+      - "packages/contracts/src/book-production-legacy-illustration-plan.ts"
       - "packages/contracts/src/book-production-legacy-compat.ts"
       - "packages/contracts/src/book-production-legacy-state-import.ts"
       - "packages/contracts/src/book-production-legacy-state-import-safe.ts"
@@ -23,6 +24,7 @@ on:
       - ".github/workflows/book-studio-production-handoff.yml"
       - "packages/contracts/src/book-production.ts"
       - "packages/contracts/src/book-production-profile.ts"
+      - "packages/contracts/src/book-production-legacy-illustration-plan.ts"
       - "packages/contracts/src/book-production-legacy-compat.ts"
       - "packages/contracts/src/book-production-legacy-state-import.ts"
       - "packages/contracts/src/book-production-legacy-state-import-safe.ts"
@@ -75,6 +77,7 @@ jobs:
             --outDir packages/contracts/dist \
             packages/contracts/src/book-production.ts \
             packages/contracts/src/book-production-profile.ts \
+            packages/contracts/src/book-production-legacy-illustration-plan.ts \
             packages/contracts/src/book-production-legacy-compat.ts \
             packages/contracts/src/book-production-legacy-state-import.ts \
             packages/contracts/src/book-production-legacy-state-import-safe.ts \
@@ -83,9 +86,10 @@ jobs:
           printf '%s\n' \
             'export * from "./book-production.js";' \
             'export * from "./book-production-profile.js";' \
+            'export * from "./book-production-legacy-illustration-plan.js";' \
             'export * from "./book-production-legacy-compat.js";' \
             'export * from "./book-production-legacy-state-import-safe.js";' \
             'export * from "./book-production-legacy-state-batch-safe.js";' \
             > packages/contracts/dist/index.js
-      - name: Run Book Art contract, production-profile, legacy-state and exact batch attacks
+      - name: Run Book Art contract, production-profile, illustration-parity, legacy-state and exact batch attacks
         run: node --test packages/contracts/test/book-production*.test.mjs
