@@ -8,6 +8,7 @@ import test from "node:test";
 import {
   BOOK_ART_HANDOFF_CONTRACT,
   compileBookArtProductionWorkOrder,
+  fingerprintBookArtBrief,
 } from "@evavo/art-contracts";
 
 const cwd = new URL("..", import.meta.url);
@@ -82,10 +83,11 @@ async function inputFile(root) {
     },
     rightsEvidenceIds: ["rights-1"],
     createdAt: "2026-08-02T00:00:00.000Z",
-    briefFingerprint: sha("e"),
+    briefFingerprint: "",
     providerCandidateMayBeFinal: false,
     publicationPerformed: false,
   };
+  brief.briefFingerprint = await fingerprintBookArtBrief(brief);
   const compiled = await compileBookArtProductionWorkOrder(brief);
   assert.equal(compiled.status, "ready", compiled.blockers.join("\n"));
   assert.ok(compiled.workOrder);

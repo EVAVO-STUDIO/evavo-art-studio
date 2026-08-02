@@ -3,12 +3,13 @@ import test from "node:test";
 import {
   BOOK_ART_HANDOFF_CONTRACT,
   compileBookArtProductionWorkOrder,
+  fingerprintBookArtBrief,
   translateLegacyWebsiteBookArtGenerationPlan,
   validateBookArtProductionWorkOrder,
 } from "../dist/index.js";
 
 const sha = (character) => character.repeat(64);
-function brief(purpose = "front_cover_art") {
+function unsignedBrief(purpose = "front_cover_art") {
   return {
     outputKind: "evavo_book_art_brief",
     schemaVersion: 1,
@@ -31,10 +32,15 @@ function brief(purpose = "front_cover_art") {
     output: { widthPx: 3000, heightPx: 4800, minimumPpi: 300, allowedMimeTypes: ["image/png", "image/tiff"], colourIntent: "rgb", alpha: purpose === "ornament" ? "required" : "allowed", textPolicy: "text_free", printUse: true, digitalUse: true },
     rightsEvidenceIds: ["rights-1"],
     createdAt: "2026-08-02T00:00:00.000Z",
-    briefFingerprint: sha("e"),
+    briefFingerprint: "",
     providerCandidateMayBeFinal: false,
     publicationPerformed: false,
   };
+}
+async function brief(purpose = "front_cover_art") {
+  const value = unsignedBrief(purpose);
+  value.briefFingerprint = await fingerprintBookArtBrief(value);
+  return value;
 }
 function legacyPlan() {
   return {
@@ -63,9 +69,14 @@ function legacyPlan() {
 }
 
 test("compiles a manuscript-bound cover into a provider-neutral non-final work order", async () => {
-  const result = await compileBookArtProductionWorkOrder(brief());
+  const result = await compileBookArtProductionWorkOrder(await brief());
   assert.equal(result.status, "ready", result.blockers.join("\n"));
   assert.equal(result.workOrder?.assetClass, "cover_background");
+  assert.match(result.workOrder?.sourceBriefFingerprint ?? "", /^[a-f0-9]{64}$/);
+  assert.equal(
+    result.workOrder?.providerRequest.metadata.sourceBriefFingerprint,
+    result.workOrder?.sourceBriefFingerprint,
+  );
   assert.equal(result.workOrder?.providerRequest.assetKind, "print");
   assert.equal(result.workOrder?.providerRequest.target.outputFormat, "png");
   assert.equal(result.workOrder?.providerRequest.target.transparency, "opaque");
@@ -79,11 +90,11 @@ test("compiles a manuscript-bound cover into a provider-neutral non-final work o
 });
 
 test("compiles illustration and ornament profiles without moving page layout authority", async () => {
-  const illustration = await compileBookArtProductionWorkOrder(brief("interior_full_page_illustration"));
+  const illustration = await compileBookArtProductionWorkOrder(await brief("interior_full_page_illustration"));
   assert.equal(illustration.status, "ready", illustration.blockers.join("\n"));
   assert.equal(illustration.workOrder?.assetClass, "interior_illustration");
   assert.equal(illustration.workOrder?.providerRequest.assetKind, "illustration");
-  const ornament = await compileBookArtProductionWorkOrder(brief("ornament"));
+  const ornament = await compileBookArtProductionWorkOrder(await brief("ornament"));
   assert.equal(ornament.status, "ready", ornament.blockers.join("\n"));
   assert.equal(ornament.workOrder?.providerRequest.target.transparency, "required");
   assert.equal(ornament.workOrder?.providerRequest.background.strategy, "native-alpha");
@@ -91,8 +102,8 @@ test("compiles illustration and ornament profiles without moving page layout aut
 });
 
 test("is deterministic and fingerprint-bound", async () => {
-  const first = await compileBookArtProductionWorkOrder(brief());
-  const second = await compileBookArtProductionWorkOrder(brief());
+  const first = await compileBookArtProductionWorkOrder(await brief());
+  const second = await compileBookArtProductionWorkOrder(await brief());
   assert.equal(first.workOrder?.workOrderFingerprintSha256, second.workOrder?.workOrderFingerprintSha256);
   const tampered = structuredClone(first.workOrder);
   tampered.providerRequest.creativeIntent += " altered";
@@ -101,8 +112,21 @@ test("is deterministic and fingerprint-bound", async () => {
   assert.ok(validation.issues.some((item) => item.includes("fingerprint does not match")));
 });
 
+test("rejects a structurally valid Book Art brief whose exact fingerprint is stale", async () => {
+  const value = await brief();
+  value.creativeThesis += " Tampered after sealing.";
+  const result = await compileBookArtProductionWorkOrder(value);
+  assert.equal(result.status, "blocked");
+  assert.ok(
+    result.blockers.some((item) =>
+      item.includes("fingerprint differs from its exact canonical contents"),
+    ),
+  );
+  assert.equal(result.workOrder, undefined);
+});
+
 test("blocks Docs Suite-owned typography and publication fields at the Art Studio boundary", async () => {
-  const value = brief();
+  const value = await brief();
   value.title = "This does not belong in Art Studio";
   value.output.isbn = "9780000000000";
   const result = await compileBookArtProductionWorkOrder(value);
@@ -113,7 +137,7 @@ test("blocks Docs Suite-owned typography and publication fields at the Art Studi
 });
 
 test("blocks non-text-free cover candidates before provider execution", async () => {
-  const value = brief();
+  const value = await brief();
   value.output.textPolicy = "exact_editable_labels_only";
   const result = await compileBookArtProductionWorkOrder(value);
   assert.equal(result.status, "blocked");
@@ -124,7 +148,7 @@ test("translates one exact legacy Website cover task for shadow comparison only"
   const result = await translateLegacyWebsiteBookArtGenerationPlan({
     outputKind: "evavo_legacy_website_book_art_plan_translation_input",
     schemaVersion: 1,
-    brief: brief(),
+    brief: await brief(),
     legacyPlan: legacyPlan(),
     candidateId: "candidate-1",
   });
@@ -143,7 +167,7 @@ test("blocks stale legacy art direction and duplicate candidate identities", asy
   const result = await translateLegacyWebsiteBookArtGenerationPlan({
     outputKind: "evavo_legacy_website_book_art_plan_translation_input",
     schemaVersion: 1,
-    brief: brief(),
+    brief: await brief(),
     legacyPlan: plan,
     candidateId: "candidate-1",
   });

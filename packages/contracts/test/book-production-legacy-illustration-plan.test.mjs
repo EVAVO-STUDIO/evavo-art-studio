@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   BOOK_ART_HANDOFF_CONTRACT,
+  fingerprintBookArtBrief,
   translateLegacyWebsiteBookIllustrationGenerationPlan,
 } from "../dist/index.js";
 
@@ -15,8 +16,8 @@ const hashText = async (value) => [...new Uint8Array(await crypto.subtle.digest(
 const hash = async (value) => hashText(JSON.stringify(canonical(value)));
 const seal = async (value, key) => ({ ...value, [key]: await hash(value) });
 
-function brief(purpose = "interior_full_page_illustration") {
-  return {
+async function brief(purpose = "interior_full_page_illustration") {
+  const value = {
     outputKind: "evavo_book_art_brief",
     schemaVersion: 1,
     contract: BOOK_ART_HANDOFF_CONTRACT,
@@ -38,10 +39,12 @@ function brief(purpose = "interior_full_page_illustration") {
     output: { widthPx: 2400, heightPx: 3600, minimumPpi: 600, allowedMimeTypes: ["image/png", "image/tiff"], colourIntent: "monochrome", alpha: purpose === "ornament" ? "required" : "allowed", textPolicy: "text_free", printUse: true, digitalUse: true },
     rightsEvidenceIds: ["rights-1"],
     createdAt: "2026-08-02T00:00:00.000Z",
-    briefFingerprint: sha("e"),
+    briefFingerprint: "",
     providerCandidateMayBeFinal: false,
     publicationPerformed: false,
   };
+  value.briefFingerprint = await fingerprintBookArtBrief(value);
+  return value;
 }
 
 async function styleAuthority(overrides = {}) {
@@ -145,7 +148,7 @@ async function plan({ purpose = "interior_full_page_illustration", role = "full_
     inputDigestSha256: await hash(inputSnapshot),
     ...planOverrides,
   };
-  return { brief: brief(purpose), candidateId, plan: await seal(without, "planDigestSha256") };
+  return { brief: await brief(purpose), candidateId, plan: await seal(without, "planDigestSha256") };
 }
 
 async function translate(value) {
