@@ -1,0 +1,94 @@
+name: Supervisor compiler diagnostics
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out diagnostic source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build compiler dependencies
+        run: pnpm run build:domain
+
+      - name: Print exact automatic workflow blockers
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import {
+            analyseAutomaticSpriteWorkflow,
+            compileAutomaticSpriteWorkflow,
+          } from "./packages/sprite-supervisor/dist/index.js";
+
+          const input = JSON.parse(
+            fs.readFileSync("examples/automatic-sprite-workflow.json", "utf8"),
+          );
+          const analysed = analyseAutomaticSpriteWorkflow(input);
+          console.log("AUTOMATIC_ANALYSIS_BEGIN");
+          console.log(JSON.stringify({
+            disposition: analysed.analysis.disposition,
+            blockers: analysed.analysis.blockers,
+            warnings: analysed.analysis.warnings,
+            totals: analysed.analysis.totals,
+            directions: analysed.request.spritePlan.directions,
+            clips: analysed.request.spritePlan.clips.map((clip) => ({
+              id: clip.id,
+              directions: clip.directions,
+              framesPerDirection: clip.framesPerDirection,
+              keyPoseIndices: clip.keyPoseIndices,
+            })),
+          }, null, 2));
+          console.log("AUTOMATIC_ANALYSIS_END");
+
+          try {
+            const compiled = compileAutomaticSpriteWorkflow(input);
+            console.log("AUTOMATIC_COMPILE_OK", compiled.supervisorRequest.tasks.length);
+          } catch (error) {
+            console.log("AUTOMATIC_COMPILE_ERROR_BEGIN");
+            console.log(JSON.stringify({
+              name: error?.name,
+              code: error?.code,
+              message: error?.message,
+              details: error?.details,
+              stack: error?.stack,
+            }, null, 2));
+            console.log("AUTOMATIC_COMPILE_ERROR_END");
+            process.exitCode = 1;
+          }
+          NODE
+
+      - name: Remove generated lockfile and verify clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
