@@ -1,0 +1,148 @@
+name: Inspect exact residual Art Studio worker state
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact production candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/fix-art-studio-full-validation-20260802
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact candidate head
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "234e912bb8223f132d2d79205ee968e4fd8bdaa6" ]]
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Apply reviewed fixes and local diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show origin/automation/fix-residual-worker-234e912-20260802:.github/scripts/apply-residual-worker-fixes.py > /tmp/apply-residual-worker-fixes.py
+          python /tmp/apply-residual-worker-fixes.py
+          python - <<'PY'
+          from pathlib import Path
+
+          mirror = Path("apps/worker/test/deterministic-mirroring.test.mjs")
+          source = mirror.read_text(encoding="utf-8")
+          needle = '''    const familyResult = await familyHandler(
+              context(store, manifest, inputArtifacts, requiredCapabilities),
+            );
+          '''
+          replacement = '''    let familyResult;
+            try {
+              familyResult = await familyHandler(
+                context(store, manifest, inputArtifacts, requiredCapabilities),
+              );
+            } catch (error) {
+              let evidence = null;
+              if (error?.details?.evidenceArtifactId) {
+                evidence = JSON.parse(
+                  (await store.read(error.details.evidenceArtifactId)).toString("utf8"),
+                );
+              }
+              console.error(
+                "EXACT_MIRROR_FAMILY_EVIDENCE",
+                JSON.stringify(
+                  {
+                    code: error?.code,
+                    message: error?.message,
+                    details: error?.details,
+                    evidence,
+                  },
+                  null,
+                  2,
+                ),
+              );
+              throw error;
+            }
+          '''
+          if source.count(needle) != 1:
+              raise SystemExit(f"mirror diagnostic call count={source.count(needle)}")
+          mirror.write_text(source.replace(needle, replacement), encoding="utf-8")
+
+          supervisor = Path("apps/worker/test/sprite-supervisor-runtime.test.mjs")
+          source = supervisor.read_text(encoding="utf-8")
+          marker = 'test("supervisor routes a permanent failure through one repair and retries only the failed task", async () => {'
+          if source.count(marker) != 1:
+              raise SystemExit("repair supervisor marker missing")
+          prefix, suffix = source.split(marker, 1)
+          needle = '''    const state = await stateFor(fx.artifacts, workflow.runId);
+              assert.equal(state.status, "succeeded");
+          '''
+          replacement = '''    const state = await stateFor(fx.artifacts, workflow.runId);
+            if (state.status !== "succeeded") {
+              console.error(
+                "EXACT_REPAIR_SUPERVISOR_STATE",
+                JSON.stringify(
+                  { state, generationCalls, repairCalls },
+                  null,
+                  2,
+                ),
+              );
+            }
+            assert.equal(state.status, "succeeded");
+          '''
+          if suffix.count(needle) != 1:
+              raise SystemExit(f"repair state assertion count={suffix.count(needle)}")
+          supervisor.write_text(
+              prefix + marker + suffix.replace(needle, replacement),
+              encoding="utf-8",
+          )
+          PY
+          git diff --check
+
+      - name: Build worker and domain dependencies
+        run: pnpm run build:domain && pnpm --filter @evavo/art-studio-worker build
+
+      - name: Inspect mirrored family evidence
+        id: mirror
+        continue-on-error: true
+        working-directory: apps/worker
+        run: node --test test/deterministic-mirroring.test.mjs
+
+      - name: Inspect repair supervisor state
+        id: supervisor
+        continue-on-error: true
+        working-directory: apps/worker
+        run: node --test test/sprite-supervisor-runtime.test.mjs
+
+      - name: Report targeted outcomes
+        shell: bash
+        run: |
+          printf 'mirror=%s\nsupervisor=%s\n' \
+            '${{ steps.mirror.outcome }}' \
+            '${{ steps.supervisor.outcome }}'
+
+      - name: Restore source and prove no diagnostic mutation
+        if: always()
+        shell: bash
+        run: |
+          git reset --hard HEAD
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
