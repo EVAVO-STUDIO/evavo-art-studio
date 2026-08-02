@@ -1,0 +1,101 @@
+{
+  "schema": "evavo/book-studio-and-art-batch-source-landing",
+  "version": 1,
+  "migrationRunId": "book-studio-and-art-batch-source-20260802",
+  "landedAt": "2026-08-02",
+  "status": "source_and_destination_batch_contracts_landed_runtime_not_cut_over",
+  "repositories": {
+    "website": {
+      "repository": "EVAVO-STUDIO/Website",
+      "commit": "cd2c3f5ef6bbcae8795a3d56e19724e9783999e9",
+      "artifactStateExportCommit": "fc26f065be8f73924e9636df78ee37c19e0301b6",
+      "role": "authoritative_source_manifest_and_active_compatibility_runtime"
+    },
+    "docsSuite": {
+      "repository": "EVAVO-STUDIO/evavo-docs-suite",
+      "commit": "4a435994cb5facc6e318446ffc6bcc80aaa866d3",
+      "pullRequest": 40,
+      "role": "target_exact_artwork_use_batch_validation_and_later_persistence"
+    },
+    "artStudio": {
+      "repository": "EVAVO-STUDIO/evavo-art-studio",
+      "commit": "df972a29593b0571a4da2e6abd7c92ade13fe2c0",
+      "pullRequest": 38,
+      "role": "target_legacy_art_evidence_batch_validation_and_promotion"
+    },
+    "writingStudio": {
+      "repository": "EVAVO-STUDIO/evavo-writing-studio",
+      "commit": "72415fd14f44b3350ff70c238822a029e5b81bc9",
+      "role": "reusable_writing_intelligence_unchanged"
+    }
+  },
+  "contract": "evavo_book_art_handoff_v1",
+  "landedCapabilities": [
+    "Website read-only artifact-state export classifies every current Book Cover artifact kind without embedding or rewriting bytes",
+    "Website source-manifest compilation requires exact full Art migration IDs and separately declared Book Design use IDs",
+    "Website cross-validates legacy quality authority, candidate-set authority, selection binding, artifact reference, SHA-256, art direction and named selection evidence",
+    "Website emits deterministic source-bound Art Studio batch input and Docs Suite use-intent batch input",
+    "Art Studio batch import rejects duplicate, missing, unexpected and source-fingerprint-mismatched legacy state before processing",
+    "Art Studio preserves item-level blockers, requires later promotion and performs no authoritative writes",
+    "Docs Suite batch validation rejects duplicate, missing, unexpected and source-fingerprint-mismatched artwork-use records",
+    "Docs Suite keeps bindings unpersisted and requires canonical renderer byte verification",
+    "legacy artifact references and exact artwork bytes remain unchanged across every landed contract"
+  ],
+  "validation": {
+    "websiteSourceManifest": {
+      "validationRepository": "EVAVO-STUDIO/evavo-art-studio",
+      "validationPullRequest": 39,
+      "compilerGitBlob": "96c77bfec9291b97f3ee58ccfed32eedcae03f1b",
+      "testGitBlob": "cd4af7c35eb8cb934eda0dd44c1366e209fdca3d",
+      "byteIdentityProved": true,
+      "executableTestsPassed": 7,
+      "executableTestsFailed": 0
+    },
+    "artStudioBatch": {
+      "hostedWorkflowObservedGreen": true,
+      "strictTypeScriptCompilePassed": true,
+      "totalExecutableTestsPassed": 18,
+      "totalExecutableTestsFailed": 0
+    },
+    "docsSuiteBatch": {
+      "hostedWorkflowStarted": false,
+      "hostedWorkflowExposedSteps": false,
+      "hostedSourceFailureObserved": false,
+      "strictConfigurationEncoded": [
+        "strict",
+        "noUncheckedIndexedAccess",
+        "exactOptionalPropertyTypes",
+        "Bundler module resolution"
+      ],
+      "sourceExecutingTestsPresent": true
+    }
+  },
+  "notYetPerformed": [
+    "production Website project enumeration into a reviewed source manifest",
+    "bulk transfer or registration of artwork bytes in Art Studio immutable storage",
+    "Art Studio promotion of imported candidates",
+    "joining promoted Art Studio receipts to all Website Book Design use intents",
+    "compare-and-swap persistence of Docs Suite artwork-use bindings",
+    "canonical manuscript, visual-canon, cover-scene, interior-layout or publication-state migration",
+    "Website API CLI MCP or agent compatibility cutover",
+    "shadow dual-run parity",
+    "production traffic cutover",
+    "Website source retirement",
+    "book publication"
+  ],
+  "currentFlags": {
+    "websiteRuntimeStillAuthoritative": true,
+    "sourceManifestCanClaimCompleteWithoutExpectedIds": false,
+    "destinationBatchCanProcessPartialCoverage": false,
+    "authoritativeWritesPerformed": false,
+    "artworkBytesReadBySourceManifest": false,
+    "artworkBytesRewritten": false,
+    "artPromotionRequired": true,
+    "docsSuiteBindingsPersisted": false,
+    "dualAuthoritativeWritesAllowed": false,
+    "runtimeCutoverApproved": false,
+    "websiteSourceDeletionApproved": false,
+    "publicationPerformed": false
+  },
+  "recordFingerprint": "28e7eaa8dfeaf0d7b8a8c5ff4c1144ab43db4f5ed50af112cc8cd72ba233b379"
+}
