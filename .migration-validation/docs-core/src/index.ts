@@ -11,3 +11,8 @@ export * from "./book-studio-legacy-art-use-safe";
 export * from "./book-studio-legacy-art-use-boundary";
 export * from "./book-studio-legacy-art-use-batch";
 export * from "./book-studio-art-promotion-join";
+export {
+  fingerprintArtStudioBookPromotionBatch,
+  fingerprintWebsiteBookArtworkUseIntent,
+  joinBookArtPromotionsToUseIntents,
+} from "./book-studio-art-promotion-join";
