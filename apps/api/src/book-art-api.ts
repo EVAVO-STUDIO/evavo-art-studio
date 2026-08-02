@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import type { ArtifactStore } from "@evavo/art-artifacts";
 import {
   BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
   BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
@@ -7,6 +8,7 @@ import {
   submitBookArtProviderShadowJob,
   type BookArtProviderAdapterPolicyV1,
 } from "@evavo/art-book-runtime";
+import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
 import { RuntimeError, type RuntimeRepository } from "@evavo/art-runtime";
 
 export interface BookArtApiContext {
@@ -16,6 +18,7 @@ export interface BookArtApiContext {
   readonly requestId: string;
   readonly maximumBodyBytes: number;
   readonly runtime: RuntimeRepository | undefined;
+  readonly artifacts: ArtifactStore | undefined;
   readonly adapterPolicy: BookArtProviderAdapterPolicyV1 | undefined;
   readonly accessReady: boolean;
   readonly accessAuthorized: boolean;
@@ -34,12 +37,18 @@ export interface BookArtApiContext {
 const PROTOCOL_PATH = "/v1/book-art/provider-runtime";
 const COMPILE_PATH = "/v1/book-art/provider-jobs/compile";
 const SUBMIT_PATH = "/v1/book-art/provider-jobs/submit";
+const INSPECT_PATH = "/v1/book-art/provider-jobs/inspect";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 function pathHandled(pathname: string): boolean {
-  return pathname === PROTOCOL_PATH || pathname === COMPILE_PATH || pathname === SUBMIT_PATH;
+  return (
+    pathname === PROTOCOL_PATH ||
+    pathname === COMPILE_PATH ||
+    pathname === SUBMIT_PATH ||
+    pathname === INSPECT_PATH
+  );
 }
 
 function actor(request: IncomingMessage): string {
@@ -65,7 +74,7 @@ function requirePolicy(context: BookArtApiContext): BookArtProviderAdapterPolicy
   return null;
 }
 
-function requireSubmissionAccess(context: BookArtApiContext): boolean {
+function requireProtectedAccess(context: BookArtApiContext): boolean {
   if (!context.accessReady) {
     context.writeJson(
       context.response,
@@ -74,7 +83,7 @@ function requireSubmissionAccess(context: BookArtApiContext): boolean {
         error: {
           code: "BOOK_ART_RUNTIME_ACCESS_UNAVAILABLE",
           message:
-            "Book Art provider submission requires EVAVO_ART_ALLOW_WRITES=true and a server-side control token of at least 32 bytes.",
+            "Book Art provider submission and inspection require EVAVO_ART_ALLOW_WRITES=true and a server-side control token of at least 32 bytes.",
         },
       },
       context.requestId,
@@ -137,6 +146,8 @@ export async function handleBookArtApiRequest(
         providerFallbackAllowed: false,
         compilePerformsProviderCall: false,
         submitPerformsProviderCall: false,
+        inspectPerformsProviderCall: false,
+        inspectionWritesArtifacts: false,
         candidateApprovalState: "unapproved",
         candidateStorageClass: "intermediate",
         selectionPerformed: false,
@@ -152,14 +163,22 @@ export async function handleBookArtApiRequest(
 
   if (
     request.method === "POST" &&
-    (url.pathname === COMPILE_PATH || url.pathname === SUBMIT_PATH)
+    (url.pathname === COMPILE_PATH ||
+      url.pathname === SUBMIT_PATH ||
+      url.pathname === INSPECT_PATH)
   ) {
     const adapterPolicy = requirePolicy(context);
     if (!adapterPolicy) return true;
-    if (url.pathname === SUBMIT_PATH && !requireSubmissionAccess(context)) {
+    if (
+      (url.pathname === SUBMIT_PATH || url.pathname === INSPECT_PATH) &&
+      !requireProtectedAccess(context)
+    ) {
       return true;
     }
-    if (url.pathname === SUBMIT_PATH && !context.runtime) {
+    if (
+      (url.pathname === SUBMIT_PATH || url.pathname === INSPECT_PATH) &&
+      !context.runtime
+    ) {
       context.writeJson(
         response,
         503,
@@ -168,6 +187,21 @@ export async function handleBookArtApiRequest(
             code: "ART_STUDIO_RUNTIME_NOT_CONFIGURED",
             message:
               "A durable runtime repository is not configured for this API process.",
+          },
+        },
+        requestId,
+      );
+      return true;
+    }
+    if (url.pathname === INSPECT_PATH && !context.artifacts) {
+      context.writeJson(
+        response,
+        503,
+        {
+          error: {
+            code: "ART_STUDIO_ARTIFACT_STORE_NOT_CONFIGURED",
+            message:
+              "An immutable artifact store is not configured for Book Art provider inspection.",
           },
         },
         requestId,
@@ -194,11 +228,24 @@ export async function handleBookArtApiRequest(
     }
 
     try {
+      const compilation = await compileBookArtProviderShadowJob(input);
       if (url.pathname === COMPILE_PATH) {
-        const result = await compileBookArtProviderShadowJob(input);
         context.writeJson(
           response,
-          result.status === "ready" ? 200 : 422,
+          compilation.status === "ready" ? 200 : 422,
+          compilation,
+          requestId,
+        );
+        return true;
+      }
+      if (url.pathname === INSPECT_PATH) {
+        const result = await inspectBookArtProviderShadowJob(compilation, {
+          runtime: context.runtime!,
+          artifacts: context.artifacts!,
+        });
+        context.writeJson(
+          response,
+          result.status === "blocked" ? 422 : 200,
           result,
           requestId,
         );
