@@ -4,24 +4,33 @@ on:
   push:
     branches:
       - agent/validate-docs-canonical-writing-art-20260803
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
 
 concurrency:
-  group: agent-validate-docs-canonical-writing-art-link
+  group: agent-validate-docs-canonical-writing-art-link-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
-    if: github.repository == 'EVAVO-STUDIO/evavo-art-studio'
+    if: >-
+      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
+      (github.event_name == 'push' ||
+       github.event.pull_request.head.repo.full_name == github.repository) &&
+      (github.event_name == 'push' ||
+       github.event.pull_request.head.ref == 'agent/validate-docs-canonical-writing-art-20260803')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out exact disposable validation head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
 
@@ -29,8 +38,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "${GITHUB_REF}" == "refs/heads/agent/validate-docs-canonical-writing-art-20260803" ]]
-          [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
+          expected_sha="${GITHUB_SHA}"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            expected_sha="${{ github.event.pull_request.head.sha }}"
+          fi
+          [[ "$(git rev-parse HEAD)" == "${expected_sha}" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
           base="$(git merge-base origin/main HEAD)"
           unexpected="$(git diff --name-only "${base}"...HEAD | grep -Ev '^(.github/workflows/agent-validate-docs-writing-art-link.yml|validation/docs-writing-art/)' || true)"
