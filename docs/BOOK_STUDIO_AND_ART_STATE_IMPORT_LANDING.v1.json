@@ -1,0 +1,85 @@
+{
+  "schema": "evavo/book-studio-and-art-state-import-landing",
+  "version": 1,
+  "migrationRunId": "book-studio-and-art-legacy-state-import-20260802",
+  "landedAt": "2026-08-02",
+  "status": "first_legacy_state_import_slice_landed_runtime_not_cut_over",
+  "repositories": {
+    "website": {
+      "repository": "EVAVO-STUDIO/Website",
+      "commit": "ac20604b554315711ed586b2189774099d1eede4",
+      "role": "active_compatibility_runtime_and_legacy_state_source"
+    },
+    "docsSuite": {
+      "repository": "EVAVO-STUDIO/evavo-docs-suite",
+      "commit": "9f594c3cd09083ba77f061251eb518aa0ec79f18",
+      "pullRequest": 39,
+      "role": "target_book_state_and_exact_art_use_binding_authority_after_cutover"
+    },
+    "artStudio": {
+      "repository": "EVAVO-STUDIO/evavo-art-studio",
+      "commit": "45f4b0196e2da26c85bd20366f78f82b9e995097",
+      "pullRequest": 37,
+      "role": "target_art_candidate_quality_selection_promotion_and_artifact_authority"
+    },
+    "writingStudio": {
+      "repository": "EVAVO-STUDIO/evavo-writing-studio",
+      "commit": "72415fd14f44b3350ff70c238822a029e5b81bc9",
+      "role": "reusable_writing_intelligence_unchanged"
+    }
+  },
+  "contract": "evavo_book_art_handoff_v1",
+  "landedCapabilities": [
+    "Art Studio imports exact Website quality, candidate-set and selection-binding evidence without reading or rewriting artwork bytes",
+    "legacy quality-only evidence enters as candidate and complete selected evidence enters as review_required",
+    "rights-blocked, unknown-origin, stale, inconsistent, partial and byte-mismatched legacy evidence fails closed",
+    "legacy Website selection never becomes final Art Studio approval and always requires a new promotion receipt",
+    "Docs Suite creates an exact BookArtworkUseBinding only after a current approved Art Studio artifact, selection receipt and promotion receipt",
+    "Docs Suite rejects unsupported artwork purposes, incomplete legacy selection authority, stale art direction, stale selection evidence and malformed input",
+    "book-cover-artifact and book-publication-artifact references remain exact and artwork bytes remain unchanged",
+    "canonical renderer byte verification, publication false and single-writer migration boundaries remain mandatory"
+  ],
+  "validation": {
+    "artStudio": {
+      "hostedWorkflowObservedGreen": true,
+      "strictTypeScriptCompilePassed": true,
+      "executableTestsPassed": 13,
+      "executableTestsFailed": 0
+    },
+    "docsSuite": {
+      "hostedWorkflowStarted": false,
+      "hostedWorkflowExposedSteps": false,
+      "hostedSourceFailureObserved": false,
+      "strictConfigurationReviewed": [
+        "strict",
+        "noUncheckedIndexedAccess",
+        "exactOptionalPropertyTypes",
+        "Bundler module resolution"
+      ],
+      "sourceExecutingTestBoundaryCorrected": true
+    }
+  },
+  "notYetPerformed": [
+    "bulk Website Book Art state enumeration and import",
+    "artwork byte transfer into Art Studio immutable storage",
+    "Art Studio promotion of imported legacy candidates",
+    "Docs Suite import of canonical manuscript, story, visual-canon, layout or publication state",
+    "Website API CLI or agent compatibility proxy cutover",
+    "shadow dual-run parity",
+    "production traffic cutover",
+    "Website source retirement",
+    "book publication"
+  ],
+  "currentFlags": {
+    "websiteRuntimeStillAuthoritative": true,
+    "docsSuiteRuntimeCutoverApproved": false,
+    "artStudioBookProfileCutoverApproved": false,
+    "legacyImportCreatesFinalApproval": false,
+    "artPromotionRequired": true,
+    "artworkBytesRewritten": false,
+    "dualAuthoritativeWritesAllowed": false,
+    "websiteSourceDeletionApproved": false,
+    "publicationPerformed": false
+  },
+  "recordFingerprint": "c9273ec0572c0791d92b47aaa5df0388b96c2a25de8b0db365d17c7eb0a395b7"
+}
