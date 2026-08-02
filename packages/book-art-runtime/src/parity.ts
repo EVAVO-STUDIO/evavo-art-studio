@@ -942,11 +942,11 @@ export async function compareBookArtProviderShadowParity(
     observation.outcome === "pending" ||
     inspection.status === "not-submitted" ||
     inspection.status === "pending";
-  const status: BookArtProviderShadowParityStatus = incomplete
+  const status: BookArtProviderShadowParityStatus = mismatches.length
+  ? "mismatched"
+  : incomplete
     ? "incomplete"
-    : mismatches.length
-      ? "mismatched"
-      : "matched";
+    : "matched";
   return finishParity({
     status,
     identity: observation.identity,

@@ -160,6 +160,41 @@ test("shared parity reports matching not-submitted observations as incomplete an
   }
 });
 
+test("structural request drift remains mismatched before either runtime submits", async () => {
+  const compiled = await compilation();
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-book-art-parity-drift-"));
+  try {
+    const observation = notSubmittedObservation(compiled.plan);
+    const { observationFingerprintSha256: _discarded, ...unsigned } = observation;
+    const changed = {
+      ...unsigned,
+      normalizedProviderRequestSha256: "f".repeat(64),
+    };
+    const result = await compareBookArtProviderShadowParity(
+      compiled,
+      {
+        ...changed,
+        observationFingerprintSha256:
+          fingerprintWebsiteBookArtProviderShadowObservation(changed),
+      },
+      {
+        runtime: new LocalRuntimeRepository({ root: path.join(root, "runtime") }),
+        artifacts: new LocalArtifactStore({ root: path.join(root, "artifacts") }),
+      },
+    );
+    assert.equal(result.status, "mismatched");
+    assert.equal(result.comparison.normalizedProviderRequestMatched, false);
+    assert.ok(
+      result.mismatches.some((entry) =>
+        entry.includes("normalized provider-request fingerprints differ"),
+      ),
+    );
+    assert.equal(result.cutoverEligible, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Website parity observation fingerprint fails closed after request tampering", async () => {
   const compiled = await compilation();
   const observation = notSubmittedObservation(compiled.plan);
