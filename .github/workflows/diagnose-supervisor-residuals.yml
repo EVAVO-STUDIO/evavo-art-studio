@@ -1,0 +1,166 @@
+name: Diagnose residual supervisor failures
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact diagnostic branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: validation/diagnose-f07d900-20260802
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build compiler dependencies
+        run: pnpm run build:domain
+
+      - name: Print exact residual diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import {
+            analyseAutomaticSpriteWorkflow,
+            compileAutomaticSpriteFinalizationWorkflow,
+            compileAutomaticSpriteWorkflow,
+          } from "./packages/sprite-supervisor/dist/index.js";
+
+          const read = (name) => JSON.parse(fs.readFileSync(name, "utf8"));
+          const summarizeError = (error) => ({
+            name: error?.name,
+            code: error?.code,
+            message: error?.message,
+            details: error?.details,
+            stack: error?.stack,
+          });
+          const report = (label, fn) => {
+            console.log(`DIAGNOSTIC_${label}_BEGIN`);
+            try {
+              const value = fn();
+              console.log(JSON.stringify({ ok: true, value }, null, 2));
+            } catch (error) {
+              console.log(JSON.stringify({ ok: false, error: summarizeError(error) }, null, 2));
+            }
+            console.log(`DIAGNOSTIC_${label}_END`);
+          };
+
+          const workflow = read("examples/automatic-sprite-workflow.json");
+          report("AUTOMATIC_ANALYSIS", () => {
+            const analysed = analyseAutomaticSpriteWorkflow(workflow);
+            return {
+              disposition: analysed.analysis.disposition,
+              blockers: analysed.analysis.blockers,
+              warnings: analysed.analysis.warnings,
+              totals: analysed.analysis.totals,
+              directions: analysed.request.spritePlan.directions,
+              clips: analysed.request.spritePlan.clips.map((clip) => ({
+                id: clip.id,
+                directions: clip.directions,
+                framesPerDirection: clip.framesPerDirection,
+                keyPoseIndices: clip.keyPoseIndices,
+              })),
+            };
+          });
+          report("AUTOMATIC_COMPILE", () => {
+            const compiled = compileAutomaticSpriteWorkflow(workflow);
+            return {
+              disposition: compiled.analysis.disposition,
+              tasks: compiled.supervisorRequest.tasks.length,
+              releaseRoles: compiled.supervisorRequest.policy.requiredReleaseArtifactRoles,
+            };
+          });
+
+          const finalization = read("examples/automatic-sprite-finalization.json");
+          report("FINALIZATION_COMPILE", () => {
+            const compiled = compileAutomaticSpriteFinalizationWorkflow(finalization);
+            return {
+              tasks: compiled.supervisorRequest.tasks.length,
+              releaseRoles: compiled.supervisorRequest.policy.requiredReleaseArtifactRoles,
+            };
+          });
+
+          const mirroredWorkflow = structuredClone(workflow);
+          mirroredWorkflow.spritePlanRequest.allowDerivedMirrors = true;
+          mirroredWorkflow.spritePlanRequest.artDirectionRequest.asset.asymmetric = false;
+          mirroredWorkflow.references.layerReferenceArtifactIds = {
+            shadow: `artifact_${"b".repeat(64)}`,
+          };
+          mirroredWorkflow.metadata = {
+            ...(mirroredWorkflow.metadata ?? {}),
+            deterministicMirroring: { lightingReviewed: true },
+          };
+          report("MIRROR_WORKFLOW", () => {
+            const compiled = compileAutomaticSpriteWorkflow(mirroredWorkflow);
+            return {
+              tasks: compiled.supervisorRequest.tasks.length,
+              mirrors: compiled.supervisorRequest.tasks.filter(
+                (task) => task.payloadTemplate?.operation === "mirror-horizontal",
+              ).length,
+              releaseRoles: compiled.supervisorRequest.policy.requiredReleaseArtifactRoles,
+            };
+          });
+          report("MIRROR_FINALIZATION", () => {
+            const compiled = compileAutomaticSpriteFinalizationWorkflow({
+              schemaVersion: "1.0",
+              workflow: mirroredWorkflow,
+              background: {
+                mode: "auto",
+                nativeAlphaAdapterIds: [],
+                requireFakeTransparencyRejection: true,
+                requireMeaningfulAlpha: true,
+                proofBackgrounds: ["#000000", "#ffffff", "#808080", "#00ff00", "#ff00ff"],
+              },
+              finalization: {
+                deliveryProfileId: "godot-sprite-lossless",
+                requireFamilyVerification: true,
+                requireHostileMatteProof: true,
+                requireNoRejectedArtifacts: true,
+                requireExactDimensions: true,
+                maximumDeterministicRepairPasses: 2,
+                transparentBleedRadius: 2,
+                matteSearchRadius: 6,
+                matteDistanceThreshold: 72,
+              },
+            });
+            return {
+              tasks: compiled.supervisorRequest.tasks.length,
+              mirrors: compiled.supervisorRequest.tasks.filter(
+                (task) => task.payloadTemplate?.operation === "mirror-horizontal",
+              ).length,
+              releaseRoles: compiled.supervisorRequest.policy.requiredReleaseArtifactRoles,
+            };
+          });
+          NODE
+
+      - name: Remove generated lockfile and verify clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
