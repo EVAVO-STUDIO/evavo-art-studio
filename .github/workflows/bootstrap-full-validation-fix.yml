@@ -1,0 +1,163 @@
+name: Bootstrap exact full-validation repair
+
+on:
+  push:
+    branches:
+      - agent/fix-art-studio-full-validation-20260802
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-art-studio-full-validation-fix
+  cancel-in-progress: true
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/fix-art-studio-full-validation-20260802
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply proven corrections and current-main fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            6a8bec366c8e9695012e51a863a630648f83d501 \
+            8f54467e701a5f6bc1c209a4c5bfb18bb5681231
+          git diff --binary \
+            6a8bec366c8e9695012e51a863a630648f83d501 \
+            8f54467e701a5f6bc1c209a4c5bfb18bb5681231 \
+            -- \
+            .github/workflows/ci.yml \
+            apps/worker/src/adaptive-finalizer-guarded-handlers.ts \
+            apps/worker/src/adaptive-sprite-family-handlers.ts \
+            packages/audio-delivery-optimizer/test/audio.test.mjs \
+            packages/sprite-supervisor/src/automatic-compiler.ts \
+            > /tmp/proven-corrections.patch
+          git apply --3way /tmp/proven-corrections.patch
+
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one exact replacement, found {count}")
+              target.write_text(text.replace(old, new), encoding="utf-8")
+
+          replace_exact(
+              "packages/sprite-supervisor/src/validation.ts",
+              '  "art.candidate.master-alpha",\n  "art.candidate.select",',
+              '  "art.candidate.master-alpha",\n  "art.candidate.finalize-adaptive",\n  "art.candidate.select",',
+          )
+          replace_exact(
+              "packages/sprite-supervisor/src/validation.ts",
+              '      ...tasks.flatMap((task) => task.requiredArtifactRoles),',
+              '      ...tasks\n        .filter((task) => task.triggeredByFailureOfTaskId === undefined)\n        .flatMap((task) => task.requiredArtifactRoles),',
+          )
+          replace_exact(
+              "packages/sprite-supervisor/src/automatic-finalization-validation.ts",
+              'import { compileAutomaticSpriteWorkflow } from "./automatic-compiler.js";',
+              'import { compileAutomaticSpriteWorkflow } from "./automatic-mirror-compiler.js";',
+          )
+          replace_exact(
+              "packages/sprite-supervisor/src/automatic-protocol.ts",
+              '      "Provider source canvases are mastered and deterministically resized to the exact sprite dimensions before selection.",',
+              '      "Every provider source canvas receives deterministic target-size mastering to the exact sprite dimensions before selection.",',
+          )
+          replace_exact(
+              "packages/contracts/src/book-production-legacy-state-import.ts",
+              '    provenance,\n    generation,\n  });',
+              '    provenance,\n    ...(generation === undefined ? {} : { generation }),\n  });',
+          )
+          replace_exact(
+              "packages/contracts/src/book-production-legacy-state-import.ts",
+              '    technicalQualityReceiptSha256: qualityDigest,\n    selectionReceiptSha256,\n    generatedTextDetected,',
+              '    technicalQualityReceiptSha256: qualityDigest,\n    ...(selectionReceiptSha256 === undefined\n      ? {}\n      : { selectionReceiptSha256 }),\n    generatedTextDetected,',
+          )
+          replace_exact(
+              "packages/contracts/src/book-production-legacy-state-import.ts",
+              '''  return {
+    origin: input.mappedOrigin,
+    provider: optionalText(input.generation?.provider),
+    model: optionalText(input.generation?.model),
+    modelVersion: optionalText(input.generation?.modelVersion),
+    promptSha256: isSha(input.generation?.promptSha256) ? text(input.generation?.promptSha256) : undefined,
+    seed: optionalText(input.generation?.seed),
+    sourceArtifactIds,
+    rightsEvidenceIds: [input.rightsReference],''',
+              '''  const provider = optionalText(input.generation?.provider);
+  const model = optionalText(input.generation?.model);
+  const modelVersion = optionalText(input.generation?.modelVersion);
+  const promptSha256 = isSha(input.generation?.promptSha256)
+    ? text(input.generation?.promptSha256)
+    : undefined;
+  const seed = optionalText(input.generation?.seed);
+  return {
+    origin: input.mappedOrigin,
+    ...(provider === undefined ? {} : { provider }),
+    ...(model === undefined ? {} : { model }),
+    ...(modelVersion === undefined ? {} : { modelVersion }),
+    ...(promptSha256 === undefined ? {} : { promptSha256 }),
+    ...(seed === undefined ? {} : { seed }),
+    sourceArtifactIds,
+    rightsEvidenceIds: [input.rightsReference],''',
+          )
+          PY
+
+          git diff --check
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run strict targeted validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run build:domain
+          pnpm --filter @evavo/art-contracts test
+          pnpm --filter @evavo/art-sprite-supervisor test
+          pnpm --filter @evavo/art-studio-worker typecheck
+
+      - name: Commit the verified repair and remove bootstrap authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          rm -f .github/workflows/bootstrap-full-validation-fix.yml
+          git diff --check
+          git add \
+            .github/workflows/ci.yml \
+            apps/worker/src/adaptive-finalizer-guarded-handlers.ts \
+            apps/worker/src/adaptive-sprite-family-handlers.ts \
+            packages/audio-delivery-optimizer/test/audio.test.mjs \
+            packages/contracts/src/book-production-legacy-state-import.ts \
+            packages/sprite-supervisor/src/automatic-compiler.ts \
+            packages/sprite-supervisor/src/automatic-finalization-validation.ts \
+            packages/sprite-supervisor/src/automatic-protocol.ts \
+            packages/sprite-supervisor/src/validation.ts \
+            .github/workflows/bootstrap-full-validation-fix.yml
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "174633320+EVAVO-STUDIO@users.noreply.github.com"
+          git commit -m "fix: restore exact Art Studio validation"
+          git push origin HEAD:agent/fix-art-studio-full-validation-20260802
