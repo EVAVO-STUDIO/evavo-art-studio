@@ -7,8 +7,11 @@ const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.u
 const authority = JSON.parse(readFileSync(path.join(root, "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"), "utf8"));
 const contract = readFileSync(path.join(root, "packages/contracts/src/book-production.ts"), "utf8");
 const legacy = readFileSync(path.join(root, "packages/contracts/src/book-production-legacy-compat.ts"), "utf8");
+const importer = readFileSync(path.join(root, "packages/contracts/src/book-production-legacy-state-import.ts"), "utf8");
+const safeImporter = readFileSync(path.join(root, "packages/contracts/src/book-production-legacy-state-import-safe.ts"), "utf8");
 const index = readFileSync(path.join(root, "packages/contracts/src/index.ts"), "utf8");
 const test = readFileSync(path.join(root, "packages/contracts/test/book-production.test.mjs"), "utf8");
+const importTest = readFileSync(path.join(root, "packages/contracts/test/book-production-legacy-state-import.test.mjs"), "utf8");
 const problems = [];
 const requiredHeads = {
   website: "01dc0f36635c77e94d852e5691f0047bc7e275c0",
@@ -27,7 +30,7 @@ function assert(condition, message) { if (!condition) problems.push(message); }
 assert(authority.schema === "evavo/book-studio-and-art-migration-authority", "migration authority schema is invalid");
 assert(authority.version === 2, "migration authority version is invalid");
 for (const [key, sha] of Object.entries(requiredHeads)) {
-  assert(authority.sourceHeads?.[key]?.commit === sha, `${key} source head differs from reviewed baseline`);
+  assert(authority.sourceHeads?.[key]?.commit === sha, `${key} source head differs from the reviewed baseline`);
   assert(/^[a-f0-9]{40}$/.test(authority.sourceHeads?.[key]?.commit ?? ""), `${key} source head is not exact`);
 }
 assert(authority.contractExtraction?.artStudioContract === "evavo_book_art_handoff_v1", "Art Studio handoff contract is missing");
@@ -44,13 +47,18 @@ const expectedFingerprint = createHash("sha256").update(JSON.stringify(canonical
 assert(recordFingerprint === expectedFingerprint, "migration authority fingerprint does not match exact contents");
 for (const token of ["evavo_book_art_handoff_v1", "providerCandidateMayBeFinal: false", "promotionReceiptSha256", "canonicalRendererMustVerifyBytes: true", "Book use requires an approved Art Studio artifact"]) assert(contract.includes(token), `book-production contract is missing ${token}`);
 for (const token of ["book-cover-artifact", "book-publication-artifact", "sourceReferenceRetained: true", "bytesRewritten: false", "validateLegacyCompatibleBookArtArtifactReceipt", "validateLegacyCompatibleBookArtworkUseBinding"]) assert(legacy.includes(token), `legacy Book art compatibility is missing ${token}`);
+for (const token of ["book_cover_artwork_quality_authority_v1", "book_cover_artwork_candidate_set_authority_v1", "book_cover_artwork_selection_binding_v1", "promotionRequired: true", "legacyApprovalPromotedAutomatically: false", "artifactBytesRewritten: false", "status: candidateSet && binding ? \"review_required\" : \"candidate\""]) assert(importer.includes(token), `legacy Website state importer is missing ${token}`);
+for (const token of ["rights status is blocked", "source_artwork kind", "unresolved required revision", "does not match human review decision", "importLegacyWebsiteBookArtStateUnchecked"]) assert(safeImporter.includes(token), `fail-closed legacy importer is missing ${token}`);
 assert(index.includes('export * from "./book-production.js";'), "book-production contract must be publicly exported");
 assert(index.includes('export * from "./book-production-legacy-compat.js";'), "legacy book-production compatibility must be publicly exported");
+assert(index.includes('export * from "./book-production-legacy-state-import-safe.js";'), "fail-closed legacy Website state importer must be publicly exported");
+assert(!index.includes('export * from "./book-production-legacy-state-import.js";'), "unchecked legacy state importer must not be publicly exported");
 for (const token of ["accepts an exact manuscript-bound", "requires selection and promotion", "allows book use only", "preserves legacy Website cover", "rejects a legacy use binding"]) assert(test.includes(token), `book-production tests are missing ${token}`);
+for (const token of ["imports exact Website selection evidence as review-required", "imports quality-only evidence as a candidate", "blocks mismatched legacy binding bytes", "blocks unknown origin", "blocks a legacy blocked quality authority", "blocks rights-blocked legacy artwork", "blocks internally inconsistent legacy approval records"]) assert(importTest.includes(token), `legacy state-import tests are missing ${token}`);
 
 if (problems.length) {
   console.error("Book Studio production handoff check failed.");
   for (const problem of problems) console.error(`- ${problem}`);
   process.exit(1);
 }
-console.log(JSON.stringify({ status: "PASS", migrationRunId: authority.migrationRunId, contract: authority.contractExtraction.artStudioContract, sourceHeads: requiredHeads, legacyReferencesRetained: true, bytesRewritten: false, providerCandidateIsFinal: false, runtimeCutoverApproved: false, publicationPerformed: false }, null, 2));
+console.log(JSON.stringify({ status: "PASS", migrationRunId: authority.migrationRunId, contract: authority.contractExtraction.artStudioContract, sourceHeads: requiredHeads, legacyReferencesRetained: true, legacyStateImporter: true, failClosedLegacyApprovalBoundary: true, legacyApprovalPromotedAutomatically: false, bytesRewritten: false, providerCandidateIsFinal: false, runtimeCutoverApproved: false, publicationPerformed: false }, null, 2));
