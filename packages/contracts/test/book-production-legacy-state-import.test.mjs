@@ -123,6 +123,20 @@ test("imports quality-only evidence as a candidate", () => {
   assert.equal(result.status, "candidate_imported", result.blockers.join("\n"));
   assert.equal(result.receipt?.status, "candidate");
   assert.equal(result.receipt?.selectionReceiptSha256, undefined);
+  assert.equal(Object.hasOwn(result.receipt, "selectionReceiptSha256"), false);
+});
+
+test("omits absent generation provenance instead of serialising undefined fields", () => {
+  const value = input();
+  delete value.candidateSetAuthority;
+  delete value.selectionBinding;
+  value.qualityAuthority.candidate.provenance.origin = "human_digital_art";
+  delete value.qualityAuthority.candidate.provenance.generation;
+  const result = importLegacyWebsiteBookArtState(value);
+  assert.equal(result.status, "candidate_imported", result.blockers.join("\n"));
+  for (const key of ["provider", "model", "modelVersion", "promptSha256", "seed"]) {
+    assert.equal(Object.hasOwn(result.receipt?.provenance ?? {}, key), false, key);
+  }
 });
 
 test("blocks mismatched legacy binding bytes", () => {
