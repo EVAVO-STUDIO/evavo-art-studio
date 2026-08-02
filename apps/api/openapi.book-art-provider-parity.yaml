@@ -1,0 +1,349 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Book Art Provider Shadow Parity API
+  version: 0.1.0
+  description: >-
+    Protected read-only comparison of one independently fingerprinted Website
+    Book Art provider observation with the exact Art Studio shadow request,
+    durable runtime job and immutable inspection receipt. Structural parity
+    does not compare pixels, approve artwork, satisfy the observation period,
+    approve runtime cutover, permit Website source deletion or publish a book.
+servers:
+  - url: http://127.0.0.1:4100
+    description: Local standalone Art Studio control plane
+tags:
+  - name: Book Art Provider Shadow Parity
+paths:
+  /v1/book-art/provider-jobs/parity:
+    post:
+      tags: [Book Art Provider Shadow Parity]
+      operationId: compareBookArtProviderShadowParity
+      summary: Compare Website and Art Studio provider shadow structure
+      description: >-
+        The server injects its adapter allow-list, recompiles the exact request,
+        verifies the Art Studio runtime and immutable output evidence, validates
+        the independently fingerprinted Website observation, and compares
+        request, execution, attempt, provider and unapproved-candidate
+        boundaries. No provider call, runtime submission or artifact write is
+        performed by this operation.
+      security:
+        - ArtStudioControlToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookArtProviderShadowParityRequest"
+      responses:
+        "200":
+          description: Matching, incomplete or structurally matched parity receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookArtProviderShadowParityResult"
+        "401":
+          $ref: "#/components/responses/AuthorizationError"
+        "409":
+          description: Valid evidence proves a structural mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookArtProviderShadowParityResult"
+        "422":
+          description: Invalid evidence or blocked Art Studio inspection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookArtProviderShadowParityResult"
+        "503":
+          $ref: "#/components/responses/ConfigurationError"
+components:
+  securitySchemes:
+    ArtStudioControlToken:
+      type: http
+      scheme: bearer
+      description: Server-side Art Studio control token; never stored in parity evidence.
+  schemas:
+    BookArtProviderShadowParityRequest:
+      type: object
+      additionalProperties: false
+      required: [request, websiteObservation]
+      properties:
+        request:
+          $ref: "#/components/schemas/BookArtProviderShadowRequest"
+        websiteObservation:
+          $ref: "#/components/schemas/WebsiteBookArtProviderShadowObservation"
+    BookArtProviderShadowRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - outputKind
+        - schemaVersion
+        - executionId
+        - requestedAt
+        - workOrder
+      properties:
+        outputKind:
+          const: evavo_book_art_provider_shadow_job_input
+        schemaVersion: { const: 1 }
+        executionId:
+          type: string
+          minLength: 1
+          maxLength: 200
+        requestedAt:
+          type: string
+          format: date-time
+        workOrder:
+          type: object
+          description: Exact fingerprint-valid evavo_book_art_production_work_order.
+    BookArtIdentity:
+      type: object
+      additionalProperties: false
+      required: [workspaceId, projectId, bookId, requestId]
+      properties:
+        workspaceId: { type: string, minLength: 1, maxLength: 200 }
+        projectId: { type: string, minLength: 1, maxLength: 200 }
+        bookId: { type: string, minLength: 1, maxLength: 200 }
+        editionId: { type: string, minLength: 1, maxLength: 200 }
+        requestId: { type: string, minLength: 1, maxLength: 200 }
+    WebsiteBookArtProviderShadowFailure:
+      type: object
+      additionalProperties: false
+      required: [classification, code]
+      properties:
+        classification:
+          enum:
+            - transient
+            - permanent
+            - cancelled
+            - lease-expired
+            - deadline-exceeded
+            - dependency-failed
+            - timeout
+        code: { type: string, minLength: 1, maxLength: 128 }
+    WebsiteBookArtProviderShadowCandidate:
+      type: object
+      additionalProperties: false
+      required:
+        - contentSha256
+        - byteLength
+        - mediaType
+        - storageClass
+        - approvalState
+        - finalDeliverable
+        - requiresMastering
+        - requiresBlockingQa
+      properties:
+        contentSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        byteLength:
+          type: integer
+          minimum: 1
+        mediaType:
+          enum: [image/png, image/jpeg, image/webp, image/tiff]
+        storageClass: { const: intermediate }
+        approvalState: { const: unapproved }
+        finalDeliverable: { const: false }
+        requiresMastering: { const: true }
+        requiresBlockingQa: { const: true }
+    WebsiteBookArtProviderShadowObservation:
+      type: object
+      additionalProperties: false
+      required:
+        - outputKind
+        - schemaVersion
+        - sourceRepository
+        - sourceCommitSha
+        - observedAt
+        - identity
+        - executionId
+        - sourceBriefFingerprint
+        - workOrderFingerprintSha256
+        - normalizedProviderRequestSha256
+        - outcome
+        - requestedCandidateCount
+        - attemptCount
+        - providerFallbackUsed
+        - providerExecutionObserved
+        - candidateArtifactsWritten
+        - authoritativeBookWritesPerformed
+        - providerCandidateMayBeFinal
+        - selectionPerformed
+        - promotionPerformed
+        - bookUseBindingCreated
+        - runtimeCutoverApproved
+        - publicationPerformed
+        - observationFingerprintSha256
+      properties:
+        outputKind:
+          const: evavo_website_book_art_provider_shadow_observation
+        schemaVersion: { const: 1 }
+        sourceRepository: { const: EVAVO-STUDIO/Website }
+        sourceCommitSha:
+          type: string
+          pattern: "^[a-f0-9]{40}$"
+        observedAt:
+          type: string
+          format: date-time
+        identity:
+          $ref: "#/components/schemas/BookArtIdentity"
+        executionId: { type: string, minLength: 1, maxLength: 200 }
+        sourceBriefFingerprint:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        workOrderFingerprintSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        normalizedProviderRequestSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        outcome:
+          enum: [not-submitted, pending, failed, candidate-produced]
+        requestedCandidateCount: { const: 1 }
+        attemptCount:
+          type: integer
+          minimum: 0
+          maximum: 1
+        providerFallbackUsed: { const: false }
+        providerExecutionObserved: { type: boolean }
+        candidateArtifactsWritten: { type: boolean }
+        adapterId: { type: string, minLength: 1, maxLength: 128 }
+        model: { type: string, minLength: 1, maxLength: 128 }
+        failure:
+          $ref: "#/components/schemas/WebsiteBookArtProviderShadowFailure"
+        candidate:
+          $ref: "#/components/schemas/WebsiteBookArtProviderShadowCandidate"
+        authoritativeBookWritesPerformed: { const: false }
+        providerCandidateMayBeFinal: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+        observationFingerprintSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+    BookArtProviderShadowParityComparison:
+      type: object
+      additionalProperties: false
+      required:
+        - identityMatched
+        - executionIdMatched
+        - sourceBriefFingerprintMatched
+        - workOrderFingerprintMatched
+        - normalizedProviderRequestMatched
+        - outcomeMatched
+        - attemptBoundaryMatched
+        - providerPolicyMatched
+        - adapterMatched
+        - modelMatched
+        - candidateBoundaryMatched
+        - failureClassificationMatched
+      properties:
+        identityMatched: { type: boolean }
+        executionIdMatched: { type: boolean }
+        sourceBriefFingerprintMatched: { type: boolean }
+        workOrderFingerprintMatched: { type: boolean }
+        normalizedProviderRequestMatched: { type: boolean }
+        outcomeMatched: { type: boolean }
+        attemptBoundaryMatched: { type: boolean }
+        providerPolicyMatched: { type: [boolean, "null"] }
+        adapterMatched: { type: [boolean, "null"] }
+        modelMatched: { type: [boolean, "null"] }
+        candidateBoundaryMatched: { type: [boolean, "null"] }
+        failureClassificationMatched: { type: [boolean, "null"] }
+    BookArtProviderShadowParityResult:
+      type: object
+      additionalProperties: false
+      required:
+        - outputKind
+        - schemaVersion
+        - status
+        - identity
+        - blockers
+        - mismatches
+        - warnings
+        - parityFingerprintSha256
+        - shadowOnly
+        - parityReadOnly
+        - parityScope
+        - providerCallPerformedByParity
+        - artifactWritesPerformedByParity
+        - visualSimilarityEvaluated
+        - candidateBytesExpectedEqual
+        - structuralParityMatched
+        - observationPeriodSatisfied
+        - cutoverEligible
+        - websiteRuntimeStillActive
+        - websiteSourceDeletionAllowed
+        - authoritativeBookWritesPerformed
+        - selectionPerformed
+        - promotionPerformed
+        - bookUseBindingCreated
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        outputKind:
+          const: evavo_book_art_provider_shadow_parity_result
+        schemaVersion: { const: 1 }
+        status: { enum: [blocked, incomplete, matched, mismatched] }
+        identity:
+          $ref: "#/components/schemas/BookArtIdentity"
+        website: { type: object }
+        artStudio: { type: object }
+        comparison:
+          $ref: "#/components/schemas/BookArtProviderShadowParityComparison"
+        blockers:
+          type: array
+          items: { type: string }
+        mismatches:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+        parityFingerprintSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        shadowOnly: { const: true }
+        parityReadOnly: { const: true }
+        parityScope: { const: request-execution-and-authority }
+        providerCallPerformedByParity: { const: false }
+        artifactWritesPerformedByParity: { const: false }
+        visualSimilarityEvaluated: { const: false }
+        candidateBytesExpectedEqual: { const: false }
+        structuralParityMatched: { type: boolean }
+        observationPeriodSatisfied: { const: false }
+        cutoverEligible: { const: false }
+        websiteRuntimeStillActive: { const: true }
+        websiteSourceDeletionAllowed: { const: false }
+        authoritativeBookWritesPerformed: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    AuthorizationError:
+      description: Art Studio control token is absent or invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ConfigurationError:
+      description: Host policy, runtime, artifact store or protected access is unavailable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
