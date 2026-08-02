@@ -1,0 +1,66 @@
+name: Validate Docs Suite Book Story
+
+on:
+  push:
+    branches:
+      - agent/validate-docs-book-story-20260802
+    paths:
+      - ".github/workflows/validate-docs-book-story.yml"
+      - ".migration-validation/docs-story/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-docs-book-story.yml"
+      - ".migration-validation/docs-story/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-book-story-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Use governed Node.js runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      - name: Prove exact Docs Suite Git blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .migration-validation/docs-story/src/book-studio-story-contracts.ts)" = "28f3505bab596dfe02400c3b57e684e95774b464"
+          test "$(git hash-object .migration-validation/docs-story/src/book-studio-legacy-story-import.ts)" = "214e8cfc32fe9d9c914bf660f285302d55821da7"
+          test "$(git hash-object .migration-validation/docs-story/test/book-studio-story-continuity.test.mjs)" = "20f28d23864c6d22c60e4805783cac4fde14999f"
+      - name: Compile exact Docs Suite source with strict settings
+        run: |
+          npm exec --yes --package=typescript@5.9.3 -- tsc \
+            --noEmit \
+            --target ES2022 \
+            --lib ES2022,DOM,DOM.Iterable \
+            --module ESNext \
+            --moduleResolution Bundler \
+            --strict \
+            --noUncheckedIndexedAccess \
+            --exactOptionalPropertyTypes \
+            --skipLibCheck \
+            .migration-validation/docs-story/src/book-studio-project-contracts.ts \
+            .migration-validation/docs-story/src/book-studio-story-contracts.ts \
+            .migration-validation/docs-story/src/book-studio-legacy-story-import.ts
+      - name: Run exact story and continuity attacks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .migration-validation/docs-story
+          npm exec --yes --package=tsx@4.20.3 -- tsx --test test/book-studio-story-continuity.test.mjs
