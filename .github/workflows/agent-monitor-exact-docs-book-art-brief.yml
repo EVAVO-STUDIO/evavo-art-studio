@@ -1,0 +1,103 @@
+name: Agent Monitor Exact Docs Book Art Brief
+
+on:
+  pull_request:
+    branches:
+      - agent/exact-docs-book-art-brief-20260803
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: agent-monitor-exact-docs-book-art-brief
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    if: >-
+      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: agent/exact-docs-book-art-brief-20260803
+      WORKFLOW_FILE: agent-complete-exact-docs-book-art-brief.yml
+    steps:
+      - name: Check out exact feature base
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/exact-docs-book-art-brief-20260803
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact PR base
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.base.sha }}" ]]
+          [[ "$(git merge-base origin/main HEAD)" == "c3712705ddcf16fe46395182de11d706f8d5c51d" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Trigger one observable exact push validation
+        id: trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit --allow-empty -m 'chore(agent): trigger exact Docs receiver validation'
+          trigger_sha="$(git rev-parse HEAD)"
+          git push origin HEAD:refs/heads/${TARGET_BRANCH}
+          echo "sha=${trigger_sha}" >> "${GITHUB_OUTPUT}"
+
+      - name: Watch exact push workflow
+        id: watch
+        shell: bash
+        run: |
+          set -euo pipefail
+          trigger_sha='${{ steps.trigger.outputs.sha }}'
+          run_id=''
+          for _ in $(seq 1 120); do
+            run_id="$(
+              gh api \
+                -H 'Accept: application/vnd.github+json' \
+                "/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${TARGET_BRANCH}&event=push&per_page=20" \
+                --jq ".workflow_runs[] | select(.head_sha == \"${trigger_sha}\") | .id" \
+                | head -n 1
+            )"
+            [[ -n "${run_id}" ]] && break
+            sleep 5
+          done
+          [[ -n "${run_id}" ]] || { echo 'Exact push workflow run was not created.' >&2; exit 1; }
+          echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+          for _ in $(seq 1 180); do
+            status="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq .status)"
+            conclusion="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.conclusion // ""')"
+            echo "run ${run_id}: ${status} ${conclusion}"
+            if [[ "${status}" == 'completed' ]]; then
+              if [[ "${conclusion}" != 'success' ]]; then
+                gh run view "${run_id}" --repo "${GITHUB_REPOSITORY}" --log || true
+                exit 1
+              fi
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Exact push workflow ${run_id} did not complete within the bounded monitor window." >&2
+          exit 1
+
+      - name: Prove validated source was published
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            +refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}
+          remote_sha="$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})"
+          [[ "${remote_sha}" != '${{ steps.trigger.outputs.sha }}' ]]
+          git show "${remote_sha}:packages/contracts/src/book-production-profile.ts" \
+            | grep -F 'export async function fingerprintBookArtBrief'
+          echo "validated branch head: ${remote_sha}"
+          echo "push workflow run: ${{ steps.watch.outputs.run_id }}"
