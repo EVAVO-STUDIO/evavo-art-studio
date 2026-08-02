@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/book-studio-production-handoff.yml"
       - "packages/contracts/src/book-production.ts"
+      - "packages/contracts/src/book-production-profile.ts"
       - "packages/contracts/src/book-production-legacy-compat.ts"
       - "packages/contracts/src/book-production-legacy-state-import.ts"
       - "packages/contracts/src/book-production-legacy-state-import-safe.ts"
@@ -21,6 +22,7 @@ on:
     paths:
       - ".github/workflows/book-studio-production-handoff.yml"
       - "packages/contracts/src/book-production.ts"
+      - "packages/contracts/src/book-production-profile.ts"
       - "packages/contracts/src/book-production-legacy-compat.ts"
       - "packages/contracts/src/book-production-legacy-state-import.ts"
       - "packages/contracts/src/book-production-legacy-state-import-safe.ts"
@@ -63,12 +65,16 @@ jobs:
           mkdir -p packages/contracts/dist
           npm exec --yes --package=typescript@5.9.3 -- tsc \
             --target ES2022 \
+            --lib ES2022,DOM,DOM.Iterable \
             --module NodeNext \
             --moduleResolution NodeNext \
             --strict \
+            --noUncheckedIndexedAccess \
+            --exactOptionalPropertyTypes \
             --skipLibCheck \
             --outDir packages/contracts/dist \
             packages/contracts/src/book-production.ts \
+            packages/contracts/src/book-production-profile.ts \
             packages/contracts/src/book-production-legacy-compat.ts \
             packages/contracts/src/book-production-legacy-state-import.ts \
             packages/contracts/src/book-production-legacy-state-import-safe.ts \
@@ -76,9 +82,10 @@ jobs:
             packages/contracts/src/book-production-legacy-state-batch-safe.ts
           printf '%s\n' \
             'export * from "./book-production.js";' \
+            'export * from "./book-production-profile.js";' \
             'export * from "./book-production-legacy-compat.js";' \
             'export * from "./book-production-legacy-state-import-safe.js";' \
             'export * from "./book-production-legacy-state-batch-safe.js";' \
             > packages/contracts/dist/index.js
-      - name: Run Book Art contract, legacy-state and exact batch attacks
+      - name: Run Book Art contract, production-profile, legacy-state and exact batch attacks
         run: node --test packages/contracts/test/book-production*.test.mjs
