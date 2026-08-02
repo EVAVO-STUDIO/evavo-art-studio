@@ -21,6 +21,20 @@ import {
   type RuntimeWorkerRunResult,
 } from "@evavo/art-runtime";
 
+export {
+  BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
+  BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
+  compileBookArtProviderShadowJob,
+  submitBookArtProviderShadowJob,
+} from "./book-art-provider-jobs.js";
+export type {
+  BookArtProviderAdapterPolicyV1,
+  BookArtProviderShadowJobCompilationResultV1,
+  BookArtProviderShadowJobInputV1,
+  BookArtProviderShadowJobPlanV1,
+  BookArtProviderShadowJobSubmissionResultV1,
+} from "./book-art-provider-jobs.js";
+
 import {
   createDeterministicMirrorAwareFinalizerHandlers,
   deterministicMirrorAwareFinalizerWorkerCapabilities,

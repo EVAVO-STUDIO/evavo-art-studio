@@ -109,7 +109,6 @@ export interface BookArtProviderShadowJobSubmissionResultV1 {
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,199}$/;
 const SAFE_PROVIDER_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const SHA256 = /^(?:sha256:)?[a-f0-9]{64}$/;
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const INPUT_FIELDS = new Set([
   "outputKind",
@@ -161,8 +160,12 @@ export async function compileBookArtProviderShadowJob(
   }
   const workOrder = workOrderRecord as unknown as BookArtProductionWorkOrderV1;
   if (workOrderRecord) {
-    const validation = await validateBookArtProductionWorkOrder(workOrder);
-    blockers.push(...validation.issues);
+    try {
+      const validation = await validateBookArtProductionWorkOrder(workOrder);
+      blockers.push(...validation.issues);
+    } catch (error: unknown) {
+      blockers.push(message(error, "Book Art provider work-order validation failed."));
+    }
     if (workOrder.authoritativeWritesPerformed !== false) {
       blockers.push("Book Art provider work order cannot perform authoritative writes.");
     }
@@ -198,7 +201,11 @@ export async function compileBookArtProviderShadowJob(
       blockers,
     );
   }
-  const allowedAdapterIds = stringArray(adapterPolicy?.allowedAdapterIds).sort();
+  const allowedAdapterIds = strictStringArray(
+    adapterPolicy?.allowedAdapterIds,
+    "Book Art provider shadow-job allowedAdapterIds",
+    blockers,
+  ).sort();
   if (
     allowedAdapterIds.length < 1 ||
     allowedAdapterIds.length > 16 ||
@@ -591,16 +598,32 @@ function text(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 function optionalText(value: unknown): string | undefined {
-  const result = text(value).trim();
-  return result ? result : undefined;
+  if (value === undefined) return undefined;
+  return typeof value === "string" && value.trim() === value && value.length > 0
+    ? value
+    : "";
 }
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter(
-        (entry): entry is string =>
-          typeof entry === "string" && entry.trim() === entry && entry.length > 0,
-      )
-    : [];
+function strictStringArray(
+  value: unknown,
+  label: string,
+  blockers: string[],
+): string[] {
+  if (!Array.isArray(value)) {
+    blockers.push(`${label} must be an array.`);
+    return [];
+  }
+  if (
+    value.some(
+      (entry) =>
+        typeof entry !== "string" ||
+        entry.trim() !== entry ||
+        entry.length === 0,
+    )
+  ) {
+    blockers.push(`${label} must contain only non-empty, already-trimmed strings.`);
+    return [];
+  }
+  return [...value] as string[];
 }
 function isSafeId(value: unknown): value is string {
   return (
@@ -610,14 +633,11 @@ function isSafeId(value: unknown): value is string {
   );
 }
 function isTimestamp(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    ISO_TIMESTAMP.test(value) &&
-    !Number.isNaN(Date.parse(value))
-  );
-}
-function isSha(value: unknown): value is string {
-  return typeof value === "string" && SHA256.test(value);
+  if (typeof value !== "string" || !ISO_TIMESTAMP.test(value)) return false;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const canonical = parsed.toISOString();
+  return value === canonical || value === canonical.replace(".000Z", "Z");
 }
 function parseIdentity(value: Record<string, unknown> | undefined): BookArtIdentityV1 {
   return {
