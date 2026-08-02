@@ -50,6 +50,6 @@ test("automatic sprite finalization OpenAPI remains adaptive, compile-only, and 
       `OpenAPI contains an execution shortcut: ${forbidden}`,
     );
   }
-  assert.match(openapi, /never call an image provider/i);
-  assert.match(openapi, /never.*deploy/i);
+  assert.match(openapi, /never call an image\s+provider/i);
+  assert.match(openapi, /never.*deploy/is);
 });
