@@ -183,14 +183,38 @@ components:
         runtimeCutoverApproved: { const: false }
         publicationPerformed: { const: false }
     BookArtProviderSubmissionResult:
-      allOf:
-        - $ref: "#/components/schemas/BookArtProviderCompilationResult"
-        - type: object
-          properties:
-            outputKind:
-              const: evavo_book_art_provider_shadow_job_submission_result
-            status: { enum: [blocked, submitted] }
-            job: { type: object }
+      type: object
+      required:
+        - outputKind
+        - schemaVersion
+        - status
+        - blockers
+        - warnings
+        - shadowOnly
+        - providerCallPerformed
+        - candidateArtifactsWritten
+      properties:
+        outputKind:
+          const: evavo_book_art_provider_shadow_job_submission_result
+        schemaVersion: { const: 1 }
+        status: { enum: [blocked, submitted] }
+        plan: { type: object }
+        job: { type: object }
+        blockers:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+        shadowOnly: { const: true }
+        providerCallPerformed: { const: false }
+        candidateArtifactsWritten: { const: false }
+        authoritativeBookWritesPerformed: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
     Error:
       type: object
       required: [error]
