@@ -1,0 +1,70 @@
+name: Validate Docs Suite Book Execution
+
+on:
+  push:
+    branches:
+      - agent/validate-docs-book-execution-20260802
+    paths:
+      - ".github/workflows/validate-docs-book-execution.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-docs-book-execution.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-book-execution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact Docs Suite execution branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: EVAVO-STUDIO/evavo-docs-suite
+          ref: agent/book-studio-execution-20260802
+          path: docs-source
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Prove exact Docs Suite candidate
+        working-directory: docs-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "8615a0642acb2750a70b71c115271b8fb37e5f72"
+          test "$(git merge-base --is-ancestor 79b4110965d86e7ee69205532c4d8ee591c56fe8 HEAD && echo yes)" = "yes"
+      - name: Use governed Node.js runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      - name: Verify execution migration authority
+        working-directory: docs-source
+        run: node scripts/check-book-studio-execution-migration.mjs
+      - name: Compile exact Docs Suite execution source
+        working-directory: docs-source
+        run: |
+          npm exec --yes --package=typescript@5.9.3 -- tsc \
+            --noEmit \
+            --target ES2022 \
+            --lib ES2022,DOM,DOM.Iterable \
+            --module ESNext \
+            --moduleResolution Bundler \
+            --strict \
+            --noUncheckedIndexedAccess \
+            --exactOptionalPropertyTypes \
+            --skipLibCheck \
+            packages/core/src/book-studio-project-contracts.ts \
+            packages/core/src/book-studio-execution-contracts.ts \
+            packages/core/src/book-studio-execution-plan.ts \
+            packages/core/src/book-studio-execution-state.ts \
+            packages/core/src/book-studio-legacy-execution-import.ts
+      - name: Run exact execution migration attacks
+        working-directory: docs-source
+        run: npm exec --yes --package=tsx@4.20.3 -- tsx --test packages/core/test/book-studio-execution.test.mjs
