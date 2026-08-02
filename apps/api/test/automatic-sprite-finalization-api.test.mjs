@@ -71,7 +71,7 @@ test("automatic finalization API compiles adaptive proof without executing work"
     assert.ok(protocolBody.backgroundModes.includes("magenta-matte"));
     assert.ok(
       protocolBody.backgroundRules.some((entry) =>
-        entry.includes("checkerboards"),
+        entry.toLowerCase().includes("checkerboards"),
       ),
     );
     assert.ok(
