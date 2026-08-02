@@ -8,6 +8,7 @@ import test from "node:test";
 import {
   BOOK_ART_HANDOFF_CONTRACT,
   compileBookArtProductionWorkOrder,
+  fingerprintBookArtBrief,
 } from "@evavo/art-contracts";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 
@@ -32,8 +33,8 @@ function run(args, env = providerEnvironment()) {
   });
 }
 
-function brief() {
-  return {
+async function brief() {
+  const value = {
     outputKind: "evavo_book_art_brief",
     schemaVersion: 1,
     contract: BOOK_ART_HANDOFF_CONTRACT,
@@ -83,14 +84,16 @@ function brief() {
     },
     rightsEvidenceIds: ["rights-1"],
     createdAt: "2026-08-02T00:00:00.000Z",
-    briefFingerprint: sha("e"),
+    briefFingerprint: "",
     providerCandidateMayBeFinal: false,
     publicationPerformed: false,
   };
+  value.briefFingerprint = await fingerprintBookArtBrief(value);
+  return value;
 }
 
 async function inputFile(root) {
-  const compiled = await compileBookArtProductionWorkOrder(brief());
+  const compiled = await compileBookArtProductionWorkOrder(await brief());
   assert.equal(compiled.status, "ready", compiled.blockers.join("\n"));
   assert.ok(compiled.workOrder);
   const file = path.join(root, "book-art-shadow.json");

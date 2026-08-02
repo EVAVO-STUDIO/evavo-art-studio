@@ -7,6 +7,7 @@ import test from "node:test";
 import {
   BOOK_ART_HANDOFF_CONTRACT,
   compileBookArtProductionWorkOrder,
+  fingerprintBookArtBrief,
 } from "@evavo/art-contracts";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 
@@ -18,8 +19,8 @@ import {
 
 const sha = (character) => character.repeat(64);
 
-function brief() {
-  return {
+async function brief() {
+  const value = {
     outputKind: "evavo_book_art_brief",
     schemaVersion: 1,
     contract: BOOK_ART_HANDOFF_CONTRACT,
@@ -37,7 +38,11 @@ function brief() {
       extractedTextSha256: sha("b"),
       visualCanonSha256: sha("c"),
       artDirectionSha256: sha("d"),
-      approvedEvidenceIds: ["evidence-1"],
+      approvedEvidenceIds: [
+        "docs-main-966e240f03a0912a0ff0c0c890bf0fe0e9a6dd77",
+        "docs-writing-art-link-evidence",
+        "docs-website-mutation-receipt-evidence",
+      ],
     },
     conceptTerritoryId: "manuscript-first",
     conceptTerritoryLabel: "Manuscript first",
@@ -69,14 +74,16 @@ function brief() {
     },
     rightsEvidenceIds: ["rights-1"],
     createdAt: "2026-08-02T00:00:00.000Z",
-    briefFingerprint: sha("e"),
+    briefFingerprint: "",
     providerCandidateMayBeFinal: false,
     publicationPerformed: false,
   };
+  value.briefFingerprint = await fingerprintBookArtBrief(value);
+  return value;
 }
 
 async function shadowInput() {
-  const compiled = await compileBookArtProductionWorkOrder(brief());
+  const compiled = await compileBookArtProductionWorkOrder(await brief());
   assert.equal(compiled.status, "ready", compiled.blockers.join("\n"));
   assert.ok(compiled.workOrder);
   return {
@@ -92,6 +99,19 @@ async function shadowInput() {
     },
   };
 }
+
+test("rejects a tampered final Docs Suite brief before work-order or provider-job compilation", async () => {
+  const value = await brief();
+  value.primarySubject += " altered after Docs release";
+  const compiled = await compileBookArtProductionWorkOrder(value);
+  assert.equal(compiled.status, "blocked");
+  assert.ok(
+    compiled.blockers.some((item) =>
+      item.includes("fingerprint differs from its exact canonical contents"),
+    ),
+  );
+  assert.equal(compiled.workOrder, undefined);
+});
 
 test("shared Book Art runtime compiles the exact no-fallback one-attempt contract", async () => {
   const input = await shadowInput();
