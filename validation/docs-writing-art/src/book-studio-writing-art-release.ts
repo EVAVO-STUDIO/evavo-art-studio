@@ -1,12 +1,12 @@
-import {
-  validateBookArtBriefExact,
-} from "./book-studio-art-brief-exact";
+import { validateBookArtBriefExact } from "./book-studio-art-brief-exact";
 import type { BookArtBriefV1 } from "./book-studio-art-contracts";
+import { importWebsiteCanonicalMutationReceipt } from "./book-studio-canonical-mutation-receipt-import";
+import { parseWebsiteCanonicalMutationReceipt } from "./book-studio-canonical-mutation-receipt-parse";
+import type {
+  BookCanonicalMutationPlanV1,
+  WebsiteCanonicalMutationReceiptV1,
+} from "./book-studio-canonical-mutation-types";
 import { canonicalBookJson, sha256BookText } from "./book-studio-project-contracts";
-import {
-  BOOK_WEBSITE_MANUSCRIPT_CAS_CONTRACT,
-  validateWebsiteBookManuscriptCompareAndSwapReceipt,
-} from "./book-studio-website-manuscript-cas";
 import {
   BOOK_WRITING_ART_LINK_CONTRACT,
   compileBookWritingArtLink,
@@ -21,8 +21,10 @@ export interface BookWritingArtReleaseInputV1 {
   schemaVersion: 1;
   contract: typeof BOOK_WRITING_ART_RELEASE_CONTRACT;
   link: BookWritingArtLinkInputV1;
-  websiteCompareAndSwapReceipt: unknown;
-  artBrief: BookArtBriefV1;
+  websiteMutationReceipt: WebsiteCanonicalMutationReceiptV1;
+  receiptImportedAt: string;
+  receiptImportedBy: string;
+  finalArtBrief: BookArtBriefV1;
   releasedAt: string;
   releasedBy: string;
   writingStudioMayCallArtStudioDirectly: false;
@@ -37,16 +39,18 @@ export interface BookWritingArtReleaseReceiptV1 {
   contract: typeof BOOK_WRITING_ART_RELEASE_CONTRACT;
   status: "ready_for_art_shadow" | "needs_work" | "blocked";
   linkContract: typeof BOOK_WRITING_ART_LINK_CONTRACT;
-  websiteCompareAndSwapContract: typeof BOOK_WEBSITE_MANUSCRIPT_CAS_CONTRACT;
   linkFingerprint: string;
+  mutationId: string;
+  canonicalMutationPlanFingerprint: string;
+  websiteMutationReceiptFingerprint?: string;
+  websiteMutationImportFingerprint?: string;
   projectId: string;
+  programmeId: string;
   volumeId: string;
-  priorManuscriptRevisionId: string;
   manuscriptRevisionId: string;
   manuscriptSha256: string;
   draftArtBriefFingerprint?: string;
-  artBriefFingerprint?: string;
-  websiteCompareAndSwapReceiptFingerprint?: string;
+  finalArtBriefFingerprint?: string;
   writingStudioMainCommit: string;
   artStudioMainCommit: string;
   releasedAt: string;
@@ -55,8 +59,8 @@ export interface BookWritingArtReleaseReceiptV1 {
   blockers: string[];
   requiredActions: string[];
   releaseFingerprint: string;
-  websiteCompareAndSwapVerified: boolean;
-  exactArtBriefVerified: boolean;
+  websiteCanonicalMutationVerified: boolean;
+  exactFinalArtBriefVerified: boolean;
   writingStudioMayCallArtStudioDirectly: false;
   docsSuiteCanonicalWriterEnabled: false;
   artStudioCandidateMayBeFinal: false;
@@ -71,13 +75,15 @@ const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 
 type UnknownRecord = Record<string, unknown>;
 
-const FIELDS = new Set([
+const INPUT_FIELDS = new Set([
   "outputKind",
   "schemaVersion",
   "contract",
   "link",
-  "websiteCompareAndSwapReceipt",
-  "artBrief",
+  "websiteMutationReceipt",
+  "receiptImportedAt",
+  "receiptImportedBy",
+  "finalArtBrief",
   "releasedAt",
   "releasedBy",
   "writingStudioMayCallArtStudioDirectly",
@@ -92,16 +98,25 @@ export async function compileBookWritingArtRelease(
   const blockers: string[] = [];
   const requiredActions: string[] = [];
   const root = record(input, "Book writing-art release input", blockers);
-  rejectUnknown(root, FIELDS, "Book writing-art release input", blockers);
-  if (root.outputKind !== "evavo_docs_book_writing_art_release_input") {
-    blockers.push("Book writing-art release outputKind is invalid.");
+  rejectUnknown(root, INPUT_FIELDS, "Book writing-art release input", blockers);
+  if (
+    root.outputKind !== "evavo_docs_book_writing_art_release_input" ||
+    root.schemaVersion !== 1 ||
+    root.contract !== BOOK_WRITING_ART_RELEASE_CONTRACT
+  ) {
+    blockers.push("Book writing-art release identity or version is invalid.");
   }
-  if (root.schemaVersion !== 1) {
-    blockers.push("Book writing-art release schemaVersion is invalid.");
-  }
-  if (root.contract !== BOOK_WRITING_ART_RELEASE_CONTRACT) {
-    blockers.push("Book writing-art release contract is invalid.");
-  }
+  const receiptImportedAt = timestamp(
+    root.receiptImportedAt,
+    "receiptImportedAt",
+    blockers,
+  );
+  const receiptImportedBy = text(
+    root.receiptImportedBy,
+    "receiptImportedBy",
+    blockers,
+    300,
+  );
   const releasedAt = timestamp(root.releasedAt, "releasedAt", blockers);
   const releasedBy = text(root.releasedBy, "releasedBy", blockers, 300);
   if (
@@ -110,191 +125,196 @@ export async function compileBookWritingArtRelease(
     root.runtimeCutoverApproved !== false ||
     root.publicationPerformed !== false
   ) {
-    blockers.push(
-      "Book writing-art release cannot grant direct Writing-to-Art calls, Docs Suite canonical writes, runtime cutover or publication.",
-    );
+    blockers.push("Book writing-art release authority flags are invalid.");
   }
 
-  const linkInput = root.link as BookWritingArtLinkInputV1;
-  const link = await compileBookWritingArtLink(linkInput);
+  const linkInput = isObject(root.link)
+    ? (root.link as BookWritingArtLinkInputV1)
+    : undefined;
+  if (!linkInput) blockers.push("Book writing-art release link must be an object.");
+  const link = await compileBookWritingArtLink(root.link);
   blockers.push(...link.blockers);
   requiredActions.push(...link.requiredActions);
   if (link.status !== "ready_for_website_compare_and_swap") {
+    requiredActions.push("Resolve the writing-art link before Art release.");
+  }
+
+  const plan = linkInput?.canonicalMutationPlan as
+    | BookCanonicalMutationPlanV1
+    | undefined;
+  const parsedReceipt = await parseWebsiteCanonicalMutationReceipt(
+    root.websiteMutationReceipt,
+    blockers,
+  );
+  const websiteImport = await importWebsiteCanonicalMutationReceipt({
+    outputKind: "evavo_docs_website_canonical_mutation_receipt_import_input",
+    schemaVersion: 1,
+    plan,
+    receipt: parsedReceipt,
+    importedAt: receiptImportedAt,
+    importedBy: receiptImportedBy,
+  });
+  blockers.push(...websiteImport.blockers);
+  requiredActions.push(...websiteImport.requiredActions);
+  if (websiteImport.status !== "ready_for_shadow_observation") {
     requiredActions.push(
-      "Resolve the writing-art link before validating Website compare-and-swap.",
+      "Import one exact successful Website canonical-mutation receipt.",
     );
   }
+  match(
+    websiteImport.planFingerprint,
+    link.canonicalMutationPlanFingerprint,
+    "Imported Website receipt belongs to a different canonical mutation plan.",
+    blockers,
+  );
+  match(
+    websiteImport.receiptFingerprint,
+    parsedReceipt.receiptFingerprint,
+    "Imported Website receipt fingerprint differs from the parsed receipt.",
+    blockers,
+  );
+  match(
+    websiteImport.resultingSnapshotFingerprint,
+    plan?.proposedSnapshot?.stateFingerprint,
+    "Imported Website receipt resulting snapshot differs from the canonical plan.",
+    blockers,
+  );
 
-  const casValidation =
-    await validateWebsiteBookManuscriptCompareAndSwapReceipt(
-      root.websiteCompareAndSwapReceipt,
-    );
-  blockers.push(...casValidation.blockers);
-  if (casValidation.status !== "ready" || !casValidation.receipt) {
-    requiredActions.push(
-      "Provide an exact fingerprint-valid Website manuscript compare-and-swap receipt.",
-    );
-  }
-  const cas = casValidation.receipt;
-
-  if (cas) {
-    match(
-      cas.projectId,
-      link.projectId,
-      "Website compare-and-swap projectId differs from the writing-art link.",
-      blockers,
-    );
-    match(
-      cas.volumeId,
-      link.volumeId,
-      "Website compare-and-swap volumeId differs from the writing-art link.",
-      blockers,
-    );
-    match(
-      cas.priorRevisionId,
-      link.priorManuscriptRevisionId,
-      "Website compare-and-swap prior revision differs from the writing-art link.",
-      blockers,
-    );
-    match(
-      cas.nextRevisionId,
-      link.proposedManuscriptRevisionId,
-      "Website compare-and-swap next revision differs from the writing-art link.",
-      blockers,
-    );
-    match(
-      cas.beforeManuscriptSha256,
-      link.beforeManuscriptSha256,
-      "Website compare-and-swap before-manuscript SHA-256 differs from the writing-art link.",
-      blockers,
-    );
-    match(
-      cas.afterManuscriptSha256,
-      link.proposedAfterManuscriptSha256,
-      "Website compare-and-swap after-manuscript SHA-256 differs from the writing-art link.",
-      blockers,
-    );
-    match(
-      cas.compareAndSwapRequestFingerprint,
-      link.linkFingerprint,
-      "Website compare-and-swap request fingerprint differs from the exact writing-art link.",
-      blockers,
-    );
-  }
-
-  const artBrief = await parseExactArtBrief(root.artBrief, blockers);
-  const draftArtBrief = linkInput?.artBrief;
-  if (artBrief && draftArtBrief) {
+  const finalArtBrief = await parseExactArtBrief(root.finalArtBrief, blockers);
+  const draftArtBrief = linkInput?.draftArtBrief;
+  if (finalArtBrief && draftArtBrief && plan?.proposedSnapshot) {
     if (
-      canonicalBookJson(bookArtBriefIntent(artBrief)) !==
+      canonicalBookJson(bookArtBriefIntent(finalArtBrief)) !==
       canonicalBookJson(bookArtBriefIntent(draftArtBrief))
     ) {
       blockers.push(
-        "Final Book Art brief creative intent differs from the pre-CAS draft brief.",
+        "Final Book Art brief creative intent differs from the pre-mutation draft brief.",
       );
     }
     match(
-      artBrief.identity.projectId,
-      link.projectId,
-      "Final Book Art brief projectId differs from the writing-art link.",
+      finalArtBrief.identity.projectId,
+      plan.projectId,
+      "Final Art brief project differs from canonical plan.",
       blockers,
     );
     match(
-      artBrief.identity.bookId,
-      link.volumeId,
-      "Final Book Art brief bookId differs from the writing-art link.",
+      finalArtBrief.identity.bookId,
+      plan.volumeId,
+      "Final Art brief book differs from canonical plan volume.",
       blockers,
     );
     match(
-      artBrief.manuscript.manuscriptRevisionId,
-      link.proposedManuscriptRevisionId,
-      "Final Book Art brief manuscript revision differs from the writing-art link.",
+      finalArtBrief.manuscript.manuscriptRevisionId,
+      plan.proposedSnapshot.manuscriptRevisionId,
+      "Final Art brief revision differs from canonical proposed snapshot.",
       blockers,
     );
     match(
-      artBrief.manuscript.manuscriptSha256,
-      link.proposedAfterManuscriptSha256,
-      "Final Book Art brief manuscript SHA-256 differs from the writing-art link.",
+      finalArtBrief.manuscript.manuscriptSha256,
+      plan.proposedSnapshot.manuscriptSha256,
+      "Final Art brief manuscript differs from canonical proposed snapshot.",
       blockers,
     );
-    if (cas && Date.parse(artBrief.createdAt) < Date.parse(cas.committedAt)) {
-      blockers.push(
-        "Final Book Art brief createdAt predates Website compare-and-swap.",
-      );
+    match(
+      finalArtBrief.manuscript.extractedTextSha256,
+      link.proposedExtractedTextSha256,
+      "Final Art brief extracted-text fingerprint differs from link.",
+      blockers,
+    );
+    match(
+      finalArtBrief.manuscript.visualCanonSha256,
+      link.visualCanonSha256,
+      "Final Art brief visual-canon fingerprint differs from link.",
+      blockers,
+    );
+    match(
+      finalArtBrief.manuscript.artDirectionSha256,
+      link.artDirectionSha256,
+      "Final Art brief art-direction fingerprint differs from link.",
+      blockers,
+    );
+    if (Date.parse(finalArtBrief.createdAt) < Date.parse(parsedReceipt.persistedAt)) {
+      blockers.push("Final Art brief predates Website canonical mutation.");
     }
-    if (Date.parse(releasedAt) < Date.parse(artBrief.createdAt)) {
-      blockers.push("Art shadow release predates the final Book Art brief.");
+    if (Date.parse(finalArtBrief.createdAt) < Date.parse(receiptImportedAt)) {
+      blockers.push("Final Art brief predates Website receipt import.");
+    }
+    if (Date.parse(releasedAt) < Date.parse(finalArtBrief.createdAt)) {
+      blockers.push("Art shadow release predates the final Art brief.");
     }
   }
 
-  const casEvidenceIds = cas
-    ? [...cas.evidenceIds, cas.receiptFingerprint]
-    : [];
-  const requiredEvidenceIds = unique([
-    ...link.requiredEvidenceIds,
-    ...casEvidenceIds,
-  ]).sort();
+  const requiredEvidenceIds = unique(
+    [
+      ...link.requiredEvidenceIds,
+      link.linkFingerprint,
+      link.draftArtBriefFingerprint ?? "",
+      plan?.planFingerprint ?? "",
+      ...(plan?.evidenceIds ?? []),
+      websiteImport.importFingerprint,
+      parsedReceipt.receiptFingerprint,
+    ].filter(Boolean),
+  ).sort();
   const approvedEvidence = new Set(
-    artBrief?.manuscript.approvedEvidenceIds ?? [],
+    finalArtBrief?.manuscript.approvedEvidenceIds ?? [],
   );
   for (const evidenceId of requiredEvidenceIds) {
     if (!approvedEvidence.has(evidenceId)) {
       blockers.push(
-        `Final Book Art brief is missing approved release evidence ${evidenceId}.`,
+        `Final Art brief is missing approved release evidence ${evidenceId}.`,
       );
     }
   }
 
-  const uniqueBlockers = unique(blockers);
-  const uniqueActions = unique(requiredActions);
-  const websiteCompareAndSwapVerified =
-    casValidation.status === "ready" && cas !== undefined;
-  const exactArtBriefVerified = artBrief !== undefined;
-  const status: BookWritingArtReleaseReceiptV1["status"] =
-    uniqueBlockers.length > 0
-      ? "blocked"
-      : link.status === "ready_for_website_compare_and_swap" &&
-          websiteCompareAndSwapVerified &&
-          exactArtBriefVerified &&
-          uniqueActions.length === 0
-        ? "ready_for_art_shadow"
-        : "needs_work";
-  const withoutFingerprint: Omit<
-    BookWritingArtReleaseReceiptV1,
-    "releaseFingerprint"
-  > = {
+  const finalBlockers = unique(blockers);
+  const finalActions = unique(requiredActions);
+  const websiteCanonicalMutationVerified =
+    websiteImport.status === "ready_for_shadow_observation" &&
+    websiteImport.receiptFingerprint === parsedReceipt.receiptFingerprint;
+  const exactFinalArtBriefVerified = finalArtBrief !== undefined;
+  const status: BookWritingArtReleaseReceiptV1["status"] = finalBlockers.length
+    ? "blocked"
+    : finalActions.length ||
+        link.status !== "ready_for_website_compare_and_swap" ||
+        !websiteCanonicalMutationVerified ||
+        !exactFinalArtBriefVerified
+      ? "needs_work"
+      : "ready_for_art_shadow";
+  const unsigned: Omit<BookWritingArtReleaseReceiptV1, "releaseFingerprint"> = {
     outputKind: "evavo_docs_book_writing_art_release_receipt",
     schemaVersion: 1,
     contract: BOOK_WRITING_ART_RELEASE_CONTRACT,
     status,
     linkContract: BOOK_WRITING_ART_LINK_CONTRACT,
-    websiteCompareAndSwapContract: BOOK_WEBSITE_MANUSCRIPT_CAS_CONTRACT,
     linkFingerprint: link.linkFingerprint,
+    mutationId: link.mutationId,
+    canonicalMutationPlanFingerprint: link.canonicalMutationPlanFingerprint,
+    ...(parsedReceipt.receiptFingerprint
+      ? { websiteMutationReceiptFingerprint: parsedReceipt.receiptFingerprint }
+      : {}),
+    ...(websiteImport.importFingerprint
+      ? { websiteMutationImportFingerprint: websiteImport.importFingerprint }
+      : {}),
     projectId: link.projectId,
+    programmeId: link.programmeId,
     volumeId: link.volumeId,
-    priorManuscriptRevisionId: link.priorManuscriptRevisionId,
     manuscriptRevisionId: link.proposedManuscriptRevisionId,
     manuscriptSha256: link.proposedAfterManuscriptSha256,
-    ...(link.artBriefFingerprint === undefined
+    ...(link.draftArtBriefFingerprint === undefined
       ? {}
-      : { draftArtBriefFingerprint: link.artBriefFingerprint }),
-    ...(artBrief?.briefFingerprint === undefined
+      : { draftArtBriefFingerprint: link.draftArtBriefFingerprint }),
+    ...(finalArtBrief?.briefFingerprint === undefined
       ? {}
-      : { artBriefFingerprint: artBrief.briefFingerprint }),
-    ...(cas?.receiptFingerprint === undefined
-      ? {}
-      : {
-          websiteCompareAndSwapReceiptFingerprint: cas.receiptFingerprint,
-        }),
+      : { finalArtBriefFingerprint: finalArtBrief.briefFingerprint }),
     writingStudioMainCommit: link.writingStudioMainCommit,
     artStudioMainCommit: link.artStudioMainCommit,
     releasedAt,
     releasedBy,
     requiredEvidenceIds,
-    blockers: uniqueBlockers,
-    requiredActions: uniqueActions,
-    websiteCompareAndSwapVerified,
-    exactArtBriefVerified,
+    blockers: finalBlockers,
+    requiredActions: finalActions,
+    websiteCanonicalMutationVerified,
+    exactFinalArtBriefVerified,
     writingStudioMayCallArtStudioDirectly: false,
     docsSuiteCanonicalWriterEnabled: false,
     artStudioCandidateMayBeFinal: false,
@@ -305,10 +325,8 @@ export async function compileBookWritingArtRelease(
     publicationPerformed: false,
   };
   return {
-    ...withoutFingerprint,
-    releaseFingerprint: await sha256BookText(
-      canonicalBookJson(withoutFingerprint),
-    ),
+    ...unsigned,
+    releaseFingerprint: await sha256BookText(canonicalBookJson(unsigned)),
   };
 }
 
@@ -316,20 +334,17 @@ async function parseExactArtBrief(
   value: unknown,
   blockers: string[],
 ): Promise<BookArtBriefV1 | undefined> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!isObject(value)) {
     blockers.push("Final Book Art brief must be an object.");
     return undefined;
   }
-  const artBrief = value as BookArtBriefV1;
-  const validation = await validateBookArtBriefExact(artBrief);
+  const brief = value as BookArtBriefV1;
+  const validation = await validateBookArtBriefExact(brief);
   if (!validation.valid) {
-    blockers.push(
-      "Art release requires an exact valid final Book Art brief.",
-      ...validation.issues,
-    );
+    blockers.push("Final Book Art brief is invalid.", ...validation.issues);
     return undefined;
   }
-  return artBrief;
+  return brief;
 }
 
 function bookArtBriefIntent(value: BookArtBriefV1): unknown {
@@ -366,16 +381,15 @@ function bookArtBriefIntent(value: BookArtBriefV1): unknown {
   };
 }
 
-function record(
-  value: unknown,
-  label: string,
-  blockers: string[],
-): UnknownRecord {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+function isObject(value: unknown): value is UnknownRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+function record(value: unknown, label: string, blockers: string[]): UnknownRecord {
+  if (!isObject(value)) {
     blockers.push(`${label} must be an object.`);
     return {};
   }
-  return value as UnknownRecord;
+  return value;
 }
 function rejectUnknown(
   value: UnknownRecord,
