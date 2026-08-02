@@ -7,6 +7,7 @@ on:
       - ".github/workflows/book-studio-production-handoff.yml"
       - "packages/contracts/src/book-production.ts"
       - "packages/contracts/src/book-production-profile.ts"
+      - "packages/contracts/src/book-production-legacy-illustration-plan.ts"
       - "packages/contracts/src/book-production-legacy-compat.ts"
       - "packages/contracts/src/book-production-legacy-state-import.ts"
       - "packages/contracts/src/book-production-legacy-state-import-safe.ts"
@@ -19,12 +20,14 @@ on:
       - "docs/book-studio-production-handoff.md"
       - "docs/book-art-immutable-promotion-receipts.md"
       - "scripts/check-book-studio-production-handoff.mjs"
+      - "scripts/check-book-illustration-plan-parity.mjs"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/book-studio-production-handoff.yml"
       - "packages/contracts/src/book-production.ts"
       - "packages/contracts/src/book-production-profile.ts"
+      - "packages/contracts/src/book-production-legacy-illustration-plan.ts"
       - "packages/contracts/src/book-production-legacy-compat.ts"
       - "packages/contracts/src/book-production-legacy-state-import.ts"
       - "packages/contracts/src/book-production-legacy-state-import-safe.ts"
@@ -37,6 +40,7 @@ on:
       - "docs/book-studio-production-handoff.md"
       - "docs/book-art-immutable-promotion-receipts.md"
       - "scripts/check-book-studio-production-handoff.mjs"
+      - "scripts/check-book-illustration-plan-parity.mjs"
   workflow_dispatch:
 
 permissions:
@@ -63,6 +67,8 @@ jobs:
           package-manager-cache: false
       - name: Verify migration authority
         run: node scripts/check-book-studio-production-handoff.mjs
+      - name: Verify Book Illustration parity boundary
+        run: node scripts/check-book-illustration-plan-parity.mjs
       - name: Compile dependency-light Book Art contracts
         run: |
           rm -rf packages/contracts/dist
@@ -79,6 +85,7 @@ jobs:
             --outDir packages/contracts/dist \
             packages/contracts/src/book-production.ts \
             packages/contracts/src/book-production-profile.ts \
+            packages/contracts/src/book-production-legacy-illustration-plan.ts \
             packages/contracts/src/book-production-legacy-compat.ts \
             packages/contracts/src/book-production-legacy-state-import.ts \
             packages/contracts/src/book-production-legacy-state-import-safe.ts \
@@ -88,10 +95,11 @@ jobs:
           printf '%s\n' \
             'export * from "./book-production.js";' \
             'export * from "./book-production-profile.js";' \
+            'export * from "./book-production-legacy-illustration-plan.js";' \
             'export * from "./book-production-legacy-compat.js";' \
             'export * from "./book-production-legacy-state-import-safe.js";' \
             'export * from "./book-production-legacy-state-batch-safe.js";' \
             'export * from "./book-production-promotion-adapter.js";' \
             > packages/contracts/dist/index.js
-      - name: Run Book Art contract, production-profile, legacy-state, batch and immutable-promotion attacks
+      - name: Run Book Art contract, production-profile, illustration-parity, legacy-state, batch and immutable-promotion attacks
         run: node --test packages/contracts/test/book-production*.test.mjs
