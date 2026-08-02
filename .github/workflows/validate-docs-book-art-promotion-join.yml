@@ -40,6 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test "$(git hash-object .migration-validation/docs-core/package.json)" = "dd313c678ade6d33cdeed50667e69eb183cbd20e"
           test "$(git hash-object .migration-validation/docs-core/src/book-studio-art-contracts.ts)" = "62e0e202d99779a49548852a996ea22a90d0e0c4"
           test "$(git hash-object .migration-validation/docs-core/src/book-studio-art-legacy-compat.ts)" = "c4133a41e64adbb41dc3af615608b5245a8747e1"
           test "$(git hash-object .migration-validation/docs-core/src/book-studio-legacy-art-use-import.ts)" = "5f86fb5897929e285d038de479b079b846cc4622"
