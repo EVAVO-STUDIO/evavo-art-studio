@@ -1,12 +1,11 @@
-import {
-  validateBookArtBriefExact,
-} from "./book-studio-art-brief-exact";
+import { validateBookArtBriefExact } from "./book-studio-art-brief-exact";
 import type { BookArtBriefV1 } from "./book-studio-art-contracts";
 import { evaluateBookAuthoringAdmission } from "./book-studio-authoring-admission";
 import { validateAndNormalizeBookAuthoringPacket } from "./book-studio-authoring-packet";
 import { validateBookAuthoringResult } from "./book-studio-authoring-result-validation";
 import type { BookAuthoringAdmissionEvidenceV1 } from "./book-studio-authoring-types";
-import type { BookManuscriptRevisionV1 } from "./book-studio-manuscript-contracts";
+import { validateBookCanonicalMutationPlan } from "./book-studio-canonical-mutation-plan-validate";
+import type { BookCanonicalMutationPlanV1 } from "./book-studio-canonical-mutation-types";
 import { canonicalBookJson, sha256BookText } from "./book-studio-project-contracts";
 import { validateBookWritingHandoffResponse } from "./book-studio-writing-handoff-response";
 
@@ -19,6 +18,7 @@ export const BOOK_WRITING_ART_COMPATIBLE_WRITING_STUDIO_COMMITS = Object.freeze(
 ] as const);
 export const BOOK_WRITING_ART_COMPATIBLE_ART_STUDIO_COMMITS = Object.freeze([
   "2f804d8ec4bd3067d72f114a4d4ed8242c3fa585",
+  "2e16bcf338174681ef5e4d2a5abdb4ebd9b4e057",
 ] as const);
 
 export interface BookWritingArtLinkInputV1 {
@@ -26,16 +26,16 @@ export interface BookWritingArtLinkInputV1 {
   schemaVersion: 1;
   contract: typeof BOOK_WRITING_ART_LINK_CONTRACT;
   linkId: string;
+  canonicalMutationPlan: BookCanonicalMutationPlanV1;
   authoringPacket: unknown;
   writingRequest: unknown;
   writingResponse: unknown;
   authoringResult: unknown;
   admissionEvidence: unknown;
-  proposedManuscriptRevision: BookManuscriptRevisionV1;
   proposedExtractedTextSha256: string;
   visualCanonSha256: string;
   artDirectionSha256: string;
-  artBrief: BookArtBriefV1;
+  draftArtBrief: BookArtBriefV1;
   writingStudioMainCommit: string;
   artStudioMainCommit: string;
   linkedAt: string;
@@ -54,9 +54,12 @@ export interface BookWritingArtLinkReceiptV1 {
   contract: typeof BOOK_WRITING_ART_LINK_CONTRACT;
   status: "ready_for_website_compare_and_swap" | "needs_work" | "blocked";
   linkId: string;
+  mutationId: string;
+  canonicalMutationPlanFingerprint: string;
   projectId: string;
+  programmeId: string;
   volumeId: string;
-  priorManuscriptRevisionId: string;
+  currentManuscriptRevisionId: string;
   proposedManuscriptRevisionId: string;
   beforeManuscriptSha256: string;
   proposedAfterManuscriptSha256: string;
@@ -67,7 +70,7 @@ export interface BookWritingArtLinkReceiptV1 {
   writingResponseFingerprint?: string;
   authoringResultFingerprint?: string;
   admissionFingerprint?: string;
-  artBriefFingerprint?: string;
+  draftArtBriefFingerprint?: string;
   writingStudioMainCommit: string;
   artStudioMainCommit: string;
   requiredEvidenceIds: string[];
@@ -87,28 +90,27 @@ export interface BookWritingArtLinkReceiptV1 {
 }
 
 const SAFE_ID = /^[a-z][a-z0-9._:@/-]{1,199}$/;
-const OBJECT_ID = /^[A-Za-z0-9][A-Za-z0-9._:+@/-]{1,299}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const GIT_COMMIT = /^[a-f0-9]{40}$/;
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 
 type UnknownRecord = Record<string, unknown>;
 
-const FIELDS = new Set([
+const INPUT_FIELDS = new Set([
   "outputKind",
   "schemaVersion",
   "contract",
   "linkId",
+  "canonicalMutationPlan",
   "authoringPacket",
   "writingRequest",
   "writingResponse",
   "authoringResult",
   "admissionEvidence",
-  "proposedManuscriptRevision",
   "proposedExtractedTextSha256",
   "visualCanonSha256",
   "artDirectionSha256",
-  "artBrief",
+  "draftArtBrief",
   "writingStudioMainCommit",
   "artStudioMainCommit",
   "linkedAt",
@@ -155,16 +157,13 @@ export async function compileBookWritingArtLink(
   const blockers: string[] = [];
   const requiredActions: string[] = [];
   const root = record(input, "Book writing-art link input", blockers);
-  rejectUnknown(root, FIELDS, "Book writing-art link input", blockers);
-
-  if (root.outputKind !== "evavo_docs_book_writing_art_link_input") {
-    blockers.push("Book writing-art link outputKind is invalid.");
-  }
-  if (root.schemaVersion !== 1) {
-    blockers.push("Book writing-art link schemaVersion is invalid.");
-  }
-  if (root.contract !== BOOK_WRITING_ART_LINK_CONTRACT) {
-    blockers.push("Book writing-art link contract is invalid.");
+  rejectUnknown(root, INPUT_FIELDS, "Book writing-art link input", blockers);
+  if (
+    root.outputKind !== "evavo_docs_book_writing_art_link_input" ||
+    root.schemaVersion !== 1 ||
+    root.contract !== BOOK_WRITING_ART_LINK_CONTRACT
+  ) {
+    blockers.push("Book writing-art link identity or version is invalid.");
   }
   const linkId = id(root.linkId, "linkId", blockers);
   const proposedExtractedTextSha256 = digest(
@@ -204,17 +203,21 @@ export async function compileBookWritingArtLink(
     root.runtimeCutoverApproved !== false ||
     root.publicationPerformed !== false
   ) {
-    blockers.push(
-      "Book writing-art linking must preserve data-contract-only integration, the Website compatibility writer and every cutover and publication gate.",
-    );
+    blockers.push("Book writing-art link authority flags are invalid.");
   }
+
+  const planBlockers = await validateBookCanonicalMutationPlan(
+    root.canonicalMutationPlan,
+  );
+  blockers.push(...planBlockers);
+  const plan = root.canonicalMutationPlan as BookCanonicalMutationPlanV1;
 
   const packetValidation = await validateAndNormalizeBookAuthoringPacket(
     root.authoringPacket,
   );
   if (packetValidation.status !== "ready" || !packetValidation.packet) {
     blockers.push(
-      "Book writing-art linking requires a valid authoring packet.",
+      "Writing-art link requires a valid authoring packet.",
       ...packetValidation.blockers,
     );
   }
@@ -227,103 +230,88 @@ export async function compileBookWritingArtLink(
   );
   if (writingValidation.status !== "ready" || !writingValidation.response) {
     blockers.push(
-      "Book writing-art linking requires a complete exact Writing Studio response.",
+      "Writing-art link requires a complete exact Writing Studio response.",
       ...writingValidation.blockers,
     );
     requiredActions.push(...writingValidation.requiredActions);
   }
   const response = writingValidation.response;
 
-  const authoringValidation = await validateBookAuthoringResult(
+  const resultValidation = await validateBookAuthoringResult(
     root.authoringPacket,
     root.authoringResult,
   );
   if (
-    authoringValidation.status !== "accepted_for_review" ||
-    !authoringValidation.result
+    resultValidation.status !== "accepted_for_review" ||
+    !resultValidation.result
   ) {
     blockers.push(
-      "Book writing-art linking requires an authoring result accepted for review.",
-      ...authoringValidation.blockers,
+      "Writing-art link requires an authoring result accepted for review.",
+      ...resultValidation.blockers,
     );
-    requiredActions.push(...authoringValidation.requiredActions);
+    requiredActions.push(...resultValidation.requiredActions);
   }
-  const result = authoringValidation.result;
+  const result = resultValidation.result;
 
+  const admissionEvidence = parseAdmissionEvidence(
+    root.admissionEvidence,
+    blockers,
+  );
   const admission = await evaluateBookAuthoringAdmission(
     root.authoringPacket,
     root.authoringResult,
     root.admissionEvidence,
   );
   if (admission.status !== "ready_for_website_compare_and_swap") {
+    blockers.push(...admission.blockers);
     requiredActions.push(...admission.requiredActions);
-    if (admission.status === "blocked") blockers.push(...admission.blockers);
   }
 
-  const proposedRevision = parseRevision(
-    root.proposedManuscriptRevision,
+  const draftArtBrief = await parseExactArtBrief(
+    root.draftArtBrief,
+    "Draft Book Art brief",
     blockers,
   );
-  const admissionEvidence = parseAdmissionEvidence(
-    root.admissionEvidence,
-    blockers,
-  );
-  const artBrief = await parseArtBrief(root.artBrief, blockers);
 
-  if (packet) {
-    match(
-      packet.projectId,
-      proposedRevision.projectId,
-      "Proposed revision projectId differs from the authoring packet.",
-      blockers,
-    );
-    match(
-      packet.volumeId,
-      proposedRevision.volumeId,
-      "Proposed revision volumeId differs from the authoring packet.",
-      blockers,
-    );
+  if (packet && plan?.currentSnapshot && plan?.proposedSnapshot) {
+    match(packet.projectId, plan.projectId, "Packet project differs from canonical plan.", blockers);
+    match(packet.programmeId, plan.programmeId, "Packet programme differs from canonical plan.", blockers);
+    match(packet.volumeId, plan.volumeId, "Packet volume differs from canonical plan.", blockers);
     match(
       packet.manuscriptRevisionId,
-      proposedRevision.parentRevisionId,
-      "Proposed revision parent differs from the authoring packet revision.",
+      plan.currentSnapshot.manuscriptRevisionId,
+      "Packet manuscript revision differs from canonical current snapshot.",
       blockers,
     );
-    if (proposedRevision.revisionId === packet.manuscriptRevisionId) {
-      blockers.push("The proposed manuscript revision must have a new identity.");
-    }
     match(
-      packet.manuscriptRevisionId,
-      writingValidation.request?.manuscriptRevisionId,
-      "Writing request manuscript revision differs from the authoring packet.",
+      packet.manuscriptSha256,
+      plan.currentSnapshot.manuscriptSha256,
+      "Packet manuscript SHA-256 differs from canonical current snapshot.",
       blockers,
     );
   }
 
-  if (result && response) {
+  if (response && result) {
     match(
       response.candidateObjectId,
       result.candidateObjectId,
-      "Writing candidate object differs from the authoring result.",
+      "Writing candidate object differs from authoring result.",
       blockers,
     );
     match(
       response.candidateSha256,
       result.candidateTextSha256,
-      "Writing candidate SHA-256 differs from the authoring result.",
+      "Writing candidate SHA-256 differs from authoring result.",
       blockers,
     );
     match(
       response.candidateByteLength,
       result.candidateByteLength,
-      "Writing candidate byte length differs from the authoring result.",
+      "Writing candidate byte length differs from authoring result.",
       blockers,
     );
     if (Date.parse(result.completedAt) < Date.parse(response.completedAt)) {
-      blockers.push("Authoring result completedAt predates the Writing response.");
-    }
-    if (Date.parse(proposedRevision.createdAt) < Date.parse(result.completedAt)) {
-      blockers.push("Proposed manuscript revision predates the authoring result.");
+      blockers.push("Authoring result predates the Writing response.");
     }
     const resultEvidence = new Set(result.producedEvidenceIds);
     for (const evidenceId of [
@@ -332,93 +320,78 @@ export async function compileBookWritingArtLink(
       ...response.qualityReceiptIds,
     ]) {
       if (!resultEvidence.has(evidenceId)) {
-        blockers.push(
-          `Authoring result is missing Writing Studio evidence ${evidenceId}.`,
-        );
+        blockers.push(`Authoring result is missing Writing evidence ${evidenceId}.`);
       }
     }
-    match(
-      result.manuscriptSha256After,
-      proposedRevision.manuscriptSha256,
-      "Proposed manuscript revision does not match the admitted authoring result.",
-      blockers,
-    );
   }
 
-  if (result) {
+  if (result && plan?.proposedSnapshot) {
     match(
-      admissionEvidence.proposedAfterManuscriptSha256,
       result.manuscriptSha256After,
-      "Admission proposed manuscript SHA-256 differs from the authoring result.",
+      plan.proposedSnapshot.manuscriptSha256,
+      "Authoring result proposed manuscript differs from canonical plan.",
       blockers,
     );
+    compareChangedUnits(result.changedUnits, plan.changedUnits, blockers);
+    if (Date.parse(plan.requestedAt) < Date.parse(result.completedAt)) {
+      blockers.push("Canonical mutation plan predates the authoring result.");
+    }
   }
+
+  match(
+    admission.admissionFingerprint,
+    plan?.authoringAdmissionFingerprint,
+    "Authoring admission fingerprint differs from canonical plan.",
+    blockers,
+  );
   match(
     admissionEvidence.proposedAfterManuscriptSha256,
-    proposedRevision.manuscriptSha256,
-    "Proposed manuscript revision differs from admission evidence.",
+    plan?.proposedSnapshot?.manuscriptSha256,
+    "Admission proposed manuscript differs from canonical plan.",
     blockers,
   );
 
-  if (artBrief) {
+  if (draftArtBrief && plan?.proposedSnapshot) {
+    match(draftArtBrief.identity.projectId, plan.projectId, "Draft Art brief project differs from plan.", blockers);
+    match(draftArtBrief.identity.bookId, plan.volumeId, "Draft Art brief book differs from plan volume.", blockers);
     match(
-      artBrief.identity.projectId,
-      proposedRevision.projectId,
-      "Art brief projectId differs from the proposed manuscript revision.",
+      draftArtBrief.manuscript.manuscriptRevisionId,
+      plan.proposedSnapshot.manuscriptRevisionId,
+      "Draft Art brief revision differs from proposed canonical snapshot.",
       blockers,
     );
     match(
-      artBrief.identity.bookId,
-      proposedRevision.volumeId,
-      "Art brief bookId must equal the Docs Suite volumeId.",
+      draftArtBrief.manuscript.manuscriptSha256,
+      plan.proposedSnapshot.manuscriptSha256,
+      "Draft Art brief manuscript differs from proposed canonical snapshot.",
       blockers,
     );
     match(
-      artBrief.manuscript.manuscriptRevisionId,
-      proposedRevision.revisionId,
-      "Art brief manuscript revision differs from the proposed manuscript revision.",
-      blockers,
-    );
-    match(
-      artBrief.manuscript.manuscriptSha256,
-      proposedRevision.manuscriptSha256,
-      "Art brief manuscript SHA-256 differs from the proposed manuscript revision.",
-      blockers,
-    );
-    match(
-      artBrief.manuscript.extractedTextSha256,
+      draftArtBrief.manuscript.extractedTextSha256,
       proposedExtractedTextSha256,
-      "Art brief extracted-text SHA-256 differs from Docs Suite evidence.",
+      "Draft Art brief extracted-text fingerprint differs from Docs evidence.",
       blockers,
     );
     match(
-      artBrief.manuscript.visualCanonSha256,
+      draftArtBrief.manuscript.visualCanonSha256,
       visualCanonSha256,
-      "Art brief visual-canon SHA-256 differs from Docs Suite evidence.",
+      "Draft Art brief visual-canon fingerprint differs from Docs evidence.",
       blockers,
     );
     match(
-      artBrief.manuscript.artDirectionSha256,
+      draftArtBrief.manuscript.artDirectionSha256,
       artDirectionSha256,
-      "Art brief art-direction SHA-256 differs from Docs Suite evidence.",
+      "Draft Art brief art-direction fingerprint differs from Docs evidence.",
       blockers,
     );
-    if (Date.parse(artBrief.createdAt) < Date.parse(proposedRevision.createdAt)) {
-      blockers.push("Art brief createdAt predates the proposed manuscript revision.");
+    if (Date.parse(draftArtBrief.createdAt) < Date.parse(plan.requestedAt)) {
+      blockers.push("Draft Art brief predates the canonical mutation plan.");
     }
-    if (Date.parse(linkedAt) < Date.parse(artBrief.createdAt)) {
-      blockers.push("Writing-art link timestamp predates the Book Art brief.");
+    if (Date.parse(linkedAt) < Date.parse(draftArtBrief.createdAt)) {
+      blockers.push("Writing-art link predates the draft Art brief.");
     }
   }
 
-  const admissionReceiptFingerprints = [
-    admissionEvidence.evidenceFingerprint,
-    admissionEvidence.phraseOverlapReceiptFingerprint,
-    admissionEvidence.continuityReceiptFingerprint,
-    admissionEvidence.factualIntegrityReceiptFingerprint,
-    admissionEvidence.antiGenericityReceiptFingerprint,
-    admissionEvidence.independentReviewReceiptFingerprint,
-  ];
   const requiredEvidenceIds = unique([
     ...(packet?.contextEvidenceIds ?? []),
     ...(writingValidation.request?.requiredEvidenceIds ?? []),
@@ -427,64 +400,62 @@ export async function compileBookWritingArtLink(
     ...(response?.factEvidenceIds ?? []),
     ...(response?.qualityReceiptIds ?? []),
     ...admissionEvidence.evidenceIds,
-    ...admissionReceiptFingerprints,
-  ]).sort();
+    admissionEvidence.evidenceFingerprint,
+    admissionEvidence.phraseOverlapReceiptFingerprint,
+    admissionEvidence.continuityReceiptFingerprint,
+    admissionEvidence.factualIntegrityReceiptFingerprint,
+    admissionEvidence.antiGenericityReceiptFingerprint,
+    admissionEvidence.independentReviewReceiptFingerprint,
+    plan?.planFingerprint ?? "",
+    plan?.authoringAdmissionFingerprint ?? "",
+    plan?.reviewCraftAdmissionFingerprint ?? "",
+    plan?.executionTaskFingerprint ?? "",
+    plan?.executionReceiptFingerprint ?? "",
+    ...(plan?.evidenceIds ?? []),
+    ...(plan?.structuralChangeEvidenceIds ?? []),
+  ].filter(Boolean)).sort();
   const approvedEvidence = new Set(
-    artBrief?.manuscript.approvedEvidenceIds ?? [],
+    draftArtBrief?.manuscript.approvedEvidenceIds ?? [],
   );
   for (const evidenceId of requiredEvidenceIds) {
     if (!approvedEvidence.has(evidenceId)) {
-      blockers.push(
-        `Book Art brief is missing approved writing or admission evidence ${evidenceId}.`,
-      );
+      blockers.push(`Draft Art brief is missing approved link evidence ${evidenceId}.`);
     }
   }
 
-  if (proposedRevision.canonical !== false) {
-    blockers.push("The proposed manuscript revision cannot be marked canonical.");
-  }
-  if (
-    artBrief?.providerCandidateMayBeFinal !== false ||
-    artBrief?.publicationPerformed !== false
-  ) {
-    blockers.push(
-      "The Book Art brief cannot grant provider finality or publication authority.",
-    );
-  }
-
-  const uniqueBlockers = unique(blockers);
-  const uniqueActions = unique(requiredActions);
-  const status: BookWritingArtLinkReceiptV1["status"] = uniqueBlockers.length
+  const finalBlockers = unique(blockers);
+  const finalActions = unique(requiredActions);
+  const status: BookWritingArtLinkReceiptV1["status"] = finalBlockers.length
     ? "blocked"
-    : admission.status === "ready_for_website_compare_and_swap" &&
-        uniqueActions.length === 0
-      ? "ready_for_website_compare_and_swap"
-      : "needs_work";
-  const withoutFingerprint: Omit<
-    BookWritingArtLinkReceiptV1,
-    "linkFingerprint"
-  > = {
+    : finalActions.length
+      ? "needs_work"
+      : "ready_for_website_compare_and_swap";
+  const unsigned: Omit<BookWritingArtLinkReceiptV1, "linkFingerprint"> = {
     outputKind: "evavo_docs_book_writing_art_link_receipt",
     schemaVersion: 1,
     contract: BOOK_WRITING_ART_LINK_CONTRACT,
     status,
     linkId,
-    projectId: proposedRevision.projectId,
-    volumeId: proposedRevision.volumeId,
-    priorManuscriptRevisionId: packet?.manuscriptRevisionId ?? "invalid-id",
-    proposedManuscriptRevisionId: proposedRevision.revisionId,
+    mutationId: plan?.mutationId ?? "invalid-id",
+    canonicalMutationPlanFingerprint:
+      plan?.planFingerprint ?? `sha256:${"0".repeat(64)}`,
+    projectId: plan?.projectId ?? "invalid-id",
+    programmeId: plan?.programmeId ?? "invalid-id",
+    volumeId: plan?.volumeId ?? "invalid-id",
+    currentManuscriptRevisionId:
+      plan?.currentSnapshot?.manuscriptRevisionId ?? "invalid-id",
+    proposedManuscriptRevisionId:
+      plan?.proposedSnapshot?.manuscriptRevisionId ?? "invalid-id",
     beforeManuscriptSha256:
-      packet?.manuscriptSha256 ?? `sha256:${"0".repeat(64)}`,
-    proposedAfterManuscriptSha256: proposedRevision.manuscriptSha256,
+      plan?.currentSnapshot?.manuscriptSha256 ?? `sha256:${"0".repeat(64)}`,
+    proposedAfterManuscriptSha256:
+      plan?.proposedSnapshot?.manuscriptSha256 ?? `sha256:${"0".repeat(64)}`,
     proposedExtractedTextSha256,
     visualCanonSha256,
     artDirectionSha256,
     ...(writingValidation.request?.requestFingerprint === undefined
       ? {}
-      : {
-          writingRequestFingerprint:
-            writingValidation.request.requestFingerprint,
-        }),
+      : { writingRequestFingerprint: writingValidation.request.requestFingerprint }),
     ...(response?.responseFingerprint === undefined
       ? {}
       : { writingResponseFingerprint: response.responseFingerprint }),
@@ -492,14 +463,14 @@ export async function compileBookWritingArtLink(
       ? {}
       : { authoringResultFingerprint: result.resultFingerprint }),
     admissionFingerprint: admission.admissionFingerprint,
-    ...(artBrief?.briefFingerprint === undefined
+    ...(draftArtBrief?.briefFingerprint === undefined
       ? {}
-      : { artBriefFingerprint: artBrief.briefFingerprint }),
+      : { draftArtBriefFingerprint: draftArtBrief.briefFingerprint }),
     writingStudioMainCommit,
     artStudioMainCommit,
     requiredEvidenceIds,
-    blockers: uniqueBlockers,
-    requiredActions: uniqueActions,
+    blockers: finalBlockers,
+    requiredActions: finalActions,
     crossRepositoryRuntimeSourceImportAllowed: false,
     writingStudioMayCallArtStudioDirectly: false,
     websiteCompatibilityWriterRequired: true,
@@ -512,174 +483,77 @@ export async function compileBookWritingArtLink(
     publicationPerformed: false,
   };
   return {
-    ...withoutFingerprint,
-    linkFingerprint: await sha256BookText(canonicalBookJson(withoutFingerprint)),
+    ...unsigned,
+    linkFingerprint: await sha256BookText(canonicalBookJson(unsigned)),
   };
 }
 
-async function parseArtBrief(
+function compareChangedUnits(
+  resultUnits: Array<{ unitId: string; beforeSha256: string; afterSha256: string }>,
+  planUnits: Array<{
+    unitId: string;
+    beforeSha256?: string;
+    afterSha256?: string;
+  }>,
+  blockers: string[],
+): void {
+  const resultById = new Map(resultUnits.map((unit) => [unit.unitId, unit]));
+  const planById = new Map(planUnits.map((unit) => [unit.unitId, unit]));
+  if (resultById.size !== planById.size) {
+    blockers.push("Authoring result changed-unit coverage differs from canonical plan.");
+  }
+  for (const [unitId, planUnit] of planById) {
+    const resultUnit = resultById.get(unitId);
+    if (
+      !resultUnit ||
+      resultUnit.beforeSha256 !== planUnit.beforeSha256 ||
+      resultUnit.afterSha256 !== planUnit.afterSha256
+    ) {
+      blockers.push(`Authoring result change ${unitId} differs from canonical plan.`);
+    }
+  }
+}
+
+async function parseExactArtBrief(
   value: unknown,
+  label: string,
   blockers: string[],
 ): Promise<BookArtBriefV1 | undefined> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    blockers.push("Book Art brief must be an object.");
+    blockers.push(`${label} must be an object.`);
     return undefined;
   }
-  const artBrief = value as BookArtBriefV1;
-  const validation = await validateBookArtBriefExact(artBrief);
+  const brief = value as BookArtBriefV1;
+  const validation = await validateBookArtBriefExact(brief);
   if (!validation.valid) {
-    blockers.push(
-      "Book writing-art linking requires an exact valid Book Art brief.",
-      ...validation.issues,
-    );
+    blockers.push(`${label} is invalid.`, ...validation.issues);
     return undefined;
   }
-  return artBrief;
-}
-
-function parseRevision(
-  value: unknown,
-  blockers: string[],
-): BookManuscriptRevisionV1 {
-  const source = record(value, "proposedManuscriptRevision", blockers);
-  rejectUnknown(
-    source,
-    new Set([
-      "revisionId",
-      "parentRevisionId",
-      "projectId",
-      "volumeId",
-      "manuscriptObjectId",
-      "manuscriptStorageVersion",
-      "manuscriptByteLength",
-      "manuscriptSha256",
-      "unitSequenceSha256",
-      "orderedUnitIds",
-      "createdAt",
-      "createdBy",
-      "canonical",
-    ]),
-    "proposedManuscriptRevision",
-    blockers,
-  );
-  const parentRevisionId = id(
-    source.parentRevisionId,
-    "parentRevisionId",
-    blockers,
-  );
-  const revision: BookManuscriptRevisionV1 = {
-    revisionId: id(source.revisionId, "revisionId", blockers),
-    parentRevisionId,
-    projectId: id(source.projectId, "revision projectId", blockers),
-    volumeId: id(source.volumeId, "revision volumeId", blockers),
-    manuscriptObjectId: objectId(
-      source.manuscriptObjectId,
-      "manuscriptObjectId",
-      blockers,
-    ),
-    manuscriptStorageVersion: text(
-      source.manuscriptStorageVersion,
-      "manuscriptStorageVersion",
-      blockers,
-      300,
-    ),
-    manuscriptByteLength: integer(
-      source.manuscriptByteLength,
-      "manuscriptByteLength",
-      blockers,
-      1,
-      Number.MAX_SAFE_INTEGER,
-    ),
-    manuscriptSha256: digest(
-      source.manuscriptSha256,
-      "revision manuscriptSha256",
-      blockers,
-    ),
-    unitSequenceSha256: digest(
-      source.unitSequenceSha256,
-      "unitSequenceSha256",
-      blockers,
-    ),
-    orderedUnitIds: ids(
-      source.orderedUnitIds,
-      "orderedUnitIds",
-      blockers,
-      1_000_000,
-      true,
-    ),
-    createdAt: timestamp(source.createdAt, "revision createdAt", blockers),
-    createdBy: text(source.createdBy, "revision createdBy", blockers, 300),
-    canonical: false,
-  };
-  if (source.canonical !== false) {
-    blockers.push("proposedManuscriptRevision.canonical must remain false.");
-  }
-  return revision;
+  return brief;
 }
 
 function parseAdmissionEvidence(
   value: unknown,
   blockers: string[],
 ): BookAuthoringAdmissionEvidenceV1 {
-  const source = record(value, "admissionEvidence", blockers);
-  rejectUnknown(source, ADMISSION_FIELDS, "admissionEvidence", blockers);
-  if (source.outputKind !== "evavo_docs_book_authoring_admission_evidence") {
-    blockers.push("admissionEvidence outputKind is invalid.");
-  }
-  if (source.schemaVersion !== 1) {
-    blockers.push("admissionEvidence schemaVersion is invalid.");
-  }
-  for (const field of [
-    "phraseOverlapPassed",
-    "continuityPassed",
-    "factualIntegrityPassed",
-    "antiGenericityPassed",
-    "independentReviewPassed",
-    "humanReviewRequired",
-    "humanReviewRecorded",
-  ]) {
-    if (source[field] !== true && source[field] !== false) {
-      blockers.push(`admissionEvidence ${field} must be boolean.`);
-    }
+  const source = record(value, "Admission evidence", blockers);
+  rejectUnknown(source, ADMISSION_FIELDS, "Admission evidence", blockers);
+  if (
+    source.outputKind !== "evavo_docs_book_authoring_admission_evidence" ||
+    source.schemaVersion !== 1
+  ) {
+    blockers.push("Admission evidence identity or version is invalid.");
   }
   return {
     outputKind: "evavo_docs_book_authoring_admission_evidence",
     schemaVersion: 1,
-    packetFingerprint: digest(
-      source.packetFingerprint,
-      "admission packetFingerprint",
-      blockers,
-    ),
-    resultFingerprint: digest(
-      source.resultFingerprint,
-      "admission resultFingerprint",
-      blockers,
-    ),
-    phraseOverlapReceiptFingerprint: digest(
-      source.phraseOverlapReceiptFingerprint,
-      "phraseOverlapReceiptFingerprint",
-      blockers,
-    ),
-    continuityReceiptFingerprint: digest(
-      source.continuityReceiptFingerprint,
-      "continuityReceiptFingerprint",
-      blockers,
-    ),
-    factualIntegrityReceiptFingerprint: digest(
-      source.factualIntegrityReceiptFingerprint,
-      "factualIntegrityReceiptFingerprint",
-      blockers,
-    ),
-    antiGenericityReceiptFingerprint: digest(
-      source.antiGenericityReceiptFingerprint,
-      "antiGenericityReceiptFingerprint",
-      blockers,
-    ),
-    independentReviewReceiptFingerprint: digest(
-      source.independentReviewReceiptFingerprint,
-      "independentReviewReceiptFingerprint",
-      blockers,
-    ),
+    packetFingerprint: digest(source.packetFingerprint, "packetFingerprint", blockers),
+    resultFingerprint: digest(source.resultFingerprint, "resultFingerprint", blockers),
+    phraseOverlapReceiptFingerprint: digest(source.phraseOverlapReceiptFingerprint, "phraseOverlapReceiptFingerprint", blockers),
+    continuityReceiptFingerprint: digest(source.continuityReceiptFingerprint, "continuityReceiptFingerprint", blockers),
+    factualIntegrityReceiptFingerprint: digest(source.factualIntegrityReceiptFingerprint, "factualIntegrityReceiptFingerprint", blockers),
+    antiGenericityReceiptFingerprint: digest(source.antiGenericityReceiptFingerprint, "antiGenericityReceiptFingerprint", blockers),
+    independentReviewReceiptFingerprint: digest(source.independentReviewReceiptFingerprint, "independentReviewReceiptFingerprint", blockers),
     phraseOverlapPassed: source.phraseOverlapPassed === true,
     continuityPassed: source.continuityPassed === true,
     factualIntegrityPassed: source.factualIntegrityPassed === true,
@@ -687,68 +561,28 @@ function parseAdmissionEvidence(
     independentReviewPassed: source.independentReviewPassed === true,
     humanReviewRequired: source.humanReviewRequired === true,
     humanReviewRecorded: source.humanReviewRecorded === true,
-    beforeManuscriptSha256: digest(
-      source.beforeManuscriptSha256,
-      "beforeManuscriptSha256",
-      blockers,
-    ),
-    proposedAfterManuscriptSha256: digest(
-      source.proposedAfterManuscriptSha256,
-      "proposedAfterManuscriptSha256",
-      blockers,
-    ),
-    evidenceIds: ids(
-      source.evidenceIds,
-      "admission evidenceIds",
-      blockers,
-      16_384,
-      true,
-    ),
-    evidenceFingerprint: digest(
-      source.evidenceFingerprint,
-      "admission evidenceFingerprint",
-      blockers,
-    ),
+    beforeManuscriptSha256: digest(source.beforeManuscriptSha256, "beforeManuscriptSha256", blockers),
+    proposedAfterManuscriptSha256: digest(source.proposedAfterManuscriptSha256, "proposedAfterManuscriptSha256", blockers),
+    evidenceIds: ids(source.evidenceIds, "evidenceIds", blockers, 16_384, true),
+    evidenceFingerprint: digest(source.evidenceFingerprint, "evidenceFingerprint", blockers),
   };
 }
 
-function record(
-  value: unknown,
-  label: string,
-  blockers: string[],
-): UnknownRecord {
+function record(value: unknown, label: string, blockers: string[]): UnknownRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     blockers.push(`${label} must be an object.`);
     return {};
   }
   return value as UnknownRecord;
 }
-function rejectUnknown(
-  value: UnknownRecord,
-  allowed: Set<string>,
-  label: string,
-  blockers: string[],
-): void {
+function rejectUnknown(value: UnknownRecord, allowed: Set<string>, label: string, blockers: string[]): void {
   const unknown = Object.keys(value).filter((key) => !allowed.has(key)).sort();
-  if (unknown.length) {
-    blockers.push(`${label} contains unsupported fields: ${unknown.join(", ")}.`);
-  }
+  if (unknown.length) blockers.push(`${label} contains unsupported fields: ${unknown.join(", ")}.`);
 }
 function id(value: unknown, label: string, blockers: string[]): string {
-  if (
-    typeof value !== "string" ||
-    !SAFE_ID.test(value) ||
-    ["__proto__", "constructor", "prototype"].includes(value)
-  ) {
+  if (typeof value !== "string" || !SAFE_ID.test(value)) {
     blockers.push(`${label} is invalid.`);
     return "invalid-id";
-  }
-  return value;
-}
-function objectId(value: unknown, label: string, blockers: string[]): string {
-  if (typeof value !== "string" || !OBJECT_ID.test(value)) {
-    blockers.push(`${label} is invalid.`);
-    return "invalid-object";
   }
   return value;
 }
@@ -759,23 +593,21 @@ function digest(value: unknown, label: string, blockers: string[]): string {
   }
   return value;
 }
-function compatibleGitCommit(
-  value: unknown,
-  label: string,
-  compatible: Set<string>,
-  blockers: string[],
-): string {
-  if (
-    typeof value !== "string" ||
-    !GIT_COMMIT.test(value) ||
-    /^0{40}$/.test(value)
-  ) {
+function ids(value: unknown, label: string, blockers: string[], maximum: number, required: boolean): string[] {
+  if (!Array.isArray(value) || value.length > maximum || (required && value.length < 1)) {
+    blockers.push(`${label} is invalid or unbounded.`);
+    return [];
+  }
+  const result = value.map((item) => id(item, label, blockers));
+  if (new Set(result).size !== result.length) blockers.push(`${label} contains duplicates.`);
+  return unique(result);
+}
+function compatibleGitCommit(value: unknown, label: string, compatible: Set<string>, blockers: string[]): string {
+  if (typeof value !== "string" || !GIT_COMMIT.test(value) || /^0{40}$/.test(value)) {
     blockers.push(`${label} must be a non-zero exact 40-character Git commit.`);
     return "0".repeat(40);
   }
-  if (!compatible.has(value)) {
-    blockers.push(`${label} is not in the reviewed compatibility set.`);
-  }
+  if (!compatible.has(value)) blockers.push(`${label} is not in the reviewed compatibility set.`);
   return value;
 }
 function timestamp(value: unknown, label: string, blockers: string[]): string {
@@ -790,12 +622,7 @@ function timestamp(value: unknown, label: string, blockers: string[]): string {
   }
   return value;
 }
-function text(
-  value: unknown,
-  label: string,
-  blockers: string[],
-  maximum: number,
-): string {
+function text(value: unknown, label: string, blockers: string[], maximum: number): string {
   if (
     typeof value !== "string" ||
     value !== value.trim() ||
@@ -808,50 +635,7 @@ function text(
   }
   return value;
 }
-function integer(
-  value: unknown,
-  label: string,
-  blockers: string[],
-  minimum: number,
-  maximum: number,
-): number {
-  if (
-    !Number.isSafeInteger(value) ||
-    Number(value) < minimum ||
-    Number(value) > maximum
-  ) {
-    blockers.push(`${label} is invalid.`);
-    return minimum;
-  }
-  return Number(value);
-}
-function ids(
-  value: unknown,
-  label: string,
-  blockers: string[],
-  maximum: number,
-  required: boolean,
-): string[] {
-  if (
-    !Array.isArray(value) ||
-    value.length > maximum ||
-    (required && value.length < 1)
-  ) {
-    blockers.push(`${label} is invalid or unbounded.`);
-    return [];
-  }
-  const result = value.map((item) => id(item, label, blockers));
-  if (new Set(result).size !== result.length) {
-    blockers.push(`${label} contains duplicates.`);
-  }
-  return unique(result);
-}
-function match(
-  left: unknown,
-  right: unknown,
-  message: string,
-  blockers: string[],
-): void {
+function match(left: unknown, right: unknown, message: string, blockers: string[]): void {
   if (left !== right) blockers.push(message);
 }
 function unique<T>(values: T[]): T[] {
