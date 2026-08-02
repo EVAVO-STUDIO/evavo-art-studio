@@ -1,0 +1,131 @@
+name: Validate exact Book Art parity main c371270
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-exact-book-art-parity-main-c371270
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      EXPECTED_MAIN_SHA: c3712705ddcf16fe46395182de11d706f8d5c51d
+      VALIDATION_WORKFLOW: .github/workflows/validate-exact-main-book-art-parity.yml
+    steps:
+      - name: Check out exact validation branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: validation/exact-main-book-art-parity-c371270-20260803
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact current-main ancestry and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD^)" == "${EXPECTED_MAIN_SHA}" ]]
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_MAIN_SHA}" HEAD)
+          [[ "${#changed[@]}" -eq 1 ]]
+          [[ "${changed[0]}" == "${VALIDATION_WORKFLOW}" ]]
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${EXPECTED_MAIN_SHA}" ]]
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Verify Book Art runtime, inspection and structural parity authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-book-art-provider-runtime.mjs
+          node scripts/check-book-art-provider-inspection.mjs
+          node scripts/check-book-art-provider-parity.mjs
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete repository validation
+        run: pnpm check
+
+      - name: Remove generated lockfile and verify clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_MAIN_SHA}" HEAD)
+          [[ "${#changed[@]}" -eq 1 ]]
+          [[ "${changed[0]}" == "${VALIDATION_WORKFLOW}" ]]
+
+      - name: Re-prove exact current main and write bounded receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${EXPECTED_MAIN_SHA}" ]]
+          node --input-type=module - <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const receipt = {
+            schemaVersion: "1.0",
+            repository: "EVAVO-STUDIO/evavo-art-studio",
+            validatedMainSha: process.env.EXPECTED_MAIN_SHA,
+            validation: "passed",
+            node: "22.14.0",
+            pnpm: "10.13.1",
+            ffmpegAvailable: true,
+            ffprobeAvailable: true,
+            providerRuntimeAuthorityPassed: true,
+            immutableInspectionAuthorityPassed: true,
+            structuralParityAuthorityPassed: true,
+            completeRepositoryCheckPassed: true,
+            cleanSourcePassed: true,
+            providerCallPerformed: false,
+            artifactWritePerformed: false,
+            selectionPerformed: false,
+            promotionPerformed: false,
+            bookUseBindingCreated: false,
+            runtimeCutoverApproved: false,
+            publicationPerformed: false
+          };
+          fs.writeFileSync(
+            path.join(process.env.RUNNER_TEMP, "book-art-parity-main-receipt.json"),
+            `${JSON.stringify(receipt, null, 2)}\n`,
+            "utf8",
+          );
+          NODE
+
+      - name: Upload exact-main validation receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: book-art-parity-main-c371270-receipt
+          path: ${{ runner.temp }}/book-art-parity-main-receipt.json
+          if-no-files-found: error
+          retention-days: 14
