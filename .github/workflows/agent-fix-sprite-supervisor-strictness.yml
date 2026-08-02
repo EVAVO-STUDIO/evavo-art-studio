@@ -1,4 +1,4 @@
-name: Agent Fix Sprite Supervisor Strictness
+name: Agent Fix Strict Runtime Typing
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: agent-fix-sprite-supervisor-strictness-${{ github.event.pull_request.number }}
+  group: agent-fix-strict-runtime-typing-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
@@ -33,48 +33,108 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
-          [[ "$(git rev-parse HEAD^)" == "cfc79f44353cc04bc5a356043b06a3ae7c0570b1" ]]
+          [[ "$(git rev-parse HEAD^)" == "cf7692a2b100c057f598166eb3f61dc8ccc39ec8" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
           test "$(git diff --name-only HEAD^ HEAD)" = ".github/workflows/agent-fix-sprite-supervisor-strictness.yml"
 
-      - name: Apply exact strict-TypeScript repair
+      - name: Apply exact strict-TypeScript repairs
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('packages/sprite-supervisor/src/automatic-compiler.ts')
-          text = path.read_text(encoding='utf-8')
-
-          replacements = [
-              (
-                  '''  const keys = group.filter((entry) => entry.keyPose);\n  return {\n    previous: [...keys]\n      .reverse()\n      .find((entry) => entry.frameIndex < frame.frameIndex),\n    next: keys.find((entry) => entry.frameIndex > frame.frameIndex),\n  };\n''',
-                  '''  const keys = group.filter((entry) => entry.keyPose);\n  const previous = [...keys]\n    .reverse()\n    .find((entry) => entry.frameIndex < frame.frameIndex);\n  const next = keys.find((entry) => entry.frameIndex > frame.frameIndex);\n  return {\n    ...(previous === undefined ? {} : { previous }),\n    ...(next === undefined ? {} : { next }),\n  };\n''',
-              ),
-              (
-                  '''        phase: identityUnit.phase,\n        frame,\n        clip: identityUnit.clip,\n        direction: frame.direction,\n''',
-                  '''        phase: identityUnit.phase,\n        frame,\n        ...(identityUnit.clip === undefined ? {} : { clip: identityUnit.clip }),\n        direction: frame.direction,\n''',
-              ),
-              (
-                  '''  const includedRoles = layerDecisions.map((entry) => entry.role);\n''',
-                  '''  const includedRoles = new Set<string>(\n    layerDecisions.map((entry) => entry.role),\n  );\n''',
-              ),
-              (
-                  '''        (unit) => unit.frameId === frame.id && includedRoles.includes(unit.layerRole),\n''',
-                  '''        (unit) => unit.frameId === frame.id && includedRoles.has(unit.layerRole),\n''',
-              ),
-          ]
-
-          for before, after in replacements:
+          def replace_once(path: Path, before: str, after: str) -> None:
+              text = path.read_text(encoding='utf-8')
               if text.count(before) != 1:
-                  raise SystemExit('Expected strictness repair source block exactly once.')
-              text = text.replace(before, after, 1)
+                  raise SystemExit(f'Expected repair block exactly once in {path}.')
+              path.write_text(text.replace(before, after, 1), encoding='utf-8')
 
-          path.write_text(text, encoding='utf-8')
+          sprite = Path('packages/sprite-supervisor/src/automatic-compiler.ts')
+          replace_once(
+              sprite,
+              '''  const keys = group.filter((entry) => entry.keyPose);\n  return {\n    previous: [...keys]\n      .reverse()\n      .find((entry) => entry.frameIndex < frame.frameIndex),\n    next: keys.find((entry) => entry.frameIndex > frame.frameIndex),\n  };\n''',
+              '''  const keys = group.filter((entry) => entry.keyPose);\n  const previous = [...keys]\n    .reverse()\n    .find((entry) => entry.frameIndex < frame.frameIndex);\n  const next = keys.find((entry) => entry.frameIndex > frame.frameIndex);\n  return {\n    ...(previous === undefined ? {} : { previous }),\n    ...(next === undefined ? {} : { next }),\n  };\n''',
+          )
+          replace_once(
+              sprite,
+              '''        phase: identityUnit.phase,\n        frame,\n        clip: identityUnit.clip,\n        direction: frame.direction,\n''',
+              '''        phase: identityUnit.phase,\n        frame,\n        ...(identityUnit.clip === undefined ? {} : { clip: identityUnit.clip }),\n        direction: frame.direction,\n''',
+          )
+          replace_once(
+              sprite,
+              '''  const includedRoles = layerDecisions.map((entry) => entry.role);\n''',
+              '''  const includedRoles = new Set<string>(\n    layerDecisions.map((entry) => entry.role),\n  );\n''',
+          )
+          replace_once(
+              sprite,
+              '''        (unit) => unit.frameId === frame.id && includedRoles.includes(unit.layerRole),\n''',
+              '''        (unit) => unit.frameId === frame.id && includedRoles.has(unit.layerRole),\n''',
+          )
+
+          finalizer = Path('apps/worker/src/adaptive-finalizer-guarded-handlers.ts')
+          replace_once(
+              finalizer,
+              '''import {\n  PermanentRuntimeError,\n  type RuntimeJobHandler,\n} from "@evavo/art-runtime";\n''',
+              '''import {\n  PermanentRuntimeError,\n  type RuntimeHandlerResult,\n  type RuntimeJobHandler,\n} from "@evavo/art-runtime";\n''',
+          )
+          replace_once(
+              finalizer,
+              '''function outputByRole(\n  artifacts: readonly StoredArtifact[],\n  role: string,\n): StoredArtifact {\n''',
+              '''function requireBaseResult(\n  value: RuntimeHandlerResult | void,\n): RuntimeHandlerResult {\n  if (!value) {\n    throw new PermanentRuntimeError(\n      "ADAPTIVE_FINALIZER_BASE_RESULT_MISSING",\n      "The base adaptive finalizer returned no result for a successful candidate.",\n    );\n  }\n  return value;\n}\n\nfunction outputByRole(\n  artifacts: readonly StoredArtifact[],\n  role: string,\n): StoredArtifact {\n''',
+          )
+          replace_once(
+              finalizer,
+              '''  baseResult: Awaited<ReturnType<RuntimeJobHandler>>,\n): Promise<Awaited<ReturnType<RuntimeJobHandler>>> {\n  const artifacts = await Promise.all(\n    baseResult.outputArtifacts.map((artifactId) =>\n''',
+              '''  baseResult: RuntimeHandlerResult,\n): Promise<RuntimeHandlerResult> {\n  const artifacts = await Promise.all(\n    (baseResult.outputArtifacts ?? []).map((artifactId) =>\n''',
+          )
+          replace_once(
+              finalizer,
+              '''      return normalizeSuccessfulLineage(\n        context,\n        sourceId,\n        await base(context),\n      );\n''',
+              '''      return normalizeSuccessfulLineage(\n        context,\n        sourceId,\n        requireBaseResult(await base(context)),\n      );\n''',
+          )
+
+          family = Path('apps/worker/src/adaptive-sprite-family-handlers.ts')
+          replace_once(
+              family,
+              '''import {\n  PermanentRuntimeError,\n  type RuntimeJobHandler,\n} from "@evavo/art-runtime";\n''',
+              '''import {\n  PermanentRuntimeError,\n  type RuntimeHandlerResult,\n  type RuntimeJobHandler,\n} from "@evavo/art-runtime";\n''',
+          )
+          replace_once(
+              family,
+              '''function adaptiveRequired(\n  manifest: ReturnType<typeof validateSpriteFamilyManifest>,\n): boolean {\n''',
+              '''function requireBaseResult(\n  value: RuntimeHandlerResult | void,\n): RuntimeHandlerResult {\n  if (!value) {\n    throw new PermanentRuntimeError(\n      "ADAPTIVE_FAMILY_BASE_RESULT_MISSING",\n      "The base sprite-family verifier returned no result.",\n    );\n  }\n  return value;\n}\n\nfunction adaptiveRequired(\n  manifest: ReturnType<typeof validateSpriteFamilyManifest>,\n): boolean {\n''',
+          )
+          replace_once(
+              family,
+              '''    const baseResult = await base(context);\n    const proofArtifactIds = [\n''',
+              '''    const baseResult = requireBaseResult(await base(context));\n    const baseOutputArtifacts = baseResult.outputArtifacts ?? [];\n    const proofArtifactIds = [\n''',
+          )
+          replace_once(
+              family,
+              '''      baseOutputArtifactIds: baseResult.outputArtifacts,\n''',
+              '''      baseOutputArtifactIds: baseOutputArtifacts,\n''',
+          )
+          replace_once(
+              family,
+              '''            ...baseResult.outputArtifacts,\n''',
+              '''            ...baseOutputArtifacts,\n''',
+          )
+          replace_once(
+              family,
+              '''      outputArtifacts: [...baseResult.outputArtifacts, evidence.artifactId],\n''',
+              '''      outputArtifacts: [...baseOutputArtifacts, evidence.artifactId],\n''',
+          )
           PY
           git diff --check
-          test "$(git diff --name-only)" = "packages/sprite-supervisor/src/automatic-compiler.ts"
+          git diff --name-only | sort > "${RUNNER_TEMP}/actual-paths.txt"
+          cat > "${RUNNER_TEMP}/expected-paths.txt" <<'PATHS'
+          apps/worker/src/adaptive-finalizer-guarded-handlers.ts
+          apps/worker/src/adaptive-sprite-family-handlers.ts
+          packages/sprite-supervisor/src/automatic-compiler.ts
+          PATHS
+          sort "${RUNNER_TEMP}/expected-paths.txt" -o "${RUNNER_TEMP}/expected-paths.txt"
+          diff -u "${RUNNER_TEMP}/expected-paths.txt" "${RUNNER_TEMP}/actual-paths.txt"
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -96,16 +156,26 @@ jobs:
       - name: Run worker and Book Art provider runtime regressions
         run: pnpm --filter @evavo/art-studio-worker test
 
-      - name: Commit source-only repair
+      - name: Commit source-only repairs
         shell: bash
         run: |
           set -euo pipefail
           rm -f pnpm-lock.yaml
           git diff --check
-          test "$(git diff --name-only)" = "packages/sprite-supervisor/src/automatic-compiler.ts"
-          test "$(git status --porcelain=v1 --untracked-files=all)" = " M packages/sprite-supervisor/src/automatic-compiler.ts"
-          git add packages/sprite-supervisor/src/automatic-compiler.ts
+          git diff --name-only | sort > "${RUNNER_TEMP}/actual-paths.txt"
+          cat > "${RUNNER_TEMP}/expected-paths.txt" <<'PATHS'
+          apps/worker/src/adaptive-finalizer-guarded-handlers.ts
+          apps/worker/src/adaptive-sprite-family-handlers.ts
+          packages/sprite-supervisor/src/automatic-compiler.ts
+          PATHS
+          sort "${RUNNER_TEMP}/expected-paths.txt" -o "${RUNNER_TEMP}/expected-paths.txt"
+          diff -u "${RUNNER_TEMP}/expected-paths.txt" "${RUNNER_TEMP}/actual-paths.txt"
+          git add \
+            apps/worker/src/adaptive-finalizer-guarded-handlers.ts \
+            apps/worker/src/adaptive-sprite-family-handlers.ts \
+            packages/sprite-supervisor/src/automatic-compiler.ts
+          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -v '^M  \|^A  ' || true)"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix(sprite-supervisor): satisfy strict optional layer typing'
+          git commit -m 'fix(runtime): harden strict handler and sprite typing'
           git push origin HEAD:refs/heads/agent/book-art-provider-runtime-20260802
