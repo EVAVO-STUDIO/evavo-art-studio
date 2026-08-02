@@ -10,6 +10,39 @@ A `BookArtBriefV1` must bind one request to the exact workspace, project, book, 
 
 Cover and narrative illustration work is text-free. Titles, author names, series details, captions, exact labels, spine text, ISBNs and barcodes remain editable Book Design elements.
 
+## Art Studio production profile
+
+`compileBookArtProductionWorkOrder()` converts one exact `BookArtBriefV1` into a fingerprinted `evavo_book_art_production_work_order` under `evavo_book_art_profile_v1`.
+
+The work order supports:
+
+- front-cover and full-wrap background art;
+- full-page, half-page and spot illustrations;
+- diagrams and maps;
+- transparent or opaque ornaments;
+- print, digital or combined delivery requirements;
+- provider-neutral one-candidate-at-a-time execution;
+- exact manuscript, visual-canon, art-direction and rights evidence replay;
+- separate technical mastering, selection, promotion and Book Studio use binding.
+
+The compiler rejects unknown fields and refuses title, subtitle, author, contributor, spine, ISBN, barcode, KDP, trim, bleed, pricing, listing metadata or publication authority at the Art Studio boundary. It emits only an intermediate PNG candidate request. Delivery MIME types, final dimensions, PPI and colour intent remain technical mastering requirements rather than claims that a provider response is final.
+
+Every work order keeps:
+
+```text
+providerCandidateMayBeFinal: false
+authoritativeWritesPerformed: false
+selectionRequired: true
+promotionRequired: true
+bookUseBindingRequired: true
+artifactBytesRewritten: false
+canonicalRendererMustVerifyBytes: true
+runtimeCutoverApproved: false
+publicationPerformed: false
+```
+
+`translateLegacyWebsiteBookArtGenerationPlan()` validates one exact ready Website cover-generation task against the canonical Book Art brief. It retains the old plan, input, scene, art-direction and prompt digests for shadow comparison, but does not retain or trust the raw legacy provider prompt as the new authority. Translation is shadow-only and performs no provider call, artifact write, selection, promotion, cutover or publication.
+
 ## Outputs owned by Art Studio
 
 A `BookArtArtifactReceiptV1` represents one immutable candidate or approved artifact. Approval requires:
@@ -58,4 +91,4 @@ Large image files use immutable artifact references or bounded binary upload. Th
 
 ## Migration posture
 
-Website remains the active compatibility runtime. The new contract starts the no-loss convergence of Website cover/illustration candidate logic into Art Studio while Book Studio and Book Design move to Docs Suite. No production cutover, source deletion or publication is approved by this contract.
+Website remains the active compatibility runtime. The production profile makes Art Studio capable of compiling the Art-owned generation boundary for cover and illustration work, but it does not switch the active Website provider path. Provider execution wiring, exact shadow parity, immutable storage registration and controlled candidate-lifecycle cutover remain separately gated. No production cutover, source deletion or publication is approved by this contract.

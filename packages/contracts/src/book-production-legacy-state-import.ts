@@ -49,7 +49,7 @@ const RIGHTS_STATUSES = new Set<BookArtProvenanceV1["rightsStatus"]>([
   "review_required",
   "blocked",
 ]);
-const LEGACY_ORIGIN_MAP: Record<string, BookArtProvenanceV1["origin"]> = {
+const LEGACY_ORIGIN_MAP: Readonly<Record<string, BookArtProvenanceV1["origin"]>> = {
   photographic_capture: "human_authored",
   commissioned_illustration: "commissioned",
   licensed_artwork: "licensed",
@@ -66,8 +66,8 @@ export function importLegacyWebsiteBookArtState(
   const warnings: string[] = [];
   const sourceEvidence: LegacyWebsiteBookArtSourceEvidenceV1 = {};
   const identity = cloneIdentity(input?.identity);
-
   validateIdentity(identity, blockers);
+
   if (input?.outputKind !== "evavo_legacy_website_book_art_state_import_input" || input?.schemaVersion !== 1) {
     blockers.push("Legacy Website Book Art import kind or version is invalid.");
   }
@@ -78,8 +78,10 @@ export function importLegacyWebsiteBookArtState(
 
   const quality = record(input?.qualityAuthority);
   if (!quality) {
-    blockers.push("Legacy Website Book Art quality authority must be an object.");
-    return blocked(identity, sourceEvidence, blockers, warnings);
+    return blocked(identity, sourceEvidence, [
+      ...blockers,
+      "Legacy Website Book Art quality authority must be an object.",
+    ], warnings);
   }
   const candidate = record(quality.candidate) ?? {};
   const governed = record(quality.governedArtifact) ?? {};
@@ -96,9 +98,7 @@ export function importLegacyWebsiteBookArtState(
   const qualityDigest = text(quality.authorityDigestSha256);
   if (!isSha(qualityDigest)) blockers.push("Legacy Website artwork quality authority digest is invalid.");
   else sourceEvidence.qualityAuthoritySha256 = qualityDigest;
-
-  const artDirectionDigest = text(quality.artDirectionDigestSha256);
-  if (!isSha(artDirectionDigest) || artDirectionDigest !== sourceBriefFingerprint) {
+  if (quality.artDirectionDigestSha256 !== sourceBriefFingerprint || !isSha(quality.artDirectionDigestSha256)) {
     blockers.push("Legacy Website art direction does not match the imported source brief fingerprint.");
   }
   const qualityStatus = text(quality.status);
@@ -130,9 +130,7 @@ export function importLegacyWebsiteBookArtState(
 
   const legacyOrigin = text(provenance.origin);
   const mappedOrigin = LEGACY_ORIGIN_MAP[legacyOrigin];
-  if (!mappedOrigin) {
-    blockers.push(`Legacy Website artwork origin ${legacyOrigin || "missing"} is not safely migratable.`);
-  }
+  if (!mappedOrigin) blockers.push(`Legacy Website artwork origin ${legacyOrigin || "missing"} is not safely migratable.`);
   const rightsStatusText = text(provenance.rightsStatus);
   const rightsStatus = RIGHTS_STATUSES.has(rightsStatusText as BookArtProvenanceV1["rightsStatus"])
     ? rightsStatusText as BookArtProvenanceV1["rightsStatus"]
@@ -144,30 +142,18 @@ export function importLegacyWebsiteBookArtState(
 
   const candidateSetRaw = input?.candidateSetAuthority;
   const candidateSet = candidateSetRaw === undefined ? undefined : record(candidateSetRaw);
-  if (candidateSetRaw !== undefined && !candidateSet) {
-    blockers.push("Legacy Website candidate-set authority must be an object.");
-  }
+  if (candidateSetRaw !== undefined && !candidateSet) blockers.push("Legacy Website candidate-set authority must be an object.");
   let selectionReceiptSha256: string | undefined;
   let candidateSetDigest: string | undefined;
   if (candidateSet) {
     if (candidateSet.outputKind !== "book_cover_artwork_candidate_set_authority" || candidateSet.version !== "book_cover_artwork_candidate_set_authority_v1") {
       blockers.push("Legacy Website candidate-set authority kind or version is invalid.");
     }
-    if (candidateSet.status !== "selected_for_composition") {
-      blockers.push("Legacy Website candidate-set authority has not selected one candidate.");
-    }
-    if (candidateSet.projectId !== identity.projectId) {
-      blockers.push("Legacy Website candidate-set authority belongs to a different project.");
-    }
-    if (candidateSet.artDirectionDigestSha256 !== sourceBriefFingerprint) {
-      blockers.push("Legacy Website candidate-set art direction differs from the imported brief.");
-    }
-    if (candidateSet.selectedCandidateId !== candidateId) {
-      blockers.push("Legacy Website candidate-set authority selected a different candidate.");
-    }
-    if (candidateSet.selectedQualityAuthorityDigestSha256 !== qualityDigest) {
-      blockers.push("Legacy Website candidate-set authority selected a different quality authority.");
-    }
+    if (candidateSet.status !== "selected_for_composition") blockers.push("Legacy Website candidate-set authority has not selected one candidate.");
+    if (candidateSet.projectId !== identity.projectId) blockers.push("Legacy Website candidate-set authority belongs to a different project.");
+    if (candidateSet.artDirectionDigestSha256 !== sourceBriefFingerprint) blockers.push("Legacy Website candidate-set art direction differs from the imported brief.");
+    if (candidateSet.selectedCandidateId !== candidateId) blockers.push("Legacy Website candidate-set authority selected a different candidate.");
+    if (candidateSet.selectedQualityAuthorityDigestSha256 !== qualityDigest) blockers.push("Legacy Website candidate-set authority selected a different quality authority.");
     candidateSetDigest = text(candidateSet.authorityDigestSha256);
     if (!isSha(candidateSetDigest)) blockers.push("Legacy Website candidate-set authority digest is invalid.");
     else {
@@ -180,30 +166,19 @@ export function importLegacyWebsiteBookArtState(
 
   const bindingRaw = input?.selectionBinding;
   const binding = bindingRaw === undefined ? undefined : record(bindingRaw);
-  if (bindingRaw !== undefined && !binding) {
-    blockers.push("Legacy Website selection binding must be an object.");
-  }
+  if (bindingRaw !== undefined && !binding) blockers.push("Legacy Website selection binding must be an object.");
   if (binding) {
     if (!candidateSet) blockers.push("Legacy Website selection binding requires the matching candidate-set authority.");
     if (binding.outputKind !== "book_cover_artwork_selection_binding" || binding.version !== "book_cover_artwork_selection_binding_v1" || binding.status !== "selected_for_composition") {
       blockers.push("Legacy Website selection binding kind, version or status is invalid.");
     }
-    if (binding.projectId !== identity.projectId || binding.candidateId !== candidateId) {
-      blockers.push("Legacy Website selection binding belongs to a different project or candidate.");
-    }
-    if (binding.sourceArtifactReference !== artifactReference || binding.sourceArtifactSha256 !== contentSha256) {
-      blockers.push("Legacy Website selection binding identifies different artifact bytes.");
-    }
-    if (binding.artworkQualityAuthorityDigestSha256 !== qualityDigest || binding.candidateSetAuthorityDigestSha256 !== candidateSetDigest) {
-      blockers.push("Legacy Website selection binding evidence digests do not match.");
-    }
-    if (binding.artDirectionDigestSha256 !== sourceBriefFingerprint) {
-      blockers.push("Legacy Website selection binding uses different art direction.");
-    }
+    if (binding.projectId !== identity.projectId || binding.candidateId !== candidateId) blockers.push("Legacy Website selection binding belongs to a different project or candidate.");
+    if (binding.sourceArtifactReference !== artifactReference || binding.sourceArtifactSha256 !== contentSha256) blockers.push("Legacy Website selection binding identifies different artifact bytes.");
+    if (binding.artworkQualityAuthorityDigestSha256 !== qualityDigest || binding.candidateSetAuthorityDigestSha256 !== candidateSetDigest) blockers.push("Legacy Website selection binding evidence digests do not match.");
+    if (binding.artDirectionDigestSha256 !== sourceBriefFingerprint) blockers.push("Legacy Website selection binding uses different art direction.");
     const bindingDigest = text(binding.bindingDigestSha256);
     if (!isSha(bindingDigest)) blockers.push("Legacy Website selection binding digest is invalid.");
     else sourceEvidence.selectionBindingSha256 = bindingDigest;
-
     const selectedBy = text(binding.selectedBy);
     const selectedByRole = text(binding.selectedByRole);
     const selectedAt = text(binding.selectedAt);
@@ -216,14 +191,9 @@ export function importLegacyWebsiteBookArtState(
     }
   }
 
-  if (candidateSet && !binding) {
-    warnings.push("Legacy candidate selection exists but has no exact scene selection binding.");
-  }
-
+  if (candidateSet && !binding) warnings.push("Legacy candidate selection exists but has no exact scene selection binding.");
   const generatedTextDetected = answers.generated_text_contamination !== "pass";
-  if (generatedTextDetected) {
-    warnings.push("Legacy review does not prove the candidate is free of generated-text contamination.");
-  }
+  if (generatedTextDetected) warnings.push("Legacy review does not prove the candidate is free of generated-text contamination.");
   warnings.push("A new Art Studio promotion is required; legacy shortlist or composition approval is not imported as final approval.");
 
   const uniqueBlockers = unique(blockers);
@@ -238,7 +208,7 @@ export function importLegacyWebsiteBookArtState(
     rightsStatus,
     rightsReference,
     provenance,
-    generation,
+    ...(generation === undefined ? {} : { generation }),
   });
   const receipt: BookArtArtifactReceiptV1 = {
     outputKind: "evavo_book_art_artifact_receipt",
@@ -256,16 +226,14 @@ export function importLegacyWebsiteBookArtState(
     heightPx,
     provenance: mappedProvenance,
     technicalQualityReceiptSha256: qualityDigest,
-    selectionReceiptSha256,
+    ...(selectionReceiptSha256 === undefined ? {} : { selectionReceiptSha256 }),
     generatedTextDetected,
     unresolvedRisks: uniqueWarnings,
     artifactFingerprint: contentSha256,
     publicationPerformed: false,
   };
   const receiptValidation = validateLegacyCompatibleBookArtArtifactReceipt(receipt);
-  if (!receiptValidation.valid) {
-    return blocked(identity, sourceEvidence, receiptValidation.issues, uniqueWarnings);
-  }
+  if (!receiptValidation.valid) return blocked(identity, sourceEvidence, receiptValidation.issues, uniqueWarnings);
   return {
     outputKind: "evavo_legacy_website_book_art_state_import_result",
     schemaVersion: 1,
@@ -294,13 +262,18 @@ function mapProvenance(input: {
     ...stringArray(input.provenance.ingredientSha256s).map((item) => `sha256:${item.replace(/^sha256:/, "")}`),
     text(input.provenance.sourceReference),
   ]);
+  const provider = optionalText(input.generation?.provider);
+  const model = optionalText(input.generation?.model);
+  const modelVersion = optionalText(input.generation?.modelVersion);
+  const promptSha256 = isSha(input.generation?.promptSha256) ? text(input.generation?.promptSha256) : undefined;
+  const seed = optionalText(input.generation?.seed);
   return {
     origin: input.mappedOrigin,
-    provider: optionalText(input.generation?.provider),
-    model: optionalText(input.generation?.model),
-    modelVersion: optionalText(input.generation?.modelVersion),
-    promptSha256: isSha(input.generation?.promptSha256) ? text(input.generation?.promptSha256) : undefined,
-    seed: optionalText(input.generation?.seed),
+    ...(provider === undefined ? {} : { provider }),
+    ...(model === undefined ? {} : { model }),
+    ...(modelVersion === undefined ? {} : { modelVersion }),
+    ...(promptSha256 === undefined ? {} : { promptSha256 }),
+    ...(seed === undefined ? {} : { seed }),
     sourceArtifactIds,
     rightsEvidenceIds: [input.rightsReference],
     rightsStatus: input.rightsStatus,
@@ -344,16 +317,12 @@ function cloneIdentity(value: BookArtIdentityV1 | undefined): BookArtIdentityV1 
     requestId: text(value?.requestId),
   };
 }
-
 function validateIdentity(value: BookArtIdentityV1, blockers: string[]): void {
   for (const key of ["workspaceId", "projectId", "bookId", "requestId"] as const) {
     if (!isSafeId(value[key])) blockers.push(`Legacy Website Book Art identity ${key} is invalid.`);
   }
-  if (value.editionId !== undefined && !isSafeId(value.editionId)) {
-    blockers.push("Legacy Website Book Art identity editionId is invalid.");
-  }
+  if (value.editionId !== undefined && !isSafeId(value.editionId)) blockers.push("Legacy Website Book Art identity editionId is invalid.");
 }
-
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
