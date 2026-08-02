@@ -65,33 +65,34 @@ function legacyInput(id, checksumCharacter) {
   };
 }
 
-function item(id, checksumCharacter) {
+async function item(id, checksumCharacter) {
   const input = legacyInput(id, checksumCharacter);
   return {
     migrationItemId: `migration-${id}`,
-    sourceRecordFingerprint: fingerprintLegacyWebsiteBookArtSourceRecord(input),
+    sourceRecordFingerprint: await fingerprintLegacyWebsiteBookArtSourceRecord(input),
     input,
   };
 }
 
-function batch(items = [item("candidate-1", "b"), item("candidate-2", "c")]) {
+async function batch(items) {
+  const resolvedItems = items ?? [await item("candidate-1", "b"), await item("candidate-2", "c")];
   return {
     outputKind: "evavo_legacy_website_book_art_batch_input",
     schemaVersion: 1,
     batchId: "batch-cover-art-1",
     sourceRepository: "EVAVO-STUDIO/Website",
     sourceCommit: "a".repeat(40),
-    expectedMigrationItemIds: items.map((entry) => entry.migrationItemId),
-    items,
+    expectedMigrationItemIds: resolvedItems.map((entry) => entry.migrationItemId),
+    items: resolvedItems,
   };
 }
 
-test("processes every expected item once with deterministic ordering and fingerprint", () => {
-  const first = batch();
-  const second = batch([...first.items].reverse());
+test("processes every expected item once with deterministic ordering and fingerprint", async () => {
+  const first = await batch();
+  const second = await batch([...first.items].reverse());
   second.expectedMigrationItemIds.reverse();
-  const firstResult = importLegacyWebsiteBookArtStateBatch(first);
-  const secondResult = importLegacyWebsiteBookArtStateBatch(second);
+  const firstResult = await importLegacyWebsiteBookArtStateBatch(first);
+  const secondResult = await importLegacyWebsiteBookArtStateBatch(second);
   assert.equal(firstResult.status, "ready_for_promotion_review", firstResult.blockers.join("\n"));
   assert.deepEqual(firstResult.processedMigrationItemIds, ["migration-candidate-1", "migration-candidate-2"]);
   assert.equal(firstResult.counts.expected, 2);
@@ -101,40 +102,40 @@ test("processes every expected item once with deterministic ordering and fingerp
   assert.equal(firstResult.batchFingerprint, secondResult.batchFingerprint);
 });
 
-test("blocks duplicate item identities before processing any state", () => {
-  const repeated = item("candidate-1", "b");
-  const value = batch([repeated, structuredClone(repeated)]);
+test("blocks duplicate item identities before processing any state", async () => {
+  const repeated = await item("candidate-1", "b");
+  const value = await batch([repeated, structuredClone(repeated)]);
   value.expectedMigrationItemIds = [repeated.migrationItemId];
-  const result = importLegacyWebsiteBookArtStateBatch(value);
+  const result = await importLegacyWebsiteBookArtStateBatch(value);
   assert.equal(result.status, "blocked");
   assert.equal(result.counts.processed, 0);
   assert.equal(result.itemResults.length, 0);
   assert.ok(result.duplicateMigrationItemIds.includes(repeated.migrationItemId));
 });
 
-test("blocks missing or unexpected state instead of reporting partial coverage", () => {
-  const value = batch([item("candidate-1", "b")]);
+test("blocks missing or unexpected state instead of reporting partial coverage", async () => {
+  const value = await batch([await item("candidate-1", "b")]);
   value.expectedMigrationItemIds = ["migration-candidate-1", "migration-candidate-2"];
-  const result = importLegacyWebsiteBookArtStateBatch(value);
+  const result = await importLegacyWebsiteBookArtStateBatch(value);
   assert.equal(result.status, "blocked");
   assert.deepEqual(result.missingMigrationItemIds, ["migration-candidate-2"]);
   assert.equal(result.counts.processed, 0);
 });
 
-test("blocks a tampered source-record fingerprint", () => {
-  const value = batch();
+test("blocks a tampered source-record fingerprint", async () => {
+  const value = await batch();
   value.items[0].sourceRecordFingerprint = sha("9");
-  const result = importLegacyWebsiteBookArtStateBatch(value);
+  const result = await importLegacyWebsiteBookArtStateBatch(value);
   assert.equal(result.status, "blocked");
   assert.equal(result.itemResults.length, 0);
   assert.ok(result.blockers.some((entry) => entry.includes("does not match its exact canonical input")));
 });
 
-test("retains item-level failures as needs-resolution without claiming writes", () => {
-  const value = batch();
+test("retains item-level failures as needs-resolution without claiming writes", async () => {
+  const value = await batch();
   value.items[1].input.qualityAuthority.candidate.provenance.rightsStatus = "blocked";
-  value.items[1].sourceRecordFingerprint = fingerprintLegacyWebsiteBookArtSourceRecord(value.items[1].input);
-  const result = importLegacyWebsiteBookArtStateBatch(value);
+  value.items[1].sourceRecordFingerprint = await fingerprintLegacyWebsiteBookArtSourceRecord(value.items[1].input);
+  const result = await importLegacyWebsiteBookArtStateBatch(value);
   assert.equal(result.status, "needs_resolution");
   assert.equal(result.counts.processed, 2);
   assert.equal(result.counts.blocked, 1);
