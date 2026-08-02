@@ -40,6 +40,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('packages/contracts/test/book-production-legacy-illustration-plan.test.mjs')
+          source = path.read_text(encoding='utf-8')
+          token = '  fingerprintBookArtBrief,\n'
+          if token not in source:
+              anchor = '  BOOK_ART_HANDOFF_CONTRACT,\n'
+              if source.count(anchor) != 1:
+                  raise SystemExit('Expected one legacy illustration import anchor.')
+              path.write_text(source.replace(anchor, anchor + token, 1), encoding='utf-8')
+          PY
           python .github/scripts/complete-exact-docs-book-art-brief.py
           git diff --check
           if git diff --quiet; then
