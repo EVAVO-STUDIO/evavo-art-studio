@@ -1,0 +1,62 @@
+name: Targeted final supervisor repair validation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact validation branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: validation/supervisor-8b9e2d8-20260802
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove direct candidate ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD^)" == "03f0b90c6d6555f55da49105ea64acbde65525a0" ]]
+          mapfile -t changed < <(git diff --name-only 03f0b90c6d6555f55da49105ea64acbde65525a0..HEAD)
+          [[ "${#changed[@]}" -eq 1 ]]
+          [[ "${changed[0]}" == ".github/workflows/targeted-supervisor-validation.yml" ]]
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build domain packages
+        run: pnpm run build:domain
+
+      - name: Run complete sprite-supervisor test suite
+        run: pnpm --filter @evavo/art-sprite-supervisor test
+
+      - name: Recheck worker strict types
+        run: pnpm --filter @evavo/art-studio-worker typecheck
+
+      - name: Remove generated lockfile and verify clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
