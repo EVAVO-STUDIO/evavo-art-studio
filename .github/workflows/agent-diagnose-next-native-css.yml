@@ -27,12 +27,12 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
 
-      - name: Prove exact workflow-only boundary
+      - name: Prove exact workflow-only revision
         shell: bash
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
-          [[ "$(git rev-parse HEAD^)" == "5d13b9c24d21c5277ea111c99c6e6aa4bc064055" ]]
+          [[ "$(git rev-parse HEAD^)" == "5dd42caff4423ec4e07c8b9a04a36647fdaf9445" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
           test "$(git diff --name-only HEAD^ HEAD)" = ".github/workflows/agent-diagnose-next-native-css.yml"
 
@@ -50,45 +50,22 @@ jobs:
       - name: Install review-first dependency graph
         run: pnpm install --no-frozen-lockfile
 
-      - name: Inspect exact Next native module contracts
-        id: inspect
+      - name: Inspect installed Next compiled loader paths
         shell: bash
         run: |
           set -euo pipefail
           next_package="$(find node_modules/.pnpm -path '*/node_modules/next/package.json' -print -quit)"
           test -n "${next_package}"
           next_dir="$(dirname "${next_package}")"
-          lightning_package="${next_dir}/dist/compiled/lightningcss/package.json"
-          oxide_package="${next_dir}/dist/compiled/@tailwindcss/oxide/package.json"
-          test -f "${lightning_package}"
-          test -f "${oxide_package}"
           next_version="$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).version" "${next_package}")"
-          lightning_version="$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).version" "${lightning_package}")"
-          oxide_version="$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).version" "${oxide_package}")"
-          printf 'next_dir=%s\nnext_version=%s\nlightning_version=%s\noxide_version=%s\n' \
-            "${next_dir}" "${next_version}" "${lightning_version}" "${oxide_version}"
-          printf 'next_dir=%s\n' "${next_dir}" >> "${GITHUB_OUTPUT}"
-          printf 'lightning_version=%s\n' "${lightning_version}" >> "${GITHUB_OUTPUT}"
-          printf 'oxide_version=%s\n' "${oxide_version}" >> "${GITHUB_OUTPUT}"
-          echo '--- lightningcss package ---'
-          cat "${lightning_package}"
-          echo '--- oxide package ---'
-          cat "${oxide_package}"
-          echo '--- native require sites ---'
-          grep -R -n -E 'lightningcss\.linux-x64-gnu|lightningcss-linux-x64-gnu' \
-            "${next_dir}/dist/compiled/lightningcss" "${next_dir}/dist/compiled" | head -20 || true
-          grep -R -n -E 'tailwindcss-oxide\.linux-x64-gnu|oxide-linux-x64-gnu' \
-            "${next_dir}/dist/compiled/@tailwindcss/oxide" "${next_dir}/dist/compiled" | head -20 || true
-          echo '--- installed native candidates before repair ---'
-          find node_modules/.pnpm -maxdepth 2 -type d \
-            \( -name '*lightningcss*linux*x64*gnu*' -o -name '*oxide*linux*x64*gnu*' \) -print || true
-          find "${next_dir}/dist/compiled" -type f \( -name '*lightningcss*.node' -o -name '*oxide*.node' \) -print || true
+          printf 'next_dir=%s\nnext_version=%s\n' "${next_dir}" "${next_version}"
+          [[ "${next_version}" == "16.2.12" ]]
+          find "${next_dir}/dist" -type f | grep -E 'lightningcss|tailwindcss|oxide' | head -100 || true
+          grep -R -n -E 'lightningcss-linux-x64-gnu|lightningcss\.linux-x64-gnu|oxide-linux-x64-gnu|tailwindcss-oxide\.linux-x64-gnu' \
+            "${next_dir}/dist" | head -100 || true
 
-      - name: Install exact native binaries in an isolated prefix
+      - name: Install exact official Linux native packages in isolation
         shell: bash
-        env:
-          LIGHTNING_VERSION: ${{ steps.inspect.outputs.lightning_version }}
-          OXIDE_VERSION: ${{ steps.inspect.outputs.oxide_version }}
         run: |
           set -euo pipefail
           rm -rf "${RUNNER_TEMP}/native-css"
@@ -99,27 +76,28 @@ jobs:
             --no-package-lock \
             --no-audit \
             --no-fund \
-            "lightningcss-linux-x64-gnu@${LIGHTNING_VERSION}" \
-            "@tailwindcss/oxide-linux-x64-gnu@${OXIDE_VERSION}"
+            'lightningcss-linux-x64-gnu@1.30.2' \
+            '@tailwindcss/oxide-linux-x64-gnu@4.1.18'
+          test -f "${RUNNER_TEMP}/native-css/node_modules/lightningcss-linux-x64-gnu/lightningcss.linux-x64-gnu.node"
+          test -f "${RUNNER_TEMP}/native-css/node_modules/@tailwindcss/oxide-linux-x64-gnu/tailwindcss-oxide.linux-x64-gnu.node"
           find "${RUNNER_TEMP}/native-css/node_modules" -type f -name '*.node' -print -exec sha256sum {} \;
 
-      - name: Place exact binaries at Next compiled-module require paths
+      - name: Expose exact native packages through normal Node resolution
         shell: bash
-        env:
-          NEXT_DIR: ${{ steps.inspect.outputs.next_dir }}
         run: |
           set -euo pipefail
-          lightning_source="${RUNNER_TEMP}/native-css/node_modules/lightningcss-linux-x64-gnu/lightningcss.linux-x64-gnu.node"
-          oxide_source="${RUNNER_TEMP}/native-css/node_modules/@tailwindcss/oxide-linux-x64-gnu/tailwindcss-oxide.linux-x64-gnu.node"
-          test -f "${lightning_source}"
-          test -f "${oxide_source}"
-          lightning_target="${NEXT_DIR}/dist/compiled/lightningcss.linux-x64-gnu.node"
-          oxide_target="${NEXT_DIR}/dist/compiled/@tailwindcss/oxide/tailwindcss-oxide.linux-x64-gnu.node"
-          install -m 0644 "${lightning_source}" "${lightning_target}"
-          install -m 0644 "${oxide_source}" "${oxide_target}"
-          sha256sum "${lightning_target}" "${oxide_target}"
+          mkdir -p node_modules/@tailwindcss
+          ln -sfn \
+            "${RUNNER_TEMP}/native-css/node_modules/lightningcss-linux-x64-gnu" \
+            node_modules/lightningcss-linux-x64-gnu
+          ln -sfn \
+            "${RUNNER_TEMP}/native-css/node_modules/@tailwindcss/oxide-linux-x64-gnu" \
+            node_modules/@tailwindcss/oxide-linux-x64-gnu
+          NODE_PATH="${PWD}/node_modules" node -e "require('lightningcss-linux-x64-gnu'); require('@tailwindcss/oxide-linux-x64-gnu'); console.log('native-css-modules=loaded')"
 
       - name: Prove exact web production build
+        env:
+          NODE_PATH: ${{ github.workspace }}/node_modules
         run: pnpm --filter @evavo/art-studio-web build
 
       - name: Restore repository cleanliness
@@ -127,6 +105,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f pnpm-lock.yaml
+          rm -rf apps/web/.next
           git clean -fdX
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
