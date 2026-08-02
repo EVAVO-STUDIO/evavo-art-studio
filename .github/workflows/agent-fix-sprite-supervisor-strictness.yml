@@ -1,4 +1,4 @@
-name: Agent Fix Strict Runtime Typing
+name: Agent Validate Strict Worker Repairs
 
 on:
   pull_request:
@@ -7,19 +7,21 @@ on:
 
 permissions:
   contents: write
+  issues: read
+  pull-requests: read
 
 concurrency:
-  group: agent-fix-strict-runtime-typing-${{ github.event.pull_request.number }}
+  group: agent-validate-strict-worker-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
-  fix:
+  validate:
     if: >-
       github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'agent/book-art-provider-runtime-20260802'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Check out exact pull request head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -33,104 +35,70 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
-          [[ "$(git rev-parse HEAD^)" == "cf7692a2b100c057f598166eb3f61dc8ccc39ec8" ]]
+          [[ "$(git rev-parse HEAD^)" == "91062578ece710115fb15c99dbe46c00753e58c1" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
           test "$(git diff --name-only HEAD^ HEAD)" = ".github/workflows/agent-fix-sprite-supervisor-strictness.yml"
 
-      - name: Apply exact strict-TypeScript repairs
+      - name: Reconstruct and apply checksum-bound repair patch
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           python - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
           from pathlib import Path
+          from urllib.request import Request, urlopen
 
-          def replace_once(path: Path, before: str, after: str) -> None:
-              text = path.read_text(encoding='utf-8')
-              if text.count(before) != 1:
-                  raise SystemExit(f'Expected repair block exactly once in {path}.')
-              path.write_text(text.replace(before, after, 1), encoding='utf-8')
+          marker_prefix = 'STRICT_WORKER_FIXES_V1_PART_'
+          request = Request(
+              f"https://api.github.com/repos/{os.environ['REPOSITORY']}/issues/{os.environ['PR_NUMBER']}/comments?per_page=100",
+              headers={
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'X-GitHub-Api-Version': '2022-11-28',
+              },
+          )
+          with urlopen(request, timeout=30) as response:
+              comments = json.load(response)
 
-          sprite = Path('packages/sprite-supervisor/src/automatic-compiler.ts')
-          replace_once(
-              sprite,
-              '''  const keys = group.filter((entry) => entry.keyPose);\n  return {\n    previous: [...keys]\n      .reverse()\n      .find((entry) => entry.frameIndex < frame.frameIndex),\n    next: keys.find((entry) => entry.frameIndex > frame.frameIndex),\n  };\n''',
-              '''  const keys = group.filter((entry) => entry.keyPose);\n  const previous = [...keys]\n    .reverse()\n    .find((entry) => entry.frameIndex < frame.frameIndex);\n  const next = keys.find((entry) => entry.frameIndex > frame.frameIndex);\n  return {\n    ...(previous === undefined ? {} : { previous }),\n    ...(next === undefined ? {} : { next }),\n  };\n''',
-          )
-          replace_once(
-              sprite,
-              '''        phase: identityUnit.phase,\n        frame,\n        clip: identityUnit.clip,\n        direction: frame.direction,\n''',
-              '''        phase: identityUnit.phase,\n        frame,\n        ...(identityUnit.clip === undefined ? {} : { clip: identityUnit.clip }),\n        direction: frame.direction,\n''',
-          )
-          replace_once(
-              sprite,
-              '''  const includedRoles = layerDecisions.map((entry) => entry.role);\n''',
-              '''  const includedRoles = new Set<string>(\n    layerDecisions.map((entry) => entry.role),\n  );\n''',
-          )
-          replace_once(
-              sprite,
-              '''        (unit) => unit.frameId === frame.id && includedRoles.includes(unit.layerRole),\n''',
-              '''        (unit) => unit.frameId === frame.id && includedRoles.has(unit.layerRole),\n''',
-          )
+          parts = []
+          for part in range(1, 6):
+              marker = f'{marker_prefix}{part}_OF_5\n'
+              matches = [
+                  comment.get('body', '')[len(marker):].strip()
+                  for comment in comments
+                  if comment.get('body', '').startswith(marker)
+              ]
+              if len(matches) != 1:
+                  raise SystemExit(f'Expected one strict-worker patch part {part}; found {len(matches)}.')
+              parts.append(matches[0])
 
-          finalizer = Path('apps/worker/src/adaptive-finalizer-guarded-handlers.ts')
-          replace_once(
-              finalizer,
-              '''import {\n  PermanentRuntimeError,\n  type RuntimeJobHandler,\n} from "@evavo/art-runtime";\n''',
-              '''import {\n  PermanentRuntimeError,\n  type RuntimeHandlerResult,\n  type RuntimeJobHandler,\n} from "@evavo/art-runtime";\n''',
-          )
-          replace_once(
-              finalizer,
-              '''function outputByRole(\n  artifacts: readonly StoredArtifact[],\n  role: string,\n): StoredArtifact {\n''',
-              '''function requireBaseResult(\n  value: RuntimeHandlerResult | void,\n): RuntimeHandlerResult {\n  if (!value) {\n    throw new PermanentRuntimeError(\n      "ADAPTIVE_FINALIZER_BASE_RESULT_MISSING",\n      "The base adaptive finalizer returned no result for a successful candidate.",\n    );\n  }\n  return value;\n}\n\nfunction outputByRole(\n  artifacts: readonly StoredArtifact[],\n  role: string,\n): StoredArtifact {\n''',
-          )
-          replace_once(
-              finalizer,
-              '''  baseResult: Awaited<ReturnType<RuntimeJobHandler>>,\n): Promise<Awaited<ReturnType<RuntimeJobHandler>>> {\n  const artifacts = await Promise.all(\n    baseResult.outputArtifacts.map((artifactId) =>\n''',
-              '''  baseResult: RuntimeHandlerResult,\n): Promise<RuntimeHandlerResult> {\n  const artifacts = await Promise.all(\n    (baseResult.outputArtifacts ?? []).map((artifactId) =>\n''',
-          )
-          replace_once(
-              finalizer,
-              '''      return normalizeSuccessfulLineage(\n        context,\n        sourceId,\n        await base(context),\n      );\n''',
-              '''      return normalizeSuccessfulLineage(\n        context,\n        sourceId,\n        requireBaseResult(await base(context)),\n      );\n''',
-          )
-
-          family = Path('apps/worker/src/adaptive-sprite-family-handlers.ts')
-          replace_once(
-              family,
-              '''import {\n  PermanentRuntimeError,\n  type RuntimeJobHandler,\n} from "@evavo/art-runtime";\n''',
-              '''import {\n  PermanentRuntimeError,\n  type RuntimeHandlerResult,\n  type RuntimeJobHandler,\n} from "@evavo/art-runtime";\n''',
-          )
-          replace_once(
-              family,
-              '''function adaptiveRequired(\n  manifest: ReturnType<typeof validateSpriteFamilyManifest>,\n): boolean {\n''',
-              '''function requireBaseResult(\n  value: RuntimeHandlerResult | void,\n): RuntimeHandlerResult {\n  if (!value) {\n    throw new PermanentRuntimeError(\n      "ADAPTIVE_FAMILY_BASE_RESULT_MISSING",\n      "The base sprite-family verifier returned no result.",\n    );\n  }\n  return value;\n}\n\nfunction adaptiveRequired(\n  manifest: ReturnType<typeof validateSpriteFamilyManifest>,\n): boolean {\n''',
-          )
-          replace_once(
-              family,
-              '''    const baseResult = await base(context);\n    const proofArtifactIds = [\n''',
-              '''    const baseResult = requireBaseResult(await base(context));\n    const baseOutputArtifacts = baseResult.outputArtifacts ?? [];\n    const proofArtifactIds = [\n''',
-          )
-          replace_once(
-              family,
-              '''      baseOutputArtifactIds: baseResult.outputArtifacts,\n''',
-              '''      baseOutputArtifactIds: baseOutputArtifacts,\n''',
-          )
-          replace_once(
-              family,
-              '''            ...baseResult.outputArtifacts,\n''',
-              '''            ...baseOutputArtifacts,\n''',
-          )
-          replace_once(
-              family,
-              '''      outputArtifacts: [...baseResult.outputArtifacts, evidence.artifactId],\n''',
-              '''      outputArtifacts: [...baseOutputArtifacts, evidence.artifactId],\n''',
-          )
+          payload = ''.join(parts)
+          if len(payload) != 14880:
+              raise SystemExit(f'Strict-worker Base64 length mismatch: {len(payload)}.')
+          patch = base64.b64decode(payload, validate=True)
+          if len(patch) != 11158:
+              raise SystemExit(f'Strict-worker patch length mismatch: {len(patch)}.')
+          if hashlib.sha256(patch).hexdigest() != '134695636e8da8c42fb2f39a30579a7b75d4cd51ded77eba077add71533bd8b2':
+              raise SystemExit('Strict-worker patch SHA-256 mismatch.')
+          Path(os.environ['RUNNER_TEMP'], 'strict-worker-fixes.patch').write_bytes(patch)
           PY
+          git apply --check "${RUNNER_TEMP}/strict-worker-fixes.patch"
+          git apply "${RUNNER_TEMP}/strict-worker-fixes.patch"
           git diff --check
           git diff --name-only | sort > "${RUNNER_TEMP}/actual-paths.txt"
           cat > "${RUNNER_TEMP}/expected-paths.txt" <<'PATHS'
           apps/worker/src/adaptive-finalizer-guarded-handlers.ts
           apps/worker/src/adaptive-sprite-family-handlers.ts
+          apps/worker/src/mastering-handlers.ts
+          apps/worker/test/adaptive-finalizer-source-contract.test.mjs
+          apps/worker/test/mastering-worker.test.mjs
           packages/sprite-supervisor/src/automatic-compiler.ts
           PATHS
           sort "${RUNNER_TEMP}/expected-paths.txt" -o "${RUNNER_TEMP}/expected-paths.txt"
@@ -153,10 +121,10 @@ jobs:
       - name: Build exact Art Studio domain dependencies
         run: pnpm run build:domain
 
-      - name: Run worker and Book Art provider runtime regressions
+      - name: Run complete worker and Book Art provider regressions
         run: pnpm --filter @evavo/art-studio-worker test
 
-      - name: Commit source-only repairs
+      - name: Commit only the validated repair slice
         shell: bash
         run: |
           set -euo pipefail
@@ -166,6 +134,9 @@ jobs:
           cat > "${RUNNER_TEMP}/expected-paths.txt" <<'PATHS'
           apps/worker/src/adaptive-finalizer-guarded-handlers.ts
           apps/worker/src/adaptive-sprite-family-handlers.ts
+          apps/worker/src/mastering-handlers.ts
+          apps/worker/test/adaptive-finalizer-source-contract.test.mjs
+          apps/worker/test/mastering-worker.test.mjs
           packages/sprite-supervisor/src/automatic-compiler.ts
           PATHS
           sort "${RUNNER_TEMP}/expected-paths.txt" -o "${RUNNER_TEMP}/expected-paths.txt"
@@ -173,9 +144,12 @@ jobs:
           git add \
             apps/worker/src/adaptive-finalizer-guarded-handlers.ts \
             apps/worker/src/adaptive-sprite-family-handlers.ts \
+            apps/worker/src/mastering-handlers.ts \
+            apps/worker/test/adaptive-finalizer-source-contract.test.mjs \
+            apps/worker/test/mastering-worker.test.mjs \
             packages/sprite-supervisor/src/automatic-compiler.ts
-          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -v '^M  \|^A  ' || true)"
+          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -v '^M  ' || true)"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix(runtime): harden strict handler and sprite typing'
+          git commit -m 'fix(runtime): restore strict worker validation'
           git push origin HEAD:refs/heads/agent/book-art-provider-runtime-20260802
