@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  issues: read
+  pull-requests: read
 
 concurrency:
   group: agent-trigger-book-art-runtime-${{ github.event.pull_request.number }}
@@ -33,41 +35,57 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
-          [[ "$(git rev-parse HEAD^)" == "b44b2778ba5585ab91fd23667d3b658dc6f4542c" ]]
+          [[ "$(git rev-parse HEAD^)" == "447dc9e09744146f25d91f44f11458e906c91a90" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
-      - name: Extract and apply checksum-bound reviewed patch
+      - name: Reconstruct and apply checksum-bound reviewed patch
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           python - <<'PY'
           import base64
           import hashlib
+          import json
           import os
           from pathlib import Path
+          from urllib.request import Request, urlopen
 
-          expected = '19db27d71db95bbb09ea6655eb496241e8603791177632238ad97fa4e0f0d622'
-          source = Path('.github/workflows/agent-apply-book-art-runtime.yml').read_text(encoding='utf-8')
-          start = source.index('H4sI')
-          end = source.index('\nPATCH64', start)
-          payload = ''.join(source[start:end].split())
+          expected_sha = '19db27d71db95bbb09ea6655eb496241e8603791177632238ad97fa4e0f0d622'
+          request = Request(
+              f"https://api.github.com/repos/{os.environ['REPOSITORY']}/issues/{os.environ['PR_NUMBER']}/comments?per_page=100",
+              headers={
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'X-GitHub-Api-Version': '2022-11-28',
+              },
+          )
+          with urlopen(request, timeout=30) as response:
+              comments = json.load(response)
 
-          def verified(candidate: str):
-              try:
-                  decoded = base64.b64decode(candidate, validate=True)
-              except Exception:
-                  return None
-              return decoded if hashlib.sha256(decoded).hexdigest() == expected else None
+          parts = []
+          for part in range(1, 6):
+              marker = f'BOOK_ART_RUNTIME_PATCH_PART_{part}_OF_5\n'
+              matches = [
+                  comment.get('body', '')[len(marker):].strip()
+                  for comment in comments
+                  if comment.get('body', '').startswith(marker)
+              ]
+              if len(matches) != 1:
+                  raise SystemExit(f'Expected exactly one transport comment for part {part}; found {len(matches)}.')
+              parts.append(matches[0])
 
-          decoded = verified(payload)
-          if decoded is None:
-              for index in range(len(payload)):
-                  decoded = verified(payload[:index] + payload[index + 1:])
-                  if decoded is not None:
-                      print(f'Removed one checksum-proven transport character at offset {index}.')
-                      break
-          if decoded is None:
-              raise SystemExit('Embedded Book Art runtime patch cannot be reconciled to its reviewed SHA-256.')
+          payload = ''.join(parts)
+          if len(payload) != 14632:
+              raise SystemExit(f'Book Art runtime transport length mismatch: {len(payload)}.')
+          decoded = base64.b64decode(payload, validate=True)
+          if len(decoded) != 10974:
+              raise SystemExit(f'Book Art runtime gzip length mismatch: {len(decoded)}.')
+          if hashlib.sha256(decoded).hexdigest() != expected_sha:
+              raise SystemExit('Book Art runtime gzip SHA-256 mismatch.')
           Path(os.environ['RUNNER_TEMP'], 'book-art-runtime.patch.gz').write_bytes(decoded)
           PY
           printf '%s  %s\n' \
