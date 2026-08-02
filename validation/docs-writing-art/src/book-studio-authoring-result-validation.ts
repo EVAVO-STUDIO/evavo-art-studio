@@ -1,3 +1,9 @@
+export interface StubAuthoringChangedUnit {
+  unitId: string;
+  beforeSha256: string;
+  afterSha256: string;
+}
+
 export interface StubAuthoringResult {
   candidateObjectId?: string;
   candidateTextSha256?: string;
@@ -5,6 +11,7 @@ export interface StubAuthoringResult {
   completedAt: string;
   producedEvidenceIds: string[];
   manuscriptSha256After: string;
+  changedUnits: StubAuthoringChangedUnit[];
   resultFingerprint: string;
 }
 
@@ -26,6 +33,7 @@ export async function validateBookAuthoringResult(
     !result.completedAt ||
     !Array.isArray(result.producedEvidenceIds) ||
     !result.manuscriptSha256After ||
+    !Array.isArray(result.changedUnits) ||
     !result.resultFingerprint
   ) {
     return {
