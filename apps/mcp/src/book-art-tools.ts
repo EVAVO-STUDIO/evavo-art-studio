@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
   BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
   BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
@@ -7,6 +8,7 @@ import {
   submitBookArtProviderShadowJob,
   type BookArtProviderAdapterPolicyV1,
 } from "@evavo/art-book-runtime";
+import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
@@ -74,6 +76,12 @@ function runtimeRoot(): string {
   );
 }
 
+function artifactRoot(): string {
+  return path.resolve(
+    process.env.EVAVO_ART_ARTIFACT_ROOT ?? ".art-studio/artifacts",
+  );
+}
+
 function writesEnabled(): boolean {
   return process.env.EVAVO_ART_ALLOW_WRITES === "true";
 }
@@ -110,6 +118,8 @@ function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
     providerFallbackAllowed: false,
     compilePerformsProviderCall: false,
     submitPerformsProviderCall: false,
+    inspectPerformsProviderCall: false,
+    inspectionWritesArtifacts: false,
     candidateApprovalState: "unapproved",
     candidateStorageClass: "intermediate",
     selectionPerformed: false,
@@ -130,12 +140,20 @@ function requiredPolicy(): BookArtProviderAdapterPolicyV1 {
   return policy;
 }
 
+function requireOperationalAccess(): void {
+  if (!writesEnabled()) {
+    throw new Error(
+      "Book Art runtime submission and inspection require EVAVO_ART_ALLOW_WRITES=true on the trusted MCP host.",
+    );
+  }
+}
+
 export function registerBookArtTools(server: McpServer): void {
   server.registerTool(
     "book_art_provider_runtime_protocol",
     {
       description:
-        "Report the shadow-only Book Art provider runtime contract, host policy readiness and non-authority guarantees without compiling or submitting work.",
+        "Report the shadow-only Book Art provider runtime contract, host policy readiness and non-authority guarantees without compiling, submitting or inspecting work.",
       inputSchema: z.object({}),
     },
     async () => textResult(protocol(providerPolicy())),
@@ -172,15 +190,8 @@ export function registerBookArtTools(server: McpServer): void {
       }),
     },
     async ({ request, actor }) => {
-      if (!writesEnabled()) {
-        return toolError(
-          "ART_STUDIO_WRITES_DISABLED",
-          new Error(
-            "Book Art runtime submission requires EVAVO_ART_ALLOW_WRITES=true.",
-          ),
-        );
-      }
       try {
+        requireOperationalAccess();
         return textResult(
           await submitBookArtProviderShadowJob(
             configuredInput(request, requiredPolicy()),
@@ -192,6 +203,31 @@ export function registerBookArtTools(server: McpServer): void {
         );
       } catch (error: unknown) {
         return toolError("BOOK_ART_PROVIDER_SUBMISSION_REJECTED", error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "inspect_book_art_provider_shadow_job",
+    {
+      description:
+        "Read and verify the exact durable Book Art provider job, immutable candidate and provider evidence without calling a provider, writing artifacts, selecting, promoting, binding or publishing. Requires the trusted operational boundary.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        requireOperationalAccess();
+        const compilation = await compileBookArtProviderShadowJob(
+          configuredInput(request, requiredPolicy()),
+        );
+        return textResult(
+          await inspectBookArtProviderShadowJob(compilation, {
+            runtime: new LocalRuntimeRepository({ root: runtimeRoot() }),
+            artifacts: new LocalArtifactStore({ root: artifactRoot() }),
+          }),
+        );
+      } catch (error: unknown) {
+        return toolError("BOOK_ART_PROVIDER_INSPECTION_REJECTED", error);
       }
     },
   );

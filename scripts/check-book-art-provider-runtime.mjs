@@ -257,7 +257,6 @@ for (const [label, source] of [
     "createProviderHandlers",
     "executeProviderCandidateRequest",
     "FixtureImageProviderAdapter",
-    "LocalArtifactStore",
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
     "promoteSelectedCandidate",

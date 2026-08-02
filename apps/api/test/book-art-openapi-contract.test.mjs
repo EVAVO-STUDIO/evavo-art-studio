@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("Book Art provider OpenAPI remains host-policy, shadow-only and durable-submit-only", async () => {
+test("Book Art provider OpenAPI remains host-policy, shadow-only and read-only on inspection", async () => {
   const source = await readFile(
     new URL("../openapi.book-art-provider.yaml", import.meta.url),
     "utf8",
@@ -12,12 +12,19 @@ test("Book Art provider OpenAPI remains host-policy, shadow-only and durable-sub
     "/v1/book-art/provider-runtime:",
     "/v1/book-art/provider-jobs/compile:",
     "/v1/book-art/provider-jobs/submit:",
+    "/v1/book-art/provider-jobs/inspect:",
     "evavo_book_art_provider_shadow_runtime_v1",
+    "evavo_book_art_provider_shadow_job_inspection_result",
     "oneCandidate: { const: true }",
     "maximumRuntimeAttempts: { const: 1 }",
     "providerFallbackAllowed: { const: false }",
     "compilePerformsProviderCall: { const: false }",
     "submitPerformsProviderCall: { const: false }",
+    "inspectPerformsProviderCall: { const: false }",
+    "inspectionWritesArtifacts: { const: false }",
+    "inspectionReadOnly: { const: true }",
+    "providerCallPerformedByInspection: { const: false }",
+    "candidateArtifactsWrittenByInspection: { const: false }",
     "candidateApprovalState: { const: unapproved }",
     "candidateStorageClass: { const: intermediate }",
     "selectionPerformed: { const: false }",
@@ -42,10 +49,20 @@ test("Book Art provider OpenAPI remains host-policy, shadow-only and durable-sub
   );
   const submissionSchema = source.slice(
     source.indexOf("BookArtProviderSubmissionResult:"),
+    source.indexOf("BookArtProviderInspectionResult:"),
+  );
+  const inspectionSchema = source.slice(
+    source.indexOf("BookArtProviderInspectionResult:"),
     source.indexOf("    Error:"),
   );
   assert.ok(compilationSchema.includes("status: { enum: [blocked, ready] }"));
   assert.ok(submissionSchema.includes("status: { enum: [blocked, submitted] }"));
+  assert.ok(
+    inspectionSchema.includes(
+      "status: { enum: [blocked, not-submitted, pending, failed, succeeded] }",
+    ),
+  );
+  assert.ok(inspectionSchema.includes("additionalProperties: false"));
   assert.ok(!submissionSchema.includes("BookArtProviderCompilationResult"));
   assert.ok(!submissionSchema.includes("allOf:"));
 
@@ -58,6 +75,8 @@ test("Book Art provider OpenAPI remains host-policy, shadow-only and durable-sub
     "updateReference",
     "providerCallPerformed: { const: true }",
     "candidateArtifactsWritten: { const: true }",
+    "providerCallPerformedByInspection: { const: true }",
+    "candidateArtifactsWrittenByInspection: { const: true }",
     "selectionPerformed: { const: true }",
     "promotionPerformed: { const: true }",
     "runtimeCutoverApproved: { const: true }",
