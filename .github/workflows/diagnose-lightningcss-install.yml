@@ -1,0 +1,165 @@
+name: Trace exact web route build state
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact diagnostic branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: validation/lightningcss-03f0b90-20260802
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove direct candidate ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD^)" == "03f0b90c6d6555f55da49105ea64acbde65525a0" ]]
+          mapfile -t changed < <(git diff --name-only 03f0b90c6d6555f55da49105ea64acbde65525a0..HEAD)
+          [[ "${#changed[@]}" -eq 1 ]]
+          [[ "${changed[0]}" == ".github/workflows/diagnose-lightningcss-install.yml" ]]
+
+      - name: Install and identify audio media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update >/dev/null
+          sudo apt-get install --yes --no-install-recommends ffmpeg >/dev/null
+          echo "FFMPEG_BIN=$(command -v ffmpeg)" >> "${GITHUB_ENV}"
+          echo "FFPROBE_BIN=$(command -v ffprobe)" >> "${GITHUB_ENV}"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Print initial web and Next dependency state
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== source paths containing art-direction ==="
+          find apps/web \
+            -path 'apps/web/node_modules' -prune -o \
+            -path 'apps/web/.next' -prune -o \
+            -iname '*art-direction*' -print | sort
+          echo "=== Next manifest lightningcss declaration ==="
+          pnpm --filter @evavo/art-studio-web exec node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { createRequire } from "node:module";
+          const appRequire = createRequire(import.meta.url);
+          const nextPackage = appRequire.resolve("next/package.json");
+          const manifest = JSON.parse(fs.readFileSync(nextPackage, "utf8"));
+          const nextRequire = createRequire(nextPackage);
+          let resolution = null;
+          let error = null;
+          try {
+            resolution = nextRequire.resolve("lightningcss");
+          } catch (caught) {
+            error = caught instanceof Error ? caught.message : String(caught);
+          }
+          console.log(JSON.stringify({
+            nextPackage,
+            nextVersion: manifest.version,
+            dependency: manifest.dependencies?.lightningcss ?? null,
+            optionalDependency: manifest.optionalDependencies?.lightningcss ?? null,
+            resolution,
+            error,
+          }, null, 2));
+          NODE
+          git status --short --ignored apps/web
+
+      - name: Build domain packages and run exact workspace typecheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run build:domain
+          pnpm typecheck
+          echo "=== .next files mentioning art-direction after typecheck ==="
+          grep -R -l --exclude='*.map' 'art-direction' apps/web/.next 2>/dev/null | sort | head -200 || true
+          echo "=== .next paths named art-direction after typecheck ==="
+          find apps/web/.next -iname '*art-direction*' -print 2>/dev/null | sort || true
+          git status --short --ignored apps/web
+
+      - name: Run exact workspace tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm test
+          echo "=== source paths containing art-direction after tests ==="
+          find apps/web \
+            -path 'apps/web/node_modules' -prune -o \
+            -path 'apps/web/.next' -prune -o \
+            -iname '*art-direction*' -print | sort
+          echo "=== .next files mentioning art-direction after tests ==="
+          grep -R -l --exclude='*.map' 'art-direction' apps/web/.next 2>/dev/null | sort | head -200 || true
+          echo "=== .next paths named art-direction after tests ==="
+          find apps/web/.next -iname '*art-direction*' -print 2>/dev/null | sort || true
+          git status --short --ignored apps/web
+
+      - name: Run exact recursive production build and compare clean serial web build
+        shell: bash
+        run: |
+          set +e
+          pnpm build
+          recursive_status=$?
+          set -e
+          echo "RECURSIVE_BUILD_STATUS=${recursive_status}"
+          echo "=== .next files mentioning art-direction after recursive build ==="
+          grep -R -l --exclude='*.map' 'art-direction' apps/web/.next 2>/dev/null | sort | head -200 || true
+          echo "=== .next paths named art-direction after recursive build ==="
+          find apps/web/.next -iname '*art-direction*' -print 2>/dev/null | sort || true
+          echo "=== Next Lightning CSS resolution after recursive build ==="
+          pnpm --filter @evavo/art-studio-web exec node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { createRequire } from "node:module";
+          const appRequire = createRequire(import.meta.url);
+          const nextPackage = appRequire.resolve("next/package.json");
+          const nextRequire = createRequire(nextPackage);
+          let resolution = null;
+          let loadResult = null;
+          try {
+            resolution = nextRequire.resolve("lightningcss");
+            loadResult = Object.keys(nextRequire("lightningcss")).sort();
+          } catch (error) {
+            loadResult = error instanceof Error ? error.stack : String(error);
+          }
+          console.log(JSON.stringify({ nextPackage, resolution, loadResult }, null, 2));
+          NODE
+          if [[ "${recursive_status}" -ne 0 ]]; then
+            echo "=== clean serial web build comparison ==="
+            rm -rf apps/web/.next
+            set +e
+            pnpm --filter @evavo/art-studio-web build
+            serial_status=$?
+            set -e
+            echo "SERIAL_WEB_BUILD_STATUS=${serial_status}"
+            exit "${recursive_status}"
+          fi
+
+      - name: Remove generated lockfile and verify clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
