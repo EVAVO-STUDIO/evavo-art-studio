@@ -8,6 +8,7 @@
   },
   "references": [
     { "path": "../../packages/artifacts" },
+    { "path": "../../packages/book-art-runtime" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/delivery-optimizer" },
     { "path": "../../packages/finalizer" },

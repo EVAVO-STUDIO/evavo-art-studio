@@ -15,6 +15,7 @@ import {
 } from "@evavo/art-quality";
 import { assertPathWithinAllowedRoots, inspectRepository } from "@evavo/art-repo-inspector";
 
+import { registerBookArtTools } from "./book-art-tools.js";
 import { registerProviderTools } from "./provider-tools.js";
 import { registerRuntimeTools } from "./runtime-tools.js";
 import { registerSelectionTools } from "./selection-tools.js";
@@ -27,6 +28,7 @@ const server = new McpServer({
 
 registerRuntimeTools(server);
 registerProviderTools(server);
+registerBookArtTools(server);
 registerSelectionTools(server);
 registerSpriteFamilyTools(server);
 

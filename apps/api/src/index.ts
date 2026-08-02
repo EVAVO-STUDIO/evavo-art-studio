@@ -12,6 +12,7 @@ import {
   LocalArtifactStore,
   type ArtifactStore,
 } from "@evavo/art-artifacts";
+import type { BookArtProviderAdapterPolicyV1 } from "@evavo/art-book-runtime";
 import { validateArtBrief } from "@evavo/art-contracts";
 import { CAPABILITY_CATALOG, createProductionPlan } from "@evavo/art-core";
 import {
@@ -37,6 +38,7 @@ import {
   type RuntimeRepository,
 } from "@evavo/art-runtime";
 
+import { handleBookArtApiRequest } from "./book-art-api.js";
 import { handleProviderApiRequest } from "./provider-api.js";
 import { handleRuntimeApiRequest } from "./runtime-api.js";
 
@@ -52,6 +54,9 @@ export interface ArtStudioApiOptions {
   readonly artifacts?: ArtifactStore | undefined;
   readonly runtimeRoot?: string | undefined;
   readonly artifactRoot?: string | undefined;
+  readonly bookArtProviderAdapterPolicy?:
+    | BookArtProviderAdapterPolicyV1
+    | undefined;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -229,6 +234,7 @@ export function createArtStudioApiServer(
   const artifacts =
     options.artifacts ??
     (artifactRoot ? new LocalArtifactStore({ root: artifactRoot }) : undefined);
+  const bookArtProviderAdapterPolicy = options.bookArtProviderAdapterPolicy;
 
   return createServer(async (request, response) => {
     const requestId = randomUUID();
@@ -258,6 +264,23 @@ export function createArtStudioApiServer(
       const controlAuthorized =
         writeToken !== undefined && writeTokenMatches(request, writeToken);
       if (
+        await handleBookArtApiRequest({
+          request,
+          response,
+          url,
+          requestId,
+          maximumBodyBytes,
+          runtime,
+          adapterPolicy: bookArtProviderAdapterPolicy,
+          accessReady: writesReady,
+          accessAuthorized: controlAuthorized,
+          readJsonBody,
+          writeJson,
+        })
+      ) {
+        return;
+      }
+      if (
         await handleRuntimeApiRequest({
           request,
           response,
@@ -286,6 +309,8 @@ export function createArtStudioApiServer(
             writesEnabled: writesReady,
             runtimeConfigured: runtime !== undefined,
             artifactStoreConfigured: artifacts !== undefined,
+            bookArtProviderPolicyConfigured:
+              bookArtProviderAdapterPolicy !== undefined,
           },
           requestId,
         );
@@ -550,6 +575,38 @@ function envList(name: string): string[] {
     .filter(Boolean);
 }
 
+function envCsv(name: string): string[] {
+  return [
+    ...new Set(
+      (process.env[name] ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ].sort();
+}
+
+function optionalEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value || undefined;
+}
+
+function bookArtProviderPolicyFromEnvironment():
+  | BookArtProviderAdapterPolicyV1
+  | undefined {
+  const allowedAdapterIds = envCsv("EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS");
+  if (!allowedAdapterIds.length) return undefined;
+  const preferredAdapterId = optionalEnv(
+    "EVAVO_BOOK_ART_PROVIDER_PREFERRED_ADAPTER",
+  );
+  const preferredModel = optionalEnv("EVAVO_BOOK_ART_PROVIDER_MODEL");
+  return {
+    allowedAdapterIds,
+    ...(preferredAdapterId === undefined ? {} : { preferredAdapterId }),
+    ...(preferredModel === undefined ? {} : { preferredModel }),
+  };
+}
+
 const isEntryPoint =
   process.argv[1] !== undefined &&
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
@@ -564,6 +621,7 @@ if (isEntryPoint) {
     writeToken: process.env.EVAVO_ART_WRITE_TOKEN,
     runtimeRoot: process.env.EVAVO_ART_RUNTIME_ROOT,
     artifactRoot: process.env.EVAVO_ART_ARTIFACT_ROOT,
+    bookArtProviderAdapterPolicy: bookArtProviderPolicyFromEnvironment(),
   });
   server.listen(port, host, () => {
     process.stdout.write(
