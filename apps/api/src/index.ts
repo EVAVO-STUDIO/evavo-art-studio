@@ -271,6 +271,7 @@ export function createArtStudioApiServer(
           requestId,
           maximumBodyBytes,
           runtime,
+          artifacts,
           adapterPolicy: bookArtProviderAdapterPolicy,
           accessReady: writesReady,
           accessAuthorized: controlAuthorized,
