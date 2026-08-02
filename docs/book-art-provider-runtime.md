@@ -10,20 +10,20 @@ This slice does not make Art Studio the active Book Studio runtime. It adds a sh
 
 ## Shared runtime ownership
 
-The reusable compiler and durable-submission boundary live in `packages/book-art-runtime` as `@evavo/art-book-runtime`. The worker retains a compatibility re-export only; it no longer owns a second implementation. REST, CLI, MCP and worker tests import the same package, so their provider request normalization, fingerprinting, one-attempt policy and idempotency rules cannot silently diverge.
+The reusable compiler, durable-submission boundary and immutable inspection verifier live in `packages/book-art-runtime` as `@evavo/art-book-runtime`. The worker retains a compatibility re-export only; it no longer owns a second compiler or submission implementation. REST, CLI, MCP and worker tests use the same package contracts, so provider request normalization, fingerprinting, one-attempt policy, idempotency and inspection rules cannot silently diverge.
 
-The package owns only deterministic compilation and durable submission. It does not create a provider registry, read provider credentials, call a provider, write candidate bytes, select artwork, promote a master, bind artwork into a book or publish an edition.
+The package owns deterministic compilation, durable submission and read-only verification. It does not create a provider registry, read provider credentials, call a provider, write candidate bytes during compilation or inspection, select artwork, promote a master, bind artwork into a book or publish an edition.
 
-## Compile, submit, execute
+## Compile, submit, execute, inspect
 
-The boundary is deliberately split into three stages.
+The boundary is deliberately split into four stages.
 
 ### Compile
 
 `compileBookArtProviderShadowJob()` accepts one exact, fingerprint-valid `evavo_book_art_production_work_order` and a server-approved provider adapter policy. Compilation:
 
 - revalidates the complete Book Art work-order fingerprint;
-- requires one independent `generate` candidate;
+- requires exactly one provider candidate using the independent `generate` operation;
 - accepts no caller-supplied image references in this initial boundary;
 - requires an explicit adapter allow-list;
 - allows an optional preferred adapter and model only when they are within that policy;
@@ -74,9 +74,53 @@ requiresBlockingQa: true
 
 It is not a selected master, promotion authorization, Book Studio use binding or publication package.
 
+### Inspect
+
+`inspectBookArtProviderShadowJob()` accepts the exact compiled result plus read-only runtime and artifact-store interfaces. It does not submit a job, call a provider or write an artifact.
+
+Inspection first proves that the durable job still matches the compiled job ID, specification hash, one-attempt limit, queue, kind and Book identity labels. It then reports one of five typed states:
+
+```text
+blocked
+not-submitted
+pending
+failed
+succeeded
+```
+
+A `succeeded` receipt is emitted only after all runtime output descriptors and bytes pass immutable verification and the output contains:
+
+- exactly one image with `artifactRole: provider-candidate`;
+- `storageClass: intermediate`;
+- `approvalState: unapproved`;
+- the exact compiled provider-request hash;
+- `finalDeliverable: false`;
+- `requiresMastering: true`;
+- `requiresBlockingQa: true`;
+- exactly one `provider-candidate-evidence` JSON artifact;
+- evidence bound to the exact candidate artifact;
+- one successful adapter attempt inside the host allow-list;
+- one matching no-fallback provider request and Book identity;
+- no selected-master, promotion-authorization, book-use-binding or publication-package role.
+
+The result includes a deterministic `inspectionFingerprintSha256` over the verified state summary. A job may have executed before inspection, but the inspection operation itself always records:
+
+```text
+inspectionReadOnly: true
+providerCallPerformedByInspection: false
+candidateArtifactsWrittenByInspection: false
+selectionPerformed: false
+promotionPerformed: false
+bookUseBindingCreated: false
+runtimeCutoverApproved: false
+publicationPerformed: false
+```
+
+Descriptor claims are never trusted by themselves. The verifier checks the immutable descriptor, content hash, evidence JSON, normalized provider-request hash and source-artifact binding. A descriptor wrapper that falsely changes the candidate from `unapproved` to `selected` is blocked by regression coverage.
+
 ## REST, CLI and MCP parity
 
-All operator surfaces call `@evavo/art-book-runtime` directly.
+All operator surfaces call `@evavo/art-book-runtime` directly. Inspection requires trusted access to the runtime journal and immutable artifact store, but remains read-only.
 
 ### REST
 
@@ -86,9 +130,10 @@ The API exposes:
 GET  /v1/book-art/provider-runtime
 POST /v1/book-art/provider-jobs/compile
 POST /v1/book-art/provider-jobs/submit
+POST /v1/book-art/provider-jobs/inspect
 ```
 
-The API host injects its adapter policy. Callers may not send `adapterPolicy` or provider credentials. Compilation is read-only. Submission requires the existing Art Studio write enablement and control token, plus a configured durable runtime repository. A successful submission returns `201` whether it created the deterministic job or idempotently reused it; neither path calls a provider.
+The API host injects its adapter policy. Callers may not send `adapterPolicy` or provider credentials. Compilation is public and read-only. Submission and inspection require the existing Art Studio operational enablement and control token. Submission additionally requires a durable runtime repository. Inspection requires both the runtime repository and immutable artifact store. A successful submission returns `201` whether it created the deterministic job or idempotently reused it; neither submission nor inspection calls a provider.
 
 ### CLI
 
@@ -98,9 +143,10 @@ The CLI exposes:
 evavo-art book-art-provider-protocol
 evavo-art book-art-provider-compile --input request.json
 evavo-art book-art-provider-submit --input request.json --runtime-root .art-studio/runtime
+evavo-art book-art-provider-inspect --input request.json --runtime-root .art-studio/runtime --artifact-root .art-studio/artifacts
 ```
 
-The CLI receives provider policy only from the host environment. The input file contains the execution identity and exact work order but no policy or credentials.
+The CLI receives provider policy only from the host environment. The input file contains the execution identity and exact work order but no policy or credentials. Inspection reports `not-submitted` and `pending` without failing the command; a blocked or terminally failed receipt exits non-zero for automation.
 
 ### MCP
 
@@ -110,9 +156,10 @@ The MCP server registers:
 book_art_provider_runtime_protocol
 compile_book_art_provider_shadow_job
 submit_book_art_provider_shadow_job
+inspect_book_art_provider_shadow_job
 ```
 
-Compilation is side-effect free. MCP submission requires `EVAVO_ART_ALLOW_WRITES=true` and writes only the durable job journal. It cannot instantiate a provider registry, write artifact bytes, update an approved reference or promote an artwork.
+Compilation is side-effect free. MCP submission and protected inspection require `EVAVO_ART_ALLOW_WRITES=true` as the existing trusted operational boundary. Submission writes only the durable job journal. Inspection reads the configured runtime and artifact roots and cannot instantiate a provider registry, write artifact bytes, update an approved reference or promote artwork.
 
 ## Provider policy
 
@@ -139,13 +186,15 @@ The regression suite uses a counting fixture adapter to prove:
 3. the fixture adapter is called once;
 4. resubmission after success still returns the same job;
 5. a later worker cycle claims zero jobs;
-6. the only image artifact remains an unapproved intermediate candidate.
+6. the only image artifact remains an unapproved intermediate candidate;
+7. inspection moves from `not-submitted` to `pending` to verified `succeeded` without creating another runtime event, provider request or artifact;
+8. tampered approval claims fail closed.
 
-The shared package, REST and CLI tests also prove that compilation writes no job and repeated submission creates one journal identity. The fixture proves runtime and artifact semantics without making live provider traffic or claiming that a paid provider, credentials or account configuration has passed production smoke testing.
+The shared package, REST and CLI tests also prove that compilation writes no job, repeated submission creates one journal identity and inspection performs no write. The fixture proves runtime and artifact semantics without making live provider traffic or claiming that a paid provider, credentials or account configuration has passed production smoke testing.
 
 ## Non-authority flags
 
-Compilation, submission and execution preserve these boundaries:
+Compilation, submission, execution and inspection preserve these boundaries:
 
 ```text
 shadowOnly: true
@@ -164,24 +213,25 @@ The worker does not write Website or Docs Suite book state. It does not update a
 
 The focused `Book Art Provider Runtime` workflow runs on relevant pull-request and mainline changes. It:
 
-- verifies the static authority and surface-parity boundary;
+- verifies the static authority and REST, CLI and MCP surface-parity boundary;
 - installs the review-first workspace dependency graph with the governed Node and pnpm versions;
 - builds the complete domain dependency chain, including the shared Book Art runtime package;
-- runs the shared runtime, worker, REST, CLI and MCP regression suites;
+- runs the shared runtime, worker execution and inspection, REST, CLI and MCP regression suites;
+- runs the repository-wide `pnpm check` on the exact candidate;
 - removes the generated lockfile and proves the tracked source remains clean.
 
-The repository-wide exact-main validation still runs after merge. Passing source and fixture tests is not equivalent to receiving a live provider response or approving an artwork.
+The repository-wide exact-main validation still runs after merge. Passing source and fixture tests is not equivalent to receiving a live provider response or approving artwork.
 
 ## Remaining migration gates
 
 No production cutover is approved by this slice. Before Website provider execution can be retired, the coordinated migration still requires:
 
 - registration of exact legacy artwork bytes in immutable Art Studio storage without checksum changes;
-- authenticated Website-to-Art-Studio shadow requests and success/failure parity evidence;
+- authenticated Website-to-Art-Studio shadow requests and success/failure parity evidence using the typed inspection receipt;
 - production-provider credential, model and response smoke tests;
 - technical mastering and candidate-comparison parity;
 - immutable promotion and Docs Suite artwork-use binding for eligible artifacts;
-- authenticated cross-repository invocation and agent-authorization parity using the now-shared REST, CLI and MCP contracts;
+- authenticated cross-repository invocation and agent-authorization parity using the shared REST, CLI and MCP contracts;
 - rollback drills, an observation period and an exact deletion manifest.
 
-Until those gates pass, Website remains the active compatibility runtime, Art Studio runs only the explicit shadow candidate path, Docs Suite remains authoritative for book design and publication, and there is still only one authoritative writer.
+Until those gates pass, Website remains the active compatibility runtime, Art Studio runs only the explicit shadow candidate path, Docs Suite remains authoritative for book design and publication, and there is still only one authoritative writer. No production cutover is approved.
