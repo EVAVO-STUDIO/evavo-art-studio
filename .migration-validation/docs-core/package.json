@@ -1,0 +1,17 @@
+{
+  "name": "@evavo-docs/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "echo lint pending for @evavo-docs/core",
+    "typecheck": "tsc --noEmit",
+    "test": "echo tests pending for @evavo-docs/core"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
