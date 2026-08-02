@@ -1,0 +1,222 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Book Art Provider Runtime API
+  version: 0.1.0
+  description: >-
+    Shadow-only Book Art provider job compilation and durable submission. The
+    Art Studio host owns the adapter allow-list. Compilation and submission do
+    not call an image provider, create candidate artifacts, select artwork,
+    promote a master, bind artwork into a book, approve runtime cutover or
+    publish an edition.
+servers:
+  - url: http://127.0.0.1:4100
+    description: Local standalone Art Studio control plane
+tags:
+  - name: Book Art Provider Runtime
+paths:
+  /v1/book-art/provider-runtime:
+    get:
+      tags: [Book Art Provider Runtime]
+      operationId: getBookArtProviderRuntimeProtocol
+      summary: Read the shadow runtime and host-policy readiness contract
+      security: []
+      responses:
+        "200":
+          description: Book Art provider shadow runtime protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookArtProviderRuntimeProtocol"
+  /v1/book-art/provider-jobs/compile:
+    post:
+      tags: [Book Art Provider Runtime]
+      operationId: compileBookArtProviderShadowJob
+      summary: Compile one work order into a deterministic provider job
+      description: >-
+        The server injects its configured adapter policy. The caller may not
+        supply provider policy or credentials. No runtime job, provider request
+        or artifact is created.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookArtProviderShadowRequest"
+      responses:
+        "200":
+          description: Ready deterministic provider-job plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookArtProviderCompilationResult"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ConfigurationError"
+  /v1/book-art/provider-jobs/submit:
+    post:
+      tags: [Book Art Provider Runtime]
+      operationId: submitBookArtProviderShadowJob
+      summary: Submit or reuse one durable provider job
+      description: >-
+        Submission is authenticated, idempotent, limited to one runtime attempt
+        and performs no provider call. An eligible provider worker may later
+        lease the job and store one unapproved intermediate candidate.
+      security:
+        - ArtStudioControlToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookArtProviderShadowRequest"
+      responses:
+        "201":
+          description: Durable job submitted or idempotently reused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookArtProviderSubmissionResult"
+        "401":
+          $ref: "#/components/responses/AuthorizationError"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ConfigurationError"
+components:
+  securitySchemes:
+    ArtStudioControlToken:
+      type: http
+      scheme: bearer
+      description: Server-side Art Studio control token; never stored in a work order.
+  schemas:
+    BookArtProviderShadowRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - outputKind
+        - schemaVersion
+        - executionId
+        - requestedAt
+        - workOrder
+      properties:
+        outputKind:
+          const: evavo_book_art_provider_shadow_job_input
+        schemaVersion:
+          const: 1
+        executionId:
+          type: string
+          minLength: 1
+          maxLength: 200
+        requestedAt:
+          type: string
+          format: date-time
+        workOrder:
+          type: object
+          description: Exact fingerprint-valid evavo_book_art_production_work_order.
+    BookArtProviderRuntimeProtocol:
+      type: object
+      additionalProperties: false
+      required:
+        - schemaVersion
+        - contract
+        - shadowOnly
+        - providerPolicyConfigured
+        - oneCandidate
+        - maximumRuntimeAttempts
+        - providerFallbackAllowed
+        - candidateApprovalState
+        - candidateStorageClass
+        - selectionPerformed
+        - promotionPerformed
+        - bookUseBindingCreated
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        schemaVersion: { const: 1 }
+        contract: { const: evavo_book_art_provider_shadow_runtime_v1 }
+        shadowOnly: { const: true }
+        providerPolicyConfigured: { type: boolean }
+        oneCandidate: { const: true }
+        maximumRuntimeAttempts: { const: 1 }
+        providerFallbackAllowed: { const: false }
+        compilePerformsProviderCall: { const: false }
+        submitPerformsProviderCall: { const: false }
+        candidateApprovalState: { const: unapproved }
+        candidateStorageClass: { const: intermediate }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+    BookArtProviderCompilationResult:
+      type: object
+      required:
+        - outputKind
+        - schemaVersion
+        - status
+        - blockers
+        - warnings
+        - shadowOnly
+        - providerCallPerformed
+        - candidateArtifactsWritten
+      properties:
+        outputKind:
+          const: evavo_book_art_provider_shadow_job_compilation_result
+        schemaVersion: { const: 1 }
+        status: { enum: [blocked, ready] }
+        plan: { type: object }
+        blockers:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+        shadowOnly: { const: true }
+        providerCallPerformed: { const: false }
+        candidateArtifactsWritten: { const: false }
+        authoritativeBookWritesPerformed: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+    BookArtProviderSubmissionResult:
+      allOf:
+        - $ref: "#/components/schemas/BookArtProviderCompilationResult"
+        - type: object
+          properties:
+            outputKind:
+              const: evavo_book_art_provider_shadow_job_submission_result
+            status: { enum: [blocked, submitted] }
+            job: { type: object }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    ValidationError:
+      description: Invalid or blocked Book Art request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ConfigurationError:
+      description: Provider policy, runtime or authenticated write access is unavailable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    AuthorizationError:
+      description: Art Studio control token is absent or invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
