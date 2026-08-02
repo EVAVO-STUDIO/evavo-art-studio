@@ -1,6 +1,7 @@
 import {
   normalizeJson,
   type ArtifactId,
+  type JsonValue,
   type StoredArtifact,
 } from "@evavo/art-artifacts";
 import {
@@ -20,6 +21,11 @@ import {
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
 const MAXIMUM_LINEAGE_DEPTH = 10;
 
+type ConcreteRuntimeHandlerResult = Readonly<{
+  outputArtifacts: readonly ArtifactId[];
+  result?: JsonValue;
+}>;
+
 interface AdaptiveProofLineage {
   readonly selectedSourceArtifactId: ArtifactId;
   readonly finalizedCandidateArtifactId: ArtifactId;
@@ -31,6 +37,18 @@ interface AdaptiveProofLineage {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requireBaseResult(
+  value: Awaited<ReturnType<RuntimeJobHandler>>,
+): ConcreteRuntimeHandlerResult {
+  if (!value || value.outputArtifacts === undefined) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FAMILY_BASE_RESULT_MISSING",
+      "The base sprite-family verifier returned no output artifact result.",
+    );
+  }
+  return value as ConcreteRuntimeHandlerResult;
 }
 
 function requiredArtifactLabel(value: string | undefined, name: string): ArtifactId {
@@ -318,7 +336,7 @@ export function createAdaptiveSpriteFamilyHandlers(): Readonly<
         findAdaptiveFinalization(artifactId, context),
       ),
     );
-    const baseResult = await base(context);
+    const baseResult = requireBaseResult(await base(context));
     const proofArtifactIds = [
       ...new Set(lineage.map((entry) => entry.proofArtifactId)),
     ].sort();

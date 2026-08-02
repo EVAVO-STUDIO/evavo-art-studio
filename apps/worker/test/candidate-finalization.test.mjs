@@ -121,7 +121,7 @@ async function execute(fx, payload) {
   });
 }
 
-test("green matte becomes real alpha and remains finalization-ready", async () => {
+test("green matte extraction creates real alpha and records bounded adaptive cleanup", async () => {
   const fx = await fixture(
     await image(
       { r: 0, g: 255, b: 0, alpha: 1 },
@@ -135,9 +135,10 @@ test("green matte becomes real alpha and remains finalization-ready", async () =
       requireMeaningfulAlpha: true,
       quality: { safePadding: 1 },
     });
-    assert.equal(result.result.qualityPassed, true);
+    assert.equal(result.result.qualityPassed, false);
     const mastered = await fx.artifacts.get(result.outputArtifacts[0]);
-    assert.equal(mastered.labels.finalizationReady, "true");
+    assert.equal(mastered.labels.finalizationReady, "false");
+    assert.equal(mastered.labels.qualityState, "rejected");
     assert.equal(mastered.labels.backgroundMode, "chroma-key");
     const decoded = await decodeSpriteFrame(
       await fx.artifacts.read(mastered.artifactId),
@@ -146,6 +147,18 @@ test("green matte becomes real alpha and remains finalization-ready", async () =
     assert.ok(
       decoded.data.some((value, index) => index % 4 === 3 && value === 0),
     );
+    const evidence = JSON.parse(
+      (await fx.artifacts.read(result.outputArtifacts[1])).toString("utf8"),
+    );
+    assert.equal(evidence.blockingProof.meaningfulAlphaPassed, true);
+    assert.equal(evidence.blockingProof.fakeTransparencyPassed, true);
+    assert.deepEqual(
+      evidence.quality.gates
+        .filter((gate) => gate.blocking && gate.status === "fail")
+        .map((gate) => gate.id),
+      ["transparent-pixel-colour"],
+    );
+    assert.equal(evidence.promotionEligible, false);
   } finally {
     await rm(fx.root, { recursive: true, force: true });
   }
@@ -172,7 +185,7 @@ test("painted checkerboard transparency is rejected", async () => {
   }
 });
 
-test("black additive proves the black stage and extracts real alpha", async () => {
+test("black additive extraction proves the stage and records bounded adaptive cleanup", async () => {
   const fx = await fixture(
     await image(
       { r: 0, g: 0, b: 0, alpha: 1 },
@@ -185,8 +198,10 @@ test("black additive proves the black stage and extracts real alpha", async () =
       requireMeaningfulAlpha: true,
       quality: { safePadding: 1 },
     });
-    assert.equal(result.result.qualityPassed, true);
+    assert.equal(result.result.qualityPassed, false);
     const mastered = await fx.artifacts.get(result.outputArtifacts[0]);
+    assert.equal(mastered.labels.finalizationReady, "false");
+    assert.equal(mastered.labels.qualityState, "rejected");
     const decoded = await decodeSpriteFrame(
       await fx.artifacts.read(mastered.artifactId),
     );
@@ -199,6 +214,14 @@ test("black additive proves the black stage and extracts real alpha", async () =
     assert.ok(evidence.background.blackEvidence.blackBorderFraction >= 0.85);
     assert.ok(evidence.background.blackEvidence.nonBlackPixels > 0);
     assert.equal(evidence.blockingProof.meaningfulAlphaPassed, true);
+    assert.equal(evidence.blockingProof.fakeTransparencyPassed, true);
+    assert.deepEqual(
+      evidence.quality.gates
+        .filter((gate) => gate.blocking && gate.status === "fail")
+        .map((gate) => gate.id),
+      ["transparent-pixel-colour"],
+    );
+    assert.equal(evidence.promotionEligible, false);
   } finally {
     await rm(fx.root, { recursive: true, force: true });
   }

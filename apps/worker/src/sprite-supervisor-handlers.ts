@@ -589,7 +589,7 @@ async function observeTask(
     }
     const states = { ...next.taskStates };
     states[task.id] = {
-      ...taskWithFailure,
+      ...taskWithoutCurrent(taskWithFailure),
       status: "repairing",
       repairCycles: taskWithFailure.repairCycles + 1,
     };

@@ -14,7 +14,7 @@ test("sprite planning OpenAPI describes complete compile-only coverage", async (
     "/v1/sprite-plans/compile:",
     "playable-character",
     "particle-effect",
-    "isometric",
+    "authored and safely",
     "art.sprite-plan.compile",
     "sprite.inventory.compile",
     "sprite.animation-matrix.compile",

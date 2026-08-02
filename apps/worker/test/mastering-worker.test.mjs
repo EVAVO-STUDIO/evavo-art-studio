@@ -62,6 +62,7 @@ test("mastering worker converts a chroma candidate into an unapproved QA-backed 
     inputArtifacts: [candidate.artifactId],
     requiredCapabilities: [
       "media.chroma-extract",
+      "media.raster",
       "quality.sprite-frame",
       "evidence.bundle",
     ],
@@ -77,6 +78,7 @@ test("mastering worker converts a chroma candidate into an unapproved QA-backed 
       queues: ["media"],
       capabilities: [
         "media.chroma-extract",
+        "media.raster",
         "quality.sprite-frame",
         "evidence.bundle",
       ],
@@ -97,7 +99,7 @@ test("mastering worker converts a chroma candidate into an unapproved QA-backed 
   const evidence = await descriptorByRole(
     artifacts,
     completed.outputArtifacts,
-    "candidate-alpha-mastering-evidence",
+    "candidate-finalization-evidence",
   );
   assert.ok(mastered, "missing mastered candidate artifact");
   assert.ok(evidence, "missing mastering evidence artifact");
@@ -113,9 +115,9 @@ test("mastering worker converts a chroma candidate into an unapproved QA-backed 
   assert.equal(proof.sourceCandidate.artifactId, candidate.artifactId);
   assert.equal(proof.masteredCandidate.artifactId, mastered.artifactId);
   assert.equal(proof.approvalState, "unapproved");
-  assert.equal(proof.extraction.matte.hex, "#00ff00");
-  assert.ok(proof.extraction.output.transparentPixels > 0);
-  assert.ok(proof.extraction.output.partialPixels > 0);
+  assert.equal(proof.background.extraction.matte.hex, "#00ff00");
+  assert.ok(proof.background.extraction.output.transparentPixels > 0);
+  assert.ok(proof.background.extraction.output.partialPixels > 0);
   assert.equal(proof.quality.source.hasAlpha, true);
   assert.equal(proof.promotionEligible, proof.quality.passed);
   assert.deepEqual(await artifacts.listReferences("projects/fixture"), []);
@@ -144,6 +146,7 @@ test("mastering worker rejects candidates that are not declared as immutable inp
     inputArtifacts: [],
     requiredCapabilities: [
       "media.chroma-extract",
+      "media.raster",
       "quality.sprite-frame",
       "evidence.bundle",
     ],
@@ -157,6 +160,7 @@ test("mastering worker rejects candidates that are not declared as immutable inp
       queues: ["media"],
       capabilities: [
         "media.chroma-extract",
+        "media.raster",
         "quality.sprite-frame",
         "evidence.bundle",
       ],

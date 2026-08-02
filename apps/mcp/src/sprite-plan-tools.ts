@@ -11,6 +11,8 @@ import {
 
 import { registerSpriteSupervisorTools } from "./sprite-supervisor-tools.js";
 
+const SPRITE_PLAN_COMPILE_JOB_KIND = "art.sprite-plan.compile" as const;
+
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
 });
@@ -82,6 +84,7 @@ export function registerSpritePlanTools(server: McpServer): void {
           schemaVersion: "1.0",
           compiledPlan: compileSpriteProductionPlan(request),
           compiledJob: compileSpritePlanJob(request),
+          compileJobKind: SPRITE_PLAN_COMPILE_JOB_KIND,
           executionBoundary:
             "Compile-only: no provider execution, image generation, artifact reads, worker execution, promotion or named-reference mutation.",
         });

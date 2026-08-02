@@ -28,11 +28,6 @@ async function sourcePng() {
       data[offset + 3] = 255;
     }
   }
-  const hidden = (1 * WIDTH + 1) * 4;
-  data[hidden] = 17;
-  data[hidden + 1] = 43;
-  data[hidden + 2] = 91;
-  data[hidden + 3] = 0;
   return sharp(data, { raw: { width: WIDTH, height: HEIGHT, channels: 4 } })
     .png({ compressionLevel: 9, adaptiveFiltering: false, palette: false })
     .toBuffer();
@@ -54,7 +49,27 @@ function context(store, payload, inputArtifacts, requiredCapabilities) {
   };
 }
 
-test("worker mirrors the complete RGBA canvas and emits family-level proof", async () => {
+test("horizontal RGBA mirroring preserves hidden transparent colour exactly", () => {
+  const source = Buffer.alloc(WIDTH * HEIGHT * 4);
+  const hidden = (1 * WIDTH + 1) * 4;
+  source[hidden] = 17;
+  source[hidden + 1] = 43;
+  source[hidden + 2] = 91;
+  source[hidden + 3] = 0;
+
+  const mirrored = mirrorHorizontalRgba(source, WIDTH, HEIGHT);
+  const mirroredHidden = (1 * WIDTH + (WIDTH - 2)) * 4;
+  assert.deepEqual(
+    [...mirrored.subarray(mirroredHidden, mirroredHidden + 4)],
+    [17, 43, 91, 0],
+  );
+  assert.deepEqual(
+    mirrorHorizontalRgba(mirrored, WIDTH, HEIGHT),
+    source,
+  );
+});
+
+test("worker mirrors a release-clean RGBA canvas and emits family-level proof", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-mirror-worker-"));
   const store = new LocalArtifactStore({ root });
   try {
@@ -88,8 +103,8 @@ test("worker mirrors the complete RGBA canvas and emits family-level proof", asy
           frameIndex: 0,
           expectedWidth: WIDTH,
           expectedHeight: HEIGHT,
-          pivot: { x: WIDTH / 2, y: HEIGHT - 1 },
-          baseline: HEIGHT - 1,
+          pivot: { x: WIDTH / 2, y: 12 },
+          baseline: 12,
           quality: {
             frameId: "idle:left:0000",
             transparency: "alpha-required",
@@ -140,12 +155,6 @@ test("worker mirrors the complete RGBA canvas and emits family-level proof", asy
       mirrorHorizontalRgba(targetDecoded.data, WIDTH, HEIGHT),
       Buffer.from(sourceDecoded.data),
     );
-    const mirroredHidden = (1 * WIDTH + (WIDTH - 2)) * 4;
-    assert.deepEqual(
-      [...targetDecoded.data.subarray(mirroredHidden, mirroredHidden + 4)],
-      [17, 43, 91, 0],
-    );
-
     const manifest = {
       schemaVersion: "1.0",
       familyId: "mirror-worker-family",
@@ -173,8 +182,8 @@ test("worker mirrors the complete RGBA canvas and emits family-level proof", asy
           frameIndex: 0,
           globalFrameIndex: 0,
           durationMs: 100,
-          pivot: { x: WIDTH / 2, y: HEIGHT - 1 },
-          baseline: HEIGHT - 1,
+          pivot: { x: WIDTH / 2, y: 12 },
+          baseline: 12,
           groundContact: true,
           layers: [{ layerId: "identity-core", artifactId: source.artifactId }],
         },
@@ -185,8 +194,8 @@ test("worker mirrors the complete RGBA canvas and emits family-level proof", asy
           frameIndex: 0,
           globalFrameIndex: 1,
           durationMs: 100,
-          pivot: { x: WIDTH / 2, y: HEIGHT - 1 },
-          baseline: HEIGHT - 1,
+          pivot: { x: WIDTH / 2, y: 12 },
+          baseline: 12,
           groundContact: true,
           layers: [{ layerId: "identity-core", artifactId: masterId }],
         },

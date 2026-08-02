@@ -9,25 +9,39 @@ const readRepository = (relativePath) =>
   readFile(new URL(`../../../${relativePath}`, import.meta.url), "utf8");
 
 test("worker registers adaptive finalization and envelope-backed family verification", async () => {
-  const [index, handler, guard, family, packageSource, tsconfigSource] =
-    await Promise.all([
-      read("src/index.ts"),
-      read("src/adaptive-finalizer-handlers.ts"),
-      read("src/adaptive-finalizer-guarded-handlers.ts"),
-      read("src/adaptive-sprite-family-handlers.ts"),
-      read("package.json"),
-      read("tsconfig.json"),
-    ]);
+  const [
+    index,
+    mirror,
+    handler,
+    guard,
+    family,
+    packageSource,
+    tsconfigSource,
+  ] = await Promise.all([
+    read("src/index.ts"),
+    read("src/deterministic-mirror-handlers.ts"),
+    read("src/adaptive-finalizer-handlers.ts"),
+    read("src/adaptive-finalizer-guarded-handlers.ts"),
+    read("src/adaptive-sprite-family-handlers.ts"),
+    read("package.json"),
+    read("tsconfig.json"),
+  ]);
   const packageJson = JSON.parse(packageSource);
   const tsconfig = JSON.parse(tsconfigSource);
 
   for (const token of [
-    "createGuardedAdaptiveFinalizerHandlers()",
-    "createAdaptiveSpriteFamilyHandlers()",
-    "guardedAdaptiveFinalizerWorkerCapabilities()",
-    '"media.adaptive-finalize"',
+    "createDeterministicMirrorAwareFinalizerHandlers()",
+    "createMirroredSpriteFamilyHandlers()",
+    "deterministicMirrorAwareFinalizerWorkerCapabilities()",
   ]) {
     assert.ok(index.includes(token), `missing worker registration: ${token}`);
+  }
+  for (const token of [
+    "createGuardedAdaptiveFinalizerHandlers",
+    "guardedAdaptiveFinalizerWorkerCapabilities",
+    '"media.adaptive-finalize"',
+  ]) {
+    assert.ok(mirror.includes(token), `missing adaptive wrapper registration: ${token}`);
   }
   for (const token of [
     '"art.candidate.finalize-adaptive"',

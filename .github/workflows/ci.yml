@@ -61,6 +61,27 @@ jobs:
           [[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
+      - name: Install and identify audio media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          FFMPEG_PATH="$(command -v ffmpeg)"
+          FFPROBE_PATH="$(command -v ffprobe)"
+          test -x "${FFMPEG_PATH}"
+          test -x "${FFPROBE_PATH}"
+          FFMPEG_VERSION="$(${FFMPEG_PATH} -version | head -n 1)"
+          FFPROBE_VERSION="$(${FFPROBE_PATH} -version | head -n 1)"
+          FFMPEG_SHA256="$(sha256sum "${FFMPEG_PATH}" | awk '{print $1}')"
+          FFPROBE_SHA256="$(sha256sum "${FFPROBE_PATH}" | awk '{print $1}')"
+          echo "FFMPEG_BIN=${FFMPEG_PATH}" >> "${GITHUB_ENV}"
+          echo "FFPROBE_BIN=${FFPROBE_PATH}" >> "${GITHUB_ENV}"
+          echo "ART_STUDIO_FFMPEG_VERSION=${FFMPEG_VERSION}" >> "${GITHUB_ENV}"
+          echo "ART_STUDIO_FFPROBE_VERSION=${FFPROBE_VERSION}" >> "${GITHUB_ENV}"
+          echo "ART_STUDIO_FFMPEG_SHA256=${FFMPEG_SHA256}" >> "${GITHUB_ENV}"
+          echo "ART_STUDIO_FFPROBE_SHA256=${FFPROBE_SHA256}" >> "${GITHUB_ENV}"
+
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
@@ -116,6 +137,18 @@ jobs:
             "currentMainAtReceipt": true,
             "node": "22.14.0",
             "pnpm": "10.13.1",
+            "mediaTools": {
+              "ffmpeg": {
+                "path": process.env.FFMPEG_BIN,
+                "version": process.env.ART_STUDIO_FFMPEG_VERSION,
+                "sha256": process.env.ART_STUDIO_FFMPEG_SHA256
+              },
+              "ffprobe": {
+                "path": process.env.FFPROBE_BIN,
+                "version": process.env.ART_STUDIO_FFPROBE_VERSION,
+                "sha256": process.env.ART_STUDIO_FFPROBE_SHA256
+              }
+            },
             "lockfilePolicy": "review-first",
             "installedWithoutCommittedLockfile": true,
             "validation": "passed",

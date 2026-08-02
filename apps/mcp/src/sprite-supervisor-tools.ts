@@ -11,6 +11,11 @@ import {
   spriteSupervisorProtocolSummary,
 } from "@evavo/art-sprite-supervisor";
 
+const AUTOMATIC_FINALIZATION_INPUT_SECTIONS = [
+  "background",
+  "threeD",
+] as const;
+
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
 });
@@ -163,6 +168,7 @@ export function registerSpriteSupervisorTools(server: McpServer): void {
         return textResult({
           request: workflow.request,
           analysis: workflow.analysis,
+          inputSections: AUTOMATIC_FINALIZATION_INPUT_SECTIONS,
         });
       } catch (error: unknown) {
         return toolError(error);
@@ -182,6 +188,7 @@ export function registerSpriteSupervisorTools(server: McpServer): void {
         return textResult({
           schemaVersion: "1.0",
           workflow: compileAutomaticSpriteFinalizationWorkflow(request),
+          inputSections: AUTOMATIC_FINALIZATION_INPUT_SECTIONS,
           executionBoundary:
             "Compile-only: no runtime submission, provider call, artifact read, repository mutation, promotion, shell execution or deployment.",
         });

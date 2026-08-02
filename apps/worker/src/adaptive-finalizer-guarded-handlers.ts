@@ -21,6 +21,11 @@ import {
 
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
 
+type ConcreteRuntimeHandlerResult = Readonly<{
+  outputArtifacts: readonly ArtifactId[];
+  result?: JsonValue;
+}>;
+
 const isRecord = (
   value: JsonValue | undefined,
 ): value is Readonly<Record<string, JsonValue>> =>
@@ -34,6 +39,18 @@ function requiredArtifactId(value: JsonValue | undefined): ArtifactId {
     );
   }
   return value as ArtifactId;
+}
+
+function requireBaseResult(
+  value: Awaited<ReturnType<RuntimeJobHandler>>,
+): ConcreteRuntimeHandlerResult {
+  if (!value || value.outputArtifacts === undefined) {
+    throw new PermanentRuntimeError(
+      "ADAPTIVE_FINALIZER_BASE_RESULT_MISSING",
+      "The base adaptive finalizer returned no output artifact result.",
+    );
+  }
+  return value as ConcreteRuntimeHandlerResult;
 }
 
 function integer(
@@ -167,8 +184,8 @@ function outputByRole(
 async function normalizeSuccessfulLineage(
   context: Parameters<RuntimeJobHandler>[0],
   sourceId: ArtifactId,
-  baseResult: Awaited<ReturnType<RuntimeJobHandler>>,
-): Promise<Awaited<ReturnType<RuntimeJobHandler>>> {
+  baseResult: ConcreteRuntimeHandlerResult,
+): Promise<ConcreteRuntimeHandlerResult> {
   const artifacts = await Promise.all(
     baseResult.outputArtifacts.map((artifactId) =>
       verifiedOutput(artifactId, context),
@@ -332,7 +349,7 @@ export function createGuardedAdaptiveFinalizerHandlers(): Readonly<
       return normalizeSuccessfulLineage(
         context,
         sourceId,
-        await base(context),
+        requireBaseResult(await base(context)),
       );
     }
 
