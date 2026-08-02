@@ -171,7 +171,7 @@ const profiles: Readonly<Record<DeliveryProfileId, DeliveryImageProfile>> =
       id: "godot-sprite-lossless",
       title: "General Godot lossless sprite",
       description:
-        "Colour-preserving PNG sprite derivative for assets that do not use the retro grayscale delivery profiles.",
+        "Canonical RGBA8 PNG sprite derivative that preserves exact alpha and spatial transparent-pixel colour for Godot mastering and QA.",
       target: "godot-4.6.2",
       maxWidth: 2048,
       maxHeight: 2048,
@@ -182,21 +182,17 @@ const profiles: Readonly<Record<DeliveryProfileId, DeliveryImageProfile>> =
       requireMeaningfulTransparency: false,
       flattenColour: "#000000",
       outputFormat: "png",
-      pngStorage: null,
-      candidates: Object.freeze([
-        png(128),
-        png(256),
-        PNG_TRUECOLOUR,
-      ]),
+      pngStorage: Object.freeze({ bitDepth: 8, colourType: 6, interlace: 0 }),
+      candidates: Object.freeze([PNG_TRUECOLOUR]),
       quality: Object.freeze({
-        minimumPsnr: 38,
-        maximumMeanAbsoluteError: 3,
-        maximumAlphaMeanAbsoluteError: 0.5,
-        maximumAlphaDifference: 8,
+        minimumPsnr: 99,
+        maximumMeanAbsoluteError: 0,
+        maximumAlphaMeanAbsoluteError: 0,
+        maximumAlphaDifference: 0,
       }),
       maximumOutputBytes: 4 * MiB,
       intendedRuntimeScale:
-        "Keep the source close to its largest expected display footprint; do not enlarge low-resolution sprites during preparation.",
+        "Keep the source close to its largest expected display footprint; retain canonical RGBA8 storage and do not enlarge low-resolution sprites during preparation.",
     }),
     "godot-background-1080p": Object.freeze({
       id: "godot-background-1080p",

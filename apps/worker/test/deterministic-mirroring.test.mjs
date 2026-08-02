@@ -16,6 +16,7 @@ import { createMirroredSpriteFamilyHandlers } from "../dist/mirrored-sprite-fami
 
 const WIDTH = 16;
 const HEIGHT = 16;
+const VISIBLE_BASELINE = 12;
 
 async function sourcePng() {
   const data = Buffer.alloc(WIDTH * HEIGHT * 4);
@@ -103,8 +104,8 @@ test("worker mirrors a release-clean RGBA canvas and emits family-level proof", 
           frameIndex: 0,
           expectedWidth: WIDTH,
           expectedHeight: HEIGHT,
-          pivot: { x: WIDTH / 2, y: 12 },
-          baseline: 12,
+          pivot: { x: WIDTH / 2, y: VISIBLE_BASELINE },
+          baseline: VISIBLE_BASELINE,
           quality: {
             frameId: "idle:left:0000",
             transparency: "alpha-required",
@@ -155,6 +156,7 @@ test("worker mirrors a release-clean RGBA canvas and emits family-level proof", 
       mirrorHorizontalRgba(targetDecoded.data, WIDTH, HEIGHT),
       Buffer.from(sourceDecoded.data),
     );
+
     const manifest = {
       schemaVersion: "1.0",
       familyId: "mirror-worker-family",
@@ -182,8 +184,8 @@ test("worker mirrors a release-clean RGBA canvas and emits family-level proof", 
           frameIndex: 0,
           globalFrameIndex: 0,
           durationMs: 100,
-          pivot: { x: WIDTH / 2, y: 12 },
-          baseline: 12,
+          pivot: { x: WIDTH / 2, y: VISIBLE_BASELINE },
+          baseline: VISIBLE_BASELINE,
           groundContact: true,
           layers: [{ layerId: "identity-core", artifactId: source.artifactId }],
         },
@@ -194,8 +196,8 @@ test("worker mirrors a release-clean RGBA canvas and emits family-level proof", 
           frameIndex: 0,
           globalFrameIndex: 1,
           durationMs: 100,
-          pivot: { x: WIDTH / 2, y: 12 },
-          baseline: 12,
+          pivot: { x: WIDTH / 2, y: VISIBLE_BASELINE },
+          baseline: VISIBLE_BASELINE,
           groundContact: true,
           layers: [{ layerId: "identity-core", artifactId: masterId }],
         },

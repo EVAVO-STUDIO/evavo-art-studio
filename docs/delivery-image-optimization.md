@@ -36,7 +36,7 @@ Do not repeatedly recompress a derivative. Re-run the pipeline from the retained
 | `retro-ui-icon-256` | icons, cursors and UI tokens | 256 × 256 | PNG with alpha | preserve or remove border matte |
 | `retro-scene-720p` | fixed-camera room/location plate | 1280 × 720 | opaque PNG | preserve |
 | `retro-overlay-720p` | registered weather, light, occlusion or prop layer | 1280 × 720 | PNG with alpha | preserve or remove border matte |
-| `godot-sprite-lossless` | general colour Godot sprite | 2048 × 2048 | PNG | role-dependent |
+| `godot-sprite-lossless` | general colour Godot sprite and mastered alpha intermediate | 2048 × 2048 | canonical RGBA8 PNG | preserve |
 | `godot-background-1080p` | non-retro project that truly needs 1080p | 1920 × 1080 | near-lossless WebP | opaque |
 | `web-raster-1080p` | responsive web derivative | 1920 × 1080 | near-lossless WebP | preserve |
 | `source-master-lossless` | metadata-stripped retained source | unchanged | true-colour PNG | preserve |
@@ -79,7 +79,7 @@ When the border does not provide enough confident matte evidence, preparation fa
 
 ## Candidate selection and quality
 
-Each profile declares multiple encoding candidates. PNG profiles test indexed palette sizes and true-colour fallback. Web profiles test bounded near-lossless qualities.
+Each profile declares one or more governed encoding candidates. Profiles that must retain spatial RGB beneath transparent pixels, including `godot-sprite-lossless`, use canonical RGBA8 PNG only. Web profiles may test bounded near-lossless qualities.
 
 Every candidate is decoded again and compared with the role-normalized reference. Evidence records:
 

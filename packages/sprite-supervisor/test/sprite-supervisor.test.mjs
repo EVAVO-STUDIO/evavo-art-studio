@@ -220,6 +220,8 @@ function releaseResolution(expectedStateTick = 4, overrides = {}) {
 }
 
 test("compiles deterministic root supervision jobs", () => {
+  const normalized = validateSpriteSupervisorCompileRequest(request());
+  assert.deepEqual(validateSpriteSupervisorCompileRequest(normalized), normalized);
   const first = compileSpriteSupervisorWorkflow(request());
   const second = compileSpriteSupervisorWorkflow(request());
   assert.equal(first.requestSha256, second.requestSha256);
@@ -233,6 +235,24 @@ test("compiles deterministic root supervision jobs", () => {
   ]);
   assert.ok(first.rootJob.inputArtifacts.includes(IDENTITY));
   assert.ok(first.rootJob.inputArtifacts.includes(CANDIDATE));
+});
+
+test("only output-artifact label selectors may normalize an empty pointer", () => {
+  const invalid = request();
+  invalid.tasks[0].outputBindings[0] = {
+    role: "idle-key-pose",
+    source: "runtime-result-json",
+    labels: {},
+    pointer: "",
+    cardinality: "one",
+  };
+  assert.throws(
+    () => validateSpriteSupervisorCompileRequest(invalid),
+    (error) =>
+      error instanceof SpriteSupervisorError &&
+      error.code === "SPRITE_SUPERVISOR_REQUEST_INVALID" &&
+      error.message.includes("pointer"),
+  );
 });
 
 test("review submissions retain workflow identity but receive a new request identity", () => {

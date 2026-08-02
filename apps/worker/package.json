@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",
+    "@evavo/art-contracts": "workspace:*",
     "@evavo/art-delivery-optimizer": "workspace:*",
     "@evavo/art-finalizer": "workspace:*",
     "@evavo/art-godot": "workspace:*",

@@ -181,6 +181,29 @@ test("preserves red UI accents in canonical RGBA8 storage", async () => {
   assert.ok(redPixels > 1000);
 });
 
+test("Godot sprite profile preserves spatial transparent RGB in canonical RGBA8 storage", async () => {
+  const input = await uncompressedPng(16, 16, (x, y) => {
+    if (x >= 5 && x <= 10 && y >= 4 && y <= 11) return [210, 70, 35, 255];
+    if (x === 4 && y >= 5 && y <= 10) return [210, 70, 35, 0];
+    return [0, 0, 0, 0];
+  });
+  const result = await optimizeDeliveryImage(input, {
+    profileId: "godot-sprite-lossless",
+    background: { mode: "preserve" },
+  });
+  assert.equal(result.evidence.selectedCandidateId, "png-rgba8");
+  assert.deepEqual(pngStorage(result.bytes), {
+    bitDepth: 8,
+    colourType: 6,
+    interlace: 0,
+  });
+  const decoded = await sharp(result.bytes).ensureAlpha().raw().toBuffer();
+  const bleed = (5 * 16 + 4) * 4;
+  const far = (1 * 16 + 1) * 4;
+  assert.deepEqual([...decoded.subarray(bleed, bleed + 4)], [210, 70, 35, 0]);
+  assert.deepEqual([...decoded.subarray(far, far + 4)], [0, 0, 0, 0]);
+});
+
 test("lossless source profile retains decoded pixels exactly", async () => {
   const input = await uncompressedPng(96, 64, (x, y) => [
     (x * 11) % 256,

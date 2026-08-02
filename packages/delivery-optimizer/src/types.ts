@@ -2,7 +2,7 @@ export const DELIVERY_OPTIMIZER_SCHEMA = "evavo.art-delivery-optimization.v1" as
 export const DELIVERY_OPTIMIZER_RECEIPT_SCHEMA =
   "evavo.art-delivery-optimization-receipt.v1" as const;
 export const DELIVERY_OPTIMIZER_VERSION = "0.2.0" as const;
-export const PROFILE_CATALOG_VERSION = "2026-08-01.2" as const;
+export const PROFILE_CATALOG_VERSION = "2026-08-02.1" as const;
 
 export type DeliveryImageFormat = "png" | "webp";
 export type DeliveryColourPolicy = "preserve" | "grayscale";

@@ -30,6 +30,22 @@ function roleStrings(value: unknown): readonly string[] {
     : [];
 }
 
+function omitNormalizedLabelRootPointer(value: unknown): unknown {
+  if (!isRecord(value) || !Array.isArray(value.outputBindings)) return value;
+  const outputBindings = value.outputBindings.map((candidate) => {
+    if (
+      !isRecord(candidate) ||
+      candidate.source !== "output-artifact-labels" ||
+      candidate.pointer !== ""
+    ) {
+      return candidate;
+    }
+    const { pointer: _pointer, ...outputBinding } = candidate;
+    return outputBinding;
+  });
+  return { ...value, outputBindings };
+}
+
 function prepareCoreInput(input: unknown): Readonly<{
   input: unknown;
   adaptiveFinalizerTaskIndexes: ReadonlySet<number>;
@@ -45,11 +61,15 @@ function prepareCoreInput(input: unknown): Readonly<{
 
   const adaptiveFinalizerTaskIndexes = new Set<number>();
   const transformedTasks = input.tasks.map((candidate, index) => {
-    if (!isRecord(candidate) || candidate.kind !== ADAPTIVE_FINALIZER_KIND) {
-      return candidate;
+    const normalizedCandidate = omitNormalizedLabelRootPointer(candidate);
+    if (
+      !isRecord(normalizedCandidate) ||
+      normalizedCandidate.kind !== ADAPTIVE_FINALIZER_KIND
+    ) {
+      return normalizedCandidate;
     }
     adaptiveFinalizerTaskIndexes.add(index);
-    return { ...candidate, kind: CORE_MEDIA_KIND };
+    return { ...normalizedCandidate, kind: CORE_MEDIA_KIND };
   });
 
   const availableRoles = new Set<string>();

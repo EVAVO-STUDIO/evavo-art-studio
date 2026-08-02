@@ -105,6 +105,18 @@ type CandidateResult = Readonly<{
   transformations: readonly string[];
 }>;
 
+function containsNonZeroTransparentRgb(data: Uint8Array): boolean {
+  for (let offset = 0; offset < data.byteLength; offset += 4) {
+    if (
+      data[offset + 3] === 0 &&
+      (data[offset] !== 0 || data[offset + 1] !== 0 || data[offset + 2] !== 0)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function baseCandidateEvidence(
   id: string,
   format: "png" | "webp",
@@ -185,6 +197,9 @@ export async function optimizeDeliveryImage(
     transformations,
   );
   const referenceAlpha = alphaCounts(referenceData);
+  const requiresTransparentRgbPreservation =
+    request.profileId === "godot-sprite-lossless" &&
+    containsNonZeroTransparentRgb(referenceData);
   if (
     profile.requireMeaningfulTransparency &&
     referenceAlpha.transparentPixels + referenceAlpha.partialPixels === 0
@@ -269,7 +284,14 @@ export async function optimizeDeliveryImage(
             nearLossless: encoding.nearLossless,
           }),
     } satisfies Omit<DeliveryCandidateEvidence, "passed" | "failures">;
-    const failures = candidateFailures(base, request.profileId);
+    const failures = [
+      ...candidateFailures(base, request.profileId),
+      ...(requiresTransparentRgbPreservation &&
+      encoding.format === "png" &&
+      encoding.paletteColours !== undefined
+        ? ["transparent-rgb-preservation-requires-truecolour"]
+        : []),
+    ];
     candidates.push({
       bytes: encoded,
       evidence: {
