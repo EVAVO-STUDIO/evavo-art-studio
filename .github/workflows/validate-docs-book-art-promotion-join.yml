@@ -47,7 +47,7 @@ jobs:
           test "$(git hash-object .migration-validation/docs-core/src/book-studio-legacy-art-use-boundary.ts)" = "d4b67407ae37c20c641ad57872a0a696e68e4f68"
           test "$(git hash-object .migration-validation/docs-core/src/book-studio-legacy-art-use-batch.ts)" = "63072c770981f9e002a056dcea89975f86b2c85c"
           test "$(git hash-object .migration-validation/docs-core/src/book-studio-art-promotion-join.ts)" = "6f9155e4eb0402c97f11936b4934ee53829b4a0f"
-          test "$(git hash-object .migration-validation/docs-core/src/index.ts)" = "070c82b8f6e55b22ce4b27db89c507f0e7ce0eb6"
+          test "$(git hash-object .migration-validation/docs-core/src/index.ts)" = "42333403b5f4063dad96259727a04ddcb0d40d2c"
           test "$(git hash-object .migration-validation/docs-core/test/book-studio-art-promotion-join.test.mjs)" = "2706e423f163303db99d88bfbad6774a521fec8c"
       - name: Compile exact Docs Suite source with strict settings
         run: |
