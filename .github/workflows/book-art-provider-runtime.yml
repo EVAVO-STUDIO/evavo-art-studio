@@ -9,7 +9,9 @@ on:
       - "packages/book-art-runtime/**"
       - "packages/book-art-runtime/src/index.ts"
       - "packages/book-art-runtime/src/inspection.ts"
+      - "packages/book-art-runtime/src/parity.ts"
       - "packages/book-art-runtime/test/runtime.test.mjs"
+      - "packages/book-art-runtime/test/parity.test.mjs"
       - "apps/worker/package.json"
       - "apps/worker/tsconfig.json"
       - "apps/worker/src/book-art-provider-jobs.ts"
@@ -17,25 +19,31 @@ on:
       - "apps/worker/src/provider-handlers.ts"
       - "apps/worker/test/book-art-provider-jobs.test.mjs"
       - "apps/worker/test/book-art-provider-inspection.test.mjs"
+      - "apps/worker/test/book-art-provider-parity.test.mjs"
       - "apps/api/package.json"
       - "apps/api/tsconfig.json"
       - "apps/api/src/book-art-api.ts"
       - "apps/api/src/index.ts"
       - "apps/api/openapi.book-art-provider.yaml"
+      - "apps/api/openapi.book-art-provider-parity.yaml"
       - "apps/api/test/book-art-api.test.mjs"
       - "apps/api/test/book-art-api-inspection.test.mjs"
+      - "apps/api/test/book-art-api-parity.test.mjs"
       - "apps/api/test/book-art-openapi-contract.test.mjs"
+      - "apps/api/test/book-art-parity-openapi-contract.test.mjs"
       - "apps/cli/package.json"
       - "apps/cli/tsconfig.json"
       - "apps/cli/src/book-art-commands.ts"
       - "apps/cli/src/index.ts"
       - "apps/cli/test/book-art-cli.test.mjs"
       - "apps/cli/test/book-art-cli-inspection.test.mjs"
+      - "apps/cli/test/book-art-cli-parity.test.mjs"
       - "apps/mcp/package.json"
       - "apps/mcp/tsconfig.json"
       - "apps/mcp/src/book-art-tools.ts"
       - "apps/mcp/src/index.ts"
       - "apps/mcp/test/book-art-tools-contract.test.mjs"
+      - "apps/mcp/test/book-art-parity-contract.test.mjs"
       - "packages/contracts/src/book-production.ts"
       - "packages/contracts/src/book-production-profile.ts"
       - "packages/contracts/src/index.ts"
@@ -50,6 +58,7 @@ on:
       - "docs/book-studio-production-handoff.md"
       - "scripts/check-book-art-provider-runtime.mjs"
       - "scripts/check-book-art-provider-inspection.mjs"
+      - "scripts/check-book-art-provider-parity.mjs"
   pull_request:
     branches: [main]
     paths:
@@ -58,7 +67,9 @@ on:
       - "packages/book-art-runtime/**"
       - "packages/book-art-runtime/src/index.ts"
       - "packages/book-art-runtime/src/inspection.ts"
+      - "packages/book-art-runtime/src/parity.ts"
       - "packages/book-art-runtime/test/runtime.test.mjs"
+      - "packages/book-art-runtime/test/parity.test.mjs"
       - "apps/worker/package.json"
       - "apps/worker/tsconfig.json"
       - "apps/worker/src/book-art-provider-jobs.ts"
@@ -66,25 +77,31 @@ on:
       - "apps/worker/src/provider-handlers.ts"
       - "apps/worker/test/book-art-provider-jobs.test.mjs"
       - "apps/worker/test/book-art-provider-inspection.test.mjs"
+      - "apps/worker/test/book-art-provider-parity.test.mjs"
       - "apps/api/package.json"
       - "apps/api/tsconfig.json"
       - "apps/api/src/book-art-api.ts"
       - "apps/api/src/index.ts"
       - "apps/api/openapi.book-art-provider.yaml"
+      - "apps/api/openapi.book-art-provider-parity.yaml"
       - "apps/api/test/book-art-api.test.mjs"
       - "apps/api/test/book-art-api-inspection.test.mjs"
+      - "apps/api/test/book-art-api-parity.test.mjs"
       - "apps/api/test/book-art-openapi-contract.test.mjs"
+      - "apps/api/test/book-art-parity-openapi-contract.test.mjs"
       - "apps/cli/package.json"
       - "apps/cli/tsconfig.json"
       - "apps/cli/src/book-art-commands.ts"
       - "apps/cli/src/index.ts"
       - "apps/cli/test/book-art-cli.test.mjs"
       - "apps/cli/test/book-art-cli-inspection.test.mjs"
+      - "apps/cli/test/book-art-cli-parity.test.mjs"
       - "apps/mcp/package.json"
       - "apps/mcp/tsconfig.json"
       - "apps/mcp/src/book-art-tools.ts"
       - "apps/mcp/src/index.ts"
       - "apps/mcp/test/book-art-tools-contract.test.mjs"
+      - "apps/mcp/test/book-art-parity-contract.test.mjs"
       - "packages/contracts/src/book-production.ts"
       - "packages/contracts/src/book-production-profile.ts"
       - "packages/contracts/src/index.ts"
@@ -99,6 +116,7 @@ on:
       - "docs/book-studio-production-handoff.md"
       - "scripts/check-book-art-provider-runtime.mjs"
       - "scripts/check-book-art-provider-inspection.mjs"
+      - "scripts/check-book-art-provider-parity.mjs"
   workflow_dispatch:
 
 permissions:
@@ -139,10 +157,11 @@ jobs:
           ffmpeg -version | head -1
           ffprobe -version | head -1
 
-      - name: Verify Book Art provider runtime authority and surface parity
+      - name: Verify Book Art provider runtime, inspection and structural parity authority
         run: |
           node scripts/check-book-art-provider-runtime.mjs
           node scripts/check-book-art-provider-inspection.mjs
+          node scripts/check-book-art-provider-parity.mjs
 
       - name: Install review-first dependency graph
         run: pnpm install --no-frozen-lockfile
@@ -153,7 +172,7 @@ jobs:
       - name: Run shared Book Art runtime regressions
         run: pnpm --filter @evavo/art-book-runtime test
 
-      - name: Run worker provider execution and inspection regressions
+      - name: Run worker provider execution, inspection and parity regressions
         run: pnpm --filter @evavo/art-studio-worker test
 
       - name: Run Book Art REST regressions
