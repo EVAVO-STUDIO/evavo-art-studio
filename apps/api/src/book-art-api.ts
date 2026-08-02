@@ -9,6 +9,7 @@ import {
   type BookArtProviderAdapterPolicyV1,
 } from "@evavo/art-book-runtime";
 import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
+import { compareBookArtProviderShadowParity } from "@evavo/art-book-runtime/parity";
 import { RuntimeError, type RuntimeRepository } from "@evavo/art-runtime";
 
 export interface BookArtApiContext {
@@ -38,6 +39,8 @@ const PROTOCOL_PATH = "/v1/book-art/provider-runtime";
 const COMPILE_PATH = "/v1/book-art/provider-jobs/compile";
 const SUBMIT_PATH = "/v1/book-art/provider-jobs/submit";
 const INSPECT_PATH = "/v1/book-art/provider-jobs/inspect";
+const PARITY_PATH = "/v1/book-art/provider-jobs/parity";
+const PARITY_FIELDS = new Set(["request", "websiteObservation"]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -47,7 +50,8 @@ function pathHandled(pathname: string): boolean {
     pathname === PROTOCOL_PATH ||
     pathname === COMPILE_PATH ||
     pathname === SUBMIT_PATH ||
-    pathname === INSPECT_PATH
+    pathname === INSPECT_PATH ||
+    pathname === PARITY_PATH
   );
 }
 
@@ -83,7 +87,7 @@ function requireProtectedAccess(context: BookArtApiContext): boolean {
         error: {
           code: "BOOK_ART_RUNTIME_ACCESS_UNAVAILABLE",
           message:
-            "Book Art provider submission and inspection require EVAVO_ART_ALLOW_WRITES=true and a server-side control token of at least 32 bytes.",
+            "Book Art provider submission, inspection and parity require EVAVO_ART_ALLOW_WRITES=true and a server-side control token of at least 32 bytes.",
         },
       },
       context.requestId,
@@ -114,6 +118,23 @@ function configuredInput(
   if (!isRecord(body)) return null;
   if (Object.hasOwn(body, "adapterPolicy")) return null;
   return { ...body, adapterPolicy };
+}
+
+function configuredParityInput(
+  body: unknown,
+  adapterPolicy: BookArtProviderAdapterPolicyV1,
+): Readonly<{
+  request: Record<string, unknown>;
+  websiteObservation: unknown;
+}> | null {
+  if (!isRecord(body)) return null;
+  if (Object.keys(body).some((key) => !PARITY_FIELDS.has(key))) return null;
+  if (!Object.hasOwn(body, "request") || !Object.hasOwn(body, "websiteObservation")) {
+    return null;
+  }
+  const request = configuredInput(body.request, adapterPolicy);
+  if (!request) return null;
+  return { request, websiteObservation: body.websiteObservation };
 }
 
 function sendRuntimeError(context: BookArtApiContext, error: RuntimeError): void {
@@ -148,6 +169,10 @@ export async function handleBookArtApiRequest(
         submitPerformsProviderCall: false,
         inspectPerformsProviderCall: false,
         inspectionWritesArtifacts: false,
+        parityPerformsProviderCall: false,
+        parityWritesArtifacts: false,
+        visualSimilarityEvaluated: false,
+        cutoverEligible: false,
         candidateApprovalState: "unapproved",
         candidateStorageClass: "intermediate",
         selectionPerformed: false,
@@ -165,18 +190,23 @@ export async function handleBookArtApiRequest(
     request.method === "POST" &&
     (url.pathname === COMPILE_PATH ||
       url.pathname === SUBMIT_PATH ||
-      url.pathname === INSPECT_PATH)
+      url.pathname === INSPECT_PATH ||
+      url.pathname === PARITY_PATH)
   ) {
     const adapterPolicy = requirePolicy(context);
     if (!adapterPolicy) return true;
     if (
-      (url.pathname === SUBMIT_PATH || url.pathname === INSPECT_PATH) &&
+      (url.pathname === SUBMIT_PATH ||
+        url.pathname === INSPECT_PATH ||
+        url.pathname === PARITY_PATH) &&
       !requireProtectedAccess(context)
     ) {
       return true;
     }
     if (
-      (url.pathname === SUBMIT_PATH || url.pathname === INSPECT_PATH) &&
+      (url.pathname === SUBMIT_PATH ||
+        url.pathname === INSPECT_PATH ||
+        url.pathname === PARITY_PATH) &&
       !context.runtime
     ) {
       context.writeJson(
@@ -193,7 +223,10 @@ export async function handleBookArtApiRequest(
       );
       return true;
     }
-    if (url.pathname === INSPECT_PATH && !context.artifacts) {
+    if (
+      (url.pathname === INSPECT_PATH || url.pathname === PARITY_PATH) &&
+      !context.artifacts
+    ) {
       context.writeJson(
         response,
         503,
@@ -201,7 +234,7 @@ export async function handleBookArtApiRequest(
           error: {
             code: "ART_STUDIO_ARTIFACT_STORE_NOT_CONFIGURED",
             message:
-              "An immutable artifact store is not configured for Book Art provider inspection.",
+              "An immutable artifact store is not configured for Book Art provider inspection or parity.",
           },
         },
         requestId,
@@ -210,7 +243,14 @@ export async function handleBookArtApiRequest(
     }
 
     const body = await context.readJsonBody(request, context.maximumBodyBytes);
-    const input = configuredInput(body, adapterPolicy);
+    const parityInput =
+      url.pathname === PARITY_PATH
+        ? configuredParityInput(body, adapterPolicy)
+        : null;
+    const input =
+      url.pathname === PARITY_PATH
+        ? parityInput?.request ?? null
+        : configuredInput(body, adapterPolicy);
     if (!input) {
       context.writeJson(
         response,
@@ -219,7 +259,9 @@ export async function handleBookArtApiRequest(
           error: {
             code: "BOOK_ART_PROVIDER_REQUEST_INVALID",
             message:
-              "The request must be one object and must not contain adapterPolicy; provider policy is configured by the Art Studio host.",
+              url.pathname === PARITY_PATH
+                ? "Parity requires exactly request and websiteObservation; request must not contain adapterPolicy because provider policy is configured by the Art Studio host."
+                : "The request must be one object and must not contain adapterPolicy; provider policy is configured by the Art Studio host.",
           },
         },
         requestId,
@@ -246,6 +288,27 @@ export async function handleBookArtApiRequest(
         context.writeJson(
           response,
           result.status === "blocked" ? 422 : 200,
+          result,
+          requestId,
+        );
+        return true;
+      }
+      if (url.pathname === PARITY_PATH) {
+        const result = await compareBookArtProviderShadowParity(
+          compilation,
+          parityInput!.websiteObservation,
+          {
+            runtime: context.runtime!,
+            artifacts: context.artifacts!,
+          },
+        );
+        context.writeJson(
+          response,
+          result.status === "blocked"
+            ? 422
+            : result.status === "mismatched"
+              ? 409
+              : 200,
           result,
           requestId,
         );
