@@ -553,7 +553,9 @@ async function sha256Text(value: string): Promise<string> {
   return sha256Bytes(new TextEncoder().encode(value));
 }
 async function sha256Bytes(value: Uint8Array): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", value);
+  const buffer = new ArrayBuffer(value.byteLength);
+  new Uint8Array(buffer).set(value);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", buffer);
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 function fail(code: string, message: string): never {
