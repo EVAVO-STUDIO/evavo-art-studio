@@ -26,7 +26,7 @@ jobs:
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "257b28cd1aa1c3db051629edf1676b7aed963c2f" ]]
 
-      - name: Apply reviewed literal replacement
+      - name: Apply reviewed structural replacement
         shell: bash
         run: |
           set -euo pipefail
@@ -34,55 +34,57 @@ jobs:
           from pathlib import Path
 
           path = Path("apps/worker/src/mastering-handlers.ts")
-          source = path.read_text(encoding="utf-8")
-          old = '''  const transparency = mode === "opaque-preserve" ? "opaque" : "alpha-required";
-          return {
-            ...supplied,
-            frameId,
-            transparency,
-            expectedWidth:
-              typeof supplied.expectedWidth === "number" ? supplied.expectedWidth : width,
-            expectedHeight:
-              typeof supplied.expectedHeight === "number" ? supplied.expectedHeight : height,
-            expectedFormat: "png",
-            safePadding:
-              typeof supplied.safePadding === "number"
-                ? supplied.safePadding
-                : transparency === "opaque"
-                  ? 0
-                  : 1,
-            knownMatteColours: [
-              ...(matteColour ? [matteColour] : []),
-              ...existingMattes,
-            ],
-          };
-          '''
-          new = '''  const transparency = mode === "opaque-preserve" ? "opaque" : "alpha-required";
-          const knownMatteColours = [
-            ...(matteColour ? [matteColour] : []),
-            ...existingMattes,
-          ];
-          return {
-            ...supplied,
-            frameId,
-            transparency,
-            expectedWidth:
-              typeof supplied.expectedWidth === "number" ? supplied.expectedWidth : width,
-            expectedHeight:
-              typeof supplied.expectedHeight === "number" ? supplied.expectedHeight : height,
-            expectedFormat: "png",
-            safePadding:
-              typeof supplied.safePadding === "number"
-                ? supplied.safePadding
-                : transparency === "opaque"
-                  ? 0
-                  : 1,
-            ...(knownMatteColours.length ? { knownMatteColours } : {}),
-          };
-          '''
-          if source.count(old) != 1:
-              raise SystemExit(f"expected exactly one mastering quality block, found {source.count(old)}")
-          path.write_text(source.replace(old, new), encoding="utf-8")
+          lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+          transparency_matches = [
+              index
+              for index, line in enumerate(lines)
+              if line.strip()
+              == 'const transparency = mode === "opaque-preserve" ? "opaque" : "alpha-required";'
+          ]
+          matte_matches = [
+              index
+              for index, line in enumerate(lines)
+              if line.strip() == "knownMatteColours: ["
+          ]
+          if len(transparency_matches) != 1:
+              raise SystemExit(
+                  f"expected one transparency assignment, found {len(transparency_matches)}"
+              )
+          if len(matte_matches) != 1:
+              raise SystemExit(
+                  f"expected one knownMatteColours assignment, found {len(matte_matches)}"
+              )
+
+          transparency_index = transparency_matches[0]
+          indentation = lines[transparency_index][
+              : len(lines[transparency_index]) - len(lines[transparency_index].lstrip())
+          ]
+          lines[transparency_index + 1 : transparency_index + 1] = [
+              f"{indentation}const knownMatteColours = [\n",
+              f"{indentation}  ...(matteColour ? [matteColour] : []),\n",
+              f"{indentation}  ...existingMattes,\n",
+              f"{indentation}];\n",
+          ]
+
+          matte_index = matte_matches[0] + 4
+          matte_indentation = lines[matte_index][
+              : len(lines[matte_index]) - len(lines[matte_index].lstrip())
+          ]
+          expected = [
+              "knownMatteColours: [",
+              "...(matteColour ? [matteColour] : []),",
+              "...existingMattes,",
+              "],",
+          ]
+          actual = [line.strip() for line in lines[matte_index : matte_index + 4]]
+          if actual != expected:
+              raise SystemExit(
+                  f"knownMatteColours block drifted: expected {expected!r}, found {actual!r}"
+              )
+          lines[matte_index : matte_index + 4] = [
+              f"{matte_indentation}...(knownMatteColours.length ? {{ knownMatteColours }} : {{}}),\n"
+          ]
+          path.write_text("".join(lines), encoding="utf-8")
           PY
           git diff --check
           git diff -- apps/worker/src/mastering-handlers.ts
