@@ -1,42 +1,39 @@
-name: Agent Validate Docs Writing Art Link
+name: Agent Validate Docs Canonical Writing Art Link
 
 on:
-  pull_request:
+  push:
     branches:
-      - main
+      - agent/validate-docs-canonical-writing-art-20260803
 
 permissions:
   contents: read
 
 concurrency:
-  group: agent-validate-docs-writing-art-link-${{ github.event.pull_request.number }}
+  group: agent-validate-docs-canonical-writing-art-link
   cancel-in-progress: true
 
 jobs:
   validate:
-    if: >-
-      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'agent/validate-docs-link-20260803'
+    if: github.repository == 'EVAVO-STUDIO/evavo-art-studio'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out exact disposable validation head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
 
       - name: Prove validation scope and exact mirrored production blobs
         shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
+          [[ "${GITHUB_REF}" == "refs/heads/agent/validate-docs-canonical-writing-art-20260803" ]]
+          [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
-          unexpected="$(git diff --name-only "${BASE_SHA}"...HEAD | grep -Ev '^(.github/workflows/agent-validate-docs-writing-art-link.yml|validation/docs-writing-art/)' || true)"
+          base="$(git merge-base origin/main HEAD)"
+          unexpected="$(git diff --name-only "${base}"...HEAD | grep -Ev '^(.github/workflows/agent-validate-docs-writing-art-link.yml|validation/docs-writing-art/)' || true)"
           [[ -z "${unexpected}" ]] || {
             echo "Disposable validator changed production paths:" >&2
             printf '%s\n' "${unexpected}" >&2
@@ -44,9 +41,15 @@ jobs:
           }
 
           [[ "$(git hash-object validation/docs-writing-art/src/book-studio-art-brief-exact.ts)" == "f543cdb600edee575c34b7764565b5f3fb617433" ]]
-          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-website-manuscript-cas.ts)" == "de78a790ba9e72912f4cd50a66718fcd30fe6ace" ]]
-          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-writing-art-link.ts)" == "6639d954077307d95417ee2930cfaf823a3f3c14" ]]
-          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-writing-art-release.ts)" == "6bff651fc25d0221c824be8c332c993999f937e5" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-writing-art-link.ts)" == "b8fbf9d8b1197a5bb7f34656a6f43147e66e4583" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-writing-art-release.ts)" == "5b40819b87432675ea6248a11a87e3a18e78cc72" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-types.ts)" == "2b835bc1280e694c45557b73a61c082a301b6528" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-shared.ts)" == "5bbedfeca418fb0b68cca24b437e55ec9026ccf7" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-change.ts)" == "e294abde42498b035b84c2bec1ca74379c73aea7" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-snapshot.ts)" == "7bc305f6a38d7662c4b72902507cb9de5bb516a3" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-plan-validate.ts)" == "604d6f8bc8cbfe86ac3279e776da2867aaf6bbf5" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-receipt-parse.ts)" == "c67344560a33fabdbf39bb7edd153e3dcdad5041" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-receipt-import.ts)" == "e25879e4463426ed9d300b9240a55b6e7e063f54" ]]
 
       - name: Use Docs Suite Node.js runtime
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
@@ -54,10 +57,10 @@ jobs:
           node-version: 22.14.0
           package-manager-cache: false
 
-      - name: Strictly compile mirrored production modules
+      - name: Strictly compile byte-identical production modules
         run: npm exec --yes --package=typescript@5.9.3 -- tsc -p validation/docs-writing-art/tsconfig.json
 
-      - name: Run mirrored cross-repository adversarial harness
+      - name: Run canonical cross-repository adversarial harness
         run: npm exec --yes --package=tsx@4.20.3 -- tsx --test validation/docs-writing-art/test.mjs
 
       - name: Verify disposable validation left source clean
