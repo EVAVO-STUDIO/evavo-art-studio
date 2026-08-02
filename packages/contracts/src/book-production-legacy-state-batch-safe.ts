@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import type {
   LegacyWebsiteBookArtBatchInputV1,
   LegacyWebsiteBookArtBatchResultV1,
@@ -19,19 +17,19 @@ export type {
  * Public batch entrypoint. Every declared source-record fingerprint must match
  * the exact canonical legacy import input before any item can be processed.
  */
-export function importLegacyWebsiteBookArtStateBatch(
+export async function importLegacyWebsiteBookArtStateBatch(
   input: LegacyWebsiteBookArtBatchInputV1,
-): LegacyWebsiteBookArtBatchResultV1 {
+): Promise<LegacyWebsiteBookArtBatchResultV1> {
   const sourceBlockers: string[] = [];
   for (const item of Array.isArray(input?.items) ? input.items : []) {
-    const expected = sha256(canonicalJson(item?.input));
+    const expected = await sha256(canonicalJson(item?.input));
     const supplied = normalizeSha(item?.sourceRecordFingerprint);
     if (!supplied || supplied !== expected) {
       sourceBlockers.push(`Legacy Website Book Art item ${text(item?.migrationItemId) || "unknown"} source record fingerprint does not match its exact canonical input.`);
     }
   }
 
-  const result = importLegacyWebsiteBookArtStateBatchUnchecked(input);
+  const result = await importLegacyWebsiteBookArtStateBatchUnchecked(input);
   if (!sourceBlockers.length) return result;
   const withoutFingerprint: Omit<LegacyWebsiteBookArtBatchResultV1, "batchFingerprint"> = {
     ...result,
@@ -54,17 +52,15 @@ export function importLegacyWebsiteBookArtStateBatch(
   };
   return {
     ...withoutFingerprint,
-    batchFingerprint: sha256(canonicalJson(withoutFingerprint)),
+    batchFingerprint: await sha256(canonicalJson(withoutFingerprint)),
   };
 }
 
-export function fingerprintLegacyWebsiteBookArtSourceRecord(value: unknown): string {
+export async function fingerprintLegacyWebsiteBookArtSourceRecord(value: unknown): Promise<string> {
   return sha256(canonicalJson(value));
 }
 
-function canonicalJson(value: unknown): string {
-  return JSON.stringify(canonical(value));
-}
+function canonicalJson(value: unknown): string { return JSON.stringify(canonical(value)); }
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {
@@ -75,8 +71,10 @@ function canonical(value: unknown): unknown {
   }
   return value;
 }
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
+async function sha256(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 function normalizeSha(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
