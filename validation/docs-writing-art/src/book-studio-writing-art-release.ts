@@ -129,7 +129,7 @@ export async function compileBookWritingArtRelease(
   }
 
   const linkInput = isObject(root.link)
-    ? (root.link as BookWritingArtLinkInputV1)
+    ? (root.link as unknown as BookWritingArtLinkInputV1)
     : undefined;
   if (!linkInput) blockers.push("Book writing-art release link must be an object.");
   const link = await compileBookWritingArtLink(root.link);
@@ -338,7 +338,7 @@ async function parseExactArtBrief(
     blockers.push("Final Book Art brief must be an object.");
     return undefined;
   }
-  const brief = value as BookArtBriefV1;
+  const brief = value as unknown as BookArtBriefV1;
   const validation = await validateBookArtBriefExact(brief);
   if (!validation.valid) {
     blockers.push("Final Book Art brief is invalid.", ...validation.issues);
