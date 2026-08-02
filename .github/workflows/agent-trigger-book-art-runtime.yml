@@ -33,20 +33,25 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
-          [[ "$(git rev-parse HEAD^)" == "9da5a50db5441aec3271be32b0ec98dd09bb6862" ]]
+          [[ "$(git rev-parse HEAD^)" == "1d02ba37605447df24be152c055243e166fc9730" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
       - name: Extract and apply checksum-bound reviewed patch
         shell: bash
         run: |
           set -euo pipefail
-          awk '
-            /^H4sI/ { capture = 1 }
-            capture && /^PATCH64$/ { exit }
-            capture { print }
-          ' .github/workflows/agent-apply-book-art-runtime.yml > "${RUNNER_TEMP}/book-art-runtime.patch.gz.b64"
-          test -s "${RUNNER_TEMP}/book-art-runtime.patch.gz.b64"
-          base64 --decode "${RUNNER_TEMP}/book-art-runtime.patch.gz.b64" > "${RUNNER_TEMP}/book-art-runtime.patch.gz"
+          python - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          source = Path('.github/workflows/agent-apply-book-art-runtime.yml').read_text(encoding='utf-8')
+          start = source.index('H4sI')
+          end = source.index('\nPATCH64', start)
+          payload = ''.join(source[start:end].split())
+          decoded = base64.b64decode(payload, validate=True)
+          Path(os.environ['RUNNER_TEMP'], 'book-art-runtime.patch.gz').write_bytes(decoded)
+          PY
           printf '%s  %s\n' \
             '19db27d71db95bbb09ea6655eb496241e8603791177632238ad97fa4e0f0d622' \
             "${RUNNER_TEMP}/book-art-runtime.patch.gz" | sha256sum --check
