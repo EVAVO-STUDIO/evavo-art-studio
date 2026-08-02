@@ -1,4 +1,5 @@
 export * from "./book-production.js";
+export * from "./book-production-profile.js";
 export * from "./book-production-legacy-compat.js";
 export * from "./book-production-legacy-state-import-safe.js";
 export * from "./book-production-legacy-state-batch-safe.js";
