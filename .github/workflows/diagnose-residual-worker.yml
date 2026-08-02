@@ -1,0 +1,195 @@
+name: Diagnose exact residual worker failures
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact diagnostic branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: validation/worker-diag-234e912-20260802
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove direct candidate ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD^)" == "234e912bb8223f132d2d79205ee968e4fd8bdaa6" ]]
+          mapfile -t changed < <(git diff --name-only 234e912bb8223f132d2d79205ee968e4fd8bdaa6..HEAD)
+          [[ "${#changed[@]}" -eq 1 ]]
+          [[ "${changed[0]}" == ".github/workflows/diagnose-residual-worker.yml" ]]
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build worker and domain dependencies
+        run: pnpm run build:domain && pnpm --filter @evavo/art-studio-worker build
+
+      - name: Instrument exact tests locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          finalization = Path("apps/worker/test/candidate-finalization.test.mjs")
+          source = finalization.read_text(encoding="utf-8")
+          needle = "    assert.equal(result.result.qualityPassed, true);\n"
+          replacement = '''    if (!result.result.qualityPassed) {
+              for (const artifactId of result.outputArtifacts) {
+                const descriptor = await fx.artifacts.get(artifactId);
+                if (descriptor?.mediaType === "application/json") {
+                  const diagnostic = JSON.parse(
+                    (await fx.artifacts.read(artifactId)).toString("utf8"),
+                  );
+                  console.error(
+                    "DIAG_FINALIZATION_QUALITY",
+                    JSON.stringify({ descriptor, diagnostic }, null, 2),
+                  );
+                }
+              }
+            }
+            assert.equal(result.result.qualityPassed, true);
+          '''
+          if source.count(needle) != 3:
+              raise SystemExit(f"expected three passing-quality assertions, found {source.count(needle)}")
+          finalization.write_text(source.replace(needle, replacement), encoding="utf-8")
+
+          mirror = Path("apps/worker/test/deterministic-mirroring.test.mjs")
+          source = mirror.read_text(encoding="utf-8")
+          needle = '''    const familyResult = await familyHandler(
+              context(store, manifest, inputArtifacts, requiredCapabilities),
+            );
+          '''
+          replacement = '''    let familyResult;
+            try {
+              familyResult = await familyHandler(
+                context(store, manifest, inputArtifacts, requiredCapabilities),
+              );
+            } catch (error) {
+              console.error(
+                "DIAG_MIRROR_FAMILY",
+                JSON.stringify(
+                  {
+                    code: error?.code,
+                    message: error?.message,
+                    details: error?.details,
+                  },
+                  null,
+                  2,
+                ),
+              );
+              throw error;
+            }
+          '''
+          if source.count(needle) != 1:
+              raise SystemExit(f"expected one mirror family call, found {source.count(needle)}")
+          mirror.write_text(source.replace(needle, replacement), encoding="utf-8")
+
+          supervisor = Path("apps/worker/test/sprite-supervisor-runtime.test.mjs")
+          source = supervisor.read_text(encoding="utf-8")
+          terminal = '''  assert.fail(`Supervisor ${runId} did not become terminal within the fixture budget.`);
+          '''
+          terminal_replacement = '''  const diagnosticJobs = await runtime.list({ limit: 1000 });
+            console.error(
+              "DIAG_SUPERVISOR_TERMINAL",
+              JSON.stringify(
+                diagnosticJobs.map((job) => ({
+                  id: job.id,
+                  kind: job.spec.kind,
+                  queue: job.spec.queue,
+                  state: job.state,
+                  attempts: job.attempts,
+                  failure: job.failure,
+                  outputArtifacts: job.outputArtifacts,
+                })),
+                null,
+                2,
+              ),
+            );
+            assert.fail(`Supervisor ${runId} did not become terminal within the fixture budget.`);
+          '''
+          if source.count(terminal) != 1:
+              raise SystemExit(f"expected one terminal failure, found {source.count(terminal)}")
+          source = source.replace(terminal, terminal_replacement)
+          state = '''  assert.fail(
+              `Supervisor ${runId} did not reach ${expectedStatus} within the fixture budget.`,
+            );
+          '''
+          state_replacement = '''  const diagnosticReference = await artifacts.resolveReference(
+              "sprite-supervisor/runtime-demo",
+              runId,
+            );
+            if (diagnosticReference) {
+              const diagnosticState = JSON.parse(
+                (await artifacts.read(diagnosticReference.artifactId)).toString("utf8"),
+              );
+              console.error(
+                "DIAG_SUPERVISOR_STATE",
+                JSON.stringify(diagnosticState, null, 2),
+              );
+            } else {
+              console.error("DIAG_SUPERVISOR_STATE", "no state reference");
+            }
+            assert.fail(
+              `Supervisor ${runId} did not reach ${expectedStatus} within the fixture budget.`,
+            );
+          '''
+          if source.count(state) != 1:
+              raise SystemExit(f"expected one state failure, found {source.count(state)}")
+          supervisor.write_text(source.replace(state, state_replacement), encoding="utf-8")
+          PY
+
+      - name: Diagnose candidate finalization gates
+        id: finalization
+        continue-on-error: true
+        working-directory: apps/worker
+        run: node --test test/candidate-finalization.test.mjs
+
+      - name: Diagnose mirrored family gates
+        id: mirror
+        continue-on-error: true
+        working-directory: apps/worker
+        run: node --test test/deterministic-mirroring.test.mjs
+
+      - name: Diagnose supervisor state progression
+        id: supervisor
+        continue-on-error: true
+        working-directory: apps/worker
+        run: node --test test/sprite-supervisor-runtime.test.mjs
+
+      - name: Require diagnostics to reproduce
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${{ steps.finalization.outcome }}" == "failure" ]]
+          [[ "${{ steps.mirror.outcome }}" == "failure" ]]
+          [[ "${{ steps.supervisor.outcome }}" == "failure" ]]
+
+      - name: Restore source and verify diagnostic branch cleanliness
+        if: always()
+        shell: bash
+        run: |
+          git reset --hard HEAD
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
