@@ -1,0 +1,41 @@
+name: Validate Website Book Art Source Manifest
+
+on:
+  push:
+    branches:
+      - agent/validate-website-book-art-source-manifest-20260802
+    paths:
+      - ".github/workflows/validate-website-book-art-source-manifest.yml"
+      - ".migration-validation/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-website-book-art-source-manifest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Use governed Node.js runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 24.18.0
+          package-manager-cache: false
+      - name: Prove byte identity with Website PR 49
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .migration-validation/compile-book-art-state-migration-manifest.mjs)" = "96c77bfec9291b97f3ee58ccfed32eedcae03f1b"
+          test "$(git hash-object .migration-validation/test-book-art-state-migration-manifest.mjs)" = "cd4af7c35eb8cb934eda0dd44c1366e209fdca3d"
+      - name: Run exact Website source-manifest attacks
+        run: node --test .migration-validation/test-book-art-state-migration-manifest.mjs
