@@ -348,7 +348,10 @@ function normalizeSelector(
       512,
     );
   }
-  const pointer = item.pointer === undefined ? "" : text(item.pointer, `${name}.pointer`, undefined, 1_024);
+  const pointer =
+    item.pointer === undefined || item.pointer === ""
+      ? ""
+      : text(item.pointer, `${name}.pointer`, undefined, 1_024);
   if (pointer && !pointer.startsWith("/")) {
     fail(
       "SPRITE_SUPERVISOR_REQUEST_INVALID",
