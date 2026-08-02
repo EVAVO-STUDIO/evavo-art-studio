@@ -1,4 +1,4 @@
-name: Agent Validate Strict Worker Repairs
+name: Agent Diagnose Remaining Worker Failures
 
 on:
   pull_request:
@@ -6,40 +6,40 @@ on:
     types: [reopened]
 
 permissions:
-  contents: write
+  contents: read
   issues: read
   pull-requests: read
 
 concurrency:
-  group: agent-validate-strict-worker-${{ github.event.pull_request.number }}
+  group: agent-diagnose-worker-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
-  validate:
+  diagnose:
     if: >-
       github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'agent/book-art-provider-runtime-20260802'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - name: Check out exact pull request head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 2
-          persist-credentials: true
+          persist-credentials: false
 
-      - name: Verify exact repair boundary
+      - name: Verify exact diagnostic boundary
         shell: bash
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
-          [[ "$(git rev-parse HEAD^)" == "91062578ece710115fb15c99dbe46c00753e58c1" ]]
+          [[ "$(git rev-parse HEAD^)" == "2b6cf1a5299525de11ce1cfe072e7949a260edbc" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
           test "$(git diff --name-only HEAD^ HEAD)" = ".github/workflows/agent-fix-sprite-supervisor-strictness.yml"
 
-      - name: Reconstruct and apply checksum-bound repair patch
+      - name: Reconstruct checksum-bound repair candidate
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,7 +55,6 @@ jobs:
           from pathlib import Path
           from urllib.request import Request, urlopen
 
-          marker_prefix = 'STRICT_WORKER_FIXES_V1_PART_'
           request = Request(
               f"https://api.github.com/repos/{os.environ['REPOSITORY']}/issues/{os.environ['PR_NUMBER']}/comments?per_page=100",
               headers={
@@ -69,7 +68,7 @@ jobs:
 
           parts = []
           for part in range(1, 6):
-              marker = f'{marker_prefix}{part}_OF_5\n'
+              marker = f'STRICT_WORKER_FIXES_V1_PART_{part}_OF_5\n'
               matches = [
                   comment.get('body', '')[len(marker):].strip()
                   for comment in comments
@@ -92,17 +91,78 @@ jobs:
           git apply --check "${RUNNER_TEMP}/strict-worker-fixes.patch"
           git apply "${RUNNER_TEMP}/strict-worker-fixes.patch"
           git diff --check
-          git diff --name-only | sort > "${RUNNER_TEMP}/actual-paths.txt"
-          cat > "${RUNNER_TEMP}/expected-paths.txt" <<'PATHS'
-          apps/worker/src/adaptive-finalizer-guarded-handlers.ts
-          apps/worker/src/adaptive-sprite-family-handlers.ts
-          apps/worker/src/mastering-handlers.ts
-          apps/worker/test/adaptive-finalizer-source-contract.test.mjs
-          apps/worker/test/mastering-worker.test.mjs
-          packages/sprite-supervisor/src/automatic-compiler.ts
-          PATHS
-          sort "${RUNNER_TEMP}/expected-paths.txt" -o "${RUNNER_TEMP}/expected-paths.txt"
-          diff -u "${RUNNER_TEMP}/expected-paths.txt" "${RUNNER_TEMP}/actual-paths.txt"
+
+      - name: Add temporary evidence-rich diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, before: str, after: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              if text.count(before) != 1:
+                  raise SystemExit(f'Expected diagnostic insertion exactly once in {path}.')
+              path.write_text(text.replace(before, after, 1), encoding='utf-8')
+
+          candidate = Path('apps/worker/test/candidate-finalization.test.mjs')
+          replace_once(
+              candidate,
+              '''test("green matte becomes real alpha and remains finalization-ready", async () => {\n''',
+              '''async function diagnoseQualityFailure(fx, result) {\n  if (result.result.qualityPassed) return;\n  const evidenceId = result.result.evidenceArtifactId ?? result.outputArtifacts[1];\n  const evidence = evidenceId\n    ? JSON.parse((await fx.artifacts.read(evidenceId)).toString("utf8"))\n    : null;\n  console.error(\n    "QUALITY_GATE_DIAGNOSTIC",\n    JSON.stringify(\n      {\n        evidenceId,\n        background: evidence?.background,\n        failedGates: evidence?.quality?.gates?.filter(\n          (entry) => entry.blocking && entry.status === "fail",\n        ),\n        alpha: evidence?.quality?.alpha,\n        fakeTransparency: evidence?.quality?.fakeTransparency,\n        halo: evidence?.quality?.halo,\n        transparentRgb: evidence?.quality?.transparentRgb,\n        blockingProof: evidence?.blockingProof,\n      },\n      null,\n      2,\n    ),\n  );\n}\n\ntest("green matte becomes real alpha and remains finalization-ready", async () => {\n''',
+          )
+          text = candidate.read_text(encoding='utf-8')
+          old = '    assert.equal(result.result.qualityPassed, true);\n'
+          if text.count(old) != 3:
+              raise SystemExit(f'Expected three positive quality assertions; found {text.count(old)}.')
+          candidate.write_text(
+              text.replace(
+                  old,
+                  '    await diagnoseQualityFailure(fx, result);\n    assert.equal(result.result.qualityPassed, true);\n',
+              ),
+              encoding='utf-8',
+          )
+
+          mirror = Path('apps/worker/test/deterministic-mirroring.test.mjs')
+          replace_once(
+              mirror,
+              '''    const familyResult = await familyHandler(\n      context(store, manifest, inputArtifacts, requiredCapabilities),\n    );\n''',
+              '''    let familyResult;\n    try {\n      familyResult = await familyHandler(\n        context(store, manifest, inputArtifacts, requiredCapabilities),\n      );\n    } catch (error) {\n      const evidenceId = error?.details?.evidenceArtifactId;\n      let evidence = null;\n      if (typeof evidenceId === "string") {\n        evidence = JSON.parse((await store.read(evidenceId)).toString("utf8"));\n      }\n      console.error(\n        "MIRROR_FAMILY_DIAGNOSTIC",\n        JSON.stringify(\n          {\n            code: error?.code,\n            message: error?.message,\n            details: error?.details,\n            familyGates: evidence?.familyGates?.filter(\n              (entry) => entry.blocking && entry.status === "fail",\n            ),\n            frames: evidence?.frameEvidence\n              ?.map((frame) => ({\n                frameId: frame.frameId,\n                passed: frame.passed,\n                gates: frame.gates?.filter(\n                  (entry) => entry.blocking && entry.status === "fail",\n                ),\n                layers: frame.layers\n                  ?.map((layer) => ({\n                    layerId: layer.layerId,\n                    gates: layer.gates?.filter(\n                      (entry) => entry.blocking && entry.status === "fail",\n                    ),\n                  }))\n                  .filter((layer) => layer.gates?.length),\n                comparisons: frame.comparisons\n                  ?.map((comparison) => ({\n                    relation: comparison.relation,\n                    referenceFrameId: comparison.referenceFrameId,\n                    gates: comparison.gates?.filter(\n                      (entry) => entry.blocking && entry.status === "fail",\n                    ),\n                  }))\n                  .filter((comparison) => comparison.gates?.length),\n              }))\n              .filter(\n                (frame) =>\n                  !frame.passed ||\n                  frame.gates?.length ||\n                  frame.layers?.length ||\n                  frame.comparisons?.length,\n              ),\n          },\n          null,\n          2,\n        ),\n      );\n      throw error;\n    }\n''',
+          )
+
+          supervisor = Path('apps/worker/test/sprite-supervisor-runtime.test.mjs')
+          replace_once(
+              supervisor,
+              '''async function runUntilSupervisorTerminal(worker, runtime, runId) {\n''',
+              '''function compactJobs(jobs) {\n  return jobs.map((job) => ({\n    id: job.id,\n    kind: job.spec.kind,\n    state: job.state,\n    attempts: job.attempts.length,\n    outputArtifacts: job.outputArtifacts,\n    failure: job.failure,\n    labels: job.spec.labels,\n  }));\n}\n\nasync function diagnoseRuntime(runtime, runId) {\n  const jobs = await runtime.list({ limit: 1000 });\n  console.error(\n    "SPRITE_SUPERVISOR_DIAGNOSTIC",\n    JSON.stringify({ runId, jobs: compactJobs(jobs) }, null, 2),\n  );\n}\n\nasync function runUntilSupervisorTerminal(worker, runtime, runId) {\n''',
+          )
+          replace_once(
+              supervisor,
+              '''    if (terminalResult && !active) return;\n    await delay(275);\n''',
+              '''    if (terminalResult && !active) return;\n    if (roots.length > 0 && !active) {\n      await diagnoseRuntime(runtime, runId);\n      assert.fail(`Supervisor ${runId} stopped without terminal output.`);\n    }\n    await delay(275);\n''',
+          )
+          replace_once(
+              supervisor,
+              '''  assert.fail(`Supervisor ${runId} did not become terminal within the fixture budget.`);\n''',
+              '''  await diagnoseRuntime(runtime, runId);\n  assert.fail(`Supervisor ${runId} did not become terminal within the fixture budget.`);\n''',
+          )
+          replace_once(
+              supervisor,
+              '''async function runUntilState(worker, artifacts, runId, expectedStatus) {\n''',
+              '''async function runUntilState(worker, runtime, artifacts, runId, expectedStatus) {\n''',
+          )
+          replace_once(
+              supervisor,
+              '''    await delay(275);\n  }\n  assert.fail(\n    `Supervisor ${runId} did not reach ${expectedStatus} within the fixture budget.`,\n  );\n}\n''',
+              '''    const roots = await runtime.list({\n      kinds: ["art.sprite-production.supervise"],\n      limit: 100,\n    });\n    const active = roots.some((job) =>\n      ["waiting", "queued", "leased", "running", "retry-wait"].includes(job.state),\n    );\n    if (roots.length > 0 && !active) {\n      await diagnoseRuntime(runtime, runId);\n      assert.fail(`Supervisor ${runId} stopped before reaching ${expectedStatus}.`);\n    }\n    await delay(275);\n  }\n  await diagnoseRuntime(runtime, runId);\n  assert.fail(\n    `Supervisor ${runId} did not reach ${expectedStatus} within the fixture budget.`,\n  );\n}\n''',
+          )
+          replace_once(
+              supervisor,
+              '''      worker,\n      fx.artifacts,\n      runId,\n''',
+              '''      worker,\n      fx.runtime,\n      fx.artifacts,\n      runId,\n''',
+          )
+          PY
+          git diff --check
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -118,38 +178,15 @@ jobs:
       - name: Install review-first dependency graph
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build exact Art Studio domain dependencies
-        run: pnpm run build:domain
-
-      - name: Run complete worker and Book Art provider regressions
-        run: pnpm --filter @evavo/art-studio-worker test
-
-      - name: Commit only the validated repair slice
-        shell: bash
+      - name: Build exact domain and worker source
         run: |
-          set -euo pipefail
-          rm -f pnpm-lock.yaml
-          git diff --check
-          git diff --name-only | sort > "${RUNNER_TEMP}/actual-paths.txt"
-          cat > "${RUNNER_TEMP}/expected-paths.txt" <<'PATHS'
-          apps/worker/src/adaptive-finalizer-guarded-handlers.ts
-          apps/worker/src/adaptive-sprite-family-handlers.ts
-          apps/worker/src/mastering-handlers.ts
-          apps/worker/test/adaptive-finalizer-source-contract.test.mjs
-          apps/worker/test/mastering-worker.test.mjs
-          packages/sprite-supervisor/src/automatic-compiler.ts
-          PATHS
-          sort "${RUNNER_TEMP}/expected-paths.txt" -o "${RUNNER_TEMP}/expected-paths.txt"
-          diff -u "${RUNNER_TEMP}/expected-paths.txt" "${RUNNER_TEMP}/actual-paths.txt"
-          git add \
-            apps/worker/src/adaptive-finalizer-guarded-handlers.ts \
-            apps/worker/src/adaptive-sprite-family-handlers.ts \
-            apps/worker/src/mastering-handlers.ts \
-            apps/worker/test/adaptive-finalizer-source-contract.test.mjs \
-            apps/worker/test/mastering-worker.test.mjs \
-            packages/sprite-supervisor/src/automatic-compiler.ts
-          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -v '^M  ' || true)"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix(runtime): restore strict worker validation'
-          git push origin HEAD:refs/heads/agent/book-art-provider-runtime-20260802
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
+
+      - name: Run evidence-rich targeted diagnostics
+        working-directory: apps/worker
+        run: |
+          node --test \
+            test/candidate-finalization.test.mjs \
+            test/deterministic-mirroring.test.mjs \
+            test/sprite-supervisor-runtime.test.mjs
