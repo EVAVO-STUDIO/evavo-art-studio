@@ -1,0 +1,75 @@
+name: Validate exact final Art Studio candidate 519db57
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Check out exact validation branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: validation/final-art-studio-519db57-20260802
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove direct candidate ancestry and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD^)" == "519db576f11661ead90aef5fd315864d3eb01132" ]]
+          mapfile -t changed < <(git diff --name-only 519db576f11661ead90aef5fd315864d3eb01132..HEAD)
+          [[ "${#changed[@]}" -eq 1 ]]
+          [[ "${changed[0]}" == ".github/workflows/validate-final-art-studio-519db57.yml" ]]
+
+      - name: Install FFmpeg for media-backed tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete repository validation
+        run: pnpm check
+
+      - name: Verify clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Record exact validation summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Exact Art Studio candidate validation'
+            echo
+            echo '- Candidate: `519db576f11661ead90aef5fd315864d3eb01132`'
+            echo '- Node: `22.14.0`'
+            echo '- pnpm: `10.13.1`'
+            echo '- Scope: complete `pnpm check`, all TypeScript checks, package and application tests, production builds, and clean-source verification.'
+          } >> "$GITHUB_STEP_SUMMARY"
