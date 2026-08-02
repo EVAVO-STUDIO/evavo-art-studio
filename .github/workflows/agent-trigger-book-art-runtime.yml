@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
-          [[ "$(git rev-parse HEAD^)" == "447dc9e09744146f25d91f44f11458e906c91a90" ]]
+          [[ "$(git rev-parse HEAD^)" == "5b7d120daae04f920907b8c0a308a0b8fd00a8a4" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
       - name: Reconstruct and apply checksum-bound reviewed patch
@@ -54,7 +54,7 @@ jobs:
           from pathlib import Path
           from urllib.request import Request, urlopen
 
-          expected_sha = '19db27d71db95bbb09ea6655eb496241e8603791177632238ad97fa4e0f0d622'
+          expected_gzip_sha = 'af7438c1f17eeab01ecf3310b2badce4bab2f28e22d0c6e7fcdc8199ee7ad856'
           request = Request(
               f"https://api.github.com/repos/{os.environ['REPOSITORY']}/issues/{os.environ['PR_NUMBER']}/comments?per_page=100",
               headers={
@@ -84,14 +84,17 @@ jobs:
           decoded = base64.b64decode(payload, validate=True)
           if len(decoded) != 10974:
               raise SystemExit(f'Book Art runtime gzip length mismatch: {len(decoded)}.')
-          if hashlib.sha256(decoded).hexdigest() != expected_sha:
+          if hashlib.sha256(decoded).hexdigest() != expected_gzip_sha:
               raise SystemExit('Book Art runtime gzip SHA-256 mismatch.')
           Path(os.environ['RUNNER_TEMP'], 'book-art-runtime.patch.gz').write_bytes(decoded)
           PY
           printf '%s  %s\n' \
-            '19db27d71db95bbb09ea6655eb496241e8603791177632238ad97fa4e0f0d622' \
+            'af7438c1f17eeab01ecf3310b2badce4bab2f28e22d0c6e7fcdc8199ee7ad856' \
             "${RUNNER_TEMP}/book-art-runtime.patch.gz" | sha256sum --check
           gzip --decompress --stdout "${RUNNER_TEMP}/book-art-runtime.patch.gz" > "${RUNNER_TEMP}/book-art-runtime.patch"
+          printf '%s  %s\n' \
+            '19db27d71db95bbb09ea6655eb496241e8603791177632238ad97fa4e0f0d622' \
+            "${RUNNER_TEMP}/book-art-runtime.patch" | sha256sum --check
           git apply --check "${RUNNER_TEMP}/book-art-runtime.patch"
           git apply --index "${RUNNER_TEMP}/book-art-runtime.patch"
           git rm -f \
