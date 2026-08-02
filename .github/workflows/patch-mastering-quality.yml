@@ -1,0 +1,98 @@
+name: Apply exact mastering quality patch
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/fix-art-studio-full-validation-20260802
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "257b28cd1aa1c3db051629edf1676b7aed963c2f" ]]
+
+      - name: Apply reviewed literal replacement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/worker/src/mastering-handlers.ts")
+          source = path.read_text(encoding="utf-8")
+          old = '''  const transparency = mode === "opaque-preserve" ? "opaque" : "alpha-required";
+          return {
+            ...supplied,
+            frameId,
+            transparency,
+            expectedWidth:
+              typeof supplied.expectedWidth === "number" ? supplied.expectedWidth : width,
+            expectedHeight:
+              typeof supplied.expectedHeight === "number" ? supplied.expectedHeight : height,
+            expectedFormat: "png",
+            safePadding:
+              typeof supplied.safePadding === "number"
+                ? supplied.safePadding
+                : transparency === "opaque"
+                  ? 0
+                  : 1,
+            knownMatteColours: [
+              ...(matteColour ? [matteColour] : []),
+              ...existingMattes,
+            ],
+          };
+          '''
+          new = '''  const transparency = mode === "opaque-preserve" ? "opaque" : "alpha-required";
+          const knownMatteColours = [
+            ...(matteColour ? [matteColour] : []),
+            ...existingMattes,
+          ];
+          return {
+            ...supplied,
+            frameId,
+            transparency,
+            expectedWidth:
+              typeof supplied.expectedWidth === "number" ? supplied.expectedWidth : width,
+            expectedHeight:
+              typeof supplied.expectedHeight === "number" ? supplied.expectedHeight : height,
+            expectedFormat: "png",
+            safePadding:
+              typeof supplied.safePadding === "number"
+                ? supplied.safePadding
+                : transparency === "opaque"
+                  ? 0
+                  : 1,
+            ...(knownMatteColours.length ? { knownMatteColours } : {}),
+          };
+          '''
+          if source.count(old) != 1:
+              raise SystemExit(f"expected exactly one mastering quality block, found {source.count(old)}")
+          path.write_text(source.replace(old, new), encoding="utf-8")
+          PY
+          git diff --check
+          git diff -- apps/worker/src/mastering-handlers.ts
+
+      - name: Commit and push exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO validation automation"
+          git config user.email "174633320+EVAVO-STUDIO@users.noreply.github.com"
+          git add apps/worker/src/mastering-handlers.ts
+          git commit -m "fix: omit empty mastering matte expectations"
+          git push origin HEAD:agent/fix-art-studio-full-validation-20260802
