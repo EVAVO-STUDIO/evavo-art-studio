@@ -35,6 +35,20 @@ test("Book Art provider OpenAPI remains host-policy, shadow-only and durable-sub
   );
   assert.ok(requestSchema.includes("additionalProperties: false"));
   assert.ok(!requestSchema.includes("adapterPolicy:"));
+
+  const compilationSchema = source.slice(
+    source.indexOf("BookArtProviderCompilationResult:"),
+    source.indexOf("BookArtProviderSubmissionResult:"),
+  );
+  const submissionSchema = source.slice(
+    source.indexOf("BookArtProviderSubmissionResult:"),
+    source.indexOf("    Error:"),
+  );
+  assert.ok(compilationSchema.includes("status: { enum: [blocked, ready] }"));
+  assert.ok(submissionSchema.includes("status: { enum: [blocked, submitted] }"));
+  assert.ok(!submissionSchema.includes("BookArtProviderCompilationResult"));
+  assert.ok(!submissionSchema.includes("allOf:"));
+
   for (const forbidden of [
     "OPENAI_API_KEY",
     "providerCredential",
