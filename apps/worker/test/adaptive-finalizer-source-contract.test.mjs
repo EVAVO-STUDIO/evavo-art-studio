@@ -33,13 +33,13 @@ test("worker registers adaptive finalization and envelope-backed family verifica
     "createDeterministicMirrorAwareFinalizerHandlers()",
     "createMirroredSpriteFamilyHandlers()",
     "deterministicMirrorAwareFinalizerWorkerCapabilities()",
-    '"media.adaptive-finalize"',
   ]) {
     assert.ok(index.includes(token), `missing worker registration: ${token}`);
   }
   for (const token of [
     "createGuardedAdaptiveFinalizerHandlers",
     "guardedAdaptiveFinalizerWorkerCapabilities",
+    '"media.adaptive-finalize"',
   ]) {
     assert.ok(mirror.includes(token), `missing adaptive wrapper registration: ${token}`);
   }
