@@ -8,6 +8,7 @@ import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
   BOOK_ART_HANDOFF_CONTRACT,
   compileBookArtProductionWorkOrder,
+  fingerprintBookArtBrief,
 } from "@evavo/art-contracts";
 import {
   FixtureImageProviderAdapter,
@@ -31,8 +32,8 @@ import {
 
 const sha = (character) => character.repeat(64);
 
-function brief() {
-  return {
+async function brief() {
+  const value = {
     outputKind: "evavo_book_art_brief",
     schemaVersion: 1,
     contract: BOOK_ART_HANDOFF_CONTRACT,
@@ -78,17 +79,19 @@ function brief() {
     },
     rightsEvidenceIds: ["rights-1"],
     createdAt: "2026-08-02T00:00:00.000Z",
-    briefFingerprint: sha("e"),
+    briefFingerprint: "",
     providerCandidateMayBeFinal: false,
     publicationPerformed: false,
   };
+  value.briefFingerprint = await fingerprintBookArtBrief(value);
+  return value;
 }
 
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-book-art-parity-worker-"));
   const runtime = new LocalRuntimeRepository({ root: path.join(root, "runtime") });
   const artifacts = new LocalArtifactStore({ root: path.join(root, "artifacts") });
-  const workOrder = await compileBookArtProductionWorkOrder(brief());
+  const workOrder = await compileBookArtProductionWorkOrder(await brief());
   assert.equal(workOrder.status, "ready", workOrder.blockers.join("\n"));
   assert.ok(workOrder.workOrder);
   const request = {

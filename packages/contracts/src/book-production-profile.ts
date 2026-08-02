@@ -253,6 +253,14 @@ const FORBIDDEN_AUTHORITY_KEYS = [
   "backcovercopy", "back_cover_copy", "metadata", "keywords", "categories",
 ];
 
+export async function fingerprintBookArtBrief(
+  value: Omit<BookArtBriefV1, "briefFingerprint"> | BookArtBriefV1,
+): Promise<string> {
+  const { briefFingerprint: _discarded, ...unsigned } =
+    value as BookArtBriefV1;
+  return `sha256:${await sha256(canonicalJson(unsigned))}`;
+}
+
 export async function compileBookArtProductionWorkOrder(
   value: unknown,
 ): Promise<BookArtProductionWorkOrderCompilationResultV1> {
@@ -281,6 +289,17 @@ export async function compileBookArtProductionWorkOrder(
     validation = { valid: false, issues: [message(error, "Book Art brief validation failed.")] };
   }
   blockers.push(...validation.issues);
+  if (validation.valid) {
+    const expectedBriefFingerprint = await fingerprintBookArtBrief(brief);
+    if (
+      normalizeSha(brief.briefFingerprint) !==
+      normalizeSha(expectedBriefFingerprint)
+    ) {
+      blockers.push(
+        "Book Art production brief fingerprint differs from its exact canonical contents.",
+      );
+    }
+  }
   validateProfileFields(brief, blockers);
   if (blockers.length) return blockedCompilation(identity, unique(blockers), warnings);
 
@@ -293,7 +312,7 @@ export async function compileBookArtProductionWorkOrder(
     identity: cloneIdentity(brief.identity),
     purpose: brief.purpose,
     assetClass: assetClassFor(brief.purpose),
-    sourceBriefFingerprint: brief.briefFingerprint,
+    sourceBriefFingerprint: normalizeSha(brief.briefFingerprint)!,
     providerRequest,
     technicalRequirements: {
       deliveryWidthPx: brief.output.widthPx,
@@ -515,7 +534,7 @@ function providerRequestFor(brief: BookArtBriefV1): BookArtProviderRequestV1 {
       extractedTextSha256: brief.manuscript.extractedTextSha256,
       visualCanonSha256: brief.manuscript.visualCanonSha256,
       artDirectionSha256: brief.manuscript.artDirectionSha256,
-      sourceBriefFingerprint: brief.briefFingerprint,
+      sourceBriefFingerprint: sourceSha,
       conceptTerritoryId: brief.conceptTerritoryId,
       rightsEvidenceIds: [...brief.rightsEvidenceIds],
       providerCandidateMayBeFinal: false,
