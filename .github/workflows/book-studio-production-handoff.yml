@@ -11,6 +11,7 @@ on:
       - "packages/contracts/src/book-production-legacy-state-import-safe.ts"
       - "packages/contracts/src/book-production-legacy-state-batch.ts"
       - "packages/contracts/src/book-production-legacy-state-batch-safe.ts"
+      - "packages/contracts/src/book-production-promotion-adapter.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-production*.test.mjs"
       - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
@@ -26,6 +27,7 @@ on:
       - "packages/contracts/src/book-production-legacy-state-import-safe.ts"
       - "packages/contracts/src/book-production-legacy-state-batch.ts"
       - "packages/contracts/src/book-production-legacy-state-batch-safe.ts"
+      - "packages/contracts/src/book-production-promotion-adapter.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-production*.test.mjs"
       - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
@@ -73,12 +75,14 @@ jobs:
             packages/contracts/src/book-production-legacy-state-import.ts \
             packages/contracts/src/book-production-legacy-state-import-safe.ts \
             packages/contracts/src/book-production-legacy-state-batch.ts \
-            packages/contracts/src/book-production-legacy-state-batch-safe.ts
+            packages/contracts/src/book-production-legacy-state-batch-safe.ts \
+            packages/contracts/src/book-production-promotion-adapter.ts
           printf '%s\n' \
             'export * from "./book-production.js";' \
             'export * from "./book-production-legacy-compat.js";' \
             'export * from "./book-production-legacy-state-import-safe.js";' \
             'export * from "./book-production-legacy-state-batch-safe.js";' \
+            'export * from "./book-production-promotion-adapter.js";' \
             > packages/contracts/dist/index.js
-      - name: Run Book Art contract, legacy-state and exact batch attacks
+      - name: Run Book Art contract, legacy-state, batch and immutable-promotion attacks
         run: node --test packages/contracts/test/book-production*.test.mjs
