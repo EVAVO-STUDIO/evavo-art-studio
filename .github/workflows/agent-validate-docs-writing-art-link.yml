@@ -54,7 +54,7 @@ jobs:
 
           [[ "$(git hash-object validation/docs-writing-art/src/book-studio-art-brief-exact.ts)" == "f543cdb600edee575c34b7764565b5f3fb617433" ]]
           [[ "$(git hash-object validation/docs-writing-art/src/book-studio-writing-art-link.ts)" == "b8fbf9d8b1197a5bb7f34656a6f43147e66e4583" ]]
-          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-writing-art-release.ts)" == "5b40819b87432675ea6248a11a87e3a18e78cc72" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-writing-art-release.ts)" == "4d86986fee6a3933e5a7123c47a4f504183f18ca" ]]
           [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-types.ts)" == "2b835bc1280e694c45557b73a61c082a301b6528" ]]
           [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-shared.ts)" == "5bbedfeca418fb0b68cca24b437e55ec9026ccf7" ]]
           [[ "$(git hash-object validation/docs-writing-art/src/book-studio-canonical-mutation-change.ts)" == "e294abde42498b035b84c2bec1ca74379c73aea7" ]]
