@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import type {
   LegacyWebsiteBookArtStateImportInputV1,
   LegacyWebsiteBookArtStateImportResultV1,
@@ -62,9 +60,9 @@ const COMMIT_SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^(?:sha256:)?[a-f0-9]{64}$/;
 const MAXIMUM_ITEMS = 10_000;
 
-export function importLegacyWebsiteBookArtStateBatch(
+export async function importLegacyWebsiteBookArtStateBatch(
   input: LegacyWebsiteBookArtBatchInputV1,
-): LegacyWebsiteBookArtBatchResultV1 {
+): Promise<LegacyWebsiteBookArtBatchResultV1> {
   const blockers: string[] = [];
   const warnings: string[] = [];
   const batchId = text(input?.batchId);
@@ -72,9 +70,7 @@ export function importLegacyWebsiteBookArtStateBatch(
   const expectedIds = stringArray(input?.expectedMigrationItemIds).sort();
   const items = Array.isArray(input?.items) ? input.items : [];
 
-  if (input?.outputKind !== "evavo_legacy_website_book_art_batch_input" || input?.schemaVersion !== 1) {
-    blockers.push("Legacy Website Book Art batch kind or version is invalid.");
-  }
+  if (input?.outputKind !== "evavo_legacy_website_book_art_batch_input" || input?.schemaVersion !== 1) blockers.push("Legacy Website Book Art batch kind or version is invalid.");
   if (!isSafeId(batchId)) blockers.push("Legacy Website Book Art batchId is invalid.");
   if (input?.sourceRepository !== "EVAVO-STUDIO/Website") blockers.push("Legacy Website Book Art batch source repository is invalid.");
   if (!COMMIT_SHA.test(sourceCommit)) blockers.push("Legacy Website Book Art batch source commit must be an exact lowercase Git commit SHA.");
@@ -124,15 +120,10 @@ export function importLegacyWebsiteBookArtStateBatch(
       sourceRecordFingerprint: item.sourceRecordFingerprint,
       importResult: importLegacyWebsiteBookArtState(item.input),
     }));
-  for (const result of itemResults) {
-    warnings.push(...result.importResult.warnings.map((warning) => `${result.migrationItemId}: ${warning}`));
-  }
+  for (const result of itemResults) warnings.push(...result.importResult.warnings.map((warning) => `${result.migrationItemId}: ${warning}`));
   const itemBlockers = itemResults.flatMap((result) => result.importResult.blockers.map((blocker) => `${result.migrationItemId}: ${blocker}`));
-  const status: LegacyWebsiteBookArtBatchResultV1["status"] = itemBlockers.length
-    ? "needs_resolution"
-    : "ready_for_promotion_review";
   return seal({
-    status,
+    status: itemBlockers.length ? "needs_resolution" : "ready_for_promotion_review",
     batchId,
     sourceCommit,
     expectedIds,
@@ -146,7 +137,7 @@ export function importLegacyWebsiteBookArtStateBatch(
   });
 }
 
-function seal(input: {
+async function seal(input: {
   status: LegacyWebsiteBookArtBatchResultV1["status"];
   batchId: string;
   sourceCommit: string;
@@ -158,7 +149,7 @@ function seal(input: {
   itemResults: LegacyWebsiteBookArtBatchItemResultV1[];
   blockers: string[];
   warnings: string[];
-}): LegacyWebsiteBookArtBatchResultV1 {
+}): Promise<LegacyWebsiteBookArtBatchResultV1> {
   const itemResults = [...input.itemResults].sort((a, b) => a.migrationItemId.localeCompare(b.migrationItemId));
   const withoutFingerprint: Omit<LegacyWebsiteBookArtBatchResultV1, "batchFingerprint"> = {
     outputKind: "evavo_legacy_website_book_art_batch_result",
@@ -187,15 +178,10 @@ function seal(input: {
     artifactBytesRewritten: false,
     publicationPerformed: false,
   };
-  return {
-    ...withoutFingerprint,
-    batchFingerprint: sha256(canonicalJson(withoutFingerprint)),
-  };
+  return { ...withoutFingerprint, batchFingerprint: await sha256(canonicalJson(withoutFingerprint)) };
 }
 
-function canonicalJson(value: unknown): string {
-  return JSON.stringify(canonical(value));
-}
+function canonicalJson(value: unknown): string { return JSON.stringify(canonical(value)); }
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {
@@ -206,13 +192,13 @@ function canonical(value: unknown): unknown {
   }
   return value;
 }
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
+async function sha256(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 function text(value: unknown): string { return typeof value === "string" ? value : ""; }
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
+function stringArray(value: unknown): string[] { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
 function unique(values: string[]): string[] { return [...new Set(values.map((item) => item.trim()).filter(Boolean))]; }
 function duplicates(values: string[]): string[] {
   const seen = new Set<string>();
