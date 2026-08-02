@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
   BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
   BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
@@ -8,11 +9,13 @@ import {
   submitBookArtProviderShadowJob,
   type BookArtProviderAdapterPolicyV1,
 } from "@evavo/art-book-runtime";
+import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 
 export interface BookArtCommandValues {
   readonly input?: string;
   readonly "runtime-root"?: string;
+  readonly "artifact-root"?: string;
   readonly actor?: string;
 }
 
@@ -24,6 +27,7 @@ const COMMANDS = new Set([
   "book-art-provider-protocol",
   "book-art-provider-compile",
   "book-art-provider-submit",
+  "book-art-provider-inspect",
 ]);
 
 function envCsv(name: string): string[] {
@@ -70,6 +74,14 @@ function runtimeRoot(values: BookArtCommandValues): string {
   );
 }
 
+function artifactRoot(values: BookArtCommandValues): string {
+  return path.resolve(
+    values["artifact-root"] ??
+      process.env.EVAVO_ART_ARTIFACT_ROOT ??
+      ".art-studio/artifacts",
+  );
+}
+
 function actor(values: BookArtCommandValues): string {
   return (
     values.actor?.trim() ||
@@ -113,6 +125,8 @@ function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
     providerFallbackAllowed: false,
     compilePerformsProviderCall: false,
     submitPerformsProviderCall: false,
+    inspectPerformsProviderCall: false,
+    inspectionWritesArtifacts: false,
     candidateApprovalState: "unapproved",
     candidateStorageClass: "intermediate",
     selectionPerformed: false,
@@ -141,12 +155,25 @@ export async function handleBookArtCommand(
     required(values.input, "--input"),
     policy,
   );
+  const compilation = await compileBookArtProviderShadowJob(input);
   if (command === "book-art-provider-compile") {
-    const result = await compileBookArtProviderShadowJob(input);
+    return {
+      handled: true,
+      value: compilation,
+      ...(compilation.status === "ready" ? {} : { exitCode: 2 }),
+    };
+  }
+  if (command === "book-art-provider-inspect") {
+    const result = await inspectBookArtProviderShadowJob(compilation, {
+      runtime: new LocalRuntimeRepository({ root: runtimeRoot(values) }),
+      artifacts: new LocalArtifactStore({ root: artifactRoot(values) }),
+    });
     return {
       handled: true,
       value: result,
-      ...(result.status === "ready" ? {} : { exitCode: 2 }),
+      ...(result.status === "blocked" || result.status === "failed"
+        ? { exitCode: 3 }
+        : {}),
     };
   }
 
