@@ -1,0 +1,111 @@
+name: Agent Fix Sprite Supervisor Strictness
+
+on:
+  pull_request:
+    branches: [main]
+    types: [reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-fix-sprite-supervisor-strictness-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    if: >-
+      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/book-art-provider-runtime-20260802'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Verify exact repair boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
+          [[ "$(git rev-parse HEAD^)" == "cfc79f44353cc04bc5a356043b06a3ae7c0570b1" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          test "$(git diff --name-only HEAD^ HEAD)" = ".github/workflows/agent-fix-sprite-supervisor-strictness.yml"
+
+      - name: Apply exact strict-TypeScript repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('packages/sprite-supervisor/src/automatic-compiler.ts')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  '''  const keys = group.filter((entry) => entry.keyPose);\n  return {\n    previous: [...keys]\n      .reverse()\n      .find((entry) => entry.frameIndex < frame.frameIndex),\n    next: keys.find((entry) => entry.frameIndex > frame.frameIndex),\n  };\n''',
+                  '''  const keys = group.filter((entry) => entry.keyPose);\n  const previous = [...keys]\n    .reverse()\n    .find((entry) => entry.frameIndex < frame.frameIndex);\n  const next = keys.find((entry) => entry.frameIndex > frame.frameIndex);\n  return {\n    ...(previous === undefined ? {} : { previous }),\n    ...(next === undefined ? {} : { next }),\n  };\n''',
+              ),
+              (
+                  '''        phase: identityUnit.phase,\n        frame,\n        clip: identityUnit.clip,\n        direction: frame.direction,\n''',
+                  '''        phase: identityUnit.phase,\n        frame,\n        ...(identityUnit.clip === undefined ? {} : { clip: identityUnit.clip }),\n        direction: frame.direction,\n''',
+              ),
+              (
+                  '''  const includedRoles = layerDecisions.map((entry) => entry.role);\n''',
+                  '''  const includedRoles = new Set<string>(\n    layerDecisions.map((entry) => entry.role),\n  );\n''',
+              ),
+              (
+                  '''        (unit) => unit.frameId === frame.id && includedRoles.includes(unit.layerRole),\n''',
+                  '''        (unit) => unit.frameId === frame.id && includedRoles.has(unit.layerRole),\n''',
+              ),
+          ]
+
+          for before, after in replacements:
+              if text.count(before) != 1:
+                  raise SystemExit('Expected strictness repair source block exactly once.')
+              text = text.replace(before, after, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+          git diff --check
+          test "$(git diff --name-only)" = "packages/sprite-supervisor/src/automatic-compiler.ts"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build exact Art Studio domain dependencies
+        run: pnpm run build:domain
+
+      - name: Run worker and Book Art provider runtime regressions
+        run: pnpm --filter @evavo/art-studio-worker test
+
+      - name: Commit source-only repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --check
+          test "$(git diff --name-only)" = "packages/sprite-supervisor/src/automatic-compiler.ts"
+          test "$(git status --porcelain=v1 --untracked-files=all)" = " M packages/sprite-supervisor/src/automatic-compiler.ts"
+          git add packages/sprite-supervisor/src/automatic-compiler.ts
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(sprite-supervisor): satisfy strict optional layer typing'
+          git push origin HEAD:refs/heads/agent/book-art-provider-runtime-20260802
