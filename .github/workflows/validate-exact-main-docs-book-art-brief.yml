@@ -1,0 +1,199 @@
+name: Validate exact Docs Book Art receiver main e9e96fd
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-exact-docs-book-art-receiver-main-e9e96fd
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      EXPECTED_MAIN_SHA: e9e96fd54a9e9d9c16bbd8faa2231caebb840c45
+      VALIDATION_WORKFLOW: .github/workflows/validate-exact-main-docs-book-art-brief.yml
+      DOCS_SUITE_MAIN_SHA: 966e240f03a0912a0ff0c0c890bf0fe0e9a6dd77
+    steps:
+      - name: Check out exact validation branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: validation/exact-main-docs-book-art-brief-e9e96fd-20260803
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact current-main ancestry and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD^)" == "${EXPECTED_MAIN_SHA}" ]]
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_MAIN_SHA}" HEAD)
+          [[ "${#changed[@]}" -eq 1 ]]
+          [[ "${changed[0]}" == "${VALIDATION_WORKFLOW}" ]]
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${EXPECTED_MAIN_SHA}" ]]
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Verify exact Docs Book Art receiver source boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const profilePath = "packages/contracts/src/book-production-profile.ts";
+          const profile = fs.readFileSync(profilePath, "utf8");
+          for (const token of [
+            "export async function fingerprintBookArtBrief",
+            "Omit<BookArtBriefV1, \"briefFingerprint\"> | BookArtBriefV1",
+            "Book Art production brief fingerprint differs from its exact canonical contents.",
+            "sourceBriefFingerprint: normalizeSha(brief.briefFingerprint)!",
+            "sourceBriefFingerprint: sourceSha",
+          ]) {
+            if (!profile.includes(token)) {
+              throw new Error(`Exact Book Art receiver is missing: ${token}`);
+            }
+          }
+
+          const roots = ["packages", "apps"];
+          const testFiles = [];
+          const walk = (directory) => {
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const candidate = path.join(directory, entry.name);
+              if (entry.isDirectory()) walk(candidate);
+              else if (entry.isFile() && candidate.endsWith(".test.mjs")) testFiles.push(candidate);
+            }
+          };
+          for (const root of roots) walk(root);
+
+          const staleFixtures = [];
+          for (const file of testFiles) {
+            const source = fs.readFileSync(file, "utf8");
+            if (
+              source.includes("compileBookArtProductionWorkOrder") &&
+              source.includes('briefFingerprint: sha("e")')
+            ) {
+              staleFixtures.push(file);
+            }
+          }
+          if (staleFixtures.length) {
+            throw new Error(`Unsealed Book Art fixtures remain:\n${staleFixtures.join("\n")}`);
+          }
+
+          const runtimeTest = fs.readFileSync(
+            "packages/book-art-runtime/test/runtime.test.mjs",
+            "utf8",
+          );
+          for (const token of [
+            process.env.DOCS_SUITE_MAIN_SHA,
+            "docs-writing-art-link-evidence",
+            "docs-website-mutation-receipt-evidence",
+            "rejects a tampered final Docs Suite brief before work-order or provider-job compilation",
+          ]) {
+            if (!runtimeTest.includes(token)) {
+              throw new Error(`Exact Docs-to-Art runtime regression is missing: ${token}`);
+            }
+          }
+          NODE
+
+      - name: Verify Book Art runtime, inspection and structural parity authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-book-art-provider-runtime.mjs
+          node scripts/check-book-art-provider-inspection.mjs
+          node scripts/check-book-art-provider-parity.mjs
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete repository validation
+        run: pnpm check
+
+      - name: Remove generated lockfile and verify clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_MAIN_SHA}" HEAD)
+          [[ "${#changed[@]}" -eq 1 ]]
+          [[ "${changed[0]}" == "${VALIDATION_WORKFLOW}" ]]
+
+      - name: Re-prove exact current main and write bounded receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${EXPECTED_MAIN_SHA}" ]]
+          node --input-type=module - <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const receipt = {
+            schemaVersion: "1.0",
+            repository: "EVAVO-STUDIO/evavo-art-studio",
+            validatedMainSha: process.env.EXPECTED_MAIN_SHA,
+            docsSuiteMainSha: process.env.DOCS_SUITE_MAIN_SHA,
+            validation: "passed",
+            node: "22.14.0",
+            pnpm: "10.13.1",
+            ffmpegAvailable: true,
+            ffprobeAvailable: true,
+            exactBookArtBriefFingerprintVerified: true,
+            postSealMutationRejected: true,
+            providerRuntimeAuthorityPassed: true,
+            immutableInspectionAuthorityPassed: true,
+            structuralParityAuthorityPassed: true,
+            completeRepositoryCheckPassed: true,
+            cleanSourcePassed: true,
+            providerCallPerformed: false,
+            runtimeSubmissionPerformed: false,
+            artifactWritePerformed: false,
+            selectionPerformed: false,
+            promotionPerformed: false,
+            bookUseBindingCreated: false,
+            runtimeCutoverApproved: false,
+            publicationPerformed: false
+          };
+          fs.writeFileSync(
+            path.join(process.env.RUNNER_TEMP, "docs-book-art-receiver-main-receipt.json"),
+            `${JSON.stringify(receipt, null, 2)}\n`,
+            "utf8",
+          );
+          NODE
+
+      - name: Upload exact-main validation receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: docs-book-art-receiver-main-e9e96fd-receipt
+          path: ${{ runner.temp }}/docs-book-art-receiver-main-receipt.json
+          if-no-files-found: error
+          retention-days: 14
