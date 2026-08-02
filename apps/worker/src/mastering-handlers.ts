@@ -445,6 +445,10 @@ function qualityExpectations(
     ? supplied.knownMatteColours
     : [];
   const transparency = mode === "opaque-preserve" ? "opaque" : "alpha-required";
+  const knownMatteColours = [
+    ...(matteColour ? [matteColour] : []),
+    ...existingMattes,
+  ];
   return {
     ...supplied,
     frameId,
@@ -460,10 +464,7 @@ function qualityExpectations(
         : transparency === "opaque"
           ? 0
           : 1,
-    knownMatteColours: [
-      ...(matteColour ? [matteColour] : []),
-      ...existingMattes,
-    ],
+    ...(knownMatteColours.length ? { knownMatteColours } : {}),
   };
 }
 
