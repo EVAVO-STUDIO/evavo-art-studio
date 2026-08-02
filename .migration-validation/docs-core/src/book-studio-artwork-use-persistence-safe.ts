@@ -141,7 +141,7 @@ export async function persistBookArtworkUseBatch(input: Readonly<{
     expectations,
     persistedStates: storeResult.persistedStates,
     conflicts: [],
-    receipt: storeResult.receipt,
+    ...(storeResult.receipt === undefined ? {} : { receipt: storeResult.receipt }),
     shadowStoreWritesPerformed: storeResult.status === "committed",
   });
 }
@@ -552,8 +552,8 @@ function requireText(value: unknown, label: string, maximum: number): string {
   return value;
 }
 function duplicateValues(values: string[]): string[] {
-  const seen = new Set();
-  const duplicated = new Set();
+  const seen = new Set<string>();
+  const duplicated = new Set<string>();
   for (const value of values) seen.has(value) ? duplicated.add(value) : seen.add(value);
   return [...duplicated].sort();
 }

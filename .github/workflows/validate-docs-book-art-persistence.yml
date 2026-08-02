@@ -49,7 +49,7 @@ jobs:
           test "$(git hash-object .migration-validation/docs-core/src/book-studio-legacy-art-use-batch.ts)" = "63072c770981f9e002a056dcea89975f86b2c85c"
           test "$(git hash-object .migration-validation/docs-core/src/book-studio-art-promotion-join.ts)" = "6f9155e4eb0402c97f11936b4934ee53829b4a0f"
           test "$(git hash-object .migration-validation/docs-core/src/book-studio-artwork-use-persistence.ts)" = "9ca45e68af0aa1b5841826701c43384309df83b7"
-          test "$(git hash-object .migration-validation/docs-core/src/book-studio-artwork-use-persistence-safe.ts)" = "69cca0a49844de0851aac02b6269ebe65c8c2099"
+          test "$(git hash-object .migration-validation/docs-core/src/book-studio-artwork-use-persistence-safe.ts)" = "953ca78abbbf5e574aa7b9353fe295e133ef5dad"
           test "$(git hash-object .migration-validation/docs-core/src/index.ts)" = "25ba433079297485b950941d106655899087b36b"
           test "$(git hash-object .migration-validation/docs-core/test/book-studio-art-promotion-join.test.mjs)" = "2706e423f163303db99d88bfbad6774a521fec8c"
           test "$(git hash-object .migration-validation/docs-core/test/book-studio-artwork-use-persistence.test.mjs)" = "79c54f8fd7b672b5ddf59a641240fca3c84d5c6b"
