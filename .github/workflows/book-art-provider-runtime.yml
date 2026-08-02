@@ -8,6 +8,7 @@ on:
       - "package.json"
       - "packages/book-art-runtime/**"
       - "packages/book-art-runtime/src/index.ts"
+      - "packages/book-art-runtime/src/inspection.ts"
       - "packages/book-art-runtime/test/runtime.test.mjs"
       - "apps/worker/package.json"
       - "apps/worker/tsconfig.json"
@@ -15,18 +16,21 @@ on:
       - "apps/worker/src/index.ts"
       - "apps/worker/src/provider-handlers.ts"
       - "apps/worker/test/book-art-provider-jobs.test.mjs"
+      - "apps/worker/test/book-art-provider-inspection.test.mjs"
       - "apps/api/package.json"
       - "apps/api/tsconfig.json"
       - "apps/api/src/book-art-api.ts"
       - "apps/api/src/index.ts"
       - "apps/api/openapi.book-art-provider.yaml"
       - "apps/api/test/book-art-api.test.mjs"
+      - "apps/api/test/book-art-api-inspection.test.mjs"
       - "apps/api/test/book-art-openapi-contract.test.mjs"
       - "apps/cli/package.json"
       - "apps/cli/tsconfig.json"
       - "apps/cli/src/book-art-commands.ts"
       - "apps/cli/src/index.ts"
       - "apps/cli/test/book-art-cli.test.mjs"
+      - "apps/cli/test/book-art-cli-inspection.test.mjs"
       - "apps/mcp/package.json"
       - "apps/mcp/tsconfig.json"
       - "apps/mcp/src/book-art-tools.ts"
@@ -45,6 +49,7 @@ on:
       - "docs/book-art-provider-runtime.md"
       - "docs/book-studio-production-handoff.md"
       - "scripts/check-book-art-provider-runtime.mjs"
+      - "scripts/check-book-art-provider-inspection.mjs"
   pull_request:
     branches: [main]
     paths:
@@ -52,6 +57,7 @@ on:
       - "package.json"
       - "packages/book-art-runtime/**"
       - "packages/book-art-runtime/src/index.ts"
+      - "packages/book-art-runtime/src/inspection.ts"
       - "packages/book-art-runtime/test/runtime.test.mjs"
       - "apps/worker/package.json"
       - "apps/worker/tsconfig.json"
@@ -59,18 +65,21 @@ on:
       - "apps/worker/src/index.ts"
       - "apps/worker/src/provider-handlers.ts"
       - "apps/worker/test/book-art-provider-jobs.test.mjs"
+      - "apps/worker/test/book-art-provider-inspection.test.mjs"
       - "apps/api/package.json"
       - "apps/api/tsconfig.json"
       - "apps/api/src/book-art-api.ts"
       - "apps/api/src/index.ts"
       - "apps/api/openapi.book-art-provider.yaml"
       - "apps/api/test/book-art-api.test.mjs"
+      - "apps/api/test/book-art-api-inspection.test.mjs"
       - "apps/api/test/book-art-openapi-contract.test.mjs"
       - "apps/cli/package.json"
       - "apps/cli/tsconfig.json"
       - "apps/cli/src/book-art-commands.ts"
       - "apps/cli/src/index.ts"
       - "apps/cli/test/book-art-cli.test.mjs"
+      - "apps/cli/test/book-art-cli-inspection.test.mjs"
       - "apps/mcp/package.json"
       - "apps/mcp/tsconfig.json"
       - "apps/mcp/src/book-art-tools.ts"
@@ -89,6 +98,7 @@ on:
       - "docs/book-art-provider-runtime.md"
       - "docs/book-studio-production-handoff.md"
       - "scripts/check-book-art-provider-runtime.mjs"
+      - "scripts/check-book-art-provider-inspection.mjs"
   workflow_dispatch:
 
 permissions:
@@ -101,7 +111,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Check out exact source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -130,7 +140,9 @@ jobs:
           ffprobe -version | head -1
 
       - name: Verify Book Art provider runtime authority and surface parity
-        run: node scripts/check-book-art-provider-runtime.mjs
+        run: |
+          node scripts/check-book-art-provider-runtime.mjs
+          node scripts/check-book-art-provider-inspection.mjs
 
       - name: Install review-first dependency graph
         run: pnpm install --no-frozen-lockfile
@@ -141,7 +153,7 @@ jobs:
       - name: Run shared Book Art runtime regressions
         run: pnpm --filter @evavo/art-book-runtime test
 
-      - name: Run worker and provider execution regressions
+      - name: Run worker provider execution and inspection regressions
         run: pnpm --filter @evavo/art-studio-worker test
 
       - name: Run Book Art REST regressions
@@ -152,6 +164,9 @@ jobs:
 
       - name: Run Book Art MCP contract regressions
         run: pnpm --filter @evavo/art-studio-mcp test
+
+      - name: Run complete repository validation
+        run: pnpm check
 
       - name: Remove generated lockfile and verify clean tracked source
         if: always()
