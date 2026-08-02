@@ -7,6 +7,7 @@
   },
   "references": [
     { "path": "../../packages/artifacts" },
+    { "path": "../../packages/book-art-runtime" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
     { "path": "../../packages/art-direction" },
