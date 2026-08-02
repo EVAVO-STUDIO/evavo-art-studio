@@ -13,7 +13,7 @@ export function automaticSpriteWorkflowProtocolSummary() {
       "Automatic release requires direction masters, every key pose and every runtime frame; partial frame families use a separate planning workflow.",
       "Layer frames use the selected current body frame as base-image while retaining distinct previous and next key-pose controls for in-betweens.",
       "Every provider task produces exactly one candidate; ranking compares two to eight independently retained candidates.",
-      "Provider source canvases are mastered and deterministically resized to the exact sprite dimensions before selection.",
+      "Every provider source canvas receives deterministic target-size mastering to the exact sprite dimensions before selection.",
       "Planner-approved derived directions use an exact full-canvas RGBA reflection only after the source master is selected.",
       "Every selected or deterministically derived master retains immutable proof before complete family verification.",
       "Every selected frame and retained visible layer is reconstructed and verified as one complete family before release evidence.",

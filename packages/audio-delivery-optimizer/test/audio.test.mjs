@@ -19,8 +19,20 @@ function run(command, args) {
     encoding: "buffer",
     maxBuffer: 64 * 1024 * 1024,
   });
-  assert.equal(result.status, 0, String(result.stderr));
-  return Buffer.from(result.stdout);
+  if (result.error || result.signal || result.status !== 0) {
+    const detail = [
+      result.error?.message,
+      result.signal ? `signal=${result.signal}` : null,
+      result.status === null ? "status=null" : `status=${result.status}`,
+      result.stderr?.toString("utf8"),
+      result.stdout?.toString("utf8"),
+    ]
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, 8_000);
+    assert.fail(`${command} ${args.join(" ")} failed:\n${detail || "no process diagnostics"}`);
+  }
+  return Buffer.from(result.stdout ?? Buffer.alloc(0));
 }
 
 function sourceWav({ duration = 1, leading = 0, trailing = 0, frequency = 440, channels = 2, sampleRate = 48000 } = {}) {

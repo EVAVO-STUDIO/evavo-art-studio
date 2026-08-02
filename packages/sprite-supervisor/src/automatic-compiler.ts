@@ -287,11 +287,13 @@ function previousAndNextKeyPoses(
   group: readonly SpritePlannedFrame[],
 ): Readonly<{ previous?: SpritePlannedFrame; next?: SpritePlannedFrame }> {
   const keys = group.filter((entry) => entry.keyPose);
+  const previous = [...keys]
+    .reverse()
+    .find((entry) => entry.frameIndex < frame.frameIndex);
+  const next = keys.find((entry) => entry.frameIndex > frame.frameIndex);
   return {
-    previous: [...keys]
-      .reverse()
-      .find((entry) => entry.frameIndex < frame.frameIndex),
-    next: keys.find((entry) => entry.frameIndex > frame.frameIndex),
+    ...(previous === undefined ? {} : { previous }),
+    ...(next === undefined ? {} : { next }),
   };
 }
 
@@ -439,7 +441,7 @@ function createUnitDrafts(
         kind: "layer",
         phase: identityUnit.phase,
         frame,
-        clip: identityUnit.clip,
+        ...(identityUnit.clip === undefined ? {} : { clip: identityUnit.clip }),
         direction: frame.direction,
         layerRole: decision.role,
         selectionReferenceRole: layerReferenceRole,
@@ -1019,7 +1021,9 @@ function familyManifest(
   layerDecisions: readonly CompiledArtLayerDecision[],
   units: readonly AutomaticSpriteProductionUnit[],
 ): JsonValue {
-  const includedRoles = layerDecisions.map((entry) => entry.role);
+  const includedRoles = new Set<string>(
+    layerDecisions.map((entry) => entry.role),
+  );
   const definitions = [...layerDecisions]
     .sort((left, right) => left.zOrder - right.zOrder || left.role.localeCompare(right.role))
     .map((decision, index, sorted) => ({
@@ -1045,7 +1049,7 @@ function familyManifest(
     .filter((frame) => frame.authored)
     .map((frame) => {
       const frameUnits = units.filter(
-        (unit) => unit.frameId === frame.id && includedRoles.includes(unit.layerRole),
+        (unit) => unit.frameId === frame.id && includedRoles.has(unit.layerRole),
       );
       return {
         id: frame.id,
