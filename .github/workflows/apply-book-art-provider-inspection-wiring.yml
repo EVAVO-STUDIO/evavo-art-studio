@@ -1,0 +1,110 @@
+name: Apply exact Book Art inspection wiring
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact inspection candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/book-art-provider-inspection-20260802
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact candidate head
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "4fefb9df55dcbb8060c7662d92bd44476cac9816" ]]
+
+      - name: Apply three bounded integration edits
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str, label: str) -> None:
+              target = Path(path)
+              source = target.read_text(encoding="utf-8")
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one exact block, found {count}")
+              target.write_text(source.replace(old, new), encoding="utf-8")
+
+          replace_once(
+              "apps/api/src/index.ts",
+              """          maximumBodyBytes,
+                    runtime,
+                    adapterPolicy: bookArtProviderAdapterPolicy,
+          """,
+              """          maximumBodyBytes,
+                    runtime,
+                    artifacts,
+                    adapterPolicy: bookArtProviderAdapterPolicy,
+          """,
+              "API artifact-store injection",
+          )
+
+          replace_once(
+              "apps/cli/src/index.ts",
+              """  evavo-art book-art-provider-submit --input book-art-shadow-request.json [--runtime-root .art-studio/runtime] [--actor cli] [--output submitted-book-art-job.json]
+          """,
+              """  evavo-art book-art-provider-submit --input book-art-shadow-request.json [--runtime-root .art-studio/runtime] [--actor cli] [--output submitted-book-art-job.json]
+            evavo-art book-art-provider-inspect --input book-art-shadow-request.json [--runtime-root .art-studio/runtime] [--artifact-root .art-studio/artifacts] [--output inspected-book-art-job.json]
+          """,
+              "CLI inspection help",
+          )
+
+          replace_once(
+              "apps/cli/src/index.ts",
+              """Book Art provider commands require EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS; the input may not supply adapterPolicy. Compilation and submission perform no provider call, and submission remains one-attempt and duplicate-safe.
+          """,
+              """Book Art provider commands require EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS; the input may not supply adapterPolicy. Compilation, submission and inspection perform no provider call. Submission remains one-attempt and duplicate-safe, while inspection verifies the exact runtime and immutable artifact evidence without writing.
+          """,
+              "CLI inspection authority copy",
+          )
+
+          replace_once(
+              "scripts/check-book-art-provider-runtime.mjs",
+              """    \"LocalArtifactStore\",
+          """,
+              "",
+              "allow read-only local artifact inspection",
+          )
+          PY
+
+          git diff --check
+          node scripts/check-book-art-provider-runtime.mjs
+          node scripts/check-book-art-provider-inspection.mjs
+
+      - name: Verify exact changed-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git diff --name-only)
+          [[ "${#changed[@]}" -eq 3 ]]
+          printf '%s\n' "${changed[@]}" | grep -Fx 'apps/api/src/index.ts'
+          printf '%s\n' "${changed[@]}" | grep -Fx 'apps/cli/src/index.ts'
+          printf '%s\n' "${changed[@]}" | grep -Fx 'scripts/check-book-art-provider-runtime.mjs'
+
+      - name: Commit and push exact integration wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO validation automation"
+          git config user.email "174633320+EVAVO-STUDIO@users.noreply.github.com"
+          git add \
+            apps/api/src/index.ts \
+            apps/cli/src/index.ts \
+            scripts/check-book-art-provider-runtime.mjs
+          git commit -m "feat(book-art): wire inspection across hosts"
+          git push origin HEAD:agent/book-art-provider-inspection-20260802
