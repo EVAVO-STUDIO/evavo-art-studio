@@ -1,15 +1,16 @@
 name: Agent Validate Docs Writing Art Link
 
 on:
-  push:
-    branches:
-      - agent/validate-docs-link-20260803
   pull_request:
     branches:
       - main
 
 permissions:
   contents: read
+
+concurrency:
+  group: agent-validate-docs-writing-art-link-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -20,79 +21,46 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Check out disposable validator
+      - name: Check out exact disposable validation head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Fetch exact private Docs Suite branch archive
+      - name: Prove validation scope and exact mirrored production blobs
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          url="https://api.github.com/repos/EVAVO-STUDIO/evavo-docs-suite/tarball/agent/writing-art-link-20260802"
-          status="$(curl --silent --show-error --location \
-            --output "${RUNNER_TEMP}/docs-suite.tar.gz" \
-            --write-out '%{http_code}' \
-            -H 'Accept: application/vnd.github+json' \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "${url}")"
-          echo "GitHub archive HTTP status: ${status}"
-          [[ "${status}" == "200" ]]
-          mkdir -p "${RUNNER_TEMP}/docs-suite"
-          tar -xzf "${RUNNER_TEMP}/docs-suite.tar.gz" \
-            -C "${RUNNER_TEMP}/docs-suite" --strip-components=1
-          test -f "${RUNNER_TEMP}/docs-suite/packages/core/src/book-studio-writing-art-release.ts"
-          echo "DOCS_SUITE_DIR=${RUNNER_TEMP}/docs-suite" >> "${GITHUB_ENV}"
+          [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          unexpected="$(git diff --name-only "${BASE_SHA}"...HEAD | grep -Ev '^(.github/workflows/agent-validate-docs-writing-art-link.yml|validation/docs-writing-art/)' || true)"
+          [[ -z "${unexpected}" ]] || {
+            echo "Disposable validator changed production paths:" >&2
+            printf '%s\n' "${unexpected}" >&2
+            exit 1
+          }
+
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-art-brief-exact.ts)" == "f543cdb600edee575c34b7764565b5f3fb617433" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-website-manuscript-cas.ts)" == "de78a790ba9e72912f4cd50a66718fcd30fe6ace" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-writing-art-link.ts)" == "6639d954077307d95417ee2930cfaf823a3f3c14" ]]
+          [[ "$(git hash-object validation/docs-writing-art/src/book-studio-writing-art-release.ts)" == "6bff651fc25d0221c824be8c332c993999f937e5" ]]
 
       - name: Use Docs Suite Node.js runtime
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version-file: ${{ env.DOCS_SUITE_DIR }}/.nvmrc
+          node-version: 22.14.0
           package-manager-cache: false
 
-      - name: Verify exact Docs Suite integration source
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "${DOCS_SUITE_DIR}"
-          node scripts/check-book-studio-writing-art-link.mjs
-          npm exec --yes --package=typescript@5.9.3 -- tsc \
-            --noEmit \
-            --target ES2022 \
-            --lib ES2022,DOM,DOM.Iterable \
-            --module ESNext \
-            --moduleResolution Bundler \
-            --strict \
-            --noUncheckedIndexedAccess \
-            --exactOptionalPropertyTypes \
-            --skipLibCheck \
-            packages/core/src/book-studio-project-contracts.ts \
-            packages/core/src/book-studio-manuscript-contracts.ts \
-            packages/core/src/book-studio-art-contracts.ts \
-            packages/core/src/book-studio-art-brief-exact.ts \
-            packages/core/src/book-studio-authoring-types.ts \
-            packages/core/src/book-studio-authoring-shared.ts \
-            packages/core/src/book-studio-authoring-packet.ts \
-            packages/core/src/book-studio-authoring-result-parse.ts \
-            packages/core/src/book-studio-authoring-result-validation.ts \
-            packages/core/src/book-studio-authoring-admission.ts \
-            packages/core/src/book-studio-writing-handoff-types.ts \
-            packages/core/src/book-studio-writing-handoff-shared.ts \
-            packages/core/src/book-studio-writing-handoff-request.ts \
-            packages/core/src/book-studio-writing-handoff-response.ts \
-            packages/core/src/book-studio-website-manuscript-cas.ts \
-            packages/core/src/book-studio-writing-art-link.ts \
-            packages/core/src/book-studio-writing-art-release.ts
-          npm exec --yes --package=tsx@4.20.3 -- tsx --test \
-            packages/core/test/book-studio-website-manuscript-cas.test.mjs \
-            packages/core/test/book-studio-writing-art-link.test.mjs
+      - name: Strictly compile mirrored production modules
+        run: npm exec --yes --package=typescript@5.9.3 -- tsc -p validation/docs-writing-art/tsconfig.json
 
-      - name: Verify disposable validator did not modify Art Studio
+      - name: Run mirrored cross-repository adversarial harness
+        run: npm exec --yes --package=tsx@4.20.3 -- tsx --test validation/docs-writing-art/test.mjs
+
+      - name: Verify disposable validation left source clean
         if: always()
         shell: bash
         run: |
