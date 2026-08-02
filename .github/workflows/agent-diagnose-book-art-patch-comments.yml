@@ -1,0 +1,84 @@
+name: Agent Diagnose Book Art Patch Comments
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  diagnose:
+    if: >-
+      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'automation/diagnose-book-art-patch-comments-20260802'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Diagnose exact server-side comment hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_PR: '66'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from urllib.request import Request, urlopen
+
+          expected = {
+              1: ('3500', '382f58adca8699308999a8e4b7be4f3fb72b37beed51969c4e268613e7bf3e76'),
+              2: ('3500', 'de030df46347c6c6fef32cb82fed8ac7ddd830c70d72620ddc7c2782f1a3230e'),
+              3: ('3500', '103dedb1e3495a46a0e7cb65f656d97242da7fd3205d0aa650317950ba4dbfb2'),
+              4: ('3500', '2aca7b2918fbaeb1e47d51b7b96c6fa6ecd3368cc548db60d681dc129f0291ca'),
+              5: ('3500', 'e7a02406a709a2c3b633224fde7ede429a9751f8c7fbb6b66661623bfc0eeac8'),
+              6: ('3500', 'ba361121ee3194cb9d68424b3a6fbd57c16598d17a2cd249a9c0c72d49b5251d'),
+              7: ('3500', '554fb5e139cd13154c527123f9fab30e8b2b69862bbf146f2775568d3c0379d1'),
+              8: ('3500', '0a848ac16550415b40947deea0b5fc37be5f576e13204d96eaccbb44714d10b0'),
+              9: ('352', '7667985fce389934c8a0a0320cd8342970082e48723dd70f67f2adc89029dc4b'),
+          }
+          request = Request(
+              f"https://api.github.com/repos/{os.environ['REPOSITORY']}/issues/{os.environ['SOURCE_PR']}/comments?per_page=100",
+              headers={
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'X-GitHub-Api-Version': '2022-11-28',
+              },
+          )
+          with urlopen(request, timeout=30) as response:
+              comments = json.load(response)
+
+          mismatch = False
+          aggregate = []
+          for part in range(1, 10):
+              marker = f'BOOK_ART_CLEAN_PATCH_PART_{part}_OF_9\n'
+              matches = [
+                  comment.get('body', '')[len(marker):].strip()
+                  for comment in comments
+                  if comment.get('body', '').startswith(marker)
+              ]
+              if len(matches) != 1:
+                  print(f'part={part} count={len(matches)} MISMATCH')
+                  mismatch = True
+                  continue
+              payload = matches[0]
+              digest = hashlib.sha256(payload.encode()).hexdigest()
+              expected_length, expected_digest = expected[part]
+              ok = len(payload) == int(expected_length) and digest == expected_digest
+              print(
+                  f'part={part} length={len(payload)} expected_length={expected_length} '
+                  f'sha256={digest} expected_sha256={expected_digest} ok={str(ok).lower()}'
+              )
+              mismatch |= not ok
+              aggregate.append(payload)
+          joined = ''.join(aggregate)
+          print(f'aggregate_base64_length={len(joined)}')
+          print(f'aggregate_text_sha256={hashlib.sha256(joined.encode()).hexdigest()}')
+          raise SystemExit(1 if mismatch else 0)
+          PY
