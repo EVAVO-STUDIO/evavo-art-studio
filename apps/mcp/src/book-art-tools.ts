@@ -9,6 +9,7 @@ import {
   type BookArtProviderAdapterPolicyV1,
 } from "@evavo/art-book-runtime";
 import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
+import { compareBookArtProviderShadowParity } from "@evavo/art-book-runtime/parity";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
@@ -120,6 +121,10 @@ function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
     submitPerformsProviderCall: false,
     inspectPerformsProviderCall: false,
     inspectionWritesArtifacts: false,
+    parityPerformsProviderCall: false,
+    parityWritesArtifacts: false,
+    visualSimilarityEvaluated: false,
+    cutoverEligible: false,
     candidateApprovalState: "unapproved",
     candidateStorageClass: "intermediate",
     selectionPerformed: false,
@@ -143,7 +148,7 @@ function requiredPolicy(): BookArtProviderAdapterPolicyV1 {
 function requireOperationalAccess(): void {
   if (!writesEnabled()) {
     throw new Error(
-      "Book Art runtime submission and inspection require EVAVO_ART_ALLOW_WRITES=true on the trusted MCP host.",
+      "Book Art runtime submission, inspection and parity require EVAVO_ART_ALLOW_WRITES=true on the trusted MCP host.",
     );
   }
 }
@@ -153,7 +158,7 @@ export function registerBookArtTools(server: McpServer): void {
     "book_art_provider_runtime_protocol",
     {
       description:
-        "Report the shadow-only Book Art provider runtime contract, host policy readiness and non-authority guarantees without compiling, submitting or inspecting work.",
+        "Report the shadow-only Book Art provider runtime contract, host policy readiness and non-authority guarantees without compiling, submitting, inspecting or comparing work.",
       inputSchema: z.object({}),
     },
     async () => textResult(protocol(providerPolicy())),
@@ -228,6 +233,38 @@ export function registerBookArtTools(server: McpServer): void {
         );
       } catch (error: unknown) {
         return toolError("BOOK_ART_PROVIDER_INSPECTION_REJECTED", error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compare_book_art_provider_shadow_parity",
+    {
+      description:
+        "Compare one independently fingerprinted Website Book Art provider observation with the exact Art Studio request, runtime job and immutable inspection receipt. This is structural parity only: it compares no pixels, approves no artwork, writes nothing and cannot approve cutover or Website source deletion.",
+      inputSchema: z.object({
+        request: z.unknown(),
+        websiteObservation: z.unknown(),
+      }),
+    },
+    async ({ request, websiteObservation }) => {
+      try {
+        requireOperationalAccess();
+        const compilation = await compileBookArtProviderShadowJob(
+          configuredInput(request, requiredPolicy()),
+        );
+        return textResult(
+          await compareBookArtProviderShadowParity(
+            compilation,
+            websiteObservation,
+            {
+              runtime: new LocalRuntimeRepository({ root: runtimeRoot() }),
+              artifacts: new LocalArtifactStore({ root: artifactRoot() }),
+            },
+          ),
+        );
+      } catch (error: unknown) {
+        return toolError("BOOK_ART_PROVIDER_PARITY_REJECTED", error);
       }
     },
   );
