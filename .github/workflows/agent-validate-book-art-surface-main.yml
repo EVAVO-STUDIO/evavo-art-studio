@@ -1,0 +1,105 @@
+name: Agent Validate Exact Book Art Surface Main
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-validate-book-art-surface-main-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-exact-main:
+    if: >-
+      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'automation/validate-book-art-surface-main-2f804d8-20260802'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EXPECTED_MAIN_SHA: 2f804d8ec4bd3067d72f114a4d4ed8242c3fa585
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Check out exact validation head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Prove disposable workflow-only boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ github.event.pull_request.head.sha }}" ]]
+          [[ "$(git rev-parse HEAD^)" == "${EXPECTED_MAIN_SHA}" ]]
+          test "$(git diff --name-only HEAD^ HEAD)" = ".github/workflows/agent-validate-book-art-surface-main.yml"
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Switch to exact production main commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "${EXPECTED_MAIN_SHA}"
+          git clean -ffd
+          [[ "$(git rev-parse HEAD)" == "${EXPECTED_MAIN_SHA}" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          echo "EXPECTED_TREE_SHA=$(git rev-parse 'HEAD^{tree}')" >> "${GITHUB_ENV}"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Verify repository and Book Art authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+          node scripts/check-book-art-provider-runtime.mjs
+          node scripts/check-book-studio-production-handoff.mjs
+          node scripts/check-book-illustration-plan-parity.mjs
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Re-prove exact clean production tree
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          [[ "$(git rev-parse HEAD)" == "${EXPECTED_MAIN_SHA}" ]]
+          [[ "$(git rev-parse 'HEAD^{tree}')" == "${EXPECTED_TREE_SHA}" ]]
+
+      - name: Reconfirm main was not superseded
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse FETCH_HEAD)" == "${EXPECTED_MAIN_SHA}" ]]
