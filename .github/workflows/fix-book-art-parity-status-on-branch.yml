@@ -37,6 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
+          import re
           from pathlib import Path
 
           def replace_once(path: Path, old: str, new: str, label: str) -> None:
@@ -46,21 +47,27 @@ jobs:
                   raise SystemExit(f"{label}: expected one block, found {count}")
               path.write_text(source.replace(old, new), encoding="utf-8")
 
+          def replace_regex_once(
+              path: Path,
+              pattern: str,
+              replacement: str,
+              label: str,
+          ) -> None:
+              source = path.read_text(encoding="utf-8")
+              updated, count = re.subn(pattern, replacement, source, count=1)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one block, found {count}")
+              path.write_text(updated, encoding="utf-8")
+
           parity = Path("packages/book-art-runtime/src/parity.ts")
-          replace_once(
+          replace_regex_once(
               parity,
-              '''  const status: BookArtProviderShadowParityStatus = incomplete
-            ? "incomplete"
-            : mismatches.length
-              ? "mismatched"
-              : "matched";
-          ''',
+              r'''  const status: BookArtProviderShadowParityStatus = incomplete\n\s+\? "incomplete"\n\s+: mismatches\.length\n\s+\? "mismatched"\n\s+: "matched";''',
               '''  const status: BookArtProviderShadowParityStatus = mismatches.length
             ? "mismatched"
             : incomplete
               ? "incomplete"
-              : "matched";
-          ''',
+              : "matched";''',
               "parity mismatch precedence",
           )
 
