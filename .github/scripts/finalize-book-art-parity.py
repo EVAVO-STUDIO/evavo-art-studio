@@ -1,0 +1,274 @@
+from pathlib import Path
+
+
+def replace_once(path: Path, old: str, new: str, label: str) -> None:
+    source = path.read_text(encoding="utf-8")
+    count = source.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected exactly one source block, found {count}")
+    path.write_text(source.replace(old, new), encoding="utf-8")
+
+
+def replace_count(
+    path: Path,
+    old: str,
+    new: str,
+    expected: int,
+    label: str,
+) -> None:
+    source = path.read_text(encoding="utf-8")
+    count = source.count(old)
+    if count != expected:
+        raise SystemExit(f"{label}: expected {expected} source blocks, found {count}")
+    path.write_text(source.replace(old, new), encoding="utf-8")
+
+
+cli_index = Path("apps/cli/src/index.ts")
+replace_once(
+    cli_index,
+    "  evavo-art book-art-provider-inspect --input book-art-shadow-request.json [--runtime-root .art-studio/runtime] [--artifact-root .art-studio/artifacts] [--output inspected-book-art-job.json]\n",
+    "  evavo-art book-art-provider-inspect --input book-art-shadow-request.json [--runtime-root .art-studio/runtime] [--artifact-root .art-studio/artifacts] [--output inspected-book-art-job.json]\n  evavo-art book-art-provider-parity --input book-art-parity.json [--runtime-root .art-studio/runtime] [--artifact-root .art-studio/artifacts] [--output book-art-parity-result.json]\n",
+    "CLI parity help command",
+)
+replace_once(
+    cli_index,
+    "Book Art provider commands require EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS; the input may not supply adapterPolicy. Compilation, submission and inspection perform no provider call. Submission remains one-attempt and duplicate-safe, while inspection verifies the exact runtime and immutable artifact evidence without writing.\n",
+    "Book Art provider commands require EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS; the input may not supply adapterPolicy. Compilation, submission, inspection and structural parity perform no provider call. Submission remains one-attempt and duplicate-safe. Inspection verifies immutable runtime evidence, while parity compares a fingerprinted Website observation without comparing pixels, writing artifacts or approving cutover.\n",
+    "CLI parity authority explanation",
+)
+
+docs = Path("docs/book-art-provider-runtime.md")
+replace_once(
+    docs,
+    "This slice does not make Art Studio the active Book Studio runtime. It adds a shadow-only path that can compile, submit, execute and inspect exactly one provider candidate without granting that candidate any final or publication authority.",
+    "This slice does not make Art Studio the active Book Studio runtime. It adds a shadow-only path that can compile, submit, execute, inspect and compare the structure of exactly one provider candidate without granting that candidate any final, cutover or publication authority.",
+    "docs purpose parity",
+)
+replace_once(
+    docs,
+    "The reusable compiler, durable-submission boundary and immutable inspection verifier live in `packages/book-art-runtime` as `@evavo/art-book-runtime`.",
+    "The reusable compiler, durable-submission boundary, immutable inspection verifier and structural Website parity comparator live in `packages/book-art-runtime` as `@evavo/art-book-runtime`.",
+    "docs shared parity ownership",
+)
+replace_once(
+    docs,
+    "The package owns deterministic compilation, durable submission and read-only verification.",
+    "The package owns deterministic compilation, durable submission, read-only verification and read-only structural parity comparison.",
+    "docs package parity ownership",
+)
+replace_once(
+    docs,
+    "## Compile, submit, execute, inspect\n\nThe boundary is deliberately split into four stages.",
+    "## Compile, submit, execute, inspect, compare\n\nThe boundary is deliberately split into five stages.",
+    "docs five stages",
+)
+parity_section = '''### Compare structural Website parity
+
+`compareBookArtProviderShadowParity()` accepts the exact Art Studio compilation plus one independently fingerprinted Website observation. The Website evidence uses:
+
+```text
+evavo_website_book_art_provider_shadow_observation
+```
+
+It binds the Website source commit, Book identity, execution ID, source-brief fingerprint, work-order fingerprint, normalized provider-request fingerprint, outcome, one-attempt/no-fallback boundary, adapter and model, failure classification and unapproved-candidate state. The observation fingerprint must match its complete canonical contents before comparison begins.
+
+The comparator reuses immutable Art Studio inspection and reports:
+
+```text
+blocked
+incomplete
+matched
+mismatched
+```
+
+A deterministic `parityFingerprintSha256` binds the Website summary, Art Studio summary, field-level comparison, blockers, mismatches and warnings. A `matched` result means the request, execution and authority structure agrees. It does not mean that two provider images have identical bytes or visual appearance.
+
+Structural shadow parity does not compare candidate pixels or prove visual similarity. Provider outputs may be stochastic, so candidate bytes are not expected to be equal. The operation writes no runtime job or artifact and cannot approve artwork, selection, promotion, Book use, runtime cutover, source deletion or publication.
+
+```text
+parityReadOnly: true
+providerCallPerformedByParity: false
+artifactWritesPerformedByParity: false
+visualSimilarityEvaluated: false
+candidateBytesExpectedEqual: false
+observationPeriodSatisfied: false
+cutoverEligible: false
+websiteRuntimeStillActive: true
+websiteSourceDeletionAllowed: false
+runtimeCutoverApproved: false
+publicationPerformed: false
+```
+
+A matched receipt is one bounded piece of migration evidence. It does not satisfy the observation period, production-provider smoke test, visual/technical comparison, rollback drill or deletion-manifest gates.
+
+'''
+replace_once(
+    docs,
+    "## REST, CLI and MCP parity\n",
+    parity_section + "## REST, CLI and MCP parity\n",
+    "docs structural parity section",
+)
+replace_once(
+    docs,
+    "POST /v1/book-art/provider-jobs/inspect\n```",
+    "POST /v1/book-art/provider-jobs/inspect\nPOST /v1/book-art/provider-jobs/parity\n```",
+    "docs REST parity route",
+)
+replace_once(
+    docs,
+    "Inspection requires both the runtime repository and immutable artifact store. A successful submission returns `201` whether it created the deterministic job or idempotently reused it; neither submission nor inspection calls a provider.",
+    "Inspection and parity require both the runtime repository and immutable artifact store. Parity accepts exactly `request` plus a fingerprinted `websiteObservation`; a structural mismatch returns `409`. A successful submission returns `201` whether it created the deterministic job or idempotently reused it. Submission, inspection and parity do not call a provider.",
+    "docs REST parity behavior",
+)
+replace_once(
+    docs,
+    "evavo-art book-art-provider-inspect --input request.json --runtime-root .art-studio/runtime --artifact-root .art-studio/artifacts\n```",
+    "evavo-art book-art-provider-inspect --input request.json --runtime-root .art-studio/runtime --artifact-root .art-studio/artifacts\nevavo-art book-art-provider-parity --input parity.json --runtime-root .art-studio/runtime --artifact-root .art-studio/artifacts\n```",
+    "docs CLI parity command",
+)
+replace_once(
+    docs,
+    "Inspection reports `not-submitted` and `pending` without failing the command; a blocked or terminally failed receipt exits non-zero for automation.",
+    "Inspection reports `not-submitted` and `pending` without failing the command; a blocked or terminally failed receipt exits non-zero. Parity consumes an envelope containing `request` and `websiteObservation`; blocked or mismatched evidence exits non-zero, while matched or incomplete structural evidence remains machine-readable.",
+    "docs CLI parity behavior",
+)
+replace_once(
+    docs,
+    "inspect_book_art_provider_shadow_job\n```",
+    "inspect_book_art_provider_shadow_job\ncompare_book_art_provider_shadow_parity\n```",
+    "docs MCP parity tool",
+)
+replace_once(
+    docs,
+    "Inspection reads the configured runtime and artifact roots and cannot instantiate a provider registry, write artifact bytes, update an approved reference or promote artwork.",
+    "Inspection and parity read the configured runtime and artifact roots and cannot instantiate a provider registry, write artifact bytes, update an approved reference or promote artwork. Parity additionally refuses to claim visual similarity, cutover eligibility or permission to delete Website source.",
+    "docs MCP parity authority",
+)
+replace_once(
+    docs,
+    "8. tampered approval claims fail closed.",
+    "8. tampered approval claims fail closed;\n9. a fingerprinted Website observation matches only when request, outcome, one-attempt policy, adapter/model and candidate authority agree;\n10. a model or request mismatch remains explicit and cutover-ineligible.",
+    "docs parity regressions",
+)
+replace_once(
+    docs,
+    "Compilation, submission, execution and inspection preserve these boundaries:",
+    "Compilation, submission, execution, inspection and structural parity preserve these boundaries:",
+    "docs parity non-authority",
+)
+replace_once(
+    docs,
+    "- verifies the static authority and REST, CLI and MCP surface-parity boundary;",
+    "- verifies the static runtime, inspection and structural Website parity authority boundaries across REST, CLI and MCP;",
+    "docs parity checker validation",
+)
+replace_once(
+    docs,
+    "- runs the shared runtime, worker execution and inspection, REST, CLI and MCP regression suites;",
+    "- runs the shared runtime, worker execution/inspection/parity, REST, CLI, MCP and OpenAPI regression suites;",
+    "docs parity validation suites",
+)
+replace_once(
+    docs,
+    "- authenticated Website-to-Art-Studio shadow requests and success/failure parity evidence using the typed inspection receipt;",
+    "- a sustained batch of authenticated Website-to-Art-Studio shadow requests with matched success/failure structural parity receipts;",
+    "docs remaining parity gate",
+)
+
+openapi = Path("apps/api/openapi.book-art-provider.yaml")
+replace_once(openapi, "  version: 0.2.0\n", "  version: 0.3.0\n", "OpenAPI version")
+replace_once(
+    openapi,
+    "    Shadow-only Book Art provider job compilation, durable submission and\n    immutable inspection.",
+    "    Shadow-only Book Art provider job compilation, durable submission,\n    immutable inspection and structural Website parity.",
+    "OpenAPI parity description",
+)
+replace_once(
+    openapi,
+    "        - inspectionWritesArtifacts\n        - candidateApprovalState",
+    "        - inspectionWritesArtifacts\n        - parityPerformsProviderCall\n        - parityWritesArtifacts\n        - visualSimilarityEvaluated\n        - cutoverEligible\n        - candidateApprovalState",
+    "OpenAPI parity required fields",
+)
+replace_once(
+    openapi,
+    "        inspectionWritesArtifacts: { const: false }\n        candidateApprovalState:",
+    "        inspectionWritesArtifacts: { const: false }\n        parityPerformsProviderCall: { const: false }\n        parityWritesArtifacts: { const: false }\n        visualSimilarityEvaluated: { const: false }\n        cutoverEligible: { const: false }\n        candidateApprovalState:",
+    "OpenAPI parity protocol fields",
+)
+
+openapi_test = Path("apps/api/test/book-art-openapi-contract.test.mjs")
+replace_once(
+    openapi_test,
+    '    "inspectionWritesArtifacts: { const: false }",\n    "inspectionReadOnly: { const: true }",',
+    '    "inspectionWritesArtifacts: { const: false }",\n    "parityPerformsProviderCall: { const: false }",\n    "parityWritesArtifacts: { const: false }",\n    "visualSimilarityEvaluated: { const: false }",\n    "cutoverEligible: { const: false }",\n    "inspectionReadOnly: { const: true }",',
+    "OpenAPI test parity invariants",
+)
+replace_once(
+    openapi_test,
+    '    "candidateArtifactsWrittenByInspection: { const: true }",\n    "selectionPerformed: { const: true }",',
+    '    "candidateArtifactsWrittenByInspection: { const: true }",\n    "parityPerformsProviderCall: { const: true }",\n    "parityWritesArtifacts: { const: true }",\n    "visualSimilarityEvaluated: { const: true }",\n    "cutoverEligible: { const: true }",\n    "selectionPerformed: { const: true }",',
+    "OpenAPI test parity forbidden authority",
+)
+
+workflow = Path(".github/workflows/book-art-provider-runtime.yml")
+replace_count(
+    workflow,
+    '      - "packages/book-art-runtime/src/inspection.ts"\n      - "packages/book-art-runtime/test/runtime.test.mjs"',
+    '      - "packages/book-art-runtime/src/inspection.ts"\n      - "packages/book-art-runtime/src/parity.ts"\n      - "packages/book-art-runtime/test/runtime.test.mjs"\n      - "packages/book-art-runtime/test/parity.test.mjs"',
+    2,
+    "workflow shared parity paths",
+)
+replace_count(
+    workflow,
+    '      - "apps/worker/test/book-art-provider-inspection.test.mjs"\n      - "apps/api/package.json"',
+    '      - "apps/worker/test/book-art-provider-inspection.test.mjs"\n      - "apps/worker/test/book-art-provider-parity.test.mjs"\n      - "apps/api/package.json"',
+    2,
+    "workflow worker parity paths",
+)
+replace_count(
+    workflow,
+    '      - "apps/api/openapi.book-art-provider.yaml"\n      - "apps/api/test/book-art-api.test.mjs"',
+    '      - "apps/api/openapi.book-art-provider.yaml"\n      - "apps/api/openapi.book-art-provider-parity.yaml"\n      - "apps/api/test/book-art-api.test.mjs"',
+    2,
+    "workflow parity OpenAPI paths",
+)
+replace_count(
+    workflow,
+    '      - "apps/api/test/book-art-api-inspection.test.mjs"\n      - "apps/api/test/book-art-openapi-contract.test.mjs"',
+    '      - "apps/api/test/book-art-api-inspection.test.mjs"\n      - "apps/api/test/book-art-api-parity.test.mjs"\n      - "apps/api/test/book-art-openapi-contract.test.mjs"\n      - "apps/api/test/book-art-parity-openapi-contract.test.mjs"',
+    2,
+    "workflow REST parity test paths",
+)
+replace_count(
+    workflow,
+    '      - "apps/cli/test/book-art-cli-inspection.test.mjs"\n      - "apps/mcp/package.json"',
+    '      - "apps/cli/test/book-art-cli-inspection.test.mjs"\n      - "apps/cli/test/book-art-cli-parity.test.mjs"\n      - "apps/mcp/package.json"',
+    2,
+    "workflow CLI parity paths",
+)
+replace_count(
+    workflow,
+    '      - "apps/mcp/test/book-art-tools-contract.test.mjs"\n      - "packages/contracts/src/book-production.ts"',
+    '      - "apps/mcp/test/book-art-tools-contract.test.mjs"\n      - "apps/mcp/test/book-art-parity-contract.test.mjs"\n      - "packages/contracts/src/book-production.ts"',
+    2,
+    "workflow MCP parity paths",
+)
+replace_count(
+    workflow,
+    '      - "scripts/check-book-art-provider-inspection.mjs"\n',
+    '      - "scripts/check-book-art-provider-inspection.mjs"\n      - "scripts/check-book-art-provider-parity.mjs"\n',
+    2,
+    "workflow parity checker paths",
+)
+replace_once(
+    workflow,
+    "          node scripts/check-book-art-provider-inspection.mjs\n",
+    "          node scripts/check-book-art-provider-inspection.mjs\n          node scripts/check-book-art-provider-parity.mjs\n",
+    "workflow parity checker command",
+)
+replace_once(
+    workflow,
+    "      - name: Run worker provider execution and inspection regressions\n",
+    "      - name: Run worker provider execution, inspection and parity regressions\n",
+    "workflow worker parity label",
+)
