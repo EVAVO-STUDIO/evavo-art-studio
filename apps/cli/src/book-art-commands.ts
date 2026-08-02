@@ -10,6 +10,7 @@ import {
   type BookArtProviderAdapterPolicyV1,
 } from "@evavo/art-book-runtime";
 import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
+import { compareBookArtProviderShadowParity } from "@evavo/art-book-runtime/parity";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 
 export interface BookArtCommandValues {
@@ -28,7 +29,9 @@ const COMMANDS = new Set([
   "book-art-provider-compile",
   "book-art-provider-submit",
   "book-art-provider-inspect",
+  "book-art-provider-parity",
 ]);
+const PARITY_FIELDS = new Set(["request", "websiteObservation"]);
 
 function envCsv(name: string): string[] {
   return [
@@ -90,23 +93,68 @@ function actor(values: BookArtCommandValues): string {
   );
 }
 
-async function configuredInput(
+async function readInputObject(
   filePath: string,
-  adapterPolicy: BookArtProviderAdapterPolicyV1,
+  label: string,
 ): Promise<Record<string, unknown>> {
   const value = JSON.parse(
     await readFile(path.resolve(filePath), "utf8"),
   ) as unknown;
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Book Art provider input must be a JSON object.");
+    throw new Error(`${label} must be a JSON object.`);
   }
-  const input = value as Record<string, unknown>;
+  return value as Record<string, unknown>;
+}
+
+function configuredInputValue(
+  input: Record<string, unknown>,
+  adapterPolicy: BookArtProviderAdapterPolicyV1,
+): Record<string, unknown> {
   if (Object.hasOwn(input, "adapterPolicy")) {
     throw new Error(
       "Book Art provider input must not contain adapterPolicy; configure EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS on the host.",
     );
   }
   return { ...input, adapterPolicy };
+}
+
+async function configuredInput(
+  filePath: string,
+  adapterPolicy: BookArtProviderAdapterPolicyV1,
+): Promise<Record<string, unknown>> {
+  return configuredInputValue(
+    await readInputObject(filePath, "Book Art provider input"),
+    adapterPolicy,
+  );
+}
+
+async function configuredParityInput(
+  filePath: string,
+  adapterPolicy: BookArtProviderAdapterPolicyV1,
+): Promise<Readonly<{
+  request: Record<string, unknown>;
+  websiteObservation: unknown;
+}>> {
+  const envelope = await readInputObject(filePath, "Book Art provider parity input");
+  if (
+    Object.keys(envelope).some((key) => !PARITY_FIELDS.has(key)) ||
+    !Object.hasOwn(envelope, "request") ||
+    !Object.hasOwn(envelope, "websiteObservation") ||
+    !envelope.request ||
+    typeof envelope.request !== "object" ||
+    Array.isArray(envelope.request)
+  ) {
+    throw new Error(
+      "Book Art provider parity input must contain exactly request and websiteObservation objects.",
+    );
+  }
+  return {
+    request: configuredInputValue(
+      envelope.request as Record<string, unknown>,
+      adapterPolicy,
+    ),
+    websiteObservation: envelope.websiteObservation,
+  };
 }
 
 function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
@@ -127,6 +175,10 @@ function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
     submitPerformsProviderCall: false,
     inspectPerformsProviderCall: false,
     inspectionWritesArtifacts: false,
+    parityPerformsProviderCall: false,
+    parityWritesArtifacts: false,
+    visualSimilarityEvaluated: false,
+    cutoverEligible: false,
     candidateApprovalState: "unapproved",
     candidateStorageClass: "intermediate",
     selectionPerformed: false,
@@ -151,10 +203,28 @@ export async function handleBookArtCommand(
       "EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS must configure at least one allowed adapter.",
     );
   }
-  const input = await configuredInput(
-    required(values.input, "--input"),
-    policy,
-  );
+  const inputPath = required(values.input, "--input");
+  if (command === "book-art-provider-parity") {
+    const envelope = await configuredParityInput(inputPath, policy);
+    const compilation = await compileBookArtProviderShadowJob(envelope.request);
+    const result = await compareBookArtProviderShadowParity(
+      compilation,
+      envelope.websiteObservation,
+      {
+        runtime: new LocalRuntimeRepository({ root: runtimeRoot(values) }),
+        artifacts: new LocalArtifactStore({ root: artifactRoot(values) }),
+      },
+    );
+    return {
+      handled: true,
+      value: result,
+      ...(result.status === "blocked" || result.status === "mismatched"
+        ? { exitCode: 3 }
+        : {}),
+    };
+  }
+
+  const input = await configuredInput(inputPath, policy);
   const compilation = await compileBookArtProviderShadowJob(input);
   if (command === "book-art-provider-compile") {
     return {

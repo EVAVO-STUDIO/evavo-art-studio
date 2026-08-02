@@ -6,17 +6,17 @@ The Book Art provider runtime is the next controlled migration step between the 
 
 Art Studio owns provider execution, candidate provenance, immutable candidate and evidence storage, technical mastering, comparison, selection evidence and later promotion. Docs Suite remains authoritative for manuscript and visual canon, cover and interior composition, editable typography, illustration placement, ISBN and barcode data, edition geometry, proofing and publication. Website remains the active compatibility runtime while shadow parity, storage registration, rollback and cutover evidence are incomplete.
 
-This slice does not make Art Studio the active Book Studio runtime. It adds a shadow-only path that can compile, submit, execute and inspect exactly one provider candidate without granting that candidate any final or publication authority.
+This slice does not make Art Studio the active Book Studio runtime. It adds a shadow-only path that can compile, submit, execute, inspect and compare the structure of exactly one provider candidate without granting that candidate any final, cutover or publication authority.
 
 ## Shared runtime ownership
 
-The reusable compiler, durable-submission boundary and immutable inspection verifier live in `packages/book-art-runtime` as `@evavo/art-book-runtime`. The worker retains a compatibility re-export only; it no longer owns a second compiler or submission implementation. REST, CLI, MCP and worker tests use the same package contracts, so provider request normalization, fingerprinting, one-attempt policy, idempotency and inspection rules cannot silently diverge.
+The reusable compiler, durable-submission boundary, immutable inspection verifier and structural Website parity comparator live in `packages/book-art-runtime` as `@evavo/art-book-runtime`. The worker retains a compatibility re-export only; it no longer owns a second compiler or submission implementation. REST, CLI, MCP and worker tests use the same package contracts, so provider request normalization, fingerprinting, one-attempt policy, idempotency and inspection rules cannot silently diverge.
 
-The package owns deterministic compilation, durable submission and read-only verification. It does not create a provider registry, read provider credentials, call a provider, write candidate bytes during compilation or inspection, select artwork, promote a master, bind artwork into a book or publish an edition.
+The package owns deterministic compilation, durable submission, read-only verification and read-only structural parity comparison. It does not create a provider registry, read provider credentials, call a provider, write candidate bytes during compilation or inspection, select artwork, promote a master, bind artwork into a book or publish an edition.
 
-## Compile, submit, execute, inspect
+## Compile, submit, execute, inspect, compare
 
-The boundary is deliberately split into four stages.
+The boundary is deliberately split into five stages.
 
 ### Compile
 
@@ -118,6 +118,45 @@ publicationPerformed: false
 
 Descriptor claims are never trusted by themselves. The verifier checks the immutable descriptor, content hash, evidence JSON, normalized provider-request hash and source-artifact binding. A descriptor wrapper that falsely changes the candidate from `unapproved` to `selected` is blocked by regression coverage.
 
+### Compare structural Website parity
+
+`compareBookArtProviderShadowParity()` accepts the exact Art Studio compilation plus one independently fingerprinted Website observation. The Website evidence uses:
+
+```text
+evavo_website_book_art_provider_shadow_observation
+```
+
+It binds the Website source commit, Book identity, execution ID, source-brief fingerprint, work-order fingerprint, normalized provider-request fingerprint, outcome, one-attempt/no-fallback boundary, adapter and model, failure classification and unapproved-candidate state. The observation fingerprint must match its complete canonical contents before comparison begins.
+
+The comparator reuses immutable Art Studio inspection and reports:
+
+```text
+blocked
+incomplete
+matched
+mismatched
+```
+
+A deterministic `parityFingerprintSha256` binds the Website summary, Art Studio summary, field-level comparison, blockers, mismatches and warnings. A `matched` result means the request, execution and authority structure agrees. It does not mean that two provider images have identical bytes or visual appearance.
+
+Structural shadow parity does not compare candidate pixels or prove visual similarity. Provider outputs may be stochastic, so candidate bytes are not expected to be equal. The operation writes no runtime job or artifact and cannot approve artwork, selection, promotion, Book use, runtime cutover, source deletion or publication.
+
+```text
+parityReadOnly: true
+providerCallPerformedByParity: false
+artifactWritesPerformedByParity: false
+visualSimilarityEvaluated: false
+candidateBytesExpectedEqual: false
+observationPeriodSatisfied: false
+cutoverEligible: false
+websiteRuntimeStillActive: true
+websiteSourceDeletionAllowed: false
+runtimeCutoverApproved: false
+publicationPerformed: false
+```
+
+A matched receipt is one bounded piece of migration evidence. It does not satisfy the observation period, production-provider smoke test, visual/technical comparison, rollback drill or deletion-manifest gates.
+
 ## REST, CLI and MCP parity
 
 All operator surfaces call `@evavo/art-book-runtime` directly. Inspection requires trusted access to the runtime journal and immutable artifact store, but remains read-only.
@@ -131,9 +170,10 @@ GET  /v1/book-art/provider-runtime
 POST /v1/book-art/provider-jobs/compile
 POST /v1/book-art/provider-jobs/submit
 POST /v1/book-art/provider-jobs/inspect
+POST /v1/book-art/provider-jobs/parity
 ```
 
-The API host injects its adapter policy. Callers may not send `adapterPolicy` or provider credentials. Compilation is public and read-only. Submission and inspection require the existing Art Studio operational enablement and control token. Submission additionally requires a durable runtime repository. Inspection requires both the runtime repository and immutable artifact store. A successful submission returns `201` whether it created the deterministic job or idempotently reused it; neither submission nor inspection calls a provider.
+The API host injects its adapter policy. Callers may not send `adapterPolicy` or provider credentials. Compilation is public and read-only. Submission and inspection require the existing Art Studio operational enablement and control token. Submission additionally requires a durable runtime repository. Inspection and parity require both the runtime repository and immutable artifact store. Parity accepts exactly `request` plus a fingerprinted `websiteObservation`; a structural mismatch returns `409`. A successful submission returns `201` whether it created the deterministic job or idempotently reused it. Submission, inspection and parity do not call a provider.
 
 ### CLI
 
@@ -144,9 +184,10 @@ evavo-art book-art-provider-protocol
 evavo-art book-art-provider-compile --input request.json
 evavo-art book-art-provider-submit --input request.json --runtime-root .art-studio/runtime
 evavo-art book-art-provider-inspect --input request.json --runtime-root .art-studio/runtime --artifact-root .art-studio/artifacts
+evavo-art book-art-provider-parity --input parity.json --runtime-root .art-studio/runtime --artifact-root .art-studio/artifacts
 ```
 
-The CLI receives provider policy only from the host environment. The input file contains the execution identity and exact work order but no policy or credentials. Inspection reports `not-submitted` and `pending` without failing the command; a blocked or terminally failed receipt exits non-zero for automation.
+The CLI receives provider policy only from the host environment. The input file contains the execution identity and exact work order but no policy or credentials. Inspection reports `not-submitted` and `pending` without failing the command; a blocked or terminally failed receipt exits non-zero. Parity consumes an envelope containing `request` and `websiteObservation`; blocked or mismatched evidence exits non-zero, while matched or incomplete structural evidence remains machine-readable.
 
 ### MCP
 
@@ -157,9 +198,10 @@ book_art_provider_runtime_protocol
 compile_book_art_provider_shadow_job
 submit_book_art_provider_shadow_job
 inspect_book_art_provider_shadow_job
+compare_book_art_provider_shadow_parity
 ```
 
-Compilation is side-effect free. MCP submission and protected inspection require `EVAVO_ART_ALLOW_WRITES=true` as the existing trusted operational boundary. Submission writes only the durable job journal. Inspection reads the configured runtime and artifact roots and cannot instantiate a provider registry, write artifact bytes, update an approved reference or promote artwork.
+Compilation is side-effect free. MCP submission and protected inspection require `EVAVO_ART_ALLOW_WRITES=true` as the existing trusted operational boundary. Submission writes only the durable job journal. Inspection and parity read the configured runtime and artifact roots and cannot instantiate a provider registry, write artifact bytes, update an approved reference or promote artwork. Parity additionally refuses to claim visual similarity, cutover eligibility or permission to delete Website source.
 
 ## Provider policy
 
@@ -188,13 +230,15 @@ The regression suite uses a counting fixture adapter to prove:
 5. a later worker cycle claims zero jobs;
 6. the only image artifact remains an unapproved intermediate candidate;
 7. inspection moves from `not-submitted` to `pending` to verified `succeeded` without creating another runtime event, provider request or artifact;
-8. tampered approval claims fail closed.
+8. tampered approval claims fail closed;
+9. a fingerprinted Website observation matches only when request, outcome, one-attempt policy, adapter/model and candidate authority agree;
+10. a model or request mismatch remains explicit and cutover-ineligible.
 
 The shared package, REST and CLI tests also prove that compilation writes no job, repeated submission creates one journal identity and inspection performs no write. The fixture proves runtime and artifact semantics without making live provider traffic or claiming that a paid provider, credentials or account configuration has passed production smoke testing.
 
 ## Non-authority flags
 
-Compilation, submission, execution and inspection preserve these boundaries:
+Compilation, submission, execution, inspection and structural parity preserve these boundaries:
 
 ```text
 shadowOnly: true
@@ -213,10 +257,10 @@ The worker does not write Website or Docs Suite book state. It does not update a
 
 The focused `Book Art Provider Runtime` workflow runs on relevant pull-request and mainline changes. It:
 
-- verifies the static authority and REST, CLI and MCP surface-parity boundary;
+- verifies the static runtime, inspection and structural Website parity authority boundaries across REST, CLI and MCP;
 - installs the review-first workspace dependency graph with the governed Node and pnpm versions;
 - builds the complete domain dependency chain, including the shared Book Art runtime package;
-- runs the shared runtime, worker execution and inspection, REST, CLI and MCP regression suites;
+- runs the shared runtime, worker execution/inspection/parity, REST, CLI, MCP and OpenAPI regression suites;
 - runs the repository-wide `pnpm check` on the exact candidate;
 - removes the generated lockfile and proves the tracked source remains clean.
 
@@ -227,7 +271,7 @@ The repository-wide exact-main validation still runs after merge. Passing source
 No production cutover is approved by this slice. Before Website provider execution can be retired, the coordinated migration still requires:
 
 - registration of exact legacy artwork bytes in immutable Art Studio storage without checksum changes;
-- authenticated Website-to-Art-Studio shadow requests and success/failure parity evidence using the typed inspection receipt;
+- a sustained batch of authenticated Website-to-Art-Studio shadow requests with matched success/failure structural parity receipts;
 - production-provider credential, model and response smoke tests;
 - technical mastering and candidate-comparison parity;
 - immutable promotion and Docs Suite artwork-use binding for eligible artifacts;

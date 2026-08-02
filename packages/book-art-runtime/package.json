@@ -13,6 +13,10 @@
     "./inspection": {
       "types": "./dist/inspection.d.ts",
       "import": "./dist/inspection.js"
+    },
+    "./parity": {
+      "types": "./dist/parity.d.ts",
+      "import": "./dist/parity.js"
     }
   },
   "files": ["dist"],
