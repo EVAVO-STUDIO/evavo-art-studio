@@ -1,13 +1,13 @@
 openapi: 3.1.0
 info:
   title: EVAVO Art Studio Book Art Provider Runtime API
-  version: 0.1.0
+  version: 0.2.0
   description: >-
-    Shadow-only Book Art provider job compilation and durable submission. The
-    Art Studio host owns the adapter allow-list. Compilation and submission do
-    not call an image provider, create candidate artifacts, select artwork,
-    promote a master, bind artwork into a book, approve runtime cutover or
-    publish an edition.
+    Shadow-only Book Art provider job compilation, durable submission and
+    immutable inspection. The Art Studio host owns the adapter allow-list.
+    Compilation, submission and inspection do not themselves call an image
+    provider, create candidate artifacts, select artwork, promote a master,
+    bind artwork into a book, approve runtime cutover or publish an edition.
 servers:
   - url: http://127.0.0.1:4100
     description: Local standalone Art Studio control plane
@@ -84,6 +84,39 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "503":
           $ref: "#/components/responses/ConfigurationError"
+  /v1/book-art/provider-jobs/inspect:
+    post:
+      tags: [Book Art Provider Runtime]
+      operationId: inspectBookArtProviderShadowJob
+      summary: Verify the exact runtime job and immutable candidate evidence
+      description: >-
+        Inspection is authenticated and read-only. The server recompiles the
+        exact request, resolves its deterministic runtime job, verifies every
+        output descriptor and content hash, and accepts a successful receipt
+        only when exactly one unapproved intermediate provider candidate and
+        one matching provider evidence artifact remain within the shadow-only
+        authority boundary. Inspection calls no provider and writes no artifact.
+      security:
+        - ArtStudioControlToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookArtProviderShadowRequest"
+      responses:
+        "200":
+          description: Read-only not-submitted, pending, failed or verified-success receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookArtProviderInspectionResult"
+        "401":
+          $ref: "#/components/responses/AuthorizationError"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ConfigurationError"
 components:
   securitySchemes:
     ArtStudioControlToken:
@@ -126,6 +159,10 @@ components:
         - oneCandidate
         - maximumRuntimeAttempts
         - providerFallbackAllowed
+        - compilePerformsProviderCall
+        - submitPerformsProviderCall
+        - inspectPerformsProviderCall
+        - inspectionWritesArtifacts
         - candidateApprovalState
         - candidateStorageClass
         - selectionPerformed
@@ -143,6 +180,8 @@ components:
         providerFallbackAllowed: { const: false }
         compilePerformsProviderCall: { const: false }
         submitPerformsProviderCall: { const: false }
+        inspectPerformsProviderCall: { const: false }
+        inspectionWritesArtifacts: { const: false }
         candidateApprovalState: { const: unapproved }
         candidateStorageClass: { const: intermediate }
         selectionPerformed: { const: false }
@@ -215,6 +254,64 @@ components:
         bookUseBindingCreated: { const: false }
         runtimeCutoverApproved: { const: false }
         publicationPerformed: { const: false }
+    BookArtProviderInspectionResult:
+      type: object
+      additionalProperties: false
+      required:
+        - outputKind
+        - schemaVersion
+        - status
+        - identity
+        - blockers
+        - warnings
+        - inspectionFingerprintSha256
+        - shadowOnly
+        - inspectionReadOnly
+        - providerCallPerformedByInspection
+        - candidateArtifactsWrittenByInspection
+        - providerExecutionObserved
+        - candidateArtifactObserved
+        - providerEvidenceObserved
+        - authoritativeBookWritesPerformed
+        - selectionPerformed
+        - promotionPerformed
+        - bookUseBindingCreated
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        outputKind:
+          const: evavo_book_art_provider_shadow_job_inspection_result
+        schemaVersion: { const: 1 }
+        status: { enum: [blocked, not-submitted, pending, failed, succeeded] }
+        identity: { type: object }
+        planFingerprintSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        runtimeJob: { type: object }
+        candidate: { type: object }
+        providerEvidence: { type: object }
+        blockers:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+        inspectionFingerprintSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        shadowOnly: { const: true }
+        inspectionReadOnly: { const: true }
+        providerCallPerformedByInspection: { const: false }
+        candidateArtifactsWrittenByInspection: { const: false }
+        providerExecutionObserved: { type: boolean }
+        candidateArtifactObserved: { type: boolean }
+        providerEvidenceObserved: { type: boolean }
+        authoritativeBookWritesPerformed: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
     Error:
       type: object
       required: [error]
@@ -227,13 +324,13 @@ components:
             message: { type: string }
   responses:
     ValidationError:
-      description: Invalid or blocked Book Art request
+      description: Invalid request or blocked immutable inspection result
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     ConfigurationError:
-      description: Provider policy, runtime or authenticated write access is unavailable
+      description: Provider policy, runtime, artifact store or protected operational access is unavailable
       content:
         application/json:
           schema:
