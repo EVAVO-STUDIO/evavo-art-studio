@@ -11,8 +11,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: agent-book-art-legacy-illustration-plan-translation
-  cancel-in-progress: true
+  group: agent-trigger-book-art-legacy-illustration-plan-translation
+  cancel-in-progress: false
 
 jobs:
   apply-verify-publish:
