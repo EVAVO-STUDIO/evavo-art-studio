@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: agent-apply-book-art-legacy-byte-registration
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply:
@@ -52,6 +52,7 @@ jobs:
           .github/agent-payloads/legacy-registration-payload.part08
           .github/agent-payloads/legacy-registration-payload.part1
           .github/agent-payloads/legacy-registration-payload.part2
+          .github/agent-payloads/trigger.txt
           .github/workflows/agent-apply-book-art-legacy-byte-registration.yml
           PATHS
           sort "${RUNNER_TEMP}/expected-bootstrap-paths.txt" -o "${RUNNER_TEMP}/expected-bootstrap-paths.txt"
@@ -104,6 +105,7 @@ jobs:
           .github/agent-payloads/legacy-registration-payload.part08
           .github/agent-payloads/legacy-registration-payload.part1
           .github/agent-payloads/legacy-registration-payload.part2
+          .github/agent-payloads/trigger.txt
           .github/workflows/agent-apply-book-art-legacy-byte-registration.yml
           .github/workflows/book-art-provider-runtime.yml
           apps/cli/src/book-art-commands.ts
