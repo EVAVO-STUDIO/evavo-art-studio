@@ -86,14 +86,17 @@ export async function compileBookStudioAutopilot(
   const execution = operationResult.result as Record<string, unknown>;
   const nextTask = execution.nextTask as Record<string, unknown>;
   const task = nextTask.task as Record<string, unknown>;
+  const executionMode = task.executionMode === "provider"
+    ? "provider"
+    : "automation";
   const action: BookStudioAutopilotActionV1 = {
-    actionKind: task.executionMode === "provider"
+    actionKind: executionMode === "provider"
       ? "writing_candidate"
       : "docs_operation",
     taskId: String(task.taskId),
     stageId: String(task.stageId),
-    executionMode: task.executionMode as BookStudioAutopilotActionV1["executionMode"],
-    dispatchPath: task.executionMode === "provider"
+    executionMode,
+    dispatchPath: executionMode === "provider"
       ? "/api/v1/book-studio/writing-candidate"
       : "/api/v1/book-studio/operations",
     expectedAttempt: Number(nextTask.expectedAttempt),
