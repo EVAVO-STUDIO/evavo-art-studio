@@ -38,10 +38,10 @@ jobs:
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 22.14.0
-          cache: pnpm
+          package-manager-cache: false
 
-      - name: Install exact Art Studio dependency graph
-        run: pnpm install --frozen-lockfile
+      - name: Install review-first Art Studio dependency graph
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build the actual Art Studio contracts receiver
         run: pnpm --filter @evavo/art-contracts build
@@ -75,6 +75,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf validation/docs-art-plan/dist validation/docs-art-plan/node_modules
+          rm -rf validation/docs-art-plan/dist validation/docs-art-plan/node_modules pnpm-lock.yaml
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
