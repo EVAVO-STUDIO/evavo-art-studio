@@ -187,7 +187,11 @@ export async function submitDocsBookArtReleaseShadowJob(
     },
     options,
   );
-  if (providerSubmission.status !== "submitted" || !providerSubmission.job) {
+  if (
+    providerSubmission.status !== "submitted" ||
+    !providerSubmission.plan ||
+    !providerSubmission.job
+  ) {
     return blockedSubmission(
       release,
       providerSubmission.blockers,
