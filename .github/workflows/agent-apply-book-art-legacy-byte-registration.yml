@@ -89,20 +89,49 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/cli/src/book-art-commands.ts")
+          text = path.read_text(encoding="utf-8")
+          old = "function providerProtocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {\n"
+          new = "function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {\n"
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one providerProtocol declaration, found {text.count(old)}")
+          text = text.replace(old, new, 1)
+          old_call = "return { handled: true, value: providerProtocol(policy) };"
+          new_call = "return { handled: true, value: protocol(policy) };"
+          if text.count(old_call) != 1:
+              raise SystemExit(f"expected one providerProtocol call, found {text.count(old_call)}")
+          path.write_text(text.replace(old_call, new_call, 1), encoding="utf-8")
+          PY
           python /tmp/apply_legacy_registration.py
           python - <<'PY'
           from pathlib import Path
 
-          path = Path("docs/book-art-provider-runtime.md")
-          text = path.read_text(encoding="utf-8")
-          if "unapproved source artifact" not in text:
-              text = text.rstrip() + """
+          cli_path = Path("apps/cli/src/book-art-commands.ts")
+          cli = cli_path.read_text(encoding="utf-8")
+          old = "function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {\n"
+          new = "function providerProtocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {\n"
+          if cli.count(old) != 1:
+              raise SystemExit(f"expected one patched protocol declaration, found {cli.count(old)}")
+          cli = cli.replace(old, new, 1)
+          old_call = "return { handled: true, value: protocol(policy) };"
+          new_call = "return { handled: true, value: providerProtocol(policy) };"
+          if cli.count(old_call) != 1:
+              raise SystemExit(f"expected one patched protocol call, found {cli.count(old_call)}")
+          cli_path.write_text(cli.replace(old_call, new_call, 1), encoding="utf-8")
+
+          docs_path = Path("docs/book-art-provider-runtime.md")
+          docs = docs_path.read_text(encoding="utf-8")
+          if "unapproved source artifact" not in docs:
+              docs = docs.rstrip() + """
 
           ## Legacy byte registration authority
 
           Legacy byte registration stores the original bytes unchanged as an unapproved source artifact and writes separate immutable byte-registration evidence. It does not create or update a named reference, select or promote artwork, create a Book-use binding, approve runtime cutover, delete Website source, or publish an edition.
           """
-              path.write_text(text.rstrip() + "\n", encoding="utf-8")
+              docs_path.write_text(docs.rstrip() + "\n", encoding="utf-8")
           PY
           git rm -r .github/agent-payloads
           git rm "${WORKFLOW_PATH}"
@@ -180,7 +209,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f pnpm-lock.yaml
-          git restore --source=HEAD -- packages/contracts/tsconfig.tsbuildinfo
+          rm -f packages/contracts/tsconfig.tsbuildinfo
           git diff --check
           git fetch --no-tags --prune origin \
             +refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH} \
