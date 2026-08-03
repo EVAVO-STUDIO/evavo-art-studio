@@ -25,7 +25,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TARGET_BRANCH: agent/book-art-legacy-byte-registration-rebased-20260803
       WORKFLOW_FILE: agent-apply-book-art-legacy-byte-registration.yml
-      EXPECTED_BOOTSTRAP_SHA: 88a2eb3e2a5439745a6780ecdb276993637f0bd3
+      EXPECTED_BOOTSTRAP_SHA: 367a6233484418c6511903108a39fb15a7f4e5a3
     steps:
       - name: Check out exact observed bootstrap commit
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -92,5 +92,6 @@ jobs:
           git show "${published}:scripts/check-book-art-legacy-registration.mjs" \
             | grep -F 'legacy byte registration'
           ! git cat-file -e "${published}:.github/agent-payloads/apply-script.gz.b64"
-          ! git cat-file -e "${published}:.github/workflows/${WORKFLOW_FILE}"
-          echo "published production candidate: ${published}"
+          git cat-file -e "${published}:.github/workflows/${WORKFLOW_FILE}"
+          git diff --exit-code "e6c2613b1598a53b13e7fd91ebe622607fb2c09e" "${published}" -- .github/workflows/book-art-provider-runtime.yml
+          echo "published non-workflow candidate: ${published}"
