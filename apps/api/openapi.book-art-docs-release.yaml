@@ -1,0 +1,318 @@
+openapi: 3.1.0
+info:
+  title: EVAVO Art Studio Docs Book Release Receiver API
+  version: 0.1.0
+  description: >-
+    Verify one complete Docs Suite ready_for_art_shadow release receipt and
+    sealed final Book Art brief before compiling or idempotently submitting one
+    no-fallback, one-attempt provider job. Compilation and submission call no
+    provider and perform no Book write, artwork selection, promotion, Book-use
+    binding, runtime cutover or publication.
+servers:
+  - url: http://127.0.0.1:4100
+    description: Local standalone Art Studio control plane
+tags:
+  - name: Docs Book Release Receiver
+paths:
+  /v1/book-art/docs-release-runtime:
+    get:
+      tags: [Docs Book Release Receiver]
+      operationId: getDocsBookReleaseRuntimeProtocol
+      summary: Read the verified Docs release receiver contract
+      security: []
+      responses:
+        "200":
+          description: Docs release receiver protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocsBookReleaseRuntimeProtocol"
+  /v1/book-art/docs-releases/compile:
+    post:
+      tags: [Docs Book Release Receiver]
+      operationId: compileDocsBookArtReleaseShadowJob
+      summary: Verify a Docs release and compile one provider job
+      description: >-
+        The server injects adapter policy. The caller supplies the exact Docs
+        release receipt and final brief but no provider policy or credential.
+        No runtime job, provider call or candidate artifact is created.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocsBookReleaseShadowRequest"
+      responses:
+        "200":
+          description: Verified release and ready deterministic provider plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocsBookReleaseCompilationResult"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ConfigurationError"
+  /v1/book-art/docs-releases/submit:
+    post:
+      tags: [Docs Book Release Receiver]
+      operationId: submitDocsBookArtReleaseShadowJob
+      summary: Verify and submit or reuse one durable provider job
+      description: >-
+        Submission is authenticated and duplicate-safe. It performs no provider
+        call. An eligible worker may later store one unapproved intermediate
+        candidate, which still requires separate selection, promotion and Book
+        use binding.
+      security:
+        - ArtStudioControlToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocsBookReleaseShadowRequest"
+      responses:
+        "201":
+          description: Verified durable job submitted or idempotently reused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocsBookReleaseSubmissionResult"
+        "401":
+          $ref: "#/components/responses/AuthorizationError"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ConfigurationError"
+components:
+  securitySchemes:
+    ArtStudioControlToken:
+      type: http
+      scheme: bearer
+      description: Server-side Art Studio control token; never stored in a release or work order.
+  schemas:
+    DocsBookReleaseShadowRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - outputKind
+        - schemaVersion
+        - executionId
+        - requestedAt
+        - release
+      properties:
+        outputKind:
+          const: evavo_docs_book_art_release_shadow_job_input
+        schemaVersion:
+          const: 1
+        executionId:
+          type: string
+          minLength: 1
+          maxLength: 200
+        requestedAt:
+          type: string
+          format: date-time
+        release:
+          $ref: "#/components/schemas/DocsBookReleaseEnvelope"
+    DocsBookReleaseEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - outputKind
+        - schemaVersion
+        - contract
+        - sourceRepository
+        - targetRepository
+        - docsSuiteCommit
+        - receivedAt
+        - releaseReceipt
+        - finalArtBrief
+        - crossRepositoryRuntimeSourceImportAllowed
+        - writingStudioMayCallArtStudioDirectly
+        - authoritativeBookWritesAllowed
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        outputKind: { const: evavo_art_studio_docs_book_release_envelope }
+        schemaVersion: { const: 1 }
+        contract: { const: evavo_art_studio_docs_book_release_v1 }
+        sourceRepository: { const: EVAVO-STUDIO/evavo-docs-suite }
+        targetRepository: { const: EVAVO-STUDIO/evavo-art-studio }
+        docsSuiteCommit:
+          const: d7e5cd0f79ebcb211c502d33a90f84e93763f23c
+        receivedAt: { type: string, format: date-time }
+        releaseReceipt:
+          type: object
+          description: Exact fingerprint-valid evavo_docs_book_writing_art_release_receipt.
+        finalArtBrief:
+          type: object
+          description: Exact fingerprint-valid evavo_book_art_brief named by the release receipt.
+        crossRepositoryRuntimeSourceImportAllowed: { const: false }
+        writingStudioMayCallArtStudioDirectly: { const: false }
+        authoritativeBookWritesAllowed: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+    DocsBookReleaseRuntimeProtocol:
+      type: object
+      additionalProperties: false
+      required:
+        - schemaVersion
+        - contract
+        - shadowOnly
+        - providerPolicyConfigured
+        - requiresReadyForArtShadowRelease
+        - verifiesReleaseFingerprint
+        - verifiesExactFinalBrief
+        - verifiesRepositoryCompatibility
+        - verifiesCompleteReleaseEvidence
+        - oneCandidate
+        - maximumRuntimeAttempts
+        - providerFallbackAllowed
+        - compilePerformsProviderCall
+        - submitPerformsProviderCall
+        - candidateApprovalState
+        - candidateStorageClass
+        - authoritativeBookWritesPerformed
+        - selectionPerformed
+        - promotionPerformed
+        - bookUseBindingCreated
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        schemaVersion: { const: 1 }
+        contract: { const: evavo_docs_book_art_release_shadow_runtime_v1 }
+        shadowOnly: { const: true }
+        providerPolicyConfigured: { type: boolean }
+        requiresReadyForArtShadowRelease: { const: true }
+        verifiesReleaseFingerprint: { const: true }
+        verifiesExactFinalBrief: { const: true }
+        verifiesRepositoryCompatibility: { const: true }
+        verifiesCompleteReleaseEvidence: { const: true }
+        oneCandidate: { const: true }
+        maximumRuntimeAttempts: { const: 1 }
+        providerFallbackAllowed: { const: false }
+        compilePerformsProviderCall: { const: false }
+        submitPerformsProviderCall: { const: false }
+        candidateApprovalState: { const: unapproved }
+        candidateStorageClass: { const: intermediate }
+        authoritativeBookWritesPerformed: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+    DocsBookReleaseCompilationResult:
+      type: object
+      required:
+        - outputKind
+        - schemaVersion
+        - contract
+        - status
+        - release
+        - blockers
+        - warnings
+        - releaseVerified
+        - exactFinalArtBriefVerified
+        - shadowOnly
+        - providerCallPerformed
+        - candidateArtifactsWritten
+        - authoritativeBookWritesPerformed
+        - selectionPerformed
+        - promotionPerformed
+        - bookUseBindingCreated
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        outputKind:
+          const: evavo_docs_book_art_release_shadow_job_compilation_result
+        schemaVersion: { const: 1 }
+        contract: { const: evavo_docs_book_art_release_shadow_runtime_v1 }
+        status: { enum: [blocked, ready] }
+        release: { type: object }
+        plan: { type: object }
+        blockers: { type: array, items: { type: string } }
+        warnings: { type: array, items: { type: string } }
+        releaseVerified: { type: boolean }
+        exactFinalArtBriefVerified: { type: boolean }
+        shadowOnly: { const: true }
+        providerCallPerformed: { const: false }
+        candidateArtifactsWritten: { const: false }
+        authoritativeBookWritesPerformed: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+    DocsBookReleaseSubmissionResult:
+      type: object
+      required:
+        - outputKind
+        - schemaVersion
+        - contract
+        - status
+        - release
+        - blockers
+        - warnings
+        - releaseVerified
+        - exactFinalArtBriefVerified
+        - shadowOnly
+        - providerCallPerformed
+        - candidateArtifactsWritten
+        - authoritativeBookWritesPerformed
+        - selectionPerformed
+        - promotionPerformed
+        - bookUseBindingCreated
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        outputKind:
+          const: evavo_docs_book_art_release_shadow_job_submission_result
+        schemaVersion: { const: 1 }
+        contract: { const: evavo_docs_book_art_release_shadow_runtime_v1 }
+        status: { enum: [blocked, submitted] }
+        release: { type: object }
+        plan: { type: object }
+        job: { type: object }
+        blockers: { type: array, items: { type: string } }
+        warnings: { type: array, items: { type: string } }
+        releaseVerified: { type: boolean }
+        exactFinalArtBriefVerified: { type: boolean }
+        shadowOnly: { const: true }
+        providerCallPerformed: { const: false }
+        candidateArtifactsWritten: { const: false }
+        authoritativeBookWritesPerformed: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    ValidationError:
+      description: Invalid request or blocked release verification result
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ConfigurationError:
+      description: Provider policy, runtime or protected operational access is unavailable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    AuthorizationError:
+      description: Art Studio control token is absent or invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
