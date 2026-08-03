@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      EXPECTED_PARENT_SHA: 9eab30022726808a06d1c10221527bad347293b8
+      EXPECTED_BASE_SHA: 9eab30022726808a06d1c10221527bad347293b8
       CARRIER_URL: https://res.cloudinary.com/dntogqtey/raw/upload/v1785727238/evavo/book-studio/private/website-book-art-audit-20260803.zip
       EXPECTED_CARRIER_BYTES: '153148'
       EXPECTED_INNER_BYTES: '939123'
@@ -35,12 +35,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prove direct-child workflow-only scope
+      - name: Prove exact workflow-only scope
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$(git rev-parse HEAD^)" == "${EXPECTED_PARENT_SHA}" ]]
-          [[ "$(git diff --name-only "${EXPECTED_PARENT_SHA}" HEAD)" == '.github/workflows/diagnostic-recover-website-book-studio-carrier.yml' ]]
+          [[ "$(git merge-base origin/main HEAD)" == "${EXPECTED_BASE_SHA}" ]]
+          [[ "$(git rev-parse origin/main)" == "${EXPECTED_BASE_SHA}" ]]
+          [[ "$(git diff --name-only "${EXPECTED_BASE_SHA}" HEAD)" == '.github/workflows/diagnostic-recover-website-book-studio-carrier.yml' ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
       - name: Download and inspect immutable carrier
