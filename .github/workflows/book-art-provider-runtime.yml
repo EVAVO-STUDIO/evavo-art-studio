@@ -52,7 +52,6 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          from textwrap import dedent
 
           source = Path(
               '.github/workflows/agent-book-art-legacy-illustration-plan-translation.yml'
@@ -61,7 +60,11 @@ jobs:
           end_marker = "\n          PY\n          python /tmp/apply.py"
           start = source.index(start_marker) + len(start_marker)
           end = source.index(end_marker, start)
-          script = dedent(source[start:end])
+          lines = source[start:end].splitlines()
+          script = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in lines
+          ) + "\n"
           for token in [
               'translateLegacyWebsiteBookIllustrationGenerationPlan',
               'legacy-illustration-plans/translate',
