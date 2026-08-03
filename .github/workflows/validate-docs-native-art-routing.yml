@@ -46,6 +46,13 @@ jobs:
         run: npm exec --yes --package=typescript@5.9.3 -- tsc -p .validation/docs-native-art-routing/tsconfig.json
       - name: Run exact routing attacks
         run: npm exec --yes --package=tsx@4.20.3 -- tsx --test .validation/docs-native-art-routing/test/book-studio-autopilot-routing.test.mjs
-      - name: Verify no production source changed
+      - name: Verify no Art Studio production source changed
+        shell: bash
         run: |
-          git diff --exit-code origin/main -- . ':!.github/workflows/validate-docs-native-art-routing.yml' ':!.validation/docs-native-art-routing/**'
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin bc25cdd0fad5d562a8ed60be46ac2d99d62a23c9
+          unexpected="$(git diff --name-only bc25cdd0fad5d562a8ed60be46ac2d99d62a23c9 HEAD | grep -Ev '^(\.github/workflows/validate-docs-native-art-routing\.yml|\.validation/docs-native-art-routing/)' || true)"
+          test -z "$unexpected" || {
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
