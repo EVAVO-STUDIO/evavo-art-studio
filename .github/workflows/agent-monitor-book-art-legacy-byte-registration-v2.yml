@@ -1,0 +1,93 @@
+name: Agent Monitor Book Art Legacy Byte Registration V2
+
+on:
+  pull_request:
+    branches:
+      - agent/book-art-legacy-byte-registration-20260803
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: agent-monitor-book-art-legacy-byte-registration-v2
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    if: >-
+      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: agent/book-art-legacy-byte-registration-20260803
+      WORKFLOW_FILE: agent-apply-book-art-legacy-byte-registration.yml
+      EXPECTED_SHA: ddc8409b5f48025f926d0ca80feab7137782bff8
+    steps:
+      - name: Check out exact observed feature head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact observer scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${EXPECTED_SHA}" ]]
+          [[ "${{ github.event.pull_request.base.ref }}" == "${TARGET_BRANCH}" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Watch exact bootstrap workflow
+        id: watch
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=''
+          for _ in $(seq 1 120); do
+            run_id="$(
+              gh api \
+                -H 'Accept: application/vnd.github+json' \
+                "/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${TARGET_BRANCH}&event=push&per_page=30" \
+                --jq ".workflow_runs[] | select(.head_sha == \"${EXPECTED_SHA}\") | .id" \
+                | head -n 1
+            )"
+            [[ -n "${run_id}" ]] && break
+            sleep 5
+          done
+          [[ -n "${run_id}" ]] || { echo 'Exact checksummed bootstrap workflow run was not created.' >&2; exit 1; }
+          echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+          for _ in $(seq 1 180); do
+            status="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq .status)"
+            conclusion="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.conclusion // ""')"
+            echo "run ${run_id}: ${status} ${conclusion}"
+            if [[ "${status}" == 'completed' ]]; then
+              if [[ "${conclusion}" != 'success' ]]; then
+                gh run view "${run_id}" --repo "${GITHUB_REPOSITORY}" --log || true
+                exit 1
+              fi
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Exact checksummed bootstrap workflow ${run_id} did not complete within the bounded observer window." >&2
+          exit 1
+
+      - name: Prove validated production source was published
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            +refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}
+          published="$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})"
+          [[ "${published}" != "${EXPECTED_SHA}" ]]
+          git show "${published}:packages/book-art-runtime/src/legacy-registration.ts" \
+            | grep -F 'export async function registerLegacyBookArtBytes'
+          ! git cat-file -e "${published}:.github/agent-payloads/legacy-registration-payload.part1"
+          ! git cat-file -e "${published}:.github/workflows/agent-apply-book-art-legacy-byte-registration.yml"
+          echo "validated branch head: ${published}"
+          echo "bootstrap workflow run: ${{ steps.watch.outputs.run_id }}"
