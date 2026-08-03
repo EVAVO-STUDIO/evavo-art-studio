@@ -8,6 +8,11 @@ import {
   submitBookArtProviderShadowJob,
   type BookArtProviderAdapterPolicyV1,
 } from "@evavo/art-book-runtime";
+import {
+  DOCS_BOOK_ART_RELEASE_RUNTIME_CONTRACT,
+  compileDocsBookArtReleaseShadowJob,
+  submitDocsBookArtReleaseShadowJob,
+} from "@evavo/art-book-runtime/docs-release";
 import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
 import { compareBookArtProviderShadowParity } from "@evavo/art-book-runtime/parity";
 import { RuntimeError, type RuntimeRepository } from "@evavo/art-runtime";
@@ -40,6 +45,9 @@ const COMPILE_PATH = "/v1/book-art/provider-jobs/compile";
 const SUBMIT_PATH = "/v1/book-art/provider-jobs/submit";
 const INSPECT_PATH = "/v1/book-art/provider-jobs/inspect";
 const PARITY_PATH = "/v1/book-art/provider-jobs/parity";
+const DOCS_RELEASE_PROTOCOL_PATH = "/v1/book-art/docs-release-runtime";
+const DOCS_RELEASE_COMPILE_PATH = "/v1/book-art/docs-releases/compile";
+const DOCS_RELEASE_SUBMIT_PATH = "/v1/book-art/docs-releases/submit";
 const PARITY_FIELDS = new Set(["request", "websiteObservation"]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -51,7 +59,10 @@ function pathHandled(pathname: string): boolean {
     pathname === COMPILE_PATH ||
     pathname === SUBMIT_PATH ||
     pathname === INSPECT_PATH ||
-    pathname === PARITY_PATH
+    pathname === PARITY_PATH ||
+    pathname === DOCS_RELEASE_PROTOCOL_PATH ||
+    pathname === DOCS_RELEASE_COMPILE_PATH ||
+    pathname === DOCS_RELEASE_SUBMIT_PATH
   );
 }
 
@@ -61,7 +72,9 @@ function actor(request: IncomingMessage): string {
   return raw?.trim() || "api-book-art-shadow";
 }
 
-function requirePolicy(context: BookArtApiContext): BookArtProviderAdapterPolicyV1 | null {
+function requirePolicy(
+  context: BookArtApiContext,
+): BookArtProviderAdapterPolicyV1 | null {
   if (context.adapterPolicy) return context.adapterPolicy;
   context.writeJson(
     context.response,
@@ -129,7 +142,10 @@ function configuredParityInput(
 }> | null {
   if (!isRecord(body)) return null;
   if (Object.keys(body).some((key) => !PARITY_FIELDS.has(key))) return null;
-  if (!Object.hasOwn(body, "request") || !Object.hasOwn(body, "websiteObservation")) {
+  if (
+    !Object.hasOwn(body, "request") ||
+    !Object.hasOwn(body, "websiteObservation")
+  ) {
     return null;
   }
   const request = configuredInput(body.request, adapterPolicy);
@@ -147,6 +163,64 @@ function sendRuntimeError(context: BookArtApiContext, error: RuntimeError): void
   );
 }
 
+function providerProtocol(
+  context: BookArtApiContext,
+): Readonly<Record<string, unknown>> {
+  return {
+    schemaVersion: BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
+    contract: BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
+    shadowOnly: true,
+    providerPolicyConfigured: context.adapterPolicy !== undefined,
+    oneCandidate: true,
+    maximumRuntimeAttempts: 1,
+    providerFallbackAllowed: false,
+    compilePerformsProviderCall: false,
+    submitPerformsProviderCall: false,
+    inspectPerformsProviderCall: false,
+    inspectionWritesArtifacts: false,
+    parityPerformsProviderCall: false,
+    parityWritesArtifacts: false,
+    visualSimilarityEvaluated: false,
+    cutoverEligible: false,
+    candidateApprovalState: "unapproved",
+    candidateStorageClass: "intermediate",
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  };
+}
+
+function docsReleaseProtocol(
+  context: BookArtApiContext,
+): Readonly<Record<string, unknown>> {
+  return {
+    schemaVersion: BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
+    contract: DOCS_BOOK_ART_RELEASE_RUNTIME_CONTRACT,
+    shadowOnly: true,
+    providerPolicyConfigured: context.adapterPolicy !== undefined,
+    requiresReadyForArtShadowRelease: true,
+    verifiesReleaseFingerprint: true,
+    verifiesExactFinalBrief: true,
+    verifiesRepositoryCompatibility: true,
+    verifiesCompleteReleaseEvidence: true,
+    oneCandidate: true,
+    maximumRuntimeAttempts: 1,
+    providerFallbackAllowed: false,
+    compilePerformsProviderCall: false,
+    submitPerformsProviderCall: false,
+    candidateApprovalState: "unapproved",
+    candidateStorageClass: "intermediate",
+    authoritativeBookWritesPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  };
+}
+
 export async function handleBookArtApiRequest(
   context: BookArtApiContext,
 ): Promise<boolean> {
@@ -154,61 +228,34 @@ export async function handleBookArtApiRequest(
   const { request, response, url, requestId } = context;
 
   if (request.method === "GET" && url.pathname === PROTOCOL_PATH) {
-    context.writeJson(
-      response,
-      200,
-      {
-        schemaVersion: BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
-        contract: BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
-        shadowOnly: true,
-        providerPolicyConfigured: context.adapterPolicy !== undefined,
-        oneCandidate: true,
-        maximumRuntimeAttempts: 1,
-        providerFallbackAllowed: false,
-        compilePerformsProviderCall: false,
-        submitPerformsProviderCall: false,
-        inspectPerformsProviderCall: false,
-        inspectionWritesArtifacts: false,
-        parityPerformsProviderCall: false,
-        parityWritesArtifacts: false,
-        visualSimilarityEvaluated: false,
-        cutoverEligible: false,
-        candidateApprovalState: "unapproved",
-        candidateStorageClass: "intermediate",
-        selectionPerformed: false,
-        promotionPerformed: false,
-        bookUseBindingCreated: false,
-        runtimeCutoverApproved: false,
-        publicationPerformed: false,
-      },
-      requestId,
-    );
+    context.writeJson(response, 200, providerProtocol(context), requestId);
+    return true;
+  }
+  if (
+    request.method === "GET" &&
+    url.pathname === DOCS_RELEASE_PROTOCOL_PATH
+  ) {
+    context.writeJson(response, 200, docsReleaseProtocol(context), requestId);
     return true;
   }
 
-  if (
-    request.method === "POST" &&
-    (url.pathname === COMPILE_PATH ||
-      url.pathname === SUBMIT_PATH ||
-      url.pathname === INSPECT_PATH ||
-      url.pathname === PARITY_PATH)
-  ) {
+  const postPath =
+    url.pathname === COMPILE_PATH ||
+    url.pathname === SUBMIT_PATH ||
+    url.pathname === INSPECT_PATH ||
+    url.pathname === PARITY_PATH ||
+    url.pathname === DOCS_RELEASE_COMPILE_PATH ||
+    url.pathname === DOCS_RELEASE_SUBMIT_PATH;
+  if (request.method === "POST" && postPath) {
     const adapterPolicy = requirePolicy(context);
     if (!adapterPolicy) return true;
-    if (
-      (url.pathname === SUBMIT_PATH ||
-        url.pathname === INSPECT_PATH ||
-        url.pathname === PARITY_PATH) &&
-      !requireProtectedAccess(context)
-    ) {
-      return true;
-    }
-    if (
-      (url.pathname === SUBMIT_PATH ||
-        url.pathname === INSPECT_PATH ||
-        url.pathname === PARITY_PATH) &&
-      !context.runtime
-    ) {
+    const protectedPath =
+      url.pathname === SUBMIT_PATH ||
+      url.pathname === INSPECT_PATH ||
+      url.pathname === PARITY_PATH ||
+      url.pathname === DOCS_RELEASE_SUBMIT_PATH;
+    if (protectedPath && !requireProtectedAccess(context)) return true;
+    if (protectedPath && !context.runtime) {
       context.writeJson(
         response,
         503,
@@ -252,16 +299,23 @@ export async function handleBookArtApiRequest(
         ? parityInput?.request ?? null
         : configuredInput(body, adapterPolicy);
     if (!input) {
+      const docsReleasePath =
+        url.pathname === DOCS_RELEASE_COMPILE_PATH ||
+        url.pathname === DOCS_RELEASE_SUBMIT_PATH;
       context.writeJson(
         response,
         422,
         {
           error: {
-            code: "BOOK_ART_PROVIDER_REQUEST_INVALID",
+            code: docsReleasePath
+              ? "BOOK_ART_DOCS_RELEASE_REQUEST_INVALID"
+              : "BOOK_ART_PROVIDER_REQUEST_INVALID",
             message:
               url.pathname === PARITY_PATH
                 ? "Parity requires exactly request and websiteObservation; request must not contain adapterPolicy because provider policy is configured by the Art Studio host."
-                : "The request must be one object and must not contain adapterPolicy; provider policy is configured by the Art Studio host.",
+                : docsReleasePath
+                  ? "The Docs release request must be one object and must not contain adapterPolicy; provider policy is configured by the Art Studio host."
+                  : "The request must be one object and must not contain adapterPolicy; provider policy is configured by the Art Studio host.",
           },
         },
         requestId,
@@ -270,6 +324,30 @@ export async function handleBookArtApiRequest(
     }
 
     try {
+      if (url.pathname === DOCS_RELEASE_COMPILE_PATH) {
+        const result = await compileDocsBookArtReleaseShadowJob(input);
+        context.writeJson(
+          response,
+          result.status === "ready" ? 200 : 422,
+          result,
+          requestId,
+        );
+        return true;
+      }
+      if (url.pathname === DOCS_RELEASE_SUBMIT_PATH) {
+        const result = await submitDocsBookArtReleaseShadowJob(input, {
+          runtime: context.runtime!,
+          actor: actor(request),
+        });
+        context.writeJson(
+          response,
+          result.status === "submitted" ? 201 : 422,
+          result,
+          requestId,
+        );
+        return true;
+      }
+
       const compilation = await compileBookArtProviderShadowJob(input);
       if (url.pathname === COMPILE_PATH) {
         context.writeJson(
