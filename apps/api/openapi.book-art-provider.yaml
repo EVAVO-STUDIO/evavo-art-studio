@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: EVAVO Art Studio Book Art Provider Runtime API
-  version: 0.3.0
+  version: 0.4.0
   description: >-
-    Shadow-only Book Art provider job compilation, durable submission,
+    Exact legacy Website plan translation plus shadow-only Book Art provider job compilation, durable submission,
     immutable inspection and structural Website parity. The Art Studio host owns the adapter allow-list.
     Compilation, submission and inspection do not themselves call an image
     provider, create candidate artifacts, select artwork, promote a master,
@@ -14,6 +14,50 @@ servers:
 tags:
   - name: Book Art Provider Runtime
 paths:
+
+  /v1/book-art/legacy-plan-runtime:
+    get:
+      tags: [Book Art Provider Runtime]
+      operationId: getLegacyWebsiteBookArtPlanTranslationProtocol
+      summary: Read the exact legacy-plan translation authority boundary
+      security: []
+      responses:
+        "200":
+          description: Read-only legacy Website Book Art plan translation protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegacyWebsiteBookArtPlanTranslationProtocol"
+  /v1/book-art/legacy-plans/translate:
+    post:
+      tags: [Book Art Provider Runtime]
+      operationId: translateLegacyWebsiteBookArtGenerationPlan
+      summary: Translate one exact legacy Website plan candidate for shadow comparison
+      description: >-
+        Requires a canonical fingerprint-valid Book Art brief, the exact retained
+        Website generation plan and one candidate identity. The operation is authenticated,
+        read-only, trusts no raw legacy prompt, calls no provider and writes no runtime job or artifact.
+      security:
+        - ArtStudioControlToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LegacyWebsiteBookArtPlanTranslationInput"
+      responses:
+        "200":
+          description: Provider-neutral Art Studio work order ready for shadow comparison
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegacyWebsiteBookArtPlanTranslationResult"
+        "401":
+          $ref: "#/components/responses/AuthorizationError"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ConfigurationError"
   /v1/book-art/provider-runtime:
     get:
       tags: [Book Art Provider Runtime]
@@ -124,6 +168,111 @@ components:
       scheme: bearer
       description: Server-side Art Studio control token; never stored in a work order.
   schemas:
+
+    LegacyWebsiteBookArtPlanTranslationInput:
+      type: object
+      additionalProperties: false
+      required: [outputKind, schemaVersion, brief, legacyPlan, candidateId]
+      properties:
+        outputKind: { const: evavo_legacy_website_book_art_plan_translation_input }
+        schemaVersion: { const: 1 }
+        brief:
+          type: object
+          description: Canonical fingerprint-valid evavo_book_art_brief owned by Docs Suite.
+        legacyPlan:
+          type: object
+          description: Exact retained Website book_cover_artwork_generation_plan_v1.
+        candidateId:
+          type: string
+          minLength: 1
+          maxLength: 200
+    LegacyWebsiteBookArtPlanTranslationProtocol:
+      type: object
+      additionalProperties: false
+      required:
+        - schemaVersion
+        - contract
+        - translationInputKind
+        - translationResultKind
+        - requiresCanonicalBookArtBrief
+        - verifiesExactBriefFingerprint
+        - verifiesLegacyPlanIdentity
+        - verifiesCandidateUniqueness
+        - verifiesArtDirectionDigest
+        - rawLegacyPromptTrustedAsAuthority
+        - translationReadOnly
+        - providerCallPerformed
+        - runtimeJobSubmitted
+        - candidateArtifactsWritten
+        - authoritativeBookWritesPerformed
+        - selectionPerformed
+        - promotionPerformed
+        - bookUseBindingCreated
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        schemaVersion: { const: 1 }
+        contract: { const: evavo_book_art_profile_v1 }
+        translationInputKind: { const: evavo_legacy_website_book_art_plan_translation_input }
+        translationResultKind: { const: evavo_legacy_website_book_art_plan_translation_result }
+        requiresCanonicalBookArtBrief: { const: true }
+        verifiesExactBriefFingerprint: { const: true }
+        verifiesLegacyPlanIdentity: { const: true }
+        verifiesCandidateUniqueness: { const: true }
+        verifiesArtDirectionDigest: { const: true }
+        rawLegacyPromptTrustedAsAuthority: { const: false }
+        translationReadOnly: { const: true }
+        providerCallPerformed: { const: false }
+        runtimeJobSubmitted: { const: false }
+        candidateArtifactsWritten: { const: false }
+        authoritativeBookWritesPerformed: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+    LegacyWebsiteBookArtPlanTranslationResult:
+      type: object
+      additionalProperties: false
+      required:
+        - outputKind
+        - schemaVersion
+        - status
+        - identity
+        - legacyEvidence
+        - blockers
+        - warnings
+        - shadowOnly
+        - rawLegacyPromptTrustedAsAuthority
+        - authoritativeWritesPerformed
+        - providerCandidateMayBeFinal
+        - promotionRequired
+        - artifactBytesRead
+        - artifactBytesRewritten
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        outputKind: { const: evavo_legacy_website_book_art_plan_translation_result }
+        schemaVersion: { const: 1 }
+        status: { enum: [blocked, ready_for_shadow_comparison] }
+        identity: { type: object }
+        workOrder: { type: object }
+        legacyEvidence: { type: object }
+        blockers:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+        shadowOnly: { const: true }
+        rawLegacyPromptTrustedAsAuthority: { const: false }
+        authoritativeWritesPerformed: { const: false }
+        providerCandidateMayBeFinal: { const: false }
+        promotionRequired: { const: true }
+        artifactBytesRead: { const: false }
+        artifactBytesRewritten: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
     BookArtProviderShadowRequest:
       type: object
       additionalProperties: false

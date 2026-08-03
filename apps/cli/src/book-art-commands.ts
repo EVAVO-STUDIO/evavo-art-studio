@@ -3,6 +3,11 @@ import path from "node:path";
 
 import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
+  BOOK_ART_PROFILE_CONTRACT,
+  BOOK_ART_PROFILE_SCHEMA_VERSION,
+  translateLegacyWebsiteBookArtGenerationPlan,
+} from "@evavo/art-contracts";
+import {
   BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
   BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
   compileBookArtProviderShadowJob,
@@ -32,6 +37,8 @@ export type BookArtCommandResult =
 
 const COMMANDS = new Set([
   "book-art-legacy-register",
+  "book-art-legacy-plan-protocol",
+  "book-art-legacy-plan-translate",
   "book-art-provider-protocol",
   "book-art-provider-compile",
   "book-art-provider-submit",
@@ -289,6 +296,32 @@ function docsReleaseProtocol(
   } as const;
 }
 
+
+function legacyPlanProtocol() {
+  return {
+    schemaVersion: BOOK_ART_PROFILE_SCHEMA_VERSION,
+    contract: BOOK_ART_PROFILE_CONTRACT,
+    translationInputKind: "evavo_legacy_website_book_art_plan_translation_input",
+    translationResultKind: "evavo_legacy_website_book_art_plan_translation_result",
+    requiresCanonicalBookArtBrief: true,
+    verifiesExactBriefFingerprint: true,
+    verifiesLegacyPlanIdentity: true,
+    verifiesCandidateUniqueness: true,
+    verifiesArtDirectionDigest: true,
+    rawLegacyPromptTrustedAsAuthority: false,
+    translationReadOnly: true,
+    providerCallPerformed: false,
+    runtimeJobSubmitted: false,
+    candidateArtifactsWritten: false,
+    authoritativeBookWritesPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  } as const;
+}
+
 export async function handleBookArtCommand(
   command: string,
   values: BookArtCommandValues,
@@ -309,6 +342,20 @@ export async function handleBookArtCommand(
       handled: true,
       value: result,
       ...(result.status === "registered" ? {} : { exitCode: 2 }),
+    };
+  }
+  if (command === "book-art-legacy-plan-protocol") {
+    return { handled: true, value: legacyPlanProtocol() };
+  }
+  if (command === "book-art-legacy-plan-translate") {
+    const inputPath = required(values.input, "--input");
+    const result = await translateLegacyWebsiteBookArtGenerationPlan(
+      await readInputObject(inputPath, "Legacy Website Book Art plan translation input"),
+    );
+    return {
+      handled: true,
+      value: result,
+      ...(result.status === "ready_for_shadow_comparison" ? {} : { exitCode: 2 }),
     };
   }
   const policy = providerPolicy();

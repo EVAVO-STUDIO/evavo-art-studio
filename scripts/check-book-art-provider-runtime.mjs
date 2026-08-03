@@ -6,6 +6,7 @@ const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.u
 const read = (relative) => readFileSync(path.join(root, relative), "utf8");
 const json = (relative) => JSON.parse(read(relative));
 
+const productionProfile = read("packages/contracts/src/book-production-profile.ts");
 const sharedRuntime = read("packages/book-art-runtime/src/index.ts");
 const sharedPackage = json("packages/book-art-runtime/package.json");
 const sharedTsconfig = json("packages/book-art-runtime/tsconfig.json");
@@ -42,6 +43,24 @@ const problems = [];
 
 function assert(condition, message) {
   if (!condition) problems.push(message);
+}
+
+
+for (const token of [
+  "LegacyWebsiteBookArtPlanTranslationInputV1",
+  "LegacyWebsiteBookArtPlanTranslationResultV1",
+  "translateLegacyWebsiteBookArtGenerationPlan",
+  "ready_for_shadow_comparison",
+  "rawLegacyPromptTrustedAsAuthority: false",
+  "artifactBytesRead: false",
+  "artifactBytesRewritten: false",
+  "runtimeCutoverApproved: false",
+  "publicationPerformed: false",
+]) {
+  assert(
+    productionProfile.includes(token),
+    `Book Art legacy plan translator is missing ${token}`,
+  );
 }
 
 for (const token of [
@@ -180,6 +199,13 @@ for (const token of [
 }
 
 for (const token of [
+  "/v1/book-art/legacy-plan-runtime",
+  "/v1/book-art/legacy-plans/translate",
+  "translateLegacyWebsiteBookArtGenerationPlan",
+  "requiresCanonicalBookArtBrief: true",
+  "rawLegacyPromptTrustedAsAuthority: false",
+  "translationReadOnly: true",
+  "runtimeJobSubmitted: false",
   "/v1/book-art/provider-runtime",
   "/v1/book-art/provider-jobs/compile",
   "/v1/book-art/provider-jobs/submit",
@@ -209,6 +235,11 @@ for (const token of [
 }
 
 for (const token of [
+  "book-art-legacy-plan-protocol",
+  "book-art-legacy-plan-translate",
+  "translateLegacyWebsiteBookArtGenerationPlan",
+  "requiresCanonicalBookArtBrief: true",
+  "translationReadOnly: true",
   "book-art-provider-protocol",
   "book-art-provider-compile",
   "book-art-provider-submit",
@@ -228,6 +259,11 @@ assert(
 );
 
 for (const token of [
+  "book_art_legacy_plan_translation_protocol",
+  "translate_legacy_website_book_art_plan",
+  "translateLegacyWebsiteBookArtGenerationPlan",
+  "requiresCanonicalBookArtBrief: true",
+  "translationReadOnly: true",
   "book_art_provider_runtime_protocol",
   "compile_book_art_provider_shadow_job",
   "submit_book_art_provider_shadow_job",
@@ -287,6 +323,8 @@ for (const title of [
   assert(workerTests.includes(title), `Worker Book Art tests are missing: ${title}`);
 }
 for (const token of [
+  "Book Art REST exposes authenticated read-only legacy plan translation without provider policy",
+  "Book Art REST blocks stale or duplicate legacy candidate evidence",
   "Book Art REST compilation injects host policy and performs no runtime write",
   "Book Art REST submission is authenticated and duplicate-safe without provider execution",
   "BOOK_ART_RUNTIME_UNAUTHORIZED",
@@ -295,6 +333,7 @@ for (const token of [
   assert(apiTests.includes(token), `Book Art REST tests are missing ${token}`);
 }
 for (const token of [
+  "CLI translates an exact legacy Website plan without provider policy or side effects",
   "CLI compiles with host policy and writes no runtime job",
   "CLI submits one duplicate-safe durable Book Art job without a provider call",
   "CLI rejects caller-supplied provider policy",
@@ -309,6 +348,10 @@ for (const token of [
   assert(mcpTests.includes(token), `Book Art MCP tests are missing ${token}`);
 }
 for (const token of [
+  "/v1/book-art/legacy-plan-runtime:",
+  "/v1/book-art/legacy-plans/translate:",
+  "LegacyWebsiteBookArtPlanTranslationInput:",
+  "LegacyWebsiteBookArtPlanTranslationResult:",
   "/v1/book-art/provider-runtime:",
   "/v1/book-art/provider-jobs/compile:",
   "/v1/book-art/provider-jobs/submit:",
@@ -340,6 +383,9 @@ for (const token of [
 }
 
 for (const token of [
+  "Legacy Website plan translation",
+  "canonical Docs-owned Book Art brief",
+  "raw legacy prompt",
   "Shared runtime ownership",
   "REST, CLI and MCP parity",
   "exactly one provider candidate",
@@ -377,6 +423,9 @@ console.log(
       contract: "evavo_book_art_provider_shadow_runtime_v1",
       sharedRuntimePackage: "@evavo/art-book-runtime",
       workerCompatibilityReexport: true,
+      legacyPlanTranslation: true,
+      legacyPlanTranslationRequiresCanonicalBrief: true,
+      rawLegacyPromptTrustedAsAuthority: false,
       restParity: true,
       cliParity: true,
       mcpParity: true,

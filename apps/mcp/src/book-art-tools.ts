@@ -2,6 +2,11 @@ import path from "node:path";
 
 import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
+  BOOK_ART_PROFILE_CONTRACT,
+  BOOK_ART_PROFILE_SCHEMA_VERSION,
+  translateLegacyWebsiteBookArtGenerationPlan,
+} from "@evavo/art-contracts";
+import {
   BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
   BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
   compileBookArtProviderShadowJob,
@@ -174,6 +179,32 @@ function docsReleaseProtocol(
   } as const;
 }
 
+
+function legacyPlanProtocol() {
+  return {
+    schemaVersion: BOOK_ART_PROFILE_SCHEMA_VERSION,
+    contract: BOOK_ART_PROFILE_CONTRACT,
+    translationInputKind: "evavo_legacy_website_book_art_plan_translation_input",
+    translationResultKind: "evavo_legacy_website_book_art_plan_translation_result",
+    requiresCanonicalBookArtBrief: true,
+    verifiesExactBriefFingerprint: true,
+    verifiesLegacyPlanIdentity: true,
+    verifiesCandidateUniqueness: true,
+    verifiesArtDirectionDigest: true,
+    rawLegacyPromptTrustedAsAuthority: false,
+    translationReadOnly: true,
+    providerCallPerformed: false,
+    runtimeJobSubmitted: false,
+    candidateArtifactsWritten: false,
+    authoritativeBookWritesPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  } as const;
+}
+
 function requiredPolicy(): BookArtProviderAdapterPolicyV1 {
   const policy = providerPolicy();
   if (!policy) {
@@ -201,6 +232,35 @@ export function registerBookArtTools(server: McpServer): void {
       inputSchema: z.object({}),
     },
     async () => textResult(providerProtocol(providerPolicy())),
+  );
+
+
+  server.registerTool(
+    "book_art_legacy_plan_translation_protocol",
+    {
+      description:
+        "Report the exact read-only legacy Website Book Art plan translation contract. Translation requires a canonical Docs-owned brief, trusts no raw legacy prompt and performs no provider call or runtime write.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(legacyPlanProtocol()),
+  );
+
+  server.registerTool(
+    "translate_legacy_website_book_art_plan",
+    {
+      description:
+        "Validate one canonical Book Art brief and one exact retained Website cover-generation plan, then translate one candidate into a provider-neutral Art Studio work order for shadow comparison only. This tool calls no provider and writes no runtime job or artifact.",
+      inputSchema: z.object({ translation: z.unknown() }),
+    },
+    async ({ translation }) => {
+      try {
+        return textResult(
+          await translateLegacyWebsiteBookArtGenerationPlan(translation),
+        );
+      } catch (error: unknown) {
+        return toolError("BOOK_ART_LEGACY_PLAN_TRANSLATION_REJECTED", error);
+      }
+    },
   );
 
   server.registerTool(
