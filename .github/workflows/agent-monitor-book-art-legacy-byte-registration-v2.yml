@@ -30,7 +30,7 @@ jobs:
       - name: Check out exact observed feature head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ env.EXPECTED_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -39,7 +39,9 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "${EXPECTED_SHA}" ]]
-          [[ "${{ github.event.pull_request.base.ref }}" == "${TARGET_BRANCH}" ]]
+          git fetch --no-tags --prune origin \
+            +refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}
+          [[ "$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})" == "${EXPECTED_SHA}" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
       - name: Watch exact bootstrap workflow
