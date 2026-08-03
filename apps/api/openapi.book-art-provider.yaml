@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: EVAVO Art Studio Book Art Provider Runtime API
-  version: 0.4.0
+  version: 0.5.0
   description: >-
-    Exact legacy Website plan translation plus shadow-only Book Art provider job compilation, durable submission,
+    Exact legacy Website cover and illustration plan translation plus shadow-only Book Art provider job compilation, durable submission,
     immutable inspection and structural Website parity. The Art Studio host owns the adapter allow-list.
     Compilation, submission and inspection do not themselves call an image
     provider, create candidate artifacts, select artwork, promote a master,
@@ -52,6 +52,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LegacyWebsiteBookArtPlanTranslationResult"
+        "401":
+          $ref: "#/components/responses/AuthorizationError"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/ConfigurationError"
+
+  /v1/book-art/legacy-illustration-plan-runtime:
+    get:
+      tags: [Book Art Provider Runtime]
+      operationId: getLegacyWebsiteBookIllustrationPlanTranslationProtocol
+      summary: Read the exact legacy illustration-plan authority boundary
+      security: []
+      responses:
+        "200":
+          description: Read-only legacy Website Book Illustration plan translation protocol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegacyWebsiteBookIllustrationPlanTranslationProtocol"
+  /v1/book-art/legacy-illustration-plans/translate:
+    post:
+      tags: [Book Art Provider Runtime]
+      operationId: translateLegacyWebsiteBookIllustrationGenerationPlan
+      summary: Translate one exact legacy Website illustration candidate for shadow comparison
+      description: >-
+        Requires a canonical fingerprint-valid Book Art brief, the exact retained
+        Website illustration plan, exact style and page authorities, and one candidate identity.
+        The operation is authenticated and read-only, trusts neither raw legacy prompts nor
+        legacy layout as Art authority, calls no provider and writes no runtime job or artifact.
+      security:
+        - ArtStudioControlToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LegacyWebsiteBookIllustrationPlanTranslationInput"
+      responses:
+        "200":
+          description: Provider-neutral illustration work order ready for shadow comparison
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegacyWebsiteBookIllustrationPlanTranslationResult"
         "401":
           $ref: "#/components/responses/AuthorizationError"
         "422":
@@ -269,6 +314,121 @@ components:
         authoritativeWritesPerformed: { const: false }
         providerCandidateMayBeFinal: { const: false }
         promotionRequired: { const: true }
+        artifactBytesRead: { const: false }
+        artifactBytesRewritten: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+
+    LegacyWebsiteBookIllustrationPlanTranslationInput:
+      type: object
+      additionalProperties: false
+      required: [outputKind, schemaVersion, brief, legacyPlan, candidateId]
+      properties:
+        outputKind: { const: evavo_legacy_website_book_illustration_plan_translation_input }
+        schemaVersion: { const: 1 }
+        brief:
+          type: object
+          description: Canonical fingerprint-valid evavo_book_art_brief owned by Docs Suite.
+        legacyPlan:
+          type: object
+          description: Exact retained Website book_illustration_generation_plan_v1.
+        candidateId:
+          type: string
+          minLength: 1
+          maxLength: 200
+    LegacyWebsiteBookIllustrationPlanTranslationProtocol:
+      type: object
+      additionalProperties: false
+      required:
+        - schemaVersion
+        - contract
+        - translationInputKind
+        - translationResultKind
+        - requiresCanonicalBookArtBrief
+        - verifiesExactBriefFingerprint
+        - verifiesLegacyPlanIdentity
+        - verifiesCandidateUniqueness
+        - verifiesArtDirectionDigest
+        - verifiesStyleAuthorityDigest
+        - verifiesPageAuthorityDigest
+        - rawLegacyPromptTrustedAsAuthority
+        - legacyLayoutTrustedAsArtAuthority
+        - translationReadOnly
+        - providerCallPerformed
+        - runtimeJobSubmitted
+        - candidateArtifactsWritten
+        - authoritativeBookWritesPerformed
+        - selectionPerformed
+        - promotionPerformed
+        - bookUseBindingCreated
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        schemaVersion: { const: 1 }
+        contract: { const: evavo_book_art_profile_v1 }
+        translationInputKind: { const: evavo_legacy_website_book_illustration_plan_translation_input }
+        translationResultKind: { const: evavo_legacy_website_book_illustration_plan_translation_result }
+        requiresCanonicalBookArtBrief: { const: true }
+        verifiesExactBriefFingerprint: { const: true }
+        verifiesLegacyPlanIdentity: { const: true }
+        verifiesCandidateUniqueness: { const: true }
+        verifiesArtDirectionDigest: { const: true }
+        verifiesStyleAuthorityDigest: { const: true }
+        verifiesPageAuthorityDigest: { const: true }
+        rawLegacyPromptTrustedAsAuthority: { const: false }
+        legacyLayoutTrustedAsArtAuthority: { const: false }
+        translationReadOnly: { const: true }
+        providerCallPerformed: { const: false }
+        runtimeJobSubmitted: { const: false }
+        candidateArtifactsWritten: { const: false }
+        authoritativeBookWritesPerformed: { const: false }
+        selectionPerformed: { const: false }
+        promotionPerformed: { const: false }
+        bookUseBindingCreated: { const: false }
+        runtimeCutoverApproved: { const: false }
+        publicationPerformed: { const: false }
+    LegacyWebsiteBookIllustrationPlanTranslationResult:
+      type: object
+      additionalProperties: false
+      required:
+        - outputKind
+        - schemaVersion
+        - status
+        - identity
+        - legacyEvidence
+        - blockers
+        - warnings
+        - shadowOnly
+        - rawLegacyPromptTrustedAsAuthority
+        - legacyLayoutTrustedAsArtAuthority
+        - authoritativeWritesPerformed
+        - providerCandidateMayBeFinal
+        - promotionRequired
+        - bookUseBindingRequired
+        - artifactBytesRead
+        - artifactBytesRewritten
+        - runtimeCutoverApproved
+        - publicationPerformed
+      properties:
+        outputKind: { const: evavo_legacy_website_book_illustration_plan_translation_result }
+        schemaVersion: { const: 1 }
+        status: { enum: [blocked, ready_for_shadow_comparison] }
+        identity: { type: object }
+        workOrder: { type: object }
+        legacyEvidence: { type: object }
+        blockers:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+        shadowOnly: { const: true }
+        rawLegacyPromptTrustedAsAuthority: { const: false }
+        legacyLayoutTrustedAsArtAuthority: { const: false }
+        authoritativeWritesPerformed: { const: false }
+        providerCandidateMayBeFinal: { const: false }
+        promotionRequired: { const: true }
+        bookUseBindingRequired: { const: true }
         artifactBytesRead: { const: false }
         artifactBytesRewritten: { const: false }
         runtimeCutoverApproved: { const: false }
