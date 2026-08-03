@@ -2,6 +2,11 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { ArtifactStore } from "@evavo/art-artifacts";
 import {
+  BOOK_ART_PROFILE_CONTRACT,
+  BOOK_ART_PROFILE_SCHEMA_VERSION,
+  translateLegacyWebsiteBookArtGenerationPlan,
+} from "@evavo/art-contracts";
+import {
   BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
   BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
   compileBookArtProviderShadowJob,
@@ -45,6 +50,8 @@ const COMPILE_PATH = "/v1/book-art/provider-jobs/compile";
 const SUBMIT_PATH = "/v1/book-art/provider-jobs/submit";
 const INSPECT_PATH = "/v1/book-art/provider-jobs/inspect";
 const PARITY_PATH = "/v1/book-art/provider-jobs/parity";
+const LEGACY_PLAN_PROTOCOL_PATH = "/v1/book-art/legacy-plan-runtime";
+const LEGACY_PLAN_TRANSLATE_PATH = "/v1/book-art/legacy-plans/translate";
 const DOCS_RELEASE_PROTOCOL_PATH = "/v1/book-art/docs-release-runtime";
 const DOCS_RELEASE_COMPILE_PATH = "/v1/book-art/docs-releases/compile";
 const DOCS_RELEASE_SUBMIT_PATH = "/v1/book-art/docs-releases/submit";
@@ -60,6 +67,8 @@ function pathHandled(pathname: string): boolean {
     pathname === SUBMIT_PATH ||
     pathname === INSPECT_PATH ||
     pathname === PARITY_PATH ||
+    pathname === LEGACY_PLAN_PROTOCOL_PATH ||
+    pathname === LEGACY_PLAN_TRANSLATE_PATH ||
     pathname === DOCS_RELEASE_PROTOCOL_PATH ||
     pathname === DOCS_RELEASE_COMPILE_PATH ||
     pathname === DOCS_RELEASE_SUBMIT_PATH
@@ -100,7 +109,7 @@ function requireProtectedAccess(context: BookArtApiContext): boolean {
         error: {
           code: "BOOK_ART_RUNTIME_ACCESS_UNAVAILABLE",
           message:
-            "Book Art provider submission, inspection and parity require EVAVO_ART_ALLOW_WRITES=true and a server-side control token of at least 32 bytes.",
+            "Book Art legacy-plan translation, provider submission, inspection and parity require EVAVO_ART_ALLOW_WRITES=true and a server-side control token of at least 32 bytes.",
         },
       },
       context.requestId,
@@ -221,6 +230,32 @@ function docsReleaseProtocol(
   };
 }
 
+
+function legacyPlanProtocol(): Readonly<Record<string, unknown>> {
+  return {
+    schemaVersion: BOOK_ART_PROFILE_SCHEMA_VERSION,
+    contract: BOOK_ART_PROFILE_CONTRACT,
+    translationInputKind: "evavo_legacy_website_book_art_plan_translation_input",
+    translationResultKind: "evavo_legacy_website_book_art_plan_translation_result",
+    requiresCanonicalBookArtBrief: true,
+    verifiesExactBriefFingerprint: true,
+    verifiesLegacyPlanIdentity: true,
+    verifiesCandidateUniqueness: true,
+    verifiesArtDirectionDigest: true,
+    rawLegacyPromptTrustedAsAuthority: false,
+    translationReadOnly: true,
+    providerCallPerformed: false,
+    runtimeJobSubmitted: false,
+    candidateArtifactsWritten: false,
+    authoritativeBookWritesPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  };
+}
+
 export async function handleBookArtApiRequest(
   context: BookArtApiContext,
 ): Promise<boolean> {
@@ -236,6 +271,28 @@ export async function handleBookArtApiRequest(
     url.pathname === DOCS_RELEASE_PROTOCOL_PATH
   ) {
     context.writeJson(response, 200, docsReleaseProtocol(context), requestId);
+    return true;
+  }
+  if (
+    request.method === "GET" &&
+    url.pathname === LEGACY_PLAN_PROTOCOL_PATH
+  ) {
+    context.writeJson(response, 200, legacyPlanProtocol(), requestId);
+    return true;
+  }
+  if (
+    request.method === "POST" &&
+    url.pathname === LEGACY_PLAN_TRANSLATE_PATH
+  ) {
+    if (!requireProtectedAccess(context)) return true;
+    const body = await context.readJsonBody(request, context.maximumBodyBytes);
+    const result = await translateLegacyWebsiteBookArtGenerationPlan(body);
+    context.writeJson(
+      response,
+      result.status === "ready_for_shadow_comparison" ? 200 : 422,
+      result,
+      requestId,
+    );
     return true;
   }
 

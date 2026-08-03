@@ -263,3 +263,120 @@ test("Book Art REST submission is authenticated and duplicate-safe without provi
     await rm(root, { recursive: true, force: true });
   }
 });
+
+function legacyPlan() {
+  return {
+    outputKind: "book_cover_artwork_generation_plan",
+    version: "book_cover_artwork_generation_plan_v1",
+    status: "ready_to_generate",
+    projectId: "project-1",
+    runId: "legacy-run-1",
+    requestedAt: "2026-08-02T00:00:00.000Z",
+    profile: "production",
+    sceneDigestSha256: sha("1"),
+    artDirectionDigestSha256: sha("d"),
+    publicationTextDigestSha256: sha("2"),
+    directionStatus: "ready_for_composition",
+    providerProfile: {},
+    maximumRefinementRounds: 3,
+    genreProfiles: [],
+    conceptTerritories: [],
+    tasks: [{
+      candidateId: "candidate-1",
+      order: 1,
+      territoryId: "manuscript-first",
+      territoryLabel: "Manuscript first",
+      territoryArchetype: "symbolic_monument",
+      variationId: "editorial_restraint",
+      prompt: "Create one manuscript-grounded text-free image with protected negative space and no publication lettering.",
+      promptDigestSha256: sha("3"),
+      expectedWidthPx: 2160,
+      expectedHeightPx: 3456,
+      flattenBackgroundHex: "#000000",
+      idempotencyKey: sha("4"),
+      state: "ready",
+      stopConditions: [],
+    }],
+    nextCandidateId: "candidate-1",
+    completedCandidateIds: [],
+    hardErrors: [],
+    warnings: [],
+    executionRules: [],
+    blockedClaims: [],
+    inputSnapshot: {},
+    inputDigestSha256: sha("5"),
+    planDigestSha256: sha("6"),
+  };
+}
+
+async function legacyTranslationBody() {
+  return {
+    outputKind: "evavo_legacy_website_book_art_plan_translation_input",
+    schemaVersion: 1,
+    brief: await brief(),
+    legacyPlan: legacyPlan(),
+    candidateId: "candidate-1",
+  };
+}
+
+test("Book Art REST exposes authenticated read-only legacy plan translation without provider policy", async () => {
+  await withServer(
+    { allowWrites: true, writeToken: token },
+    async (base) => {
+      const protocol = await fetch(`${base}/v1/book-art/legacy-plan-runtime`);
+      assert.equal(protocol.status, 200);
+      const protocolBody = await protocol.json();
+      assert.equal(protocolBody.contract, "evavo_book_art_profile_v1");
+      assert.equal(protocolBody.requiresCanonicalBookArtBrief, true);
+      assert.equal(protocolBody.rawLegacyPromptTrustedAsAuthority, false);
+      assert.equal(protocolBody.translationReadOnly, true);
+      assert.equal(protocolBody.providerCallPerformed, false);
+      assert.equal(protocolBody.runtimeJobSubmitted, false);
+
+      const denied = await fetch(`${base}/v1/book-art/legacy-plans/translate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(await legacyTranslationBody()),
+      });
+      assert.equal(denied.status, 401);
+
+      const translated = await fetch(`${base}/v1/book-art/legacy-plans/translate`, {
+        method: "POST",
+        headers: authorizedHeaders(),
+        body: JSON.stringify(await legacyTranslationBody()),
+      });
+      const text = await translated.text();
+      assert.equal(translated.status, 200, text);
+      const body = JSON.parse(text);
+      assert.equal(body.status, "ready_for_shadow_comparison", body.blockers.join("\n"));
+      assert.equal(body.shadowOnly, true);
+      assert.equal(body.rawLegacyPromptTrustedAsAuthority, false);
+      assert.equal(body.workOrder.outputKind, "evavo_book_art_production_work_order");
+      assert.equal(body.workOrder.providerCandidateMayBeFinal, false);
+      assert.equal(body.runtimeCutoverApproved, false);
+      assert.equal(body.publicationPerformed, false);
+    },
+  );
+});
+
+test("Book Art REST blocks stale or duplicate legacy candidate evidence", async () => {
+  const input = await legacyTranslationBody();
+  input.legacyPlan.artDirectionDigestSha256 = sha("9");
+  input.legacyPlan.tasks.push({ ...input.legacyPlan.tasks[0] });
+  await withServer(
+    { allowWrites: true, writeToken: token },
+    async (base) => {
+      const response = await fetch(`${base}/v1/book-art/legacy-plans/translate`, {
+        method: "POST",
+        headers: authorizedHeaders(),
+        body: JSON.stringify(input),
+      });
+      assert.equal(response.status, 422);
+      const body = await response.json();
+      assert.equal(body.status, "blocked");
+      assert.ok(body.blockers.some((item) => item.includes("stale or different art direction")));
+      assert.ok(body.blockers.some((item) => item.includes("exactly once")));
+      assert.equal(body.workOrder, undefined);
+    },
+  );
+});

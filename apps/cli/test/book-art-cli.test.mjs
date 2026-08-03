@@ -217,3 +217,67 @@ test("CLI rejects caller-supplied provider policy", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+function legacyPlan() {
+  return {
+    outputKind: "book_cover_artwork_generation_plan",
+    version: "book_cover_artwork_generation_plan_v1",
+    status: "ready_to_generate",
+    projectId: "project-1",
+    runId: "legacy-run-1",
+    requestedAt: "2026-08-02T00:00:00.000Z",
+    profile: "production",
+    sceneDigestSha256: sha("1"),
+    artDirectionDigestSha256: sha("d"),
+    publicationTextDigestSha256: sha("2"),
+    directionStatus: "ready_for_composition",
+    providerProfile: {}, maximumRefinementRounds: 3, genreProfiles: [], conceptTerritories: [],
+    tasks: [{
+      candidateId: "candidate-1", order: 1, territoryId: "manuscript-first", territoryLabel: "Manuscript first",
+      territoryArchetype: "symbolic_monument", variationId: "editorial_restraint",
+      prompt: "Create one manuscript-grounded text-free image with protected negative space and no publication lettering.",
+      promptDigestSha256: sha("3"), expectedWidthPx: 2160, expectedHeightPx: 3456,
+      flattenBackgroundHex: "#000000", idempotencyKey: sha("4"), state: "ready", stopConditions: [],
+    }],
+    nextCandidateId: "candidate-1", completedCandidateIds: [], hardErrors: [], warnings: [], executionRules: [], blockedClaims: [],
+    inputSnapshot: {}, inputDigestSha256: sha("5"), planDigestSha256: sha("6"),
+  };
+}
+
+async function legacyTranslationFile(root) {
+  const file = path.join(root, "legacy-plan-translation.json");
+  await writeFile(file, JSON.stringify({
+    outputKind: "evavo_legacy_website_book_art_plan_translation_input",
+    schemaVersion: 1,
+    brief: await brief(),
+    legacyPlan: legacyPlan(),
+    candidateId: "candidate-1",
+  }));
+  return file;
+}
+
+test("CLI translates an exact legacy Website plan without provider policy or side effects", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-book-art-cli-legacy-plan-"));
+  try {
+    const protocol = run(["book-art-legacy-plan-protocol"], { ...process.env });
+    assert.equal(protocol.status, 0, protocol.stderr);
+    const protocolBody = JSON.parse(protocol.stdout);
+    assert.equal(protocolBody.contract, "evavo_book_art_profile_v1");
+    assert.equal(protocolBody.translationReadOnly, true);
+    assert.equal(protocolBody.providerCallPerformed, false);
+    assert.equal(protocolBody.runtimeJobSubmitted, false);
+
+    const input = await legacyTranslationFile(root);
+    const result = run(["book-art-legacy-plan-translate", "--input", input], { ...process.env });
+    assert.equal(result.status, 0, result.stderr);
+    const body = JSON.parse(result.stdout);
+    assert.equal(body.status, "ready_for_shadow_comparison", body.blockers.join("\n"));
+    assert.equal(body.rawLegacyPromptTrustedAsAuthority, false);
+    assert.equal(body.workOrder.outputKind, "evavo_book_art_production_work_order");
+    assert.equal(body.authoritativeWritesPerformed, false);
+    assert.equal(body.runtimeCutoverApproved, false);
+    assert.equal(body.publicationPerformed, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

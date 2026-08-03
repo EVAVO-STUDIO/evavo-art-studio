@@ -313,3 +313,24 @@ Until those gates pass, Website remains the active compatibility runtime, Art St
 ## Legacy byte registration authority
 
 Legacy byte registration stores the original bytes unchanged as an unapproved source artifact and writes separate immutable byte-registration evidence. It does not create or update a named reference, select or promote artwork, create a Book-use binding, approve runtime cutover, delete Website source, or publish an edition.
+
+## Legacy Website plan translation
+
+Art Studio exposes the existing exact legacy Website cover-plan translator through all operator surfaces:
+
+```text
+GET  /v1/book-art/legacy-plan-runtime
+POST /v1/book-art/legacy-plans/translate
+
+evavo-art book-art-legacy-plan-protocol
+evavo-art book-art-legacy-plan-translate --input legacy-plan-translation.json
+
+book_art_legacy_plan_translation_protocol
+translate_legacy_website_book_art_plan
+```
+
+Translation requires both the exact retained `book_cover_artwork_generation_plan_v1` and a canonical Docs-owned Book Art brief with a fingerprint-valid `evavo_book_art_brief`. Art Studio does not manufacture missing workspace, book, edition, manuscript-revision, visual-canon, art-direction, evidence or rights identities from the legacy plan.
+
+The translator verifies project identity, exact brief fingerprint, art-direction digest, candidate uniqueness, candidate state, territory identity, prompt digest and retained plan digests. The raw legacy prompt is retained only by digest as migration evidence and is never trusted as the provider-neutral authority.
+
+A successful result is only `ready_for_shadow_comparison`. Translation is read-only: it performs no provider call, submits no runtime job, reads or writes no artwork bytes, selects or promotes no candidate, creates no Book-use binding, approves no cutover and publishes nothing. REST translation requires the Art Studio control token; local CLI and MCP callers use the same shared `translateLegacyWebsiteBookArtGenerationPlan` implementation.

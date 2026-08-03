@@ -28,6 +28,10 @@ test("MCP exposes shared Book Art submission, verified Docs release and read-onl
 
   for (const token of [
     "book_art_provider_runtime_protocol",
+    "book_art_legacy_plan_translation_protocol",
+    "translate_legacy_website_book_art_plan",
+    "translateLegacyWebsiteBookArtGenerationPlan",
+    "BOOK_ART_PROFILE_CONTRACT",
     "compile_book_art_provider_shadow_job",
     "submit_book_art_provider_shadow_job",
     "inspect_book_art_provider_shadow_job",
@@ -48,6 +52,10 @@ test("MCP exposes shared Book Art submission, verified Docs release and read-onl
     "LocalRuntimeRepository",
     "LocalArtifactStore",
     "maximumRuntimeAttempts: 1",
+    "requiresCanonicalBookArtBrief: true",
+    "rawLegacyPromptTrustedAsAuthority: false",
+    "translationReadOnly: true",
+    "runtimeJobSubmitted: false",
     "providerFallbackAllowed: false",
     "compilePerformsProviderCall: false",
     "submitPerformsProviderCall: false",
