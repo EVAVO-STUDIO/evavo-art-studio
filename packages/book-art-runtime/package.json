@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./docs-release": {
+      "types": "./dist/docs-release.d.ts",
+      "import": "./dist/docs-release.js"
+    },
     "./inspection": {
       "types": "./dist/inspection.d.ts",
       "import": "./dist/inspection.js"
