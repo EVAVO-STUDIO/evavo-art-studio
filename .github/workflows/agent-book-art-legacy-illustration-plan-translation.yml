@@ -1,0 +1,1059 @@
+name: Apply and verify Book Art legacy illustration plan translation
+
+on:
+  push:
+    branches:
+      - feat/book-art-legacy-illustration-plan-translation-20260803
+    paths:
+      - .github/workflows/agent-book-art-legacy-illustration-plan-translation.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-book-art-legacy-illustration-plan-translation
+  cancel-in-progress: false
+
+jobs:
+  apply-verify-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact feature branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: feat/book-art-legacy-illustration-plan-translation-20260803
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact branch and temporary-only input scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          [[ "$(git merge-base HEAD origin/main)" == "$(git rev-parse origin/main)" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          test "$(git diff --name-only origin/main...HEAD)" = ".github/workflows/agent-book-art-legacy-illustration-plan-translation.yml"
+
+      - name: Apply exact legacy illustration-plan surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/apply.py <<'PY'
+          from pathlib import Path
+
+          def read(path):
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path, value):
+              Path(path).write_text(value, encoding="utf-8")
+
+          def replace_once(path, old, new):
+              source = read(path)
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement anchor, found {count}: {old[:120]!r}")
+              write(path, source.replace(old, new, 1))
+
+          def append_once(path, marker, text):
+              source = read(path)
+              if marker in source:
+                  raise SystemExit(f"{path}: marker already exists: {marker}")
+              write(path, source.rstrip() + "\n\n" + text.strip() + "\n")
+
+          api = "apps/api/src/book-art-api.ts"
+          replace_once(
+              api,
+              '''  BOOK_ART_PROFILE_SCHEMA_VERSION,
+  translateLegacyWebsiteBookArtGenerationPlan,
+} from "@evavo/art-contracts";''',
+              '''  BOOK_ART_PROFILE_SCHEMA_VERSION,
+  translateLegacyWebsiteBookArtGenerationPlan,
+  translateLegacyWebsiteBookIllustrationGenerationPlan,
+} from "@evavo/art-contracts";''',
+          )
+          replace_once(
+              api,
+              '''const LEGACY_PLAN_PROTOCOL_PATH = "/v1/book-art/legacy-plan-runtime";
+const LEGACY_PLAN_TRANSLATE_PATH = "/v1/book-art/legacy-plans/translate";
+const DOCS_RELEASE_PROTOCOL_PATH''',
+              '''const LEGACY_PLAN_PROTOCOL_PATH = "/v1/book-art/legacy-plan-runtime";
+const LEGACY_PLAN_TRANSLATE_PATH = "/v1/book-art/legacy-plans/translate";
+const LEGACY_ILLUSTRATION_PLAN_PROTOCOL_PATH =
+  "/v1/book-art/legacy-illustration-plan-runtime";
+const LEGACY_ILLUSTRATION_PLAN_TRANSLATE_PATH =
+  "/v1/book-art/legacy-illustration-plans/translate";
+const DOCS_RELEASE_PROTOCOL_PATH''',
+          )
+          replace_once(
+              api,
+              '''    pathname === LEGACY_PLAN_PROTOCOL_PATH ||
+    pathname === LEGACY_PLAN_TRANSLATE_PATH ||
+    pathname === DOCS_RELEASE_PROTOCOL_PATH ||''',
+              '''    pathname === LEGACY_PLAN_PROTOCOL_PATH ||
+    pathname === LEGACY_PLAN_TRANSLATE_PATH ||
+    pathname === LEGACY_ILLUSTRATION_PLAN_PROTOCOL_PATH ||
+    pathname === LEGACY_ILLUSTRATION_PLAN_TRANSLATE_PATH ||
+    pathname === DOCS_RELEASE_PROTOCOL_PATH ||''',
+          )
+          illustration_protocol = '''
+          function legacyIllustrationPlanProtocol(): Readonly<Record<string, unknown>> {
+            return {
+              schemaVersion: BOOK_ART_PROFILE_SCHEMA_VERSION,
+              contract: BOOK_ART_PROFILE_CONTRACT,
+              translationInputKind:
+                "evavo_legacy_website_book_illustration_plan_translation_input",
+              translationResultKind:
+                "evavo_legacy_website_book_illustration_plan_translation_result",
+              requiresCanonicalBookArtBrief: true,
+              verifiesExactBriefFingerprint: true,
+              verifiesLegacyPlanIdentity: true,
+              verifiesCandidateUniqueness: true,
+              verifiesArtDirectionDigest: true,
+              verifiesStyleAuthorityDigest: true,
+              verifiesPageAuthorityDigest: true,
+              rawLegacyPromptTrustedAsAuthority: false,
+              legacyLayoutTrustedAsArtAuthority: false,
+              translationReadOnly: true,
+              providerCallPerformed: false,
+              runtimeJobSubmitted: false,
+              candidateArtifactsWritten: false,
+              authoritativeBookWritesPerformed: false,
+              selectionPerformed: false,
+              promotionPerformed: false,
+              bookUseBindingCreated: false,
+              runtimeCutoverApproved: false,
+              publicationPerformed: false,
+            };
+          }
+          '''
+          replace_once(
+              api,
+              '\nexport async function handleBookArtApiRequest(\n',
+              '\n' + illustration_protocol + '\nexport async function handleBookArtApiRequest(\n',
+          )
+          illustration_routes = '''
+            if (
+              request.method === "GET" &&
+              url.pathname === LEGACY_ILLUSTRATION_PLAN_PROTOCOL_PATH
+            ) {
+              context.writeJson(
+                response,
+                200,
+                legacyIllustrationPlanProtocol(),
+                requestId,
+              );
+              return true;
+            }
+            if (
+              request.method === "POST" &&
+              url.pathname === LEGACY_ILLUSTRATION_PLAN_TRANSLATE_PATH
+            ) {
+              if (!requireProtectedAccess(context)) return true;
+              const body = await context.readJsonBody(
+                request,
+                context.maximumBodyBytes,
+              );
+              const result =
+                await translateLegacyWebsiteBookIllustrationGenerationPlan(body);
+              context.writeJson(
+                response,
+                result.status === "ready_for_shadow_comparison" ? 200 : 422,
+                result,
+                requestId,
+              );
+              return true;
+            }
+
+          '''
+          replace_once(api, '\n  const postPath =\n', '\n' + illustration_routes + '  const postPath =\n')
+
+          cli = "apps/cli/src/book-art-commands.ts"
+          replace_once(
+              cli,
+              '''  BOOK_ART_PROFILE_SCHEMA_VERSION,
+  translateLegacyWebsiteBookArtGenerationPlan,
+} from "@evavo/art-contracts";''',
+              '''  BOOK_ART_PROFILE_SCHEMA_VERSION,
+  translateLegacyWebsiteBookArtGenerationPlan,
+  translateLegacyWebsiteBookIllustrationGenerationPlan,
+} from "@evavo/art-contracts";''',
+          )
+          replace_once(
+              cli,
+              '''  "book-art-legacy-plan-protocol",
+  "book-art-legacy-plan-translate",
+  "book-art-provider-protocol",''',
+              '''  "book-art-legacy-plan-protocol",
+  "book-art-legacy-plan-translate",
+  "book-art-legacy-illustration-plan-protocol",
+  "book-art-legacy-illustration-plan-translate",
+  "book-art-provider-protocol",''',
+          )
+          cli_protocol = illustration_protocol.replace(
+              'function legacyIllustrationPlanProtocol(): Readonly<Record<string, unknown>>',
+              'function legacyIllustrationPlanProtocol()',
+          ).replace('            };', '            } as const;')
+          replace_once(
+              cli,
+              '\nexport async function handleBookArtCommand(\n',
+              '\n' + cli_protocol + '\nexport async function handleBookArtCommand(\n',
+          )
+          cli_handlers = '''
+            if (command === "book-art-legacy-illustration-plan-protocol") {
+              return { handled: true, value: legacyIllustrationPlanProtocol() };
+            }
+            if (command === "book-art-legacy-illustration-plan-translate") {
+              const inputPath = required(values.input, "--input");
+              const result =
+                await translateLegacyWebsiteBookIllustrationGenerationPlan(
+                  await readInputObject(
+                    inputPath,
+                    "Legacy Website Book Illustration plan translation input",
+                  ),
+                );
+              return {
+                handled: true,
+                value: result,
+                ...(result.status === "ready_for_shadow_comparison"
+                  ? {}
+                  : { exitCode: 2 }),
+              };
+            }
+          '''
+          replace_once(cli, '\n  const policy = providerPolicy();\n', '\n' + cli_handlers + '  const policy = providerPolicy();\n')
+
+          cli_index = "apps/cli/src/index.ts"
+          replace_once(
+              cli_index,
+              '''  evavo-art book-art-legacy-plan-translate --input legacy-plan-translation.json [--output translated-book-art-work-order.json]
+
+  evavo-art book-art-provider-protocol''',
+              '''  evavo-art book-art-legacy-plan-translate --input legacy-plan-translation.json [--output translated-book-art-work-order.json]
+  evavo-art book-art-legacy-illustration-plan-protocol [--output book-art-legacy-illustration-plan-protocol.json]
+  evavo-art book-art-legacy-illustration-plan-translate --input legacy-illustration-plan-translation.json [--output translated-book-illustration-work-order.json]
+
+  evavo-art book-art-provider-protocol''',
+          )
+          replace_once(
+              cli_index,
+              '''Legacy Book Art plan translation requires a canonical fingerprint-valid Docs-owned brief and the exact retained Website plan; it calls no provider, submits no runtime job and does not require provider policy.
+Book Art provider commands require''',
+              '''Legacy Book Art plan translation requires a canonical fingerprint-valid Docs-owned brief and the exact retained Website plan; it calls no provider, submits no runtime job and does not require provider policy.
+Legacy Book Illustration plan translation additionally verifies exact style, page, layout and live-text protection evidence while leaving page layout and text authority in Docs Suite.
+Book Art provider commands require''',
+          )
+
+          mcp = "apps/mcp/src/book-art-tools.ts"
+          replace_once(
+              mcp,
+              '''  BOOK_ART_PROFILE_SCHEMA_VERSION,
+  translateLegacyWebsiteBookArtGenerationPlan,
+} from "@evavo/art-contracts";''',
+              '''  BOOK_ART_PROFILE_SCHEMA_VERSION,
+  translateLegacyWebsiteBookArtGenerationPlan,
+  translateLegacyWebsiteBookIllustrationGenerationPlan,
+} from "@evavo/art-contracts";''',
+          )
+          replace_once(
+              mcp,
+              '\nfunction requiredPolicy(): BookArtProviderAdapterPolicyV1 {\n',
+              '\n' + cli_protocol + '\nfunction requiredPolicy(): BookArtProviderAdapterPolicyV1 {\n',
+          )
+          mcp_tools = '''
+            server.registerTool(
+              "book_art_legacy_illustration_plan_translation_protocol",
+              {
+                description:
+                  "Report the exact read-only legacy Website Book Illustration plan translation contract. Translation requires a canonical Docs-owned brief plus exact style, page, layout and candidate evidence, while performing no provider call or runtime write.",
+                inputSchema: z.object({}),
+              },
+              async () => textResult(legacyIllustrationPlanProtocol()),
+            );
+
+            server.registerTool(
+              "translate_legacy_website_book_illustration_plan",
+              {
+                description:
+                  "Validate one canonical Book Art brief and one exact retained Website illustration-generation plan, then translate one candidate into a provider-neutral Art Studio work order for shadow comparison only. Docs Suite retains page layout and live-text authority; this tool calls no provider and writes no runtime job or artifact.",
+                inputSchema: z.object({ translation: z.unknown() }),
+              },
+              async ({ translation }) => {
+                try {
+                  return textResult(
+                    await translateLegacyWebsiteBookIllustrationGenerationPlan(
+                      translation,
+                    ),
+                  );
+                } catch (error: unknown) {
+                  return toolError(
+                    "BOOK_ART_LEGACY_ILLUSTRATION_PLAN_TRANSLATION_REJECTED",
+                    error,
+                  );
+                }
+              },
+            );
+
+          '''
+          replace_once(
+              mcp,
+              '  server.registerTool(\n    "book_art_docs_release_runtime_protocol",',
+              mcp_tools + '  server.registerTool(\n    "book_art_docs_release_runtime_protocol",',
+          )
+
+          openapi = "apps/api/openapi.book-art-provider.yaml"
+          replace_once(openapi, "  version: 0.4.0", "  version: 0.5.0")
+          replace_once(
+              openapi,
+              "    Exact legacy Website plan translation plus shadow-only Book Art provider job compilation, durable submission,\n",
+              "    Exact legacy Website cover and illustration plan translation plus shadow-only Book Art provider job compilation, durable submission,\n",
+          )
+          openapi_paths = '''
+            /v1/book-art/legacy-illustration-plan-runtime:
+              get:
+                tags: [Book Art Provider Runtime]
+                operationId: getLegacyWebsiteBookIllustrationPlanTranslationProtocol
+                summary: Read the exact legacy illustration-plan authority boundary
+                security: []
+                responses:
+                  "200":
+                    description: Read-only legacy Website Book Illustration plan translation protocol
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/LegacyWebsiteBookIllustrationPlanTranslationProtocol"
+            /v1/book-art/legacy-illustration-plans/translate:
+              post:
+                tags: [Book Art Provider Runtime]
+                operationId: translateLegacyWebsiteBookIllustrationGenerationPlan
+                summary: Translate one exact legacy Website illustration candidate for shadow comparison
+                description: >-
+                  Requires a canonical fingerprint-valid Book Art brief, the exact retained
+                  Website illustration plan, exact style and page authorities, and one candidate identity.
+                  The operation is authenticated and read-only, trusts neither raw legacy prompts nor
+                  legacy layout as Art authority, calls no provider and writes no runtime job or artifact.
+                security:
+                  - ArtStudioControlToken: []
+                requestBody:
+                  required: true
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/LegacyWebsiteBookIllustrationPlanTranslationInput"
+                responses:
+                  "200":
+                    description: Provider-neutral illustration work order ready for shadow comparison
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/LegacyWebsiteBookIllustrationPlanTranslationResult"
+                  "401":
+                    $ref: "#/components/responses/AuthorizationError"
+                  "422":
+                    $ref: "#/components/responses/ValidationError"
+                  "503":
+                    $ref: "#/components/responses/ConfigurationError"
+          '''
+          replace_once(
+              openapi,
+              "  /v1/book-art/provider-runtime:\n",
+              openapi_paths + "  /v1/book-art/provider-runtime:\n",
+          )
+          openapi_schemas = '''
+              LegacyWebsiteBookIllustrationPlanTranslationInput:
+                type: object
+                additionalProperties: false
+                required: [outputKind, schemaVersion, brief, legacyPlan, candidateId]
+                properties:
+                  outputKind: { const: evavo_legacy_website_book_illustration_plan_translation_input }
+                  schemaVersion: { const: 1 }
+                  brief:
+                    type: object
+                    description: Canonical fingerprint-valid evavo_book_art_brief owned by Docs Suite.
+                  legacyPlan:
+                    type: object
+                    description: Exact retained Website book_illustration_generation_plan_v1.
+                  candidateId:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+              LegacyWebsiteBookIllustrationPlanTranslationProtocol:
+                type: object
+                additionalProperties: false
+                required:
+                  - schemaVersion
+                  - contract
+                  - translationInputKind
+                  - translationResultKind
+                  - requiresCanonicalBookArtBrief
+                  - verifiesExactBriefFingerprint
+                  - verifiesLegacyPlanIdentity
+                  - verifiesCandidateUniqueness
+                  - verifiesArtDirectionDigest
+                  - verifiesStyleAuthorityDigest
+                  - verifiesPageAuthorityDigest
+                  - rawLegacyPromptTrustedAsAuthority
+                  - legacyLayoutTrustedAsArtAuthority
+                  - translationReadOnly
+                  - providerCallPerformed
+                  - runtimeJobSubmitted
+                  - candidateArtifactsWritten
+                  - authoritativeBookWritesPerformed
+                  - selectionPerformed
+                  - promotionPerformed
+                  - bookUseBindingCreated
+                  - runtimeCutoverApproved
+                  - publicationPerformed
+                properties:
+                  schemaVersion: { const: 1 }
+                  contract: { const: evavo_book_art_profile_v1 }
+                  translationInputKind: { const: evavo_legacy_website_book_illustration_plan_translation_input }
+                  translationResultKind: { const: evavo_legacy_website_book_illustration_plan_translation_result }
+                  requiresCanonicalBookArtBrief: { const: true }
+                  verifiesExactBriefFingerprint: { const: true }
+                  verifiesLegacyPlanIdentity: { const: true }
+                  verifiesCandidateUniqueness: { const: true }
+                  verifiesArtDirectionDigest: { const: true }
+                  verifiesStyleAuthorityDigest: { const: true }
+                  verifiesPageAuthorityDigest: { const: true }
+                  rawLegacyPromptTrustedAsAuthority: { const: false }
+                  legacyLayoutTrustedAsArtAuthority: { const: false }
+                  translationReadOnly: { const: true }
+                  providerCallPerformed: { const: false }
+                  runtimeJobSubmitted: { const: false }
+                  candidateArtifactsWritten: { const: false }
+                  authoritativeBookWritesPerformed: { const: false }
+                  selectionPerformed: { const: false }
+                  promotionPerformed: { const: false }
+                  bookUseBindingCreated: { const: false }
+                  runtimeCutoverApproved: { const: false }
+                  publicationPerformed: { const: false }
+              LegacyWebsiteBookIllustrationPlanTranslationResult:
+                type: object
+                additionalProperties: false
+                required:
+                  - outputKind
+                  - schemaVersion
+                  - status
+                  - identity
+                  - legacyEvidence
+                  - blockers
+                  - warnings
+                  - shadowOnly
+                  - rawLegacyPromptTrustedAsAuthority
+                  - legacyLayoutTrustedAsArtAuthority
+                  - authoritativeWritesPerformed
+                  - providerCandidateMayBeFinal
+                  - promotionRequired
+                  - bookUseBindingRequired
+                  - artifactBytesRead
+                  - artifactBytesRewritten
+                  - runtimeCutoverApproved
+                  - publicationPerformed
+                properties:
+                  outputKind: { const: evavo_legacy_website_book_illustration_plan_translation_result }
+                  schemaVersion: { const: 1 }
+                  status: { enum: [blocked, ready_for_shadow_comparison] }
+                  identity: { type: object }
+                  workOrder: { type: object }
+                  legacyEvidence: { type: object }
+                  blockers:
+                    type: array
+                    items: { type: string }
+                  warnings:
+                    type: array
+                    items: { type: string }
+                  shadowOnly: { const: true }
+                  rawLegacyPromptTrustedAsAuthority: { const: false }
+                  legacyLayoutTrustedAsArtAuthority: { const: false }
+                  authoritativeWritesPerformed: { const: false }
+                  providerCandidateMayBeFinal: { const: false }
+                  promotionRequired: { const: true }
+                  bookUseBindingRequired: { const: true }
+                  artifactBytesRead: { const: false }
+                  artifactBytesRewritten: { const: false }
+                  runtimeCutoverApproved: { const: false }
+                  publicationPerformed: { const: false }
+          '''
+          replace_once(
+              openapi,
+              "    BookArtProviderShadowRequest:\n",
+              openapi_schemas + "    BookArtProviderShadowRequest:\n",
+          )
+
+          fixture_helpers = r'''
+          const illustrationCanonical = (value) => Array.isArray(value)
+            ? value.map(illustrationCanonical)
+            : value && typeof value === "object"
+              ? Object.fromEntries(
+                  Object.entries(value)
+                    .filter(([, item]) => item !== undefined)
+                    .sort(([left], [right]) => left.localeCompare(right))
+                    .map(([key, item]) => [key, illustrationCanonical(item)]),
+                )
+              : value;
+          const illustrationHashText = async (value) =>
+            [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+              .map((byte) => byte.toString(16).padStart(2, "0"))
+              .join("");
+          const illustrationHash = async (value) =>
+            illustrationHashText(JSON.stringify(illustrationCanonical(value)));
+          const illustrationSeal = async (value, key) => ({
+            ...value,
+            [key]: await illustrationHash(value),
+          });
+
+          async function illustrationBrief() {
+            const value = await brief();
+            value.identity.requestId = "request-illustration-1";
+            value.purpose = "interior_full_page_illustration";
+            value.output.minimumPpi = 600;
+            value.output.colourIntent = "monochrome";
+            value.briefFingerprint = "";
+            value.briefFingerprint = await fingerprintBookArtBrief(value);
+            return value;
+          }
+
+          async function legacyIllustrationTranslationBody() {
+            const styleAuthority = await illustrationSeal({
+              outputKind: "book_illustration_style_authority",
+              version: "book_illustration_style_authority_v1",
+              status: "approved_for_page_design",
+              projectId: "project-1",
+              styleId: "style-1",
+              compiledAt: "2026-08-02T00:00:00.000Z",
+              styleFamily: "engraved_book_plate",
+              colourMode: "one_bit_black",
+              paperTone: "white",
+              inkLayerMode: "binary_alpha",
+              minimumLineWidthPt: 0.25,
+              targetLineArtPpi: 600,
+              profile: {},
+              projectVisualIdentity: "Exact manuscript-grounded line art",
+              projectDirectives: [],
+              prohibitedTraits: ["pseudo-text"],
+              historicalReferenceDigestSha256: sha("1"),
+              approvedReviewIds: ["review-1"],
+              hardErrors: [],
+              warnings: [],
+              requiredRevisions: [],
+              requiredHumanDecisions: [],
+              blockedClaims: [],
+            }, "authorityDigestSha256");
+            const pageAuthority = await illustrationSeal({
+              outputKind: "book_illustrated_page_authority",
+              version: "book_illustrated_page_authority_v1",
+              status: "ready_for_generation",
+              projectId: "project-1",
+              pageId: "page-1",
+              compiledAt: "2026-08-02T00:00:00.000Z",
+              styleAuthorityDigestSha256: styleAuthority.authorityDigestSha256,
+              pageRole: "full_page_black_ink_plate",
+              narrativeMode: "literal_scene",
+              manuscriptAuthorityDigestSha256: sha("2"),
+              visualManuscriptAuthorityDigestSha256: sha("3"),
+              manuscriptEvidenceSpanIds: ["span-1"],
+              directionDigestSha256: sha("d"),
+              layoutDigestSha256: sha("4"),
+              editionFormats: ["paperback"],
+              sharesPageWithLiveText: true,
+              protectedTextZoneCount: 2,
+              hardErrors: [],
+              warnings: [],
+              requiredHumanDecisions: [],
+              blockedClaims: [],
+            }, "authorityDigestSha256");
+            const prompt =
+              "Create one exact manuscript-grounded black-ink illustrated page candidate with no generated publication text.";
+            const candidateId = "page-1-formal_plate";
+            const inputSnapshot = {
+              projectId: "project-1",
+              runId: "illustration-run-1",
+              pageId: "page-1",
+            };
+            const withoutDigest = {
+              outputKind: "book_illustration_generation_plan",
+              version: "book_illustration_generation_plan_v1",
+              status: "ready_to_generate",
+              projectId: "project-1",
+              runId: "illustration-run-1",
+              requestedAt: "2026-08-02T00:00:00.000Z",
+              profile: "production",
+              styleAuthority,
+              pageAuthority,
+              providerProfile: {
+                adapter: "openai_image_api",
+                model: "gpt-image-2-2026-04-21",
+                size: "2048x3072",
+                quality: "high",
+                outputFormat: "png",
+                background: "opaque",
+                maximumCandidatesPerRun: 4,
+                maximumConcurrency: 1,
+                automaticProviderRetries: 0,
+              },
+              maximumRefinementRounds: 3,
+              tasks: [{
+                candidateId,
+                order: 1,
+                variation: "formal_plate",
+                prompt,
+                promptDigestSha256: await illustrationHashText(prompt),
+                expectedWidthPx: 2048,
+                expectedHeightPx: 3072,
+                flattenBackgroundHex: "#ffffff",
+                createTransparentInkLayer: false,
+                inkLayerMode: "none",
+                idempotencyKey: sha("5"),
+                state: "ready",
+                stopConditions: [],
+              }],
+              nextCandidateId: candidateId,
+              completedCandidateIds: [],
+              hardErrors: [],
+              warnings: [],
+              executionRules: [],
+              blockedClaims: [],
+              inputSnapshot,
+              inputDigestSha256: await illustrationHash(inputSnapshot),
+            };
+            return {
+              outputKind:
+                "evavo_legacy_website_book_illustration_plan_translation_input",
+              schemaVersion: 1,
+              brief: await illustrationBrief(),
+              legacyPlan: await illustrationSeal(
+                withoutDigest,
+                "planDigestSha256",
+              ),
+              candidateId,
+            };
+          }
+          '''
+
+          api_test = "apps/api/test/book-art-api.test.mjs"
+          api_tests = fixture_helpers + r'''
+          test("Book Art REST exposes authenticated read-only legacy illustration plan translation", async () => {
+            await withServer(
+              { allowWrites: true, writeToken: token },
+              async (base) => {
+                const protocol = await fetch(
+                  `${base}/v1/book-art/legacy-illustration-plan-runtime`,
+                );
+                assert.equal(protocol.status, 200);
+                const protocolBody = await protocol.json();
+                assert.equal(protocolBody.contract, "evavo_book_art_profile_v1");
+                assert.equal(protocolBody.verifiesStyleAuthorityDigest, true);
+                assert.equal(protocolBody.verifiesPageAuthorityDigest, true);
+                assert.equal(protocolBody.legacyLayoutTrustedAsArtAuthority, false);
+                assert.equal(protocolBody.translationReadOnly, true);
+                assert.equal(protocolBody.providerCallPerformed, false);
+                assert.equal(protocolBody.runtimeJobSubmitted, false);
+
+                const input = await legacyIllustrationTranslationBody();
+                const denied = await fetch(
+                  `${base}/v1/book-art/legacy-illustration-plans/translate`,
+                  {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify(input),
+                  },
+                );
+                assert.equal(denied.status, 401);
+
+                const translated = await fetch(
+                  `${base}/v1/book-art/legacy-illustration-plans/translate`,
+                  {
+                    method: "POST",
+                    headers: authorizedHeaders(),
+                    body: JSON.stringify(input),
+                  },
+                );
+                const text = await translated.text();
+                assert.equal(translated.status, 200, text);
+                const body = JSON.parse(text);
+                assert.equal(
+                  body.status,
+                  "ready_for_shadow_comparison",
+                  body.blockers.join("\n"),
+                );
+                assert.equal(body.workOrder.assetClass, "interior_illustration");
+                assert.equal(body.legacyEvidence.pageRole, "full_page_black_ink_plate");
+                assert.equal(body.legacyEvidence.sharesPageWithLiveText, true);
+                assert.equal(body.legacyEvidence.protectedTextZoneCount, 2);
+                assert.equal(body.rawLegacyPromptTrustedAsAuthority, false);
+                assert.equal(body.legacyLayoutTrustedAsArtAuthority, false);
+                assert.equal(body.authoritativeWritesPerformed, false);
+                assert.equal(body.runtimeCutoverApproved, false);
+                assert.equal(body.publicationPerformed, false);
+              },
+            );
+          });
+
+          test("Book Art REST blocks stale or duplicate legacy illustration evidence", async () => {
+            const input = await legacyIllustrationTranslationBody();
+            input.legacyPlan.pageAuthority.directionDigestSha256 = sha("9");
+            input.legacyPlan.tasks.push({ ...input.legacyPlan.tasks[0] });
+            await withServer(
+              { allowWrites: true, writeToken: token },
+              async (base) => {
+                const response = await fetch(
+                  `${base}/v1/book-art/legacy-illustration-plans/translate`,
+                  {
+                    method: "POST",
+                    headers: authorizedHeaders(),
+                    body: JSON.stringify(input),
+                  },
+                );
+                assert.equal(response.status, 422);
+                const body = await response.json();
+                assert.equal(body.status, "blocked");
+                assert.ok(
+                  body.blockers.some((item) =>
+                    item.includes("stale or different art direction"),
+                  ),
+                );
+                assert.ok(
+                  body.blockers.some((item) => item.includes("exactly once")),
+                );
+                assert.equal(body.workOrder, undefined);
+              },
+            );
+          });
+          '''
+          append_once(
+              api_test,
+              'Book Art REST exposes authenticated read-only legacy illustration plan translation',
+              api_tests,
+          )
+
+          cli_test = "apps/cli/test/book-art-cli.test.mjs"
+          cli_helpers = fixture_helpers.replace(
+              'async function legacyIllustrationTranslationBody()',
+              'async function legacyIllustrationTranslationValue()',
+          )
+          cli_tests = cli_helpers + r'''
+          async function legacyIllustrationTranslationFile(root) {
+            const file = path.join(
+              root,
+              "legacy-illustration-plan-translation.json",
+            );
+            await writeFile(
+              file,
+              JSON.stringify(await legacyIllustrationTranslationValue()),
+            );
+            return file;
+          }
+
+          test("CLI translates an exact legacy Website illustration plan without provider policy or side effects", async () => {
+            const root = await mkdtemp(
+              path.join(os.tmpdir(), "evavo-book-art-cli-legacy-illustration-plan-"),
+            );
+            try {
+              const protocol = run(
+                ["book-art-legacy-illustration-plan-protocol"],
+                { ...process.env },
+              );
+              assert.equal(protocol.status, 0, protocol.stderr);
+              const protocolBody = JSON.parse(protocol.stdout);
+              assert.equal(protocolBody.contract, "evavo_book_art_profile_v1");
+              assert.equal(protocolBody.verifiesStyleAuthorityDigest, true);
+              assert.equal(protocolBody.verifiesPageAuthorityDigest, true);
+              assert.equal(protocolBody.legacyLayoutTrustedAsArtAuthority, false);
+              assert.equal(protocolBody.translationReadOnly, true);
+              assert.equal(protocolBody.providerCallPerformed, false);
+              assert.equal(protocolBody.runtimeJobSubmitted, false);
+
+              const input = await legacyIllustrationTranslationFile(root);
+              const result = run(
+                [
+                  "book-art-legacy-illustration-plan-translate",
+                  "--input",
+                  input,
+                ],
+                { ...process.env },
+              );
+              assert.equal(result.status, 0, result.stderr);
+              const body = JSON.parse(result.stdout);
+              assert.equal(
+                body.status,
+                "ready_for_shadow_comparison",
+                body.blockers.join("\n"),
+              );
+              assert.equal(body.workOrder.assetClass, "interior_illustration");
+              assert.equal(body.legacyEvidence.pageRole, "full_page_black_ink_plate");
+              assert.equal(body.rawLegacyPromptTrustedAsAuthority, false);
+              assert.equal(body.legacyLayoutTrustedAsArtAuthority, false);
+              assert.equal(body.authoritativeWritesPerformed, false);
+              assert.equal(body.runtimeCutoverApproved, false);
+              assert.equal(body.publicationPerformed, false);
+            } finally {
+              await rm(root, { recursive: true, force: true });
+            }
+          });
+          '''
+          append_once(
+              cli_test,
+              'CLI translates an exact legacy Website illustration plan without provider policy',
+              cli_tests,
+          )
+
+          mcp_test = "apps/mcp/test/book-art-tools-contract.test.mjs"
+          replace_once(
+              mcp_test,
+              '''    "translateLegacyWebsiteBookArtGenerationPlan",
+    "BOOK_ART_PROFILE_CONTRACT",''',
+              '''    "translateLegacyWebsiteBookArtGenerationPlan",
+    "book_art_legacy_illustration_plan_translation_protocol",
+    "translate_legacy_website_book_illustration_plan",
+    "translateLegacyWebsiteBookIllustrationGenerationPlan",
+    "verifiesStyleAuthorityDigest: true",
+    "verifiesPageAuthorityDigest: true",
+    "legacyLayoutTrustedAsArtAuthority: false",
+    "BOOK_ART_PROFILE_CONTRACT",''',
+          )
+
+          openapi_test = "apps/api/test/book-art-openapi-contract.test.mjs"
+          replace_once(
+              openapi_test,
+              '''    "/v1/book-art/legacy-plans/translate:",
+    "/v1/book-art/provider-runtime:",''',
+              '''    "/v1/book-art/legacy-plans/translate:",
+    "/v1/book-art/legacy-illustration-plan-runtime:",
+    "/v1/book-art/legacy-illustration-plans/translate:",
+    "/v1/book-art/provider-runtime:",''',
+          )
+          replace_once(
+              openapi_test,
+              '''    "evavo_legacy_website_book_art_plan_translation_result",
+    "requiresCanonicalBookArtBrief: { const: true }",''',
+              '''    "evavo_legacy_website_book_art_plan_translation_result",
+    "evavo_legacy_website_book_illustration_plan_translation_input",
+    "evavo_legacy_website_book_illustration_plan_translation_result",
+    "verifiesStyleAuthorityDigest: { const: true }",
+    "verifiesPageAuthorityDigest: { const: true }",
+    "legacyLayoutTrustedAsArtAuthority: { const: false }",
+    "requiresCanonicalBookArtBrief: { const: true }",''',
+          )
+
+          checker = "scripts/check-book-art-provider-runtime.mjs"
+          replace_once(
+              checker,
+              '''const productionProfile = read("packages/contracts/src/book-production-profile.ts");
+const sharedRuntime''',
+              '''const productionProfile = read("packages/contracts/src/book-production-profile.ts");
+const legacyIllustrationProfile = read(
+  "packages/contracts/src/book-production-legacy-illustration-plan.ts",
+);
+const sharedRuntime''',
+          )
+          illustration_checker = '''
+          for (const token of [
+            "LegacyWebsiteBookIllustrationPlanTranslationInputV1",
+            "LegacyWebsiteBookIllustrationPlanTranslationResultV1",
+            "translateLegacyWebsiteBookIllustrationGenerationPlan",
+            "ready_for_shadow_comparison",
+            "rawLegacyPromptTrustedAsAuthority: false",
+            "legacyLayoutTrustedAsArtAuthority: false",
+            "artifactBytesRead: false",
+            "artifactBytesRewritten: false",
+            "runtimeCutoverApproved: false",
+            "publicationPerformed: false",
+          ]) {
+            assert(
+              legacyIllustrationProfile.includes(token),
+              `Book Art legacy illustration plan translator is missing ${token}`,
+            );
+          }
+
+          '''
+          replace_once(
+              checker,
+              'for (const token of [\n  "evavo_book_art_provider_shadow_runtime_v1",',
+              illustration_checker + 'for (const token of [\n  "evavo_book_art_provider_shadow_runtime_v1",',
+          )
+          replace_once(
+              checker,
+              '''  "/v1/book-art/legacy-plans/translate",
+  "translateLegacyWebsiteBookArtGenerationPlan",''',
+              '''  "/v1/book-art/legacy-plans/translate",
+  "translateLegacyWebsiteBookArtGenerationPlan",
+  "/v1/book-art/legacy-illustration-plan-runtime",
+  "/v1/book-art/legacy-illustration-plans/translate",
+  "translateLegacyWebsiteBookIllustrationGenerationPlan",
+  "verifiesStyleAuthorityDigest: true",
+  "verifiesPageAuthorityDigest: true",
+  "legacyLayoutTrustedAsArtAuthority: false",''',
+          )
+          replace_once(
+              checker,
+              '''  "book-art-legacy-plan-translate",
+  "translateLegacyWebsiteBookArtGenerationPlan",''',
+              '''  "book-art-legacy-plan-translate",
+  "translateLegacyWebsiteBookArtGenerationPlan",
+  "book-art-legacy-illustration-plan-protocol",
+  "book-art-legacy-illustration-plan-translate",
+  "translateLegacyWebsiteBookIllustrationGenerationPlan",
+  "verifiesStyleAuthorityDigest: true",
+  "verifiesPageAuthorityDigest: true",
+  "legacyLayoutTrustedAsArtAuthority: false",''',
+          )
+          replace_once(
+              checker,
+              '''  "translate_legacy_website_book_art_plan",
+  "translateLegacyWebsiteBookArtGenerationPlan",''',
+              '''  "translate_legacy_website_book_art_plan",
+  "translateLegacyWebsiteBookArtGenerationPlan",
+  "book_art_legacy_illustration_plan_translation_protocol",
+  "translate_legacy_website_book_illustration_plan",
+  "translateLegacyWebsiteBookIllustrationGenerationPlan",
+  "verifiesStyleAuthorityDigest: true",
+  "verifiesPageAuthorityDigest: true",
+  "legacyLayoutTrustedAsArtAuthority: false",''',
+          )
+          replace_once(
+              checker,
+              '''  "Book Art REST blocks stale or duplicate legacy candidate evidence",
+  "Book Art REST compilation injects host policy''',
+              '''  "Book Art REST blocks stale or duplicate legacy candidate evidence",
+  "Book Art REST exposes authenticated read-only legacy illustration plan translation",
+  "Book Art REST blocks stale or duplicate legacy illustration evidence",
+  "Book Art REST compilation injects host policy''',
+          )
+          replace_once(
+              checker,
+              '''  "CLI translates an exact legacy Website plan without provider policy or side effects",
+  "CLI compiles with host policy''',
+              '''  "CLI translates an exact legacy Website plan without provider policy or side effects",
+  "CLI translates an exact legacy Website illustration plan without provider policy or side effects",
+  "CLI compiles with host policy''',
+          )
+          replace_once(
+              checker,
+              '''  "/v1/book-art/legacy-plans/translate:",
+  "LegacyWebsiteBookArtPlanTranslationInput:",''',
+              '''  "/v1/book-art/legacy-plans/translate:",
+  "/v1/book-art/legacy-illustration-plan-runtime:",
+  "/v1/book-art/legacy-illustration-plans/translate:",
+  "LegacyWebsiteBookIllustrationPlanTranslationInput:",
+  "LegacyWebsiteBookIllustrationPlanTranslationResult:",
+  "LegacyWebsiteBookArtPlanTranslationInput:",''',
+          )
+          replace_once(
+              checker,
+              '''  "Legacy Website plan translation",
+  "canonical Docs-owned Book Art brief",''',
+              '''  "Legacy Website plan translation",
+  "Legacy Website illustration plan translation",
+  "canonical Docs-owned Book Art brief",''',
+          )
+          replace_once(
+              checker,
+              '''      legacyPlanTranslation: true,
+      legacyPlanTranslationRequiresCanonicalBrief: true,''',
+              '''      legacyPlanTranslation: true,
+      legacyIllustrationPlanTranslation: true,
+      legacyPlanTranslationRequiresCanonicalBrief: true,
+      legacyIllustrationLayoutTrustedAsArtAuthority: false,''',
+          )
+
+          docs = "docs/book-art-provider-runtime.md"
+          docs_append = '''
+          ## Legacy Website illustration plan translation
+
+          Art Studio exposes the existing exact legacy Website Book Illustration translator through all operator surfaces:
+
+          ```text
+          GET  /v1/book-art/legacy-illustration-plan-runtime
+          POST /v1/book-art/legacy-illustration-plans/translate
+
+          evavo-art book-art-legacy-illustration-plan-protocol
+          evavo-art book-art-legacy-illustration-plan-translate --input legacy-illustration-plan-translation.json
+
+          book_art_legacy_illustration_plan_translation_protocol
+          translate_legacy_website_book_illustration_plan
+          ```
+
+          Translation requires a canonical Docs-owned Book Art brief, its exact fingerprint, the retained `book_illustration_generation_plan_v1`, exact style and page authority fingerprints, protected live-text zones and one unique ready candidate. It validates project, art-direction, style, page, candidate, prompt, input and plan identity before returning a provider-neutral work order.
+
+          The raw legacy prompt is retained only by digest. Legacy page geometry and live text are not trusted as Art Studio authority: Docs Suite remains authoritative for page layout, captions, typography and publication text. A successful result is only `ready_for_shadow_comparison`.
+
+          Translation is read-only. It performs no provider call, submits no runtime job, reads or writes no artwork bytes, selects or promotes no candidate, creates no Book-use binding, approves no cutover and publishes nothing.
+          '''
+          append_once(
+              docs,
+              '## Legacy Website illustration plan translation',
+              docs_append,
+          )
+          PY
+          python /tmp/apply.py
+          rm -f /tmp/apply.py
+          git diff --check
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run exact target validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-book-art-provider-runtime.mjs
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-api test
+          pnpm --filter @evavo/art-studio-cli test
+          pnpm --filter @evavo/art-studio-mcp test
+          pnpm check
+
+      - name: Commit only the clean permanent source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          rm -f .github/workflows/agent-book-art-legacy-illustration-plan-translation.yml
+          git diff --check
+          git diff --name-only origin/main | sort > "${RUNNER_TEMP}/actual-final.txt"
+          cat > "${RUNNER_TEMP}/expected-final.txt" <<'PATHS'
+          apps/api/openapi.book-art-provider.yaml
+          apps/api/src/book-art-api.ts
+          apps/api/test/book-art-api.test.mjs
+          apps/api/test/book-art-openapi-contract.test.mjs
+          apps/cli/src/book-art-commands.ts
+          apps/cli/src/index.ts
+          apps/cli/test/book-art-cli.test.mjs
+          apps/mcp/src/book-art-tools.ts
+          apps/mcp/test/book-art-tools-contract.test.mjs
+          docs/book-art-provider-runtime.md
+          scripts/check-book-art-provider-runtime.mjs
+          PATHS
+          sed -i 's/^          //' "${RUNNER_TEMP}/expected-final.txt"
+          sort "${RUNNER_TEMP}/expected-final.txt" -o "${RUNNER_TEMP}/expected-final.txt"
+          diff -u "${RUNNER_TEMP}/expected-final.txt" "${RUNNER_TEMP}/actual-final.txt"
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(book-art): expose legacy illustration plan translation'
+          diff -u \
+            "${RUNNER_TEMP}/expected-final.txt" \
+            <(git diff --name-only origin/main...HEAD | sort)
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          git push origin HEAD:refs/heads/feat/book-art-legacy-illustration-plan-translation-20260803
