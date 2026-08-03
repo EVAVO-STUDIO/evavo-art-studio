@@ -1,2 +1,5 @@
 export * from "./book-studio-autopilot-routing.ts";
-export * from "./book-studio-project-contracts.ts";
+export {
+  canonicalBookJson,
+  sha256BookText,
+} from "./book-studio-project-contracts.ts";
