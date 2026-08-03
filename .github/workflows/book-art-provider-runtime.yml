@@ -6,6 +6,9 @@ on:
       - feat/book-art-legacy-illustration-plan-translation-20260803
     paths:
       - .github/workflows/book-art-provider-runtime.yml
+  pull_request:
+    branches: [main]
+    types: [ready_for_review, synchronize, reopened]
 
 permissions:
   contents: write
