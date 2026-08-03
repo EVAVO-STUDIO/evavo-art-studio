@@ -1,0 +1,39 @@
+{
+  "schema": "evavo/website-book-art-source-retirement",
+  "version": 1,
+  "recordedAt": "2026-08-04T00:00:00.000Z",
+  "sourceRepository": "EVAVO-STUDIO/Website",
+  "sourceReviewBaseCommit": "bd31f4fb42b3efdb6d1b86078e56dc0c0c293ec7",
+  "recoveredRetirementSourceCommit": "929a9375ab2e7f08eda652e14d45cded474c1c9b",
+  "authoritativeArtRepository": "EVAVO-STUDIO/evavo-art-studio",
+  "authoritativeArtCommit": "bc25cdd0fad5d562a8ed60be46ac2d99d62a23c9",
+  "docsSuiteRepository": "EVAVO-STUDIO/evavo-docs-suite",
+  "docsSuiteCommit": "ecf6bc25f33b81a2b306dabf17a8683d9db0d3b0",
+  "contract": "evavo_book_art_handoff_v1",
+  "retiredResponsibilities": [
+    "cover and illustration provider execution",
+    "source-art byte intake and generated-art storage",
+    "raster mastering, repair and finishing execution",
+    "candidate compilation, comparison, iteration, QA, selection and promotion",
+    "provider and post-process command execution"
+  ],
+  "retainedWebsiteResponsibilities": [
+    "manuscript-grounded art direction compatibility",
+    "read-only legacy artwork binding replay",
+    "editable cover composition and typography",
+    "ISBN, barcode and KDP geometry",
+    "optical proof and publication evidence"
+  ],
+  "websiteBookArtRuntimeActive": false,
+  "websiteMayWriteBookArtSourceBytes": false,
+  "websiteMaySelectOrPromoteBookArt": false,
+  "artStudioRuntimeAuthoritative": true,
+  "docsSuiteMustBindApprovedArtifact": true,
+  "bookArtRuntimeCutoverApproved": true,
+  "bookArtSourceDeletionApproved": true,
+  "legacyPlanTranslationAdaptersComplete": true,
+  "remainingBookStudioMigrationBoundaryCount": 12,
+  "overallBookProductCutoverApproved": false,
+  "publicationPerformed": false,
+  "recordFingerprint": "sha256:442b302635d8cc73080d4c0410b6017a565062f8bfbadf98ce27748c1507a41c"
+}
