@@ -1,0 +1,197 @@
+{
+  "schema": "evavo/book-studio-destination-surface-evidence",
+  "version": 1,
+  "recordedDate": "2026-08-04",
+  "repository": "EVAVO-STUDIO/Website",
+  "reviewedSourceReconciliationFingerprint": "sha256:ffff120fc155d88b7c6a8a545936c165a7d1f84e1e2a6ad57d57e51ac11aba77",
+  "sourceBundleSha256": "2e946a6b3343e691c4808a4640c8785b5679c9d3c283b579117940c1a9d754d1",
+  "observedRepositoryHeads": {
+    "website": "47ee7ec75fa546f28db109ebe4fe2c6d170b499d",
+    "writingStudio": "83a5d1b183335e2d86565b10f3f8c822399e3697",
+    "docsSuite": "ecf6bc25f33b81a2b306dabf17a8683d9db0d3b0",
+    "artStudio": "bc25cdd0fad5d562a8ed60be46ac2d99d62a23c9"
+  },
+  "writingCandidateCoordination": {
+    "contract": "evavo_docs_book_candidate_runtime_v1",
+    "writingStudioContractCommit": "dbe33dd046ce50ea23e01a3d913dad63acbc355a",
+    "writingStudioRestartSafeCommit": "83a5d1b183335e2d86565b10f3f8c822399e3697",
+    "docsSuiteCoordinatorCommit": "cdb0672bdc3dc9bc8272ff27184da19320d609bd",
+    "docsSuiteTransportHardeningCommit": "99f5aae362d5f1faf845e30063d4ca64599337da",
+    "protectedRestSurface": "/api/v1/book-studio/writing-candidate",
+    "candidateProseCrossesDocsApi": false,
+    "providerAttemptMaximum": 1,
+    "ambiguousRetryAllowed": false,
+    "immutableCandidateEvidenceRequired": true,
+    "canonicalManuscriptMutationPerformed": false,
+    "artStudioCalledByWritingStudio": false,
+    "publicationPerformed": false,
+    "status": "coordinated_restart_safe_runtime"
+  },
+  "programmeAndAmazonAutopilot": {
+    "contract": "evavo_docs_book_autopilot_v1",
+    "docsSuiteCommit": "46a6b7571e21ced18166a7b0171f0d5037734a83",
+    "protectedRestSurface": "/api/v1/book-studio/autopilot",
+    "cliSurface": "apps/web/scripts/evavo-docs-book-autopilot.mjs",
+    "mcpTool": "run_book_studio_autopilot",
+    "executionOperation": "execution.plan_next",
+    "publicationOperation": "publication.compile_programme",
+    "operationResultFingerprintsVerified": true,
+    "oneBoundedStepPerCall": true,
+    "dryRunCannotDispatch": true,
+    "automaticAmazonUploadAllowed": false,
+    "destinationSurfaceReady": true,
+    "docsSuiteIntegrationAdapterComplete": true,
+    "semanticParityVerified": false,
+    "sourcePaths": [
+      {
+        "path": "tools/evavo-doc-studio/scripts/run-book-amazon-autopilot.ts",
+        "byteLength": 6414,
+        "sha256": "93cca567b3922e7d533784208e12474b4edd30b7fb977e0de927f2446bbfe0eb",
+        "disposition": "REPLACE_WITH_VERSIONED_ADAPTER"
+      },
+      {
+        "path": "tools/evavo-doc-studio/scripts/run-book-autonomous-amazon-release.ts",
+        "byteLength": 6630,
+        "sha256": "e357431f4ff3bfac953c46c65c657e7ec86f2cb50063b3c884bfe4ad65053787",
+        "disposition": "REPLACE_WITH_VERSIONED_ADAPTER"
+      },
+      {
+        "path": "tools/evavo-doc-studio/scripts/run-book-programme-autopilot.ts",
+        "byteLength": 6000,
+        "sha256": "352a2013baca288fc5c1ab2e293f15089f2e4c01012196c9fa6cecbb5e9b9751",
+        "disposition": "REPLACE_WITH_VERSIONED_ADAPTER"
+      },
+      {
+        "path": "tools/evavo-doc-studio/scripts/run-book-studio-publication-handoff.ts",
+        "byteLength": 5823,
+        "sha256": "99115d33786505c512d4546d7f0021e6118aa95b36f2bafacacaad116a135498",
+        "disposition": "REPLACE_WITH_VERSIONED_ADAPTER"
+      }
+    ],
+    "authoritativeWritesPerformed": false,
+    "canonicalManuscriptMutationPerformed": false,
+    "runtimeCutoverApproved": false,
+    "sourceDeletionApproved": false,
+    "publicationPerformed": false
+  },
+  "legacyPlanDestinationSurfaces": [
+    {
+      "kind": "cover_artwork_generation",
+      "sourcePaths": [
+        {
+          "path": "tools/evavo-doc-studio/scripts/run-book-cover-artwork-generation.ts",
+          "byteLength": 12601,
+          "sha256": "9c102355a0b6e512ced87b208d86dca4d8bb674088697a845e304e07923ea8a6",
+          "disposition": "REPLACE_WITH_VERSIONED_ADAPTER"
+        },
+        {
+          "path": "tools/evavo-doc-studio/src/app/api/book-cover-studio/artwork-generation/route.ts",
+          "byteLength": 13946,
+          "sha256": "fd133282df665a44e72167cfc5c0f7306c0de96e22ba270a899ae2a56ce76497",
+          "disposition": "REPLACE_WITH_VERSIONED_ADAPTER"
+        }
+      ],
+      "artStudioMinimumCommit": "0f1a2ad79fce0cf33dc8dff9230477cfa8b61220",
+      "artStudioCurrentCommit": "bc25cdd0fad5d562a8ed60be46ac2d99d62a23c9",
+      "contract": "evavo_book_art_profile_v1",
+      "restProtocol": "/v1/book-art/legacy-plan-runtime",
+      "restTranslation": "/v1/book-art/legacy-plans/translate",
+      "cliProtocol": "book-art-legacy-plan-protocol",
+      "cliTranslation": "book-art-legacy-plan-translate",
+      "mcpProtocol": "book_art_legacy_plan_translation_protocol",
+      "mcpTranslation": "translate_legacy_website_book_art_plan",
+      "docsSuiteAdapterCommit": "ecf6bc25f33b81a2b306dabf17a8683d9db0d3b0",
+      "docsSuiteRestSurface": "/api/v1/book-studio/art-plan-translation",
+      "docsSuiteCliCapabilities": "art-plan-capabilities",
+      "docsSuiteCliTranslation": "art-plan-translate",
+      "docsSuiteMcpTool": "translate_legacy_book_art_plan",
+      "independentWorkOrderRecompilation": true,
+      "artStudioCallMaximum": 1,
+      "ambiguousRetryAllowed": false,
+      "crossRepositoryParityValidated": true,
+      "validationRepository": "EVAVO-STUDIO/evavo-art-studio",
+      "validationCommit": "291cede3dc7a877dde224b9a1f5208cf30f887af",
+      "validationWorkflowRunId": 30829894815,
+      "validationJobId": 91740925115,
+      "destinationSurfaceReady": true,
+      "docsSuiteIntegrationAdapterComplete": true,
+      "providerCallPerformed": false,
+      "runtimeJobSubmitted": false,
+      "artifactBytesWritten": false,
+      "runtimeCutoverApproved": false,
+      "publicationPerformed": false
+    },
+    {
+      "kind": "book_illustration_generation",
+      "sourcePaths": [
+        {
+          "path": "tools/evavo-doc-studio/scripts/run-book-illustration-studio.ts",
+          "byteLength": 16307,
+          "sha256": "826311a912bc3468c0990b6e3758c8a8f3ead5a6050bdd605b9dc89af1c04fdd",
+          "disposition": "REPLACE_WITH_VERSIONED_ADAPTER"
+        },
+        {
+          "path": "tools/evavo-doc-studio/src/app/api/book-illustration-studio/generation/route.ts",
+          "byteLength": 14163,
+          "sha256": "429864fc76985df47e3cd5bf29ab35eab691681b19b66f0cfcc119f4a035fbb9",
+          "disposition": "REPLACE_WITH_VERSIONED_ADAPTER"
+        }
+      ],
+      "artStudioMinimumCommit": "bc25cdd0fad5d562a8ed60be46ac2d99d62a23c9",
+      "artStudioCurrentCommit": "bc25cdd0fad5d562a8ed60be46ac2d99d62a23c9",
+      "contract": "evavo_book_art_profile_v1",
+      "restProtocol": "/v1/book-art/legacy-illustration-plan-runtime",
+      "restTranslation": "/v1/book-art/legacy-illustration-plans/translate",
+      "cliProtocol": "book-art-legacy-illustration-plan-protocol",
+      "cliTranslation": "book-art-legacy-illustration-plan-translate",
+      "mcpProtocol": "book_art_legacy_illustration_plan_translation_protocol",
+      "mcpTranslation": "translate_legacy_website_book_illustration_plan",
+      "docsSuiteAdapterCommit": "ecf6bc25f33b81a2b306dabf17a8683d9db0d3b0",
+      "docsSuiteRestSurface": "/api/v1/book-studio/art-plan-translation",
+      "docsSuiteCliCapabilities": "art-plan-capabilities",
+      "docsSuiteCliTranslation": "art-plan-translate",
+      "docsSuiteMcpTool": "translate_legacy_book_art_plan",
+      "independentWorkOrderRecompilation": true,
+      "artStudioCallMaximum": 1,
+      "ambiguousRetryAllowed": false,
+      "crossRepositoryParityValidated": true,
+      "validationRepository": "EVAVO-STUDIO/evavo-art-studio",
+      "validationCommit": "291cede3dc7a877dde224b9a1f5208cf30f887af",
+      "validationWorkflowRunId": 30829894815,
+      "validationJobId": 91740925115,
+      "destinationSurfaceReady": true,
+      "docsSuiteIntegrationAdapterComplete": true,
+      "providerCallPerformed": false,
+      "runtimeJobSubmitted": false,
+      "artifactBytesWritten": false,
+      "legacyLayoutTrustedAsArtAuthority": false,
+      "runtimeCutoverApproved": false,
+      "publicationPerformed": false
+    }
+  ],
+  "counts": {
+    "reviewedSourcePathsBound": 8,
+    "destinationSurfacesReady": 8,
+    "integrationAdaptersComplete": 8,
+    "originalUnresolvedBoundaryCount": 20,
+    "remainingUnresolvedBoundaryCount": 12
+  },
+  "gates": {
+    "allReviewedAdaptersComplete": true,
+    "allSymbolSplitsComplete": false,
+    "semanticParityVerified": false,
+    "sourceReplayApproved": false,
+    "canonicalWriterChanged": false,
+    "runtimeCutoverApproved": false,
+    "sourceDeletionApproved": false,
+    "publicationPerformed": false
+  },
+  "notes": [
+    "All eight reviewed versioned-adapter paths now have protected destination implementations and exact source-bound evidence.",
+    "The four programme, Amazon release and publication-handoff paths use the operation-validated Docs Suite autopilot and do not execute a stage, mutate a manuscript or upload to Amazon.",
+    "The four cover and illustration paths now use one protected Docs Suite to Art Studio adapter that independently recompiles each work order, makes at most one read-only Art call and passed exact cross-repository parity on the functioning Art Studio runner.",
+    "Twelve mixed-authority symbol-level splits remain before the full 74-file migration can claim semantic parity.",
+    "No source replay, canonical writer change, overall runtime cutover, source deletion for the remaining Book Studio boundaries or publication is approved."
+  ],
+  "recordFingerprint": "sha256:d1f512e3ae94ba2c22ce7c63fe30586becc70b70cc5ac4bcdfed768ce3231de7"
+}
