@@ -1,0 +1,68 @@
+name: Recover Website Book Studio Carrier
+
+on:
+  push:
+    branches:
+      - diagnostic/recover-website-book-studio-carrier-20260803
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diagnostic-recover-website-book-studio-carrier
+  cancel-in-progress: true
+
+jobs:
+  recover:
+    if: github.repository == 'EVAVO-STUDIO/evavo-art-studio'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      EXPECTED_PARENT_SHA: 9eab30022726808a06d1c10221527bad347293b8
+      CARRIER_URL: https://res.cloudinary.com/dntogqtey/raw/upload/v1785727238/evavo/book-studio/private/website-book-art-audit-20260803.zip
+      EXPECTED_CARRIER_BYTES: '153148'
+      EXPECTED_INNER_BYTES: '939123'
+    steps:
+      - name: Check out exact diagnostic commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove direct-child workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD^)" == "${EXPECTED_PARENT_SHA}" ]]
+          [[ "$(git diff --name-only "${EXPECTED_PARENT_SHA}" HEAD)" == '.github/workflows/diagnostic-recover-website-book-studio-carrier.yml' ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Download and inspect immutable carrier
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/website-book-studio-carrier"
+          mkdir -p "${out}/extracted"
+          curl --fail --location --retry 5 --retry-all-errors \
+            "${CARRIER_URL}" \
+            --output "${out}/carrier.zip"
+          [[ "$(stat -c '%s' "${out}/carrier.zip")" == "${EXPECTED_CARRIER_BYTES}" ]]
+          unzip -q "${out}/carrier.zip" -d "${out}/extracted"
+          mapfile -t files < <(find "${out}/extracted" -type f -print | sort)
+          [[ "${#files[@]}" == '1' ]]
+          [[ "$(stat -c '%s' "${files[0]}")" == "${EXPECTED_INNER_BYTES}" ]]
+          cp "${files[0]}" "${out}/reviewed-carrier.bin"
+          file "${out}/carrier.zip" "${out}/reviewed-carrier.bin" | tee "${out}/file-types.txt"
+          sha256sum "${out}/carrier.zip" "${out}/reviewed-carrier.bin" > "${out}/SHA256SUMS"
+          find "${out}/extracted" -type f -printf '%P\t%s\n' > "${out}/contents.tsv"
+          rm -rf "${out}/extracted"
+
+      - name: Upload bounded recovery artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: website-book-studio-reviewed-carrier
+          path: ${{ runner.temp }}/website-book-studio-carrier
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
