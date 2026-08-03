@@ -25,7 +25,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TARGET_BRANCH: agent/book-art-legacy-byte-registration-20260803
       WORKFLOW_FILE: agent-apply-book-art-legacy-byte-registration.yml
-      EXPECTED_SHA: a06aa4ca6b3c01641f14378a5b50c6f59988bac9
+      EXPECTED_SHA: a7ccb77337963984f62fe01459af61f34defb053
     steps:
       - name: Check out exact observed feature head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
