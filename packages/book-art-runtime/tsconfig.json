@@ -4,13 +4,28 @@
     "outDir": "dist",
     "rootDir": "src",
     "composite": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "references": [
-    { "path": "../artifacts" },
-    { "path": "../contracts" },
-    { "path": "../providers" },
-    { "path": "../runtime" }
+    {
+      "path": "../artifacts"
+    },
+    {
+      "path": "../contracts"
+    },
+    {
+      "path": "../providers"
+    },
+    {
+      "path": "../quality"
+    },
+    {
+      "path": "../runtime"
+    }
   ],
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts"
+  ]
 }

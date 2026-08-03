@@ -15,6 +15,7 @@ import {
   submitDocsBookArtReleaseShadowJob,
 } from "@evavo/art-book-runtime/docs-release";
 import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
+import { registerLegacyBookArtBytes } from "@evavo/art-book-runtime/legacy-registration";
 import { compareBookArtProviderShadowParity } from "@evavo/art-book-runtime/parity";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 
@@ -30,6 +31,7 @@ export type BookArtCommandResult =
   | Readonly<{ handled: true; value: unknown; exitCode?: number }>;
 
 const COMMANDS = new Set([
+  "book-art-legacy-register",
   "book-art-provider-protocol",
   "book-art-provider-compile",
   "book-art-provider-submit",
@@ -40,6 +42,7 @@ const COMMANDS = new Set([
   "book-art-docs-release-submit",
 ]);
 const PARITY_FIELDS = new Set(["request", "websiteObservation"]);
+const REGISTRATION_ENVELOPE_FIELDS = new Set(["registration", "sourceFile"]);
 
 function envCsv(name: string): string[] {
   return [
@@ -93,11 +96,14 @@ function artifactRoot(values: BookArtCommandValues): string {
   );
 }
 
-function actor(values: BookArtCommandValues): string {
+function actor(
+  values: BookArtCommandValues,
+  fallback = "cli-book-art-shadow",
+): string {
   return (
     values.actor?.trim() ||
     process.env.EVAVO_ART_ACTOR?.trim() ||
-    "cli-book-art-shadow"
+    fallback
   );
 }
 
@@ -162,6 +168,58 @@ async function configuredParityInput(
       adapterPolicy,
     ),
     websiteObservation: envelope.websiteObservation,
+  };
+}
+
+async function legacyRegistrationEnvelope(
+  filePath: string,
+): Promise<Readonly<{ registration: Record<string, unknown>; bytes: Buffer }>> {
+  const envelopePath = path.resolve(filePath);
+  const envelope = await readInputObject(
+    envelopePath,
+    "Legacy Book Art byte-registration input",
+  );
+  if (
+    Object.keys(envelope).some(
+      (key) => !REGISTRATION_ENVELOPE_FIELDS.has(key),
+    ) ||
+    !Object.hasOwn(envelope, "registration") ||
+    !Object.hasOwn(envelope, "sourceFile") ||
+    !envelope.registration ||
+    typeof envelope.registration !== "object" ||
+    Array.isArray(envelope.registration) ||
+    typeof envelope.sourceFile !== "string"
+  ) {
+    throw new Error(
+      "Legacy Book Art byte-registration input must contain exactly registration and sourceFile.",
+    );
+  }
+  const sourceFile = envelope.sourceFile.trim();
+  if (
+    !sourceFile ||
+    sourceFile.length > 1_024 ||
+    sourceFile.includes("\0") ||
+    path.isAbsolute(sourceFile)
+  ) {
+    throw new Error(
+      "Legacy Book Art sourceFile must be one relative path beside the registration envelope.",
+    );
+  }
+  const inputDirectory = path.dirname(envelopePath);
+  const resolvedSource = path.resolve(inputDirectory, sourceFile);
+  const relativeSource = path.relative(inputDirectory, resolvedSource);
+  if (
+    relativeSource === ".." ||
+    relativeSource.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativeSource)
+  ) {
+    throw new Error(
+      "Legacy Book Art sourceFile must remain inside the registration-envelope directory.",
+    );
+  }
+  return {
+    registration: envelope.registration as Record<string, unknown>,
+    bytes: await readFile(resolvedSource),
   };
 }
 
@@ -236,6 +294,23 @@ export async function handleBookArtCommand(
   values: BookArtCommandValues,
 ): Promise<BookArtCommandResult> {
   if (!COMMANDS.has(command)) return { handled: false };
+  if (command === "book-art-legacy-register") {
+    const inputPath = required(values.input, "--input");
+    const envelope = await legacyRegistrationEnvelope(inputPath);
+    const result = await registerLegacyBookArtBytes(
+      envelope.registration,
+      envelope.bytes,
+      {
+        artifacts: new LocalArtifactStore({ root: artifactRoot(values) }),
+        actor: actor(values, "cli-book-art-legacy-registration"),
+      },
+    );
+    return {
+      handled: true,
+      value: result,
+      ...(result.status === "registered" ? {} : { exitCode: 2 }),
+    };
+  }
   const policy = providerPolicy();
   if (command === "book-art-provider-protocol") {
     return { handled: true, value: providerProtocol(policy) };

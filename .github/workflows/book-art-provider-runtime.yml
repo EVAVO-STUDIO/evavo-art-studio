@@ -38,6 +38,7 @@ on:
       - "apps/cli/test/book-art-cli.test.mjs"
       - "apps/cli/test/book-art-cli-inspection.test.mjs"
       - "apps/cli/test/book-art-cli-parity.test.mjs"
+      - "apps/cli/test/book-art-cli-legacy-registration.test.mjs"
       - "apps/mcp/package.json"
       - "apps/mcp/tsconfig.json"
       - "apps/mcp/src/book-art-tools.ts"
@@ -59,6 +60,7 @@ on:
       - "scripts/check-book-art-provider-runtime.mjs"
       - "scripts/check-book-art-provider-inspection.mjs"
       - "scripts/check-book-art-provider-parity.mjs"
+      - "scripts/check-book-art-legacy-registration.mjs"
   pull_request:
     branches: [main]
     paths:
@@ -96,6 +98,7 @@ on:
       - "apps/cli/test/book-art-cli.test.mjs"
       - "apps/cli/test/book-art-cli-inspection.test.mjs"
       - "apps/cli/test/book-art-cli-parity.test.mjs"
+      - "apps/cli/test/book-art-cli-legacy-registration.test.mjs"
       - "apps/mcp/package.json"
       - "apps/mcp/tsconfig.json"
       - "apps/mcp/src/book-art-tools.ts"
@@ -117,6 +120,7 @@ on:
       - "scripts/check-book-art-provider-runtime.mjs"
       - "scripts/check-book-art-provider-inspection.mjs"
       - "scripts/check-book-art-provider-parity.mjs"
+      - "scripts/check-book-art-legacy-registration.mjs"
   workflow_dispatch:
 
 permissions:
@@ -157,11 +161,12 @@ jobs:
           ffmpeg -version | head -1
           ffprobe -version | head -1
 
-      - name: Verify Book Art provider runtime, inspection and structural parity authority
+      - name: Verify Book Art provider runtime, inspection, parity and legacy-byte authority
         run: |
           node scripts/check-book-art-provider-runtime.mjs
           node scripts/check-book-art-provider-inspection.mjs
           node scripts/check-book-art-provider-parity.mjs
+          node scripts/check-book-art-legacy-registration.mjs
 
       - name: Install review-first dependency graph
         run: pnpm install --no-frozen-lockfile

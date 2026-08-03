@@ -119,10 +119,16 @@ It never maps a Website shortlist, composition approval or selected scene bindin
 
 The importer does not read, copy, regenerate or rewrite the image bytes. It imports evidence about the exact legacy artifact reference and checksum so later workers can resolve and verify those bytes through the governed artifact boundary.
 
+## Exact legacy artwork byte registration
+
+`registerLegacyBookArtBytes()` consumes the original Website state-import input and reruns `importLegacyWebsiteBookArtState()` before accepting any file. It then verifies the original file checksum, byte length, decoded MIME type and dimensions against the imported legacy evidence. Eligible cover artwork is stored byte-for-byte as an immutable unapproved `source` artifact, followed by a separate registration-evidence artifact.
+
+Registration does not re-encode or rewrite the image, create a mutable named reference, import legacy approval, select a candidate, promote a master, create a Book-use binding or approve publication. The production corpus still requires complete item coverage and receipt collection before any Website retirement decision.
+
 ## Transport
 
 Large image files use immutable artifact references or bounded binary upload. They are not embedded as large JSON/base64 request fields.
 
 ## Migration posture
 
-Website remains the active compatibility runtime. The production profile and exact cover/illustration shadow translators make Art Studio capable of compiling the Art-owned generation boundary without absorbing Book Design authority. The durable Book Art provider shadow runtime can now submit one idempotent, one-attempt, no-fallback provider candidate job and retain only unapproved intermediate candidate and evidence artifacts. Provider execution wiring, immutable storage registration, production shadow calls and controlled candidate-lifecycle cutover remain separately gated for the active Book Studio path; the new bridge is shadow-only. Exact legacy-byte registration, authenticated production shadow parity, mastering and comparison parity, Website retirement and deletion evidence also remain gated. No production cutover, source deletion or publication is approved by this contract.
+Website remains the active compatibility runtime. The production profile and exact cover/illustration shadow translators make Art Studio capable of compiling the Art-owned generation boundary without absorbing Book Design authority. The durable Book Art provider shadow runtime can now submit one idempotent, one-attempt, no-fallback provider candidate job and retain only unapproved intermediate candidate and evidence artifacts. Provider execution wiring, immutable storage registration, production shadow calls and controlled candidate-lifecycle cutover remain separately gated for the active Book Studio path; the new bridge is shadow-only. The exact legacy-byte registrar is implemented, but complete production-corpus registration and receipt coverage remain gated alongside authenticated production shadow parity, mastering and comparison parity, Website retirement and deletion evidence. No production cutover, source deletion or publication is approved by this contract.

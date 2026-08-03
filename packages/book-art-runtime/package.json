@@ -21,9 +21,15 @@
     "./parity": {
       "types": "./dist/parity.d.ts",
       "import": "./dist/parity.js"
+    },
+    "./legacy-registration": {
+      "types": "./dist/legacy-registration.d.ts",
+      "import": "./dist/legacy-registration.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -33,6 +39,7 @@
     "@evavo/art-artifacts": "workspace:*",
     "@evavo/art-contracts": "workspace:*",
     "@evavo/art-providers": "workspace:*",
+    "@evavo/art-quality": "workspace:*",
     "@evavo/art-runtime": "workspace:*"
   },
   "devDependencies": {
