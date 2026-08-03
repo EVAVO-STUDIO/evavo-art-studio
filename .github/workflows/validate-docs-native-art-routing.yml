@@ -1,0 +1,51 @@
+name: Validate Docs Native Art Routing
+
+on:
+  push:
+    branches:
+      - validation/docs-native-art-routing-20260804
+    paths:
+      - ".github/workflows/validate-docs-native-art-routing.yml"
+      - ".validation/docs-native-art-routing/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-docs-native-art-routing.yml"
+      - ".validation/docs-native-art-routing/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-native-art-routing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Prove exact Docs Suite Git blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .validation/docs-native-art-routing/src/book-studio-autopilot-routing.ts)" = "541437c1b7fa0077283fd292a673e8fba8530cdd"
+          test "$(git hash-object .validation/docs-native-art-routing/test/book-studio-autopilot-routing.test.mjs)" = "45e91c52456c2710a0586fc96be56e202c6bdea4"
+      - name: Compile exact routed core with strict TypeScript
+        run: npm exec --yes --package=typescript@5.9.3 -- tsc -p .validation/docs-native-art-routing/tsconfig.json
+      - name: Run exact routing attacks
+        run: npm exec --yes --package=tsx@4.20.3 -- tsx --test .validation/docs-native-art-routing/test/book-studio-autopilot-routing.test.mjs
+      - name: Verify no production source changed
+        run: |
+          git diff --exit-code origin/main -- . ':!.github/workflows/validate-docs-native-art-routing.yml' ':!.validation/docs-native-art-routing/**'
