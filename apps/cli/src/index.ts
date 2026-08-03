@@ -87,6 +87,10 @@ Usage:
   evavo-art book-art-provider-inspect --input book-art-shadow-request.json [--runtime-root .art-studio/runtime] [--artifact-root .art-studio/artifacts] [--output inspected-book-art-job.json]
   evavo-art book-art-provider-parity --input book-art-parity.json [--runtime-root .art-studio/runtime] [--artifact-root .art-studio/artifacts] [--output book-art-parity-result.json]
 
+  evavo-art book-art-docs-release-protocol [--output book-art-docs-release-protocol.json]
+  evavo-art book-art-docs-release-compile --input docs-book-release.json [--output compiled-docs-book-release-job.json]
+  evavo-art book-art-docs-release-submit --input docs-book-release.json [--runtime-root .art-studio/runtime] [--actor cli] [--output submitted-docs-book-release-job.json]
+
   evavo-art selection-protocol [--output selection-protocol.json]
   evavo-art selection-validate --input selection.json [--output normalized-selection.json]
   evavo-art selection-compile --input selection.json [--output selection-job.json]
@@ -117,6 +121,7 @@ Sprite planning calculates complete clip, direction, frame, layer, variant, shee
 Sprite supervision submits bounded durable jobs, observes immutable evidence, redrives transient failures, routes authorised repair and stops for review without weakening quality gates.
 Provider validation and compilation never call an external model. Candidate execution occurs only through a capability-matched durable worker job.
 Book Art provider commands require EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS; the input may not supply adapterPolicy. Compilation, submission, inspection and structural parity perform no provider call. Submission remains one-attempt and duplicate-safe. Inspection verifies immutable runtime evidence, while parity compares a fingerprinted Website observation without comparing pixels, writing artifacts or approving cutover.
+Docs Book release commands verify the complete ready_for_art_shadow receipt and sealed final brief before compiling or submitting the same one-candidate, one-attempt, no-fallback provider job. They perform no provider call, Book write, selection, promotion, binding, cutover or publication.
 Alpha mastering is deterministic and writes an unapproved PNG plus evidence. It exits with code 3 when blocking sprite QA fails.
 Selection writes immutable ranking evidence. Promotion is a separate explicit compare-and-swap operation and cannot override blocking failures.
 Atlas and durable-runtime writes are explicit, local and root-scoped.
