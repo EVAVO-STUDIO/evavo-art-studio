@@ -24,7 +24,7 @@ jobs:
       TARGET_BRANCH: agent/book-art-legacy-byte-registration-20260803
       WORKFLOW_PATH: .github/workflows/agent-apply-book-art-legacy-byte-registration.yml
       PAYLOAD_SHA256: 03fc1fc796035582fb8f734dde0490c33e668a33a6d0ae4b7307040044da94b7
-      APPLY_SCRIPT_SHA256: 476cfcf655cbfba265737c6579b7ff1a58fa814358350993257d87d9effc6125
+      APPLY_SCRIPT_SHA256: 57a8f5b0da02fa0696cd9c9ca6365b8b6c7589e754af8754ac2a0ab204bd9a21
     steps:
       - name: Check out exact bootstrap candidate
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
