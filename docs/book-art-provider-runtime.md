@@ -157,6 +157,35 @@ publicationPerformed: false
 
 A matched receipt is one bounded piece of migration evidence. It does not satisfy the observation period, production-provider smoke test, visual/technical comparison, rollback drill or deletion-manifest gates.
 
+## Register exact legacy artwork bytes
+
+`registerLegacyBookArtBytes()` closes the receiver-side storage-registration gap for eligible legacy Website cover artwork. The operator supplies one exact Website state-import input, the source repository commit and path, and the original image file. Art Studio reruns the fail-closed legacy state importer before it inspects or stores the bytes; a caller cannot substitute a fabricated imported receipt.
+
+Before any artifact write, registration proves:
+
+- the Website quality, candidate-set and selection-binding evidence remains internally consistent;
+- the imported state is only `candidate` or `review_required`, never approved;
+- the source SHA-256 and byte length match the legacy governed-artifact evidence;
+- decoded MIME type, width and height match the imported receipt;
+- the source path is a normalized relative Website repository path; and
+- rights-blocked or revision-blocked artwork remains blocked.
+
+A successful operation writes the original file byte-for-byte as one immutable `storageClass: source` artifact with `approvalState: unapproved`. It then reads the stored object back, rechecks its checksum and size, compares every stored byte with the supplied source, and writes a separate immutable `book-art-legacy-byte-registration-evidence` JSON artifact. It does not re-encode, resize, recolour, optimise or otherwise rewrite the artwork. It creates no named reference and cannot select, promote or bind the artwork into a book.
+
+The shared boundary is exported as:
+
+```text
+@evavo/art-book-runtime/legacy-registration
+```
+
+The local CLI accepts a small envelope containing `registration` plus a relative `sourceFile` path:
+
+```text
+evavo-art book-art-legacy-register --input legacy-registration.json --artifact-root .art-studio/artifacts --actor migration-operator
+```
+
+Registration is deliberately local/root-scoped because the current REST and MCP contracts do not yet define a bounded authenticated binary-upload transport. Website remains the active compatibility runtime. Completing this capability does not prove that the production legacy corpus has been registered, satisfy the observation period, approve runtime cutover or allow Website source deletion.
+
 ## REST, CLI and MCP parity
 
 All operator surfaces call `@evavo/art-book-runtime` directly. Inspection requires trusted access to the runtime journal and immutable artifact store, but remains read-only.
@@ -180,6 +209,7 @@ The API host injects its adapter policy. Callers may not send `adapterPolicy` or
 The CLI exposes:
 
 ```text
+evavo-art book-art-legacy-register --input legacy-registration.json --artifact-root .art-studio/artifacts --actor migration-operator
 evavo-art book-art-provider-protocol
 evavo-art book-art-provider-compile --input request.json
 evavo-art book-art-provider-submit --input request.json --runtime-root .art-studio/runtime
@@ -270,7 +300,7 @@ The repository-wide exact-main validation still runs after merge. Passing source
 
 No production cutover is approved by this slice. Before Website provider execution can be retired, the coordinated migration still requires:
 
-- registration of exact legacy artwork bytes in immutable Art Studio storage without checksum changes;
+- execution of the exact-byte registrar across the complete production legacy-artwork corpus, with immutable per-item receipts and complete expected-item coverage;
 - a sustained batch of authenticated Website-to-Art-Studio shadow requests with matched success/failure structural parity receipts;
 - production-provider credential, model and response smoke tests;
 - technical mastering and candidate-comparison parity;
@@ -279,3 +309,7 @@ No production cutover is approved by this slice. Before Website provider executi
 - rollback drills, an observation period and an exact deletion manifest.
 
 Until those gates pass, Website remains the active compatibility runtime, Art Studio runs only the explicit shadow candidate path, Docs Suite remains authoritative for book design and publication, and there is still only one authoritative writer. No production cutover is approved.
+
+## Legacy byte registration authority
+
+Legacy byte registration stores the original bytes unchanged as an unapproved source artifact and writes separate immutable byte-registration evidence. It does not create or update a named reference, select or promote artwork, create a Book-use binding, approve runtime cutover, delete Website source, or publish an edition.
