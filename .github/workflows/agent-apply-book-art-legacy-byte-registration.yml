@@ -180,6 +180,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f pnpm-lock.yaml
+          git restore --source=HEAD -- packages/contracts/tsconfig.tsbuildinfo
           git diff --check
           git fetch --no-tags --prune origin \
             +refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH} \
