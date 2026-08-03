@@ -24,9 +24,8 @@ jobs:
     timeout-minutes: 15
     env:
       EXPECTED_BASE_SHA: 9eab30022726808a06d1c10221527bad347293b8
-      CARRIER_URL: https://res.cloudinary.com/dntogqtey/raw/upload/v1785727238/evavo/book-studio/private/website-book-art-audit-20260803.zip
-      EXPECTED_CARRIER_BYTES: '153148'
-      EXPECTED_INNER_BYTES: '939123'
+      BACKUP_URL: https://res.cloudinary.com/dntogqtey/raw/upload/v1785569873/bf8ed43af3f2520ccb1bae71c3be2704cddb56f2
+      EXPECTED_BACKUP_BYTES: '939123'
     steps:
       - name: Check out exact diagnostic commit
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -44,25 +43,28 @@ jobs:
           [[ "$(git diff --name-only "${EXPECTED_BASE_SHA}" HEAD)" == '.github/workflows/diagnostic-recover-website-book-studio-carrier.yml' ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
-      - name: Download and inspect immutable carrier
+      - name: Download exact signed backup and inspect carrier
         shell: bash
         run: |
           set -euo pipefail
           out="${RUNNER_TEMP}/website-book-studio-carrier"
-          mkdir -p "${out}/extracted"
-          curl --fail --location --retry 5 --retry-all-errors \
-            "${CARRIER_URL}" \
-            --output "${out}/carrier.zip"
-          [[ "$(stat -c '%s' "${out}/carrier.zip")" == "${EXPECTED_CARRIER_BYTES}" ]]
-          unzip -q "${out}/carrier.zip" -d "${out}/extracted"
-          mapfile -t files < <(find "${out}/extracted" -type f -print | sort)
-          [[ "${#files[@]}" == '1' ]]
-          [[ "$(stat -c '%s' "${files[0]}")" == "${EXPECTED_INNER_BYTES}" ]]
-          cp "${files[0]}" "${out}/reviewed-carrier.bin"
-          file "${out}/carrier.zip" "${out}/reviewed-carrier.bin" | tee "${out}/file-types.txt"
-          sha256sum "${out}/carrier.zip" "${out}/reviewed-carrier.bin" > "${out}/SHA256SUMS"
-          find "${out}/extracted" -type f -printf '%P\t%s\n' > "${out}/contents.tsv"
-          rm -rf "${out}/extracted"
+          mkdir -p "${out}"
+          curl --fail --location --retry 3 --retry-all-errors \
+            "${BACKUP_URL}" \
+            --output "${out}/reviewed-carrier.bin"
+          [[ "$(stat -c '%s' "${out}/reviewed-carrier.bin")" == "${EXPECTED_BACKUP_BYTES}" ]]
+          file "${out}/reviewed-carrier.bin" | tee "${out}/file-types.txt"
+          sha256sum "${out}/reviewed-carrier.bin" > "${out}/SHA256SUMS"
+          cat > "${out}/recovery-metadata.json" <<JSON
+          {
+            "schemaVersion": "1.0",
+            "sourceAssetId": "35d8442662e10be3dcb8ea0b6a1fb09d",
+            "sourceVersionId": "65185fdd2b572832bc43b84ec67dc209",
+            "sourceBytes": ${EXPECTED_BACKUP_BYTES},
+            "diagnosticHeadSha": "$(git rev-parse HEAD)",
+            "productionBaseSha": "${EXPECTED_BASE_SHA}"
+          }
+          JSON
 
       - name: Upload bounded recovery artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
