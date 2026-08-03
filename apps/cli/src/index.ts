@@ -83,6 +83,8 @@ Usage:
 
   evavo-art book-art-legacy-plan-protocol [--output book-art-legacy-plan-protocol.json]
   evavo-art book-art-legacy-plan-translate --input legacy-plan-translation.json [--output translated-book-art-work-order.json]
+  evavo-art book-art-legacy-illustration-plan-protocol [--output book-art-legacy-illustration-plan-protocol.json]
+  evavo-art book-art-legacy-illustration-plan-translate --input legacy-illustration-plan-translation.json [--output translated-book-illustration-work-order.json]
 
   evavo-art book-art-provider-protocol [--output book-art-provider-protocol.json]
   evavo-art book-art-provider-compile --input book-art-shadow-request.json [--output compiled-book-art-job.json]
@@ -124,6 +126,7 @@ Sprite planning calculates complete clip, direction, frame, layer, variant, shee
 Sprite supervision submits bounded durable jobs, observes immutable evidence, redrives transient failures, routes authorised repair and stops for review without weakening quality gates.
 Provider validation and compilation never call an external model. Candidate execution occurs only through a capability-matched durable worker job.
 Legacy Book Art plan translation requires a canonical fingerprint-valid Docs-owned brief and the exact retained Website plan; it calls no provider, submits no runtime job and does not require provider policy.
+Legacy Book Illustration plan translation additionally verifies exact style, page, layout and live-text protection evidence while leaving page layout and text authority in Docs Suite.
 Book Art provider commands require EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS; the input may not supply adapterPolicy. Compilation, submission, inspection and structural parity perform no provider call. Submission remains one-attempt and duplicate-safe. Inspection verifies immutable runtime evidence, while parity compares a fingerprinted Website observation without comparing pixels, writing artifacts or approving cutover.
 Docs Book release commands verify the complete ready_for_art_shadow receipt and sealed final brief before compiling or submitting the same one-candidate, one-attempt, no-fallback provider job. They perform no provider call, Book write, selection, promotion, binding, cutover or publication.
 Alpha mastering is deterministic and writes an unapproved PNG plus evidence. It exits with code 3 when blocking sprite QA fails.

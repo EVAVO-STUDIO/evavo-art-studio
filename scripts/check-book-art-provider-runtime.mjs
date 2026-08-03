@@ -7,6 +7,9 @@ const read = (relative) => readFileSync(path.join(root, relative), "utf8");
 const json = (relative) => JSON.parse(read(relative));
 
 const productionProfile = read("packages/contracts/src/book-production-profile.ts");
+const legacyIllustrationProfile = read(
+  "packages/contracts/src/book-production-legacy-illustration-plan.ts",
+);
 const sharedRuntime = read("packages/book-art-runtime/src/index.ts");
 const sharedPackage = json("packages/book-art-runtime/package.json");
 const sharedTsconfig = json("packages/book-art-runtime/tsconfig.json");
@@ -60,6 +63,25 @@ for (const token of [
   assert(
     productionProfile.includes(token),
     `Book Art legacy plan translator is missing ${token}`,
+  );
+}
+
+
+for (const token of [
+  "LegacyWebsiteBookIllustrationPlanTranslationInputV1",
+  "LegacyWebsiteBookIllustrationPlanTranslationResultV1",
+  "translateLegacyWebsiteBookIllustrationGenerationPlan",
+  "ready_for_shadow_comparison",
+  "rawLegacyPromptTrustedAsAuthority: false",
+  "legacyLayoutTrustedAsArtAuthority: false",
+  "artifactBytesRead: false",
+  "artifactBytesRewritten: false",
+  "runtimeCutoverApproved: false",
+  "publicationPerformed: false",
+]) {
+  assert(
+    legacyIllustrationProfile.includes(token),
+    `Book Art legacy illustration plan translator is missing ${token}`,
   );
 }
 
@@ -202,6 +224,12 @@ for (const token of [
   "/v1/book-art/legacy-plan-runtime",
   "/v1/book-art/legacy-plans/translate",
   "translateLegacyWebsiteBookArtGenerationPlan",
+  "/v1/book-art/legacy-illustration-plan-runtime",
+  "/v1/book-art/legacy-illustration-plans/translate",
+  "translateLegacyWebsiteBookIllustrationGenerationPlan",
+  "verifiesStyleAuthorityDigest: true",
+  "verifiesPageAuthorityDigest: true",
+  "legacyLayoutTrustedAsArtAuthority: false",
   "requiresCanonicalBookArtBrief: true",
   "rawLegacyPromptTrustedAsAuthority: false",
   "translationReadOnly: true",
@@ -238,6 +266,12 @@ for (const token of [
   "book-art-legacy-plan-protocol",
   "book-art-legacy-plan-translate",
   "translateLegacyWebsiteBookArtGenerationPlan",
+  "book-art-legacy-illustration-plan-protocol",
+  "book-art-legacy-illustration-plan-translate",
+  "translateLegacyWebsiteBookIllustrationGenerationPlan",
+  "verifiesStyleAuthorityDigest: true",
+  "verifiesPageAuthorityDigest: true",
+  "legacyLayoutTrustedAsArtAuthority: false",
   "requiresCanonicalBookArtBrief: true",
   "translationReadOnly: true",
   "book-art-provider-protocol",
@@ -262,6 +296,12 @@ for (const token of [
   "book_art_legacy_plan_translation_protocol",
   "translate_legacy_website_book_art_plan",
   "translateLegacyWebsiteBookArtGenerationPlan",
+  "book_art_legacy_illustration_plan_translation_protocol",
+  "translate_legacy_website_book_illustration_plan",
+  "translateLegacyWebsiteBookIllustrationGenerationPlan",
+  "verifiesStyleAuthorityDigest: true",
+  "verifiesPageAuthorityDigest: true",
+  "legacyLayoutTrustedAsArtAuthority: false",
   "requiresCanonicalBookArtBrief: true",
   "translationReadOnly: true",
   "book_art_provider_runtime_protocol",
@@ -325,6 +365,8 @@ for (const title of [
 for (const token of [
   "Book Art REST exposes authenticated read-only legacy plan translation without provider policy",
   "Book Art REST blocks stale or duplicate legacy candidate evidence",
+  "Book Art REST exposes authenticated read-only legacy illustration plan translation",
+  "Book Art REST blocks stale or duplicate legacy illustration evidence",
   "Book Art REST compilation injects host policy and performs no runtime write",
   "Book Art REST submission is authenticated and duplicate-safe without provider execution",
   "BOOK_ART_RUNTIME_UNAUTHORIZED",
@@ -334,6 +376,7 @@ for (const token of [
 }
 for (const token of [
   "CLI translates an exact legacy Website plan without provider policy or side effects",
+  "CLI translates an exact legacy Website illustration plan without provider policy or side effects",
   "CLI compiles with host policy and writes no runtime job",
   "CLI submits one duplicate-safe durable Book Art job without a provider call",
   "CLI rejects caller-supplied provider policy",
@@ -350,6 +393,10 @@ for (const token of [
 for (const token of [
   "/v1/book-art/legacy-plan-runtime:",
   "/v1/book-art/legacy-plans/translate:",
+  "/v1/book-art/legacy-illustration-plan-runtime:",
+  "/v1/book-art/legacy-illustration-plans/translate:",
+  "LegacyWebsiteBookIllustrationPlanTranslationInput:",
+  "LegacyWebsiteBookIllustrationPlanTranslationResult:",
   "LegacyWebsiteBookArtPlanTranslationInput:",
   "LegacyWebsiteBookArtPlanTranslationResult:",
   "/v1/book-art/provider-runtime:",
@@ -384,6 +431,7 @@ for (const token of [
 
 for (const token of [
   "Legacy Website plan translation",
+  "Legacy Website illustration plan translation",
   "canonical Docs-owned Book Art brief",
   "raw legacy prompt",
   "Shared runtime ownership",
@@ -424,7 +472,9 @@ console.log(
       sharedRuntimePackage: "@evavo/art-book-runtime",
       workerCompatibilityReexport: true,
       legacyPlanTranslation: true,
+      legacyIllustrationPlanTranslation: true,
       legacyPlanTranslationRequiresCanonicalBrief: true,
+      legacyIllustrationLayoutTrustedAsArtAuthority: false,
       rawLegacyPromptTrustedAsAuthority: false,
       restParity: true,
       cliParity: true,

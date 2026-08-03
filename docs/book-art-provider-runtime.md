@@ -334,3 +334,24 @@ Translation requires both the exact retained `book_cover_artwork_generation_plan
 The translator verifies project identity, exact brief fingerprint, art-direction digest, candidate uniqueness, candidate state, territory identity, prompt digest and retained plan digests. The raw legacy prompt is retained only by digest as migration evidence and is never trusted as the provider-neutral authority.
 
 A successful result is only `ready_for_shadow_comparison`. Translation is read-only: it performs no provider call, submits no runtime job, reads or writes no artwork bytes, selects or promotes no candidate, creates no Book-use binding, approves no cutover and publishes nothing. REST translation requires the Art Studio control token; local CLI and MCP callers use the same shared `translateLegacyWebsiteBookArtGenerationPlan` implementation.
+
+## Legacy Website illustration plan translation
+
+Art Studio exposes the existing exact legacy Website Book Illustration translator through all operator surfaces:
+
+```text
+GET  /v1/book-art/legacy-illustration-plan-runtime
+POST /v1/book-art/legacy-illustration-plans/translate
+
+evavo-art book-art-legacy-illustration-plan-protocol
+evavo-art book-art-legacy-illustration-plan-translate --input legacy-illustration-plan-translation.json
+
+book_art_legacy_illustration_plan_translation_protocol
+translate_legacy_website_book_illustration_plan
+```
+
+Translation requires a canonical Docs-owned Book Art brief, its exact fingerprint, the retained `book_illustration_generation_plan_v1`, exact style and page authority fingerprints, protected live-text zones and one unique ready candidate. It validates project, art-direction, style, page, candidate, prompt, input and plan identity before returning a provider-neutral work order.
+
+The raw legacy prompt is retained only by digest. Legacy page geometry and live text are not trusted as Art Studio authority: Docs Suite remains authoritative for page layout, captions, typography and publication text. A successful result is only `ready_for_shadow_comparison`.
+
+Translation is read-only. It performs no provider call, submits no runtime job, reads or writes no artwork bytes, selects or promotes no candidate, creates no Book-use binding, approves no cutover and publishes nothing.

@@ -6,6 +6,7 @@ import {
   BOOK_ART_PROFILE_CONTRACT,
   BOOK_ART_PROFILE_SCHEMA_VERSION,
   translateLegacyWebsiteBookArtGenerationPlan,
+  translateLegacyWebsiteBookIllustrationGenerationPlan,
 } from "@evavo/art-contracts";
 import {
   BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
@@ -39,6 +40,8 @@ const COMMANDS = new Set([
   "book-art-legacy-register",
   "book-art-legacy-plan-protocol",
   "book-art-legacy-plan-translate",
+  "book-art-legacy-illustration-plan-protocol",
+  "book-art-legacy-illustration-plan-translate",
   "book-art-provider-protocol",
   "book-art-provider-compile",
   "book-art-provider-submit",
@@ -322,6 +325,37 @@ function legacyPlanProtocol() {
   } as const;
 }
 
+
+function legacyIllustrationPlanProtocol() {
+  return {
+    schemaVersion: BOOK_ART_PROFILE_SCHEMA_VERSION,
+    contract: BOOK_ART_PROFILE_CONTRACT,
+    translationInputKind:
+      "evavo_legacy_website_book_illustration_plan_translation_input",
+    translationResultKind:
+      "evavo_legacy_website_book_illustration_plan_translation_result",
+    requiresCanonicalBookArtBrief: true,
+    verifiesExactBriefFingerprint: true,
+    verifiesLegacyPlanIdentity: true,
+    verifiesCandidateUniqueness: true,
+    verifiesArtDirectionDigest: true,
+    verifiesStyleAuthorityDigest: true,
+    verifiesPageAuthorityDigest: true,
+    rawLegacyPromptTrustedAsAuthority: false,
+    legacyLayoutTrustedAsArtAuthority: false,
+    translationReadOnly: true,
+    providerCallPerformed: false,
+    runtimeJobSubmitted: false,
+    candidateArtifactsWritten: false,
+    authoritativeBookWritesPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  };
+}
+
 export async function handleBookArtCommand(
   command: string,
   values: BookArtCommandValues,
@@ -356,6 +390,27 @@ export async function handleBookArtCommand(
       handled: true,
       value: result,
       ...(result.status === "ready_for_shadow_comparison" ? {} : { exitCode: 2 }),
+    };
+  }
+
+  if (command === "book-art-legacy-illustration-plan-protocol") {
+    return { handled: true, value: legacyIllustrationPlanProtocol() };
+  }
+  if (command === "book-art-legacy-illustration-plan-translate") {
+    const inputPath = required(values.input, "--input");
+    const result =
+      await translateLegacyWebsiteBookIllustrationGenerationPlan(
+        await readInputObject(
+          inputPath,
+          "Legacy Website Book Illustration plan translation input",
+        ),
+      );
+    return {
+      handled: true,
+      value: result,
+      ...(result.status === "ready_for_shadow_comparison"
+        ? {}
+        : { exitCode: 2 }),
     };
   }
   const policy = providerPolicy();

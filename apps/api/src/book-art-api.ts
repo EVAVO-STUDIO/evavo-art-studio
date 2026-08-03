@@ -5,6 +5,7 @@ import {
   BOOK_ART_PROFILE_CONTRACT,
   BOOK_ART_PROFILE_SCHEMA_VERSION,
   translateLegacyWebsiteBookArtGenerationPlan,
+  translateLegacyWebsiteBookIllustrationGenerationPlan,
 } from "@evavo/art-contracts";
 import {
   BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
@@ -52,6 +53,10 @@ const INSPECT_PATH = "/v1/book-art/provider-jobs/inspect";
 const PARITY_PATH = "/v1/book-art/provider-jobs/parity";
 const LEGACY_PLAN_PROTOCOL_PATH = "/v1/book-art/legacy-plan-runtime";
 const LEGACY_PLAN_TRANSLATE_PATH = "/v1/book-art/legacy-plans/translate";
+const LEGACY_ILLUSTRATION_PLAN_PROTOCOL_PATH =
+  "/v1/book-art/legacy-illustration-plan-runtime";
+const LEGACY_ILLUSTRATION_PLAN_TRANSLATE_PATH =
+  "/v1/book-art/legacy-illustration-plans/translate";
 const DOCS_RELEASE_PROTOCOL_PATH = "/v1/book-art/docs-release-runtime";
 const DOCS_RELEASE_COMPILE_PATH = "/v1/book-art/docs-releases/compile";
 const DOCS_RELEASE_SUBMIT_PATH = "/v1/book-art/docs-releases/submit";
@@ -69,6 +74,8 @@ function pathHandled(pathname: string): boolean {
     pathname === PARITY_PATH ||
     pathname === LEGACY_PLAN_PROTOCOL_PATH ||
     pathname === LEGACY_PLAN_TRANSLATE_PATH ||
+    pathname === LEGACY_ILLUSTRATION_PLAN_PROTOCOL_PATH ||
+    pathname === LEGACY_ILLUSTRATION_PLAN_TRANSLATE_PATH ||
     pathname === DOCS_RELEASE_PROTOCOL_PATH ||
     pathname === DOCS_RELEASE_COMPILE_PATH ||
     pathname === DOCS_RELEASE_SUBMIT_PATH
@@ -256,6 +263,37 @@ function legacyPlanProtocol(): Readonly<Record<string, unknown>> {
   };
 }
 
+
+function legacyIllustrationPlanProtocol(): Readonly<Record<string, unknown>> {
+  return {
+    schemaVersion: BOOK_ART_PROFILE_SCHEMA_VERSION,
+    contract: BOOK_ART_PROFILE_CONTRACT,
+    translationInputKind:
+      "evavo_legacy_website_book_illustration_plan_translation_input",
+    translationResultKind:
+      "evavo_legacy_website_book_illustration_plan_translation_result",
+    requiresCanonicalBookArtBrief: true,
+    verifiesExactBriefFingerprint: true,
+    verifiesLegacyPlanIdentity: true,
+    verifiesCandidateUniqueness: true,
+    verifiesArtDirectionDigest: true,
+    verifiesStyleAuthorityDigest: true,
+    verifiesPageAuthorityDigest: true,
+    rawLegacyPromptTrustedAsAuthority: false,
+    legacyLayoutTrustedAsArtAuthority: false,
+    translationReadOnly: true,
+    providerCallPerformed: false,
+    runtimeJobSubmitted: false,
+    candidateArtifactsWritten: false,
+    authoritativeBookWritesPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  };
+}
+
 export async function handleBookArtApiRequest(
   context: BookArtApiContext,
 ): Promise<boolean> {
@@ -287,6 +325,39 @@ export async function handleBookArtApiRequest(
     if (!requireProtectedAccess(context)) return true;
     const body = await context.readJsonBody(request, context.maximumBodyBytes);
     const result = await translateLegacyWebsiteBookArtGenerationPlan(body);
+    context.writeJson(
+      response,
+      result.status === "ready_for_shadow_comparison" ? 200 : 422,
+      result,
+      requestId,
+    );
+    return true;
+  }
+
+
+  if (
+    request.method === "GET" &&
+    url.pathname === LEGACY_ILLUSTRATION_PLAN_PROTOCOL_PATH
+  ) {
+    context.writeJson(
+      response,
+      200,
+      legacyIllustrationPlanProtocol(),
+      requestId,
+    );
+    return true;
+  }
+  if (
+    request.method === "POST" &&
+    url.pathname === LEGACY_ILLUSTRATION_PLAN_TRANSLATE_PATH
+  ) {
+    if (!requireProtectedAccess(context)) return true;
+    const body = await context.readJsonBody(
+      request,
+      context.maximumBodyBytes,
+    );
+    const result =
+      await translateLegacyWebsiteBookIllustrationGenerationPlan(body);
     context.writeJson(
       response,
       result.status === "ready_for_shadow_comparison" ? 200 : 422,

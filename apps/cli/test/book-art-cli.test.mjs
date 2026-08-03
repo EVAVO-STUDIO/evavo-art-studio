@@ -281,3 +281,210 @@ test("CLI translates an exact legacy Website plan without provider policy or sid
     await rm(root, { recursive: true, force: true });
   }
 });
+
+const illustrationCanonical = (value) => Array.isArray(value)
+  ? value.map(illustrationCanonical)
+  : value && typeof value === "object"
+    ? Object.fromEntries(
+        Object.entries(value)
+          .filter(([, item]) => item !== undefined)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, illustrationCanonical(item)]),
+      )
+    : value;
+const illustrationHashText = async (value) =>
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+const illustrationHash = async (value) =>
+  illustrationHashText(JSON.stringify(illustrationCanonical(value)));
+const illustrationSeal = async (value, key) => ({
+  ...value,
+  [key]: await illustrationHash(value),
+});
+
+async function illustrationBrief() {
+  const value = await brief();
+  value.identity.requestId = "request-illustration-1";
+  value.purpose = "interior_full_page_illustration";
+  value.output.minimumPpi = 600;
+  value.output.colourIntent = "monochrome";
+  value.briefFingerprint = "";
+  value.briefFingerprint = await fingerprintBookArtBrief(value);
+  return value;
+}
+
+async function legacyIllustrationTranslationValue() {
+  const styleAuthority = await illustrationSeal({
+    outputKind: "book_illustration_style_authority",
+    version: "book_illustration_style_authority_v1",
+    status: "approved_for_page_design",
+    projectId: "project-1",
+    styleId: "style-1",
+    compiledAt: "2026-08-02T00:00:00.000Z",
+    styleFamily: "engraved_book_plate",
+    colourMode: "one_bit_black",
+    paperTone: "white",
+    inkLayerMode: "binary_alpha",
+    minimumLineWidthPt: 0.25,
+    targetLineArtPpi: 600,
+    profile: {},
+    projectVisualIdentity: "Exact manuscript-grounded line art",
+    projectDirectives: [],
+    prohibitedTraits: ["pseudo-text"],
+    historicalReferenceDigestSha256: sha("1"),
+    approvedReviewIds: ["review-1"],
+    hardErrors: [],
+    warnings: [],
+    requiredRevisions: [],
+    requiredHumanDecisions: [],
+    blockedClaims: [],
+  }, "authorityDigestSha256");
+  const pageAuthority = await illustrationSeal({
+    outputKind: "book_illustrated_page_authority",
+    version: "book_illustrated_page_authority_v1",
+    status: "ready_for_generation",
+    projectId: "project-1",
+    pageId: "page-1",
+    compiledAt: "2026-08-02T00:00:00.000Z",
+    styleAuthorityDigestSha256: styleAuthority.authorityDigestSha256,
+    pageRole: "full_page_black_ink_plate",
+    narrativeMode: "literal_scene",
+    manuscriptAuthorityDigestSha256: sha("2"),
+    visualManuscriptAuthorityDigestSha256: sha("3"),
+    manuscriptEvidenceSpanIds: ["span-1"],
+    directionDigestSha256: sha("d"),
+    layoutDigestSha256: sha("4"),
+    editionFormats: ["paperback"],
+    sharesPageWithLiveText: true,
+    protectedTextZoneCount: 2,
+    hardErrors: [],
+    warnings: [],
+    requiredHumanDecisions: [],
+    blockedClaims: [],
+  }, "authorityDigestSha256");
+  const prompt =
+    "Create one exact manuscript-grounded black-ink illustrated page candidate with no generated publication text.";
+  const candidateId = "page-1-formal_plate";
+  const inputSnapshot = {
+    projectId: "project-1",
+    runId: "illustration-run-1",
+    pageId: "page-1",
+  };
+  const withoutDigest = {
+    outputKind: "book_illustration_generation_plan",
+    version: "book_illustration_generation_plan_v1",
+    status: "ready_to_generate",
+    projectId: "project-1",
+    runId: "illustration-run-1",
+    requestedAt: "2026-08-02T00:00:00.000Z",
+    profile: "production",
+    styleAuthority,
+    pageAuthority,
+    providerProfile: {
+      adapter: "openai_image_api",
+      model: "gpt-image-2-2026-04-21",
+      size: "2048x3072",
+      quality: "high",
+      outputFormat: "png",
+      background: "opaque",
+      maximumCandidatesPerRun: 4,
+      maximumConcurrency: 1,
+      automaticProviderRetries: 0,
+    },
+    maximumRefinementRounds: 3,
+    tasks: [{
+      candidateId,
+      order: 1,
+      variation: "formal_plate",
+      prompt,
+      promptDigestSha256: await illustrationHashText(prompt),
+      expectedWidthPx: 2048,
+      expectedHeightPx: 3072,
+      flattenBackgroundHex: "#ffffff",
+      createTransparentInkLayer: false,
+      inkLayerMode: "none",
+      idempotencyKey: sha("5"),
+      state: "ready",
+      stopConditions: [],
+    }],
+    nextCandidateId: candidateId,
+    completedCandidateIds: [],
+    hardErrors: [],
+    warnings: [],
+    executionRules: [],
+    blockedClaims: [],
+    inputSnapshot,
+    inputDigestSha256: await illustrationHash(inputSnapshot),
+  };
+  return {
+    outputKind:
+      "evavo_legacy_website_book_illustration_plan_translation_input",
+    schemaVersion: 1,
+    brief: await illustrationBrief(),
+    legacyPlan: await illustrationSeal(
+      withoutDigest,
+      "planDigestSha256",
+    ),
+    candidateId,
+  };
+}
+
+async function legacyIllustrationTranslationFile(root) {
+  const file = path.join(
+    root,
+    "legacy-illustration-plan-translation.json",
+  );
+  await writeFile(
+    file,
+    JSON.stringify(await legacyIllustrationTranslationValue()),
+  );
+  return file;
+}
+
+test("CLI translates an exact legacy Website illustration plan without provider policy or side effects", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "evavo-book-art-cli-legacy-illustration-plan-"),
+  );
+  try {
+    const protocol = run(
+      ["book-art-legacy-illustration-plan-protocol"],
+      { ...process.env },
+    );
+    assert.equal(protocol.status, 0, protocol.stderr);
+    const protocolBody = JSON.parse(protocol.stdout);
+    assert.equal(protocolBody.contract, "evavo_book_art_profile_v1");
+    assert.equal(protocolBody.verifiesStyleAuthorityDigest, true);
+    assert.equal(protocolBody.verifiesPageAuthorityDigest, true);
+    assert.equal(protocolBody.legacyLayoutTrustedAsArtAuthority, false);
+    assert.equal(protocolBody.translationReadOnly, true);
+    assert.equal(protocolBody.providerCallPerformed, false);
+    assert.equal(protocolBody.runtimeJobSubmitted, false);
+
+    const input = await legacyIllustrationTranslationFile(root);
+    const result = run(
+      [
+        "book-art-legacy-illustration-plan-translate",
+        "--input",
+        input,
+      ],
+      { ...process.env },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const body = JSON.parse(result.stdout);
+    assert.equal(
+      body.status,
+      "ready_for_shadow_comparison",
+      body.blockers.join("\n"),
+    );
+    assert.equal(body.workOrder.assetClass, "interior_illustration");
+    assert.equal(body.legacyEvidence.pageRole, "full_page_black_ink_plate");
+    assert.equal(body.rawLegacyPromptTrustedAsAuthority, false);
+    assert.equal(body.legacyLayoutTrustedAsArtAuthority, false);
+    assert.equal(body.authoritativeWritesPerformed, false);
+    assert.equal(body.runtimeCutoverApproved, false);
+    assert.equal(body.publicationPerformed, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
