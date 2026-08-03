@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": ".",
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["apps/web/src/*"]
+    },
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "packages/core/src/**/*.ts",
+    "apps/web/src/lib/book-studio-art-plan-translation-client.ts",
+    "apps/web/src/lib/book-studio-art-plan-translation-service.ts",
+    "apps/web/src/lib/docs-suite-request-context.ts",
+    "apps/web/src/app/api/v1/book-studio/art-plan-translation/route.ts",
+    "types/**/*.d.ts"
+  ]
+}

@@ -1,0 +1,74 @@
+name: Book Studio Art Plan Translation Alt Runner
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/book-art-plan-translation-adapter-20260803
+    paths: &art_plan_paths
+      - '.github/workflows/book-studio-art-plan-translation.yml'
+      - 'packages/core/src/book-studio-art-plan-translation.ts'
+      - 'packages/core/test/book-studio-art-plan-translation.test.mjs'
+      - 'apps/web/src/lib/book-studio-art-plan-translation-client.ts'
+      - 'apps/web/src/lib/book-studio-art-plan-translation-service.ts'
+      - 'apps/web/src/app/api/v1/book-studio/art-plan-translation/route.ts'
+      - 'apps/web/test/book-studio-art-plan-translation.test.mjs'
+      - 'apps/web/test/book-studio-art-plan-translation-cli-mcp.test.mjs'
+      - 'scripts/check-book-studio-art-plan-translation.mjs'
+  pull_request:
+    branches: [main]
+    paths: *art_plan_paths
+
+permissions:
+  contents: read
+
+jobs:
+  verify-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 9.15.0
+          run_install: false
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-book-studio-art-plan-translation.mjs
+      - run: pnpm --filter @evavo-docs/core typecheck
+      - run: pnpm --filter @evavo-docs/web typecheck
+      - run: node --test packages/core/test/book-studio-art-plan-translation.test.mjs
+      - run: node --test apps/web/test/book-studio-art-plan-translation.test.mjs
+      - run: node --test apps/web/test/book-studio-art-plan-translation-cli-mcp.test.mjs
+      - run: git diff --exit-code
+
+  verify-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 9.15.0
+          run_install: false
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-book-studio-art-plan-translation.mjs
+      - run: pnpm --filter @evavo-docs/core typecheck
+      - run: pnpm --filter @evavo-docs/web typecheck
+      - run: node --test packages/core/test/book-studio-art-plan-translation.test.mjs
+      - run: node --test apps/web/test/book-studio-art-plan-translation.test.mjs
+      - run: node --test apps/web/test/book-studio-art-plan-translation-cli-mcp.test.mjs
+      - run: git diff --exit-code
