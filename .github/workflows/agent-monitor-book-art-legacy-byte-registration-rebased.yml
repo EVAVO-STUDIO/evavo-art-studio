@@ -25,7 +25,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TARGET_BRANCH: agent/book-art-legacy-byte-registration-rebased-20260803
       WORKFLOW_FILE: agent-apply-book-art-legacy-byte-registration.yml
-      EXPECTED_BOOTSTRAP_SHA: 4d7a72b38c9fa4644023b3a1b193d066e198af25
+      EXPECTED_BOOTSTRAP_SHA: 88a2eb3e2a5439745a6780ecdb276993637f0bd3
     steps:
       - name: Check out exact observed bootstrap commit
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
