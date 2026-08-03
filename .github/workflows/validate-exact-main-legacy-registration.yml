@@ -1,0 +1,160 @@
+name: Validate exact main legacy Book Art registration
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: validate-exact-main-legacy-registration
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: >-
+      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_MAIN_SHA: 9eab30022726808a06d1c10221527bad347293b8
+      EXPECTED_WORKFLOW: ci.yml
+      VALIDATION_PATH: .github/workflows/validate-exact-main-legacy-registration.yml
+    steps:
+      - name: Check out exact validation branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove direct-child workflow-only validation scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${{ github.event.pull_request.base.ref }}" == "main" ]]
+          [[ "${{ github.event.pull_request.base.sha }}" == "${EXPECTED_MAIN_SHA}" ]]
+          [[ "$(git rev-parse HEAD^)" == "${EXPECTED_MAIN_SHA}" ]]
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${EXPECTED_MAIN_SHA}" ]]
+          git diff --name-only "${EXPECTED_MAIN_SHA}" HEAD > "${RUNNER_TEMP}/changed.txt"
+          [[ "$(wc -l < "${RUNNER_TEMP}/changed.txt" | tr -d ' ')" == "1" ]]
+          [[ "$(cat "${RUNNER_TEMP}/changed.txt")" == "${VALIDATION_PATH}" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Wait for automatic exact-main validation
+        id: main_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=''
+          for _ in $(seq 1 120); do
+            run_id="$(
+              gh api \
+                -H 'Accept: application/vnd.github+json' \
+                "/repos/${GITHUB_REPOSITORY}/actions/workflows/${EXPECTED_WORKFLOW}/runs?branch=main&event=push&per_page=30" \
+                --jq ".workflow_runs[] | select(.head_sha == \"${EXPECTED_MAIN_SHA}\") | .id" \
+                | head -n 1
+            )"
+            [[ -n "${run_id}" ]] && break
+            sleep 5
+          done
+          [[ -n "${run_id}" ]] || { echo 'Exact-main push workflow was not created.' >&2; exit 1; }
+          echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+
+          for _ in $(seq 1 480); do
+            status="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.status')"
+            [[ "${status}" == 'completed' ]] && break
+            sleep 5
+          done
+          metadata="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}")"
+          status="$(jq -r '.status' <<< "${metadata}")"
+          conclusion="$(jq -r '.conclusion // ""' <<< "${metadata}")"
+          head_sha="$(jq -r '.head_sha' <<< "${metadata}")"
+          event="$(jq -r '.event' <<< "${metadata}")"
+          [[ "${status}" == 'completed' ]]
+          [[ "${conclusion}" == 'success' ]]
+          [[ "${head_sha}" == "${EXPECTED_MAIN_SHA}" ]]
+          [[ "${event}" == 'push' ]]
+
+      - name: Verify exact-main receipt artifact
+        id: receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id='${{ steps.main_gate.outputs.run_id }}'
+          expected_name="art-studio-validation-${EXPECTED_MAIN_SHA}"
+          artifact_id="$(
+            gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+              --jq ".artifacts[] | select(.name == \"${expected_name}\" and .expired == false) | .id" \
+              | head -n 1
+          )"
+          [[ -n "${artifact_id}" ]] || { echo 'Exact-main receipt artifact was not found.' >&2; exit 1; }
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "${RUNNER_TEMP}/main-receipt.zip"
+          mkdir -p "${RUNNER_TEMP}/main-receipt"
+          unzip -q "${RUNNER_TEMP}/main-receipt.zip" -d "${RUNNER_TEMP}/main-receipt"
+          receipt="${RUNNER_TEMP}/main-receipt/art-studio-validation-receipt.json"
+          test -f "${receipt}"
+          node --input-type=module - "${receipt}" "${EXPECTED_MAIN_SHA}" <<'NODE'
+          import fs from "node:fs";
+          const [file, expectedSha] = process.argv.slice(2);
+          const value = JSON.parse(fs.readFileSync(file, "utf8"));
+          const checks = [
+            [value.schemaVersion === "1.1", "schemaVersion"],
+            [value.repository === "EVAVO-STUDIO/evavo-art-studio", "repository"],
+            [value.candidateSha === expectedSha, "candidateSha"],
+            [value.trigger === "push", "trigger"],
+            [value.requestSource === "github-main-push", "requestSource"],
+            [value.currentMainAtReceipt === true, "currentMainAtReceipt"],
+            [value.node === "22.14.0", "node"],
+            [value.pnpm === "10.13.1", "pnpm"],
+            [value.lockfilePolicy === "review-first", "lockfilePolicy"],
+            [value.installedWithoutCommittedLockfile === true, "installedWithoutCommittedLockfile"],
+            [value.validation === "passed", "validation"],
+            [value.liveProviderRequest === false, "liveProviderRequest"],
+            [value.artifactPromotion === false, "artifactPromotion"],
+            [value.deployment === "disabled", "deployment"],
+          ];
+          const failed = checks.filter(([ok]) => !ok).map(([, label]) => label);
+          if (failed.length) throw new Error(`Invalid exact-main receipt fields: ${failed.join(", ")}`);
+          NODE
+          echo "artifact_id=${artifact_id}" >> "${GITHUB_OUTPUT}"
+
+      - name: Re-prove exact current main and write monitor receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${EXPECTED_MAIN_SHA}" ]]
+          cat > "${RUNNER_TEMP}/legacy-registration-main-receipt.json" <<JSON
+          {
+            "schemaVersion": "1.0",
+            "repository": "EVAVO-STUDIO/evavo-art-studio",
+            "candidateSha": "${EXPECTED_MAIN_SHA}",
+            "currentMainAtReceipt": true,
+            "automaticMainWorkflowRunId": "${{ steps.main_gate.outputs.run_id }}",
+            "automaticMainArtifactId": "${{ steps.receipt.outputs.artifact_id }}",
+            "automaticMainReceiptVerified": true,
+            "legacyByteRegistrationAuthorityChecked": true,
+            "liveProviderRequest": false,
+            "selectionPerformed": false,
+            "promotionPerformed": false,
+            "bookUseBindingCreated": false,
+            "runtimeCutoverApproved": false,
+            "websiteSourceDeletionAllowed": false,
+            "publicationPerformed": false
+          }
+          JSON
+
+      - name: Upload bounded exact-main monitor receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: legacy-registration-main-9eab300-receipt
+          path: ${{ runner.temp }}/legacy-registration-main-receipt.json
+          if-no-files-found: error
+          retention-days: 14
