@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   group: bootstrap-book-art-legacy-illustration-plan-translation
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply-verify-publish:
@@ -36,6 +36,7 @@ jobs:
           git fetch origin main --no-tags
           [[ "$(git merge-base HEAD origin/main)" == "$(git rev-parse origin/main)" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          echo "START_HEAD=$(git rev-parse HEAD)" >> "${GITHUB_ENV}"
           git diff --name-only origin/main...HEAD | sort > "${RUNNER_TEMP}/actual-input.txt"
           cat > "${RUNNER_TEMP}/expected-input.txt" <<'PATHS'
           .github/workflows/agent-book-art-legacy-illustration-plan-translation.yml
@@ -105,8 +106,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -f packages/book-art-runtime/src/index.ts
+          test -f packages/book-art-runtime/test/runtime.test.mjs
+          test -f apps/worker/test/book-art-provider-jobs.test.mjs
           node scripts/check-book-art-provider-runtime.mjs
           pnpm run build:domain
+          pnpm --filter @evavo/art-book-runtime test
+          pnpm --filter @evavo/art-studio-worker test
           pnpm --filter @evavo/art-studio-api test
           pnpm --filter @evavo/art-studio-cli test
           pnpm --filter @evavo/art-studio-mcp test
@@ -143,8 +149,11 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'feat(book-art): expose legacy illustration plan translation'
+          git diff --exit-code
           diff -u \
             "${RUNNER_TEMP}/expected-final.txt" \
             <(git diff --name-only origin/main...HEAD | sort)
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          git fetch origin feat/book-art-legacy-illustration-plan-translation-20260803 --no-tags
+          [[ "$(git rev-parse origin/feat/book-art-legacy-illustration-plan-translation-20260803)" == "${START_HEAD}" ]]
           git push origin HEAD:refs/heads/feat/book-art-legacy-illustration-plan-translation-20260803
