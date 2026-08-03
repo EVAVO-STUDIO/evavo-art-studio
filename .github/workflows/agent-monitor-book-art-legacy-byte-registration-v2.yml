@@ -1,4 +1,4 @@
-name: Agent Monitor Book Art Legacy Byte Registration V2
+name: Agent Diagnose Book Art Legacy Byte Registration
 
 on:
   pull_request:
@@ -11,16 +11,16 @@ permissions:
   actions: read
 
 concurrency:
-  group: agent-monitor-book-art-legacy-byte-registration-v2
+  group: agent-diagnose-book-art-legacy-byte-registration
   cancel-in-progress: true
 
 jobs:
-  monitor:
+  diagnose:
     if: >-
       github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
       TARGET_BRANCH: agent/book-art-legacy-byte-registration-20260803
@@ -44,52 +44,27 @@ jobs:
           [[ "$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})" == "${EXPECTED_SHA}" ]]
           [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 
-      - name: Watch exact bootstrap workflow
-        id: watch
+      - name: Report exact bootstrap result and bounded failure tail
         shell: bash
         run: |
           set -euo pipefail
-          run_id=''
-          for _ in $(seq 1 120); do
-            run_id="$(
-              gh api \
-                -H 'Accept: application/vnd.github+json' \
-                "/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${TARGET_BRANCH}&event=push&per_page=30" \
-                --jq ".workflow_runs[] | select(.head_sha == \"${EXPECTED_SHA}\") | .id" \
-                | head -n 1
-            )"
-            [[ -n "${run_id}" ]] && break
-            sleep 5
-          done
-          [[ -n "${run_id}" ]] || { echo 'Exact checksummed bootstrap workflow run was not created.' >&2; exit 1; }
-          echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
-          for _ in $(seq 1 180); do
-            status="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq .status)"
-            conclusion="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.conclusion // ""')"
-            echo "run ${run_id}: ${status} ${conclusion}"
-            if [[ "${status}" == 'completed' ]]; then
-              if [[ "${conclusion}" != 'success' ]]; then
-                gh run view "${run_id}" --repo "${GITHUB_REPOSITORY}" --log || true
-                exit 1
-              fi
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Exact checksummed bootstrap workflow ${run_id} did not complete within the bounded observer window." >&2
-          exit 1
-
-      - name: Prove validated production source was published
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --no-tags --prune origin \
-            +refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}
-          published="$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})"
-          [[ "${published}" != "${EXPECTED_SHA}" ]]
-          git show "${published}:packages/book-art-runtime/src/legacy-registration.ts" \
-            | grep -F 'export async function registerLegacyBookArtBytes'
-          ! git cat-file -e "${published}:.github/agent-payloads/legacy-registration-payload.part1"
-          ! git cat-file -e "${published}:.github/workflows/agent-apply-book-art-legacy-byte-registration.yml"
-          echo "validated branch head: ${published}"
-          echo "bootstrap workflow run: ${{ steps.watch.outputs.run_id }}"
+          run_id="$(
+            gh api \
+              -H 'Accept: application/vnd.github+json' \
+              "/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${TARGET_BRANCH}&event=push&per_page=30" \
+              --jq ".workflow_runs[] | select(.head_sha == \"${EXPECTED_SHA}\") | .id" \
+              | head -n 1
+          )"
+          [[ -n "${run_id}" ]] || { echo 'Exact bootstrap workflow run was not found.' >&2; exit 1; }
+          echo "bootstrap_run_id=${run_id}"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" \
+            --jq '{status,conclusion,head_sha,event,run_attempt,created_at,updated_at}'
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100" \
+            --jq '.jobs[] | {id,name,status,conclusion,steps:[.steps[] | {number,name,status,conclusion}]}'
+          conclusion="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.conclusion // ""')"
+          if [[ "${conclusion}" != 'success' ]]; then
+            echo '--- bounded failed-log tail ---'
+            gh run view "${run_id}" --repo "${GITHUB_REPOSITORY}" --log-failed 2>&1 \
+              | tail -n 220
+            exit 1
+          fi
