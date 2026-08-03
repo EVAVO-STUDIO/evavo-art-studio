@@ -77,6 +77,7 @@ jobs:
           PY
           python /tmp/apply.py
           rm -f /tmp/apply.py
+          git checkout origin/main -- .github/workflows/book-art-provider-runtime.yml
           git diff --check
 
       - name: Set up pnpm 10.13.1
@@ -122,7 +123,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git checkout origin/main -- .github/workflows/book-art-provider-runtime.yml
           rm -f pnpm-lock.yaml
           rm -f \
             .github/workflows/agent-book-art-legacy-illustration-plan-translation.yml \
