@@ -8,6 +8,11 @@ import {
   submitBookArtProviderShadowJob,
   type BookArtProviderAdapterPolicyV1,
 } from "@evavo/art-book-runtime";
+import {
+  DOCS_BOOK_ART_RELEASE_RUNTIME_CONTRACT,
+  compileDocsBookArtReleaseShadowJob,
+  submitDocsBookArtReleaseShadowJob,
+} from "@evavo/art-book-runtime/docs-release";
 import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
 import { compareBookArtProviderShadowParity } from "@evavo/art-book-runtime/parity";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
@@ -92,18 +97,18 @@ function configuredInput(
   policy: BookArtProviderAdapterPolicyV1,
 ): Record<string, unknown> {
   if (!request || typeof request !== "object" || Array.isArray(request)) {
-    throw new Error("Book Art provider request must be one object.");
+    throw new Error("Book Art request must be one object.");
   }
   const input = request as Record<string, unknown>;
   if (Object.hasOwn(input, "adapterPolicy")) {
     throw new Error(
-      "Book Art provider request must not contain adapterPolicy; configure provider policy on the MCP host.",
+      "Book Art request must not contain adapterPolicy; configure provider policy on the MCP host.",
     );
   }
   return { ...input, adapterPolicy: policy };
 }
 
-function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
+function providerProtocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
   return {
     schemaVersion: BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
     contract: BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
@@ -127,6 +132,40 @@ function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
     cutoverEligible: false,
     candidateApprovalState: "unapproved",
     candidateStorageClass: "intermediate",
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  } as const;
+}
+
+function docsReleaseProtocol(
+  policy: BookArtProviderAdapterPolicyV1 | undefined,
+) {
+  return {
+    schemaVersion: BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
+    contract: DOCS_BOOK_ART_RELEASE_RUNTIME_CONTRACT,
+    shadowOnly: true,
+    providerPolicyConfigured: policy !== undefined,
+    providerPolicyEnvironment: {
+      allowedAdapterIds: "EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS",
+      preferredAdapterId: "EVAVO_BOOK_ART_PROVIDER_PREFERRED_ADAPTER",
+      preferredModel: "EVAVO_BOOK_ART_PROVIDER_MODEL",
+    },
+    requiresReadyForArtShadowRelease: true,
+    verifiesReleaseFingerprint: true,
+    verifiesExactFinalBrief: true,
+    verifiesRepositoryCompatibility: true,
+    verifiesCompleteReleaseEvidence: true,
+    oneCandidate: true,
+    maximumRuntimeAttempts: 1,
+    providerFallbackAllowed: false,
+    compilePerformsProviderCall: false,
+    submitPerformsProviderCall: false,
+    candidateApprovalState: "unapproved",
+    candidateStorageClass: "intermediate",
+    authoritativeBookWritesPerformed: false,
     selectionPerformed: false,
     promotionPerformed: false,
     bookUseBindingCreated: false,
@@ -161,7 +200,65 @@ export function registerBookArtTools(server: McpServer): void {
         "Report the shadow-only Book Art provider runtime contract, host policy readiness and non-authority guarantees without compiling, submitting, inspecting or comparing work.",
       inputSchema: z.object({}),
     },
-    async () => textResult(protocol(providerPolicy())),
+    async () => textResult(providerProtocol(providerPolicy())),
+  );
+
+  server.registerTool(
+    "book_art_docs_release_runtime_protocol",
+    {
+      description:
+        "Report the verified Docs Suite Book Art release receiver contract. A release must be ready_for_art_shadow, fingerprint-valid, manuscript-bound and evidence-complete before it can compile to one no-fallback provider job.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(docsReleaseProtocol(providerPolicy())),
+  );
+
+  server.registerTool(
+    "compile_book_art_docs_release_shadow_job",
+    {
+      description:
+        "Verify one complete Docs Suite writing-to-art release receipt and exact final brief, then compile one deterministic no-fallback provider job. The MCP host injects adapter policy. This tool calls no provider and writes no runtime job or artifact.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(
+          await compileDocsBookArtReleaseShadowJob(
+            configuredInput(request, requiredPolicy()),
+          ),
+        );
+      } catch (error: unknown) {
+        return toolError("BOOK_ART_DOCS_RELEASE_COMPILATION_REJECTED", error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "submit_book_art_docs_release_shadow_job",
+    {
+      description:
+        "Verify and submit one complete Docs Suite Book Art release to the local durable runtime. Requires EVAVO_ART_ALLOW_WRITES=true; submission calls no provider and duplicate releases reuse the same one-attempt job.",
+      inputSchema: z.object({
+        request: z.unknown(),
+        actor: z.string().min(1).max(256).optional(),
+      }),
+    },
+    async ({ request, actor }) => {
+      try {
+        requireOperationalAccess();
+        return textResult(
+          await submitDocsBookArtReleaseShadowJob(
+            configuredInput(request, requiredPolicy()),
+            {
+              runtime: new LocalRuntimeRepository({ root: runtimeRoot() }),
+              actor: actor?.trim() || "mcp-book-art-docs-release-shadow",
+            },
+          ),
+        );
+      } catch (error: unknown) {
+        return toolError("BOOK_ART_DOCS_RELEASE_SUBMISSION_REJECTED", error);
+      }
+    },
   );
 
   server.registerTool(

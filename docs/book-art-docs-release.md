@@ -5,7 +5,7 @@ Reviewed: 3 August 2026
 
 ## Purpose
 
-Art Studio now verifies the complete final Book Art release emitted by `EVAVO-STUDIO/evavo-docs-suite` before it accepts the final brief for provider-job compilation.
+Art Studio verifies the complete final Book Art release emitted by `EVAVO-STUDIO/evavo-docs-suite` before it accepts the final brief for provider-job compilation.
 
 The receiver closes the operational seam between `EVAVO-STUDIO/evavo-writing-studio`, Docs Suite and `EVAVO-STUDIO/evavo-art-studio` without importing runtime source between repositories.
 
@@ -55,6 +55,42 @@ The receiver requires:
 - valid chronology from Docs release to Art receipt.
 
 Unknown envelope or receipt fields fail closed.
+
+## REST API
+
+```text
+GET  /v1/book-art/docs-release-runtime
+POST /v1/book-art/docs-releases/compile
+POST /v1/book-art/docs-releases/submit
+```
+
+Compilation is unauthenticated and read-only. Submission requires the existing Art Studio control token, write enablement and durable runtime. The Art Studio host injects the provider adapter allow-list; a caller-supplied `adapterPolicy` is rejected.
+
+The machine-readable contract is:
+
+```text
+apps/api/openapi.book-art-docs-release.yaml
+```
+
+## CLI
+
+```text
+evavo-art book-art-docs-release-protocol
+evavo-art book-art-docs-release-compile --input docs-release.json
+evavo-art book-art-docs-release-submit --input docs-release.json --runtime-root .art-studio/runtime --actor operator
+```
+
+The CLI reads provider policy from `EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS`, with optional preferred adapter and model variables. It never accepts provider policy inside the release file.
+
+## MCP
+
+```text
+book_art_docs_release_runtime_protocol
+compile_book_art_docs_release_shadow_job
+submit_book_art_docs_release_shadow_job
+```
+
+The MCP host owns provider policy. Submission additionally requires `EVAVO_ART_ALLOW_WRITES=true`. MCP adapters call the shared release runtime and contain no provider execution, promotion or Book publication implementation.
 
 ## Runtime behaviour
 

@@ -5,16 +5,24 @@ import test from "node:test";
 const read = (relativePath) =>
   readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
-test("MCP exposes shared Book Art submission and read-only inspection without authority shortcuts", async () => {
-  const [tools, index, packageSource, tsconfigSource, sharedRuntime, inspection] =
-    await Promise.all([
-      read("src/book-art-tools.ts"),
-      read("src/index.ts"),
-      read("package.json"),
-      read("tsconfig.json"),
-      read("../../packages/book-art-runtime/src/index.ts"),
-      read("../../packages/book-art-runtime/src/inspection.ts"),
-    ]);
+test("MCP exposes shared Book Art submission, verified Docs release and read-only inspection without authority shortcuts", async () => {
+  const [
+    tools,
+    index,
+    packageSource,
+    tsconfigSource,
+    sharedRuntime,
+    docsReleaseRuntime,
+    inspection,
+  ] = await Promise.all([
+    read("src/book-art-tools.ts"),
+    read("src/index.ts"),
+    read("package.json"),
+    read("tsconfig.json"),
+    read("../../packages/book-art-runtime/src/index.ts"),
+    read("../../packages/book-art-runtime/src/docs-release.ts"),
+    read("../../packages/book-art-runtime/src/inspection.ts"),
+  ]);
   const packageJson = JSON.parse(packageSource);
   const tsconfig = JSON.parse(tsconfigSource);
 
@@ -23,9 +31,14 @@ test("MCP exposes shared Book Art submission and read-only inspection without au
     "compile_book_art_provider_shadow_job",
     "submit_book_art_provider_shadow_job",
     "inspect_book_art_provider_shadow_job",
+    "book_art_docs_release_runtime_protocol",
+    "compile_book_art_docs_release_shadow_job",
+    "submit_book_art_docs_release_shadow_job",
     "compileBookArtProviderShadowJob",
     "submitBookArtProviderShadowJob",
     "inspectBookArtProviderShadowJob",
+    "compileDocsBookArtReleaseShadowJob",
+    "submitDocsBookArtReleaseShadowJob",
     "EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS",
     "EVAVO_BOOK_ART_PROVIDER_PREFERRED_ADAPTER",
     "EVAVO_BOOK_ART_PROVIDER_MODEL",
@@ -40,6 +53,11 @@ test("MCP exposes shared Book Art submission and read-only inspection without au
     "submitPerformsProviderCall: false",
     "inspectPerformsProviderCall: false",
     "inspectionWritesArtifacts: false",
+    "requiresReadyForArtShadowRelease: true",
+    "verifiesReleaseFingerprint: true",
+    "verifiesExactFinalBrief: true",
+    "verifiesRepositoryCompatibility: true",
+    "verifiesCompleteReleaseEvidence: true",
     'candidateApprovalState: "unapproved"',
     "selectionPerformed: false",
     "promotionPerformed: false",
@@ -76,6 +94,27 @@ test("MCP exposes shared Book Art submission and read-only inspection without au
     assert.ok(
       sharedRuntime.includes(token),
       `shared Book Art runtime is missing ${token}`,
+    );
+  }
+  for (const token of [
+    "evavo_docs_book_art_release_shadow_runtime_v1",
+    "compileDocsBookArtReleaseEnvelope",
+    "compileBookArtProviderShadowJob",
+    "submitBookArtProviderShadowJob",
+    "releaseVerified: true",
+    "exactFinalArtBriefVerified: true",
+    "providerCallPerformed: false",
+    "candidateArtifactsWritten: false",
+    "authoritativeBookWritesPerformed: false",
+    "selectionPerformed: false",
+    "promotionPerformed: false",
+    "bookUseBindingCreated: false",
+    "runtimeCutoverApproved: false",
+    "publicationPerformed: false",
+  ]) {
+    assert.ok(
+      docsReleaseRuntime.includes(token),
+      `Docs release runtime is missing ${token}`,
     );
   }
   for (const token of [

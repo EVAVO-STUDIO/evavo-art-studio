@@ -9,6 +9,11 @@ import {
   submitBookArtProviderShadowJob,
   type BookArtProviderAdapterPolicyV1,
 } from "@evavo/art-book-runtime";
+import {
+  DOCS_BOOK_ART_RELEASE_RUNTIME_CONTRACT,
+  compileDocsBookArtReleaseShadowJob,
+  submitDocsBookArtReleaseShadowJob,
+} from "@evavo/art-book-runtime/docs-release";
 import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspection";
 import { compareBookArtProviderShadowParity } from "@evavo/art-book-runtime/parity";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
@@ -30,6 +35,9 @@ const COMMANDS = new Set([
   "book-art-provider-submit",
   "book-art-provider-inspect",
   "book-art-provider-parity",
+  "book-art-docs-release-protocol",
+  "book-art-docs-release-compile",
+  "book-art-docs-release-submit",
 ]);
 const PARITY_FIELDS = new Set(["request", "websiteObservation"]);
 
@@ -112,7 +120,7 @@ function configuredInputValue(
 ): Record<string, unknown> {
   if (Object.hasOwn(input, "adapterPolicy")) {
     throw new Error(
-      "Book Art provider input must not contain adapterPolicy; configure EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS on the host.",
+      "Book Art input must not contain adapterPolicy; configure EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS on the host.",
     );
   }
   return { ...input, adapterPolicy };
@@ -123,7 +131,7 @@ async function configuredInput(
   adapterPolicy: BookArtProviderAdapterPolicyV1,
 ): Promise<Record<string, unknown>> {
   return configuredInputValue(
-    await readInputObject(filePath, "Book Art provider input"),
+    await readInputObject(filePath, "Book Art input"),
     adapterPolicy,
   );
 }
@@ -157,7 +165,7 @@ async function configuredParityInput(
   };
 }
 
-function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
+function providerProtocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
   return {
     schemaVersion: BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
     contract: BOOK_ART_PROVIDER_RUNTIME_CONTRACT,
@@ -189,6 +197,40 @@ function protocol(policy: BookArtProviderAdapterPolicyV1 | undefined) {
   } as const;
 }
 
+function docsReleaseProtocol(
+  policy: BookArtProviderAdapterPolicyV1 | undefined,
+) {
+  return {
+    schemaVersion: BOOK_ART_PROVIDER_RUNTIME_SCHEMA_VERSION,
+    contract: DOCS_BOOK_ART_RELEASE_RUNTIME_CONTRACT,
+    shadowOnly: true,
+    providerPolicyConfigured: policy !== undefined,
+    providerPolicyEnvironment: {
+      allowedAdapterIds: "EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS",
+      preferredAdapterId: "EVAVO_BOOK_ART_PROVIDER_PREFERRED_ADAPTER",
+      preferredModel: "EVAVO_BOOK_ART_PROVIDER_MODEL",
+    },
+    requiresReadyForArtShadowRelease: true,
+    verifiesReleaseFingerprint: true,
+    verifiesExactFinalBrief: true,
+    verifiesRepositoryCompatibility: true,
+    verifiesCompleteReleaseEvidence: true,
+    oneCandidate: true,
+    maximumRuntimeAttempts: 1,
+    providerFallbackAllowed: false,
+    compilePerformsProviderCall: false,
+    submitPerformsProviderCall: false,
+    candidateApprovalState: "unapproved",
+    candidateStorageClass: "intermediate",
+    authoritativeBookWritesPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  } as const;
+}
+
 export async function handleBookArtCommand(
   command: string,
   values: BookArtCommandValues,
@@ -196,7 +238,10 @@ export async function handleBookArtCommand(
   if (!COMMANDS.has(command)) return { handled: false };
   const policy = providerPolicy();
   if (command === "book-art-provider-protocol") {
-    return { handled: true, value: protocol(policy) };
+    return { handled: true, value: providerProtocol(policy) };
+  }
+  if (command === "book-art-docs-release-protocol") {
+    return { handled: true, value: docsReleaseProtocol(policy) };
   }
   if (!policy) {
     throw new Error(
@@ -225,6 +270,26 @@ export async function handleBookArtCommand(
   }
 
   const input = await configuredInput(inputPath, policy);
+  if (command === "book-art-docs-release-compile") {
+    const result = await compileDocsBookArtReleaseShadowJob(input);
+    return {
+      handled: true,
+      value: result,
+      ...(result.status === "ready" ? {} : { exitCode: 2 }),
+    };
+  }
+  if (command === "book-art-docs-release-submit") {
+    const result = await submitDocsBookArtReleaseShadowJob(input, {
+      runtime: new LocalRuntimeRepository({ root: runtimeRoot(values) }),
+      actor: actor(values),
+    });
+    return {
+      handled: true,
+      value: result,
+      ...(result.status === "submitted" ? {} : { exitCode: 2 }),
+    };
+  }
+
   const compilation = await compileBookArtProviderShadowJob(input);
   if (command === "book-art-provider-compile") {
     return {
