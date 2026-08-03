@@ -73,6 +73,17 @@ jobs:
           PY
           python /tmp/apply.py
           rm -f /tmp/apply.py
+          python - <<'PY'
+          from pathlib import Path
+
+          docs = Path('docs/book-art-provider-runtime.md')
+          source = docs.read_text(encoding='utf-8')
+          old = 'a canonical fingerprint-valid Docs-owned `evavo_book_art_brief`'
+          new = 'a canonical Docs-owned Book Art brief with a fingerprint-valid `evavo_book_art_brief`'
+          if source.count(old) != 1:
+              raise SystemExit('Expected exactly one legacy-plan documentation phrase to normalize.')
+          docs.write_text(source.replace(old, new, 1), encoding='utf-8')
+          PY
           git diff --check
 
       - name: Set up pnpm 10.13.1
