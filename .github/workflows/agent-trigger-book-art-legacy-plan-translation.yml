@@ -1,0 +1,147 @@
+name: Agent Trigger Book Art Legacy Plan Translation
+
+on:
+  push:
+    branches:
+      - feat/book-art-legacy-plan-translation-20260803
+    paths:
+      - .github/workflows/agent-trigger-book-art-legacy-plan-translation.yml
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-book-art-legacy-plan-translation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply-verify-publish:
+    if: >-
+      github.repository == 'EVAVO-STUDIO/evavo-art-studio' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/feat/book-art-legacy-plan-translation-20260803') ||
+        (github.event_name == 'pull_request' &&
+         github.event.pull_request.head.repo.full_name == github.repository &&
+         github.event.pull_request.head.ref == 'feat/book-art-legacy-plan-translation-20260803')
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact feature branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: feat/book-art-legacy-plan-translation-20260803
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact branch and temporary-only input scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          [[ "$(git merge-base HEAD origin/main)" == "$(git rev-parse origin/main)" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          git diff --name-only origin/main...HEAD | sort > "${RUNNER_TEMP}/actual-input.txt"
+          cat > "${RUNNER_TEMP}/expected-input.txt" <<'PATHS'
+          .github/workflows/agent-book-art-legacy-plan-translation.yml
+          .github/workflows/agent-trigger-book-art-legacy-plan-translation.yml
+          PATHS
+          sort "${RUNNER_TEMP}/expected-input.txt" -o "${RUNNER_TEMP}/expected-input.txt"
+          diff -u "${RUNNER_TEMP}/expected-input.txt" "${RUNNER_TEMP}/actual-input.txt"
+
+      - name: Extract and apply the reviewed source transformation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          workflow = Path('.github/workflows/agent-book-art-legacy-plan-translation.yml')
+          source = workflow.read_text(encoding='utf-8')
+          start_marker = "          cat > /tmp/apply.py <<'PY'\n"
+          end_marker = "\n          PY\n          python /tmp/apply.py"
+          start = source.index(start_marker) + len(start_marker)
+          end = source.index(end_marker, start)
+          script = dedent(source[start:end])
+          if 'translateLegacyWebsiteBookArtGenerationPlan' not in script:
+              raise SystemExit('Reviewed apply script is missing the legacy-plan translator boundary.')
+          Path('/tmp/apply.py').write_text(script, encoding='utf-8')
+          PY
+          python /tmp/apply.py
+          rm -f /tmp/apply.py
+          git diff --check
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run permanent authority and surface checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-book-art-provider-runtime.mjs
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-api test
+          pnpm --filter @evavo/art-studio-cli test
+          pnpm --filter @evavo/art-studio-mcp test
+
+      - name: Run complete repository validation
+        run: pnpm check
+
+      - name: Commit only the clean permanent source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          rm -f \
+            .github/workflows/agent-book-art-legacy-plan-translation.yml \
+            .github/workflows/agent-trigger-book-art-legacy-plan-translation.yml
+          git diff --check
+          git diff --name-only origin/main | sort > "${RUNNER_TEMP}/actual-final.txt"
+          cat > "${RUNNER_TEMP}/expected-final.txt" <<'PATHS'
+          apps/api/openapi.book-art-provider.yaml
+          apps/api/src/book-art-api.ts
+          apps/api/test/book-art-api.test.mjs
+          apps/api/test/book-art-openapi-contract.test.mjs
+          apps/cli/src/book-art-commands.ts
+          apps/cli/src/index.ts
+          apps/cli/test/book-art-cli.test.mjs
+          apps/mcp/src/book-art-tools.ts
+          apps/mcp/test/book-art-tools-contract.test.mjs
+          docs/book-art-provider-runtime.md
+          scripts/check-book-art-provider-runtime.mjs
+          PATHS
+          sort "${RUNNER_TEMP}/expected-final.txt" -o "${RUNNER_TEMP}/expected-final.txt"
+          diff -u "${RUNNER_TEMP}/expected-final.txt" "${RUNNER_TEMP}/actual-final.txt"
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(book-art): expose legacy plan translation'
+          diff -u \
+            "${RUNNER_TEMP}/expected-final.txt" \
+            <(git diff --name-only origin/main...HEAD | sort)
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          git push origin HEAD:refs/heads/feat/book-art-legacy-plan-translation-20260803
