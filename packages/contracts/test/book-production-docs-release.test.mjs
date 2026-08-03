@@ -158,7 +158,10 @@ test("verifies one exact Docs Suite writing-to-art release and compiles its fina
   assert.equal(result.status, "ready", result.blockers.join("\n"));
   assert.equal(result.releaseVerified, true);
   assert.equal(result.exactFinalArtBriefVerified, true);
-  assert.equal(result.workOrder.sourceBriefFingerprint, result.releaseReceipt.finalArtBriefFingerprint);
+  assert.equal(
+    `sha256:${result.workOrder.sourceBriefFingerprint}`,
+    result.releaseReceipt.finalArtBriefFingerprint,
+  );
   assert.equal(result.workOrder.identity.projectId, "project:wren");
   assert.equal(result.workOrder.authoritativeWritesPerformed, false);
   assert.equal(result.workOrder.providerCandidateMayBeFinal, false);
