@@ -93,7 +93,10 @@ jobs:
           git rm -r .github/agent-payloads
           git rm "${WORKFLOW_PATH}"
           git diff --check
-          git diff --name-only HEAD | sort > "${RUNNER_TEMP}/actual-working-paths.txt"
+          {
+            git diff --name-only HEAD
+            git ls-files --others --exclude-standard
+          } | sort -u > "${RUNNER_TEMP}/actual-working-paths.txt"
           cat > "${RUNNER_TEMP}/expected-working-paths.txt" <<'PATHS'
           .github/agent-payloads/apply-script.gz.b64
           .github/agent-payloads/legacy-registration-payload.part02
