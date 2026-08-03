@@ -7,7 +7,7 @@ Reviewed: 3 August 2026
 
 Art Studio now verifies the complete final Book Art release emitted by `EVAVO-STUDIO/evavo-docs-suite` before it accepts the final brief for provider-job compilation.
 
-The receiver closes the operational seam between the moved writing side and Art Studio without importing runtime source between repositories.
+The receiver closes the operational seam between `EVAVO-STUDIO/evavo-writing-studio`, Docs Suite and `EVAVO-STUDIO/evavo-art-studio` without importing runtime source between repositories.
 
 ```text
 Docs Suite authoring packet
@@ -23,13 +23,13 @@ Docs Suite authoring packet
 ## Reviewed repository boundary
 
 ```text
-Writing Studio contract main
+EVAVO-STUDIO/evavo-writing-studio
 c776a9e7f856815dbb92ffec08426cd12f176bea
 
-Docs Suite release main
+EVAVO-STUDIO/evavo-docs-suite
 d7e5cd0f79ebcb211c502d33a90f84e93763f23c
 
-Art Studio exact brief receiver contract
+EVAVO-STUDIO/evavo-art-studio
 e9e96fd54a9e9d9c16bbd8faa2231caebb840c45
 ```
 
@@ -58,7 +58,7 @@ Unknown envelope or receipt fields fail closed.
 
 ## Runtime behaviour
 
-A verified release may compile to exactly one provider candidate and one runtime attempt with no fallback. Compilation and durable submission perform no provider call. Duplicate submissions reuse the same deterministic runtime job.
+A verified release may compile to one candidate, exactly one runtime attempt and no fallback. Compilation and durable submission perform no provider call. Duplicate submissions reuse the same deterministic runtime job.
 
 A later provider worker may store one unapproved intermediate candidate and evidence. That candidate is not final.
 
