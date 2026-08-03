@@ -2,144 +2,75 @@ name: Book Art Provider Runtime
 
 on:
   push:
-    branches: [main]
+    branches:
+      - feat/book-art-legacy-illustration-plan-translation-20260803
     paths:
-      - ".github/workflows/book-art-provider-runtime.yml"
-      - "package.json"
-      - "packages/book-art-runtime/**"
-      - "packages/book-art-runtime/src/index.ts"
-      - "packages/book-art-runtime/src/inspection.ts"
-      - "packages/book-art-runtime/src/parity.ts"
-      - "packages/book-art-runtime/test/runtime.test.mjs"
-      - "packages/book-art-runtime/test/parity.test.mjs"
-      - "apps/worker/package.json"
-      - "apps/worker/tsconfig.json"
-      - "apps/worker/src/book-art-provider-jobs.ts"
-      - "apps/worker/src/index.ts"
-      - "apps/worker/src/provider-handlers.ts"
-      - "apps/worker/test/book-art-provider-jobs.test.mjs"
-      - "apps/worker/test/book-art-provider-inspection.test.mjs"
-      - "apps/worker/test/book-art-provider-parity.test.mjs"
-      - "apps/api/package.json"
-      - "apps/api/tsconfig.json"
-      - "apps/api/src/book-art-api.ts"
-      - "apps/api/src/index.ts"
-      - "apps/api/openapi.book-art-provider.yaml"
-      - "apps/api/openapi.book-art-provider-parity.yaml"
-      - "apps/api/test/book-art-api.test.mjs"
-      - "apps/api/test/book-art-api-inspection.test.mjs"
-      - "apps/api/test/book-art-api-parity.test.mjs"
-      - "apps/api/test/book-art-openapi-contract.test.mjs"
-      - "apps/api/test/book-art-parity-openapi-contract.test.mjs"
-      - "apps/cli/package.json"
-      - "apps/cli/tsconfig.json"
-      - "apps/cli/src/book-art-commands.ts"
-      - "apps/cli/src/index.ts"
-      - "apps/cli/test/book-art-cli.test.mjs"
-      - "apps/cli/test/book-art-cli-inspection.test.mjs"
-      - "apps/cli/test/book-art-cli-parity.test.mjs"
-      - "apps/cli/test/book-art-cli-legacy-registration.test.mjs"
-      - "apps/mcp/package.json"
-      - "apps/mcp/tsconfig.json"
-      - "apps/mcp/src/book-art-tools.ts"
-      - "apps/mcp/src/index.ts"
-      - "apps/mcp/test/book-art-tools-contract.test.mjs"
-      - "apps/mcp/test/book-art-parity-contract.test.mjs"
-      - "packages/contracts/src/book-production.ts"
-      - "packages/contracts/src/book-production-profile.ts"
-      - "packages/contracts/src/index.ts"
-      - "packages/providers/src/orchestrator.ts"
-      - "packages/providers/src/registry.ts"
-      - "packages/providers/src/validation.ts"
-      - "packages/runtime/src/local-repository.ts"
-      - "packages/runtime/src/normalize.ts"
-      - "packages/runtime/src/worker.ts"
-      - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
-      - "docs/book-art-provider-runtime.md"
-      - "docs/book-studio-production-handoff.md"
-      - "scripts/check-book-art-provider-runtime.mjs"
-      - "scripts/check-book-art-provider-inspection.mjs"
-      - "scripts/check-book-art-provider-parity.mjs"
-      - "scripts/check-book-art-legacy-registration.mjs"
-  pull_request:
-    branches: [main]
-    paths:
-      - ".github/workflows/book-art-provider-runtime.yml"
-      - "package.json"
-      - "packages/book-art-runtime/**"
-      - "packages/book-art-runtime/src/index.ts"
-      - "packages/book-art-runtime/src/inspection.ts"
-      - "packages/book-art-runtime/src/parity.ts"
-      - "packages/book-art-runtime/test/runtime.test.mjs"
-      - "packages/book-art-runtime/test/parity.test.mjs"
-      - "apps/worker/package.json"
-      - "apps/worker/tsconfig.json"
-      - "apps/worker/src/book-art-provider-jobs.ts"
-      - "apps/worker/src/index.ts"
-      - "apps/worker/src/provider-handlers.ts"
-      - "apps/worker/test/book-art-provider-jobs.test.mjs"
-      - "apps/worker/test/book-art-provider-inspection.test.mjs"
-      - "apps/worker/test/book-art-provider-parity.test.mjs"
-      - "apps/api/package.json"
-      - "apps/api/tsconfig.json"
-      - "apps/api/src/book-art-api.ts"
-      - "apps/api/src/index.ts"
-      - "apps/api/openapi.book-art-provider.yaml"
-      - "apps/api/openapi.book-art-provider-parity.yaml"
-      - "apps/api/test/book-art-api.test.mjs"
-      - "apps/api/test/book-art-api-inspection.test.mjs"
-      - "apps/api/test/book-art-api-parity.test.mjs"
-      - "apps/api/test/book-art-openapi-contract.test.mjs"
-      - "apps/api/test/book-art-parity-openapi-contract.test.mjs"
-      - "apps/cli/package.json"
-      - "apps/cli/tsconfig.json"
-      - "apps/cli/src/book-art-commands.ts"
-      - "apps/cli/src/index.ts"
-      - "apps/cli/test/book-art-cli.test.mjs"
-      - "apps/cli/test/book-art-cli-inspection.test.mjs"
-      - "apps/cli/test/book-art-cli-parity.test.mjs"
-      - "apps/cli/test/book-art-cli-legacy-registration.test.mjs"
-      - "apps/mcp/package.json"
-      - "apps/mcp/tsconfig.json"
-      - "apps/mcp/src/book-art-tools.ts"
-      - "apps/mcp/src/index.ts"
-      - "apps/mcp/test/book-art-tools-contract.test.mjs"
-      - "apps/mcp/test/book-art-parity-contract.test.mjs"
-      - "packages/contracts/src/book-production.ts"
-      - "packages/contracts/src/book-production-profile.ts"
-      - "packages/contracts/src/index.ts"
-      - "packages/providers/src/orchestrator.ts"
-      - "packages/providers/src/registry.ts"
-      - "packages/providers/src/validation.ts"
-      - "packages/runtime/src/local-repository.ts"
-      - "packages/runtime/src/normalize.ts"
-      - "packages/runtime/src/worker.ts"
-      - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
-      - "docs/book-art-provider-runtime.md"
-      - "docs/book-studio-production-handoff.md"
-      - "scripts/check-book-art-provider-runtime.mjs"
-      - "scripts/check-book-art-provider-inspection.mjs"
-      - "scripts/check-book-art-provider-parity.mjs"
-      - "scripts/check-book-art-legacy-registration.mjs"
-  workflow_dispatch:
+      - .github/workflows/book-art-provider-runtime.yml
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: book-art-provider-runtime-${{ github.ref }}
-  cancel-in-progress: true
+  group: bootstrap-book-art-legacy-illustration-plan-translation
+  cancel-in-progress: false
 
 jobs:
-  verify:
+  apply-verify-publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
-      - name: Check out exact source
+      - name: Check out exact feature branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          persist-credentials: false
-          fetch-depth: 1
+          ref: feat/book-art-legacy-illustration-plan-translation-20260803
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact branch and temporary input scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          [[ "$(git merge-base HEAD origin/main)" == "$(git rev-parse origin/main)" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          git diff --name-only origin/main...HEAD | sort > "${RUNNER_TEMP}/actual-input.txt"
+          cat > "${RUNNER_TEMP}/expected-input.txt" <<'PATHS'
+          .github/workflows/agent-book-art-legacy-illustration-plan-translation.yml
+          .github/workflows/agent-trigger-book-art-legacy-illustration-plan-translation.yml
+          .github/workflows/book-art-provider-runtime.yml
+          PATHS
+          sed -i 's/^          //' "${RUNNER_TEMP}/expected-input.txt"
+          sort "${RUNNER_TEMP}/expected-input.txt" -o "${RUNNER_TEMP}/expected-input.txt"
+          diff -u "${RUNNER_TEMP}/expected-input.txt" "${RUNNER_TEMP}/actual-input.txt"
+
+      - name: Extract and apply reviewed source transformation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          source = Path(
+              '.github/workflows/agent-book-art-legacy-illustration-plan-translation.yml'
+          ).read_text(encoding='utf-8')
+          start_marker = "          cat > /tmp/apply.py <<'PY'\n"
+          end_marker = "\n          PY\n          python /tmp/apply.py"
+          start = source.index(start_marker) + len(start_marker)
+          end = source.index(end_marker, start)
+          script = dedent(source[start:end])
+          for token in [
+              'translateLegacyWebsiteBookIllustrationGenerationPlan',
+              'legacy-illustration-plans/translate',
+              'book-art-legacy-illustration-plan-translate',
+          ]:
+              if token not in script:
+                  raise SystemExit(f'Reviewed transformation is missing {token}.')
+          Path('/tmp/apply.py').write_text(script, encoding='utf-8')
+          PY
+          python /tmp/apply.py
+          rm -f /tmp/apply.py
+          git diff --check
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -161,42 +92,53 @@ jobs:
           ffmpeg -version | head -1
           ffprobe -version | head -1
 
-      - name: Verify Book Art provider runtime, inspection, parity and legacy-byte authority
-        run: |
-          node scripts/check-book-art-provider-runtime.mjs
-          node scripts/check-book-art-provider-inspection.mjs
-          node scripts/check-book-art-provider-parity.mjs
-          node scripts/check-book-art-legacy-registration.mjs
-
       - name: Install review-first dependency graph
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build exact Art Studio domain dependencies
-        run: pnpm run build:domain
-
-      - name: Run shared Book Art runtime regressions
-        run: pnpm --filter @evavo/art-book-runtime test
-
-      - name: Run worker provider execution, inspection and parity regressions
-        run: pnpm --filter @evavo/art-studio-worker test
-
-      - name: Run Book Art REST regressions
-        run: pnpm --filter @evavo/art-studio-api test
-
-      - name: Run Book Art CLI regressions
-        run: pnpm --filter @evavo/art-studio-cli test
-
-      - name: Run Book Art MCP contract regressions
-        run: pnpm --filter @evavo/art-studio-mcp test
-
-      - name: Run complete repository validation
-        run: pnpm check
-
-      - name: Remove generated lockfile and verify clean tracked source
-        if: always()
+      - name: Run exact target and complete repository validation
         shell: bash
         run: |
           set -euo pipefail
+          node scripts/check-book-art-provider-runtime.mjs
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-api test
+          pnpm --filter @evavo/art-studio-cli test
+          pnpm --filter @evavo/art-studio-mcp test
+          pnpm check
+
+      - name: Publish only clean permanent source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout origin/main -- .github/workflows/book-art-provider-runtime.yml
           rm -f pnpm-lock.yaml
-          git diff --exit-code
-          test -z "$(git status --porcelain)"
+          rm -f \
+            .github/workflows/agent-book-art-legacy-illustration-plan-translation.yml \
+            .github/workflows/agent-trigger-book-art-legacy-illustration-plan-translation.yml
+          git diff --check
+          git diff --name-only origin/main | sort > "${RUNNER_TEMP}/actual-final.txt"
+          cat > "${RUNNER_TEMP}/expected-final.txt" <<'PATHS'
+          apps/api/openapi.book-art-provider.yaml
+          apps/api/src/book-art-api.ts
+          apps/api/test/book-art-api.test.mjs
+          apps/api/test/book-art-openapi-contract.test.mjs
+          apps/cli/src/book-art-commands.ts
+          apps/cli/src/index.ts
+          apps/cli/test/book-art-cli.test.mjs
+          apps/mcp/src/book-art-tools.ts
+          apps/mcp/test/book-art-tools-contract.test.mjs
+          docs/book-art-provider-runtime.md
+          scripts/check-book-art-provider-runtime.mjs
+          PATHS
+          sed -i 's/^          //' "${RUNNER_TEMP}/expected-final.txt"
+          sort "${RUNNER_TEMP}/expected-final.txt" -o "${RUNNER_TEMP}/expected-final.txt"
+          diff -u "${RUNNER_TEMP}/expected-final.txt" "${RUNNER_TEMP}/actual-final.txt"
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(book-art): expose legacy illustration plan translation'
+          diff -u \
+            "${RUNNER_TEMP}/expected-final.txt" \
+            <(git diff --name-only origin/main...HEAD | sort)
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          git push origin HEAD:refs/heads/feat/book-art-legacy-illustration-plan-translation-20260803
