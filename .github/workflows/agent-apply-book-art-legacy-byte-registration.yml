@@ -90,6 +90,20 @@ jobs:
         run: |
           set -euo pipefail
           python /tmp/apply_legacy_registration.py
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("docs/book-art-provider-runtime.md")
+          text = path.read_text(encoding="utf-8")
+          if "unapproved source artifact" not in text:
+              text = text.rstrip() + """
+
+          ## Legacy byte registration authority
+
+          Legacy byte registration stores the original bytes unchanged as an unapproved source artifact and writes separate immutable byte-registration evidence. It does not create or update a named reference, select or promote artwork, create a Book-use binding, approve runtime cutover, delete Website source, or publish an edition.
+          """
+              path.write_text(text.rstrip() + "\n", encoding="utf-8")
+          PY
           git rm -r .github/agent-payloads
           git rm "${WORKFLOW_PATH}"
           git diff --check
