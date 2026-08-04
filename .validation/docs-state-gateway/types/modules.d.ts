@@ -1,5 +1,9 @@
 declare module "server-only";
 
+declare const Buffer: {
+  byteLength(value: string, encoding?: string): number;
+};
+
 declare module "next/server" {
   export class NextRequest {
     headers: Headers;
