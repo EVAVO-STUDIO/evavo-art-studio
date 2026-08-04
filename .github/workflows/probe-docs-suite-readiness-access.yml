@@ -38,7 +38,7 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
-      - name: Prove exact Docs Suite source, public index and transport blobs
+      - name: Prove exact Docs Suite source, route, public index and transport blobs
         shell: bash
         run: |
           set -euo pipefail
@@ -49,6 +49,8 @@ jobs:
           public_index="$(git hash-object "$root/packages/core/src/index.ts")"
           readiness_test="$(git hash-object "$root/packages/core/test/book-studio-universal-readiness.test.mjs")"
           governance_test="$(git hash-object "$root/packages/core/test/book-studio-universal-readiness-governance.test.mjs")"
+          service="$(git hash-object "$root/apps/web/src/lib/book-studio-universal-readiness-service.ts")"
+          route="$(git hash-object "$root/apps/web/src/app/api/v1/book-studio/universal-readiness/route.ts")"
           api_client="$(git hash-object "$root/apps/web/scripts/docs-suite-api-client.mjs")"
           cli="$(git hash-object "$root/apps/web/scripts/evavo-docs-book-readiness-cli.mjs")"
           mcp="$(git hash-object "$root/apps/web/scripts/evavo-docs-book-readiness-mcp.mjs")"
@@ -60,6 +62,8 @@ jobs:
             "public_index=$public_index" \
             "readiness_test=$readiness_test" \
             "governance_test=$governance_test" \
+            "service=$service" \
+            "route=$route" \
             "api_client=$api_client" \
             "cli=$cli" \
             "mcp=$mcp" \
@@ -70,6 +74,8 @@ jobs:
           test "$public_index" = "6125aec60176bbfb257e81fa993d1abc73b8a4ce"
           test "$readiness_test" = "de9f0e5287cefca3cd13e5455a0ca456bdda645c"
           test "$governance_test" = "b840c94f280ea1280879a0f0a338d8eefad51e57"
+          test "$service" = "f8d37c77e660e7c9f3b586e540b2d1efcf71005f"
+          test "$route" = "cea0182dd53bc6853769989cb6343be054daa125"
           test "$api_client" = "9c05188ea028616e125ab682bb4da33e99081d04"
           test "$cli" = "428be906cd9a5d45575d5161daae07b6be8b24ba"
           test "$mcp" = "7378422089aee4ea4cc0dd6cafc3de7a089c48b7"
@@ -87,7 +93,7 @@ jobs:
       - name: Install validation-only compiler tools
         run: npm install --prefix validation/docs-book-universal-readiness --no-save --package-lock=false --ignore-scripts typescript@5.9.3 tsx@4.20.3
 
-      - name: Compile the readiness boundary strictly
+      - name: Compile core, service and protected route strictly
         run: validation/docs-book-universal-readiness/node_modules/.bin/tsc -p validation/docs-book-universal-readiness/tsconfig.json
 
       - name: Run universal project, governance and edge-case attacks
@@ -95,6 +101,9 @@ jobs:
 
       - name: Run exact CLI and MCP transport attacks
         run: node --test validation/docs-book-universal-readiness/apps/web/scripts/test-book-studio-universal-readiness-adapters.mjs
+
+      - name: Run protected HTTP route attacks
+        run: validation/docs-book-universal-readiness/node_modules/.bin/tsx --tsconfig validation/docs-book-universal-readiness/tsconfig.json --test validation/docs-book-universal-readiness/apps/web/test/book-studio-universal-readiness-route.test.mjs
 
       - name: Verify no Art Studio production source changed
         shell: bash
