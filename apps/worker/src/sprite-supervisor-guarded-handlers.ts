@@ -112,9 +112,36 @@ function verifyPayloadAndJobIdentity(
     const labelTick = parseTickLabel(
       context.job.spec.labels.supervisorTick,
     );
+    if (
+      context.job.spec.labels.runId !== workflow.runId ||
+      context.job.spec.labels.spritePlanId !==
+        workflow.request.spritePlan.planId ||
+      context.job.spec.labels.workflowSha256 !== workflow.workflowSha256
+    ) {
+      throw new PermanentRuntimeError(
+        "SPRITE_SUPERVISOR_JOB_LABEL_MISMATCH",
+        "Supervisor job labels do not match the compiled workflow identity.",
+        normalizeJson({
+          expected: {
+            runId: workflow.runId,
+            spritePlanId: workflow.request.spritePlan.planId,
+            workflowSha256: workflow.workflowSha256,
+            supervisorTick: String(labelTick),
+          },
+          actual: context.job.spec.labels,
+        }),
+      );
+    }
     const suppliedRequestSha256 = payload.requestSha256;
-    const rootRequest = suppliedRequestSha256 !== undefined;
+    const rootRequest =
+      context.job.spec.labels.supervisorTick === "0";
     if (rootRequest) {
+      if (suppliedRequestSha256 === undefined) {
+        throw new PermanentRuntimeError(
+          "SPRITE_SUPERVISOR_REQUEST_HASH_MISSING",
+          "Root supervisor payload must declare the exact compiled request SHA-256.",
+        );
+      }
       if (
         typeof suppliedRequestSha256 !== "string" ||
         suppliedRequestSha256 !== workflow.requestSha256
@@ -138,6 +165,12 @@ function verifyPayloadAndJobIdentity(
         );
       }
     } else {
+      if (suppliedRequestSha256 !== undefined) {
+        throw new PermanentRuntimeError(
+          "SPRITE_SUPERVISOR_CONTINUATION_REQUEST_HASH_FORBIDDEN",
+          "Continuation payloads must use their exact workflow and durable state tick identity, not a root request hash.",
+        );
+      }
       const expectedKey = `${workflow.runId}:supervisor:${workflow.workflowSha256}:tick-${labelTick}`;
       if (context.job.spec.idempotencyKey !== expectedKey) {
         throw new PermanentRuntimeError(
