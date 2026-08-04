@@ -5,13 +5,13 @@ import {
   BOOK_STATE_SHADOW_ROLLBACK_CONTRACT,
   compileBookStateShadowRollbackPlan,
   prepareBookStateShadowImport,
-} from "../../../../packages/core/src/book-studio-state-shadow-import";
+} from "../../../../packages/core/src/book-studio-state-shadow-import.ts";
 import {
   executeBookStudioOperation,
-} from "../../../../packages/core/src/book-studio-operation-dispatch";
+} from "../../../../packages/core/src/book-studio-operation-dispatch.ts";
 import {
   FileBookStudioShadowStatePersistence,
-} from "./book-studio-shadow-state-persistence";
+} from "./book-studio-shadow-state-persistence.ts";
 
 export {
   BOOK_STATE_SHADOW_IMPORT_CONTRACT,
