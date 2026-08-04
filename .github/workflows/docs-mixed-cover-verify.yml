@@ -34,8 +34,8 @@ jobs:
           set -euo pipefail
           root="validation/docs-mixed-cover"
           test "$(git hash-object "$root/packages/core/src/book-studio-project-contracts.ts")" = "fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
-          test "$(git hash-object "$root/packages/core/src/book-studio-universal-readiness.ts")" = "a5afe05a9a2cc28a10ead259e05fce14fd766264"
-          test "$(git hash-object "$root/packages/core/test/book-studio-universal-readiness.test.mjs")" = "b67ac328ee7a1202b9d98c2d61741a1162d4cae0"
+          test "$(git hash-object "$root/packages/core/src/book-studio-universal-readiness.ts")" = "ea422c033dbd3fbc6ff78ccf5b0dd48650767905"
+          test "$(git hash-object "$root/packages/core/test/book-studio-universal-readiness.test.mjs")" = "6c489fe9ddfcbc40d6629632738d7524e0873b1f"
 
       - name: Install validation-only compiler tools
         run: npm install --prefix validation/docs-mixed-cover --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
