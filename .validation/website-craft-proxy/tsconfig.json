@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "types": ["node"],
+    "baseUrl": "./tools/evavo-doc-studio/src",
+    "paths": {
+      "@/*": ["*"]
+    }
+  },
+  "include": [
+    "tools/evavo-doc-studio/src/evavo/api/apiResponse.ts",
+    "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraft*.ts",
+    "tools/evavo-doc-studio/src/app/api/books/write/craft-genome/route.ts",
+    "tools/evavo-doc-studio/scripts/check-book-studio-craft-provider-contract.ts",
+    "tools/evavo-doc-studio/test/website-craft-proxy-route.test.ts"
+  ]
+}
