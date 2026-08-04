@@ -26,8 +26,28 @@ function webp(quality: number): Readonly<{
   format: "webp";
   quality: number;
   nearLossless: true;
+  lossless: false;
 }> {
-  return Object.freeze({ format: "webp", quality, nearLossless: true });
+  return Object.freeze({
+    format: "webp",
+    quality,
+    nearLossless: true,
+    lossless: false,
+  });
+}
+
+function webpLossless(): Readonly<{
+  format: "webp";
+  quality: 100;
+  nearLossless: false;
+  lossless: true;
+}> {
+  return Object.freeze({
+    format: "webp",
+    quality: 100,
+    nearLossless: false,
+    lossless: true,
+  });
 }
 
 const profiles: Readonly<Record<DeliveryProfileId, DeliveryImageProfile>> =
@@ -194,11 +214,38 @@ const profiles: Readonly<Record<DeliveryProfileId, DeliveryImageProfile>> =
       intendedRuntimeScale:
         "Keep the source close to its largest expected display footprint; retain canonical RGBA8 storage and do not enlarge low-resolution sprites during preparation.",
     }),
+    "godot-cutout-webp-1080p": Object.freeze({
+      id: "godot-cutout-webp-1080p",
+      title: "General Godot transparent lossless WebP, 1080p maximum",
+      description:
+        "True lossless WebP derivative for an approved transparent sprite or overlay when exact decoded RGBA survives round-trip validation.",
+      target: "godot-4.6.2",
+      maxWidth: 1920,
+      maxHeight: 1080,
+      resizePolicy: "fit-inside",
+      kernel: "lanczos3",
+      colourPolicy: "preserve",
+      transparencyPolicy: "required",
+      requireMeaningfulTransparency: true,
+      flattenColour: "#000000",
+      outputFormat: "webp",
+      pngStorage: null,
+      candidates: Object.freeze([webpLossless()]),
+      quality: Object.freeze({
+        minimumPsnr: 99,
+        maximumMeanAbsoluteError: 0,
+        maximumAlphaMeanAbsoluteError: 0,
+        maximumAlphaDifference: 0,
+      }),
+      maximumOutputBytes: 8 * MiB,
+      intendedRuntimeScale:
+        "Optional same-basename WebP sibling for a game-approved cut-out or overlay. The source PNG remains authoritative when hidden transparent RGB cannot be retained exactly.",
+    }),
     "godot-background-1080p": Object.freeze({
       id: "godot-background-1080p",
       title: "General Godot opaque background, 1080p maximum",
       description:
-        "Lossless WebP delivery for non-retro projects that genuinely require a 1920x1080 runtime background.",
+        "True lossless WebP delivery for non-retro projects that genuinely require a 1920x1080 runtime background or document plate.",
       target: "godot-4.6.2",
       maxWidth: 1920,
       maxHeight: 1080,
@@ -210,16 +257,16 @@ const profiles: Readonly<Record<DeliveryProfileId, DeliveryImageProfile>> =
       flattenColour: "#000000",
       outputFormat: "webp",
       pngStorage: null,
-      candidates: Object.freeze([webp(100), webp(98), webp(96)]),
+      candidates: Object.freeze([webpLossless()]),
       quality: Object.freeze({
-        minimumPsnr: 40,
-        maximumMeanAbsoluteError: 2.5,
+        minimumPsnr: 99,
+        maximumMeanAbsoluteError: 0,
         maximumAlphaMeanAbsoluteError: 0,
         maximumAlphaDifference: 0,
       }),
-      maximumOutputBytes: 6 * MiB,
+      maximumOutputBytes: 12 * MiB,
       intendedRuntimeScale:
-        "Use only when a project art-direction contract names 1080p as the actual runtime source size.",
+        "Use only when a project art-direction contract names the actual runtime source size; fixed 720p projects should not carry a redundant 1080p raster.",
     }),
     "web-raster-1080p": Object.freeze({
       id: "web-raster-1080p",
