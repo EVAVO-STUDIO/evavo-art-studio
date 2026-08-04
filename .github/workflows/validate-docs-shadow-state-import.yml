@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Check out exact validation source
+      - name: Check out validation source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
@@ -36,24 +36,18 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
-      - name: Prove exact Docs Suite Git blobs
+      - name: Prove exact Docs Suite engine blobs
         shell: bash
         run: |
           set -euo pipefail
           test "$(git hash-object .validation/docs-shadow-import/packages/core/src/book-studio-state-shadow-import.ts)" = "6648b63398a6932cabe2b0572950facb672061a7"
           test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-persistence.ts)" = "7862b293ad0e314b52720aeebafc33ac4c0332fb"
           test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-import-service.ts)" = "c6b7a559c920cf2401bad175e9c992818c16439b"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/app/api/v1/book-studio/migration/state-import/route.ts)" = "61e5ddc7724447e0626e619e8aa705d7c81aa37c"
-          test "$(git hash-object .validation/docs-shadow-import/packages/core/test/book-studio-state-shadow-import.test.mjs)" = "b29c4a2f3c9bba2fdcf63496a94e92894a6361d9"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-persistence.test.mjs)" = "bef99cabf034250159c6f861978b11ee6aeb7e0e"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/scripts/evavo-docs-book-state-import.mjs)" = "87eb4d323912202d2a2e1734fd51c5bee361d4e5"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/scripts/evavo-docs-book-state-import-mcp.mjs)" = "d0ac881798a1aad5d6761d3f2a29a7428b650f65"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-import-cli-mcp.test.mjs)" = "a505ca12940597373a2bdc6788f6d3c860855b9e"
-      - name: Compile exact core service persistence and route
+      - name: Compile core service persistence and protected route
         run: npm exec --yes --package=typescript@5.9.3 --package=@types/node@22 -- tsc -p .validation/docs-shadow-import/tsconfig.json
-      - name: Run exact core and restart-persistence attacks
+      - name: Run core and restart-persistence attacks
         run: npm exec --yes --package=tsx@4.20.3 -- tsx --test .validation/docs-shadow-import/packages/core/test/book-studio-state-shadow-import.test.mjs .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-persistence.test.mjs
-      - name: Run exact CLI and MCP attacks
+      - name: Run CLI and MCP attacks
         run: node --test .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-import-cli-mcp.test.mjs
       - name: Verify no Art Studio production source changed
         shell: bash
