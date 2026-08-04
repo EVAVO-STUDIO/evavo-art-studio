@@ -12,6 +12,7 @@
   },
   "include": [
     "packages/core/src/book-studio-project-contracts.ts",
-    "packages/core/src/book-studio-universal-readiness.ts"
+    "packages/core/src/book-studio-universal-readiness.ts",
+    "packages/core/src/book-studio-universal-readiness-governance.ts"
   ]
 }
