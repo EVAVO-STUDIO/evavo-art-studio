@@ -34,7 +34,7 @@ import {
 
 const MODES = new Set<BookNarrativeCraftMode>(["draft_scene", "revise_scene", "dialogue_pass", "emotion_pass", "prose_pass", "tension_pass", "full_scene_pass"]);
 const INPUT_KEYS = new Set(["outputKind", "schemaVersion", "programmeId", "projectId", "volumeId", "manuscriptRevisionId", "mode", "craftProfile", "requestedKnowledgeModuleIds", "archetypeMix", "projectVoiceAnchorIds", "narrativeConstraintIds", "scene", "characters", "dialogue", "emotionBeats", "prose", "acceptedPatternIds", "rejectedPatternIds", "evidenceIds", "policy"]);
-const DIRECT_IMITATION = /\b(?:in the style of|write like|sound like|imitate|mimic|recreate the voice of|indistinguishable from|perfectly like)\b/i;
+const DIRECT_IMITATION_REQUEST = /(?:\bin the style of\b|\bwrite like\b|\bsound like\b|\brecreate the voice of\b|\bindistinguishable from\b|\bperfectly like\b|\b(?:imitate|mimic)\s+(?:the\s+)?(?:voice|style|prose|writing|work)\s+of\b)/i;
 
 export async function compileBookNarrativeCraftPacket(input: unknown): Promise<BookNarrativeCraftCompileResultV1> {
   const blockers: string[] = [];
@@ -57,7 +57,7 @@ export async function compileBookNarrativeCraftPacket(input: unknown): Promise<B
   const craftProfileFingerprint = reviewCraftDigest(craftProfile.profileFingerprint, "craftProfile.profileFingerprint", blockers);
   const craftProfileProviderInstruction = typeof craftProfile.providerInstruction === "string" ? craftProfile.providerInstruction : "";
   if (!craftProfileProviderInstruction) blockers.push("Craft profile requires its de-identified provider instruction.");
-  if (DIRECT_IMITATION.test(craftProfileProviderInstruction)) blockers.push("Craft profile provider instruction requests direct imitation.");
+  if (DIRECT_IMITATION_REQUEST.test(craftProfileProviderInstruction)) blockers.push("Craft profile provider instruction requests direct imitation.");
 
   const projectVoiceAnchorIds = reviewCraftIds(source.projectVoiceAnchorIds, "projectVoiceAnchorIds", blockers, 256, true);
   const narrativeConstraintIds = reviewCraftIds(source.narrativeConstraintIds, "narrativeConstraintIds", blockers, 256, true);
@@ -186,14 +186,22 @@ export async function validateBookNarrativeCraftPacket(value: unknown): Promise<
   for (const key of requiredFalse) if (source[key] !== false) blockers.push(`Narrative craft packet ${key} must remain false.`);
   const requiredTrue = ["phraseOverlapScanRequired", "projectOwnedVoiceRequired", "independentReviewRequired", "websiteCompatibilityRuntimeStillAuthoritative"];
   for (const key of requiredTrue) if (source[key] !== true) blockers.push(`Narrative craft packet ${key} must remain true.`);
-  if (typeof source.providerInstruction !== "string" || DIRECT_IMITATION.test(source.providerInstruction)) blockers.push("Narrative craft provider instruction is invalid or imitation-seeking.");
+  if (typeof source.providerInstruction !== "string" || DIRECT_IMITATION_REQUEST.test(source.providerInstruction)) blockers.push("Narrative craft provider instruction is invalid or imitation-seeking.");
   const packetFingerprint = reviewCraftDigest(source.packetFingerprint, "packetFingerprint", blockers);
   const { packetFingerprint: _discarded, ...unsigned } = source;
   if (packetFingerprint !== await sha256ReviewCraftText(canonicalReviewCraftJson(unsigned))) blockers.push("Narrative craft packet fingerprint does not match its exact contents.");
   const context = reviewCraftRecord(source.writingContextBlock, "writingContextBlock", blockers);
   const contextText = typeof context.text === "string" ? context.text : "";
-  if (reviewCraftDigest(context.textSha256, "writingContextBlock.textSha256", blockers) !== await sha256ReviewCraftText(contextText)) blockers.push("Narrative craft context text hash does not match.");
-  if (context.role !== "constraint" || typeof context.objectId !== "string" || !context.objectId.startsWith("narrative-craft:")) blockers.push("Narrative craft context block identity is invalid.");
+  const contextTextSha256 = reviewCraftDigest(context.textSha256, "writingContextBlock.textSha256", blockers);
+  if (contextTextSha256 !== await sha256ReviewCraftText(contextText)) blockers.push("Narrative craft context text hash does not match.");
+  const expectedContextFingerprint = await sha256ReviewCraftText(canonicalReviewCraftJson({
+    contract: BOOK_NARRATIVE_CRAFT_CONTRACT,
+    role: "constraint",
+    textSha256: contextTextSha256,
+  }));
+  if (reviewCraftDigest(context.objectFingerprint, "writingContextBlock.objectFingerprint", blockers) !== expectedContextFingerprint) blockers.push("Narrative craft context fingerprint does not match.");
+  const expectedObjectId = `narrative-craft:${contextTextSha256.slice("sha256:".length, "sha256:".length + 24)}`;
+  if (context.role !== "constraint" || context.objectId !== expectedObjectId) blockers.push("Narrative craft context block identity is invalid.");
   return uniqueReviewCraft(blockers);
 }
 
