@@ -402,7 +402,19 @@ export async function requestEvavoDocsSuiteLegacyCraft(input: {
       );
     }
 
-    const parsed = await readBoundedResponse(response, configuration.maximumResponseBytes);
+    let parsed: unknown;
+    try {
+      parsed = await readBoundedResponse(response, configuration.maximumResponseBytes);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new EvavoDocsSuiteLegacyCraftProxyError(
+          "BOOK_CRAFT_PROXY_TIMEOUT",
+          "Docs Suite legacy craft response timed out and was not retried.",
+          504
+        );
+      }
+      throw error;
+    }
     if (!response.ok) {
       throw new EvavoDocsSuiteLegacyCraftProxyError(
         "BOOK_CRAFT_PROXY_REMOTE_REJECTED",
