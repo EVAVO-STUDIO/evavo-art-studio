@@ -1,0 +1,6 @@
+validation=retained-unattended-plus-byte-pinned-authorial-mirror
+docs-base-head=626bcd3af1bc1b1ffb92e28661e62069ed181951
+docs-feature-head=8aeea45b1224683c12060e82f3d838522934a15a
+provider-call-performed=false
+canonical-manuscript-mutation-performed=false
+publication-performed=false
