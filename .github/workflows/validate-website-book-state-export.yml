@@ -1,0 +1,79 @@
+name: Validate Website Book State Export
+
+on:
+  push:
+    branches:
+      - automation/validate-website-book-state-export-20260804
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-website-book-state-export.yml"
+      - "validation/website-book-state-export/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-website-book-state-export-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact validation carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 10.13.1
+          run_install: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install exact Art Studio dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Prove exact Website Git blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="validation/website-book-state-export"
+          test "$(git hash-object "$root/tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteStateMigrationExport.ts")" = "2096447c0879b18dceefa286a539bb0c2ad37ef1"
+          test "$(git hash-object "$root/tools/evavo-doc-studio/scripts/run-book-studio-state-migration-export.ts")" = "f0e50d8a9438eccd64ef8455dbd3598d423d483f"
+          test "$(git hash-object "$root/tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export.ts")" = "7a269025baf6bebed72e928bdaba453fee7e789a"
+          test "$(git hash-object "$root/tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export-gateway.mjs")" = "7e94785318b0e81aeaa459059c87bb5683ec504f"
+          test "$(git hash-object "$root/tools/evavo-doc-studio/docs/BOOK_STUDIO_STATE_MIGRATION_EXPORT.md")" = "16efd54422864b666992b106cf05fd5292d024e9"
+          test "$(git hash-object "$root/.github/workflows/book-studio-state-migration-export.yml")" = "025b5cff8ffd67627bab3209744c809a960d0aa9"
+          test "$(git hash-object "$root/tools/evavo-doc-studio/data/migration/WEBSITE_BOOK_STATE_EXPORT_GATEWAY.v1.json")" = "7efed0be821f94f3f31722db4bceb9bebe2b6784"
+
+      - name: Compile exact Website gateway under strict TypeScript
+        run: pnpm exec tsc -p validation/website-book-state-export/tsconfig.json
+
+      - name: Run exact source, coverage, artwork and transport attacks
+        run: pnpm exec tsx validation/website-book-state-export/tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export.ts
+
+      - name: Verify permanent gateway authority and signed record
+        working-directory: validation/website-book-state-export
+        run: node tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export-gateway.mjs
+
+      - name: Exercise the exact operator capabilities command
+        run: pnpm exec tsx validation/website-book-state-export/tools/evavo-doc-studio/scripts/run-book-studio-state-migration-export.ts capabilities
+
+      - name: Prove validation leaves no tracked source changes
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
