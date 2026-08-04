@@ -10,6 +10,7 @@ import {
   EvavoDocsSuiteLegacyCraftProxyError,
   requestEvavoDocsSuiteLegacyCraft
 } from "@/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftClient";
+import { readEvavoBoundedUtf8Body } from "@/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftStream";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,20 +27,21 @@ function privateResponse<T extends NextResponse>(response: T): T {
 }
 
 async function readBoundedJson(request: NextRequest): Promise<unknown> {
-  const declaredLength = request.headers.get("content-length");
-  if (declaredLength !== null) {
-    const parsedLength = Number(declaredLength);
-    if (!Number.isFinite(parsedLength) || parsedLength < 0 || parsedLength > MAXIMUM_BODY_BYTES) {
-      throw new Error("BOOK_CRAFT_REQUEST_TOO_LARGE");
-    }
+  let source: string;
+  try {
+    source = await readEvavoBoundedUtf8Body({
+      body: request.body,
+      declaredLength: request.headers.get("content-length"),
+      maximumBytes: MAXIMUM_BODY_BYTES,
+      tooLarge: () => new Error("BOOK_CRAFT_REQUEST_TOO_LARGE"),
+      invalidEncoding: () => new Error("BOOK_CRAFT_REQUEST_INVALID")
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "BOOK_CRAFT_REQUEST_INVALID";
+    if (code === "BOOK_CRAFT_REQUEST_TOO_LARGE") throw error;
+    throw new Error("BOOK_CRAFT_REQUEST_INVALID");
   }
-
-  const source = await request.text();
   if (!source.trim()) throw new Error("BOOK_CRAFT_REQUEST_INVALID");
-  if (Buffer.byteLength(source, "utf8") > MAXIMUM_BODY_BYTES) {
-    throw new Error("BOOK_CRAFT_REQUEST_TOO_LARGE");
-  }
-
   try {
     return JSON.parse(source) as unknown;
   } catch {
@@ -83,7 +85,8 @@ export async function GET() {
       schemaValidityGrantsCanonicalAdmission: false,
       websiteLocalCraftExecutionAllowed: false,
       automaticRetryAllowed: false,
-      localFallbackAllowed: false
+      localFallbackAllowed: false,
+      streamingBodyLimitsRequired: true
     },
     boundary: "Website preserves the legacy API and CLI surface, but all deterministic craft compilation, provider-packet construction, provider-response validation and phrase-overlap execution now occur in Docs Suite. Website performs no local craft calculation, model call, canonical manuscript mutation, automatic admission or publication."
   }));
@@ -115,6 +118,18 @@ export async function POST(request: NextRequest) {
       }, { status: 400, requestId }));
     }
     if (error instanceof EvavoDocsSuiteLegacyCraftProxyError) {
+      if (error.code === "BOOK_CRAFT_PROXY_REMOTE_REJECTED" && error.status === 400) {
+        return privateResponse(apiFail({
+          code: "VALIDATION_ERROR",
+          message: "Craft request body was rejected by the authoritative compatibility validator."
+        }, { status: 400, requestId }));
+      }
+      if (error.code === "BOOK_CRAFT_PROXY_REMOTE_REJECTED" && error.status === 413) {
+        return privateResponse(apiFail({
+          code: "BOOK_CRAFT_REQUEST_TOO_LARGE",
+          message: "Craft request body is too large."
+        }, { status: 413, requestId }));
+      }
       return privateResponse(apiFail({
         code: error.code,
         message: "Craft operation failed closed at the Docs Suite compatibility boundary.",
