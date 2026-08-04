@@ -127,16 +127,15 @@ test("review source imports no provider, runtime, artifact or write implementati
   }
 });
 
-test("symlinked review roots fail closed", () => {
+test("symlinked review roots fail closed", (t) => {
   const current = temporaryRoots();
   const link = path.join(current.root, "linked-game");
   try {
     try {
       fs.symlinkSync(current.game, link, "dir");
     } catch (error) {
-      current.dispose();
       if (error && typeof error === "object" && "code" in error) {
-        test.skip(`symlinks unavailable: ${error.code}`);
+        t.skip(`symlinks unavailable: ${error.code}`);
         return;
       }
       throw error;
@@ -146,6 +145,6 @@ test("symlinked review roots fail closed", () => {
       /non-symlink directory/iu,
     );
   } finally {
-    if (fs.existsSync(current.root)) current.dispose();
+    current.dispose();
   }
 });
