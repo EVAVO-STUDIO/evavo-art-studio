@@ -49,7 +49,7 @@ scan_phrase_overlap
 
 Website validates the retained public operation shape, binds the exact Website Git commit, constructs the compatibility envelope, and verifies the Docs Suite request and result fingerprints before returning the nested legacy result to callers.
 
-The public response remains the old operation result. The migration receipt is checked server-side and is not substituted for the legacy payload.
+The public response remains the old operation result. The migration receipt is checked server-side and is not substituted for the legacy payload. Authoritative deep-validation failures from Docs Suite retain the public `400 VALIDATION_ERROR` behavior instead of leaking a migration-specific transport code to legacy clients.
 
 ## Configuration
 
@@ -87,7 +87,7 @@ VERCEL_GIT_COMMIT_SHA
 GITHUB_SHA
 ```
 
-The token is server-only and must never be exposed to browser code or returned in an error. HTTPS is mandatory outside localhost. Credentials, query strings and fragments are rejected in the configured base URL.
+The token is server-only and must never be exposed to browser code or returned in an error. It must be non-empty, bounded, and free of all control characters. HTTPS is mandatory outside localhost. The configured Docs URL must be an origin only: credentials, non-root paths, query strings and fragments are rejected rather than silently normalised.
 
 ## Transport guarantees
 
@@ -98,13 +98,16 @@ The proxy:
 - sets `redirect: "error"`;
 - uses a bounded abort timeout;
 - permits at most 8 MiB for the compatibility request and response;
+- enforces declared and actual byte counts while each body is **streamed before buffering**;
+- cancels an oversized stream as soon as the byte boundary is crossed;
+- requires strict UTF-8 before JSON parsing;
 - carries the exact source commit, request ID, timestamp and operation;
 - marks provider calls, authoritative writes, canonical mutation, automatic admission, runtime cutover and publication as false;
 - requires Docs Suite to attest that Website local execution did not occur;
 - recomputes both deterministic SHA-256 fingerprints;
 - rejects every unknown response field.
 
-The 8 MiB route-local boundary preserves the legacy comparison corpus allowance without changing unrelated Website or Docs Suite APIs.
+The 8 MiB route-local boundary preserves the legacy comparison corpus allowance without changing unrelated Website or Docs Suite APIs. Streaming enforcement prevents a missing or dishonest `Content-Length` header from forcing an unbounded in-memory body before the limit is checked.
 
 ## Provider boundary
 
@@ -132,7 +135,11 @@ This compatibility path does not:
 - submit to Amazon KDP;
 - publish a book.
 
-The permanent local-runtime checker fails if any of the nine retired Website craft files reappears or if the proxy loses its no-retry, no-fallback, fixed-endpoint, fingerprint or authority constraints.
+The permanent local-runtime checker fails if any of the nine retired Website craft files reappears; if any hidden import or symbol reference remains; or if the proxy loses its streaming limits, strict UTF-8, no-retry, no-fallback, fixed-endpoint, fingerprint, configuration or authority constraints.
+
+## Deployment boundary
+
+The repository root intentionally disables Vercel Git deployment in the root `vercel.json`. This compatibility migration does not change that release boundary. A future Doc Studio Vercel project must use `tools/evavo-doc-studio` as its configured Root Directory so the package containing Next.js and `.nvmrc` is authoritative.
 
 ## Verification
 
@@ -141,8 +148,9 @@ From `tools/evavo-doc-studio`:
 ```text
 npx tsx scripts/check-book-studio-craft-genome.ts
 npx tsx scripts/check-book-studio-craft-provider-contract.ts
+npx tsx scripts/check-book-studio-craft-proxy-route.ts
 npx tsc --noEmit --project tsconfig.book-studio-craft-genome.json
 npm run build
 ```
 
-The dedicated workflow also builds the complete root Website production application and proves that validation leaves tracked source clean.
+The dedicated workflow also runs complete Doc Studio typecheck, lint and retained Book Studio quality gates, builds the complete root Website workspace, and proves that validation leaves tracked source clean whenever Website Actions allocate a runner.
