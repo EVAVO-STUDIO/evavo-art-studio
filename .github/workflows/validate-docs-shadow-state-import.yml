@@ -1,0 +1,67 @@
+name: Validate Docs Shadow State Import
+
+on:
+  push:
+    branches:
+      - validation/docs-shadow-state-import-20260804
+    paths:
+      - ".github/workflows/validate-docs-shadow-state-import.yml"
+      - ".validation/docs-shadow-import/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-docs-shadow-state-import.yml"
+      - ".validation/docs-shadow-import/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-shadow-state-import-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Prove exact Docs Suite Git blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .validation/docs-shadow-import/packages/core/src/book-studio-state-shadow-import.ts)" = "6648b63398a6932cabe2b0572950facb672061a7"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-persistence.ts)" = "7862b5df37e2156fd662b12c913a0356978eccbf"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-import-service.ts)" = "c6b7a559c920cf2401bad175e9c992818c16439b"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/app/api/v1/book-studio/migration/state-import/route.ts)" = "61e5d7ad2d38d4c95209dd23d9ac08ccca83fe14"
+          test "$(git hash-object .validation/docs-shadow-import/packages/core/test/book-studio-state-shadow-import.test.mjs)" = "b29f415637e0205c41a99a1ca093c67a488bd733"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-persistence.test.mjs)" = "bef99c94dc6fce999dfb8d2b17be1ab344e41ee0"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/scripts/evavo-docs-book-state-import.mjs)" = "87ebc4092d47a95abb5d8d9ac9d968df9711a12f"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/scripts/evavo-docs-book-state-import-mcp.mjs)" = "d0ace45a79e543f4cdf08e006046bd93036c59f5"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-import-cli-mcp.test.mjs)" = "a505ca12940597373a2bdc6788f6d3c860855b9e"
+      - name: Compile exact core service persistence and route
+        run: npm exec --yes --package=typescript@5.9.3 --package=@types/node@22 -- tsc -p .validation/docs-shadow-import/tsconfig.json
+      - name: Run exact core and restart-persistence attacks
+        run: npm exec --yes --package=tsx@4.20.3 -- tsx --test .validation/docs-shadow-import/packages/core/test/book-studio-state-shadow-import.test.mjs .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-persistence.test.mjs
+      - name: Run exact CLI and MCP attacks
+        run: node --test .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-import-cli-mcp.test.mjs
+      - name: Verify no Art Studio production source changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin 00798ae2e19864b4b9370be757eb5ea91431c105
+          unexpected="$(git diff --name-only 00798ae2e19864b4b9370be757eb5ea91431c105 HEAD | grep -Ev '^(\.github/workflows/validate-docs-shadow-state-import\.yml|\.validation/docs-shadow-import/)' || true)"
+          test -z "$unexpected" || {
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
