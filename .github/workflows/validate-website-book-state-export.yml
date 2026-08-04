@@ -61,14 +61,14 @@ jobs:
         run: pnpm exec tsc -p validation/website-book-state-export/tsconfig.json
 
       - name: Run exact source, coverage, artwork and transport attacks
-        run: pnpm exec tsx validation/website-book-state-export/tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export.ts
+        run: pnpm dlx tsx@4.20.6 validation/website-book-state-export/tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export.ts
 
       - name: Verify permanent gateway authority and signed record
         working-directory: validation/website-book-state-export
         run: node tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export-gateway.mjs
 
       - name: Exercise the exact operator capabilities command
-        run: pnpm exec tsx validation/website-book-state-export/tools/evavo-doc-studio/scripts/run-book-studio-state-migration-export.ts capabilities
+        run: pnpm dlx tsx@4.20.6 validation/website-book-state-export/tools/evavo-doc-studio/scripts/run-book-studio-state-migration-export.ts capabilities
 
       - name: Prove validation leaves no tracked source changes
         if: always()
