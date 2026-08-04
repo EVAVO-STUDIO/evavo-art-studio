@@ -1,0 +1,88 @@
+name: Patch and Validate Docs Mixed Cover Readiness
+
+on:
+  push:
+    branches:
+      - automation/patch-docs-mixed-cover-readiness-20260804
+    paths:
+      - ".github/workflows/docs-mixed-cover-patch.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact validation branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: automation/patch-docs-mixed-cover-readiness-20260804
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Prove exact unmodified Docs source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="validation/docs-mixed-cover"
+          test "$(git hash-object "$root/packages/core/src/book-studio-project-contracts.ts")" = "fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
+          test "$(git hash-object "$root/packages/core/src/book-studio-universal-readiness.ts")" = "3c348b4969d94f2e81a7a4e8e0f9c2399850e640"
+          test "$(git hash-object "$root/packages/core/test/book-studio-universal-readiness.test.mjs")" = "de9f0e5287cefca3cd13e5455a0ca456bdda645c"
+
+      - name: Apply exact mixed-cover patch
+        run: node validation/docs-mixed-cover/apply-mixed-cover-patch.mjs
+
+      - name: Install validation-only compiler tools
+        run: npm install --prefix validation/docs-mixed-cover --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
+
+      - name: Compile exact patched core strictly
+        shell: bash
+        run: |
+          set -euo pipefail
+          validation/docs-mixed-cover/node_modules/.bin/tsc \
+            --noEmit \
+            --target ES2022 \
+            --lib ES2022,DOM,DOM.Iterable \
+            --module ESNext \
+            --moduleResolution Bundler \
+            --strict \
+            --noUncheckedIndexedAccess \
+            --exactOptionalPropertyTypes \
+            --skipLibCheck \
+            validation/docs-mixed-cover/packages/core/src/book-studio-project-contracts.ts \
+            validation/docs-mixed-cover/packages/core/src/book-studio-universal-readiness.ts
+
+      - name: Run all readiness attacks including mixed cover series
+        run: validation/docs-mixed-cover/node_modules/.bin/tsx --test validation/docs-mixed-cover/packages/core/test/book-studio-universal-readiness.test.mjs
+
+      - name: Prove patch scope and commit generated exact blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=$'validation/docs-mixed-cover/packages/core/src/book-studio-universal-readiness.ts\nvalidation/docs-mixed-cover/packages/core/test/book-studio-universal-readiness.test.mjs'
+          actual="$(git diff --name-only | sort)"
+          test "$actual" = "$expected"
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add validation/docs-mixed-cover/packages/core/src/book-studio-universal-readiness.ts validation/docs-mixed-cover/packages/core/test/book-studio-universal-readiness.test.mjs
+          git commit -m 'chore(validation): seal mixed-cover readiness patch'
+          git push origin HEAD:automation/patch-docs-mixed-cover-readiness-20260804
+
+      - name: Verify no Art Studio production source changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          merge_base="$(git merge-base HEAD origin/main)"
+          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/docs-mixed-cover-patch\.yml|validation/docs-mixed-cover/)' || true)"
+          test -z "$unexpected" || { printf '%s\n' "$unexpected"; exit 1; }
