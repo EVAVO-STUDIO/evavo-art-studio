@@ -37,7 +37,7 @@ jobs:
         id: validation
         env:
           VALIDATION_RECEIPT_TMP: ${{ runner.temp }}/docs-unattended-authorial-validation.json
-        run: bash validation/docs-narrative-craft/run-unattended-authorial-validation.sh
+        run: bash validation/docs-narrative-craft/run-unattended-authorial-validation-current.sh
 
       - name: Persist hosted validation receipt
         if: always() && github.event_name == 'push'
@@ -62,7 +62,7 @@ jobs:
             workflowRunId: process.env.GITHUB_RUN_ID ?? "unknown",
             workflowRunAttempt: process.env.GITHUB_RUN_ATTEMPT ?? "unknown",
             testedValidationHead: process.env.GITHUB_SHA ?? "unknown",
-            docsFeatureHead: "8aeea45b1224683c12060e82f3d838522934a15a",
+            docsFeatureHead: "6509256a38b9968f74e922a005d54102840fd83c",
             docsBaseHead: "626bcd3af1bc1b1ffb92e28661e62069ed181951",
             providerCallPerformed: false,
             canonicalManuscriptMutationPerformed: false,
