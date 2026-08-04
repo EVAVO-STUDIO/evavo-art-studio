@@ -11,14 +11,46 @@ const AUTHORITY_SCHEMA = "evavo.foundation-media-delivery-authority.v1";
 const MAXIMUM_INPUT_BYTES = 64 * 1024 * 1024;
 const MAXIMUM_SOURCE_BYTES = 512 * 1024 * 1024;
 const MAXIMUM_ITEMS = 1_000;
+const MAXIMUM_PLAN_ITEMS = 100_000;
 const MAXIMUM_ROLES = 100;
 const SHA256 = /^[a-f0-9]{64}$/;
+const REPOSITORY_ID = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const ROLE_ID = /^[a-z0-9][a-z0-9-]{0,95}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const SUPPORTED_ALPHA_POLICIES = new Set([
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/u;
+const WINDOWS_FORBIDDEN_PATH_CHARACTERS = /[<>:"|?*]/u;
+const WINDOWS_RESERVED_STEMS = new Set([
+  "con",
+  "prn",
+  "aux",
+  "nul",
+  ...Array.from({ length: 9 }, (_, index) => `com${index + 1}`),
+  ...Array.from({ length: 9 }, (_, index) => `lpt${index + 1}`),
+]);
+const IMAGE_ALPHA_POLICIES = new Set([
   "require-meaningful-alpha",
   "preserve-authored-opaque",
   "preserve-authored-black-stage",
+  "preserve-role-owned",
   "review-required",
+]);
+const IMAGE_RUNTIME_FORMATS = new Set([
+  "png-lossless",
+  "png-plus-fnt",
+  "webp-lossless",
+]);
+const AUDIO_RUNTIME_FORMATS = new Set([
+  "wav-mono-low-latency",
+  "wav-or-ogg-role-owned",
+  "ogg-vorbis-streaming",
+]);
+const CONTRACT_RUNTIME_EXTENSIONS = new Map([
+  ["png-lossless", new Set([".png"])],
+  ["png-plus-fnt", new Set([".png"])],
+  ["webp-lossless", new Set([".webp"])],
+  ["wav-mono-low-latency", new Set([".wav"])],
+  ["wav-or-ogg-role-owned", new Set([".wav", ".ogg"])],
+  ["ogg-vorbis-streaming", new Set([".ogg"])],
 ]);
 
 class FoundationDeliveryManifestError extends Error {
@@ -49,16 +81,25 @@ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 const parseArgs = (argv) => {
   const result = { roles: [] };
+  const seenScalars = new Set();
+  const seenRoles = new Set();
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (!["--repo", "--contract", "--plan", "--output", "--role"].includes(token)) {
-      fail("OPTION_UNSUPPORTED", token);
+      fail("OPTION_UNSUPPORTED", String(token));
     }
     const value = argv[index + 1];
     if (!value || value.startsWith("--")) fail("OPTION_VALUE_MISSING", token);
     index += 1;
-    if (token === "--role") result.roles.push(value);
-    else result[token.slice(2)] = value;
+    if (token === "--role") {
+      if (seenRoles.has(value)) fail("OPTION_DUPLICATE", `${token}:${value}`);
+      seenRoles.add(value);
+      result.roles.push(value);
+      continue;
+    }
+    if (seenScalars.has(token)) fail("OPTION_DUPLICATE", token);
+    seenScalars.add(token);
+    result[token.slice(2)] = value;
   }
   for (const required of ["repo", "contract", "plan", "output"]) {
     if (!result[required]) fail("OPTION_REQUIRED", `--${required}`);
@@ -71,7 +112,7 @@ const text = (value, label, maximum = 2048) => {
     typeof value !== "string" ||
     value.length === 0 ||
     value.length > maximum ||
-    /[\0\r\n]/u.test(value)
+    CONTROL_CHARACTERS.test(value)
   ) {
     fail("TEXT_INVALID", label);
   }
@@ -81,6 +122,12 @@ const text = (value, label, maximum = 2048) => {
 const identifier = (value, label) => {
   const candidate = text(value, label, 128);
   if (!IDENTIFIER.test(candidate)) fail("IDENTIFIER_INVALID", label);
+  return candidate;
+};
+
+const roleIdentifier = (value, label) => {
+  const candidate = text(value, label, 96);
+  if (!ROLE_ID.test(candidate)) fail("ROLE_ID_INVALID", label);
   return candidate;
 };
 
@@ -101,35 +148,70 @@ const boolean = (value, label) => {
   return value;
 };
 
-const canonicalRelative = (value, label) => {
+const assertPortableSegment = (segment, label) => {
+  if (
+    segment.length === 0 ||
+    segment === "." ||
+    segment === ".." ||
+    CONTROL_CHARACTERS.test(segment) ||
+    WINDOWS_FORBIDDEN_PATH_CHARACTERS.test(segment) ||
+    /[ .]$/u.test(segment)
+  ) {
+    fail("PATH_PORTABILITY_INVALID", `${label}:${segment}`);
+  }
+  const stem = segment.split(".", 1)[0].toLocaleLowerCase("en-US");
+  if (WINDOWS_RESERVED_STEMS.has(stem)) {
+    fail("RUNTIME_TARGET_WINDOWS_RESERVED", `${label}:${segment}`);
+  }
+};
+
+const canonicalRelative = (value, label, { portable = true } = {}) => {
   const candidate = text(value, label, 1024);
   if (candidate.includes("\\")) fail("PATH_INVALID", `${label}:backslash`);
-  const normalized = path.posix.normalize(candidate).normalize("NFC");
+  const normalizedUnicode = candidate.normalize("NFC");
+  const normalized = path.posix.normalize(normalizedUnicode);
   if (
+    normalizedUnicode !== candidate ||
     normalized !== candidate ||
     normalized === "." ||
     normalized === ".." ||
     normalized.startsWith("/") ||
     normalized.startsWith("../") ||
-    /^[A-Za-z]:/u.test(normalized) ||
-    normalized.split("/").some((part) => part === "" || part === "." || part === "..")
+    /^[A-Za-z]:/u.test(normalized)
   ) {
     fail("PATH_INVALID", `${label}:${candidate}`);
+  }
+  const segments = normalized.split("/");
+  if (segments.some((part) => part === "" || part === "." || part === "..")) {
+    fail("PATH_INVALID", `${label}:${candidate}`);
+  }
+  if (portable) {
+    for (const segment of segments) assertPortableSegment(segment, label);
   }
   return candidate;
 };
 
-const stringArray = (value, label, maximumItems = 256) => {
-  if (!Array.isArray(value) || value.length > maximumItems) {
+const stringArray = (value, label, maximumItems = 256, { allowEmpty = true } = {}) => {
+  if (
+    !Array.isArray(value) ||
+    value.length > maximumItems ||
+    (!allowEmpty && value.length === 0)
+  ) {
     fail("STRING_ARRAY_INVALID", label);
   }
-  const result = value.map((entry, index) => text(entry, `${label}[${index}]`, 512));
-  if (new Set(result).size !== result.length) fail("STRING_ARRAY_DUPLICATE", label);
+  const result = value.map((entry, index) =>
+    text(entry, `${label}[${index}]`, 512),
+  );
+  if (new Set(result).size !== result.length) {
+    fail("STRING_ARRAY_DUPLICATE", label);
+  }
   return result;
 };
 
 const portableKey = (value) =>
-  canonicalRelative(value, "portablePath").normalize("NFC").toLocaleLowerCase("en-US");
+  canonicalRelative(value, "portablePath")
+    .normalize("NFC")
+    .toLocaleLowerCase("en-US");
 
 const isWithin = (candidate, root) => {
   const relative = path.relative(root, candidate);
@@ -140,6 +222,8 @@ const isWithin = (candidate, root) => {
       !path.isAbsolute(relative))
   );
 };
+
+const samePath = (left, right) => path.relative(left, right) === "";
 
 const rejectSymlinkSegments = (absoluteInput, label, allowMissingLeaf = false) => {
   const absolute = path.resolve(absoluteInput);
@@ -154,7 +238,9 @@ const rejectSymlinkSegments = (absoluteInput, label, allowMissingLeaf = false) =
       fail("PATH_MISSING", `${label}:${current}`);
     }
     const stats = fs.lstatSync(current);
-    if (stats.isSymbolicLink()) fail("SYMLINK_PATH_FORBIDDEN", `${label}:${current}`);
+    if (stats.isSymbolicLink()) {
+      fail("SYMLINK_PATH_FORBIDDEN", `${label}:${current}`);
+    }
   }
   return absolute;
 };
@@ -173,21 +259,30 @@ const fileIdentity = (stats) => ({
   dev: stats.dev,
   ino: stats.ino,
   size: stats.size,
+  mode: stats.mode,
   mtimeMs: stats.mtimeMs,
+  ctimeMs: stats.ctimeMs,
 });
 
 const sameIdentity = (left, right) =>
   left.dev === right.dev &&
   left.ino === right.ino &&
   left.size === right.size &&
-  left.mtimeMs === right.mtimeMs;
+  left.mode === right.mode &&
+  left.mtimeMs === right.mtimeMs &&
+  left.ctimeMs === right.ctimeMs;
 
 const stableJson = (value, label) => {
   const requested = rejectSymlinkSegments(value, label, false);
   const descriptor = fs.openSync(requested, "r");
   try {
     const beforeStats = fs.fstatSync(descriptor);
-    if (!beforeStats.isFile() || beforeStats.size > MAXIMUM_INPUT_BYTES) {
+    if (
+      !beforeStats.isFile() ||
+      beforeStats.isSymbolicLink() ||
+      beforeStats.size < 1 ||
+      beforeStats.size > MAXIMUM_INPUT_BYTES
+    ) {
       fail("FILE_INVALID", label);
     }
     const before = fileIdentity(beforeStats);
@@ -198,12 +293,19 @@ const stableJson = (value, label) => {
     }
     let parsed;
     try {
-      parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+      parsed = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+      );
     } catch (error) {
-      fail("JSON_INVALID", `${label}:${error instanceof Error ? error.message : String(error)}`);
+      fail(
+        "JSON_INVALID",
+        `${label}:${error instanceof Error ? error.message : String(error)}`,
+      );
     }
     const afterPath = fileIdentity(fs.lstatSync(requested));
-    if (!sameIdentity(before, afterPath)) fail("FILE_CHANGED_DURING_READ", label);
+    if (!sameIdentity(before, afterPath)) {
+      fail("FILE_CHANGED_DURING_READ", label);
+    }
     return {
       path: fs.realpathSync.native(requested),
       value: parsed,
@@ -215,17 +317,27 @@ const stableJson = (value, label) => {
   }
 };
 
-const stableSource = (repositoryRoot, sourcePath, expectedBytes, expectedSha256) => {
+const stableSource = (
+  repositoryRoot,
+  sourcePath,
+  expectedBytes,
+  expectedSha256,
+) => {
   const absolute = path.resolve(repositoryRoot, ...sourcePath.split("/"));
-  if (!isWithin(absolute, repositoryRoot)) fail("SOURCE_PATH_ESCAPE", sourcePath);
+  if (!isWithin(absolute, repositoryRoot)) {
+    fail("SOURCE_PATH_ESCAPE", sourcePath);
+  }
   rejectSymlinkSegments(absolute, `source:${sourcePath}`, false);
   const canonical = fs.realpathSync.native(absolute);
-  if (!isWithin(canonical, repositoryRoot)) fail("SOURCE_PATH_ESCAPE", sourcePath);
+  if (!isWithin(canonical, repositoryRoot)) {
+    fail("SOURCE_PATH_ESCAPE", sourcePath);
+  }
   const descriptor = fs.openSync(canonical, "r");
   try {
     const beforeStats = fs.fstatSync(descriptor);
     if (
       !beforeStats.isFile() ||
+      beforeStats.isSymbolicLink() ||
       beforeStats.size < 1 ||
       beforeStats.size > MAXIMUM_SOURCE_BYTES
     ) {
@@ -233,7 +345,10 @@ const stableSource = (repositoryRoot, sourcePath, expectedBytes, expectedSha256)
     }
     const before = fileIdentity(beforeStats);
     if (before.size !== expectedBytes) {
-      fail("SOURCE_BYTES_MISMATCH", `${sourcePath}:${before.size}:${expectedBytes}`);
+      fail(
+        "SOURCE_BYTES_MISMATCH",
+        `${sourcePath}:${before.size}:${expectedBytes}`,
+      );
     }
     const digest = createHash("sha256");
     const buffer = Buffer.allocUnsafe(1024 * 1024);
@@ -257,7 +372,10 @@ const stableSource = (repositoryRoot, sourcePath, expectedBytes, expectedSha256)
     }
     const actualSha256 = digest.digest("hex");
     if (actualSha256 !== expectedSha256) {
-      fail("SOURCE_SHA256_MISMATCH", `${sourcePath}:${actualSha256}:${expectedSha256}`);
+      fail(
+        "SOURCE_SHA256_MISMATCH",
+        `${sourcePath}:${actualSha256}:${expectedSha256}`,
+      );
     }
     return { absolute: canonical, identity: before, sha256: actualSha256 };
   } finally {
@@ -267,25 +385,40 @@ const stableSource = (repositoryRoot, sourcePath, expectedBytes, expectedSha256)
 
 const reverifySource = (snapshot, sourcePath) => {
   const current = fileIdentity(fs.lstatSync(snapshot.absolute));
-  if (!sameIdentity(snapshot.identity, current)) fail("SOURCE_CHANGED_BEFORE_WRITE", sourcePath);
-};
-
-const runtimeExtension = (runtimeFormat) => {
-  const normalized = runtimeFormat.toLocaleLowerCase("en-US");
-  if (normalized.includes("png")) return ".png";
-  if (normalized.includes("webp")) return ".webp";
-  fail("RUNTIME_FORMAT_UNSUPPORTED", runtimeFormat);
-};
-
-const profileFor = (runtimeFormat, alphaPolicy) => {
-  const normalized = runtimeFormat.toLocaleLowerCase("en-US");
-  if (normalized.includes("png")) return "godot-sprite-lossless";
-  if (normalized.includes("webp")) {
-    return alphaPolicy === "require-meaningful-alpha"
-      ? "godot-cutout-webp-1080p"
-      : "godot-background-1080p";
+  if (!sameIdentity(snapshot.identity, current)) {
+    fail("SOURCE_CHANGED_BEFORE_WRITE", sourcePath);
   }
-  fail("RUNTIME_FORMAT_UNSUPPORTED", runtimeFormat);
+};
+
+const runtimeExtensions = (runtimeFormat) => {
+  const extensions = CONTRACT_RUNTIME_EXTENSIONS.get(runtimeFormat);
+  if (!extensions) fail("CONTRACT_RUNTIME_FORMAT_INVALID", runtimeFormat);
+  return extensions;
+};
+
+const deliveryProfileFor = (runtimeFormat, alphaPolicy) => {
+  switch (runtimeFormat) {
+    case "png-lossless":
+    case "png-plus-fnt":
+      return "godot-sprite-lossless";
+    case "webp-lossless":
+      if (alphaPolicy === "require-meaningful-alpha") {
+        return "godot-cutout-webp-1080p";
+      }
+      if (
+        alphaPolicy === "preserve-authored-opaque" ||
+        alphaPolicy === "preserve-authored-black-stage"
+      ) {
+        return "godot-background-1080p";
+      }
+      fail(
+        "DELIVERY_ALPHA_POLICY_UNSUPPORTED",
+        `${runtimeFormat}:${alphaPolicy}`,
+      );
+      break;
+    default:
+      fail("RUNTIME_FORMAT_UNSUPPORTED", runtimeFormat);
+  }
 };
 
 const validateContract = (value, repository) => {
@@ -293,7 +426,8 @@ const validateContract = (value, repository) => {
     !isRecord(value) ||
     value.schemaVersion !== "1.0" ||
     value.contract !== CONTRACT_ID ||
-    value.repository !== repository
+    value.repository !== repository ||
+    !REPOSITORY_ID.test(repository)
   ) {
     fail("CONTRACT_IDENTITY_INVALID", repository);
   }
@@ -305,7 +439,11 @@ const validateContract = (value, repository) => {
   ) {
     fail("CONTRACT_ENGINE_INVALID", repository);
   }
-  const renderingDomain = text(value.engine.renderingDomain, "contract.engine.renderingDomain", 64);
+  const renderingDomain = text(
+    value.engine.renderingDomain,
+    "contract.engine.renderingDomain",
+    64,
+  );
   const renderer = text(value.engine.renderer, "contract.engine.renderer", 64);
   if (
     !isRecord(value.batchPolicy) ||
@@ -326,9 +464,14 @@ const validateContract = (value, repository) => {
     fail("CONTRACT_MCP_POLICY_INVALID", repository);
   }
   if (!isRecord(value.roots)) fail("CONTRACT_ROOTS_INVALID", repository);
-  const runtimeRoots = stringArray(value.roots.runtime, "contract.roots.runtime", MAXIMUM_ROLES)
-    .map((entry, index) => canonicalRelative(entry, `contract.roots.runtime[${index}]`));
-  if (runtimeRoots.length === 0) fail("CONTRACT_RUNTIME_ROOTS_REQUIRED", repository);
+  const runtimeRoots = stringArray(
+    value.roots.runtime,
+    "contract.roots.runtime",
+    MAXIMUM_ROLES,
+    { allowEmpty: false },
+  ).map((entry, index) =>
+    canonicalRelative(entry, `contract.roots.runtime[${index}]`),
+  );
   const foldedRuntimeRoots = runtimeRoots.map(portableKey);
   if (new Set(foldedRuntimeRoots).size !== foldedRuntimeRoots.length) {
     fail("CONTRACT_RUNTIME_ROOT_COLLISION", repository);
@@ -341,10 +484,13 @@ const validateContract = (value, repository) => {
     fail("CONTRACT_ROLES_INVALID", repository);
   }
   const roles = new Map();
+  const foldedRoleIds = new Set();
   for (const [index, raw] of value.roles.entries()) {
     if (!isRecord(raw)) fail("CONTRACT_ROLE_INVALID", String(index));
-    const id = identifier(raw.id, `contract.roles[${index}].id`);
-    if (roles.has(id)) fail("CONTRACT_ROLE_DUPLICATE", id);
+    const id = roleIdentifier(raw.id, `contract.roles[${index}].id`);
+    const foldedId = id.toLocaleLowerCase("en-US");
+    if (foldedRoleIds.has(foldedId)) fail("CONTRACT_ROLE_DUPLICATE", id);
+    foldedRoleIds.add(foldedId);
     const runtimeRoot = canonicalRelative(
       raw.runtimeRoot,
       `contract.roles[${index}].runtimeRoot`,
@@ -362,23 +508,50 @@ const validateContract = (value, repository) => {
       `contract.roles[${index}].runtimeFormat`,
       128,
     );
-    runtimeExtension(runtimeFormat);
+    runtimeExtensions(runtimeFormat);
     const alphaPolicy = text(
       raw.alphaPolicy,
       `contract.roles[${index}].alphaPolicy`,
       128,
     );
-    if (!SUPPORTED_ALPHA_POLICIES.has(alphaPolicy)) {
-      fail("CONTRACT_ROLE_ALPHA_POLICY_INVALID", id);
+    const fitPolicy = text(
+      raw.fitPolicy,
+      `contract.roles[${index}].fitPolicy`,
+      128,
+    );
+    const imageRole = raw.canvas !== null;
+    if (imageRole) {
+      if (
+        !isRecord(raw.canvas) ||
+        !IMAGE_ALPHA_POLICIES.has(alphaPolicy) ||
+        fitPolicy === "not-applicable" ||
+        !IMAGE_RUNTIME_FORMATS.has(runtimeFormat)
+      ) {
+        fail("CONTRACT_IMAGE_ROLE_INVALID", id);
+      }
+      if (raw.canvas.policy === "exact") {
+        integer(raw.canvas.width, `${id}.canvas.width`, 1, 100_000);
+        integer(raw.canvas.height, `${id}.canvas.height`, 1, 100_000);
+      }
+    } else if (
+      alphaPolicy !== "not-applicable" ||
+      fitPolicy !== "not-applicable" ||
+      !AUDIO_RUNTIME_FORMATS.has(runtimeFormat)
+    ) {
+      fail("CONTRACT_NON_IMAGE_ROLE_INVALID", id);
     }
-    const fitPolicy = text(raw.fitPolicy, `contract.roles[${index}].fitPolicy`, 128);
+    if (!isRecord(raw.godotImport)) {
+      fail("CONTRACT_GODOT_IMPORT_INVALID", id);
+    }
     const requiredStages = stringArray(
       raw.requiredStages,
       `contract.roles[${index}].requiredStages`,
       64,
+      { allowEmpty: false },
     );
     roles.set(id, {
       id,
+      imageRole,
       runtimeRoot,
       runtimeFormat,
       alphaPolicy,
@@ -428,7 +601,13 @@ const validateSummary = (summary, workItems) => {
   }
 };
 
-const validatePlan = (value, contract, repository, repositoryRoot, contractRecord) => {
+const validatePlan = (
+  value,
+  contract,
+  repository,
+  repositoryRoot,
+  contractRecord,
+) => {
   if (
     !isRecord(value) ||
     value.schemaVersion !== "1.0" ||
@@ -437,22 +616,34 @@ const validatePlan = (value, contract, repository, repositoryRoot, contractRecor
   ) {
     fail("PLAN_IDENTITY_INVALID", repository);
   }
-  const contractPath = canonicalRelative(value.contractPath, "plan.contractPath");
+  const contractPath = canonicalRelative(
+    value.contractPath,
+    "plan.contractPath",
+  );
   const actualContractPath = canonicalRelative(
     path.relative(repositoryRoot, contractRecord.path).split(path.sep).join("/"),
     "actualContractPath",
   );
   if (contractPath !== actualContractPath) {
-    fail("PLAN_CONTRACT_PATH_MISMATCH", `${contractPath}:${actualContractPath}`);
+    fail(
+      "PLAN_CONTRACT_PATH_MISMATCH",
+      `${contractPath}:${actualContractPath}`,
+    );
   }
   if (value.contractSha256 !== contractRecord.sha256) {
-    fail("PLAN_CONTRACT_SHA256_MISMATCH", String(value.contractSha256));
+    fail(
+      "PLAN_CONTRACT_SHA256_MISMATCH",
+      String(value.contractSha256),
+    );
   }
   if (!SHA256.test(String(value.auditSha256 ?? ""))) {
     fail("PLAN_AUDIT_SHA256_INVALID", String(value.auditSha256 ?? ""));
   }
-  const auditRoot = resolveDirectory(text(value.auditRoot, "plan.auditRoot", 4096), "plan.auditRoot");
-  if (auditRoot !== repositoryRoot) {
+  const auditRoot = resolveDirectory(
+    text(value.auditRoot, "plan.auditRoot", 4096),
+    "plan.auditRoot",
+  );
+  if (!samePath(auditRoot, repositoryRoot)) {
     fail("PLAN_AUDIT_ROOT_MISMATCH", `${auditRoot}:${repositoryRoot}`);
   }
   if (
@@ -462,18 +653,30 @@ const validatePlan = (value, contract, repository, repositoryRoot, contractRecor
   ) {
     fail("PLAN_AUTHORITY_INVALID", repository);
   }
-  const selectedRoles = stringArray(value.selectedRoles, "plan.selectedRoles", MAXIMUM_ROLES);
-  if (selectedRoles.length === 0) fail("PLAN_SELECTED_ROLES_REQUIRED", repository);
+  const selectedRoles = stringArray(
+    value.selectedRoles,
+    "plan.selectedRoles",
+    MAXIMUM_ROLES,
+    { allowEmpty: false },
+  ).map((entry, index) =>
+    roleIdentifier(entry, `plan.selectedRoles[${index}]`),
+  );
   for (const role of selectedRoles) {
     if (!contract.roles.has(role)) fail("PLAN_ROLE_UNKNOWN", role);
   }
-  if (!Array.isArray(value.workItems) || value.workItems.length > 100_000) {
+  if (
+    !Array.isArray(value.workItems) ||
+    value.workItems.length > MAXIMUM_PLAN_ITEMS
+  ) {
     fail("PLAN_WORK_ITEMS_INVALID", repository);
   }
   const sources = new Set();
   const workItems = value.workItems.map((raw, index) => {
     if (!isRecord(raw)) fail("PLAN_ITEM_INVALID", String(index));
-    const sourcePath = canonicalRelative(raw.sourcePath, `plan.workItems[${index}].sourcePath`);
+    const sourcePath = canonicalRelative(
+      raw.sourcePath,
+      `plan.workItems[${index}].sourcePath`,
+    );
     const sourceKey = portableKey(sourcePath);
     if (sources.has(sourceKey)) fail("PLAN_SOURCE_DUPLICATE", sourcePath);
     sources.add(sourceKey);
@@ -482,7 +685,9 @@ const validatePlan = (value, contract, repository, repositoryRoot, contractRecor
       `plan.workItems[${index}].sourceSha256`,
       64,
     );
-    if (!SHA256.test(sourceSha256)) fail("PLAN_SOURCE_SHA256_INVALID", sourcePath);
+    if (!SHA256.test(sourceSha256)) {
+      fail("PLAN_SOURCE_SHA256_INVALID", sourcePath);
+    }
     const sourceBytes = integer(
       raw.sourceBytes,
       `plan.workItems[${index}].sourceBytes`,
@@ -496,13 +701,19 @@ const validatePlan = (value, contract, repository, repositoryRoot, contractRecor
     );
     if (
       sourceExtension !== sourceExtension.toLocaleLowerCase("en-US") ||
-      sourceExtension !== path.posix.extname(sourcePath).toLocaleLowerCase("en-US")
+      sourceExtension !==
+        path.posix.extname(sourcePath).toLocaleLowerCase("en-US")
     ) {
       fail("PLAN_SOURCE_EXTENSION_MISMATCH", sourcePath);
     }
-    const role = identifier(raw.role, `plan.workItems[${index}].role`);
+    const role = roleIdentifier(
+      raw.role,
+      `plan.workItems[${index}].role`,
+    );
     const contractRole = contract.roles.get(role);
-    if (!contractRole || !selectedRoles.includes(role)) fail("PLAN_ITEM_ROLE_INVALID", role);
+    if (!contractRole || !selectedRoles.includes(role)) {
+      fail("PLAN_ITEM_ROLE_INVALID", role);
+    }
     const runtimeRoot = canonicalRelative(
       raw.runtimeRoot,
       `plan.workItems[${index}].runtimeRoot`,
@@ -527,8 +738,13 @@ const validatePlan = (value, contract, repository, repositoryRoot, contractRecor
     if (!runtimeTargetKey.startsWith(`${runtimeRootKey}/`)) {
       fail("PLAN_ITEM_RUNTIME_TARGET_OUTSIDE_ROOT", sourcePath);
     }
-    if (path.posix.extname(runtimeTargetPath).toLowerCase() !== runtimeExtension(runtimeFormat)) {
-      fail("PLAN_ITEM_RUNTIME_EXTENSION_MISMATCH", runtimeTargetPath);
+    const targetExtension =
+      path.posix.extname(runtimeTargetPath).toLocaleLowerCase("en-US");
+    if (!runtimeExtensions(runtimeFormat).has(targetExtension)) {
+      fail(
+        "PLAN_ITEM_RUNTIME_EXTENSION_MISMATCH",
+        runtimeTargetPath,
+      );
     }
     if (raw.alphaPolicy !== contractRole.alphaPolicy) {
       fail("PLAN_ITEM_ALPHA_POLICY_MISMATCH", sourcePath);
@@ -540,8 +756,12 @@ const validatePlan = (value, contract, repository, repositoryRoot, contractRecor
       raw.requiredStages,
       `plan.workItems[${index}].requiredStages`,
       64,
+      { allowEmpty: false },
     );
-    if (canonicalJson(requiredStages) !== canonicalJson(contractRole.requiredStages)) {
+    if (
+      canonicalJson(requiredStages) !==
+      canonicalJson(contractRole.requiredStages)
+    ) {
       fail("PLAN_ITEM_REQUIRED_STAGES_MISMATCH", sourcePath);
     }
     const blockers = stringArray(
@@ -584,16 +804,41 @@ const validatePlan = (value, contract, repository, repositoryRoot, contractRecor
   };
 };
 
+const syncDirectoryBestEffort = (directory) => {
+  let descriptor;
+  try {
+    descriptor = fs.openSync(directory, "r");
+    fs.fsyncSync(descriptor);
+  } catch (error) {
+    const code =
+      error && typeof error === "object" ? error.code : undefined;
+    if (!["EACCES", "EINVAL", "EISDIR", "ENOTSUP", "EPERM"].includes(code)) {
+      throw error;
+    }
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+  }
+};
+
 const createOnlyWrite = (outputInput, repositoryRoot, value) => {
   const output = path.resolve(outputInput);
-  const parent = rejectSymlinkSegments(path.dirname(output), "outputParent", false);
-  const canonicalParent = fs.realpathSync.native(parent);
+  const parentRequested = rejectSymlinkSegments(
+    path.dirname(output),
+    "outputParent",
+    false,
+  );
+  const canonicalParent = fs.realpathSync.native(parentRequested);
   const parentStats = fs.lstatSync(canonicalParent);
   if (!parentStats.isDirectory() || parentStats.isSymbolicLink()) {
     fail("OUTPUT_PARENT_INVALID", canonicalParent);
   }
   rejectSymlinkSegments(output, "output", true);
-  if (isWithin(output, repositoryRoot)) fail("OUTPUT_INSIDE_REPOSITORY", output);
+  if (!isWithin(output, canonicalParent)) {
+    fail("OUTPUT_PATH_INVALID", output);
+  }
+  if (isWithin(output, repositoryRoot)) {
+    fail("OUTPUT_INSIDE_REPOSITORY", output);
+  }
   if (fs.existsSync(output)) fail("OUTPUT_EXISTS", output);
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
   const descriptor = fs.openSync(output, "wx", 0o600);
@@ -603,12 +848,7 @@ const createOnlyWrite = (outputInput, repositoryRoot, value) => {
   } finally {
     fs.closeSync(descriptor);
   }
-  const parentDescriptor = fs.openSync(canonicalParent, "r");
-  try {
-    fs.fsyncSync(parentDescriptor);
-  } finally {
-    fs.closeSync(parentDescriptor);
-  }
+  syncDirectoryBestEffort(canonicalParent);
   return { output, bytes, sha256: sha256(bytes) };
 };
 
@@ -623,7 +863,11 @@ const main = () => {
   if (isWithin(planRecord.path, repositoryRoot)) {
     fail("PLAN_INSIDE_REPOSITORY", planRecord.path);
   }
-  const repository = text(contractRecord.value?.repository, "contract.repository", 256);
+  const repository = text(
+    contractRecord.value?.repository,
+    "contract.repository",
+    256,
+  );
   const contract = validateContract(contractRecord.value, repository);
   const plan = validatePlan(
     planRecord.value,
@@ -633,28 +877,45 @@ const main = () => {
     contractRecord,
   );
   const requestedRoles =
-    options.roles.length === 0 ? [...plan.selectedRoles] : [...new Set(options.roles)];
-  if (requestedRoles.length > MAXIMUM_ROLES) fail("ROLE_LIMIT_EXCEEDED", String(requestedRoles.length));
+    options.roles.length === 0 ? [...plan.selectedRoles] : [...options.roles];
+  if (requestedRoles.length > MAXIMUM_ROLES) {
+    fail("ROLE_LIMIT_EXCEEDED", String(requestedRoles.length));
+  }
   for (const role of requestedRoles) {
-    identifier(role, "requestedRole");
+    roleIdentifier(role, "requestedRole");
     if (!plan.selectedRoles.includes(role)) fail("ROLE_NOT_IN_PLAN", role);
   }
-  const selected = plan.workItems.filter((item) => requestedRoles.includes(item.role));
-  if (selected.length < 1) fail("EXECUTION_ITEMS_REQUIRED", repository);
-  if (selected.length > MAXIMUM_ITEMS) fail("EXECUTION_ITEM_LIMIT_EXCEEDED", String(selected.length));
+  const selected = plan.workItems.filter((item) =>
+    requestedRoles.includes(item.role),
+  );
+  if (selected.length < 1) {
+    fail("EXECUTION_ITEMS_REQUIRED", repository);
+  }
+  if (selected.length > MAXIMUM_ITEMS) {
+    fail("EXECUTION_ITEM_LIMIT_EXCEEDED", String(selected.length));
+  }
   for (const item of selected) {
-    if (item.blockers.length > 0 || item.reviewRequired || item.auditFindings.length > 0) {
+    if (
+      item.blockers.length > 0 ||
+      item.reviewRequired ||
+      item.auditFindings.length > 0
+    ) {
       fail(
         "PLAN_ITEM_NOT_READY",
-        `${item.sourcePath}:blockers=${item.blockers.join(",")}:findings=${item.auditFindings.join(",")}`,
+        `${item.sourcePath}:blockers=${item.blockers.join(
+          ",",
+        )}:findings=${item.auditFindings.join(",")}`,
       );
     }
+    deliveryProfileFor(item.runtimeFormat, item.alphaPolicy);
   }
   const targetOwners = new Map();
   for (const item of selected) {
     const key = portableKey(item.runtimeTargetPath);
     const prior = targetOwners.get(key);
-    if (prior) fail("RUNTIME_TARGET_COLLISION", `${prior}:${item.sourcePath}`);
+    if (prior) {
+      fail("RUNTIME_TARGET_COLLISION", `${prior}:${item.sourcePath}`);
+    }
     targetOwners.set(key, item.sourcePath);
   }
   const sourceSnapshots = selected.map((item) => ({
@@ -685,11 +946,19 @@ const main = () => {
         targetPath: item.runtimeTargetPath,
         sourceSha256: item.sourceSha256,
         sourceBytes: item.sourceBytes,
-        profileId: profileFor(item.runtimeFormat, item.alphaPolicy),
+        profileId: deliveryProfileFor(
+          item.runtimeFormat,
+          item.alphaPolicy,
+        ),
         background: { mode: "preserve" },
       };
     })
-    .sort((left, right) => left.targetPath.localeCompare(right.targetPath, "en-US"));
+    .sort((left, right) =>
+      left.targetPath.localeCompare(right.targetPath, "en-US"),
+    );
+  const manifestItemBySource = new Map(
+    manifestItems.map((item) => [item.sourcePath, item]),
+  );
   const batchId = `foundation-${planRecord.sha256.slice(0, 24)}`;
   const manifestCore = {
     schema: DELIVERY_SCHEMA,
@@ -705,17 +974,22 @@ const main = () => {
   };
   const postDeliveryItems = selected
     .map((item) => ({
-      id: manifestItems.find((entry) => entry.sourcePath === item.sourcePath)?.id,
+      id: manifestItemBySource.get(item.sourcePath)?.id,
       role: item.role,
       sourcePath: item.sourcePath,
       runtimeTargetPath: item.runtimeTargetPath,
       requiredStages: item.requiredStages,
       sidecars:
-        item.runtimeFormat.toLocaleLowerCase("en-US") === "png-plus-fnt"
+        item.runtimeFormat === "png-plus-fnt"
           ? ["bitmap-font-metadata"]
           : [],
     }))
-    .sort((left, right) => left.runtimeTargetPath.localeCompare(right.runtimeTargetPath, "en-US"));
+    .sort((left, right) =>
+      left.runtimeTargetPath.localeCompare(
+        right.runtimeTargetPath,
+        "en-US",
+      ),
+    );
   const output = {
     ...manifestCore,
     foundationAuthority: {
@@ -723,7 +997,10 @@ const main = () => {
       repository,
       repositoryRoot,
       contractPath: canonicalRelative(
-        path.relative(repositoryRoot, contractRecord.path).split(path.sep).join("/"),
+        path
+          .relative(repositoryRoot, contractRecord.path)
+          .split(path.sep)
+          .join("/"),
         "authority.contractPath",
       ),
       contractSha256: contractRecord.sha256,
@@ -737,7 +1014,7 @@ const main = () => {
       ),
       sourceFilesAreImmutable: true,
       outputsAreUnapprovedUntilPromoted: true,
-      planFileCreated: true,
+      deliveryManifestFileCreated: true,
       mutationPerformed: true,
       mutationScope: "create-only-delivery-manifest",
       targetRepositoryMutationPerformed: false,
@@ -749,7 +1026,8 @@ const main = () => {
     },
     postDelivery: {
       items: postDeliveryItems,
-      independentGate: "python -m godot_game_test_lab.foundation_media_plan",
+      independentGate:
+        "python -m godot_game_test_lab.foundation_media_plan",
       deliveryCommand:
         "pnpm --filter @evavo/art-delivery-optimizer start -- batch --manifest <manifest> --source-root <repository> --output-root <staging> --apply",
       stagingRootMustBeOutsideTargetRepository: true,
@@ -782,7 +1060,7 @@ const main = () => {
         planSha256: planRecord.sha256,
         auditSha256: plan.auditSha256,
         exactSourceBytesVerified: true,
-        planFileCreated: true,
+        deliveryManifestFileCreated: true,
         mutationPerformed: true,
         mutationScope: "create-only-delivery-manifest",
         targetRepositoryMutationPerformed: false,
@@ -801,6 +1079,8 @@ try {
   main();
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${JSON.stringify({ status: "failed", error: message })}\n`);
+  process.stderr.write(
+    `${JSON.stringify({ status: "failed", error: message })}\n`,
+  );
   process.exitCode = 2;
 }
