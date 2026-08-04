@@ -25,7 +25,7 @@ export function buildBookNarrativeCraftProviderInstruction(input: {
   return [
     `EVAVO ORIGINAL NARRATIVE CRAFT: ${input.mode}`,
     "Use project-owned voice and de-identified abstract mechanisms only.",
-    "Do not name, infer, imitate, mimic or reconstruct any source creator, work, signature phrase, recognisable surface style or trade dress.",
+    "Do not name or infer source creators, and do not reconstruct any creator, work, signature phrase, recognisable surface style or trade dress.",
     "A blend of mechanisms is not permission to copy. Preserve exact evidence, viewpoint, character knowledge, causality and rights boundaries.",
     input.craftProfileProviderInstruction,
     `Scene identity: ${input.sceneId}.`,
