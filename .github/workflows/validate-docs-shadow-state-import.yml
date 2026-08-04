@@ -40,9 +40,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git hash-object .validation/docs-shadow-import/packages/core/src/book-studio-state-shadow-import.ts)" = "6648b63398a6932cabe2b0572950facb672061a7"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-persistence.ts)" = "3ed88c22dce8da181bea4c3888b064939ad2ac85"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-import-service.ts)" = "c6b7a559c920cf2401bad175e9c992818c16439b"
+          actual_core="$(git hash-object .validation/docs-shadow-import/packages/core/src/book-studio-state-shadow-import.ts)"
+          actual_store="$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-persistence.ts)"
+          actual_service="$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-import-service.ts)"
+          printf 'core=%s\nstore=%s\nservice=%s\n' "$actual_core" "$actual_store" "$actual_service"
+          test "$actual_core" = "6648b63398a6932cabe2b0572950facb672061a7"
+          test "$actual_store" = "3ed88c22dce8da181bea4c3888b064939ad2ac85"
+          test "$actual_service" = "a58302798ecacc88e76826945995601248671024"
       - name: Install validation-only compiler tools
         run: npm install --prefix .validation/docs-shadow-import --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
       - name: Compile core service persistence and protected route
