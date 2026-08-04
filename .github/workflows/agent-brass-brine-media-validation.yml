@@ -42,16 +42,20 @@ jobs:
       - name: Install review-first dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Build delivery optimizer dependency closure
+        run: pnpm --filter @evavo/art-delivery-optimizer... build
+
       - name: Typecheck delivery optimizer
         run: pnpm --filter @evavo/art-delivery-optimizer typecheck
 
       - name: Test delivery optimizer
         run: pnpm --filter @evavo/art-delivery-optimizer test
 
-      - name: Verify source remains clean except generated lockfile
+      - name: Verify source remains clean except generated outputs
         shell: bash
         run: |
           set -euo pipefail
           rm -f pnpm-lock.yaml
+          find packages -type d -name dist -prune -exec rm -rf {} +
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
