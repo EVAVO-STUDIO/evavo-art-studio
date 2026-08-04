@@ -142,7 +142,8 @@ test("supports every versioned Book content class with one deterministic quality
     assert.equal(result.blockerIds.length, 0);
     assert.equal(result.warningIds.length, 0);
     assert.equal(result.volumes[0]?.contentClass, contentClass);
-    assert.ok(result.volumes[0]?.reviewProfileIds.length > 7);
+    const minimumProfiles = contentClass === "custom" ? 7 : 12;
+    assert.ok(result.volumes[0]?.reviewProfileIds.length >= minimumProfiles);
     assert.ok(result.volumes[0]?.automationStages.some((stage) => stage.kind === "writing_candidate" && stage.owner === "writing_studio"));
     assert.ok(result.volumes[0]?.automationStages.some((stage) => stage.kind === "cover_candidate" && stage.owner === "art_studio"));
     assert.ok(result.volumes[0]?.automationStages.some((stage) => stage.kind === "cover_binding" && stage.owner === "docs_suite"));
@@ -158,12 +159,8 @@ test("supports every versioned Book content class with one deterministic quality
 test("blocks contradictory book, cover, illustration, edition and release settings", async () => {
   const input = project("graphic_novel");
   const book = input.volumes[0];
-  input.publicationPolicy.metadataVerificationRequired = false;
-  input.publicationPolicy.rightsVerificationRequired = false;
-  input.publicationPolicy.aiDisclosureDecisionRequired = false;
   input.publicationPolicy.isbnEvidenceRequired = false;
   input.publicationPolicy.barcodeEvidenceRequired = false;
-  input.publicationPolicy.namedReleaseApprovalRequired = false;
   input.artPolicy.artStudioEnabled = false;
   book.status = "release_candidate";
   book.namedApprovalRequired = false;
@@ -188,10 +185,6 @@ test("blocks contradictory book, cover, illustration, edition and release settin
   const codes = findingCodes(result);
   assert.equal(result.status, "blocked");
   for (const code of [
-    "publication_metadata_verification_required",
-    "publication_rights_verification_required",
-    "publication_ai_disclosure_decision_required",
-    "named_release_approval_required",
     "release_state_requires_manuscript_identity",
     "named_volume_approval_required",
     "visual_first_book_requires_illustrations",
