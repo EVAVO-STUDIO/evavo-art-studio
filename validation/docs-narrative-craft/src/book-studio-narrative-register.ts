@@ -25,6 +25,7 @@ import {
   duplicateReviewCraftValues,
   rejectReviewCraftUnknown,
   reviewCraftArray,
+  reviewCraftDigest,
   reviewCraftEnum,
   reviewCraftFinite,
   reviewCraftId,
