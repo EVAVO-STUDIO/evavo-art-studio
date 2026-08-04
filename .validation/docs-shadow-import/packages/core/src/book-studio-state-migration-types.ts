@@ -1,0 +1,55 @@
+export interface BookStateMigrationBundleInputV1 {
+  outputKind: string;
+  schemaVersion: number;
+  contract: string;
+  authorityMode: string;
+  bundleId: string;
+  sourceRepository: string;
+  sourceCommit: string;
+  projectId: string;
+  programmeId: string;
+  volumeIds: string[];
+  artworkRequiredVolumeIds: string[];
+  expectedItems: Array<{ migrationItemId: string; stateKind: string; scope: string; scopeId: string }>;
+  items: Array<{ migrationItemId: string; itemFingerprint: string; [key: string]: unknown }>;
+  compiledAt: string;
+  compiledBy: string;
+  evidenceIds: string[];
+  authoritativeWritesAllowed: false;
+  canonicalManuscriptMutationAllowed: false;
+  runtimeCutoverApproved: false;
+  sourceDeletionApproved: false;
+  publicationPerformed: false;
+}
+export interface BookStateMigrationBundleResultV1 {
+  outputKind: "evavo_docs_book_state_migration_bundle_result";
+  schemaVersion: 1;
+  contract: "evavo_docs_book_state_migration_bundle_v1";
+  status: "blocked" | "needs_resolution" | "ready_for_cutover_review";
+  bundleId: string;
+  sourceRepository: "EVAVO-STUDIO/Website";
+  sourceCommit: string;
+  projectId: string;
+  programmeId: string;
+  volumeIds: string[];
+  artworkRequiredVolumeIds: string[];
+  expectedMigrationItemIds: string[];
+  processedMigrationItemIds: string[];
+  missingMigrationItemIds: string[];
+  unexpectedMigrationItemIds: string[];
+  duplicateMigrationItemIds: string[];
+  itemResults: Array<{ migrationItemId: string; itemFingerprint: string; status: "validated" | "blocked"; blockers: string[]; warnings: string[] }>;
+  blockers: string[];
+  warnings: string[];
+  bundleFingerprint: string;
+  authoritativeWritesPerformed: false;
+  statePersisted: false;
+  canonicalManuscriptMutationPerformed: false;
+  websiteCompatibilityRuntimeStillAuthoritative: true;
+  docsSuiteCanonicalWriterEnabled: false;
+  dualAuthoritativeWritesAllowed: false;
+  runtimeCutoverApproved: false;
+  sourceDeletionApproved: false;
+  publicationPerformed: false;
+}
+export type BookStateMigrationOperationExecutor = (request: unknown) => Promise<unknown>;
