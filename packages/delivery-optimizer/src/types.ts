@@ -1,8 +1,8 @@
 export const DELIVERY_OPTIMIZER_SCHEMA = "evavo.art-delivery-optimization.v1" as const;
 export const DELIVERY_OPTIMIZER_RECEIPT_SCHEMA =
   "evavo.art-delivery-optimization-receipt.v1" as const;
-export const DELIVERY_OPTIMIZER_VERSION = "0.2.0" as const;
-export const PROFILE_CATALOG_VERSION = "2026-08-02.1" as const;
+export const DELIVERY_OPTIMIZER_VERSION = "0.3.0" as const;
+export const PROFILE_CATALOG_VERSION = "2026-08-04.2" as const;
 
 export type DeliveryImageFormat = "png" | "webp";
 export type DeliveryColourPolicy = "preserve" | "grayscale";
@@ -29,6 +29,7 @@ export type DeliveryProfileId =
   | "retro-scene-720p"
   | "retro-overlay-720p"
   | "godot-sprite-lossless"
+  | "godot-cutout-webp-1080p"
   | "godot-background-1080p"
   | "web-raster-1080p"
   | "source-master-lossless";
@@ -43,6 +44,7 @@ export interface WebpEncodingCandidate {
   readonly format: "webp";
   readonly quality: number;
   readonly nearLossless: boolean;
+  readonly lossless?: boolean;
 }
 
 export type DeliveryEncodingCandidate =
@@ -128,6 +130,9 @@ export interface DeliveryPixelMetrics {
   readonly alphaMaximumDifference: number;
   readonly comparedColourSamples: number;
   readonly pixels: number;
+  readonly transparentRgbComparedPixels: number;
+  readonly transparentRgbDifferingPixels: number;
+  readonly transparentRgbMaximumDifference: number;
 }
 
 export interface DeliveryCandidateEvidence {
@@ -138,6 +143,7 @@ export interface DeliveryCandidateEvidence {
   readonly paletteColours?: number;
   readonly quality?: number;
   readonly nearLossless?: boolean;
+  readonly lossless?: boolean;
   readonly dither?: number;
   readonly pngStorage: DeliveryPngStorageEvidence | null;
   readonly metrics: DeliveryPixelMetrics;

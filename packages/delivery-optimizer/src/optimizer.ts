@@ -417,6 +417,7 @@ export async function optimizeDeliveryImage(
         : {
             quality: encoding.quality,
             nearLossless: encoding.nearLossless,
+            lossless: encoding.lossless === true,
           }),
     } satisfies Omit<DeliveryCandidateEvidence, "passed" | "failures">;
     const failures = [
