@@ -38,15 +38,22 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
-      - name: Prove exact Docs Suite source blobs
+      - name: Prove exact Docs Suite source and test blobs
         shell: bash
         run: |
           set -euo pipefail
           project_contracts="$(git hash-object validation/docs-book-universal-readiness/packages/core/src/book-studio-project-contracts.ts)"
           readiness="$(git hash-object validation/docs-book-universal-readiness/packages/core/src/book-studio-universal-readiness.ts)"
-          printf 'project_contracts=%s\nreadiness=%s\n' "$project_contracts" "$readiness"
+          governance="$(git hash-object validation/docs-book-universal-readiness/packages/core/src/book-studio-universal-readiness-governance.ts)"
+          readiness_test="$(git hash-object validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness.test.mjs)"
+          governance_test="$(git hash-object validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness-governance.test.mjs)"
+          printf 'project_contracts=%s\nreadiness=%s\ngovernance=%s\nreadiness_test=%s\ngovernance_test=%s\n' \
+            "$project_contracts" "$readiness" "$governance" "$readiness_test" "$governance_test"
           test "$project_contracts" = "fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
           test "$readiness" = "3c348b4969d94f2e81a7a4e8e0f9c2399850e640"
+          test "$governance" = "aac0ff806dbfc41259b4925918a96103a5615489"
+          test "$readiness_test" = "de9f0e5287cefca3cd13e5455a0ca456bdda645c"
+          test "$governance_test" = "b840c94f280ea1280879a0f0a338d8eefad51e57"
 
       - name: Install validation-only compiler tools
         run: npm install --prefix validation/docs-book-universal-readiness --no-save --package-lock=false --ignore-scripts typescript@5.9.3 tsx@4.20.3
@@ -54,8 +61,8 @@ jobs:
       - name: Compile the readiness boundary strictly
         run: validation/docs-book-universal-readiness/node_modules/.bin/tsc -p validation/docs-book-universal-readiness/tsconfig.json
 
-      - name: Run universal project and edge-case attacks
-        run: validation/docs-book-universal-readiness/node_modules/.bin/tsx --test validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness.test.mjs
+      - name: Run universal project, governance and edge-case attacks
+        run: validation/docs-book-universal-readiness/node_modules/.bin/tsx --test validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness.test.mjs validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness-governance.test.mjs
 
       - name: Verify no Art Studio production source changed
         shell: bash
