@@ -16,6 +16,7 @@ import { canonicalBookJson, sha256BookText } from "../src/book-studio-project-co
 const digest = (character) => `sha256:${character.repeat(64)}`;
 const targetText = "Mara placed the damaged key on Orren's ledger and asked for the archive register.";
 const executionTime = "2026-08-04T10:05:00.000Z";
+const dependencyCompletedAt = "2026-08-04T10:04:00.000Z";
 
 function authoringPacket(overrides = {}) {
   return {
@@ -344,18 +345,37 @@ function unattendedInput() {
   };
 }
 
+async function exactDependencyReceipts(plan, stageId) {
+  const stage = plan.volumes
+    .flatMap((volume) => volume.stagePlans)
+    .find((item) => item.stageId === stageId);
+  return Promise.all((stage?.dependencyStageIds ?? []).map(async (dependencyStageId) => ({
+    stageId: dependencyStageId,
+    receiptFingerprint: await sha256BookText(canonicalBookJson({
+      outputKind: "evavo_docs_book_unattended_authorial_dependency_receipt_identity",
+      schemaVersion: 1,
+      unattendedResultFingerprint: plan.resultFingerprint,
+      stageId: dependencyStageId,
+      completedAt: dependencyCompletedAt,
+    })),
+    completedAt: dependencyCompletedAt,
+  })));
+}
+
 async function executionInput({
   expectedFingerprint,
   stageId = "volume-one:writing_candidate",
   revisionCycle = 1,
   priorRevisionReceiptFingerprint,
-  dependencyReceipts = [],
+  dependencyReceipts,
   additionalEvidenceIds = [],
   reverseContexts = false,
   overrides = {},
 } = {}) {
   const unattendedProductionInput = unattendedInput();
   const plan = await compileBookUnattendedProduction(unattendedProductionInput);
+  const resolvedDependencyReceipts = dependencyReceipts
+    ?? await exactDependencyReceipts(plan, stageId);
   return {
     outputKind: "evavo_docs_book_unattended_authorial_writing_compile_input",
     schemaVersion: 1,
@@ -366,7 +386,7 @@ async function executionInput({
     stageId,
     revisionCycle,
     ...(priorRevisionReceiptFingerprint === undefined ? {} : { priorRevisionReceiptFingerprint }),
-    dependencyReceipts,
+    dependencyReceipts: resolvedDependencyReceipts,
     authorialWritingBridgeInput: await bridgeInput({ additionalEvidenceIds, reverseContexts }),
     executionRequestedAt: executionTime,
     executionRequestedBy: "book-production-supervisor",
@@ -389,6 +409,15 @@ test("binds one exact unattended writing stage to the authorial runtime without 
   assert.equal(first.selectedStage.kind, "writing_candidate");
   assert.equal(first.sourceDispatchOperation, "/api/v1/book-studio/writing-candidate");
   assert.equal(first.effectiveDispatchOperation, "/api/v1/book-studio/writing-candidate/authorial");
+  assert.deepEqual(
+    first.dependencyReceipts.map((item) => item.stageId),
+    first.selectedStage.dependencyStageIds,
+  );
+  assert.ok(first.dependencyReceipts.length > 0);
+  for (const receipt of first.dependencyReceipts) {
+    assert.ok(first.requiredWritingHandoffEvidenceIds.includes(receipt.receiptFingerprint));
+    assert.ok(first.authorialBridge.handoffRequest.requiredEvidenceIds.includes(receipt.receiptFingerprint));
+  }
   assert.equal(first.authorialBridge.status, "ready");
   assert.equal(first.providerCallAllowed, true);
   assert.equal(first.providerCallPerformed, false);
@@ -440,11 +469,17 @@ test("requires exact revision receipts after the first bounded cycle", async () 
 });
 
 test("rejects dependency, revision-limit and authority escalation attacks", async () => {
+  const missingDependency = await compileBookUnattendedAuthorialWritingExecution(await executionInput({
+    dependencyReceipts: [],
+  }));
+  assert.equal(missingDependency.status, "blocked");
+  assert.ok(missingDependency.blockers.some((item) => /exact selected-stage dependency set/i.test(item)));
+
   const extraDependency = await compileBookUnattendedAuthorialWritingExecution(await executionInput({
     dependencyReceipts: [{
       stageId: "volume-one:invented_dependency",
       receiptFingerprint: digest("7"),
-      completedAt: "2026-08-04T10:04:00.000Z",
+      completedAt: dependencyCompletedAt,
     }],
   }));
   assert.equal(extraDependency.status, "blocked");
