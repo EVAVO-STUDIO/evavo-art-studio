@@ -192,11 +192,13 @@ jobs:
       - name: Run complete repository validation
         run: pnpm check
 
-      - name: Remove generated lockfile and verify clean tracked source
+      - name: Remove bounded validation scratch and verify clean exact source
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           rm -f pnpm-lock.yaml
+          rm -rf examples/legacy-book-artwork-registration/artifacts
+          test ! -e examples/legacy-book-artwork-registration/artifacts
           git diff --exit-code
-          test -z "$(git status --porcelain)"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
