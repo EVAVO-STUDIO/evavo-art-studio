@@ -41,13 +41,13 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git hash-object .validation/docs-shadow-import/packages/core/src/book-studio-state-shadow-import.ts)" = "6648b63398a6932cabe2b0572950facb672061a7"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-persistence.ts)" = "7862b5df37e2156fd662b12c913a0356978eccbf"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-persistence.ts)" = "7862b293ad0e314b52720aeebafc33ac4c0332fb"
           test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-import-service.ts)" = "c6b7a559c920cf2401bad175e9c992818c16439b"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/app/api/v1/book-studio/migration/state-import/route.ts)" = "61e5d7ad2d38d4c95209dd23d9ac08ccca83fe14"
-          test "$(git hash-object .validation/docs-shadow-import/packages/core/test/book-studio-state-shadow-import.test.mjs)" = "b29f415637e0205c41a99a1ca093c67a488bd733"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-persistence.test.mjs)" = "bef99c94dc6fce999dfb8d2b17be1ab344e41ee0"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/scripts/evavo-docs-book-state-import.mjs)" = "87ebc4092d47a95abb5d8d9ac9d968df9711a12f"
-          test "$(git hash-object .validation/docs-shadow-import/apps/web/scripts/evavo-docs-book-state-import-mcp.mjs)" = "d0ace45a79e543f4cdf08e006046bd93036c59f5"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/src/app/api/v1/book-studio/migration/state-import/route.ts)" = "61e5ddc7724447e0626e619e8aa705d7c81aa37c"
+          test "$(git hash-object .validation/docs-shadow-import/packages/core/test/book-studio-state-shadow-import.test.mjs)" = "b29c4a2f3c9bba2fdcf63496a94e92894a6361d9"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-persistence.test.mjs)" = "bef99cabf034250159c6f861978b11ee6aeb7e0e"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/scripts/evavo-docs-book-state-import.mjs)" = "87eb4d323912202d2a2e1734fd51c5bee361d4e5"
+          test "$(git hash-object .validation/docs-shadow-import/apps/web/scripts/evavo-docs-book-state-import-mcp.mjs)" = "d0ac881798a1aad5d6761d3f2a29a7428b650f65"
           test "$(git hash-object .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-import-cli-mcp.test.mjs)" = "a505ca12940597373a2bdc6788f6d3c860855b9e"
       - name: Compile exact core service persistence and route
         run: npm exec --yes --package=typescript@5.9.3 --package=@types/node@22 -- tsc -p .validation/docs-shadow-import/tsconfig.json
