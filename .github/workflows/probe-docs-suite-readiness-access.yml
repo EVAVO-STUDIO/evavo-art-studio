@@ -59,6 +59,18 @@ jobs:
           test "$(wc -c < "$archive")" = "23532"
           test "$(sha256sum "$archive" | cut -d' ' -f1)" = "575bc289dc84444259bb3e86b1d96174fa3c07f26251004b718d1418b699e592"
           tar -xzf "$archive" -C "$root"
+          python - "$root/packages/core/test/book-studio-unattended-production.test.mjs" <<'PY'
+          from pathlib import Path
+          import sys
+
+          path = Path(sys.argv[1])
+          source = path.read_text(encoding="utf-8")
+          old = '  assert.ok(strict.blockerIds.some((item) => item.includes("unattended_stop_cover_route_comparison_insufficient")));\n  assert.ok(strict.findings.some((finding) =>\n    finding.severity === "blocker" &&\n    finding.code === "unattended_stop_cover_route_comparison_insufficient"\n  ));\n  assert.equal(strict.internalWritingAutomationEnabled, false);\n\n  const permissive = await compileBookUnattendedProduction(input(warningProject, policy({ stopOnReadinessWarning: false })));\n  assert.equal(permissive.status, "needs_work");\n  assert.ok(permissive.warningIds.some((item) => item.includes("cover_route_comparison_insufficient")));\n  assert.ok(!permissive.blockerIds.some((item) => item.includes("unattended_stop_cover_route_comparison_insufficient")));\n  assert.equal(permissive.internalWritingAutomationEnabled, true);'
+          new = '  const escalated = strict.findings.find((finding) =>\n    finding.severity === "blocker" &&\n    finding.code === "unattended_stop_cover_route_comparison_insufficient"\n  );\n  assert.ok(escalated);\n  assert.ok(strict.blockerIds.includes(escalated.findingId));\n  assert.equal(strict.internalWritingAutomationEnabled, false);\n\n  const permissive = await compileBookUnattendedProduction(input(warningProject, policy({ stopOnReadinessWarning: false })));\n  assert.equal(permissive.status, "needs_work");\n  assert.ok(permissive.warningIds.some((item) => item.includes("cover_route_comparison_insufficient")));\n  assert.equal(permissive.blockerIds.length, 0);\n  assert.ok(!permissive.findings.some((finding) =>\n    finding.code === "unattended_stop_cover_route_comparison_insufficient"\n  ));\n  assert.equal(permissive.internalWritingAutomationEnabled, true);'
+          if source.count(old) != 1:
+              raise SystemExit("expected one exact warning-blocker regression block")
+          path.write_text(source.replace(old, new), encoding="utf-8")
+          PY
           printf 'VALIDATION_ROOT=%s\n' "$root" >> "$GITHUB_ENV"
 
       - name: Prove exact current dependency and Docs PR blobs
@@ -73,7 +85,7 @@ jobs:
           expected["packages/core/src/book-studio-universal-readiness-governance.ts"]="aac0ff806dbfc41259b4925918a96103a5615489"
           expected["packages/core/src/book-studio-unattended-production.ts"]="a680376b58addae4ffb6b8a9cdfcab361a2711e4"
           expected["packages/core/src/index.ts"]="5df8781724b032aa8eb6e82104353f3bf6154350"
-          expected["packages/core/test/book-studio-unattended-production.test.mjs"]="0445ab51bb49e492d4689fab5dcaeb94ed4caa89"
+          expected["packages/core/test/book-studio-unattended-production.test.mjs"]="825b157a02b284791f8673a61094fc94c9dface0"
           expected["apps/web/src/lib/book-studio-unattended-production-service.ts"]="7e4a8808df788d17d4e788d8987291a151dd7811"
           expected["apps/web/src/app/api/v1/book-studio/unattended-production/route.ts"]="ecbc2f9f016a89c15f33f338f134a2358a79ad23"
           expected["apps/web/scripts/docs-suite-api-client.mjs"]="9c05188ea028616e125ab682bb4da33e99081d04"
@@ -181,9 +193,10 @@ jobs:
             "workflowRunAttempt": "${GITHUB_RUN_ATTEMPT}",
             "testedValidationHead": "${GITHUB_SHA}",
             "docsSuitePullRequest": 72,
-            "docsSuiteBranchHead": "a8752ee2490fbc71d3aaafc5c753e57446f729ff",
+            "docsSuiteBranchHead": "25d1c16cef8c8a5df679450353c93dba64a332fe",
             "docsSuiteBaseHead": "64a97575878652ad91ce2aba151997baa357fa12",
             "payloadSha256": "575bc289dc84444259bb3e86b1d96174fa3c07f26251004b718d1418b699e592",
+            "patchedTestBlob": "825b157a02b284791f8673a61094fc94c9dface0",
             "steps": {
               "checkout": "$CHECKOUT_OUTCOME",
               "node": "$NODE_OUTCOME",
