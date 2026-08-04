@@ -1,0 +1,73 @@
+name: Validate Docs Narrative Craft
+
+on:
+  push:
+    branches:
+      - validation/docs-narrative-craft-20260804
+    paths:
+      - ".github/workflows/validate-docs-narrative-craft.yml"
+      - "validation/docs-narrative-craft/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-docs-narrative-craft.yml"
+      - "validation/docs-narrative-craft/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-narrative-craft-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source-equivalent validation mirror
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Install validation-only compiler tools
+        run: npm install --prefix validation/docs-narrative-craft --no-save --package-lock=false --ignore-scripts typescript@5.9.3 tsx@4.20.3
+
+      - name: Compile strict narrative craft boundary
+        run: validation/docs-narrative-craft/node_modules/.bin/tsc -p validation/docs-narrative-craft/tsconfig.json
+
+      - name: Run psychology dialogue prose originality and tamper attacks
+        run: validation/docs-narrative-craft/node_modules/.bin/tsx --test validation/docs-narrative-craft/test/narrative-craft.test.mjs
+
+      - name: Prove no Art Studio production source changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          merge_base="$(git merge-base HEAD origin/main)"
+          test -n "$merge_base"
+          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/validate-docs-narrative-craft\.yml|validation/docs-narrative-craft/)' || true)"
+          test -z "$unexpected" || {
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
+
+      - name: Record validation boundary
+        run: |
+          printf '%s\n' \
+            'validation=source-equivalent' \
+            'byte-identical-claim=false' \
+            'knowledge-modules=11' \
+            'quality-criteria=14' \
+            'provider-call-performed=false' \
+            'canonical-manuscript-mutation-performed=false' \
+            'automatic-canonical-admission-allowed=false' \
+            'publication-performed=false'
