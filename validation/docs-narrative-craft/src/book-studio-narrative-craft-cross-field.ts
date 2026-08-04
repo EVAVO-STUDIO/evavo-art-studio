@@ -11,7 +11,7 @@ import type {
 import { normaliseNarrativeText } from "./book-studio-narrative-craft-state";
 import { intersectsReviewCraft } from "./book-studio-review-craft-shared";
 
-const DIRECT_IMITATION = /\b(?:in the style of|write like|sound like|imitate|mimic|recreate the voice of|indistinguishable from|perfectly like)\b/i;
+const DIRECT_IMITATION_REQUEST = /(?:\bin the style of\b|\bwrite like\b|\bsound like\b|\brecreate the voice of\b|\bindistinguishable from\b|\bperfectly like\b|\b(?:imitate|mimic)\s+(?:the\s+)?(?:voice|style|prose|writing|work)\s+of\b)/i;
 
 export function validateNarrativeCraftCrossFields(input: {
   mode: BookNarrativeCraftMode;
@@ -74,7 +74,7 @@ export function validateNarrativeCraftCrossFields(input: {
     ...input.characters.flatMap((item) => [item.publicGoal, item.privateNeed, item.currentBelief, item.mistakenBelief, item.immediateAppraisal, item.emotionalState, item.outwardDisplay, item.withheldInformation, item.relationshipPressure, item.statusPosition]),
     ...input.emotionBeats.flatMap((item) => [item.trigger, item.goalRelevance, item.agencyAttribution, item.outwardExpression, item.delayedAftereffect]),
   ];
-  if (inspectedText.some((text) => DIRECT_IMITATION.test(text))) blockers.push("Narrative craft input requests direct creator imitation rather than abstract project-owned mechanisms.");
+  if (inspectedText.some((text) => DIRECT_IMITATION_REQUEST.test(text))) blockers.push("Narrative craft input requests direct creator imitation rather than abstract project-owned mechanisms.");
 }
 
 function requiredModulesForMode(mode: BookNarrativeCraftMode, dialogueEnabled: boolean): BookNarrativeKnowledgeModuleId[] {
