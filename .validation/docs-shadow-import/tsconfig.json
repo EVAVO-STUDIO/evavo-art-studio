@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["apps/web/src/*"]
+    }
+  },
+  "include": [
+    "packages/core/src/**/*.ts",
+    "apps/web/src/lib/**/*.ts",
+    "apps/web/src/app/api/v1/book-studio/migration/state-import/route.ts",
+    "types/**/*.d.ts"
+  ]
+}
