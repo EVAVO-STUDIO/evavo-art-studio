@@ -620,7 +620,7 @@ function splitSentences(text: string): string[] {
 
 function quotedWordCount(text: string): number {
   let count = 0;
-  for (const match of text.matchAll(/[\"“]([^\"”]{1,50_000})[\"”]/gsu)) count += tokenize(match[1] ?? "").length;
+  for (const match of text.matchAll(/[\"“]([^\"”]{1,50000})[\"”]/gsu)) count += tokenize(match[1] ?? "").length;
   return count;
 }
 
