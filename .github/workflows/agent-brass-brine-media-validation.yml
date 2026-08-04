@@ -71,8 +71,13 @@ jobs:
           )
           replace_exact(
               "packages/delivery-optimizer/src/encoding.ts",
-              """      nearLossless:\n        candidate.lossless === true ? false : candidate.nearLossless,\n      smartSubsample: false,\n""",
-              """      nearLossless:\n        candidate.lossless === true ? false : candidate.nearLossless,\n      exact: candidate.lossless === true,\n      smartSubsample: false,\n""",
+              """import sharp from \"sharp\";""",
+              """import sharp, { type WebpOptions } from \"sharp\";""",
+          )
+          replace_exact(
+              "packages/delivery-optimizer/src/encoding.ts",
+              """  return pipeline\n    .webp({\n      quality: candidate.quality,\n      alphaQuality: 100,\n      effort: 6,\n      lossless: candidate.lossless === true,\n      nearLossless:\n        candidate.lossless === true ? false : candidate.nearLossless,\n      smartSubsample: false,\n    })\n    .toBuffer();\n""",
+              """  const webpOptions: WebpOptions & { readonly exact: boolean } = {\n    quality: candidate.quality,\n    alphaQuality: 100,\n    effort: 6,\n    lossless: candidate.lossless === true,\n    nearLossless:\n      candidate.lossless === true ? false : candidate.nearLossless,\n    exact: candidate.lossless === true,\n    smartSubsample: false,\n  };\n  return pipeline.webp(webpOptions).toBuffer();\n""",
           )
           replace_exact(
               "packages/delivery-optimizer/src/encoding.ts",
