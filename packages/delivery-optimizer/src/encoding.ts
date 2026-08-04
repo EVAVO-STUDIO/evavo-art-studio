@@ -37,6 +37,7 @@ export function candidateId(
       ? "png-truecolour"
       : `png-palette-${candidate.paletteColours}-dither-${candidate.dither}`;
   }
+  if (candidate.lossless === true) return "webp-lossless";
   return `webp-q${candidate.quality}-${candidate.nearLossless ? "near-lossless" : "lossy"}`;
 }
 
@@ -98,7 +99,9 @@ export async function encodeCandidate(
       quality: candidate.quality,
       alphaQuality: 100,
       effort: 6,
-      nearLossless: candidate.nearLossless,
+      lossless: candidate.lossless === true,
+      nearLossless:
+        candidate.lossless === true ? false : candidate.nearLossless,
       smartSubsample: false,
     })
     .toBuffer();
