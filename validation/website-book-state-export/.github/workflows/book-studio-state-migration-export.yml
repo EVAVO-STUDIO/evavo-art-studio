@@ -1,0 +1,65 @@
+name: Book Studio State Migration Export
+
+on:
+  push:
+    branches: [main]
+    paths: &state_export_paths
+      - ".github/workflows/book-studio-state-migration-export.yml"
+      - "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteStateMigrationExport.ts"
+      - "tools/evavo-doc-studio/src/evavo/bookStudio/index.ts"
+      - "tools/evavo-doc-studio/scripts/run-book-studio-state-migration-export.ts"
+      - "tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export.ts"
+      - "tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export-gateway.mjs"
+      - "tools/evavo-doc-studio/docs/BOOK_STUDIO_STATE_MIGRATION_EXPORT.md"
+      - "tools/evavo-doc-studio/data/migration/WEBSITE_BOOK_STATE_EXPORT_GATEWAY.v1.json"
+  pull_request:
+    branches: [main]
+    paths: *state_export_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: book-studio-state-migration-export-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use governed Node runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version-file: tools/evavo-doc-studio/.nvmrc
+          package-manager-cache: false
+
+      - name: Verify exact child lockfile
+        run: node scripts/check-doc-studio-lockfile.mjs
+
+      - name: Install locked Doc Studio dependencies
+        working-directory: tools/evavo-doc-studio
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Typecheck complete retained Doc Studio source
+        working-directory: tools/evavo-doc-studio
+        run: npm run typecheck
+
+      - name: Run state export contract and transport attacks
+        working-directory: tools/evavo-doc-studio
+        run: npx tsx scripts/check-book-studio-state-migration-export.ts
+
+      - name: Verify permanent state export authority
+        run: node tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export-gateway.mjs
+
+      - name: Prove clean exact source
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
