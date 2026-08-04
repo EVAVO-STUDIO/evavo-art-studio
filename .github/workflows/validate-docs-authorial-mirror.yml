@@ -7,11 +7,6 @@ on:
     paths:
       - ".github/workflows/validate-docs-authorial-mirror.yml"
       - "validation/docs-narrative-craft/**"
-  pull_request:
-    branches: [main]
-    paths:
-      - ".github/workflows/validate-docs-authorial-mirror.yml"
-      - "validation/docs-narrative-craft/**"
   workflow_dispatch:
 
 permissions:
@@ -26,324 +21,63 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - name: Check out source-equivalent validation mirror
-        id: checkout
+      - name: Check out self-contained validation mirror
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: true
           fetch-depth: 0
 
-      - name: Check out retained unattended production carrier
-        id: retained
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: ${{ github.repository }}
-          ref: automation/validate-docs-book-unattended-production-20260804
-          path: retained-unattended
-          persist-credentials: false
-          fetch-depth: 1
-
       - name: Use Node.js 22
-        id: node
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 22
           package-manager-cache: false
 
-      - name: Reconstruct exact retained unattended planner
-        id: assemble
-        shell: bash
-        run: |
-          set -euo pipefail
-          mirror="$GITHUB_WORKSPACE/validation/docs-narrative-craft"
-          carrier="$GITHUB_WORKSPACE/retained-unattended"
-          source_root="$RUNNER_TEMP/docs-book-unattended-source"
-          payload="$RUNNER_TEMP/docs-source-overlay.tar.gz"
-          encoded="$RUNNER_TEMP/docs-source-overlay.tar.gz.b64"
-          rm -rf "$source_root" "$payload" "$encoded"
-          cp -R "$carrier/validation/docs-book-universal-readiness" "$source_root"
-          cat "$carrier"/validation/docs-book-unattended-production-payload/docs-source-overlay.tar.gz.b64.part-* > "$encoded"
-          base64 --decode "$encoded" > "$payload"
-          echo "f385bf9cdc51b6d3ee247c69336b169ce7718f240881271b0e928876956bf75d  $payload" | sha256sum -c -
-          tar -xzf "$payload" -C "$source_root"
-          cp "$source_root/packages/core/src/book-studio-project-contracts.ts" "$mirror/src/"
-          cp "$source_root/packages/core/src/book-studio-universal-readiness.ts" "$mirror/src/"
-          cp "$source_root/packages/core/src/book-studio-universal-readiness-governance.ts" "$mirror/src/"
-          cp "$source_root/packages/core/src/book-studio-unattended-production.ts" "$mirror/src/"
-          printf 'MIRROR_ROOT=%s\n' "$mirror" >> "$GITHUB_ENV"
-
-      - name: Prove exact retained and reviewed source blobs
-        id: blobs
-        shell: bash
-        run: |
-          set -euo pipefail
-          declare -A expected=()
-          expected["src/book-studio-project-contracts.ts"]="fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
-          expected["src/book-studio-universal-readiness.ts"]="3c348b4969d94f2e81a7a4e8e0f9c2399850e640"
-          expected["src/book-studio-universal-readiness-governance.ts"]="aac0ff806dbfc41259b4925918a96103a5615489"
-          expected["src/book-studio-unattended-production.ts"]="a680376b58addae4ffb6b8a9cdfcab361a2711e4"
-          expected["src/book-studio-authorial-writing-bridge-types.ts"]="83401cf318fc78905af74920894ba22e353fa595"
-          expected["src/book-studio-narrative-craft.ts"]="65b1d1e1610d36320a9331a52c1cb641c6408b84"
-          expected["src/book-studio-unattended-authorial-writing.ts"]="80d831f95233af9ce252e35ddee43a2a1d7e015e"
-          expected["test/unattended-authorial-writing.test.mjs"]="2ce70202a693dbb46aeda5f051f88eee0a3fa93b"
-          expected["apps/web/scripts/docs-suite-api-client.mjs"]="7d9570fb7e41d089a639cd2b6784c6a0ca3ca876"
-          expected["apps/web/scripts/evavo-docs-book-unattended-authorial-writing-cli.mjs"]="3ac7e5dd8deb8e08636328d68448a1805e29db98"
-          expected["apps/web/scripts/evavo-docs-book-unattended-authorial-writing-mcp.mjs"]="5f2e379ac39cbb2d7d2f316bba1a6fb27801bfe0"
-          expected["apps/web/scripts/test-book-studio-unattended-authorial-writing-adapters.mjs"]="759eb6b8b8274d9d71d86a2d89ff8a1668647c7b"
-          expected["evidence/apps/web/src/lib/book-studio-unattended-authorial-writing-service.ts"]="4046bf7a9f5bc25bdf565d8392b1154c03200e3c"
-          expected["evidence/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts"]="78b55cf0946ffa5c02a7f2578b5a3a337f85eb72"
-          expected["evidence/packages/core/src/index.ts"]="ef029b952b70325bc42224fa79e7d147b45e11fe"
-          expected["evidence/scripts/check-book-studio-unattended-authorial-writing.mjs"]="719c6b3d9ecd227366a93f66230dbda05a15b3f1"
-          expected["evidence/.github/workflows/book-studio-unattended-authorial-writing.yml"]="74563be88b93f6f84ba35551160fd7997f5b427c"
-          expected["evidence/docs/migrations/book-studio/BOOK_STUDIO_UNATTENDED_AUTHORIAL_WRITING.md"]="d046669fe6a8ac4d891ce31070edece97a580482"
-          for relative in "${!expected[@]}"; do
-            actual="$(git hash-object "$MIRROR_ROOT/$relative")"
-            printf '%s=%s\n' "$relative" "$actual"
-            test "$actual" = "${expected[$relative]}"
-          done
-
-      - name: Install validation-only compiler tools
-        id: install
-        run: npm install --prefix "$MIRROR_ROOT" --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
-
-      - name: Compile strict authorial and unattended core boundary
-        id: core_typecheck
-        run: "$MIRROR_ROOT/node_modules/.bin/tsc" -p "$MIRROR_ROOT/tsconfig.json"
-
-      - name: Run narrative authorial bridge and unattended attacks
-        id: core_tests
-        run: >-
-          "$MIRROR_ROOT/node_modules/.bin/tsx" --test
-          "$MIRROR_ROOT/test/narrative-craft.test.mjs"
-          "$MIRROR_ROOT/test/authorial-runtime.test.mjs"
-          "$MIRROR_ROOT/test/authorial-writing-bridge.test.mjs"
-          "$MIRROR_ROOT/test/unattended-authorial-writing.test.mjs"
-
-      - name: Run CLI and dual-era MCP transport attacks
-        id: adapter_tests
-        run: node --test "$MIRROR_ROOT/apps/web/scripts/test-book-studio-unattended-authorial-writing-adapters.mjs"
-
-      - name: Compile exact protected service and route strictly
-        id: web_typecheck
-        shell: bash
-        run: |
-          set -euo pipefail
-          webroot="$RUNNER_TEMP/docs-authorial-webcheck"
-          mkdir -p \
-            "$webroot/packages/core/src" \
-            "$webroot/apps/web/src/lib" \
-            "$webroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing" \
-            "$webroot/stubs"
-          cp "$MIRROR_ROOT"/src/*.ts "$webroot/packages/core/src/"
-          cat > "$webroot/packages/core/src/index.ts" <<'TS'
-          export * from "./book-studio-project-contracts";
-          export * from "./book-studio-writing-candidate-types";
-          export * from "./book-studio-unattended-authorial-writing";
-          TS
-          cp "$MIRROR_ROOT/evidence/apps/web/src/lib/book-studio-unattended-authorial-writing-service.ts" "$webroot/apps/web/src/lib/"
-          cp "$MIRROR_ROOT/evidence/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts" "$webroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts"
-          cat > "$webroot/apps/web/src/lib/book-studio-writing-candidate-client.ts" <<'TS'
-          export interface BookWritingCandidateClientConfigV1 {
-            timeoutMilliseconds: number;
-          }
-          TS
-          cat > "$webroot/apps/web/src/lib/book-studio-writing-candidate-service.ts" <<'TS'
-          import type { BookWritingCandidateCoordinationResultV1 } from "../../../../packages/core/src/index";
-          import type { BookWritingCandidateClientConfigV1 } from "./book-studio-writing-candidate-client";
-          export async function coordinateBookWritingCandidate(
-            _input: unknown,
-            _options: Readonly<{
-              config?: BookWritingCandidateClientConfigV1;
-              fetchImpl?: typeof fetch;
-              expectedRuntimeRequestFingerprint?: string;
-            }> = {},
-          ): Promise<BookWritingCandidateCoordinationResultV1> {
-            throw new Error("typecheck stub");
-          }
-          TS
-          cat > "$webroot/apps/web/src/lib/docs-suite-request-context.ts" <<'TS'
-          export interface DocsSuiteRequestContext {
-            scopes: string[];
-            workspaceId: string;
-            actorType: string;
-          }
-          export async function readDocsSuiteRequestContext(): Promise<DocsSuiteRequestContext | null> {
-            return null;
-          }
-          TS
-          cat > "$webroot/stubs/next-server.ts" <<'TS'
-          export class NextRequest extends Request {}
-          export class NextResponse {
-            static json(value: unknown, init?: ResponseInit): Response {
-              return new Response(JSON.stringify(value), init);
-            }
-          }
-          TS
-          printf 'export {};\n' > "$webroot/stubs/server-only.ts"
-          ln -s "$MIRROR_ROOT/node_modules" "$webroot/node_modules"
-          cat > "$webroot/tsconfig.json" <<'JSON'
-          {
-            "compilerOptions": {
-              "target": "ES2022",
-              "module": "ESNext",
-              "moduleResolution": "Bundler",
-              "lib": ["ES2022", "DOM"],
-              "strict": true,
-              "noUncheckedIndexedAccess": true,
-              "exactOptionalPropertyTypes": true,
-              "noImplicitOverride": true,
-              "noEmit": true,
-              "skipLibCheck": true,
-              "baseUrl": ".",
-              "paths": {
-                "@/*": ["apps/web/src/*"],
-                "next/server": ["stubs/next-server.ts"],
-                "server-only": ["stubs/server-only.ts"]
-              },
-              "types": ["node"]
-            },
-            "include": [
-              "packages/core/src/**/*.ts",
-              "apps/web/src/**/*.ts",
-              "stubs/**/*.ts"
-            ]
-          }
-          JSON
-          "$MIRROR_ROOT/node_modules/.bin/tsc" -p "$webroot/tsconfig.json"
-
-      - name: Run exact permanent production checker
-        id: authority_checker
-        shell: bash
-        run: |
-          set -euo pipefail
-          checkroot="$RUNNER_TEMP/docs-book-production-check"
-          mkdir -p \
-            "$checkroot/packages/core/src" \
-            "$checkroot/packages/core/test" \
-            "$checkroot/apps/web/src/lib" \
-            "$checkroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing" \
-            "$checkroot/apps/web/scripts" \
-            "$checkroot/scripts" \
-            "$checkroot/.github/workflows" \
-            "$checkroot/docs/migrations/book-studio"
-          cp "$MIRROR_ROOT"/src/*.ts "$checkroot/packages/core/src/"
-          cp "$MIRROR_ROOT/evidence/packages/core/src/index.ts" "$checkroot/packages/core/src/index.ts"
-          cp "$MIRROR_ROOT/test/unattended-authorial-writing.test.mjs" "$checkroot/packages/core/test/book-studio-unattended-authorial-writing.test.mjs"
-          cp "$MIRROR_ROOT/evidence/apps/web/src/lib/book-studio-unattended-authorial-writing-service.ts" "$checkroot/apps/web/src/lib/"
-          cp "$MIRROR_ROOT/evidence/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts" "$checkroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts"
-          cp "$MIRROR_ROOT/apps/web/scripts/docs-suite-api-client.mjs" "$checkroot/apps/web/scripts/"
-          cp "$MIRROR_ROOT/apps/web/scripts/evavo-docs-book-unattended-authorial-writing-cli.mjs" "$checkroot/apps/web/scripts/"
-          cp "$MIRROR_ROOT/apps/web/scripts/evavo-docs-book-unattended-authorial-writing-mcp.mjs" "$checkroot/apps/web/scripts/"
-          cp "$MIRROR_ROOT/apps/web/scripts/test-book-studio-unattended-authorial-writing-adapters.mjs" "$checkroot/apps/web/scripts/"
-          cp "$MIRROR_ROOT/evidence/scripts/check-book-studio-unattended-authorial-writing.mjs" "$checkroot/scripts/"
-          cp "$MIRROR_ROOT/evidence/.github/workflows/book-studio-unattended-authorial-writing.yml" "$checkroot/.github/workflows/"
-          cp "$MIRROR_ROOT/evidence/docs/migrations/book-studio/BOOK_STUDIO_UNATTENDED_AUTHORIAL_WRITING.md" "$checkroot/docs/migrations/book-studio/"
-          node "$checkroot/scripts/check-book-studio-unattended-authorial-writing.mjs"
-
-      - name: Prove no Art Studio production source changed
-        id: isolation
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin main
-          merge_base="$(git merge-base HEAD origin/main)"
-          test -n "$merge_base"
-          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/(validate-docs-authorial-mirror|validate-docs-narrative-craft|diagnose-docs-unattended-authorial-checker|surface-docs-unattended-authorial-diagnostic)\.yml|validation/docs-narrative-craft/|validation-results/docs-unattended-authorial-validation\.json)' || true)"
-          test -z "$unexpected" || {
-            printf '%s\n' "$unexpected"
-            exit 1
-          }
-
-      - name: Restore disposable reconstruction and prove clean checkout
-        id: clean
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          git -C "$GITHUB_WORKSPACE" checkout -- validation/docs-narrative-craft/src/book-studio-project-contracts.ts
-          rm -f \
-            "$GITHUB_WORKSPACE/validation/docs-narrative-craft/src/book-studio-universal-readiness.ts" \
-            "$GITHUB_WORKSPACE/validation/docs-narrative-craft/src/book-studio-universal-readiness-governance.ts" \
-            "$GITHUB_WORKSPACE/validation/docs-narrative-craft/src/book-studio-unattended-production.ts"
-          git -C "$GITHUB_WORKSPACE" diff --exit-code
-          test -z "$(git -C "$GITHUB_WORKSPACE" status --porcelain=v1 --untracked-files=no)"
+      - name: Run exact unattended authorial validation
+        id: validation
+        env:
+          VALIDATION_RECEIPT_TMP: ${{ runner.temp }}/docs-unattended-authorial-validation.json
+        run: bash validation/docs-narrative-craft/run-unattended-authorial-validation.sh
 
       - name: Persist hosted validation receipt
         if: always() && github.event_name == 'push'
         env:
-          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
-          RETAINED_OUTCOME: ${{ steps.retained.outcome }}
-          NODE_OUTCOME: ${{ steps.node.outcome }}
-          ASSEMBLE_OUTCOME: ${{ steps.assemble.outcome }}
-          BLOBS_OUTCOME: ${{ steps.blobs.outcome }}
-          INSTALL_OUTCOME: ${{ steps.install.outcome }}
-          CORE_TYPECHECK_OUTCOME: ${{ steps.core_typecheck.outcome }}
-          CORE_TESTS_OUTCOME: ${{ steps.core_tests.outcome }}
-          ADAPTER_TESTS_OUTCOME: ${{ steps.adapter_tests.outcome }}
-          WEB_TYPECHECK_OUTCOME: ${{ steps.web_typecheck.outcome }}
-          AUTHORITY_OUTCOME: ${{ steps.authority_checker.outcome }}
-          ISOLATION_OUTCOME: ${{ steps.isolation.outcome }}
-          CLEAN_OUTCOME: ${{ steps.clean.outcome }}
+          VALIDATION_RECEIPT_TMP: ${{ runner.temp }}/docs-unattended-authorial-validation.json
         shell: bash
         run: |
           set -euo pipefail
-          conclusion="success"
-          for outcome in \
-            "$CHECKOUT_OUTCOME" \
-            "$RETAINED_OUTCOME" \
-            "$NODE_OUTCOME" \
-            "$ASSEMBLE_OUTCOME" \
-            "$BLOBS_OUTCOME" \
-            "$INSTALL_OUTCOME" \
-            "$CORE_TYPECHECK_OUTCOME" \
-            "$CORE_TESTS_OUTCOME" \
-            "$ADAPTER_TESTS_OUTCOME" \
-            "$WEB_TYPECHECK_OUTCOME" \
-            "$AUTHORITY_OUTCOME" \
-            "$ISOLATION_OUTCOME" \
-            "$CLEAN_OUTCOME"
-          do
-            if [[ "$outcome" != "success" ]]; then conclusion="failure"; fi
-          done
           receipt="validation-results/docs-unattended-authorial-validation.json"
           mkdir -p "$(dirname "$receipt")"
-          cat > "$receipt" <<JSON
-          {
-            "outputKind": "evavo_art_docs_unattended_authorial_validation_receipt",
-            "schemaVersion": 1,
-            "conclusion": "$conclusion",
-            "workflowRunId": "${GITHUB_RUN_ID}",
-            "workflowRunAttempt": "${GITHUB_RUN_ATTEMPT}",
-            "testedValidationHead": "${GITHUB_SHA}",
-            "docsFeatureHead": "8aeea45b1224683c12060e82f3d838522934a15a",
-            "docsBaseHead": "626bcd3af1bc1b1ffb92e28661e62069ed181951",
-            "steps": {
-              "checkout": "$CHECKOUT_OUTCOME",
-              "retainedCarrierCheckout": "$RETAINED_OUTCOME",
-              "node": "$NODE_OUTCOME",
-              "retainedPlannerReconstruction": "$ASSEMBLE_OUTCOME",
-              "exactBlobProof": "$BLOBS_OUTCOME",
-              "toolInstall": "$INSTALL_OUTCOME",
-              "strictCoreTypeScript": "$CORE_TYPECHECK_OUTCOME",
-              "coreBehaviouralAttacks": "$CORE_TESTS_OUTCOME",
-              "cliAndDualEraMcpAttacks": "$ADAPTER_TESTS_OUTCOME",
-              "strictProtectedWebTypeScript": "$WEB_TYPECHECK_OUTCOME",
-              "permanentAuthorityChecker": "$AUTHORITY_OUTCOME",
-              "artProductionSourceIsolation": "$ISOLATION_OUTCOME",
-              "cleanTrackedCheckout": "$CLEAN_OUTCOME"
-            },
-            "providerCallPerformed": false,
-            "canonicalManuscriptMutationPerformed": false,
-            "automaticCanonicalAdmissionAllowed": false,
-            "artStudioProductionSourceChanged": false,
-            "publicationPerformed": false
-          }
-          JSON
+          if [[ -f "$VALIDATION_RECEIPT_TMP" ]]; then
+            cp "$VALIDATION_RECEIPT_TMP" "$receipt"
+          else
+            node - "$receipt" <<'NODE'
+          const fs = require("node:fs");
+          fs.writeFileSync(process.argv[2], `${JSON.stringify({
+            outputKind: "evavo_art_docs_unattended_authorial_validation_receipt",
+            schemaVersion: 1,
+            conclusion: "failure",
+            failedStage: "runner_setup",
+            completedStages: [],
+            workflowRunId: process.env.GITHUB_RUN_ID ?? "unknown",
+            workflowRunAttempt: process.env.GITHUB_RUN_ATTEMPT ?? "unknown",
+            testedValidationHead: process.env.GITHUB_SHA ?? "unknown",
+            docsFeatureHead: "8aeea45b1224683c12060e82f3d838522934a15a",
+            docsBaseHead: "626bcd3af1bc1b1ffb92e28661e62069ed181951",
+            providerCallPerformed: false,
+            canonicalManuscriptMutationPerformed: false,
+            automaticCanonicalAdmissionAllowed: false,
+            artStudioProductionSourceChanged: null,
+            publicationPerformed: false,
+          }, null, 2)}\n`, "utf8");
+          NODE
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$receipt"
           if ! git diff --cached --quiet; then
+            conclusion="$(node -p "JSON.parse(require('fs').readFileSync('$receipt','utf8')).conclusion")"
             git commit -m "test(validation): record unattended authorial ${conclusion}"
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
-          test "$conclusion" = "success"
+          node -e "const r=JSON.parse(require('fs').readFileSync('$receipt','utf8')); if(r.conclusion!=='success') process.exit(1)"
