@@ -10,9 +10,11 @@
     "src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftTypes.ts",
     "src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftContracts.ts",
     "src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftShared.ts",
+    "src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftStream.ts",
     "src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftClient.ts",
     "src/app/api/books/write/craft-genome/route.ts",
-    "scripts/check-book-studio-craft-provider-contract.ts"
+    "scripts/check-book-studio-craft-provider-contract.ts",
+    "scripts/check-book-studio-craft-proxy-route.ts"
   ],
   "exclude": [
     "node_modules",
