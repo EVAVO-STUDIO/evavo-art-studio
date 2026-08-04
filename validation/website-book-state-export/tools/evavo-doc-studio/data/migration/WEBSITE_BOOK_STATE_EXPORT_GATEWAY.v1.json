@@ -1,0 +1,38 @@
+{
+  "schema": "evavo/website-book-state-export-gateway",
+  "version": 1,
+  "recordedAt": "2026-08-04T01:00:00.000Z",
+  "sourceRepository": "EVAVO-STUDIO/Website",
+  "sourceBaseCommit": "5c3fbc63e98e269b323269742a13609bc63a0088",
+  "docsSuiteRepository": "EVAVO-STUDIO/evavo-docs-suite",
+  "docsSuiteValidationCommit": "c83def34e8b4f9aef6108ddffc664f7c8a4c523c",
+  "contract": "evavo_docs_book_state_migration_bundle_v1",
+  "operationEndpoint": "/api/v1/book-studio/operations",
+  "bundleEndpoint": "/api/v1/book-studio/migration/state-bundle",
+  "operatorCommand": "npx tsx scripts/run-book-studio-state-migration-export.ts export --input manifest.json --output receipt.json --bundle-output bundle.json",
+  "capabilities": {
+    "exactSourceBytesHashed": true,
+    "exactGitBlobSha1Computed": true,
+    "sourceSymlinksAllowed": false,
+    "sourcePathEscapeAllowed": false,
+    "operationValidationPerformed": true,
+    "bundleValidationPerformed": true,
+    "operationRetryAllowed": false,
+    "ambiguousBundleRetryAllowed": false,
+    "outputOverwriteAllowed": false
+  },
+  "authority": {
+    "providerCalled": false,
+    "authoritativeWritesPerformed": false,
+    "canonicalManuscriptMutationPerformed": false,
+    "docsSuiteCanonicalWriterEnabled": false,
+    "runtimeCutoverApproved": false,
+    "sourceDeletionApproved": false,
+    "publicationPerformed": false
+  },
+  "status": "implementation_ready_for_live_operator_execution",
+  "liveProductionStateImported": false,
+  "liveBundleValidated": false,
+  "overallBookProductCutoverApproved": false,
+  "recordFingerprint": "sha256:b0b47ac33fb7a61f02631d50ff39397b8759aa6b78ee7922e0bf7d505559a8f3"
+}
