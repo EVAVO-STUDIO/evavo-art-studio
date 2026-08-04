@@ -50,6 +50,9 @@ jobs:
       - name: Run direct voice register idea and synthesis attacks
         run: validation/docs-narrative-craft/node_modules/.bin/tsx --test validation/docs-narrative-craft/test/authorial-runtime.test.mjs
 
+      - name: Run authorial synthesis to Writing runtime attacks
+        run: validation/docs-narrative-craft/node_modules/.bin/tsx --test validation/docs-narrative-craft/test/authorial-writing-bridge.test.mjs
+
       - name: Prove no Art Studio production source changed
         shell: bash
         run: |
@@ -75,6 +78,7 @@ jobs:
             'scenarios=25' \
             'idea-criteria=10' \
             'prose-devices=22' \
+            'authorial-writing-bridge=prevalidated-one-call-runtime' \
             'provider-call-performed=false' \
             'canonical-manuscript-mutation-performed=false' \
             'automatic-canonical-admission-allowed=false' \
