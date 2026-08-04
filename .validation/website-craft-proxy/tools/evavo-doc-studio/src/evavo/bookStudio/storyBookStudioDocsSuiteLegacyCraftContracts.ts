@@ -61,4 +61,6 @@ export function validateEvavoLegacyCraftPublicRequest(value: unknown): EvavoLega
       if (!exactKeys(source, ["operation", "scanInput"])) throw new Error("BOOK_CRAFT_REQUEST_INVALID");
       return { operation: source.operation, scanInput: requireRecord(source.scanInput) };
   }
+
+  throw new Error("BOOK_CRAFT_OPERATION_UNSUPPORTED");
 }
