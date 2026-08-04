@@ -613,7 +613,7 @@ function tokenize(text: string): string[] {
 }
 
 function splitSentences(text: string): string[] {
-  return (text.replace(/\r\n?/gu, "\n").match(/[^.!?\n]+(?:[.!?]+["'”’\)\]\}]*)|[^.!?\n]+$/gmu) ?? [])
+  return (text.replace(/\r\n?/gu, "\n").match(/[^.!?\n]+(?:[.!?]+["'”’)]*)|[^.!?\n]+$/gmu) ?? [])
     .map((item) => item.trim())
     .filter(Boolean);
 }
