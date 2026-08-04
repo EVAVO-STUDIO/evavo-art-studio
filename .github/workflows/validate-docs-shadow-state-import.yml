@@ -43,10 +43,12 @@ jobs:
           test "$(git hash-object .validation/docs-shadow-import/packages/core/src/book-studio-state-shadow-import.ts)" = "6648b63398a6932cabe2b0572950facb672061a7"
           test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-persistence.ts)" = "7862b293ad0e314b52720aeebafc33ac4c0332fb"
           test "$(git hash-object .validation/docs-shadow-import/apps/web/src/lib/book-studio-shadow-state-import-service.ts)" = "c6b7a559c920cf2401bad175e9c992818c16439b"
+      - name: Install validation-only compiler tools
+        run: npm install --prefix .validation/docs-shadow-import --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
       - name: Compile core service persistence and protected route
-        run: npm exec --yes --package=typescript@5.9.3 --package=@types/node@22 -- tsc -p .validation/docs-shadow-import/tsconfig.json
+        run: .validation/docs-shadow-import/node_modules/.bin/tsc -p .validation/docs-shadow-import/tsconfig.json
       - name: Run core and restart-persistence attacks
-        run: npm exec --yes --package=tsx@4.20.3 -- tsx --test .validation/docs-shadow-import/packages/core/test/book-studio-state-shadow-import.test.mjs .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-persistence.test.mjs
+        run: .validation/docs-shadow-import/node_modules/.bin/tsx --test .validation/docs-shadow-import/packages/core/test/book-studio-state-shadow-import.test.mjs .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-persistence.test.mjs
       - name: Run CLI and MCP attacks
         run: node --test .validation/docs-shadow-import/apps/web/test/book-studio-shadow-state-import-cli-mcp.test.mjs
       - name: Verify no Art Studio production source changed
