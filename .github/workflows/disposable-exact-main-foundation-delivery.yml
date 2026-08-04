@@ -1,0 +1,137 @@
+name: Disposable exact-current-main Foundation delivery validation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/disposable-exact-main-foundation-delivery.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: disposable-exact-main-foundation-delivery-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      EXPECTED_MAIN_SHA: 51c25eaf6e1e30d11105c2d65ff0ac04ce497e55
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Prove expected commit is current main before validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+      - name: Check out exact production main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ env.EXPECTED_MAIN_SHA }}
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install and identify FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Verify pinned toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = "v22.14.0"
+          test "$(pnpm --version)" = "10.13.1"
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete exact-current-main repository validation
+        run: pnpm check
+
+      - name: Remove bounded validation outputs and prove clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          find packages apps -type d -name dist -prune -exec rm -rf {} +
+          rm -rf examples/legacy-book-artwork-registration/artifacts
+          test ! -e examples/legacy-book-artwork-registration/artifacts
+          git diff --exit-code
+          status="$(git status --porcelain=v1 --untracked-files=all)"
+          if [ -n "$status" ]; then
+            printf '%s\n' "$status"
+            exit 1
+          fi
+
+      - name: Prove validated commit remains current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+      - name: Write bounded exact-main receipt
+        shell: bash
+        env:
+          VALIDATION_RUN_ID: ${{ github.run_id }}
+          VALIDATION_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const receipt = {
+            schemaVersion: "1.0",
+            receiptType: "evavo-art-studio-exact-current-main-validation",
+            repository: process.env.GITHUB_REPOSITORY,
+            candidateSha: process.env.EXPECTED_MAIN_SHA,
+            workflowRunId: process.env.VALIDATION_RUN_ID,
+            workflowRunAttempt: process.env.VALIDATION_ATTEMPT,
+            trigger: "pull_request",
+            requestSource: "github-disposable-exact-main-monitor",
+            currentMainAtReceipt: true,
+            validation: "passed",
+            toolchain: {
+              node: "22.14.0",
+              pnpm: "10.13.1",
+              ffmpegAndFfprobeIdentified: true
+            },
+            completeRepositoryCheckPassed: true,
+            cleanExactSourcePassed: true,
+            liveProviderRequest: false,
+            targetGameRepositoryMutation: false,
+            artifactPromotion: false,
+            deployment: false,
+            publication: false
+          };
+          fs.writeFileSync(
+            "/tmp/evavo-art-studio-exact-main-receipt.json",
+            `${JSON.stringify(receipt, null, 2)}\n`,
+            { mode: 0o600 }
+          );
+          NODE
+
+      - name: Upload bounded exact-main receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: art-studio-exact-main-${{ env.EXPECTED_MAIN_SHA }}
+          path: /tmp/evavo-art-studio-exact-main-receipt.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
