@@ -59,8 +59,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin 00798ae2e19864b4b9370be757eb5ea91431c105
-          unexpected="$(git diff --name-only 00798ae2e19864b4b9370be757eb5ea91431c105 HEAD | grep -Ev '^(\.github/workflows/validate-docs-shadow-state-import\.yml|\.validation/docs-shadow-import/)' || true)"
+          base="a067d835b68bb9db34e26673558cadc2fb48dfb5"
+          git fetch --no-tags --depth=1 origin "$base"
+          unexpected="$(git diff --name-only "$base" HEAD | grep -Ev '^(\.github/workflows/validate-docs-shadow-state-import\.yml|\.validation/docs-shadow-import/)' || true)"
           test -z "$unexpected" || {
             printf '%s\n' "$unexpected"
             exit 1
