@@ -1,0 +1,29 @@
+{
+  "outputKind": "evavo_art_docs_unattended_authorial_validation_receipt",
+  "schemaVersion": 1,
+  "conclusion": "failure",
+  "failedStage": "core_behavioural_attacks",
+  "completedStages": [
+    "retained_planner_reconstruction",
+    "exact_blob_proof",
+    "tool_install",
+    "strict_core_typescript"
+  ],
+  "workflowRunId": "30936116459",
+  "workflowRunAttempt": "1",
+  "testedValidationHead": "a752d720d82b72680d21738243d6ea266b009449",
+  "docsFeatureHead": "8aeea45b1224683c12060e82f3d838522934a15a",
+  "docsBaseHead": "626bcd3af1bc1b1ffb92e28661e62069ed181951",
+  "exactRetainedPlannerPayload": true,
+  "exactReviewedBlobProof": true,
+  "strictCoreTypeScript": true,
+  "coreBehaviouralAttacks": false,
+  "cliAndDualEraMcpAttacks": false,
+  "strictProtectedWebTypeScript": false,
+  "permanentAuthorityChecker": false,
+  "artStudioProductionSourceChanged": null,
+  "providerCallPerformed": false,
+  "canonicalManuscriptMutationPerformed": false,
+  "automaticCanonicalAdmissionAllowed": false,
+  "publicationPerformed": false
+}
