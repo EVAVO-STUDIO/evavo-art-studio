@@ -1,0 +1,15 @@
+{
+  "name": "docs-legacy-craft-validation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:core": "tsx --test packages/core/test/book-studio-legacy-craft-genome.test.mjs apps/web/scripts/test-book-studio-legacy-craft-genome-input.mjs",
+    "test:adapters": "node --test apps/web/scripts/test-book-studio-legacy-craft-genome-adapters.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.8",
+    "tsx": "4.20.3",
+    "typescript": "5.9.3"
+  }
+}
