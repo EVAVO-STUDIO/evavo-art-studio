@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["apps/web/src/*"]
+    }
+  },
+  "include": [
+    "packages/core/src/book-studio-legacy-craft-*.ts",
+    "packages/core/src/index.ts",
+    "apps/web/src/lib/book-studio-legacy-craft-genome-*.ts",
+    "apps/web/src/lib/docs-suite-request-context.ts",
+    "apps/web/src/app/api/v1/book-studio/legacy-craft-genome/route.ts",
+    "types/**/*.d.ts"
+  ]
+}
