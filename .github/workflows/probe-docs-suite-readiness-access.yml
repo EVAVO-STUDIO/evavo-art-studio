@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - automation/validate-docs-book-universal-readiness-20260804
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/probe-docs-suite-readiness-access.yml"
 
 permissions:
   contents: read
