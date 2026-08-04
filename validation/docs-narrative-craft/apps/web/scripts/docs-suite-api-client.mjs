@@ -7,6 +7,12 @@ export const DOCS_SUITE_RESPONSE_LIMIT_BYTES = 4_000_000;
 export const DOCS_SUITE_REQUEST_TIMEOUT_MS = 30_000;
 export const DOCS_SUITE_BOOK_CANDIDATE_TIMEOUT_MS = 300_000;
 
+const LONG_RUNNING_BOOK_ENDPOINTS = new Set([
+  "/api/v1/book-studio/writing-candidate",
+  "/api/v1/book-studio/writing-candidate/authorial",
+  "/api/v1/book-studio/unattended-production/authorial-writing",
+]);
+
 export class DocsSuiteApiError extends Error {
   constructor(message, options = {}) {
     super(message);
@@ -59,7 +65,7 @@ function boundedOption(value, fallback, minimum, maximum, label) {
 export async function docsSuiteApiRequest(pathname, options = {}) {
   const configuration = options.configuration ?? resolveDocsSuiteApiConfiguration();
   const url = safeApiUrl(pathname, configuration.baseUrl);
-  const defaultTimeout = pathname === "/api/v1/book-studio/writing-candidate"
+  const defaultTimeout = LONG_RUNNING_BOOK_ENDPOINTS.has(pathname)
     ? DOCS_SUITE_BOOK_CANDIDATE_TIMEOUT_MS
     : DOCS_SUITE_REQUEST_TIMEOUT_MS;
   const timeoutMs = boundedOption(options.timeoutMs, defaultTimeout, 1_000, 300_000, "Docs Suite request timeout");

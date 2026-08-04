@@ -60,6 +60,7 @@ export * from "./book-studio-writing-candidate";
 export * from "./book-studio-legacy-authoring-import";
 export * from "./book-studio-review-craft";
 export * from "./book-studio-narrative-craft";
+export * from "./book-studio-legacy-craft-genome";
 export * from "./book-studio-canonical-mutation";
 export * from "./book-studio-writing-art-link";
 export * from "./book-studio-writing-art-release";

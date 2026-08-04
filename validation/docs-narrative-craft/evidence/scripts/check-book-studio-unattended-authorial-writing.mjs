@@ -63,6 +63,7 @@ if (!failures.length) {
   expect(source.narrativeFacade, 'export * from "./book-studio-authorial-writing-bridge"', "narrative facade");
   expect(source.barrel, 'export * from "./book-studio-narrative-craft"', "core barrel");
   expect(source.barrel, 'export * from "./book-studio-unattended-authorial-writing"', "core barrel");
+  expect(source.barrel, 'export * from "./book-studio-legacy-craft-genome"', "core barrel legacy compatibility preservation");
 
   for (const token of [
     "expectedUnattendedResultFingerprint",
@@ -166,6 +167,8 @@ if (failures.length) {
     contract: "evavo_docs_book_unattended_authorial_writing_v1",
     actualCoreImportGraphChecked: true,
     actualCoreBarrelChecked: true,
+    currentScopedRouteChecked: true,
+    legacyCraftCompatibilityPreserved: true,
     exactPlanAndStageEvidenceBound: true,
     revisionReceiptDoubleBound: true,
     oneProviderAttemptPerCycle: true,

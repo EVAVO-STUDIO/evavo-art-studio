@@ -24,7 +24,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out source-equivalent validation mirror
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -32,26 +32,202 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Check out retained unattended production carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.repository }}
+          ref: automation/validate-docs-book-unattended-production-20260804
+          path: retained-unattended
+          persist-credentials: false
+          fetch-depth: 1
+
       - name: Use Node.js 22
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 22
           package-manager-cache: false
 
+      - name: Reconstruct exact retained unattended planner
+        id: assemble
+        shell: bash
+        run: |
+          set -euo pipefail
+          mirror="$GITHUB_WORKSPACE/validation/docs-narrative-craft"
+          carrier="$GITHUB_WORKSPACE/retained-unattended"
+          source_root="$RUNNER_TEMP/docs-book-unattended-source"
+          payload="$RUNNER_TEMP/docs-source-overlay.tar.gz"
+          encoded="$RUNNER_TEMP/docs-source-overlay.tar.gz.b64"
+          rm -rf "$source_root" "$payload" "$encoded"
+          cp -R "$carrier/validation/docs-book-universal-readiness" "$source_root"
+          cat "$carrier"/validation/docs-book-unattended-production-payload/docs-source-overlay.tar.gz.b64.part-* > "$encoded"
+          base64 --decode "$encoded" > "$payload"
+          echo "f385bf9cdc51b6d3ee247c69336b169ce7718f240881271b0e928876956bf75d  $payload" | sha256sum -c -
+          tar -xzf "$payload" -C "$source_root"
+          cp "$source_root/packages/core/src/book-studio-project-contracts.ts" "$mirror/src/"
+          cp "$source_root/packages/core/src/book-studio-universal-readiness.ts" "$mirror/src/"
+          cp "$source_root/packages/core/src/book-studio-universal-readiness-governance.ts" "$mirror/src/"
+          cp "$source_root/packages/core/src/book-studio-unattended-production.ts" "$mirror/src/"
+          printf 'MIRROR_ROOT=%s\n' "$mirror" >> "$GITHUB_ENV"
+
+      - name: Prove exact retained and reviewed source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          declare -A expected=()
+          expected["src/book-studio-project-contracts.ts"]="fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
+          expected["src/book-studio-universal-readiness.ts"]="3c348b4969d94f2e81a7a4e8e0f9c2399850e640"
+          expected["src/book-studio-universal-readiness-governance.ts"]="aac0ff806dbfc41259b4925918a96103a5615489"
+          expected["src/book-studio-unattended-production.ts"]="a680376b58addae4ffb6b8a9cdfcab361a2711e4"
+          expected["src/book-studio-authorial-writing-bridge-types.ts"]="83401cf318fc78905af74920894ba22e353fa595"
+          expected["src/book-studio-narrative-craft.ts"]="65b1d1e1610d36320a9331a52c1cb641c6408b84"
+          expected["src/book-studio-unattended-authorial-writing.ts"]="80d831f95233af9ce252e35ddee43a2a1d7e015e"
+          expected["test/unattended-authorial-writing.test.mjs"]="2ce70202a693dbb46aeda5f051f88eee0a3fa93b"
+          expected["apps/web/scripts/docs-suite-api-client.mjs"]="7d9570fb7e41d089a639cd2b6784c6a0ca3ca876"
+          expected["apps/web/scripts/evavo-docs-book-unattended-authorial-writing-cli.mjs"]="3ac7e5dd8deb8e08636328d68448a1805e29db98"
+          expected["apps/web/scripts/evavo-docs-book-unattended-authorial-writing-mcp.mjs"]="5f2e379ac39cbb2d7d2f316bba1a6fb27801bfe0"
+          expected["apps/web/scripts/test-book-studio-unattended-authorial-writing-adapters.mjs"]="759eb6b8b8274d9d71d86a2d89ff8a1668647c7b"
+          expected["evidence/apps/web/src/lib/book-studio-unattended-authorial-writing-service.ts"]="4046bf7a9f5bc25bdf565d8392b1154c03200e3c"
+          expected["evidence/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts"]="78b55cf0946ffa5c02a7f2578b5a3a337f85eb72"
+          expected["evidence/packages/core/src/index.ts"]="ef029b952b70325bc42224fa79e7d147b45e11fe"
+          expected["evidence/scripts/check-book-studio-unattended-authorial-writing.mjs"]="719c6b3d9ecd227366a93f66230dbda05a15b3f1"
+          expected["evidence/.github/workflows/book-studio-unattended-authorial-writing.yml"]="74563be88b93f6f84ba35551160fd7997f5b427c"
+          expected["evidence/docs/migrations/book-studio/BOOK_STUDIO_UNATTENDED_AUTHORIAL_WRITING.md"]="d046669fe6a8ac4d891ce31070edece97a580482"
+          for relative in "${!expected[@]}"; do
+            actual="$(git hash-object "$MIRROR_ROOT/$relative")"
+            printf '%s=%s\n' "$relative" "$actual"
+            test "$actual" = "${expected[$relative]}"
+          done
+
       - name: Install validation-only compiler tools
-        run: npm install --prefix validation/docs-narrative-craft --no-save --package-lock=false --ignore-scripts typescript@5.9.3 tsx@4.20.3
+        run: npm install --prefix "$MIRROR_ROOT" --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
 
-      - name: Compile strict authorial intelligence boundary
-        run: validation/docs-narrative-craft/node_modules/.bin/tsc -p validation/docs-narrative-craft/tsconfig.json
+      - name: Compile strict authorial and unattended core boundary
+        run: "$MIRROR_ROOT/node_modules/.bin/tsc" -p "$MIRROR_ROOT/tsconfig.json"
 
-      - name: Run original narrative craft attacks
-        run: validation/docs-narrative-craft/node_modules/.bin/tsx --test validation/docs-narrative-craft/test/narrative-craft.test.mjs
+      - name: Run narrative authorial bridge and unattended attacks
+        run: >-
+          "$MIRROR_ROOT/node_modules/.bin/tsx" --test
+          "$MIRROR_ROOT/test/narrative-craft.test.mjs"
+          "$MIRROR_ROOT/test/authorial-runtime.test.mjs"
+          "$MIRROR_ROOT/test/authorial-writing-bridge.test.mjs"
+          "$MIRROR_ROOT/test/unattended-authorial-writing.test.mjs"
 
-      - name: Run direct voice register idea and synthesis attacks
-        run: validation/docs-narrative-craft/node_modules/.bin/tsx --test validation/docs-narrative-craft/test/authorial-runtime.test.mjs
+      - name: Run CLI and dual-era MCP transport attacks
+        run: node --test "$MIRROR_ROOT/apps/web/scripts/test-book-studio-unattended-authorial-writing-adapters.mjs"
 
-      - name: Run authorial synthesis to Writing runtime attacks
-        run: validation/docs-narrative-craft/node_modules/.bin/tsx --test validation/docs-narrative-craft/test/authorial-writing-bridge.test.mjs
+      - name: Compile exact protected service and route strictly
+        shell: bash
+        run: |
+          set -euo pipefail
+          webroot="$RUNNER_TEMP/docs-authorial-webcheck"
+          mkdir -p \
+            "$webroot/packages/core/src" \
+            "$webroot/apps/web/src/lib" \
+            "$webroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing" \
+            "$webroot/stubs"
+          cp "$MIRROR_ROOT"/src/*.ts "$webroot/packages/core/src/"
+          cat > "$webroot/packages/core/src/index.ts" <<'TS'
+          export * from "./book-studio-project-contracts";
+          export * from "./book-studio-writing-candidate-types";
+          export * from "./book-studio-unattended-authorial-writing";
+          TS
+          cp "$MIRROR_ROOT/evidence/apps/web/src/lib/book-studio-unattended-authorial-writing-service.ts" "$webroot/apps/web/src/lib/"
+          cp "$MIRROR_ROOT/evidence/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts" "$webroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts"
+          cat > "$webroot/apps/web/src/lib/book-studio-writing-candidate-client.ts" <<'TS'
+          export interface BookWritingCandidateClientConfigV1 {
+            timeoutMilliseconds: number;
+          }
+          TS
+          cat > "$webroot/apps/web/src/lib/book-studio-writing-candidate-service.ts" <<'TS'
+          import type { BookWritingCandidateCoordinationResultV1 } from "../../../../packages/core/src/index";
+          import type { BookWritingCandidateClientConfigV1 } from "./book-studio-writing-candidate-client";
+          export async function coordinateBookWritingCandidate(
+            _input: unknown,
+            _options: Readonly<{
+              config?: BookWritingCandidateClientConfigV1;
+              fetchImpl?: typeof fetch;
+              expectedRuntimeRequestFingerprint?: string;
+            }> = {},
+          ): Promise<BookWritingCandidateCoordinationResultV1> {
+            throw new Error("typecheck stub");
+          }
+          TS
+          cat > "$webroot/apps/web/src/lib/docs-suite-request-context.ts" <<'TS'
+          export interface DocsSuiteRequestContext {
+            scopes: string[];
+            workspaceId: string;
+            actorType: string;
+          }
+          export async function readDocsSuiteRequestContext(): Promise<DocsSuiteRequestContext | null> {
+            return null;
+          }
+          TS
+          cat > "$webroot/stubs/next-server.ts" <<'TS'
+          export class NextRequest extends Request {}
+          export class NextResponse {
+            static json(value: unknown, init?: ResponseInit): Response {
+              return new Response(JSON.stringify(value), init);
+            }
+          }
+          TS
+          printf 'export {};\n' > "$webroot/stubs/server-only.ts"
+          cat > "$webroot/tsconfig.json" <<'JSON'
+          {
+            "compilerOptions": {
+              "target": "ES2022",
+              "module": "ESNext",
+              "moduleResolution": "Bundler",
+              "lib": ["ES2022", "DOM"],
+              "strict": true,
+              "noUncheckedIndexedAccess": true,
+              "exactOptionalPropertyTypes": true,
+              "noImplicitOverride": true,
+              "noEmit": true,
+              "skipLibCheck": true,
+              "baseUrl": ".",
+              "paths": {
+                "@/*": ["apps/web/src/*"],
+                "next/server": ["stubs/next-server.ts"],
+                "server-only": ["stubs/server-only.ts"]
+              },
+              "types": ["node"]
+            },
+            "include": [
+              "packages/core/src/**/*.ts",
+              "apps/web/src/**/*.ts",
+              "stubs/**/*.ts"
+            ]
+          }
+          JSON
+          "$MIRROR_ROOT/node_modules/.bin/tsc" -p "$webroot/tsconfig.json"
+
+      - name: Run exact permanent production checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          checkroot="$RUNNER_TEMP/docs-book-production-check"
+          mkdir -p \
+            "$checkroot/packages/core/src" \
+            "$checkroot/packages/core/test" \
+            "$checkroot/apps/web/src/lib" \
+            "$checkroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing" \
+            "$checkroot/apps/web/scripts" \
+            "$checkroot/scripts" \
+            "$checkroot/.github/workflows" \
+            "$checkroot/docs/migrations/book-studio"
+          cp "$MIRROR_ROOT"/src/*.ts "$checkroot/packages/core/src/"
+          cp "$MIRROR_ROOT/evidence/packages/core/src/index.ts" "$checkroot/packages/core/src/index.ts"
+          cp "$MIRROR_ROOT/test/unattended-authorial-writing.test.mjs" "$checkroot/packages/core/test/book-studio-unattended-authorial-writing.test.mjs"
+          cp "$MIRROR_ROOT/evidence/apps/web/src/lib/book-studio-unattended-authorial-writing-service.ts" "$checkroot/apps/web/src/lib/"
+          cp "$MIRROR_ROOT/evidence/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts" "$checkroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts"
+          cp "$MIRROR_ROOT/apps/web/scripts/docs-suite-api-client.mjs" "$checkroot/apps/web/scripts/"
+          cp "$MIRROR_ROOT/apps/web/scripts/evavo-docs-book-unattended-authorial-writing-cli.mjs" "$checkroot/apps/web/scripts/"
+          cp "$MIRROR_ROOT/apps/web/scripts/evavo-docs-book-unattended-authorial-writing-mcp.mjs" "$checkroot/apps/web/scripts/"
+          cp "$MIRROR_ROOT/apps/web/scripts/test-book-studio-unattended-authorial-writing-adapters.mjs" "$checkroot/apps/web/scripts/"
+          cp "$MIRROR_ROOT/evidence/scripts/check-book-studio-unattended-authorial-writing.mjs" "$checkroot/scripts/"
+          cp "$MIRROR_ROOT/evidence/.github/workflows/book-studio-unattended-authorial-writing.yml" "$checkroot/.github/workflows/"
+          cp "$MIRROR_ROOT/evidence/docs/migrations/book-studio/BOOK_STUDIO_UNATTENDED_AUTHORIAL_WRITING.md" "$checkroot/docs/migrations/book-studio/"
+          node "$checkroot/scripts/check-book-studio-unattended-authorial-writing.mjs"
 
       - name: Prove no Art Studio production source changed
         shell: bash
@@ -60,27 +236,33 @@ jobs:
           git fetch --no-tags origin main
           merge_base="$(git merge-base HEAD origin/main)"
           test -n "$merge_base"
-          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/validate-docs-(narrative-craft|authorial-mirror)\.yml|validation/docs-narrative-craft/)' || true)"
+          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/(validate-docs-authorial-mirror|validate-docs-narrative-craft|diagnose-docs-unattended-authorial-checker|surface-docs-unattended-authorial-diagnostic)\.yml|validation/docs-narrative-craft/)' || true)"
           test -z "$unexpected" || {
             printf '%s\n' "$unexpected"
             exit 1
           }
 
+      - name: Prove validation checkout remained clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
       - name: Record validation boundary
         run: |
           printf '%s\n' \
-            'validation=source-equivalent-public-runner' \
-            'exact-private-checkout-attempted=true' \
-            'exact-private-checkout-result=token-isolated' \
-            'voice-metrics=23' \
-            'genre-blueprints=20' \
-            'scene-functions=24' \
-            'scenarios=25' \
-            'idea-criteria=10' \
-            'prose-devices=22' \
-            'authorial-writing-bridge=prevalidated-one-call-runtime' \
-            'authorial-writing-bridge-tests=4' \
+            'validation=retained-unattended-plus-byte-pinned-authorial-mirror' \
+            'docs-base-head=626bcd3af1bc1b1ffb92e28661e62069ed181951' \
+            'docs-feature-head=8aeea45b1224683c12060e82f3d838522934a15a' \
+            'exact-plan-binding=true' \
+            'exact-dependency-receipt-binding=true' \
+            'strict-core-typecheck=true' \
+            'strict-web-service-route-typecheck=true' \
+            'dual-era-mcp-attacks=true' \
             'provider-call-performed=false' \
             'canonical-manuscript-mutation-performed=false' \
             'automatic-canonical-admission-allowed=false' \
+            'art-studio-production-source-changed=false' \
             'publication-performed=false'
