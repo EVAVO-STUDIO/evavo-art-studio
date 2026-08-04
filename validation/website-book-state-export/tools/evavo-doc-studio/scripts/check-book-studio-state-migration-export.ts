@@ -137,6 +137,7 @@ async function createFixture(root: string): Promise<string> {
   await stateRecord("state-project", "project", "project", "project-1", { projectId: "project-1" });
   for (let index = 0; index < VOLUME_KINDS.length; index += 1) {
     const stateKind = VOLUME_KINDS[index];
+    if (!stateKind) throw new Error("fixture volume kind missing");
     await stateRecord(
       `state-volume-1-${stateKind}`,
       stateKind,
