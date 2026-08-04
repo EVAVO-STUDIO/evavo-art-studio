@@ -10,6 +10,8 @@ const errors = [];
 const files = {
   compiler: "scripts/compile-foundation-delivery-manifest.mjs",
   tests: "scripts/test-foundation-delivery-manifest.mjs",
+  productionContractTests:
+    "scripts/test-foundation-delivery-production-contract.mjs",
   docs: "docs/foundation-kit-media-delivery-manifest.md",
   workflow: ".github/workflows/foundation-media-delivery-authority.yml",
   package: "package.json",
@@ -83,12 +85,25 @@ try {
     "SOURCE_SHA256_MISMATCH",
     "SOURCE_CHANGED_BEFORE_WRITE",
     "RUNTIME_TARGET_COLLISION",
+    "RUNTIME_TARGET_WINDOWS_RESERVED",
+    "CONTRACT_RUNTIME_FORMAT_INVALID",
+    "RUNTIME_FORMAT_UNSUPPORTED",
     "OUTPUT_INSIDE_REPOSITORY",
     "PLAN_ITEM_NOT_READY",
+    "png-lossless",
+    "png-plus-fnt",
+    "webp-lossless",
+    "wav-mono-low-latency",
+    "wav-or-ogg-role-owned",
+    "ogg-vorbis-streaming",
+    "preserve-role-owned",
+    "not-applicable",
     "godot-sprite-lossless",
     "godot-cutout-webp-1080p",
     "godot-background-1080p",
     "deliveryManifestSha256",
+    "deliveryManifestFileCreated: true",
+    "syncDirectoryBestEffort",
     "exactSourceBytesVerified: true",
     'mutationScope: "create-only-delivery-manifest"',
     "targetRepositoryMutationPerformed: false",
@@ -105,6 +120,7 @@ try {
     "spawnSync",
     "unlinkSync",
     "rmSync",
+    "planFileCreated: true",
     "applyAuthorized: true",
     "selectionPerformed: true",
     "promotionPerformed: true",
@@ -126,6 +142,22 @@ try {
     "validateDeliveryBatchManifest",
   ]);
 
+  requireTokens(
+    "Foundation production-contract compatibility tests",
+    source.productionContractTests,
+    [
+      "preserve-role-owned",
+      "wav-mono-low-latency",
+      "wav-or-ogg-role-owned",
+      "ogg-vorbis-streaming",
+      "deliveryManifestFileCreated",
+      "RUNTIME_FORMAT_UNSUPPORTED",
+      "CONTRACT_RUNTIME_FORMAT_INVALID",
+      "RUNTIME_TARGET_WINDOWS_RESERVED",
+      "OPTION_DUPLICATE",
+    ],
+  );
+
   requireTokens("Foundation delivery documentation", source.docs, [
     "Exact input authorities",
     "create-only delivery manifest",
@@ -133,7 +165,10 @@ try {
     "Staging and execution",
     "Independent gates",
     "Truth boundary",
-    "godot-sprite-lossless",
+    "png-lossless",
+    "webp-lossless",
+    "mixed image and audio contract",
+    "deliveryManifestFileCreated",
     "Godot Game Test Lab",
     "EVAVO Development Studio",
   ]);
@@ -173,7 +208,12 @@ try {
     "DELIVERY_MANIFEST_TARGET_COLLISION",
   ]);
 
-  for (const relative of [files.compiler, files.tests, "scripts/check-foundation-delivery-manifest.mjs"]) {
+  for (const relative of [
+    files.compiler,
+    files.tests,
+    files.productionContractTests,
+    "scripts/check-foundation-delivery-manifest.mjs",
+  ]) {
     run(`Syntax check ${relative}`, process.execPath, [
       "--check",
       path.join(root, relative),
@@ -188,6 +228,12 @@ try {
       env: { FOUNDATION_DELIVERY_REQUIRE_PACKAGE: "1" },
     },
   );
+  run(
+    "Foundation production-contract compatibility attacks",
+    process.execPath,
+    [path.join(root, files.productionContractTests)],
+    { timeout: 180_000 },
+  );
 } catch (error) {
   errors.push(error instanceof Error ? error.message : String(error));
 }
@@ -200,6 +246,7 @@ if (errors.length > 0) {
   process.stdout.write(
     "Foundation media-delivery authority check passed.\n" +
       "- exact contract, plan, audit and source-byte authorities remain bound\n" +
+      "- the mixed production contract is accepted without widening selected formats\n" +
       "- emitted output is accepted by the delivery-optimizer manifest runtime\n" +
       "- blocked, tampered, colliding and unsafe paths fail before output\n" +
       "- execution, approval and publication remain separate authorities\n",
