@@ -91,7 +91,7 @@ jobs:
           grep -F 'from "./book-studio-universal-readiness-governance";' "$index"
 
       - name: Install validation-only compiler tools
-        run: npm install --prefix validation/docs-book-universal-readiness --no-save --package-lock=false --ignore-scripts typescript@5.9.3 tsx@4.20.3
+        run: npm install --prefix validation/docs-book-universal-readiness --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
 
       - name: Compile core, service and protected route strictly
         run: validation/docs-book-universal-readiness/node_modules/.bin/tsc -p validation/docs-book-universal-readiness/tsconfig.json
