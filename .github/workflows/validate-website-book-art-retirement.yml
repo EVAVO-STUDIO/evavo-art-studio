@@ -1,0 +1,106 @@
+name: Validate Website Book Art Retirement
+
+on:
+  push:
+    branches:
+      - automation/validate-website-retirement-crossrepo-20260804
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-website-book-art-retirement-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out validation carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out exact Website candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: EVAVO-STUDIO/Website
+          ref: 9bffde89c04899e5d141aea49333858961d893c8
+          path: website
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove exact Website source boundary
+        working-directory: website
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "9bffde89c04899e5d141aea49333858961d893c8" ]]
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test -f tools/evavo-doc-studio/src/evavo/bookCoverStudio/bookArtRetirementCompatibility.ts
+          test -f tools/evavo-doc-studio/data/migration/BOOK_STUDIO_SYMBOL_SPLIT_CLOSURE.v1.json
+
+      - name: Set up governed Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version-file: website/tools/evavo-doc-studio/.nvmrc
+          package-manager-cache: false
+
+      - name: Verify exact child lockfile
+        working-directory: website
+        run: node scripts/check-doc-studio-lockfile.mjs
+
+      - name: Install exact Doc Studio dependencies
+        working-directory: website/tools/evavo-doc-studio
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Typecheck the complete retained Doc Studio source
+        working-directory: website/tools/evavo-doc-studio
+        run: npm run typecheck
+
+      - name: Run exact migration and retirement checks
+        working-directory: website
+        run: |
+          node tools/evavo-doc-studio/scripts/check-book-studio-migration-inventory.mjs
+          node tools/evavo-doc-studio/scripts/check-book-studio-destination-surface-evidence.mjs
+          node tools/evavo-doc-studio/scripts/check-book-studio-adapter-reconciliation.mjs
+          node tools/evavo-doc-studio/scripts/check-website-book-art-retirement-paths.mjs
+          node tools/evavo-doc-studio/scripts/check-website-book-art-retirement.mjs
+          node tools/evavo-doc-studio/scripts/check-book-studio-migration-authority.mjs
+
+      - name: Prove retired runtime entrypoints fail closed
+        working-directory: website/tools/evavo-doc-studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx tsx --eval '
+            import assert from "node:assert/strict";
+            import * as retired from "./src/evavo/bookCoverStudio/bookArtRetirementCompatibility.ts";
+            for (const name of [
+              "analyseCoverPixels",
+              "compileCoverArtworkGenerationPlan",
+              "executeCoverArtworkPostProcess",
+              "inspectBookCoverArtworkRaster",
+              "runArtworkModelSubmissionPipeline",
+              "compileBookCoverArtworkReleaseAuthority",
+              "applyApprovedCoverArtworkToScene"
+            ]) {
+              assert.equal(typeof retired[name], "function", `${name} must remain import-compatible.`);
+              assert.throws(() => retired[name](), /Website Book Art production is retired/);
+            }
+            assert.throws(() => new retired.BookCoverIterationStore(), /Website Book Art production is retired/);
+            assert.equal(retired.bookCoverAntiSyntheticWorkflow.status, "retired");
+            assert.equal(retired.bookCoverAntiSyntheticWorkflow.authoritativeRepository, "EVAVO-STUDIO/evavo-art-studio");
+          '
+
+      - name: Prove exact Website tree remains clean
+        if: always()
+        working-directory: website
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
