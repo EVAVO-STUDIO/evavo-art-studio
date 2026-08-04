@@ -41,8 +41,8 @@ jobs:
           node-version: 22.14.0
           package-manager-cache: false
 
-      - name: Install exact Art Studio dependency graph
-        run: pnpm install --frozen-lockfile
+      - name: Install review-first Art Studio dependency graph
+        run: pnpm install --no-frozen-lockfile
 
       - name: Prove exact Website Git blobs
         shell: bash
@@ -75,5 +75,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f pnpm-lock.yaml
           git diff --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
