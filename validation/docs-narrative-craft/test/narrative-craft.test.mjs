@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { BOOK_NARRATIVE_KNOWLEDGE_MODULES } from "../src/book-studio-narrative-craft-knowledge-modules.ts";
+import { BOOK_NARRATIVE_QUALITY_RUBRIC } from "../src/book-studio-narrative-craft-quality.ts";
 import {
-  BOOK_NARRATIVE_KNOWLEDGE_MODULES,
-  BOOK_NARRATIVE_QUALITY_RUBRIC,
   bookAuthoringOperationRequiresNarrativeCraft,
-  compileBookNarrativeCraftPacket,
-  evaluateBookNarrativeCraftEvidence,
   narrativeCraftModeForBookAuthoringOperation,
+} from "../src/book-studio-narrative-craft-provider.ts";
+import {
+  compileBookNarrativeCraftPacket,
   validateBookNarrativeCraftPacket,
-} from "../src/index.ts";
+} from "../src/book-studio-narrative-craft-packet.ts";
+import { evaluateBookNarrativeCraftEvidence } from "../src/book-studio-narrative-craft-evaluate.ts";
 import {
   canonicalReviewCraftJson,
   sha256ReviewCraftText,
