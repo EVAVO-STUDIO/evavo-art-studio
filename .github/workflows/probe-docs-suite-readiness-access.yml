@@ -38,22 +38,51 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
-      - name: Prove exact Docs Suite source and test blobs
+      - name: Prove exact Docs Suite source, public index and transport blobs
         shell: bash
         run: |
           set -euo pipefail
-          project_contracts="$(git hash-object validation/docs-book-universal-readiness/packages/core/src/book-studio-project-contracts.ts)"
-          readiness="$(git hash-object validation/docs-book-universal-readiness/packages/core/src/book-studio-universal-readiness.ts)"
-          governance="$(git hash-object validation/docs-book-universal-readiness/packages/core/src/book-studio-universal-readiness-governance.ts)"
-          readiness_test="$(git hash-object validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness.test.mjs)"
-          governance_test="$(git hash-object validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness-governance.test.mjs)"
-          printf 'project_contracts=%s\nreadiness=%s\ngovernance=%s\nreadiness_test=%s\ngovernance_test=%s\n' \
-            "$project_contracts" "$readiness" "$governance" "$readiness_test" "$governance_test"
+          root="validation/docs-book-universal-readiness"
+          project_contracts="$(git hash-object "$root/packages/core/src/book-studio-project-contracts.ts")"
+          readiness="$(git hash-object "$root/packages/core/src/book-studio-universal-readiness.ts")"
+          governance="$(git hash-object "$root/packages/core/src/book-studio-universal-readiness-governance.ts")"
+          public_index="$(git hash-object "$root/packages/core/src/index.ts")"
+          readiness_test="$(git hash-object "$root/packages/core/test/book-studio-universal-readiness.test.mjs")"
+          governance_test="$(git hash-object "$root/packages/core/test/book-studio-universal-readiness-governance.test.mjs")"
+          api_client="$(git hash-object "$root/apps/web/scripts/docs-suite-api-client.mjs")"
+          cli="$(git hash-object "$root/apps/web/scripts/evavo-docs-book-readiness-cli.mjs")"
+          mcp="$(git hash-object "$root/apps/web/scripts/evavo-docs-book-readiness-mcp.mjs")"
+          adapter_test="$(git hash-object "$root/apps/web/scripts/test-book-studio-universal-readiness-adapters.mjs")"
+          printf '%s\n' \
+            "project_contracts=$project_contracts" \
+            "readiness=$readiness" \
+            "governance=$governance" \
+            "public_index=$public_index" \
+            "readiness_test=$readiness_test" \
+            "governance_test=$governance_test" \
+            "api_client=$api_client" \
+            "cli=$cli" \
+            "mcp=$mcp" \
+            "adapter_test=$adapter_test"
           test "$project_contracts" = "fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
           test "$readiness" = "3c348b4969d94f2e81a7a4e8e0f9c2399850e640"
           test "$governance" = "aac0ff806dbfc41259b4925918a96103a5615489"
+          test "$public_index" = "6125aec60176bbfb257e81fa993d1abc73b8a4ce"
           test "$readiness_test" = "de9f0e5287cefca3cd13e5455a0ca456bdda645c"
           test "$governance_test" = "b840c94f280ea1280879a0f0a338d8eefad51e57"
+          test "$api_client" = "9c05188ea028616e125ab682bb4da33e99081d04"
+          test "$cli" = "428be906cd9a5d45575d5161daae07b6be8b24ba"
+          test "$mcp" = "7378422089aee4ea4cc0dd6cafc3de7a089c48b7"
+          test "$adapter_test" = "47cf2b7d9fb04ac7316941d4f379d987c1024d44"
+
+      - name: Verify reconciled public authority exports
+        shell: bash
+        run: |
+          set -euo pipefail
+          index="validation/docs-book-universal-readiness/packages/core/src/index.ts"
+          grep -F 'export * from "./book-studio-state-shadow-import";' "$index"
+          grep -F 'compileGovernedBookUniversalReadiness as compileBookUniversalReadiness' "$index"
+          grep -F 'from "./book-studio-universal-readiness-governance";' "$index"
 
       - name: Install validation-only compiler tools
         run: npm install --prefix validation/docs-book-universal-readiness --no-save --package-lock=false --ignore-scripts typescript@5.9.3 tsx@4.20.3
@@ -63,6 +92,9 @@ jobs:
 
       - name: Run universal project, governance and edge-case attacks
         run: validation/docs-book-universal-readiness/node_modules/.bin/tsx --test validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness.test.mjs validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness-governance.test.mjs
+
+      - name: Run exact CLI and MCP transport attacks
+        run: node --test validation/docs-book-universal-readiness/apps/web/scripts/test-book-studio-universal-readiness-adapters.mjs
 
       - name: Verify no Art Studio production source changed
         shell: bash
