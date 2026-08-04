@@ -5,7 +5,8 @@ import {
 } from "../src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftContracts";
 import {
   EvavoDocsSuiteLegacyCraftProxyError,
-  requestEvavoDocsSuiteLegacyCraft
+  requestEvavoDocsSuiteLegacyCraft,
+  resolveEvavoDocsSuiteLegacyCraftConfiguration
 } from "../src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftClient";
 import { fingerprintEvavoLegacyCraftValue } from "../src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftShared";
 import type {
@@ -86,6 +87,44 @@ function remoteResponse(
     status: 200,
     headers: { "content-type": "application/json" }
   });
+}
+
+function streamedBody(chunks: Uint8Array[]): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(chunk);
+      controller.close();
+    }
+  });
+}
+
+function assertConfigurationHardening(): void {
+  const baseEnvironment: NodeJS.ProcessEnv = {
+    EVAVO_DOCS_SUITE_BOOK_CRAFT_URL: "https://docs.example.test",
+    EVAVO_DOCS_SUITE_BOOK_CRAFT_TOKEN: "secret.payload",
+    EVAVO_WEBSITE_COMMIT_SHA: "a".repeat(40),
+    EVAVO_DOCS_SUITE_BOOK_CRAFT_TIMEOUT_MS: "500"
+  };
+  const resolved = resolveEvavoDocsSuiteLegacyCraftConfiguration(baseEnvironment);
+  assert.equal(resolved.baseUrl.href, "https://docs.example.test/");
+  assert.equal(resolved.timeoutMs, 500);
+
+  assert.throws(
+    () => resolveEvavoDocsSuiteLegacyCraftConfiguration({
+      ...baseEnvironment,
+      EVAVO_DOCS_SUITE_BOOK_CRAFT_URL: "https://docs.example.test/hidden/path"
+    }),
+    (error: unknown) => error instanceof EvavoDocsSuiteLegacyCraftProxyError
+      && error.code === "BOOK_CRAFT_PROXY_CONFIGURATION_INVALID"
+  );
+  assert.throws(
+    () => resolveEvavoDocsSuiteLegacyCraftConfiguration({
+      ...baseEnvironment,
+      EVAVO_DOCS_SUITE_BOOK_CRAFT_TOKEN: "secret\u0001payload"
+    }),
+    (error: unknown) => error instanceof EvavoDocsSuiteLegacyCraftProxyError
+      && error.code === "BOOK_CRAFT_PROXY_CONFIGURATION_INVALID"
+  );
 }
 
 async function assertExactRemoteExecution(): Promise<void> {
@@ -233,6 +272,72 @@ async function assertFingerprintTamperingIsRejected(): Promise<void> {
   );
 }
 
+async function assertStreamedResponseLimit(): Promise<void> {
+  let calls = 0;
+  await assert.rejects(
+    requestEvavoDocsSuiteLegacyCraft({
+      requestId: "request:stream-limit",
+      requestedAt: "2026-08-05T00:00:00.000Z",
+      payload,
+      configuration: { ...configuration, maximumResponseBytes: 32 },
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response(streamedBody([
+          new Uint8Array(24).fill(120),
+          new Uint8Array(24).fill(121)
+        ]), {
+          status: 200,
+          headers: { "content-length": "2" }
+        });
+      }
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EvavoDocsSuiteLegacyCraftProxyError);
+      assert.equal(error.code, "BOOK_CRAFT_PROXY_RESPONSE_TOO_LARGE");
+      return true;
+    }
+  );
+  assert.equal(calls, 1);
+}
+
+async function assertInvalidUtf8ResponseRejected(): Promise<void> {
+  await assert.rejects(
+    requestEvavoDocsSuiteLegacyCraft({
+      requestId: "request:utf8",
+      requestedAt: "2026-08-05T00:00:00.000Z",
+      payload,
+      configuration,
+      fetchImpl: async () => new Response(new Uint8Array([0xff]), { status: 200 })
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EvavoDocsSuiteLegacyCraftProxyError);
+      assert.equal(error.code, "BOOK_CRAFT_PROXY_RESPONSE_INVALID");
+      return true;
+    }
+  );
+}
+
+async function assertRemoteValidationStatusPreserved(): Promise<void> {
+  await assert.rejects(
+    requestEvavoDocsSuiteLegacyCraft({
+      requestId: "request:validation-status",
+      requestedAt: "2026-08-05T00:00:00.000Z",
+      payload,
+      configuration,
+      fetchImpl: async () => new Response(JSON.stringify({ ok: false }), {
+        status: 400,
+        headers: { "content-type": "application/json" }
+      })
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EvavoDocsSuiteLegacyCraftProxyError);
+      assert.equal(error.code, "BOOK_CRAFT_PROXY_REMOTE_REJECTED");
+      assert.equal(error.status, 400);
+      return true;
+    }
+  );
+}
+
 function assertPublicRequestValidation(): void {
   assert.deepEqual(validateEvavoLegacyCraftPublicRequest(payload), payload);
   assert.throws(
@@ -246,6 +351,7 @@ function assertPublicRequestValidation(): void {
 }
 
 async function main(): Promise<void> {
+  assertConfigurationHardening();
   assertPublicRequestValidation();
   await assertExactRemoteExecution();
   await assertNoRetryAndNoSecretLeak();
@@ -253,11 +359,19 @@ async function main(): Promise<void> {
   await assertAuthorityTamperingIsRejected();
   await assertUnknownResponseFieldsAreRejected();
   await assertFingerprintTamperingIsRejected();
+  await assertStreamedResponseLimit();
+  await assertInvalidUtf8ResponseRejected();
+  await assertRemoteValidationStatusPreserved();
 
   console.log(JSON.stringify({
     status: "PASS",
     contract: "evavo_docs_book_legacy_craft_genome_v1",
     endpoint: "/api/v1/book-studio/legacy-craft-genome",
+    streamedRequestAndResponseLimitsRequired: true,
+    strictUtf8Required: true,
+    originOnlyConfigurationRequired: true,
+    controlCharacterFreeTokenRequired: true,
+    remoteValidationStatusPreserved: true,
     websiteLocalCraftExecutionAllowed: false,
     redirectsAllowed: false,
     automaticRetriesAllowed: false,
