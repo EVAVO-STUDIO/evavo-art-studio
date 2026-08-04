@@ -7,6 +7,7 @@ on:
       - ".github/workflows/foundation-media-delivery-authority.yml"
       - "scripts/compile-foundation-delivery-manifest.mjs"
       - "scripts/test-foundation-delivery-manifest.mjs"
+      - "scripts/test-foundation-delivery-production-contract.mjs"
       - "scripts/check-foundation-delivery-manifest.mjs"
       - "docs/foundation-kit-media-delivery-manifest.md"
       - "packages/delivery-optimizer/**"
@@ -88,11 +89,13 @@ jobs:
             toolchain: { node: "22.14.0", pnpm: "10.13.1" },
             verified: [
               "exact-contract-and-plan-binding",
+              "production-mixed-image-audio-contract-compatibility",
               "exact-audit-root-binding",
               "exact-source-byte-verification",
               "delivery-manifest-runtime-compatibility",
               "blocked-and-tampered-input-rejection",
               "runtime-target-collision-rejection",
+              "windows-portable-target-rejection",
               "unsupported-format-rejection",
               "symlink-path-rejection",
               "target-repository-output-isolation",
