@@ -13,6 +13,7 @@ import {
 } from "./storyBookStudioDocsSuiteLegacyCraftTypes";
 import { isEvavoLegacyCraftRecord } from "./storyBookStudioDocsSuiteLegacyCraftContracts";
 import { fingerprintEvavoLegacyCraftValue } from "./storyBookStudioDocsSuiteLegacyCraftShared";
+import { readEvavoBoundedUtf8Body } from "./storyBookStudioDocsSuiteLegacyCraftStream";
 
 const DEFAULT_DOCS_SUITE_URL = "https://docs.evavo.com.au";
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -86,47 +87,69 @@ function stringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => nonEmptyString(item));
 }
 
+function configurationError(message: string): EvavoDocsSuiteLegacyCraftProxyError {
+  return new EvavoDocsSuiteLegacyCraftProxyError(
+    "BOOK_CRAFT_PROXY_CONFIGURATION_INVALID",
+    message,
+    503
+  );
+}
+
 function positiveBoundedInteger(value: string | undefined, fallback: number): number {
   if (value === undefined || !value.trim()) return fallback;
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 500 || parsed > MAXIMUM_TIMEOUT_MS) {
-    throw new EvavoDocsSuiteLegacyCraftProxyError(
-      "BOOK_CRAFT_PROXY_CONFIGURATION_INVALID",
-      "EVAVO Docs Suite legacy craft timeout must be an integer from 500 to 300000 milliseconds.",
-      503
-    );
+    throw configurationError("EVAVO Docs Suite legacy craft timeout must be an integer from 500 to 300000 milliseconds.");
   }
   return parsed;
 }
 
 function safeBaseUrl(value: string): URL {
+  if (!value || value !== value.trim()) {
+    throw configurationError("EVAVO Docs Suite legacy craft URL must not rely on whitespace normalisation.");
+  }
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    throw new EvavoDocsSuiteLegacyCraftProxyError(
-      "BOOK_CRAFT_PROXY_CONFIGURATION_INVALID",
-      "EVAVO Docs Suite legacy craft URL is invalid.",
-      503
-    );
+    throw configurationError("EVAVO Docs Suite legacy craft URL is invalid.");
   }
   const localHttp = url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if (url.protocol !== "https:" && !localHttp) {
-    throw new EvavoDocsSuiteLegacyCraftProxyError(
-      "BOOK_CRAFT_PROXY_CONFIGURATION_INVALID",
-      "EVAVO Docs Suite legacy craft URL must use HTTPS outside local development.",
-      503
-    );
+    throw configurationError("EVAVO Docs Suite legacy craft URL must use HTTPS outside local development.");
   }
-  if (url.username || url.password || url.search || url.hash) {
-    throw new EvavoDocsSuiteLegacyCraftProxyError(
-      "BOOK_CRAFT_PROXY_CONFIGURATION_INVALID",
-      "EVAVO Docs Suite legacy craft URL cannot contain credentials, query parameters or fragments.",
-      503
-    );
+  if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+    throw configurationError("EVAVO Docs Suite legacy craft URL must be a credential-free origin without a path, query or fragment.");
   }
-  url.pathname = "/";
   return url;
+}
+
+function validateResolvedConfiguration(
+  configuration: EvavoDocsSuiteLegacyCraftConfiguration
+): EvavoDocsSuiteLegacyCraftConfiguration {
+  const baseUrl = safeBaseUrl(configuration.baseUrl.href);
+  if (
+    !configuration.token
+    || configuration.token !== configuration.token.trim()
+    || configuration.token.length > 8192
+    || /[\u0000-\u001f\u007f]/.test(configuration.token)
+  ) {
+    throw configurationError("A bounded unmodified control-character-free Docs Suite automation token is required for legacy craft compatibility.");
+  }
+  if (!/^[a-f0-9]{40,64}$/.test(configuration.websiteCommit)) {
+    throw configurationError("The exact 40-64 character Website Git commit is required for legacy craft compatibility.");
+  }
+  if (!Number.isInteger(configuration.timeoutMs) || configuration.timeoutMs < 1 || configuration.timeoutMs > MAXIMUM_TIMEOUT_MS) {
+    throw configurationError("Resolved legacy craft timeout is outside the supported boundary.");
+  }
+  if (
+    !Number.isInteger(configuration.maximumResponseBytes)
+    || configuration.maximumResponseBytes < 1
+    || configuration.maximumResponseBytes > MAXIMUM_RESPONSE_BYTES
+  ) {
+    throw configurationError("Resolved legacy craft response limit is outside the supported boundary.");
+  }
+  return { ...configuration, baseUrl };
 }
 
 export function resolveEvavoDocsSuiteLegacyCraftConfiguration(
@@ -136,12 +159,10 @@ export function resolveEvavoDocsSuiteLegacyCraftConfiguration(
     ?? environment.EVAVO_DOCS_SUITE_BOOK_WRITER_URL
     ?? environment.EVAVO_DOCS_URL
     ?? DEFAULT_DOCS_SUITE_URL;
-  const token = (
-    environment.EVAVO_DOCS_SUITE_BOOK_CRAFT_TOKEN
+  const token = environment.EVAVO_DOCS_SUITE_BOOK_CRAFT_TOKEN
     ?? environment.EVAVO_DOCS_SUITE_BOOK_WRITER_TOKEN
     ?? environment.EVAVO_DOCS_TOKEN
-    ?? ""
-  ).trim();
+    ?? "";
   const websiteCommit = (
     environment.EVAVO_WEBSITE_COMMIT_SHA
     ?? environment.VERCEL_GIT_COMMIT_SHA
@@ -149,28 +170,13 @@ export function resolveEvavoDocsSuiteLegacyCraftConfiguration(
     ?? ""
   ).trim().toLowerCase();
 
-  if (!token || token.length > 8192 || /[\r\n]/.test(token)) {
-    throw new EvavoDocsSuiteLegacyCraftProxyError(
-      "BOOK_CRAFT_PROXY_CONFIGURATION_INVALID",
-      "A bounded Docs Suite automation token is required for legacy craft compatibility.",
-      503
-    );
-  }
-  if (!/^[a-f0-9]{40,64}$/.test(websiteCommit)) {
-    throw new EvavoDocsSuiteLegacyCraftProxyError(
-      "BOOK_CRAFT_PROXY_CONFIGURATION_INVALID",
-      "The exact 40-64 character Website Git commit is required for legacy craft compatibility.",
-      503
-    );
-  }
-
-  return {
+  return validateResolvedConfiguration({
     baseUrl: safeBaseUrl(url),
     token,
     websiteCommit,
     timeoutMs: positiveBoundedInteger(environment.EVAVO_DOCS_SUITE_BOOK_CRAFT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
     maximumResponseBytes: MAXIMUM_RESPONSE_BYTES
-  };
+  });
 }
 
 export function buildEvavoDocsSuiteLegacyCraftRequest(input: {
@@ -207,22 +213,28 @@ export function buildEvavoDocsSuiteLegacyCraftRequest(input: {
 }
 
 async function readBoundedResponse(response: Response, maximumBytes: number): Promise<unknown> {
-  const declaredLength = response.headers.get("content-length");
-  if (declaredLength !== null) {
-    const parsed = Number(declaredLength);
-    if (!Number.isFinite(parsed) || parsed < 0 || parsed > maximumBytes) {
-      throw new EvavoDocsSuiteLegacyCraftProxyError(
+  let source: string;
+  try {
+    source = await readEvavoBoundedUtf8Body({
+      body: response.body,
+      declaredLength: response.headers.get("content-length"),
+      maximumBytes,
+      tooLarge: () => new EvavoDocsSuiteLegacyCraftProxyError(
         "BOOK_CRAFT_PROXY_RESPONSE_TOO_LARGE",
         "Docs Suite returned an oversized legacy craft response.",
         502
-      );
-    }
-  }
-  const source = await response.text();
-  if (Buffer.byteLength(source, "utf8") > maximumBytes) {
+      ),
+      invalidEncoding: () => new EvavoDocsSuiteLegacyCraftProxyError(
+        "BOOK_CRAFT_PROXY_RESPONSE_INVALID",
+        "Docs Suite returned a non-UTF-8 legacy craft response.",
+        502
+      )
+    });
+  } catch (error) {
+    if (error instanceof EvavoDocsSuiteLegacyCraftProxyError) throw error;
     throw new EvavoDocsSuiteLegacyCraftProxyError(
-      "BOOK_CRAFT_PROXY_RESPONSE_TOO_LARGE",
-      "Docs Suite returned an oversized legacy craft response.",
+      "BOOK_CRAFT_PROXY_RESPONSE_INVALID",
+      "Docs Suite legacy craft response stream failed.",
       502
     );
   }
@@ -339,7 +351,9 @@ export async function requestEvavoDocsSuiteLegacyCraft(input: {
   configuration?: EvavoDocsSuiteLegacyCraftConfiguration;
   fetchImpl?: typeof fetch;
 }): Promise<EvavoDocsSuiteLegacyCraftProxyReceiptV1> {
-  const configuration = input.configuration ?? resolveEvavoDocsSuiteLegacyCraftConfiguration();
+  const configuration = validateResolvedConfiguration(
+    input.configuration ?? resolveEvavoDocsSuiteLegacyCraftConfiguration()
+  );
   const request = buildEvavoDocsSuiteLegacyCraftRequest({
     requestId: input.requestId,
     requestedAt: input.requestedAt,
