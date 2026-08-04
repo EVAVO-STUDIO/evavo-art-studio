@@ -1,0 +1,58 @@
+name: Validate Website Runtime State Export
+
+on:
+  push:
+    branches:
+      - validation/website-runtime-state-export-20260804
+    paths:
+      - ".github/workflows/validate-website-runtime-state-export.yml"
+      - ".validation/website-state-export/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-website-runtime-state-export.yml"
+      - ".validation/website-state-export/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-website-runtime-state-export-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Use Node.js 24
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 24.18.0
+          package-manager-cache: false
+      - name: Prove exact Website Git blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .validation/website-state-export/tools/evavo-doc-studio/scripts/book-studio-runtime-state-bundle-core.mjs)" = "bb2fd3a160b599795785c74b2a9e044ceb388252"
+          test "$(git hash-object .validation/website-state-export/tools/evavo-doc-studio/scripts/compile-book-studio-runtime-state-bundle.mjs)" = "8e7480d7ffb8db2cdef5fc76038a3b5d4521268a"
+          test "$(git hash-object .validation/website-state-export/tools/evavo-doc-studio/scripts/test-book-studio-runtime-state-bundle.mjs)" = "b7096cd0a7a8fd19ca1167c0d7c8c4dc968614e7"
+      - name: Run exact filesystem, fingerprint and no-clobber attacks
+        working-directory: .validation/website-state-export
+        run: node --test tools/evavo-doc-studio/scripts/test-book-studio-runtime-state-bundle.mjs
+      - name: Verify no Art Studio production source changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$(git merge-base HEAD origin/main)"
+          unexpected="$(git diff --name-only "$base" HEAD | grep -Ev '^(\.github/workflows/validate-website-runtime-state-export\.yml|\.validation/website-state-export/)' || true)"
+          test -z "$unexpected" || {
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
