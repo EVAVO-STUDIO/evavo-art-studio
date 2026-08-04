@@ -175,6 +175,9 @@ try {
 
   requireTokens("Foundation delivery workflow", source.workflow, [
     "name: Foundation Media Delivery Authority",
+    "scripts/test-foundation-delivery-production-contract.mjs",
+    "production-mixed-image-audio-contract-compatibility",
+    "windows-portable-target-rejection",
     "ubuntu-24.04",
     "version: 10.13.1",
     'node-version: "22.14.0"',
