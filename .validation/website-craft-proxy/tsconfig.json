@@ -23,6 +23,7 @@
     "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraft*.ts",
     "tools/evavo-doc-studio/src/app/api/books/write/craft-genome/route.ts",
     "tools/evavo-doc-studio/scripts/check-book-studio-craft-provider-contract.ts",
+    "tools/evavo-doc-studio/scripts/check-book-studio-craft-proxy-route.ts",
     "tools/evavo-doc-studio/test/website-craft-proxy-route.test.ts"
   ]
 }
