@@ -29,7 +29,7 @@ canonical_mutation
 publication
 ```
 
-Volumes listed in `artworkRequiredVolumeIds` also require one `artwork_use` source containing an approved Art Studio artifact receipt and exact Docs Suite Book Artwork Use binding.
+Volumes listed in `artworkRequiredVolumeIds` also require one `artwork_use` source containing an approved Art Studio artifact receipt and exact Docs Suite Book Artwork Use binding. Together they form the approved Book Artwork Use evidence required for migration review.
 
 Missing, duplicate, unknown or mismatched state is rejected before bundle submission.
 
