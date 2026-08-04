@@ -24,6 +24,8 @@ The contract must:
 - retain the game-owned runtime roots, role policies, Godot version, batch policy and MCP restrictions;
 - match the exact SHA-256 already recorded in the media plan.
 
+The production contract is a mixed image and audio contract. The compiler validates the legitimate image policies, `preserve-role-owned` policy, non-image `not-applicable` policy, PNG formats, and current WAV/OGG role formats without pretending every role is executable through the image delivery optimizer.
+
 The plan must:
 
 - use `evavo_godot_media_production_plan_v1`;
@@ -35,6 +37,8 @@ The plan must:
 - require human creative approval.
 
 Every selected work item is checked again against the live source file. Path, byte length and SHA-256 must still match. Repository, contract, plan, source and output-parent symlinks are rejected. A source that changes during compilation or before the create-only write fails closed.
+
+Duplicate scalar options and duplicate `--role` values are rejected rather than silently replacing authority.
 
 ## Compile a create-only delivery manifest
 
@@ -49,10 +53,11 @@ pnpm run foundation:delivery -- `
   --repo C:\GitRepos\GodotGameFoundationKit `
   --contract C:\GitRepos\GodotGameFoundationKit\examples\playable_foundation_hub\data\foundation_kit_media_production_contract_v1.json `
   --plan C:\EVAVO-Evidence\GodotGameFoundationKit\media-production-plan.json `
-  --output C:\EVAVO-Evidence\GodotGameFoundationKit\delivery-manifest.json
+  --output C:\EVAVO-Evidence\GodotGameFoundationKit\delivery-manifest.json `
+  --role shell-desktop-icon
 ```
 
-Limit the manifest to one or more plan-owned roles:
+Limit the manifest to one or more plan-owned image roles:
 
 ```powershell
 pnpm run foundation:delivery -- `
@@ -63,7 +68,9 @@ pnpm run foundation:delivery -- `
   --role godz-character-atlas
 ```
 
-The output must remain outside the target repository. It is written with create-only `wx` semantics and cannot replace an earlier authority file.
+When a plan includes audio work, select only the image roles intended for this handoff. Selecting current WAV or OGG roles fails with `RUNTIME_FORMAT_UNSUPPORTED`; those roles remain owned by the separate governed audio pipeline.
+
+The output must remain outside the target repository. It is written with create-only `wx` semantics and cannot replace an earlier authority file. The output file is flushed before close. Parent-directory synchronisation is attempted where the operating system supports it and tolerates the documented Windows directory-handle limitations without weakening create-only output.
 
 ## Readiness boundary
 
@@ -75,8 +82,10 @@ A selected item cannot enter the delivery manifest when it has:
 - a missing or changed source file;
 - a source byte-length or SHA-256 mismatch;
 - a runtime target outside its role-owned root;
-- a target collision under portable case-insensitive identity;
-- an unsupported runtime format.
+- a portable case-insensitive target collision;
+- a Windows-reserved target such as `con`, `aux`, `com1`, or `lpt1`;
+- a path segment with forbidden Windows characters or a trailing dot or space;
+- an unsupported exact runtime format.
 
 The compiler therefore consumes a ready plan. It does not hide unresolved review work by translating it into an executable batch.
 
@@ -88,18 +97,21 @@ The emitted JSON uses the normal delivery-optimizer schema:
 evavo.art-delivery-optimization.v1
 ```
 
-Current governed mapping is deliberately narrow:
+Current governed mapping is deliberately narrow and exact:
 
 ```text
 png-lossless or png-plus-fnt
   → godot-sprite-lossless
 
-lossless WebP with meaningful alpha
+webp-lossless with require-meaningful-alpha
   → godot-cutout-webp-1080p
 
-lossless opaque WebP
+webp-lossless with preserve-authored-opaque
+or preserve-authored-black-stage
   → godot-background-1080p
 ```
+
+Substring matches are not accepted. A value merely containing `png` or `webp` is not a supported format.
 
 The compiler uses `background.mode = preserve`. Alpha extraction, connected matte removal and luminance-to-alpha conversion are separate reviewed mastering decisions and are not guessed during this handoff.
 
@@ -124,7 +136,7 @@ The staging root must remain outside the target repository. Produced derivatives
 The compiler receipt reports truthfully:
 
 ```text
-planFileCreated = true
+deliveryManifestFileCreated = true
 mutationPerformed = true
 mutationScope = create-only-delivery-manifest
 targetRepositoryMutationPerformed = false
@@ -134,6 +146,8 @@ promotionPerformed = false
 publicationPerformed = false
 ```
 
+`planFileCreated` is not emitted because this command consumes a plan and creates a delivery manifest.
+
 ## Independent gates
 
 After deterministic delivery preparation:
@@ -142,6 +156,7 @@ After deterministic delivery preparation:
 2. Godot import and native captures prove the role-owned runtime behavior.
 3. Named human review approves visual quality, animation, registration and suite coherence.
 4. EVAVO Development Studio performs the separately authorized Git/LFS publication transaction.
+5. Audio roles continue through the governed EVAVO Audio Studio path rather than the image delivery optimizer.
 
 The delivery manifest cannot satisfy any of those gates by itself.
 
@@ -158,9 +173,12 @@ The focused checker validates:
 
 - compiler, tests and workflow syntax;
 - exact contract, plan, audit-root and source-byte binding;
+- compatibility with the real mixed production-contract shape;
+- image-role filtering when the same plan contains audio work;
 - delivery-optimizer manifest compatibility;
 - blocked and tampered-plan rejection;
-- collision and unsupported-format rejection;
+- exact format allowlisting;
+- collision and Windows-portability rejection;
 - output isolation and create-only behavior;
 - symlink rejection;
 - clean authority boundaries.
@@ -179,4 +197,5 @@ It does not prove:
 - that a native capture was reviewed;
 - that a human approved the art;
 - that an artifact was selected or promoted;
+- that an audio role was mastered or approved;
 - that any game-repository commit, deployment or publication occurred.
