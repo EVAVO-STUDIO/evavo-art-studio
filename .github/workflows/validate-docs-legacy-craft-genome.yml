@@ -1,0 +1,111 @@
+name: Validate exact Docs legacy craft compatibility
+
+on:
+  push:
+    branches:
+      - validation/docs-legacy-craft-genome-20260805
+    paths:
+      - ".github/workflows/validate-docs-legacy-craft-genome.yml"
+      - ".validation/docs-legacy-craft/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-docs-legacy-craft-genome.yml"
+      - ".validation/docs-legacy-craft/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-legacy-craft-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Prove all exact Docs Suite Git blobs
+        run: node .validation/docs-legacy-craft/verify-exact-blobs.mjs
+
+      - name: Install validation-only compiler tools
+        run: >-
+          npm install --prefix .validation/docs-legacy-craft
+          --no-save --package-lock=false --ignore-scripts --no-audit --no-fund
+          typescript@5.9.3 @types/node@22.18.8 tsx@4.20.3
+
+      - name: Check transport script syntax
+        run: |
+          node --check .validation/docs-legacy-craft/apps/web/scripts/docs-suite-api-client.mjs
+          node --check .validation/docs-legacy-craft/apps/web/scripts/evavo-docs-book-legacy-craft-genome-common.mjs
+          node --check .validation/docs-legacy-craft/apps/web/scripts/evavo-docs-book-legacy-craft-genome-cli.mjs
+          node --check .validation/docs-legacy-craft/apps/web/scripts/evavo-docs-book-legacy-craft-genome-mcp.mjs
+
+      - name: Compile exact core service input and protected route
+        run: .validation/docs-legacy-craft/node_modules/.bin/tsc -p .validation/docs-legacy-craft/tsconfig.json
+
+      - name: Run exact compiler response overlap input and authority attacks
+        run: >-
+          .validation/docs-legacy-craft/node_modules/.bin/tsx --test
+          .validation/docs-legacy-craft/packages/core/test/book-studio-legacy-craft-genome.test.mjs
+          .validation/docs-legacy-craft/apps/web/scripts/test-book-studio-legacy-craft-genome-input.mjs
+
+      - name: Run exact CLI and MCP transport attacks
+        run: node --test .validation/docs-legacy-craft/apps/web/scripts/test-book-studio-legacy-craft-genome-adapters.mjs
+
+      - name: Verify no Art Studio production source changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="57e0623d7de840ec1523cbba271b77595a432661"
+          git fetch --no-tags --depth=1 origin "$base"
+          unexpected="$(git diff --name-only "$base" HEAD | grep -Ev '^(\.github/workflows/validate-docs-legacy-craft-genome\.yml|\.validation/docs-legacy-craft/)' || true)"
+          test -z "$unexpected" || {
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
+
+      - name: Write bounded validation receipt
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/docs-legacy-craft-validation.json" <<JSON
+          {
+            "status": "PASS",
+            "docsRepository": "EVAVO-STUDIO/evavo-docs-suite",
+            "docsPullRequest": 78,
+            "docsHead": "8a879e842a8a25e5440943588d47e38902153722",
+            "mirrorRepository": "EVAVO-STUDIO/evavo-art-studio",
+            "mirrorHead": "${GITHUB_SHA}",
+            "exactGitBlobs": 20,
+            "strictTypeScript": true,
+            "coreAndBoundaryAttacks": true,
+            "cliAndMcpAttacks": true,
+            "artStudioProductionSourceChanged": false,
+            "providerCalled": false,
+            "canonicalManuscriptMutationPerformed": false,
+            "automaticCanonicalAdmissionAllowed": false,
+            "publicationPerformed": false
+          }
+          JSON
+          cat "$RUNNER_TEMP/docs-legacy-craft-validation.json"
+
+      - name: Prove clean tracked source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
