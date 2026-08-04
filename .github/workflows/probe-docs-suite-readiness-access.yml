@@ -1,0 +1,26 @@
+name: Probe Docs Suite Readiness Access
+
+on:
+  push:
+    branches:
+      - automation/validate-docs-book-universal-readiness-20260804
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Probe exact private Docs source access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/EVAVO-STUDIO/evavo-docs-suite/contents/packages/core/src/book-studio-project-contracts.ts \
+            -f ref=agent/book-universal-readiness-20260804 \
+            --jq '.sha'
