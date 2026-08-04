@@ -1,30 +1,32 @@
-name: Validate Docs Book Universal Readiness
+name: Validate Docs Book Unattended Production
 
 on:
   push:
     branches:
-      - automation/validate-docs-book-universal-readiness-20260804
+      - automation/validate-docs-book-unattended-production-20260804
     paths:
       - ".github/workflows/probe-docs-suite-readiness-access.yml"
       - "validation/docs-book-universal-readiness/**"
+      - "validation/docs-book-unattended-production-payload/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/probe-docs-suite-readiness-access.yml"
       - "validation/docs-book-universal-readiness/**"
+      - "validation/docs-book-unattended-production-payload/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: validate-docs-book-universal-readiness-${{ github.ref }}
+  group: validate-docs-book-unattended-production-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Check out validation source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -38,84 +40,75 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
-      - name: Prove every exact Docs Suite readiness landing blob
+      - name: Reconstruct exact Docs Suite unattended source overlay
         shell: bash
         run: |
           set -euo pipefail
-          root="validation/docs-book-universal-readiness"
-          project_contracts="$(git hash-object "$root/packages/core/src/book-studio-project-contracts.ts")"
-          readiness="$(git hash-object "$root/packages/core/src/book-studio-universal-readiness.ts")"
-          governance="$(git hash-object "$root/packages/core/src/book-studio-universal-readiness-governance.ts")"
-          public_index="$(git hash-object "$root/packages/core/src/index.ts")"
-          readiness_test="$(git hash-object "$root/packages/core/test/book-studio-universal-readiness.test.mjs")"
-          governance_test="$(git hash-object "$root/packages/core/test/book-studio-universal-readiness-governance.test.mjs")"
-          service="$(git hash-object "$root/apps/web/src/lib/book-studio-universal-readiness-service.ts")"
-          route="$(git hash-object "$root/apps/web/src/app/api/v1/book-studio/universal-readiness/route.ts")"
-          api_client="$(git hash-object "$root/apps/web/scripts/docs-suite-api-client.mjs")"
-          cli="$(git hash-object "$root/apps/web/scripts/evavo-docs-book-readiness-cli.mjs")"
-          mcp="$(git hash-object "$root/apps/web/scripts/evavo-docs-book-readiness-mcp.mjs")"
-          adapter_test="$(git hash-object "$root/apps/web/scripts/test-book-studio-universal-readiness-adapters.mjs")"
-          checker="$(git hash-object "$root/scripts/check-book-studio-universal-readiness.mjs")"
-          guide="$(git hash-object "$root/docs/migrations/book-studio/BOOK_STUDIO_UNIVERSAL_READINESS.md")"
-          workflow="$(git hash-object "$root/.github/workflows/book-studio-universal-readiness.yml")"
-          printf '%s\n' \
-            "project_contracts=$project_contracts" \
-            "readiness=$readiness" \
-            "governance=$governance" \
-            "public_index=$public_index" \
-            "readiness_test=$readiness_test" \
-            "governance_test=$governance_test" \
-            "service=$service" \
-            "route=$route" \
-            "api_client=$api_client" \
-            "cli=$cli" \
-            "mcp=$mcp" \
-            "adapter_test=$adapter_test" \
-            "checker=$checker" \
-            "guide=$guide" \
-            "workflow=$workflow"
-          test "$project_contracts" = "fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
-          test "$readiness" = "3c348b4969d94f2e81a7a4e8e0f9c2399850e640"
-          test "$governance" = "aac0ff806dbfc41259b4925918a96103a5615489"
-          test "$public_index" = "6125aec60176bbfb257e81fa993d1abc73b8a4ce"
-          test "$readiness_test" = "de9f0e5287cefca3cd13e5455a0ca456bdda645c"
-          test "$governance_test" = "b840c94f280ea1280879a0f0a338d8eefad51e57"
-          test "$service" = "f8d37c77e660e7c9f3b586e540b2d1efcf71005f"
-          test "$route" = "cea0182dd53bc6853769989cb6343be054daa125"
-          test "$api_client" = "9c05188ea028616e125ab682bb4da33e99081d04"
-          test "$cli" = "428be906cd9a5d45575d5161daae07b6be8b24ba"
-          test "$mcp" = "7378422089aee4ea4cc0dd6cafc3de7a089c48b7"
-          test "$adapter_test" = "47cf2b7d9fb04ac7316941d4f379d987c1024d44"
-          test "$checker" = "5993627811e68444b5bd96b9f3459e3838a7abdd"
-          test "$guide" = "de399fee31fb3717aa0db5193a5a55e1bce22d09"
-          test "$workflow" = "a2155fe482b841824c7312fd37f05f6d79ba7525"
+          root="$RUNNER_TEMP/docs-book-unattended-production"
+          payload="$RUNNER_TEMP/docs-book-unattended-production.b64"
+          archive="$RUNNER_TEMP/docs-book-unattended-production.tar.gz"
+          rm -rf "$root" "$payload" "$archive"
+          cp -R validation/docs-book-universal-readiness "$root"
+          cat validation/docs-book-unattended-production-payload/part-*.b64 > "$payload"
+          test "$(wc -c < "$payload")" = "31376"
+          test "$(sha256sum "$payload" | cut -d' ' -f1)" = "a2559ebe10e04debf667f26a41117b967c19ac842b97d89164fd62d3cb8336f7"
+          base64 --decode "$payload" > "$archive"
+          test "$(wc -c < "$archive")" = "23532"
+          test "$(sha256sum "$archive" | cut -d' ' -f1)" = "575bc289dc84444259bb3e86b1d96174fa3c07f26251004b718d1418b699e592"
+          tar -xzf "$archive" -C "$root"
+          printf 'VALIDATION_ROOT=%s\n' "$root" >> "$GITHUB_ENV"
 
-      - name: Verify reconciled public authority exports
+      - name: Prove exact current dependency and Docs PR blobs
         shell: bash
         run: |
           set -euo pipefail
-          index="validation/docs-book-universal-readiness/packages/core/src/index.ts"
-          grep -F 'export * from "./book-studio-state-shadow-import";' "$index"
-          grep -F 'compileGovernedBookUniversalReadiness as compileBookUniversalReadiness' "$index"
-          grep -F 'from "./book-studio-universal-readiness-governance";' "$index"
+          root="$VALIDATION_ROOT"
+          declare -A expected=(
+            ["packages/core/src/book-studio-project-contracts.ts"]="fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
+            ["packages/core/src/book-studio-universal-readiness.ts"]="3c348b4969d94f2e81a7a4e8e0f9c2399850e640"
+            ["packages/core/src/book-studio-universal-readiness-governance.ts"]="aac0ff806dbfc41259b4925918a96103a5615489"
+            ["packages/core/src/book-studio-unattended-production.ts"]="a680376b58addae4ffb6b8a9cdfcab361a2711e4"
+            ["packages/core/src/index.ts"]="5df8781724b032aa8eb6e82104353f3bf6154350"
+            ["packages/core/test/book-studio-unattended-production.test.mjs"]="0445ab51bb49e492d4689fab5dcaeb94ed4caa89"
+            ["apps/web/src/lib/book-studio-unattended-production-service.ts"]="7e4a8808df788d17d4e788d8987291a151dd7811"
+            ["apps/web/src/app/api/v1/book-studio/unattended-production/route.ts"]="ecbc2f9f016a89c15f33f338f134a2358a79ad23"
+            ["apps/web/scripts/docs-suite-api-client.mjs"]="9c05188ea028616e125ab682bb4da33e99081d04"
+            ["apps/web/scripts/evavo-docs-book-unattended-cli.mjs"]="784b1271be255c93dac44b63a9f72468aaaa2d4e"
+            ["apps/web/scripts/evavo-docs-book-unattended-mcp.mjs"]="fa0fda428c4078b5241ea2925597c2f6f01661f0"
+            ["apps/web/scripts/test-book-studio-unattended-production-adapters.mjs"]="b7bb2851c3152a8bde23bb36f8f339c5ca9a58d7"
+            ["apps/web/test/book-studio-unattended-production-route.test.mjs"]="9ccff3b65be7eb2ae0be454ba0a655e11a445df7"
+            ["scripts/check-book-studio-unattended-production.mjs"]="8b9a599c1141aa161bd35479a281427563dd016b"
+            ["docs/migrations/book-studio/BOOK_STUDIO_UNATTENDED_PRODUCTION.md"]="4f8c711e961992aa04538a9a185d7649ac4d7acb"
+            [".github/workflows/book-studio-unattended-production.yml"]="6945157a9405080b3719dbafe8d58cd4730cb4e8"
+            ["tsconfig.json"]="6241fe0c198ed8653bb6101e09692662f5269abb"
+          )
+          for relative in "${!expected[@]}"; do
+            actual="$(git hash-object "$root/$relative")"
+            printf '%s=%s\n' "$relative" "$actual"
+            test "$actual" = "${expected[$relative]}"
+          done
 
-      - name: Run exact permanent authority checker
-        run: node validation/docs-book-universal-readiness/scripts/check-book-studio-universal-readiness.mjs
+      - name: Run exact permanent unattended authority checker
+        run: node "$VALIDATION_ROOT/scripts/check-book-studio-unattended-production.mjs"
 
       - name: Install validation-only compiler tools
-        run: npm install --prefix validation/docs-book-universal-readiness --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
+        run: npm install --prefix "$VALIDATION_ROOT" --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
 
       - name: Compile core, service and protected route strictly
-        run: validation/docs-book-universal-readiness/node_modules/.bin/tsc -p validation/docs-book-universal-readiness/tsconfig.json
+        run: "$VALIDATION_ROOT/node_modules/.bin/tsc" -p "$VALIDATION_ROOT/tsconfig.json"
 
-      - name: Run universal project, governance and edge-case attacks
-        run: validation/docs-book-universal-readiness/node_modules/.bin/tsx --test validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness.test.mjs validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness-governance.test.mjs
+      - name: Run universal readiness and unattended policy attacks
+        run: |
+          "$VALIDATION_ROOT/node_modules/.bin/tsx" --test \
+            "$VALIDATION_ROOT/packages/core/test/book-studio-universal-readiness.test.mjs" \
+            "$VALIDATION_ROOT/packages/core/test/book-studio-universal-readiness-governance.test.mjs" \
+            "$VALIDATION_ROOT/packages/core/test/book-studio-unattended-production.test.mjs"
 
       - name: Run exact CLI and MCP transport attacks
-        run: node --test validation/docs-book-universal-readiness/apps/web/scripts/test-book-studio-universal-readiness-adapters.mjs
+        run: node --test "$VALIDATION_ROOT/apps/web/scripts/test-book-studio-unattended-production-adapters.mjs"
 
       - name: Run protected HTTP route attacks
-        run: validation/docs-book-universal-readiness/node_modules/.bin/tsx --tsconfig validation/docs-book-universal-readiness/tsconfig.json --test validation/docs-book-universal-readiness/apps/web/test/book-studio-universal-readiness-route.test.mjs
+        run: "$VALIDATION_ROOT/node_modules/.bin/tsx" --tsconfig "$VALIDATION_ROOT/tsconfig.json" --test "$VALIDATION_ROOT/apps/web/test/book-studio-unattended-production-route.test.mjs"
 
       - name: Verify no Art Studio production source changed
         shell: bash
@@ -124,7 +117,7 @@ jobs:
           git fetch --no-tags origin main
           merge_base="$(git merge-base HEAD origin/main)"
           test -n "$merge_base"
-          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/probe-docs-suite-readiness-access\.yml|validation/docs-book-universal-readiness/)' || true)"
+          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/probe-docs-suite-readiness-access\.yml|validation/docs-book-universal-readiness/|validation/docs-book-unattended-production-payload/)' || true)"
           test -z "$unexpected" || {
             printf '%s\n' "$unexpected"
             exit 1
