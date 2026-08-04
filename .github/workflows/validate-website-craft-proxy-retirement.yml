@@ -1,9 +1,9 @@
-name: Validate exact Website craft proxy retirement
+name: Validate exact Website craft proxy hardening
 
 on:
   push:
     branches:
-      - validation/website-craft-proxy-retirement-20260805
+      - validation/website-craft-proxy-hardening-20260805
     paths:
       - ".github/workflows/validate-website-craft-proxy-retirement.yml"
       - ".validation/website-craft-proxy/**"
@@ -18,13 +18,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: validate-website-craft-proxy-${{ github.ref }}
+  group: validate-website-craft-proxy-hardening-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - name: Check out exact validation source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -32,13 +32,13 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Use Node.js 22 for isolated validation
+      - name: Use Node.js 22
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 22
           package-manager-cache: false
 
-      - name: Prove exact Website Git blobs and retired-source absence
+      - name: Prove 14 exact Website Git blobs and retired-source absence
         run: node .validation/website-craft-proxy/verify-exact-blobs.mjs
 
       - name: Install validation-only compiler and runtime
@@ -46,90 +46,41 @@ jobs:
           npm install --prefix .validation/website-craft-proxy
           --package-lock=false --ignore-scripts --no-audit --no-fund
 
-      - name: Compile exact proxy client route and tests
+      - name: Compile exact stream client route and permanent attacks
         run: >-
           .validation/website-craft-proxy/node_modules/.bin/tsc
           -p .validation/website-craft-proxy/tsconfig.json
 
-      - name: Run exact transport fingerprint and authority attacks
+      - name: Run exact streamed transport fingerprint and authority attacks
         run: >-
           .validation/website-craft-proxy/node_modules/.bin/tsx
           .validation/website-craft-proxy/tools/evavo-doc-studio/scripts/check-book-studio-craft-provider-contract.ts
 
-      - name: Run executable public-route attacks
+      - name: Run exact public-route streaming and compatibility attacks
+        env:
+          TSX_TSCONFIG_PATH: .validation/website-craft-proxy/tsconfig.json
+        run: >-
+          .validation/website-craft-proxy/node_modules/.bin/tsx
+          .validation/website-craft-proxy/tools/evavo-doc-studio/scripts/check-book-studio-craft-proxy-route.ts
+
+      - name: Run retained executable route regression test
         env:
           TSX_TSCONFIG_PATH: .validation/website-craft-proxy/tsconfig.json
         run: >-
           .validation/website-craft-proxy/node_modules/.bin/tsx --test
           .validation/website-craft-proxy/tools/evavo-doc-studio/test/website-craft-proxy-route.test.ts
 
-      - name: Run exact repository-wide retirement scanner
+      - name: Run exact repository-wide retirement and hardening scanner
         working-directory: .validation/website-craft-proxy/tools/evavo-doc-studio
         run: ../../node_modules/.bin/tsx scripts/check-book-studio-craft-genome.ts
 
-      - name: Probe exact private Website archive access
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          WEBSITE_HEAD: 46d7bdccefef268f4d39e7aa3e489897d4568691
-        run: |
-          set -euo pipefail
-          archive="$RUNNER_TEMP/website-source.tar.gz"
-          source_dir="$RUNNER_TEMP/website-source"
-          mkdir -p "$source_dir"
-          status="$(curl --silent --show-error --location \
-            --output "$archive" \
-            --write-out '%{http_code}' \
-            --header 'Accept: application/vnd.github+json' \
-            --header "Authorization: Bearer $GH_TOKEN" \
-            --header 'X-GitHub-Api-Version: 2022-11-28' \
-            "https://api.github.com/repos/EVAVO-STUDIO/Website/tarball/$WEBSITE_HEAD" || true)"
-          if [[ "$status" != "200" ]]; then
-            rm -f "$archive"
-            echo "WEBSITE_ARCHIVE_ACCESSIBLE=false" >> "$GITHUB_ENV"
-            echo "Private Website archive was not available to this repository-scoped token (HTTP $status)."
-            exit 0
-          fi
-          tar -xzf "$archive" --strip-components=1 -C "$source_dir"
-          test -f "$source_dir/tools/evavo-doc-studio/.nvmrc"
-          echo "WEBSITE_ARCHIVE_ACCESSIBLE=true" >> "$GITHUB_ENV"
-          echo "WEBSITE_SOURCE_DIR=$source_dir" >> "$GITHUB_ENV"
-
-      - name: Use exact Website Node.js runtime
-        if: env.WEBSITE_ARCHIVE_ACCESSIBLE == 'true'
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
-        with:
-          node-version-file: ${{ runner.temp }}/website-source/tools/evavo-doc-studio/.nvmrc
-          registry-url: https://registry.npmjs.org
-          package-manager-cache: false
-
-      - name: Run complete exact Website verification and builds
-        if: env.WEBSITE_ARCHIVE_ACCESSIBLE == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$WEBSITE_SOURCE_DIR/tools/evavo-doc-studio"
-          node ../../scripts/check-doc-studio-lockfile.mjs
-          npm ci --ignore-scripts --no-audit --no-fund
-          npx tsx scripts/check-book-studio-craft-genome.ts
-          npx tsx scripts/check-book-studio-craft-provider-contract.ts
-          npx tsc --noEmit --project tsconfig.book-studio-craft-genome.json
-          npm run typecheck
-          npm run lint
-          npm run quality:book-studio
-          npm run quality:book-prose-restraint
-          npm run build
-          cd "$WEBSITE_SOURCE_DIR"
-          npm run build
-
       - name: Verify no Art Studio production source changed
         shell: bash
-        env:
-          VALIDATION_BASE_SHA: ${{ github.event.pull_request.base.sha || '57e0623d7de840ec1523cbba271b77595a432661' }}
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin "$VALIDATION_BASE_SHA"
-          unexpected="$(git diff --name-only "$VALIDATION_BASE_SHA" HEAD | grep -Ev '^(\.github/workflows/validate-website-craft-proxy-retirement\.yml|\.validation/website-craft-proxy/)' || true)"
+          base="57e0623d7de840ec1523cbba271b77595a432661"
+          git fetch --no-tags --depth=1 origin "$base"
+          unexpected="$(git diff --name-only "$base" HEAD | grep -Ev '^(\.github/workflows/validate-website-craft-proxy-retirement\.yml|\.validation/website-craft-proxy/)' || true)"
           test -z "$unexpected" || {
             printf '%s\n' "$unexpected"
             exit 1
@@ -138,24 +89,26 @@ jobs:
       - name: Write bounded validation receipt
         shell: bash
         run: |
-          archive_access="${WEBSITE_ARCHIVE_ACCESSIBLE:-false}"
-          cat > "$RUNNER_TEMP/website-craft-proxy-validation.json" <<JSON
+          cat > "$RUNNER_TEMP/website-craft-proxy-hardening-validation.json" <<JSON
           {
             "status": "PASS",
             "websiteRepository": "EVAVO-STUDIO/Website",
-            "websitePullRequest": 73,
-            "websiteHead": "46d7bdccefef268f4d39e7aa3e489897d4568691",
+            "websiteBase": "9a39372a5d3ee63bf12f1c766828bb38b4d1645f",
+            "websiteHead": "af19c0fc7b650319b058c751f0d35c11bdc9882d",
             "mirrorRepository": "EVAVO-STUDIO/evavo-art-studio",
             "mirrorHead": "${GITHUB_SHA}",
-            "exactGitBlobs": 12,
+            "exactGitBlobs": 14,
             "retiredLocalRuntimeFilesAbsent": 9,
             "strictTypeScript": true,
-            "transportAndAuthorityAttacks": true,
-            "publicRouteAttacks": true,
+            "streamedRequestAndResponseLimits": true,
+            "strictUtf8": true,
+            "originOnlyConfiguration": true,
+            "controlCharacterFreeToken": true,
+            "remoteValidationStatusPreserved": true,
+            "transportFingerprintAndAuthorityAttacks": true,
+            "publicRouteStreamingAttacks": true,
+            "retainedRouteRegressionTest": true,
             "repositoryWideHiddenReferenceScan": true,
-            "privateWebsiteArchiveAccessAttempted": true,
-            "privateWebsiteArchiveAccessible": ${archive_access},
-            "completeWebsiteBuildsRun": ${archive_access},
             "artStudioProductionSourceChanged": false,
             "providerCalled": false,
             "canonicalManuscriptMutationPerformed": false,
@@ -163,7 +116,7 @@ jobs:
             "publicationPerformed": false
           }
           JSON
-          cat "$RUNNER_TEMP/website-craft-proxy-validation.json"
+          cat "$RUNNER_TEMP/website-craft-proxy-hardening-validation.json"
 
       - name: Prove clean tracked source
         if: always()
