@@ -1,0 +1,41 @@
+name: Publish Validated Docs Mixed Cover Sources
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/docs-mixed-cover-artifact.yml"
+      - "validation/docs-mixed-cover/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Prove exact validated source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="validation/docs-mixed-cover"
+          test "$(git hash-object "$root/packages/core/src/book-studio-universal-readiness.ts")" = "ea422c033dbd3fbc6ff78ccf5b0dd48650767905"
+          test "$(git hash-object "$root/packages/core/test/book-studio-universal-readiness.test.mjs")" = "6c489fe9ddfcbc40d6629632738d7524e0873b1f"
+
+      - name: Upload exact patched Docs source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: docs-mixed-cover-patched-source
+          path: |
+            validation/docs-mixed-cover/packages/core/src/book-studio-universal-readiness.ts
+            validation/docs-mixed-cover/packages/core/test/book-studio-universal-readiness.test.mjs
+          if-no-files-found: error
+          retention-days: 1
