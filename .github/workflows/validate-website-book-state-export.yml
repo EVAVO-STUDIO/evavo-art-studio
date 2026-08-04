@@ -51,7 +51,7 @@ jobs:
           root="validation/website-book-state-export"
           test "$(git hash-object "$root/tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteStateMigrationExport.ts")" = "2096447c0879b18dceefa286a539bb0c2ad37ef1"
           test "$(git hash-object "$root/tools/evavo-doc-studio/scripts/run-book-studio-state-migration-export.ts")" = "f0e50d8a9438eccd64ef8455dbd3598d423d483f"
-          test "$(git hash-object "$root/tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export.ts")" = "7a269025baf6bebed72e928bdaba453fee7e789a"
+          test "$(git hash-object "$root/tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export.ts")" = "1d87e8e48013775984d642d6ef29d388efe171c2"
           test "$(git hash-object "$root/tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export-gateway.mjs")" = "7e94785318b0e81aeaa459059c87bb5683ec504f"
           test "$(git hash-object "$root/tools/evavo-doc-studio/docs/BOOK_STUDIO_STATE_MIGRATION_EXPORT.md")" = "16efd54422864b666992b106cf05fd5292d024e9"
           test "$(git hash-object "$root/.github/workflows/book-studio-state-migration-export.yml")" = "025b5cff8ffd67627bab3209744c809a960d0aa9"
