@@ -57,6 +57,8 @@ jobs:
           .validation/website-craft-proxy/tools/evavo-doc-studio/scripts/check-book-studio-craft-provider-contract.ts
 
       - name: Run executable public-route attacks
+        env:
+          TSX_TSCONFIG_PATH: .validation/website-craft-proxy/tsconfig.json
         run: >-
           .validation/website-craft-proxy/node_modules/.bin/tsx --test
           .validation/website-craft-proxy/tools/evavo-doc-studio/test/website-craft-proxy-route.test.ts
