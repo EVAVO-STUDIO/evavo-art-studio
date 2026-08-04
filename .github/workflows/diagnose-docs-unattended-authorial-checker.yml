@@ -1,0 +1,103 @@
+name: Diagnose Docs Unattended Authorial Checker
+
+on:
+  push:
+    branches:
+      - validation/docs-narrative-craft-20260804
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: diagnose-docs-unattended-authorial-checker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Check out retained unattended carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.repository }}
+          ref: automation/validate-docs-book-unattended-production-20260804
+          path: retained-unattended
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Assemble exact checker source tree
+        id: assemble
+        shell: bash
+        run: |
+          set -euo pipefail
+          carrier="$GITHUB_WORKSPACE/retained-unattended"
+          source_root="$RUNNER_TEMP/docs-book-unattended-source"
+          payload="$RUNNER_TEMP/docs-source-overlay.tar.gz"
+          encoded="$RUNNER_TEMP/docs-source-overlay.tar.gz.b64"
+          combined="$RUNNER_TEMP/docs-book-unattended-authorial"
+          checkroot="$RUNNER_TEMP/docs-book-production-check"
+
+          cp -R "$carrier/validation/docs-book-universal-readiness" "$source_root"
+          cat "$carrier"/validation/docs-book-unattended-production-payload/docs-source-overlay.tar.gz.b64.part-* > "$encoded"
+          base64 --decode "$encoded" > "$payload"
+          echo "f385bf9cdc51b6d3ee247c69336b169ce7718f240881271b0e928876956bf75d  $payload" | sha256sum -c -
+          tar -xzf "$payload" -C "$source_root"
+
+          cp -R validation/docs-narrative-craft "$combined"
+          cp "$source_root/packages/core/src/book-studio-universal-readiness.ts" "$combined/src/"
+          cp "$source_root/packages/core/src/book-studio-universal-readiness-governance.ts" "$combined/src/"
+          cp "$source_root/packages/core/src/book-studio-unattended-production.ts" "$combined/src/"
+
+          mkdir -p \
+            "$checkroot/packages/core/src" \
+            "$checkroot/packages/core/test" \
+            "$checkroot/apps/web/src/lib" \
+            "$checkroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing" \
+            "$checkroot/apps/web/scripts" \
+            "$checkroot/scripts" \
+            "$checkroot/.github/workflows" \
+            "$checkroot/docs/migrations/book-studio"
+          cp "$combined"/src/*.ts "$checkroot/packages/core/src/"
+          cp validation/docs-narrative-craft/evidence/packages/core/src/index.ts "$checkroot/packages/core/src/index.ts"
+          cp validation/docs-narrative-craft/test/unattended-authorial-writing.test.mjs "$checkroot/packages/core/test/book-studio-unattended-authorial-writing.test.mjs"
+          cp validation/docs-narrative-craft/evidence/apps/web/src/lib/book-studio-unattended-authorial-writing-service.ts "$checkroot/apps/web/src/lib/"
+          cp validation/docs-narrative-craft/evidence/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts "$checkroot/apps/web/src/app/api/v1/book-studio/unattended-production/authorial-writing/route.ts"
+          cp validation/docs-narrative-craft/apps/web/scripts/docs-suite-api-client.mjs "$checkroot/apps/web/scripts/"
+          cp validation/docs-narrative-craft/apps/web/scripts/evavo-docs-book-unattended-authorial-writing-cli.mjs "$checkroot/apps/web/scripts/"
+          cp validation/docs-narrative-craft/apps/web/scripts/evavo-docs-book-unattended-authorial-writing-mcp.mjs "$checkroot/apps/web/scripts/"
+          cp validation/docs-narrative-craft/apps/web/scripts/test-book-studio-unattended-authorial-writing-adapters.mjs "$checkroot/apps/web/scripts/"
+          cp validation/docs-narrative-craft/evidence/scripts/check-book-studio-unattended-authorial-writing.mjs "$checkroot/scripts/"
+          cp validation/docs-narrative-craft/evidence/.github/workflows/book-studio-unattended-authorial-writing.yml "$checkroot/.github/workflows/"
+          cp validation/docs-narrative-craft/evidence/docs/migrations/book-studio/BOOK_STUDIO_UNATTENDED_AUTHORIAL_WRITING.md "$checkroot/docs/migrations/book-studio/"
+          echo "checkroot=$checkroot" >> "$GITHUB_OUTPUT"
+
+      - name: Execute checker and post exact diagnostics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          node "${{ steps.assemble.outputs.checkroot }}/scripts/check-book-studio-unattended-authorial-writing.mjs" > "$RUNNER_TEMP/checker.log" 2>&1
+          status=$?
+          set -e
+          {
+            echo "### Unattended authorial checker diagnostic"
+            echo
+            echo "Validation head: \`${GITHUB_SHA}\`"
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/checker.log"
+            echo '```'
+          } > "$RUNNER_TEMP/comment.md"
+          jq -Rs '{body: .}' "$RUNNER_TEMP/comment.md" | \
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/121/comments" --input -
+          exit "$status"
