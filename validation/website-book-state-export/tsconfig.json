@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["node"]
+  },
+  "include": [
+    "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteStateMigrationExport.ts",
+    "tools/evavo-doc-studio/scripts/run-book-studio-state-migration-export.ts",
+    "tools/evavo-doc-studio/scripts/check-book-studio-state-migration-export.ts"
+  ]
+}
