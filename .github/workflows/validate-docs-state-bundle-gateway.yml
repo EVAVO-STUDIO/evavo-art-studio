@@ -1,0 +1,61 @@
+name: Validate Docs State Bundle Gateway
+
+on:
+  push:
+    branches:
+      - validation/docs-state-bundle-gateway-20260804
+    paths:
+      - ".github/workflows/validate-docs-state-bundle-gateway.yml"
+      - ".validation/docs-state-gateway/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-docs-state-bundle-gateway.yml"
+      - ".validation/docs-state-gateway/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-state-bundle-gateway-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Prove exact Docs Suite Git blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .validation/docs-state-gateway/apps/web/scripts/evavo-docs-book-state-migration.mjs)" = "0c4c3020a0934873e1183c04207742788e4c92d4"
+          test "$(git hash-object .validation/docs-state-gateway/apps/web/scripts/evavo-docs-book-state-migration-mcp.mjs)" = "36712c06542778acb2e31328924b4fb30814e570"
+          test "$(git hash-object .validation/docs-state-gateway/apps/web/test/book-studio-state-migration-cli-mcp.test.mjs)" = "31f5b13d528461f993d7b563dc9addf26d0a1664"
+          test "$(git hash-object .validation/docs-state-gateway/apps/web/src/lib/book-studio-state-migration-service.ts)" = "590119f1182a51ffe92aed8df5dd872abc08c440"
+          test "$(git hash-object .validation/docs-state-gateway/apps/web/src/app/api/v1/book-studio/migration/state-bundle/route.ts)" = "b6f9468026a9a003ec38866da7ab065202843b55"
+      - name: Compile exact service and route with strict TypeScript
+        run: npm exec --yes --package=typescript@5.9.3 -- tsc -p .validation/docs-state-gateway/tsconfig.json
+      - name: Run exact CLI and MCP attacks
+        run: node --test .validation/docs-state-gateway/apps/web/test/book-studio-state-migration-cli-mcp.test.mjs
+      - name: Verify no Art Studio production source changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin bc25cdd0fad5d562a8ed60be46ac2d99d62a23c9
+          unexpected="$(git diff --name-only bc25cdd0fad5d562a8ed60be46ac2d99d62a23c9 HEAD | grep -Ev '^(\.github/workflows/validate-docs-state-bundle-gateway\.yml|\.validation/docs-state-gateway/)' || true)"
+          test -z "$unexpected" || {
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
