@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type WebpOptions } from "sharp";
 
 import { resolveDeliveryImageProfile } from "./profiles.js";
 import { MAXIMUM_PIXELS } from "./raster.js";
@@ -94,17 +94,17 @@ export async function encodeCandidate(
       .toBuffer();
   }
 
-  return pipeline
-    .webp({
-      quality: candidate.quality,
-      alphaQuality: 100,
-      effort: 6,
-      lossless: candidate.lossless === true,
-      nearLossless:
-        candidate.lossless === true ? false : candidate.nearLossless,
-      smartSubsample: false,
-    })
-    .toBuffer();
+  const webpOptions: WebpOptions & { readonly exact: boolean } = {
+    quality: candidate.quality,
+    alphaQuality: 100,
+    effort: 6,
+    lossless: candidate.lossless === true,
+    nearLossless:
+      candidate.lossless === true ? false : candidate.nearLossless,
+    exact: candidate.lossless === true,
+    smartSubsample: false,
+  };
+  return pipeline.webp(webpOptions).toBuffer();
 }
 
 export function candidateFailures(
@@ -178,6 +178,13 @@ export function candidateFailures(
     evidence.alpha.transparentPixels + evidence.alpha.partialPixels > 0
   ) {
     failures.push("opaque-profile-retained-transparency");
+  }
+  if (
+    profileId === "godot-cutout-webp-1080p" &&
+    evidence.format === "webp" &&
+    evidence.metrics.transparentRgbDifferingPixels > 0
+  ) {
+    failures.push("transparent-rgb-not-preserved");
   }
   return failures;
 }

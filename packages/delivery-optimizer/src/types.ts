@@ -130,6 +130,9 @@ export interface DeliveryPixelMetrics {
   readonly alphaMaximumDifference: number;
   readonly comparedColourSamples: number;
   readonly pixels: number;
+  readonly transparentRgbComparedPixels: number;
+  readonly transparentRgbDifferingPixels: number;
+  readonly transparentRgbMaximumDifference: number;
 }
 
 export interface DeliveryCandidateEvidence {

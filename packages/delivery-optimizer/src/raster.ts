@@ -208,6 +208,9 @@ export function comparePixels(
   let alphaAbsolute = 0;
   let alphaMaximumDifference = 0;
   const pixels = reference.byteLength / 4;
+  let transparentRgbComparedPixels = 0;
+  let transparentRgbDifferingPixels = 0;
+  let transparentRgbMaximumDifference = 0;
 
   for (let offset = 0; offset < reference.byteLength; offset += 4) {
     const referenceAlpha = reference[offset + 3]!;
@@ -215,6 +218,21 @@ export function comparePixels(
     const alphaDifference = Math.abs(referenceAlpha - candidateAlpha);
     alphaAbsolute += alphaDifference;
     alphaMaximumDifference = Math.max(alphaMaximumDifference, alphaDifference);
+    if (referenceAlpha === 0 && candidateAlpha === 0) {
+      transparentRgbComparedPixels += 1;
+      let pixelDiffers = false;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const difference = Math.abs(
+          reference[offset + channel]! - candidate[offset + channel]!,
+        );
+        if (difference > 0) pixelDiffers = true;
+        transparentRgbMaximumDifference = Math.max(
+          transparentRgbMaximumDifference,
+          difference,
+        );
+      }
+      if (pixelDiffers) transparentRgbDifferingPixels += 1;
+    }
     const weight = Math.max(referenceAlpha, candidateAlpha) / 255;
     if (weight <= 0) continue;
     for (let channel = 0; channel < 3; channel += 1) {
@@ -242,6 +260,9 @@ export function comparePixels(
     alphaMaximumDifference,
     comparedColourSamples: colourSamples,
     pixels,
+    transparentRgbComparedPixels,
+    transparentRgbDifferingPixels,
+    transparentRgbMaximumDifference,
   };
 }
 
