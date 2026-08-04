@@ -1,10 +1,10 @@
 export * from "./book-studio-narrative-craft-types";
+export { BOOK_NARRATIVE_ARCHETYPES } from "./book-studio-narrative-craft-archetypes";
+export { BOOK_NARRATIVE_KNOWLEDGE_MODULES } from "./book-studio-narrative-craft-knowledge-modules";
 export {
-  BOOK_NARRATIVE_ARCHETYPES,
-  BOOK_NARRATIVE_KNOWLEDGE_MODULES,
   BOOK_NARRATIVE_QUALITY_RUBRIC,
   BOOK_NARRATIVE_REVISION_PROTOCOL,
-} from "./book-studio-narrative-craft-knowledge";
+} from "./book-studio-narrative-craft-quality";
 export {
   bookAuthoringOperationRequiresNarrativeCraft,
   listBookNarrativeCraftCapabilities,
@@ -15,6 +15,4 @@ export {
   fingerprintBookNarrativeCraftPacket,
   validateBookNarrativeCraftPacket,
 } from "./book-studio-narrative-craft-packet";
-export {
-  evaluateBookNarrativeCraftEvidence,
-} from "./book-studio-narrative-craft-evaluate";
+export { evaluateBookNarrativeCraftEvidence } from "./book-studio-narrative-craft-evaluate";
