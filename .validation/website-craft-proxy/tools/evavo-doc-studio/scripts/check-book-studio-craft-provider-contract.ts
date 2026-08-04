@@ -212,6 +212,38 @@ async function assertTimeoutIsNotRetried(): Promise<void> {
   assert.equal(calls, 1);
 }
 
+async function assertResponseBodyTimeoutIsNotRetried(): Promise<void> {
+  let calls = 0;
+  await assert.rejects(
+    requestEvavoDocsSuiteLegacyCraft({
+      requestId: "request:response-timeout",
+      requestedAt: "2026-08-05T00:00:00.000Z",
+      payload,
+      configuration: { ...configuration, timeoutMs: 10 },
+      fetchImpl: async (_input, init) => {
+        calls += 1;
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("{"));
+            init?.signal?.addEventListener("abort", () => {
+              const error = new Error("aborted while reading response");
+              error.name = "AbortError";
+              controller.error(error);
+            }, { once: true });
+          }
+        }), { status: 200 });
+      }
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EvavoDocsSuiteLegacyCraftProxyError);
+      assert.equal(error.code, "BOOK_CRAFT_PROXY_TIMEOUT");
+      assert.equal(error.status, 504);
+      return true;
+    }
+  );
+  assert.equal(calls, 1);
+}
+
 async function assertAuthorityTamperingIsRejected(): Promise<void> {
   await assert.rejects(
     requestEvavoDocsSuiteLegacyCraft({
@@ -356,6 +388,7 @@ async function main(): Promise<void> {
   await assertExactRemoteExecution();
   await assertNoRetryAndNoSecretLeak();
   await assertTimeoutIsNotRetried();
+  await assertResponseBodyTimeoutIsNotRetried();
   await assertAuthorityTamperingIsRejected();
   await assertUnknownResponseFieldsAreRejected();
   await assertFingerprintTamperingIsRejected();
@@ -368,6 +401,7 @@ async function main(): Promise<void> {
     contract: "evavo_docs_book_legacy_craft_genome_v1",
     endpoint: "/api/v1/book-studio/legacy-craft-genome",
     streamedRequestAndResponseLimitsRequired: true,
+    requestAndResponseBodyTimeoutsClassified: true,
     strictUtf8Required: true,
     originOnlyConfigurationRequired: true,
     controlCharacterFreeTokenRequired: true,
