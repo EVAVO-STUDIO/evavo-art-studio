@@ -16,6 +16,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 concurrency:
   group: validate-docs-authorial-mirror-${{ github.ref }}
@@ -27,12 +29,14 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Check out source-equivalent validation mirror
+        id: checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Check out retained unattended production carrier
+        id: retained
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: ${{ github.repository }}
@@ -42,6 +46,7 @@ jobs:
           fetch-depth: 1
 
       - name: Use Node.js 22
+        id: node
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 22
@@ -70,6 +75,7 @@ jobs:
           printf 'MIRROR_ROOT=%s\n' "$mirror" >> "$GITHUB_ENV"
 
       - name: Prove exact retained and reviewed source blobs
+        id: blobs
         shell: bash
         run: |
           set -euo pipefail
@@ -99,12 +105,15 @@ jobs:
           done
 
       - name: Install validation-only compiler tools
+        id: install
         run: npm install --prefix "$MIRROR_ROOT" --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
 
       - name: Compile strict authorial and unattended core boundary
+        id: core_typecheck
         run: "$MIRROR_ROOT/node_modules/.bin/tsc" -p "$MIRROR_ROOT/tsconfig.json"
 
       - name: Run narrative authorial bridge and unattended attacks
+        id: core_tests
         run: >-
           "$MIRROR_ROOT/node_modules/.bin/tsx" --test
           "$MIRROR_ROOT/test/narrative-craft.test.mjs"
@@ -113,9 +122,11 @@ jobs:
           "$MIRROR_ROOT/test/unattended-authorial-writing.test.mjs"
 
       - name: Run CLI and dual-era MCP transport attacks
+        id: adapter_tests
         run: node --test "$MIRROR_ROOT/apps/web/scripts/test-book-studio-unattended-authorial-writing-adapters.mjs"
 
       - name: Compile exact protected service and route strictly
+        id: web_typecheck
         shell: bash
         run: |
           set -euo pipefail
@@ -171,6 +182,7 @@ jobs:
           }
           TS
           printf 'export {};\n' > "$webroot/stubs/server-only.ts"
+          ln -s "$MIRROR_ROOT/node_modules" "$webroot/node_modules"
           cat > "$webroot/tsconfig.json" <<'JSON'
           {
             "compilerOptions": {
@@ -202,6 +214,7 @@ jobs:
           "$MIRROR_ROOT/node_modules/.bin/tsc" -p "$webroot/tsconfig.json"
 
       - name: Run exact permanent production checker
+        id: authority_checker
         shell: bash
         run: |
           set -euo pipefail
@@ -230,6 +243,7 @@ jobs:
           node "$checkroot/scripts/check-book-studio-unattended-authorial-writing.mjs"
 
       - name: Prove no Art Studio production source changed
+        id: isolation
         shell: bash
         run: |
           set -euo pipefail
@@ -242,27 +256,85 @@ jobs:
             exit 1
           }
 
-      - name: Prove validation checkout remained clean
+      - name: Restore disposable reconstruction and prove clean checkout
+        id: clean
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          git diff --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          git -C "$GITHUB_WORKSPACE" checkout -- validation/docs-narrative-craft/src/book-studio-project-contracts.ts
+          rm -f \
+            "$GITHUB_WORKSPACE/validation/docs-narrative-craft/src/book-studio-universal-readiness.ts" \
+            "$GITHUB_WORKSPACE/validation/docs-narrative-craft/src/book-studio-universal-readiness-governance.ts" \
+            "$GITHUB_WORKSPACE/validation/docs-narrative-craft/src/book-studio-unattended-production.ts"
+          git -C "$GITHUB_WORKSPACE" diff --exit-code
+          test -z "$(git -C "$GITHUB_WORKSPACE" status --porcelain=v1 --untracked-files=no)"
 
-      - name: Record validation boundary
+      - name: Publish hosted validation receipt
+        if: always() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          RETAINED_OUTCOME: ${{ steps.retained.outcome }}
+          NODE_OUTCOME: ${{ steps.node.outcome }}
+          ASSEMBLE_OUTCOME: ${{ steps.assemble.outcome }}
+          BLOBS_OUTCOME: ${{ steps.blobs.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          CORE_TYPECHECK_OUTCOME: ${{ steps.core_typecheck.outcome }}
+          CORE_TESTS_OUTCOME: ${{ steps.core_tests.outcome }}
+          ADAPTER_TESTS_OUTCOME: ${{ steps.adapter_tests.outcome }}
+          WEB_TYPECHECK_OUTCOME: ${{ steps.web_typecheck.outcome }}
+          AUTHORITY_OUTCOME: ${{ steps.authority_checker.outcome }}
+          ISOLATION_OUTCOME: ${{ steps.isolation.outcome }}
+          CLEAN_OUTCOME: ${{ steps.clean.outcome }}
+        shell: bash
         run: |
-          printf '%s\n' \
-            'validation=retained-unattended-plus-byte-pinned-authorial-mirror' \
-            'docs-base-head=626bcd3af1bc1b1ffb92e28661e62069ed181951' \
-            'docs-feature-head=8aeea45b1224683c12060e82f3d838522934a15a' \
-            'exact-plan-binding=true' \
-            'exact-dependency-receipt-binding=true' \
-            'strict-core-typecheck=true' \
-            'strict-web-service-route-typecheck=true' \
-            'dual-era-mcp-attacks=true' \
-            'provider-call-performed=false' \
-            'canonical-manuscript-mutation-performed=false' \
-            'automatic-canonical-admission-allowed=false' \
-            'art-studio-production-source-changed=false' \
-            'publication-performed=false'
+          set -euo pipefail
+          conclusion="success"
+          for outcome in \
+            "$CHECKOUT_OUTCOME" \
+            "$RETAINED_OUTCOME" \
+            "$NODE_OUTCOME" \
+            "$ASSEMBLE_OUTCOME" \
+            "$BLOBS_OUTCOME" \
+            "$INSTALL_OUTCOME" \
+            "$CORE_TYPECHECK_OUTCOME" \
+            "$CORE_TESTS_OUTCOME" \
+            "$ADAPTER_TESTS_OUTCOME" \
+            "$WEB_TYPECHECK_OUTCOME" \
+            "$AUTHORITY_OUTCOME" \
+            "$ISOLATION_OUTCOME" \
+            "$CLEAN_OUTCOME"
+          do
+            if [[ "$outcome" != "success" ]]; then conclusion="failure"; fi
+          done
+          cat > "$RUNNER_TEMP/receipt.md" <<EOF
+          ### Docs unattended authorial hosted validation
+
+          Validation head: \`${GITHUB_SHA}\`
+          Workflow run: \`${GITHUB_RUN_ID}\`
+          Conclusion: **${conclusion}**
+          Docs feature head: \`8aeea45b1224683c12060e82f3d838522934a15a\`
+          Docs base head: \`626bcd3af1bc1b1ffb92e28661e62069ed181951\`
+
+          | Boundary | Outcome |
+          |---|---|
+          | checkout | ${CHECKOUT_OUTCOME} |
+          | retained unattended reconstruction | ${ASSEMBLE_OUTCOME} |
+          | exact blob proof | ${BLOBS_OUTCOME} |
+          | strict core TypeScript | ${CORE_TYPECHECK_OUTCOME} |
+          | narrative, authorial, bridge and unattended attacks | ${CORE_TESTS_OUTCOME} |
+          | CLI and dual-era MCP attacks | ${ADAPTER_TESTS_OUTCOME} |
+          | strict protected service and route TypeScript | ${WEB_TYPECHECK_OUTCOME} |
+          | permanent production authority checker | ${AUTHORITY_OUTCOME} |
+          | Art production-source isolation | ${ISOLATION_OUTCOME} |
+          | clean tracked checkout | ${CLEAN_OUTCOME} |
+
+          Provider call performed: **false**  
+          Canonical manuscript mutation performed: **false**  
+          Automatic canonical admission allowed: **false**  
+          Publication performed: **false**
+          EOF
+          jq -Rs '{body: .}' "$RUNNER_TEMP/receipt.md" | \
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/121/comments" --input -
+          test "$conclusion" = "success"
