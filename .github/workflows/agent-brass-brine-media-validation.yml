@@ -4,13 +4,18 @@ on:
   push:
     branches:
       - agent/brass-brine-media-plan-20260804
+  pull_request:
+    paths:
+      - ".github/workflows/agent-brass-brine-media-validation.yml"
+      - "packages/delivery-optimizer/**"
+      - "docs/delivery-image-optimization.md"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: agent-brass-brine-media-${{ github.ref }}
+  group: agent-brass-brine-media-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
