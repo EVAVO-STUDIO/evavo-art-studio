@@ -1,30 +1,71 @@
-name: Probe Docs Suite Readiness Access
+name: Validate Docs Book Universal Readiness
 
 on:
   push:
     branches:
       - automation/validate-docs-book-universal-readiness-20260804
+    paths:
+      - ".github/workflows/probe-docs-suite-readiness-access.yml"
+      - "validation/docs-book-universal-readiness/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/probe-docs-suite-readiness-access.yml"
+      - "validation/docs-book-universal-readiness/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: validate-docs-book-universal-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  probe:
+  verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Check out validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - name: Probe exact private Docs source access
-        env:
-          GH_TOKEN: ${{ github.token }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Prove exact Docs Suite source blobs
+        shell: bash
         run: |
           set -euo pipefail
-          gh api repos/EVAVO-STUDIO/evavo-docs-suite/contents/packages/core/src/book-studio-project-contracts.ts \
-            -f ref=agent/book-universal-readiness-20260804 \
-            --jq '.sha'
+          project_contracts="$(git hash-object validation/docs-book-universal-readiness/packages/core/src/book-studio-project-contracts.ts)"
+          readiness="$(git hash-object validation/docs-book-universal-readiness/packages/core/src/book-studio-universal-readiness.ts)"
+          printf 'project_contracts=%s\nreadiness=%s\n' "$project_contracts" "$readiness"
+          test "$project_contracts" = "fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
+          test "$readiness" = "3c348b4969d94f2e81a7a4e8e0f9c2399850e640"
+
+      - name: Install validation-only compiler tools
+        run: npm install --prefix validation/docs-book-universal-readiness --no-save --package-lock=false --ignore-scripts typescript@5.9.3 tsx@4.20.3
+
+      - name: Compile the readiness boundary strictly
+        run: validation/docs-book-universal-readiness/node_modules/.bin/tsc -p validation/docs-book-universal-readiness/tsconfig.json
+
+      - name: Run universal project and edge-case attacks
+        run: validation/docs-book-universal-readiness/node_modules/.bin/tsx --test validation/docs-book-universal-readiness/packages/core/test/book-studio-universal-readiness.test.mjs
+
+      - name: Verify no Art Studio production source changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          merge_base="$(git merge-base HEAD origin/main)"
+          test -n "$merge_base"
+          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/probe-docs-suite-readiness-access\.yml|validation/docs-book-universal-readiness/)' || true)"
+          test -z "$unexpected" || {
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
