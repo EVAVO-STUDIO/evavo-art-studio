@@ -8,6 +8,33 @@ const CONTRACT_ID = "evavo_godot_media_production_contract_v1";
 const PLAN_ID = "evavo_godot_media_production_plan_v1";
 const MAXIMUM_INPUT_BYTES = 64 * 1024 * 1024;
 const MAXIMUM_ITEMS = 100_000;
+const MAXIMUM_ROLES = 100;
+const SHA256 = /^[a-f0-9]{64}$/;
+const REPOSITORY_ID = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const ROLE_ID = /^[a-z0-9][a-z0-9-]{0,95}$/;
+const EXTENSION = /^\.[a-z0-9][a-z0-9.+-]{0,31}$/;
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+const WINDOWS_RESERVED_STEMS = new Set([
+  "con",
+  "prn",
+  "aux",
+  "nul",
+  ...Array.from({ length: 9 }, (_, index) => `com${index + 1}`),
+  ...Array.from({ length: 9 }, (_, index) => `lpt${index + 1}`),
+]);
+const ALPHA_USAGES = new Set([
+  "none",
+  "opaque-channel",
+  "meaningful",
+  "fully-transparent",
+  "unknown",
+]);
+const IMAGE_ALPHA_POLICIES = new Set([
+  "require-meaningful-alpha",
+  "preserve-authored-opaque",
+  "preserve-authored-black-stage",
+  "review-required",
+]);
 
 class FoundationMediaPlanError extends Error {
   constructor(code, message) {
@@ -17,71 +44,144 @@ class FoundationMediaPlanError extends Error {
   }
 }
 
+const isRecord = (value) =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const fail = (code, message) => {
+  throw new FoundationMediaPlanError(code, message);
+};
+
 const parseArgs = (argv) => {
   const result = { roles: [], strict: false };
+  const seenScalar = new Set();
+  let strictSeen = false;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--strict") {
+      if (strictSeen) fail("OPTION_DUPLICATE", token);
+      strictSeen = true;
       result.strict = true;
       continue;
     }
     if (!["--repo", "--contract", "--audit", "--output", "--role"].includes(token)) {
-      throw new FoundationMediaPlanError("OPTION_UNSUPPORTED", token);
+      fail("OPTION_UNSUPPORTED", String(token));
     }
     const value = argv[index + 1];
     if (!value || value.startsWith("--")) {
-      throw new FoundationMediaPlanError("OPTION_VALUE_MISSING", token);
+      fail("OPTION_VALUE_MISSING", token);
     }
     index += 1;
-    if (token === "--role") result.roles.push(value);
-    else result[token.slice(2)] = value;
+    if (token === "--role") {
+      result.roles.push(value);
+      continue;
+    }
+    if (seenScalar.has(token)) fail("OPTION_DUPLICATE", token);
+    seenScalar.add(token);
+    result[token.slice(2)] = value;
   }
   for (const required of ["repo", "contract", "audit", "output"]) {
-    if (!result[required]) {
-      throw new FoundationMediaPlanError("OPTION_REQUIRED", `--${required}`);
-    }
+    if (!result[required]) fail("OPTION_REQUIRED", `--${required}`);
   }
   return result;
 };
 
 const isWithin = (candidate, root) => {
   const relative = path.relative(root, candidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  return (
+    relative === "" ||
+    (!relative.startsWith(`..${path.sep}`) &&
+      relative !== ".." &&
+      !path.isAbsolute(relative))
+  );
 };
 
-const resolveDirectory = (value, label) => {
-  const absolute = fs.realpathSync.native(path.resolve(value));
-  const stats = fs.lstatSync(absolute);
-  if (!stats.isDirectory() || stats.isSymbolicLink()) {
-    throw new FoundationMediaPlanError("DIRECTORY_INVALID", label);
+const samePath = (left, right) => path.relative(left, right) === "";
+
+const assertNoSymlinkSegments = (
+  value,
+  label,
+  { allowMissingLeaf = false } = {},
+) => {
+  const absolute = path.resolve(value);
+  const parsed = path.parse(absolute);
+  const parts = absolute
+    .slice(parsed.root.length)
+    .split(path.sep)
+    .filter(Boolean);
+  let current = parsed.root;
+  for (let index = 0; index < parts.length; index += 1) {
+    current = path.join(current, parts[index]);
+    const finalPart = index === parts.length - 1;
+    if (allowMissingLeaf && finalPart && !fs.existsSync(current)) break;
+    let stats;
+    try {
+      stats = fs.lstatSync(current);
+    } catch (error) {
+      fail(
+        "PATH_COMPONENT_MISSING",
+        `${label}:${current}:${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (stats.isSymbolicLink()) {
+      fail("SYMLINK_PATH_FORBIDDEN", `${label}:${current}`);
+    }
   }
   return absolute;
 };
 
+const resolveDirectory = (value, label) => {
+  const unresolved = assertNoSymlinkSegments(value, label);
+  const absolute = fs.realpathSync.native(unresolved);
+  const stats = fs.lstatSync(absolute);
+  if (!stats.isDirectory() || stats.isSymbolicLink()) {
+    fail("DIRECTORY_INVALID", label);
+  }
+  return absolute;
+};
+
+const sameIdentity = (left, right) =>
+  left.dev === right.dev &&
+  left.ino === right.ino &&
+  left.size === right.size &&
+  left.mtimeMs === right.mtimeMs;
+
 const stableJson = (value, label) => {
-  const absolute = fs.realpathSync.native(path.resolve(value));
+  const unresolved = assertNoSymlinkSegments(value, label);
+  const absolute = fs.realpathSync.native(unresolved);
   const statsBefore = fs.lstatSync(absolute);
   if (!statsBefore.isFile() || statsBefore.isSymbolicLink()) {
-    throw new FoundationMediaPlanError("FILE_INVALID", label);
+    fail("FILE_INVALID", label);
   }
   if (statsBefore.size > MAXIMUM_INPUT_BYTES) {
-    throw new FoundationMediaPlanError("FILE_TOO_LARGE", label);
+    fail("FILE_TOO_LARGE", label);
   }
-  const bytes = fs.readFileSync(absolute);
+  const descriptor = fs.openSync(absolute, "r");
+  let bytes;
+  try {
+    const opened = fs.fstatSync(descriptor);
+    if (!sameIdentity(statsBefore, opened)) {
+      fail("FILE_CHANGED_BEFORE_OPEN", label);
+    }
+    bytes = fs.readFileSync(descriptor);
+    const openedAfter = fs.fstatSync(descriptor);
+    if (!sameIdentity(opened, openedAfter)) {
+      fail("FILE_CHANGED_DURING_READ", label);
+    }
+  } finally {
+    fs.closeSync(descriptor);
+  }
   let parsed;
   try {
     parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch (error) {
-    throw new FoundationMediaPlanError("JSON_INVALID", `${label}:${error.message}`);
+    fail(
+      "JSON_INVALID",
+      `${label}:${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   const statsAfter = fs.lstatSync(absolute);
-  if (
-    statsBefore.dev !== statsAfter.dev ||
-    statsBefore.ino !== statsAfter.ino ||
-    statsBefore.size !== statsAfter.size ||
-    statsBefore.mtimeMs !== statsAfter.mtimeMs
-  ) {
-    throw new FoundationMediaPlanError("FILE_CHANGED_DURING_READ", label);
+  if (!sameIdentity(statsBefore, statsAfter)) {
+    fail("FILE_CHANGED_DURING_READ", label);
   }
   return {
     path: absolute,
@@ -91,104 +191,310 @@ const stableJson = (value, label) => {
 };
 
 const normalizeRelative = (value, label) => {
-  if (typeof value !== "string" || value.length === 0 || value.includes("\0")) {
-    throw new FoundationMediaPlanError("PATH_INVALID", label);
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    CONTROL_CHARACTERS.test(value)
+  ) {
+    fail("PATH_INVALID", label);
   }
   const normalized = value.replaceAll("\\", "/").normalize("NFC");
   if (
     normalized.startsWith("/") ||
     /^[A-Za-z]:/.test(normalized) ||
-    normalized.split("/").some((part) => part === ".." || part === "")
+    normalized
+      .split("/")
+      .some((part) => part === ".." || part === "." || part === "")
   ) {
-    throw new FoundationMediaPlanError("PATH_INVALID", `${label}:${value}`);
+    fail("PATH_INVALID", `${label}:${value}`);
   }
   return normalized;
 };
 
-const portableKey = (value) => normalizeRelative(value, "portable path").toLocaleLowerCase("en-US");
+const portableKey = (value) =>
+  normalizeRelative(value, "portable path").toLocaleLowerCase("en-US");
 
-const stringArray = (value, label) => {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.length === 0)) {
-    throw new FoundationMediaPlanError("STRING_ARRAY_INVALID", label);
+const nonEmptyString = (value, label, maximum = 512) => {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > maximum ||
+    CONTROL_CHARACTERS.test(value)
+  ) {
+    fail("STRING_INVALID", label);
   }
-  if (new Set(value).size !== value.length) {
-    throw new FoundationMediaPlanError("STRING_ARRAY_DUPLICATE", label);
-  }
-  return [...value];
+  return value;
 };
+
+const stringArray = (
+  value,
+  label,
+  { allowEmpty = false, caseInsensitive = false, maximumItems = 10_000 } = {},
+) => {
+  if (
+    !Array.isArray(value) ||
+    (!allowEmpty && value.length === 0) ||
+    value.length > maximumItems
+  ) {
+    fail("STRING_ARRAY_INVALID", label);
+  }
+  const output = value.map((item, index) =>
+    nonEmptyString(item, `${label}[${index}]`, 2_048),
+  );
+  const identities = output.map((item) =>
+    caseInsensitive ? item.toLocaleLowerCase("en-US") : item,
+  );
+  if (new Set(identities).size !== identities.length) {
+    fail("STRING_ARRAY_DUPLICATE", label);
+  }
+  return output;
+};
+
+const positiveInteger = (value, label) => {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    fail("POSITIVE_INTEGER_INVALID", label);
+  }
+  return value;
+};
+
+const nonNegativeInteger = (value, label) => {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    fail("NON_NEGATIVE_INTEGER_INVALID", label);
+  }
+  return value;
+};
+
+const normalizePathToken = (value, label) => {
+  const token = nonEmptyString(value, label, 512)
+    .replaceAll("\\", "/")
+    .normalize("NFC");
+  if (token.split("/").some((part) => part === ".." || part === ".")) {
+    fail("PATH_TOKEN_INVALID", `${label}:${value}`);
+  }
+  return token;
+};
+
+const runtimeRootAllowed = (runtimeRoot, roots) =>
+  roots.some(
+    (root) =>
+      runtimeRoot === root || runtimeRoot.startsWith(`${root}/`),
+  );
 
 const contractRoles = (contract, repository) => {
   if (
-    contract?.schemaVersion !== "1.0" ||
-    contract?.contract !== CONTRACT_ID ||
-    contract?.repository !== repository ||
-    contract?.engine?.name !== "Godot" ||
-    contract?.engine?.minimumVersion !== "4.6.2"
+    !isRecord(contract) ||
+    contract.schemaVersion !== "1.0" ||
+    contract.contract !== CONTRACT_ID ||
+    contract.repository !== repository ||
+    !REPOSITORY_ID.test(repository) ||
+    contract.engine?.name !== "Godot" ||
+    contract.engine?.minimumVersion !== "4.6.2"
   ) {
-    throw new FoundationMediaPlanError("CONTRACT_IDENTITY_INVALID", repository);
+    fail("CONTRACT_IDENTITY_INVALID", String(repository));
   }
   if (
-    contract?.batchPolicy?.sourceFilesAreImmutable !== true ||
-    contract?.batchPolicy?.outputsAreUnapprovedUntilPromoted !== true ||
-    contract?.batchPolicy?.automaticDeletionAllowed !== false ||
-    contract?.batchPolicy?.partialBatchPublicationAllowed !== false
+    contract.batchPolicy?.sourceFilesAreImmutable !== true ||
+    contract.batchPolicy?.outputsAreUnapprovedUntilPromoted !== true ||
+    contract.batchPolicy?.automaticDeletionAllowed !== false ||
+    contract.batchPolicy?.partialBatchPublicationAllowed !== false
   ) {
-    throw new FoundationMediaPlanError("CONTRACT_BATCH_POLICY_INVALID", repository);
+    fail("CONTRACT_BATCH_POLICY_INVALID", repository);
   }
   if (
-    contract?.mcpExecution?.rootRestrictionRequired !== true ||
-    contract?.mcpExecution?.arbitraryShellAllowed !== false ||
-    contract?.mcpExecution?.arbitraryGitArgumentsAllowed !== false ||
-    contract?.mcpExecution?.forcePushAllowed !== false
+    contract.mcpExecution?.rootRestrictionRequired !== true ||
+    contract.mcpExecution?.arbitraryShellAllowed !== false ||
+    contract.mcpExecution?.arbitraryGitArgumentsAllowed !== false ||
+    contract.mcpExecution?.forcePushAllowed !== false
   ) {
-    throw new FoundationMediaPlanError("CONTRACT_MCP_POLICY_INVALID", repository);
+    fail("CONTRACT_MCP_POLICY_INVALID", repository);
   }
-  if (!Array.isArray(contract.roles) || contract.roles.length === 0 || contract.roles.length > 100) {
-    throw new FoundationMediaPlanError("CONTRACT_ROLES_INVALID", repository);
+  if (
+    !Array.isArray(contract.roles) ||
+    contract.roles.length === 0 ||
+    contract.roles.length > MAXIMUM_ROLES
+  ) {
+    fail("CONTRACT_ROLES_INVALID", repository);
   }
+  const runtimeRoots = Array.isArray(contract.roots?.runtime)
+    ? stringArray(contract.roots.runtime, "contract.roots.runtime", {
+        caseInsensitive: true,
+        maximumItems: 1_000,
+      }).map((entry, index) =>
+        normalizeRelative(entry, `contract.roots.runtime[${index}]`),
+      )
+    : [];
   const roles = new Map();
   const identities = new Set();
   for (const source of contract.roles) {
-    if (!source || typeof source !== "object" || typeof source.id !== "string") {
-      throw new FoundationMediaPlanError("CONTRACT_ROLE_INVALID", repository);
+    if (!isRecord(source) || typeof source.id !== "string" || !ROLE_ID.test(source.id)) {
+      fail("CONTRACT_ROLE_INVALID", repository);
     }
     const identity = source.id.toLocaleLowerCase("en-US");
     if (identities.has(identity)) {
-      throw new FoundationMediaPlanError("CONTRACT_ROLE_DUPLICATE", source.id);
+      fail("CONTRACT_ROLE_DUPLICATE", source.id);
     }
     identities.add(identity);
+    const runtimeRoot = normalizeRelative(
+      source.runtimeRoot,
+      `${source.id}.runtimeRoot`,
+    );
+    if (
+      runtimeRoots.length > 0 &&
+      !runtimeRootAllowed(runtimeRoot, runtimeRoots)
+    ) {
+      fail("CONTRACT_RUNTIME_ROOT_UNDECLARED", `${source.id}:${runtimeRoot}`);
+    }
+    const auditRoles = stringArray(source.auditRoles, `${source.id}.auditRoles`, {
+      caseInsensitive: true,
+      maximumItems: 100,
+    });
+    const pathTokens = stringArray(source.pathTokens, `${source.id}.pathTokens`, {
+      caseInsensitive: true,
+      maximumItems: 100,
+    }).map((entry, index) =>
+      normalizePathToken(entry, `${source.id}.pathTokens[${index}]`),
+    );
+    const requiredStages = stringArray(
+      source.requiredStages,
+      `${source.id}.requiredStages`,
+      { caseInsensitive: true, maximumItems: 1_000 },
+    );
+    if (source.canvas === null) {
+      if (
+        source.alphaPolicy !== "not-applicable" ||
+        source.fitPolicy !== "not-applicable"
+      ) {
+        fail("CONTRACT_NON_IMAGE_ROLE_INVALID", source.id);
+      }
+    } else {
+      if (!isRecord(source.canvas)) {
+        fail("CONTRACT_ROLE_CANVAS_INVALID", source.id);
+      }
+      const policy = nonEmptyString(
+        source.canvas.policy,
+        `${source.id}.canvas.policy`,
+        64,
+      );
+      if (policy === "exact") {
+        positiveInteger(source.canvas.width, `${source.id}.canvas.width`);
+        positiveInteger(source.canvas.height, `${source.id}.canvas.height`);
+      }
+      if (!IMAGE_ALPHA_POLICIES.has(source.alphaPolicy)) {
+        fail("CONTRACT_ALPHA_POLICY_INVALID", source.id);
+      }
+      if (
+        source.fitPolicy === "not-applicable" ||
+        typeof source.fitPolicy !== "string" ||
+        source.fitPolicy.length === 0
+      ) {
+        fail("CONTRACT_FIT_POLICY_INVALID", source.id);
+      }
+      if (!isRecord(source.godotImport)) {
+        fail("CONTRACT_GODOT_IMPORT_INVALID", source.id);
+      }
+    }
+    nonEmptyString(source.runtimeFormat, `${source.id}.runtimeFormat`, 128);
     const role = {
       ...source,
-      runtimeRoot: normalizeRelative(source.runtimeRoot, `${source.id}.runtimeRoot`),
-      auditRoles: stringArray(source.auditRoles, `${source.id}.auditRoles`),
-      pathTokens: stringArray(source.pathTokens, `${source.id}.pathTokens`),
-      requiredStages: stringArray(source.requiredStages, `${source.id}.requiredStages`),
+      runtimeRoot,
+      auditRoles,
+      auditRoleIdentities: new Set(
+        auditRoles.map((entry) => entry.toLocaleLowerCase("en-US")),
+      ),
+      pathTokens,
+      requiredStages,
     };
     roles.set(source.id, role);
   }
   return roles;
 };
 
+const validateImageEvidence = (image, label) => {
+  if (!isRecord(image)) fail("AUDIT_IMAGE_EVIDENCE_INVALID", label);
+  nonEmptyString(image.format, `${label}.format`, 64);
+  if (image.width !== undefined) positiveInteger(image.width, `${label}.width`);
+  if (image.height !== undefined) positiveInteger(image.height, `${label}.height`);
+  if (typeof image.hasAlphaChannel !== "boolean") {
+    fail("AUDIT_IMAGE_EVIDENCE_INVALID", `${label}.hasAlphaChannel`);
+  }
+  if (!ALPHA_USAGES.has(image.alphaUsage)) {
+    fail("AUDIT_IMAGE_EVIDENCE_INVALID", `${label}.alphaUsage`);
+  }
+  if (typeof image.probeComplete !== "boolean") {
+    fail("AUDIT_IMAGE_EVIDENCE_INVALID", `${label}.probeComplete`);
+  }
+  stringArray(image.warnings, `${label}.warnings`, {
+    allowEmpty: true,
+    maximumItems: 10_000,
+  });
+};
+
+const validateAuditRow = (row, index) => {
+  const label = `audit.artFiles[${index}]`;
+  if (!isRecord(row)) fail("AUDIT_ROW_INVALID", label);
+  const sourcePath = normalizeRelative(row.path, `${label}.path`);
+  const extension = nonEmptyString(row.extension, `${label}.extension`, 32)
+    .normalize("NFC")
+    .toLocaleLowerCase("en-US");
+  if (!EXTENSION.test(extension)) {
+    fail("AUDIT_ROW_EXTENSION_INVALID", `${label}:${extension}`);
+  }
+  if (path.posix.extname(sourcePath).toLocaleLowerCase("en-US") !== extension) {
+    fail("AUDIT_ROW_EXTENSION_MISMATCH", `${sourcePath}:${extension}`);
+  }
+  if (typeof row.sha256 !== "string" || !SHA256.test(row.sha256)) {
+    fail("AUDIT_ROW_SHA256_INVALID", sourcePath);
+  }
+  nonNegativeInteger(row.sizeBytes, `${label}.sizeBytes`);
+  nonEmptyString(row.category, `${label}.category`, 64);
+  nonEmptyString(row.role, `${label}.role`, 128);
+  const findings = stringArray(row.findings, `${label}.findings`, {
+    allowEmpty: true,
+    maximumItems: 10_000,
+  });
+  if (row.category === "image" || row.image !== undefined) {
+    validateImageEvidence(row.image, `${label}.image`);
+  }
+  return {
+    ...row,
+    path: sourcePath,
+    extension,
+    findings,
+  };
+};
+
 const auditRows = (audit, repositoryRoot) => {
   if (
-    audit?.schemaVersion !== "1.0" ||
-    audit?.analysisVersion !== "1.0" ||
-    audit?.engine !== "godot" ||
-    audit?.truncated === true ||
-    !Array.isArray(audit?.artFiles)
+    !isRecord(audit) ||
+    audit.schemaVersion !== "1.0" ||
+    audit.analysisVersion !== "1.0" ||
+    audit.engine !== "godot" ||
+    audit.truncated !== false ||
+    !Array.isArray(audit.artFiles)
   ) {
-    throw new FoundationMediaPlanError("AUDIT_AUTHORITY_INVALID", repositoryRoot);
+    fail("AUDIT_AUTHORITY_INVALID", repositoryRoot);
   }
   if (audit.artFiles.length > MAXIMUM_ITEMS) {
-    throw new FoundationMediaPlanError("AUDIT_ITEM_LIMIT_EXCEEDED", String(audit.artFiles.length));
+    fail("AUDIT_ITEM_LIMIT_EXCEEDED", String(audit.artFiles.length));
   }
-  return audit.artFiles;
+  const auditRoot = resolveDirectory(audit.root, "audit.root");
+  if (!samePath(auditRoot, repositoryRoot)) {
+    fail("AUDIT_ROOT_MISMATCH", `${auditRoot}:${repositoryRoot}`);
+  }
+  return {
+    auditRoot,
+    rows: audit.artFiles.map(validateAuditRow),
+  };
 };
 
 const roleMatches = (row, role) => {
-  const auditMatch = role.auditRoles.includes(row.role);
-  const lowerPath = `/${String(row.path).replaceAll("\\", "/").toLocaleLowerCase("en-US")}`;
-  const tokenMatch = role.pathTokens.some((token) => lowerPath.includes(String(token).toLocaleLowerCase("en-US")));
+  const auditMatch = role.auditRoleIdentities.has(
+    row.role.toLocaleLowerCase("en-US"),
+  );
+  const lowerPath = `/${row.path.toLocaleLowerCase("en-US")}`;
+  const tokenMatch = role.pathTokens.some((token) =>
+    lowerPath.includes(token.toLocaleLowerCase("en-US")),
+  );
   return { auditMatch, tokenMatch, matched: auditMatch || tokenMatch };
 };
 
@@ -198,17 +504,23 @@ const extensionFor = (runtimeFormat, sourceExtension) => {
   if (normalized.includes("webp")) return ".webp";
   if (normalized.includes("ogg")) return ".ogg";
   if (normalized.includes("wav")) return ".wav";
-  return sourceExtension.startsWith(".") ? sourceExtension : `.${sourceExtension}`;
+  return sourceExtension.startsWith(".")
+    ? sourceExtension
+    : `.${sourceExtension}`;
 };
 
 const runtimeName = (sourcePath, extension) => {
   const parsed = path.posix.parse(sourcePath);
-  const stem = parsed.name
-    .normalize("NFC")
-    .toLocaleLowerCase("en-US")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "") || "asset";
-  return `${stem}${extension}`;
+  const stem =
+    parsed.name
+      .normalize("NFC")
+      .toLocaleLowerCase("en-US")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "asset";
+  return {
+    fileName: `${stem}${extension}`,
+    windowsReserved: WINDOWS_RESERVED_STEMS.has(stem),
+  };
 };
 
 const itemActions = (role) => {
@@ -220,38 +532,68 @@ const itemActions = (role) => {
   if (role.alphaPolicy === "require-meaningful-alpha") {
     actions.push("master-and-review-alpha-edges");
   }
-  if (role.animation) actions.push("compile-and-review-animation-sequence");
+  if (role.animation) {
+    actions.push("compile-and-review-animation-sequence");
+  }
   return actions;
 };
 
 const roleBlockers = (row, role) => {
   const blockers = [];
-  if (role.canvas !== null && !row.image) blockers.push("image-evidence-required");
+  if (role.canvas !== null && !row.image) {
+    blockers.push("image-evidence-required");
+  }
   if (
     role.alphaPolicy === "require-meaningful-alpha" &&
     row.image?.alphaUsage !== "meaningful"
   ) {
     blockers.push("meaningful-alpha-required");
   }
-  if (role.alphaPolicy === "preserve-authored-opaque" && row.image?.alphaUsage === "fully-transparent") {
+  if (
+    role.alphaPolicy === "preserve-authored-opaque" &&
+    row.image?.alphaUsage === "fully-transparent"
+  ) {
     blockers.push("opaque-art-cannot-be-fully-transparent");
   }
   if (role.canvas?.policy === "exact") {
-    if (row.image?.width !== role.canvas.width || row.image?.height !== role.canvas.height) {
+    if (
+      row.image?.width !== role.canvas.width ||
+      row.image?.height !== role.canvas.height
+    ) {
       blockers.push("exact-canvas-mismatch");
     }
   }
   return [...new Set(blockers)].sort();
 };
 
-const writeCreateOnly = (output, value) => {
-  const absolute = path.resolve(output);
-  const parent = fs.realpathSync.native(path.dirname(absolute));
+const syncDirectoryBestEffort = (directory) => {
+  let descriptor;
+  try {
+    descriptor = fs.openSync(directory, "r");
+    fs.fsyncSync(descriptor);
+  } catch (error) {
+    const code = error && typeof error === "object" ? error.code : undefined;
+    if (!["EACCES", "EINVAL", "EISDIR", "ENOTSUP", "EPERM"].includes(code)) {
+      throw error;
+    }
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+  }
+};
+
+const writeCreateOnly = (output, value, repositoryRoot) => {
+  const absolute = assertNoSymlinkSegments(output, "output", {
+    allowMissingLeaf: true,
+  });
+  const parent = resolveDirectory(path.dirname(absolute), "output parent");
   if (fs.existsSync(absolute)) {
-    throw new FoundationMediaPlanError("OUTPUT_EXISTS", absolute);
+    fail("OUTPUT_EXISTS", absolute);
   }
   if (!isWithin(absolute, parent)) {
-    throw new FoundationMediaPlanError("OUTPUT_PATH_INVALID", absolute);
+    fail("OUTPUT_PATH_INVALID", absolute);
+  }
+  if (isWithin(absolute, repositoryRoot)) {
+    fail("OUTPUT_INSIDE_REPOSITORY", absolute);
   }
   const source = `${JSON.stringify(value, null, 2)}\n`;
   const descriptor = fs.openSync(absolute, "wx", 0o600);
@@ -261,6 +603,8 @@ const writeCreateOnly = (output, value) => {
   } finally {
     fs.closeSync(descriptor);
   }
+  syncDirectoryBestEffort(parent);
+  return absolute;
 };
 
 const main = () => {
@@ -268,25 +612,34 @@ const main = () => {
   const repositoryRoot = resolveDirectory(options.repo, "repository");
   const contractRecord = stableJson(options.contract, "contract");
   if (!isWithin(contractRecord.path, repositoryRoot)) {
-    throw new FoundationMediaPlanError("CONTRACT_OUTSIDE_REPOSITORY", contractRecord.path);
+    fail("CONTRACT_OUTSIDE_REPOSITORY", contractRecord.path);
   }
   const auditRecord = stableJson(options.audit, "audit");
   const repository = contractRecord.value.repository;
   const roles = contractRoles(contractRecord.value, repository);
-  const requestedRoles = options.roles.length === 0 ? [...roles.keys()] : [...new Set(options.roles)];
+  const requestedRoleIdentities = new Set();
+  const requestedRoles = [];
+  for (const source of options.roles.length === 0
+    ? [...roles.keys()]
+    : options.roles) {
+    const roleId = nonEmptyString(source, "--role", 96);
+    const identity = roleId.toLocaleLowerCase("en-US");
+    if (requestedRoleIdentities.has(identity)) continue;
+    requestedRoleIdentities.add(identity);
+    requestedRoles.push(roleId);
+  }
   for (const roleId of requestedRoles) {
-    if (!roles.has(roleId)) throw new FoundationMediaPlanError("ROLE_UNKNOWN", roleId);
+    if (!roles.has(roleId)) fail("ROLE_UNKNOWN", roleId);
   }
   const selectedRoleSet = new Set(requestedRoles);
-  const rows = auditRows(auditRecord.value, repositoryRoot);
+  const audited = auditRows(auditRecord.value, repositoryRoot);
   const workItems = [];
   const seen = new Set();
-  for (const row of rows) {
-    if (!row || typeof row !== "object") continue;
-    const sourcePath = normalizeRelative(row.path, "audit.artFiles.path");
+  for (const row of audited.rows) {
+    const sourcePath = row.path;
     const identity = portableKey(sourcePath);
     if (seen.has(identity)) {
-      throw new FoundationMediaPlanError("AUDIT_PATH_COLLISION", sourcePath);
+      fail("AUDIT_PATH_COLLISION", sourcePath);
     }
     seen.add(identity);
     const candidates = [];
@@ -297,47 +650,73 @@ const main = () => {
     }
     if (candidates.length === 0) continue;
     candidates.sort((left, right) => {
-      if (left.auditMatch !== right.auditMatch) return left.auditMatch ? -1 : 1;
+      if (left.auditMatch !== right.auditMatch) {
+        return left.auditMatch ? -1 : 1;
+      }
       return left.role.id.localeCompare(right.role.id, "en-US");
     });
-    const strongest = candidates.filter((candidate) => candidate.auditMatch === candidates[0].auditMatch);
+    const strongest = candidates.filter(
+      (candidate) => candidate.auditMatch === candidates[0].auditMatch,
+    );
     const role = strongest[0].role;
     const blockers = roleBlockers(row, role);
-    if (strongest.length > 1) blockers.push("ambiguous-role-classification");
-    const findings = Array.isArray(row.findings)
-      ? [...new Set(row.findings.filter((value) => typeof value === "string" && value.length > 0))].sort()
-      : [];
-    const extension = extensionFor(role.runtimeFormat, String(row.extension ?? ".png"));
-    const runtimeTargetPath = `${role.runtimeRoot}/${runtimeName(sourcePath, extension)}`;
+    if (strongest.length > 1) {
+      blockers.push("ambiguous-role-classification");
+    }
+    const extension = extensionFor(role.runtimeFormat, row.extension);
+    const runtime = runtimeName(sourcePath, extension);
+    if (runtime.windowsReserved) {
+      blockers.push("windows-reserved-runtime-name");
+    }
+    const runtimeTargetPath = `${role.runtimeRoot}/${runtime.fileName}`;
     workItems.push({
       sourcePath,
       sourceSha256: row.sha256,
       sourceBytes: row.sizeBytes,
       sourceExtension: row.extension,
       role: role.id,
-      roleAuthority: candidates[0].auditMatch ? "audit-role" : "path-token",
+      roleAuthority: candidates[0].auditMatch
+        ? "audit-role"
+        : "path-token",
       runtimeRoot: role.runtimeRoot,
       runtimeFormat: role.runtimeFormat,
       runtimeTargetPath,
       ...(role.canvas === undefined ? {} : { canvas: role.canvas }),
       alphaPolicy: role.alphaPolicy,
       fitPolicy: role.fitPolicy,
-      ...(role.godotImport === undefined ? {} : { godotImport: role.godotImport }),
+      ...(role.godotImport === undefined
+        ? {}
+        : { godotImport: role.godotImport }),
       actions: itemActions(role),
       requiredStages: role.requiredStages,
       blockers: [...new Set(blockers)].sort(),
-      reviewRequired: blockers.length > 0 || findings.length > 0,
-      auditFindings: findings,
+      reviewRequired: blockers.length > 0 || row.findings.length > 0,
+      auditFindings: row.findings,
     });
   }
-  workItems.sort((left, right) => left.sourcePath.localeCompare(right.sourcePath, "en-US", { sensitivity: "base" }));
-  const targetIdentities = new Set();
+  workItems.sort(
+    (left, right) =>
+      left.sourcePath.localeCompare(right.sourcePath, "en-US", {
+        sensitivity: "base",
+      }) || left.sourcePath.localeCompare(right.sourcePath, "en-US"),
+  );
+  const targetGroups = new Map();
   for (const item of workItems) {
     const key = portableKey(item.runtimeTargetPath);
-    if (targetIdentities.has(key)) item.blockers.push("runtime-target-collision");
-    targetIdentities.add(key);
+    const members = targetGroups.get(key) ?? [];
+    members.push(item);
+    targetGroups.set(key, members);
+  }
+  for (const members of targetGroups.values()) {
+    if (members.length < 2) continue;
+    for (const item of members) {
+      item.blockers.push("runtime-target-collision");
+    }
+  }
+  for (const item of workItems) {
     item.blockers = [...new Set(item.blockers)].sort();
-    item.reviewRequired = item.blockers.length > 0 || item.auditFindings.length > 0;
+    item.reviewRequired =
+      item.blockers.length > 0 || item.auditFindings.length > 0;
   }
   const roleCounts = {};
   const blockerCounts = {};
@@ -352,51 +731,69 @@ const main = () => {
     }
   }
   if (options.strict && (blocked > 0 || reviewRequired > 0)) {
-    throw new FoundationMediaPlanError(
+    fail(
       "STRICT_PLAN_NOT_READY",
       `blocked=${blocked},reviewRequired=${reviewRequired}`,
     );
   }
-  const contractPath = normalizeRelative(path.relative(repositoryRoot, contractRecord.path), "contractPath");
+  const contractPath = normalizeRelative(
+    path.relative(repositoryRoot, contractRecord.path),
+    "contractPath",
+  );
   const plan = {
     schemaVersion: "1.0",
     contract: PLAN_ID,
     repository,
     contractPath,
     contractSha256: contractRecord.sha256,
-    auditRoot: String(auditRecord.value.root ?? repositoryRoot),
+    auditRoot: audited.auditRoot,
     auditSha256: auditRecord.sha256,
-    selectedRoles: requestedRoles.filter((roleId) => roles.get(roleId).canvas !== null).sort(),
+    selectedRoles: requestedRoles
+      .filter((roleId) => roles.get(roleId).canvas !== null)
+      .sort(),
     summary: {
       workItems: workItems.length,
       reviewRequired,
       blocked,
       roleCounts: Object.fromEntries(Object.entries(roleCounts).sort()),
-      blockerCounts: Object.fromEntries(Object.entries(blockerCounts).sort()),
+      blockerCounts: Object.fromEntries(
+        Object.entries(blockerCounts).sort(),
+      ),
     },
     workItems,
     publicationAuthority: false,
     deletionAuthority: false,
     humanCreativeApprovalRequired: true,
   };
-  writeCreateOnly(options.output, plan);
-  process.stdout.write(`${JSON.stringify({
-    status: "passed",
-    output: path.resolve(options.output),
-    workItems: workItems.length,
-    blocked,
-    reviewRequired,
-    contractSha256: contractRecord.sha256,
-    auditSha256: auditRecord.sha256,
-    mutationPerformed: false,
-    publicationAuthority: false,
-  }, null, 2)}\n`);
+  const outputPath = writeCreateOnly(options.output, plan, repositoryRoot);
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        status: "passed",
+        output: outputPath,
+        workItems: workItems.length,
+        blocked,
+        reviewRequired,
+        contractSha256: contractRecord.sha256,
+        auditSha256: auditRecord.sha256,
+        planFileCreated: true,
+        mutationPerformed: true,
+        mutationScope: "create-only-plan-file",
+        targetRepositoryMutationPerformed: false,
+        publicationAuthority: false,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 };
 
 try {
   main();
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${JSON.stringify({ status: "failed", error: message })}\n`);
+  process.stderr.write(
+    `${JSON.stringify({ status: "failed", error: message })}\n`,
+  );
   process.exitCode = 2;
 }
