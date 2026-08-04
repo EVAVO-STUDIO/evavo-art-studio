@@ -56,22 +56,21 @@ test("prepares one exact shadow import after rerunning current validators", asyn
 });
 
 test("rejects stale validation identity and incomplete production state", async () => {
+  const stale = await request({ expectedValidationFingerprint: sha("f") });
   await assert.rejects(
-    () => prepareBookStateShadowImport(
-      request({ expectedValidationFingerprint: sha("f") }),
-      executor,
-    ),
+    () => prepareBookStateShadowImport(stale, executor),
     /VALIDATION_MISMATCH/,
   );
 
   const bundle = await fixture();
   bundle.items.pop();
   const validation = await compileBookStateMigrationBundle(bundle, executor);
+  const incomplete = await request({
+    bundle,
+    expectedValidationFingerprint: validation.bundleFingerprint,
+  });
   await assert.rejects(
-    () => prepareBookStateShadowImport(
-      request({ bundle, expectedValidationFingerprint: validation.bundleFingerprint }),
-      executor,
-    ),
+    () => prepareBookStateShadowImport(incomplete, executor),
     /BUNDLE_NOT_READY/,
   );
 });
@@ -95,23 +94,19 @@ test("rejects duplicate validation payloads, unknown fields and authority escala
 });
 
 test("requires coherent optimistic compare-and-swap expectations", async () => {
+  const inconsistent = await request({
+    expectedCurrentRevision: 0,
+    expectedCurrentSnapshotFingerprint: sha("1"),
+  });
   await assert.rejects(
-    () => prepareBookStateShadowImport(
-      request({
-        expectedCurrentRevision: 0,
-        expectedCurrentSnapshotFingerprint: sha("1"),
-      }),
-      executor,
-    ),
+    () => prepareBookStateShadowImport(inconsistent, executor),
     /EXPECTATION_INCONSISTENT/,
   );
-  const prepared = await prepareBookStateShadowImport(
-    await request({
-      expectedCurrentRevision: 3,
-      expectedCurrentSnapshotFingerprint: sha("2"),
-    }),
-    executor,
-  );
+  const coherent = await request({
+    expectedCurrentRevision: 3,
+    expectedCurrentSnapshotFingerprint: sha("2"),
+  });
+  const prepared = await prepareBookStateShadowImport(coherent, executor);
   assert.equal(prepared.plan.expectedCurrentRevision, 3);
   assert.equal(prepared.plan.expectedCurrentSnapshotFingerprint, sha("2"));
 });
@@ -147,4 +142,5 @@ test("compiles a deterministic non-mutating rollback rehearsal plan", async () =
   assert.equal(first.statePersisted, false);
   assert.equal(first.docsSuiteCanonicalWriterEnabled, false);
   assert.equal(first.publicationPerformed, false);
-});
+}
+);
