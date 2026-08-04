@@ -67,11 +67,12 @@ jobs:
 
       - name: Verify no Art Studio production source changed
         shell: bash
+        env:
+          VALIDATION_BASE_SHA: ${{ github.event.pull_request.base.sha || '57e0623d7de840ec1523cbba271b77595a432661' }}
         run: |
           set -euo pipefail
-          base="57e0623d7de840ec1523cbba271b77595a432661"
-          git fetch --no-tags --depth=1 origin "$base"
-          unexpected="$(git diff --name-only "$base" HEAD | grep -Ev '^(\.github/workflows/validate-website-craft-proxy-retirement\.yml|\.validation/website-craft-proxy/)' || true)"
+          git fetch --no-tags --depth=1 origin "$VALIDATION_BASE_SHA"
+          unexpected="$(git diff --name-only "$VALIDATION_BASE_SHA" HEAD | grep -Ev '^(\.github/workflows/validate-website-craft-proxy-retirement\.yml|\.validation/website-craft-proxy/)' || true)"
           test -z "$unexpected" || {
             printf '%s\n' "$unexpected"
             exit 1
@@ -85,7 +86,7 @@ jobs:
             "status": "PASS",
             "websiteRepository": "EVAVO-STUDIO/Website",
             "websitePullRequest": 73,
-            "websiteHead": "c9bfc9617daf83a2e3de0699b7b2b1679545a79d",
+            "websiteHead": "46d7bdccefef268f4d39e7aa3e489897d4568691",
             "mirrorRepository": "EVAVO-STUDIO/evavo-art-studio",
             "mirrorHead": "${GITHUB_SHA}",
             "exactGitBlobs": 12,
