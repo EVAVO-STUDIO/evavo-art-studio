@@ -21,12 +21,14 @@ concurrency:
 
 env:
   DOCS_SOURCE_REPOSITORY: EVAVO-STUDIO/evavo-docs-suite
-  DOCS_SOURCE_REF: agent/book-narrative-craft-intelligence-20260804
+  DOCS_SOURCE_REF: refs/pull/77/merge
+  EXPECTED_DOCS_SOURCE_SHA: 25c19a34f1f7c7e8c4ed6cfc73fde7453409f9d9
+  EXPECTED_DOCS_PR_HEAD: 70d7c08def858fd264116ee4376a5ce3c53934cc
 
 jobs:
   exact-source:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Check out disposable validation host
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -34,7 +36,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Check out exact Docs Suite branch source
+      - name: Check out exact Docs Suite PR merge source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: ${{ env.DOCS_SOURCE_REPOSITORY }}
@@ -43,12 +45,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Record checked Docs source identity
+      - name: Prove exact reviewed merge identity
         shell: bash
         run: |
           set -euo pipefail
-          printf 'docs-source-sha=%s\n' "$(git -C docs-source rev-parse HEAD)"
-          test "$(git -C docs-source branch --show-current)" = "${DOCS_SOURCE_REF}"
+          actual="$(git -C docs-source rev-parse HEAD)"
+          printf '%s\n' \
+            "docs-source-sha=$actual" \
+            "docs-pr-head=${EXPECTED_DOCS_PR_HEAD}"
+          test "$actual" = "${EXPECTED_DOCS_SOURCE_SHA}"
 
       - name: Use exact Docs Suite Node.js runtime
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
@@ -72,7 +77,7 @@ jobs:
           corepack pnpm --filter @evavo-docs/core typecheck
           corepack pnpm --filter @evavo-docs/web typecheck
 
-      - name: Run narrative and authorial adversarial suites
+      - name: Run psychology dialogue prose voice genre idea evidence and rights attacks
         working-directory: docs-source
         run: >-
           npm exec --yes --package=tsx@4.20.3 -- tsx --test
@@ -82,6 +87,14 @@ jobs:
       - name: Run exact CLI and MCP attacks
         working-directory: docs-source
         run: node --test apps/web/scripts/test-book-studio-narrative-craft-adapters.mjs
+
+      - name: Run complete repository verification
+        working-directory: docs-source
+        run: corepack pnpm verify
+
+      - name: Build complete production workspace
+        working-directory: docs-source
+        run: corepack pnpm build
 
       - name: Prove exact Docs source remained clean
         working-directory: docs-source
@@ -107,8 +120,17 @@ jobs:
       - name: Record validation boundary
         run: |
           printf '%s\n' \
-            'validation=exact-docs-source-checkout' \
-            'source-equivalent-claim=false' \
+            'validation=exact-docs-pr-merge-source' \
+            "source-sha=${EXPECTED_DOCS_SOURCE_SHA}" \
+            "pr-head=${EXPECTED_DOCS_PR_HEAD}" \
+            'knowledge-version=2' \
+            'unicode-language-evidence=true' \
+            'exact-dialogue-turn-plan=true' \
+            'deep-packet-validation=true' \
+            'exact-phrase-overlap-receipt=true' \
+            'criterion-specific-independent-reviews=true' \
+            'self-review-allowed=false' \
+            'non-applicable-criteria-excluded=true' \
             'voice-metrics=23' \
             'genre-blueprints=20' \
             'idea-criteria=10' \
