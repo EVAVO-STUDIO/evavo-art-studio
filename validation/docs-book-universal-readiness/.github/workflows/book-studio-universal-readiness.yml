@@ -1,0 +1,72 @@
+name: Book Studio Universal Readiness
+
+on:
+  push:
+    branches: [main]
+    paths: &readiness_paths
+      - ".github/workflows/book-studio-universal-readiness.yml"
+      - "packages/core/src/book-studio-universal-readiness.ts"
+      - "packages/core/src/book-studio-universal-readiness-governance.ts"
+      - "packages/core/src/index.ts"
+      - "packages/core/test/book-studio-universal-readiness.test.mjs"
+      - "packages/core/test/book-studio-universal-readiness-governance.test.mjs"
+      - "apps/web/src/lib/book-studio-universal-readiness-service.ts"
+      - "apps/web/src/app/api/v1/book-studio/universal-readiness/route.ts"
+      - "apps/web/scripts/evavo-docs-book-readiness-cli.mjs"
+      - "apps/web/scripts/evavo-docs-book-readiness-mcp.mjs"
+      - "apps/web/scripts/test-book-studio-universal-readiness-adapters.mjs"
+      - "scripts/check-book-studio-universal-readiness.mjs"
+      - "docs/migrations/book-studio/BOOK_STUDIO_UNIVERSAL_READINESS.md"
+  pull_request:
+    branches: [main]
+    paths: *readiness_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: book-studio-universal-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use repository Node.js runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Verify universal readiness authority and surfaces
+        run: node scripts/check-book-studio-universal-readiness.mjs
+
+      - name: Install exact workspace
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Run strict core and web typecheck
+        run: |
+          corepack pnpm --filter @evavo-docs/core typecheck
+          corepack pnpm --filter @evavo-docs/web typecheck
+
+      - name: Run universal project, governance and edge-case attacks
+        run: npm exec --yes --package=tsx@4.20.3 -- tsx --test packages/core/test/book-studio-universal-readiness.test.mjs packages/core/test/book-studio-universal-readiness-governance.test.mjs
+
+      - name: Run CLI and MCP adapter attacks
+        run: node --test apps/web/scripts/test-book-studio-universal-readiness-adapters.mjs
+
+      - name: Prove clean tracked source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
