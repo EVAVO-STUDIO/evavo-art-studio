@@ -27,11 +27,13 @@ const HELP = `EVAVO Art Delivery Optimizer
 
 Commands:
   evavo-art-optimize profiles
-  evavo-art-optimize image --input <file> --profile <id> --background <preserve|black|#RRGGBB> (--dry-run | --apply --output <file>) [--evidence <json>]
+  evavo-art-optimize image --input <file> --profile <id> --background <preserve|black|#RRGGBB|luminance-alpha> (--dry-run | --apply --output <file>) [--evidence <json>]
   evavo-art-optimize batch --manifest <json> --source-root <dir> --output-root <new-dir> (--dry-run | --apply)
 
 Production batches are create-only and publish through an atomic new output directory.
 Dialogue portraits normally use --background preserve; standing characters, cutout props and UI icons may use black or an explicit matte colour.
+Rain, snow, fog, spray and reflection sources painted over black may use --background luminance-alpha to create soft tintable alpha without a hard threshold.
+Advanced luminance black point, white point, gamma, colour and inversion controls are available in batch manifests.
 `;
 
 function required(value: string | undefined, name: string): string {
@@ -60,11 +62,21 @@ function exactMode(values: Readonly<Record<string, unknown>>): boolean {
 function background(value: string): DeliveryBackgroundPolicy {
   const normalized = value.trim().toLowerCase();
   if (normalized === "preserve") return { mode: "preserve" };
+  if (normalized === "luminance-alpha") {
+    return {
+      mode: "luminance-alpha",
+      blackPoint: 0,
+      whitePoint: 255,
+      gamma: 1,
+      outputColour: "#ffffff",
+      invert: false,
+    };
+  }
   const matteColour = normalized === "black" ? "#000000" : normalized;
   if (!/^#[0-9a-f]{6}$/u.test(matteColour)) {
     throw new DeliveryOptimizerError(
       "DELIVERY_CLI_BACKGROUND_INVALID",
-      "--background must be preserve, black or #RRGGBB.",
+      "--background must be preserve, luminance-alpha, black or #RRGGBB.",
     );
   }
   return {
