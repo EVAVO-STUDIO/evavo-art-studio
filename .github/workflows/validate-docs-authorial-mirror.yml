@@ -79,6 +79,7 @@ jobs:
             'idea-criteria=10' \
             'prose-devices=22' \
             'authorial-writing-bridge=prevalidated-one-call-runtime' \
+            'authorial-writing-bridge-tests=4' \
             'provider-call-performed=false' \
             'canonical-manuscript-mutation-performed=false' \
             'automatic-canonical-admission-allowed=false' \
