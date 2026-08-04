@@ -115,9 +115,22 @@ for (const token of [
   "pnpm --filter @evavo/art-book-runtime test",
   "pnpm --filter @evavo/art-studio-cli test",
   "pnpm check",
+  "Remove bounded validation scratch and verify clean exact source",
+  "rm -rf examples/legacy-book-artwork-registration/artifacts",
+  "test ! -e examples/legacy-book-artwork-registration/artifacts",
+  'git status --porcelain=v1 --untracked-files=all',
 ]) {
   assert(workflow.includes(token), `Book Art workflow is missing ${token}`);
 }
+assert(
+  (workflow.match(/rm -rf examples\/legacy-book-artwork-registration\/artifacts/g) ?? [])
+    .length === 1,
+  "Book Art workflow must remove exactly one bounded legacy-registration scratch directory",
+);
+assert(
+  !workflow.includes("rm -rf examples/legacy-book-artwork-registration\n"),
+  "Book Art workflow must not remove the complete legacy-registration example boundary",
+);
 for (const token of [
   "Register exact legacy artwork bytes",
   "book-art-legacy-register",
@@ -149,6 +162,7 @@ console.log(
       sourceArtifactWrites: 1,
       evidenceArtifactWrites: 1,
       namedReferenceUpdates: 0,
+      boundedValidationScratchCleanup: true,
       selectionPerformed: false,
       promotionPerformed: false,
       bookUseBindingCreated: false,

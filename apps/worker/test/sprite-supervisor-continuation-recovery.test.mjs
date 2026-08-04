@@ -118,6 +118,26 @@ function continuationFromSnapshot(snapshot, key) {
   );
 }
 
+function supervisorSubmission(fx, tick, payload, overrides = {}) {
+  return {
+    queue: "control",
+    kind: "art.sprite-production.supervise",
+    idempotencyKey: continuationKey(fx, tick),
+    payload,
+    requiredCapabilities: SPRITE_SUPERVISOR_CAPABILITIES,
+    maximumAttempts: 3,
+    leaseDurationMs: 120_000,
+    timeoutMs: 300_000,
+    labels: {
+      runId: fx.workflow.runId,
+      spritePlanId: fx.workflow.request.spritePlan.planId,
+      workflowSha256: fx.workflow.workflowSha256,
+      supervisorTick: String(tick),
+    },
+    ...overrides,
+  };
+}
+
 test("recovers one missing continuation from persisted running state", async () => {
   const fx = await fixture("restart-safe-missing-continuation");
   try {
@@ -253,6 +273,86 @@ test("rejects an incompatible control-queue idempotency entry", async () => {
       (error) =>
         error instanceof RuntimeError &&
         error.code === "RUNTIME_IDEMPOTENCY_CONFLICT",
+    );
+  } finally {
+    await rm(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("rejects a tick-zero root job that omits the exact request hash", async () => {
+  const fx = await fixture("restart-safe-root-request-hash-required");
+  try {
+    const forged = await fx.runtime.submit(
+      supervisorSubmission(fx, 0, {
+        schemaVersion: "1.0",
+        workflowSha256: fx.workflow.workflowSha256,
+        request: fx.workflow.request,
+      }),
+      "continuation-recovery-test",
+    );
+    await assert.rejects(
+      () => fx.handler(handlerContext(fx, forged)),
+      (error) =>
+        error instanceof RuntimeError &&
+        error.code === "SPRITE_SUPERVISOR_REQUEST_HASH_MISSING",
+    );
+  } finally {
+    await rm(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("rejects a continuation that carries root request-hash authority", async () => {
+  const fx = await fixture("restart-safe-continuation-request-hash-forbidden");
+  try {
+    const forged = await fx.runtime.submit(
+      supervisorSubmission(fx, 1, {
+        schemaVersion: "1.0",
+        workflowSha256: fx.workflow.workflowSha256,
+        requestSha256: fx.workflow.requestSha256,
+        request: fx.workflow.request,
+      }),
+      "continuation-recovery-test",
+    );
+    await assert.rejects(
+      () => fx.handler(handlerContext(fx, forged)),
+      (error) =>
+        error instanceof RuntimeError &&
+        error.code ===
+          "SPRITE_SUPERVISOR_CONTINUATION_REQUEST_HASH_FORBIDDEN",
+    );
+  } finally {
+    await rm(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("rejects supervisor labels that drift from the compiled workflow", async () => {
+  const fx = await fixture("restart-safe-label-identity-required");
+  try {
+    const forged = await fx.runtime.submit(
+      supervisorSubmission(
+        fx,
+        1,
+        {
+          schemaVersion: "1.0",
+          workflowSha256: fx.workflow.workflowSha256,
+          request: fx.workflow.request,
+        },
+        {
+          labels: {
+            runId: "different-run",
+            spritePlanId: fx.workflow.request.spritePlan.planId,
+            workflowSha256: fx.workflow.workflowSha256,
+            supervisorTick: "1",
+          },
+        },
+      ),
+      "continuation-recovery-test",
+    );
+    await assert.rejects(
+      () => fx.handler(handlerContext(fx, forged)),
+      (error) =>
+        error instanceof RuntimeError &&
+        error.code === "SPRITE_SUPERVISOR_JOB_LABEL_MISMATCH",
     );
   } finally {
     await rm(fx.root, { recursive: true, force: true });
