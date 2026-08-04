@@ -8,11 +8,23 @@
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["apps/web/src/*"],
+      "next/server": ["stubs/next-server.ts"],
+      "server-only": ["stubs/server-only.ts"]
+    }
   },
   "include": [
     "packages/core/src/book-studio-project-contracts.ts",
     "packages/core/src/book-studio-universal-readiness.ts",
-    "packages/core/src/book-studio-universal-readiness-governance.ts"
+    "packages/core/src/book-studio-universal-readiness-governance.ts",
+    "apps/web/src/lib/book-studio-universal-readiness-service.ts",
+    "apps/web/src/lib/docs-suite-api-input.ts",
+    "apps/web/src/lib/docs-suite-request-context.ts",
+    "apps/web/src/app/api/v1/book-studio/universal-readiness/route.ts",
+    "stubs/next-server.ts",
+    "stubs/server-only.ts"
   ]
 }
