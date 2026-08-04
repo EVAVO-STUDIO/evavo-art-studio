@@ -392,7 +392,12 @@ const reverifySource = (snapshot, sourcePath) => {
 
 const runtimeExtensions = (runtimeFormat) => {
   const extensions = CONTRACT_RUNTIME_EXTENSIONS.get(runtimeFormat);
-  if (!extensions) fail("CONTRACT_RUNTIME_FORMAT_INVALID", runtimeFormat);
+  if (!extensions) {
+    fail(
+      "RUNTIME_FORMAT_UNSUPPORTED",
+      `CONTRACT_RUNTIME_FORMAT_INVALID:${runtimeFormat}`,
+    );
+  }
   return extensions;
 };
 
