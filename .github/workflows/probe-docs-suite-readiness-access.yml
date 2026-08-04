@@ -38,7 +38,7 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
-      - name: Prove exact Docs Suite source, route, public index and transport blobs
+      - name: Prove every exact Docs Suite readiness landing blob
         shell: bash
         run: |
           set -euo pipefail
@@ -55,6 +55,9 @@ jobs:
           cli="$(git hash-object "$root/apps/web/scripts/evavo-docs-book-readiness-cli.mjs")"
           mcp="$(git hash-object "$root/apps/web/scripts/evavo-docs-book-readiness-mcp.mjs")"
           adapter_test="$(git hash-object "$root/apps/web/scripts/test-book-studio-universal-readiness-adapters.mjs")"
+          checker="$(git hash-object "$root/scripts/check-book-studio-universal-readiness.mjs")"
+          guide="$(git hash-object "$root/docs/migrations/book-studio/BOOK_STUDIO_UNIVERSAL_READINESS.md")"
+          workflow="$(git hash-object "$root/.github/workflows/book-studio-universal-readiness.yml")"
           printf '%s\n' \
             "project_contracts=$project_contracts" \
             "readiness=$readiness" \
@@ -67,7 +70,10 @@ jobs:
             "api_client=$api_client" \
             "cli=$cli" \
             "mcp=$mcp" \
-            "adapter_test=$adapter_test"
+            "adapter_test=$adapter_test" \
+            "checker=$checker" \
+            "guide=$guide" \
+            "workflow=$workflow"
           test "$project_contracts" = "fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
           test "$readiness" = "3c348b4969d94f2e81a7a4e8e0f9c2399850e640"
           test "$governance" = "aac0ff806dbfc41259b4925918a96103a5615489"
@@ -80,6 +86,9 @@ jobs:
           test "$cli" = "428be906cd9a5d45575d5161daae07b6be8b24ba"
           test "$mcp" = "7378422089aee4ea4cc0dd6cafc3de7a089c48b7"
           test "$adapter_test" = "47cf2b7d9fb04ac7316941d4f379d987c1024d44"
+          test "$checker" = "5993627811e68444b5bd96b9f3459e3838a7abdd"
+          test "$guide" = "de399fee31fb3717aa0db5193a5a55e1bce22d09"
+          test "$workflow" = "a2155fe482b841824c7312fd37f05f6d79ba7525"
 
       - name: Verify reconciled public authority exports
         shell: bash
@@ -89,6 +98,9 @@ jobs:
           grep -F 'export * from "./book-studio-state-shadow-import";' "$index"
           grep -F 'compileGovernedBookUniversalReadiness as compileBookUniversalReadiness' "$index"
           grep -F 'from "./book-studio-universal-readiness-governance";' "$index"
+
+      - name: Run exact permanent authority checker
+        run: node validation/docs-book-universal-readiness/scripts/check-book-studio-universal-readiness.mjs
 
       - name: Install validation-only compiler tools
         run: npm install --prefix validation/docs-book-universal-readiness --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
