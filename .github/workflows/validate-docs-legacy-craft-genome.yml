@@ -86,7 +86,7 @@ jobs:
             "status": "PASS",
             "docsRepository": "EVAVO-STUDIO/evavo-docs-suite",
             "docsPullRequest": 78,
-            "docsHead": "8a879e842a8a25e5440943588d47e38902153722",
+            "docsHead": "432954f64688c7d0648c8a58a5ebdad68f7cb709",
             "mirrorRepository": "EVAVO-STUDIO/evavo-art-studio",
             "mirrorHead": "${GITHUB_SHA}",
             "exactGitBlobs": 20,
