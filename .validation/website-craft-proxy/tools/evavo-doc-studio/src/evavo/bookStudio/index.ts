@@ -51,6 +51,7 @@ export * from "./storyBookStudioHumanAuthorialSynthesisProviderProtocol";
 export * from "./storyBookStudioDocsSuiteLegacyCraftTypes";
 export * from "./storyBookStudioDocsSuiteLegacyCraftContracts";
 export * from "./storyBookStudioDocsSuiteLegacyCraftShared";
+export * from "./storyBookStudioDocsSuiteLegacyCraftStream";
 export * from "./storyBookStudioDocsSuiteLegacyCraftClient";
 export * from "./storyBookStudioUniversalPublishingTypes";
 export * from "./storyBookStudioUniversalPublishingProgramme";
