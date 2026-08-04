@@ -1,0 +1,32 @@
+{
+  "outputKind": "evavo_art_docs_book_unattended_validation_receipt",
+  "schemaVersion": 1,
+  "conclusion": "failure",
+  "workflowRunId": "30893557365",
+  "workflowRunAttempt": "1",
+  "testedValidationHead": "a473a64b5f9dd9f40ea9df72b5b6e08588c4fff7",
+  "docsSuitePullRequest": 72,
+  "docsSuiteBranchHead": "a8752ee2490fbc71d3aaafc5c753e57446f729ff",
+  "docsSuiteBaseHead": "64a97575878652ad91ce2aba151997baa357fa12",
+  "payloadSha256": "575bc289dc84444259bb3e86b1d96174fa3c07f26251004b718d1418b699e592",
+  "steps": {
+    "checkout": "success",
+    "node": "success",
+    "reconstruct": "success",
+    "exactBlobs": "success",
+    "authorityChecker": "success",
+    "toolInstall": "success",
+    "strictTypeScript": "success",
+    "coreAndGovernanceTests": "failure",
+    "cliAndMcpTests": "skipped",
+    "protectedRouteTests": "skipped",
+    "artSourceIsolation": "skipped"
+  },
+  "artProductionSourceChanged": false,
+  "providerCallPerformed": false,
+  "runtimeJobSubmitted": false,
+  "authoritativeWritePerformed": false,
+  "canonicalManuscriptMutationPerformed": false,
+  "runtimeCutoverApproved": false,
+  "publicationPerformed": false
+}
