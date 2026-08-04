@@ -97,8 +97,8 @@ export interface BookCoverReadinessV1 {
   textFreeArtworkRequired: boolean;
   editableTypographyRequired: boolean;
   seriesIdentityRequired: boolean;
-  immutablePromotionRequired: true;
-  exactBookUseBindingRequired: true;
+  immutablePromotionRequired: boolean;
+  exactBookUseBindingRequired: boolean;
 }
 
 export interface BookIllustrationReadinessV1 {
@@ -322,7 +322,9 @@ async function compileVolumeReadiness(
 
   const enabledEditions = volume.editionPlans.filter((edition) => edition.enabled);
   const coverCandidateTarget = volume.coverPlan.routeCount * volume.coverPlan.candidatesPerRoute;
-  const coverArtRequired = project.artPolicy.artStudioEnabled;
+  const coverArtRequired =
+    project.artPolicy.artStudioEnabled &&
+    volume.coverPlan.textFreeGeneratedArtworkRequired;
   const illustrationTarget = volume.illustrationPlan.targetCount;
   const qualityGateIds = unique([
     ...reviewProfileIds,
@@ -372,8 +374,8 @@ async function compileVolumeReadiness(
       textFreeArtworkRequired: volume.coverPlan.textFreeGeneratedArtworkRequired,
       editableTypographyRequired: volume.coverPlan.editableTypographyRequired,
       seriesIdentityRequired: volume.coverPlan.seriesIdentityRequired,
-      immutablePromotionRequired: true,
-      exactBookUseBindingRequired: true,
+      immutablePromotionRequired: coverArtRequired,
+      exactBookUseBindingRequired: coverArtRequired,
     },
     illustrations: {
       mode: volume.illustrationPlan.mode,
@@ -566,12 +568,12 @@ function addVolumeFindings(
       "Enable the protected Art Studio handoff or replace generated-art requirements with approved human or licensed artifacts.",
     );
   }
-  if (project.artPolicy.artStudioEnabled && project.artPolicy.generatedArtworkTextFreeRequired && !volume.coverPlan.textFreeGeneratedArtworkRequired) {
+  if (generatedCoverRequired && !project.artPolicy.generatedArtworkTextFreeRequired) {
     add(
       "cover_text_free_policy_mismatch",
       "blocker",
-      `Volume ${volume.volumeId} cover plan conflicts with the project text-free generated artwork policy.`,
-      "Keep generated cover artwork text-free and add title, author, series, spine, ISBN and barcode as editable Docs Suite layers.",
+      `Volume ${volume.volumeId} requests generated cover artwork while the project does not require text-free generated pixels.`,
+      "Require text-free generated cover artwork and add title, author, series, spine, ISBN and barcode as editable Docs Suite layers.",
     );
   }
   if (project.artPolicy.editableTypographyRequired && !volume.coverPlan.editableTypographyRequired) {

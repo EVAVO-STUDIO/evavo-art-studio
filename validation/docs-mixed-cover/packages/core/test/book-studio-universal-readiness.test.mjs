@@ -275,3 +275,56 @@ test("is deterministic across series input order and preserves bounded ownership
     assert.ok(item.automationStages.filter((stage) => stage.automaticExecutionAllowed).every((stage) => stage.owner !== "human_or_external"));
   }
 });
+
+
+test("supports mixed generated-art and typography-only covers in one series", async () => {
+  const input = project("fiction");
+  input.projectId = "mixed-cover-series";
+  input.projectKind = "series";
+  input.sourceAuthorityIds.push("source-authority-2");
+
+  const artVolume = input.volumes[0];
+  artVolume.illustrationPlan = {
+    mode: "none",
+    minimumCount: 0,
+    targetCount: 0,
+    maximumCount: 0,
+    fullPageTarget: 0,
+    smallOrInlineTarget: 0,
+    textWrapRequired: false,
+    reflowFallback: "not_applicable",
+    textFreeGeneratedArtworkRequired: true,
+    editableLabelsRequired: true,
+    sourceEvidenceRequired: true,
+  };
+
+  const typographyVolume = volume("fiction", "volume-2", 2, ["volume-1"]);
+  typographyVolume.coverPlan.textFreeGeneratedArtworkRequired = false;
+  typographyVolume.illustrationPlan = structuredClone(artVolume.illustrationPlan);
+  input.volumes.push(typographyVolume);
+
+  const result = await compileBookUniversalReadiness(input);
+  assert.equal(result.status, "ready_for_automation", result.findings.map((item) => item.message).join("\n"));
+
+  const generated = result.volumes.find((item) => item.volumeId === "volume-1");
+  const typography = result.volumes.find((item) => item.volumeId === "volume-2");
+  assert.ok(generated);
+  assert.ok(typography);
+
+  assert.equal(generated.cover.immutablePromotionRequired, true);
+  assert.equal(generated.cover.exactBookUseBindingRequired, true);
+  assert.ok(generated.automationStages.some((stage) => stage.kind === "cover_candidate" && stage.owner === "art_studio"));
+  assert.ok(generated.automationStages.some((stage) => stage.kind === "cover_binding" && stage.owner === "docs_suite"));
+
+  assert.equal(typography.cover.immutablePromotionRequired, false);
+  assert.equal(typography.cover.exactBookUseBindingRequired, false);
+  assert.equal(typography.automationStages.some((stage) => stage.kind === "cover_candidate"), false);
+  assert.equal(typography.automationStages.some((stage) => stage.kind === "cover_promotion"), false);
+  assert.equal(typography.automationStages.some((stage) => stage.kind === "cover_binding"), false);
+  assert.ok(typography.automationStages.some((stage) =>
+    stage.kind === "cover_selection" &&
+    stage.owner === "human_or_external" &&
+    stage.gateIds.includes("typography_only_or_approved_external_art_route")
+  ));
+  assert.equal(result.totals.artworkUseBindingTarget, 1);
+});
