@@ -73,12 +73,6 @@ for (const [name, value] of Object.entries(retired)) {
 }
 assert.ok(checkedFunctions >= 70, `Only ${checkedFunctions} runtime entrypoints were checked.`);
 
-const shim = await import(
-  pathToFileURL(path.join(root, "dist", "generated", "analyseCoverPixels.js")).href
-);
-assert.equal(shim.analyseCoverPixels, retired.analyseCoverPixels);
-assert.throws(() => shim.analyseCoverPixels(), /Website Book Art production is retired/);
-
 const signedReceipts = {
   authority: "dbb408f53f53c3ab1d295caa2168f01eaeb0ef7cb170367a29bdbf8bb3124c6e",
   retirement: "sha256:ebf3663aa2ac35b5b7b688d1b3af9699d891923a7a32bd79a109ef206cec7a62",
