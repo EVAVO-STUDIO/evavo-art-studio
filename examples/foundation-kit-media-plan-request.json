@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "repository": "EVAVO-STUDIO/GodotGameFoundationKit",
+  "contractPath": "examples/playable_foundation_hub/data/foundation_kit_media_production_contract_v1.json",
+  "selectedRoles": [
+    "shell-desktop-icon",
+    "suite-pointer",
+    "suite-boot-splash",
+    "bitmap-font-atlas",
+    "godz-character-atlas",
+    "godz-citadel-environment",
+    "jonez-location-plate",
+    "jonez-token-and-portrait",
+    "skyfury-aircraft-and-target-atlas",
+    "skyfury-battlefield-plate",
+    "pizza-isometric-entity-atlas",
+    "pizza-management-ui"
+  ],
+  "sourcePolicy": {
+    "immutable": true,
+    "retainEditableMasters": true,
+    "recursiveDerivativeCompressionAllowed": false
+  },
+  "outputPolicy": {
+    "createOnly": true,
+    "strict": false,
+    "publicationAuthority": false,
+    "deletionAuthority": false,
+    "humanCreativeApprovalRequired": true
+  },
+  "nextGate": "python -m godot_game_test_lab.foundation_media_plan"
+}
