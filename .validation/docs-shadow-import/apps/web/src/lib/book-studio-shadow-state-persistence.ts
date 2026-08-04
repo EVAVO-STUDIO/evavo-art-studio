@@ -492,6 +492,7 @@ async function ensureDirectory(directory: string, create: boolean): Promise<void
       stat = await lstat(current);
       created = true;
     }
+    if (!stat) throw new Error("BOOK_STATE_SHADOW_STORE_DIRECTORY_MISSING");
     if (stat.isSymbolicLink() || !stat.isDirectory()) {
       throw new Error("BOOK_STATE_SHADOW_STORE_DIRECTORY_UNSAFE");
     }
@@ -528,6 +529,7 @@ async function withLock<T>(
     if (isCode(error, "EEXIST")) throw new Error("BOOK_STATE_SHADOW_STORE_LOCKED");
     throw error;
   }
+  if (!handle) throw new Error("BOOK_STATE_SHADOW_STORE_LOCK_HANDLE_MISSING");
   try {
     return await run();
   } finally {
