@@ -200,5 +200,15 @@ jobs:
           rm -f pnpm-lock.yaml
           rm -rf examples/legacy-book-artwork-registration/artifacts
           test ! -e examples/legacy-book-artwork-registration/artifacts
-          git diff --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          if ! git diff --exit-code; then
+            echo "::error title=Dirty exact source::Tracked files changed during validation"
+            exit 1
+          fi
+          status="$(git status --porcelain=v1 --untracked-files=all)"
+          if [ -n "$status" ]; then
+            printf '%s\n' "$status"
+            while IFS= read -r line; do
+              echo "::error title=Dirty exact source::$line"
+            done <<< "$status"
+            exit 1
+          fi
