@@ -1,0 +1,8 @@
+Docs Suite unattended Book production validation payload
+
+base64 bytes: 31376
+base64 sha256: a2559ebe10e04debf667f26a41117b967c19ac842b97d89164fd62d3cb8336f7
+archive bytes: 23532
+archive sha256: 575bc289dc84444259bb3e86b1d96174fa3c07f26251004b718d1418b699e592
+Docs PR branch head represented: a8752ee2490fbc71d3aaafc5c753e57446f729ff
+No Art Studio production source is included or changed.
