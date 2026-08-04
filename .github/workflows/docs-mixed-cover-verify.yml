@@ -1,0 +1,70 @@
+name: Verify Docs Mixed Cover Readiness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/docs-mixed-cover-verify.yml"
+      - "validation/docs-mixed-cover/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Prove exact generated Docs blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="validation/docs-mixed-cover"
+          test "$(git hash-object "$root/packages/core/src/book-studio-project-contracts.ts")" = "fa5fd3bf4ceb314cb4926add4231d22cb82863d6"
+          test "$(git hash-object "$root/packages/core/src/book-studio-universal-readiness.ts")" = "a5afe05a9a2cc28a10ead259e05fce14fd766264"
+          test "$(git hash-object "$root/packages/core/test/book-studio-universal-readiness.test.mjs")" = "b67ac328ee7a1202b9d98c2d61741a1162d4cae0"
+
+      - name: Install validation-only compiler tools
+        run: npm install --prefix validation/docs-mixed-cover --no-save --package-lock=false --ignore-scripts typescript@5.9.3 @types/node@22 tsx@4.20.3
+
+      - name: Compile patched readiness strictly
+        shell: bash
+        run: |
+          set -euo pipefail
+          validation/docs-mixed-cover/node_modules/.bin/tsc \
+            --noEmit \
+            --target ES2022 \
+            --lib ES2022,DOM,DOM.Iterable \
+            --module ESNext \
+            --moduleResolution Bundler \
+            --strict \
+            --noUncheckedIndexedAccess \
+            --exactOptionalPropertyTypes \
+            --skipLibCheck \
+            validation/docs-mixed-cover/packages/core/src/book-studio-project-contracts.ts \
+            validation/docs-mixed-cover/packages/core/src/book-studio-universal-readiness.ts
+
+      - name: Run all readiness and mixed-cover attacks
+        run: validation/docs-mixed-cover/node_modules/.bin/tsx --test validation/docs-mixed-cover/packages/core/test/book-studio-universal-readiness.test.mjs
+
+      - name: Verify validation-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          merge_base="$(git merge-base HEAD origin/main)"
+          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/docs-mixed-cover-(patch|verify)\.yml|validation/docs-mixed-cover/)' || true)"
+          test -z "$unexpected" || { printf '%s\n' "$unexpected"; exit 1; }
