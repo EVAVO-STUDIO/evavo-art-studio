@@ -1,0 +1,126 @@
+name: Foundation Media Delivery Authority
+
+on:
+  push:
+    branches: [main]
+    paths: &foundation_delivery_paths
+      - ".github/workflows/foundation-media-delivery-authority.yml"
+      - "scripts/compile-foundation-delivery-manifest.mjs"
+      - "scripts/test-foundation-delivery-manifest.mjs"
+      - "scripts/check-foundation-delivery-manifest.mjs"
+      - "docs/foundation-kit-media-delivery-manifest.md"
+      - "packages/delivery-optimizer/**"
+      - "package.json"
+  pull_request:
+    paths: *foundation_delivery_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundation-media-delivery-authority-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build delivery optimizer dependency closure
+        run: pnpm --filter @evavo/art-delivery-optimizer... build
+
+      - name: Typecheck delivery optimizer
+        run: pnpm --filter @evavo/art-delivery-optimizer typecheck
+
+      - name: Run complete delivery optimizer suite
+        run: pnpm --filter @evavo/art-delivery-optimizer test
+
+      - name: Validate Foundation delivery-manifest authority
+        run: node scripts/check-foundation-delivery-manifest.mjs
+
+      - name: Prove exact source remains clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          find packages apps -type d -name dist -prune -exec rm -rf {} +
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Write bounded authority receipt
+        shell: bash
+        env:
+          VALIDATED_SHA: ${{ github.sha }}
+          VALIDATION_RUN_ID: ${{ github.run_id }}
+          VALIDATION_ATTEMPT: ${{ github.run_attempt }}
+          VALIDATION_REF: ${{ github.ref }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const receipt = {
+            schemaVersion: "1.0",
+            receiptType: "evavo-foundation-media-delivery-authority",
+            repository: "EVAVO-STUDIO/evavo-art-studio",
+            commitSha: process.env.VALIDATED_SHA,
+            workflowRunId: process.env.VALIDATION_RUN_ID,
+            workflowRunAttempt: process.env.VALIDATION_ATTEMPT,
+            ref: process.env.VALIDATION_REF,
+            toolchain: { node: "22.14.0", pnpm: "10.13.1" },
+            verified: [
+              "exact-contract-and-plan-binding",
+              "exact-audit-root-binding",
+              "exact-source-byte-verification",
+              "delivery-manifest-runtime-compatibility",
+              "blocked-and-tampered-input-rejection",
+              "runtime-target-collision-rejection",
+              "unsupported-format-rejection",
+              "symlink-path-rejection",
+              "target-repository-output-isolation",
+              "truthful-create-only-mutation-receipt",
+              "delivery-optimizer-build-typecheck-and-tests",
+              "clean-exact-source"
+            ],
+            providerCalled: false,
+            targetRepositoryMutated: false,
+            candidatePixelsMutatedByValidation: false,
+            deletionPerformed: false,
+            selectionPerformed: false,
+            promotionPerformed: false,
+            deploymentPerformed: false,
+            publicationPerformed: false
+          };
+          fs.writeFileSync(
+            "/tmp/evavo-foundation-media-delivery-authority.json",
+            `${JSON.stringify(receipt, null, 2)}\n`,
+            { mode: 0o600 }
+          );
+          NODE
+
+      - name: Upload bounded authority receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: foundation-media-delivery-authority-${{ github.sha }}
+          path: /tmp/evavo-foundation-media-delivery-authority.json
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 9
