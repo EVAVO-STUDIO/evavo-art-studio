@@ -58,6 +58,7 @@ test("Godot opaque profile emits true lossless WebP", async () => {
   assert.equal(selected?.lossless, true);
   assert.equal(selected?.metrics.meanAbsoluteError, 0);
   assert.equal(selected?.metrics.alphaMeanAbsoluteError, 0);
+  assert.equal(selected?.metrics.transparentRgbDifferingPixels, 0);
   assert.deepEqual(await decoded(result.bytes), sourceRaw);
 });
 
@@ -78,6 +79,11 @@ test("Godot cutout WebP preserves exact visible colour and alpha", async () => {
     background: { mode: "preserve" },
   });
   assert.equal(result.evidence.selectedCandidateId, "webp-lossless");
+  const selected = result.evidence.candidates.find(
+    (candidate) => candidate.id === "webp-lossless",
+  );
+  assert.equal(selected?.lossless, true);
+  assert.equal(selected?.metrics.transparentRgbDifferingPixels, 0);
   assert.deepEqual(await decoded(result.bytes), sourceRaw);
 });
 
@@ -97,13 +103,20 @@ test("Godot cutout WebP fails closed when transparent RGB is not retained", asyn
       profileId: "godot-cutout-webp-1080p",
       background: { mode: "preserve" },
     });
+    const selected = result.evidence.candidates.find(
+      (candidate) => candidate.id === "webp-lossless",
+    );
+    assert.equal(selected?.metrics.transparentRgbDifferingPixels, 0);
     assert.deepEqual(await decoded(result.bytes), sourceRaw);
   } catch (error) {
     assert.ok(error instanceof DeliveryOptimizerError);
     assert.equal(error.code, "DELIVERY_NO_ENCODING_CANDIDATE_PASSED");
-    const failures = error.details?.candidates?.flatMap(
-      (candidate) => candidate.failures,
-    );
-    assert.ok(failures?.includes("transparent-rgb-not-preserved"));
+    const candidates = error.details?.candidates;
+    assert.ok(Array.isArray(candidates));
+    const candidate = candidates.find((value) => value.id === "webp-lossless");
+    assert.ok(candidate.metrics.transparentRgbComparedPixels > 0);
+    assert.ok(candidate.metrics.transparentRgbDifferingPixels > 0);
+    assert.ok(candidate.metrics.transparentRgbMaximumDifference > 0);
+    assert.ok(candidate.failures.includes("transparent-rgb-not-preserved"));
   }
 });
