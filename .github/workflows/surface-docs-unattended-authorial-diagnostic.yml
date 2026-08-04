@@ -1,0 +1,53 @@
+name: Surface Docs Unattended Authorial Diagnostic
+
+on:
+  push:
+    branches:
+      - validation/docs-narrative-craft-20260804
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
+concurrency:
+  group: surface-docs-unattended-authorial-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  surface:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Copy matching diagnostic comment into PR body
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MATCH: Validation head: `${{ github.sha }}`
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=""
+          for _ in $(seq 1 60); do
+            gh api "repos/${GITHUB_REPOSITORY}/issues/121/comments?per_page=100" > "$RUNNER_TEMP/comments.json"
+            body="$(node - "$RUNNER_TEMP/comments.json" <<'NODE'
+          const fs = require('node:fs');
+          const comments = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const match = process.env.MATCH;
+          const found = [...comments].reverse().find((comment) =>
+            typeof comment.body === 'string' && comment.body.includes(match)
+          );
+          if (found) process.stdout.write(found.body);
+          NODE
+            )"
+            if [[ -n "$body" ]]; then
+              break
+            fi
+            sleep 2
+          done
+          if [[ -z "$body" ]]; then
+            echo "Matching diagnostic comment was not found." >&2
+            exit 1
+          fi
+          printf '%s' "$body" | jq -Rs '{body: .}' | \
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/pulls/121" --input -
