@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/lib/book-studio-state-migration-service": [
+        "apps/web/src/lib/book-studio-state-migration-service.ts"
+      ],
+      "@/lib/docs-suite-request-context": [
+        "apps/web/src/lib/docs-suite-request-context.ts"
+      ]
+    }
+  },
+  "include": [
+    "types/**/*.d.ts",
+    "apps/web/src/lib/book-studio-state-migration-service.ts",
+    "apps/web/src/lib/docs-suite-request-context.ts",
+    "apps/web/src/app/api/v1/book-studio/migration/state-bundle/route.ts",
+    "packages/core/src/**/*.ts"
+  ]
+}
