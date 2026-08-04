@@ -30,6 +30,7 @@ import {
   type DeliveryCandidateEvidence,
   type DeliveryImageRequest,
   type DeliveryImageResult,
+  type LuminanceAlphaBackgroundPolicy,
 } from "./types.js";
 
 function backgroundOptions(
@@ -56,6 +57,122 @@ function backgroundOptions(
     maximumInputBytes: MAXIMUM_INPUT_BYTES,
     maximumPixels: MAXIMUM_PIXELS,
   };
+}
+
+function outputColour(value: string | undefined): readonly [number, number, number] {
+  const candidate = (value ?? "#ffffff").toLowerCase();
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/u.exec(candidate);
+  if (!match) {
+    throw new DeliveryOptimizerError(
+      "DELIVERY_LUMINANCE_OUTPUT_COLOUR_INVALID",
+      "Luminance-alpha outputColour must use #RRGGBB.",
+    );
+  }
+  return Object.freeze([
+    Number.parseInt(match[1]!, 16),
+    Number.parseInt(match[2]!, 16),
+    Number.parseInt(match[3]!, 16),
+  ]);
+}
+
+async function deriveLuminanceAlpha(
+  input: Buffer,
+  policy: LuminanceAlphaBackgroundPolicy,
+): Promise<Readonly<{ png: Buffer; evidence: Readonly<Record<string, unknown>> }>> {
+  const blackPoint = policy.blackPoint ?? 0;
+  const whitePoint = policy.whitePoint ?? 255;
+  const gamma = policy.gamma ?? 1;
+  if (
+    !Number.isFinite(blackPoint) ||
+    !Number.isFinite(whitePoint) ||
+    !Number.isFinite(gamma) ||
+    blackPoint < 0 ||
+    blackPoint > 254 ||
+    whitePoint < 1 ||
+    whitePoint > 255 ||
+    blackPoint >= whitePoint ||
+    gamma < 0.1 ||
+    gamma > 4
+  ) {
+    throw new DeliveryOptimizerError(
+      "DELIVERY_LUMINANCE_POLICY_INVALID",
+      "Luminance-alpha points or gamma are invalid.",
+    );
+  }
+  const colour = outputColour(policy.outputColour);
+  const decoded = await sharp(input, {
+    failOn: "error",
+    limitInputPixels: MAXIMUM_PIXELS,
+    sequentialRead: true,
+  })
+    .rotate()
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const width = decoded.info.width;
+  const height = decoded.info.height;
+  const source = normalizeRawRgba(
+    decoded.data,
+    width,
+    height,
+    decoded.info.channels,
+  );
+  const result = Buffer.allocUnsafe(source.byteLength);
+  const denominator = whitePoint - blackPoint;
+  for (let offset = 0; offset < source.byteLength; offset += 4) {
+    const luminance =
+      (54 * source[offset]! +
+        183 * source[offset + 1]! +
+        19 * source[offset + 2]! +
+        128) >>
+      8;
+    let normalized = Math.max(
+      0,
+      Math.min(1, (luminance - blackPoint) / denominator),
+    );
+    if (policy.invert === true) normalized = 1 - normalized;
+    const sourceAlpha = source[offset + 3]! / 255;
+    const alpha = Math.round(Math.pow(normalized, gamma) * sourceAlpha * 255);
+    result[offset] = colour[0];
+    result[offset + 1] = colour[1];
+    result[offset + 2] = colour[2];
+    result[offset + 3] = alpha;
+  }
+  const png = await sharp(result, {
+    raw: { width, height, channels: 4 },
+    failOn: "error",
+    limitInputPixels: MAXIMUM_PIXELS,
+    sequentialRead: true,
+  })
+    .png({
+      compressionLevel: 9,
+      adaptiveFiltering: true,
+      effort: 10,
+      palette: false,
+    })
+    .toBuffer();
+  return Object.freeze({
+    png,
+    evidence: Object.freeze({
+      schema: "evavo.art-luminance-alpha-master.v1",
+      method: "rec709-soft-luminance-to-alpha",
+      blackPoint,
+      whitePoint,
+      gamma,
+      invert: policy.invert === true,
+      outputColour: `#${colour
+        .map((channel) => channel.toString(16).padStart(2, "0"))
+        .join("")}`,
+      sourceSha256: sha256(input),
+      outputSha256: sha256(png),
+      width,
+      height,
+      sourceAlpha: alphaCounts(source),
+      outputAlpha: alphaCounts(result),
+      hardThresholdApplied: false,
+      sourceAlphaMultiplied: true,
+    }),
+  });
 }
 
 function transformedPipeline(
@@ -143,12 +260,21 @@ export async function optimizeDeliveryImage(
   const original = exactImageBytes(input);
   const profile = resolveDeliveryImageProfile(request.profileId);
   if (
-    request.background.mode === "remove-border-matte" &&
+    request.background.mode !== "preserve" &&
     profile.transparencyPolicy === "opaque"
   ) {
     throw new DeliveryOptimizerError(
-      "DELIVERY_BACKGROUND_REMOVAL_FOR_OPAQUE_PROFILE",
-      `Profile ${profile.id} is opaque and cannot remove a matte background.`,
+      "DELIVERY_BACKGROUND_TRANSFORM_FOR_OPAQUE_PROFILE",
+      `Profile ${profile.id} is opaque and cannot derive or remove a background.`,
+    );
+  }
+  if (
+    request.background.mode === "luminance-alpha" &&
+    profile.transparencyPolicy !== "required"
+  ) {
+    throw new DeliveryOptimizerError(
+      "DELIVERY_LUMINANCE_PROFILE_INVALID",
+      `Profile ${profile.id} must require transparency before luminance-alpha mastering.`,
     );
   }
 
@@ -167,6 +293,15 @@ export async function optimizeDeliveryImage(
     transformations.push(
       `remove-border-connected-matte-${request.background.matteColour.toLowerCase()}`,
       "decontaminate-edge-and-bleed-transparent-rgb",
+    );
+  } else if (request.background.mode === "luminance-alpha") {
+    const extracted = await deriveLuminanceAlpha(original, request.background);
+    working = extracted.png;
+    backgroundEvidence = extracted.evidence;
+    transformations.push(
+      "derive-soft-alpha-from-luminance",
+      "multiply-derived-alpha-by-source-alpha",
+      `set-tintable-overlay-colour-${request.background.outputColour ?? "#ffffff"}`,
     );
   } else {
     transformations.push("preserve-authored-background");

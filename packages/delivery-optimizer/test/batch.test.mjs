@@ -154,3 +154,71 @@ test("rejects case-insensitive target collisions", () => {
     /collision/i,
   );
 });
+
+test("accepts bounded luminance-alpha weather policy", () => {
+  const manifest = validateDeliveryBatchManifest({
+    schema: DELIVERY_OPTIMIZER_SCHEMA,
+    batchId: "weather-alpha",
+    project: {
+      id: "brass-brine",
+      title: "Brass & Brine",
+      engine: "Godot",
+      engineVersion: "4.6.2",
+      viewport: { width: 1280, height: 720 },
+      rendering: "engraved-monochrome",
+    },
+    items: [
+      {
+        id: "rain-sheet-01",
+        sourcePath: "weather/rain_sheet_01.png",
+        targetPath: "assets/art/fx/weather/rain_sheet_01.png",
+        sourceSha256: "c".repeat(64),
+        sourceBytes: 1024,
+        profileId: "retro-overlay-720p",
+        background: {
+          mode: "luminance-alpha",
+          blackPoint: 4,
+          whitePoint: 244,
+          gamma: 0.9,
+          outputColour: "#f2f2f2",
+          invert: false,
+        },
+      },
+    ],
+  });
+  assert.deepEqual(manifest.items[0].background, {
+    mode: "luminance-alpha",
+    blackPoint: 4,
+    whitePoint: 244,
+    gamma: 0.9,
+    outputColour: "#f2f2f2",
+    invert: false,
+  });
+});
+
+test("rejects invalid luminance-alpha ranges", () => {
+  assert.throws(
+    () =>
+      validateDeliveryBatchManifest({
+        schema: DELIVERY_OPTIMIZER_SCHEMA,
+        batchId: "weather-alpha-invalid",
+        project: { id: "brass-brine", title: "Brass & Brine" },
+        items: [
+          {
+            id: "fog",
+            sourcePath: "weather/fog.png",
+            targetPath: "assets/art/fx/weather/fog.png",
+            sourceSha256: "d".repeat(64),
+            sourceBytes: 1024,
+            profileId: "retro-overlay-720p",
+            background: {
+              mode: "luminance-alpha",
+              blackPoint: 200,
+              whitePoint: 100,
+            },
+          },
+        ],
+      }),
+    /blackPoint must be lower than whitePoint/i,
+  );
+});

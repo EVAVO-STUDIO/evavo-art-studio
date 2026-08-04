@@ -91,9 +91,19 @@ export interface RemoveBorderMattePolicy {
   readonly minimumBorderMatteFraction?: number;
 }
 
+export interface LuminanceAlphaBackgroundPolicy {
+  readonly mode: "luminance-alpha";
+  readonly blackPoint?: number;
+  readonly whitePoint?: number;
+  readonly gamma?: number;
+  readonly outputColour?: string;
+  readonly invert?: boolean;
+}
+
 export type DeliveryBackgroundPolicy =
   | PreserveBackgroundPolicy
-  | RemoveBorderMattePolicy;
+  | RemoveBorderMattePolicy
+  | LuminanceAlphaBackgroundPolicy;
 
 export interface DeliveryImageRequest {
   readonly profileId: DeliveryProfileId;

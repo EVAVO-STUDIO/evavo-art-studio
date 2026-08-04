@@ -112,6 +112,18 @@ function finiteOption(
   return value;
 }
 
+function optionalColour(value: unknown, label: string): string | undefined {
+  if (value === undefined) return undefined;
+  const colour = text(value, label, 7).toLowerCase();
+  if (!/^#[0-9a-f]{6}$/u.test(colour)) {
+    throw new DeliveryOptimizerError(
+      "DELIVERY_MANIFEST_BACKGROUND_INVALID",
+      `${label} must use #RRGGBB.`,
+    );
+  }
+  return colour;
+}
+
 function backgroundPolicy(
   value: unknown,
   label: string,
@@ -123,10 +135,53 @@ function backgroundPolicy(
     );
   }
   if (value.mode === "preserve") return { mode: "preserve" };
+  if (value.mode === "luminance-alpha") {
+    const blackPoint = finiteOption(
+      value.blackPoint,
+      `${label}.blackPoint`,
+      0,
+      254,
+    );
+    const whitePoint = finiteOption(
+      value.whitePoint,
+      `${label}.whitePoint`,
+      1,
+      255,
+    );
+    const gamma = finiteOption(value.gamma, `${label}.gamma`, 0.1, 4);
+    const outputColour = optionalColour(
+      value.outputColour,
+      `${label}.outputColour`,
+    );
+    if (
+      blackPoint !== undefined &&
+      whitePoint !== undefined &&
+      blackPoint >= whitePoint
+    ) {
+      throw new DeliveryOptimizerError(
+        "DELIVERY_MANIFEST_BACKGROUND_INVALID",
+        `${label}.blackPoint must be lower than whitePoint.`,
+      );
+    }
+    if (value.invert !== undefined && typeof value.invert !== "boolean") {
+      throw new DeliveryOptimizerError(
+        "DELIVERY_MANIFEST_BACKGROUND_INVALID",
+        `${label}.invert must be a boolean.`,
+      );
+    }
+    return {
+      mode: "luminance-alpha",
+      ...(blackPoint === undefined ? {} : { blackPoint }),
+      ...(whitePoint === undefined ? {} : { whitePoint }),
+      ...(gamma === undefined ? {} : { gamma }),
+      ...(outputColour === undefined ? {} : { outputColour }),
+      ...(value.invert === undefined ? {} : { invert: value.invert }),
+    };
+  }
   if (value.mode !== "remove-border-matte") {
     throw new DeliveryOptimizerError(
       "DELIVERY_MANIFEST_BACKGROUND_INVALID",
-      `${label}.mode must be preserve or remove-border-matte.`,
+      `${label}.mode must be preserve, remove-border-matte or luminance-alpha.`,
     );
   }
   const matteColour = text(
@@ -362,20 +417,21 @@ export function deliveryBatchSha256(value: DeliveryBatchManifest): string {
 export async function readDeliveryBatchManifest(
   manifestPath: string,
 ): Promise<DeliveryBatchManifest> {
-  const bytes = await readFile(path.resolve(manifestPath));
-  if (bytes.byteLength < 2 || bytes.byteLength > 4 * 1024 * 1024) {
+  const requested = path.resolve(manifestPath);
+  const bytes = await readFile(requested);
+  if (bytes.byteLength > 16 * 1024 * 1024) {
     throw new DeliveryOptimizerError(
-      "DELIVERY_MANIFEST_SIZE_INVALID",
-      "Manifest must contain between 2 bytes and 4 MiB.",
+      "DELIVERY_MANIFEST_TOO_LARGE",
+      "Manifest exceeds 16 MiB.",
     );
   }
   let value: unknown;
   try {
-    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-  } catch {
+    value = JSON.parse(bytes.toString("utf8"));
+  } catch (error: unknown) {
     throw new DeliveryOptimizerError(
       "DELIVERY_MANIFEST_JSON_INVALID",
-      "Manifest is not valid strict UTF-8 JSON.",
+      `Manifest is not valid UTF-8 JSON: ${error instanceof Error ? error.message : String(error)}.`,
     );
   }
   return validateDeliveryBatchManifest(value);

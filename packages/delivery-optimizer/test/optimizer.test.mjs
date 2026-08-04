@@ -204,6 +204,56 @@ test("Godot sprite profile preserves spatial transparent RGB in canonical RGBA8 
   assert.deepEqual([...decoded.subarray(far, far + 4)], [0, 0, 0, 0]);
 });
 
+test("derives soft tintable alpha from luminance without a hard threshold", async () => {
+  const levels = [0, 64, 128, 255];
+  const input = await uncompressedPng(4, 1, (x) => {
+    const level = levels[x];
+    return [level, level, level, 255];
+  });
+  const result = await optimizeDeliveryImage(input, {
+    profileId: "retro-overlay-720p",
+    background: {
+      mode: "luminance-alpha",
+      blackPoint: 0,
+      whitePoint: 255,
+      gamma: 1,
+      outputColour: "#ffffff",
+      invert: false,
+    },
+  });
+  const decoded = await sharp(result.bytes)
+    .toColourspace("srgb")
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  assert.equal(decoded.info.width, 4);
+  assert.equal(decoded.info.height, 1);
+  assert.deepEqual(pngStorage(result.bytes), {
+    bitDepth: 8,
+    colourType: 4,
+    interlace: 0,
+  });
+  const observedAlpha = [];
+  for (let offset = 0; offset < decoded.data.length; offset += 4) {
+    assert.deepEqual(
+      [...decoded.data.subarray(offset, offset + 3)],
+      [255, 255, 255],
+    );
+    observedAlpha.push(decoded.data[offset + 3]);
+  }
+  assert.deepEqual(observedAlpha, levels);
+  assert.equal(result.evidence.background.mode, "luminance-alpha");
+  assert.equal(
+    result.evidence.background.evidence.method,
+    "rec709-soft-luminance-to-alpha",
+  );
+  assert.equal(result.evidence.background.evidence.hardThresholdApplied, false);
+  assert.equal(result.evidence.background.evidence.sourceAlphaMultiplied, true);
+  assert.ok(
+    result.evidence.transformations.includes("derive-soft-alpha-from-luminance"),
+  );
+});
+
 test("lossless source profile retains decoded pixels exactly", async () => {
   const input = await uncompressedPng(96, 64, (x, y) => [
     (x * 11) % 256,
