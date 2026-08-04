@@ -234,9 +234,13 @@ test("MCP rejects extra arguments and duplicate request identities without trans
     const deadline = Date.now() + 5_000;
     while (responses.length < 3 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
     assert.equal(responses.length, 3);
-    assert.equal(responses[1].result.isError, true);
-    assert.match(responses[1].result.structuredContent.error, /exactly one payload object/i);
-    assert.equal(responses[2].error.code, -32600);
+    const invalidTool = responses.find((item) => item.id === "bad" && item.result);
+    const duplicateId = responses.find((item) => item.id === "bad" && item.error);
+    assert.ok(invalidTool);
+    assert.equal(invalidTool.result.isError, true);
+    assert.match(invalidTool.result.structuredContent.error, /exactly one payload object/i);
+    assert.ok(duplicateId);
+    assert.equal(duplicateId.error.code, -32600);
     assert.equal(mock.calls.length, 0);
   } finally {
     child.kill("SIGTERM");
