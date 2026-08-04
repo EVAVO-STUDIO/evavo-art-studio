@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const exact = new Map([
   ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftTypes.ts", "42be33c54ee61e4989295c8635bd869a0704f37f"],
-  ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftContracts.ts", "76ec858968b8697404c4b4423ef0f1f067af3403"],
+  ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftContracts.ts", "ba47423fc28a7e225ad69ba0443bf595f0431ebd"],
   ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftShared.ts", "07b733ea5b70b329f6e3f6ca4180b566256c96f1"],
   ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftClient.ts", "93254f5e9e9852da6ffc2e1374ffbc9cd3ea3458"],
   ["tools/evavo-doc-studio/src/app/api/books/write/craft-genome/route.ts", "23d1c9db421052b18b26f43c10fdaeefa96732c1"],
@@ -55,7 +55,7 @@ console.log(JSON.stringify({
   status: "PASS",
   websiteRepository: "EVAVO-STUDIO/Website",
   websitePullRequest: 73,
-  websiteHead: "c9bfc9617daf83a2e3de0699b7b2b1679545a79d",
+  websiteHead: "46d7bdccefef268f4d39e7aa3e489897d4568691",
   exactGitBlobs: exact.size,
   retiredLocalRuntimeFilesAbsent: retired.length,
   websiteLocalCraftExecutionAllowed: false,
