@@ -15,9 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  issues: write
-  pull-requests: write
+  contents: write
 
 concurrency:
   group: validate-docs-authorial-mirror-${{ github.ref }}
@@ -32,7 +30,7 @@ jobs:
         id: checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          persist-credentials: false
+          persist-credentials: true
           fetch-depth: 0
 
       - name: Check out retained unattended production carrier
@@ -250,7 +248,7 @@ jobs:
           git fetch --no-tags origin main
           merge_base="$(git merge-base HEAD origin/main)"
           test -n "$merge_base"
-          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/(validate-docs-authorial-mirror|validate-docs-narrative-craft|diagnose-docs-unattended-authorial-checker|surface-docs-unattended-authorial-diagnostic)\.yml|validation/docs-narrative-craft/)' || true)"
+          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/(validate-docs-authorial-mirror|validate-docs-narrative-craft|diagnose-docs-unattended-authorial-checker|surface-docs-unattended-authorial-diagnostic)\.yml|validation/docs-narrative-craft/|validation-results/docs-unattended-authorial-validation\.json)' || true)"
           test -z "$unexpected" || {
             printf '%s\n' "$unexpected"
             exit 1
@@ -270,10 +268,9 @@ jobs:
           git -C "$GITHUB_WORKSPACE" diff --exit-code
           test -z "$(git -C "$GITHUB_WORKSPACE" status --porcelain=v1 --untracked-files=no)"
 
-      - name: Publish hosted validation receipt
+      - name: Persist hosted validation receipt
         if: always() && github.event_name == 'push'
         env:
-          GH_TOKEN: ${{ github.token }}
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           RETAINED_OUTCOME: ${{ steps.retained.outcome }}
           NODE_OUTCOME: ${{ steps.node.outcome }}
@@ -308,33 +305,45 @@ jobs:
           do
             if [[ "$outcome" != "success" ]]; then conclusion="failure"; fi
           done
-          cat > "$RUNNER_TEMP/receipt.md" <<EOF
-          ### Docs unattended authorial hosted validation
-
-          Validation head: \`${GITHUB_SHA}\`
-          Workflow run: \`${GITHUB_RUN_ID}\`
-          Conclusion: **${conclusion}**
-          Docs feature head: \`8aeea45b1224683c12060e82f3d838522934a15a\`
-          Docs base head: \`626bcd3af1bc1b1ffb92e28661e62069ed181951\`
-
-          | Boundary | Outcome |
-          |---|---|
-          | checkout | ${CHECKOUT_OUTCOME} |
-          | retained unattended reconstruction | ${ASSEMBLE_OUTCOME} |
-          | exact blob proof | ${BLOBS_OUTCOME} |
-          | strict core TypeScript | ${CORE_TYPECHECK_OUTCOME} |
-          | narrative, authorial, bridge and unattended attacks | ${CORE_TESTS_OUTCOME} |
-          | CLI and dual-era MCP attacks | ${ADAPTER_TESTS_OUTCOME} |
-          | strict protected service and route TypeScript | ${WEB_TYPECHECK_OUTCOME} |
-          | permanent production authority checker | ${AUTHORITY_OUTCOME} |
-          | Art production-source isolation | ${ISOLATION_OUTCOME} |
-          | clean tracked checkout | ${CLEAN_OUTCOME} |
-
-          Provider call performed: **false**  
-          Canonical manuscript mutation performed: **false**  
-          Automatic canonical admission allowed: **false**  
-          Publication performed: **false**
-          EOF
-          jq -Rs '{body: .}' "$RUNNER_TEMP/receipt.md" | \
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/121/comments" --input -
+          receipt="validation-results/docs-unattended-authorial-validation.json"
+          mkdir -p "$(dirname "$receipt")"
+          cat > "$receipt" <<JSON
+          {
+            "outputKind": "evavo_art_docs_unattended_authorial_validation_receipt",
+            "schemaVersion": 1,
+            "conclusion": "$conclusion",
+            "workflowRunId": "${GITHUB_RUN_ID}",
+            "workflowRunAttempt": "${GITHUB_RUN_ATTEMPT}",
+            "testedValidationHead": "${GITHUB_SHA}",
+            "docsFeatureHead": "8aeea45b1224683c12060e82f3d838522934a15a",
+            "docsBaseHead": "626bcd3af1bc1b1ffb92e28661e62069ed181951",
+            "steps": {
+              "checkout": "$CHECKOUT_OUTCOME",
+              "retainedCarrierCheckout": "$RETAINED_OUTCOME",
+              "node": "$NODE_OUTCOME",
+              "retainedPlannerReconstruction": "$ASSEMBLE_OUTCOME",
+              "exactBlobProof": "$BLOBS_OUTCOME",
+              "toolInstall": "$INSTALL_OUTCOME",
+              "strictCoreTypeScript": "$CORE_TYPECHECK_OUTCOME",
+              "coreBehaviouralAttacks": "$CORE_TESTS_OUTCOME",
+              "cliAndDualEraMcpAttacks": "$ADAPTER_TESTS_OUTCOME",
+              "strictProtectedWebTypeScript": "$WEB_TYPECHECK_OUTCOME",
+              "permanentAuthorityChecker": "$AUTHORITY_OUTCOME",
+              "artProductionSourceIsolation": "$ISOLATION_OUTCOME",
+              "cleanTrackedCheckout": "$CLEAN_OUTCOME"
+            },
+            "providerCallPerformed": false,
+            "canonicalManuscriptMutationPerformed": false,
+            "automaticCanonicalAdmissionAllowed": false,
+            "artStudioProductionSourceChanged": false,
+            "publicationPerformed": false
+          }
+          JSON
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$receipt"
+          if ! git diff --cached --quiet; then
+            git commit -m "test(validation): record unattended authorial ${conclusion}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
           test "$conclusion" = "success"
