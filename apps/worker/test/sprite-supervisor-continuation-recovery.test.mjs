@@ -7,7 +7,7 @@ import test from "node:test";
 import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
   LocalRuntimeRepository,
-  PermanentRuntimeError,
+  RuntimeError,
   TransientRuntimeError,
 } from "@evavo/art-runtime";
 import {
@@ -110,6 +110,14 @@ function continuationKey(fx, tick) {
   return `${fx.workflow.runId}:supervisor:${fx.workflow.workflowSha256}:tick-${tick}`;
 }
 
+function continuationFromSnapshot(snapshot, key) {
+  return Object.values(snapshot.jobs).find(
+    (job) =>
+      job.spec.queue === "control" &&
+      job.spec.idempotencyKey === key,
+  );
+}
+
 test("recovers one missing continuation from persisted running state", async () => {
   const fx = await fixture("restart-safe-missing-continuation");
   try {
@@ -118,11 +126,12 @@ test("recovers one missing continuation from persisted running state", async () 
     assert.equal(first.result.expectedStateTick, 0);
     assert.equal(first.result.tick, 1);
     const snapshot = await fx.runtime.snapshot();
-    const continuationId = snapshot.idempotencyIndex[continuationKey(fx, 1)];
-    assert.ok(continuationId);
-    assert.equal(first.result.nextTickJobId, continuationId);
-    const continuation = await fx.runtime.get(continuationId);
+    const continuation = continuationFromSnapshot(
+      snapshot,
+      continuationKey(fx, 1),
+    );
     assert.ok(continuation);
+    assert.equal(first.result.nextTickJobId, continuation.id);
     assert.deepEqual(continuation.spec.dependencyJobIds, [fx.rootJob.id]);
     assert.deepEqual(continuation.spec.inputArtifacts, [fx.stored.artifactId]);
     assert.equal(continuation.spec.labels.supervisorTick, "1");
@@ -132,7 +141,7 @@ test("recovers one missing continuation from persisted running state", async () 
     );
 
     const replay = await fx.handler(handlerContext(fx, fx.rootJob));
-    assert.equal(replay.result.nextTickJobId, continuationId);
+    assert.equal(replay.result.nextTickJobId, continuation.id);
     const jobs = await fx.runtime.list({
       kinds: ["art.sprite-production.supervise"],
       limit: 100,
@@ -226,12 +235,12 @@ test("fails transiently when a continuation outruns durable state", async () => 
   }
 });
 
-test("rejects an incompatible runtime idempotency entry", async () => {
+test("rejects an incompatible control-queue idempotency entry", async () => {
   const fx = await fixture("restart-safe-idempotency-conflict");
   try {
     await fx.runtime.submit(
       {
-        queue: "provider",
+        queue: "control",
         kind: "art.candidate.generate",
         idempotencyKey: continuationKey(fx, 1),
         payload: { schemaVersion: "1.0", operation: "generate" },
@@ -242,8 +251,8 @@ test("rejects an incompatible runtime idempotency entry", async () => {
     await assert.rejects(
       () => fx.handler(handlerContext(fx, fx.rootJob)),
       (error) =>
-        error instanceof PermanentRuntimeError &&
-        error.code === "SPRITE_SUPERVISOR_CONTINUATION_IDENTITY_CONFLICT",
+        error instanceof RuntimeError &&
+        error.code === "RUNTIME_IDEMPOTENCY_CONFLICT",
     );
   } finally {
     await rm(fx.root, { recursive: true, force: true });
