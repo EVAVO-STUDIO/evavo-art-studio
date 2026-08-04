@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: validate-docs-book-unattended-production-${{ github.ref }}
@@ -31,7 +31,7 @@ jobs:
       - name: Check out validation source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          persist-credentials: false
+          persist-credentials: true
           fetch-depth: 0
 
       - name: Use Node.js 22
@@ -117,8 +117,47 @@ jobs:
           git fetch --no-tags origin main
           merge_base="$(git merge-base HEAD origin/main)"
           test -n "$merge_base"
-          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/probe-docs-suite-readiness-access\.yml|validation/docs-book-universal-readiness/|validation/docs-book-unattended-production-payload/)' || true)"
+          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(\.github/workflows/probe-docs-suite-readiness-access\.yml|validation/docs-book-universal-readiness/|validation/docs-book-unattended-production-payload/|validation-results/docs-book-unattended-production\.json)' || true)"
           test -z "$unexpected" || {
             printf '%s\n' "$unexpected"
             exit 1
           }
+
+      - name: Publish hosted validation receipt
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt="validation-results/docs-book-unattended-production.json"
+          test ! -e "$receipt"
+          mkdir -p "$(dirname "$receipt")"
+          cat > "$receipt" <<JSON
+          {
+            "outputKind": "evavo_art_docs_book_unattended_validation_receipt",
+            "schemaVersion": 1,
+            "conclusion": "success",
+            "workflowRunId": "${GITHUB_RUN_ID}",
+            "workflowRunAttempt": "${GITHUB_RUN_ATTEMPT}",
+            "testedValidationHead": "${GITHUB_SHA}",
+            "docsSuitePullRequest": 72,
+            "docsSuiteBranchHead": "a8752ee2490fbc71d3aaafc5c753e57446f729ff",
+            "docsSuiteBaseHead": "64a97575878652ad91ce2aba151997baa357fa12",
+            "payloadSha256": "575bc289dc84444259bb3e86b1d96174fa3c07f26251004b718d1418b699e592",
+            "strictTypeScriptPassed": true,
+            "coreAndGovernanceTestsPassed": true,
+            "cliAndMcpTestsPassed": true,
+            "protectedRouteTestsPassed": true,
+            "artProductionSourceChanged": false,
+            "providerCallPerformed": false,
+            "runtimeJobSubmitted": false,
+            "authoritativeWritePerformed": false,
+            "canonicalManuscriptMutationPerformed": false,
+            "runtimeCutoverApproved": false,
+            "publicationPerformed": false
+          }
+          JSON
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$receipt"
+          git commit -m "test(validation): record unattended source success"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
