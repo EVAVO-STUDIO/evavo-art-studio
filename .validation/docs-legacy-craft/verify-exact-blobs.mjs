@@ -23,7 +23,7 @@ const exact = new Map([
   ["apps/web/scripts/evavo-docs-book-legacy-craft-genome-cli.mjs", "139d147cf7fe5fb082860be5f1fac027546788ba"],
   ["apps/web/scripts/evavo-docs-book-legacy-craft-genome-mcp.mjs", "062819bc41c57609ec22fda63c18a8ba6a3e3e0d"],
   ["apps/web/scripts/test-book-studio-legacy-craft-genome-input.mjs", "684e7a199d9978cf4b09384b5c31e67dc21e3d1d"],
-  ["apps/web/scripts/test-book-studio-legacy-craft-genome-adapters.mjs", "c4b1ff9da52ca5777a27a7d66617b20713027011"],
+  ["apps/web/scripts/test-book-studio-legacy-craft-genome-adapters.mjs", "3445b2dc3baab6f06755c281dcbf461b9743f981"],
 ]);
 
 const failures = [];
@@ -41,7 +41,7 @@ if (failures.length) {
 console.log(JSON.stringify({
   status: "PASS",
   docsRepository: "EVAVO-STUDIO/evavo-docs-suite",
-  docsHead: "8a879e842a8a25e5440943588d47e38902153722",
+  docsHead: "432954f64688c7d0648c8a58a5ebdad68f7cb709",
   exactGitBlobs: exact.size,
   productionProviderCalled: false,
   canonicalManuscriptMutationPerformed: false,
