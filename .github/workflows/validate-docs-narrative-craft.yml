@@ -1,4 +1,4 @@
-name: Validate Docs Narrative Craft
+name: Validate Docs Authorial Intelligence
 
 on:
   push:
@@ -6,46 +6,90 @@ on:
       - validation/docs-narrative-craft-20260804
     paths:
       - ".github/workflows/validate-docs-narrative-craft.yml"
-      - "validation/docs-narrative-craft/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/validate-docs-narrative-craft.yml"
-      - "validation/docs-narrative-craft/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: validate-docs-narrative-craft-${{ github.ref }}
+  group: validate-docs-authorial-intelligence-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DOCS_SOURCE_REPOSITORY: EVAVO-STUDIO/evavo-docs-suite
+  DOCS_SOURCE_REF: agent/book-narrative-craft-intelligence-20260804
+
 jobs:
-  verify:
+  exact-source:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
-      - name: Check out source-equivalent validation mirror
+      - name: Check out disposable validation host
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Use Node.js 22
+      - name: Check out exact Docs Suite branch source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ env.DOCS_SOURCE_REPOSITORY }}
+          ref: ${{ env.DOCS_SOURCE_REF }}
+          path: docs-source
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Record checked Docs source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'docs-source-sha=%s\n' "$(git -C docs-source rev-parse HEAD)"
+          test "$(git -C docs-source branch --show-current)" = "${DOCS_SOURCE_REF}"
+
+      - name: Use exact Docs Suite Node.js runtime
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 22
+          node-version-file: docs-source/.nvmrc
           package-manager-cache: false
 
-      - name: Install validation-only compiler tools
-        run: npm install --prefix validation/docs-narrative-craft --no-save --package-lock=false --ignore-scripts typescript@5.9.3 tsx@4.20.3
+      - name: Verify permanent authorial contracts
+        working-directory: docs-source
+        run: |
+          node scripts/check-book-studio-narrative-craft.mjs
+          node scripts/check-book-studio-authorial-intelligence.mjs
 
-      - name: Compile strict narrative craft boundary
-        run: validation/docs-narrative-craft/node_modules/.bin/tsc -p validation/docs-narrative-craft/tsconfig.json
+      - name: Install exact Docs Suite workspace
+        working-directory: docs-source
+        run: corepack pnpm install --frozen-lockfile
 
-      - name: Run psychology dialogue prose originality and tamper attacks
-        run: validation/docs-narrative-craft/node_modules/.bin/tsx --test validation/docs-narrative-craft/test/narrative-craft.test.mjs
+      - name: Run strict core and web TypeScript
+        working-directory: docs-source
+        run: |
+          corepack pnpm --filter @evavo-docs/core typecheck
+          corepack pnpm --filter @evavo-docs/web typecheck
+
+      - name: Run narrative and authorial adversarial suites
+        working-directory: docs-source
+        run: >-
+          npm exec --yes --package=tsx@4.20.3 -- tsx --test
+          packages/core/test/book-studio-narrative-craft.test.mjs
+          packages/core/test/book-studio-authorial-intelligence.test.mjs
+
+      - name: Run exact CLI and MCP attacks
+        working-directory: docs-source
+        run: node --test apps/web/scripts/test-book-studio-narrative-craft-adapters.mjs
+
+      - name: Prove exact Docs source remained clean
+        working-directory: docs-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
       - name: Prove no Art Studio production source changed
         shell: bash
@@ -63,10 +107,13 @@ jobs:
       - name: Record validation boundary
         run: |
           printf '%s\n' \
-            'validation=source-equivalent' \
-            'byte-identical-claim=false' \
-            'knowledge-modules=11' \
-            'quality-criteria=14' \
+            'validation=exact-docs-source-checkout' \
+            'source-equivalent-claim=false' \
+            'voice-metrics=23' \
+            'genre-blueprints=20' \
+            'idea-criteria=10' \
+            'advanced-knowledge-modules=9' \
+            'mcp-tools=15' \
             'provider-call-performed=false' \
             'canonical-manuscript-mutation-performed=false' \
             'automatic-canonical-admission-allowed=false' \
