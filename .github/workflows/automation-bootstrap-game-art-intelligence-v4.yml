@@ -1,32 +1,32 @@
-name: Bootstrap sealed Game Art Intelligence v4
+name: Validate and publish Game Art Intelligence v4
 
 on:
   push:
-    branches: [automation/bootstrap-game-art-intelligence-v3-20260805]
+    branches: [automation/bootstrap-game-art-intelligence-v4-20260805]
 
 permissions:
   contents: write
 
 concurrency:
-  group: bootstrap-game-art-intelligence-v4-20260805
+  group: game-art-intelligence-v4-current-main
   cancel-in-progress: false
 
 jobs:
-  publish:
+  validate-and-publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 60
     env:
-      EXPECTED_MAIN_SHA: 5b08bdab285f7e28fd5d4fc2cc3d7d6fb4984ab0
-      TARGET_BRANCH: agent/game-art-intelligence-20260805
+      EXPECTED_MAIN_SHA: 308a368263f74d7bafca6f11abcd982a1f213759
+      TARGET_BRANCH: agent/game-art-intelligence-current-main-20260805
       PAYLOAD_ROOT: .github/automation/game-art-intelligence-v2
       ARCHIVE_SHA256: b571a8e0936d8dcb25185f5942f763774e0964b5adead29d280451fc7aa68c37
       PATCH_SHA256: f7c5541dfac45f31736cb98c3b47f2d6f982960ac6850a4666bbc085bee833f3
     steps:
-      - name: Check out exact bootstrap source
+      - name: Check out exact carrier
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Recover and verify sealed patch
         shell: bash
@@ -39,30 +39,33 @@ jobs:
             test "${chunks[$index]}" = "$expected"
           done
           : > /tmp/game-art-intelligence.patch.gz.b64
-          for chunk in "${chunks[@]}"; do cat "$PAYLOAD_ROOT/$chunk" >> /tmp/game-art-intelligence.patch.gz.b64; done
+          for chunk in "${chunks[@]}"; do
+            cat "$PAYLOAD_ROOT/$chunk" >> /tmp/game-art-intelligence.patch.gz.b64
+          done
           base64 --decode /tmp/game-art-intelligence.patch.gz.b64 > /tmp/game-art-intelligence.patch.gz
           printf '%s  %s\n' "$ARCHIVE_SHA256" /tmp/game-art-intelligence.patch.gz | sha256sum -c -
           gzip --decompress --stdout /tmp/game-art-intelligence.patch.gz > /tmp/game-art-intelligence.patch
           printf '%s  %s\n' "$PATCH_SHA256" /tmp/game-art-intelligence.patch | sha256sum -c -
 
-      - name: Verify exact refs and apply one commit
+      - name: Apply sealed source to exact current main
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags --prune origin \
-            "+refs/heads/main:refs/remotes/origin/main" \
-            "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main"
           test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
-          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$EXPECTED_MAIN_SHA"
+          if git ls-remote --exit-code origin "refs/heads/$TARGET_BRANCH" >/dev/null 2>&1; then
+            echo "::error title=Target branch already exists::$TARGET_BRANCH"
+            exit 1
+          fi
           git config user.name "EVAVO Automation"
           git config user.email "evavo-automation@users.noreply.github.com"
           git switch --force-create "$TARGET_BRANCH" refs/remotes/origin/main
-          git am --whitespace=error-all /tmp/game-art-intelligence.patch
+          git am --3way --whitespace=error-all /tmp/game-art-intelligence.patch
           test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
           test "$(git log -1 --format=%s)" = "feat(game-art): add project-wide production intelligence"
           git diff --check HEAD^ HEAD
-          git diff --name-only HEAD^ HEAD | LC_ALL=C sort > /tmp/actual-paths.txt
-          cat > /tmp/expected-paths.txt <<'PATHS'
+          git diff --name-only HEAD^ HEAD | LC_ALL=C sort > /tmp/full-paths.txt
+          cat > /tmp/expected-full-paths.txt <<'PATHS'
           .github/workflows/game-art-intelligence.yml
           apps/mcp/package.json
           apps/mcp/src/game-intelligence.ts
@@ -82,66 +85,390 @@ jobs:
           packages/game-art-intelligence/tsconfig.json
           scripts/check-game-art-intelligence.mjs
           PATHS
-          LC_ALL=C sort -o /tmp/expected-paths.txt /tmp/expected-paths.txt
-          diff -u /tmp/expected-paths.txt /tmp/actual-paths.txt
-          node --check scripts/check-game-art-intelligence.mjs
-          node scripts/check-game-art-intelligence.mjs
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
-          git rev-parse HEAD > /tmp/feature-sha.txt
+          LC_ALL=C sort -o /tmp/expected-full-paths.txt /tmp/expected-full-paths.txt
+          diff -u /tmp/expected-full-paths.txt /tmp/full-paths.txt
+          cp .github/workflows/game-art-intelligence.yml /tmp/game-art-intelligence.yml
 
-      - name: Compare-and-swap feature ref through GitHub REST
+      - name: Apply current-main compatibility repairs
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          feature_sha="$(cat /tmp/feature-sha.txt)"
-          response="$(curl --fail-with-body --silent --show-error \
-            --request PATCH \
-            --header "Authorization: Bearer $GH_TOKEN" \
-            --header "Accept: application/vnd.github+json" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/heads/$TARGET_BRANCH" \
-            --data "{\"sha\":\"$feature_sha\",\"force\":false}")"
-          node -e 'const r=JSON.parse(process.argv[1]); if(r.object?.sha!==process.argv[2]) process.exit(1)' "$response" "$feature_sha"
-          remote_sha="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
-          test "$remote_sha" = "$feature_sha"
+          python <<'PY'
+          from pathlib import Path
 
-      - name: Write bounded bootstrap receipt
+          compiler = Path("packages/game-art-intelligence/src/compiler.ts")
+          lines = compiler.read_text(encoding="utf-8").splitlines()
+
+          selected_matches = [
+              index
+              for index, line in enumerate(lines)
+              if line.strip()
+              == 'const selectedProjection = projection as ArtDirectionStyleInput["projection"];'
+          ]
+          if len(selected_matches) != 1:
+              raise SystemExit(
+                  f"expected one selectedProjection statement, found {len(selected_matches)}"
+              )
+          selected_index = selected_matches[0]
+          indent = lines[selected_index][
+              : len(lines[selected_index]) - len(lines[selected_index].lstrip())
+          ]
+          merge_inputs = [
+              (
+                  "requiredDistinctiveMotifs",
+                  "base.antiGeneric?.requiredDistinctiveMotifs",
+                  "override?.antiGeneric?.requiredDistinctiveMotifs",
+              ),
+              (
+                  "prohibitedGenericMotifs",
+                  "base.antiGeneric?.prohibitedGenericMotifs",
+                  "override?.antiGeneric?.prohibitedGenericMotifs",
+              ),
+              ("mustHave", "base.mustHave", "override?.mustHave"),
+              ("mustAvoid", "base.mustAvoid", "override?.mustAvoid"),
+              (
+                  "materialLanguage",
+                  "base.materialLanguage",
+                  "override?.materialLanguage",
+              ),
+              (
+                  "lineTreatment",
+                  "base.lineTreatment",
+                  "override?.lineTreatment",
+              ),
+              (
+                  "compositionRules",
+                  "base.compositionRules",
+                  "override?.compositionRules",
+              ),
+          ]
+          inserted = [f"{indent}const selectedProjection: ArtProjection = projection;"]
+          for symbol, base_value, override_value in merge_inputs:
+              inserted.extend(
+                  [
+                      f"{indent}const {symbol} = uniqueMerge(",
+                      f"{indent}  {base_value},",
+                      f"{indent}  {override_value},",
+                      f"{indent});",
+                  ]
+              )
+          lines[selected_index : selected_index + 1] = inserted
+
+          def replace_nested_merge(symbol: str) -> None:
+              starts = [
+                  index
+                  for index, line in enumerate(lines)
+                  if line.strip() == "...(uniqueMerge("
+                  and index + 1 < len(lines)
+                  and symbol in lines[index + 1]
+              ]
+              if len(starts) != 1:
+                  raise SystemExit(
+                      f"expected one nested {symbol} merge block, found {len(starts)}"
+                  )
+              start = starts[0]
+              end = next(
+                  (
+                      index
+                      for index in range(start + 1, len(lines))
+                      if lines[index].strip() == "}),"
+                  ),
+                  None,
+              )
+              if end is None:
+                  raise SystemExit(f"could not find end of nested {symbol} merge block")
+              block_indent = lines[start][
+                  : len(lines[start]) - len(lines[start].lstrip())
+              ]
+              lines[start : end + 1] = [
+                  f"{block_indent}...({symbol} === undefined",
+                  f"{block_indent}  ? {{}}",
+                  f"{block_indent}  : {{ {symbol} }}),",
+              ]
+
+          def replace_top_level_merge(symbol: str) -> None:
+              starts = [
+                  index
+                  for index, line in enumerate(lines)
+                  if line.strip().startswith("...(uniqueMerge(")
+                  and f"base.{symbol}" in line
+              ]
+              if len(starts) != 1:
+                  raise SystemExit(
+                      f"expected one top-level {symbol} merge block, found {len(starts)}"
+                  )
+              start = starts[0]
+              end = next(
+                  (
+                      index
+                      for index in range(start, len(lines))
+                      if lines[index].strip().endswith("}),")
+                  ),
+                  None,
+              )
+              if end is None:
+                  raise SystemExit(
+                      f"could not find end of top-level {symbol} merge block"
+                  )
+              block_indent = lines[start][
+                  : len(lines[start]) - len(lines[start].lstrip())
+              ]
+              lines[start : end + 1] = [
+                  f"{block_indent}...({symbol} === undefined",
+                  f"{block_indent}  ? {{}}",
+                  f"{block_indent}  : {{ {symbol} }}),",
+              ]
+
+          replace_nested_merge("requiredDistinctiveMotifs")
+          replace_nested_merge("prohibitedGenericMotifs")
+          for symbol in (
+              "mustHave",
+              "mustAvoid",
+              "materialLanguage",
+              "lineTreatment",
+              "compositionRules",
+          ):
+              replace_top_level_merge(symbol)
+
+          source = "\n".join(lines) + "\n"
+          old_message = '"Compiled profile body does not match profileSha256."'
+          new_message = '"Compiled profile body hash does not match profileSha256."'
+          if source.count(old_message) != 1:
+              raise SystemExit("expected one profile hash-mismatch message")
+          compiler.write_text(source.replace(old_message, new_message), encoding="utf-8")
+
+          geometry = Path("packages/game-art-intelligence/src/geometry-palette.ts")
+          geometry_source = geometry.read_text(encoding="utf-8")
+          old_guard = (
+              '  if (input.projection === "isometric-2:1" && '
+              'input.directionMode !== "eight-way") {'
+          )
+          new_guard = (
+              '  if (\n'
+              '    input.projection === "isometric-2:1" &&\n'
+              '    input.directionMode !== "none" &&\n'
+              '    input.directionMode !== "eight-way"\n'
+              '  ) {'
+          )
+          if geometry_source.count(old_guard) != 1:
+              raise SystemExit("expected one isometric direction-mode guard")
+          geometry.write_text(
+              geometry_source.replace(old_guard, new_guard),
+              encoding="utf-8",
+          )
+
+          compiler_lines = compiler.read_text(encoding="utf-8").splitlines()
+          prop_matches = [
+              index
+              for index, line in enumerate(compiler_lines)
+              if line.strip()
+              == '} else if (asset.family === "prop" && !asset.animated) {'
+          ]
+          if len(prop_matches) != 1:
+              raise SystemExit(
+                  f"expected one static-prop routing block, found {len(prop_matches)}"
+              )
+          prop_index = prop_matches[0]
+          if (
+              prop_index + 2 >= len(compiler_lines)
+              or compiler_lines[prop_index + 1].strip()
+              != 'primary = "godot-4.6.2-tile-atlas";'
+              or not compiler_lines[prop_index + 2].strip().startswith("} else primary")
+          ):
+              raise SystemExit("static-prop routing block has unexpected shape")
+          prop_block = compiler_lines[prop_index : prop_index + 2]
+          del compiler_lines[prop_index : prop_index + 2]
+          background_matches = [
+              index
+              for index, line in enumerate(compiler_lines)
+              if line.strip()
+              == '} else if (asset.family === "background") primary = "web-game-raster";'
+          ]
+          if len(background_matches) != 1:
+              raise SystemExit(
+                  f"expected one background routing line, found {len(background_matches)}"
+              )
+          compiler_lines[background_matches[0]:background_matches[0]] = prop_block
+          compiler.write_text("\n".join(compiler_lines) + "\n", encoding="utf-8")
+
+          tests = Path(
+              "packages/game-art-intelligence/test/game-art-intelligence.test.mjs"
+          )
+          test_source = tests.read_text(encoding="utf-8")
+          hero_assertion = "  assert.equal(hero.directionGeometry.length, 8);"
+          direction_assertions = """  assert.equal(hero.directionGeometry.length, 8);
+          const floor = first.assets.find((entry) => entry.assetId === "floor-stone");
+          assert.equal(floor?.directionGeometry.length, 1);
+          const smoke = first.assets.find((entry) => entry.assetId === "muzzle-smoke");
+          assert.equal(smoke?.directionGeometry.length, 1);"""
+          if test_source.count(hero_assertion) != 1:
+              raise SystemExit("expected one hero direction assertion")
+          test_source = test_source.replace(hero_assertion, direction_assertions)
+          crate_assertion = (
+              '  assert.equal(crate?.deliveryKeys.includes('
+              '"godot-4.6.2-tile-atlas"), true);'
+          )
+          crate_resource_assertions = """  assert.equal(crate?.deliveryKeys.includes("godot-4.6.2-tile-atlas"), true);
+          assert.equal(
+            first.godot.tileSetResources.some((entry) =>
+              entry.endsWith("/cargo-crate.tres"),
+            ),
+            true,
+          );"""
+          if test_source.count(crate_assertion) != 1:
+              raise SystemExit("expected one cargo-crate delivery assertion")
+          tests.write_text(
+              test_source.replace(crate_assertion, crate_resource_assertions),
+              encoding="utf-8",
+          )
+          PY
+          git add \
+            packages/game-art-intelligence/src/compiler.ts \
+            packages/game-art-intelligence/src/geometry-palette.ts \
+            packages/game-art-intelligence/test/game-art-intelligence.test.mjs
+          git commit --amend --no-edit
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
+          git diff --check HEAD^ HEAD
+          node --check scripts/check-game-art-intelligence.mjs
+          node scripts/check-game-art-intelligence.mjs
+          sha256sum \
+            packages/game-art-intelligence/src/compiler.ts \
+            packages/game-art-intelligence/src/geometry-palette.ts \
+            packages/game-art-intelligence/test/game-art-intelligence.test.mjs \
+            > /tmp/compatibility-source-sha256.txt
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install dependencies review-first
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+          pnpm install --no-frozen-lockfile
+
+      - name: Validate focused Game Art Intelligence implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run build:domain
+          pnpm --filter @evavo/art-game-intelligence build
+          pnpm --filter @evavo/art-game-intelligence typecheck
+          pnpm --filter @evavo/art-game-intelligence test
+          pnpm --filter @evavo/art-studio-mcp build
+          pnpm --filter @evavo/art-studio-mcp typecheck
+          node --test apps/mcp/test/game-art-intelligence-mcp.test.mjs
+          node scripts/check-game-art-intelligence.mjs
+
+      - name: Validate complete repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check
+          node scripts/check-game-art-intelligence.mjs
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Publish ordinary source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/game-art-intelligence.yml
+          git commit --amend --no-edit
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
+          git diff --check HEAD^ HEAD
+          git diff --name-only HEAD^ HEAD | LC_ALL=C sort > /tmp/published-paths.txt
+          cat > /tmp/expected-published-paths.txt <<'PATHS'
+          apps/mcp/package.json
+          apps/mcp/src/game-intelligence.ts
+          apps/mcp/test/game-art-intelligence-mcp.test.mjs
+          apps/mcp/tsconfig.json
+          docs/game-art-intelligence.md
+          package.json
+          packages/game-art-intelligence/package.json
+          packages/game-art-intelligence/src/adaptive.ts
+          packages/game-art-intelligence/src/canonical.ts
+          packages/game-art-intelligence/src/catalogue.ts
+          packages/game-art-intelligence/src/compiler.ts
+          packages/game-art-intelligence/src/geometry-palette.ts
+          packages/game-art-intelligence/src/index.ts
+          packages/game-art-intelligence/src/types.ts
+          packages/game-art-intelligence/test/game-art-intelligence.test.mjs
+          packages/game-art-intelligence/tsconfig.json
+          scripts/check-game-art-intelligence.mjs
+          PATHS
+          LC_ALL=C sort -o /tmp/expected-published-paths.txt /tmp/expected-published-paths.txt
+          diff -u /tmp/expected-published-paths.txt /tmp/published-paths.txt
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git rev-parse HEAD > /tmp/feature-sha.txt
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$(cat /tmp/feature-sha.txt)"
+
+      - name: Write bounded receipt
         shell: bash
         run: |
           node <<'NODE'
-          const fs = require("node:fs");
+          const fs = require('node:fs');
           const receipt = {
-            schemaVersion: "1.0",
-            receiptType: "evavo-game-art-intelligence-bootstrap",
+            schemaVersion: '1.0',
+            receiptType: 'evavo-game-art-intelligence-current-main-bootstrap',
             repository: process.env.GITHUB_REPOSITORY,
             runId: process.env.GITHUB_RUN_ID,
             expectedMainSha: process.env.EXPECTED_MAIN_SHA,
             targetBranch: process.env.TARGET_BRANCH,
-            featureSha: fs.readFileSync("/tmp/feature-sha.txt", "utf8").trim(),
+            featureSha: fs.readFileSync('/tmp/feature-sha.txt', 'utf8').trim(),
             archiveSha256: process.env.ARCHIVE_SHA256,
             patchSha256: process.env.PATCH_SHA256,
-            changedPaths: fs.readFileSync("/tmp/actual-paths.txt", "utf8").trim().split("\n"),
-            exactParentVerified: true,
-            exactPathScopeVerified: true,
+            strictOptionalCompatibilityRepair: true,
+            nonDirectionalIsometricAssetsSupported: true,
+            directionalIsometricAssetsRequireEightWay: true,
+            staticIsometricPropsUseTileAtlas: true,
+            profileHashMismatchMessageClarified: true,
+            compatibilitySourceSha256: fs
+              .readFileSync('/tmp/compatibility-source-sha256.txt', 'utf8')
+              .trim()
+              .split('\n'),
+            publishedPaths: fs
+              .readFileSync('/tmp/published-paths.txt', 'utf8')
+              .trim()
+              .split('\n'),
+            focusedValidationPassed: true,
+            completeRepositoryCheckPassed: true,
             permanentCheckerPassed: true,
-            refUpdatedByCompareAndSwap: true,
+            permanentWorkflowDeferredToWorkflowWriter: true,
             providerCalled: false,
             runtimeJobSubmitted: false,
             targetRepositoryMutated: false,
             selectionPerformed: false,
             promotionPerformed: false,
+            deploymentPerformed: false,
             publicationPerformed: false
           };
-          fs.writeFileSync("/tmp/game-art-intelligence-bootstrap.json", `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+          fs.writeFileSync(
+            '/tmp/game-art-intelligence-current-main-bootstrap.json',
+            `${JSON.stringify(receipt, null, 2)}\n`,
+            { mode: 0o600 }
+          );
           NODE
 
-      - name: Upload bounded bootstrap receipt
+      - name: Upload bounded evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: game-art-intelligence-bootstrap-${{ github.run_id }}
-          path: /tmp/game-art-intelligence-bootstrap.json
+          name: game-art-intelligence-current-main-bootstrap-${{ github.run_id }}
+          path: |
+            /tmp/game-art-intelligence-current-main-bootstrap.json
+            /tmp/game-art-intelligence.yml
           if-no-files-found: error
           retention-days: 7
           compression-level: 9
