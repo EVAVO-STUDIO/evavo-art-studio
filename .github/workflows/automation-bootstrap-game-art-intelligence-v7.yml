@@ -1,0 +1,146 @@
+name: Validate and publish Game Art Intelligence v7
+
+on:
+  push:
+    branches: [automation/bootstrap-game-art-intelligence-v7-20260805]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: game-art-intelligence-v7-current-main
+  cancel-in-progress: false
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EXPECTED_MAIN_SHA: 308a368263f74d7bafca6f11abcd982a1f213759
+      TARGET_BRANCH: agent/game-art-intelligence-current-main-20260805
+      PAYLOAD_ROOT: .github/automation/game-art-intelligence-v2
+      ARCHIVE_SHA256: b571a8e0936d8dcb25185f5942f763774e0964b5adead29d280451fc7aa68c37
+      PATCH_SHA256: f7c5541dfac45f31736cb98c3b47f2d6f982960ac6850a4666bbc085bee833f3
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Preserve validated carrier scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          workflow = Path(
+              ".github/workflows/automation-bootstrap-game-art-intelligence-v6.yml"
+          )
+          lines = workflow.read_text(encoding="utf-8").splitlines()
+          name = "Preserve validated carrier scripts"
+          matches = [
+              index
+              for index, line in enumerate(lines)
+              if line.strip() == f"- name: {name}"
+          ]
+          if len(matches) != 1:
+              raise SystemExit(
+                  f"expected one v6 preservation step, found {len(matches)}"
+              )
+          run_index = next(
+              (
+                  index
+                  for index in range(matches[0] + 1, len(lines))
+                  if lines[index].strip() == "run: |"
+              ),
+              None,
+          )
+          if run_index is None:
+              raise SystemExit("v6 preservation step has no run block")
+          run_indent = len(lines[run_index]) - len(lines[run_index].lstrip())
+          content_indent = run_indent + 2
+          output: list[str] = []
+          for line in lines[run_index + 1 :]:
+              stripped = line.lstrip()
+              indent = len(line) - len(stripped)
+              if stripped and indent <= run_indent:
+                  break
+              output.append(line[content_indent:] if len(line) >= content_indent else "")
+          script = "\n".join(output).rstrip() + "\n"
+          old_guard = '''    if not script.startswith("set -euo pipefail"):
+                  raise SystemExit(f"step {name!r} extraction was not shell-safe")
+              return script
+          '''
+          new_guard = '''    if name == "Write bounded receipt":
+                  if not script.startswith("node <<'NODE'"):
+                      raise SystemExit(
+                          f"step {name!r} was not the expected bounded Node receipt"
+                      )
+              elif not script.startswith("set -euo pipefail"):
+                  raise SystemExit(f"step {name!r} extraction was not shell-safe")
+              return script
+          '''
+          if script.count(old_guard) != 1:
+              raise SystemExit(
+                  f"expected one v6 shell-safety guard, found {script.count(old_guard)}"
+              )
+          script = script.replace(old_guard, new_guard)
+          target = Path("/tmp/preserve-game-art-scripts.sh")
+          target.write_text(script, encoding="utf-8")
+          target.chmod(0o700)
+          PY
+          bash -n /tmp/preserve-game-art-scripts.sh
+          bash /tmp/preserve-game-art-scripts.sh
+
+      - name: Reconstruct, rebase and repair exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash /tmp/game-art-step-01.sh
+          bash /tmp/game-art-step-02.sh
+          bash /tmp/game-art-step-03.sh
+          bash /tmp/game-art-step-04.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install dependencies review-first
+        shell: bash
+        run: bash /tmp/game-art-step-05.sh
+
+      - name: Validate focused sprite and Game Art implementation
+        shell: bash
+        run: bash /tmp/game-art-step-06.sh
+
+      - name: Validate complete repository
+        shell: bash
+        run: bash /tmp/game-art-step-07.sh
+
+      - name: Publish ordinary source files
+        shell: bash
+        run: bash /tmp/game-art-step-08.sh
+
+      - name: Write bounded receipt
+        shell: bash
+        run: bash /tmp/game-art-step-09.sh
+
+      - name: Upload bounded evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: game-art-intelligence-current-main-bootstrap-${{ github.run_id }}
+          path: |
+            /tmp/game-art-intelligence-current-main-bootstrap.json
+            /tmp/game-art-intelligence.yml
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
