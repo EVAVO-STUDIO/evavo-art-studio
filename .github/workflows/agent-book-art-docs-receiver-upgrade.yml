@@ -73,6 +73,16 @@ jobs:
         run: |
           node --check .github/agent/apply-book-art-docs-receiver-upgrade.mjs
           node .github/agent/apply-book-art-docs-receiver-upgrade.mjs
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("scripts/check-book-art-docs-release.mjs")
+          source = path.read_text(encoding="utf-8")
+          invalid = '  "approvalState, "unapproved"",'
+          valid = '  \'approvalState, "unapproved"\','
+          if source.count(invalid) != 1:
+              raise SystemExit("generated checker approval-state token was not found exactly once")
+          path.write_text(source.replace(invalid, valid), encoding="utf-8")
+          PY
           git restore .github/agent/apply-book-art-docs-receiver-upgrade.mjs
 
       - name: Verify permanent source contract before dependency install
