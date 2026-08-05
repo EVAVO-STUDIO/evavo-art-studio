@@ -1,0 +1,42 @@
+name: Diagnose Game Art package wiring hunk
+
+on:
+  push:
+    branches: [automation/bootstrap-game-art-intelligence-v7-20260805]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PAYLOAD_ROOT: .github/automation/game-art-intelligence-v2
+      ARCHIVE_SHA256: b571a8e0936d8dcb25185f5942f763774e0964b5adead29d280451fc7aa68c37
+      PATCH_SHA256: f7c5541dfac45f31736cb98c3b47f2d6f982960ac6850a4666bbc085bee833f3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Recover patch and show package hunk
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t chunks < <(find "$PAYLOAD_ROOT" -maxdepth 1 -type f -name 'chunk-*.b64' -printf '%f\n' | LC_ALL=C sort)
+          test "${#chunks[@]}" -eq 24
+          : > /tmp/game-art-intelligence.patch.gz.b64
+          for chunk in "${chunks[@]}"; do cat "$PAYLOAD_ROOT/$chunk" >> /tmp/game-art-intelligence.patch.gz.b64; done
+          base64 --decode /tmp/game-art-intelligence.patch.gz.b64 > /tmp/game-art-intelligence.patch.gz
+          printf '%s  %s\n' "$ARCHIVE_SHA256" /tmp/game-art-intelligence.patch.gz | sha256sum -c -
+          gzip --decompress --stdout /tmp/game-art-intelligence.patch.gz > /tmp/game-art-intelligence.patch
+          printf '%s  %s\n' "$PATCH_SHA256" /tmp/game-art-intelligence.patch | sha256sum -c -
+          echo '--- root package.json patch hunk ---'
+          awk '
+            /^diff --git a\/package.json b\/package.json$/ { show = 1 }
+            show && /^diff --git / && $0 !~ /a\/package.json b\/package.json/ { exit }
+            show { print }
+          ' /tmp/game-art-intelligence.patch
+          echo '--- every audio-matrix reference in sealed patch ---'
+          grep -n -C3 -E 'audio.*matrix|matrix.*audio|test:audio' /tmp/game-art-intelligence.patch || true
