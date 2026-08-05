@@ -29,6 +29,7 @@ import {
   uniqueReviewCraft,
 } from "./book-studio-review-craft-shared";
 
+
 const CRITERION_KEYS = new Set(["criterionId", "score", "evidenceIds", "findingIds", "independentReviews"]);
 const REVIEW_KEYS = new Set([
   "outputKind", "schemaVersion", "reviewId", "packetFingerprint", "candidateId", "candidateTextSha256", "criterionId",
