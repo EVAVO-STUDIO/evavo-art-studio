@@ -58,6 +58,10 @@ requireTokens("source", runtime, [
   "deliveryProfileSha256",
   "duplicate JSON key",
   "byte-order mark",
+  "ART_PRODUCTION_MANIFEST_BOM_FORBIDDEN",
+  "bytes[0] === 0xef",
+  "bytes[1] === 0xbb",
+  "bytes[2] === 0xbf",
   '"preserve"',
   '"remove-border-matte"',
   '"luminance-alpha"',
@@ -193,5 +197,6 @@ if (errors.length > 0) {
 console.log("Brass art production MCP contract passed.");
 console.log("- exactly three staging-only tools remain exposed");
 console.log("- exact source bytes and strict manifests are revalidated before optimization");
+console.log("- UTF-8 BOM is rejected from raw bytes before TextDecoder normalization");
 console.log("- outputs are atomic, create-only and external to source repositories");
 console.log("- provider, runtime, target, deletion, promotion and publication authority remain absent");
