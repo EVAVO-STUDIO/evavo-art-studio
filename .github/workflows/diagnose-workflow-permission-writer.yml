@@ -1,0 +1,75 @@
+name: Locate workflow-permission writer
+
+on:
+  push:
+    branches: [automation/bootstrap-game-art-intelligence-v8-20260805]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_MAIN_SHA: 3de1fe91db5b2067de478303666a8a6bf1f51485
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Inspect exact current-main source writers
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          git switch --detach refs/remotes/origin/main
+          python <<'PY'
+          from pathlib import Path
+
+          roots = [Path("scripts"), Path("packages"), Path("apps"), Path(".github")]
+          extensions = {".js", ".mjs", ".cjs", ".ts", ".tsx", ".json", ".yml", ".yaml"}
+          exact_needles = (
+              ".github/workflows/ci.yml",
+              "workflows/ci.yml",
+              "actions: write",
+              "actions:\\n",
+              "actions:",
+              "contents: write",
+              "workflow permission",
+              "workflow-permission",
+              "content-scoped write permissions",
+          )
+          hits = []
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob("*"):
+                  if not path.is_file() or path.suffix not in extensions:
+                      continue
+                  try:
+                      text = path.read_text(encoding="utf-8")
+                  except UnicodeDecodeError:
+                      continue
+                  lowered = text.lower()
+                  if any(needle.lower() in lowered for needle in exact_needles) or (
+                      "actions" in lowered and "write" in lowered
+                  ):
+                      matching = []
+                      for number, line in enumerate(text.splitlines(), start=1):
+                          line_lower = line.lower()
+                          if (
+                              "ci.yml" in line_lower
+                              or "actions" in line_lower
+                              or "content-scoped" in line_lower
+                              or "workflow permission" in line_lower
+                          ):
+                              matching.append((number, line))
+                      hits.append((str(path), matching))
+          for path, matching in sorted(hits):
+              print(f"--- {path}")
+              for number, line in matching:
+                  print(f"{number}: {line}")
+          print(f"matched_files={len(hits)}")
+          PY
