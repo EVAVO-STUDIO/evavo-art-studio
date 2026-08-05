@@ -1,0 +1,250 @@
+import { validateAndNormalizeBookAuthoringPacket } from "./book-studio-authoring-packet";
+import type {
+  BookAuthoringOperation,
+  BookAuthoringPacketV1,
+} from "./book-studio-authoring-types";
+import { evaluateBookNarrativeCraftEvidence } from "./book-studio-narrative-craft-evaluate-main";
+import { fingerprintBookNarrativeIndependentReviewReceipt } from "./book-studio-narrative-craft-evaluate-evidence";
+import { validateBookNarrativeCraftPacket } from "./book-studio-narrative-craft-packet";
+import type {
+  BookNarrativeCraftEvaluationV1,
+  BookNarrativeCraftPacketV1,
+  BookNarrativeCriterionEvidenceV1,
+  BookNarrativeIndependentReviewReceiptV1,
+} from "./book-studio-narrative-craft-types";
+import { validateBookPhraseOverlapScanIntegrity } from "./book-studio-phrase-overlap-integrity";
+import {
+  canonicalBookJson,
+  sha256BookText,
+} from "./book-studio-project-contracts";
+import type { BookProviderId } from "./book-studio-project-contracts";
+import type { BookPhraseOverlapScanV1 } from "./book-studio-review-craft-types";
+import {
+  compileBookUnattendedProduction,
+} from "./book-studio-unattended-production";
+import type {
+  BookUnattendedProductionInputV1,
+  BookUnattendedProductionResultV1,
+  BookUnattendedStagePlanV1,
+} from "./book-studio-unattended-production";
+import {
+  compileBookWritingCandidateRuntimeRequest,
+} from "./book-studio-writing-candidate-contracts";
+import type {
+  BookWritingCandidateRuntimeRequestV1,
+  CompileBookWritingCandidateInputV1,
+} from "./book-studio-writing-candidate-types";
+
+export const BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT =
+  "evavo_docs_book_unattended_editorial_consensus_v1" as const;
+
+const REVIEW_PAYLOAD_OUTPUT_KIND =
+  "evavo_docs_book_unattended_editorial_reviewer_payload" as const;
+const REVIEW_RESPONSE_INSTRUCTION_TOKEN = REVIEW_PAYLOAD_OUTPUT_KIND;
+const SAFE_ID = /^[a-z][a-z0-9._:@/-]{1,299}$/u;
+const SHA256 = /^sha256:[a-f0-9]{64}$/u;
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
+const REVIEW_OPERATIONS = new Set<BookAuthoringOperation>([
+  "critique_candidate",
+  "evaluate_voice",
+  "fact_check_candidate",
+  "continuity_review",
+  "custom",
+]);
+
+type UnknownRecord = Record<string, unknown>;
+
+export interface BookUnattendedEditorialDependencyReceiptV1 {
+  stageId: string;
+  receiptFingerprint: string;
+  completedAt: string;
+}
+
+export interface BookUnattendedEditorialReviewerAssignmentInputV1 {
+  assignmentId: string;
+  reviewerProducerId: string;
+  criterionIds: string[];
+  candidateCompileInput: CompileBookWritingCandidateInputV1;
+}
+
+export interface BookUnattendedEditorialConsensusProgrammeInputV1 {
+  outputKind: "evavo_docs_book_unattended_editorial_consensus_programme_input";
+  schemaVersion: 1;
+  contract: typeof BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT;
+  unattendedProductionInput: BookUnattendedProductionInputV1;
+  expectedUnattendedResultFingerprint: string;
+  volumeId: string;
+  stageId: string;
+  candidateId: string;
+  candidateProducerId: string;
+  candidateTextSha256: string;
+  candidateStorageReceiptFingerprint: string;
+  candidateEvidenceIds: string[];
+  narrativeCraftPacket: BookNarrativeCraftPacketV1;
+  phraseOverlapScan: BookPhraseOverlapScanV1;
+  dependencyReceipts: BookUnattendedEditorialDependencyReceiptV1[];
+  reviewerAssignments: BookUnattendedEditorialReviewerAssignmentInputV1[];
+  unresolvedFindingIds: string[];
+  evaluationEvidenceIds: string[];
+  executionRequestedAt: string;
+  executionRequestedBy: string;
+  providerFallbackAllowed: false;
+  authoritativeWritesAllowed: false;
+  canonicalManuscriptMutationAllowed: false;
+  automaticCanonicalAdmissionAllowed: false;
+  automaticPublicationAllowed: false;
+  runtimeCutoverApproved: false;
+  publicationPerformed: false;
+}
+
+export interface BookUnattendedEditorialReviewerAssignmentV1 {
+  assignmentId: string;
+  assignmentFingerprint: string;
+  reviewerProducerId: string;
+  reviewerProvider: BookProviderId;
+  reviewerModel: string;
+  criterionIds: string[];
+  authoringPacket: BookAuthoringPacketV1;
+  runtimeRequest: BookWritingCandidateRuntimeRequestV1;
+  candidateCompileInput: CompileBookWritingCandidateInputV1;
+  providerAttemptLimit: 1;
+  providerFallbackAllowed: false;
+  reviewerWasCandidateProducer: false;
+}
+
+export interface BookUnattendedEditorialConsensusProgrammeV1 {
+  outputKind: "evavo_docs_book_unattended_editorial_consensus_programme";
+  schemaVersion: 1;
+  contract: typeof BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT;
+  status: "ready";
+  projectId: string;
+  programmeId: string;
+  volumeId: string;
+  stageId: string;
+  stagePlan: BookUnattendedStagePlanV1;
+  unattendedRequestFingerprint: string;
+  unattendedReadinessFingerprint: string;
+  unattendedResultFingerprint: string;
+  volumePlanFingerprint: string;
+  candidateId: string;
+  candidateProducerId: string;
+  candidateTextSha256: string;
+  candidateStorageReceiptFingerprint: string;
+  candidateEvidenceIds: string[];
+  narrativeCraftPacket: BookNarrativeCraftPacketV1;
+  phraseOverlapScan: BookPhraseOverlapScanV1;
+  dependencyReceipts: BookUnattendedEditorialDependencyReceiptV1[];
+  reviewerAssignments: BookUnattendedEditorialReviewerAssignmentV1[];
+  unresolvedFindingIds: string[];
+  evaluationEvidenceIds: string[];
+  executionRequestedAt: string;
+  executionRequestedBy: string;
+  programmeFingerprint: string;
+  minimumIndependentReviewers: number;
+  minimumConsensusBasisPoints: number;
+  providerCallAllowed: true;
+  providerCallPerformed: false;
+  oneProviderAttemptPerReviewerRequired: true;
+  providerFallbackAllowed: false;
+  blindIndependentReviewRequired: true;
+  dissentPreservationRequired: true;
+  authoritativeBookStateWritePerformed: false;
+  canonicalManuscriptMutationPerformed: false;
+  automaticCanonicalAdmissionAllowed: false;
+  artStudioCalled: false;
+  runtimeCutoverApproved: false;
+  publicationPerformed: false;
+}
+
+export interface BookUnattendedEditorialConsensusProgrammeResultV1 {
+  outputKind: "evavo_docs_book_unattended_editorial_consensus_programme_result";
+  schemaVersion: 1;
+  status: "ready" | "blocked";
+  unattendedProduction: BookUnattendedProductionResultV1;
+  programme?: BookUnattendedEditorialConsensusProgrammeV1;
+  blockers: string[];
+  warnings: string[];
+  providerCallAllowed: boolean;
+  providerCallPerformed: false;
+  canonicalManuscriptMutationPerformed: false;
+  automaticCanonicalAdmissionAllowed: false;
+  publicationPerformed: false;
+}
+
+export interface BookUnattendedEditorialReviewerPayloadV1 {
+  outputKind: typeof REVIEW_PAYLOAD_OUTPUT_KIND;
+  schemaVersion: 1;
+  contract: typeof BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT;
+  assignmentId: string;
+  assignmentFingerprint: string;
+  candidateId: string;
+  candidateTextSha256: string;
+  reviewerProducerId: string;
+  reviewerProvider: BookProviderId;
+  reviewerModel: string;
+  receipts: BookNarrativeIndependentReviewReceiptV1[];
+  minorityFindingIds: string[];
+  completedAt: string;
+  payloadFingerprint: string;
+  reviewerWasCandidateProducer: false;
+  canonicalAdmissionAllowed: false;
+  canonicalManuscriptMutationPerformed: false;
+  publicationPerformed: false;
+}
+
+export interface BookUnattendedEditorialReviewerExecutionV1 {
+  assignmentId: string;
+  assignmentFingerprint: string;
+  runtimeRequestFingerprint: string;
+  runtimeResultFingerprint: string;
+  providerRequestId: string;
+  providerAttemptCount: 1;
+  providerCalled: true;
+  providerFallbackAllowed: false;
+  payload: BookUnattendedEditorialReviewerPayloadV1;
+  executionFingerprint: string;
+}
+
+export interface BookUnattendedEditorialConsensusEvaluationInputV1 {
+  outputKind: "evavo_docs_book_unattended_editorial_consensus_evaluation_input";
+  schemaVersion: 1;
+  contract: typeof BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT;
+  programme: BookUnattendedEditorialConsensusProgrammeV1;
+  reviewerExecutions: BookUnattendedEditorialReviewerExecutionV1[];
+}
+
+export interface BookUnattendedEditorialConsensusEvaluationV1 {
+  outputKind: "evavo_docs_book_unattended_editorial_consensus_evaluation";
+  schemaVersion: 1;
+  contract: typeof BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT;
+  status: "ready_for_governed_admission" | "needs_work";
+  programmeFingerprint: string;
+  narrativeEvaluation: BookNarrativeCraftEvaluationV1;
+  reviewerExecutionFingerprints: string[];
+  passingReviewerProducerIds: string[];
+  dissentingReviewerProducerIds: string[];
+  minorityFindingIds: string[];
+  consensusBasisPoints: number;
+  minimumConsensusBasisPoints: number;
+  consensusReached: boolean;
+  requiredActions: string[];
+  evaluationFingerprint: string;
+  providerCallsPerformed: number;
+  providerFallbackAllowed: false;
+  authoritativeBookStateWritePerformed: false;
+  canonicalManuscriptMutationPerformed: false;
+  automaticCanonicalAdmissionAllowed: false;
+  artStudioCalled: false;
+  runtimeCutoverApproved: false;
+  publicationPerformed: false;
+}
+
+export interface BookUnattendedEditorialConsensusEvaluationResultV1 {
+  outputKind: "evavo_docs_book_unattended_editorial_consensus_evaluation_result";
+  schemaVersion: 1;
+  status: "ready_for_governed_admission" | "needs_work" | "blocked";
+  evaluation?: BookUnattendedEditorialConsensusEvaluationV1;
+  blockers: string[];
+  requiredActions: string[];
+  providerCallsPerformed: number;
+  providerFallbackAllowed: false;
