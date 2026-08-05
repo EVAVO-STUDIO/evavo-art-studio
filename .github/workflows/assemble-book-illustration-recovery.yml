@@ -1,0 +1,86 @@
+name: Assemble Book Illustration Recovery
+
+on:
+  push:
+    branches:
+      - agent/book-print-illustration-intelligence-20260805
+    paths:
+      - ".github/workflows/assemble-book-illustration-recovery.yml"
+      - ".github/source-payload/book-illustration-recovery/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assemble-book-illustration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact feature branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Set up Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      - name: Reconstruct and verify exact archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload_dir=.github/source-payload/book-illustration-recovery
+          cat "$payload_dir"/part-*.b64 > /tmp/book-illustration-recovery.tar.gz.b64
+          base64 --decode /tmp/book-illustration-recovery.tar.gz.b64 > /tmp/book-illustration-recovery.tar.gz
+          echo "a1c343649a9d26a8a9eb34e671f94a36c72207e0e32cfe82e8c158d6c1b448cb  /tmp/book-illustration-recovery.tar.gz" | sha256sum -c -
+          actual="$(tar -tzf /tmp/book-illustration-recovery.tar.gz | LC_ALL=C sort)"
+          expected="$(printf '%s\n' \
+            '.github/workflows/book-illustration-intelligence.yml' \
+            'docs/book-illustration-intelligence.md' \
+            'packages/contracts/src/book-illustration-intelligence.ts' \
+            'packages/contracts/src/index.ts' \
+            'packages/contracts/test/book-illustration-intelligence-cli.test.mjs' \
+            'packages/contracts/test/book-illustration-intelligence.test.mjs' \
+            'scripts/check-book-illustration-intelligence.mjs' \
+            'scripts/evavo-art-book-illustration-cli.mjs' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          tar -xzf /tmp/book-illustration-recovery.tar.gz --no-same-owner --no-same-permissions
+      - name: Verify every extracted source byte
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' \
+            '6dd3f569fb22719bf800374afeddaa25eb8d30d381a108b912bbeab5fbb829ac  .github/workflows/book-illustration-intelligence.yml' \
+            '45b1e98077443ce9c579823e06718528087e7c5b62e9c52ca13b1e19c2e27691  docs/book-illustration-intelligence.md' \
+            '62bed70fa6627d7686b2e8cd8858fe9e1c8b8c2598514e5e0f00fab0fed13d99  packages/contracts/src/book-illustration-intelligence.ts' \
+            '44bad36fef1b4b63e1c497aaff5dc39862ddcc37e1ca692889fb622141ae27b1  packages/contracts/src/index.ts' \
+            'dbc561bf8c9c89ad3a981594827e5cb570be7aefc338635d92eb45ee48bb4c37  packages/contracts/test/book-illustration-intelligence.test.mjs' \
+            'fc36185000047e8b3a5586df92a5de6ef0e2b7ec22a95b539faff326448813f3  packages/contracts/test/book-illustration-intelligence-cli.test.mjs' \
+            '1448bbe0055840501ed78026ea23fb0b92e76ed10ea8839c16e8938c5a04edc2  scripts/check-book-illustration-intelligence.mjs' \
+            '07b841c6385237f6af1068e92bf39fe40d9d03e8501d34af25d2159e92be6cc7  scripts/evavo-art-book-illustration-cli.mjs' | sha256sum -c -
+          node scripts/check-book-illustration-intelligence.mjs
+      - name: Commit exact reconstructed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add -- \
+            .github/workflows/book-illustration-intelligence.yml \
+            docs/book-illustration-intelligence.md \
+            packages/contracts/src/book-illustration-intelligence.ts \
+            packages/contracts/src/index.ts \
+            packages/contracts/test/book-illustration-intelligence-cli.test.mjs \
+            packages/contracts/test/book-illustration-intelligence.test.mjs \
+            scripts/check-book-illustration-intelligence.mjs \
+            scripts/evavo-art-book-illustration-cli.mjs
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No reconstructed source changes found"; exit 1; }
+          git commit -m "feat(book): add print illustration intelligence"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
