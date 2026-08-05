@@ -7,7 +7,13 @@ import {
   type DeliveryBatchManifest,
 } from "@evavo/art-delivery-optimizer";
 
-import { BrassArtProductionMcpError } from "./production-contract.js";
+import {
+  BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES,
+  BrassArtProductionMcpError,
+  brassArtProductionFileIdentity,
+  sameBrassArtProductionFileIdentity,
+  type BrassArtProductionManifestFile,
+} from "./production-contract.js";
 
 class StrictJsonScanner {
   private index = 0;
@@ -163,14 +169,123 @@ export function parseStrictJson(source: string): unknown {
   }
 }
 
+function changedManifest(message: string): BrassArtProductionMcpError {
+  return new BrassArtProductionMcpError(
+    "ART_PRODUCTION_MANIFEST_CHANGED_DURING_READ",
+    message,
+  );
+}
+
+function pathIdentity(manifestFile: BrassArtProductionManifestFile) {
+  let state: ReturnType<typeof fs.lstatSync>;
+  try {
+    state = fs.lstatSync(manifestFile.path);
+  } catch (error: unknown) {
+    throw changedManifest(
+      `Manifest path became unavailable: ${error instanceof Error ? error.message : String(error)}.`,
+    );
+  }
+  if (!state.isFile() || state.isSymbolicLink()) {
+    throw changedManifest(
+      "Manifest path no longer identifies the resolved regular file.",
+    );
+  }
+  return brassArtProductionFileIdentity(state);
+}
+
+function readExactManifestBytes(
+  manifestFile: BrassArtProductionManifestFile,
+): Buffer {
+  let descriptor: number;
+  try {
+    descriptor = fs.openSync(manifestFile.path, "r");
+  } catch (error: unknown) {
+    throw changedManifest(
+      `Manifest could not be opened after identity resolution: ${error instanceof Error ? error.message : String(error)}.`,
+    );
+  }
+  try {
+    const openedState = fs.fstatSync(descriptor);
+    if (!openedState.isFile()) {
+      throw changedManifest("Opened manifest descriptor is not a regular file.");
+    }
+    const openedIdentity = brassArtProductionFileIdentity(openedState);
+    if (
+      !sameBrassArtProductionFileIdentity(
+        manifestFile.identity,
+        openedIdentity,
+      )
+    ) {
+      throw changedManifest(
+        "Manifest identity changed after path validation and before descriptor open.",
+      );
+    }
+    if (
+      openedIdentity.size < 1 ||
+      openedIdentity.size > BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES
+    ) {
+      throw new BrassArtProductionMcpError(
+        "ART_PRODUCTION_MANIFEST_SIZE_INVALID",
+        "Manifest has an invalid byte length.",
+      );
+    }
+
+    const bytes = Buffer.allocUnsafe(openedIdentity.size);
+    let offset = 0;
+    while (offset < bytes.byteLength) {
+      const count = fs.readSync(
+        descriptor,
+        bytes,
+        offset,
+        Math.min(64 * 1024, bytes.byteLength - offset),
+        offset,
+      );
+      if (count <= 0) {
+        throw changedManifest("Manifest became shorter during descriptor read.");
+      }
+      offset += count;
+    }
+    const extra = Buffer.allocUnsafe(1);
+    if (fs.readSync(descriptor, extra, 0, 1, bytes.byteLength) !== 0) {
+      throw changedManifest("Manifest grew during descriptor read.");
+    }
+
+    const afterReadIdentity = brassArtProductionFileIdentity(
+      fs.fstatSync(descriptor),
+    );
+    if (
+      !sameBrassArtProductionFileIdentity(
+        openedIdentity,
+        afterReadIdentity,
+      ) ||
+      !sameBrassArtProductionFileIdentity(
+        openedIdentity,
+        pathIdentity(manifestFile),
+      )
+    ) {
+      throw changedManifest("Manifest changed during descriptor read.");
+    }
+    return bytes;
+  } catch (error: unknown) {
+    if (error instanceof BrassArtProductionMcpError) throw error;
+    throw changedManifest(
+      `Manifest descriptor read failed: ${error instanceof Error ? error.message : String(error)}.`,
+    );
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
 export function loadDeliveryManifestStrict(
-  manifestPath: string,
+  manifestFile: BrassArtProductionManifestFile,
 ): Readonly<{
   manifest: DeliveryBatchManifest;
   manifestSha256: string;
   bytes: number;
+  descriptorBoundRead: true;
+  manifestIdentityRechecked: true;
 }> {
-  const bytes = fs.readFileSync(manifestPath);
+  const bytes = readExactManifestBytes(manifestFile);
   if (
     bytes.byteLength >= 3 &&
     bytes[0] === 0xef &&
@@ -192,9 +307,19 @@ export function loadDeliveryManifestStrict(
     );
   }
   const manifest = validateDeliveryBatchManifest(parseStrictJson(source));
+  if (
+    !sameBrassArtProductionFileIdentity(
+      manifestFile.identity,
+      pathIdentity(manifestFile),
+    )
+  ) {
+    throw changedManifest("Manifest path changed while JSON was validated.");
+  }
   return Object.freeze({
     manifest,
     manifestSha256: createHash("sha256").update(bytes).digest("hex"),
     bytes: bytes.byteLength,
+    descriptorBoundRead: true,
+    manifestIdentityRechecked: true,
   });
 }

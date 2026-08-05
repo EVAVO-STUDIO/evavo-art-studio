@@ -68,6 +68,17 @@ requireTokens("source", runtime, [
   "stagingWritesEnabled: true",
   "createOnlyOutputs: true",
   "atomicOutputPublication: true",
+  "BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES",
+  "descriptorBoundManifestReads: true",
+  "manifestIdentityRecheckedAfterRead: true",
+  "descriptorBoundManifestRead: loaded.descriptorBoundRead",
+  "manifestIdentityRechecked: loaded.manifestIdentityRechecked",
+  "ART_PRODUCTION_MANIFEST_CHANGED_DURING_READ",
+  "ART_PRODUCTION_MANIFEST_CHANGED_DURING_RESOLUTION",
+  "fs.openSync",
+  "fs.fstatSync",
+  "fs.readSync",
+  "sameBrassArtProductionFileIdentity",
   "sourceMutationAllowed: false",
   "targetRepositoryMutationAllowed: false",
   "deletionAuthority: false",
@@ -96,11 +107,14 @@ forbidTokens("source", runtime, [
   "shell: true",
   "unlinkSync",
   "rmSync",
+  "fs.readFileSync(manifestFile.path)",
 ]);
 requireTokens("tests", source.tests ?? "", [
   'test("production roots are explicit, canonical and disjoint"',
   'test("production profile exposes exactly three bounded staging tools"',
   'test("strict manifest loading rejects duplicate keys and UTF-8 BOM"',
+  'test("manifest identity swaps after resolution fail before parsing"',
+  'test("manifest growth and truncation during descriptor reads fail closed"',
   'test("validation rechecks source bytes without writing output"',
   'test("staging creates one atomic batch and receipt outside the source root"',
   'test("changed source identity and unconfigured roots fail closed"',
@@ -118,6 +132,8 @@ requireTokens("docs", source.docs ?? "", [
   "remove-border-matte",
   "luminance-alpha",
   "create-only",
+  "descriptor-bound",
+  "path replacement",
   "Development Studio",
 ]);
 
@@ -198,5 +214,6 @@ console.log("Brass art production MCP contract passed.");
 console.log("- exactly three staging-only tools remain exposed");
 console.log("- exact source bytes and strict manifests are revalidated before optimization");
 console.log("- UTF-8 BOM is rejected from raw bytes before TextDecoder normalization");
+console.log("- descriptor-bound reads reject path replacement, rewrite, growth and truncation");
 console.log("- outputs are atomic, create-only and external to source repositories");
 console.log("- provider, runtime, target, deletion, promotion and publication authority remain absent");

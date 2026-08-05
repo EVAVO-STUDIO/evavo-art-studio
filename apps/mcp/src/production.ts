@@ -20,6 +20,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import * as z from "zod/v4";
 
 import {
+  BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES,
   BRASS_ART_PRODUCTION_MODE,
   BRASS_ART_PRODUCTION_PROFILE,
   BRASS_ART_PRODUCTION_TOOL_NAMES,
@@ -29,6 +30,7 @@ import {
 import { loadDeliveryManifestStrict } from "./production-manifest.js";
 
 export {
+  BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES,
   BRASS_ART_PRODUCTION_MODE,
   BRASS_ART_PRODUCTION_PROFILE,
   BRASS_ART_PRODUCTION_TOOL_NAMES,
@@ -75,6 +77,9 @@ export function productionCapabilityDocument(
     stagingWritesEnabled: true,
     createOnlyOutputs: true,
     atomicOutputPublication: true,
+    maximumManifestBytes: BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES,
+    descriptorBoundManifestReads: true,
+    manifestIdentityRecheckedAfterRead: true,
     sourceMutationAllowed: false,
     targetRepositoryMutationAllowed: false,
     deletionAuthority: false,
@@ -90,6 +95,7 @@ export function productionCapabilityDocument(
     mutationPerformed: false,
     truthBoundaries: Object.freeze([
       "A staged derivative and receipt are not human creative approval.",
+      "Manifest path, descriptor and post-parse identities must remain exact throughout loading.",
       "Staging does not modify the Brass & Brine checkout or publish Git changes.",
       "Development Studio must independently admit exact receipts and selected paths before publication.",
     ]),
@@ -106,8 +112,8 @@ async function execute(
   }>,
 ): Promise<Readonly<Record<string, unknown>>> {
   const sourceRoot = config.resolveSourceRoot(argumentsValue.sourceRoot);
-  const manifestPath = config.resolveManifest(argumentsValue.manifest);
-  const loaded = loadDeliveryManifestStrict(manifestPath);
+  const manifestFile = config.resolveManifest(argumentsValue.manifest);
+  const loaded = loadDeliveryManifestStrict(manifestFile);
   const outputRoot = argumentsValue.apply
     ? config.resolveOutput(argumentsValue.outputDirectory)
     : path.join(
@@ -127,9 +133,11 @@ async function execute(
       : "evavo_brass_art_delivery_validation_v1",
     profile: BRASS_ART_PRODUCTION_PROFILE,
     sourceRoot,
-    manifestPath,
+    manifestPath: manifestFile.path,
     manifestFileSha256: loaded.manifestSha256,
     manifestBytes: loaded.bytes,
+    descriptorBoundManifestRead: loaded.descriptorBoundRead,
+    manifestIdentityRechecked: loaded.manifestIdentityRechecked,
     canonicalBatchSha256: deliveryBatchSha256(loaded.manifest),
     ...(argumentsValue.apply ? { outputRoot } : {}),
     receipt: receipt satisfies DeliveryBatchReceipt,
