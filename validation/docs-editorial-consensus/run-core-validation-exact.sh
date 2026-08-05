@@ -16,6 +16,9 @@ source = source.replace(
 ).replace(
     "68305e1d009e63763bdb68d8135a4a56f07a481e",
     "6838032f0996ef1db9f48b46919e245a384d7df9",
+).replace(
+    "docs-feature=e843e31442643057dca3de23c9b9ab10ded8d7e5",
+    "docs-feature=e843f9130bae5c0521523cdbb0d159d8acae9172",
 )
 old = '''cp "$ROOT/validation/docs-editorial-consensus/source/book-studio-unattended-editorial-consensus-integrity.ts" "$MIRROR/src/"
 cp "$ROOT/validation/docs-editorial-consensus/source/book-studio-unattended-editorial-consensus-integrity.test.mjs" "$MIRROR/test/unattended-editorial-consensus-integrity.test.mjs"
@@ -26,10 +29,28 @@ assemble_exact_blob 6838032f0996ef1db9f48b46919e245a384d7df9 "$MIRROR/test/unatt
 phrase_source="${RUNNER_TEMP:-/tmp}/book-studio-phrase-overlap-integrity.ts"
 sed 's#../docs-narrative-craft/src/#./#g' "$ROOT/validation/docs-editorial-consensus/source/book-studio-phrase-overlap-integrity.ts" > "$phrase_source"
 assemble_exact_blob 1fec55714b98e852d457a575691ae218af8b75a8 "$MIRROR/src/book-studio-phrase-overlap-integrity.ts" "$phrase_source"
+
+review_type_parts=("$ROOT"/validation/docs-editorial-consensus/dependencies/book-studio-review-craft-types.ts.part-*)
+narrative_type_parts=("$ROOT"/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-types.ts.part-*)
+assemble_exact_blob 51ca369a41a63c52613a97e82c4024b8bd05f7f3 "$MIRROR/src/book-studio-review-craft-types.ts" "${review_type_parts[@]}"
+assemble_exact_blob 39b770a724610b9cf33fbe772b6ed9bf8df05075 "$MIRROR/src/book-studio-narrative-craft-types.ts" "${narrative_type_parts[@]}"
+assemble_exact_blob 77a2d6f1c20769675f8aa2c2daee749a999cf8ba "$MIRROR/src/book-studio-narrative-craft-evaluate-main.ts" "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-main.ts"
+assemble_exact_blob 60b39017475ab7666b5cc2201fab890fd6009ce7 "$MIRROR/src/book-studio-narrative-craft-evaluate-evidence.ts" "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-evidence.ts"
 '''
 if old not in source:
     raise SystemExit("Expected direct-file assembly block was not found.")
-Path(sys.argv[2]).write_text(source.replace(old, new))
+source = source.replace(old, new)
+marker = '''check_blob src/book-studio-phrase-overlap-integrity.ts 1fec55714b98e852d457a575691ae218af8b75a8
+'''
+checks = marker + '''check_blob src/book-studio-review-craft-types.ts 51ca369a41a63c52613a97e82c4024b8bd05f7f3
+check_blob src/book-studio-narrative-craft-types.ts 39b770a724610b9cf33fbe772b6ed9bf8df05075
+check_blob src/book-studio-narrative-craft-evaluate-main.ts 77a2d6f1c20769675f8aa2c2daee749a999cf8ba
+check_blob src/book-studio-narrative-craft-evaluate-evidence.ts 60b39017475ab7666b5cc2201fab890fd6009ce7
+'''
+if marker not in source:
+    raise SystemExit("Expected phrase-overlap blob check was not found.")
+source = source.replace(marker, checks)
+Path(sys.argv[2]).write_text(source)
 PY
 
 chmod +x "$PATCHED"
