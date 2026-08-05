@@ -1,0 +1,54 @@
+{
+  "schema": "evavo.raw-art-production-orchestrator.v2",
+  "queueSchema": "evavo.raw-art-production-queue.v2",
+  "styleProfileSchema": "evavo.approved-style-reference-profile.v2",
+  "workspaceJobSchema": "evavo.governed-workspace-job.v1",
+  "acceptedDecisionSchemas": [
+    "evavo.image-reference-work-order.v2",
+    "evavo.image-reference-review.v1"
+  ],
+  "states": [
+    "blocked-missing-decision",
+    "blocked-role-unmapped",
+    "blocked-target-unresolved",
+    "blocked-source-evidence",
+    "blocked-receipt-mismatch",
+    "ready-deterministic",
+    "provider-required",
+    "reference-only",
+    "held-rejected",
+    "completed"
+  ],
+  "batch": {
+    "defaultSize": 100,
+    "maximumSize": 500,
+    "groupBySemanticRole": true,
+    "stableOrdering": true,
+    "targetPathCollisionsRejected": true
+  },
+  "styleLearning": {
+    "metadataOnly": true,
+    "modelTrainingClaimed": false,
+    "approvedTraitsSeparatedFromDefects": true,
+    "negativeConstraintsRetained": true,
+    "sourceHashesRequired": true,
+    "duplicateExemplarsRejected": true,
+    "provenanceApprovalRequiredForApprovedStatus": true,
+    "creativeApprovalRequiredForApprovedStatus": true,
+    "historicalApprovalRequiredForApprovedStatus": true,
+    "maximumExemplarsPerScope": 24
+  },
+  "execution": {
+    "sourceMutation": false,
+    "sourceDeletion": false,
+    "targetRepositoryMutation": false,
+    "providerExecution": false,
+    "publication": false,
+    "checkpointResumeSupported": true,
+    "exactReceiptBindingRequired": true,
+    "receiptCannotBypassReviewDecision": true,
+    "deliveryOptimizerPreferred": "sharp-delivery-optimizer",
+    "portableFallback": "python-pillow-fallback",
+    "stagingOnly": true
+  }
+}
