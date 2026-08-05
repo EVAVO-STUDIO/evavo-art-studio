@@ -1,0 +1,128 @@
+name: Agent apply Book Art Docs receiver upgrade
+
+on:
+  push:
+    branches:
+      - agent/book-art-docs-production-receiver-20260805
+    paths:
+      - ".github/agent/apply-book-art-docs-receiver-upgrade.mjs"
+      - ".github/workflows/agent-book-art-docs-receiver-upgrade.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-book-art-docs-receiver-upgrade-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply-verify-push:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact agent branch with push authority
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Normalize temporary patcher literals
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path(".github/agent/apply-book-art-docs-receiver-upgrade.mjs")
+          source = path.read_text(encoding="utf-8")
+
+          escaped_ticks = source.count("\\\\`")
+          if escaped_ticks != 6:
+              raise SystemExit(f"expected 6 double-escaped inner template ticks, found {escaped_ticks}")
+          source = source.replace("\\\\`", "\\`")
+
+          base_interpolations = source.count("${base}")
+          if base_interpolations != 2:
+              raise SystemExit(f"expected 2 generated-test base interpolations, found {base_interpolations}")
+          source = source.replace("${base}", "\\${base}")
+
+          old = '''  if (count !== 1) {
+              throw new Error(`${relative}: expected one exact replacement, found ${count}.\\n--- expected ---\\n${before}`);
+            }
+            writeFileSync(absolute, source.replace(before, after), "utf8");'''
+          new = '''  if (count < 1) {
+              throw new Error(`${relative}: exact replacement source was not found.\\n--- expected ---\\n${before}`);
+            }
+            writeFileSync(absolute, source.split(before).join(after), "utf8");'''
+          if old not in source:
+              raise SystemExit("temporary patcher exact-replacement implementation was not found")
+          source = source.replace(old, new)
+          path.write_text(source, encoding="utf-8")
+
+      - name: Parse and apply exact receiver upgrade
+        run: |
+          node --check .github/agent/apply-book-art-docs-receiver-upgrade.mjs
+          node .github/agent/apply-book-art-docs-receiver-upgrade.mjs
+          git restore .github/agent/apply-book-art-docs-receiver-upgrade.mjs
+
+      - name: Verify permanent source contract before dependency install
+        run: node scripts/check-book-art-docs-release.mjs
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build exact Art Studio domain dependencies
+        run: pnpm run build:domain
+
+      - name: Run Book Art release contract attacks
+        run: pnpm --filter @evavo/art-contracts test
+
+      - name: Run shared Docs release runtime attacks
+        run: pnpm --filter @evavo/art-book-runtime test
+
+      - name: Run provider-worker and immutable-inspection integration attacks
+        run: pnpm --filter @evavo/art-studio-worker test
+
+      - name: Run Docs release REST and OpenAPI attacks
+        run: pnpm --filter @evavo/art-studio-api test
+
+      - name: Run complete repository validation
+        run: pnpm check
+
+      - name: Prove patch cleanliness and commit exact scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --check
+          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -Ev '^ (M|A) ' || true)"
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add \
+            .github/workflows/book-art-docs-release.yml \
+            apps/api/openapi.book-art-docs-release.yaml \
+            apps/api/test/book-art-docs-release-api.test.mjs \
+            apps/api/test/book-art-docs-release-openapi-contract.test.mjs \
+            apps/worker/test/book-art-docs-release-runtime.test.mjs \
+            docs/book-art-docs-release.md \
+            packages/book-art-runtime/test/docs-release.test.mjs \
+            packages/contracts/src/book-production-docs-release.ts \
+            packages/contracts/test/book-production-docs-release.test.mjs \
+            scripts/check-book-art-docs-release.mjs
+          git diff --cached --check
+          git diff --cached --quiet && {
+            echo "No receiver upgrade changes were produced."
+            exit 1
+          }
+          git commit -m "feat(book-art): activate Docs release candidate production"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
