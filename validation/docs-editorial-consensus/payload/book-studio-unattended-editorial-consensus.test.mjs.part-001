@@ -1,0 +1,120 @@
+      [],
+    );
+    assert.equal(result.evaluation.providerCallsPerformed, 2);
+    assert.equal(
+      result.evaluation.automaticCanonicalAdmissionAllowed,
+      false,
+    );
+    assert.equal(
+      result.evaluation.canonicalManuscriptMutationPerformed,
+      false,
+    );
+  },
+);
+
+test(
+  "preserves minority findings and withholds consensus when one reviewer dissents",
+  async () => {
+    const { programme, evidence } = await programmeFixture();
+    const alphaReceipts = evidence.map((item) =>
+      item.independentReviews.find(
+        (review) => review.reviewerProducerId === "reviewer-alpha",
+      ),
+    );
+    const betaReceipts = [];
+    for (const item of evidence) {
+      const original = item.independentReviews.find(
+        (review) => review.reviewerProducerId === "reviewer-beta",
+      );
+      const unsigned = {
+        ...original,
+        score: 60,
+        decision: "needs_work",
+        evidenceIds: [
+          ...original.evidenceIds,
+          `dissent-evidence-${item.criterionId}`,
+        ].sort(),
+        findingIds: [`minority-${item.criterionId}`],
+      };
+      delete unsigned.reviewFingerprint;
+      betaReceipts.push({
+        ...unsigned,
+        reviewFingerprint:
+          await fingerprintBookNarrativeIndependentReviewReceipt(
+            unsigned,
+          ),
+      });
+    }
+    const minorityFindingIds = betaReceipts
+      .flatMap((item) => item.findingIds)
+      .sort();
+    const result = await evaluateBookUnattendedEditorialConsensus({
+      outputKind:
+        "evavo_docs_book_unattended_editorial_consensus_evaluation_input",
+      schemaVersion: 1,
+      contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+      programme,
+      reviewerExecutions: [
+        await execution(
+          programme,
+          "reviewer-alpha",
+          alphaReceipts,
+        ),
+        await execution(
+          programme,
+          "reviewer-beta",
+          betaReceipts,
+          { minorityFindingIds },
+        ),
+      ],
+    });
+    assert.equal(result.status, "needs_work");
+    assert.equal(result.evaluation.consensusBasisPoints, 5_000);
+    assert.deepEqual(
+      result.evaluation.dissentingReviewerProducerIds,
+      ["reviewer-beta"],
+    );
+    assert.deepEqual(
+      result.evaluation.minorityFindingIds,
+      minorityFindingIds,
+    );
+    assert.ok(
+      result.requiredActions.some((item) =>
+        /preserve and adjudicate minority findings/i.test(item)),
+    );
+  },
+);
+
+test(
+  "rejects programme tampering and incomplete reviewer execution coverage",
+  async () => {
+    const { programme, evidence } = await programmeFixture();
+    const tampered = structuredClone(programme);
+    tampered.minimumConsensusBasisPoints = 5_000;
+    const oneExecution = await execution(
+      programme,
+      "reviewer-alpha",
+      evidence.map((item) =>
+        item.independentReviews.find(
+          (review) =>
+            review.reviewerProducerId === "reviewer-alpha",
+        ),
+      ),
+    );
+    const result = await evaluateBookUnattendedEditorialConsensus({
+      outputKind:
+        "evavo_docs_book_unattended_editorial_consensus_evaluation_input",
+      schemaVersion: 1,
+      contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+      programme: tampered,
+      reviewerExecutions: [oneExecution],
+    });
+    assert.equal(result.status, "blocked");
+    assert.ok(
+      result.blockers.some((item) =>
+        /programme fingerprint|exact reviewer assignment set/i.test(item)),
+    );
+    assert.equal(result.providerFallbackAllowed, false);
+    assert.equal(result.automaticCanonicalAdmissionAllowed, false);
+  },
+);
