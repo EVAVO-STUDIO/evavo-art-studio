@@ -1,0 +1,317 @@
+name: Validate and publish Game Art Intelligence v5
+
+on:
+  push:
+    branches: [automation/bootstrap-game-art-intelligence-v5-20260805]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: game-art-intelligence-v5-current-main
+  cancel-in-progress: false
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EXPECTED_MAIN_SHA: 308a368263f74d7bafca6f11abcd982a1f213759
+      TARGET_BRANCH: agent/game-art-intelligence-current-main-20260805
+      PAYLOAD_ROOT: .github/automation/game-art-intelligence-v2
+      ARCHIVE_SHA256: b571a8e0936d8dcb25185f5942f763774e0964b5adead29d280451fc7aa68c37
+      PATCH_SHA256: f7c5541dfac45f31736cb98c3b47f2d6f982960ac6850a4666bbc085bee833f3
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Recover and verify sealed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t chunks < <(find "$PAYLOAD_ROOT" -maxdepth 1 -type f -name 'chunk-*.b64' -printf '%f\n' | LC_ALL=C sort)
+          test "${#chunks[@]}" -eq 24
+          for index in $(seq 0 23); do
+            printf -v expected 'chunk-%03d.b64' "$index"
+            test "${chunks[$index]}" = "$expected"
+          done
+          : > /tmp/game-art-intelligence.patch.gz.b64
+          for chunk in "${chunks[@]}"; do
+            cat "$PAYLOAD_ROOT/$chunk" >> /tmp/game-art-intelligence.patch.gz.b64
+          done
+          base64 --decode /tmp/game-art-intelligence.patch.gz.b64 > /tmp/game-art-intelligence.patch.gz
+          printf '%s  %s\n' "$ARCHIVE_SHA256" /tmp/game-art-intelligence.patch.gz | sha256sum -c -
+          gzip --decompress --stdout /tmp/game-art-intelligence.patch.gz > /tmp/game-art-intelligence.patch
+          printf '%s  %s\n' "$PATCH_SHA256" /tmp/game-art-intelligence.patch | sha256sum -c -
+
+      - name: Apply sealed source to exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          if git ls-remote --exit-code origin "refs/heads/$TARGET_BRANCH" >/dev/null 2>&1; then
+            echo "::error title=Target branch already exists::$TARGET_BRANCH"
+            exit 1
+          fi
+          git config user.name "EVAVO Automation"
+          git config user.email "evavo-automation@users.noreply.github.com"
+          git switch --force-create "$TARGET_BRANCH" refs/remotes/origin/main
+          git am --3way --whitespace=error-all /tmp/game-art-intelligence.patch
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
+          test "$(git log -1 --format=%s)" = "feat(game-art): add project-wide production intelligence"
+          git diff --check HEAD^ HEAD
+          git diff --name-only HEAD^ HEAD | LC_ALL=C sort > /tmp/sealed-paths.txt
+          cat > /tmp/expected-sealed-paths.txt <<'PATHS'
+          .github/workflows/game-art-intelligence.yml
+          apps/mcp/package.json
+          apps/mcp/src/game-intelligence.ts
+          apps/mcp/test/game-art-intelligence-mcp.test.mjs
+          apps/mcp/tsconfig.json
+          docs/game-art-intelligence.md
+          package.json
+          packages/game-art-intelligence/package.json
+          packages/game-art-intelligence/src/adaptive.ts
+          packages/game-art-intelligence/src/canonical.ts
+          packages/game-art-intelligence/src/catalogue.ts
+          packages/game-art-intelligence/src/compiler.ts
+          packages/game-art-intelligence/src/geometry-palette.ts
+          packages/game-art-intelligence/src/index.ts
+          packages/game-art-intelligence/src/types.ts
+          packages/game-art-intelligence/test/game-art-intelligence.test.mjs
+          packages/game-art-intelligence/tsconfig.json
+          scripts/check-game-art-intelligence.mjs
+          PATHS
+          LC_ALL=C sort -o /tmp/expected-sealed-paths.txt /tmp/expected-sealed-paths.txt
+          diff -u /tmp/expected-sealed-paths.txt /tmp/sealed-paths.txt
+          cp .github/workflows/game-art-intelligence.yml /tmp/game-art-intelligence.yml
+
+      - name: Reapply validated current-main compatibility repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          awk '
+            /^[[:space:]]*python <<'\''PY'\''$/ { capture = 1; next }
+            capture && /^[[:space:]]*PY$/ { exit }
+            capture { sub(/^          /, ""); print }
+          ' .github/workflows/automation-bootstrap-game-art-intelligence-v4.yml > /tmp/current-main-repair.py
+          test -s /tmp/current-main-repair.py
+          python /tmp/current-main-repair.py
+
+      - name: Honour explicit sprite features at core coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          planner = Path("packages/sprite-planner/src/directions-clips.ts")
+          source = planner.read_text(encoding="utf-8")
+          old = '''  if (request.coverage !== "core") {
+            for (const id of roleDefaultClipIds(request.role)) selected.add(id);
+            for (const id of gameplayDefaultClipIds(request.gameplayProfile)) selected.add(id);
+            for (const feature of request.features) for (const id of FEATURE_CLIPS[feature] ?? []) selected.add(id);
+          }
+          '''
+          new = '''  if (request.coverage !== "core") {
+            for (const id of roleDefaultClipIds(request.role)) selected.add(id);
+            for (const id of gameplayDefaultClipIds(request.gameplayProfile)) selected.add(id);
+          }
+          for (const feature of request.features) {
+            for (const id of FEATURE_CLIPS[feature] ?? []) selected.add(id);
+          }
+          '''
+          if source.count(old) != 1:
+              raise SystemExit(
+                  f"expected one coverage-gated feature block, found {source.count(old)}"
+              )
+          planner.write_text(source.replace(old, new), encoding="utf-8")
+
+          tests = Path("packages/sprite-planner/test/sprite-planner.test.mjs")
+          test_source = tests.read_text(encoding="utf-8")
+          anchor = '''  assert.ok(plan.totals.runtimeFrames > 500);
+          });
+          '''
+          addition = '''  assert.ok(plan.totals.runtimeFrames > 500);
+          });
+
+          test("honours explicit feature requests at core coverage without widening defaults", () => {
+            const plan = compileSpriteProductionPlan(request({
+              coverage: "core",
+              includeFeatures: ["melee", "ranged", "interact"],
+            }));
+            for (const id of ["attack-light", "attack-ranged", "interact"]) {
+              assert.ok(plan.clips.some((clip) => clip.id === id));
+            }
+            assert.equal(plan.clips.some((clip) => clip.id === "reload"), false);
+          });
+          '''
+          if test_source.count(anchor) != 1:
+              raise SystemExit(
+                  f"expected one sprite planner test anchor, found {test_source.count(anchor)}"
+              )
+          tests.write_text(test_source.replace(anchor, addition), encoding="utf-8")
+          PY
+          git add \
+            packages/game-art-intelligence/src/compiler.ts \
+            packages/game-art-intelligence/src/geometry-palette.ts \
+            packages/game-art-intelligence/test/game-art-intelligence.test.mjs \
+            packages/sprite-planner/src/directions-clips.ts \
+            packages/sprite-planner/test/sprite-planner.test.mjs
+          git commit --amend --no-edit
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
+          git diff --check HEAD^ HEAD
+          node --check scripts/check-game-art-intelligence.mjs
+          node scripts/check-game-art-intelligence.mjs
+          sha256sum \
+            packages/game-art-intelligence/src/compiler.ts \
+            packages/game-art-intelligence/src/geometry-palette.ts \
+            packages/game-art-intelligence/test/game-art-intelligence.test.mjs \
+            packages/sprite-planner/src/directions-clips.ts \
+            packages/sprite-planner/test/sprite-planner.test.mjs \
+            > /tmp/compatibility-source-sha256.txt
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install dependencies review-first
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+          pnpm install --no-frozen-lockfile
+
+      - name: Validate focused sprite and Game Art implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run build:domain
+          pnpm --filter @evavo/art-sprite-planner build
+          pnpm --filter @evavo/art-sprite-planner typecheck
+          pnpm --filter @evavo/art-sprite-planner test
+          pnpm --filter @evavo/art-game-intelligence build
+          pnpm --filter @evavo/art-game-intelligence typecheck
+          pnpm --filter @evavo/art-game-intelligence test
+          pnpm --filter @evavo/art-studio-mcp build
+          pnpm --filter @evavo/art-studio-mcp typecheck
+          node --test apps/mcp/test/game-art-intelligence-mcp.test.mjs
+          node scripts/check-game-art-intelligence.mjs
+
+      - name: Validate complete repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check
+          node scripts/check-game-art-intelligence.mjs
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Publish ordinary source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/game-art-intelligence.yml
+          git commit --amend --no-edit
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
+          git diff --check HEAD^ HEAD
+          git diff --name-only HEAD^ HEAD | LC_ALL=C sort > /tmp/published-paths.txt
+          cat > /tmp/expected-published-paths.txt <<'PATHS'
+          apps/mcp/package.json
+          apps/mcp/src/game-intelligence.ts
+          apps/mcp/test/game-art-intelligence-mcp.test.mjs
+          apps/mcp/tsconfig.json
+          docs/game-art-intelligence.md
+          package.json
+          packages/game-art-intelligence/package.json
+          packages/game-art-intelligence/src/adaptive.ts
+          packages/game-art-intelligence/src/canonical.ts
+          packages/game-art-intelligence/src/catalogue.ts
+          packages/game-art-intelligence/src/compiler.ts
+          packages/game-art-intelligence/src/geometry-palette.ts
+          packages/game-art-intelligence/src/index.ts
+          packages/game-art-intelligence/src/types.ts
+          packages/game-art-intelligence/test/game-art-intelligence.test.mjs
+          packages/game-art-intelligence/tsconfig.json
+          packages/sprite-planner/src/directions-clips.ts
+          packages/sprite-planner/test/sprite-planner.test.mjs
+          scripts/check-game-art-intelligence.mjs
+          PATHS
+          LC_ALL=C sort -o /tmp/expected-published-paths.txt /tmp/expected-published-paths.txt
+          diff -u /tmp/expected-published-paths.txt /tmp/published-paths.txt
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git rev-parse HEAD > /tmp/feature-sha.txt
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$(cat /tmp/feature-sha.txt)"
+
+      - name: Write bounded receipt
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const receipt = {
+            schemaVersion: '1.0',
+            receiptType: 'evavo-game-art-intelligence-current-main-bootstrap',
+            repository: process.env.GITHUB_REPOSITORY,
+            runId: process.env.GITHUB_RUN_ID,
+            expectedMainSha: process.env.EXPECTED_MAIN_SHA,
+            targetBranch: process.env.TARGET_BRANCH,
+            featureSha: fs.readFileSync('/tmp/feature-sha.txt', 'utf8').trim(),
+            archiveSha256: process.env.ARCHIVE_SHA256,
+            patchSha256: process.env.PATCH_SHA256,
+            strictOptionalCompatibilityRepair: true,
+            nonDirectionalIsometricAssetsSupported: true,
+            directionalIsometricAssetsRequireEightWay: true,
+            staticIsometricPropsUseTileAtlas: true,
+            explicitCoreSpriteFeaturesHonoured: true,
+            profileHashMismatchMessageClarified: true,
+            compatibilitySourceSha256: fs
+              .readFileSync('/tmp/compatibility-source-sha256.txt', 'utf8')
+              .trim()
+              .split('\n'),
+            publishedPaths: fs
+              .readFileSync('/tmp/published-paths.txt', 'utf8')
+              .trim()
+              .split('\n'),
+            focusedValidationPassed: true,
+            completeRepositoryCheckPassed: true,
+            permanentCheckerPassed: true,
+            permanentWorkflowDeferredToWorkflowWriter: true,
+            providerCalled: false,
+            runtimeJobSubmitted: false,
+            targetRepositoryMutated: false,
+            selectionPerformed: false,
+            promotionPerformed: false,
+            deploymentPerformed: false,
+            publicationPerformed: false
+          };
+          fs.writeFileSync(
+            '/tmp/game-art-intelligence-current-main-bootstrap.json',
+            `${JSON.stringify(receipt, null, 2)}\n`,
+            { mode: 0o600 }
+          );
+          NODE
+
+      - name: Upload bounded evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: game-art-intelligence-current-main-bootstrap-${{ github.run_id }}
+          path: |
+            /tmp/game-art-intelligence-current-main-bootstrap.json
+            /tmp/game-art-intelligence.yml
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
