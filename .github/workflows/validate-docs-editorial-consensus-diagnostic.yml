@@ -1,0 +1,71 @@
+name: Validate Docs Editorial Consensus Diagnostic
+
+on:
+  push:
+    branches:
+      - validation/docs-editorial-consensus-20260805
+    paths:
+      - ".github/workflows/validate-docs-editorial-consensus-diagnostic.yml"
+      - "validation/docs-editorial-consensus/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: validate-docs-editorial-consensus-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out disposable validation host
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Execute and capture exact diagnostics
+        id: validation
+        shell: bash
+        run: |
+          set +e
+          bash validation/docs-editorial-consensus/run-core-validation-source-equivalent.sh > "$RUNNER_TEMP/editorial-consensus.log" 2>&1
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Persist bounded diagnostic receipt
+        if: always()
+        env:
+          VALIDATION_STATUS: ${{ steps.validation.outputs.status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p validation-results
+          {
+            printf 'validation_head=%s\n' "$GITHUB_SHA"
+            printf 'workflow_run=%s\n' "$GITHUB_RUN_ID"
+            printf 'status=%s\n' "${VALIDATION_STATUS:-missing}"
+            printf 'docs_base=%s\n' '22a8bf0b49637c1da1033e95eba0d7a7d8889e06'
+            printf 'docs_feature=%s\n' 'e843f9130bae5c0521523cdbb0d159d8acae9172'
+            printf '%s\n' '--- bounded log tail ---'
+            tail -n 300 "$RUNNER_TEMP/editorial-consensus.log" || true
+          } > validation-results/docs-editorial-consensus-diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add validation-results/docs-editorial-consensus-diagnostic.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "test(validation): record editorial consensus diagnostic"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          test "${VALIDATION_STATUS:-1}" = "0"
