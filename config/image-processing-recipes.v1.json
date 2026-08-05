@@ -1,0 +1,37 @@
+{
+  "schema": "evavo.image-processing-recipes.v1",
+  "processors": [
+    {
+      "id": "python-pillow",
+      "kind": "python",
+      "capabilities": ["inspect", "crop-safe", "canvas-normalize", "resize", "convert", "optimize", "alpha-analyze", "edge-decontaminate", "hidden-rgb-rebuild", "palette-normalize"],
+      "preferredFor": ["png", "webp", "jpeg"],
+      "fallbackRank": 1
+    },
+    {
+      "id": "imagemagick",
+      "kind": "external-cli",
+      "capabilities": ["inspect", "crop-safe", "canvas-normalize", "resize", "convert", "optimize", "alpha-analyze", "luminance-to-alpha"],
+      "preferredFor": ["png", "webp", "jpeg", "tiff"],
+      "fallbackRank": 2
+    },
+    {
+      "id": "powershell-system-drawing",
+      "kind": "powershell",
+      "capabilities": ["inspect", "resize", "convert"],
+      "preferredFor": ["png", "jpeg"],
+      "fallbackRank": 3
+    }
+  ],
+  "rules": {
+    "sourceOverwriteAllowed": false,
+    "createOnlyOutput": true,
+    "exactSourceHashRequired": true,
+    "decodedDimensionsRequired": true,
+    "alphaUsageRequired": true,
+    "outputHashRequired": true,
+    "fallbackMustPreserveRequestedSemantics": true,
+    "providerGenerationIsSeparate": true,
+    "humanCreativeApprovalIsSeparate": true
+  }
+}
