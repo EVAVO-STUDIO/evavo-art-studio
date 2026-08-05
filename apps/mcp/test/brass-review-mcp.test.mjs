@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { BRASS_ART_BATCH_REVIEW_SCHEMA } from "../dist/batch-review.js";
 import {
   BRASS_ART_REVIEW_PROFILE,
   BRASS_ART_REVIEW_TOOL_NAMES,
@@ -13,8 +14,15 @@ import {
 } from "../dist/review.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const sourcePath = path.resolve(here, "../src/review.ts");
-const source = fs.readFileSync(sourcePath, "utf8");
+const source = fs.readFileSync(path.resolve(here, "../src/review.ts"), "utf8");
+const batchSource = [
+  "batch-review-contract.ts",
+  "batch-review-files.ts",
+  "batch-review-gates.ts",
+  "batch-review.ts",
+]
+  .map((name) => fs.readFileSync(path.resolve(here, "../src", name), "utf8"))
+  .join("\n");
 
 function temporaryRoots() {
   const root = fs.mkdtempSync(
@@ -50,7 +58,7 @@ test("review roots are explicit, canonical and duplicate-free", () => {
   }
 });
 
-test("review profile exposes exactly six non-writing tools", () => {
+test("review profile exposes exactly seven non-writing tools", () => {
   const current = temporaryRoots();
   try {
     const value = reviewCapabilityDocument(
@@ -64,8 +72,13 @@ test("review profile exposes exactly six non-writing tools", () => {
       "compile_art_production_plan",
       "inspect_art_repository",
       "inspect_sprite_frame_quality",
+      "inspect_art_batch_quality",
       "inspect_sprite_sequence_quality",
     ]);
+    assert.equal(value.batchReview.schema, BRASS_ART_BATCH_REVIEW_SCHEMA);
+    assert.equal(value.batchReview.completeBatchDuplicateScope, true);
+    assert.equal(value.batchReview.perFileStableByteRead, true);
+    assert.equal(value.batchReview.gameOwnedRoleRequired, true);
     for (const key of [
       "writesEnabled",
       "providerExecutionAllowed",
@@ -96,11 +109,24 @@ test("review source registers only the governed inspection and planning inventor
     "assertPathWithinAllowedRoots",
     "inspectRepository",
     "analyseDecodedSpriteFrame",
+    "reviewArtBatchDirectory",
     "analyseSpriteSequenceManifestFile",
     "createProductionPlan",
+    "roleId",
     "reviewAllowedRoots();",
   ]) {
     assert.equal(source.includes(required), true, required);
+  }
+  for (const required of [
+    "evavo_brass_art_batch_review_v1",
+    "exactSource",
+    "decodedPixels",
+    "game-owned media role",
+    "humanCreativeApprovalRequired: true",
+    "mutationPerformed: false",
+    "deletionAuthority: false",
+  ]) {
+    assert.equal(batchSource.includes(required), true, required);
   }
 });
 
@@ -119,11 +145,15 @@ test("review source imports no provider, runtime, artifact or write implementati
     "EVAVO_ART_RUNTIME_ROOT",
     "EVAVO_ART_ARTIFACT_ROOT",
     "node:child_process",
+    "writeFile",
+    "unlink",
+    "rm(",
     "git push",
     "git commit",
     "shell: true",
   ]) {
-    assert.equal(source.includes(forbidden), false, forbidden);
+    assert.equal(source.includes(forbidden), false, `review:${forbidden}`);
+    assert.equal(batchSource.includes(forbidden), false, `batch:${forbidden}`);
   }
 });
 
@@ -140,10 +170,7 @@ test("symlinked review roots fail closed", (t) => {
       }
       throw error;
     }
-    assert.throws(
-      () => reviewAllowedRoots(link),
-      /non-symlink directory/iu,
-    );
+    assert.throws(() => reviewAllowedRoots(link), /non-symlink directory/iu);
   } finally {
     current.dispose();
   }

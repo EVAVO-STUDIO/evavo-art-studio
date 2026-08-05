@@ -20,6 +20,8 @@ import {
   inspectRepository,
 } from "@evavo/art-repo-inspector";
 
+import { reviewArtBatchDirectory } from "./batch-review.js";
+
 export const BRASS_ART_REVIEW_PROFILE =
   "evavo_brass_art_review_mcp_v1";
 export const BRASS_ART_REVIEW_TOOL_NAMES = Object.freeze([
@@ -28,6 +30,7 @@ export const BRASS_ART_REVIEW_TOOL_NAMES = Object.freeze([
   "compile_art_production_plan",
   "inspect_art_repository",
   "inspect_sprite_frame_quality",
+  "inspect_art_batch_quality",
   "inspect_sprite_sequence_quality",
 ] as const);
 
@@ -86,6 +89,14 @@ export function reviewCapabilityDocument(
     allowedRoots: reviewAllowedRoots(configured),
     tools: BRASS_ART_REVIEW_TOOL_NAMES,
     declaredArtStudioCapabilities: CAPABILITY_CATALOG,
+    batchReview: Object.freeze({
+      schema: "evavo_brass_art_batch_review_v1",
+      completeBatchDuplicateScope: true,
+      perFileStableByteRead: true,
+      gameOwnedRoleRequired: true,
+      maximumFiles: 1_000,
+      writesEvidenceFiles: false,
+    }),
     writesEnabled: false,
     providerExecutionAllowed: false,
     runtimeJobSubmissionAllowed: false,
@@ -98,9 +109,9 @@ export function reviewCapabilityDocument(
     arbitraryShellAllowed: false,
     arbitraryGitArgumentsAllowed: false,
     truthBoundaries: Object.freeze([
-      "Repository and pixel inspection are evidence, not creative approval.",
+      "Repository, frame, batch and sequence inspection are evidence, not creative approval.",
       "A production plan is not provider execution or asset generation.",
-      "Frame and sequence metrics are not human visual approval.",
+      "Duplicate evidence does not authorise deletion or canonical selection.",
       "Only Development Studio may admit evidence and publish target changes.",
     ]),
   });
@@ -108,7 +119,7 @@ export function reviewCapabilityDocument(
 
 const server = new McpServer({
   name: "evavo-art-studio-brass-review",
-  version: "1.0.0",
+  version: "1.1.0",
 });
 
 const textResult = (value: unknown) => ({
@@ -140,7 +151,7 @@ server.registerTool(
   "art_review_capabilities",
   {
     description:
-      "Describe the six-tool Brass art-review profile and its permanent no-write authority.",
+      "Describe the seven-tool Brass art-review profile and its permanent no-write authority.",
     inputSchema: z.object({}),
   },
   async () => textResult(reviewCapabilityDocument()),
@@ -224,6 +235,57 @@ server.registerTool(
       );
     } catch (error: unknown) {
       return toolError("SPRITE_FRAME_REVIEW_REJECTED", error);
+    }
+  },
+);
+
+server.registerTool(
+  "inspect_art_batch_quality",
+  {
+    description:
+      "Review one role-consistent root-restricted image folder as a complete bounded batch. Hash exact source bytes, decode every supported frame, report compact alpha/matte/crop/halo/transparent-RGB evidence, group exact and decoded-pixel duplicates, and return technical actions without writing or approving art.",
+    inputSchema: z.object({
+      directoryPath: z.string().min(1),
+      roleId: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
+      expectations: z.unknown(),
+      recursive: z.boolean().optional(),
+      maximumFiles: z.number().int().min(1).max(1_000).optional(),
+      maximumDepth: z.number().int().min(0).max(32).optional(),
+      maximumTotalBytes: z
+        .number()
+        .int()
+        .min(1)
+        .max(2 * 1024 * 1024 * 1024)
+        .optional(),
+      detail: z.enum(["summary", "failures", "all"]).optional(),
+    }),
+  },
+  async ({
+    directoryPath,
+    roleId,
+    expectations,
+    recursive,
+    maximumFiles,
+    maximumDepth,
+    maximumTotalBytes,
+    detail,
+  }) => {
+    try {
+      return textResult(
+        await reviewArtBatchDirectory({
+          directoryPath,
+          roleId,
+          allowedRoots: reviewAllowedRoots(),
+          expectations,
+          ...(recursive === undefined ? {} : { recursive }),
+          ...(maximumFiles === undefined ? {} : { maximumFiles }),
+          ...(maximumDepth === undefined ? {} : { maximumDepth }),
+          ...(maximumTotalBytes === undefined ? {} : { maximumTotalBytes }),
+          ...(detail === undefined ? {} : { detail }),
+        }),
+      );
+    } catch (error: unknown) {
+      return toolError("ART_BATCH_REVIEW_REJECTED", error);
     }
   },
 );
