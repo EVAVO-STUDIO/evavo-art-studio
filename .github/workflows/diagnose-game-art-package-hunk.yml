@@ -1,4 +1,4 @@
-name: Locate audio matrix timeout owner
+name: Locate forbidden workflow authority
 
 on:
   push:
@@ -12,28 +12,23 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      EXPECTED_MAIN_SHA: 308a368263f74d7bafca6f11abcd982a1f213759
+      EXPECTED_MAIN_SHA: 3de1fe91db5b2067de478303666a8a6bf1f51485
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Inspect exact current main
+      - name: Inspect exact current main permissions
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
           test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
           git switch --detach refs/remotes/origin/main
-          echo '--- audio matrix references ---'
-          grep -R -n -E 'test-audio-matrix|audio format matrix|test:audio:matrix|audio.*matrix|matrix.*audio' \
-            --exclude-dir=.git --exclude='*.map' . || true
-          echo '--- every package test command ---'
-          find . -name package.json -not -path '*/node_modules/*' -print0 |
-            sort -z |
-            xargs -0 -I{} node -e '
-              const fs=require("node:fs");
-              const p="{}";
-              const j=JSON.parse(fs.readFileSync(p,"utf8"));
-              if (j.scripts?.test) console.log(`${p}: ${j.scripts.test}`);
-            '
+          echo '--- forbidden actions write declarations ---'
+          grep -R -n -C8 -E '^[[:space:]]*actions:[[:space:]]*write[[:space:]]*$' .github/workflows || true
+          echo '--- all write declarations ---'
+          grep -R -n -C3 -E '^[[:space:]]*[a-z-]+:[[:space:]]*write[[:space:]]*$' .github/workflows || true
+          echo '--- actions API use ---'
+          grep -R -n -C5 -E 'actions/(runs|workflows)|gh (run|workflow)|rerun|cancel.*run|workflow_dispatch' \
+            .github/workflows scripts packages apps || true
