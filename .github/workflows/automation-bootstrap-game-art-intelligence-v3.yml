@@ -106,66 +106,71 @@ jobs:
           from pathlib import Path
 
           path = Path("packages/game-art-intelligence/src/compiler.ts")
-          source = path.read_text(encoding="utf-8")
+          lines = path.read_text(encoding="utf-8").splitlines()
 
-          replacements = [
-              (
-                  '''  const camera = { ...(base.camera ?? {}), ...(override?.camera ?? {}) };
-          const selectedProjection = projection as ArtDirectionStyleInput["projection"];
-          return {''',
-                  '''  const camera = { ...(base.camera ?? {}), ...(override?.camera ?? {}) };
-          const selectedProjection: ArtProjection = projection;
-          const requiredDistinctiveMotifs = uniqueMerge(
-            base.antiGeneric?.requiredDistinctiveMotifs,
-            override?.antiGeneric?.requiredDistinctiveMotifs,
-          );
-          const prohibitedGenericMotifs = uniqueMerge(
-            base.antiGeneric?.prohibitedGenericMotifs,
-            override?.antiGeneric?.prohibitedGenericMotifs,
-          );
-          return {''',
-              ),
-              (
-                  '''      ...(uniqueMerge(
-                base.antiGeneric?.requiredDistinctiveMotifs,
-                override?.antiGeneric?.requiredDistinctiveMotifs,
-              ) === undefined
-                ? {}
-                : {
-                    requiredDistinctiveMotifs: uniqueMerge(
-                      base.antiGeneric?.requiredDistinctiveMotifs,
-                      override?.antiGeneric?.requiredDistinctiveMotifs,
-                    ),
-                  }),''',
-                  '''      ...(requiredDistinctiveMotifs === undefined
-                ? {}
-                : { requiredDistinctiveMotifs }),''',
-              ),
-              (
-                  '''      ...(uniqueMerge(
-                base.antiGeneric?.prohibitedGenericMotifs,
-                override?.antiGeneric?.prohibitedGenericMotifs,
-              ) === undefined
-                ? {}
-                : {
-                    prohibitedGenericMotifs: uniqueMerge(
-                      base.antiGeneric?.prohibitedGenericMotifs,
-                      override?.antiGeneric?.prohibitedGenericMotifs,
-                    ),
-                  }),''',
-                  '''      ...(prohibitedGenericMotifs === undefined
-                ? {}
-                : { prohibitedGenericMotifs }),''',
-              ),
+          selected_matches = [
+              index
+              for index, line in enumerate(lines)
+              if line.strip()
+              == 'const selectedProjection = projection as ArtDirectionStyleInput["projection"];'
+          ]
+          if len(selected_matches) != 1:
+              raise SystemExit(
+                  f"expected one selectedProjection statement, found {len(selected_matches)}"
+              )
+
+          selected_index = selected_matches[0]
+          selected_indent = lines[selected_index][
+              : len(lines[selected_index]) - len(lines[selected_index].lstrip())
+          ]
+          lines[selected_index : selected_index + 1] = [
+              f"{selected_indent}const selectedProjection: ArtProjection = projection;",
+              f"{selected_indent}const requiredDistinctiveMotifs = uniqueMerge(",
+              f"{selected_indent}  base.antiGeneric?.requiredDistinctiveMotifs,",
+              f"{selected_indent}  override?.antiGeneric?.requiredDistinctiveMotifs,",
+              f"{selected_indent});",
+              f"{selected_indent}const prohibitedGenericMotifs = uniqueMerge(",
+              f"{selected_indent}  base.antiGeneric?.prohibitedGenericMotifs,",
+              f"{selected_indent}  override?.antiGeneric?.prohibitedGenericMotifs,",
+              f"{selected_indent});",
           ]
 
-          for old, new in replacements:
-              count = source.count(old)
-              if count != 1:
-                  raise SystemExit(f"expected one strict-merge source match, found {count}")
-              source = source.replace(old, new)
+          def replace_merge_block(symbol: str) -> None:
+              starts = [
+                  index
+                  for index, line in enumerate(lines)
+                  if line.strip() == "...(uniqueMerge("
+                  and index + 1 < len(lines)
+                  and symbol in lines[index + 1]
+              ]
+              if len(starts) != 1:
+                  raise SystemExit(
+                      f"expected one {symbol} merge block, found {len(starts)}"
+                  )
 
-          path.write_text(source, encoding="utf-8")
+              start = starts[0]
+              ends = [
+                  index
+                  for index in range(start + 1, len(lines))
+                  if lines[index].strip() == "}),"
+              ]
+              if not ends:
+                  raise SystemExit(f"could not find end of {symbol} merge block")
+
+              end = ends[0]
+              block_indent = lines[start][
+                  : len(lines[start]) - len(lines[start].lstrip())
+              ]
+              lines[start : end + 1] = [
+                  f"{block_indent}...({symbol} === undefined",
+                  f"{block_indent}  ? {{}}",
+                  f"{block_indent}  : {{ {symbol} }}),",
+              ]
+
+          replace_merge_block("requiredDistinctiveMotifs")
+          replace_merge_block("prohibitedGenericMotifs")
+
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
           git add packages/game-art-intelligence/src/compiler.ts
           git commit --amend --no-edit
@@ -246,7 +251,10 @@ jobs:
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-          const [compilerSha256] = fs.readFileSync('/tmp/compiler-source-sha256.txt', 'utf8').trim().split(/\s+/);
+          const [compilerSha256] = fs
+            .readFileSync('/tmp/compiler-source-sha256.txt', 'utf8')
+            .trim()
+            .split(/\s+/);
           const receipt = {
             schemaVersion: '1.0',
             receiptType: 'evavo-game-art-intelligence-current-main-bootstrap',
@@ -259,7 +267,10 @@ jobs:
             patchSha256: process.env.PATCH_SHA256,
             strictOptionalCompatibilityRepair: true,
             compilerSourceSha256: compilerSha256,
-            publishedPaths: fs.readFileSync('/tmp/published-paths.txt', 'utf8').trim().split('\n'),
+            publishedPaths: fs
+              .readFileSync('/tmp/published-paths.txt', 'utf8')
+              .trim()
+              .split('\n'),
             focusedValidationPassed: true,
             permanentCheckerPassed: true,
             permanentWorkflowDeferredToWorkflowWriter: true,
@@ -271,7 +282,11 @@ jobs:
             deploymentPerformed: false,
             publicationPerformed: false
           };
-          fs.writeFileSync('/tmp/game-art-intelligence-current-main-bootstrap.json', `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+          fs.writeFileSync(
+            '/tmp/game-art-intelligence-current-main-bootstrap.json',
+            `${JSON.stringify(receipt, null, 2)}\n`,
+            { mode: 0o600 }
+          );
           NODE
 
       - name: Upload bounded bootstrap evidence
