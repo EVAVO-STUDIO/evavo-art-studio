@@ -1,0 +1,37 @@
+name: Validate Docs Editorial Consensus Mirror V2
+
+on:
+  push:
+    branches:
+      - validation/docs-editorial-consensus-20260805
+    paths:
+      - ".github/workflows/validate-docs-editorial-consensus-mirror-v2.yml"
+      - "validation/docs-editorial-consensus/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-editorial-consensus-mirror-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out disposable validation host
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Run editorial consensus core validation
+        run: bash validation/docs-editorial-consensus/run-core-validation-source-equivalent.sh
