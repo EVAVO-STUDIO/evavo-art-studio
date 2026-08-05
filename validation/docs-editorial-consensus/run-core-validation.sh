@@ -29,8 +29,53 @@ mkdir -p "$overlay"
 tar -xzf "$archive" -C "$overlay"
 cp "$overlay/packages/core/src/book-studio-unattended-production.ts" "$MIRROR/src/"
 
-cat "$ROOT"/validation/docs-editorial-consensus/payload/book-studio-unattended-editorial-consensus.ts.part-* > "$MIRROR/src/book-studio-unattended-editorial-consensus.ts"
-cat "$ROOT"/validation/docs-editorial-consensus/payload/book-studio-unattended-editorial-consensus.test.mjs.part-* > "$MIRROR/test/unattended-editorial-consensus.test.mjs"
+assemble_exact_blob() {
+  local expected="$1"
+  local output="$2"
+  shift 2
+  python - "$expected" "$output" "$@" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import itertools
+import pathlib
+import sys
+
+expected = sys.argv[1]
+output = pathlib.Path(sys.argv[2])
+parts = [pathlib.Path(value).read_bytes() for value in sys.argv[3:]]
+
+def git_blob(data: bytes) -> str:
+    return hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
+
+def variants(data: bytes) -> list[bytes]:
+    base = data.rstrip(b"\n")
+    values = [data, base, base + b"\n", base + b"\n\n"]
+    unique: list[bytes] = []
+    for value in values:
+        if value not in unique:
+            unique.append(value)
+    return unique
+
+for candidate_parts in itertools.product(*(variants(part) for part in parts)):
+    candidate = b"".join(candidate_parts)
+    if git_blob(candidate) == expected:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(candidate)
+        print(f"assembled={output} blob={expected} bytes={len(candidate)}")
+        raise SystemExit(0)
+
+print(f"No exact boundary-normalized assembly matched {expected}.", file=sys.stderr)
+for index, part in enumerate(parts):
+    print(f"part[{index}] bytes={len(part)} tail={part[-16:]!r}", file=sys.stderr)
+raise SystemExit(1)
+PY
+}
+
+core_parts=("$ROOT"/validation/docs-editorial-consensus/payload/book-studio-unattended-editorial-consensus.ts.part-*)
+test_parts=("$ROOT"/validation/docs-editorial-consensus/payload/book-studio-unattended-editorial-consensus.test.mjs.part-*)
+assemble_exact_blob 4b340d331ea40cf1a1958b38f08cbdd4ce987331 "$MIRROR/src/book-studio-unattended-editorial-consensus.ts" "${core_parts[@]}"
+assemble_exact_blob 52860de647aa83d696aa60df7a738b06768f6ba5 "$MIRROR/test/unattended-editorial-consensus.test.mjs" "${test_parts[@]}"
 cp "$ROOT/validation/docs-editorial-consensus/source/book-studio-unattended-editorial-consensus-integrity.ts" "$MIRROR/src/"
 cp "$ROOT/validation/docs-editorial-consensus/source/book-studio-unattended-editorial-consensus-integrity.test.mjs" "$MIRROR/test/unattended-editorial-consensus-integrity.test.mjs"
 sed 's#../docs-narrative-craft/src/#./#g' "$ROOT/validation/docs-editorial-consensus/source/book-studio-phrase-overlap-integrity.ts" > "$MIRROR/src/book-studio-phrase-overlap-integrity.ts"
