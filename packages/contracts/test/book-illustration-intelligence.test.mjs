@@ -4,8 +4,13 @@ import test from "node:test";
 
 import {
   BOOK_ILLUSTRATION_INTELLIGENCE_CAPABILITIES,
+  BOOK_ILLUSTRATION_CAPABILITY_DESCRIPTORS,
+  compileBookIllustrationGenerationDispatch,
   compileBookIllustrationIntelligencePlan,
   evaluateBookIllustrationCandidate,
+  evaluateBookIllustrationVisualConsensus,
+  fingerprintBookIllustrationVisualReviewReceipt,
+  listBookIllustrationIntelligenceCapabilities,
   canonicalBookIllustrationJson,
   fingerprintBookIllustrationValue,
   validateBookIllustrationIntelligencePlan,
@@ -353,4 +358,245 @@ test("matches Node SHA-256 for Unicode and long canonical JSON", () => {
       .digest("hex")}`;
     assert.equal(fingerprintBookIllustrationValue(value), expected);
   }
+});
+
+
+function readyQaResult(plan) {
+  const result = evaluateBookIllustrationCandidate(goodQaInput(plan));
+  assert.equal(result.status, "ready_for_independent_review");
+  return result;
+}
+
+function generationDispatchInput(plan, operation = "book.cover.candidates.generate") {
+  return {
+    outputKind: "evavo_art_book_illustration_generation_dispatch_input",
+    schemaVersion: 1,
+    contract: "evavo_art_book_illustration_intelligence_v1",
+    operation,
+    executionId: "execution-cover-1",
+    plan,
+    observedPlanFingerprint: plan.planFingerprint,
+    workOrderFingerprintSha256: digest("1"),
+    providerRuntimeRequestFingerprint: digest("2"),
+    adapterPolicyFingerprint: digest("3"),
+    candidateCount: 4,
+    requestedAt: "2026-08-05T05:10:00.000Z",
+    requestedBy: "book-automation",
+    providerAttemptLimit: 1,
+    providerFallbackAllowed: false,
+    automaticSelectionAllowed: false,
+    automaticPromotionAllowed: false,
+    bookUseBindingAllowed: false,
+    publicationAllowed: false,
+  };
+}
+
+function unsignedVisualReview(plan, qaResult, reviewerProducerId, score = 92, decision = "pass") {
+  return {
+    outputKind: "evavo_art_book_visual_review_receipt",
+    schemaVersion: 1,
+    contract: "evavo_art_book_illustration_intelligence_v1",
+    reviewId: `review-${reviewerProducerId}`,
+    candidateId: "candidate-cover-1",
+    candidateProducerId: "candidate-producer-1",
+    candidateContentSha256: digest("4"),
+    candidateArtifactFingerprint: digest("5"),
+    planFingerprint: plan.planFingerprint,
+    qaResultFingerprint: qaResult.resultFingerprint,
+    reviewerProducerId,
+    reviewerProvider: "other_compatible_model",
+    reviewerModel: `visual-review-model-${reviewerProducerId}`,
+    score,
+    decision,
+    evidenceIds: [`evidence-${reviewerProducerId}`],
+    findingIds: decision === "pass" ? [] : [`finding-${reviewerProducerId}`],
+    reviewedAt: "2026-08-05T05:15:00.000Z",
+    reviewerWasCandidateProducer: false,
+    selectionAuthorityAllowed: false,
+    promotionAuthorityAllowed: false,
+    publicationPerformed: false,
+  };
+}
+
+function visualReview(plan, qaResult, reviewerProducerId, score = 92, decision = "pass") {
+  const unsigned = unsignedVisualReview(
+    plan,
+    qaResult,
+    reviewerProducerId,
+    score,
+    decision,
+  );
+  return {
+    ...unsigned,
+    reviewFingerprint: fingerprintBookIllustrationVisualReviewReceipt(unsigned),
+  };
+}
+
+function consensusInput(plan, qaResult, reviewerReceipts) {
+  return {
+    outputKind: "evavo_art_book_visual_consensus_input",
+    schemaVersion: 1,
+    contract: "evavo_art_book_illustration_intelligence_v1",
+    candidateId: "candidate-cover-1",
+    candidateProducerId: "candidate-producer-1",
+    candidateContentSha256: digest("4"),
+    candidateArtifactFingerprint: digest("5"),
+    plan,
+    qaResult,
+    reviewerReceipts,
+    minimumIndependentReviewers: 2,
+    minimumConsensusBasisPoints: 9000,
+    minimumPassingReviewerScore: 80,
+    requestedAt: "2026-08-05T05:20:00.000Z",
+    requestedBy: "book-automation",
+    providerCallAllowed: false,
+    reviewerFallbackAllowed: false,
+    automaticSelectionAllowed: false,
+    automaticPromotionAllowed: false,
+    bookUseBindingAllowed: false,
+    publicationAllowed: false,
+  };
+}
+
+test("publishes exact generation and consensus capability descriptors", () => {
+  const capabilities = listBookIllustrationIntelligenceCapabilities();
+  for (const capability of [
+    "book.cover.candidates.generate",
+    "book.interior.candidates.generate",
+    "book.visual.consensus",
+  ]) {
+    assert.ok(capabilities.capabilities.includes(capability), capability);
+    assert.ok(
+      BOOK_ILLUSTRATION_CAPABILITY_DESCRIPTORS.some(
+        (descriptor) => descriptor.capabilityId === capability,
+      ),
+      capability,
+    );
+  }
+  const generation = BOOK_ILLUSTRATION_CAPABILITY_DESCRIPTORS.find(
+    (descriptor) => descriptor.capabilityId === "book.cover.candidates.generate",
+  );
+  assert.equal(
+    generation.runtimeTargetContract,
+    "evavo_book_art_provider_shadow_runtime_v1",
+  );
+  assert.equal(
+    generation.runtimeTargetInputKind,
+    "evavo_book_art_provider_shadow_job_input",
+  );
+  assert.equal(generation.providerBacked, true);
+  assert.equal(generation.oneProviderAttemptRequired, true);
+  assert.equal(generation.providerFallbackAllowed, false);
+  const consensus = BOOK_ILLUSTRATION_CAPABILITY_DESCRIPTORS.find(
+    (descriptor) => descriptor.capabilityId === "book.visual.consensus",
+  );
+  assert.equal(consensus.providerBacked, false);
+  assert.equal(consensus.selectionPerformedByOperation, false);
+});
+
+test("compiles one no-fallback provider dispatch against the existing shadow runtime", () => {
+  const plan = compilePlan();
+  const result = compileBookIllustrationGenerationDispatch(
+    generationDispatchInput(plan),
+  );
+  assert.equal(result.status, "ready", JSON.stringify(result.blockers));
+  assert.equal(result.dispatch.targetContract, "evavo_book_art_provider_shadow_runtime_v1");
+  assert.equal(result.dispatch.targetInputKind, "evavo_book_art_provider_shadow_job_input");
+  assert.equal(result.dispatch.providerAttemptLimit, 1);
+  assert.equal(result.dispatch.providerFallbackAllowed, false);
+  assert.equal(result.dispatch.selectionRequired, true);
+  assert.equal(result.dispatch.selectionPerformed, false);
+  assert.equal(result.dispatch.promotionPerformed, false);
+});
+
+test("rejects cover and interior dispatch operation mismatches and fallback authority", () => {
+  const plan = compilePlan();
+  const wrong = generationDispatchInput(plan, "book.interior.candidates.generate");
+  wrong.providerFallbackAllowed = true;
+  wrong.providerAttemptLimit = 2;
+  const result = compileBookIllustrationGenerationDispatch(wrong);
+  assert.equal(result.status, "blocked");
+  assert.match(result.blockers.join("\n"), /Interior generation cannot be used for a cover plan/);
+  assert.match(result.blockers.join("\n"), /providerAttemptLimit must be exactly 1/);
+  assert.match(result.blockers.join("\n"), /providerFallbackAllowed must remain false/);
+});
+
+test("reaches independent visual consensus without selecting or promoting the candidate", () => {
+  const plan = compilePlan();
+  const qaResult = readyQaResult(plan);
+  const result = evaluateBookIllustrationVisualConsensus(
+    consensusInput(plan, qaResult, [
+      visualReview(plan, qaResult, "reviewer-alpha"),
+      visualReview(plan, qaResult, "reviewer-beta"),
+    ]),
+  );
+  assert.equal(result.status, "ready_for_governed_selection", JSON.stringify(result.blockers));
+  assert.equal(result.evaluation.consensusBasisPoints, 10_000);
+  assert.deepEqual(result.evaluation.passingReviewerProducerIds, [
+    "reviewer-alpha",
+    "reviewer-beta",
+  ]);
+  assert.equal(result.evaluation.selectionPerformed, false);
+  assert.equal(result.evaluation.promotionPerformed, false);
+  assert.equal(result.evaluation.bookUseBindingCreated, false);
+});
+
+test("preserves dissent and blocks low-scoring receipts falsely labelled pass", () => {
+  const plan = compilePlan();
+  const qaResult = readyQaResult(plan);
+  const result = evaluateBookIllustrationVisualConsensus(
+    consensusInput(plan, qaResult, [
+      visualReview(plan, qaResult, "reviewer-alpha", 95, "pass"),
+      visualReview(plan, qaResult, "reviewer-beta", 60, "pass"),
+    ]),
+  );
+  assert.equal(result.status, "needs_work");
+  assert.equal(result.evaluation.consensusBasisPoints, 5_000);
+  assert.deepEqual(result.evaluation.dissentingReviewerProducerIds, [
+    "reviewer-beta",
+  ]);
+});
+
+test("rejects visual self-review, duplicate reviewers and freshly recomputed forged receipts", () => {
+  const plan = compilePlan();
+  const qaResult = readyQaResult(plan);
+  const forgedUnsigned = unsignedVisualReview(
+    plan,
+    qaResult,
+    "candidate-producer-1",
+  );
+  const forged = {
+    ...forgedUnsigned,
+    reviewFingerprint: fingerprintBookIllustrationVisualReviewReceipt(
+      forgedUnsigned,
+    ),
+  };
+  const duplicate = visualReview(plan, qaResult, "reviewer-alpha");
+  const result = evaluateBookIllustrationVisualConsensus(
+    consensusInput(plan, qaResult, [forged, duplicate, structuredClone(duplicate)]),
+  );
+  assert.equal(result.status, "blocked");
+  assert.match(result.blockers.join("\n"), /not independent from the candidate producer/);
+  assert.match(result.blockers.join("\n"), /reviewer producers are duplicated/i);
+});
+
+test("rejects visual reviews bound to different candidate bytes or future timestamps", () => {
+  const plan = compilePlan();
+  const qaResult = readyQaResult(plan);
+  const unsigned = unsignedVisualReview(plan, qaResult, "reviewer-alpha");
+  unsigned.candidateContentSha256 = digest("9");
+  unsigned.reviewedAt = "2026-08-05T05:30:00.000Z";
+  const wrong = {
+    ...unsigned,
+    reviewFingerprint: fingerprintBookIllustrationVisualReviewReceipt(unsigned),
+  };
+  const result = evaluateBookIllustrationVisualConsensus(
+    consensusInput(plan, qaResult, [
+      wrong,
+      visualReview(plan, qaResult, "reviewer-beta"),
+    ]),
+  );
+  assert.equal(result.status, "blocked");
+  assert.match(result.blockers.join("\n"), /different candidate, plan or QA evidence/);
+  assert.match(result.blockers.join("\n"), /cannot be later than the consensus request/);
 });

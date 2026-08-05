@@ -30,8 +30,19 @@ function requireText(file, snippets) {
 requireText("source", [
   "evavo_art_book_illustration_intelligence_v1",
   "book.print_craft.qa",
+  "book.cover.candidates.generate",
+  "book.interior.candidates.generate",
+  "book.visual.consensus",
+  "BOOK_ILLUSTRATION_CAPABILITY_DESCRIPTORS",
   "compileBookIllustrationIntelligencePlan",
+  "compileBookIllustrationGenerationDispatch",
   "evaluateBookIllustrationCandidate",
+  "evaluateBookIllustrationVisualConsensus",
+  "evavo_book_art_provider_shadow_runtime_v1",
+  "providerAttemptLimit: 1",
+  "providerFallbackAllowed: false",
+  "reviewerWasCandidateProducer: false",
+  "ready_for_governed_selection",
   "deliveryWidthInches",
   "deliveryHeightInches",
   'geometryAuthority: "docs_suite_exact_dimensions"',
@@ -53,10 +64,27 @@ requireText("test", [
   "synthetic-looking craft",
   "graphic-novel artwork",
   "standards-compliant SHA-256",
+  "existing shadow runtime",
+  "independent visual consensus",
+  "low-scoring receipts falsely labelled pass",
+  "freshly recomputed forged receipts",
 ]);
-requireText("cli", ["MAXIMUM_INPUT_BYTES", 'open(resolved, "wx"', "compile-plan", "evaluate-candidate"]);
+requireText("cli", [
+  "MAXIMUM_INPUT_BYTES",
+  'open(resolved, "wx"',
+  "compile-plan",
+  "compile-generation-dispatch",
+  "evaluate-candidate",
+  "evaluate-visual-consensus",
+]);
 requireText("cliTest", ["exclusive no-clobber output", "status, 2"]);
-requireText("docs", ["Exact print geometry", "Rights-safe genre translation", "ready_for_independent_review"]);
+requireText("docs", [
+  "Exact print geometry",
+  "Rights-safe genre translation",
+  "Candidate generation dispatch",
+  "Independent visual consensus",
+  "ready_for_governed_selection",
+]);
 requireText("workflow", [
   "node scripts/check-book-illustration-intelligence.mjs",
   "@evavo/art-contracts build",

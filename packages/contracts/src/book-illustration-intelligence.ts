@@ -13,14 +13,159 @@ export const BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT =
 
 export const BOOK_ILLUSTRATION_INTELLIGENCE_CAPABILITIES = [
   "book.illustration.plan.compile",
+  "book.cover.candidates.generate",
+  "book.interior.candidates.generate",
   "book.illustration.candidate.qa",
   "book.print_craft.qa",
   "book.graphic_novel.page.plan",
+  "book.visual.consensus",
   "book.art.promotion.receipt",
 ] as const;
 
 export type BookIllustrationCapability =
   (typeof BOOK_ILLUSTRATION_INTELLIGENCE_CAPABILITIES)[number];
+
+export interface BookIllustrationCapabilityDescriptorV1 {
+  capabilityId: BookIllustrationCapability;
+  owner: "art_studio";
+  operationId: string;
+  requestContract: string;
+  responseContract: string;
+  runtimeTargetContract?: string;
+  runtimeTargetInputKind?: string;
+  runtimeTargetOperation?: string;
+  providerBacked: boolean;
+  oneProviderAttemptRequired: boolean;
+  providerFallbackAllowed: false;
+  selectionPerformedByOperation: false;
+  promotionPerformedByOperation: false;
+  bookUseBindingCreatedByOperation: false;
+  publicationPerformedByOperation: false;
+}
+
+export const BOOK_ILLUSTRATION_CAPABILITY_DESCRIPTORS: readonly BookIllustrationCapabilityDescriptorV1[] = [
+  descriptor(
+    "book.illustration.plan.compile",
+    "compileBookIllustrationIntelligencePlan",
+    "evavo_art_book_illustration_planning_input",
+    "evavo_art_book_illustration_plan_compilation_result",
+    false,
+  ),
+  descriptor(
+    "book.cover.candidates.generate",
+    "compileBookIllustrationGenerationDispatch",
+    "evavo_art_book_illustration_generation_dispatch_input",
+    "evavo_art_book_illustration_generation_dispatch_result",
+    true,
+    {
+      runtimeTargetContract: "evavo_book_art_provider_shadow_runtime_v1",
+      runtimeTargetInputKind: "evavo_book_art_provider_shadow_job_input",
+      runtimeTargetOperation: "compileBookArtProviderShadowJob",
+    },
+  ),
+  descriptor(
+    "book.interior.candidates.generate",
+    "compileBookIllustrationGenerationDispatch",
+    "evavo_art_book_illustration_generation_dispatch_input",
+    "evavo_art_book_illustration_generation_dispatch_result",
+    true,
+    {
+      runtimeTargetContract: "evavo_book_art_provider_shadow_runtime_v1",
+      runtimeTargetInputKind: "evavo_book_art_provider_shadow_job_input",
+      runtimeTargetOperation: "compileBookArtProviderShadowJob",
+    },
+  ),
+  descriptor(
+    "book.illustration.candidate.qa",
+    "evaluateBookIllustrationCandidate",
+    "evavo_art_book_illustration_candidate_qa_input",
+    "evavo_art_book_illustration_candidate_qa_result",
+    false,
+  ),
+  descriptor(
+    "book.print_craft.qa",
+    "evaluateBookIllustrationCandidate",
+    "evavo_art_book_illustration_candidate_qa_input",
+    "evavo_art_book_illustration_candidate_qa_result",
+    false,
+  ),
+  descriptor(
+    "book.graphic_novel.page.plan",
+    "compileBookIllustrationIntelligencePlan",
+    "evavo_art_book_illustration_planning_input",
+    "evavo_art_book_illustration_plan_compilation_result",
+    false,
+  ),
+  descriptor(
+    "book.visual.consensus",
+    "evaluateBookIllustrationVisualConsensus",
+    "evavo_art_book_visual_consensus_input",
+    "evavo_art_book_visual_consensus_result",
+    false,
+  ),
+  descriptor(
+    "book.art.promotion.receipt",
+    "compileBookArtArtifactReceiptFromPromotion",
+    "evavo_art_book_promotion_receipt_compile_input",
+    "evavo_book_art_artifact_receipt",
+    false,
+  ),
+] as const;
+
+function descriptor(
+  capabilityId: BookIllustrationCapability,
+  operationId: string,
+  requestContract: string,
+  responseContract: string,
+  providerBacked: boolean,
+  runtimeTarget?: Readonly<{
+    runtimeTargetContract: string;
+    runtimeTargetInputKind: string;
+    runtimeTargetOperation: string;
+  }>,
+): BookIllustrationCapabilityDescriptorV1 {
+  return {
+    capabilityId,
+    owner: "art_studio",
+    operationId,
+    requestContract,
+    responseContract,
+    ...(runtimeTarget === undefined ? {} : runtimeTarget),
+    providerBacked,
+    oneProviderAttemptRequired: providerBacked,
+    providerFallbackAllowed: false,
+    selectionPerformedByOperation: false,
+    promotionPerformedByOperation: false,
+    bookUseBindingCreatedByOperation: false,
+    publicationPerformedByOperation: false,
+  };
+}
+
+export function listBookIllustrationIntelligenceCapabilities(): Readonly<{
+  outputKind: "evavo_art_book_illustration_intelligence_capabilities";
+  schemaVersion: typeof BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION;
+  contract: typeof BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT;
+  capabilities: readonly BookIllustrationCapability[];
+  descriptors: readonly BookIllustrationCapabilityDescriptorV1[];
+  providerFallbackAllowed: false;
+  automaticSelectionAllowed: false;
+  automaticPromotionAllowed: false;
+  bookUseBindingCreated: false;
+  publicationPerformed: false;
+}> {
+  return Object.freeze({
+    outputKind: "evavo_art_book_illustration_intelligence_capabilities",
+    schemaVersion: BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
+    contract: BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
+    capabilities: BOOK_ILLUSTRATION_INTELLIGENCE_CAPABILITIES,
+    descriptors: BOOK_ILLUSTRATION_CAPABILITY_DESCRIPTORS,
+    providerFallbackAllowed: false,
+    automaticSelectionAllowed: false,
+    automaticPromotionAllowed: false,
+    bookUseBindingCreated: false,
+    publicationPerformed: false,
+  });
+}
 
 export type BookIllustrationPurpose =
   | "front_cover_art"
@@ -388,6 +533,174 @@ export interface BookIllustrationCandidateQaResultV1 {
   resultFingerprint: string;
   providerCallPerformedByQa: false;
   candidateBytesRewrittenByQa: false;
+  selectionPerformed: false;
+  promotionPerformed: false;
+  bookUseBindingCreated: false;
+  publicationPerformed: false;
+}
+
+export type BookIllustrationGenerationCapability =
+  | "book.cover.candidates.generate"
+  | "book.interior.candidates.generate";
+
+export interface BookIllustrationGenerationDispatchInputV1 {
+  outputKind: "evavo_art_book_illustration_generation_dispatch_input";
+  schemaVersion: typeof BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION;
+  contract: typeof BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT;
+  operation: BookIllustrationGenerationCapability;
+  executionId: string;
+  plan: BookIllustrationIntelligencePlanV1;
+  observedPlanFingerprint: string;
+  workOrderFingerprintSha256: string;
+  providerRuntimeRequestFingerprint: string;
+  adapterPolicyFingerprint: string;
+  candidateCount: number;
+  requestedAt: string;
+  requestedBy: string;
+  providerAttemptLimit: 1;
+  providerFallbackAllowed: false;
+  automaticSelectionAllowed: false;
+  automaticPromotionAllowed: false;
+  bookUseBindingAllowed: false;
+  publicationAllowed: false;
+}
+
+export interface BookIllustrationGenerationDispatchV1 {
+  outputKind: "evavo_art_book_illustration_generation_dispatch";
+  schemaVersion: typeof BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION;
+  contract: typeof BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT;
+  operation: BookIllustrationGenerationCapability;
+  targetContract: "evavo_book_art_provider_shadow_runtime_v1";
+  targetInputKind: "evavo_book_art_provider_shadow_job_input";
+  targetOperation: "compileBookArtProviderShadowJob";
+  executionId: string;
+  candidateCount: number;
+  purpose: BookIllustrationPurpose;
+  planFingerprint: string;
+  visualPacketFingerprint: string;
+  sourceBriefFingerprint: string;
+  workOrderFingerprintSha256: string;
+  providerRuntimeRequestFingerprint: string;
+  adapterPolicyFingerprint: string;
+  requestedAt: string;
+  requestedBy: string;
+  providerAttemptLimit: 1;
+  providerFallbackAllowed: false;
+  selectionRequired: true;
+  promotionRequired: true;
+  bookUseBindingRequired: true;
+  shadowOnly: true;
+  dispatchFingerprint: string;
+  providerCallPerformed: false;
+  selectionPerformed: false;
+  promotionPerformed: false;
+  bookUseBindingCreated: false;
+  publicationPerformed: false;
+}
+
+export interface BookIllustrationGenerationDispatchResultV1 {
+  outputKind: "evavo_art_book_illustration_generation_dispatch_result";
+  schemaVersion: typeof BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION;
+  contract: typeof BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT;
+  status: "blocked" | "ready";
+  dispatch?: BookIllustrationGenerationDispatchV1;
+  blockers: string[];
+  providerCallPerformed: false;
+  selectionPerformed: false;
+  promotionPerformed: false;
+  bookUseBindingCreated: false;
+  publicationPerformed: false;
+}
+
+export interface BookIllustrationVisualReviewReceiptV1 {
+  outputKind: "evavo_art_book_visual_review_receipt";
+  schemaVersion: typeof BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION;
+  contract: typeof BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT;
+  reviewId: string;
+  candidateId: string;
+  candidateProducerId: string;
+  candidateContentSha256: string;
+  candidateArtifactFingerprint: string;
+  planFingerprint: string;
+  qaResultFingerprint: string;
+  reviewerProducerId: string;
+  reviewerProvider: "chatgpt" | "claude" | "other_compatible_model" | "human";
+  reviewerModel: string;
+  score: number;
+  decision: "pass" | "needs_revision" | "reject";
+  evidenceIds: string[];
+  findingIds: string[];
+  reviewedAt: string;
+  reviewFingerprint: string;
+  reviewerWasCandidateProducer: false;
+  selectionAuthorityAllowed: false;
+  promotionAuthorityAllowed: false;
+  publicationPerformed: false;
+}
+
+export interface BookIllustrationVisualConsensusInputV1 {
+  outputKind: "evavo_art_book_visual_consensus_input";
+  schemaVersion: typeof BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION;
+  contract: typeof BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT;
+  candidateId: string;
+  candidateProducerId: string;
+  candidateContentSha256: string;
+  candidateArtifactFingerprint: string;
+  plan: BookIllustrationIntelligencePlanV1;
+  qaResult: BookIllustrationCandidateQaResultV1;
+  reviewerReceipts: BookIllustrationVisualReviewReceiptV1[];
+  minimumIndependentReviewers: number;
+  minimumConsensusBasisPoints: number;
+  minimumPassingReviewerScore: number;
+  requestedAt: string;
+  requestedBy: string;
+  providerCallAllowed: false;
+  reviewerFallbackAllowed: false;
+  automaticSelectionAllowed: false;
+  automaticPromotionAllowed: false;
+  bookUseBindingAllowed: false;
+  publicationAllowed: false;
+}
+
+export interface BookIllustrationVisualConsensusEvaluationV1 {
+  outputKind: "evavo_art_book_visual_consensus_evaluation";
+  schemaVersion: typeof BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION;
+  contract: typeof BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT;
+  status: "needs_work" | "ready_for_governed_selection";
+  candidateId: string;
+  candidateContentSha256: string;
+  candidateArtifactFingerprint: string;
+  planFingerprint: string;
+  qaResultFingerprint: string;
+  reviewFingerprints: string[];
+  passingReviewerProducerIds: string[];
+  dissentingReviewerProducerIds: string[];
+  minorityFindingIds: string[];
+  consensusBasisPoints: number;
+  minimumConsensusBasisPoints: number;
+  minimumIndependentReviewers: number;
+  minimumPassingReviewerScore: number;
+  consensusReached: boolean;
+  requiredActions: string[];
+  evaluationFingerprint: string;
+  providerCallPerformed: false;
+  reviewerFallbackAllowed: false;
+  selectionPerformed: false;
+  promotionPerformed: false;
+  bookUseBindingCreated: false;
+  publicationPerformed: false;
+}
+
+export interface BookIllustrationVisualConsensusResultV1 {
+  outputKind: "evavo_art_book_visual_consensus_result";
+  schemaVersion: typeof BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION;
+  contract: typeof BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT;
+  status: "blocked" | "needs_work" | "ready_for_governed_selection";
+  evaluation?: BookIllustrationVisualConsensusEvaluationV1;
+  blockers: string[];
+  requiredActions: string[];
+  providerCallPerformed: false;
+  reviewerFallbackAllowed: false;
   selectionPerformed: false;
   promotionPerformed: false;
   bookUseBindingCreated: false;
@@ -1018,6 +1331,726 @@ export function evaluateBookIllustrationCandidate(
     ...withoutFingerprint,
     resultFingerprint: fingerprint(withoutFingerprint),
   };
+}
+
+
+const GENERATION_DISPATCH_INPUT_KEYS = new Set([
+  "outputKind",
+  "schemaVersion",
+  "contract",
+  "operation",
+  "executionId",
+  "plan",
+  "observedPlanFingerprint",
+  "workOrderFingerprintSha256",
+  "providerRuntimeRequestFingerprint",
+  "adapterPolicyFingerprint",
+  "candidateCount",
+  "requestedAt",
+  "requestedBy",
+  "providerAttemptLimit",
+  "providerFallbackAllowed",
+  "automaticSelectionAllowed",
+  "automaticPromotionAllowed",
+  "bookUseBindingAllowed",
+  "publicationAllowed",
+]);
+const VISUAL_CONSENSUS_INPUT_KEYS = new Set([
+  "outputKind",
+  "schemaVersion",
+  "contract",
+  "candidateId",
+  "candidateProducerId",
+  "candidateContentSha256",
+  "candidateArtifactFingerprint",
+  "plan",
+  "qaResult",
+  "reviewerReceipts",
+  "minimumIndependentReviewers",
+  "minimumConsensusBasisPoints",
+  "minimumPassingReviewerScore",
+  "requestedAt",
+  "requestedBy",
+  "providerCallAllowed",
+  "reviewerFallbackAllowed",
+  "automaticSelectionAllowed",
+  "automaticPromotionAllowed",
+  "bookUseBindingAllowed",
+  "publicationAllowed",
+]);
+const VISUAL_REVIEW_RECEIPT_KEYS = new Set([
+  "outputKind",
+  "schemaVersion",
+  "contract",
+  "reviewId",
+  "candidateId",
+  "candidateProducerId",
+  "candidateContentSha256",
+  "candidateArtifactFingerprint",
+  "planFingerprint",
+  "qaResultFingerprint",
+  "reviewerProducerId",
+  "reviewerProvider",
+  "reviewerModel",
+  "score",
+  "decision",
+  "evidenceIds",
+  "findingIds",
+  "reviewedAt",
+  "reviewFingerprint",
+  "reviewerWasCandidateProducer",
+  "selectionAuthorityAllowed",
+  "promotionAuthorityAllowed",
+  "publicationPerformed",
+]);
+const VISUAL_REVIEW_PROVIDERS = [
+  "chatgpt",
+  "claude",
+  "other_compatible_model",
+  "human",
+] as const;
+const VISUAL_REVIEW_DECISIONS = ["pass", "needs_revision", "reject"] as const;
+const COVER_PURPOSES = new Set<BookIllustrationPurpose>([
+  "front_cover_art",
+  "full_wrap_art",
+]);
+
+export function compileBookIllustrationGenerationDispatch(
+  value: unknown,
+): BookIllustrationGenerationDispatchResultV1 {
+  const blockers: string[] = [];
+  const input = strictObject(
+    value,
+    "generation dispatch input",
+    GENERATION_DISPATCH_INPUT_KEYS,
+    blockers,
+  );
+  if (!input) return blockedGenerationDispatch(blockers);
+  if (
+    input.outputKind !== "evavo_art_book_illustration_generation_dispatch_input" ||
+    input.schemaVersion !== BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION ||
+    input.contract !== BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT
+  ) {
+    blockers.push("Generation dispatch input kind, schema version or contract is invalid.");
+  }
+  const operation = enumValue(
+    input.operation,
+    ["book.cover.candidates.generate", "book.interior.candidates.generate"] as const,
+    "operation",
+    blockers,
+  );
+  const executionId = safeId(input.executionId, "executionId", blockers);
+  const plan = input.plan as BookIllustrationIntelligencePlanV1;
+  if (!plan || typeof plan !== "object") {
+    blockers.push("Generation dispatch requires one exact illustration plan.");
+  } else {
+    blockers.push(...validateBookIllustrationIntelligencePlan(plan));
+  }
+  const observedPlanFingerprint = sha(
+    input.observedPlanFingerprint,
+    "observedPlanFingerprint",
+    blockers,
+  );
+  const workOrderFingerprintSha256 = sha(
+    input.workOrderFingerprintSha256,
+    "workOrderFingerprintSha256",
+    blockers,
+  );
+  const providerRuntimeRequestFingerprint = sha(
+    input.providerRuntimeRequestFingerprint,
+    "providerRuntimeRequestFingerprint",
+    blockers,
+  );
+  const adapterPolicyFingerprint = sha(
+    input.adapterPolicyFingerprint,
+    "adapterPolicyFingerprint",
+    blockers,
+  );
+  const candidateCount = integerInRange(
+    input.candidateCount,
+    1,
+    16,
+    "candidateCount",
+    blockers,
+  );
+  const requestedAt = boundedText(input.requestedAt, "requestedAt", blockers, 100);
+  if (!isCanonicalUtcTimestamp(requestedAt)) {
+    blockers.push("requestedAt must be a real canonical UTC timestamp with milliseconds.");
+  }
+  const requestedBy = safeId(input.requestedBy, "requestedBy", blockers);
+  if (input.providerAttemptLimit !== 1) {
+    blockers.push("providerAttemptLimit must be exactly 1.");
+  }
+  for (const field of [
+    "providerFallbackAllowed",
+    "automaticSelectionAllowed",
+    "automaticPromotionAllowed",
+    "bookUseBindingAllowed",
+    "publicationAllowed",
+  ] as const) {
+    if (input[field] !== false) blockers.push(`${field} must remain false.`);
+  }
+  if (plan && observedPlanFingerprint !== plan.planFingerprint) {
+    blockers.push("observedPlanFingerprint differs from the exact illustration plan.");
+  }
+  if (plan) {
+    const coverPurpose = COVER_PURPOSES.has(plan.purpose);
+    if (
+      operation === "book.cover.candidates.generate" && !coverPurpose
+    ) {
+      blockers.push("Cover generation can be used only for front-cover or full-wrap plans.");
+    }
+    if (
+      operation === "book.interior.candidates.generate" && coverPurpose
+    ) {
+      blockers.push("Interior generation cannot be used for a cover plan.");
+    }
+  }
+  if (blockers.length || !plan) return blockedGenerationDispatch(blockers);
+
+  const unsigned: Omit<BookIllustrationGenerationDispatchV1, "dispatchFingerprint"> = {
+    outputKind: "evavo_art_book_illustration_generation_dispatch",
+    schemaVersion: BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
+    contract: BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
+    operation,
+    targetContract: "evavo_book_art_provider_shadow_runtime_v1",
+    targetInputKind: "evavo_book_art_provider_shadow_job_input",
+    targetOperation: "compileBookArtProviderShadowJob",
+    executionId,
+    candidateCount,
+    purpose: plan.purpose,
+    planFingerprint: plan.planFingerprint,
+    visualPacketFingerprint: plan.visualPacketFingerprint,
+    sourceBriefFingerprint: plan.sourceBriefFingerprint,
+    workOrderFingerprintSha256,
+    providerRuntimeRequestFingerprint,
+    adapterPolicyFingerprint,
+    requestedAt,
+    requestedBy,
+    providerAttemptLimit: 1,
+    providerFallbackAllowed: false,
+    selectionRequired: true,
+    promotionRequired: true,
+    bookUseBindingRequired: true,
+    shadowOnly: true,
+    providerCallPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    publicationPerformed: false,
+  };
+  return {
+    outputKind: "evavo_art_book_illustration_generation_dispatch_result",
+    schemaVersion: BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
+    contract: BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
+    status: "ready",
+    dispatch: {
+      ...unsigned,
+      dispatchFingerprint: fingerprint(unsigned),
+    },
+    blockers: [],
+    providerCallPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    publicationPerformed: false,
+  };
+}
+
+export function fingerprintBookIllustrationVisualReviewReceipt(
+  value:
+    | Omit<BookIllustrationVisualReviewReceiptV1, "reviewFingerprint">
+    | BookIllustrationVisualReviewReceiptV1,
+): string {
+  const { reviewFingerprint: _discarded, ...unsigned } =
+    value as BookIllustrationVisualReviewReceiptV1;
+  return fingerprint(unsigned);
+}
+
+export function evaluateBookIllustrationVisualConsensus(
+  value: unknown,
+): BookIllustrationVisualConsensusResultV1 {
+  const blockers: string[] = [];
+  const input = strictObject(
+    value,
+    "visual consensus input",
+    VISUAL_CONSENSUS_INPUT_KEYS,
+    blockers,
+  );
+  if (!input) return blockedVisualConsensus(blockers);
+  if (
+    input.outputKind !== "evavo_art_book_visual_consensus_input" ||
+    input.schemaVersion !== BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION ||
+    input.contract !== BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT
+  ) {
+    blockers.push("Visual consensus input kind, schema version or contract is invalid.");
+  }
+  for (const field of [
+    "providerCallAllowed",
+    "reviewerFallbackAllowed",
+    "automaticSelectionAllowed",
+    "automaticPromotionAllowed",
+    "bookUseBindingAllowed",
+    "publicationAllowed",
+  ] as const) {
+    if (input[field] !== false) blockers.push(`${field} must remain false.`);
+  }
+  const candidateId = safeId(input.candidateId, "candidateId", blockers);
+  const candidateProducerId = safeId(
+    input.candidateProducerId,
+    "candidateProducerId",
+    blockers,
+  );
+  const candidateContentSha256 = sha(
+    input.candidateContentSha256,
+    "candidateContentSha256",
+    blockers,
+  );
+  const candidateArtifactFingerprint = sha(
+    input.candidateArtifactFingerprint,
+    "candidateArtifactFingerprint",
+    blockers,
+  );
+  const plan = input.plan as BookIllustrationIntelligencePlanV1;
+  if (!plan || typeof plan !== "object") {
+    blockers.push("Visual consensus requires one exact illustration plan.");
+  } else {
+    blockers.push(...validateBookIllustrationIntelligencePlan(plan));
+  }
+  const qaResult = input.qaResult as BookIllustrationCandidateQaResultV1;
+  validateVisualConsensusQaResult(qaResult, candidateId, plan, blockers);
+  const minimumIndependentReviewers = integerInRange(
+    input.minimumIndependentReviewers,
+    2,
+    16,
+    "minimumIndependentReviewers",
+    blockers,
+  );
+  const minimumConsensusBasisPoints = integerInRange(
+    input.minimumConsensusBasisPoints,
+    5_000,
+    10_000,
+    "minimumConsensusBasisPoints",
+    blockers,
+  );
+  const minimumPassingReviewerScore = numberInRange(
+    input.minimumPassingReviewerScore,
+    0,
+    100,
+    "minimumPassingReviewerScore",
+    blockers,
+  );
+  const requestedAt = boundedText(input.requestedAt, "requestedAt", blockers, 100);
+  if (!isCanonicalUtcTimestamp(requestedAt)) {
+    blockers.push("requestedAt must be a real canonical UTC timestamp with milliseconds.");
+  }
+  safeId(input.requestedBy, "requestedBy", blockers);
+
+  const values = Array.isArray(input.reviewerReceipts)
+    ? input.reviewerReceipts
+    : [];
+  if (!Array.isArray(input.reviewerReceipts) || values.length < 2 || values.length > 16) {
+    blockers.push("reviewerReceipts must contain 2 to 16 exact independent receipts.");
+  }
+  const receipts: BookIllustrationVisualReviewReceiptV1[] = [];
+  for (let index = 0; index < values.length; index += 1) {
+    const receipt = parseVisualReviewReceipt(
+      values[index],
+      index,
+      {
+        candidateId,
+        candidateProducerId,
+        candidateContentSha256,
+        candidateArtifactFingerprint,
+        planFingerprint: plan?.planFingerprint ?? `sha256:${"0".repeat(64)}`,
+        qaResultFingerprint: qaResult?.resultFingerprint ?? `sha256:${"0".repeat(64)}`,
+        requestedAt,
+      },
+      blockers,
+    );
+    if (receipt) receipts.push(receipt);
+  }
+  receipts.sort((left, right) =>
+    left.reviewerProducerId.localeCompare(right.reviewerProducerId) ||
+    left.reviewId.localeCompare(right.reviewId),
+  );
+  const duplicateReviewIds = duplicateValues(receipts.map((item) => item.reviewId));
+  const duplicateReviewers = duplicateValues(
+    receipts.map((item) => item.reviewerProducerId),
+  );
+  const duplicateFingerprints = duplicateValues(
+    receipts.map((item) => item.reviewFingerprint),
+  );
+  if (duplicateReviewIds.length) {
+    blockers.push(`Visual review IDs are duplicated: ${duplicateReviewIds.join(", ")}.`);
+  }
+  if (duplicateReviewers.length) {
+    blockers.push(`Visual reviewer producers are duplicated: ${duplicateReviewers.join(", ")}.`);
+  }
+  if (duplicateFingerprints.length) {
+    blockers.push("Visual review fingerprints are duplicated.");
+  }
+  if (receipts.length < minimumIndependentReviewers) {
+    blockers.push(
+      `Visual consensus requires at least ${minimumIndependentReviewers} independent reviewer receipts.`,
+    );
+  }
+  if (blockers.length || !plan || !qaResult) {
+    return blockedVisualConsensus(blockers);
+  }
+
+  const passingReviewerProducerIds = receipts
+    .filter(
+      (receipt) =>
+        receipt.decision === "pass" &&
+        receipt.score >= minimumPassingReviewerScore,
+    )
+    .map((receipt) => receipt.reviewerProducerId)
+    .sort();
+  const passingSet = new Set(passingReviewerProducerIds);
+  const dissentingReviewerProducerIds = receipts
+    .filter((receipt) => !passingSet.has(receipt.reviewerProducerId))
+    .map((receipt) => receipt.reviewerProducerId)
+    .sort();
+  const minorityFindingIds = unique(
+    receipts
+      .filter((receipt) => !passingSet.has(receipt.reviewerProducerId))
+      .flatMap((receipt) => receipt.findingIds),
+  ).sort();
+  const consensusBasisPoints = Math.floor(
+    (passingReviewerProducerIds.length * 10_000) / Math.max(receipts.length, 1),
+  );
+  const consensusReached =
+    qaResult.status === "ready_for_independent_review" &&
+    passingReviewerProducerIds.length >= minimumIndependentReviewers &&
+    consensusBasisPoints >= minimumConsensusBasisPoints;
+  const requiredActions = unique([
+    ...(qaResult.status === "ready_for_independent_review"
+      ? []
+      : ["Resolve every candidate QA blocker and warning before independent visual consensus."]),
+    ...(consensusReached
+      ? []
+      : [
+          `Reach ${minimumConsensusBasisPoints} visual-consensus basis points with at least ${minimumIndependentReviewers} independent passing reviewers scoring ${minimumPassingReviewerScore} or above.`,
+        ]),
+    ...(minorityFindingIds.length
+      ? [`Preserve and adjudicate minority visual findings: ${minorityFindingIds.join(", ")}.`]
+      : []),
+  ]).sort();
+  const status: BookIllustrationVisualConsensusEvaluationV1["status"] =
+    consensusReached ? "ready_for_governed_selection" : "needs_work";
+  const unsigned: Omit<
+    BookIllustrationVisualConsensusEvaluationV1,
+    "evaluationFingerprint"
+  > = {
+    outputKind: "evavo_art_book_visual_consensus_evaluation",
+    schemaVersion: BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
+    contract: BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
+    status,
+    candidateId,
+    candidateContentSha256,
+    candidateArtifactFingerprint,
+    planFingerprint: plan.planFingerprint,
+    qaResultFingerprint: qaResult.resultFingerprint,
+    reviewFingerprints: receipts.map((item) => item.reviewFingerprint).sort(),
+    passingReviewerProducerIds,
+    dissentingReviewerProducerIds,
+    minorityFindingIds,
+    consensusBasisPoints,
+    minimumConsensusBasisPoints,
+    minimumIndependentReviewers,
+    minimumPassingReviewerScore,
+    consensusReached,
+    requiredActions,
+    providerCallPerformed: false,
+    reviewerFallbackAllowed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    publicationPerformed: false,
+  };
+  const evaluation: BookIllustrationVisualConsensusEvaluationV1 = {
+    ...unsigned,
+    evaluationFingerprint: fingerprint(unsigned),
+  };
+  return {
+    outputKind: "evavo_art_book_visual_consensus_result",
+    schemaVersion: BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
+    contract: BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
+    status,
+    evaluation,
+    blockers: [],
+    requiredActions,
+    providerCallPerformed: false,
+    reviewerFallbackAllowed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    publicationPerformed: false,
+  };
+}
+
+function parseVisualReviewReceipt(
+  value: unknown,
+  index: number,
+  expected: Readonly<{
+    candidateId: string;
+    candidateProducerId: string;
+    candidateContentSha256: string;
+    candidateArtifactFingerprint: string;
+    planFingerprint: string;
+    qaResultFingerprint: string;
+    requestedAt: string;
+  }>,
+  blockers: string[],
+): BookIllustrationVisualReviewReceiptV1 | undefined {
+  const label = `reviewerReceipts[${index}]`;
+  const source = strictObject(value, label, VISUAL_REVIEW_RECEIPT_KEYS, blockers);
+  if (!source) return undefined;
+  if (
+    source.outputKind !== "evavo_art_book_visual_review_receipt" ||
+    source.schemaVersion !== BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION ||
+    source.contract !== BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT
+  ) {
+    blockers.push(`${label} kind, schema version or contract is invalid.`);
+  }
+  const reviewId = safeId(source.reviewId, `${label}.reviewId`, blockers);
+  const candidateId = safeId(source.candidateId, `${label}.candidateId`, blockers);
+  const candidateProducerId = safeId(
+    source.candidateProducerId,
+    `${label}.candidateProducerId`,
+    blockers,
+  );
+  const candidateContentSha256 = sha(
+    source.candidateContentSha256,
+    `${label}.candidateContentSha256`,
+    blockers,
+  );
+  const candidateArtifactFingerprint = sha(
+    source.candidateArtifactFingerprint,
+    `${label}.candidateArtifactFingerprint`,
+    blockers,
+  );
+  const planFingerprint = sha(
+    source.planFingerprint,
+    `${label}.planFingerprint`,
+    blockers,
+  );
+  const qaResultFingerprint = sha(
+    source.qaResultFingerprint,
+    `${label}.qaResultFingerprint`,
+    blockers,
+  );
+  const reviewerProducerId = safeId(
+    source.reviewerProducerId,
+    `${label}.reviewerProducerId`,
+    blockers,
+  );
+  const reviewerProvider = enumValue(
+    source.reviewerProvider,
+    VISUAL_REVIEW_PROVIDERS,
+    `${label}.reviewerProvider`,
+    blockers,
+  );
+  const reviewerModel = boundedText(
+    source.reviewerModel,
+    `${label}.reviewerModel`,
+    blockers,
+    300,
+  );
+  const score = numberInRange(source.score, 0, 100, `${label}.score`, blockers);
+  const decision = enumValue(
+    source.decision,
+    VISUAL_REVIEW_DECISIONS,
+    `${label}.decision`,
+    blockers,
+  );
+  const evidenceIds = idArray(
+    source.evidenceIds,
+    `${label}.evidenceIds`,
+    blockers,
+    1,
+    2_048,
+  );
+  const findingIds = idArray(
+    source.findingIds,
+    `${label}.findingIds`,
+    blockers,
+    0,
+    2_048,
+  );
+  if (!sameOrderedValues(evidenceIds, [...evidenceIds].sort())) {
+    blockers.push(`${label}.evidenceIds must be in canonical sorted order.`);
+  }
+  if (!sameOrderedValues(findingIds, [...findingIds].sort())) {
+    blockers.push(`${label}.findingIds must be in canonical sorted order.`);
+  }
+  const reviewedAt = boundedText(
+    source.reviewedAt,
+    `${label}.reviewedAt`,
+    blockers,
+    100,
+  );
+  if (!isCanonicalUtcTimestamp(reviewedAt)) {
+    blockers.push(`${label}.reviewedAt must be a real canonical UTC timestamp with milliseconds.`);
+  }
+  if (
+    isCanonicalUtcTimestamp(reviewedAt) &&
+    isCanonicalUtcTimestamp(expected.requestedAt) &&
+    Date.parse(reviewedAt) > Date.parse(expected.requestedAt)
+  ) {
+    blockers.push(`${label}.reviewedAt cannot be later than the consensus request.`);
+  }
+  for (const field of [
+    "reviewerWasCandidateProducer",
+    "selectionAuthorityAllowed",
+    "promotionAuthorityAllowed",
+    "publicationPerformed",
+  ] as const) {
+    if (source[field] !== false) blockers.push(`${label}.${field} must remain false.`);
+  }
+  if (reviewerProducerId === candidateProducerId) {
+    blockers.push(`${label} is not independent from the candidate producer.`);
+  }
+  if (
+    candidateId !== expected.candidateId ||
+    candidateProducerId !== expected.candidateProducerId ||
+    candidateContentSha256 !== expected.candidateContentSha256 ||
+    candidateArtifactFingerprint !== expected.candidateArtifactFingerprint ||
+    planFingerprint !== expected.planFingerprint ||
+    qaResultFingerprint !== expected.qaResultFingerprint
+  ) {
+    blockers.push(`${label} is bound to different candidate, plan or QA evidence.`);
+  }
+  const unsigned: Omit<BookIllustrationVisualReviewReceiptV1, "reviewFingerprint"> = {
+    outputKind: "evavo_art_book_visual_review_receipt",
+    schemaVersion: BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
+    contract: BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
+    reviewId,
+    candidateId,
+    candidateProducerId,
+    candidateContentSha256,
+    candidateArtifactFingerprint,
+    planFingerprint,
+    qaResultFingerprint,
+    reviewerProducerId,
+    reviewerProvider,
+    reviewerModel,
+    score,
+    decision,
+    evidenceIds: [...evidenceIds].sort(),
+    findingIds: [...findingIds].sort(),
+    reviewedAt,
+    reviewerWasCandidateProducer: false,
+    selectionAuthorityAllowed: false,
+    promotionAuthorityAllowed: false,
+    publicationPerformed: false,
+  };
+  const reviewFingerprint = sha(
+    source.reviewFingerprint,
+    `${label}.reviewFingerprint`,
+    blockers,
+  );
+  if (reviewFingerprint !== fingerprintBookIllustrationVisualReviewReceipt(unsigned)) {
+    blockers.push(`${label}.reviewFingerprint differs from exact canonical receipt contents.`);
+  }
+  return { ...unsigned, reviewFingerprint };
+}
+
+function validateVisualConsensusQaResult(
+  value: BookIllustrationCandidateQaResultV1 | undefined,
+  candidateId: string,
+  plan: BookIllustrationIntelligencePlanV1 | undefined,
+  blockers: string[],
+): void {
+  if (!value || typeof value !== "object") {
+    blockers.push("Visual consensus requires one candidate QA result.");
+    return;
+  }
+  if (
+    value.outputKind !== "evavo_art_book_illustration_candidate_qa_result" ||
+    value.schemaVersion !== BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION ||
+    value.contract !== BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT
+  ) {
+    blockers.push("Candidate QA result identity is invalid.");
+  }
+  const { resultFingerprint: _discarded, ...unsigned } = value;
+  if (value.resultFingerprint !== fingerprint(unsigned)) {
+    blockers.push("Candidate QA result fingerprint differs from exact contents.");
+  }
+  if (value.candidateId !== candidateId) {
+    blockers.push("Candidate QA result belongs to a different candidate.");
+  }
+  if (plan && value.planFingerprint !== plan.planFingerprint) {
+    blockers.push("Candidate QA result belongs to a different illustration plan.");
+  }
+  if (value.status !== "ready_for_independent_review") {
+    blockers.push("Candidate QA must be ready_for_independent_review before visual consensus.");
+  }
+  if (
+    value.blockerCodes.length ||
+    value.warningCodes.length ||
+    value.providerCallPerformedByQa !== false ||
+    value.candidateBytesRewrittenByQa !== false ||
+    value.selectionPerformed !== false ||
+    value.promotionPerformed !== false ||
+    value.bookUseBindingCreated !== false ||
+    value.publicationPerformed !== false
+  ) {
+    blockers.push("Candidate QA result contains unresolved findings or forbidden side effects.");
+  }
+}
+
+function blockedGenerationDispatch(
+  blockers: string[],
+): BookIllustrationGenerationDispatchResultV1 {
+  return {
+    outputKind: "evavo_art_book_illustration_generation_dispatch_result",
+    schemaVersion: BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
+    contract: BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
+    status: "blocked",
+    blockers: unique(blockers),
+    providerCallPerformed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    publicationPerformed: false,
+  };
+}
+
+function blockedVisualConsensus(
+  blockers: string[],
+): BookIllustrationVisualConsensusResultV1 {
+  return {
+    outputKind: "evavo_art_book_visual_consensus_result",
+    schemaVersion: BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
+    contract: BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
+    status: "blocked",
+    blockers: unique(blockers),
+    requiredActions: [
+      "Correct the malformed, incomplete or unauthorised visual consensus evidence.",
+    ],
+    providerCallPerformed: false,
+    reviewerFallbackAllowed: false,
+    selectionPerformed: false,
+    promotionPerformed: false,
+    bookUseBindingCreated: false,
+    publicationPerformed: false,
+  };
+}
+
+function duplicateValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) repeated.add(value);
+    seen.add(value);
+  }
+  return [...repeated].sort();
+}
+
+function sameOrderedValues(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function evaluateTechnical(

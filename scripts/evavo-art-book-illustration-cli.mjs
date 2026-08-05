@@ -3,19 +3,23 @@ import { open } from "node:fs/promises";
 import path from "node:path";
 
 import {
-  BOOK_ILLUSTRATION_INTELLIGENCE_CAPABILITIES,
   BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
   BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
+  compileBookIllustrationGenerationDispatch,
   compileBookIllustrationIntelligencePlan,
   evaluateBookIllustrationCandidate,
+  evaluateBookIllustrationVisualConsensus,
+  listBookIllustrationIntelligenceCapabilities,
   validateBookIllustrationIntelligencePlan,
 } from "../packages/contracts/dist/book-illustration-intelligence.js";
 
 const COMMANDS = new Set([
   "capabilities",
   "compile-plan",
+  "compile-generation-dispatch",
   "validate-plan",
   "evaluate-candidate",
+  "evaluate-visual-consensus",
 ]);
 
 const MAXIMUM_INPUT_BYTES = 16 * 1024 * 1024;
@@ -110,8 +114,10 @@ async function main() {
         "Usage:",
         "  evavo-art-book-illustration-cli.mjs capabilities [--output FILE]",
         "  evavo-art-book-illustration-cli.mjs compile-plan --input FILE [--output FILE]",
+        "  evavo-art-book-illustration-cli.mjs compile-generation-dispatch --input FILE [--output FILE]",
         "  evavo-art-book-illustration-cli.mjs validate-plan --input FILE [--output FILE]",
         "  evavo-art-book-illustration-cli.mjs evaluate-candidate --input FILE [--output FILE]",
+        "  evavo-art-book-illustration-cli.mjs evaluate-visual-consensus --input FILE [--output FILE]",
         "",
         "Output files are created exclusively and are never overwritten.",
       ]),
@@ -122,18 +128,14 @@ async function main() {
   let exitCode = 0;
   if (options.command === "capabilities") {
     if (options.input) throw new Error("capabilities does not accept --input.");
-    result = {
-      outputKind: "evavo_art_book_illustration_intelligence_capabilities",
-      schemaVersion: BOOK_ILLUSTRATION_INTELLIGENCE_SCHEMA_VERSION,
-      contract: BOOK_ILLUSTRATION_INTELLIGENCE_CONTRACT,
-      capabilities: [...BOOK_ILLUSTRATION_INTELLIGENCE_CAPABILITIES],
-      providerCallPerformed: false,
-      selectionPerformed: false,
-      promotionPerformed: false,
-      publicationPerformed: false,
-    };
+    result = listBookIllustrationIntelligenceCapabilities();
   } else if (options.command === "compile-plan") {
     result = compileBookIllustrationIntelligencePlan(
+      await readJsonInput(options.input),
+    );
+    if (result.status !== "ready") exitCode = 2;
+  } else if (options.command === "compile-generation-dispatch") {
+    result = compileBookIllustrationGenerationDispatch(
       await readJsonInput(options.input),
     );
     if (result.status !== "ready") exitCode = 2;
@@ -153,9 +155,14 @@ async function main() {
       publicationPerformed: false,
     };
     if (issues.length) exitCode = 2;
-  } else {
+  } else if (options.command === "evaluate-candidate") {
     result = evaluateBookIllustrationCandidate(await readJsonInput(options.input));
     if (result.status !== "ready_for_independent_review") exitCode = 2;
+  } else {
+    result = evaluateBookIllustrationVisualConsensus(
+      await readJsonInput(options.input),
+    );
+    if (result.status !== "ready_for_governed_selection") exitCode = 2;
   }
   await writeResult(result, options.output);
   process.exitCode = exitCode;

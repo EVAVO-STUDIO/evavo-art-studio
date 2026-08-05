@@ -39,3 +39,40 @@ node scripts/evavo-art-book-illustration-cli.mjs evaluate-candidate --input cand
 ```
 
 Output paths are no-clobber. A candidate can reach only `ready_for_independent_review`; this contract cannot select, promote, bind to a book or publish it.
+
+## Candidate generation dispatch
+
+Cover and interior candidate generation are separate capability IDs:
+
+- `book.cover.candidates.generate`
+- `book.interior.candidates.generate`
+
+The dispatcher binds the exact illustration plan, visual packet, source brief,
+prevalidated work-order fingerprint, provider-runtime request fingerprint and
+adapter-policy fingerprint to the existing
+`evavo_book_art_provider_shadow_runtime_v1` boundary. A provider-backed dispatch
+permits exactly one attempt, prohibits fallback, and retains mandatory
+selection, promotion and Book-use gates. Compiling a dispatch does not itself
+call a provider or write candidate bytes.
+
+## Independent visual consensus
+
+`book.visual.consensus` verifies exact reviewer receipts for one candidate and
+its exact content digest, artifact fingerprint, plan and QA result. Reviewers
+must be distinct from the candidate producer and from each other. Every receipt
+has a deterministic fingerprint, canonical timestamp, score, decision,
+evidence and findings.
+
+A low score cannot pass merely because its decision string says `pass`.
+Consensus is calculated from reviewers who both declare `pass` and meet the
+configured score threshold. Dissenting reviewer identities and minority
+findings remain in the result. The strongest result is
+`ready_for_governed_selection`; no selection, promotion, Book-use binding or
+publication is performed.
+
+Additional CLI operations:
+
+```bash
+node scripts/evavo-art-book-illustration-cli.mjs compile-generation-dispatch --input dispatch-input.json
+node scripts/evavo-art-book-illustration-cli.mjs evaluate-visual-consensus --input consensus-input.json
+```
