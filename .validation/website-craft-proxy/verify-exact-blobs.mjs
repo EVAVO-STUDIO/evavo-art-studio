@@ -5,20 +5,16 @@ import { fileURLToPath } from "node:url";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const exact = new Map([
-  ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftTypes.ts", "42be33c54ee61e4989295c8635bd869a0704f37f"],
+  ["tools/evavo-doc-studio/src/evavo/api/apiResponse.ts", "fa0574887e110c74fc2a9b4c322dd4c403c2aef1"],
   ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftContracts.ts", "ba47423fc28a7e225ad69ba0443bf595f0431ebd"],
   ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftShared.ts", "07b733ea5b70b329f6e3f6ca4180b566256c96f1"],
-  ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftStream.ts", "cedf55686fdb359f248d886d4b704c73af3d5d67"],
-  ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftClient.ts", "729a7d6571a18b925959d63563cedabfcece4b27"],
-  ["tools/evavo-doc-studio/src/app/api/books/write/craft-genome/route.ts", "162273537202cc666ad0ee92a03cf52ee7614461"],
-  ["tools/evavo-doc-studio/scripts/check-book-studio-craft-provider-contract.ts", "726ccc606d8679e309ea5e6c1c31dd11c1a6b8a8"],
-  ["tools/evavo-doc-studio/scripts/check-book-studio-craft-proxy-route.ts", "59db37cb9bff0c593e82c14a7d60c22a25d3a11b"],
-  ["tools/evavo-doc-studio/scripts/check-book-studio-craft-genome.ts", "5780e839b8c2357367bd5ce48ac38e9fcee5bf7a"],
-  ["tools/evavo-doc-studio/src/evavo/bookStudio/index.ts", "e3501830378171fc4473bc0115a3e00365900860"],
-  ["tools/evavo-doc-studio/src/evavo/cli/bookCommandRegistry.ts", "1756862e13a732911ece684651aad8e768715aea"],
-  ["tools/evavo-doc-studio/tsconfig.book-studio-craft-genome.json", "bc9e6d9ec308d1a70a26e0267dbbb23d43a9ac85"],
-  ["tools/evavo-doc-studio/docs/BOOK_STUDIO_CRAFT_GENOME.md", "f34707226641d33964a395b357cf2e29a17665d1"],
-  [".github/workflows/book-studio-craft-genome.yml", "97491758cc38a7b0df15e1928e305ce46702ce2f"]
+  ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftTypes.ts", "3d4743e9106f763957beacaddcaef8ab64a598e6"],
+  ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftStream.ts", "11f5ed979eafaa64bf767b8ae19f71d836087c03"],
+  ["tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftClient.ts", "1cc6fc432b1280b7e490cda121e03d58436d3653"],
+  ["tools/evavo-doc-studio/src/app/api/books/write/craft-genome/route.ts", "b898a24006b2d59c70235ae8dab10872432276f6"],
+  ["tools/evavo-doc-studio/scripts/check-book-studio-craft-stream.ts", "5dbb0d5373d726ca3355a8b973c65f7dc92520df"],
+  ["tools/evavo-doc-studio/scripts/check-book-studio-craft-provider-contract.ts", "8f8b7564dd860e0e1546e3f85efa8b2193f85922"],
+  ["tools/evavo-doc-studio/scripts/check-book-studio-craft-proxy-route.ts", "2689abeb83735e3168d7fbf353253bff26347ac9"]
 ]);
 
 const retired = [
@@ -48,7 +44,7 @@ for (const relative of retired) {
 }
 
 if (failures.length) {
-  console.error("Exact Website craft proxy hardening mirror verification failed.");
+  console.error("Exact Website craft proxy HTTP mirror verification failed.");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
@@ -56,16 +52,14 @@ if (failures.length) {
 console.log(JSON.stringify({
   status: "PASS",
   websiteRepository: "EVAVO-STUDIO/Website",
-  websiteBase: "9a39372a5d3ee63bf12f1c766828bb38b4d1645f",
-  websiteHead: "af19c0fc7b650319b058c751f0d35c11bdc9882d",
-  exactGitBlobs: exact.size,
+  websiteBase: "42d859fe76306d25df93e8201b3911c3f79d163b",
+  websiteHead: "983adc48176a673acaaf4199ade99e62831dff82",
+  exactExecutableGitBlobs: exact.size,
   retiredLocalRuntimeFilesAbsent: retired.length,
-  streamedRequestAndResponseLimitsRequired: true,
-  strictUtf8Required: true,
-  originOnlyConfigurationRequired: true,
-  controlCharacterFreeTokenRequired: true,
-  remoteValidationStatusPreserved: true,
-  websiteLocalCraftExecutionAllowed: false,
+  adaptiveBodyBufferRequired: true,
+  remoteErrorBodiesParsed: false,
+  ownerOrClientActorTypeRequired: true,
+  rawInternalErrorsExposed: false,
   providerCalled: false,
   canonicalManuscriptMutationPerformed: false,
   automaticCanonicalAdmissionAllowed: false,

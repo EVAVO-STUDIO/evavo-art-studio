@@ -1,0 +1,123 @@
+name: Validate exact Website craft proxy HTTP hardening
+
+on:
+  push:
+    branches:
+      - validation/website-craft-proxy-http-hardening-20260805
+    paths:
+      - ".github/workflows/validate-website-craft-proxy-http-hardening.yml"
+      - ".validation/website-craft-proxy/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-website-craft-proxy-http-hardening.yml"
+      - ".validation/website-craft-proxy/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-website-craft-proxy-http-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact validation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Prove exact Website executable Git blobs and retired-source absence
+        run: node .validation/website-craft-proxy/verify-exact-blobs.mjs
+
+      - name: Install validation-only compiler and runtime
+        run: >-
+          npm install --prefix .validation/website-craft-proxy
+          --package-lock=false --ignore-scripts --no-audit --no-fund
+
+      - name: Compile exact stream client route and attacks
+        run: >-
+          .validation/website-craft-proxy/node_modules/.bin/tsc
+          -p .validation/website-craft-proxy/tsconfig.json
+
+      - name: Run adaptive bounded stream attacks
+        run: >-
+          .validation/website-craft-proxy/node_modules/.bin/tsx
+          .validation/website-craft-proxy/tools/evavo-doc-studio/scripts/check-book-studio-craft-stream.ts
+
+      - name: Run exact HTTP transport identity and authority attacks
+        run: >-
+          .validation/website-craft-proxy/node_modules/.bin/tsx
+          .validation/website-craft-proxy/tools/evavo-doc-studio/scripts/check-book-studio-craft-provider-contract.ts
+
+      - name: Run exact public route compatibility and redaction attacks
+        env:
+          TSX_TSCONFIG_PATH: .validation/website-craft-proxy/tsconfig.json
+        run: >-
+          .validation/website-craft-proxy/node_modules/.bin/tsx
+          .validation/website-craft-proxy/tools/evavo-doc-studio/scripts/check-book-studio-craft-proxy-route.ts
+
+      - name: Verify no Art Studio production source changed
+        shell: bash
+        env:
+          VALIDATION_BASE_SHA: ${{ github.event.pull_request.base.sha || 'f24387a1de564ff11ed428daa80c11c400304d53' }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$VALIDATION_BASE_SHA"
+          unexpected="$(git diff --name-only "$VALIDATION_BASE_SHA" HEAD | grep -Ev '^(\.github/workflows/validate-website-craft-proxy-http-hardening\.yml|\.validation/website-craft-proxy/)' || true)"
+          test -z "$unexpected" || {
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
+
+      - name: Write bounded validation receipt
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/website-craft-proxy-http-validation.json" <<JSON
+          {
+            "status": "PASS",
+            "websiteRepository": "EVAVO-STUDIO/Website",
+            "websiteBase": "42d859fe76306d25df93e8201b3911c3f79d163b",
+            "websiteHead": "983adc48176a673acaaf4199ade99e62831dff82",
+            "mirrorRepository": "EVAVO-STUDIO/evavo-art-studio",
+            "mirrorHead": "${GITHUB_SHA}",
+            "exactExecutableGitBlobs": 10,
+            "retiredLocalRuntimeFilesAbsent": 9,
+            "strictTypeScript": true,
+            "adaptiveBodyBuffer": true,
+            "nonBlockingCancellation": true,
+            "strictUtf8": true,
+            "requestAndResponseTimeouts": true,
+            "remoteErrorBodiesParsed": false,
+            "remoteStatusesNormalised": true,
+            "successJsonMediaTypeRequired": true,
+            "ownerOrClientActorTypeRequired": true,
+            "workspaceIdentityRequired": true,
+            "rawInternalErrorsExposed": false,
+            "artStudioProductionSourceChanged": false,
+            "providerCalled": false,
+            "canonicalManuscriptMutationPerformed": false,
+            "automaticCanonicalAdmissionAllowed": false,
+            "publicationPerformed": false
+          }
+          JSON
+          cat "$RUNNER_TEMP/website-craft-proxy-http-validation.json"
+
+      - name: Prove clean tracked source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"

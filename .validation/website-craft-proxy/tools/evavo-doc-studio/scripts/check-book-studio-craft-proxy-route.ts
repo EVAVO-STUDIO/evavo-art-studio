@@ -12,9 +12,26 @@ const environmentKeys = [
   "EVAVO_DOCS_SUITE_BOOK_CRAFT_TIMEOUT_MS"
 ] as const;
 
+function publicPayload() {
+  return {
+    operation: "compile_profile",
+    compileInput: {
+      programmeId: "programme:route",
+      profileId: "profile:route",
+      profileVersion: 1,
+      influences: [],
+      projectVoiceAnchorIds: [],
+      narrativeConstraintIds: [],
+      acceptedPatternIds: [],
+      rejectedPatternIds: []
+    }
+  };
+}
+
 function successfulRemoteResponse(
   request: EvavoDocsSuiteLegacyCraftRequestV1,
-  overrides: Record<string, unknown> = {}
+  resultOverrides: Record<string, unknown> = {},
+  options: { contentType?: string; actorType?: string; workspaceId?: string } = {}
 ): Response {
   const unsigned = {
     outputKind: "evavo_docs_book_legacy_craft_genome_result",
@@ -30,9 +47,9 @@ function successfulRemoteResponse(
       outputKind: "evavo_book_studio_craft_genome_profile",
       schemaVersion: 1,
       status: "blocked",
-      blockers: ["Route validation fixture is intentionally incomplete."]
+      blockers: ["Route fixture is intentionally incomplete."]
     },
-    blockers: ["Route validation fixture is intentionally incomplete."],
+    blockers: ["Route fixture is intentionally incomplete."],
     warnings: [],
     docsSuiteCompatibilityExecutionPerformed: true,
     websiteLocalCraftExecutionPerformed: false,
@@ -46,37 +63,18 @@ function successfulRemoteResponse(
     runtimeCutoverApproved: false,
     sourceDeletionApproved: false,
     publicationPerformed: false,
-    ...overrides
+    ...resultOverrides
   };
-  const result = {
-    ...unsigned,
-    resultFingerprint: fingerprintEvavoLegacyCraftValue(unsigned)
-  };
+  const result = { ...unsigned, resultFingerprint: fingerprintEvavoLegacyCraftValue(unsigned) };
   return new Response(JSON.stringify({
     ok: true,
-    workspaceId: "workspace:validation",
-    actorType: "automation",
+    workspaceId: options.workspaceId ?? "workspace_route",
+    actorType: options.actorType ?? "owner",
     result
   }), {
     status: 200,
-    headers: { "content-type": "application/json" }
+    headers: { "content-type": options.contentType ?? "application/json; charset=utf-8" }
   });
-}
-
-function publicPayload() {
-  return {
-    operation: "compile_profile",
-    compileInput: {
-      programmeId: "programme:validation",
-      profileId: "profile:validation",
-      profileVersion: 1,
-      influences: [],
-      projectVoiceAnchorIds: [],
-      narrativeConstraintIds: [],
-      acceptedPatternIds: [],
-      rejectedPatternIds: []
-    }
-  };
 }
 
 function streamedRequest(chunks: Uint8Array[], declaredLength = "2"): NextRequest {
@@ -91,43 +89,63 @@ function streamedRequest(chunks: Uint8Array[], declaredLength = "2"): NextReques
   } as NextRequest;
 }
 
+function request(body: string): NextRequest {
+  return new NextRequest("http://website.test/api/books/write/craft-genome", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body
+  });
+}
+
+function assertPrivateHeaders(response: Response): void {
+  assert.equal(response.headers.get("cache-control"), "private, no-store, max-age=0");
+  assert.equal(response.headers.get("cdn-cache-control"), "no-store");
+  assert.equal(response.headers.get("vercel-cdn-cache-control"), "no-store");
+  assert.equal(response.headers.get("surrogate-control"), "no-store");
+  assert.equal(response.headers.get("vary"), "Cookie");
+  assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
+}
+
 async function main(): Promise<void> {
   const previousFetch = globalThis.fetch;
   const previousEnvironment = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
+  const secret = "header.payload";
   process.env.EVAVO_DOCS_SUITE_BOOK_CRAFT_URL = "https://docs.example.test";
-  process.env.EVAVO_DOCS_SUITE_BOOK_CRAFT_TOKEN = "secret.payload";
+  process.env.EVAVO_DOCS_SUITE_BOOK_CRAFT_TOKEN = secret;
   process.env.EVAVO_WEBSITE_COMMIT_SHA = "a".repeat(40);
   process.env.EVAVO_DOCS_SUITE_BOOK_CRAFT_TIMEOUT_MS = "1000";
 
   try {
     const capability = await GET();
     assert.equal(capability.status, 200);
-    assert.equal(capability.headers.get("cache-control"), "private, no-store, max-age=0");
-    assert.equal(capability.headers.get("x-robots-tag"), "noindex, nofollow");
+    assertPrivateHeaders(capability);
     const capabilityBody = await capability.json() as Record<string, unknown>;
-    assert.equal(capabilityBody.ok, true);
     const capabilityData = capabilityBody.data as Record<string, unknown>;
+    const constraints = capabilityData.constraints as Record<string, unknown>;
     assert.equal(capabilityData.websiteExecutionMode, "proxy_only");
     assert.equal(capabilityData.executionOwner, "Docs Suite compatibility authority");
-    const constraints = capabilityData.constraints as Record<string, unknown>;
     assert.equal(constraints.streamingBodyLimitsRequired, true);
+    assert.equal(constraints.adaptiveBodyBufferRequired, true);
+    assert.equal(constraints.remoteErrorBodiesParsed, false);
+    assert.equal(constraints.remoteSuccessJsonContentTypeRequired, true);
+    assert.equal(constraints.remoteOwnerOrClientActorRequired, true);
+    assert.equal(constraints.rawInternalErrorsExposed, false);
 
     let calls = 0;
     globalThis.fetch = (async (input, init) => {
       calls += 1;
       assert.equal(String(input), "https://docs.example.test/api/v1/book-studio/legacy-craft-genome");
+      assert.equal(init?.cache, "no-store");
       assert.equal(init?.redirect, "error");
-      const request = JSON.parse(String(init?.body)) as EvavoDocsSuiteLegacyCraftRequestV1;
-      return successfulRemoteResponse(request);
+      const remoteRequest = JSON.parse(String(init?.body)) as EvavoDocsSuiteLegacyCraftRequestV1;
+      return successfulRemoteResponse(remoteRequest);
     }) as typeof fetch;
-
-    const success = await POST(new NextRequest("http://website.test/api/books/write/craft-genome", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(publicPayload())
-    }));
+    const success = await POST(request(JSON.stringify(publicPayload())));
     assert.equal(success.status, 200);
-    assert.equal(success.headers.get("cache-control"), "private, no-store, max-age=0");
+    assertPrivateHeaders(success);
     const successBody = await success.json() as Record<string, unknown>;
     assert.equal(successBody.ok, true);
     const successData = successBody.data as Record<string, unknown>;
@@ -136,15 +154,14 @@ async function main(): Promise<void> {
     assert.equal(calls, 1);
 
     calls = 0;
-    const invalid = await POST(new NextRequest("http://website.test/api/books/write/craft-genome", {
-      method: "POST",
-      body: "{not-json}"
-    }));
+    const invalid = await POST(request("{not-json}"));
     assert.equal(invalid.status, 400);
+    assertPrivateHeaders(invalid);
     assert.equal(calls, 0);
 
     const declaredOversized = await POST(streamedRequest([new TextEncoder().encode("{}")], String(8 * 1024 * 1024 + 1)));
     assert.equal(declaredOversized.status, 413);
+    assertPrivateHeaders(declaredOversized);
     assert.equal(calls, 0);
 
     const mebibyte = 1024 * 1024;
@@ -162,44 +179,82 @@ async function main(): Promise<void> {
     calls = 0;
     globalThis.fetch = (async (_input, init) => {
       calls += 1;
-      const request = JSON.parse(String(init?.body)) as EvavoDocsSuiteLegacyCraftRequestV1;
-      return successfulRemoteResponse(request, { providerCalled: true });
+      const remoteRequest = JSON.parse(String(init?.body)) as EvavoDocsSuiteLegacyCraftRequestV1;
+      return successfulRemoteResponse(remoteRequest, { providerCalled: true });
     }) as typeof fetch;
-    const escalated = await POST(new NextRequest("http://website.test/api/books/write/craft-genome", {
-      method: "POST",
-      body: JSON.stringify(publicPayload())
-    }));
+    const escalated = await POST(request(JSON.stringify(publicPayload())));
     assert.equal(escalated.status, 502);
+    assertPrivateHeaders(escalated);
     const escalatedSource = await escalated.text();
-    assert.equal(escalatedSource.includes("secret.payload"), false);
+    assert.equal(escalatedSource.includes(secret), false);
     assert.match(escalatedSource, /BOOK_CRAFT_PROXY_RESPONSE_TAMPERED/);
     assert.equal(calls, 1);
 
     calls = 0;
     globalThis.fetch = (async () => {
       calls += 1;
-      return new Response(JSON.stringify({ ok: false }), {
-        status: 400,
-        headers: { "content-type": "application/json" }
-      });
+      throw new Error(`private-provider-detail ${secret}`);
     }) as typeof fetch;
-    const remotelyInvalid = await POST(new NextRequest("http://website.test/api/books/write/craft-genome", {
-      method: "POST",
-      body: JSON.stringify(publicPayload())
-    }));
-    assert.equal(remotelyInvalid.status, 400);
-    const remotelyInvalidBody = await remotelyInvalid.json() as Record<string, unknown>;
-    const remotelyInvalidError = remotelyInvalidBody.error as Record<string, unknown>;
-    assert.equal(remotelyInvalidError.code, "VALIDATION_ERROR");
+    const networkFailure = await POST(request(JSON.stringify(publicPayload())));
+    assert.equal(networkFailure.status, 502);
+    const networkSource = await networkFailure.text();
+    assert.equal(networkSource.includes(secret), false);
+    assert.equal(networkSource.includes("private-provider-detail"), false);
+    assert.equal(networkSource.includes("Docs Suite legacy craft request failed"), false);
+    assert.match(networkSource, /BOOK_CRAFT_PROXY_NETWORK_FAILED/);
     assert.equal(calls, 1);
+
+    for (const [remoteStatus, routeStatus, errorCode] of [
+      [400, 400, "VALIDATION_ERROR"],
+      [413, 413, "BOOK_CRAFT_REQUEST_TOO_LARGE"],
+      [401, 502, "BOOK_CRAFT_PROXY_REMOTE_REJECTED"],
+      [429, 503, "BOOK_CRAFT_PROXY_REMOTE_REJECTED"]
+    ] as const) {
+      calls = 0;
+      let cancelled = false;
+      globalThis.fetch = (async () => {
+        calls += 1;
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("private upstream detail that never finishes"));
+          },
+          cancel() {
+            cancelled = true;
+          }
+        }), { status: remoteStatus, headers: { "content-type": "text/plain" } });
+      }) as typeof fetch;
+      const response = await POST(request(JSON.stringify(publicPayload())));
+      assert.equal(response.status, routeStatus);
+      assertPrivateHeaders(response);
+      const source = await response.text();
+      assert.equal(source.includes("private upstream detail"), false);
+      if (remoteStatus === 401) assert.equal(source.includes("401"), false);
+      assert.match(source, new RegExp(errorCode));
+      await Promise.resolve();
+      assert.equal(cancelled, true);
+      assert.equal(calls, 1);
+    }
+
+    globalThis.fetch = (async (_input, init) => {
+      const remoteRequest = JSON.parse(String(init?.body)) as EvavoDocsSuiteLegacyCraftRequestV1;
+      return successfulRemoteResponse(remoteRequest, {}, { contentType: "text/plain" });
+    }) as typeof fetch;
+    const wrongMediaType = await POST(request(JSON.stringify(publicPayload())));
+    assert.equal(wrongMediaType.status, 502);
+    assert.match(await wrongMediaType.text(), /BOOK_CRAFT_PROXY_RESPONSE_INVALID/);
 
     console.log(JSON.stringify({
       status: "PASS",
       publicEndpoint: "/api/books/write/craft-genome",
-      successRequests: 1,
+      successfulProxyRequests: 1,
+      adaptiveBodyBufferRequired: true,
       streamedOversizeRequestsRejectedBeforeTransport: 2,
       invalidUtf8RequestsRejectedBeforeTransport: 1,
-      remoteValidationStatusPreserved: true,
+      remoteErrorBodiesParsed: false,
+      remoteStatusesNormalised: true,
+      remoteSuccessJsonContentTypeRequired: true,
+      ownerOrClientActorTypeRequired: true,
+      rawProxyErrorsExposed: false,
       authorityEscalationRejected: true,
       privateNoStoreHeaders: true,
       providerCalled: false,

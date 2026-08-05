@@ -19,7 +19,12 @@ const MAXIMUM_BODY_BYTES = 8 * 1024 * 1024;
 
 function privateResponse<T extends NextResponse>(response: T): T {
   response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  response.headers.set("CDN-Cache-Control", "no-store");
+  response.headers.set("Vercel-CDN-Cache-Control", "no-store");
+  response.headers.set("Surrogate-Control", "no-store");
   response.headers.set("Pragma", "no-cache");
+  response.headers.set("Vary", "Cookie");
+  response.headers.set("Cross-Origin-Resource-Policy", "same-origin");
   response.headers.set("Referrer-Policy", "no-referrer");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Robots-Tag", "noindex, nofollow");
@@ -86,7 +91,12 @@ export async function GET() {
       websiteLocalCraftExecutionAllowed: false,
       automaticRetryAllowed: false,
       localFallbackAllowed: false,
-      streamingBodyLimitsRequired: true
+      streamingBodyLimitsRequired: true,
+      adaptiveBodyBufferRequired: true,
+      remoteErrorBodiesParsed: false,
+      remoteSuccessJsonContentTypeRequired: true,
+      remoteOwnerOrClientActorRequired: true,
+      rawInternalErrorsExposed: false
     },
     boundary: "Website preserves the legacy API and CLI surface, but all deterministic craft compilation, provider-packet construction, provider-response validation and phrase-overlap execution now occur in Docs Suite. Website performs no local craft calculation, model call, canonical manuscript mutation, automatic admission or publication."
   }));
@@ -103,7 +113,7 @@ export async function POST(request: NextRequest) {
     });
     return privateResponse(apiOk(receipt.result, { requestId }));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown craft compatibility failure.";
+    const message = error instanceof Error ? error.message : "BOOK_CRAFT_OPERATION_FAILED";
     if (message === "BOOK_CRAFT_REQUEST_TOO_LARGE") {
       return privateResponse(apiFail({
         code: "BOOK_CRAFT_REQUEST_TOO_LARGE",
@@ -132,14 +142,12 @@ export async function POST(request: NextRequest) {
       }
       return privateResponse(apiFail({
         code: error.code,
-        message: "Craft operation failed closed at the Docs Suite compatibility boundary.",
-        details: { reason: error.message }
+        message: "Craft operation failed closed at the Docs Suite compatibility boundary."
       }, { status: error.status, requestId }));
     }
     return privateResponse(apiFail({
       code: "BOOK_CRAFT_OPERATION_FAILED",
-      message: "Craft operation failed.",
-      details: { reason: message }
+      message: "Craft operation failed."
     }, { status: 500, requestId }));
   }
 }

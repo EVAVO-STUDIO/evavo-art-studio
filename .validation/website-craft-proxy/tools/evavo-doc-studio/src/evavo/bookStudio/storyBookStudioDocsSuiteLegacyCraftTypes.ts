@@ -9,25 +9,10 @@ export type EvavoLegacyCraftOperation =
   | "scan_phrase_overlap";
 
 export type EvavoLegacyCraftPublicRequest =
-  | {
-      operation: "compile_profile";
-      compileInput: Record<string, unknown>;
-    }
-  | {
-      operation: "create_provider_packet";
-      compileInput: Record<string, unknown>;
-      packetInput: Record<string, unknown>;
-    }
-  | {
-      operation: "validate_provider_response";
-      compileInput: Record<string, unknown>;
-      packetInput: Record<string, unknown>;
-      providerResponse: Record<string, unknown>;
-    }
-  | {
-      operation: "scan_phrase_overlap";
-      scanInput: Record<string, unknown>;
-    };
+  | { operation: "compile_profile"; compileInput: Record<string, unknown> }
+  | { operation: "create_provider_packet"; compileInput: Record<string, unknown>; packetInput: Record<string, unknown> }
+  | { operation: "validate_provider_response"; compileInput: Record<string, unknown>; packetInput: Record<string, unknown>; providerResponse: Record<string, unknown> }
+  | { operation: "scan_phrase_overlap"; scanInput: Record<string, unknown> };
 
 export interface EvavoDocsSuiteLegacyCraftConfiguration {
   baseUrl: URL;
@@ -87,7 +72,7 @@ export interface EvavoDocsSuiteLegacyCraftCompatibilityResultV1 {
 export interface EvavoDocsSuiteLegacyCraftApiResponseV1 {
   ok: true;
   workspaceId: string;
-  actorType: string;
+  actorType: "owner" | "client";
   result: EvavoDocsSuiteLegacyCraftCompatibilityResultV1;
 }
 

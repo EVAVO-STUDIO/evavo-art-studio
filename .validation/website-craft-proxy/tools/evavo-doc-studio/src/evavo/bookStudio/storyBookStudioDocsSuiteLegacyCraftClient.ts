@@ -21,6 +21,8 @@ const MAXIMUM_TIMEOUT_MS = 300_000;
 const MAXIMUM_RESPONSE_BYTES = 8 * 1024 * 1024;
 const MAXIMUM_REQUEST_BYTES = 8 * 1024 * 1024;
 const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/;
+const DOCS_AUTOMATION_GRANT_TOKEN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+const DOCS_WORKSPACE_ID = /^[A-Za-z0-9_-]{3,160}$/;
 
 const RESPONSE_KEYS = ["ok", "workspaceId", "actorType", "result"].sort();
 const RESULT_KEYS = [
@@ -79,6 +81,14 @@ function exactKeys(value: Record<string, unknown>, expected: readonly string[]):
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
+function boundedExactString(value: unknown, maximumLength: number): value is string {
+  return typeof value === "string"
+    && value.length > 0
+    && value.length <= maximumLength
+    && value === value.trim()
+    && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
 function nonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -130,11 +140,10 @@ function validateResolvedConfiguration(
   const baseUrl = safeBaseUrl(configuration.baseUrl.href);
   if (
     !configuration.token
-    || configuration.token !== configuration.token.trim()
-    || configuration.token.length > 8192
-    || /[\u0000-\u001f\u007f]/.test(configuration.token)
+    || configuration.token.length > 4096
+    || !DOCS_AUTOMATION_GRANT_TOKEN.test(configuration.token)
   ) {
-    throw configurationError("A bounded unmodified control-character-free Docs Suite automation token is required for legacy craft compatibility.");
+    throw configurationError("A bounded two-part base64url Docs Suite automation-grant token is required for legacy craft compatibility.");
   }
   if (!/^[a-f0-9]{40,64}$/.test(configuration.websiteCommit)) {
     throw configurationError("The exact 40-64 character Website Git commit is required for legacy craft compatibility.");
@@ -163,12 +172,10 @@ export function resolveEvavoDocsSuiteLegacyCraftConfiguration(
     ?? environment.EVAVO_DOCS_SUITE_BOOK_WRITER_TOKEN
     ?? environment.EVAVO_DOCS_TOKEN
     ?? "";
-  const websiteCommit = (
-    environment.EVAVO_WEBSITE_COMMIT_SHA
+  const websiteCommit = environment.EVAVO_WEBSITE_COMMIT_SHA
     ?? environment.VERCEL_GIT_COMMIT_SHA
     ?? environment.GITHUB_SHA
-    ?? ""
-  ).trim().toLowerCase();
+    ?? "";
 
   return validateResolvedConfiguration({
     baseUrl: safeBaseUrl(url),
@@ -179,16 +186,21 @@ export function resolveEvavoDocsSuiteLegacyCraftConfiguration(
   });
 }
 
+function canonicalUtcTimestamp(value: string): boolean {
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
+}
+
 export function buildEvavoDocsSuiteLegacyCraftRequest(input: {
   requestId: string;
   requestedAt: string;
   payload: EvavoLegacyCraftPublicRequest;
   configuration: EvavoDocsSuiteLegacyCraftConfiguration;
 }): EvavoDocsSuiteLegacyCraftRequestV1 {
-  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(input.requestId) || Number.isNaN(Date.parse(input.requestedAt))) {
+  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(input.requestId) || !canonicalUtcTimestamp(input.requestedAt)) {
     throw new EvavoDocsSuiteLegacyCraftProxyError(
       "BOOK_CRAFT_PROXY_REQUEST_INVALID",
-      "Legacy craft request identity or timestamp is invalid.",
+      "Legacy craft request identity or canonical UTC timestamp is invalid.",
       400
     );
   }
@@ -212,7 +224,38 @@ export function buildEvavoDocsSuiteLegacyCraftRequest(input: {
   };
 }
 
+function isJsonContentType(value: string | null): boolean {
+  if (!value) return false;
+  const mediaType = value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  return mediaType.startsWith("application/")
+    && (mediaType === "application/json" || mediaType.endsWith("+json"));
+}
+
+function cancelRemoteResponseBody(response: Response): void {
+  if (!response.body) return;
+  try {
+    void response.body.cancel("legacy-craft-remote-status-rejected").catch(() => undefined);
+  } catch {
+    // The status-derived rejection remains authoritative if cancellation fails.
+  }
+}
+
+function remoteRejectionStatus(status: number): number {
+  if (status === 400 || status === 413) return status;
+  if (status === 429) return 503;
+  return 502;
+}
+
 async function readBoundedResponse(response: Response, maximumBytes: number): Promise<unknown> {
+  if (!isJsonContentType(response.headers.get("content-type"))) {
+    cancelRemoteResponseBody(response);
+    throw new EvavoDocsSuiteLegacyCraftProxyError(
+      "BOOK_CRAFT_PROXY_RESPONSE_INVALID",
+      "Docs Suite returned a successful legacy craft response without a JSON media type.",
+      502
+    );
+  }
+
   let source: string;
   try {
     source = await readEvavoBoundedUtf8Body({
@@ -329,10 +372,14 @@ function validateApiResponse(
       502
     );
   }
-  if (!nonEmptyString(value.workspaceId) || !nonEmptyString(value.actorType)) {
+  if (
+    !boundedExactString(value.workspaceId, 160)
+    || !DOCS_WORKSPACE_ID.test(value.workspaceId)
+    || (value.actorType !== "owner" && value.actorType !== "client")
+  ) {
     throw new EvavoDocsSuiteLegacyCraftProxyError(
       "BOOK_CRAFT_PROXY_RESPONSE_INVALID",
-      "Docs Suite legacy craft response omitted workspace or actor identity.",
+      "Docs Suite legacy craft response omitted a contract-valid workspace identity or owner/client actor type.",
       502
     );
   }
@@ -342,6 +389,14 @@ function validateApiResponse(
     actorType: value.actorType,
     result: validateCompatibilityResult(value.result, request)
   };
+}
+
+function timeoutError(message: string): EvavoDocsSuiteLegacyCraftProxyError {
+  return new EvavoDocsSuiteLegacyCraftProxyError(
+    "BOOK_CRAFT_PROXY_TIMEOUT",
+    message,
+    504
+  );
 }
 
 export async function requestEvavoDocsSuiteLegacyCraft(input: {
@@ -372,12 +427,17 @@ export async function requestEvavoDocsSuiteLegacyCraft(input: {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), configuration.timeoutMs);
   const url = new URL(EVAVO_DOCS_SUITE_LEGACY_CRAFT_ENDPOINT, configuration.baseUrl);
+  if (url.origin !== configuration.baseUrl.origin || url.pathname !== EVAVO_DOCS_SUITE_LEGACY_CRAFT_ENDPOINT) {
+    clearTimeout(timeout);
+    throw configurationError("Resolved Docs Suite legacy craft endpoint escaped its fixed origin or path.");
+  }
   const fetchImpl = input.fetchImpl ?? fetch;
   try {
     let response: Response;
     try {
       response = await fetchImpl(url, {
         method: "POST",
+        cache: "no-store",
         redirect: "error",
         signal: controller.signal,
         headers: {
@@ -388,12 +448,8 @@ export async function requestEvavoDocsSuiteLegacyCraft(input: {
         body: requestBody
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new EvavoDocsSuiteLegacyCraftProxyError(
-          "BOOK_CRAFT_PROXY_TIMEOUT",
-          "Docs Suite legacy craft request timed out and was not retried.",
-          504
-        );
+      if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+        throw timeoutError("Docs Suite legacy craft request timed out and was not retried.");
       }
       throw new EvavoDocsSuiteLegacyCraftProxyError(
         "BOOK_CRAFT_PROXY_NETWORK_FAILED",
@@ -402,25 +458,31 @@ export async function requestEvavoDocsSuiteLegacyCraft(input: {
       );
     }
 
+    if (controller.signal.aborted) {
+      cancelRemoteResponseBody(response);
+      throw timeoutError("Docs Suite legacy craft request timed out before response admission and was not retried.");
+    }
+
+    if (!response.ok) {
+      cancelRemoteResponseBody(response);
+      throw new EvavoDocsSuiteLegacyCraftProxyError(
+        "BOOK_CRAFT_PROXY_REMOTE_REJECTED",
+        `Docs Suite rejected legacy craft compatibility with status ${response.status}.`,
+        remoteRejectionStatus(response.status)
+      );
+    }
+
     let parsed: unknown;
     try {
       parsed = await readBoundedResponse(response, configuration.maximumResponseBytes);
     } catch (error) {
       if (controller.signal.aborted) {
-        throw new EvavoDocsSuiteLegacyCraftProxyError(
-          "BOOK_CRAFT_PROXY_TIMEOUT",
-          "Docs Suite legacy craft response timed out and was not retried.",
-          504
-        );
+        throw timeoutError("Docs Suite legacy craft response timed out and was not retried.");
       }
       throw error;
     }
-    if (!response.ok) {
-      throw new EvavoDocsSuiteLegacyCraftProxyError(
-        "BOOK_CRAFT_PROXY_REMOTE_REJECTED",
-        `Docs Suite rejected legacy craft compatibility with status ${response.status}.`,
-        response.status >= 500 ? 502 : response.status
-      );
+    if (controller.signal.aborted) {
+      throw timeoutError("Docs Suite legacy craft response exceeded its complete-body deadline and was not retried.");
     }
 
     const validated = validateApiResponse(parsed, request);

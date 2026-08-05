@@ -20,10 +20,14 @@
   },
   "include": [
     "tools/evavo-doc-studio/src/evavo/api/apiResponse.ts",
-    "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraft*.ts",
+    "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftTypes.ts",
+    "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftContracts.ts",
+    "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftShared.ts",
+    "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftStream.ts",
+    "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraftClient.ts",
     "tools/evavo-doc-studio/src/app/api/books/write/craft-genome/route.ts",
+    "tools/evavo-doc-studio/scripts/check-book-studio-craft-stream.ts",
     "tools/evavo-doc-studio/scripts/check-book-studio-craft-provider-contract.ts",
-    "tools/evavo-doc-studio/scripts/check-book-studio-craft-proxy-route.ts",
-    "tools/evavo-doc-studio/test/website-craft-proxy-route.test.ts"
+    "tools/evavo-doc-studio/scripts/check-book-studio-craft-proxy-route.ts"
   ]
 }
