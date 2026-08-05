@@ -1,0 +1,42 @@
+name: Probe Docs cross-repository access
+
+on:
+  push:
+    branches:
+      - validation/docs-cross-repo-publish-probe-20260805
+    paths:
+      - ".github/workflows/probe-docs-cross-repo-access.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: probe-docs-cross-repository-access-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Probe read-only sibling repository access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          if output="$(git \
+            -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
+            ls-remote --exit-code \
+            https://github.com/EVAVO-STUDIO/evavo-docs-suite.git \
+            refs/heads/main 2>"$RUNNER_TEMP/docs-access-error.log")"; then
+            test "$(printf '%s\n' "$output" | awk '{print $2}')" = "refs/heads/main"
+            sha="$(printf '%s\n' "$output" | awk '{print $1}')"
+            test "${#sha}" = "40"
+            printf 'Docs sibling read access: PASS (%s)\n' "$sha"
+          else
+            printf 'Docs sibling read access: UNAVAILABLE\n' >&2
+            exit 1
+          fi
