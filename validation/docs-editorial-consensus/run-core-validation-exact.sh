@@ -32,20 +32,20 @@ assemble_exact_blob 1fec55714b98e852d457a575691ae218af8b75a8 "$MIRROR/src/book-s
 
 review_type_parts=("$ROOT"/validation/docs-editorial-consensus/dependencies/book-studio-review-craft-types.ts.part-*)
 narrative_type_parts=("$ROOT"/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-types.ts.part-*)
-assemble_exact_blob 51ca369a41a63c52613a97e82c4024b8bd05f7f3 "$MIRROR/src/book-studio-review-craft-types.ts" "${review_type_parts[@]}"
-assemble_exact_blob 39b770a724610b9cf33fbe772b6ed9bf8df05075 "$MIRROR/src/book-studio-narrative-craft-types.ts" "${narrative_type_parts[@]}"
-assemble_exact_blob 77a2d6f1c20769675f8aa2c2daee749a999cf8ba "$MIRROR/src/book-studio-narrative-craft-evaluate-main.ts" "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-main.ts"
-assemble_exact_blob 60b39017475ab7666b5cc2201fab890fd6009ce7 "$MIRROR/src/book-studio-narrative-craft-evaluate-evidence.ts" "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-evidence.ts"
+assemble_exact_blob b06db6a2cd5f458fef6bcf3a4a950b905d490f2c "$MIRROR/src/book-studio-review-craft-types.ts" "${review_type_parts[@]}"
+assemble_exact_blob db0f8a7d3326a5e83fd000235ea99e69a25c6f04 "$MIRROR/src/book-studio-narrative-craft-types.ts" "${narrative_type_parts[@]}"
+assemble_exact_blob 9a939f326578ab749b9abf635b6c98d035ca6478 "$MIRROR/src/book-studio-narrative-craft-evaluate-main.ts" "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-main.ts"
+assemble_exact_blob 5aab79209fcb1c6945d5b9040a1ed589a7558dfe "$MIRROR/src/book-studio-narrative-craft-evaluate-evidence.ts" "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-evidence.ts"
 '''
 if old not in source:
     raise SystemExit("Expected direct-file assembly block was not found.")
 source = source.replace(old, new)
 marker = '''check_blob src/book-studio-phrase-overlap-integrity.ts 1fec55714b98e852d457a575691ae218af8b75a8
 '''
-checks = marker + '''check_blob src/book-studio-review-craft-types.ts 51ca369a41a63c52613a97e82c4024b8bd05f7f3
-check_blob src/book-studio-narrative-craft-types.ts 39b770a724610b9cf33fbe772b6ed9bf8df05075
-check_blob src/book-studio-narrative-craft-evaluate-main.ts 77a2d6f1c20769675f8aa2c2daee749a999cf8ba
-check_blob src/book-studio-narrative-craft-evaluate-evidence.ts 60b39017475ab7666b5cc2201fab890fd6009ce7
+checks = marker + '''check_blob src/book-studio-review-craft-types.ts b06db6a2cd5f458fef6bcf3a4a950b905d490f2c
+check_blob src/book-studio-narrative-craft-types.ts db0f8a7d3326a5e83fd000235ea99e69a25c6f04
+check_blob src/book-studio-narrative-craft-evaluate-main.ts 9a939f326578ab749b9abf635b6c98d035ca6478
+check_blob src/book-studio-narrative-craft-evaluate-evidence.ts 5aab79209fcb1c6945d5b9040a1ed589a7558dfe
 '''
 if marker not in source:
     raise SystemExit("Expected phrase-overlap blob check was not found.")
