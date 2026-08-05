@@ -64,6 +64,9 @@ requireTokens("source", source.source ?? "", [
   "reviewArtBatchDirectory",
   "analyseSpriteSequenceManifestFile",
   "gameOwnedRoleRequired: true",
+  "exactRelativePathSelection: true",
+  "deterministicSelectionIdentity: true",
+  "relativePaths",
   "writesEnabled: false",
   "providerExecutionAllowed: false",
   "runtimeJobSubmissionAllowed: false",
@@ -81,6 +84,9 @@ requireTokens("batch-source", batchSource, [
   "evavo_brass_art_batch_review_v1",
   "reviewArtBatchDirectory",
   "stableFileBytes",
+  "portableSelectedPath",
+  "selectImageFiles",
+  "relativePaths",
   "roleId",
   "game-owned media role",
   "maximumFiles",
@@ -88,8 +94,12 @@ requireTokens("batch-source", batchSource, [
   "maximumTotalBytes",
   "ART_BATCH_SYMLINK_ENTRY",
   "ART_BATCH_PORTABLE_COLLISION",
+  "ART_BATCH_SELECTION_DUPLICATE",
+  "ART_BATCH_SELECTION_NONCANONICAL",
   "ART_BATCH_FILE_CHANGED",
   "handle.readFile()",
+  "exact-relative-paths",
+  "selectionSha256",
   "exactSource",
   "decodedPixels",
   'scope: "complete-reviewed-batch"',
@@ -135,6 +145,8 @@ requireTokens("tests", testSource, [
   'test("review roots are explicit, canonical and duplicate-free"',
   'test("review profile exposes exactly seven non-writing tools"',
   'test("batch review analyses complete stable bytes and groups duplicates"',
+  'test("exact selected paths partition one immutable mixed RAW_ART corpus"',
+  'test("selected paths fail closed on traversal, unsupported formats and portable duplicates"',
   'test("batch review retains exact source identity for decode failures"',
   'test("batch review fails closed on role, file limits and symbolic links"',
   'test("review source registers only the governed inspection and planning inventory"',
@@ -149,6 +161,10 @@ requireTokens("docs", source.docs ?? "", [
   "inspect_art_batch_quality",
   "evavo_brass_art_batch_review_v1",
   "roleId",
+  "relativePaths",
+  "exact-relative-paths",
+  "selectionSha256",
+  "immutable mixed corpus",
   "complete reviewed batch",
   "exact source-byte duplicates",
   "decoded-pixel duplicates",
@@ -215,7 +231,8 @@ if (errors.length > 0) {
 
 console.log("Brass art review MCP contract passed.");
 console.log("- exactly seven inspection and planning tools remain exposed");
-console.log("- batch review binds one game-owned role, descriptor-stable bytes and complete-batch duplicate evidence");
+console.log("- batch review binds one game-owned role, descriptor-stable bytes and complete duplicate evidence");
+console.log("- immutable mixed corpora support exact canonical relative-path selections and deterministic identities");
 console.log("- explicit canonical review roots are mandatory");
 console.log("- provider, runtime, artifact, target and publication writes remain absent");
 console.log("- build and behavioral tests remain part of the repository check chain");
