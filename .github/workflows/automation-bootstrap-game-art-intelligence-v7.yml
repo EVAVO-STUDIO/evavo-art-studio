@@ -217,9 +217,15 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Install dependencies review-first
+      - name: Install FFmpeg and dependencies review-first
         shell: bash
-        run: bash /tmp/game-art-step-05.sh
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+          bash /tmp/game-art-step-05.sh
 
       - name: Validate focused sprite and Game Art implementation
         shell: bash
