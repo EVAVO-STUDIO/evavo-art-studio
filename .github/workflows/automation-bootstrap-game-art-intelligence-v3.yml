@@ -14,7 +14,7 @@ concurrency:
 jobs:
   publish-source-without-workflow:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 60
     env:
       EXPECTED_MAIN_SHA: 308a368263f74d7bafca6f11abcd982a1f213759
       TARGET_BRANCH: agent/game-art-intelligence-current-main-20260805
@@ -39,7 +39,9 @@ jobs:
             test "${chunks[$index]}" = "$expected"
           done
           : > /tmp/game-art-intelligence.patch.gz.b64
-          for chunk in "${chunks[@]}"; do cat "$PAYLOAD_ROOT/$chunk" >> /tmp/game-art-intelligence.patch.gz.b64; done
+          for chunk in "${chunks[@]}"; do
+            cat "$PAYLOAD_ROOT/$chunk" >> /tmp/game-art-intelligence.patch.gz.b64
+          done
           base64 --decode /tmp/game-art-intelligence.patch.gz.b64 > /tmp/game-art-intelligence.patch.gz
           printf '%s  %s\n' "$ARCHIVE_SHA256" /tmp/game-art-intelligence.patch.gz | sha256sum -c -
           gzip --decompress --stdout /tmp/game-art-intelligence.patch.gz > /tmp/game-art-intelligence.patch
@@ -65,7 +67,7 @@ jobs:
             for path in $(git diff --name-only --diff-filter=U); do
               echo "--- $path"
               git checkout --conflict=merge -- "$path" || true
-              sed -n '1,300p' "$path" || true
+              sed -n '1,320p' "$path" || true
             done
             echo "::endgroup::"
             exit 1
@@ -98,15 +100,15 @@ jobs:
           diff -u /tmp/expected-full-paths.txt /tmp/full-paths.txt
           cp .github/workflows/game-art-intelligence.yml /tmp/game-art-intelligence.yml
 
-      - name: Preserve strict optional merge semantics
+      - name: Apply strict current-main compatibility repairs
         shell: bash
         run: |
           set -euo pipefail
           python <<'PY'
           from pathlib import Path
 
-          path = Path("packages/game-art-intelligence/src/compiler.ts")
-          lines = path.read_text(encoding="utf-8").splitlines()
+          compiler = Path("packages/game-art-intelligence/src/compiler.ts")
+          lines = compiler.read_text(encoding="utf-8").splitlines()
 
           selected_matches = [
               index
@@ -241,15 +243,65 @@ jobs:
           ):
               replace_top_level_merge(symbol)
 
-          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          source = "\n".join(lines) + "\n"
+          old_message = '"Compiled profile body does not match profileSha256."'
+          new_message = '"Compiled profile body hash does not match profileSha256."'
+          if source.count(old_message) != 1:
+              raise SystemExit("expected one profile hash-mismatch message")
+          source = source.replace(old_message, new_message)
+          compiler.write_text(source, encoding="utf-8")
+
+          geometry = Path("packages/game-art-intelligence/src/geometry-palette.ts")
+          geometry_source = geometry.read_text(encoding="utf-8")
+          old_guard = (
+              '  if (input.projection === "isometric-2:1" && '
+              'input.directionMode !== "eight-way") {'
+          )
+          new_guard = (
+              '  if (\n'
+              '    input.projection === "isometric-2:1" &&\n'
+              '    input.directionMode !== "none" &&\n'
+              '    input.directionMode !== "eight-way"\n'
+              '  ) {'
+          )
+          if geometry_source.count(old_guard) != 1:
+              raise SystemExit("expected one isometric direction-mode guard")
+          geometry.write_text(
+              geometry_source.replace(old_guard, new_guard),
+              encoding="utf-8",
+          )
+
+          tests = Path(
+              "packages/game-art-intelligence/test/game-art-intelligence.test.mjs"
+          )
+          test_source = tests.read_text(encoding="utf-8")
+          hero_assertion = "  assert.equal(hero.directionGeometry.length, 8);"
+          extra_assertions = """  assert.equal(hero.directionGeometry.length, 8);
+          const floor = first.assets.find((entry) => entry.assetId === "floor-stone");
+          assert.equal(floor?.directionGeometry.length, 1);
+          const smoke = first.assets.find((entry) => entry.assetId === "muzzle-smoke");
+          assert.equal(smoke?.directionGeometry.length, 1);"""
+          if test_source.count(hero_assertion) != 1:
+              raise SystemExit("expected one hero direction assertion")
+          tests.write_text(
+              test_source.replace(hero_assertion, extra_assertions),
+              encoding="utf-8",
+          )
           PY
-          git add packages/game-art-intelligence/src/compiler.ts
+          git add \
+            packages/game-art-intelligence/src/compiler.ts \
+            packages/game-art-intelligence/src/geometry-palette.ts \
+            packages/game-art-intelligence/test/game-art-intelligence.test.mjs
           git commit --amend --no-edit
           test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
           git diff --check HEAD^ HEAD
           node --check scripts/check-game-art-intelligence.mjs
           node scripts/check-game-art-intelligence.mjs
-          sha256sum packages/game-art-intelligence/src/compiler.ts > /tmp/compiler-source-sha256.txt
+          sha256sum \
+            packages/game-art-intelligence/src/compiler.ts \
+            packages/game-art-intelligence/src/geometry-palette.ts \
+            packages/game-art-intelligence/test/game-art-intelligence.test.mjs \
+            > /tmp/compatibility-source-sha256.txt
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
       - name: Set up pnpm 10.13.1
@@ -263,13 +315,18 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Validate exact dependency graph and focused implementation
+      - name: Install dependencies review-first
         shell: bash
         run: |
           set -euo pipefail
           node scripts/check-repository-toolchain.mjs
           node scripts/test-repository-toolchain.mjs
           pnpm install --no-frozen-lockfile
+
+      - name: Validate focused Game Art Intelligence implementation
+        shell: bash
+        run: |
+          set -euo pipefail
           pnpm run build:domain
           pnpm --filter @evavo/art-game-intelligence build
           pnpm --filter @evavo/art-game-intelligence typecheck
@@ -277,6 +334,13 @@ jobs:
           pnpm --filter @evavo/art-studio-mcp build
           pnpm --filter @evavo/art-studio-mcp typecheck
           node --test apps/mcp/test/game-art-intelligence-mcp.test.mjs
+          node scripts/check-game-art-intelligence.mjs
+
+      - name: Validate complete repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check
           node scripts/check-game-art-intelligence.mjs
           rm -f pnpm-lock.yaml
           git diff --exit-code
@@ -322,10 +386,6 @@ jobs:
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-          const [compilerSha256] = fs
-            .readFileSync('/tmp/compiler-source-sha256.txt', 'utf8')
-            .trim()
-            .split(/\s+/);
           const receipt = {
             schemaVersion: '1.0',
             receiptType: 'evavo-game-art-intelligence-current-main-bootstrap',
@@ -337,12 +397,19 @@ jobs:
             archiveSha256: process.env.ARCHIVE_SHA256,
             patchSha256: process.env.PATCH_SHA256,
             strictOptionalCompatibilityRepair: true,
-            compilerSourceSha256: compilerSha256,
+            nonDirectionalIsometricAssetsSupported: true,
+            directionalIsometricAssetsRequireEightWay: true,
+            profileHashMismatchMessageClarified: true,
+            compatibilitySourceSha256: fs
+              .readFileSync('/tmp/compatibility-source-sha256.txt', 'utf8')
+              .trim()
+              .split('\n'),
             publishedPaths: fs
               .readFileSync('/tmp/published-paths.txt', 'utf8')
               .trim()
               .split('\n'),
             focusedValidationPassed: true,
+            completeRepositoryCheckPassed: true,
             permanentCheckerPassed: true,
             permanentWorkflowDeferredToWorkflowWriter: true,
             providerCalled: false,
