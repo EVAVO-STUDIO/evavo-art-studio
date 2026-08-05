@@ -112,3 +112,5 @@ jobs:
         if: success()
         shell: bash
         run: git push origin --delete "$GITHUB_REF_NAME" || echo "::warning::bootstrap cleanup deferred"
+
+# Triggered after exact carrier-tree construction.
