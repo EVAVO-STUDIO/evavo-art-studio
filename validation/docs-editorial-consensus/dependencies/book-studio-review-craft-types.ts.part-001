@@ -1,0 +1,158 @@
+
+export interface BookReviewCoverageItemV1 {
+  coverageId: string;
+  domain: BookReviewDomain;
+  unitId: string;
+  anchorIds: string[];
+  reviewerProvider: BookProviderId | "human";
+  reviewerModel: string;
+  reviewerProducerId: string;
+  passId: string;
+  manuscriptSha256: string;
+  evidenceIds: string[];
+  findingIds: string[];
+  checkedAgainstUnitIds: string[];
+  fullTextRead: boolean;
+  independentlyChecked: boolean;
+  persisted: boolean;
+  stale: boolean;
+}
+
+export interface BookReviewFindingV1 {
+  findingId: string;
+  domain: BookReviewDomain;
+  unitIds: string[];
+  severity: "info" | "minor" | "major" | "critical";
+  status: "open" | "resolved" | "waived";
+  summary: string;
+  evidenceIds: string[];
+  resolutionEvidenceIds: string[];
+  waivedBy?: string;
+  waivedAt?: string;
+}
+
+export interface BookReviewCoverageStateInputV1 {
+  outputKind: "evavo_docs_book_review_coverage_input";
+  schemaVersion: 1;
+  reviewId: string;
+  programmeId: string;
+  manuscriptRevisionId: string;
+  manuscriptSha256: string;
+  canonicalUnitIds: string[];
+  policy: BookReviewPolicyV1;
+  coverage: BookReviewCoverageItemV1[];
+  findings: BookReviewFindingV1[];
+  requiredRereadUnitIds: string[];
+  requiredIndependentReviewIds: string[];
+  completedIndependentReviewIds: string[];
+  checkpointId: string;
+  evidenceIds: string[];
+}
+
+export interface BookReviewCoverageStateV1 {
+  outputKind: "evavo_docs_book_review_coverage_state";
+  schemaVersion: 1;
+  contract: typeof BOOK_REVIEW_CRAFT_CONTRACT;
+  authorityMode: "shadow_migration";
+  reviewId: string;
+  programmeId: string;
+  manuscriptRevisionId: string;
+  manuscriptSha256: string;
+  canonicalUnitIds: string[];
+  policy: BookReviewPolicyV1;
+  coverage: BookReviewCoverageItemV1[];
+  findings: BookReviewFindingV1[];
+  requiredRereadUnitIds: string[];
+  requiredIndependentReviewIds: string[];
+  completedIndependentReviewIds: string[];
+  checkpointId: string;
+  evidenceIds: string[];
+  reviewStateFingerprint: string;
+  canonicalAdmissionAllowed: false;
+  canonicalManuscriptMutationPerformed: false;
+  websiteCompatibilityRuntimeStillAuthoritative: true;
+  dualAuthoritativeWritesAllowed: false;
+  runtimeCutoverApproved: false;
+  publicationPerformed: false;
+}
+
+export interface BookReviewCoverageResultV1 {
+  outputKind: "evavo_docs_book_review_coverage_result";
+  schemaVersion: 1;
+  status: "ready" | "needs_work" | "blocked";
+  reviewState?: BookReviewCoverageStateV1;
+  blockers: string[];
+  requiredActions: string[];
+  missingBaselineDomains: BookReviewDomain[];
+  uncoveredUnitDomainPairs: string[];
+  highRiskPairsWithoutIndependentReview: string[];
+  staleCoverageIds: string[];
+  unresolvedFindingIds: string[];
+  reviewStateFingerprint?: string;
+  canonicalAdmissionAllowed: false;
+  publicationPerformed: false;
+}
+
+export interface BookReviewCraftAdmissionInputV1 {
+  outputKind: "evavo_docs_book_review_craft_admission_input";
+  schemaVersion: 1;
+  authoringAdmissionFingerprint: string;
+  authoringAdmissionStatus: "ready_for_website_compare_and_swap" | "needs_work" | "blocked";
+  craftProfile: BookCraftProfileV1;
+  phraseOverlapScan: BookPhraseOverlapScanV1;
+  reviewCoverage: BookReviewCoverageStateV1;
+  candidateTextSha256: string;
+  manuscriptSha256Before: string;
+  proposedManuscriptSha256After: string;
+  evidenceIds: string[];
+}
+
+export interface BookReviewCraftAdmissionResultV1 {
+  outputKind: "evavo_docs_book_review_craft_admission_result";
+  schemaVersion: 1;
+  status: "ready_for_website_compare_and_swap" | "needs_work" | "blocked";
+  blockers: string[];
+  requiredActions: string[];
+  admissionFingerprint: string;
+  websiteCompatibilityWriterRequired: true;
+  docsSuiteCanonicalWriterEnabled: false;
+  canonicalAdmissionAllowed: false;
+  canonicalManuscriptMutationPerformed: false;
+  runtimeCutoverApproved: false;
+  publicationPerformed: false;
+}
+
+export interface LegacyWebsiteBookReviewCraftImportInputV1 {
+  outputKind: "evavo_legacy_website_book_review_craft_import_input";
+  schemaVersion: 1;
+  sourceRepository: "EVAVO-STUDIO/Website";
+  sourceCommit: string;
+  sourcePath: string;
+  sourceBlobSha1: string;
+  sourceRecord: unknown;
+  sourceRecordSha256: string;
+  importedAt: string;
+  importedBy: string;
+  craftProfile: BookCraftProfileV1;
+  phraseOverlapScan: BookPhraseOverlapScanV1;
+  reviewCoverage: BookReviewCoverageStateV1;
+}
+
+export interface LegacyWebsiteBookReviewCraftImportResultV1 {
+  outputKind: "evavo_legacy_website_book_review_craft_import_result";
+  schemaVersion: 1;
+  status: "ready_for_shadow_import" | "needs_resolution" | "blocked";
+  blockers: string[];
+  requiredActions: string[];
+  sourceRecordSha256: string;
+  craftProfileFingerprint?: string;
+  phraseOverlapScanFingerprint?: string;
+  reviewStateFingerprint?: string;
+  importFingerprint: string;
+  statePersisted: false;
+  authoritativeWritesPerformed: false;
+  websiteCompatibilityRuntimeStillAuthoritative: true;
+  runtimeCutoverApproved: false;
+  sourceDeletionApproved: false;
+  publicationPerformed: false;
+}
