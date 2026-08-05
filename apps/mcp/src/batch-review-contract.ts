@@ -49,6 +49,7 @@ export interface ArtBatchReviewInput {
   readonly roleId: string;
   readonly allowedRoots: readonly string[];
   readonly expectations: SpriteFrameQualityExpectations | unknown;
+  readonly relativePaths?: readonly string[];
   readonly recursive?: boolean;
   readonly maximumFiles?: number;
   readonly maximumDepth?: number;
@@ -104,6 +105,48 @@ export function portableRelative(root: string, value: string): string {
     );
   }
   return relative;
+}
+
+export function portableSelectedPath(value: unknown, index: number): string {
+  if (typeof value !== "string") {
+    throw new ArtBatchReviewError(
+      "ART_BATCH_SELECTION_PATH_INVALID",
+      `relativePaths[${index}] must be a string.`,
+    );
+  }
+  const candidate = value.normalize("NFC").trim();
+  const normalized = path.posix.normalize(candidate);
+  const parts = candidate.split("/");
+  if (
+    !candidate ||
+    candidate !== value ||
+    candidate !== normalized ||
+    candidate.startsWith("/") ||
+    /^[A-Za-z]:/u.test(candidate) ||
+    candidate.includes("\\") ||
+    /[\u0000-\u001f\u007f]/u.test(candidate) ||
+    parts.some(
+      (part) =>
+        !part ||
+        part === "." ||
+        part === ".." ||
+        part.endsWith(".") ||
+        part.endsWith(" "),
+    )
+  ) {
+    throw new ArtBatchReviewError(
+      "ART_BATCH_SELECTION_PATH_INVALID",
+      `relativePaths[${index}] must be one canonical portable repository-relative path.`,
+    );
+  }
+  const extension = path.posix.extname(candidate).toLocaleLowerCase("en-US");
+  if (!IMAGE_EXTENSIONS.has(extension)) {
+    throw new ArtBatchReviewError(
+      "ART_BATCH_SELECTION_FORMAT_UNSUPPORTED",
+      `relativePaths[${index}] is not a supported image file: ${candidate}`,
+    );
+  }
+  return candidate;
 }
 
 export function boundedInteger(
@@ -164,4 +207,3 @@ export function canonicalJsonValue(value: unknown): unknown {
 export function sha256(value: Buffer | string): string {
   return createHash("sha256").update(value).digest("hex");
 }
-
