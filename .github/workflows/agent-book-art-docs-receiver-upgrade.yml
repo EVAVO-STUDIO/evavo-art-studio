@@ -123,6 +123,14 @@ jobs:
           set -euo pipefail
           rm -f pnpm-lock.yaml
           git diff --check
+
+          echo "Transient handoff-workflow state before isolation:"
+          git status --short -- .github/workflows/book-studio-production-handoff.yml
+          git diff -- .github/workflows/book-studio-production-handoff.yml || true
+          git diff --cached -- .github/workflows/book-studio-production-handoff.yml || true
+          git restore --source=HEAD --staged --worktree .github/workflows/book-studio-production-handoff.yml
+          test -z "$(git status --porcelain=v1 -- .github/workflows/book-studio-production-handoff.yml)"
+
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
           git add \
