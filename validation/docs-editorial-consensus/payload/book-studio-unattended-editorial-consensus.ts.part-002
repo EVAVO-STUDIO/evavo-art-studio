@@ -1,0 +1,250 @@
+  return programmeResult(unattendedProduction, programme, [], warnings);
+}
+
+export async function evaluateBookUnattendedEditorialConsensus(
+  input: unknown,
+): Promise<BookUnattendedEditorialConsensusEvaluationResultV1> {
+  const blockers: string[] = [];
+  const source = strictRecord(input, EVALUATION_INPUT_KEYS, "Editorial consensus evaluation input", blockers);
+  literal(source.outputKind, "evavo_docs_book_unattended_editorial_consensus_evaluation_input", "Evaluation input outputKind is invalid.", blockers);
+  literal(source.schemaVersion, 1, "Evaluation input schemaVersion must be 1.", blockers);
+  literal(source.contract, BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT, "Evaluation input contract is invalid.", blockers);
+
+  const programme =
+    source.programme
+    && typeof source.programme === "object"
+    && !Array.isArray(source.programme)
+      ? source.programme as BookUnattendedEditorialConsensusProgrammeV1
+      : undefined;
+  if (!programme) {
+    blockers.push("Editorial consensus evaluation requires a programme object.");
+    return evaluationBlocked(blockers, 0);
+  }
+  blockers.push(...await validateBookUnattendedEditorialConsensusProgramme(programme));
+  if (blockers.length) return evaluationBlocked(blockers, 0);
+  const executionValues = array(
+    source.reviewerExecutions,
+    "reviewerExecutions",
+    blockers,
+    programme.minimumIndependentReviewers,
+    8,
+  );
+  const reviewerExecutions: BookUnattendedEditorialReviewerExecutionV1[] = [];
+  for (let index = 0; index < executionValues.length; index += 1) {
+    const parsed = await parseReviewerExecution(
+      executionValues[index],
+      index,
+      programme,
+      blockers,
+    );
+    if (parsed) reviewerExecutions.push(parsed);
+  }
+  reviewerExecutions.sort((left, right) => left.assignmentId.localeCompare(right.assignmentId));
+
+  const assignmentIds = programme.reviewerAssignments.map((item) => item.assignmentId).sort();
+  const executionIds = reviewerExecutions.map((item) => item.assignmentId).sort();
+  if (!sameSet(assignmentIds, executionIds)) {
+    blockers.push("reviewerExecutions must cover the exact reviewer assignment set.");
+  }
+  if (duplicates(reviewerExecutions.map((item) => item.executionFingerprint)).length) {
+    blockers.push("Reviewer execution fingerprints are duplicated.");
+  }
+  if (blockers.length) return evaluationBlocked(blockers, reviewerExecutions.length);
+
+  const receipts = reviewerExecutions.flatMap((execution) => execution.payload.receipts);
+  const criterionEvidence = buildCriterionEvidence(
+    programme.narrativeCraftPacket.qualityRubric.map((item) => item.criterionId),
+    receipts,
+  );
+  const narrativeResult = await evaluateBookNarrativeCraftEvidence({
+    outputKind: "evavo_docs_book_narrative_craft_evaluation_input",
+    schemaVersion: 1,
+    packet: programme.narrativeCraftPacket,
+    candidateId: programme.candidateId,
+    candidateProducerId: programme.candidateProducerId,
+    candidateTextSha256: programme.candidateTextSha256,
+    criterionEvidence,
+    phraseOverlapScan: programme.phraseOverlapScan,
+    unresolvedFindingIds: programme.unresolvedFindingIds,
+    evidenceIds: unique([
+      ...programme.evaluationEvidenceIds,
+      ...programme.candidateEvidenceIds,
+      ...reviewerExecutions.map((item) => item.executionFingerprint),
+      ...reviewerExecutions.map((item) => item.payload.payloadFingerprint),
+    ]).sort(),
+  });
+  if (narrativeResult.status === "blocked" || !narrativeResult.evaluation) {
+    return evaluationBlocked(
+      narrativeResult.blockers.map((item) => `Narrative evaluation: ${item}`),
+      reviewerExecutions.length,
+      narrativeResult.requiredActions,
+    );
+  }
+
+  const reviewerPass = new Map<string, boolean>();
+  for (const assignment of programme.reviewerAssignments) {
+    const execution = reviewerExecutions.find((item) => item.assignmentId === assignment.assignmentId)!;
+    reviewerPass.set(
+      assignment.reviewerProducerId,
+      execution.payload.receipts.every((receipt) => receipt.decision === "pass"),
+    );
+  }
+  const passingReviewerProducerIds = [...reviewerPass.entries()]
+    .filter(([, passed]) => passed)
+    .map(([reviewer]) => reviewer)
+    .sort();
+  const dissentingReviewerProducerIds = [...reviewerPass.entries()]
+    .filter(([, passed]) => !passed)
+    .map(([reviewer]) => reviewer)
+    .sort();
+  const consensusBasisPoints = Math.floor(
+    passingReviewerProducerIds.length * 10_000 / Math.max(programme.reviewerAssignments.length, 1),
+  );
+  const consensusReached =
+    passingReviewerProducerIds.length >= programme.minimumIndependentReviewers
+    && consensusBasisPoints >= programme.minimumConsensusBasisPoints;
+  const minorityFindingIds = unique(reviewerExecutions.flatMap((execution) => [
+    ...execution.payload.minorityFindingIds,
+    ...(reviewerPass.get(execution.payload.reviewerProducerId)
+      ? []
+      : execution.payload.receipts.flatMap((receipt) => receipt.findingIds)),
+  ])).sort();
+  const requiredActions = unique([
+    ...narrativeResult.requiredActions,
+    ...(consensusReached
+      ? []
+      : [
+          `Reach at least ${programme.minimumConsensusBasisPoints} text-consensus basis points with ${programme.minimumIndependentReviewers} independent passing reviewers.`,
+        ]),
+    ...(minorityFindingIds.length
+      ? [`Preserve and adjudicate minority findings: ${minorityFindingIds.join(", ")}.`]
+      : []),
+  ]).sort();
+  const status: BookUnattendedEditorialConsensusEvaluationV1["status"] =
+    narrativeResult.status === "ready_for_review" && consensusReached
+      ? "ready_for_governed_admission"
+      : "needs_work";
+
+  const unsigned: Omit<BookUnattendedEditorialConsensusEvaluationV1, "evaluationFingerprint"> = {
+    outputKind: "evavo_docs_book_unattended_editorial_consensus_evaluation",
+    schemaVersion: 1,
+    contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+    status,
+    programmeFingerprint: programme.programmeFingerprint,
+    narrativeEvaluation: narrativeResult.evaluation,
+    reviewerExecutionFingerprints: reviewerExecutions.map((item) => item.executionFingerprint).sort(),
+    passingReviewerProducerIds,
+    dissentingReviewerProducerIds,
+    minorityFindingIds,
+    consensusBasisPoints,
+    minimumConsensusBasisPoints: programme.minimumConsensusBasisPoints,
+    consensusReached,
+    requiredActions,
+    providerCallsPerformed: reviewerExecutions.length,
+    providerFallbackAllowed: false,
+    authoritativeBookStateWritePerformed: false,
+    canonicalManuscriptMutationPerformed: false,
+    automaticCanonicalAdmissionAllowed: false,
+    artStudioCalled: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  };
+  const evaluation: BookUnattendedEditorialConsensusEvaluationV1 = {
+    ...unsigned,
+    evaluationFingerprint: await sha256BookText(canonicalBookJson(unsigned)),
+  };
+  return {
+    outputKind: "evavo_docs_book_unattended_editorial_consensus_evaluation_result",
+    schemaVersion: 1,
+    status,
+    evaluation,
+    blockers: [],
+    requiredActions,
+    providerCallsPerformed: reviewerExecutions.length,
+    providerFallbackAllowed: false,
+    canonicalManuscriptMutationPerformed: false,
+    automaticCanonicalAdmissionAllowed: false,
+    publicationPerformed: false,
+  };
+}
+
+export async function validateBookUnattendedEditorialConsensusProgramme(
+  value: unknown,
+): Promise<string[]> {
+  const blockers: string[] = [];
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return ["Editorial consensus programme must be an object."];
+  }
+  const source = value as BookUnattendedEditorialConsensusProgrammeV1;
+  if (
+    source.outputKind !== "evavo_docs_book_unattended_editorial_consensus_programme"
+    || source.schemaVersion !== 1
+    || source.contract !== BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT
+    || source.status !== "ready"
+  ) blockers.push("Editorial consensus programme identity is invalid.");
+  for (const key of [
+    "providerCallPerformed", "providerFallbackAllowed",
+    "authoritativeBookStateWritePerformed", "canonicalManuscriptMutationPerformed",
+    "automaticCanonicalAdmissionAllowed", "artStudioCalled", "runtimeCutoverApproved",
+    "publicationPerformed",
+  ] as const) if (source[key] !== false) blockers.push(`Editorial consensus programme ${key} must remain false.`);
+  if (
+    source.providerCallAllowed !== true
+    || source.oneProviderAttemptPerReviewerRequired !== true
+    || source.blindIndependentReviewRequired !== true
+    || source.dissentPreservationRequired !== true
+  ) blockers.push("Editorial consensus programme execution guarantees are invalid.");
+  if (!SHA256.test(source.programmeFingerprint ?? "")) {
+    blockers.push("Editorial consensus programme fingerprint is invalid.");
+    return unique(blockers);
+  }
+  const { programmeFingerprint: _discarded, ...unsigned } = source;
+  if (source.programmeFingerprint !== await sha256BookText(canonicalBookJson(unsigned))) {
+    blockers.push("Editorial consensus programme fingerprint differs from its exact contents.");
+  }
+  return unique(blockers);
+}
+
+export async function fingerprintBookUnattendedEditorialReviewerPayload(
+  value: Omit<BookUnattendedEditorialReviewerPayloadV1, "payloadFingerprint">
+    | BookUnattendedEditorialReviewerPayloadV1,
+): Promise<string> {
+  const { payloadFingerprint: _discarded, ...unsigned } =
+    value as BookUnattendedEditorialReviewerPayloadV1;
+  return sha256BookText(canonicalBookJson(unsigned));
+}
+
+export async function fingerprintBookUnattendedEditorialReviewerExecution(
+  value: Omit<BookUnattendedEditorialReviewerExecutionV1, "executionFingerprint">
+    | BookUnattendedEditorialReviewerExecutionV1,
+): Promise<string> {
+  const { executionFingerprint: _discarded, ...unsigned } =
+    value as BookUnattendedEditorialReviewerExecutionV1;
+  return sha256BookText(canonicalBookJson(unsigned));
+}
+
+export function listBookUnattendedEditorialConsensusCapabilities() {
+  return Object.freeze({
+    outputKind: "evavo_docs_book_unattended_editorial_consensus_capabilities",
+    schemaVersion: 1,
+    contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+    stageKind: "editorial_review",
+    stageMode: "machine_consensus",
+    reviewerRuntime: "/api/v1/book-studio/writing-candidate",
+    exactCandidateBytesRequired: true,
+    exactCandidateStorageReceiptRequired: true,
+    exactUnattendedPlanRequired: true,
+    exactDependencyReceiptsRequired: true,
+    exactNarrativeCraftPacketRequired: true,
+    exactPhraseOverlapScanRequired: true,
+    everyReviewerCoversEveryApplicableCriterion: true,
+    oneProviderAttemptPerReviewerRequired: true,
+    providerFallbackAllowed: false,
+    candidateProducerMayReview: false,
+    duplicateReviewerProducersAllowed: false,
+    dissentPreservationRequired: true,
+    canonicalManuscriptMutationPerformed: false,
+    automaticCanonicalAdmissionAllowed: false,
+    artStudioCalled: false,
+    publicationPerformed: false,
+  });
