@@ -72,6 +72,8 @@ Example:
 
 The loader rejects duplicate JSON keys, escaped-equivalent duplicate keys, a UTF-8 byte-order mark, invalid UTF-8, trailing content, non-canonical paths, unknown profiles, target collisions, changed source byte lengths and changed source hashes.
 
+Manifest loading is descriptor-bound rather than path-only. Resolution snapshots the canonical file device, inode, byte length, modification time and change time. The loader then opens that exact path, requires the descriptor identity to match the snapshot, reads exactly the bounded byte length, probes for unexpected growth, and rechecks both descriptor and path identity before and after JSON validation. Path replacement, same-path rewrite, truncation, growth, symlink substitution or disappearance therefore fails before optimization.
+
 ## Role-aware preparation
 
 The manifest remains governed by the game-owned semantic media contract. Typical Brass policies are:
@@ -120,6 +122,9 @@ The production MCP records:
 stagingWritesEnabled = true
 createOnlyOutputs = true
 atomicOutputPublication = true
+maximumManifestBytes = 16777216
+descriptorBoundManifestReads = true
+manifestIdentityRecheckedAfterRead = true
 sourceMutationAllowed = false
 targetRepositoryMutationAllowed = false
 deletionAuthority = false
@@ -143,4 +148,4 @@ pnpm --filter @evavo/art-studio-mcp test
 pnpm check
 ```
 
-The focused suite covers strict root isolation, duplicate-key-safe manifests, validation without output, atomic create-only staging, changed-source rejection, unconfigured-root rejection, symlink rejection and absence of provider, runtime, deletion, Git or publication authority.
+The focused suite covers strict root isolation, duplicate-key-safe manifests, stale manifest snapshots, path replacement and same-path rewrite rejection, bounded descriptor reads, validation without output, atomic create-only staging, changed-source rejection, unconfigured-root rejection, symlink rejection and absence of provider, runtime, deletion, Git or publication authority.

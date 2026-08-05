@@ -11,7 +11,21 @@ export const BRASS_ART_PRODUCTION_TOOL_NAMES = Object.freeze([
   "stage_art_delivery_batch",
 ] as const);
 
-const MAXIMUM_MANIFEST_BYTES = 16 * 1024 * 1024;
+export const BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES =
+  16 * 1024 * 1024;
+
+export type BrassArtProductionFileIdentity = Readonly<{
+  dev: number;
+  ino: number;
+  size: number;
+  mtimeMs: number;
+  ctimeMs: number;
+}>;
+
+export type BrassArtProductionManifestFile = Readonly<{
+  path: string;
+  identity: BrassArtProductionFileIdentity;
+}>;
 const OUTPUT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 const WINDOWS_RESERVED =
   /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu;
@@ -24,6 +38,37 @@ export class BrassArtProductionMcpError extends Error {
     this.name = "BrassArtProductionMcpError";
     this.code = code;
   }
+}
+
+export function brassArtProductionFileIdentity(
+  state: Readonly<{
+    dev: number;
+    ino: number;
+    size: number;
+    mtimeMs: number;
+    ctimeMs: number;
+  }>,
+): BrassArtProductionFileIdentity {
+  return Object.freeze({
+    dev: state.dev,
+    ino: state.ino,
+    size: state.size,
+    mtimeMs: state.mtimeMs,
+    ctimeMs: state.ctimeMs,
+  });
+}
+
+export function sameBrassArtProductionFileIdentity(
+  left: BrassArtProductionFileIdentity,
+  right: BrassArtProductionFileIdentity,
+): boolean {
+  return (
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.size === right.size &&
+    left.mtimeMs === right.mtimeMs &&
+    left.ctimeMs === right.ctimeMs
+  );
 }
 
 function samePath(left: string, right: string): boolean {
@@ -123,7 +168,7 @@ function regularEvidenceFile(
   evidenceRoot: string,
   value: unknown,
   label: string,
-): string {
+): BrassArtProductionManifestFile {
   const requestedText = strictText(value, label);
   const requested = path.isAbsolute(requestedText)
     ? path.resolve(requestedText)
@@ -142,7 +187,10 @@ function regularEvidenceFile(
       `${label} must be a regular non-symlink file.`,
     );
   }
-  if (state.size < 1 || state.size > MAXIMUM_MANIFEST_BYTES) {
+  if (
+    state.size < 1 ||
+    state.size > BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES
+  ) {
     throw new BrassArtProductionMcpError(
       "ART_PRODUCTION_MANIFEST_SIZE_INVALID",
       `${label} has an invalid byte length.`,
@@ -155,7 +203,30 @@ function regularEvidenceFile(
       `${label} must use a canonical path below the evidence root.`,
     );
   }
-  return resolved;
+  const resolvedState = fs.lstatSync(resolved, { throwIfNoEntry: false });
+  if (
+    !resolvedState ||
+    !resolvedState.isFile() ||
+    resolvedState.isSymbolicLink()
+  ) {
+    throw new BrassArtProductionMcpError(
+      "ART_PRODUCTION_EVIDENCE_INVALID",
+      `${label} must remain a regular non-symlink file.`,
+    );
+  }
+  const identity = brassArtProductionFileIdentity(state);
+  if (
+    !sameBrassArtProductionFileIdentity(
+      identity,
+      brassArtProductionFileIdentity(resolvedState),
+    )
+  ) {
+    throw new BrassArtProductionMcpError(
+      "ART_PRODUCTION_MANIFEST_CHANGED_DURING_RESOLUTION",
+      `${label} changed while its canonical identity was resolved.`,
+    );
+  }
+  return Object.freeze({ path: resolved, identity });
 }
 
 function outputDirectory(
@@ -289,7 +360,7 @@ export class BrassArtProductionMcpConfig {
     return candidate;
   }
 
-  public resolveManifest(value: unknown): string {
+  public resolveManifest(value: unknown): BrassArtProductionManifestFile {
     return regularEvidenceFile(this.evidenceRoot, value, "manifest");
   }
 

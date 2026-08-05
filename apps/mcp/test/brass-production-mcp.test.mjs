@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES,
   BRASS_ART_PRODUCTION_MODE,
   BRASS_ART_PRODUCTION_PROFILE,
   BRASS_ART_PRODUCTION_TOOL_NAMES,
@@ -122,6 +123,12 @@ test("production profile exposes exactly three bounded staging tools", () => {
     assert.equal(value.stagingWritesEnabled, true);
     assert.equal(value.createOnlyOutputs, true);
     assert.equal(value.atomicOutputPublication, true);
+    assert.equal(
+      value.maximumManifestBytes,
+      BRASS_ART_PRODUCTION_MAXIMUM_MANIFEST_BYTES,
+    );
+    assert.equal(value.descriptorBoundManifestReads, true);
+    assert.equal(value.manifestIdentityRecheckedAfterRead, true);
     for (const key of [
       "sourceMutationAllowed",
       "targetRepositoryMutationAllowed",
@@ -153,7 +160,8 @@ test("strict manifest loading rejects duplicate keys and UTF-8 BOM", () => {
       '{"schema":"evavo.art-delivery-optimization.v1","batchId":"one","batchId":"two","project":{},"items":[]}',
     );
     assert.throws(
-      () => loadDeliveryManifestStrict(duplicate),
+      () =>
+        loadDeliveryManifestStrict(current.config.resolveManifest(duplicate)),
       /duplicate JSON key/iu,
     );
     const bom = path.join(current.evidenceRoot, "bom.json");
@@ -161,8 +169,91 @@ test("strict manifest loading rejects duplicate keys and UTF-8 BOM", () => {
       bom,
       Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from("{}")]),
     );
-    assert.throws(() => loadDeliveryManifestStrict(bom), /byte-order mark/iu);
+    assert.throws(
+      () => loadDeliveryManifestStrict(current.config.resolveManifest(bom)),
+      /byte-order mark/iu,
+    );
   } finally {
+    current.dispose();
+  }
+});
+
+test("manifest identity swaps after resolution fail before parsing", () => {
+  const current = fixture();
+  try {
+    const resolved = current.config.resolveManifest(current.manifestPath);
+    const replacement = path.join(current.evidenceRoot, "replacement.json");
+    fs.writeFileSync(
+      replacement,
+      `${JSON.stringify(
+        { ...current.manifest, batchId: "replacement-batch" },
+        null,
+        2,
+      )}\n`,
+    );
+    fs.renameSync(
+      current.manifestPath,
+      path.join(current.evidenceRoot, "original-batch.json"),
+    );
+    fs.renameSync(replacement, current.manifestPath);
+    assert.throws(
+      () => loadDeliveryManifestStrict(resolved),
+      (error) =>
+        error?.code === "ART_PRODUCTION_MANIFEST_CHANGED_DURING_READ",
+    );
+
+    const rewritten = current.config.resolveManifest(current.manifestPath);
+    fs.writeFileSync(
+      current.manifestPath,
+      `${JSON.stringify(
+        { ...current.manifest, batchId: "same-path-rewrite" },
+        null,
+        2,
+      )}\n`,
+    );
+    assert.throws(
+      () => loadDeliveryManifestStrict(rewritten),
+      (error) =>
+        error?.code === "ART_PRODUCTION_MANIFEST_CHANGED_DURING_READ",
+    );
+  } finally {
+    current.dispose();
+  }
+});
+
+test("manifest growth and truncation during descriptor reads fail closed", () => {
+  const current = fixture();
+  const originalReadSync = fs.readSync;
+  try {
+    for (const mutation of ["grow", "truncate"]) {
+      fs.writeFileSync(
+        current.manifestPath,
+        `${JSON.stringify(current.manifest, null, 2)}\n`,
+      );
+      const resolved = current.config.resolveManifest(current.manifestPath);
+      let mutated = false;
+      fs.readSync = (...argumentsValue) => {
+        const count = originalReadSync(...argumentsValue);
+        if (!mutated) {
+          mutated = true;
+          if (mutation === "grow") {
+            fs.appendFileSync(current.manifestPath, " ");
+          } else {
+            fs.truncateSync(current.manifestPath, 0);
+          }
+        }
+        return count;
+      };
+      assert.throws(
+        () => loadDeliveryManifestStrict(resolved),
+        (error) =>
+          error?.code === "ART_PRODUCTION_MANIFEST_CHANGED_DURING_READ",
+        mutation,
+      );
+      fs.readSync = originalReadSync;
+    }
+  } finally {
+    fs.readSync = originalReadSync;
     current.dispose();
   }
 });
@@ -179,6 +270,8 @@ test("validation rechecks source bytes without writing output", async () => {
     assert.equal(value.stagingMutationPerformed, false);
     assert.equal(value.sourceMutationPerformed, false);
     assert.equal(value.targetRepositoryMutationPerformed, false);
+    assert.equal(value.descriptorBoundManifestRead, true);
+    assert.equal(value.manifestIdentityRechecked, true);
     assert.equal(value.receipt.mutationPerformed, false);
     assert.deepEqual(fs.readdirSync(current.evidenceRoot).sort(), before);
   } finally {
@@ -268,6 +361,12 @@ test("production source registers no provider, runtime, deletion or publication 
     "remove-border-matte",
     "luminance-alpha",
     "createOnlyOutputs: true",
+    "descriptorBoundManifestReads: true",
+    "manifestIdentityRecheckedAfterRead: true",
+    "ART_PRODUCTION_MANIFEST_CHANGED_DURING_READ",
+    "fs.openSync",
+    "fs.fstatSync",
+    "fs.readSync",
     "targetRepositoryMutationAllowed: false",
   ]) {
     assert.equal(source.includes(required), true, required);
@@ -284,6 +383,7 @@ test("production source registers no provider, runtime, deletion or publication 
     "shell: true",
     "unlinkSync",
     "rmSync",
+    "fs.readFileSync(manifestFile.path)",
   ]) {
     assert.equal(source.includes(forbidden), false, forbidden);
   }
