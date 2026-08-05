@@ -21,7 +21,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Recover exact source and print affected merge
+      - name: Recover exact source and print complete merge
         shell: bash
         run: |
           set -euo pipefail
@@ -39,7 +39,7 @@ jobs:
           git config user.email "evavo-diagnostic@users.noreply.github.com"
           git switch --force-create diagnostic refs/remotes/origin/main
           git am --3way /tmp/game-art-intelligence.patch
-          echo '--- compiler.ts lines 105-165 ---'
-          nl -ba packages/game-art-intelligence/src/compiler.ts | sed -n '105,165p'
-          echo '--- related input types ---'
-          grep -R -n -A30 -B5 'interface ArtDirectionCameraInput\|type ArtDirectionCameraInput\|interface ArtDirectionAntiGenericInput\|type ArtDirectionAntiGenericInput' packages/art-direction/src packages/game-art-intelligence/src || true
+          echo '--- compiler.ts lines 120-235 ---'
+          nl -ba packages/game-art-intelligence/src/compiler.ts | sed -n '120,235p'
+          echo '--- ArtDirectionStyleInput fields ---'
+          nl -ba packages/art-direction/src/types.ts | sed -n '193,226p'
