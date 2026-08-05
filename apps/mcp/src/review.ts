@@ -94,6 +94,8 @@ export function reviewCapabilityDocument(
       completeBatchDuplicateScope: true,
       perFileStableByteRead: true,
       gameOwnedRoleRequired: true,
+      exactRelativePathSelection: true,
+      deterministicSelectionIdentity: true,
       maximumFiles: 1_000,
       writesEvidenceFiles: false,
     }),
@@ -119,7 +121,7 @@ export function reviewCapabilityDocument(
 
 const server = new McpServer({
   name: "evavo-art-studio-brass-review",
-  version: "1.1.0",
+  version: "1.2.0",
 });
 
 const textResult = (value: unknown) => ({
@@ -243,11 +245,16 @@ server.registerTool(
   "inspect_art_batch_quality",
   {
     description:
-      "Review one role-consistent root-restricted image folder as a complete bounded batch. Hash exact source bytes, decode every supported frame, report compact alpha/matte/crop/halo/transparent-RGB evidence, group exact and decoded-pixel duplicates, and return technical actions without writing or approving art.",
+      "Review one role-consistent root-restricted image folder or an exact immutable path selection from a mixed corpus. Hash exact source bytes, decode every selected frame, report compact alpha/matte/crop/halo/transparent-RGB evidence, group exact and decoded-pixel duplicates, and return technical actions without writing or approving art.",
     inputSchema: z.object({
       directoryPath: z.string().min(1),
       roleId: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
       expectations: z.unknown(),
+      relativePaths: z
+        .array(z.string().min(1).max(1_024))
+        .min(1)
+        .max(1_000)
+        .optional(),
       recursive: z.boolean().optional(),
       maximumFiles: z.number().int().min(1).max(1_000).optional(),
       maximumDepth: z.number().int().min(0).max(32).optional(),
@@ -264,6 +271,7 @@ server.registerTool(
     directoryPath,
     roleId,
     expectations,
+    relativePaths,
     recursive,
     maximumFiles,
     maximumDepth,
@@ -277,6 +285,7 @@ server.registerTool(
           roleId,
           allowedRoots: reviewAllowedRoots(),
           expectations,
+          ...(relativePaths === undefined ? {} : { relativePaths }),
           ...(recursive === undefined ? {} : { recursive }),
           ...(maximumFiles === undefined ? {} : { maximumFiles }),
           ...(maximumDepth === undefined ? {} : { maximumDepth }),
