@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const required = {
   contract: "packages/contracts/src/book-art-candidate-set.ts",
+  canonicalContract: "packages/contracts/src/book-art-candidate-set-canonical.ts",
   contractIndex: "packages/contracts/src/index.ts",
   contractTest: "packages/contracts/test/book-art-candidate-set.test.mjs",
   runtime: "packages/book-art-runtime/src/candidate-set.ts",
@@ -34,7 +35,7 @@ function reject(source, token, label) {
   if (source.includes(token)) failures.push(`${label} contains prohibited ${JSON.stringify(token)}.`);
 }
 if (!failures.length) {
-  const implementation = `${sources.contract}\n${sources.runtime}`;
+  const implementation = `${sources.contract}\n${sources.canonicalContract}\n${sources.runtime}`;
   for (const token of [
     "evavo_book_art_candidate_set_production_v1",
     "evavo_book_art_candidate_set_provider_runtime_v1",
@@ -54,6 +55,9 @@ if (!failures.length) {
     "publicationPerformed: false",
     'kind: "art.candidate.generate"',
     "maximumAttempts: 1",
+    "canonicalSourceBriefFingerprint",
+    "exact canonical work-order digest",
+    "metadata identity differs from the exact work order",
   ]) expect(implementation, token, "candidate-set implementation");
   for (const token of [
     "providerFallbackAllowed: true",
@@ -67,9 +71,19 @@ if (!failures.length) {
     "contract barrel",
   );
   expect(
+    sources.contractIndex,
+    'from "./book-art-candidate-set-canonical.js";',
+    "canonical contract barrel",
+  );
+  expect(
     sources.runtimePackage,
     '"./candidate-set"',
     "runtime package export",
+  );
+  expect(
+    sources.workflow,
+    "pnpm run build:domain",
+    "candidate-set workflow dependency build",
   );
   for (const token of [
     "near duplicates",
@@ -97,6 +111,7 @@ if (failures.length) {
     defaultCandidates: 4,
     maximumCandidates: 8,
     nearDuplicateBasisPoints: 9200,
+    canonicalSourceEvidence: true,
     oneProviderAttemptForEntireSet: true,
     providerFallbackAllowed: false,
     automaticSelectionAllowed: false,
