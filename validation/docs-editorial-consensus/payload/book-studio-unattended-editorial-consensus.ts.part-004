@@ -1,0 +1,250 @@
+      blockers.push(`Reviewer payload ${assignmentId} repeats criterion receipts.`);
+    }
+  }
+  if (candidateId !== programme.candidateId || candidateTextSha256 !== programme.candidateTextSha256) {
+    blockers.push(`Reviewer payload ${assignmentId} is bound to different candidate bytes.`);
+  }
+  for (const receipt of receipts) {
+    if (
+      receipt.packetFingerprint !== programme.narrativeCraftPacket.packetFingerprint
+      || receipt.candidateId !== programme.candidateId
+      || receipt.candidateTextSha256 !== programme.candidateTextSha256
+      || receipt.reviewerProducerId !== reviewerProducerId
+      || receipt.reviewerProvider !== reviewerProvider
+      || receipt.reviewerModel !== reviewerModel
+      || receipt.reviewerWasCandidateProducer !== false
+      || receipt.canonicalAdmissionAllowed !== false
+      || receipt.publicationPerformed !== false
+    ) blockers.push(`Reviewer payload ${assignmentId} contains a receipt bound to different evidence or authority.`);
+    if (Date.parse(receipt.reviewedAt) > Date.parse(completedAt)) {
+      blockers.push(`Reviewer payload ${assignmentId} contains a receipt completed after the payload.`);
+    }
+  }
+  const receiptFindingIds = unique(receipts.flatMap((item) => item.findingIds));
+  if (minorityFindingIds.some((findingId) => !receiptFindingIds.includes(findingId))) {
+    blockers.push(`Reviewer payload ${assignmentId} names a minority finding absent from its receipts.`);
+  }
+  const unsigned: Omit<BookUnattendedEditorialReviewerPayloadV1, "payloadFingerprint"> = {
+    outputKind: REVIEW_PAYLOAD_OUTPUT_KIND,
+    schemaVersion: 1,
+    contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+    assignmentId,
+    assignmentFingerprint,
+    candidateId,
+    candidateTextSha256,
+    reviewerProducerId,
+    reviewerProvider,
+    reviewerModel,
+    receipts,
+    minorityFindingIds,
+    completedAt,
+    reviewerWasCandidateProducer: false,
+    canonicalAdmissionAllowed: false,
+    canonicalManuscriptMutationPerformed: false,
+    publicationPerformed: false,
+  };
+  const payloadFingerprint = digest(source.payloadFingerprint, "payload.payloadFingerprint", blockers);
+  if (payloadFingerprint !== await fingerprintBookUnattendedEditorialReviewerPayload(unsigned)) {
+    blockers.push(`Reviewer payload ${assignmentId} fingerprint differs from its exact contents.`);
+  }
+  return { ...unsigned, payloadFingerprint };
+}
+
+function validateEditorialStage(
+  stage: BookUnattendedStagePlanV1,
+  volumeId: string,
+  receipts: BookUnattendedEditorialDependencyReceiptV1[],
+  executionRequestedAt: string,
+  blockers: string[],
+): void {
+  if (stage.volumeId !== volumeId) blockers.push("The selected editorial stage does not belong to volumeId.");
+  if (stage.kind !== "editorial_review") blockers.push("Only an editorial_review stage can use editorial consensus.");
+  if (stage.mode !== "machine_consensus") blockers.push("The selected editorial stage is not machine consensus.");
+  if (stage.dispatchTarget !== "docs_suite" || stage.dispatchOperation !== "review.evaluate_admission") {
+    blockers.push("The selected editorial stage is not routed to the governed Docs review boundary.");
+  }
+  if (!stage.unattendedExecutionAllowed || !stage.requiresIndependentConsensus) {
+    blockers.push("The selected editorial stage is not authorised for unattended independent consensus.");
+  }
+  if (stage.minimumIndependentReviewers < 2 || stage.minimumConsensusBasisPoints < 5_000) {
+    blockers.push("The selected editorial stage consensus policy is unsafe.");
+  }
+  const expected = [...stage.dependencyStageIds].sort();
+  const actual = receipts.map((item) => item.stageId).sort();
+  if (!sameSet(expected, actual)) {
+    blockers.push("dependencyReceipts must cover the exact editorial-stage dependency set.");
+  }
+  for (const receipt of receipts) {
+    if (Date.parse(receipt.completedAt) > Date.parse(executionRequestedAt)) {
+      blockers.push(`Dependency receipt ${receipt.stageId} completes after executionRequestedAt.`);
+    }
+  }
+}
+
+function parseDependencyReceipts(
+  value: unknown,
+  blockers: string[],
+): BookUnattendedEditorialDependencyReceiptV1[] {
+  const values = array(value, "dependencyReceipts", blockers, 0, 256);
+  const result = values.map((item, index) => {
+    const source = strictRecord(item, DEPENDENCY_KEYS, `dependencyReceipts[${index}]`, blockers);
+    return {
+      stageId: id(source.stageId, `dependencyReceipts[${index}].stageId`, blockers),
+      receiptFingerprint: digest(
+        source.receiptFingerprint,
+        `dependencyReceipts[${index}].receiptFingerprint`,
+        blockers,
+      ),
+      completedAt: timestamp(source.completedAt, `dependencyReceipts[${index}].completedAt`, blockers),
+    };
+  }).sort((left, right) => left.stageId.localeCompare(right.stageId));
+  if (duplicates(result.map((item) => item.stageId)).length) {
+    blockers.push("dependencyReceipts repeat stage identities.");
+  }
+  if (duplicates(result.map((item) => item.receiptFingerprint)).length) {
+    blockers.push("dependencyReceipts repeat receipt fingerprints.");
+  }
+  return result;
+}
+
+function buildCriterionEvidence(
+  criterionIds: string[],
+  receipts: BookNarrativeIndependentReviewReceiptV1[],
+): BookNarrativeCriterionEvidenceV1[] {
+  return [...criterionIds].sort().map((criterionId) => {
+    const independentReviews = receipts
+      .filter((item) => item.criterionId === criterionId)
+      .sort((left, right) =>
+        left.reviewerProducerId.localeCompare(right.reviewerProducerId)
+          || left.reviewId.localeCompare(right.reviewId),
+      );
+    const score = independentReviews.length
+      ? round(independentReviews.reduce((sum, review) => sum + review.score, 0) / independentReviews.length)
+      : 0;
+    return {
+      criterionId,
+      score,
+      evidenceIds: unique(independentReviews.flatMap((review) => review.evidenceIds)).sort(),
+      findingIds: unique(independentReviews.flatMap((review) => review.findingIds)).sort(),
+      independentReviews,
+    };
+  });
+}
+
+function programmeResult(
+  unattendedProduction: BookUnattendedProductionResultV1,
+  programme: BookUnattendedEditorialConsensusProgrammeV1 | undefined,
+  blockers: string[],
+  warnings: string[],
+): BookUnattendedEditorialConsensusProgrammeResultV1 {
+  return {
+    outputKind: "evavo_docs_book_unattended_editorial_consensus_programme_result",
+    schemaVersion: 1,
+    status: programme ? "ready" : "blocked",
+    unattendedProduction,
+    ...(programme === undefined ? {} : { programme }),
+    blockers: unique(blockers).sort(),
+    warnings: unique(warnings).sort(),
+    providerCallAllowed: programme !== undefined,
+    providerCallPerformed: false,
+    canonicalManuscriptMutationPerformed: false,
+    automaticCanonicalAdmissionAllowed: false,
+    publicationPerformed: false,
+  };
+}
+
+function evaluationBlocked(
+  blockers: string[],
+  providerCallsPerformed: number,
+  requiredActions = ["Correct the malformed, incomplete or unauthorised editorial consensus evidence."],
+): BookUnattendedEditorialConsensusEvaluationResultV1 {
+  return {
+    outputKind: "evavo_docs_book_unattended_editorial_consensus_evaluation_result",
+    schemaVersion: 1,
+    status: "blocked",
+    blockers: unique(blockers).sort(),
+    requiredActions: unique(requiredActions).sort(),
+    providerCallsPerformed,
+    providerFallbackAllowed: false,
+    canonicalManuscriptMutationPerformed: false,
+    automaticCanonicalAdmissionAllowed: false,
+    publicationPerformed: false,
+  };
+}
+
+function strictRecord(
+  value: unknown,
+  allowed: ReadonlySet<string>,
+  label: string,
+  blockers: string[],
+): UnknownRecord {
+  const source = record(value);
+  if (!Object.keys(source).length && (!value || typeof value !== "object" || Array.isArray(value))) {
+    blockers.push(`${label} must be an object.`);
+    return source;
+  }
+  const unknown = Object.keys(source).filter((key) => !allowed.has(key)).sort();
+  if (unknown.length) blockers.push(`${label} contains unsupported fields: ${unknown.join(", ")}.`);
+  return source;
+}
+
+function record(value: unknown): UnknownRecord {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {};
+}
+
+function array(
+  value: unknown,
+  label: string,
+  blockers: string[],
+  minimum: number,
+  maximum: number,
+): unknown[] {
+  if (!Array.isArray(value) || value.length < minimum || value.length > maximum) {
+    blockers.push(`${label} must contain between ${minimum} and ${maximum} items.`);
+    return [];
+  }
+  return value;
+}
+
+function id(value: unknown, label: string, blockers: string[]): string {
+  if (typeof value !== "string" || !SAFE_ID.test(value)) {
+    blockers.push(`${label} must be a bounded safe identity.`);
+    return "invalid";
+  }
+  return value;
+}
+
+function ids(
+  value: unknown,
+  label: string,
+  blockers: string[],
+  maximum: number,
+  required: boolean,
+): string[] {
+  if (!Array.isArray(value) || value.length > maximum || (required && !value.length)) {
+    blockers.push(`${label} must be a bounded${required ? " non-empty" : ""} identity array.`);
+    return [];
+  }
+  const result = value.map((item, index) => id(item, `${label}[${index}]`, blockers));
+  if (duplicates(result).length) blockers.push(`${label} contains duplicate identities.`);
+  return result.sort();
+}
+
+function digest(value: unknown, label: string, blockers: string[]): string {
+  if (typeof value !== "string" || !SHA256.test(value)) {
+    blockers.push(`${label} must be a canonical sha256 fingerprint.`);
+    return `sha256:${"0".repeat(64)}`;
+  }
+  return value;
+}
+
+function timestamp(value: unknown, label: string, blockers: string[]): string {
+  if (
+    typeof value !== "string"
+    || !ISO_UTC.test(value)
+    || !Number.isFinite(Date.parse(value))
+    || new Date(value).toISOString() !== value
+  ) {
+    blockers.push(`${label} must be canonical UTC ISO-8601.`);
