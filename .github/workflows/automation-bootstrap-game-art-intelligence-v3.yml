@@ -96,9 +96,85 @@ jobs:
           PATHS
           LC_ALL=C sort -o /tmp/expected-full-paths.txt /tmp/expected-full-paths.txt
           diff -u /tmp/expected-full-paths.txt /tmp/full-paths.txt
+          cp .github/workflows/game-art-intelligence.yml /tmp/game-art-intelligence.yml
+
+      - name: Preserve strict optional merge semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("packages/game-art-intelligence/src/compiler.ts")
+          source = path.read_text(encoding="utf-8")
+
+          replacements = [
+              (
+                  '''  const camera = { ...(base.camera ?? {}), ...(override?.camera ?? {}) };
+          const selectedProjection = projection as ArtDirectionStyleInput["projection"];
+          return {''',
+                  '''  const camera = { ...(base.camera ?? {}), ...(override?.camera ?? {}) };
+          const selectedProjection: ArtProjection = projection;
+          const requiredDistinctiveMotifs = uniqueMerge(
+            base.antiGeneric?.requiredDistinctiveMotifs,
+            override?.antiGeneric?.requiredDistinctiveMotifs,
+          );
+          const prohibitedGenericMotifs = uniqueMerge(
+            base.antiGeneric?.prohibitedGenericMotifs,
+            override?.antiGeneric?.prohibitedGenericMotifs,
+          );
+          return {''',
+              ),
+              (
+                  '''      ...(uniqueMerge(
+                base.antiGeneric?.requiredDistinctiveMotifs,
+                override?.antiGeneric?.requiredDistinctiveMotifs,
+              ) === undefined
+                ? {}
+                : {
+                    requiredDistinctiveMotifs: uniqueMerge(
+                      base.antiGeneric?.requiredDistinctiveMotifs,
+                      override?.antiGeneric?.requiredDistinctiveMotifs,
+                    ),
+                  }),''',
+                  '''      ...(requiredDistinctiveMotifs === undefined
+                ? {}
+                : { requiredDistinctiveMotifs }),''',
+              ),
+              (
+                  '''      ...(uniqueMerge(
+                base.antiGeneric?.prohibitedGenericMotifs,
+                override?.antiGeneric?.prohibitedGenericMotifs,
+              ) === undefined
+                ? {}
+                : {
+                    prohibitedGenericMotifs: uniqueMerge(
+                      base.antiGeneric?.prohibitedGenericMotifs,
+                      override?.antiGeneric?.prohibitedGenericMotifs,
+                    ),
+                  }),''',
+                  '''      ...(prohibitedGenericMotifs === undefined
+                ? {}
+                : { prohibitedGenericMotifs }),''',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected one strict-merge source match, found {count}")
+              source = source.replace(old, new)
+
+          path.write_text(source, encoding="utf-8")
+          PY
+          git add packages/game-art-intelligence/src/compiler.ts
+          git commit --amend --no-edit
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
+          git diff --check HEAD^ HEAD
           node --check scripts/check-game-art-intelligence.mjs
           node scripts/check-game-art-intelligence.mjs
-          cp .github/workflows/game-art-intelligence.yml /tmp/game-art-intelligence.yml
+          sha256sum packages/game-art-intelligence/src/compiler.ts > /tmp/compiler-source-sha256.txt
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -170,6 +246,7 @@ jobs:
         run: |
           node <<'NODE'
           const fs = require('node:fs');
+          const [compilerSha256] = fs.readFileSync('/tmp/compiler-source-sha256.txt', 'utf8').trim().split(/\s+/);
           const receipt = {
             schemaVersion: '1.0',
             receiptType: 'evavo-game-art-intelligence-current-main-bootstrap',
@@ -180,6 +257,8 @@ jobs:
             featureSha: fs.readFileSync('/tmp/feature-sha.txt', 'utf8').trim(),
             archiveSha256: process.env.ARCHIVE_SHA256,
             patchSha256: process.env.PATCH_SHA256,
+            strictOptionalCompatibilityRepair: true,
+            compilerSourceSha256: compilerSha256,
             publishedPaths: fs.readFileSync('/tmp/published-paths.txt', 'utf8').trim().split('\n'),
             focusedValidationPassed: true,
             permanentCheckerPassed: true,
