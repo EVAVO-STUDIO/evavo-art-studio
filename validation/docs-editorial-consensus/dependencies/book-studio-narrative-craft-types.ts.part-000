@@ -1,0 +1,299 @@
+import type {
+  BookCraftProfileV1,
+  BookPhraseOverlapScanV1,
+} from "./book-studio-review-craft-types";
+
+export const BOOK_NARRATIVE_CRAFT_CONTRACT = "evavo_docs_book_narrative_craft_v1" as const;
+export const BOOK_NARRATIVE_CRAFT_SCHEMA_VERSION = 1 as const;
+export const BOOK_NARRATIVE_CRAFT_KNOWLEDGE_VERSION = 2 as const;
+
+export type BookNarrativeCraftMode =
+  | "draft_scene"
+  | "revise_scene"
+  | "dialogue_pass"
+  | "emotion_pass"
+  | "prose_pass"
+  | "tension_pass"
+  | "full_scene_pass";
+
+export type BookNarrativeKnowledgeModuleId =
+  | "scene_causality"
+  | "character_appraisal"
+  | "emotion_regulation"
+  | "dialogue_turn_taking"
+  | "dialogue_grounding_and_repair"
+  | "dialogue_subtext_and_status"
+  | "viewpoint_information_control"
+  | "prose_specificity_and_rhythm"
+  | "suspense_curiosity_surprise"
+  | "social_simulation_and_relationship_memory"
+  | "anti_genericity_revision";
+
+export type BookNarrativeArchetypeId =
+  | "ordinary_dread_escalation"
+  | "puzzle_propulsion"
+  | "dynastic_causality"
+  | "submerged_minimalism"
+  | "youth_horror_escalation"
+  | "epic_ensemble_continuity"
+  | "time_braided_cosmic_intimacy"
+  | "intimate_social_realism";
+
+export type BookNarrativeDimensionId =
+  | "narrative_distance"
+  | "causal_density"
+  | "puzzle_density"
+  | "suspense_pressure"
+  | "ensemble_breadth"
+  | "prose_ornament"
+  | "dialogue_indirection"
+  | "dread_escalation"
+  | "audience_accessibility"
+  | "temporal_complexity";
+
+export type BookNarrativeActionTendency =
+  | "approach"
+  | "avoid"
+  | "attack"
+  | "freeze"
+  | "appease"
+  | "hide"
+  | "seek_support"
+  | "repair"
+  | "observe"
+  | "endure"
+  | "custom";
+
+export type BookNarrativeEmotionRegulationStrategy =
+  | "situation_selection"
+  | "situation_modification"
+  | "attentional_deployment"
+  | "cognitive_reappraisal"
+  | "response_suppression"
+  | "expressive_disclosure"
+  | "strategic_delay"
+  | "mixed";
+
+export type BookDialogueTurnFunction =
+  | "offer_or_claim"
+  | "request"
+  | "challenge"
+  | "answer"
+  | "evasion"
+  | "repair"
+  | "refusal"
+  | "concession"
+  | "threat"
+  | "promise"
+  | "silence"
+  | "topic_shift"
+  | "status_test"
+  | "disclosure"
+  | "misdirection";
+
+export type BookNarrativePerson = "first" | "second" | "third";
+export type BookNarrativeTense = "past" | "present";
+export type BookNarrativeDistance = "interior" | "close" | "medium" | "distant" | "variable";
+export type BookNarrativeRhythm = "compressed" | "balanced" | "expansive" | "variable";
+export type BookNarrativeDensity = "low" | "moderate" | "high" | "variable";
+export type BookNarrativeCriterionApplicability = "always" | "dialogue" | "tension" | "social_memory";
+
+export interface BookNarrativeKnowledgeModuleV1 {
+  moduleId: BookNarrativeKnowledgeModuleId;
+  purpose: string;
+  productionRules: string[];
+  failureSignals: string[];
+  researchBasisIds: string[];
+}
+
+export interface BookNarrativeArchetypeV1 {
+  archetypeId: BookNarrativeArchetypeId;
+  dimensionValues: Array<{ dimensionId: BookNarrativeDimensionId; value: number }>;
+  productionBiases: string[];
+  counterweights: string[];
+}
+
+export interface BookNarrativeArchetypeWeightV1 {
+  archetypeId: BookNarrativeArchetypeId;
+  requestedWeight: number;
+}
+
+export interface BookNarrativeNormalizedArchetypeWeightV1 {
+  archetypeId: BookNarrativeArchetypeId;
+  normalizedWeight: number;
+}
+
+export interface BookNarrativeCompositeDimensionV1 {
+  dimensionId: BookNarrativeDimensionId;
+  value: number;
+  sourceArchetypeIds: BookNarrativeArchetypeId[];
+}
+
+export interface BookNarrativeScenePlanV1 {
+  sceneId: string;
+  purpose: string;
+  openingState: string;
+  objective: string;
+  opposition: string;
+  stakes: string;
+  tactic: string;
+  turningEvent: string;
+  outcome: string;
+  cost: string;
+  closingState: string;
+  causalPredecessorIds: string[];
+  downstreamConsequenceIds: string[];
+  evidenceIds: string[];
+}
+
+export interface BookNarrativeCharacterStateV1 {
+  characterId: string;
+  publicGoal: string;
+  privateNeed: string;
+  currentBelief: string;
+  mistakenBelief: string;
+  immediateAppraisal: string;
+  emotionalState: string;
+  actionTendency: BookNarrativeActionTendency;
+  regulationStrategy: BookNarrativeEmotionRegulationStrategy;
+  outwardDisplay: string;
+  withheldInformation: string;
+  relationshipPressure: string;
+  statusPosition: string;
+  voiceConstraintIds: string[];
+  evidenceIds: string[];
+}
+
+export interface BookNarrativeDialogueTurnV1 {
+  turnId: string;
+  sequence: number;
+  speakerId: string;
+  recipientIds: string[];
+  turnFunction: BookDialogueTurnFunction;
+  respondsToTurnId?: string;
+  repairOfTurnId?: string;
+  conversationalObjective: string;
+  literalTopic: string;
+  subtextPressure: string;
+  commonGroundUpdateIds: string[];
+  statusMove: string;
+  evidenceIds: string[];
+}
+
+export interface BookNarrativeDialoguePlanV1 {
+  enabled: boolean;
+  participantIds: string[];
+  commonGroundIds: string[];
+  contestedGroundIds: string[];
+  withheldKnowledgeIds: string[];
+  statusRiskIds: string[];
+  requiredTurnFunctions: BookDialogueTurnFunction[];
+  turnPlan: BookNarrativeDialogueTurnV1[];
+  repairOpportunityRequired: boolean;
+  silenceHasMeaning: boolean;
+  maximumConsecutiveExpositoryTurns: number;
+  evidenceIds: string[];
+}
+
+export interface BookNarrativeEmotionBeatV1 {
+  beatId: string;
+  sequence: number;
+  characterId: string;
+  trigger: string;
+  goalRelevance: string;
+  goalCongruence: "advances" | "obstructs" | "mixed" | "uncertain";
+  controllability: "low" | "medium" | "high" | "uncertain";
+  agencyAttribution: string;
+  certainty: "low" | "medium" | "high";
+  novelty: "low" | "medium" | "high";
+  actionTendency: BookNarrativeActionTendency;
+  regulationStrategy: BookNarrativeEmotionRegulationStrategy;
+  outwardExpression: string;
+  delayedAftereffect: string;
+  evidenceIds: string[];
+}
+
+export interface BookNarrativeProsePlanV1 {
+  person: BookNarrativePerson;
+  tense: BookNarrativeTense;
+  narrativeDistance: BookNarrativeDistance;
+  focalCharacterId: string;
+  psychicAccessCharacterIds: string[];
+  viewpointTransitionIds: string[];
+  sensoryPriorityIds: string[];
+  motifIds: string[];
+  sentenceRhythm: BookNarrativeRhythm;
+  paragraphRhythm: BookNarrativeRhythm;
+  figurativeDensity: BookNarrativeDensity;
+  expositionDensity: BookNarrativeDensity;
+  forbiddenPatternIds: string[];
+  evidenceIds: string[];
+}
+
+export interface BookNarrativeCraftPolicyV1 {
+  minimumCompositeArchetypes?: number;
+  maximumCompositeArchetypes?: number;
+  maximumDominantArchetypeWeight?: number;
+  minimumKnowledgeModules?: number;
+  minimumProjectVoiceAnchors?: number;
+  minimumForbiddenPatterns?: number;
+  requireEmotionBeatForPointOfView?: boolean;
+  requireCausalConsequence?: boolean;
+  requireRepairForContestedDialogue?: boolean;
+  minimumIndependentReviewIds?: number;
+  minimumCriterionScore?: number;
+  minimumMandatoryCriterionScore?: number;
+  minimumPassingScore?: number;
+}
+
+export interface BookNarrativeCraftCompileInputV1 {
+  outputKind: "evavo_docs_book_narrative_craft_compile_input";
+  schemaVersion: 1;
+  programmeId: string;
+  projectId: string;
+  volumeId: string;
+  manuscriptRevisionId: string;
+  languageTag: string;
+  mode: BookNarrativeCraftMode;
+  craftProfile: unknown;
+  requestedKnowledgeModuleIds: BookNarrativeKnowledgeModuleId[];
+  archetypeMix: BookNarrativeArchetypeWeightV1[];
+  projectVoiceAnchorIds: string[];
+  narrativeConstraintIds: string[];
+  scene: BookNarrativeScenePlanV1;
+  characters: BookNarrativeCharacterStateV1[];
+  dialogue: BookNarrativeDialoguePlanV1;
+  emotionBeats: BookNarrativeEmotionBeatV1[];
+  prose: BookNarrativeProsePlanV1;
+  acceptedPatternIds: string[];
+  rejectedPatternIds: string[];
+  evidenceIds: string[];
+  policy?: BookNarrativeCraftPolicyV1;
+}
+
+export interface BookNarrativeQualityCriterionV1 {
+  criterionId: string;
+  weight: number;
+  mandatory: boolean;
+  applicability: BookNarrativeCriterionApplicability;
+  passCondition: string;
+  failureSignals: string[];
+}
+
+export interface BookNarrativeRevisionStepV1 {
+  sequence: number;
+  stepId: string;
+  instruction: string;
+  requiredEvidenceKinds: string[];
+}
+
+export interface BookNarrativeCraftContextBlockV1 {
+  objectId: string;
+  objectFingerprint: string;
+  role: "constraint";
+  text: string;
+  textSha256: string;
+}
+
+export interface BookNarrativeCraftPacketV1 {
+  outputKind: "evavo_docs_book_narrative_craft_packet";
