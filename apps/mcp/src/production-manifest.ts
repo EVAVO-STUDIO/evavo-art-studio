@@ -171,6 +171,17 @@ export function loadDeliveryManifestStrict(
   bytes: number;
 }> {
   const bytes = fs.readFileSync(manifestPath);
+  if (
+    bytes.byteLength >= 3 &&
+    bytes[0] === 0xef &&
+    bytes[1] === 0xbb &&
+    bytes[2] === 0xbf
+  ) {
+    throw new BrassArtProductionMcpError(
+      "ART_PRODUCTION_MANIFEST_BOM_FORBIDDEN",
+      "Manifest must be UTF-8 without a byte-order mark.",
+    );
+  }
   let source: string;
   try {
     source = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
