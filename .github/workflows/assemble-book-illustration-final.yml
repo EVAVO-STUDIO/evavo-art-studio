@@ -1,0 +1,95 @@
+name: Assemble Final Book Illustration Intelligence
+
+on:
+  push:
+    branches:
+      - agent/book-print-illustration-intelligence-20260805
+    paths:
+      - ".github/workflows/assemble-book-illustration-final.yml"
+      - ".github/source-payload/book-illustration-final/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assemble-final-book-illustration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact feature branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Use Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Reconstruct exact reviewed source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload_dir=.github/source-payload/book-illustration-final
+          cat "$payload_dir"/part-*.b64 > /tmp/book-illustration-final.tar.gz.b64
+          test "$(wc -c < /tmp/book-illustration-final.tar.gz.b64)" = "40600"
+          printf '%s  %s\n' \
+            'a32e86be1c6eff57fe864f5d66110a856da5c71f53a5dc159fca3139bb736eee' "$payload_dir/part-00.b64" \
+            '3c854294d79fb277b0acba5a70ffba59ed2ff04121c35a923e38d14241cdd926' "$payload_dir/part-01.b64" \
+            '16e0918dc213a7eb7a052358dbb238ba4e3c170822f47a2441f5e57b32dabd86' "$payload_dir/part-02.b64" \
+            '888653dd1d917f28362a5b16cf46397db6596e79af834318ab2264f581c64df8' "$payload_dir/part-03.b64" \
+            'c247bd0331c38cdb7b17a9893d95bc7e05b66f9f49da4b512a85911d87c52415' "$payload_dir/part-04.b64" | sha256sum -c -
+          base64 --decode /tmp/book-illustration-final.tar.gz.b64 > /tmp/book-illustration-final.tar.gz
+          test "$(wc -c < /tmp/book-illustration-final.tar.gz)" = "30448"
+          echo '834313d85efd210fd8e8b052b89eb078e0398e5f9254895c62da322002e0881a  /tmp/book-illustration-final.tar.gz' | sha256sum -c -
+          actual="$(tar -tzf /tmp/book-illustration-final.tar.gz | LC_ALL=C sort)"
+          expected="$(printf '%s\n' \
+            'docs/book-illustration-intelligence.md' \
+            'packages/contracts/src/book-illustration-intelligence.ts' \
+            'packages/contracts/src/index.ts' \
+            'packages/contracts/test/book-illustration-intelligence-cli.test.mjs' \
+            'packages/contracts/test/book-illustration-intelligence.test.mjs' \
+            'scripts/check-book-illustration-intelligence.mjs' \
+            'scripts/evavo-art-book-illustration-cli.mjs' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          tar -xzf /tmp/book-illustration-final.tar.gz --no-same-owner --no-same-permissions
+
+      - name: Verify every extracted source byte and authority checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' \
+            'cb48afd4799d5a45deb3cdc2e2859f0a5dfa2b9ec25a780abb6ab658f16ce455  docs/book-illustration-intelligence.md' \
+            'c6d4c11c43c4275f7f11b6350577ceb7f8cca6f4d5725bc1eba0327d4c98cc39  packages/contracts/src/book-illustration-intelligence.ts' \
+            '44bad36fef1b4b63e1c497aaff5dc39862ddcc37e1ca692889fb622141ae27b1  packages/contracts/src/index.ts' \
+            'dcf056cc5c12154cc73c5d5c7ecec6f4e621cc5ab4b72dcdbda70b64dc3d4f58  packages/contracts/test/book-illustration-intelligence-cli.test.mjs' \
+            'e5c291aae04af2b39178a63e686ca66a48e366315d3289cdf4ed88cfe8254e6d  packages/contracts/test/book-illustration-intelligence.test.mjs' \
+            '366a48087d953d97d1fa52c8f565f3241311711fad598b762b9063a9ea5a4aae  scripts/check-book-illustration-intelligence.mjs' \
+            'e89b363f079081080277651637fe816aa1f24ca726b78054feed86464d3e57d1  scripts/evavo-art-book-illustration-cli.mjs' | sha256sum -c -
+          node scripts/check-book-illustration-intelligence.mjs
+
+      - name: Commit exact reviewed source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'EVAVO-STUDIO'
+          git config user.email 'evavo.studio@gmail.com'
+          git add -- \
+            docs/book-illustration-intelligence.md \
+            packages/contracts/src/book-illustration-intelligence.ts \
+            packages/contracts/src/index.ts \
+            packages/contracts/test/book-illustration-intelligence-cli.test.mjs \
+            packages/contracts/test/book-illustration-intelligence.test.mjs \
+            scripts/check-book-illustration-intelligence.mjs \
+            scripts/evavo-art-book-illustration-cli.mjs
+          git diff --cached --check
+          git diff --cached --quiet && { echo 'No reviewed source changes found'; exit 1; }
+          git commit -m 'feat(book): complete automated illustration intelligence'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
