@@ -12,8 +12,6 @@ jobs:
   locate:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    env:
-      EXPECTED_MAIN_SHA: 23ec7b54a792717e5d51007c7bd3173776da487e
     steps:
       - name: Check out diagnostic carrier
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -21,15 +19,18 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Check out exact current main
+      - name: Check out captured current main
         shell: bash
         run: |
           set -euxo pipefail
           git show-ref --verify refs/remotes/origin/main
-          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
-          git switch --detach refs/remotes/origin/main
+          tested_main_sha="$(git rev-parse refs/remotes/origin/main)"
+          test "$tested_main_sha" = "$(git rev-parse --verify "$tested_main_sha^{commit}")"
+          echo "TESTED_MAIN_SHA=$tested_main_sha" >> "$GITHUB_ENV"
+          git switch --detach "$tested_main_sha"
           git status --porcelain=v1 --untracked-files=all
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo "tested_main_sha=$tested_main_sha"
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.1.0
@@ -70,6 +71,7 @@ jobs:
             current="$(sha256sum "$workflow" | awk '{print $1}')"
             if [[ "$current" != "$baseline" ]]; then
               echo "::error title=Workflow mutation detected::$label changed $workflow"
+              echo "tested_main_sha=$TESTED_MAIN_SHA"
               echo "mutating_package=$label"
               git status --short
               git diff -- "$workflow"
@@ -91,6 +93,7 @@ jobs:
             check_workflow "$package_name ($directory)"
           done < <(find packages apps -mindepth 2 -maxdepth 2 -name package.json -print | LC_ALL=C sort)
 
+          echo "tested_main_sha=$TESTED_MAIN_SHA"
           echo "tested_packages=$tested"
           rm -f pnpm-lock.yaml
           check_workflow "all sequential workspace tests"
