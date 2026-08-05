@@ -1,27 +1,92 @@
 {
-  "schema": "evavo.image-processing-recipes.v1",
+  "schema": "evavo.image-processing-recipes.v2",
   "processors": [
     {
-      "id": "python-pillow",
+      "id": "sharp-delivery-optimizer",
+      "kind": "repository-package",
+      "entrypoint": "tools/run_art_delivery_optimizer.py",
+      "capabilities": [
+        "inspect",
+        "background-preserve",
+        "connected-matte-to-alpha",
+        "luminance-to-alpha",
+        "resize",
+        "convert",
+        "optimize",
+        "alpha-analyze",
+        "edge-decontaminate",
+        "hidden-rgb-rebuild",
+        "palette-normalize"
+      ],
+      "preferredFor": [
+        "png",
+        "webp",
+        "jpeg",
+        "tiff"
+      ],
+      "fallbackRank": 0,
+      "receiptSchema": "evavo.art-delivery-optimization-receipt.v1"
+    },
+    {
+      "id": "sharp-exact-canvas-runtime",
+      "kind": "node",
+      "entrypoint": "tools/process_image_with_sharp.mjs",
+      "capabilities": [
+        "inspect",
+        "background-preserve",
+        "connected-matte-to-alpha",
+        "luminance-to-alpha",
+        "canvas-normalize",
+        "resize",
+        "convert",
+        "optimize",
+        "alpha-analyze",
+        "edge-decontaminate",
+        "hidden-rgb-rebuild",
+        "palette-normalize"
+      ],
+      "preferredFor": [
+        "png",
+        "webp",
+        "jpeg",
+        "tiff"
+      ],
+      "fallbackRank": 1,
+      "receiptSchema": "evavo.image-processing-receipt.v1"
+    },
+    {
+      "id": "python-pillow-fallback",
       "kind": "python",
-      "capabilities": ["inspect", "crop-safe", "canvas-normalize", "resize", "convert", "optimize", "alpha-analyze", "edge-decontaminate", "hidden-rgb-rebuild", "palette-normalize"],
-      "preferredFor": ["png", "webp", "jpeg"],
-      "fallbackRank": 1
-    },
-    {
-      "id": "imagemagick",
-      "kind": "external-cli",
-      "capabilities": ["inspect", "crop-safe", "canvas-normalize", "resize", "convert", "optimize", "alpha-analyze", "luminance-to-alpha"],
-      "preferredFor": ["png", "webp", "jpeg", "tiff"],
-      "fallbackRank": 2
-    },
-    {
-      "id": "powershell-system-drawing",
-      "kind": "powershell",
-      "capabilities": ["inspect", "resize", "convert"],
-      "preferredFor": ["png", "jpeg"],
-      "fallbackRank": 3
+      "entrypoint": "tools/process_image_with_pillow.py",
+      "capabilities": [
+        "inspect",
+        "background-preserve",
+        "connected-matte-to-alpha",
+        "luminance-to-alpha",
+        "canvas-normalize",
+        "resize",
+        "convert",
+        "optimize",
+        "alpha-analyze",
+        "palette-normalize"
+      ],
+      "preferredFor": [
+        "png",
+        "webp",
+        "jpeg",
+        "tiff",
+        "bmp"
+      ],
+      "fallbackRank": 2,
+      "receiptSchema": "evavo.image-processing-receipt.v1"
     }
+  ],
+  "nonDeterministicOperations": [
+    "reviewed-mask-to-alpha",
+    "retouch",
+    "inpaint",
+    "outpaint",
+    "linework-strengthen"
   ],
   "rules": {
     "sourceOverwriteAllowed": false,
@@ -30,8 +95,12 @@
     "decodedDimensionsRequired": true,
     "alphaUsageRequired": true,
     "outputHashRequired": true,
-    "fallbackMustPreserveRequestedSemantics": true,
+    "singleProcessorRoutePreferred": true,
+    "fallbackMustSupportEntireDeterministicOperationSet": true,
+    "lossyIntermediateAllowed": false,
     "providerGenerationIsSeparate": true,
-    "humanCreativeApprovalIsSeparate": true
+    "humanCreativeApprovalIsSeparate": true,
+    "exactCanvasUsesRepositoryOwnedSharpRuntime": true,
+    "pythonFallbackRemainsSecondary": true
   }
 }
