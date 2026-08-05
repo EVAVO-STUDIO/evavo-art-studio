@@ -1,0 +1,250 @@
+export const BOOK_REVIEW_CRAFT_CONTRACT = "evavo_docs_book_review_craft_v1" as const;
+export const BOOK_REVIEW_CRAFT_SCHEMA_VERSION = 1 as const;
+
+export type BookProviderId = "chatgpt" | "claude" | "other_compatible_model";
+export type BookCraftSourceKind =
+  | "public_domain"
+  | "licensed"
+  | "user_owned"
+  | "project_owned"
+  | "abstract_profile"
+  | "restricted_reference"
+  | "synthesized_profile";
+export type BookCraftRightsBasis =
+  | "public_domain"
+  | "explicit_license"
+  | "user_owned"
+  | "project_owned"
+  | "abstract_observation"
+  | "restricted_reference"
+  | "derived_abstract_profile";
+export type BookCraftSurfaceSpecificity = "general" | "distinctive" | "phrase_level";
+
+export interface BookCraftInfluenceProvenanceV1 {
+  sourceId: string;
+  privateLabel: string;
+  sourceKind: BookCraftSourceKind;
+  rightsBasis: BookCraftRightsBasis;
+  rightsEvidenceIds: string[];
+  sourceFingerprint: string;
+  providerContextAllowed: boolean;
+  phraseComparisonAllowed: boolean;
+  parentProfileId?: string;
+  parentProfileFingerprint?: string;
+  parentSynthesisDepth?: number;
+  ancestryProfileFingerprints?: string[];
+}
+
+export interface BookCraftMechanismV1 {
+  mechanismId: string;
+  dimensionId: string;
+  description: string;
+  polarity: number;
+  strength: number;
+  confidence: number;
+  evidenceIds: string[];
+  surfaceSpecificity: BookCraftSurfaceSpecificity;
+}
+
+export interface BookCraftInfluenceV1 {
+  influenceId: string;
+  requestedWeight: number;
+  provenance: BookCraftInfluenceProvenanceV1;
+  mechanisms: BookCraftMechanismV1[];
+}
+
+export interface BookCraftPolicyV1 {
+  minimumInfluences?: number;
+  maximumInfluences?: number;
+  maximumDominantWeight?: number;
+  minimumInfluenceDiversity?: number;
+  minimumProfileDistanceFromInfluence?: number;
+  maximumSynthesisDepth?: number;
+  minimumProjectVoiceAnchors?: number;
+}
+
+export interface BookCraftCompileInputV1 {
+  outputKind: "evavo_docs_book_craft_compile_input";
+  schemaVersion: 1;
+  programmeId: string;
+  profileId: string;
+  profileVersion: number;
+  influences: BookCraftInfluenceV1[];
+  projectVoiceAnchorIds: string[];
+  narrativeConstraintIds: string[];
+  acceptedPatternIds: string[];
+  rejectedPatternIds: string[];
+  policy?: BookCraftPolicyV1;
+}
+
+export interface BookCraftNormalizedInfluenceV1 {
+  influenceId: string;
+  normalizedWeight: number;
+  sourceKind: BookCraftSourceKind;
+  rightsBasis: BookCraftRightsBasis;
+  sourceFingerprint: string;
+  productionMechanismIds: string[];
+  withheldMechanismIds: string[];
+  ancestryProfileFingerprints: string[];
+  synthesisDepth: number;
+}
+
+export interface BookCraftDimensionV1 {
+  dimensionId: string;
+  value: number;
+  confidence: number;
+  mechanismCount: number;
+  productionDirections: string[];
+  sourceInfluenceIds: string[];
+}
+
+export interface BookCraftInfluenceDistanceV1 {
+  influenceId: string;
+  distance: number;
+}
+
+export interface BookCraftProfileV1 {
+  outputKind: "evavo_docs_book_craft_profile";
+  schemaVersion: 1;
+  contract: typeof BOOK_REVIEW_CRAFT_CONTRACT;
+  authorityMode: "shadow_migration";
+  status: "ready";
+  programmeId: string;
+  profileId: string;
+  profileVersion: number;
+  synthesisDepth: number;
+  normalizedInfluences: BookCraftNormalizedInfluenceV1[];
+  dimensions: BookCraftDimensionV1[];
+  influenceDistances: BookCraftInfluenceDistanceV1[];
+  pairwiseInfluenceDiversity: number;
+  projectVoiceAnchorIds: string[];
+  narrativeConstraintIds: string[];
+  acceptedPatternIds: string[];
+  rejectedPatternIds: string[];
+  providerInstruction: string;
+  profileFingerprint: string;
+  providerBriefContainsNamedSources: false;
+  directImitationPermitted: false;
+  phraseLaunderingPermitted: false;
+  projectOwnedExpressionRequired: true;
+  canonicalAdmissionAllowed: false;
+  websiteCompatibilityRuntimeStillAuthoritative: true;
+  dualAuthoritativeWritesAllowed: false;
+  runtimeCutoverApproved: false;
+  publicationPerformed: false;
+}
+
+export interface BookCraftCompileResultV1 {
+  outputKind: "evavo_docs_book_craft_compile_result";
+  schemaVersion: 1;
+  status: "ready" | "blocked";
+  profile?: BookCraftProfileV1;
+  profileFingerprint?: string;
+  blockers: string[];
+  warnings: string[];
+  canonicalAdmissionAllowed: false;
+  publicationPerformed: false;
+}
+
+export interface BookPhraseReferenceV1 {
+  referenceId: string;
+  sourceKind: BookCraftSourceKind;
+  rightsEvidenceIds: string[];
+  text: string;
+  textSha256?: string;
+  allowQuotedUse?: boolean;
+}
+
+export interface BookPhraseOverlapScanInputV1 {
+  outputKind: "evavo_docs_book_phrase_overlap_scan_input";
+  schemaVersion: 1;
+  scanId: string;
+  candidateId: string;
+  candidateText: string;
+  references: BookPhraseReferenceV1[];
+  warningNgram?: number;
+  blockingNgram?: number;
+}
+
+export interface BookPhraseOverlapFindingV1 {
+  findingId: string;
+  referenceId: string;
+  overlapWords: number;
+  candidateTokenIndex: number;
+  referenceTokenIndex: number;
+  matchSha256: string;
+  severity: "warning" | "blocking";
+  allowedQuotedUse: boolean;
+}
+
+export interface BookPhraseOverlapScanV1 {
+  outputKind: "evavo_docs_book_phrase_overlap_scan";
+  schemaVersion: 1;
+  contract: typeof BOOK_REVIEW_CRAFT_CONTRACT;
+  scanId: string;
+  candidateId: string;
+  candidateTextSha256: string;
+  warningNgram: number;
+  blockingNgram: number;
+  referenceFingerprints: Array<{ referenceId: string; textSha256: string }>;
+  findings: BookPhraseOverlapFindingV1[];
+  blockingFindingIds: string[];
+  accepted: boolean;
+  scanFingerprint: string;
+  rawReferenceTextPersisted: false;
+  rawCandidateTextPersisted: false;
+  canonicalAdmissionAllowed: false;
+  publicationPerformed: false;
+}
+
+export interface BookPhraseOverlapScanResultV1 {
+  outputKind: "evavo_docs_book_phrase_overlap_scan_result";
+  schemaVersion: 1;
+  status: "accepted" | "blocked";
+  scan?: BookPhraseOverlapScanV1;
+  blockers: string[];
+  warnings: string[];
+  canonicalAdmissionAllowed: false;
+  publicationPerformed: false;
+}
+
+export type BookReviewDomain =
+  | "source_coverage"
+  | "plot_and_causality"
+  | "continuity"
+  | "character_arc"
+  | "character_voice"
+  | "relationships"
+  | "timeline"
+  | "geography_and_travel"
+  | "world_state"
+  | "historical_accuracy"
+  | "research_support"
+  | "scene_purpose"
+  | "scene_choreography"
+  | "dialogue"
+  | "viewpoint"
+  | "emotional_truth"
+  | "prose_specificity"
+  | "sentence_and_paragraph_rhythm"
+  | "description_utility"
+  | "pacing"
+  | "setup_and_payoff"
+  | "theme"
+  | "title_quality"
+  | "anti_genericity"
+  | "copy_editing"
+  | "proofreading"
+  | "format_and_publication"
+  | "independent_release_review";
+
+export interface BookReviewPolicyV1 {
+  requiredDomains: BookReviewDomain[];
+  highRiskDomains: BookReviewDomain[];
+  requireEveryUnitInEveryRequiredDomain: boolean;
+  requireIndependentCheckForHighRisk: boolean;
+  minimumDistinctReviewersForHighRisk: number;
+  allowAdditionalPassesWithoutLimit: boolean;
+  allowAdditionalMessagesWithoutLimit: boolean;
+  stopOnlyWhenCoverageAndFindingsComplete: boolean;
+}
