@@ -65,14 +65,13 @@ jobs:
             '1448bbe0055840501ed78026ea23fb0b92e76ed10ea8839c16e8938c5a04edc2  scripts/check-book-illustration-intelligence.mjs' \
             '07b841c6385237f6af1068e92bf39fe40d9d03e8501d34af25d2159e92be6cc7  scripts/evavo-art-book-illustration-cli.mjs' | sha256sum -c -
           node scripts/check-book-illustration-intelligence.mjs
-      - name: Commit exact reconstructed source
+      - name: Commit exact reconstructed non-workflow source
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
           git add -- \
-            .github/workflows/book-illustration-intelligence.yml \
             docs/book-illustration-intelligence.md \
             packages/contracts/src/book-illustration-intelligence.ts \
             packages/contracts/src/index.ts \
@@ -83,4 +82,8 @@ jobs:
           git diff --cached --check
           git diff --cached --quiet && { echo "No reconstructed source changes found"; exit 1; }
           git commit -m "feat(book): add print illustration intelligence"
+      - name: Push reconstructed source commit
+        shell: bash
+        run: |
+          set -euo pipefail
           git push origin "HEAD:${GITHUB_REF_NAME}"
