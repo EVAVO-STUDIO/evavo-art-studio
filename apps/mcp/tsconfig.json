@@ -11,6 +11,7 @@
     { "path": "../../packages/book-art-runtime" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
+    { "path": "../../packages/delivery-optimizer" },
     { "path": "../../packages/art-direction" },
     { "path": "../../packages/sprite-planner" },
     { "path": "../../packages/sprite-supervisor" },
