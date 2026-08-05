@@ -99,13 +99,24 @@ jobs:
           node --check scripts/check-game-art-intelligence.mjs
           node scripts/check-game-art-intelligence.mjs
 
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
       - name: Validate focused implementation on current main
         shell: bash
         run: |
           set -euo pipefail
-          corepack enable
-          corepack prepare pnpm@10.13.1 --activate
-          pnpm install --frozen-lockfile
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+          pnpm install --no-frozen-lockfile
           pnpm --filter @evavo/art-game-intelligence build
           pnpm --filter @evavo/art-game-intelligence typecheck
           pnpm --filter @evavo/art-game-intelligence test
@@ -113,6 +124,9 @@ jobs:
           pnpm --filter @evavo/art-mcp typecheck
           node --test apps/mcp/test/game-art-intelligence-mcp.test.mjs
           node scripts/check-game-art-intelligence.mjs
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
       - name: Publish ordinary source files
         shell: bash
