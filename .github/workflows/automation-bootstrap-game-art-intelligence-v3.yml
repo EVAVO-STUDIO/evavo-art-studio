@@ -1,4 +1,4 @@
-name: Bootstrap sealed Game Art Intelligence v3
+name: Rebase sealed Game Art Intelligence onto current main
 
 on:
   push:
@@ -8,21 +8,21 @@ permissions:
   contents: write
 
 concurrency:
-  group: bootstrap-game-art-intelligence-v3-20260805
+  group: rebase-game-art-intelligence-current-main
   cancel-in-progress: false
 
 jobs:
-  publish:
+  publish-source-without-workflow:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
-      EXPECTED_MAIN_SHA: 5b08bdab285f7e28fd5d4fc2cc3d7d6fb4984ab0
-      TARGET_BRANCH: agent/game-art-intelligence-20260805
+      EXPECTED_MAIN_SHA: 308a368263f74d7bafca6f11abcd982a1f213759
+      TARGET_BRANCH: agent/game-art-intelligence-current-main-20260805
       PAYLOAD_ROOT: .github/automation/game-art-intelligence-v2
       ARCHIVE_SHA256: b571a8e0936d8dcb25185f5942f763774e0964b5adead29d280451fc7aa68c37
       PATCH_SHA256: f7c5541dfac45f31736cb98c3b47f2d6f982960ac6850a4666bbc085bee833f3
     steps:
-      - name: Check out exact bootstrap source
+      - name: Check out exact bootstrap carrier
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
@@ -34,7 +34,10 @@ jobs:
           set -euo pipefail
           mapfile -t chunks < <(find "$PAYLOAD_ROOT" -maxdepth 1 -type f -name 'chunk-*.b64' -printf '%f\n' | LC_ALL=C sort)
           test "${#chunks[@]}" -eq 24
-          for index in $(seq 0 23); do printf -v expected 'chunk-%03d.b64' "$index"; test "${chunks[$index]}" = "$expected"; done
+          for index in $(seq 0 23); do
+            printf -v expected 'chunk-%03d.b64' "$index"
+            test "${chunks[$index]}" = "$expected"
+          done
           : > /tmp/game-art-intelligence.patch.gz.b64
           for chunk in "${chunks[@]}"; do cat "$PAYLOAD_ROOT/$chunk" >> /tmp/game-art-intelligence.patch.gz.b64; done
           base64 --decode /tmp/game-art-intelligence.patch.gz.b64 > /tmp/game-art-intelligence.patch.gz
@@ -42,22 +45,36 @@ jobs:
           gzip --decompress --stdout /tmp/game-art-intelligence.patch.gz > /tmp/game-art-intelligence.patch
           printf '%s  %s\n' "$PATCH_SHA256" /tmp/game-art-intelligence.patch | sha256sum -c -
 
-      - name: Verify exact refs and apply one commit
+      - name: Apply sealed source to exact current main
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main" "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main"
           test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
-          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$EXPECTED_MAIN_SHA"
+          if git ls-remote --exit-code origin "refs/heads/$TARGET_BRANCH" >/dev/null 2>&1; then
+            echo "::error title=Target branch already exists::$TARGET_BRANCH"
+            exit 1
+          fi
           git config user.name "EVAVO Automation"
           git config user.email "evavo-automation@users.noreply.github.com"
           git switch --force-create "$TARGET_BRANCH" refs/remotes/origin/main
-          git am --whitespace=error-all /tmp/game-art-intelligence.patch
+          if ! git am --3way --whitespace=error-all /tmp/game-art-intelligence.patch; then
+            echo "::group::Rebase conflict evidence"
+            git status --short
+            git diff --name-only --diff-filter=U
+            for path in $(git diff --name-only --diff-filter=U); do
+              echo "--- $path"
+              git checkout --conflict=merge -- "$path" || true
+              sed -n '1,260p' "$path" || true
+            done
+            echo "::endgroup::"
+            exit 1
+          fi
           test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
           test "$(git log -1 --format=%s)" = "feat(game-art): add project-wide production intelligence"
           git diff --check HEAD^ HEAD
-          git diff --name-only HEAD^ HEAD | LC_ALL=C sort > /tmp/actual-paths.txt
-          cat > /tmp/expected-paths.txt <<'PATHS'
+          git diff --name-only HEAD^ HEAD | LC_ALL=C sort > /tmp/full-paths.txt
+          cat > /tmp/expected-full-paths.txt <<'PATHS'
           .github/workflows/game-art-intelligence.yml
           apps/mcp/package.json
           apps/mcp/src/game-intelligence.ts
@@ -77,40 +94,96 @@ jobs:
           packages/game-art-intelligence/tsconfig.json
           scripts/check-game-art-intelligence.mjs
           PATHS
-          LC_ALL=C sort -o /tmp/expected-paths.txt /tmp/expected-paths.txt
-          diff -u /tmp/expected-paths.txt /tmp/actual-paths.txt
+          LC_ALL=C sort -o /tmp/expected-full-paths.txt /tmp/expected-full-paths.txt
+          diff -u /tmp/expected-full-paths.txt /tmp/full-paths.txt
           node --check scripts/check-game-art-intelligence.mjs
           node scripts/check-game-art-intelligence.mjs
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
-          git rev-parse HEAD > /tmp/feature-sha.txt
 
-      - name: Push exact feature commit
+      - name: Validate focused implementation on current main
         shell: bash
         run: |
           set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10.13.1 --activate
+          pnpm install --frozen-lockfile
+          pnpm --filter @evavo/art-game-intelligence build
+          pnpm --filter @evavo/art-game-intelligence typecheck
+          pnpm --filter @evavo/art-game-intelligence test
+          pnpm --filter @evavo/art-mcp build
+          pnpm --filter @evavo/art-mcp typecheck
+          node --test apps/mcp/test/game-art-intelligence-mcp.test.mjs
+          node scripts/check-game-art-intelligence.mjs
+
+      - name: Publish ordinary source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/game-art-intelligence.yml
+          git commit --amend --no-edit
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
+          git diff --check HEAD^ HEAD
+          git diff --name-only HEAD^ HEAD | LC_ALL=C sort > /tmp/published-paths.txt
+          cat > /tmp/expected-published-paths.txt <<'PATHS'
+          apps/mcp/package.json
+          apps/mcp/src/game-intelligence.ts
+          apps/mcp/test/game-art-intelligence-mcp.test.mjs
+          apps/mcp/tsconfig.json
+          docs/game-art-intelligence.md
+          package.json
+          packages/game-art-intelligence/package.json
+          packages/game-art-intelligence/src/adaptive.ts
+          packages/game-art-intelligence/src/canonical.ts
+          packages/game-art-intelligence/src/catalogue.ts
+          packages/game-art-intelligence/src/compiler.ts
+          packages/game-art-intelligence/src/geometry-palette.ts
+          packages/game-art-intelligence/src/index.ts
+          packages/game-art-intelligence/src/types.ts
+          packages/game-art-intelligence/test/game-art-intelligence.test.mjs
+          packages/game-art-intelligence/tsconfig.json
+          scripts/check-game-art-intelligence.mjs
+          PATHS
+          LC_ALL=C sort -o /tmp/expected-published-paths.txt /tmp/expected-published-paths.txt
+          diff -u /tmp/expected-published-paths.txt /tmp/published-paths.txt
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git rev-parse HEAD > /tmp/feature-sha.txt
           git push origin "HEAD:refs/heads/$TARGET_BRANCH"
           test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$(cat /tmp/feature-sha.txt)"
 
-      - name: Write receipt
+      - name: Write bounded bootstrap receipt
         shell: bash
         run: |
           node <<'NODE'
-          const fs = require("node:fs");
-          fs.writeFileSync("/tmp/game-art-intelligence-bootstrap.json", `${JSON.stringify({schemaVersion:"1.0",receiptType:"evavo-game-art-intelligence-bootstrap",repository:process.env.GITHUB_REPOSITORY,runId:process.env.GITHUB_RUN_ID,expectedMainSha:process.env.EXPECTED_MAIN_SHA,targetBranch:process.env.TARGET_BRANCH,featureSha:fs.readFileSync("/tmp/feature-sha.txt","utf8").trim(),archiveSha256:process.env.ARCHIVE_SHA256,patchSha256:process.env.PATCH_SHA256,changedPaths:fs.readFileSync("/tmp/actual-paths.txt","utf8").trim().split("\n"),exactParentVerified:true,exactPathScopeVerified:true,permanentCheckerPassed:true,providerCalled:false,runtimeJobSubmitted:false,targetRepositoryMutated:false,selectionPerformed:false,promotionPerformed:false,publicationPerformed:false},null,2)}\n`,{mode:0o600});
+          const fs = require('node:fs');
+          const receipt = {
+            schemaVersion: '1.0',
+            receiptType: 'evavo-game-art-intelligence-current-main-bootstrap',
+            repository: process.env.GITHUB_REPOSITORY,
+            runId: process.env.GITHUB_RUN_ID,
+            expectedMainSha: process.env.EXPECTED_MAIN_SHA,
+            targetBranch: process.env.TARGET_BRANCH,
+            featureSha: fs.readFileSync('/tmp/feature-sha.txt', 'utf8').trim(),
+            archiveSha256: process.env.ARCHIVE_SHA256,
+            patchSha256: process.env.PATCH_SHA256,
+            publishedPaths: fs.readFileSync('/tmp/published-paths.txt', 'utf8').trim().split('\n'),
+            focusedValidationPassed: true,
+            permanentCheckerPassed: true,
+            permanentWorkflowDeferredToWorkflowWriter: true,
+            providerCalled: false,
+            runtimeJobSubmitted: false,
+            targetRepositoryMutated: false,
+            selectionPerformed: false,
+            promotionPerformed: false,
+            deploymentPerformed: false,
+            publicationPerformed: false
+          };
+          fs.writeFileSync('/tmp/game-art-intelligence-current-main-bootstrap.json', `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
           NODE
 
-      - name: Upload receipt
+      - name: Upload bounded receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: game-art-intelligence-bootstrap-${{ github.run_id }}
-          path: /tmp/game-art-intelligence-bootstrap.json
+          name: game-art-intelligence-current-main-bootstrap-${{ github.run_id }}
+          path: /tmp/game-art-intelligence-current-main-bootstrap.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 9
-
-      - name: Delete disposable bootstrap branch
-        if: success()
-        shell: bash
-        run: git push origin --delete "$GITHUB_REF_NAME" || echo "::warning::bootstrap cleanup deferred"
-
-# Triggered after exact carrier-tree construction.
