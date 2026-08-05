@@ -7,7 +7,12 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const paths = Object.freeze({
   source: "apps/mcp/src/review.ts",
+  contract: "apps/mcp/src/batch-review-contract.ts",
+  files: "apps/mcp/src/batch-review-files.ts",
+  gates: "apps/mcp/src/batch-review-gates.ts",
+  batch: "apps/mcp/src/batch-review.ts",
   tests: "apps/mcp/test/brass-review-mcp.test.mjs",
+  batchTests: "apps/mcp/test/brass-batch-review-mcp.test.mjs",
   package: "apps/mcp/package.json",
   rootPackage: "package.json",
   tsconfig: "apps/mcp/tsconfig.json",
@@ -39,6 +44,9 @@ const forbidTokens = (label, value, tokens) => {
   }
 };
 
+const batchSource = [source.contract, source.files, source.gates, source.batch].join("\n");
+const testSource = [source.tests, source.batchTests].join("\n");
+
 requireTokens("source", source.source ?? "", [
   "evavo_brass_art_review_mcp_v1",
   "EVAVO_ART_REVIEW_ALLOWED_ROOTS",
@@ -49,10 +57,13 @@ requireTokens("source", source.source ?? "", [
   "compile_art_production_plan",
   "inspect_art_repository",
   "inspect_sprite_frame_quality",
+  "inspect_art_batch_quality",
   "inspect_sprite_sequence_quality",
   "assertPathWithinAllowedRoots",
   "analyseDecodedSpriteFrame",
+  "reviewArtBatchDirectory",
   "analyseSpriteSequenceManifestFile",
+  "gameOwnedRoleRequired: true",
   "writesEnabled: false",
   "providerExecutionAllowed: false",
   "runtimeJobSubmissionAllowed: false",
@@ -66,27 +77,66 @@ requireTokens("source", source.source ?? "", [
   "arbitraryGitArgumentsAllowed: false",
   "startBrassArtReviewServer",
 ]);
-forbidTokens("source", source.source ?? "", [
-  "registerRuntimeTools",
-  "registerProviderTools",
-  "registerBookArtTools",
-  "registerSelectionTools",
-  "registerSpriteFamilyTools",
-  "buildSpriteAtlasPackage",
-  "writeGodotSpriteFramesImporter",
-  "LocalRuntimeRepository",
-  "LocalArtifactStore",
-  "EVAVO_ART_ALLOW_WRITES",
-  "EVAVO_ART_RUNTIME_ROOT",
-  "EVAVO_ART_ARTIFACT_ROOT",
-  "node:child_process",
-  "git push",
-  "git commit",
-  "shell: true",
+requireTokens("batch-source", batchSource, [
+  "evavo_brass_art_batch_review_v1",
+  "reviewArtBatchDirectory",
+  "stableFileBytes",
+  "roleId",
+  "game-owned media role",
+  "maximumFiles",
+  "maximumDepth",
+  "maximumTotalBytes",
+  "ART_BATCH_SYMLINK_ENTRY",
+  "ART_BATCH_PORTABLE_COLLISION",
+  "ART_BATCH_FILE_CHANGED",
+  "handle.readFile()",
+  "exactSource",
+  "decodedPixels",
+  'scope: "complete-reviewed-batch"',
+  "technical-pass-human-review-required",
+  "background-mastering-required",
+  "canvas-or-crop-rework-required",
+  "edge-mastering-required",
+  "humanCreativeApprovalRequired: true",
+  "nativeGodotApprovalRequired: true",
+  "mutationPerformed: false",
+  "targetRepositoryMutationAllowed: false",
+  "deletionAuthority: false",
+  "promotionAuthority: false",
+  "publicationAuthority: false",
 ]);
-requireTokens("tests", source.tests ?? "", [
+for (const [label, value] of [
+  ["source", source.source ?? ""],
+  ["batch-source", batchSource],
+]) {
+  forbidTokens(label, value, [
+    "registerRuntimeTools",
+    "registerProviderTools",
+    "registerBookArtTools",
+    "registerSelectionTools",
+    "registerSpriteFamilyTools",
+    "buildSpriteAtlasPackage",
+    "writeGodotSpriteFramesImporter",
+    "LocalRuntimeRepository",
+    "LocalArtifactStore",
+    "EVAVO_ART_ALLOW_WRITES",
+    "EVAVO_ART_RUNTIME_ROOT",
+    "EVAVO_ART_ARTIFACT_ROOT",
+    "node:child_process",
+    "writeFile",
+    "unlink",
+    "rm(",
+    "git push",
+    "git commit",
+    "shell: true",
+  ]);
+}
+requireTokens("tests", testSource, [
   'test("review roots are explicit, canonical and duplicate-free"',
-  'test("review profile exposes exactly six non-writing tools"',
+  'test("review profile exposes exactly seven non-writing tools"',
+  'test("batch review analyses complete stable bytes and groups duplicates"',
+  'test("batch review retains exact source identity for decode failures"',
+  'test("batch review fails closed on role, file limits and symbolic links"',
   'test("review source registers only the governed inspection and planning inventory"',
   'test("review source imports no provider, runtime, artifact or write implementation"',
   'test("symlinked review roots fail closed"',
@@ -96,7 +146,12 @@ requireTokens("docs", source.docs ?? "", [
   "EVAVO_ART_REVIEW_ALLOWED_ROOTS",
   "art_review_capabilities",
   "inspect_sprite_frame_quality",
-  "inspect_sprite_sequence_quality",
+  "inspect_art_batch_quality",
+  "evavo_brass_art_batch_review_v1",
+  "roleId",
+  "complete reviewed batch",
+  "exact source-byte duplicates",
+  "decoded-pixel duplicates",
   "writesEnabled = false",
   "Development Studio",
 ]);
@@ -137,9 +192,7 @@ try {
 }
 
 const registrations = [
-  ...(source.source ?? "").matchAll(
-    /server\.registerTool\(\s*"([^"]+)"/gu,
-  ),
+  ...(source.source ?? "").matchAll(/server\.registerTool\(\s*"([^"]+)"/gu),
 ].map((match) => match[1]);
 const expected = [
   "art_review_capabilities",
@@ -147,6 +200,7 @@ const expected = [
   "compile_art_production_plan",
   "inspect_art_repository",
   "inspect_sprite_frame_quality",
+  "inspect_art_batch_quality",
   "inspect_sprite_sequence_quality",
 ];
 if (registrations.join("|") !== expected.join("|")) {
@@ -160,7 +214,8 @@ if (errors.length > 0) {
 }
 
 console.log("Brass art review MCP contract passed.");
-console.log("- exactly six inspection and planning tools remain exposed");
+console.log("- exactly seven inspection and planning tools remain exposed");
+console.log("- batch review binds one game-owned role, descriptor-stable bytes and complete-batch duplicate evidence");
 console.log("- explicit canonical review roots are mandatory");
 console.log("- provider, runtime, artifact, target and publication writes remain absent");
 console.log("- build and behavioral tests remain part of the repository check chain");
