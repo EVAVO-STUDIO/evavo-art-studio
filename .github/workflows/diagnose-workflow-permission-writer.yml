@@ -1,4 +1,4 @@
-name: Locate workflow-permission writer
+name: Isolate repository-toolchain file writes
 
 on:
   push:
@@ -18,58 +18,30 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Inspect exact current-main source writers
+      - name: Check out exact current main
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
           test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
           git switch --detach refs/remotes/origin/main
-          python <<'PY'
-          from pathlib import Path
-
-          roots = [Path("scripts"), Path("packages"), Path("apps"), Path(".github")]
-          extensions = {".js", ".mjs", ".cjs", ".ts", ".tsx", ".json", ".yml", ".yaml"}
-          exact_needles = (
-              ".github/workflows/ci.yml",
-              "workflows/ci.yml",
-              "actions: write",
-              "actions:\\n",
-              "actions:",
-              "contents: write",
-              "workflow permission",
-              "workflow-permission",
-              "content-scoped write permissions",
-          )
-          hits = []
-          for root in roots:
-              if not root.exists():
-                  continue
-              for path in root.rglob("*"):
-                  if not path.is_file() or path.suffix not in extensions:
-                      continue
-                  try:
-                      text = path.read_text(encoding="utf-8")
-                  except UnicodeDecodeError:
-                      continue
-                  lowered = text.lower()
-                  if any(needle.lower() in lowered for needle in exact_needles) or (
-                      "actions" in lowered and "write" in lowered
-                  ):
-                      matching = []
-                      for number, line in enumerate(text.splitlines(), start=1):
-                          line_lower = line.lower()
-                          if (
-                              "ci.yml" in line_lower
-                              or "actions" in line_lower
-                              or "content-scoped" in line_lower
-                              or "workflow permission" in line_lower
-                          ):
-                              matching.append((number, line))
-                      hits.append((str(path), matching))
-          for path, matching in sorted(hits):
-              print(f"--- {path}")
-              for number, line in matching:
-                  print(f"{number}: {line}")
-          print(f"matched_files={len(hits)}")
-          PY
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - name: Run adversarial test with source workflow writable
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum .github/workflows/ci.yml | tee /tmp/ci-before-writable.sha
+          node scripts/test-repository-toolchain.mjs
+          sha256sum .github/workflows/ci.yml | tee /tmp/ci-after-writable.sha
+          diff -u /tmp/ci-before-writable.sha /tmp/ci-after-writable.sha
+          git diff --exit-code -- .github/workflows/ci.yml
+      - name: Run adversarial test with source workflow read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod 0444 .github/workflows/ci.yml
+          sha256sum .github/workflows/ci.yml | tee /tmp/ci-before-readonly.sha
+          node scripts/test-repository-toolchain.mjs
+          sha256sum .github/workflows/ci.yml | tee /tmp/ci-after-readonly.sha
+          diff -u /tmp/ci-before-readonly.sha /tmp/ci-after-readonly.sha
+          git diff --exit-code -- .github/workflows/ci.yml
