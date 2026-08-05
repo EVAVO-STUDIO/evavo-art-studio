@@ -1,0 +1,238 @@
+name: Land validated Game Art Intelligence
+
+on:
+  push:
+    branches: [automation/bootstrap-game-art-intelligence-v3-20260805]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: land-game-art-intelligence-20260805
+  cancel-in-progress: false
+
+jobs:
+  land:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      EXPECTED_MAIN_SHA: 5b08bdab285f7e28fd5d4fc2cc3d7d6fb4984ab0
+      TARGET_BRANCH: agent/game-art-intelligence-20260805
+      PAYLOAD_ROOT: .github/automation/game-art-intelligence-v2
+      ARCHIVE_SHA256: b571a8e0936d8dcb25185f5942f763774e0964b5adead29d280451fc7aa68c37
+      PATCH_SHA256: f7c5541dfac45f31736cb98c3b47f2d6f982960ac6850a4666bbc085bee833f3
+      PR_TITLE: feat(game-art): add project-wide production intelligence
+    steps:
+      - name: Check out exact landing authority
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Recover exact sealed commit and bind refs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mapfile -t chunks < <(find "$PAYLOAD_ROOT" -maxdepth 1 -type f -name 'chunk-*.b64' -printf '%f\n' | LC_ALL=C sort)
+          test "${#chunks[@]}" -eq 24
+          for index in $(seq 0 23); do printf -v expected 'chunk-%03d.b64' "$index"; test "${chunks[$index]}" = "$expected"; done
+          : > /tmp/gai.patch.gz.b64
+          for chunk in "${chunks[@]}"; do cat "$PAYLOAD_ROOT/$chunk" >> /tmp/gai.patch.gz.b64; done
+          base64 --decode /tmp/gai.patch.gz.b64 > /tmp/gai.patch.gz
+          printf '%s  %s\n' "$ARCHIVE_SHA256" /tmp/gai.patch.gz | sha256sum -c -
+          gzip -dc /tmp/gai.patch.gz > /tmp/gai.patch
+          printf '%s  %s\n' "$PATCH_SHA256" /tmp/gai.patch | sha256sum -c -
+
+          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main" "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          feature_before="$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)"
+          if [ "$feature_before" = "$EXPECTED_MAIN_SHA" ]; then
+            git config user.name "EVAVO Automation"
+            git config user.email "evavo-automation@users.noreply.github.com"
+            git switch --force-create "$TARGET_BRANCH" refs/remotes/origin/main
+            git am --whitespace=error-all /tmp/gai.patch
+            feature_sha="$(git rev-parse HEAD)"
+            response="$(curl --fail-with-body --silent --show-error --request PATCH \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/heads/$TARGET_BRANCH" \
+              --data "{\"sha\":\"$feature_sha\",\"force\":false}")"
+            node -e 'const r=JSON.parse(process.argv[1]);if(r.object?.sha!==process.argv[2])process.exit(1)' "$response" "$feature_sha"
+          else
+            git switch --force-create "$TARGET_BRANCH" refs/remotes/origin/$TARGET_BRANCH
+            feature_sha="$(git rev-parse HEAD)"
+          fi
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
+          test "$(git log -1 --format=%s)" = "$PR_TITLE"
+          git diff --check HEAD^ HEAD
+          git diff --name-only HEAD^ HEAD | LC_ALL=C sort > /tmp/actual-paths.txt
+          cat > /tmp/expected-paths.txt <<'PATHS'
+          .github/workflows/game-art-intelligence.yml
+          apps/mcp/package.json
+          apps/mcp/src/game-intelligence.ts
+          apps/mcp/test/game-art-intelligence-mcp.test.mjs
+          apps/mcp/tsconfig.json
+          docs/game-art-intelligence.md
+          package.json
+          packages/game-art-intelligence/package.json
+          packages/game-art-intelligence/src/adaptive.ts
+          packages/game-art-intelligence/src/canonical.ts
+          packages/game-art-intelligence/src/catalogue.ts
+          packages/game-art-intelligence/src/compiler.ts
+          packages/game-art-intelligence/src/geometry-palette.ts
+          packages/game-art-intelligence/src/index.ts
+          packages/game-art-intelligence/src/types.ts
+          packages/game-art-intelligence/test/game-art-intelligence.test.mjs
+          packages/game-art-intelligence/tsconfig.json
+          scripts/check-game-art-intelligence.mjs
+          PATHS
+          LC_ALL=C sort -o /tmp/expected-paths.txt /tmp/expected-paths.txt
+          diff -u /tmp/expected-paths.txt /tmp/actual-paths.txt
+          node --check scripts/check-game-art-intelligence.mjs
+          node scripts/check-game-art-intelligence.mjs
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$feature_sha"
+          printf '%s\n' "$feature_sha" > /tmp/feature-sha.txt
+
+      - name: Install and identify FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run complete exact-source validation
+        run: pnpm check
+
+      - name: Prove clean exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          rm -rf examples/legacy-book-artwork-registration/artifacts
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main" "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$(cat /tmp/feature-sha.txt)"
+
+      - name: Resolve or create exact pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          encoded_head="EVAVO-STUDIO%3Aagent%2Fgame-art-intelligence-20260805"
+          pulls="$(curl --fail-with-body --silent --show-error \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls?state=open&head=$encoded_head&base=main&per_page=10")"
+          count="$(node -e 'const p=JSON.parse(process.argv[1]);process.stdout.write(String(p.length))' "$pulls")"
+          if [ "$count" = 0 ]; then
+            body='Project-wide game art intelligence for genre, camera, directions, semantic animation, palette, complete asset packs, Godot delivery, deterministic repair and proposal-only learning. Exact-source validation passed before merge.'
+            pulls="$(curl --fail-with-body --silent --show-error --request POST \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls" \
+              --data "$(node -e 'console.log(JSON.stringify({title:process.env.PR_TITLE,head:process.env.TARGET_BRANCH,base:"main",body:process.argv[1]}))' "$body")")"
+            pr_number="$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).number))' "$pulls")"
+          elif [ "$count" = 1 ]; then
+            pr_number="$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1])[0].number))' "$pulls")"
+          else
+            echo "Multiple open PRs found for exact head" >&2
+            exit 1
+          fi
+          printf '%s\n' "$pr_number" > /tmp/pr-number.txt
+
+      - name: Guarded squash merge exact head
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pr_number="$(cat /tmp/pr-number.txt)"
+          feature_sha="$(cat /tmp/feature-sha.txt)"
+          data="$(node -e 'console.log(JSON.stringify({commit_title:process.env.PR_TITLE,commit_message:"Add deterministic project-wide game art intelligence with exact-source validation and permanent authority boundaries.",sha:process.argv[1],merge_method:"squash"}))' "$feature_sha")"
+          merged="$(curl --fail-with-body --silent --show-error --request PUT \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$pr_number/merge" \
+            --data "$data")"
+          node -e 'const r=JSON.parse(process.argv[1]);if(r.merged!==true||!/^[0-9a-f]{40}$/.test(r.sha))process.exit(1);process.stdout.write(r.sha)' "$merged" > /tmp/main-sha.txt
+          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$(cat /tmp/main-sha.txt)"
+
+      - name: Dispatch exact-current-main validation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          main_sha="$(cat /tmp/main-sha.txt)"
+          payload="$(node -e 'console.log(JSON.stringify({ref:"main",inputs:{expected_sha:process.argv[1],request_source:"evavo-development-studio"}}))' "$main_sha")"
+          curl --fail-with-body --silent --show-error --request POST \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches" \
+            --data "$payload"
+
+      - name: Write bounded landing receipt
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const receipt = {
+            schemaVersion: "1.0",
+            receiptType: "evavo-game-art-intelligence-landing",
+            repository: process.env.GITHUB_REPOSITORY,
+            runId: process.env.GITHUB_RUN_ID,
+            baseSha: process.env.EXPECTED_MAIN_SHA,
+            featureSha: fs.readFileSync("/tmp/feature-sha.txt", "utf8").trim(),
+            pullRequest: Number(fs.readFileSync("/tmp/pr-number.txt", "utf8")),
+            mainSha: fs.readFileSync("/tmp/main-sha.txt", "utf8").trim(),
+            completeRepositoryValidationPassed: true,
+            cleanExactSourcePassed: true,
+            exactCurrentMainValidationDispatched: true,
+            providerCalled: false,
+            runtimeJobSubmitted: false,
+            targetRepositoryMutated: false,
+            artworkApproved: false,
+            selectionPerformed: false,
+            promotionPerformed: false,
+            publicationPerformed: false
+          };
+          fs.writeFileSync("/tmp/game-art-intelligence-landing.json", `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+          NODE
+
+      - name: Upload bounded landing receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: game-art-intelligence-landing-${{ github.run_id }}
+          path: /tmp/game-art-intelligence-landing.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
