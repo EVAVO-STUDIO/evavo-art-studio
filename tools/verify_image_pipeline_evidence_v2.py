@@ -157,8 +157,14 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
 
     source = resolve_inside(source_root, source_path)
     candidate = resolve_inside(candidate_root, candidate_path)
-    actual_source_sha, actual_source_size = sha256_file(source, int(contract["limits"]["maximumSourceBytes"]))
-    actual_candidate_sha, actual_candidate_size = sha256_file(candidate, int(contract["limits"]["maximumSourceBytes"]))
+    actual_source_sha, actual_source_size = sha256_file(
+        source,
+        int(contract["limits"]["maximumSourceBytes"]),
+    )
+    actual_candidate_sha, actual_candidate_size = sha256_file(
+        candidate,
+        int(contract["limits"]["maximumSourceBytes"]),
+    )
     if actual_source_sha != source_sha:
         fail("source bytes differ from work-order evidence")
     if actual_candidate_sha != candidate_sha:
@@ -175,9 +181,13 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
         fail("candidate byte length differs from evaluation evidence")
 
     if args.verify_pixels:
-        source_features = feature_vector(load_image(source, int(contract["limits"]["maximumDecodedPixels"])))
-        candidate_features = source_features if source.resolve() == candidate.resolve() else feature_vector(
-            load_image(candidate, int(contract["limits"]["maximumDecodedPixels"]))
+        maximum_pixels = int(contract["limits"]["maximumDecodedPixels"])
+        source_features = feature_vector(load_image(source, maximum_pixels))
+        candidate_features = (
+            source_features
+            if source.resolve() == candidate.resolve()
+            else feature_vector(load_image(candidate, maximum_pixels))
+        )
         if receipt is not None:
             if canonical_json(receipt.get("beforeFeatures")) != canonical_json(source_features):
                 fail("processing beforeFeatures do not match current source pixels")
