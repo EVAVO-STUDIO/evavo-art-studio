@@ -34,4 +34,4 @@ jobs:
           package-manager-cache: false
 
       - name: Run exact editorial consensus core validation
-        run: bash validation/docs-editorial-consensus/run-core-validation.sh
+        run: bash validation/docs-editorial-consensus/run-core-validation-exact.sh
