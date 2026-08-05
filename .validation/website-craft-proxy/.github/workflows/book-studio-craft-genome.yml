@@ -1,0 +1,124 @@
+name: Book Studio craft-genome proxy retirement
+
+on:
+  push:
+    branches:
+      - main
+      - "agent/book-craft-proxy-*"
+    paths: &craft_paths
+      - ".github/workflows/book-studio-craft-genome.yml"
+      - "package.json"
+      - "tools/evavo-doc-studio/.nvmrc"
+      - "tools/evavo-doc-studio/package.json"
+      - "tools/evavo-doc-studio/package-lock.json"
+      - "tools/evavo-doc-studio/tsconfig.book-studio-craft-genome.json"
+      - "tools/evavo-doc-studio/scripts/check-book-studio-craft-genome.ts"
+      - "tools/evavo-doc-studio/scripts/check-book-studio-craft-provider-contract.ts"
+      - "tools/evavo-doc-studio/scripts/check-book-studio-craft-proxy-route.ts"
+      - "tools/evavo-doc-studio/docs/BOOK_STUDIO_CRAFT_GENOME.md"
+      - "tools/evavo-doc-studio/src/app/api/books/write/craft-genome/**"
+      - "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioCraft*.ts"
+      - "tools/evavo-doc-studio/src/evavo/bookStudio/storyBookStudioDocsSuiteLegacyCraft*.ts"
+      - "tools/evavo-doc-studio/src/evavo/bookStudio/index.ts"
+      - "tools/evavo-doc-studio/src/evavo/cli/bookCommandRegistry.ts"
+      - "scripts/check-doc-studio-lockfile.mjs"
+  pull_request:
+    branches: [main]
+    paths: *craft_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: book-studio-craft-proxy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Retain exact tested source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz --output="${RUNNER_TEMP}/website-source-${GITHUB_SHA}.tar.gz" HEAD
+
+      - name: Upload exact tested source snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: website-source-${{ github.sha }}
+          path: ${{ runner.temp }}/website-source-${{ github.sha }}.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+
+      - name: Use governed Node.js runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version-file: tools/evavo-doc-studio/.nvmrc
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Verify exact dependency authority
+        working-directory: tools/evavo-doc-studio
+        run: node ../../scripts/check-doc-studio-lockfile.mjs
+
+      - name: Install exact Doc Studio dependencies
+        working-directory: tools/evavo-doc-studio
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify craft proxy ownership and source retirement
+        working-directory: tools/evavo-doc-studio
+        run: npx tsx scripts/check-book-studio-craft-genome.ts
+
+      - name: Run adversarial proxy transport and authority checks
+        working-directory: tools/evavo-doc-studio
+        run: npx tsx scripts/check-book-studio-craft-provider-contract.ts
+
+      - name: Run executable public-route and streaming attacks
+        working-directory: tools/evavo-doc-studio
+        run: npx tsx scripts/check-book-studio-craft-proxy-route.ts
+
+      - name: Run strict focused TypeScript
+        working-directory: tools/evavo-doc-studio
+        run: npx tsc --noEmit --project tsconfig.book-studio-craft-genome.json
+
+      - name: Run complete Doc Studio typecheck
+        working-directory: tools/evavo-doc-studio
+        run: npm run typecheck
+
+      - name: Run complete Doc Studio lint
+        working-directory: tools/evavo-doc-studio
+        run: npm run lint
+
+      - name: Run retained Book Studio quality gates
+        working-directory: tools/evavo-doc-studio
+        run: |
+          npm run quality:book-studio
+          npm run quality:book-prose-restraint
+
+      - name: Build complete Doc Studio production application
+        working-directory: tools/evavo-doc-studio
+        run: npm run build
+
+      - name: Build complete root Website workspace
+        run: npm run build
+
+      - name: Prove clean tracked source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"

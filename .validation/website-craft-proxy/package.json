@@ -1,0 +1,13 @@
+{
+  "name": "website-craft-proxy-validation",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "next": "file:./stubs/next"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.8",
+    "tsx": "4.20.3",
+    "typescript": "5.9.3"
+  }
+}
