@@ -1,3 +1,4 @@
+export * from "./book-illustration-intelligence.js";
 export * from "./book-production.js";
 export * from "./book-production-profile.js";
 export * from "./book-production-docs-release.js";
