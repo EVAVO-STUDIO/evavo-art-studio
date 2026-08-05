@@ -24,6 +24,7 @@ import {
 import {
   canonicalDirectory,
   discoverImageFiles,
+  selectImageFiles,
   stableFileBytes,
 } from "./batch-review-files.js";
 import {
@@ -78,13 +79,30 @@ export async function reviewArtBatchDirectory(
   const expectations = normalizeExpectations(input.expectations);
   const canonicalExpectations = canonicalJsonValue(expectations);
   const root = await canonicalDirectory(input.directoryPath, input.allowedRoots);
-  const discovered = await discoverImageFiles({
-    root,
-    allowedRoots: input.allowedRoots,
-    recursive: input.recursive ?? true,
-    maximumFiles,
-    maximumDepth,
-  });
+  const selectionMode =
+    input.relativePaths === undefined ? "directory" : "exact-relative-paths";
+  const discovered =
+    input.relativePaths === undefined
+      ? await discoverImageFiles({
+          root,
+          allowedRoots: input.allowedRoots,
+          recursive: input.recursive ?? true,
+          maximumFiles,
+          maximumDepth,
+        })
+      : await selectImageFiles({
+          root,
+          allowedRoots: input.allowedRoots,
+          relativePaths: input.relativePaths,
+          maximumFiles,
+        });
+  const selectedRelativePaths = discovered.files.map((file) => file.relativePath);
+  const selectionSha256 = sha256(
+    Buffer.from(
+      JSON.stringify(canonicalJsonValue(selectedRelativePaths)),
+      "utf8",
+    ),
+  );
   const declaredBytes = discovered.files.reduce(
     (total, file) => total + file.sizeBytes,
     0,
@@ -186,6 +204,8 @@ export async function reviewArtBatchDirectory(
     schemaVersion: "1.0",
     root,
     roleId,
+    selectionMode,
+    selectionSha256,
     expectations: canonicalExpectations,
     files: items.map((item) => ({
       path: item.path,
@@ -201,6 +221,8 @@ export async function reviewArtBatchDirectory(
     review: BRASS_ART_BATCH_REVIEW_SCHEMA,
     root,
     roleId,
+    selectionMode,
+    selectionSha256,
     technicalStatus: failedFiles === 0 ? "passed" : "blocked",
     batchIdentitySha256: sha256(
       Buffer.from(JSON.stringify(canonicalJsonValue(identityDocument)), "utf8"),
@@ -216,6 +238,8 @@ export async function reviewArtBatchDirectory(
       detail,
     }),
     discovery: Object.freeze({
+      selectionMode,
+      selectionSha256,
       visitedEntries: discovered.visitedEntries,
       supportedImageFiles: discovered.files.length,
       ignoredDirectories: discovered.ignoredDirectories,
@@ -235,6 +259,7 @@ export async function reviewArtBatchDirectory(
       exactSource: sourceDuplicateGroups,
       decodedPixels: decodedDuplicateGroups,
       scope: "complete-reviewed-batch",
+      selectionMode,
     }),
     items: Object.freeze(items),
     humanCreativeApprovalRequired: true,
@@ -246,7 +271,7 @@ export async function reviewArtBatchDirectory(
     publicationAuthority: false,
     truthBoundaries: Object.freeze([
       "A batch technical pass is not a judgement that the artwork is creatively good.",
-      "Shared expectations are valid only for one role-consistent folder or batch.",
+      "Shared expectations are valid only for one role-consistent folder or exact selected batch.",
       "Duplicate evidence does not authorise deletion or canonical selection.",
       "Only Development Studio may admit evidence and publish target changes.",
     ]),
