@@ -1,0 +1,60 @@
+    return "1970-01-01T00:00:00.000Z";
+  }
+  return value;
+}
+
+function text(
+  value: unknown,
+  label: string,
+  blockers: string[],
+  maximum: number,
+): string {
+  if (typeof value !== "string" || !value.trim() || value.length > maximum) {
+    blockers.push(`${label} must be non-empty bounded text.`);
+    return "invalid";
+  }
+  return value;
+}
+
+function provider(value: unknown, label: string, blockers: string[]): BookProviderId {
+  if (value !== "chatgpt" && value !== "claude" && value !== "other_compatible_model") {
+    blockers.push(`${label} is unsupported.`);
+    return "other_compatible_model";
+  }
+  return value;
+}
+
+function literal(
+  value: unknown,
+  expected: unknown,
+  message: string,
+  blockers: string[],
+): void {
+  if (value !== expected) blockers.push(message);
+}
+
+function falseAuthority(value: unknown, label: string, blockers: string[]): void {
+  if (value !== false) blockers.push(`${label} must remain false.`);
+}
+
+function duplicates(values: string[]): string[] {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) repeated.add(value);
+    seen.add(value);
+  }
+  return [...repeated].sort();
+}
+
+function sameSet(left: string[], right: string[]): boolean {
+  return canonicalBookJson([...new Set(left)].sort()) === canonicalBookJson([...new Set(right)].sort());
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function round(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
