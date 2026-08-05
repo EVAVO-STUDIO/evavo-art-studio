@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1.0",
+  "contract": "evavo.executable-image-pipeline.v1",
+  "schemas": {
+    "styleSelection": "evavo.image-style-reference-selection.v1",
+    "styleBank": "evavo.image-style-reference-bank.v1",
+    "workOrder": "evavo.image-reference-work-order.v1",
+    "processingReceipt": "evavo.image-processing-receipt.v1",
+    "candidateEvaluation": "evavo.image-candidate-evaluation.v1"
+  },
+  "backends": [
+    {
+      "id": "python-pillow",
+      "priority": 10,
+      "supports": [
+        "inspect",
+        "crop-safe",
+        "canvas-normalize",
+        "resize",
+        "connected-matte-to-alpha",
+        "luminance-to-alpha",
+        "edge-decontaminate",
+        "hidden-rgb-rebuild",
+        "palette-normalize",
+        "linework-strengthen",
+        "convert",
+        "optimize"
+      ]
+    },
+    {
+      "id": "powershell-system-drawing",
+      "priority": 30,
+      "supports": [
+        "inspect",
+        "canvas-normalize",
+        "resize",
+        "convert"
+      ]
+    }
+  ],
+  "limits": {
+    "maximumSourceBytes": 2147483648,
+    "maximumDecodedPixels": 220000000,
+    "maximumReferencesPerBank": 10000,
+    "defaultStyleDistanceThreshold": 0.35,
+    "maximumStyleDistanceThreshold": 0.75,
+    "minimumCandidateBytes": 128
+  },
+  "styleFeatures": [
+    "dimensions",
+    "aspect-ratio",
+    "alpha-usage",
+    "luminance-mean",
+    "luminance-deviation",
+    "entropy",
+    "edge-density",
+    "red-accent-ratio",
+    "perceptual-dhash",
+    "active-occupancy-grid",
+    "dominant-palette"
+  ],
+  "acceptance": {
+    "exactSourceHashRequired": true,
+    "createOnlyCandidateRequired": true,
+    "targetCanvasRequired": true,
+    "alphaPolicyRequired": true,
+    "runtimeFormatRequired": true,
+    "beforeAndAfterFeaturesRequired": true,
+    "sourceAndCandidateHashesRequired": true,
+    "processorIdentityRequired": true,
+    "independentCandidateEvaluationRequired": true,
+    "creativeApprovalSeparate": true,
+    "runtimeApprovalSeparate": true
+  },
+  "effects": {
+    "providerExecution": false,
+    "sourceOverwrite": false,
+    "sourceDeletion": false,
+    "targetRepositoryMutation": false,
+    "publication": false
+  }
+}
