@@ -1,0 +1,38 @@
+name: Executable image pipeline
+
+on:
+  pull_request:
+    paths:
+      - "config/executable-image-pipeline.v1.json"
+      - "requirements-image-pipeline.txt"
+      - "tools/image_style_features.py"
+      - "tools/build_image_style_reference_bank.py"
+      - "tools/process_image_work_order.py"
+      - "tools/process_image_work_order_system_drawing.ps1"
+      - "tools/evaluate_image_candidate.py"
+      - "tools/verify_executable_image_pipeline.py"
+      - ".github/workflows/executable-image-pipeline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: executable-image-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Install deterministic image backend
+        run: python3 -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
+      - name: Compile Python sources
+        run: python3 -m py_compile tools/image_style_features.py tools/build_image_style_reference_bank.py tools/process_image_work_order.py tools/evaluate_image_candidate.py tools/verify_executable_image_pipeline.py
+      - name: Run executable and adversarial image checks
+        run: python3 tools/verify_executable_image_pipeline.py
