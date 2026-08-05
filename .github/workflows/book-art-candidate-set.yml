@@ -1,0 +1,78 @@
+name: Book Art Candidate Set
+
+on:
+  push:
+    branches:
+      - main
+      - agent/book-candidate-set-quality-20260806
+    paths: &candidate_set_paths
+      - ".github/workflows/book-art-candidate-set.yml"
+      - "packages/contracts/src/book-art-candidate-set.ts"
+      - "packages/contracts/src/index.ts"
+      - "packages/contracts/test/book-art-candidate-set.test.mjs"
+      - "packages/book-art-runtime/src/candidate-set.ts"
+      - "packages/book-art-runtime/package.json"
+      - "packages/book-art-runtime/test/candidate-set-runtime.test.mjs"
+      - "scripts/check-book-art-candidate-set.mjs"
+      - "docs/book-art-candidate-set.md"
+  pull_request:
+    branches: [main]
+    paths: *candidate_set_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: book-art-candidate-set-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install exact workspace
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Check permanent candidate-set boundary
+        run: node scripts/check-book-art-candidate-set.mjs
+
+      - name: Build contract and runtime packages
+        run: |
+          pnpm --filter @evavo/art-contracts build
+          pnpm --filter @evavo/art-book-runtime build
+
+      - name: Run candidate-set attacks
+        run: |
+          node --test packages/contracts/test/book-art-candidate-set.test.mjs
+          node --test packages/book-art-runtime/test/candidate-set-runtime.test.mjs
+
+      - name: Run strict package typechecks
+        run: |
+          pnpm --filter @evavo/art-contracts typecheck
+          pnpm --filter @evavo/art-book-runtime typecheck
+
+      - name: Remove bounded generated lock and prove clean source
+        if: always()
+        run: |
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
