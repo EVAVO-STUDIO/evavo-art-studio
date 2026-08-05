@@ -117,13 +117,12 @@ jobs:
       - name: Run complete repository validation
         run: pnpm check
 
-      - name: Prove patch cleanliness and commit exact scope
+      - name: Prove exact patch scope, commit and push
         shell: bash
         run: |
           set -euo pipefail
           rm -f pnpm-lock.yaml
           git diff --check
-          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -Ev '^ (M|A) ' || true)"
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
           git add \
@@ -137,6 +136,24 @@ jobs:
             packages/contracts/src/book-production-docs-release.ts \
             packages/contracts/test/book-production-docs-release.test.mjs \
             scripts/check-book-art-docs-release.mjs
+          cat > "${RUNNER_TEMP}/expected-receiver-upgrade-paths.txt" <<'EOF'
+          .github/workflows/book-art-docs-release.yml
+          apps/api/openapi.book-art-docs-release.yaml
+          apps/api/test/book-art-docs-release-api.test.mjs
+          apps/api/test/book-art-docs-release-openapi-contract.test.mjs
+          apps/worker/test/book-art-docs-release-runtime.test.mjs
+          docs/book-art-docs-release.md
+          packages/book-art-runtime/test/docs-release.test.mjs
+          packages/contracts/src/book-production-docs-release.ts
+          packages/contracts/test/book-production-docs-release.test.mjs
+          scripts/check-book-art-docs-release.mjs
+          EOF
+          sed -i 's/^          //' "${RUNNER_TEMP}/expected-receiver-upgrade-paths.txt"
+          sort -o "${RUNNER_TEMP}/expected-receiver-upgrade-paths.txt" "${RUNNER_TEMP}/expected-receiver-upgrade-paths.txt"
+          git diff --cached --name-only | sort > "${RUNNER_TEMP}/actual-receiver-upgrade-paths.txt"
+          diff -u "${RUNNER_TEMP}/expected-receiver-upgrade-paths.txt" "${RUNNER_TEMP}/actual-receiver-upgrade-paths.txt"
+          test -z "$(git diff --name-only)"
+          test -z "$(git ls-files --others --exclude-standard)"
           git diff --cached --check
           git diff --cached --quiet && {
             echo "No receiver upgrade changes were produced."
