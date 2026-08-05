@@ -120,22 +120,52 @@ jobs:
               )
 
           selected_index = selected_matches[0]
-          selected_indent = lines[selected_index][
+          indent = lines[selected_index][
               : len(lines[selected_index]) - len(lines[selected_index].lstrip())
           ]
-          lines[selected_index : selected_index + 1] = [
-              f"{selected_indent}const selectedProjection: ArtProjection = projection;",
-              f"{selected_indent}const requiredDistinctiveMotifs = uniqueMerge(",
-              f"{selected_indent}  base.antiGeneric?.requiredDistinctiveMotifs,",
-              f"{selected_indent}  override?.antiGeneric?.requiredDistinctiveMotifs,",
-              f"{selected_indent});",
-              f"{selected_indent}const prohibitedGenericMotifs = uniqueMerge(",
-              f"{selected_indent}  base.antiGeneric?.prohibitedGenericMotifs,",
-              f"{selected_indent}  override?.antiGeneric?.prohibitedGenericMotifs,",
-              f"{selected_indent});",
+          merge_inputs = [
+              (
+                  "requiredDistinctiveMotifs",
+                  "base.antiGeneric?.requiredDistinctiveMotifs",
+                  "override?.antiGeneric?.requiredDistinctiveMotifs",
+              ),
+              (
+                  "prohibitedGenericMotifs",
+                  "base.antiGeneric?.prohibitedGenericMotifs",
+                  "override?.antiGeneric?.prohibitedGenericMotifs",
+              ),
+              ("mustHave", "base.mustHave", "override?.mustHave"),
+              ("mustAvoid", "base.mustAvoid", "override?.mustAvoid"),
+              (
+                  "materialLanguage",
+                  "base.materialLanguage",
+                  "override?.materialLanguage",
+              ),
+              (
+                  "lineTreatment",
+                  "base.lineTreatment",
+                  "override?.lineTreatment",
+              ),
+              (
+                  "compositionRules",
+                  "base.compositionRules",
+                  "override?.compositionRules",
+              ),
           ]
 
-          def replace_merge_block(symbol: str) -> None:
+          inserted = [f"{indent}const selectedProjection: ArtProjection = projection;"]
+          for symbol, base_value, override_value in merge_inputs:
+              inserted.extend(
+                  [
+                      f"{indent}const {symbol} = uniqueMerge(",
+                      f"{indent}  {base_value},",
+                      f"{indent}  {override_value},",
+                      f"{indent});",
+                  ]
+              )
+          lines[selected_index : selected_index + 1] = inserted
+
+          def replace_nested_merge(symbol: str) -> None:
               starts = [
                   index
                   for index, line in enumerate(lines)
@@ -145,19 +175,19 @@ jobs:
               ]
               if len(starts) != 1:
                   raise SystemExit(
-                      f"expected one {symbol} merge block, found {len(starts)}"
+                      f"expected one nested {symbol} merge block, found {len(starts)}"
                   )
-
               start = starts[0]
-              ends = [
-                  index
-                  for index in range(start + 1, len(lines))
-                  if lines[index].strip() == "}),"
-              ]
-              if not ends:
-                  raise SystemExit(f"could not find end of {symbol} merge block")
-
-              end = ends[0]
+              end = next(
+                  (
+                      index
+                      for index in range(start + 1, len(lines))
+                      if lines[index].strip() == "}),"
+                  ),
+                  None,
+              )
+              if end is None:
+                  raise SystemExit(f"could not find end of nested {symbol} merge block")
               block_indent = lines[start][
                   : len(lines[start]) - len(lines[start].lstrip())
               ]
@@ -167,8 +197,49 @@ jobs:
                   f"{block_indent}  : {{ {symbol} }}),",
               ]
 
-          replace_merge_block("requiredDistinctiveMotifs")
-          replace_merge_block("prohibitedGenericMotifs")
+          def replace_top_level_merge(symbol: str) -> None:
+              starts = [
+                  index
+                  for index, line in enumerate(lines)
+                  if line.strip().startswith("...(uniqueMerge(")
+                  and f"base.{symbol}" in line
+              ]
+              if len(starts) != 1:
+                  raise SystemExit(
+                      f"expected one top-level {symbol} merge block, found {len(starts)}"
+                  )
+              start = starts[0]
+              end = next(
+                  (
+                      index
+                      for index in range(start, len(lines))
+                      if lines[index].strip().endswith("}),")
+                  ),
+                  None,
+              )
+              if end is None:
+                  raise SystemExit(
+                      f"could not find end of top-level {symbol} merge block"
+                  )
+              block_indent = lines[start][
+                  : len(lines[start]) - len(lines[start].lstrip())
+              ]
+              lines[start : end + 1] = [
+                  f"{block_indent}...({symbol} === undefined",
+                  f"{block_indent}  ? {{}}",
+                  f"{block_indent}  : {{ {symbol} }}),",
+              ]
+
+          replace_nested_merge("requiredDistinctiveMotifs")
+          replace_nested_merge("prohibitedGenericMotifs")
+          for symbol in (
+              "mustHave",
+              "mustAvoid",
+              "materialLanguage",
+              "lineTreatment",
+              "compositionRules",
+          ):
+              replace_top_level_merge(symbol)
 
           path.write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
