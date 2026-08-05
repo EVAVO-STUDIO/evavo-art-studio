@@ -1,0 +1,27 @@
+{
+  "schema": "evavo.image-reference-intelligence.v1",
+  "decisions": ["keep","edit","recreate","generate-variation","reference-only","reject"],
+  "analysis": [
+    "semantic-role","subject-identity","composition","camera","silhouette","palette","line-language","lighting","materials","historical-plausibility","cultural-specificity","anatomy","perspective","pseudo-text","alpha","edge-halo","crop","resolution","compression","animation-continuity","provenance"
+  ],
+  "editOperations": [
+    "crop-safe","canvas-normalize","background-preserve","connected-matte-to-alpha","reviewed-mask-to-alpha","luminance-to-alpha","edge-decontaminate","hidden-rgb-rebuild","retouch","inpaint","outpaint","palette-normalize","linework-strengthen","resize","convert","optimize"
+  ],
+  "recreationRequirements": [
+    "retain-approved-identity","retain-approved-composition","retain-approved-style-evidence","state-defects-to-remove","state-game-role","state-canvas-alpha-and-format","state-negative-constraints","independent-comparison-required"
+  ],
+  "comparison": {
+    "referenceSimilarityIsNotSufficient": true,
+    "gameFitnessRequired": true,
+    "technicalFitnessRequired": true,
+    "historicalReviewRequired": true,
+    "creativeApprovalSeparate": true
+  },
+  "effects": {
+    "providerExecution": false,
+    "sourceOverwrite": false,
+    "sourceDeletion": false,
+    "targetRepositoryMutation": false,
+    "publication": false
+  }
+}
