@@ -101,7 +101,110 @@ jobs:
           bash /tmp/game-art-step-01.sh
           bash /tmp/game-art-step-02.sh
           bash /tmp/game-art-step-03.sh
-          bash /tmp/game-art-step-04.sh
+          python <<'PY'
+          from pathlib import Path
+
+          planner = Path("packages/sprite-planner/src/directions-clips.ts")
+          lines = planner.read_text(encoding="utf-8").splitlines()
+          coverage_matches = [
+              index
+              for index, line in enumerate(lines)
+              if line.strip() == 'if (request.coverage !== "core") {'
+          ]
+          if len(coverage_matches) != 1:
+              raise SystemExit(
+                  f"expected one coverage block, found {len(coverage_matches)}"
+              )
+          coverage_index = coverage_matches[0]
+          feature_matches = [
+              index
+              for index in range(coverage_index + 1, min(coverage_index + 12, len(lines)))
+              if "for (const feature of request.features)" in lines[index]
+          ]
+          if len(feature_matches) != 1:
+              raise SystemExit(
+                  f"expected one coverage-gated explicit feature line, found {len(feature_matches)}"
+              )
+          feature_index = feature_matches[0]
+          del lines[feature_index]
+          closing_index = next(
+              (
+                  index
+                  for index in range(coverage_index + 1, len(lines))
+                  if lines[index].strip() == "}"
+              ),
+              None,
+          )
+          if closing_index is None:
+              raise SystemExit("could not find the coverage block closing brace")
+          outer_indent = lines[coverage_index][
+              : len(lines[coverage_index]) - len(lines[coverage_index].lstrip())
+          ]
+          body_indent = f"{outer_indent}  "
+          lines[closing_index + 1 : closing_index + 1] = [
+              f"{outer_indent}for (const feature of request.features) {{",
+              f"{body_indent}for (const id of FEATURE_CLIPS[feature] ?? []) selected.add(id);",
+              f"{outer_indent}}}",
+          ]
+          planner.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+          tests = Path("packages/sprite-planner/test/sprite-planner.test.mjs")
+          test_lines = tests.read_text(encoding="utf-8").splitlines()
+          anchor_matches = [
+              index
+              for index, line in enumerate(test_lines)
+              if line.strip() == "assert.ok(plan.totals.runtimeFrames > 500);"
+          ]
+          if len(anchor_matches) != 1:
+              raise SystemExit(
+                  f"expected one runtime-frame test anchor, found {len(anchor_matches)}"
+              )
+          anchor_index = anchor_matches[0]
+          closing_test_index = next(
+              (
+                  index
+                  for index in range(anchor_index + 1, min(anchor_index + 5, len(test_lines)))
+                  if test_lines[index].strip() == "});"
+              ),
+              None,
+          )
+          if closing_test_index is None:
+              raise SystemExit("could not find the first test closing line")
+          new_test = [
+              "",
+              'test("honours explicit feature requests at core coverage without widening defaults", () => {',
+              "  const plan = compileSpriteProductionPlan(request({",
+              '    coverage: "core",',
+              '    includeFeatures: ["melee", "ranged", "interact"],',
+              "  }));",
+              '  for (const id of ["attack-light", "attack-ranged", "interact"]) {',
+              "    assert.ok(plan.clips.some((clip) => clip.id === id));",
+              "  }",
+              '  assert.equal(plan.clips.some((clip) => clip.id === "reload"), false);',
+              "});",
+          ]
+          test_lines[closing_test_index + 1 : closing_test_index + 1] = new_test
+          tests.write_text("\n".join(test_lines) + "\n", encoding="utf-8")
+          PY
+          git add \
+            packages/game-art-intelligence/src/compiler.ts \
+            packages/game-art-intelligence/src/geometry-palette.ts \
+            packages/game-art-intelligence/test/game-art-intelligence.test.mjs \
+            packages/sprite-planner/src/directions-clips.ts \
+            packages/sprite-planner/test/sprite-planner.test.mjs
+          git commit --amend --no-edit
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN_SHA"
+          git diff --check HEAD^ HEAD
+          node --check scripts/check-game-art-intelligence.mjs
+          node scripts/check-game-art-intelligence.mjs
+          sha256sum \
+            packages/game-art-intelligence/src/compiler.ts \
+            packages/game-art-intelligence/src/geometry-palette.ts \
+            packages/game-art-intelligence/test/game-art-intelligence.test.mjs \
+            packages/sprite-planner/src/directions-clips.ts \
+            packages/sprite-planner/test/sprite-planner.test.mjs \
+            > /tmp/compatibility-source-sha256.txt
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
