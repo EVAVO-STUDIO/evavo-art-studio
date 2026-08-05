@@ -1,4 +1,4 @@
-name: Isolate repository-toolchain file writes
+name: Isolate workflow mutation by root gate
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 60
     env:
       EXPECTED_MAIN_SHA: 3de1fe91db5b2067de478303666a8a6bf1f51485
     steps:
@@ -26,22 +26,74 @@ jobs:
           test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
           git switch --detach refs/remotes/origin/main
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
-      - name: Run adversarial test with source workflow writable
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+      - name: Install runtime prerequisites
         shell: bash
         run: |
           set -euo pipefail
-          sha256sum .github/workflows/ci.yml | tee /tmp/ci-before-writable.sha
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          node scripts/check-repository-toolchain.mjs
           node scripts/test-repository-toolchain.mjs
-          sha256sum .github/workflows/ci.yml | tee /tmp/ci-after-writable.sha
-          diff -u /tmp/ci-before-writable.sha /tmp/ci-after-writable.sha
+          pnpm install --no-frozen-lockfile
+          rm -f pnpm-lock.yaml
           git diff --exit-code -- .github/workflows/ci.yml
-      - name: Run adversarial test with source workflow read-only
+      - name: Run exact root gates one by one
         shell: bash
         run: |
           set -euo pipefail
-          chmod 0444 .github/workflows/ci.yml
-          sha256sum .github/workflows/ci.yml | tee /tmp/ci-before-readonly.sha
-          node scripts/test-repository-toolchain.mjs
-          sha256sum .github/workflows/ci.yml | tee /tmp/ci-after-readonly.sha
-          diff -u /tmp/ci-before-readonly.sha /tmp/ci-after-readonly.sha
-          git diff --exit-code -- .github/workflows/ci.yml
+          baseline="$(sha256sum .github/workflows/ci.yml | awk '{print $1}')"
+          gate_index=0
+
+          check_workflow() {
+            local label="$1"
+            local current
+            current="$(sha256sum .github/workflows/ci.yml | awk '{print $1}')"
+            if [[ "$current" != "$baseline" ]]; then
+              echo "::error title=Workflow mutation detected::$label changed .github/workflows/ci.yml"
+              echo "gate_index=$gate_index"
+              echo "gate_label=$label"
+              git diff -- .github/workflows/ci.yml
+              exit 42
+            fi
+            echo "workflow unchanged after: $label"
+          }
+
+          run_gate() {
+            local label="$1"
+            shift
+            gate_index=$((gate_index + 1))
+            echo "::group::gate $gate_index - $label"
+            "$@"
+            echo "::endgroup::"
+            check_workflow "$label"
+          }
+
+          run_gate "toolchain installed check" pnpm run toolchain:check:installed
+          run_gate "toolchain adversarial tests" pnpm run toolchain:test
+          run_gate "Brass review MCP authority" pnpm run brass:review:mcp:check
+          run_gate "Brass production MCP authority" pnpm run brass:production:mcp:check
+          run_gate "image reference intelligence" pnpm run reference-intelligence:check
+          run_gate "image processing recipes" pnpm run image-processing-recipes:check
+          run_gate "governed workspace handoff" pnpm run governed-workspace-handoff:check
+          run_gate "RAW_ART production authority" pnpm run raw-art:production:check
+          run_gate "RAW_ART production attacks" pnpm run raw-art:production:test
+          run_gate "domain build" pnpm run build:domain
+          run_gate "Sharp exact runtime" pnpm run sharp-exact-runtime:test
+          run_gate "workspace typecheck" pnpm typecheck
+          run_gate "workspace tests" pnpm test
+          run_gate "workspace builds" pnpm build
+          run_gate "foundation plan authority" pnpm run foundation:check
+          run_gate "foundation delivery authority" pnpm run foundation:delivery:check
+
+          rm -f pnpm-lock.yaml
+          check_workflow "all exact root gates"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
