@@ -64,11 +64,12 @@ export async function validateBookArtCandidateSetWorkOrder(
   if (
     !sourceBriefFingerprint ||
     !metadataSourceBriefFingerprint ||
+    workOrder.sourceBriefFingerprint !== sourceBriefFingerprint ||
     sourceBriefFingerprint !== metadataSourceBriefFingerprint ||
     metadata.sourceBriefFingerprint !== sourceBriefFingerprint
   ) {
     issues.push(
-      "Candidate-set provider metadata sourceBriefFingerprint must use the exact canonical work-order digest.",
+      "Candidate-set sourceBriefFingerprint and provider metadata must use the exact canonical work-order digest.",
     );
   }
 
