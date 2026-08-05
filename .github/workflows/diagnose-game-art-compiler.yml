@@ -1,4 +1,4 @@
-name: Diagnose strict Game Art compiler merge
+name: Diagnose Game Art direction role semantics
 
 on:
   push:
@@ -21,7 +21,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Recover exact source and print complete merge
+
+      - name: Recover exact source and print direction boundaries
         shell: bash
         run: |
           set -euo pipefail
@@ -39,7 +40,17 @@ jobs:
           git config user.email "evavo-diagnostic@users.noreply.github.com"
           git switch --force-create diagnostic refs/remotes/origin/main
           git am --3way /tmp/game-art-intelligence.patch
-          echo '--- compiler.ts lines 120-235 ---'
-          nl -ba packages/game-art-intelligence/src/compiler.ts | sed -n '120,235p'
-          echo '--- ArtDirectionStyleInput fields ---'
-          nl -ba packages/art-direction/src/types.ts | sed -n '193,226p'
+
+          echo '--- compiler.ts asset planning ---'
+          nl -ba packages/game-art-intelligence/src/compiler.ts | sed -n '730,870p'
+          echo '--- compiler.ts pack compilation ---'
+          nl -ba packages/game-art-intelligence/src/compiler.ts | sed -n '1120,1225p'
+          echo '--- compiler.ts profile verification ---'
+          nl -ba packages/game-art-intelligence/src/compiler.ts | sed -n '250,330p'
+          echo '--- geometry-palette.ts direction compiler ---'
+          nl -ba packages/game-art-intelligence/src/geometry-palette.ts | sed -n '100,210p'
+          echo '--- types.ts asset and direction inputs ---'
+          grep -n -A70 -B15 'GameArtAssetInput\|GameArtDirectionMode\|GameArtCompiledDirectionGeometry' packages/game-art-intelligence/src/types.ts || true
+          echo '--- tests helper and failing cases ---'
+          nl -ba packages/game-art-intelligence/test/game-art-intelligence.test.mjs | sed -n '45,115p'
+          nl -ba packages/game-art-intelligence/test/game-art-intelligence.test.mjs | sed -n '210,440p'
