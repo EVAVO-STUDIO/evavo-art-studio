@@ -7,7 +7,7 @@ on:
       - agent/book-candidate-set-quality-20260806
     paths: &candidate_set_paths
       - ".github/workflows/book-art-candidate-set.yml"
-      - "packages/contracts/src/book-art-candidate-set.ts"
+      - "packages/contracts/src/book-art-candidate-set*.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-art-candidate-set.test.mjs"
       - "packages/book-art-runtime/src/candidate-set.ts"
@@ -55,10 +55,8 @@ jobs:
       - name: Check permanent candidate-set boundary
         run: node scripts/check-book-art-candidate-set.mjs
 
-      - name: Build contract and runtime packages
-        run: |
-          pnpm --filter @evavo/art-contracts build
-          pnpm --filter @evavo/art-book-runtime build
+      - name: Build exact Art Studio domain dependencies
+        run: pnpm run build:domain
 
       - name: Run candidate-set attacks
         run: |
