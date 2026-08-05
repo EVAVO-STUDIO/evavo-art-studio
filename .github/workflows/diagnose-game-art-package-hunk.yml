@@ -1,4 +1,4 @@
-name: Locate forbidden workflow authority
+name: Capture current-main validation residue
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 35
     env:
       EXPECTED_MAIN_SHA: 3de1fe91db5b2067de478303666a8a6bf1f51485
     steps:
@@ -18,17 +18,46 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Inspect exact current main permissions
+      - name: Check out exact current main
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
           test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
           git switch --detach refs/remotes/origin/main
-          echo '--- forbidden actions write declarations ---'
-          grep -R -n -C8 -E '^[[:space:]]*actions:[[:space:]]*write[[:space:]]*$' .github/workflows || true
-          echo '--- all write declarations ---'
-          grep -R -n -C3 -E '^[[:space:]]*[a-z-]+:[[:space:]]*write[[:space:]]*$' .github/workflows || true
-          echo '--- actions API use ---'
-          grep -R -n -C5 -E 'actions/(runs|workflows)|gh (run|workflow)|rerun|cancel.*run|workflow_dispatch' \
-            .github/workflows scripts packages apps || true
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - name: Install FFmpeg
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+      - name: Run exact current-main validation and retain residue
+        shell: bash
+        run: |
+          set -uo pipefail
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+          pnpm install --no-frozen-lockfile
+          set +e
+          pnpm check
+          validation_status=$?
+          set -e
+          rm -f pnpm-lock.yaml
+          echo "validation_status=${validation_status}"
+          echo '--- git status ---'
+          git status --short --untracked-files=all
+          echo '--- tracked diff stat ---'
+          git diff --stat
+          echo '--- tracked diff ---'
+          git diff -- . ':!pnpm-lock.yaml'
+          echo '--- untracked files ---'
+          git ls-files --others --exclude-standard
+          test "$validation_status" -eq 0
