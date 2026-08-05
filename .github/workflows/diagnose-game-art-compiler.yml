@@ -1,4 +1,4 @@
-name: Diagnose Game Art asset direction normalization
+name: Diagnose Game Art TileSet routing
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Recover exact source and print normalization paths
+      - name: Recover exact source and print TileSet routing
         shell: bash
         run: |
           set -euo pipefail
@@ -41,9 +41,11 @@ jobs:
           git switch --force-create diagnostic refs/remotes/origin/main
           git am --3way /tmp/game-art-intelligence.patch
 
-          echo '--- compiler.ts normalized assets and asset plan ---'
-          nl -ba packages/game-art-intelligence/src/compiler.ts | sed -n '850,1135p'
-          echo '--- compiler.ts profile hash verification message ---'
-          grep -n -A12 -B12 'does not match profileSha256' packages/game-art-intelligence/src/compiler.ts
-          echo '--- complete asset fixture ---'
-          nl -ba packages/game-art-intelligence/test/game-art-intelligence.test.mjs | sed -n '77,210p'
+          echo '--- default output profile routing ---'
+          nl -ba packages/game-art-intelligence/src/compiler.ts | sed -n '884,921p'
+          echo '--- TileSet resource references ---'
+          grep -R -n -A80 -B50 'tileSetResources' packages/game-art-intelligence/src
+          echo '--- Godot integration builders ---'
+          grep -R -n -A120 -B20 'function compileGodot\|function.*Godot\|tileFootprint' packages/game-art-intelligence/src/compiler.ts
+          echo '--- failing asset-pack test ---'
+          nl -ba packages/game-art-intelligence/test/game-art-intelligence.test.mjs | sed -n '220,250p'
