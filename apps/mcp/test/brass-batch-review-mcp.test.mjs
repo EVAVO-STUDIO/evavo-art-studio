@@ -69,8 +69,11 @@ test("batch review analyses complete stable bytes and groups duplicates", async 
 
     assert.equal(value.review, BRASS_ART_BATCH_REVIEW_SCHEMA);
     assert.equal(value.roleId, "ui-icon");
+    assert.equal(value.selectionMode, "directory");
+    assert.match(value.selectionSha256, /^[a-f0-9]{64}$/u);
     assert.equal(value.technicalStatus, "blocked");
     assert.equal(value.discovery.supportedImageFiles, 4);
+    assert.equal(value.discovery.selectionMode, "directory");
     assert.equal(value.discovery.truncated, false);
     assert.equal(value.summary.reviewedFiles, 4);
     assert.equal(value.summary.passedFiles, 3);
@@ -97,6 +100,102 @@ test("batch review analyses complete stable bytes and groups duplicates", async 
     assert.equal(value.mutationPerformed, false);
     assert.equal(value.deletionAuthority, false);
     assert.match(value.batchIdentitySha256, /^[a-f0-9]{64}$/u);
+  } finally {
+    current.dispose();
+  }
+});
+
+test("exact selected paths partition one immutable mixed RAW_ART corpus", async () => {
+  const current = temporaryRoots();
+  try {
+    const batch = path.join(current.game, "RAW_ART");
+    const icons = path.join(batch, "icons");
+    const ports = path.join(batch, "ports");
+    fs.mkdirSync(icons, { recursive: true });
+    fs.mkdirSync(ports, { recursive: true });
+    fs.writeFileSync(path.join(icons, "approved_a.png"), ALPHA_PNG);
+    fs.writeFileSync(path.join(icons, "approved_b.png"), ALPHA_PNG);
+    fs.writeFileSync(path.join(ports, "aden.png"), OPAQUE_PNG);
+
+    const common = {
+      directoryPath: batch,
+      roleId: "ui-icon",
+      allowedRoots: [current.game],
+      expectations,
+      maximumFiles: 10,
+      detail: "summary",
+    };
+    const value = await reviewArtBatchDirectory({
+      ...common,
+      relativePaths: ["icons/approved_b.png", "icons/approved_a.png"],
+    });
+    const reordered = await reviewArtBatchDirectory({
+      ...common,
+      relativePaths: ["icons/approved_a.png", "icons/approved_b.png"],
+    });
+
+    assert.equal(value.selectionMode, "exact-relative-paths");
+    assert.equal(value.discovery.selectionMode, "exact-relative-paths");
+    assert.equal(value.discovery.supportedImageFiles, 2);
+    assert.equal(value.discovery.visitedEntries, 2);
+    assert.deepEqual(
+      value.items.map((item) => item.path),
+      ["icons/approved_a.png", "icons/approved_b.png"],
+    );
+    assert.equal(value.items.some((item) => item.path === "ports/aden.png"), false);
+    assert.deepEqual(value.duplicateGroups.exactSource[0].paths, [
+      "icons/approved_a.png",
+      "icons/approved_b.png",
+    ]);
+    assert.match(value.selectionSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(value.selectionSha256, reordered.selectionSha256);
+    assert.equal(value.batchIdentitySha256, reordered.batchIdentitySha256);
+    assert.equal(value.mutationPerformed, false);
+    assert.equal(value.promotionAuthority, false);
+  } finally {
+    current.dispose();
+  }
+});
+
+test("selected paths fail closed on traversal, unsupported formats and portable duplicates", async () => {
+  const current = temporaryRoots();
+  try {
+    const batch = path.join(current.game, "RAW_ART");
+    const icons = path.join(batch, "icons");
+    fs.mkdirSync(icons, { recursive: true });
+    fs.writeFileSync(path.join(icons, "approved.png"), ALPHA_PNG);
+
+    const common = {
+      directoryPath: batch,
+      roleId: "ui-icon",
+      allowedRoots: [current.game],
+      expectations,
+      maximumFiles: 10,
+    };
+    await assert.rejects(
+      () =>
+        reviewArtBatchDirectory({
+          ...common,
+          relativePaths: ["../outside.png"],
+        }),
+      /portable repository-relative path/iu,
+    );
+    await assert.rejects(
+      () =>
+        reviewArtBatchDirectory({
+          ...common,
+          relativePaths: ["icons/approved.txt"],
+        }),
+      /supported image file/iu,
+    );
+    await assert.rejects(
+      () =>
+        reviewArtBatchDirectory({
+          ...common,
+          relativePaths: ["icons/approved.png", "ICONS/APPROVED.PNG"],
+        }),
+      /repeats or case-collides/iu,
+    );
   } finally {
     current.dispose();
   }
@@ -184,6 +283,18 @@ test("batch review fails closed on role, file limits and symbolic links", async 
           maximumFiles: 10,
         }),
       /symbolic-link entry/iu,
+    );
+    await assert.rejects(
+      () =>
+        reviewArtBatchDirectory({
+          directoryPath: batch,
+          roleId: "ui-icon",
+          allowedRoots: [current.game, current.evidence],
+          expectations,
+          relativePaths: ["linked.png"],
+          maximumFiles: 10,
+        }),
+      /regular non-symlink file/iu,
     );
   } finally {
     current.dispose();

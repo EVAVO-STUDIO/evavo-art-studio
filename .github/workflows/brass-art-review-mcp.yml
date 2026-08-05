@@ -1,0 +1,78 @@
+name: Brass art review MCP
+
+on:
+  push:
+    branches:
+      - main
+    paths: &brass_art_review_paths
+      - ".github/workflows/brass-art-review-mcp.yml"
+      - "apps/mcp/src/batch-review-*.ts"
+      - "apps/mcp/src/review.ts"
+      - "apps/mcp/test/brass-batch-review-mcp.test.mjs"
+      - "apps/mcp/test/brass-review-mcp.test.mjs"
+      - "docs/brass-art-review-mcp.md"
+      - "scripts/check-brass-art-review-mcp.mjs"
+      - "apps/mcp/package.json"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+  pull_request:
+    paths: *brass_art_review_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brass-art-review-mcp-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Verify exact repository toolchain
+        run: node scripts/check-repository-toolchain.mjs
+
+      - name: Run adversarial toolchain fixtures
+        run: node scripts/test-repository-toolchain.mjs
+
+      - name: Install review-first dependency graph
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Art Studio MCP dependency closure
+        run: pnpm --filter @evavo/art-studio-mcp... build
+
+      - name: Typecheck exact review server
+        run: pnpm --filter @evavo/art-studio-mcp typecheck
+
+      - name: Run exact review server tests
+        run: pnpm --filter @evavo/art-studio-mcp test
+
+      - name: Verify permanent Brass review contract
+        run: node scripts/check-brass-art-review-mcp.mjs
+
+      - name: Prove source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"

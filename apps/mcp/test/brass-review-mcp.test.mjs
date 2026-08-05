@@ -79,6 +79,8 @@ test("review profile exposes exactly seven non-writing tools", () => {
     assert.equal(value.batchReview.completeBatchDuplicateScope, true);
     assert.equal(value.batchReview.perFileStableByteRead, true);
     assert.equal(value.batchReview.gameOwnedRoleRequired, true);
+    assert.equal(value.batchReview.exactRelativePathSelection, true);
+    assert.equal(value.batchReview.deterministicSelectionIdentity, true);
     for (const key of [
       "writesEnabled",
       "providerExecutionAllowed",
@@ -113,12 +115,18 @@ test("review source registers only the governed inspection and planning inventor
     "analyseSpriteSequenceManifestFile",
     "createProductionPlan",
     "roleId",
+    "relativePaths",
+    "exactRelativePathSelection: true",
     "reviewAllowedRoots();",
   ]) {
     assert.equal(source.includes(required), true, required);
   }
   for (const required of [
     "evavo_brass_art_batch_review_v1",
+    "selectImageFiles",
+    "portableSelectedPath",
+    "exact-relative-paths",
+    "selectionSha256",
     "exactSource",
     "decodedPixels",
     "game-owned media role",

@@ -14,6 +14,7 @@ import {
   type DiscoveredFile,
   type StableFile,
   portableRelative,
+  portableSelectedPath,
   samePath,
   sha256,
 } from "./batch-review-contract.js";
@@ -174,6 +175,115 @@ export async function discoverImageFiles(input: {
     ignoredDirectories,
     unsupportedFiles,
     visitedEntries,
+  };
+}
+
+export async function selectImageFiles(input: {
+  readonly root: string;
+  readonly allowedRoots: readonly string[];
+  readonly relativePaths: readonly string[];
+  readonly maximumFiles: number;
+}): Promise<{
+  readonly files: readonly DiscoveredFile[];
+  readonly ignoredDirectories: 0;
+  readonly unsupportedFiles: 0;
+  readonly visitedEntries: number;
+}> {
+  if (input.relativePaths.length < 1) {
+    throw new ArtBatchReviewError(
+      "ART_BATCH_SELECTION_EMPTY",
+      "relativePaths must contain at least one selected image.",
+    );
+  }
+  if (input.relativePaths.length > input.maximumFiles) {
+    throw new ArtBatchReviewError(
+      "ART_BATCH_FILE_LIMIT_EXCEEDED",
+      `Batch selection contains more than maximumFiles=${input.maximumFiles} images.`,
+    );
+  }
+
+  const normalized = input.relativePaths.map(portableSelectedPath);
+  const portableKeys = new Map<string, string>();
+  for (const relativePath of normalized) {
+    const collisionKey = relativePath.toLocaleLowerCase("en-US");
+    const prior = portableKeys.get(collisionKey);
+    if (prior) {
+      throw new ArtBatchReviewError(
+        "ART_BATCH_SELECTION_DUPLICATE",
+        `Batch selection repeats or case-collides: ${prior} and ${relativePath}`,
+      );
+    }
+    portableKeys.set(collisionKey, relativePath);
+  }
+
+  const files: DiscoveredFile[] = [];
+  for (const relativePath of normalized) {
+    const requested = path.resolve(input.root, ...relativePath.split("/"));
+    const rootRelative = path.relative(input.root, requested);
+    if (
+      !rootRelative ||
+      rootRelative === ".." ||
+      rootRelative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(rootRelative)
+    ) {
+      throw new ArtBatchReviewError(
+        "ART_BATCH_SELECTION_PATH_ESCAPE",
+        `Selected path escapes the batch root: ${relativePath}`,
+      );
+    }
+    const safe = assertPathWithinAllowedRoots(requested, input.allowedRoots);
+    let state;
+    try {
+      state = await lstat(safe);
+    } catch (error: unknown) {
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? String((error as { readonly code: unknown }).code)
+          : "";
+      throw new ArtBatchReviewError(
+        code === "ENOENT"
+          ? "ART_BATCH_SELECTION_MISSING"
+          : "ART_BATCH_SELECTION_FILE_INVALID",
+        `Selected image is unavailable: ${relativePath}`,
+      );
+    }
+    if (!state.isFile() || state.isSymbolicLink()) {
+      throw new ArtBatchReviewError(
+        "ART_BATCH_SELECTION_FILE_INVALID",
+        `Selected image must be a regular non-symlink file: ${relativePath}`,
+      );
+    }
+    const resolved = await realpath(safe);
+    if (!samePath(requested, resolved)) {
+      throw new ArtBatchReviewError(
+        "ART_BATCH_SELECTION_NONCANONICAL",
+        `Selected image traverses a symlink or non-canonical alias: ${relativePath}`,
+      );
+    }
+    const actualRelative = portableRelative(input.root, resolved);
+    if (process.platform !== "win32" && actualRelative !== relativePath) {
+      throw new ArtBatchReviewError(
+        "ART_BATCH_SELECTION_NONCANONICAL",
+        `Selected image path differs from its canonical repository path: ${relativePath} != ${actualRelative}`,
+      );
+    }
+    files.push({
+      absolutePath: resolved,
+      relativePath: actualRelative,
+      sizeBytes: state.size,
+    });
+  }
+
+  files.sort((left, right) =>
+    left.relativePath.localeCompare(right.relativePath, "en", {
+      sensitivity: "base",
+    }),
+  );
+  return {
+    files: Object.freeze(files),
+    ignoredDirectories: 0,
+    unsupportedFiles: 0,
+    visitedEntries: normalized.length,
   };
 }
 
