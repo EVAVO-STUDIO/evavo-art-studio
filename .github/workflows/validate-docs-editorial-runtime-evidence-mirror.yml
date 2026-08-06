@@ -10,18 +10,30 @@ on:
       - "validation/docs-editorial-consensus/**"
       - "validation/docs-editorial-runtime-evidence/**"
       - "validation/docs-narrative-craft/**"
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+    paths:
+      - ".github/workflows/validate-docs-editorial-runtime-evidence-mirror.yml"
+      - "validation/docs-editorial-consensus/**"
+      - "validation/docs-editorial-runtime-evidence/**"
+      - "validation/docs-narrative-craft/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: validate-docs-editorial-runtime-evidence-mirror-${{ github.sha }}
+  group: validate-docs-editorial-runtime-evidence-mirror-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
   exact-mirror:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - name: Check out exact validation mirror
@@ -59,8 +71,8 @@ jobs:
         if: success()
         run: |
           printf '%s\n' \
-            'validation=byte-exact-source-equivalent-editorial-runtime-evidence-mirror' \
-            'docs-source=4ec7490ba8d2916ea8d6454b3baece8a25b4198d' \
+            'validation=byte-exact-source-equivalent-complete-editorial-runtime-mirror' \
+            'docs-source=55bca28e3a92879cae0f74fef598a6cbf168aa2f' \
             'provider-authentication-claimed=false' \
             'provider-call-performed=false' \
             'canonical-manuscript-mutation-performed=false' \
