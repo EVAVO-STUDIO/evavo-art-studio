@@ -6,6 +6,7 @@ import path from "node:path";
 
 const EXPECTED_NODE = "22.14.0";
 const EXPECTED_PNPM = "10.13.1";
+const EXPECTED_LOCKFILE_VERSION = "9.0";
 const CHECKOUT_SHA = "de0fac2e4500dabe0009e67214ff5f5447ce83dd";
 const PNPM_SETUP_SHA = "fc06bc1257f339d1d5d8b3a19a8cae5388b55320";
 const SETUP_NODE_SHA = "6044e13b5dc448c55e2357c09f80417699197238";
@@ -14,9 +15,12 @@ const AUTOMATIC_VALIDATION_NOTE =
   "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.";
 const CURRENT_MAIN_RECEIPT_NOTE =
   "Superseded mainline validations are cancelled; a receipt is written only after the candidate is re-proven as current origin/main.";
+const FROZEN_LOCK_NOTE =
+  "The canonical pnpm lockfile is committed source and every install must use pnpm install --frozen-lockfile.";
+const DEPENDENCY_CHANGE_NOTE =
+  "Dependency updates require an explicit reviewed pnpm-lock.yaml change generated with Node.js 22.14.0 and pnpm 10.13.1.";
 
 const args = new Set(process.argv.slice(2));
-const allowGeneratedLockfile = args.delete("--allow-generated-lockfile");
 const skipRuntime = args.delete("--skip-runtime");
 if (args.size > 0) {
   throw new Error(`ART_STUDIO_TOOLCHAIN_OPTION_UNSUPPORTED:${[...args][0]}`);
@@ -24,6 +28,8 @@ if (args.size > 0) {
 
 const root = fs.realpathSync.native(process.cwd());
 const errors = [];
+
+const portable = (value) => value.split(path.sep).join("/");
 
 const resolveInside = (relativePath) => {
   if (!relativePath || path.isAbsolute(relativePath)) {
@@ -54,6 +60,18 @@ const read = (relativePath, maximumBytes = 4_000_000) => {
     return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
     throw new Error(`Art Studio toolchain file is not valid UTF-8: ${relativePath}`);
+  }
+};
+
+const parseJson = (relativePath) => {
+  const source = read(relativePath, 16_000_000);
+  if (source.startsWith("\uFEFF")) {
+    throw new Error(`Art Studio JSON contains a BOM: ${relativePath}`);
+  }
+  try {
+    return JSON.parse(source);
+  } catch {
+    throw new Error(`Art Studio JSON is invalid: ${relativePath}`);
   }
 };
 
@@ -111,9 +129,7 @@ const workflowPushBranches = (source) => {
     if (/^  [A-Za-z_][A-Za-z0-9_-]*:/.test(line)) break;
     if (/^    [A-Za-z_][A-Za-z0-9_-]*:/.test(line)) break;
     const match = line.match(/^      -\s+(.+?)\s*$/);
-    if (match) {
-      branches.push(match[1].replace(/^['"]|['"]$/g, ""));
-    }
+    if (match) branches.push(match[1].replace(/^['"]|['"]$/g, ""));
   }
   return branches;
 };
@@ -127,95 +143,205 @@ const workflowActions = (source) => {
   return actions;
 };
 
+const workspaceManifestPaths = () => {
+  const result = ["package.json"];
+  for (const workspaceRoot of ["apps", "packages"]) {
+    const absoluteRoot = resolveInside(workspaceRoot);
+    if (!fs.existsSync(absoluteRoot)) continue;
+    const rootStats = fs.lstatSync(absoluteRoot);
+    if (!rootStats.isDirectory() || rootStats.isSymbolicLink()) {
+      errors.push(`workspace root must be one real directory: ${workspaceRoot}`);
+      continue;
+    }
+    for (const entry of fs.readdirSync(absoluteRoot, { withFileTypes: true })) {
+      if (entry.isSymbolicLink()) {
+        errors.push(`workspace entry must not be a symlink: ${workspaceRoot}/${entry.name}`);
+        continue;
+      }
+      if (!entry.isDirectory()) continue;
+      const relativeManifest = `${workspaceRoot}/${entry.name}/package.json`;
+      const absoluteManifest = resolveInside(relativeManifest);
+      if (!fs.existsSync(absoluteManifest)) continue;
+      const manifestStats = fs.lstatSync(absoluteManifest);
+      if (!manifestStats.isFile() || manifestStats.isSymbolicLink()) {
+        errors.push(`workspace package manifest must be one real file: ${relativeManifest}`);
+        continue;
+      }
+      result.push(relativeManifest);
+    }
+  }
+  return result.sort();
+};
+
+const decodeYamlKey = (raw) => {
+  const value = raw.trim();
+  if (value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1).replace(/''/g, "'");
+  }
+  if (value.startsWith('"') && value.endsWith('"')) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+};
+
+const lockfileImporters = (source) => {
+  const lines = source.split(/\r?\n/);
+  const start = lines.indexOf("importers:");
+  if (start < 0) return [];
+  const importers = [];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line && !line.startsWith(" ")) break;
+    const match = line.match(/^  ([^ ].*):$/);
+    if (match) importers.push(decodeYamlKey(match[1]));
+  }
+  return [...new Set(importers)].sort();
+};
+
 if (read(".nvmrc", 64) !== `${EXPECTED_NODE}\n`) {
   errors.push(`.nvmrc must contain exactly ${EXPECTED_NODE}`);
 }
 
-const manifest = canonicalJson("package.json");
+const packageJsonPaths = workspaceManifestPaths();
+const manifests = new Map(
+  packageJsonPaths.map((relativePath) => [
+    relativePath,
+    relativePath === "package.json" ? canonicalJson(relativePath) : parseJson(relativePath),
+  ]),
+);
+const manifest = manifests.get("package.json");
 if (
-  manifest.name !== "@evavo/art-studio" ||
-  manifest.private !== true ||
-  manifest.packageManager !== `pnpm@${EXPECTED_PNPM}` ||
-  manifest.engines?.node !== EXPECTED_NODE ||
-  manifest.engines?.pnpm !== EXPECTED_PNPM
+  manifest?.name !== "@evavo/art-studio" ||
+  manifest?.private !== true ||
+  manifest?.packageManager !== `pnpm@${EXPECTED_PNPM}` ||
+  manifest?.engines?.node !== EXPECTED_NODE ||
+  manifest?.engines?.pnpm !== EXPECTED_PNPM
 ) {
   errors.push("package.json exact Art Studio identity or toolchain authority changed");
 }
-if (JSON.stringify(manifest.workspaces) !== JSON.stringify(["apps/*", "packages/*"])) {
+if (JSON.stringify(manifest?.workspaces) !== JSON.stringify(["apps/*", "packages/*"])) {
   errors.push("package.json workspace roots changed");
 }
 for (const [name, command] of Object.entries({
   "toolchain:check": "node scripts/check-repository-toolchain.mjs",
-  "toolchain:check:installed":
-    "node scripts/check-repository-toolchain.mjs --allow-generated-lockfile",
+  "toolchain:check:installed": "node scripts/check-repository-toolchain.mjs",
   "toolchain:test": "node scripts/test-repository-toolchain.mjs",
 })) {
-  if (manifest.scripts?.[name] !== command) {
+  if (manifest?.scripts?.[name] !== command) {
     errors.push(`package.json must expose ${name} as ${command}`);
   }
 }
-const checkCommand = String(manifest.scripts?.check ?? "");
-if (
-  !checkCommand.startsWith(
-    "pnpm run toolchain:check:installed && pnpm run toolchain:test && ",
-  )
-) {
-  errors.push(
-    "package.json check must begin with installed-state toolchain and adversarial validation",
-  );
+const checkCommand = String(manifest?.scripts?.check ?? "");
+if (!checkCommand.startsWith("pnpm run toolchain:check:installed && pnpm run toolchain:test && ")) {
+  errors.push("package.json check must begin with committed-lock toolchain and adversarial validation");
 }
 for (const token of ["pnpm run build:domain", "pnpm typecheck", "pnpm test", "pnpm build"]) {
   if (!checkCommand.includes(token)) errors.push(`package.json check is missing ${token}`);
+}
+
+for (const [relativePath, packageManifest] of manifests) {
+  for (const section of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
+    const dependencies = packageManifest?.[section];
+    if (!dependencies || typeof dependencies !== "object") continue;
+    for (const [name, rawValue] of Object.entries(dependencies)) {
+      const value = String(rawValue);
+      if (value.trim().toLowerCase() === "latest") {
+        errors.push(`${relativePath} uses the floating latest tag for ${name}`);
+      }
+      if (/^file:/i.test(value)) {
+        errors.push(`${relativePath} uses prohibited file: dependency authority for ${name}`);
+      }
+      if (/^(?:[A-Za-z]:[\\/]|\/)/.test(value)) {
+        errors.push(`${relativePath} uses an absolute local dependency path for ${name}`);
+      }
+      if (/\$\{[^}]+\}|(?:_authToken|npmAuthToken|NODE_AUTH_TOKEN|NPM_TOKEN|PNPM_TOKEN)/i.test(value)) {
+        errors.push(`${relativePath} embeds environment or registry credential material for ${name}`);
+      }
+    }
+  }
 }
 
 if (read("pnpm-workspace.yaml", 512) !== 'packages:\n  - "apps/*"\n  - "packages/*"\n') {
   errors.push("pnpm-workspace.yaml workspace roots changed");
 }
 
-const lockfilePath = resolveInside("pnpm-lock.yaml");
-if (fs.existsSync(lockfilePath)) {
-  if (!allowGeneratedLockfile) {
-    errors.push(
-      "pnpm-lock.yaml appeared before the review-first lockfile transition was approved",
-    );
-  } else {
-    const generatedLockfile = read("pnpm-lock.yaml", 64_000_000);
-    if (!generatedLockfile.includes("lockfileVersion:")) {
-      errors.push("generated pnpm-lock.yaml does not contain a lockfile version");
-    }
-    const tracked = spawnSync(
-      "git",
-      ["ls-files", "--error-unmatch", "--", "pnpm-lock.yaml"],
-      {
-        cwd: root,
-        encoding: "utf8",
-        timeout: 10_000,
-        windowsHide: true,
-      },
-    );
-    if (tracked.status === 0) {
-      errors.push(
-        "pnpm-lock.yaml is tracked before the review-first lockfile transition was approved",
-      );
-    }
-  }
+const lockfile = read("pnpm-lock.yaml", 64_000_000);
+if (!new RegExp(`^lockfileVersion:\\s+['\"]?${EXPECTED_LOCKFILE_VERSION.replace(".", "\\.")}['\"]?\\s*$`, "m").test(lockfile)) {
+  errors.push(`pnpm-lock.yaml must use lockfileVersion ${EXPECTED_LOCKFILE_VERSION}`);
+}
+const lockTracked = spawnSync(
+  "git",
+  ["ls-files", "--error-unmatch", "--", "pnpm-lock.yaml"],
+  { cwd: root, encoding: "utf8", timeout: 10_000, windowsHide: true },
+);
+if (lockTracked.status !== 0) {
+  errors.push("pnpm-lock.yaml must be committed and tracked");
+}
+const expectedImporters = packageJsonPaths
+  .map((relativePath) => (relativePath === "package.json" ? "." : portable(path.dirname(relativePath))))
+  .sort();
+const observedImporters = lockfileImporters(lockfile);
+if (JSON.stringify(observedImporters) !== JSON.stringify(expectedImporters)) {
+  errors.push(
+    `pnpm-lock.yaml importers differ from the exact workspace: expected ${JSON.stringify(expectedImporters)}, observed ${JSON.stringify(observedImporters)}`,
+  );
+}
+for (const [label, pattern] of [
+  ["file dependency", /\bfile:/i],
+  ["environment interpolation", /\$\{[^}]+\}/],
+  ["registry credential", /(?:_authToken|npmAuthToken|NODE_AUTH_TOKEN|NPM_TOKEN|PNPM_TOKEN)/i],
+  ["credential-bearing URL", /https?:\/\/[^\s/@:]+:[^\s/@]+@/i],
+  ["absolute local path", /(?:^|[\s:'"])(?:[A-Za-z]:[\\/]|\/home\/|\/Users\/|\/private\/tmp\/|\/tmp\/)/m],
+]) {
+  if (pattern.test(lockfile)) errors.push(`pnpm-lock.yaml contains prohibited ${label}`);
 }
 
 const profile = canonicalJson("evavo.reliability.json");
 if (
-  profile.schemaVersion !== "1.0" ||
+  profile.schemaVersion !== "1.1" ||
   profile.id !== "evavo-art-studio" ||
   profile.repository !== "EVAVO-STUDIO/evavo-art-studio" ||
   profile.defaultBranch !== "main" ||
   profile.stack !== "node-pnpm-creative-workspace" ||
   profile.packageManager?.name !== "pnpm" ||
   profile.packageManager?.exactVersion !== EXPECTED_PNPM ||
-  profile.packageManager?.lockfilePolicy !== "review-first" ||
-  profile.packageManager?.lockfilePresent !== false ||
+  profile.packageManager?.lockfilePolicy !== "committed-frozen" ||
+  profile.packageManager?.lockfilePresent !== true ||
+  profile.packageManager?.install !== "pnpm install --frozen-lockfile" ||
   profile.runtime?.node !== EXPECTED_NODE ||
   profile.runtime?.pnpm !== EXPECTED_PNPM
 ) {
   errors.push("evavo.reliability.json Art Studio authority changed");
+}
+if (
+  profile.dependencyLock?.path !== "pnpm-lock.yaml" ||
+  profile.dependencyLock?.format !== "pnpm-lockfile-v9" ||
+  profile.dependencyLock?.generatedWith?.node !== EXPECTED_NODE ||
+  profile.dependencyLock?.generatedWith?.pnpm !== EXPECTED_PNPM ||
+  profile.dependencyLock?.committed !== true ||
+  profile.dependencyLock?.frozenInstallationRequired !== true ||
+  profile.dependencyLock?.immutableDuringValidation !== true
+) {
+  errors.push("evavo.reliability.json committed lock authority changed");
+}
+const expectedValidation = [
+  "node scripts/check-repository-toolchain.mjs",
+  "node scripts/test-repository-toolchain.mjs",
+  "pnpm install --frozen-lockfile",
+  "node scripts/check-repository-toolchain.mjs",
+  "node scripts/test-repository-toolchain.mjs",
+  "pnpm run build:domain",
+  "pnpm typecheck",
+  "pnpm test",
+  "pnpm build",
+  'git diff --exit-code -- pnpm-lock.yaml && git diff --exit-code && test -z "$(git status --porcelain)"',
+];
+if (JSON.stringify(profile.validation) !== JSON.stringify(expectedValidation)) {
+  errors.push("evavo.reliability.json frozen validation sequence changed");
 }
 if (
   profile.executedBaseline?.runId !== "30544861146" ||
@@ -223,13 +349,16 @@ if (
   profile.executedBaseline?.conclusion !== "success" ||
   profile.executedBaseline?.installedWithoutCommittedLockfile !== true
 ) {
-  errors.push("executed baseline evidence changed");
+  errors.push("historical review-first baseline evidence changed");
 }
-if (!profile.notes?.includes(AUTOMATIC_VALIDATION_NOTE)) {
-  errors.push("reliability profile is missing the automatic exact-main validation note");
+for (const note of [AUTOMATIC_VALIDATION_NOTE, CURRENT_MAIN_RECEIPT_NOTE, FROZEN_LOCK_NOTE, DEPENDENCY_CHANGE_NOTE]) {
+  if (!profile.notes?.includes(note)) errors.push(`reliability profile is missing note: ${note}`);
 }
-if (!profile.notes?.includes(CURRENT_MAIN_RECEIPT_NOTE)) {
-  errors.push("reliability profile is missing the current-main receipt note");
+for (const staleNote of [
+  "A committed pnpm lockfile requires a separate generated, reviewed and fully validated change before frozen installation can be activated.",
+  "The generated review-first lockfile is temporary installed state, must remain untracked and is removed before CI completes.",
+]) {
+  if (profile.notes?.includes(staleNote)) errors.push(`reliability profile retains stale note: ${staleNote}`);
 }
 for (const prohibited of [
   "live provider requests",
@@ -247,26 +376,46 @@ for (const prohibited of [
 const schema = canonicalJson("schemas/repository-owned-reliability-profile.schema.json");
 if (
   schema.$schema !== "https://json-schema.org/draft/2020-12/schema" ||
+  schema.properties?.schemaVersion?.const !== "1.1" ||
   schema.properties?.id?.const !== "evavo-art-studio" ||
-  schema.properties?.stack?.const !== "node-pnpm-creative-workspace"
+  schema.properties?.stack?.const !== "node-pnpm-creative-workspace" ||
+  schema.properties?.packageManager?.properties?.lockfilePolicy?.const !== "committed-frozen" ||
+  schema.properties?.packageManager?.properties?.lockfilePresent?.const !== true ||
+  schema.properties?.packageManager?.properties?.install?.const !== "pnpm install --frozen-lockfile" ||
+  schema.properties?.dependencyLock?.properties?.committed?.const !== true ||
+  schema.properties?.dependencyLock?.properties?.frozenInstallationRequired?.const !== true ||
+  !schema.required?.includes("dependencyLock")
 ) {
-  errors.push("repository-owned reliability schema identity changed");
+  errors.push("repository-owned reliability schema frozen-lock authority changed");
+}
+
+const workflowDirectory = resolveInside(".github/workflows");
+const workflowPaths = fs
+  .readdirSync(workflowDirectory, { withFileTypes: true })
+  .filter((entry) => entry.isFile() && /\.ya?ml$/i.test(entry.name))
+  .map((entry) => `.github/workflows/${entry.name}`)
+  .sort();
+for (const relativePath of workflowPaths) {
+  const source = read(relativePath, 2_000_000);
+  for (const forbidden of ["--no-frozen-lockfile", "rm -f pnpm-lock.yaml", "rm -f ./pnpm-lock.yaml"]) {
+    if (source.includes(forbidden)) errors.push(`${relativePath} contains obsolete lock handling: ${forbidden}`);
+  }
+  for (const line of source.split(/\r?\n/)) {
+    if (/\bpnpm\b.*\binstall\b/.test(line) && !line.includes("--frozen-lockfile")) {
+      errors.push(`${relativePath} contains a non-frozen pnpm install: ${line.trim()}`);
+    }
+  }
 }
 
 const workflow = read(".github/workflows/ci.yml");
 const events = workflowEvents(workflow);
 if (JSON.stringify(events) !== JSON.stringify(["push", "workflow_dispatch"])) {
-  errors.push(
-    `CI workflow must use only main push and workflow_dispatch; found ${JSON.stringify(events)}`,
-  );
+  errors.push(`CI workflow must use only main push and workflow_dispatch; found ${JSON.stringify(events)}`);
 }
 const pushBranches = workflowPushBranches(workflow);
 if (JSON.stringify(pushBranches) !== JSON.stringify(["main"])) {
-  errors.push(
-    `CI push validation must target exactly main; found ${JSON.stringify(pushBranches)}`,
-  );
+  errors.push(`CI push validation must target exactly main; found ${JSON.stringify(pushBranches)}`);
 }
-
 const requiredWorkflowTokens = [
   "name: Art Studio exact mainline validation",
   "on:\n  push:\n    branches:\n      - main\n  workflow_dispatch:",
@@ -296,20 +445,25 @@ const requiredWorkflowTokens = [
   `node-version: "${EXPECTED_NODE}"`,
   `version: ${EXPECTED_PNPM}`,
   "package-manager-cache: false",
+  "git ls-files --error-unmatch -- pnpm-lock.yaml",
+  "ART_STUDIO_LOCKFILE_SHA256",
   "node scripts/check-repository-toolchain.mjs",
   "node scripts/test-repository-toolchain.mjs",
-  "pnpm install --no-frozen-lockfile",
+  "pnpm install --frozen-lockfile",
   "pnpm check",
-  "rm -f pnpm-lock.yaml",
+  '[[ "$(sha256sum pnpm-lock.yaml | awk \'{print $1}\')" == "${ART_STUDIO_LOCKFILE_SHA256}" ]]',
+  "git diff --exit-code -- pnpm-lock.yaml",
   "git diff --exit-code",
   'test -z "$(git status --porcelain)"',
   "git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main",
   "Candidate was superseded before receipt creation",
-  '"schemaVersion": "1.1"',
+  '"schemaVersion": "1.2"',
   '"trigger": process.env.GITHUB_EVENT_NAME',
   '"requestSource": process.env.ART_STUDIO_REQUEST_SOURCE',
   '"currentMainAtReceipt": true',
-  '"installedWithoutCommittedLockfile": true',
+  '"lockfilePolicy": "committed-frozen"',
+  '"lockfileSha256": process.env.ART_STUDIO_LOCKFILE_SHA256',
+  '"installedWithoutCommittedLockfile": false',
   '"deployment": "disabled"',
   `actions/upload-artifact@${UPLOAD_ARTIFACT_SHA} # v4.6.2`,
   "retention-days: 14",
@@ -317,7 +471,6 @@ const requiredWorkflowTokens = [
 for (const token of requiredWorkflowTokens) {
   if (!workflow.includes(token)) errors.push(`CI workflow is missing: ${token}`);
 }
-
 for (const forbidden of [
   "pull_request:",
   "schedule:",
@@ -342,8 +495,9 @@ for (const forbidden of [
   "secrets.",
   "GITHUB_TOKEN",
   "Authorization: Bearer",
-  "pnpm install --frozen-lockfile",
+  "pnpm install --no-frozen-lockfile",
   "pnpm install --force",
+  "rm -f pnpm-lock.yaml",
   "git push",
   "git reset --hard",
   "git clean -",
@@ -355,16 +509,16 @@ for (const forbidden of [
 ]) {
   if (workflow.includes(forbidden)) errors.push(`CI workflow contains prohibited material: ${forbidden}`);
 }
-
 const orderedWorkflowTokens = [
   '[[ "${GITHUB_EVENT_NAME}" == "push" ]]',
   `actions/checkout@${CHECKOUT_SHA}`,
   '[[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]',
+  "git ls-files --error-unmatch -- pnpm-lock.yaml",
   "node scripts/check-repository-toolchain.mjs",
   "node scripts/test-repository-toolchain.mjs",
-  "pnpm install --no-frozen-lockfile",
+  "pnpm install --frozen-lockfile",
   "pnpm check",
-  "rm -f pnpm-lock.yaml",
+  "git diff --exit-code -- pnpm-lock.yaml",
   "git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main",
   '"currentMainAtReceipt": true',
   `actions/upload-artifact@${UPLOAD_ARTIFACT_SHA}`,
@@ -372,12 +526,9 @@ const orderedWorkflowTokens = [
 let previousIndex = -1;
 for (const token of orderedWorkflowTokens) {
   const index = workflow.indexOf(token);
-  if (index < 0 || index <= previousIndex) {
-    errors.push(`CI workflow step order is invalid at ${token}`);
-  }
+  if (index < 0 || index <= previousIndex) errors.push(`CI workflow step order is invalid at ${token}`);
   previousIndex = index;
 }
-
 for (const action of workflowActions(workflow)) {
   const at = action.lastIndexOf("@");
   const reference = at >= 0 ? action.slice(at + 1) : "";
@@ -409,11 +560,8 @@ if (errors.length > 0) {
 }
 
 console.log("Art Studio repository toolchain check passed.");
-console.log(`- Node.js ${EXPECTED_NODE} and pnpm ${EXPECTED_PNPM} are exact authorities`);
-console.log(
-  allowGeneratedLockfile
-    ? "- the generated review-first lockfile is accepted only as untracked installed state"
-    : "- the pre-install source tree contains no unreviewed lockfile",
-);
-console.log("- CI validates only exact current main, automatically or by governed replay");
-console.log("- validation order, current-main receipt proof and capability boundaries agree");
+console.log(`- Node.js ${EXPECTED_NODE}, pnpm ${EXPECTED_PNPM} and lockfile v${EXPECTED_LOCKFILE_VERSION} are exact authorities`);
+console.log(`- pnpm-lock.yaml covers ${expectedImporters.length} exact workspace importers and is committed`);
+console.log("- every permanent workflow uses frozen installation and preserves lockfile identity");
+console.log("- CI validates only exact current main and records the committed lock digest");
+console.log("- validation and production-effect authority remain separate");

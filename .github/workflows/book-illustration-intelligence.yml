@@ -61,7 +61,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends ffmpeg
       - name: Install dependency graph
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Check permanent contract authority
         run: node scripts/check-book-illustration-intelligence.mjs
       - name: Build and run illustration intelligence attacks
@@ -73,12 +73,11 @@ jobs:
             packages/contracts/test/book-art-candidate-set.test.mjs
       - name: Run complete Art Studio verification
         run: pnpm check
-      - name: Remove bounded generated lock and prove clean source
+      - name: Verify immutable lockfile and prove clean source
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          rm -f pnpm-lock.yaml
           status="$(git status --porcelain=v1 --untracked-files=all)"
           if [[ -n "$status" ]]; then
             echo "Detected out-of-band source drift after verification:"

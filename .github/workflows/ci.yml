@@ -93,24 +93,35 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
+      - name: Verify committed lockfile identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch -- pnpm-lock.yaml
+          LOCKFILE_SHA256="$(sha256sum pnpm-lock.yaml | awk '{print $1}')"
+          [[ "${LOCKFILE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          echo "ART_STUDIO_LOCKFILE_SHA256=${LOCKFILE_SHA256}" >> "${GITHUB_ENV}"
+
       - name: Verify exact repository toolchain
         run: node scripts/check-repository-toolchain.mjs
 
       - name: Run adversarial toolchain fixtures
         run: node scripts/test-repository-toolchain.mjs
 
-      - name: Install review-first dependency graph
-        run: pnpm install --no-frozen-lockfile
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
 
       - name: Run complete Art Studio validation
         run: pnpm check
 
-      - name: Remove generated lockfile and verify clean source
+      - name: Verify immutable lockfile and clean source
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          rm -f pnpm-lock.yaml
+          test -n "${ART_STUDIO_LOCKFILE_SHA256:-}"
+          [[ "$(sha256sum pnpm-lock.yaml | awk '{print $1}')" == "${ART_STUDIO_LOCKFILE_SHA256}" ]]
+          git diff --exit-code -- pnpm-lock.yaml
           git diff --exit-code
           test -z "$(git status --porcelain)"
 
@@ -129,7 +140,7 @@ jobs:
           import path from "node:path";
 
           const receipt = {
-            "schemaVersion": "1.1",
+            "schemaVersion": "1.2",
             "repository": "EVAVO-STUDIO/evavo-art-studio",
             "candidateSha": process.env.ART_STUDIO_EXPECTED_SHA,
             "trigger": process.env.GITHUB_EVENT_NAME,
@@ -149,8 +160,9 @@ jobs:
                 "sha256": process.env.ART_STUDIO_FFPROBE_SHA256
               }
             },
-            "lockfilePolicy": "review-first",
-            "installedWithoutCommittedLockfile": true,
+            "lockfilePolicy": "committed-frozen",
+            "lockfileSha256": process.env.ART_STUDIO_LOCKFILE_SHA256,
+            "installedWithoutCommittedLockfile": false,
             "validation": "passed",
             "liveProviderRequest": false,
             "artifactPromotion": false,

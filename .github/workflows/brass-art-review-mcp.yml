@@ -53,8 +53,8 @@ jobs:
       - name: Run adversarial toolchain fixtures
         run: node scripts/test-repository-toolchain.mjs
 
-      - name: Install review-first dependency graph
-        run: pnpm install --no-frozen-lockfile
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
 
       - name: Build Art Studio MCP dependency closure
         run: pnpm --filter @evavo/art-studio-mcp... build
@@ -73,6 +73,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f pnpm-lock.yaml
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"

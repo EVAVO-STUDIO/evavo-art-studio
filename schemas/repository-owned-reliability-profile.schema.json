@@ -12,6 +12,7 @@
     "authority",
     "stack",
     "packageManager",
+    "dependencyLock",
     "runtime",
     "workspace",
     "validation",
@@ -21,7 +22,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0"
+      "const": "1.1"
     },
     "id": {
       "const": "evavo-art-studio"
@@ -60,13 +61,58 @@
           "const": "pnpm-lock.yaml"
         },
         "lockfilePolicy": {
-          "const": "review-first"
+          "const": "committed-frozen"
         },
         "lockfilePresent": {
-          "const": false
+          "const": true
         },
         "install": {
-          "const": "pnpm install --no-frozen-lockfile"
+          "const": "pnpm install --frozen-lockfile"
+        }
+      }
+    },
+    "dependencyLock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "format",
+        "generatedWith",
+        "committed",
+        "frozenInstallationRequired",
+        "immutableDuringValidation"
+      ],
+      "properties": {
+        "path": {
+          "const": "pnpm-lock.yaml"
+        },
+        "format": {
+          "const": "pnpm-lockfile-v9"
+        },
+        "generatedWith": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "node",
+            "pnpm"
+          ],
+          "properties": {
+            "node": {
+              "const": "22.14.0"
+            },
+            "pnpm": {
+              "const": "10.13.1"
+            }
+          }
+        },
+        "committed": {
+          "const": true
+        },
+        "frozenInstallationRequired": {
+          "const": true
+        },
+        "immutableDuringValidation": {
+          "const": true
         }
       }
     },

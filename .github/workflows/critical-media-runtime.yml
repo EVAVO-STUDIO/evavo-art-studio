@@ -51,7 +51,7 @@ jobs:
           package-manager-cache: false
 
       - name: Install review-first dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build critical dependency closures
         run: |
@@ -80,7 +80,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f pnpm-lock.yaml
           find packages apps -type d -name dist -prune -exec rm -rf {} +
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"

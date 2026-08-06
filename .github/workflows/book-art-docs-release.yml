@@ -84,8 +84,8 @@ jobs:
       - name: Verify Docs release authority and surface boundary
         run: node scripts/check-book-art-docs-release.mjs
 
-      - name: Install review-first dependency graph
-        run: pnpm install --no-frozen-lockfile
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
 
       - name: Build exact Art Studio domain dependencies
         run: pnpm run build:domain
@@ -108,11 +108,10 @@ jobs:
       - name: Run complete repository validation
         run: pnpm check
 
-      - name: Remove generated lockfile and verify clean tracked source
+      - name: Verify immutable lockfile and clean tracked source
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          rm -f pnpm-lock.yaml
           git diff --exit-code
           test -z "$(git status --porcelain)"

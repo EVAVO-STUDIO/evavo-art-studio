@@ -181,7 +181,7 @@ try {
     "ubuntu-24.04",
     "version: 10.13.1",
     'node-version: "22.14.0"',
-    "pnpm install --no-frozen-lockfile",
+    "pnpm install --frozen-lockfile",
     "pnpm --filter @evavo/art-delivery-optimizer... build",
     "pnpm --filter @evavo/art-delivery-optimizer typecheck",
     "pnpm --filter @evavo/art-delivery-optimizer test",

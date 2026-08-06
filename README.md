@@ -43,12 +43,12 @@ This repository is intentionally broader than an image generator. It is the shar
 - MCP v2 stdio server exposing planning, provider and selection compilation, repository inspection, sprite QA, atlas delivery, runtime control and artifact governance to ChatGPT, Claude and compatible agents;
 - EVAVO hub manifest for a signed federated launch at `art.evavo.com.au`;
 - architecture, technology, quality, sprite-continuity, provider, alpha-mastering, selection, atlas-delivery, durable-runtime, operations and hub-integration decisions;
-- CI validation for `main`, automated `work/**` branches and pull requests.
+- exact-current-main CI validation with a committed, frozen pnpm dependency graph and bounded validation receipts.
 
 ## First commands
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check
 pnpm art -- validate --input examples/game-art-brief.json
 pnpm art -- plan --input examples/game-art-brief.json --output art-plan.json
