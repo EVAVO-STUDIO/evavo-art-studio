@@ -48,6 +48,7 @@ const files = [
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
+  "requirements-image-pipeline.txt",
   "schemas/repository-owned-reliability-profile.schema.json",
   "scripts/check-repository-toolchain.mjs",
   ...discoverWorkflows(),
@@ -126,6 +127,12 @@ try {
   expectFailure(run(), "Node.js drift must fail");
 
   reset();
+  mutateText("requirements-image-pipeline.txt", (value) =>
+    replaceRequired(value, "Pillow==12.2.0", "Pillow>=11,<13"),
+  );
+  expectFailure(run(), "floating Pillow range must fail");
+
+  reset();
   mutateJson("package.json", (value) => {
     value.packageManager = "pnpm@10.14.0";
   });
@@ -176,6 +183,12 @@ try {
     value.dependencyLock.committed = false;
   });
   expectFailure(run(), "committed-lock authority drift must fail");
+
+  reset();
+  mutateJson("evavo.reliability.json", (value) => {
+    value.imageToolchain.python = "3.13";
+  });
+  expectFailure(run(), "exact Python image runtime drift must fail");
 
   reset();
   mutateJson("package.json", (value) => {
@@ -234,6 +247,36 @@ try {
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
+      "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
+      "actions/setup-python@v6",
+    ),
+  );
+  expectFailure(run(), "mutable Python action reference must fail");
+
+  reset();
+  mutateText(".github/workflows/repository-toolchain-authority.yml", (value) =>
+    replaceRequired(
+      value,
+      "actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238",
+      "actions/setup-node@v6",
+    ),
+  );
+  expectFailure(run(), "mutable repository-toolchain action reference must fail");
+
+  reset();
+  mutateText(".github/workflows/repository-toolchain-authority.yml", (value) =>
+    replaceRequired(
+      value,
+      "      - name: Run adversarial toolchain fixtures\n        run: node scripts/test-repository-toolchain.mjs\n",
+      "",
+    ),
+  );
+  expectFailure(run(), "repository-toolchain adversarial gate removal must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "persist-credentials: false", "persist-credentials: true"),
   );
   expectFailure(run(), "persisted checkout credentials must fail");
@@ -243,6 +286,22 @@ try {
     replaceRequired(value, 'node-version: "22.14.0"', 'node-version: "22"'),
   );
   expectFailure(run(), "floating workflow Node.js must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(value, 'python-version: "3.13.5"', 'python-version: "3.13"'),
+  );
+  expectFailure(run(), "floating workflow Python must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
+      "      - name: Verify Brass exact-byte evidence and create-only publication\n        run: python tools/verify_brass_creative_evaluation.py\n",
+      "",
+    ),
+  );
+  expectFailure(run(), "Brass exact-byte adversarial verification removal must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
@@ -322,6 +381,16 @@ try {
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
+      '"decodedPixelsFromRetainedSourceBytes": true',
+      '"decodedPixelsFromRetainedSourceBytes": false',
+    ),
+  );
+  expectFailure(run(), "Brass exact-byte receipt assertion drift must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
       "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
       "actions/upload-artifact@v4",
     ),
@@ -361,7 +430,7 @@ try {
 
   console.log("Art Studio repository toolchain adversarial tests passed.");
   console.log(
-    "- committed lock identity, exact workspace importers, frozen installs, exact-main receipts and capability drift fail closed",
+    "- committed lock identity, exact workspace importers, frozen installs, exact Python/Pillow evidence, exact-main receipts and capability drift fail closed",
   );
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });

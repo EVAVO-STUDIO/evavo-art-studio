@@ -29,6 +29,7 @@ This repository is intentionally broader than an image generator. It is the shar
 - blocking identity, proportion, crop, layer-registration, occlusion and source-parity gates;
 - executable decoded-pixel QA for alpha, fake checkerboards, flat mattes, edge halos, hidden transparent colour and safe bounds;
 - executable sequence QA for canvas, frame order, exact duration, pivot, baseline, ground contact and declared linked-cel duplicates;
+- descriptor-bound Brass static and animation evaluation that hashes and decodes one retained byte sequence, rejects path substitution or multi-frame sources, and publishes evidence with atomic create-only collision protection;
 - deterministic no-rotation MaxRects atlas production with transparent padding, edge extrusion, alpha-aware trim restoration and content hashes;
 - Godot 4.6.2 SpriteFrames descriptors and headless importers using AtlasTexture regions, trim margins, loop modes and exact relative durations;
 - immutable content-addressed artifact objects, descriptors, lineage, verification and compare-and-swap approved references;

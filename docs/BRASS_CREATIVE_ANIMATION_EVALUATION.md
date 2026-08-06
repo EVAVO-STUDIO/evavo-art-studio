@@ -22,10 +22,16 @@ py -3 tools/evaluate_brass_creative_candidate.py `
   --output C:\EVAVO-Evidence\Brass_Brine\creative\candidate.json
 ```
 
-The evaluator binds exact candidate bytes, the game contract, the role-specific
-approved style profile and the evaluation contract. It checks canvas, alpha,
-active bounds, semantic red use, value separation and role-style distance. It
-creates real runtime-scale and black, white, grey and signal-red matte sheets.
+The evaluator opens the candidate through one descriptor-bound read, retains that
+exact byte sequence, hashes it and decodes the evaluated pixels from those same
+bytes. It never hashes one path state and reopens another. Symlinked path
+components, replacement during the read, growth, truncation, multi-frame files
+and post-read byte drift fail closed.
+
+The retained source bytes are bound to the game contract, the role-specific
+approved style profile and the evaluation contract. The evaluator checks canvas,
+alpha, active bounds, semantic red use, value separation and role-style distance.
+It creates real runtime-scale and black, white, grey and signal-red matte sheets.
 
 A technical pass does not approve identity, historical correctness, composition,
 creative quality, gameplay use or publication. Those remain explicit review
@@ -52,10 +58,11 @@ py -3 tools/evaluate_brass_animation_sequence.py `
   --output C:\EVAVO-Evidence\Brass_Brine\animation\evaluation.json
 ```
 
-The evaluator checks governed frame count and timing, exact frame bytes,
-required pose phases, pivots, baselines, ground contact, adjacent duplicate
-stutter, perceptual identity continuity, active-bounds pops and loop seams or
-terminal holds.
+Every frame uses the same descriptor-bound retained-byte rule as a static
+candidate. The evaluator checks governed frame count and timing, exact frame
+bytes, required pose phases, pivots, baselines, ground contact, adjacent
+duplicate stutter, perceptual identity continuity, active-bounds pops and loop
+seams or terminal holds.
 
 It deliberately rejects automatic interpolation between unrelated sources and
 does not treat a smooth loop as proof of correct acting, identity or history.
@@ -67,7 +74,20 @@ py -3 tools/verify_brass_creative_evaluation.py
 ```
 
 The permanent fixture proves a valid static candidate and idle sequence pass,
-while a wrong canvas and adjacent duplicate animation frame fail closed.
+while a wrong canvas and adjacent duplicate animation frame fail closed. It also
+replaces static and animation paths immediately after their descriptor reads and
+proves the reports and contact sheets still derive from the retained original
+bytes. A multi-frame image is rejected.
+
+Evidence publication is genuinely create-only. Each complete temporary file is
+flushed and synced, then atomically linked into a previously absent target. A
+target that appears during publication is preserved and the operation fails;
+`--replace` is the only explicit overwrite authority. Published bytes are read
+back and verified against the exact staged SHA-256 and byte length before a
+successful result is returned.
+
+Hosted verification uses Python 3.13.5 and Pillow 12.2.0 exactly. The same Brass
+race attacks are part of the exact-current-main validation receipt.
 
 ## Authority boundary
 

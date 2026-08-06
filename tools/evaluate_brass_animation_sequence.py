@@ -15,11 +15,10 @@ from brass_creative_evaluation import (
     ANIMATION_SCHEMA,
     atomic_image,
     atomic_json,
-    file_sha,
     hamming,
     image_features,
     load_contracts,
-    load_rgba,
+    read_rgba,
     report_hash,
     resolve_inside,
     stable_bytes,
@@ -104,7 +103,13 @@ def evaluate(args: argparse.Namespace) -> dict:
             blockers.append("duplicate-frame-path")
         seen_paths.add(relative)
         path = resolve_inside(frame_root, relative, f"frame {index}")
-        sha, size = file_sha(path, int(evaluation["limits"]["maximumImageBytes"]))
+        image, frame_bytes = read_rgba(
+            path,
+            int(evaluation["limits"]["maximumImageBytes"]),
+            int(evaluation["limits"]["maximumDecodedPixels"]),
+        )
+        sha = hashlib.sha256(frame_bytes).hexdigest()
+        size = len(frame_bytes)
         if sha != str(frame.get("sha256") or "").lower():
             blockers.append(f"frame-hash-mismatch:{index}")
         duration = frame.get("durationMs")
@@ -118,10 +123,20 @@ def evaluate(args: argparse.Namespace) -> dict:
             blockers.append(f"missing-pose-tags:{index}")
         else:
             present_tags.update(str(tag) for tag in tags)
-        image = load_rgba(path, int(evaluation["limits"]["maximumDecodedPixels"]))
         features = image_features(image)
         decoded.append((frame, image))
-        identities.append({"index": index, "path": relative, "sha256": sha, "sizeBytes": size, "features": features})
+        identities.append({
+            "index": index,
+            "path": relative,
+            "sha256": sha,
+            "sizeBytes": size,
+            "sourceBinding": {
+                "descriptorBoundRead": True,
+                "decodedFromRetainedBytes": True,
+                "singleFrameImage": True,
+            },
+            "features": features,
+        })
     missing_tags = sorted(required_tags - present_tags)
     if missing_tags:
         blockers.append("missing-required-pose-tags:" + ",".join(missing_tags))
@@ -158,8 +173,7 @@ def evaluate(args: argparse.Namespace) -> dict:
     elif not present_tags.intersection({"final-hold", "hold", "settle", "aftermath"}):
         warnings.append("terminal-hold-tag-review-required")
     sheet = contact_sheet(decoded)
-    atomic_image(args.contact_sheet.resolve(), sheet, args.replace)
-    sheet_sha, sheet_size = file_sha(args.contact_sheet.resolve(), int(evaluation["limits"]["maximumImageBytes"]))
+    sheet_sha, sheet_size = atomic_image(args.contact_sheet.resolve(), sheet, args.replace)
     report = {
         "schema": ANIMATION_SCHEMA,
         "contract": evaluation["contract"],

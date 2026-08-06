@@ -6,10 +6,13 @@ import path from "node:path";
 
 const EXPECTED_NODE = "22.14.0";
 const EXPECTED_PNPM = "10.13.1";
+const EXPECTED_PYTHON = "3.13.5";
+const EXPECTED_PILLOW = "12.2.0";
 const EXPECTED_LOCKFILE_VERSION = "9.0";
 const CHECKOUT_SHA = "de0fac2e4500dabe0009e67214ff5f5447ce83dd";
 const PNPM_SETUP_SHA = "fc06bc1257f339d1d5d8b3a19a8cae5388b55320";
 const SETUP_NODE_SHA = "6044e13b5dc448c55e2357c09f80417699197238";
+const SETUP_PYTHON_SHA = "a309ff8b426b58ec0e2a45f0f869d46889d02405";
 const UPLOAD_ARTIFACT_SHA = "ea165f8d65b6e75b540449e92b4886f43607fa02";
 const AUTOMATIC_VALIDATION_NOTE =
   "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.";
@@ -19,6 +22,8 @@ const FROZEN_LOCK_NOTE =
   "The canonical pnpm lockfile is committed source and every install must use pnpm install --frozen-lockfile.";
 const DEPENDENCY_CHANGE_NOTE =
   "Dependency updates require an explicit reviewed pnpm-lock.yaml change generated with Node.js 22.14.0 and pnpm 10.13.1.";
+const IMAGE_TOOLCHAIN_NOTE =
+  "Raster evidence validation uses Python 3.13.5 and Pillow 12.2.0 exactly; evaluated pixels are decoded from the same retained bytes that are hashed.";
 
 const args = new Set(process.argv.slice(2));
 const skipRuntime = args.delete("--skip-runtime");
@@ -205,6 +210,9 @@ const lockfileImporters = (source) => {
 if (read(".nvmrc", 64) !== `${EXPECTED_NODE}\n`) {
   errors.push(`.nvmrc must contain exactly ${EXPECTED_NODE}`);
 }
+if (read("requirements-image-pipeline.txt", 512) !== `Pillow==${EXPECTED_PILLOW}\n`) {
+  errors.push(`requirements-image-pipeline.txt must pin Pillow exactly to ${EXPECTED_PILLOW}`);
+}
 
 const packageJsonPaths = workspaceManifestPaths();
 const manifests = new Map(
@@ -302,7 +310,7 @@ for (const [label, pattern] of [
 
 const profile = canonicalJson("evavo.reliability.json");
 if (
-  profile.schemaVersion !== "1.1" ||
+  profile.schemaVersion !== "1.2" ||
   profile.id !== "evavo-art-studio" ||
   profile.repository !== "EVAVO-STUDIO/evavo-art-studio" ||
   profile.defaultBranch !== "main" ||
@@ -318,6 +326,16 @@ if (
   errors.push("evavo.reliability.json Art Studio authority changed");
 }
 if (
+  profile.imageToolchain?.python !== EXPECTED_PYTHON ||
+  profile.imageToolchain?.requirements !== "requirements-image-pipeline.txt" ||
+  profile.imageToolchain?.pillow !== EXPECTED_PILLOW ||
+  profile.imageToolchain?.install !==
+    "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt" ||
+  profile.imageToolchain?.verification !== "python tools/verify_brass_creative_evaluation.py"
+) {
+  errors.push("evavo.reliability.json exact image toolchain authority changed");
+}
+if (
   profile.dependencyLock?.path !== "pnpm-lock.yaml" ||
   profile.dependencyLock?.format !== "pnpm-lockfile-v9" ||
   profile.dependencyLock?.generatedWith?.node !== EXPECTED_NODE ||
@@ -329,6 +347,8 @@ if (
   errors.push("evavo.reliability.json committed lock authority changed");
 }
 const expectedValidation = [
+  "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt",
+  "python tools/verify_brass_creative_evaluation.py",
   "node scripts/check-repository-toolchain.mjs",
   "node scripts/test-repository-toolchain.mjs",
   "pnpm install --frozen-lockfile",
@@ -351,7 +371,13 @@ if (
 ) {
   errors.push("historical review-first baseline evidence changed");
 }
-for (const note of [AUTOMATIC_VALIDATION_NOTE, CURRENT_MAIN_RECEIPT_NOTE, FROZEN_LOCK_NOTE, DEPENDENCY_CHANGE_NOTE]) {
+for (const note of [
+  AUTOMATIC_VALIDATION_NOTE,
+  CURRENT_MAIN_RECEIPT_NOTE,
+  FROZEN_LOCK_NOTE,
+  DEPENDENCY_CHANGE_NOTE,
+  IMAGE_TOOLCHAIN_NOTE,
+]) {
   if (!profile.notes?.includes(note)) errors.push(`reliability profile is missing note: ${note}`);
 }
 for (const staleNote of [
@@ -376,7 +402,7 @@ for (const prohibited of [
 const schema = canonicalJson("schemas/repository-owned-reliability-profile.schema.json");
 if (
   schema.$schema !== "https://json-schema.org/draft/2020-12/schema" ||
-  schema.properties?.schemaVersion?.const !== "1.1" ||
+  schema.properties?.schemaVersion?.const !== "1.2" ||
   schema.properties?.id?.const !== "evavo-art-studio" ||
   schema.properties?.stack?.const !== "node-pnpm-creative-workspace" ||
   schema.properties?.packageManager?.properties?.lockfilePolicy?.const !== "committed-frozen" ||
@@ -384,9 +410,17 @@ if (
   schema.properties?.packageManager?.properties?.install?.const !== "pnpm install --frozen-lockfile" ||
   schema.properties?.dependencyLock?.properties?.committed?.const !== true ||
   schema.properties?.dependencyLock?.properties?.frozenInstallationRequired?.const !== true ||
-  !schema.required?.includes("dependencyLock")
+  schema.properties?.imageToolchain?.properties?.python?.const !== EXPECTED_PYTHON ||
+  schema.properties?.imageToolchain?.properties?.requirements?.const !== "requirements-image-pipeline.txt" ||
+  schema.properties?.imageToolchain?.properties?.pillow?.const !== EXPECTED_PILLOW ||
+  schema.properties?.imageToolchain?.properties?.install?.const !==
+    "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt" ||
+  schema.properties?.imageToolchain?.properties?.verification?.const !==
+    "python tools/verify_brass_creative_evaluation.py" ||
+  !schema.required?.includes("dependencyLock") ||
+  !schema.required?.includes("imageToolchain")
 ) {
-  errors.push("repository-owned reliability schema frozen-lock authority changed");
+  errors.push("repository-owned reliability schema frozen-lock or image-toolchain authority changed");
 }
 
 const workflowDirectory = resolveInside(".github/workflows");
@@ -440,6 +474,20 @@ const requiredWorkflowTokens = [
   "persist-credentials: false",
   "git show-ref --verify --quiet refs/remotes/origin/main",
   '[[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]',
+  `actions/setup-python@${SETUP_PYTHON_SHA} # v6.2.0`,
+  `python-version: "${EXPECTED_PYTHON}"`,
+  "cache-dependency-path: requirements-image-pipeline.txt",
+  "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt",
+  '[[ "${PYTHON_VERSION}" == "' + EXPECTED_PYTHON + '" ]]',
+  '[[ "${PILLOW_VERSION}" == "' + EXPECTED_PILLOW + '" ]]',
+  "ART_STUDIO_PYTHON_VERSION",
+  "ART_STUDIO_PILLOW_VERSION",
+  "python -m py_compile",
+  "tools/brass_creative_evaluation.py",
+  "tools/evaluate_brass_creative_candidate.py",
+  "tools/evaluate_brass_animation_sequence.py",
+  "tools/verify_brass_creative_evaluation.py",
+  "python tools/verify_brass_creative_evaluation.py",
   `pnpm/action-setup@${PNPM_SETUP_SHA} # v4.4.0`,
   `actions/setup-node@${SETUP_NODE_SHA} # v6.2.0`,
   `node-version: "${EXPECTED_NODE}"`,
@@ -457,10 +505,17 @@ const requiredWorkflowTokens = [
   'test -z "$(git status --porcelain)"',
   "git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main",
   "Candidate was superseded before receipt creation",
-  '"schemaVersion": "1.2"',
+  '"schemaVersion": "1.3"',
   '"trigger": process.env.GITHUB_EVENT_NAME',
   '"requestSource": process.env.ART_STUDIO_REQUEST_SOURCE',
   '"currentMainAtReceipt": true',
+  '"python": process.env.ART_STUDIO_PYTHON_VERSION',
+  '"pillow": process.env.ART_STUDIO_PILLOW_VERSION',
+  '"descriptorBoundSourceReads": true',
+  '"decodedPixelsFromRetainedSourceBytes": true',
+  '"singleFrameSourcesOnly": true',
+  '"atomicCreateOnlyPublication": true',
+  '"publishedEvidenceByteVerification": true',
   '"lockfilePolicy": "committed-frozen"',
   '"lockfileSha256": process.env.ART_STUDIO_LOCKFILE_SHA256',
   '"installedWithoutCommittedLockfile": false',
@@ -481,6 +536,7 @@ for (const forbidden of [
   "ubuntu-latest",
   "actions/checkout@v",
   "actions/setup-node@v",
+  "actions/setup-python@v",
   "actions/upload-artifact@v",
   "pnpm/action-setup@v",
   "persist-credentials: true",
@@ -513,6 +569,9 @@ const orderedWorkflowTokens = [
   '[[ "${GITHUB_EVENT_NAME}" == "push" ]]',
   `actions/checkout@${CHECKOUT_SHA}`,
   '[[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]',
+  `actions/setup-python@${SETUP_PYTHON_SHA}`,
+  "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt",
+  "python tools/verify_brass_creative_evaluation.py",
   "git ls-files --error-unmatch -- pnpm-lock.yaml",
   "node scripts/check-repository-toolchain.mjs",
   "node scripts/test-repository-toolchain.mjs",
@@ -534,6 +593,73 @@ for (const action of workflowActions(workflow)) {
   const reference = at >= 0 ? action.slice(at + 1) : "";
   if (!/^[a-f0-9]{40}$/i.test(reference)) {
     errors.push(`CI action must use a full 40-character commit SHA: ${action}`);
+  }
+}
+
+const toolchainWorkflow = read(".github/workflows/repository-toolchain-authority.yml");
+const toolchainEvents = workflowEvents(toolchainWorkflow);
+if (JSON.stringify(toolchainEvents) !== JSON.stringify(["pull_request", "workflow_dispatch"])) {
+  errors.push(
+    `repository toolchain workflow must use only pull_request and workflow_dispatch; found ${JSON.stringify(toolchainEvents)}`,
+  );
+}
+for (const token of [
+  "name: Repository toolchain authority",
+  '      - ".nvmrc"',
+  '      - "package.json"',
+  '      - "pnpm-lock.yaml"',
+  '      - "requirements-image-pipeline.txt"',
+  '      - "evavo.reliability.json"',
+  '      - "schemas/repository-owned-reliability-profile.schema.json"',
+  '      - "scripts/check-repository-toolchain.mjs"',
+  '      - "scripts/test-repository-toolchain.mjs"',
+  '      - ".github/workflows/ci.yml"',
+  '      - ".github/workflows/repository-toolchain-authority.yml"',
+  "permissions:\n  contents: read",
+  "cancel-in-progress: true",
+  "runs-on: ubuntu-24.04",
+  `actions/checkout@${CHECKOUT_SHA} # v6.0.2`,
+  "fetch-depth: 1",
+  "persist-credentials: false",
+  `pnpm/action-setup@${PNPM_SETUP_SHA} # v4.4.0`,
+  `version: ${EXPECTED_PNPM}`,
+  `actions/setup-node@${SETUP_NODE_SHA} # v6.2.0`,
+  `node-version: "${EXPECTED_NODE}"`,
+  "package-manager-cache: false",
+  "node scripts/check-repository-toolchain.mjs",
+  "node scripts/test-repository-toolchain.mjs",
+  "git diff --exit-code",
+  'test -z "$(git status --porcelain=v1 --untracked-files=all)"',
+]) {
+  if (!toolchainWorkflow.includes(token)) {
+    errors.push(`repository toolchain workflow is missing: ${token}`);
+  }
+}
+for (const forbidden of [
+  "  push:",
+  "schedule:",
+  "repository_dispatch:",
+  "workflow_run:",
+  "ubuntu-latest",
+  "persist-credentials: true",
+  "contents: write",
+  "write-all",
+  "secrets.",
+  "GITHUB_TOKEN",
+  "pnpm install",
+  "git push",
+  "git clean -",
+  "git reset --hard",
+]) {
+  if (toolchainWorkflow.includes(forbidden)) {
+    errors.push(`repository toolchain workflow contains prohibited material: ${forbidden}`);
+  }
+}
+for (const action of workflowActions(toolchainWorkflow)) {
+  const at = action.lastIndexOf("@");
+  const reference = at >= 0 ? action.slice(at + 1) : "";
+  if (!/^[a-f0-9]{40}$/i.test(reference)) {
+    errors.push(`repository toolchain action must use a full 40-character commit SHA: ${action}`);
   }
 }
 
@@ -560,8 +686,8 @@ if (errors.length > 0) {
 }
 
 console.log("Art Studio repository toolchain check passed.");
-console.log(`- Node.js ${EXPECTED_NODE}, pnpm ${EXPECTED_PNPM} and lockfile v${EXPECTED_LOCKFILE_VERSION} are exact authorities`);
+console.log(`- Node.js ${EXPECTED_NODE}, pnpm ${EXPECTED_PNPM}, Python ${EXPECTED_PYTHON}, Pillow ${EXPECTED_PILLOW} and lockfile v${EXPECTED_LOCKFILE_VERSION} are exact authorities`);
 console.log(`- pnpm-lock.yaml covers ${expectedImporters.length} exact workspace importers and is committed`);
 console.log("- every permanent workflow uses frozen installation and preserves lockfile identity");
-console.log("- CI validates only exact current main and records the committed lock digest");
+console.log("- CI validates only exact current main and records lock, image-runtime and Brass exact-byte evidence");
 console.log("- validation and production-effect authority remain separate");

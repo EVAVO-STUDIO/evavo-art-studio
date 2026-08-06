@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -38,7 +39,8 @@ def fixture(repo: Path, game: Path, work: Path) -> dict:
         directory.mkdir(parents=True, exist_ok=True)
     candidate = candidate_root / "standing.png"
     make_character(candidate)
-    features = core.image_features(core.load_rgba(candidate, 220_000_000))
+    candidate_image, _ = core.read_rgba(candidate, 2_147_483_648, 220_000_000)
+    features = core.image_features(candidate_image)
     style_bank = {
         "schema": core.STYLE_BANK_SCHEMA,
         "contract": "evavo.executable-image-pipeline.v1",
@@ -57,12 +59,54 @@ def fixture(repo: Path, game: Path, work: Path) -> dict:
     static_report = static.evaluate(static_args)
     if static_report["status"] != "passed" or static_report["blockers"]:
         raise AssertionError(f"valid static fixture blocked: {static_report['blockers']}")
+    if static_report["sourceBinding"] != {
+        "descriptorBoundRead": True,
+        "decodedFromRetainedBytes": True,
+        "singleFrameImage": True,
+    }:
+        raise AssertionError("static source binding evidence is incomplete")
     bad_candidate = candidate_root / "bad-canvas.png"
     make_character(bad_candidate, width=256, height=256)
     bad_args = SimpleNamespace(**{**vars(static_args), "candidate": "bad-canvas.png", "expected_candidate_sha256": None, "runtime_scale_sheet": evidence / "bad-runtime.png", "matte_sheet": evidence / "bad-matte.png", "output": evidence / "bad-static.json"})
     bad_report = static.evaluate(bad_args)
     if "wrong-canvas" not in bad_report["blockers"]:
         raise AssertionError("wrong canvas was accepted")
+
+    race_candidate = candidate_root / "race-standing.png"
+    make_character(race_candidate)
+    race_candidate_sha = hashlib.sha256(race_candidate.read_bytes()).hexdigest()
+    race_args = SimpleNamespace(**{
+        **vars(static_args),
+        "candidate": race_candidate.name,
+        "expected_candidate_sha256": race_candidate_sha,
+        "runtime_scale_sheet": evidence / "race-runtime.png",
+        "matte_sheet": evidence / "race-matte.png",
+        "output": evidence / "race-static.json",
+    })
+    original_stable_bytes = core.stable_bytes
+    static_swap_performed = False
+
+    def replace_static_after_read(path: Path, maximum: int) -> bytes:
+        nonlocal static_swap_performed
+        data = original_stable_bytes(path, maximum)
+        if not static_swap_performed and Path(path).resolve() == race_candidate.resolve():
+            replacement = candidate_root / ".race-static-replacement.png"
+            make_character(replacement, width=256, height=256)
+            os.replace(replacement, race_candidate)
+            static_swap_performed = True
+        return data
+
+    core.stable_bytes = replace_static_after_read
+    try:
+        static_race_report = static.evaluate(race_args)
+    finally:
+        core.stable_bytes = original_stable_bytes
+    if not static_swap_performed:
+        raise AssertionError("static source replacement attack did not execute")
+    if static_race_report["status"] != "passed" or static_race_report["blockers"]:
+        raise AssertionError(f"static evaluation reopened a replaced source path: {static_race_report['blockers']}")
+    if static_race_report["candidateSha256"] != race_candidate_sha or static_race_report["features"]["width"] != 512:
+        raise AssertionError("static evaluation did not remain bound to retained source bytes")
     frame_records = []
     for index, (shift, tags) in enumerate(zip([0, 3, -2, 0], [["idle"], ["weight-shift"], ["idle"], ["idle"]])):
         path = frames_root / f"idle_{index:02d}.png"
@@ -75,6 +119,50 @@ def fixture(repo: Path, game: Path, work: Path) -> dict:
     animation_report = animation.evaluate(animation_args)
     if animation_report["status"] != "passed" or animation_report["blockers"]:
         raise AssertionError(f"valid animation fixture blocked: {animation_report['blockers']}")
+    if not all(frame["sourceBinding"]["decodedFromRetainedBytes"] for frame in animation_report["frames"]):
+        raise AssertionError("animation frame binding evidence is incomplete")
+
+    race_frames_root = work / "race-frames"
+    race_frames_root.mkdir(parents=True, exist_ok=True)
+    race_frame_records = []
+    for index, (shift, tags) in enumerate(zip([0, 3, -2, 0], [["idle"], ["weight-shift"], ["idle"], ["idle"]])):
+        path = race_frames_root / f"idle_{index:02d}.png"
+        make_character(path, shift=shift)
+        race_frame_records.append({"path": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "durationMs": 120, "pivot": [0.5, 1.0], "baseline": 0.97, "groundContact": 0.97, "poseTags": tags})
+    race_manifest = {**manifest, "frames": race_frame_records}
+    race_manifest_path = work / "race-animation.json"
+    write_json(race_manifest_path, race_manifest)
+    race_animation_args = SimpleNamespace(**{
+        **vars(animation_args),
+        "frame_root": race_frames_root,
+        "manifest": race_manifest_path,
+        "contact_sheet": evidence / "race-animation-sheet.png",
+        "output": evidence / "race-animation-report.json",
+    })
+    race_frame = race_frames_root / "idle_01.png"
+    animation_swap_performed = False
+
+    def replace_animation_after_read(path: Path, maximum: int) -> bytes:
+        nonlocal animation_swap_performed
+        data = original_stable_bytes(path, maximum)
+        if not animation_swap_performed and Path(path).resolve() == race_frame.resolve():
+            replacement = race_frames_root / ".race-animation-replacement.png"
+            Image.new("RGBA", (32, 32), (255, 0, 0, 255)).save(replacement, format="PNG")
+            os.replace(replacement, race_frame)
+            animation_swap_performed = True
+        return data
+
+    core.stable_bytes = replace_animation_after_read
+    try:
+        animation_race_report = animation.evaluate(race_animation_args)
+    finally:
+        core.stable_bytes = original_stable_bytes
+    if not animation_swap_performed:
+        raise AssertionError("animation source replacement attack did not execute")
+    if animation_race_report["status"] != "passed" or animation_race_report["blockers"]:
+        raise AssertionError(f"animation evaluation reopened a replaced frame path: {animation_race_report['blockers']}")
+    if animation_race_report["frames"][1]["features"]["width"] != 512:
+        raise AssertionError("animation evaluation did not remain bound to retained frame bytes")
     duplicate = json.loads(json.dumps(manifest))
     duplicate["frames"][1]["path"] = duplicate["frames"][0]["path"]
     duplicate["frames"][1]["sha256"] = duplicate["frames"][0]["sha256"]
@@ -84,7 +172,61 @@ def fixture(repo: Path, game: Path, work: Path) -> dict:
     duplicate_report = animation.evaluate(duplicate_args)
     if not any(value.startswith("adjacent-duplicate-frame") for value in duplicate_report["blockers"]):
         raise AssertionError("adjacent duplicate animation frame was accepted")
-    return {"status": "passed", "staticEvaluationSha256": static_report["evaluationSha256"], "animationEvaluationSha256": animation_report["evaluationSha256"], "staticBlockerFixture": bad_report["blockers"], "animationBlockerFixture": duplicate_report["blockers"]}
+
+    collision_target = evidence / "create-only-race.json"
+    original_mkstemp = core.tempfile.mkstemp
+    collision_injected = False
+
+    def inject_output_collision(*args, **kwargs):
+        nonlocal collision_injected
+        descriptor, name = original_mkstemp(*args, **kwargs)
+        if not collision_injected:
+            collision_target.write_bytes(b"intruder-owned-evidence\n")
+            collision_injected = True
+        return descriptor, name
+
+    core.tempfile.mkstemp = inject_output_collision
+    try:
+        try:
+            core.atomic_json(collision_target, {"mustNot": "overwrite"})
+        except ValueError as error:
+            if "already exists" not in str(error):
+                raise
+        else:
+            raise AssertionError("create-only evidence publication overwrote a racing target")
+    finally:
+        core.tempfile.mkstemp = original_mkstemp
+    if collision_target.read_bytes() != b"intruder-owned-evidence\n":
+        raise AssertionError("create-only collision changed the pre-existing target bytes")
+
+    multi_frame = work / "multi-frame.gif"
+    Image.new("RGBA", (16, 16), (0, 0, 0, 255)).save(
+        multi_frame,
+        format="GIF",
+        save_all=True,
+        append_images=[Image.new("RGBA", (16, 16), (255, 255, 255, 255))],
+        duration=100,
+        loop=0,
+    )
+    try:
+        core.read_rgba(multi_frame, 1_000_000, 1_000_000)
+    except ValueError as error:
+        if "multi-frame image is not allowed" not in str(error):
+            raise
+    else:
+        raise AssertionError("multi-frame source image was accepted")
+
+    return {
+        "status": "passed",
+        "staticEvaluationSha256": static_report["evaluationSha256"],
+        "animationEvaluationSha256": animation_report["evaluationSha256"],
+        "staticBlockerFixture": bad_report["blockers"],
+        "animationBlockerFixture": duplicate_report["blockers"],
+        "staticSourceReplacementRace": "retained-original-bytes",
+        "animationSourceReplacementRace": "retained-original-bytes",
+        "createOnlyPublicationRace": "rejected-without-overwrite",
+        "multiFrameSource": "rejected",
+    }
 
 
 def main() -> int:

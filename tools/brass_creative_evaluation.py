@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
+import stat
 import tempfile
 from pathlib import Path
 from statistics import median
@@ -20,6 +22,15 @@ ANIMATION_MANIFEST_SCHEMA = "evavo.brass-brine.animation-sequence-manifest.v1"
 ANIMATION_SCHEMA = "evavo.brass-animation-sequence-evaluation.v1"
 HEX64 = set("0123456789abcdef")
 RESAMPLE = getattr(Image, "Resampling", Image).LANCZOS
+REQUIRED_EVIDENCE_REQUIREMENTS = (
+    "exactGameContractBinding",
+    "exactCandidateBytes",
+    "descriptorBoundSourceReads",
+    "decodedPixelsFromRetainedSourceBytes",
+    "singleFrameSourceImagesOnly",
+    "atomicCreateOnlyEvidencePublication",
+    "publishedEvidenceByteVerification",
+)
 
 
 def fail(message: str) -> None:
@@ -41,19 +52,68 @@ def valid_sha(value: Any) -> str:
     return text
 
 
+def _identity(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (
+        value.st_dev,
+        value.st_ino,
+        value.st_mode,
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_ctime_ns,
+    )
+
+
+def _assert_no_symlink_components(path: Path) -> Path:
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    parts = absolute.parts
+    current = Path(parts[0]) if parts else absolute
+    for part in parts[1:]:
+        current /= part
+        metadata = os.lstat(current)
+        if stat.S_ISLNK(metadata.st_mode):
+            fail(f"symlinked path component is not allowed: {current}")
+    return absolute
+
+
 def stable_bytes(path: Path, maximum: int) -> bytes:
-    resolved = path.resolve(strict=True)
-    if path.is_symlink() or resolved.is_symlink() or not resolved.is_file():
+    if not isinstance(maximum, int) or isinstance(maximum, bool) or maximum < 0:
+        fail("maximum byte policy must be a non-negative integer")
+    absolute = _assert_no_symlink_components(path)
+    before_path = os.stat(absolute, follow_symlinks=False)
+    if not stat.S_ISREG(before_path.st_mode):
         fail(f"not a regular file: {path}")
-    before = resolved.stat()
-    if before.st_size > maximum:
-        fail(f"file exceeds maximum bytes: {resolved}")
-    data = resolved.read_bytes()
-    after = resolved.stat()
-    identity_before = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
-    identity_after = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
-    if identity_before != identity_after or len(data) != before.st_size:
-        fail(f"file changed while being read: {resolved}")
+    if before_path.st_size > maximum:
+        fail(f"file exceeds maximum bytes: {absolute}")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(absolute, flags)
+    try:
+        before_descriptor = os.fstat(descriptor)
+        if _identity(before_descriptor) != _identity(before_path):
+            fail(f"file identity changed before descriptor read: {absolute}")
+        chunks: list[bytes] = []
+        remaining = before_descriptor.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                fail(f"file was truncated while being read: {absolute}")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            fail(f"file grew while being read: {absolute}")
+        after_descriptor = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    after_path = os.stat(absolute, follow_symlinks=False)
+    if (
+        _identity(before_descriptor) != _identity(after_descriptor)
+        or _identity(before_path) != _identity(after_path)
+    ):
+        fail(f"file changed while being read: {absolute}")
+    data = b"".join(chunks)
+    if len(data) != before_descriptor.st_size:
+        fail(f"file byte count changed while being read: {absolute}")
     return data
 
 
@@ -71,25 +131,42 @@ def resolve_inside(root: Path, relative: str, label: str) -> Path:
     value = Path(relative)
     if value.is_absolute() or ".." in value.parts:
         fail(f"{label} escaped approved root: {relative}")
-    root_resolved = root.resolve(strict=True)
-    candidate = (root_resolved / value).resolve(strict=True)
+    root_absolute = _assert_no_symlink_components(root)
+    root_resolved = root_absolute.resolve(strict=True)
+    candidate_unresolved = root_resolved / value
+    _assert_no_symlink_components(candidate_unresolved)
+    candidate = candidate_unresolved.resolve(strict=True)
     try:
         candidate.relative_to(root_resolved)
     except ValueError as error:
         raise ValueError(f"{label} escaped approved root: {relative}") from error
-    if candidate.is_symlink() or not candidate.is_file():
+    if not candidate.is_file():
         fail(f"{label} is not a regular file: {candidate}")
     return candidate
 
 
-def load_rgba(path: Path, maximum_pixels: int) -> Image.Image:
-    with Image.open(path) as opened:
+def decode_rgba(data: bytes, maximum_pixels: int, label: str = "image") -> Image.Image:
+    if not isinstance(maximum_pixels, int) or isinstance(maximum_pixels, bool) or maximum_pixels < 1:
+        fail("maximum decoded-pixel policy must be a positive integer")
+    with Image.open(io.BytesIO(data)) as opened:
+        if int(getattr(opened, "n_frames", 1)) != 1:
+            fail(f"multi-frame image is not allowed: {label}")
         width, height = opened.size
         if width < 1 or height < 1 or width * height > maximum_pixels:
-            fail(f"decoded image exceeds pixel policy: {path}")
+            fail(f"decoded image exceeds pixel policy: {label}")
         image = ImageOps.exif_transpose(opened)
         image.load()
         return image.convert("RGBA")
+
+
+def read_rgba(path: Path, maximum_bytes: int, maximum_pixels: int) -> tuple[Image.Image, bytes]:
+    data = stable_bytes(path, maximum_bytes)
+    return decode_rgba(data, maximum_pixels, str(path)), data
+
+
+def load_rgba(path: Path, maximum_pixels: int) -> Image.Image:
+    image, _ = read_rgba(path, 2_147_483_648, maximum_pixels)
+    return image
 
 
 def file_sha(path: Path, maximum: int) -> tuple[str, int]:
@@ -195,33 +272,72 @@ def profile_style_distance(features: dict[str, Any], profile: dict[str, Any]) ->
     return {"score": score, "components": components, "nearestReferenceDhashDistance": min(distances) if distances else None}
 
 
-def atomic_json(path: Path, value: dict[str, Any], replace: bool = False) -> None:
+def _fsync_directory(directory: Path) -> None:
+    if os.name == "nt":
+        return
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+    descriptor = os.open(directory, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _publish_temporary(temporary: Path, path: Path, replace: bool, label: str) -> None:
+    if replace:
+        os.replace(temporary, path)
+    else:
+        try:
+            os.link(temporary, path, follow_symlinks=False)
+        except FileExistsError as error:
+            raise ValueError(f"{label} already exists: {path}") from error
+        temporary.unlink()
+    _fsync_directory(path.parent)
+
+
+def _verify_published_bytes(path: Path, expected_sha256: str, expected_size: int) -> None:
+    published = stable_bytes(path, expected_size)
+    if len(published) != expected_size or hashlib.sha256(published).hexdigest() != expected_sha256:
+        fail(f"published evidence differs from the exact staged bytes: {path}")
+
+
+def atomic_json(path: Path, value: dict[str, Any], replace: bool = False) -> tuple[str, int]:
     path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists() and not replace:
-        fail(f"output already exists: {path}")
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     temporary = Path(temporary_name)
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+        with os.fdopen(descriptor, "w+", encoding="utf-8", newline="\n") as handle:
             json.dump(value, handle, ensure_ascii=False, indent=2)
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
+            handle.seek(0)
+            payload = handle.read().encode("utf-8")
+        digest = hashlib.sha256(payload).hexdigest()
+        size = len(payload)
+        _publish_temporary(temporary, path, replace, "output")
+        _verify_published_bytes(path, digest, size)
+        return digest, size
     finally:
         temporary.unlink(missing_ok=True)
 
 
-def atomic_image(path: Path, image: Image.Image, replace: bool = False) -> None:
+def atomic_image(path: Path, image: Image.Image, replace: bool = False) -> tuple[str, int]:
     path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists() and not replace:
-        fail(f"evidence image already exists: {path}")
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".png", dir=path.parent)
-    os.close(descriptor)
     temporary = Path(temporary_name)
     try:
-        image.save(temporary, format="PNG", optimize=True)
-        os.replace(temporary, path)
+        with os.fdopen(descriptor, "w+b") as handle:
+            image.save(handle, format="PNG", optimize=True)
+            handle.flush()
+            os.fsync(handle.fileno())
+            handle.seek(0)
+            payload = handle.read()
+        digest = hashlib.sha256(payload).hexdigest()
+        size = len(payload)
+        _publish_temporary(temporary, path, replace, "evidence image")
+        _verify_published_bytes(path, digest, size)
+        return digest, size
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -265,8 +381,14 @@ def contact_sheet_mattes(image: Image.Image, mattes: list[tuple[str, tuple[int, 
 
 def load_contracts(repo: Path, game_root: Path, art_contract_relative: str) -> tuple[dict[str, Any], bytes, dict[str, Any], bytes]:
     evaluation, evaluation_bytes = read_object(repo / "config" / "brass-creative-evaluation.v1.json", 1024 * 1024)
-    if evaluation.get("contract") != CONTRACT_ID:
+    if evaluation.get("schemaVersion") != "1.1" or evaluation.get("contract") != CONTRACT_ID:
         fail("unexpected creative evaluation contract")
+    requirements = evaluation.get("requirements")
+    if not isinstance(requirements, dict):
+        fail("creative evaluation requirements are missing")
+    for requirement in REQUIRED_EVIDENCE_REQUIREMENTS:
+        if requirements.get(requirement) is not True:
+            fail(f"creative evaluation requirement is not enabled: {requirement}")
     game_path = resolve_inside(game_root, art_contract_relative, "game art-direction contract")
     game, game_bytes = read_object(game_path, int(evaluation["limits"]["maximumJsonBytes"]))
     if game.get("contract") != GAME_CONTRACT_ID:
