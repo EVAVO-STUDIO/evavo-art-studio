@@ -12,8 +12,12 @@ const required = {
   contractIndex: "packages/contracts/src/index.ts",
   contractTest: "packages/contracts/test/book-art-candidate-set.test.mjs",
   runtime: "packages/book-art-runtime/src/candidate-set.ts",
+  executionRuntime:
+    "packages/book-art-runtime/src/candidate-set-execution.ts",
   runtimePackage: "packages/book-art-runtime/package.json",
   runtimeTest: "packages/book-art-runtime/test/candidate-set-runtime.test.mjs",
+  executionRuntimeTest:
+    "packages/book-art-runtime/test/candidate-set-execution.test.mjs",
   providerPrompt: "packages/providers/src/prompt.ts",
   providerTest: "packages/providers/test/providers.test.mjs",
   recipeCheck: "scripts/check-image-processing-recipes.mjs",
@@ -38,10 +42,11 @@ function reject(source, token, label) {
   if (source.includes(token)) failures.push(`${label} contains prohibited ${JSON.stringify(token)}.`);
 }
 if (!failures.length) {
-  const implementation = `${sources.contract}\n${sources.canonicalContract}\n${sources.runtime}\n${sources.providerPrompt}`;
+  const implementation = `${sources.contract}\n${sources.canonicalContract}\n${sources.runtime}\n${sources.executionRuntime}\n${sources.providerPrompt}`;
   for (const token of [
     "evavo_book_art_candidate_set_production_v1",
     "evavo_book_art_candidate_set_provider_runtime_v1",
+    "evavo_book_art_candidate_set_execution_evidence_v1",
     "book.candidate_set.generate",
     "book.visual.candidate_set.consensus",
     "BOOK_ART_CANDIDATE_SET_MINIMUM_CANDIDATES = 3",
@@ -54,6 +59,10 @@ if (!failures.length) {
     "expectedCandidateCount",
     "BOOK CANDIDATE-SET DIVERSITY CONTRACT",
     "canonical semantic replay",
+    "compileBookArtCandidateSetProviderRunReceipt",
+    "evaluateBookArtCandidateSetExecutionConsensus",
+    "exactOutputSetVerified: true",
+    "immutableArtifactsVerified: true",
     "oneProviderAttemptForEntireSet: true",
     "providerFallbackAllowed: false",
     "automaticSelectionAllowed: false",
@@ -81,15 +90,28 @@ if (!failures.length) {
     'from "./book-art-candidate-set-canonical.js";',
     "canonical contract barrel",
   );
-  expect(
-    sources.runtimePackage,
-    '"./candidate-set"',
-    "runtime package export",
+  for (const token of ['"./candidate-set"', '"./candidate-set-execution"']) {
+    expect(sources.runtimePackage, token, "runtime package export");
+  }
+  for (const token of [
+    "pnpm run build:domain",
+    "candidate-set-execution.test.mjs",
+    '"packages/book-art-runtime/src/candidate-set*.ts"',
+  ]) expect(sources.workflow, token, "candidate-set workflow");
+  for (const token of [
+    '"plan",',
+    "plan: input.plan",
+    "await compileBookArtCandidateSetProviderRunReceipt",
+  ]) expect(sources.executionRuntime, token, "execution-bound consensus");
+  reject(
+    sources.executionRuntime,
+    '"providerRunReceipt",\n      "consensusInput"',
+    "execution-bound consensus caller authority",
   );
   expect(
-    sources.workflow,
-    "pnpm run build:domain",
-    "candidate-set workflow dependency build",
+    sources.docs,
+    "never trusts a caller-supplied receipt",
+    "execution-evidence documentation",
   );
   for (const token of [
     "omits outputs from the governed set",
@@ -113,6 +135,12 @@ if (!failures.length) {
     "without creating four provider attempts",
     "fallback tampering",
   ]) expect(sources.runtimeTest, token, "candidate-set runtime attacks");
+  for (const token of [
+    "exact durable provider execution",
+    "exact provider output set",
+    "omitted or substituted candidates",
+    "forged receipt",
+  ]) expect(sources.executionRuntimeTest, token, "execution-evidence attacks");
 }
 if (failures.length) {
   for (const failure of failures) {
@@ -124,11 +152,14 @@ if (failures.length) {
     ok: true,
     contract: "evavo_book_art_candidate_set_production_v1",
     runtimeContract: "evavo_book_art_candidate_set_provider_runtime_v1",
+    executionEvidenceContract:
+      "evavo_book_art_candidate_set_execution_evidence_v1",
     minimumCandidates: 3,
     defaultCandidates: 4,
     maximumCandidates: 8,
     nearDuplicateBasisPoints: 9200,
     canonicalSourceEvidence: true,
+    exactProviderRunEvidence: true,
     oneProviderAttemptForEntireSet: true,
     providerFallbackAllowed: false,
     automaticSelectionAllowed: false,

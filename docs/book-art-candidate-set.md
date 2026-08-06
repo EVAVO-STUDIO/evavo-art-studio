@@ -8,6 +8,10 @@ The provider runtime contract is:
 
 `evavo_book_art_candidate_set_provider_runtime_v1`
 
+The execution-evidence contract is:
+
+`evavo_book_art_candidate_set_execution_evidence_v1`
+
 ## Why this exists
 
 The original Book Art wrapper intentionally generated one governed candidate at a time. Docs Suite's creative-quality gate now requires a real set of alternatives so generic stock imagery, template compositions and near-duplicate variations cannot pass merely because a provider returned a technically valid file.
@@ -22,6 +26,16 @@ The entire set uses one provider attempt, one allow-listed adapter and no fallba
 
 The consensus request carries the exact governed candidate count. Reviewing only a convenient subset is a blocking error even when the submitted subset is otherwise technically valid.
 
+## Execution-evidence boundary
+
+A technically coherent review set is not enough. Before candidate-set consensus can enter the Docs Suite quality gate, `compileBookArtCandidateSetProviderRunReceipt` rebuilds one read-only receipt from the exact durable runtime job, verified candidate descriptors, verified candidate bytes and the provider evidence JSON.
+
+The receipt binds the candidate-set and work-order fingerprints to the runtime job ID and spec hash, the normalized provider request, compiled prompt, one successful adapter/model attempt, the evidence artifact and the ordered output set. `evaluateBookArtCandidateSetExecutionConsensus` accepts the exact provider plan and consensus evidence, then rebuilds this receipt itself from the durable runtime and artifact store before matching every reviewed candidate ID, content hash, descriptor fingerprint and producer. It never trusts a caller-supplied receipt or standalone digest as execution authority.
+
+The durable runtime and artifact reads are part of the consensus authority decision itself, not an optional preflight that a caller may skip or replace with a cached receipt.
+
+Missing outputs, substituted bytes, reordered evidence, a different adapter, a fallback attempt, a redriven job, an altered request, an unverified artifact or a recomputed standalone review fingerprint all fail closed. The receipt compiler performs no provider call and writes no artifacts.
+
 ## Quality boundary
 
 Before Docs Suite can run its independent creative-quality gate:
@@ -34,11 +48,14 @@ Before Docs Suite can run its independent creative-quality gate:
 6. Overall, concept, composition and silhouette similarity must each remain below 9,200 basis points.
 7. The set reviewer must be human or human with machine assistance and cannot be a candidate producer.
 8. Machine-only approval is prohibited.
+9. The review set must match the exact immutable provider-run receipt.
 
-The set-level operation returns only `ready_for_docs_quality_gate`. It cannot select a candidate, promote Art, create a Book-use binding or publish anything. Downstream validation replays the complete semantic gate from the retained candidate and pairwise evidence, so a modified result cannot become valid merely by recomputing its SHA-256 fingerprint.
+The execution-bound operation returns only `ready_for_docs_quality_gate`. It cannot select a candidate, promote Art, create a Book-use binding or publish anything. Downstream validation replays the complete semantic gate from the retained candidate and pairwise evidence, so a modified result cannot become valid merely by recomputing its SHA-256 fingerprint.
 
 ## Runtime use
 
 Compile the governed base work order with `compileBookArtProductionWorkOrder`, then call `compileBookArtCandidateSetWorkOrder`. Submit the resulting work order through `compileBookArtCandidateSetProviderJob` or `submitBookArtCandidateSetProviderJob` from `@evavo/art-book-runtime/candidate-set`.
+
+After the durable job succeeds, use `evaluateBookArtCandidateSetExecutionConsensus` from `@evavo/art-book-runtime/candidate-set-execution` with the exact provider job plan, runtime repository, artifact store and consensus evidence. The evaluator rebuilds the provider-run receipt internally. `compileBookArtCandidateSetProviderRunReceipt` remains available for read-only inspection and audit display, but production integrations must not accept a caller-supplied receipt or standalone consensus fingerprint as provider-run evidence.
 
 The worker continues to use the existing provider request protocol and `art.candidate.generate` execution kind, so no second image backend or untested queue is introduced.
