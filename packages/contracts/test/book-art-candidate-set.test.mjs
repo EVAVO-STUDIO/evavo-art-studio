@@ -6,6 +6,7 @@ import {
   BOOK_ART_CANDIDATE_SET_CONTRACT,
   BOOK_ART_CANDIDATE_SET_NEAR_DUPLICATE_BASIS_POINTS,
   evaluateBookArtCandidateSetConsensus,
+  fingerprintBookArtCandidateSetConsensusEvaluation,
   fingerprintBookIllustrationValue,
   listBookArtCandidateSetCapabilities,
   validateBookArtCandidateSetConsensusEvaluation,
@@ -92,6 +93,7 @@ function consensusInput() {
     contract: BOOK_ART_CANDIDATE_SET_CONTRACT,
     candidateSetId: "candidate-set-1234567890abcdef",
     workOrderFingerprintSha256: digest("a"),
+    expectedCandidateCount: 3,
     providerRunFingerprint: digest("b"),
     candidates: [candidate(1), candidate(2), candidate(3)],
     pairwiseComparisons: [pair(1, 2), pair(1, 3, 10), pair(2, 3, 20)],
@@ -156,6 +158,14 @@ test("blocks missing or duplicated pair coverage", () => {
   assert.match(duplicatedResult.blockers.join("\n"), /duplicated/i);
 });
 
+test("blocks candidate review that omits outputs from the governed set", () => {
+  const incomplete = consensusInput();
+  incomplete.expectedCandidateCount = 4;
+  const result = evaluateBookArtCandidateSetConsensus(incomplete);
+  assert.equal(result.status, "blocked");
+  assert.match(result.blockers.join("\n"), /exactly 4 candidates/i);
+});
+
 test("blocks machine-only approval and producer self-review", () => {
   const machineOnly = consensusInput();
   machineOnly.machineOnlyDecision = true;
@@ -176,6 +186,17 @@ test("blocks stale per-candidate consensus evidence", () => {
   assert.match(result.blockers.join("\n"), /fingerprint|different candidate/i);
 });
 
+test("blocks candidate-producer participation hidden inside visual consensus", () => {
+  const input = consensusInput();
+  const consensus = input.candidates[0].visualConsensus;
+  consensus.passingReviewerProducerIds[0] = "openai-gpt-image";
+  const { evaluationFingerprint: _discarded, ...unsigned } = consensus;
+  consensus.evaluationFingerprint = fingerprintBookIllustrationValue(unsigned);
+  const result = evaluateBookArtCandidateSetConsensus(input);
+  assert.equal(result.status, "blocked");
+  assert.match(result.blockers.join("\n"), /not independent from the candidate producer/i);
+});
+
 test("returns needs_work for template variants", () => {
   const input = consensusInput();
   input.candidates[1].conceptFingerprint = input.candidates[0].conceptFingerprint;
@@ -192,5 +213,19 @@ test("detects candidate-set evaluation tampering", () => {
   assert.match(
     validateBookArtCandidateSetConsensusEvaluation(tampered).join("\n"),
     /fingerprint/i,
+  );
+});
+
+test("rejects freshly re-fingerprinted forged ready evaluations", () => {
+  const result = evaluateBookArtCandidateSetConsensus(consensusInput());
+  assert.ok(result.evaluation);
+  const forged = structuredClone(result.evaluation);
+  forged.pairwiseComparisons[0].overallSimilarityBasisPoints =
+    BOOK_ART_CANDIDATE_SET_NEAR_DUPLICATE_BASIS_POINTS;
+  forged.evaluationFingerprint =
+    fingerprintBookArtCandidateSetConsensusEvaluation(forged);
+  assert.match(
+    validateBookArtCandidateSetConsensusEvaluation(forged).join("\n"),
+    /canonical semantic replay/i,
   );
 });

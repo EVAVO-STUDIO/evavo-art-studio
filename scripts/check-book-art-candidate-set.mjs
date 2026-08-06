@@ -14,6 +14,9 @@ const required = {
   runtime: "packages/book-art-runtime/src/candidate-set.ts",
   runtimePackage: "packages/book-art-runtime/package.json",
   runtimeTest: "packages/book-art-runtime/test/candidate-set-runtime.test.mjs",
+  providerPrompt: "packages/providers/src/prompt.ts",
+  providerTest: "packages/providers/test/providers.test.mjs",
+  recipeCheck: "scripts/check-image-processing-recipes.mjs",
   workflow: ".github/workflows/book-art-candidate-set.yml",
   docs: "docs/book-art-candidate-set.md",
 };
@@ -35,7 +38,7 @@ function reject(source, token, label) {
   if (source.includes(token)) failures.push(`${label} contains prohibited ${JSON.stringify(token)}.`);
 }
 if (!failures.length) {
-  const implementation = `${sources.contract}\n${sources.canonicalContract}\n${sources.runtime}`;
+  const implementation = `${sources.contract}\n${sources.canonicalContract}\n${sources.runtime}\n${sources.providerPrompt}`;
   for (const token of [
     "evavo_book_art_candidate_set_production_v1",
     "evavo_book_art_candidate_set_provider_runtime_v1",
@@ -48,6 +51,9 @@ if (!failures.length) {
     "completePairwiseComparisonRequired: true",
     "independentSetReviewRequired: true",
     "generatedTextProhibited: true",
+    "expectedCandidateCount",
+    "BOOK CANDIDATE-SET DIVERSITY CONTRACT",
+    "canonical semantic replay",
     "oneProviderAttemptForEntireSet: true",
     "providerFallbackAllowed: false",
     "automaticSelectionAllowed: false",
@@ -86,11 +92,22 @@ if (!failures.length) {
     "candidate-set workflow dependency build",
   );
   for (const token of [
+    "omits outputs from the governed set",
     "near duplicates",
     "machine-only",
     "producer self-review",
+    "candidate-producer participation hidden inside visual consensus",
     "missing or duplicated pair coverage",
+    "freshly re-fingerprinted forged ready evaluations",
   ]) expect(sources.contractTest, token, "candidate-set attacks");
+  for (const token of [
+    "genuinely distinct non-template alternatives",
+    "same template with cosmetic changes",
+  ]) expect(sources.providerTest, token, "provider prompt attacks");
+  for (const token of [
+    "TemporaryDirectory",
+    "py_compile.compile",
+  ]) expect(sources.recipeCheck, token, "isolated Python syntax validation");
   for (const token of [
     "exact four-output set",
     "without creating four provider attempts",

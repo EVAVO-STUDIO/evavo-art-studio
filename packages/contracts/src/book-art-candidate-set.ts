@@ -551,6 +551,7 @@ export interface BookArtCandidateSetConsensusInputV1 {
   contract: typeof BOOK_ART_CANDIDATE_SET_CONTRACT;
   candidateSetId: string;
   workOrderFingerprintSha256: string;
+  expectedCandidateCount: number;
   providerRunFingerprint: string;
   candidates: BookArtCandidateSetConsensusCandidateV1[];
   pairwiseComparisons: BookArtCandidateSetPairwiseComparisonV1[];
@@ -574,6 +575,7 @@ export interface BookArtCandidateSetConsensusEvaluationV1 {
   status: "needs_work" | "ready_for_docs_quality_gate";
   candidateSetId: string;
   workOrderFingerprintSha256: string;
+  expectedCandidateCount: number;
   providerRunFingerprint: string;
   candidates: BookArtCandidateSetConsensusCandidateV1[];
   pairwiseComparisons: BookArtCandidateSetPairwiseComparisonV1[];
@@ -650,6 +652,13 @@ export function evaluateBookArtCandidateSetConsensus(
     "workOrderFingerprintSha256",
     blockers,
   );
+  const expectedCandidateCount = integer(
+    input.expectedCandidateCount,
+    BOOK_ART_CANDIDATE_SET_MINIMUM_CANDIDATES,
+    BOOK_ART_CANDIDATE_SET_MAXIMUM_CANDIDATES,
+    "expectedCandidateCount",
+    blockers,
+  );
   const providerRunFingerprint = digest(
     input.providerRunFingerprint,
     "providerRunFingerprint",
@@ -680,6 +689,14 @@ export function evaluateBookArtCandidateSetConsensus(
   ) {
     blockers.push(
       `Candidate-set consensus requires ${BOOK_ART_CANDIDATE_SET_MINIMUM_CANDIDATES} to ${BOOK_ART_CANDIDATE_SET_MAXIMUM_CANDIDATES} candidates.`,
+    );
+  }
+  if (
+    Array.isArray(input.candidates) &&
+    candidateValues.length !== expectedCandidateCount
+  ) {
+    blockers.push(
+      `Candidate-set consensus requires exactly ${expectedCandidateCount} candidates from the governed work order.`,
     );
   }
   const candidates = candidateValues
@@ -783,6 +800,7 @@ export function evaluateBookArtCandidateSetConsensus(
     status,
     candidateSetId,
     workOrderFingerprintSha256,
+    expectedCandidateCount,
     providerRunFingerprint,
     candidates,
     pairwiseComparisons: comparisons,
@@ -860,11 +878,24 @@ export function validateBookArtCandidateSetConsensusEvaluation(
   const candidates = Array.isArray(evaluation.candidates)
     ? evaluation.candidates
     : [];
+  const expectedCandidateCount = integer(
+    evaluation.expectedCandidateCount,
+    BOOK_ART_CANDIDATE_SET_MINIMUM_CANDIDATES,
+    BOOK_ART_CANDIDATE_SET_MAXIMUM_CANDIDATES,
+    "expectedCandidateCount",
+    issues,
+  );
   if (
     candidates.length < BOOK_ART_CANDIDATE_SET_MINIMUM_CANDIDATES ||
     candidates.length > BOOK_ART_CANDIDATE_SET_MAXIMUM_CANDIDATES
   ) {
     issues.push("Candidate-set consensus candidate count is invalid.");
+  }
+  if (
+    Array.isArray(evaluation.candidates) &&
+    candidates.length !== expectedCandidateCount
+  ) {
+    issues.push("Candidate-set evaluation does not contain the exact governed candidate count.");
   }
   if (
     !Array.isArray(evaluation.candidateIds) ||
@@ -901,6 +932,49 @@ export function validateBookArtCandidateSetConsensusEvaluation(
     evaluation.requiredActions.length
   ) {
     issues.push("Ready candidate-set consensus cannot retain required actions.");
+  }
+  const replay = evaluateBookArtCandidateSetConsensus({
+    outputKind: "evavo_art_book_candidate_set_consensus_input",
+    schemaVersion: BOOK_ART_CANDIDATE_SET_SCHEMA_VERSION,
+    contract: BOOK_ART_CANDIDATE_SET_CONTRACT,
+    candidateSetId: evaluation.candidateSetId,
+    workOrderFingerprintSha256: evaluation.workOrderFingerprintSha256,
+    expectedCandidateCount: evaluation.expectedCandidateCount,
+    providerRunFingerprint: evaluation.providerRunFingerprint,
+    candidates: evaluation.candidates,
+    pairwiseComparisons: evaluation.pairwiseComparisons,
+    setReviewerId: evaluation.setReviewerId,
+    setReviewMethod: evaluation.setReviewMethod,
+    machineOnlyDecision: evaluation.machineOnlyDecision,
+    requestedAt: "1970-01-01T00:00:00.000Z",
+    requestedBy: "candidate-set-evaluation-validator",
+    providerCallAllowed: false,
+    reviewerFallbackAllowed: false,
+    automaticSelectionAllowed: false,
+    automaticPromotionAllowed: false,
+    bookUseBindingAllowed: false,
+    publicationAllowed: false,
+  });
+  if (replay.status === "blocked" || !replay.evaluation) {
+    issues.push(
+      ...replay.blockers.map(
+        (issue) => `Candidate-set semantic replay: ${issue}`,
+      ),
+    );
+  } else {
+    const {
+      evaluationFingerprint: _observedReplayFingerprint,
+      ...observedReplay
+    } = evaluation as unknown as BookArtCandidateSetConsensusEvaluationV1;
+    const {
+      evaluationFingerprint: _expectedReplayFingerprint,
+      ...expectedReplay
+    } = replay.evaluation;
+    if (canonical(observedReplay) !== canonical(expectedReplay)) {
+      issues.push(
+        "Candidate-set consensus evaluation differs from canonical semantic replay.",
+      );
+    }
   }
   const observed = digest(
     evaluation.evaluationFingerprint,
@@ -991,6 +1065,7 @@ function parseConsensusCandidate(
     visualConsensus,
     {
       candidateId,
+      candidateProducerId,
       candidateContentSha256,
       candidateArtifactFingerprint,
       planFingerprint,
@@ -1019,6 +1094,7 @@ function validateVisualConsensus(
   value: BookIllustrationVisualConsensusEvaluationV1 | undefined,
   expected: Readonly<{
     candidateId: string;
+    candidateProducerId: string;
     candidateContentSha256: string;
     candidateArtifactFingerprint: string;
     planFingerprint: string;
@@ -1060,6 +1136,104 @@ function validateVisualConsensus(
     normalizeDigest(String(source.planFingerprint)) !== expected.planFingerprint
   ) {
     blockers.push(`${label}.visualConsensus belongs to different candidate evidence.`);
+  }
+  const reviewFingerprints = stringArray(
+    source.reviewFingerprints,
+    `${label}.visualConsensus.reviewFingerprints`,
+    blockers,
+    2,
+    16,
+  ).map((entry, index) =>
+    digest(
+      entry,
+      `${label}.visualConsensus.reviewFingerprints[${index}]`,
+      blockers,
+    ),
+  );
+  const passingReviewerProducerIds = stringArray(
+    source.passingReviewerProducerIds,
+    `${label}.visualConsensus.passingReviewerProducerIds`,
+    blockers,
+    0,
+    16,
+  ).map((entry, index) =>
+    safeId(
+      entry,
+      `${label}.visualConsensus.passingReviewerProducerIds[${index}]`,
+      blockers,
+    ),
+  );
+  const dissentingReviewerProducerIds = stringArray(
+    source.dissentingReviewerProducerIds,
+    `${label}.visualConsensus.dissentingReviewerProducerIds`,
+    blockers,
+    0,
+    16,
+  ).map((entry, index) =>
+    safeId(
+      entry,
+      `${label}.visualConsensus.dissentingReviewerProducerIds[${index}]`,
+      blockers,
+    ),
+  );
+  const reviewerProducerIds = [
+    ...passingReviewerProducerIds,
+    ...dissentingReviewerProducerIds,
+  ];
+  if (duplicates(reviewFingerprints).length) {
+    blockers.push(`${label}.visualConsensus review fingerprints are duplicated.`);
+  }
+  if (duplicates(reviewerProducerIds).length) {
+    blockers.push(`${label}.visualConsensus reviewer producers are duplicated.`);
+  }
+  if (reviewerProducerIds.includes(expected.candidateProducerId)) {
+    blockers.push(`${label}.visualConsensus is not independent from the candidate producer.`);
+  }
+  if (reviewFingerprints.length !== reviewerProducerIds.length) {
+    blockers.push(`${label}.visualConsensus reviewer summary count is inconsistent.`);
+  }
+  const minimumIndependentReviewers = integer(
+    source.minimumIndependentReviewers,
+    2,
+    16,
+    `${label}.visualConsensus.minimumIndependentReviewers`,
+    blockers,
+  );
+  const minimumConsensusBasisPoints = integer(
+    source.minimumConsensusBasisPoints,
+    5_000,
+    10_000,
+    `${label}.visualConsensus.minimumConsensusBasisPoints`,
+    blockers,
+  );
+  const consensusBasisPoints = integer(
+    source.consensusBasisPoints,
+    0,
+    10_000,
+    `${label}.visualConsensus.consensusBasisPoints`,
+    blockers,
+  );
+  const expectedConsensusBasisPoints = Math.floor(
+    (passingReviewerProducerIds.length * 10_000) /
+      Math.max(reviewerProducerIds.length, 1),
+  );
+  if (consensusBasisPoints !== expectedConsensusBasisPoints) {
+    blockers.push(`${label}.visualConsensus consensus basis points are inconsistent.`);
+  }
+  if (
+    source.consensusReached === true &&
+    (passingReviewerProducerIds.length < minimumIndependentReviewers ||
+      consensusBasisPoints < minimumConsensusBasisPoints)
+  ) {
+    blockers.push(`${label}.visualConsensus cannot claim consensus without the required independent passing reviewers.`);
+  }
+  if (
+    typeof source.minimumPassingReviewerScore !== "number" ||
+    !Number.isFinite(source.minimumPassingReviewerScore) ||
+    source.minimumPassingReviewerScore < 0 ||
+    source.minimumPassingReviewerScore > 100
+  ) {
+    blockers.push(`${label}.visualConsensus minimumPassingReviewerScore is invalid.`);
   }
   if (
     source.providerCallPerformed !== false ||
@@ -1314,6 +1488,7 @@ const CONSENSUS_INPUT_KEYS = new Set([
   "contract",
   "candidateSetId",
   "workOrderFingerprintSha256",
+  "expectedCandidateCount",
   "providerRunFingerprint",
   "candidates",
   "pairwiseComparisons",
@@ -1386,6 +1561,7 @@ const CONSENSUS_EVALUATION_KEYS = new Set([
   "status",
   "candidateSetId",
   "workOrderFingerprintSha256",
+  "expectedCandidateCount",
   "providerRunFingerprint",
   "candidates",
   "pairwiseComparisons",

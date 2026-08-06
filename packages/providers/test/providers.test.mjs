@@ -175,6 +175,44 @@ test("compiled prompt preserves shot and layer boundaries", async () => {
   assert.equal(providerRequestSha256(normalized).length, 64);
 });
 
+test("governed Book candidate sets demand genuinely distinct non-template alternatives", () => {
+  const normalized = validateProviderCandidateRequest(
+    request({
+      assetKind: "illustration",
+      continuityPhase: "independent",
+      target: {
+        width: 1600,
+        height: 900,
+        transparency: "opaque",
+        outputFormat: "png",
+      },
+      background: { strategy: "opaque-source" },
+      candidateCount: 4,
+      references: [],
+      metadata: {
+        candidateSetId: "candidate-set-1234567890abcdef",
+        candidateCount: 4,
+        completePairwiseComparisonRequired: true,
+        independentSetReviewRequired: true,
+        generatedTextProhibited: true,
+        automaticSelectionAllowed: false,
+        publicationPerformed: false,
+      },
+    }),
+  );
+  const compiled = compileProviderCandidatePrompt(normalized);
+  for (const token of [
+    "BOOK CANDIDATE-SET DIVERSITY CONTRACT",
+    "Return exactly 4 separate candidate files",
+    "genuinely different visual solution",
+    "palette swaps",
+    "same template with cosmetic changes",
+    "Each returned file must contain one complete candidate only",
+  ]) {
+    assert.ok(compiled.text.includes(token), `missing diversity contract: ${token}`);
+  }
+});
+
 test("registry rejects native-alpha work for GPT Image 2 but accepts chroma-key work", async () => {
   const fixture = await artifactFixture();
   const openai = new OpenAIImageProviderAdapter({

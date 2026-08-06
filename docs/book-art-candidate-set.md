@@ -18,7 +18,9 @@ This additive path preserves the original one-candidate work order as immutable 
 
 A candidate-set work order requests 3 to 8 alternatives, defaulting to 4. The provider worker receives one standard `art.candidate.generate` job with `candidateCount` set to the exact required number. The existing provider orchestrator already rejects partial output counts, so a provider returning three files for a four-file request fails the job rather than creating an incomplete review set.
 
-The entire set uses one provider attempt, one allow-listed adapter and no fallback. An ambiguous result is not automatically retried. Every output remains an unapproved intermediate artifact.
+The entire set uses one provider attempt, one allow-listed adapter and no fallback. An ambiguous result is not automatically retried. Every output remains an unapproved intermediate artifact. The provider prompt explicitly requires separate non-template alternatives with materially different concepts, compositions, silhouettes, focal hierarchies and negative-space strategies; palette swaps, crop changes, camera nudges, prop substitutions and seed-only variations are prohibited.
+
+The consensus request carries the exact governed candidate count. Reviewing only a convenient subset is a blocking error even when the submitted subset is otherwise technically valid.
 
 ## Quality boundary
 
@@ -33,7 +35,7 @@ Before Docs Suite can run its independent creative-quality gate:
 7. The set reviewer must be human or human with machine assistance and cannot be a candidate producer.
 8. Machine-only approval is prohibited.
 
-The set-level operation returns only `ready_for_docs_quality_gate`. It cannot select a candidate, promote Art, create a Book-use binding or publish anything.
+The set-level operation returns only `ready_for_docs_quality_gate`. It cannot select a candidate, promote Art, create a Book-use binding or publish anything. Downstream validation replays the complete semantic gate from the retained candidate and pairwise evidence, so a modified result cannot become valid merely by recomputing its SHA-256 fingerprint.
 
 ## Runtime use
 
