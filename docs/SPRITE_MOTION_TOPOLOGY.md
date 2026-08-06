@@ -30,6 +30,8 @@ Clips are no longer treated as only a frame count. The topology assigns complete
 - jumps: anticipation, takeoff, ascent, apex, descent, landing;
 - idle and loops: settle, hold, return.
 
+Specific action identities take precedence over broad clip categories. For example, `jump-start`, `fall` and `land` retain grounded, transition and airborne phases even though the source sprite planner classifies them within locomotion.
+
 Every phase records its exact frame range, key frame, duration, motion intent and ground-contact state. Phase allocation is deterministic, handles one to many frames, and preserves the source plan’s exact frame durations.
 
 ## Frame continuity
