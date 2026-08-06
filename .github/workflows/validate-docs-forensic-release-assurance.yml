@@ -1,0 +1,145 @@
+name: Validate Docs Forensic Release Assurance
+
+on:
+  push:
+    branches:
+      - validation/docs-forensic-release-assurance-20260806
+    paths:
+      - ".github/workflows/validate-docs-forensic-release-assurance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-forensic-release-assurance-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCS_SOURCE_REPOSITORY: EVAVO-STUDIO/evavo-docs-suite
+  DOCS_SOURCE_SHA: 6bb0a1d67a4afbb82e6aab2f9c5c3fd85e2457ac
+  DOCS_FEATURE_PARENT_SHA: ebb00ec7171f5fab0b680ec9913b54d24ab9e645
+  DOCS_MAIN_PARENT_SHA: 039f390d6a5e721f33efe2da5209a8d269635c64
+
+jobs:
+  exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out disposable Art validation host
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check out exact Docs combined commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ env.DOCS_SOURCE_REPOSITORY }}
+          ref: ${{ env.DOCS_SOURCE_SHA }}
+          path: docs-source
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Prove exact Docs source and parent identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git -C docs-source rev-parse HEAD)"
+          parents="$(git -C docs-source show -s --format=%P HEAD)"
+          test "$actual" = "$DOCS_SOURCE_SHA"
+          test "$parents" = "$DOCS_FEATURE_PARENT_SHA $DOCS_MAIN_PARENT_SHA"
+          git -C docs-source diff --check "$DOCS_MAIN_PARENT_SHA" "$DOCS_SOURCE_SHA"
+          printf '%s\n' \
+            "docs-source=$actual" \
+            "docs-feature-parent=$DOCS_FEATURE_PARENT_SHA" \
+            "docs-main-parent=$DOCS_MAIN_PARENT_SHA"
+
+      - name: Use exact Docs Node.js runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version-file: docs-source/.nvmrc
+          package-manager-cache: false
+
+      - name: Run permanent forensic authority checker
+        working-directory: docs-source
+        run: node scripts/check-book-studio-forensic-release-assurance.mjs
+
+      - name: Install exact Docs workspace
+        working-directory: docs-source
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Run strict core and protected-web TypeScript
+        working-directory: docs-source
+        run: |
+          corepack pnpm --filter @evavo-docs/core typecheck
+          corepack pnpm --filter @evavo-docs/web typecheck
+
+      - name: Run forensic and visual-production integration attacks
+        working-directory: docs-source
+        run: >-
+          corepack pnpm --filter @evavo-docs/core exec
+          node --import tsx --test
+          test/book-studio-forensic-release-assurance.test.mjs
+          test/book-studio-visual-production-conformance.test.mjs
+          test/book-studio-visual-production-conformance-hardening.test.mjs
+
+      - name: Run streamed request-boundary attacks
+        working-directory: docs-source
+        run: >-
+          corepack pnpm --filter @evavo-docs/web exec
+          node --import tsx --test
+          scripts/test-book-studio-forensic-release-input.mjs
+
+      - name: Run CLI transport attacks
+        working-directory: docs-source
+        run: >-
+          corepack pnpm --filter @evavo-docs/web exec
+          node --test
+          scripts/test-book-studio-forensic-release-assurance-cli.mjs
+
+      - name: Run complete repository verification
+        working-directory: docs-source
+        run: corepack pnpm verify
+
+      - name: Build complete production workspace
+        working-directory: docs-source
+        run: corepack pnpm build
+
+      - name: Prove exact Docs source remained clean
+        working-directory: docs-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Prove no Art Studio production source changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          merge_base="$(git merge-base HEAD origin/main)"
+          test "$merge_base" = "$(git rev-parse origin/main)"
+          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^\.github/workflows/validate-docs-forensic-release-assurance\.yml$' || true)"
+          test -z "$unexpected" || {
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
+
+      - name: Record exact validation boundary
+        run: |
+          printf '%s\n' \
+            'validation=exact-docs-forensic-release-assurance' \
+            "docs-source=${DOCS_SOURCE_SHA}" \
+            "docs-main-parent=${DOCS_MAIN_PARENT_SHA}" \
+            'forensic-authority-check=true' \
+            'strict-core-and-web-typescript=true' \
+            'visual-quality-integration-tests=true' \
+            'full-repository-verify=true' \
+            'production-build=true' \
+            'provider-call-performed=false' \
+            'canonical-manuscript-mutation-performed=false' \
+            'automatic-art-selection-allowed=false' \
+            'retailer-upload-performed=false' \
+            'publication-performed=false'
