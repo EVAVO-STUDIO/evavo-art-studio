@@ -28,7 +28,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Check out exact source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -50,6 +50,9 @@ jobs:
       - name: Install frozen dependency graph
         run: pnpm install --frozen-lockfile
 
+      - name: Build sprite planner dependency
+        run: pnpm --filter @evavo/art-direction build
+
       - name: Type-check sprite planner
         run: pnpm --filter @evavo/art-sprite-planner typecheck
 
@@ -68,6 +71,9 @@ jobs:
           grep -F 'providerCalled: false' packages/sprite-planner/src/motion-topology.ts
           grep -F 'targetRepositoryMutated: false' packages/sprite-planner/src/motion-topology.ts
           grep -F 'publicationPerformed: false' packages/sprite-planner/src/motion-topology.ts
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
 
       - name: Prove exact source remains clean
         shell: bash
