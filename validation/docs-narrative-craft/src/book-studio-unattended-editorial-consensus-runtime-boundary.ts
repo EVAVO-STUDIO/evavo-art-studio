@@ -84,7 +84,17 @@ export async function evaluateBookUnattendedEditorialConsensusWithRuntimeEvidenc
     return blocked(semanticResult.blockers, semanticResult.requiredActions);
   }
 
-  const temporalBlockers = validateRuntimeChronology(input);
+  let temporalBlockers: string[];
+  try {
+    temporalBlockers = validateRuntimeChronology(input);
+  } catch {
+    return blocked(
+      "Editorial runtime chronology could not be validated safely.",
+      [
+        "Rebuild the bounded runtime-evidence packet from structurally valid reviewer runtime results.",
+      ],
+    );
+  }
   if (temporalBlockers.length) {
     return blocked(temporalBlockers, [
       "Reconcile reviewer completion, immutable storage, handoff and runtime timestamps before evaluation.",
