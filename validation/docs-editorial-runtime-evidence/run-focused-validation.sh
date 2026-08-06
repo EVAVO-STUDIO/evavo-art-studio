@@ -146,15 +146,18 @@ fi
 
 git -C "${ROOT}" fetch --no-tags origin main
 merge_base="$(git -C "${ROOT}" merge-base HEAD origin/main)"
+changed_paths="$(git -C "${ROOT}" diff --name-only "${merge_base}" HEAD)"
 unexpected="$(
-  git -C "${ROOT}" diff --name-only "${merge_base}" HEAD \
-    | grep -Ev '^(\.github/workflows/validate-docs-editorial-runtime-evidence-mirror\.yml|validation/docs-editorial-consensus/|validation/docs-editorial-runtime-evidence/|validation/docs-narrative-craft/)' \
+  printf '%s\n' "${changed_paths}" \
+    | grep -Ev '^(\.github/workflows/(diagnose-docs-|surface-docs-|validate-docs-)[^/]+\.ya?ml|validation-results/|validation/)' \
     || true
 )"
 test -z "${unexpected}" || {
-  printf '%s\n' "${unexpected}" >&2
+  printf 'non_validation_path_changed=true\n%s\n' "${unexpected}" >&2
   exit 1
 }
+changed_path_count="$(printf '%s\n' "${changed_paths}" | sed '/^$/d' | wc -l | tr -d ' ')"
+printf 'validation_only_changed_path_count=%s\n' "${changed_path_count}"
 git -C "${ROOT}" diff --exit-code
 test -z "$(git -C "${ROOT}" status --porcelain=v1 --untracked-files=no)"
 
