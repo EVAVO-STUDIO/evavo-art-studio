@@ -59,7 +59,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "5d806039d964af58436215191ce2bcb98a3a22ce"
+          test "$(git rev-parse HEAD)" = "25364045a30b7f3e8a9463f7b74fd936d7600f95"
           if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
             head_ref="$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }} --jq .head.ref)"
             [[ "$head_ref" == validation/docs-editorial-runtime-evidence-mirror-* ]]
