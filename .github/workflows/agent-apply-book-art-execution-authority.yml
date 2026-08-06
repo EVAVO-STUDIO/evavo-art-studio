@@ -47,12 +47,81 @@ jobs:
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
-      - name: Apply reviewed execution-authority patch
+      - name: Apply exact guarded execution-authority transformations
         shell: bash
         run: |
           set -euo pipefail
-          git apply --check .github/agent-book-art-execution-authority.patch
-          git apply .github/agent-book-art-execution-authority.patch
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one exact replacement, found {count}")
+              updated = text.replace(old, new, 1)
+              with target.open("w", encoding="utf-8", newline="\n") as handle:
+                  handle.write(updated)
+
+          execution_path = "packages/book-art-runtime/src/candidate-set-execution.ts"
+          replace_once(
+              execution_path,
+              '''}\n\ntype EvidenceBody = Record<string, unknown> & { attempts: unknown[] };''',
+              '''}\n\nexport interface BookArtCandidateSetExecutionConsensusInputV1 {\n  outputKind: "evavo_book_art_candidate_set_execution_consensus_input";\n  schemaVersion: typeof BOOK_ART_CANDIDATE_SET_EXECUTION_SCHEMA_VERSION;\n  contract: typeof BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT;\n  plan: BookArtCandidateSetProviderJobPlanV1;\n  consensusInput: BookArtCandidateSetConsensusInputV1;\n}\n\ntype EvidenceBody = Record<string, unknown> & { attempts: unknown[] };''',
+          )
+          replace_once(
+              execution_path,
+              '''export function evaluateBookArtCandidateSetExecutionConsensus(\n  value: unknown,\n): BookArtCandidateSetExecutionConsensusResultV1 {\n  const input = object(value);\n  if (\n    !input ||\n    input.outputKind !== "evavo_book_art_candidate_set_execution_consensus_input" ||\n    input.schemaVersion !== BOOK_ART_CANDIDATE_SET_EXECUTION_SCHEMA_VERSION ||\n    input.contract !== BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT ||\n    !sameSet(Object.keys(input), [\n      "outputKind",\n      "schemaVersion",\n      "contract",\n      "providerRunReceipt",\n      "consensusInput",\n    ])\n  ) {\n    return blockedConsensus([\n      "Candidate-set execution consensus input identity or fields are invalid.",\n    ]);\n  }\n  const receiptIssues = validateBookArtCandidateSetProviderRunReceipt(\n    input.providerRunReceipt,\n  );\n  const consensus = object(input.consensusInput);\n  if (!consensus) receiptIssues.push("Execution consensus requires one consensus input.");\n  if (receiptIssues.length || !consensus) return blockedConsensus(receiptIssues);\n\n  const receipt = input.providerRunReceipt as BookArtCandidateSetProviderRunReceiptV1;\n  const consensusInput =\n    consensus as unknown as BookArtCandidateSetConsensusInputV1;\n  const blockers = bindConsensus(receipt, consensusInput);\n  if (blockers.length) return blockedConsensus(blockers);\n  const consensusResult = evaluateBookArtCandidateSetConsensus(consensusInput);\n  return finishConsensus(\n    consensusResult.status,\n    receipt,\n    consensusResult,\n    consensusResult.blockers,\n    consensusResult.requiredActions,\n  );\n}\n''',
+              '''export async function evaluateBookArtCandidateSetExecutionConsensus(\n  value: unknown,\n  options: Readonly<{\n    runtime: RuntimeRepository;\n    artifacts: ArtifactStore;\n  }>,\n): Promise<BookArtCandidateSetExecutionConsensusResultV1> {\n  const input = object(value);\n  if (\n    !input ||\n    input.outputKind !== "evavo_book_art_candidate_set_execution_consensus_input" ||\n    input.schemaVersion !== BOOK_ART_CANDIDATE_SET_EXECUTION_SCHEMA_VERSION ||\n    input.contract !== BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT ||\n    !sameSet(Object.keys(input), [\n      "outputKind",\n      "schemaVersion",\n      "contract",\n      "plan",\n      "consensusInput",\n    ])\n  ) {\n    return blockedConsensus([\n      "Candidate-set execution consensus input identity or fields are invalid.",\n    ]);\n  }\n  const consensus = object(input.consensusInput);\n  if (!consensus) {\n    return blockedConsensus(["Execution consensus requires one consensus input."]);\n  }\n\n  let receiptCompilation: BookArtCandidateSetProviderRunReceiptCompilationResultV1;\n  try {\n    receiptCompilation = await compileBookArtCandidateSetProviderRunReceipt(\n      {\n        outputKind:\n          "evavo_book_art_candidate_set_provider_run_receipt_compile_input",\n        schemaVersion: BOOK_ART_CANDIDATE_SET_EXECUTION_SCHEMA_VERSION,\n        plan: input.plan,\n      },\n      options,\n    );\n  } catch (error: unknown) {\n    return blockedConsensus([\n      `Candidate-set execution authority could not be rebuilt: ${errorMessage(error)}`,\n    ]);\n  }\n  if (receiptCompilation.status !== "ready" || !receiptCompilation.receipt) {\n    return blockedConsensus(\n      receiptCompilation.blockers.length\n        ? receiptCompilation.blockers\n        : ["Candidate-set execution authority could not be rebuilt."],\n    );\n  }\n\n  const receipt = receiptCompilation.receipt;\n  const consensusInput =\n    consensus as unknown as BookArtCandidateSetConsensusInputV1;\n  const blockers = bindConsensus(receipt, consensusInput);\n  if (blockers.length) return blockedConsensus(blockers);\n  const consensusResult = evaluateBookArtCandidateSetConsensus(consensusInput);\n  return finishConsensus(\n    consensusResult.status,\n    receipt,\n    consensusResult,\n    consensusResult.blockers,\n    consensusResult.requiredActions,\n  );\n}\n''',
+          )
+
+          test_path = "packages/book-art-runtime/test/candidate-set-execution.test.mjs"
+          replace_once(
+              test_path,
+              '''      const result = evaluateBookArtCandidateSetExecutionConsensus({\n        outputKind:\n          "evavo_book_art_candidate_set_execution_consensus_input",\n        schemaVersion: 1,\n        contract: BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,\n        providerRunReceipt: fixture.receipt,\n        consensusInput: consensusInput(fixture.receipt),\n      });''',
+              '''      const result = await evaluateBookArtCandidateSetExecutionConsensus(\n        {\n          outputKind:\n            "evavo_book_art_candidate_set_execution_consensus_input",\n          schemaVersion: 1,\n          contract: BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,\n          plan: fixture.compilation.plan,\n          consensusInput: consensusInput(fixture.receipt),\n        },\n        { runtime: fixture.runtime, artifacts: fixture.artifacts },\n      );''',
+          )
+          replace_once(
+              test_path,
+              '''      const result = evaluateBookArtCandidateSetExecutionConsensus({\n        outputKind:\n          "evavo_book_art_candidate_set_execution_consensus_input",\n        schemaVersion: 1,\n        contract: BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,\n        providerRunReceipt: fixture.receipt,\n        consensusInput: input,\n      });''',
+              '''      const result = await evaluateBookArtCandidateSetExecutionConsensus(\n        {\n          outputKind:\n            "evavo_book_art_candidate_set_execution_consensus_input",\n          schemaVersion: 1,\n          contract: BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,\n          plan: fixture.compilation.plan,\n          consensusInput: input,\n        },\n        { runtime: fixture.runtime, artifacts: fixture.artifacts },\n      );''',
+          )
+          replace_once(
+              test_path,
+              '''  "blocks a forged receipt after candidate or runtime identity tampering",''',
+              '''  "blocks a re-fingerprinted forged receipt by rebuilding durable authority",''',
+          )
+          replace_once(
+              test_path,
+              '''      const rebound = evaluateBookArtCandidateSetExecutionConsensus({\n        outputKind:\n          "evavo_book_art_candidate_set_execution_consensus_input",\n        schemaVersion: 1,\n        contract: BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,\n        providerRunReceipt: forged,\n        consensusInput: consensusInput(fixture.receipt),\n      });''',
+              '''      const forgedConsensus = consensusInput(fixture.receipt);\n      forgedConsensus.providerRunFingerprint = forged.receiptFingerprintSha256;\n      const rebound = await evaluateBookArtCandidateSetExecutionConsensus(\n        {\n          outputKind:\n            "evavo_book_art_candidate_set_execution_consensus_input",\n          schemaVersion: 1,\n          contract: BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,\n          plan: fixture.compilation.plan,\n          consensusInput: forgedConsensus,\n        },\n        { runtime: fixture.runtime, artifacts: fixture.artifacts },\n      );''',
+          )
+
+          checker_path = "scripts/check-book-art-candidate-set.mjs"
+          replace_once(
+              checker_path,
+              '''    "evaluateBookArtCandidateSetExecutionConsensus",\n    "exactOutputSetVerified: true",''',
+              '''    "evaluateBookArtCandidateSetExecutionConsensus",\n    "export async function evaluateBookArtCandidateSetExecutionConsensus",\n    "receiptCompilation = await compileBookArtCandidateSetProviderRunReceipt",\n    '"plan",',\n    "exactOutputSetVerified: true",''',
+          )
+          replace_once(
+              checker_path,
+              '''    "forged receipt",''',
+              '''    "re-fingerprinted forged receipt by rebuilding durable authority",''',
+          )
+
+          docs_path = "docs/book-art-candidate-set.md"
+          replace_once(
+              docs_path,
+              '''The receipt binds the candidate-set and work-order fingerprints to the runtime job ID and spec hash, the normalized provider request, compiled prompt, one successful adapter/model attempt, the evidence artifact and the ordered output set. Every reviewed candidate ID, content hash, descriptor fingerprint and producer must match that receipt through `evaluateBookArtCandidateSetExecutionConsensus`.\n\nMissing outputs, substituted bytes, reordered evidence, a different adapter, a fallback attempt, a redriven job, an altered request, an unverified artifact or a recomputed standalone review fingerprint all fail closed. The receipt compiler performs no provider call and writes no artifacts.''',
+              '''The receipt binds the candidate-set and work-order fingerprints to the runtime job ID and spec hash, the normalized provider request, compiled prompt, one successful adapter/model attempt, the evidence artifact and the ordered output set. Every reviewed candidate ID, content hash, descriptor fingerprint and producer must match that receipt.\n\n`evaluateBookArtCandidateSetExecutionConsensus` does not trust a caller-supplied receipt. It accepts the exact provider job plan plus the consensus input, re-reads the durable runtime job and immutable artifacts, rebuilds the receipt internally, and only then evaluates the review set. A caller cannot turn changed runtime identity or output evidence into authority by recomputing a receipt fingerprint and updating the consensus digest.\n\nMissing outputs, substituted bytes, reordered evidence, a different adapter, a fallback attempt, a redriven job, an altered request, an unverified artifact, a recomputed standalone review fingerprint or a re-fingerprinted provider-run receipt all fail closed. Receipt compilation and execution-bound evaluation perform no provider call and write no artifacts.''',
+          )
+          replace_once(
+              docs_path,
+              '''After the durable job succeeds, use `compileBookArtCandidateSetProviderRunReceipt` and `evaluateBookArtCandidateSetExecutionConsensus` from `@evavo/art-book-runtime/candidate-set-execution`. Production integrations should use the execution-bound evaluator rather than treating a standalone consensus fingerprint as provider-run evidence.''',
+              '''After the durable job succeeds, use `compileBookArtCandidateSetProviderRunReceipt` when a transportable inspection receipt is needed. Call the asynchronous `evaluateBookArtCandidateSetExecutionConsensus` with the exact provider job plan, consensus input, runtime repository and artifact store. Production integrations must use this authority-rebuilding evaluator rather than accepting either a standalone consensus fingerprint or a caller-supplied provider-run receipt as execution evidence.''',
+          )
+          PY
           git diff --check
 
       - name: Install exact workspace
