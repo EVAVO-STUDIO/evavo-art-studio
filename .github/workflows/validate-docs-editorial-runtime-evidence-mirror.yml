@@ -17,7 +17,7 @@ on:
     types:
       - created
   schedule:
-    - cron: "5 19 6 8 *"
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: read
