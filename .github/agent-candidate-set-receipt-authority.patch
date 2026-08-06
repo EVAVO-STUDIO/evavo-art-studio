@@ -1,0 +1,63 @@
+diff --git a/packages/book-art-runtime/src/candidate-set-execution.ts b/packages/book-art-runtime/src/candidate-set-execution.ts
+--- a/packages/book-art-runtime/src/candidate-set-execution.ts
++++ b/packages/book-art-runtime/src/candidate-set-execution.ts
+@@ -1,17 +1,22 @@
+-export function evaluateBookArtCandidateSetExecutionConsensus(
++export async function evaluateBookArtCandidateSetExecutionConsensus(
+   value: unknown,
+-): BookArtCandidateSetExecutionConsensusResultV1 {
++  options: Readonly<{
++    runtime: RuntimeRepository;
++    artifacts: ArtifactStore;
++  }>,
++): Promise<BookArtCandidateSetExecutionConsensusResultV1> {
+   const input = object(value);
+   if (
+     !input ||
+-    input.outputKind !== "evavo_book_art_candidate_set_execution_consensus_input" ||
++    input.outputKind !==
++      "evavo_book_art_candidate_set_execution_consensus_input" ||
+     input.schemaVersion !== BOOK_ART_CANDIDATE_SET_EXECUTION_SCHEMA_VERSION ||
+     input.contract !== BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT ||
+     !sameSet(Object.keys(input), [
+       "outputKind",
+       "schemaVersion",
+       "contract",
+-      "providerRunReceipt",
++      "plan",
+       "consensusInput",
+     ])
+   ) {
+@@ -19,14 +24,25 @@
+       "Candidate-set execution consensus input identity or fields are invalid.",
+     ]);
+   }
+-  const receiptIssues = validateBookArtCandidateSetProviderRunReceipt(
+-    input.providerRunReceipt,
++  const consensus = object(input.consensusInput);
++  if (!consensus) {
++    return blockedConsensus([
++      "Execution consensus requires one consensus input.",
++    ]);
++  }
++  const receiptResult = await compileBookArtCandidateSetProviderRunReceipt(
++    {
++      outputKind:
++        "evavo_book_art_candidate_set_provider_run_receipt_compile_input",
++      schemaVersion: BOOK_ART_CANDIDATE_SET_EXECUTION_SCHEMA_VERSION,
++      plan: input.plan,
++    },
++    options,
+   );
+-  const consensus = object(input.consensusInput);
+-  if (!consensus) receiptIssues.push("Execution consensus requires one consensus input.");
+-  if (receiptIssues.length || !consensus) return blockedConsensus(receiptIssues);
+-
+-  const receipt = input.providerRunReceipt as BookArtCandidateSetProviderRunReceiptV1;
++  if (receiptResult.status !== "ready" || !receiptResult.receipt) {
++    return blockedConsensus(receiptResult.blockers);
++  }
++  const receipt = receiptResult.receipt;
+   const consensusInput =
+     consensus as unknown as BookArtCandidateSetConsensusInputV1;
+   const blockers = bindConsensus(receipt, consensusInput);
