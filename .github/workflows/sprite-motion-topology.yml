@@ -1,0 +1,96 @@
+name: Sprite motion topology
+
+on:
+  pull_request:
+    paths:
+      - "packages/sprite-planner/src/motion-topology.ts"
+      - "packages/sprite-planner/src/index.ts"
+      - "packages/sprite-planner/test/motion-topology.test.mjs"
+      - "docs/SPRITE_MOTION_TOPOLOGY.md"
+      - ".github/workflows/sprite-motion-topology.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/sprite-planner/src/motion-topology.ts"
+      - "packages/sprite-planner/src/index.ts"
+      - "packages/sprite-planner/test/motion-topology.test.mjs"
+      - "docs/SPRITE_MOTION_TOPOLOGY.md"
+      - ".github/workflows/sprite-motion-topology.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sprite-motion-topology-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify audio media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          FFMPEG_PATH="$(command -v ffmpeg)"
+          FFPROBE_PATH="$(command -v ffprobe)"
+          test -x "${FFMPEG_PATH}"
+          test -x "${FFPROBE_PATH}"
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build sprite planner dependency
+        run: pnpm --filter @evavo/art-direction build
+
+      - name: Type-check sprite planner
+        run: pnpm --filter @evavo/art-sprite-planner typecheck
+
+      - name: Run sprite planner and motion topology tests
+        run: pnpm --filter @evavo/art-sprite-planner test
+
+      - name: Verify permanent source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'export * from "./motion-topology.js";' packages/sprite-planner/src/index.ts
+          grep -F 'SPRITE_MOTION_TOPOLOGY_PROTOCOL_VERSION = "2026-08-07.1"' packages/sprite-planner/src/motion-topology.ts
+          grep -F 'SPRITE_MOTION_SOURCE_PLAN_HASH_MISMATCH' packages/sprite-planner/src/motion-topology.ts
+          grep -F 'SPRITE_MOTION_ISOMETRIC_DIRECTION_COUNT_INVALID' packages/sprite-planner/src/motion-topology.ts
+          grep -F 'semantic phases' packages/sprite-planner/src/motion-topology.ts
+          grep -F 'providerCalled: false' packages/sprite-planner/src/motion-topology.ts
+          grep -F 'targetRepositoryMutated: false' packages/sprite-planner/src/motion-topology.ts
+          grep -F 'publicationPerformed: false' packages/sprite-planner/src/motion-topology.ts
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
