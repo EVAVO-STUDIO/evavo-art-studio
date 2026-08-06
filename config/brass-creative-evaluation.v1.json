@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0",
+  "contract": "evavo.brass-creative-evaluation.v1",
+  "gameContract": "evavo.brass-brine.art-direction-animation.v1",
+  "styleBankSchema": "evavo.image-style-reference-bank.v1",
+  "candidateEvaluationSchema": "evavo.brass-creative-candidate-evaluation.v1",
+  "animationManifestSchema": "evavo.brass-brine.animation-sequence-manifest.v1",
+  "animationEvaluationSchema": "evavo.brass-animation-sequence-evaluation.v1",
+  "limits": {
+    "maximumJsonBytes": 268435456,
+    "maximumImageBytes": 2147483648,
+    "maximumDecodedPixels": 220000000,
+    "maximumFrames": 64,
+    "maximumStyleDistance": 0.34,
+    "minimumSilhouetteContrastRatio": 2.4,
+    "minimumOpaqueSubjectPixels": 16
+  },
+  "requirements": {
+    "exactGameContractBinding": true,
+    "exactCandidateBytes": true,
+    "roleSpecificStyleProfile": true,
+    "runtimeScaleContactSheet": true,
+    "governedMatteContactSheet": true,
+    "animationFrameHashes": true,
+    "animationDurations": true,
+    "animationPivotBaselineAndGroundContact": true,
+    "animationPoseTags": true,
+    "animationIdentityContinuity": true,
+    "animationLoopOrTerminalEvidence": true,
+    "technicalPassIsNotCreativeApproval": true,
+    "technicalPassIsNotHistoricalApproval": true,
+    "technicalPassIsNotRuntimeApproval": true
+  },
+  "authority": {
+    "providerExecution": false,
+    "sourceOverwrite": false,
+    "sourceDeletion": false,
+    "targetRepositoryMutation": false,
+    "creativeApproval": false,
+    "historicalApproval": false,
+    "runtimeApproval": false,
+    "publication": false,
+    "forcePush": false
+  }
+}
