@@ -8,7 +8,7 @@ verify_blob() {
   local relative_path="$1"
   local expected_sha="$2"
   local actual_sha
-  actual_sha="$(git -C "${ROOT}" hash-object "${ROOT}/${relative_path}")"
+  actual_sha="$(git -C "${ROOT}" rev-parse "HEAD:${relative_path}")"
   if [[ "${actual_sha}" != "${expected_sha}" ]]; then
     printf 'exact_blob_mismatch path=%s expected=%s actual=%s\n' \
       "${relative_path}" "${expected_sha}" "${actual_sha}" >&2
