@@ -32,6 +32,8 @@ A technically coherent review set is not enough. Before candidate-set consensus 
 
 The receipt binds the candidate-set and work-order fingerprints to the runtime job ID and spec hash, the normalized provider request, compiled prompt, one successful adapter/model attempt, the evidence artifact and the ordered output set. `evaluateBookArtCandidateSetExecutionConsensus` accepts the exact provider plan and consensus evidence, then rebuilds this receipt itself from the durable runtime and artifact store before matching every reviewed candidate ID, content hash, descriptor fingerprint and producer. It never trusts a caller-supplied receipt or standalone digest as execution authority.
 
+The durable runtime and artifact reads are part of the consensus authority decision itself, not an optional preflight that a caller may skip or replace with a cached receipt.
+
 Missing outputs, substituted bytes, reordered evidence, a different adapter, a fallback attempt, a redriven job, an altered request, an unverified artifact or a recomputed standalone review fingerprint all fail closed. The receipt compiler performs no provider call and writes no artifacts.
 
 ## Quality boundary
