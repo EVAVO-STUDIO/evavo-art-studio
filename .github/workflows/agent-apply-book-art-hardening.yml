@@ -72,13 +72,14 @@ jobs:
           pnpm --filter @evavo/art-book-runtime typecheck
           pnpm --filter @evavo/art-providers typecheck
 
-      - name: Commit verified source and remove temporary agent files
+      - name: Commit verified non-workflow source
         shell: bash
         run: |
           set -euo pipefail
           rm -f pnpm-lock.yaml
           test ! -d tools/__pycache__
-          git rm -- .github/agent-book-art-hardening.patch .github/workflows/agent-apply-book-art-hardening.yml
+          git checkout -- .github/workflows/book-art-candidate-set.yml
+          git rm -- .github/agent-book-art-hardening.patch
           git add -A
           git diff --cached --check
           git config user.name "github-actions[bot]"
