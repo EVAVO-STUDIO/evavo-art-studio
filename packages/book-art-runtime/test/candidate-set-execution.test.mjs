@@ -18,6 +18,7 @@ import {
   ProviderRegistry,
   executeProviderCandidateRequest,
 } from "@evavo/art-providers";
+
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 
 import {
@@ -39,10 +40,7 @@ class DistinctFixtureImageProviderAdapter extends FixtureImageProviderAdapter {
       ...result,
       outputs: result.outputs.map((output, index) => ({
         ...output,
-        bytes: Buffer.concat([
-          Buffer.from(output.bytes),
-          Buffer.from([index + 1]),
-        ]),
+        bytes: Buffer.concat([Buffer.from(output.bytes), Buffer.from([index + 1])]),
       })),
     };
   }
@@ -88,9 +86,7 @@ async function candidateSetWorkOrder() {
     mustNotShow: ["Generated lettering", "Generic fantasy emblems"],
     spoilerRestrictions: ["Do not identify the final owner."],
     continuityRequirements: ["Match the admitted seal damage exactly."],
-    historicalAndMaterialRequirements: [
-      "Use 1871 brass and iron construction.",
-    ],
+    historicalAndMaterialRequirements: ["Use 1871 brass and iron construction."],
     negativeSpaceRequirements: ["Protect the upper-right title field."],
     output: {
       widthPx: 3000,
@@ -130,15 +126,9 @@ async function candidateSetWorkOrder() {
 }
 
 async function executeCandidateSet() {
-  const root = await mkdtemp(
-    path.join(os.tmpdir(), "evavo-book-set-execution-"),
-  );
-  const artifacts = new LocalArtifactStore({
-    root: path.join(root, "artifacts"),
-  });
-  const runtime = new LocalRuntimeRepository({
-    root: path.join(root, "runtime"),
-  });
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-book-set-execution-"));
+  const artifacts = new LocalArtifactStore({ root: path.join(root, "artifacts") });
+  const runtime = new LocalRuntimeRepository({ root: path.join(root, "runtime") });
   const input = {
     outputKind: "evavo_book_art_candidate_set_provider_job_input",
     schemaVersion: 1,
@@ -183,13 +173,10 @@ async function executeCandidateSet() {
     "2026-08-06T03:12:04.000Z",
   ];
   const run = await executeProviderCandidateRequest(started.spec.payload, {
-    registry: new ProviderRegistry([
-      new DistinctFixtureImageProviderAdapter(),
-    ]),
+    registry: new ProviderRegistry([new DistinctFixtureImageProviderAdapter()]),
     artifacts,
     signal: new AbortController().signal,
-    now: () =>
-      new Date(clock[Math.min(clockIndex++, clock.length - 1)]),
+    now: () => new Date(clock[Math.min(clockIndex++, clock.length - 1)]),
   });
   const completed = await runtime.complete(
     started.id,
@@ -258,9 +245,7 @@ function visualConsensus(proof, index) {
 
 function consensusInput(receipt) {
   const candidates = [...receipt.candidates]
-    .sort((left, right) =>
-      left.candidateId.localeCompare(right.candidateId),
-    )
+    .sort((left, right) => left.candidateId.localeCompare(right.candidateId))
     .map((proof, index) => ({
       candidateId: proof.candidateId,
       candidateProducerId: receipt.providerAttempt.adapterId,
@@ -315,133 +300,112 @@ function consensusInput(receipt) {
   };
 }
 
-test(
-  "rebuilds one immutable receipt from the exact durable provider execution",
-  async () => {
-    const fixture = await executeCandidateSet();
-    try {
-      assert.equal(
-        fixture.receipt.contract,
-        BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,
-      );
-      assert.equal(fixture.receipt.candidateCount, 4);
-      assert.equal(fixture.receipt.candidates.length, 4);
-      assert.equal(fixture.receipt.providerAttempt.outcome, "succeeded");
-      assert.equal(fixture.receipt.oneProviderAttemptForEntireSet, true);
-      assert.equal(fixture.receipt.exactOutputSetVerified, true);
-      assert.deepEqual(
-        validateBookArtCandidateSetProviderRunReceipt(fixture.receipt),
-        [],
-      );
-    } finally {
-      await rm(fixture.root, { recursive: true, force: true });
-    }
-  },
-);
+test("rebuilds one immutable receipt from the exact durable provider execution", async () => {
+  const fixture = await executeCandidateSet();
+  try {
+    assert.equal(fixture.receipt.contract, BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT);
+    assert.equal(fixture.receipt.candidateCount, 4);
+    assert.equal(fixture.receipt.candidates.length, 4);
+    assert.equal(fixture.receipt.providerAttempt.outcome, "succeeded");
+    assert.equal(fixture.receipt.oneProviderAttemptForEntireSet, true);
+    assert.equal(fixture.receipt.exactOutputSetVerified, true);
+    assert.deepEqual(validateBookArtCandidateSetProviderRunReceipt(fixture.receipt), []);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
 
-test(
-  "allows Docs quality review only for the exact provider output set",
-  async () => {
-    const fixture = await executeCandidateSet();
-    try {
-      const result = evaluateBookArtCandidateSetExecutionConsensus({
-        outputKind:
-          "evavo_book_art_candidate_set_execution_consensus_input",
+test("allows Docs quality review only for the exact provider output set", async () => {
+  const fixture = await executeCandidateSet();
+  try {
+    const result = await evaluateBookArtCandidateSetExecutionConsensus(
+      {
+        outputKind: "evavo_book_art_candidate_set_execution_consensus_input",
         schemaVersion: 1,
         contract: BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,
-        providerRunReceipt: fixture.receipt,
+        plan: fixture.compilation.plan,
         consensusInput: consensusInput(fixture.receipt),
-      });
-      assert.equal(
-        result.status,
-        "ready_for_docs_quality_gate",
-        JSON.stringify(result),
-      );
-      assert.equal(result.selectionPerformed, false);
-      assert.equal(result.promotionPerformed, false);
-      assert.equal(result.publicationPerformed, false);
-    } finally {
-      await rm(fixture.root, { recursive: true, force: true });
-    }
-  },
-);
+      },
+      { runtime: fixture.runtime, artifacts: fixture.artifacts },
+    );
+    assert.equal(result.status, "ready_for_docs_quality_gate", JSON.stringify(result));
+    assert.equal(result.selectionPerformed, false);
+    assert.equal(result.promotionPerformed, false);
+    assert.equal(result.publicationPerformed, false);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
 
-test(
-  "blocks omitted or substituted candidates even when visual evidence is re-fingerprinted",
-  async () => {
-    const fixture = await executeCandidateSet();
-    try {
-      const input = consensusInput(fixture.receipt);
-      const replacementHash = digest("f");
-      input.candidates[0].candidateContentSha256 = replacementHash;
-      input.candidates[0].visualConsensus.candidateContentSha256 =
-        replacementHash;
-      const { evaluationFingerprint: _discarded, ...unsigned } =
-        input.candidates[0].visualConsensus;
-      input.candidates[0].visualConsensus.evaluationFingerprint =
-        fingerprintBookIllustrationValue(unsigned);
-      const result = evaluateBookArtCandidateSetExecutionConsensus({
-        outputKind:
-          "evavo_book_art_candidate_set_execution_consensus_input",
+test("blocks omitted or substituted candidates even when visual evidence is re-fingerprinted", async () => {
+  const fixture = await executeCandidateSet();
+  try {
+    const input = consensusInput(fixture.receipt);
+    const replacementHash = digest("f");
+    input.candidates[0].candidateContentSha256 = replacementHash;
+    input.candidates[0].visualConsensus.candidateContentSha256 = replacementHash;
+    const { evaluationFingerprint: _discarded, ...unsigned } =
+      input.candidates[0].visualConsensus;
+    input.candidates[0].visualConsensus.evaluationFingerprint =
+      fingerprintBookIllustrationValue(unsigned);
+    const result = await evaluateBookArtCandidateSetExecutionConsensus(
+      {
+        outputKind: "evavo_book_art_candidate_set_execution_consensus_input",
         schemaVersion: 1,
         contract: BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,
-        providerRunReceipt: fixture.receipt,
+        plan: fixture.compilation.plan,
         consensusInput: input,
-      });
-      assert.equal(result.status, "blocked");
-      assert.match(
-        result.blockers.join("\n"),
-        /omitted|substituted|provider evidence/i,
-      );
-    } finally {
-      await rm(fixture.root, { recursive: true, force: true });
-    }
-  },
-);
+      },
+      { runtime: fixture.runtime, artifacts: fixture.artifacts },
+    );
+    assert.equal(result.status, "blocked");
+    assert.match(result.blockers.join("\n"), /omitted|substituted|provider evidence/i);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
 
-test(
-  "blocks a forged receipt after candidate or runtime identity tampering",
-  async () => {
-    const fixture = await executeCandidateSet();
-    try {
-      const forged = structuredClone(fixture.receipt);
-      forged.runtimeJobId = "different-runtime-job";
-      assert.match(
-        validateBookArtCandidateSetProviderRunReceipt(forged).join("\n"),
-        /fingerprint/i,
-      );
-      forged.receiptFingerprintSha256 =
-        fingerprintBookArtCandidateSetProviderRunReceipt(forged);
-      const rebound = evaluateBookArtCandidateSetExecutionConsensus({
-        outputKind:
-          "evavo_book_art_candidate_set_execution_consensus_input",
+test("blocks a forged receipt after candidate or runtime identity tampering", async () => {
+  const fixture = await executeCandidateSet();
+  try {
+    const forged = structuredClone(fixture.receipt);
+    forged.runtimeJobId = "different-runtime-job";
+    assert.match(
+      validateBookArtCandidateSetProviderRunReceipt(forged).join("\n"),
+      /fingerprint/i,
+    );
+    forged.receiptFingerprintSha256 =
+      fingerprintBookArtCandidateSetProviderRunReceipt(forged);
+    const forgedConsensus = consensusInput(fixture.receipt);
+    forgedConsensus.providerRunFingerprint = forged.receiptFingerprintSha256;
+    const rebound = await evaluateBookArtCandidateSetExecutionConsensus(
+      {
+        outputKind: "evavo_book_art_candidate_set_execution_consensus_input",
         schemaVersion: 1,
         contract: BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT,
-        providerRunReceipt: forged,
-        consensusInput: consensusInput(fixture.receipt),
-      });
-      assert.equal(rebound.status, "blocked");
-      assert.match(
-        rebound.blockers.join("\n"),
-        /provider-run fingerprint/i,
-      );
+        plan: fixture.compilation.plan,
+        consensusInput: forgedConsensus,
+      },
+      { runtime: fixture.runtime, artifacts: fixture.artifacts },
+    );
+    assert.equal(rebound.status, "blocked");
+    assert.match(rebound.blockers.join("\n"), /provider-run fingerprint/i);
 
-      const missingRuntime = {
-        get: async () => null,
-      };
-      const result = await compileBookArtCandidateSetProviderRunReceipt(
-        {
-          outputKind:
-            "evavo_book_art_candidate_set_provider_run_receipt_compile_input",
-          schemaVersion: 1,
-          plan: fixture.compilation.plan,
-        },
-        { runtime: missingRuntime, artifacts: fixture.artifacts },
-      );
-      assert.equal(result.status, "blocked");
-      assert.match(result.blockers.join("\n"), /durable runtime job/i);
-    } finally {
-      await rm(fixture.root, { recursive: true, force: true });
-    }
-  },
-);
+    const missingRuntime = {
+      get: async () => null,
+    };
+    const result = await compileBookArtCandidateSetProviderRunReceipt(
+      {
+        outputKind:
+          "evavo_book_art_candidate_set_provider_run_receipt_compile_input",
+        schemaVersion: 1,
+        plan: fixture.compilation.plan,
+      },
+      { runtime: missingRuntime, artifacts: fixture.artifacts },
+    );
+    assert.equal(result.status, "blocked");
+    assert.match(result.blockers.join("\n"), /durable runtime job/i);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
