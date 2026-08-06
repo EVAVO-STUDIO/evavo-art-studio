@@ -1,0 +1,202 @@
+name: Agent Activate Canonical pnpm Lock
+
+on:
+  push:
+    branches:
+      - agent/canonical-pnpm-lock-20260806
+    paths:
+      - ".github/workflows/agent-activate-canonical-pnpm-lock.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-activate-canonical-pnpm-lock-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  activate-verify-publish:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact lock-release branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/canonical-pnpm-lock-20260806
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove exact current-main base and temporary-only branch input
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "14a8005cae12bd376c29a2a83871dfcef39aa3d8" ]]
+          git merge-base --is-ancestor refs/remotes/origin/main HEAD
+          git diff --name-only refs/remotes/origin/main...HEAD | LC_ALL=C sort > /tmp/actual-input-paths.txt
+          cat > /tmp/expected-input-paths.txt <<'PATHS'
+          .github/agent-canonical-pnpm-lock.payload.aa
+          .github/agent-canonical-pnpm-lock.payload.ab
+          .github/agent-canonical-pnpm-lock.payload.ac
+          .github/agent-canonical-pnpm-lock.payload.ad
+          .github/workflows/agent-activate-canonical-pnpm-lock.yml
+          PATHS
+          LC_ALL=C sort -o /tmp/expected-input-paths.txt /tmp/expected-input-paths.txt
+          diff -u /tmp/expected-input-paths.txt /tmp/actual-input-paths.txt
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Prove pre-transition review-first authority
+        run: |
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+
+      - name: Establish exact public-registry policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .npmrc <<'NPMRC'
+          registry=https://registry.npmjs.org/
+          strict-peer-dependencies=true
+          verify-store-integrity=true
+          shared-workspace-lockfile=true
+          NPMRC
+          test "$(wc -c < .npmrc)" -eq 126
+
+      - name: Generate canonical lock with the exact toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(node --version)" == "v22.14.0" ]]
+          [[ "$(pnpm --version)" == "10.13.1" ]]
+          pnpm install --lockfile-only --strict-peer-dependencies
+          test -s pnpm-lock.yaml
+          LOCK_SHA256="$(sha256sum pnpm-lock.yaml | awk '{print $1}')"
+          [[ "$LOCK_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          echo "ART_STUDIO_GENERATED_LOCK_SHA256=${LOCK_SHA256}" >> "${GITHUB_ENV}"
+
+      - name: Reconstruct and apply the committed-frozen repository transition
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            .github/agent-canonical-pnpm-lock.payload.aa \
+            .github/agent-canonical-pnpm-lock.payload.ab \
+            .github/agent-canonical-pnpm-lock.payload.ac \
+            .github/agent-canonical-pnpm-lock.payload.ad \
+            > /tmp/agent-canonical-pnpm-lock.payload.b64
+          base64 --decode /tmp/agent-canonical-pnpm-lock.payload.b64 | gunzip > /tmp/agent-activate-canonical-pnpm-lock.mjs
+          [[ "$(sha256sum /tmp/agent-activate-canonical-pnpm-lock.mjs | awk '{print $1}')" == "3b29bea3e00941c45c22365d03558a81d0a85473d8893bc29055f9cb252dc628" ]]
+          node --check /tmp/agent-activate-canonical-pnpm-lock.mjs
+          node /tmp/agent-activate-canonical-pnpm-lock.mjs
+
+      - name: Remove temporary carriers and stage the exact release slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -- \
+            .github/agent-canonical-pnpm-lock.payload.aa \
+            .github/agent-canonical-pnpm-lock.payload.ab \
+            .github/agent-canonical-pnpm-lock.payload.ac \
+            .github/agent-canonical-pnpm-lock.payload.ad \
+            .github/workflows/agent-activate-canonical-pnpm-lock.yml
+          git add -A
+          git diff --cached --check
+          git diff --cached --name-only | LC_ALL=C sort > /tmp/staged-paths.txt
+          python - <<'PY'
+          from pathlib import Path
+
+          paths = [line for line in Path('/tmp/staged-paths.txt').read_text().splitlines() if line]
+          exact = {
+              '.npmrc',
+              'evavo.reliability.json',
+              'package.json',
+              'pnpm-lock.yaml',
+              'schemas/repository-owned-reliability-profile.schema.json',
+              'scripts/check-repository-toolchain.mjs',
+              'scripts/test-repository-toolchain.mjs',
+          }
+          invalid = [
+              path for path in paths
+              if path not in exact and not (
+                  path.startswith('.github/workflows/')
+                  and (path.endswith('.yml') or path.endswith('.yaml'))
+              )
+          ]
+          if invalid:
+              raise SystemExit(f'unexpected release paths: {invalid}')
+          required = exact - set(paths)
+          if required:
+              raise SystemExit(f'missing required release paths: {sorted(required)}')
+          if any('agent-canonical-pnpm-lock.payload' in path or 'agent-activate-canonical-pnpm-lock' in path for path in paths):
+              raise SystemExit('temporary carrier leaked into permanent diff')
+          if any(path.startswith('apps/') or path.startswith('packages/') for path in paths):
+              raise SystemExit('application or package source entered the dependency release')
+          print(f'bounded release paths: {len(paths)}')
+          PY
+
+      - name: Verify frozen source authority before installation
+        run: |
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+
+      - name: Install the committed dependency graph exactly
+        run: pnpm install --frozen-lockfile
+
+      - name: Re-verify frozen authority after installation
+        run: |
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove the Next.js operator build is idempotent
+        run: |
+          pnpm --filter @evavo/art-studio-web build
+          pnpm --filter @evavo/art-studio-web build
+
+      - name: Prove immutable lock identity and clean exact release source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(sha256sum pnpm-lock.yaml | awk '{print $1}')" == "${ART_STUDIO_GENERATED_LOCK_SHA256}" ]]
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+          git diff --exit-code -- pnpm-lock.yaml
+          git diff --exit-code
+          git diff --cached --check
+          test -z "$(git ls-files --others --exclude-standard)"
+          git diff --cached --name-only | LC_ALL=C sort > /tmp/final-staged-paths.txt
+          diff -u /tmp/staged-paths.txt /tmp/final-staged-paths.txt
+
+      - name: Commit and push the verified canonical lock release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "build(deps): activate canonical pnpm lock"
+          git push origin HEAD:refs/heads/agent/canonical-pnpm-lock-20260806
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
