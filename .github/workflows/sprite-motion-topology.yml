@@ -36,6 +36,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Install and identify audio media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          FFMPEG_PATH="$(command -v ffmpeg)"
+          FFPROBE_PATH="$(command -v ffprobe)"
+          test -x "${FFMPEG_PATH}"
+          test -x "${FFPROBE_PATH}"
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
