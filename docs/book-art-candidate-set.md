@@ -30,7 +30,7 @@ The consensus request carries the exact governed candidate count. Reviewing only
 
 A technically coherent review set is not enough. Before candidate-set consensus can enter the Docs Suite quality gate, `compileBookArtCandidateSetProviderRunReceipt` rebuilds one read-only receipt from the exact durable runtime job, verified candidate descriptors, verified candidate bytes and the provider evidence JSON.
 
-The receipt binds the candidate-set and work-order fingerprints to the runtime job ID and spec hash, the normalized provider request, compiled prompt, one successful adapter/model attempt, the evidence artifact and the ordered output set. Every reviewed candidate ID, content hash, descriptor fingerprint and producer must match that receipt through `evaluateBookArtCandidateSetExecutionConsensus`.
+The receipt binds the candidate-set and work-order fingerprints to the runtime job ID and spec hash, the normalized provider request, compiled prompt, one successful adapter/model attempt, the evidence artifact and the ordered output set. `evaluateBookArtCandidateSetExecutionConsensus` accepts the exact provider plan and consensus evidence, then rebuilds this receipt itself from the durable runtime and artifact store before matching every reviewed candidate ID, content hash, descriptor fingerprint and producer. It never trusts a caller-supplied receipt or standalone digest as execution authority.
 
 Missing outputs, substituted bytes, reordered evidence, a different adapter, a fallback attempt, a redriven job, an altered request, an unverified artifact or a recomputed standalone review fingerprint all fail closed. The receipt compiler performs no provider call and writes no artifacts.
 
@@ -54,6 +54,6 @@ The execution-bound operation returns only `ready_for_docs_quality_gate`. It can
 
 Compile the governed base work order with `compileBookArtProductionWorkOrder`, then call `compileBookArtCandidateSetWorkOrder`. Submit the resulting work order through `compileBookArtCandidateSetProviderJob` or `submitBookArtCandidateSetProviderJob` from `@evavo/art-book-runtime/candidate-set`.
 
-After the durable job succeeds, use `compileBookArtCandidateSetProviderRunReceipt` and `evaluateBookArtCandidateSetExecutionConsensus` from `@evavo/art-book-runtime/candidate-set-execution`. Production integrations should use the execution-bound evaluator rather than treating a standalone consensus fingerprint as provider-run evidence.
+After the durable job succeeds, use `evaluateBookArtCandidateSetExecutionConsensus` from `@evavo/art-book-runtime/candidate-set-execution` with the exact provider job plan, runtime repository, artifact store and consensus evidence. The evaluator rebuilds the provider-run receipt internally. `compileBookArtCandidateSetProviderRunReceipt` remains available for read-only inspection and audit display, but production integrations must not accept a caller-supplied receipt or standalone consensus fingerprint as provider-run evidence.
 
 The worker continues to use the existing provider request protocol and `art.candidate.generate` execution kind, so no second image backend or untested queue is introduced.
