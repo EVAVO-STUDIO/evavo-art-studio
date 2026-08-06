@@ -1,24 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mirror_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+readonly WORKSPACE="${ROOT}/validation/docs-narrative-craft"
 
-# Source the previously reviewed exact-mirror assembler. Because this script is
-# sourced, its EXIT cleanup remains deferred until this outer validation exits.
-# The original consensus and deep-integrity suites execute before the new layer.
-# The sourced script owns readonly ROOT and WORKSPACE variables, so this runner
-# deliberately uses separate names after sourcing.
-# shellcheck source=../docs-editorial-consensus/run-core-validation-exact.sh
-source "${mirror_root}/validation/docs-editorial-consensus/run-core-validation-exact.sh"
-
-readonly MIRROR_ROOT="${mirror_root}"
-readonly RUNTIME_WORKSPACE="${MIRROR_ROOT}/validation/docs-narrative-craft"
-
-verify_runtime_blob() {
+verify_blob() {
   local relative_path="$1"
   local expected_sha="$2"
   local actual_sha
-  actual_sha="$(git -C "${MIRROR_ROOT}" hash-object "${MIRROR_ROOT}/${relative_path}")"
+  actual_sha="$(git -C "${ROOT}" hash-object "${ROOT}/${relative_path}")"
   if [[ "${actual_sha}" != "${expected_sha}" ]]; then
     printf 'exact_blob_mismatch path=%s expected=%s actual=%s\n' \
       "${relative_path}" "${expected_sha}" "${actual_sha}" >&2
@@ -26,29 +16,35 @@ verify_runtime_blob() {
   fi
 }
 
-verify_runtime_blob \
+verify_blob \
   "validation/docs-narrative-craft/src/book-studio-unattended-editorial-consensus-runtime-evidence.ts" \
   "f45a9ea2f12d7b17f96c77264578bade56f507e7"
-verify_runtime_blob \
+verify_blob \
   "validation/docs-narrative-craft/src/book-studio-unattended-editorial-consensus-runtime-boundary.ts" \
-  "f7f3f982b66c3c9062c5070b0f58aac6d2e6c02f"
-verify_runtime_blob \
+  "78d0f5e8c71c4bcb350cc259eda9ae5e160d03a8"
+verify_blob \
   "validation/docs-narrative-craft/src/book-studio-writing-candidate-contracts.ts" \
   "1c6e28d9007cba88a90f9d125000bf084f48a3d8"
-verify_runtime_blob \
+verify_blob \
   "validation/docs-narrative-craft/src/book-studio-writing-handoff-response.ts" \
   "1939f3b593507431878daa37476c5c7bef9c0faa"
-verify_runtime_blob \
+verify_blob \
+  "validation/docs-narrative-craft/src/index.ts" \
+  "0aacdd08b1b141a7d169c3075aa5b91c9b03a01f"
+verify_blob \
   "validation/docs-narrative-craft/test/book-studio-narrative-craft-fixtures.mjs" \
   "ab7e38e1df4f292ecb0fc4be14459b5976bea43f"
-verify_runtime_blob \
+verify_blob \
   "validation/docs-narrative-craft/test/book-studio-unattended-editorial-consensus-runtime-evidence.test.mjs" \
   "7f3346e15eb26b89d99431147b7e3b9dd65b1395"
-verify_runtime_blob \
+verify_blob \
   "validation/docs-narrative-craft/test/book-studio-unattended-editorial-consensus-runtime-boundary.test.mjs" \
-  "a6f2d940577e114cd5221668f5c09165c9e1ec6b"
+  "600c1bdfc75a5ad2b2eb028095dcad2e450143c5"
+verify_blob \
+  "validation/docs-narrative-craft/tsconfig.json" \
+  "814af0d09c49d2a9a4cfab2f03d5d2e962f221c3"
 
-cd "${MIRROR_ROOT}"
+cd "${ROOT}"
 node --input-type=module <<'NODE'
 import fs from "node:fs";
 
@@ -64,14 +60,18 @@ const mirrorIndex = fs.readFileSync(
   "validation/docs-narrative-craft/src/index.ts",
   "utf8",
 );
+const boundaryTest = fs.readFileSync(
+  "validation/docs-narrative-craft/test/book-studio-unattended-editorial-consensus-runtime-boundary.test.mjs",
+  "utf8",
+);
 
 const requiredBoundaryTokens = [
   "MAX_REVIEWERS = 8",
   "evaluateBookUnattendedEditorialConsensusIntegrity",
   "validateRuntimeChronology",
+  "Editorial runtime chronology could not be validated safely.",
   "reports unresolved runtime blockers",
   "reports unresolved handoff risks",
-  "could not be validated safely",
   "evaluateRuntimeEvidenceUnchecked(input)",
   "providerCallsPerformed: 0",
   "automaticCanonicalAdmissionAllowed: false",
@@ -96,9 +96,27 @@ for (const token of requiredRuntimeTokens) {
 const semanticOffset = boundary.indexOf(
   "evaluateBookUnattendedEditorialConsensusIntegrity",
 );
+const chronologyOffset = boundary.indexOf(
+  "temporalBlockers = validateRuntimeChronology(input);",
+);
+const chronologyFailureOffset = boundary.indexOf(
+  "Editorial runtime chronology could not be validated safely.",
+);
 const runtimeOffset = boundary.indexOf("evaluateRuntimeEvidenceUnchecked(input)");
-if (semanticOffset < 0 || runtimeOffset < 0 || semanticOffset >= runtimeOffset) {
-  throw new Error("semantic validation must precede runtime-evidence traversal");
+if (
+  semanticOffset < 0
+  || chronologyOffset <= semanticOffset
+  || chronologyFailureOffset <= chronologyOffset
+  || runtimeOffset <= chronologyFailureOffset
+) {
+  throw new Error(
+    "semantic validation, guarded chronology and deep runtime validation must remain ordered",
+  );
+}
+if (!boundaryTest.includes(
+  "keeps malformed nested runtime chronology behind a fail-closed guard",
+)) {
+  throw new Error("chronology fail-closed regression test is missing");
 }
 if (!mirrorIndex.includes(
   'from "./book-studio-unattended-editorial-consensus-runtime-boundary"',
@@ -110,21 +128,47 @@ if (mirrorIndex.includes("evaluateBookUnattendedEditorialConsensusIntegrity,")) 
 }
 NODE
 
-npm exec --yes --package=typescript@5.9.3 -- \
-  tsc -p "${RUNTIME_WORKSPACE}/tsconfig.json"
+rm -rf "${WORKSPACE}/node_modules"
+npm install --prefix "${WORKSPACE}" --no-save --package-lock=false --ignore-scripts \
+  typescript@5.9.3 @types/node@22 tsx@4.20.3
 
-npm exec --yes --package=tsx@4.20.3 -- \
-  tsx --test \
-  "${RUNTIME_WORKSPACE}/test/book-studio-unattended-editorial-consensus-runtime-evidence.test.mjs" \
-  "${RUNTIME_WORKSPACE}/test/book-studio-unattended-editorial-consensus-runtime-boundary.test.mjs"
+"${WORKSPACE}/node_modules/.bin/tsc" -p "${WORKSPACE}/tsconfig.json"
+
+mapfile -t test_files < <(
+  find "${WORKSPACE}/test" -maxdepth 1 -type f -name '*.test.mjs' -print | sort
+)
+if (( ${#test_files[@]} < 8 )); then
+  printf 'expected at least 8 committed mirror test files, found %s\n' \
+    "${#test_files[@]}" >&2
+  exit 1
+fi
+"${WORKSPACE}/node_modules/.bin/tsx" --test "${test_files[@]}"
+
+git -C "${ROOT}" fetch --no-tags origin main
+merge_base="$(git -C "${ROOT}" merge-base HEAD origin/main)"
+unexpected="$(
+  git -C "${ROOT}" diff --name-only "${merge_base}" HEAD \
+    | grep -Ev '^(\.github/workflows/validate-docs-editorial-runtime-evidence-mirror\.yml|validation/docs-editorial-consensus/|validation/docs-editorial-runtime-evidence/|validation/docs-narrative-craft/)' \
+    || true
+)"
+test -z "${unexpected}" || {
+  printf '%s\n' "${unexpected}" >&2
+  exit 1
+}
+git -C "${ROOT}" diff --exit-code
+test -z "$(git -C "${ROOT}" status --porcelain=v1 --untracked-files=no)"
 
 printf '%s\n' \
+  'validation=byte-exact-source-equivalent-complete-editorial-runtime-mirror' \
   'exact_runtime_evidence_source=true' \
   'exact_runtime_boundary_source=true' \
   'exact_writing_candidate_validator=true' \
   'exact_handoff_response_validator=true' \
+  'strict_complete_mirror_typescript=true' \
+  'all_committed_mirror_tests_executed=true' \
   'semantic_validation_precedes_runtime_traversal=true' \
   'malformed_input_fails_closed=true' \
+  'malformed_runtime_chronology_fails_closed=true' \
   'runtime_chronology_required=true' \
   'duplicate_assignment_executions_allowed=false' \
   'immutable_reviewer_payload_binding_required=true' \
