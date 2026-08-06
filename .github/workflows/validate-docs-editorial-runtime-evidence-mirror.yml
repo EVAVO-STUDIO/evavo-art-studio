@@ -1,0 +1,44 @@
+# Permanent trigger only. Mirror source remains confined to validation PRs.
+name: Validate Docs Editorial Runtime Evidence Mirror
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+    paths:
+      - "validation/docs-editorial-consensus/**"
+      - "validation/docs-editorial-runtime-evidence/**"
+      - "validation/docs-narrative-craft/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-docs-editorial-runtime-evidence-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  exact-mirror:
+    if: startsWith(github.head_ref, 'validation/docs-editorial-runtime-evidence-mirror-')
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact validation mirror
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Use current LTS Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.18.0
+          package-manager-cache: false
+
+      - name: Run the exact source-equivalent mirror
+        shell: bash
+        run: bash validation/docs-editorial-runtime-evidence/run-focused-validation.sh
