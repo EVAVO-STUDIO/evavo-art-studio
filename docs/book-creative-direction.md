@@ -123,6 +123,31 @@ requires technical QA, print-craft QA, independent visual consensus, complete
 pairwise comparison, Docs Suite creative-quality review, governed selection
 and promotion.
 
+## Controlled first production use
+
+The first production Book should use a non-publication test edition and retain
+the complete evidence chain. Before any candidate is promoted, confirm that:
+
+1. Writing Studio supplied exact manuscript locations for every selected theme,
+   motif, setting, character state and scene;
+2. at least two concept routes use different route kinds and composition
+   archetypes rather than cosmetic variations;
+3. each route produced the exact requested candidate count as separate image
+   artifacts, never a contact sheet or comparison grid;
+4. every visible subject, prop, architectural element and material can be traced
+   to approved manuscript, research or rights evidence;
+5. Art Studio technical QA, print-craft QA and independent visual consensus
+   passed for every candidate;
+6. the complete candidate set passed pairwise originality comparison;
+7. Docs Suite creative-quality review approved the selected evidence while
+   editable typography, lettering, labels and accessibility layers remained
+   outside generated pixels;
+8. no automatic selection, promotion, Book-use binding or publication authority
+   was inferred from a provider response.
+
+A failed check stops the route. It is revised or regenerated; it is never padded
+with a fallback provider result or promoted because it is merely polished.
+
 ## Print readiness
 
 The creative compiler preserves the exact output geometry and delegates final
