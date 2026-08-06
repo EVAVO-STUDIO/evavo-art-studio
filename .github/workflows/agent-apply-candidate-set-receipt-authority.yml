@@ -42,8 +42,76 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git apply --check .github/agent-candidate-set-receipt-authority.patch
-          git apply .github/agent-candidate-set-receipt-authority.patch
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("packages/book-art-runtime/src/candidate-set-execution.ts")
+          source = path.read_text(encoding="utf8")
+          start_marker = "export function evaluateBookArtCandidateSetExecutionConsensus("
+          end_marker = "\nfunction validatePlan("
+          start = source.index(start_marker)
+          end = source.index(end_marker, start)
+          replacement = '''export async function evaluateBookArtCandidateSetExecutionConsensus(
+            value: unknown,
+            options: Readonly<{
+              runtime: RuntimeRepository;
+              artifacts: ArtifactStore;
+            }>,
+          ): Promise<BookArtCandidateSetExecutionConsensusResultV1> {
+            const input = object(value);
+            if (
+              !input ||
+              input.outputKind !==
+                "evavo_book_art_candidate_set_execution_consensus_input" ||
+              input.schemaVersion !== BOOK_ART_CANDIDATE_SET_EXECUTION_SCHEMA_VERSION ||
+              input.contract !== BOOK_ART_CANDIDATE_SET_EXECUTION_CONTRACT ||
+              !sameSet(Object.keys(input), [
+                "outputKind",
+                "schemaVersion",
+                "contract",
+                "plan",
+                "consensusInput",
+              ])
+            ) {
+              return blockedConsensus([
+                "Candidate-set execution consensus input identity or fields are invalid.",
+              ]);
+            }
+            const consensus = object(input.consensusInput);
+            if (!consensus) {
+              return blockedConsensus([
+                "Execution consensus requires one consensus input.",
+              ]);
+            }
+            const receiptResult = await compileBookArtCandidateSetProviderRunReceipt(
+              {
+                outputKind:
+                  "evavo_book_art_candidate_set_provider_run_receipt_compile_input",
+                schemaVersion: BOOK_ART_CANDIDATE_SET_EXECUTION_SCHEMA_VERSION,
+                plan: input.plan,
+              },
+              options,
+            );
+            if (receiptResult.status !== "ready" || !receiptResult.receipt) {
+              return blockedConsensus(receiptResult.blockers);
+            }
+            const receipt = receiptResult.receipt;
+            const consensusInput =
+              consensus as unknown as BookArtCandidateSetConsensusInputV1;
+            const blockers = bindConsensus(receipt, consensusInput);
+            if (blockers.length) return blockedConsensus(blockers);
+            const consensusResult = evaluateBookArtCandidateSetConsensus(consensusInput);
+            return finishConsensus(
+              consensusResult.status,
+              receipt,
+              consensusResult,
+              consensusResult.blockers,
+              consensusResult.requiredActions,
+            );
+          }
+          '''
+          path.write_text(source[:start] + replacement + source[end:], encoding="utf8")
+          PY
           git diff --check
 
       - name: Install exact workspace
