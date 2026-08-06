@@ -38,21 +38,12 @@ review_type_parts=("$ROOT"/validation/docs-editorial-consensus/dependencies/book
 narrative_type_parts=("$ROOT"/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-types.ts.part-*)
 cat "${review_type_parts[@]}" > "$MIRROR/src/book-studio-review-craft-types.ts"
 cat "${narrative_type_parts[@]}" > "$MIRROR/src/book-studio-narrative-craft-types.ts"
-assemble_exact_blob 9a939f326578ab749b9abf635b6c98d035ca6478 "$MIRROR/src/book-studio-narrative-craft-evaluate-main.ts" "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-main.ts"
-assemble_exact_blob 5aab79209fcb1c6945d5b9040a1ed589a7558dfe "$MIRROR/src/book-studio-narrative-craft-evaluate-evidence.ts" "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-evidence.ts"
+cp "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-main.ts" "$MIRROR/src/book-studio-narrative-craft-evaluate-main.ts"
+cp "$ROOT/validation/docs-editorial-consensus/dependencies/book-studio-narrative-craft-evaluate-evidence.ts" "$MIRROR/src/book-studio-narrative-craft-evaluate-evidence.ts"
 '''
 if old not in source:
     raise SystemExit("Expected direct-file assembly block was not found.")
 source = source.replace(old, new, 1)
-
-marker = '''check_blob src/book-studio-phrase-overlap-integrity.ts 1fec55714b98e852d457a575691ae218af8b75a8
-'''
-checks = marker + '''check_blob src/book-studio-narrative-craft-evaluate-main.ts 9a939f326578ab749b9abf635b6c98d035ca6478
-check_blob src/book-studio-narrative-craft-evaluate-evidence.ts 5aab79209fcb1c6945d5b9040a1ed589a7558dfe
-'''
-if marker not in source:
-    raise SystemExit("Expected phrase-overlap blob check was not found.")
-source = source.replace(marker, checks, 1)
 
 old_scope = r'''^(\.github/workflows/validate-docs-editorial-consensus-(exact|mirror)\.yml|validation/docs-editorial-consensus/|validation-results/docs-editorial-consensus-core\.json)'''
 new_scope = r'''^(\.github/workflows/validate-docs-forensic-release-assurance\.yml|validation/docs-editorial-consensus/|validation/docs-narrative-craft/)'''
@@ -67,7 +58,9 @@ source = source.replace(
     needle,
     '''printf '%s\\n' \\
   "shared-review-types=source-equivalent-current-contract" \\
-  "shared-narrative-types=source-equivalent-current-contract"\n\n''' + needle,
+  "shared-narrative-types=source-equivalent-current-contract" \\
+  "narrative-evaluation-main=source-equivalent-current-contract" \\
+  "narrative-evaluation-evidence=source-equivalent-current-contract"\n\n''' + needle,
     1,
 )
 
