@@ -97,6 +97,32 @@ function continuitySection(request: NormalizedProviderCandidateRequest): string[
   ];
 }
 
+function bookCandidateSetSection(
+  request: NormalizedProviderCandidateRequest,
+): string[] {
+  const metadata =
+    request.metadata !== null &&
+    typeof request.metadata === "object" &&
+    !Array.isArray(request.metadata)
+      ? (request.metadata as Readonly<Record<string, unknown>>)
+      : undefined;
+  if (
+    request.candidateCount <= 1 ||
+    metadata?.completePairwiseComparisonRequired !== true ||
+    metadata.independentSetReviewRequired !== true ||
+    metadata.generatedTextProhibited !== true
+  ) {
+    return [];
+  }
+  return [
+    "BOOK CANDIDATE-SET DIVERSITY CONTRACT",
+    `- Return exactly ${request.candidateCount} separate candidate files in this one provider attempt.`,
+    "- Every candidate must be a genuinely different visual solution: change the core concept, composition, silhouette, focal hierarchy and negative-space strategy while preserving every manuscript, era, identity, rights, print and style constraint.",
+    "- Do not return palette swaps, crop changes, trivial camera nudges, prop substitutions, seed-only variations or the same template with cosmetic changes.",
+    "- Do not combine alternatives into a contact sheet, comparison grid, storyboard or multi-panel image. Each returned file must contain one complete candidate only.",
+  ];
+}
+
 function backgroundSection(request: NormalizedProviderCandidateRequest): string[] {
   if (request.target.transparency === "opaque") {
     return [
@@ -130,6 +156,7 @@ function backgroundSection(request: NormalizedProviderCandidateRequest): string[
 export function compileProviderCandidatePrompt(
   request: NormalizedProviderCandidateRequest,
 ): CompiledProviderPrompt {
+  const candidateSetSection = bookCandidateSetSection(request);
   const lines = [
     "EVAVO ART STUDIO — GOVERNED CANDIDATE CONTRACT",
     "",
@@ -151,6 +178,8 @@ export function compileProviderCandidatePrompt(
     "",
     ...continuitySection(request),
     "",
+    ...candidateSetSection,
+    ...(candidateSetSection.length ? [""] : []),
     "STYLE ENVELOPE",
     `- Style name: ${request.style.styleName}.`,
     `- Art-direction intent: ${request.style.intent}`,

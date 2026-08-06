@@ -5,11 +5,14 @@ on:
     branches:
       - main
       - agent/book-print-illustration-intelligence-20260805
+      - agent/book-candidate-set-quality-20260806
     paths:
       - ".github/workflows/book-illustration-intelligence.yml"
       - "packages/contracts/src/book-illustration-intelligence.ts"
+      - "packages/contracts/src/book-art-candidate-set*.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-illustration-intelligence*.test.mjs"
+      - "packages/contracts/test/book-art-candidate-set.test.mjs"
       - "scripts/evavo-art-book-illustration-cli.mjs"
       - "scripts/check-book-illustration-intelligence.mjs"
       - "docs/book-illustration-intelligence.md"
@@ -18,8 +21,10 @@ on:
     paths:
       - ".github/workflows/book-illustration-intelligence.yml"
       - "packages/contracts/src/book-illustration-intelligence.ts"
+      - "packages/contracts/src/book-art-candidate-set*.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-illustration-intelligence*.test.mjs"
+      - "packages/contracts/test/book-art-candidate-set.test.mjs"
       - "scripts/evavo-art-book-illustration-cli.mjs"
       - "scripts/check-book-illustration-intelligence.mjs"
       - "docs/book-illustration-intelligence.md"
@@ -64,12 +69,24 @@ jobs:
           pnpm --filter @evavo/art-contracts build
           node --test \
             packages/contracts/test/book-illustration-intelligence.test.mjs \
-            packages/contracts/test/book-illustration-intelligence-cli.test.mjs
+            packages/contracts/test/book-illustration-intelligence-cli.test.mjs \
+            packages/contracts/test/book-art-candidate-set.test.mjs
       - name: Run complete Art Studio verification
         run: pnpm check
       - name: Remove bounded generated lock and prove clean source
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           rm -f pnpm-lock.yaml
+          status="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -n "$status" ]]; then
+            echo "Detected out-of-band source drift after verification:"
+            printf '%s\n' "$status"
+            echo "Tracked diff summary:"
+            git diff --stat || true
+            echo "Tracked diff:"
+            git diff --no-ext-diff --text || true
+            exit 1
+          fi
           git diff --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"

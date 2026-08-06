@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./candidate-set": {
+      "types": "./dist/candidate-set.d.ts",
+      "import": "./dist/candidate-set.js"
+    },
     "./docs-release": {
       "types": "./dist/docs-release.d.ts",
       "import": "./dist/docs-release.js"

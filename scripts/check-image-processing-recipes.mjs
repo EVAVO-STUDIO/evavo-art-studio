@@ -147,14 +147,24 @@ const pythonCandidates = process.platform === 'win32'
       ['python', []],
       ['py', ['-3']],
     ];
+const pythonSyntaxCheck = [
+  "from pathlib import Path",
+  "from tempfile import TemporaryDirectory",
+  "import py_compile",
+  "import sys",
+  "with TemporaryDirectory(prefix='evavo-art-py-compile-') as output_dir:",
+  "    for index, source_path in enumerate(sys.argv[1:]):",
+  "        output_path = Path(output_dir) / f'{index}.pyc'",
+  "        py_compile.compile(source_path, cfile=str(output_path), doraise=True)",
+].join("\n");
 let compiled = false;
 for (const [executable, prefix] of pythonCandidates) {
   const result = spawnSync(
     executable,
     [
       ...prefix,
-      '-m',
-      'py_compile',
+      '-c',
+      pythonSyntaxCheck,
       'tools/run_art_delivery_optimizer.py',
       'tools/process_image_with_pillow.py',
     ],
