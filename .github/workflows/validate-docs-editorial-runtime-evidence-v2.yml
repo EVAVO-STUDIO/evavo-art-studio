@@ -17,7 +17,7 @@ concurrency:
 
 env:
   DOCS_SOURCE_REPOSITORY: EVAVO-STUDIO/evavo-docs-suite
-  DOCS_SOURCE_SHA: f34c790e04abd000d8af50c3561eebfb7c252874
+  DOCS_SOURCE_SHA: 4ec7490ba8d2916ea8d6454b3baece8a25b4198d
   DOCS_BASE_SHA: c880df972da9aba30e5adad9dec838e83e7a1a82
 
 jobs:
