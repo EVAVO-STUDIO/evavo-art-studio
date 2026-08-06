@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 
 import {
@@ -8,6 +9,13 @@ import {
 const oversizedAssignments = Array.from(
   { length: 9 },
   (_, index) => ({ assignmentId: `assignment-${index + 1}` }),
+);
+const boundarySource = fs.readFileSync(
+  new URL(
+    "../src/book-studio-unattended-editorial-consensus-runtime-boundary.ts",
+    import.meta.url,
+  ),
+  "utf8",
 );
 
 test("blocks non-object runtime-evidence input before semantic evaluation", async () => {
@@ -54,6 +62,25 @@ test("blocks bounded malformed programme semantics without throwing", async () =
   assert.equal(result.status, "blocked");
   assert.equal(result.providerCallsPerformed, 0);
   assert.ok(result.blockers.length > 0);
+});
+
+test("keeps malformed nested runtime chronology behind a fail-closed guard", () => {
+  const chronologyCall = boundarySource.indexOf(
+    "temporalBlockers = validateRuntimeChronology(input);",
+  );
+  const chronologyFailure = boundarySource.indexOf(
+    "Editorial runtime chronology could not be validated safely.",
+  );
+  const deepRuntimeCall = boundarySource.indexOf(
+    "evaluateRuntimeEvidenceUnchecked(input)",
+  );
+  assert.ok(chronologyCall > 0);
+  assert.ok(chronologyFailure > chronologyCall);
+  assert.ok(deepRuntimeCall > chronologyFailure);
+  assert.match(
+    boundarySource.slice(chronologyCall - 80, chronologyFailure + 80),
+    /try\s*\{[\s\S]*validateRuntimeChronology\(input\);[\s\S]*\}\s*catch\s*\{/u,
+  );
 });
 
 test("blocks oversized programme reviewer assignments before traversal", async () => {
