@@ -394,11 +394,11 @@ function compileDirections(plan: CompiledSpriteProductionPlan, options: Normaliz
 function phaseTemplates(clip: SpritePlannedClip): readonly PhaseTemplate[] {
   if (clip.framesPerDirection <= 1) return SINGLE_PHASE;
   const id = clip.id.toLowerCase();
+  if (/(jump|fall|land)/.test(id)) return PHASES.jump;
   if (/(walk|run|move|swim|fly|climb|crouch-walk|work-loop|particle-loop)/.test(id) || clip.category === "locomotion") return PHASES.locomotion;
   if (/(attack|cast|shoot|fire|reload|parry|block|dodge|interact|use-item|pickup|push|pull|special)/.test(id) || clip.category === "combat") return PHASES.attack;
   if (/(hit|hurt|stun|damaged|damage)/.test(id)) return PHASES.reaction;
   if (/(death|destroyed|broken|despawn|dissipate)/.test(id)) return PHASES.collapse;
-  if (/(jump|fall|land)/.test(id)) return PHASES.jump;
   if (/(idle|blink|normal|hover|pressed|disabled|selected|focused|active-loop)/.test(id) || clip.loopMode !== "none") return PHASES.idle;
   if (/(spawn|activate|deactivate|open|close|turn|phase-transition|get-up|knockdown)/.test(id)) return PHASES.transition;
   return PHASES.generic;
