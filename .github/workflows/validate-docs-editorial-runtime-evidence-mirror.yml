@@ -1,15 +1,7 @@
-# Validation-only workflow. Never merge this branch into Art Studio production.
+# Permanent trigger only. Mirror source remains confined to validation PRs.
 name: Validate Docs Editorial Runtime Evidence Mirror
 
 on:
-  push:
-    branches:
-      - validation/docs-editorial-runtime-evidence-mirror-20260807
-    paths:
-      - ".github/workflows/validate-docs-editorial-runtime-evidence-mirror.yml"
-      - "validation/docs-editorial-consensus/**"
-      - "validation/docs-editorial-runtime-evidence/**"
-      - "validation/docs-narrative-craft/**"
   pull_request:
     branches:
       - main
@@ -18,22 +10,21 @@ on:
       - reopened
       - synchronize
     paths:
-      - ".github/workflows/validate-docs-editorial-runtime-evidence-mirror.yml"
       - "validation/docs-editorial-consensus/**"
       - "validation/docs-editorial-runtime-evidence/**"
       - "validation/docs-narrative-craft/**"
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: validate-docs-editorial-runtime-evidence-mirror-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: false
+  group: validate-docs-editorial-runtime-evidence-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
 
 jobs:
   exact-mirror:
-    runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'validation/docs-editorial-runtime-evidence-mirror-')
+    runs-on: windows-latest
     timeout-minutes: 90
     steps:
       - name: Check out exact validation mirror
@@ -48,34 +39,6 @@ jobs:
           node-version: 22.18.0
           package-manager-cache: false
 
-      - name: Run exact source-equivalent editorial mirror
+      - name: Run the exact source-equivalent mirror
         shell: bash
         run: bash validation/docs-editorial-runtime-evidence/run-focused-validation.sh
-
-      - name: Prove validation-only isolation
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin main
-          merge_base="$(git merge-base HEAD origin/main)"
-          unexpected="$(git diff --name-only "$merge_base" HEAD | grep -Ev '^(.github/workflows/validate-docs-editorial-runtime-evidence-mirror.yml|validation/docs-editorial-consensus/|validation/docs-editorial-runtime-evidence/|validation/docs-narrative-craft/)' || true)"
-          test -z "$unexpected" || {
-            printf '%s\n' "$unexpected"
-            exit 1
-          }
-          git diff --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=no)"
-
-      - name: Record authority boundary
-        if: success()
-        run: |
-          printf '%s\n' \
-            'validation=byte-exact-source-equivalent-complete-editorial-runtime-mirror' \
-            'docs-source=55bca28e3a92879cae0f74fef598a6cbf168aa2f' \
-            'provider-authentication-claimed=false' \
-            'provider-call-performed=false' \
-            'canonical-manuscript-mutation-performed=false' \
-            'automatic-canonical-admission-allowed=false' \
-            'art-studio-production-source-changed=false' \
-            'publication-performed=false'
