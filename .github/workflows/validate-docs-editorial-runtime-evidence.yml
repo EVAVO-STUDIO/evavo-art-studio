@@ -17,10 +17,62 @@ concurrency:
 
 env:
   DOCS_SOURCE_REPOSITORY: EVAVO-STUDIO/evavo-docs-suite
-  DOCS_SOURCE_SHA: 0e2a89db5530f0217f39a69017b1b517cfb9aaf0
+  DOCS_SOURCE_SHA: 4c00e016663a02aa2257ed1c67e1d60f3acb22db
   DOCS_BASE_SHA: c880df972da9aba30e5adad9dec838e83e7a1a82
 
 jobs:
+  core-preflight:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact Docs feature commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ env.DOCS_SOURCE_REPOSITORY }}
+          ref: ${{ env.DOCS_SOURCE_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Prove exact Docs source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$DOCS_SOURCE_SHA"
+
+      - name: Use exact Docs Node.js runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Run permanent editorial authority checks
+        run: |
+          node scripts/check-book-studio-unattended-editorial-consensus.mjs
+          node scripts/check-book-studio-unattended-editorial-consensus-integrity.mjs
+
+      - name: Install exact workspace
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Run strict core TypeScript
+        run: corepack pnpm --filter @evavo-docs/core typecheck
+
+      - name: Run bounded editorial attack suites
+        run: >-
+          npm exec --yes --package=tsx@4.20.3 -- tsx --test
+          packages/core/test/book-studio-unattended-editorial-consensus.test.mjs
+          packages/core/test/book-studio-unattended-editorial-consensus-integrity.test.mjs
+          packages/core/test/book-studio-unattended-editorial-consensus-runtime-evidence.test.mjs
+          packages/core/test/book-studio-unattended-editorial-consensus-runtime-boundary.test.mjs
+
+      - name: Prove exact Docs source remained clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
   exact-source:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -70,13 +122,14 @@ jobs:
           corepack pnpm --filter @evavo-docs/core typecheck
           corepack pnpm --filter @evavo-docs/web typecheck
 
-      - name: Run consensus integrity runtime-evidence and tamper attacks
+      - name: Run consensus integrity runtime-evidence bounded-preflight and tamper attacks
         working-directory: docs-source
         run: >-
           npm exec --yes --package=tsx@4.20.3 -- tsx --test
           packages/core/test/book-studio-unattended-editorial-consensus.test.mjs
           packages/core/test/book-studio-unattended-editorial-consensus-integrity.test.mjs
           packages/core/test/book-studio-unattended-editorial-consensus-runtime-evidence.test.mjs
+          packages/core/test/book-studio-unattended-editorial-consensus-runtime-boundary.test.mjs
 
       - name: Run complete repository verification
         working-directory: docs-source
@@ -113,6 +166,7 @@ jobs:
             "docs-source=${DOCS_SOURCE_SHA}" \
             "docs-base=${DOCS_BASE_SHA}" \
             'strict-core-and-web-typescript=true' \
+            'package-root-assignment-cardinality-bounded=true' \
             'duplicate-assignment-executions-allowed=false' \
             'runtime-result-revalidation-required=true' \
             'immutable-reviewer-payload-binding-required=true' \
