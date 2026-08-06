@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-readonly WORKSPACE="${ROOT}/validation/docs-narrative-craft"
+mirror_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
-verify_blob() {
+# Source the previously reviewed exact-mirror assembler. Because this script is
+# sourced, its EXIT cleanup remains deferred until this outer validation exits.
+# The original consensus and deep-integrity suites execute before the new layer.
+# The sourced script owns readonly ROOT and WORKSPACE variables, so this runner
+# deliberately uses separate names after sourcing.
+# shellcheck source=../docs-editorial-consensus/run-core-validation-exact.sh
+source "${mirror_root}/validation/docs-editorial-consensus/run-core-validation-exact.sh"
+
+readonly MIRROR_ROOT="${mirror_root}"
+readonly RUNTIME_WORKSPACE="${MIRROR_ROOT}/validation/docs-narrative-craft"
+
+verify_runtime_blob() {
   local relative_path="$1"
   local expected_sha="$2"
   local actual_sha
-  actual_sha="$(git -C "${ROOT}" hash-object "${ROOT}/${relative_path}")"
+  actual_sha="$(git -C "${MIRROR_ROOT}" hash-object "${MIRROR_ROOT}/${relative_path}")"
   if [[ "${actual_sha}" != "${expected_sha}" ]]; then
     printf 'exact_blob_mismatch path=%s expected=%s actual=%s\n' \
       "${relative_path}" "${expected_sha}" "${actual_sha}" >&2
@@ -16,34 +26,29 @@ verify_blob() {
   fi
 }
 
-# Source the previously reviewed exact-mirror assembler. Because this script is
-# sourced, its EXIT cleanup remains deferred until this outer validation exits.
-# The original consensus and deep-integrity suites execute before the new layer.
-# shellcheck source=../docs-editorial-consensus/run-core-validation-exact.sh
-source "${ROOT}/validation/docs-editorial-consensus/run-core-validation-exact.sh"
-
-verify_blob \
+verify_runtime_blob \
   "validation/docs-narrative-craft/src/book-studio-unattended-editorial-consensus-runtime-evidence.ts" \
   "f45a9ea2f12d7b17f96c77264578bade56f507e7"
-verify_blob \
+verify_runtime_blob \
   "validation/docs-narrative-craft/src/book-studio-unattended-editorial-consensus-runtime-boundary.ts" \
   "f7f3f982b66c3c9062c5070b0f58aac6d2e6c02f"
-verify_blob \
+verify_runtime_blob \
   "validation/docs-narrative-craft/src/book-studio-writing-candidate-contracts.ts" \
   "1c6e28d9007cba88a90f9d125000bf084f48a3d8"
-verify_blob \
+verify_runtime_blob \
   "validation/docs-narrative-craft/src/book-studio-writing-handoff-response.ts" \
   "1939f3b593507431878daa37476c5c7bef9c0faa"
-verify_blob \
+verify_runtime_blob \
   "validation/docs-narrative-craft/test/book-studio-narrative-craft-fixtures.mjs" \
   "ab7e38e1df4f292ecb0fc4be14459b5976bea43f"
-verify_blob \
+verify_runtime_blob \
   "validation/docs-narrative-craft/test/book-studio-unattended-editorial-consensus-runtime-evidence.test.mjs" \
   "7f3346e15eb26b89d99431147b7e3b9dd65b1395"
-verify_blob \
+verify_runtime_blob \
   "validation/docs-narrative-craft/test/book-studio-unattended-editorial-consensus-runtime-boundary.test.mjs" \
   "a6f2d940577e114cd5221668f5c09165c9e1ec6b"
 
+cd "${MIRROR_ROOT}"
 node --input-type=module <<'NODE'
 import fs from "node:fs";
 
@@ -106,12 +111,12 @@ if (mirrorIndex.includes("evaluateBookUnattendedEditorialConsensusIntegrity,")) 
 NODE
 
 npm exec --yes --package=typescript@5.9.3 -- \
-  tsc -p "${WORKSPACE}/tsconfig.json"
+  tsc -p "${RUNTIME_WORKSPACE}/tsconfig.json"
 
 npm exec --yes --package=tsx@4.20.3 -- \
   tsx --test \
-  "${WORKSPACE}/test/book-studio-unattended-editorial-consensus-runtime-evidence.test.mjs" \
-  "${WORKSPACE}/test/book-studio-unattended-editorial-consensus-runtime-boundary.test.mjs"
+  "${RUNTIME_WORKSPACE}/test/book-studio-unattended-editorial-consensus-runtime-evidence.test.mjs" \
+  "${RUNTIME_WORKSPACE}/test/book-studio-unattended-editorial-consensus-runtime-boundary.test.mjs"
 
 printf '%s\n' \
   'exact_runtime_evidence_source=true' \
