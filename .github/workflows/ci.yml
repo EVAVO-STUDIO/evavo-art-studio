@@ -30,7 +30,6 @@ jobs:
     env:
       ART_STUDIO_EXPECTED_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_sha || github.sha }}
       ART_STUDIO_REQUEST_SOURCE: ${{ github.event_name == 'workflow_dispatch' && inputs.request_source || 'github-main-push' }}
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/python-pycache
     steps:
       - name: Validate governed mainline trigger
         shell: bash
@@ -82,6 +81,14 @@ jobs:
           echo "ART_STUDIO_FFPROBE_VERSION=${FFPROBE_VERSION}" >> "${GITHUB_ENV}"
           echo "ART_STUDIO_FFMPEG_SHA256=${FFMPEG_SHA256}" >> "${GITHUB_ENV}"
           echo "ART_STUDIO_FFPROBE_SHA256=${FFPROBE_SHA256}" >> "${GITHUB_ENV}"
+
+      - name: Route Python bytecode to runner-temporary storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON_CACHE_ROOT="${RUNNER_TEMP}/python-pycache"
+          mkdir -p "${PYTHON_CACHE_ROOT}"
+          echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"
 
       - name: Set up Python 3.13.5
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
