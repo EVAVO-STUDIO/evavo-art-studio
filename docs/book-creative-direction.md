@@ -123,6 +123,14 @@ requires technical QA, print-craft QA, independent visual consensus, complete
 pairwise comparison, Docs Suite creative-quality review, governed selection
 and promotion.
 
+## Permanent verification
+
+The source-boundary checker is part of the root `pnpm check` chain. The
+dedicated workflow also runs frozen installation, strict contracts TypeScript,
+the complete contracts test suite and a clean-tree proof. The release therefore
+fails closed if genre coverage, route diversity, anti-generic safeguards or the
+non-authoritative production boundary is removed.
+
 ## Print readiness
 
 The creative compiler preserves the exact output geometry and delegates final
