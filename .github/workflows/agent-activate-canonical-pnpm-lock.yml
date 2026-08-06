@@ -1,0 +1,269 @@
+name: Agent Activate Canonical pnpm Lock
+
+on:
+  push:
+    branches:
+      - agent/canonical-pnpm-lock-v2-20260806
+    paths:
+      - ".github/workflows/agent-activate-canonical-pnpm-lock.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-activate-canonical-pnpm-lock-v2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  activate-verify-publish:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact lock-release branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/canonical-pnpm-lock-v2-20260806
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact current-main base and carrier-only branch input
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "14a8005cae12bd376c29a2a83871dfcef39aa3d8" ]]
+          [[ "$(git merge-base refs/remotes/origin/main HEAD)" == "14a8005cae12bd376c29a2a83871dfcef39aa3d8" ]]
+          git diff --name-only refs/remotes/origin/main...HEAD | LC_ALL=C sort > /tmp/actual-input-paths.txt
+          cat > /tmp/expected-input-paths.txt <<'PATHS'
+          .github/lock-transition-payload/chunk-001.b64
+          .github/lock-transition-payload/chunk-002.b64
+          .github/lock-transition-payload/chunk-003.b64
+          .github/lock-transition-payload/chunk-004.b64
+          .github/workflows/agent-activate-canonical-pnpm-lock.yml
+          PATHS
+          LC_ALL=C sort -o /tmp/expected-input-paths.txt /tmp/expected-input-paths.txt
+          diff -u /tmp/expected-input-paths.txt /tmp/actual-input-paths.txt
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Prove pre-transition review-first authority
+        run: |
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+
+      - name: Generate canonical lock with the exact toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(node --version)" == "v22.14.0" ]]
+          [[ "$(pnpm --version)" == "10.13.1" ]]
+          pnpm install --lockfile-only --strict-peer-dependencies
+          test -s pnpm-lock.yaml
+          LOCK_SHA256="$(sha256sum pnpm-lock.yaml | awk '{print $1}')"
+          [[ "${LOCK_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          echo "ART_STUDIO_GENERATED_LOCK_SHA256=${LOCK_SHA256}" >> "${GITHUB_ENV}"
+
+      - name: Reconstruct and verify the bounded transition payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/lock-transition-payload/chunk-*.b64 \
+            | tr -d '\r\n' \
+            | base64 --decode \
+            > /tmp/lockpayload.tar.gz
+          [[ "$(sha256sum /tmp/lockpayload.tar.gz | awk '{print $1}')" == "2f7411f5ea734fdbb863364f8b3ef9d56af9c1a8f63a9d41de41886aa20894c3" ]]
+          mkdir -p /tmp/lockpayload
+          tar -xzf /tmp/lockpayload.tar.gz -C /tmp/lockpayload
+          [[ "$(sha256sum /tmp/lockpayload/activate.py | awk '{print $1}')" == "725463a97bd9b55234b8ea75dd5dcbd5423d0adfa71784e4a740385023ac75ba" ]]
+          [[ "$(sha256sum /tmp/lockpayload/checker.mjs | awk '{print $1}')" == "f5e2da5536518f3ba86b3c5e78fe26f8f2fcaf3ec7d3a7787e2e17a13bc58c19" ]]
+          [[ "$(sha256sum /tmp/lockpayload/test.mjs | awk '{print $1}')" == "3d5a5b40bae2f8cd336d375debc895892e7c400f5f3473bcd80e80d284a23d2f" ]]
+          [[ "$(sha256sum /tmp/lockpayload/ci.yml | awk '{print $1}')" == "d9ffcdbf53aa5655167f94f3d6c8ebbe7b4fd1b39b1ab8ab90963fac1c5cf5fb" ]]
+          python3 -m py_compile /tmp/lockpayload/activate.py
+          node --check /tmp/lockpayload/checker.mjs
+          node --check /tmp/lockpayload/test.mjs
+          ruby -e 'require "yaml"; YAML.load_file(ARGV.fetch(0))' /tmp/lockpayload/ci.yml
+
+      - name: Apply the committed-frozen repository transition
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 /tmp/lockpayload/activate.py \
+            /tmp/lockpayload/checker.mjs \
+            /tmp/lockpayload/test.mjs \
+            /tmp/lockpayload/ci.yml
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/check-foundation-delivery-manifest.mjs")
+          source = path.read_text(encoding="utf-8")
+          old = '"pnpm install --no-frozen-lockfile",'
+          new = '"pnpm install --frozen-lockfile",'
+          if source.count(old) != 1:
+              raise SystemExit("foundation delivery lock-policy assertion drifted")
+          path.write_text(source.replace(old, new), encoding="utf-8", newline="\n")
+          PY
+          git diff --check
+
+      - name: Remove temporary carriers and stage the exact release slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -r -- .github/lock-transition-payload
+          git rm -- .github/workflows/agent-activate-canonical-pnpm-lock.yml
+          git add -A
+          git diff --cached --check
+          git diff --cached --name-status > /tmp/staged-name-status.txt
+          python3 - <<'PY'
+          from pathlib import Path
+
+          rows = []
+          for line in Path('/tmp/staged-name-status.txt').read_text().splitlines():
+              if not line:
+                  continue
+              status, path = line.split('\t', 1)
+              rows.append((status, path))
+
+          required = {
+              'README.md',
+              '.github/workflows/ci.yml',
+              'evavo.reliability.json',
+              'package.json',
+              'pnpm-lock.yaml',
+              'schemas/repository-owned-reliability-profile.schema.json',
+              'scripts/check-foundation-delivery-manifest.mjs',
+              'scripts/check-repository-toolchain.mjs',
+              'scripts/test-repository-toolchain.mjs',
+          }
+          carriers = {
+              '.github/lock-transition-payload/chunk-001.b64',
+              '.github/lock-transition-payload/chunk-002.b64',
+              '.github/lock-transition-payload/chunk-003.b64',
+              '.github/lock-transition-payload/chunk-004.b64',
+              '.github/workflows/agent-activate-canonical-pnpm-lock.yml',
+          }
+          paths = {path for _, path in rows}
+          missing = required - paths
+          if missing:
+              raise SystemExit(f'missing required release paths: {sorted(missing)}')
+          missing_carriers = carriers - paths
+          if missing_carriers:
+              raise SystemExit(f'missing carrier deletions: {sorted(missing_carriers)}')
+          for status, path in rows:
+              if path in carriers:
+                  if status != 'D':
+                      raise SystemExit(f'carrier is not deleted: {status} {path}')
+                  continue
+              if path in required:
+                  continue
+              if path.startswith('.github/workflows/') and path.endswith(('.yml', '.yaml')):
+                  continue
+              raise SystemExit(f'unexpected release path: {status} {path}')
+          if any(path.startswith(('apps/', 'packages/')) for _, path in rows):
+              raise SystemExit('application or package source entered the dependency release')
+          if not any(status == 'A' and path == 'pnpm-lock.yaml' for status, path in rows):
+              raise SystemExit('pnpm-lock.yaml is not staged as a new committed authority')
+          print(f'bounded staged release paths: {len(rows)}')
+          PY
+          cp /tmp/staged-name-status.txt /tmp/initial-staged-name-status.txt
+
+      - name: Verify frozen source authority before installation
+        run: |
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+
+      - name: Install the committed dependency graph exactly
+        run: pnpm install --frozen-lockfile
+
+      - name: Re-verify frozen authority after installation
+        run: |
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove repeated operator builds preserve the frozen graph
+        run: |
+          pnpm --filter @evavo/art-studio-web build
+          pnpm --filter @evavo/art-studio-web build
+
+      - name: Prove immutable lock identity and clean exact release source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf examples/legacy-book-artwork-registration/artifacts
+          test ! -e examples/legacy-book-artwork-registration/artifacts
+          [[ "$(sha256sum pnpm-lock.yaml | awk '{print $1}')" == "${ART_STUDIO_GENERATED_LOCK_SHA256}" ]]
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+          git diff --exit-code -- pnpm-lock.yaml
+          git diff --exit-code
+          git diff --cached --check
+          test -z "$(git ls-files --others --exclude-standard)"
+          git diff --cached --name-status > /tmp/final-staged-name-status.txt
+          diff -u /tmp/initial-staged-name-status.txt /tmp/final-staged-name-status.txt
+
+      - name: Export the exact validated release tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPORT_ROOT=/tmp/canonical-lock-release
+          mkdir -p "${EXPORT_ROOT}"
+          git diff --cached --binary > "${EXPORT_ROOT}/release.patch"
+          git diff --cached --name-status > "${EXPORT_ROOT}/name-status.txt"
+          git diff --cached --stat > "${EXPORT_ROOT}/stat.txt"
+          git write-tree > "${EXPORT_ROOT}/staged-tree-sha.txt"
+          printf '%s\n' "$(git rev-parse HEAD)" > "${EXPORT_ROOT}/carrier-head-sha.txt"
+          printf '%s\n' "$(git rev-parse refs/remotes/origin/main)" > "${EXPORT_ROOT}/base-main-sha.txt"
+          printf '%s\n' "${ART_STUDIO_GENERATED_LOCK_SHA256}" > "${EXPORT_ROOT}/pnpm-lock-sha256.txt"
+          sha256sum "${EXPORT_ROOT}/release.patch" > "${EXPORT_ROOT}/release.patch.sha256"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "build(deps): activate canonical pnpm lock"
+          git rev-parse HEAD > "${EXPORT_ROOT}/local-release-commit-sha.txt"
+          git rev-parse HEAD^{tree} > "${EXPORT_ROOT}/release-tree-sha.txt"
+          diff -u "${EXPORT_ROOT}/staged-tree-sha.txt" "${EXPORT_ROOT}/release-tree-sha.txt"
+          git show --format=fuller --no-patch HEAD > "${EXPORT_ROOT}/local-release-commit.txt"
+          git ls-tree -r HEAD > "${EXPORT_ROOT}/release-tree.txt"
+          git archive --format=tar.gz -o "${EXPORT_ROOT}/release-tree.tar.gz" HEAD
+          sha256sum "${EXPORT_ROOT}/release-tree.tar.gz" > "${EXPORT_ROOT}/release-tree.tar.gz.sha256"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Upload the exact validated release tree
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: canonical-pnpm-lock-release-${{ github.sha }}
+          path: /tmp/canonical-lock-release
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: false
+
+      - name: Confirm connector publication handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s /tmp/canonical-lock-release/release.patch
+          test -s /tmp/canonical-lock-release/release-tree.tar.gz
+          test -s /tmp/canonical-lock-release/release-tree-sha.txt
+          echo "Exact validated release tree exported for connector publication."
