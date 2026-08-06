@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "evavo-art-studio",
   "repository": "EVAVO-STUDIO/evavo-art-studio",
   "defaultBranch": "main",
@@ -9,9 +9,20 @@
     "name": "pnpm",
     "exactVersion": "10.13.1",
     "lockfilePath": "pnpm-lock.yaml",
-    "lockfilePolicy": "review-first",
-    "lockfilePresent": false,
-    "install": "pnpm install --no-frozen-lockfile"
+    "lockfilePolicy": "committed-frozen",
+    "lockfilePresent": true,
+    "install": "pnpm install --frozen-lockfile"
+  },
+  "dependencyLock": {
+    "path": "pnpm-lock.yaml",
+    "format": "pnpm-lockfile-v9",
+    "generatedWith": {
+      "node": "22.14.0",
+      "pnpm": "10.13.1"
+    },
+    "committed": true,
+    "frozenInstallationRequired": true,
+    "immutableDuringValidation": true
   },
   "runtime": {
     "node": "22.14.0",
@@ -30,14 +41,14 @@
   "validation": [
     "node scripts/check-repository-toolchain.mjs",
     "node scripts/test-repository-toolchain.mjs",
-    "pnpm install --no-frozen-lockfile",
-    "node scripts/check-repository-toolchain.mjs --allow-generated-lockfile",
+    "pnpm install --frozen-lockfile",
+    "node scripts/check-repository-toolchain.mjs",
     "node scripts/test-repository-toolchain.mjs",
     "pnpm run build:domain",
     "pnpm typecheck",
     "pnpm test",
     "pnpm build",
-    "rm -f pnpm-lock.yaml && git diff --exit-code && test -z \"$(git status --porcelain)\""
+    "git diff --exit-code -- pnpm-lock.yaml && git diff --exit-code && test -z \"$(git status --porcelain)\""
   ],
   "executedBaseline": {
     "workflow": ".github/workflows/ci.yml",
@@ -63,9 +74,9 @@
     ]
   },
   "notes": [
-    "The successful baseline proves the complete source chain at one exact head, not a frozen dependency graph.",
-    "A committed pnpm lockfile requires a separate generated, reviewed and fully validated change before frozen installation can be activated.",
-    "The generated review-first lockfile is temporary installed state, must remain untracked and is removed before CI completes.",
+    "The historical review-first baseline remains retained evidence; current installs are governed by the committed lockfile.",
+    "The canonical pnpm lockfile is committed source and every install must use pnpm install --frozen-lockfile.",
+    "Dependency updates require an explicit reviewed pnpm-lock.yaml change generated with Node.js 22.14.0 and pnpm 10.13.1.",
     "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.",
     "Superseded mainline validations are cancelled; a receipt is written only after the candidate is re-proven as current origin/main.",
     "Provider execution, promotion and production effects remain separately authorised operations."

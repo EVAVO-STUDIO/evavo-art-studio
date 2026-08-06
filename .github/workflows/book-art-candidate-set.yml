@@ -52,7 +52,7 @@ jobs:
           package-manager-cache: false
 
       - name: Install exact workspace
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Check permanent candidate-set boundary
         run: node scripts/check-book-art-candidate-set.mjs
@@ -78,12 +78,11 @@ jobs:
           pnpm --filter @evavo/art-book-runtime typecheck
           pnpm --filter @evavo/art-providers typecheck
 
-      - name: Remove bounded generated lock and prove clean source
+      - name: Verify immutable lockfile and prove clean source
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          rm -f pnpm-lock.yaml
           status="$(git status --porcelain=v1 --untracked-files=all)"
           if [[ -n "$status" ]]; then
             echo "Detected out-of-band source drift after verification:"

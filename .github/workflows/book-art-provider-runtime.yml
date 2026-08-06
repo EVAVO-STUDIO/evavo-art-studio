@@ -168,8 +168,8 @@ jobs:
           node scripts/check-book-art-provider-parity.mjs
           node scripts/check-book-art-legacy-registration.mjs
 
-      - name: Install review-first dependency graph
-        run: pnpm install --no-frozen-lockfile
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
 
       - name: Build exact Art Studio domain dependencies
         run: pnpm run build:domain
@@ -197,7 +197,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f pnpm-lock.yaml
           rm -rf examples/legacy-book-artwork-registration/artifacts
           test ! -e examples/legacy-book-artwork-registration/artifacts
           if ! git diff --exit-code; then

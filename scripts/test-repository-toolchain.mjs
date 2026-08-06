@@ -4,10 +4,13 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
+  existsSync,
   mkdtempSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -16,15 +19,55 @@ import path from "node:path";
 const sourceRoot = process.cwd();
 const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), "evavo-art-toolchain-"));
 const fixtureRoot = path.join(temporaryRoot, "fixture");
+
+const discoverWorkspaceManifests = () => {
+  const result = [];
+  for (const workspaceRoot of ["apps", "packages"]) {
+    const absoluteRoot = path.join(sourceRoot, workspaceRoot);
+    if (!existsSync(absoluteRoot)) continue;
+    for (const entry of readdirSync(absoluteRoot, { withFileTypes: true })) {
+      const relativePath = `${workspaceRoot}/${entry.name}/package.json`;
+      if (entry.isDirectory() && existsSync(path.join(sourceRoot, relativePath))) {
+        result.push(relativePath);
+      }
+    }
+  }
+  return result.sort();
+};
+
+const discoverWorkflows = () =>
+  readdirSync(path.join(sourceRoot, ".github/workflows"), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.ya?ml$/i.test(entry.name))
+    .map((entry) => `.github/workflows/${entry.name}`)
+    .sort();
+
 const files = [
-  ".github/workflows/ci.yml",
   ".nvmrc",
+  "README.md",
   "evavo.reliability.json",
   "package.json",
+  "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
   "schemas/repository-owned-reliability-profile.schema.json",
   "scripts/check-repository-toolchain.mjs",
+  ...discoverWorkflows(),
+  ...discoverWorkspaceManifests(),
 ];
+
+const git = (arguments_, expectedStatus = 0) => {
+  const result = spawnSync("git", arguments_, {
+    cwd: fixtureRoot,
+    encoding: "utf8",
+    timeout: 20_000,
+    windowsHide: true,
+  });
+  assert.equal(
+    result.status,
+    expectedStatus,
+    `git ${arguments_.join(" ")} failed:\n${result.stdout}\n${result.stderr}`,
+  );
+  return result;
+};
 
 const reset = () => {
   rmSync(fixtureRoot, { recursive: true, force: true });
@@ -34,24 +77,21 @@ const reset = () => {
     mkdirSync(path.dirname(target), { recursive: true });
     cpSync(path.join(sourceRoot, relativePath), target);
   }
+  git(["init", "-q"]);
+  git(["add", "--all"]);
 };
 
 const run = (additionalArguments = []) =>
   spawnSync(
     process.execPath,
-    [
-      "scripts/check-repository-toolchain.mjs",
-      "--skip-runtime",
-      ...additionalArguments,
-    ],
+    ["scripts/check-repository-toolchain.mjs", "--skip-runtime", ...additionalArguments],
     {
       cwd: fixtureRoot,
       encoding: "utf8",
-      timeout: 20_000,
+      timeout: 30_000,
       windowsHide: true,
     },
   );
-const runInstalled = () => run(["--allow-generated-lockfile"]);
 
 const mutateJson = (relativePath, operation) => {
   const absolutePath = path.join(fixtureRoot, relativePath);
@@ -73,49 +113,114 @@ const replaceRequired = (value, from, to) => {
   return value.replace(from, to);
 };
 
+const expectFailure = (result, label) => {
+  assert.notEqual(result.status, 0, label);
+};
+
 try {
   reset();
-  assert.equal(run().status, 0, "exact pre-install fixture must pass");
+  assert.equal(run().status, 0, "exact committed-lock fixture must pass");
 
   reset();
   writeFileSync(path.join(fixtureRoot, ".nvmrc"), "22.13.1\n", "utf8");
-  assert.notEqual(run().status, 0, "Node.js drift must fail");
+  expectFailure(run(), "Node.js drift must fail");
 
   reset();
   mutateJson("package.json", (value) => {
     value.packageManager = "pnpm@10.14.0";
   });
-  assert.notEqual(run().status, 0, "pnpm manifest drift must fail");
+  expectFailure(run(), "pnpm manifest drift must fail");
+
+  reset();
+  unlinkSync(path.join(fixtureRoot, "pnpm-lock.yaml"));
+  expectFailure(run(), "missing committed lockfile must fail");
+
+  reset();
+  git(["rm", "--cached", "-q", "--", "pnpm-lock.yaml"]);
+  expectFailure(run(), "untracked lockfile must fail");
+
+  reset();
+  mutateText("pnpm-lock.yaml", (value) =>
+    replaceRequired(value, "lockfileVersion: '9.0'", "lockfileVersion: '8.0'"),
+  );
+  expectFailure(run(), "lockfile-version drift must fail");
+
+  reset();
+  mutateText("pnpm-lock.yaml", (value) => {
+    const candidate = ["  apps/api:", "  'apps/api':", '  "apps/api":'].find((line) =>
+      value.includes(`${line}\n`),
+    );
+    assert.ok(candidate, "lockfile fixture must contain the apps/api importer");
+    return value.replace(`${candidate}\n`, `${candidate.replace("apps/api", "apps/api-missing")}\n`);
+  });
+  expectFailure(run(), "workspace importer drift must fail");
+
+  reset();
+  mutateText("pnpm-lock.yaml", (value) => `${value}# file:../outside-repository\n`);
+  expectFailure(run(), "cross-repository file dependency material must fail");
+
+  reset();
+  mutateText("pnpm-lock.yaml", (value) => `${value}# npmAuthToken: \${NPM_TOKEN}\n`);
+  expectFailure(run(), "registry credential or environment material must fail");
 
   reset();
   mutateJson("evavo.reliability.json", (value) => {
-    value.packageManager.lockfilePolicy = "committed-frozen";
-    value.packageManager.lockfilePresent = true;
+    value.packageManager.lockfilePolicy = "review-first";
+    value.packageManager.lockfilePresent = false;
+    value.packageManager.install = "pnpm install --no-frozen-lockfile";
   });
-  assert.notEqual(run().status, 0, "unreviewed lockfile-policy transition must fail");
+  expectFailure(run(), "review-first policy regression must fail");
 
   reset();
-  writeFileSync(
-    path.join(fixtureRoot, "pnpm-lock.yaml"),
-    "lockfileVersion: '9.0'\n",
-    "utf8",
-  );
-  assert.notEqual(run().status, 0, "generated lockfile must fail in pre-install mode");
-  assert.equal(
-    runInstalled().status,
-    0,
-    "generated untracked lockfile must pass only in installed-state mode",
-  );
-
   mutateJson("evavo.reliability.json", (value) => {
-    value.packageManager.lockfilePolicy = "committed-frozen";
-    value.packageManager.lockfilePresent = true;
+    value.dependencyLock.committed = false;
   });
-  assert.notEqual(
-    runInstalled().status,
-    0,
-    "installed-state mode must not approve a frozen-policy transition",
+  expectFailure(run(), "committed-lock authority drift must fail");
+
+  reset();
+  mutateJson("package.json", (value) => {
+    value.devDependencies.typescript = "latest";
+  });
+  expectFailure(run(), "floating latest dependency must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(value, "pnpm install --frozen-lockfile", "pnpm install --no-frozen-lockfile"),
   );
+  expectFailure(run(), "non-frozen mainline install must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
+      "          git diff --exit-code -- pnpm-lock.yaml\n",
+      "          rm -f pnpm-lock.yaml\n          git diff --exit-code -- pnpm-lock.yaml\n",
+    ),
+  );
+  expectFailure(run(), "lockfile deletion must fail");
+
+  reset();
+  mutateText(".github/workflows/ci.yml", (value) =>
+    replaceRequired(
+      value,
+      '"installedWithoutCommittedLockfile": false',
+      '"installedWithoutCommittedLockfile": true',
+    ),
+  );
+  expectFailure(run(), "mainline receipt lock authority drift must fail");
+
+  const secondaryWorkflow = discoverWorkflows().find((relativePath) => {
+    if (relativePath === ".github/workflows/ci.yml") return false;
+    return readFileSync(path.join(sourceRoot, relativePath), "utf8").includes(
+      "pnpm install --frozen-lockfile",
+    );
+  });
+  assert.ok(secondaryWorkflow, "fixture must contain a secondary frozen-install workflow");
+  reset();
+  mutateText(secondaryWorkflow, (value) =>
+    replaceRequired(value, "pnpm install --frozen-lockfile", "pnpm install"),
+  );
+  expectFailure(run(), "non-frozen secondary workflow install must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
@@ -125,19 +230,19 @@ try {
       "actions/checkout@v6",
     ),
   );
-  assert.notEqual(run().status, 0, "mutable action reference must fail");
+  expectFailure(run(), "mutable action reference must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "persist-credentials: false", "persist-credentials: true"),
   );
-  assert.notEqual(run().status, 0, "persisted checkout credentials must fail");
+  expectFailure(run(), "persisted checkout credentials must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, 'node-version: "22.14.0"', 'node-version: "22"'),
   );
-  assert.notEqual(run().status, 0, "floating workflow Node.js must fail");
+  expectFailure(run(), "floating workflow Node.js must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
@@ -147,13 +252,13 @@ try {
       "  workflow_dispatch:",
     ),
   );
-  assert.notEqual(run().status, 0, "missing automatic main validation must fail");
+  expectFailure(run(), "missing automatic main validation must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "      - main\n", "      - main\n      - work/**\n"),
   );
-  assert.notEqual(run().status, 0, "non-main push scope must fail");
+  expectFailure(run(), "non-main push scope must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
@@ -163,7 +268,7 @@ try {
       "  pull_request:\n  workflow_dispatch:\n",
     ),
   );
-  assert.notEqual(run().status, 0, "pull-request validation must fail");
+  expectFailure(run(), "pull-request validation must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
@@ -173,19 +278,19 @@ try {
       "default: ungoverned-dispatcher",
     ),
   );
-  assert.notEqual(run().status, 0, "manual dispatcher identity drift must fail");
+  expectFailure(run(), "manual dispatcher identity drift must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "'github-main-push'", "'untrusted-main-push'"),
   );
-  assert.notEqual(run().status, 0, "automatic dispatcher identity drift must fail");
+  expectFailure(run(), "automatic dispatcher identity drift must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "cancel-in-progress: true", "cancel-in-progress: false"),
   );
-  assert.notEqual(run().status, 0, "superseded-run cancellation drift must fail");
+  expectFailure(run(), "superseded-run cancellation drift must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
@@ -195,7 +300,7 @@ try {
       'git merge-base --is-ancestor "${ART_STUDIO_EXPECTED_SHA}" origin/main',
     ),
   );
-  assert.notEqual(run().status, 0, "initial current-main equality weakening must fail");
+  expectFailure(run(), "initial current-main equality weakening must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
@@ -205,13 +310,13 @@ try {
       "git show-ref --verify --quiet refs/remotes/origin/main",
     ),
   );
-  assert.notEqual(run().status, 0, "final current-main refresh removal must fail");
+  expectFailure(run(), "final current-main refresh removal must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, '"currentMainAtReceipt": true', '"currentMainAtReceipt": false'),
   );
-  assert.notEqual(run().status, 0, "current-main receipt assertion drift must fail");
+  expectFailure(run(), "current-main receipt assertion drift must fail");
 
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
@@ -221,15 +326,15 @@ try {
       "actions/upload-artifact@v4",
     ),
   );
-  assert.notEqual(run().status, 0, "floating artifact action must fail");
+  expectFailure(run(), "floating artifact action must fail");
 
   reset();
   mutateJson("evavo.reliability.json", (value) => {
     value.notes = value.notes.filter(
-      (item) => !item.startsWith("Validation runs automatically on pushes to main"),
+      (item) => !item.startsWith("The canonical pnpm lockfile is committed source"),
     );
   });
-  assert.notEqual(run().status, 0, "automatic workflow policy note drift must fail");
+  expectFailure(run(), "frozen-lock policy note drift must fail");
 
   reset();
   mutateJson("evavo.reliability.json", (value) => {
@@ -237,7 +342,7 @@ try {
       (item) => !item.startsWith("Superseded mainline validations are cancelled"),
     );
   });
-  assert.notEqual(run().status, 0, "current-main receipt policy note drift must fail");
+  expectFailure(run(), "current-main receipt policy note drift must fail");
 
   reset();
   mutateJson("evavo.reliability.json", (value) => {
@@ -246,11 +351,17 @@ try {
         (item) => item !== "live provider requests",
       );
   });
-  assert.notEqual(run().status, 0, "capability-boundary drift must fail");
+  expectFailure(run(), "capability-boundary drift must fail");
+
+  reset();
+  expectFailure(
+    run(["--allow-generated-lockfile"]),
+    "obsolete generated-lockfile bypass flag must fail",
+  );
 
   console.log("Art Studio repository toolchain adversarial tests passed.");
   console.log(
-    "- Node.js, pnpm, lockfile, exact-main triggers, current-main receipts and capability drift fail closed",
+    "- committed lock identity, exact workspace importers, frozen installs, exact-main receipts and capability drift fail closed",
   );
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });
