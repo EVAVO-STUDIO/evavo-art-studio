@@ -33,8 +33,8 @@ jobs:
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
           git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
-          [[ "$(git rev-parse refs/remotes/origin/main)" == "14a8005cae12bd376c29a2a83871dfcef39aa3d8" ]]
-          [[ "$(git merge-base refs/remotes/origin/main HEAD)" == "14a8005cae12bd376c29a2a83871dfcef39aa3d8" ]]
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "0de98ea8cab1bdb92705b551d825e6462697d439" ]]
+          [[ "$(git merge-base refs/remotes/origin/main HEAD)" == "0de98ea8cab1bdb92705b551d825e6462697d439" ]]
           git diff --name-only refs/remotes/origin/main...HEAD | LC_ALL=C sort > /tmp/actual-input-paths.txt
           cat > /tmp/expected-input-paths.txt <<'PATHS'
           .github/lock-transition-payload/chunk-001.b64
