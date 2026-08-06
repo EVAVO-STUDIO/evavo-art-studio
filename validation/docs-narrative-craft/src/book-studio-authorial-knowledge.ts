@@ -1,0 +1,1 @@
+export const BOOK_AUTHORIAL_KNOWLEDGE_VALIDATION_MIRROR = true as const;

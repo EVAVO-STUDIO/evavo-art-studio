@@ -1,0 +1,250 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+  evaluateBookUnattendedEditorialConsensus,
+  fingerprintBookUnattendedEditorialReviewerExecution,
+  fingerprintBookUnattendedEditorialReviewerPayload,
+} from "../src/book-studio-unattended-editorial-consensus.ts";
+import {
+  compileBookNarrativeCraftPacket,
+} from "../src/book-studio-narrative-craft.ts";
+import {
+  fingerprintBookNarrativeIndependentReviewReceipt,
+} from "../src/book-studio-narrative-craft-evaluate-evidence.ts";
+import {
+  canonicalBookJson,
+  sha256BookText,
+} from "../src/book-studio-project-contracts.ts";
+import {
+  acceptedScan,
+  criterionEvidence,
+  validInput,
+} from "./book-studio-narrative-craft-fixtures.mjs";
+
+const digest = (character) => `sha256:${character.repeat(64)}`;
+const candidateId = "candidate-editorial-one";
+const candidateProducerId = "writer-one";
+const candidateText =
+  "Mara accepts the archive debt, protects the ally, and leaves with access that changes the next council vote.";
+
+async function programmeFixture() {
+  const compiled = await compileBookNarrativeCraftPacket(await validInput());
+  assert.equal(compiled.status, "ready", JSON.stringify(compiled.blockers));
+  const narrativeCraftPacket = compiled.packet;
+  const candidateTextSha256 = await sha256BookText(candidateText);
+  const phraseOverlapScan = await acceptedScan(candidateId, candidateText);
+  const evidence = await criterionEvidence(
+    narrativeCraftPacket,
+    candidateId,
+    candidateTextSha256,
+  );
+  const criterionIds = narrativeCraftPacket.qualityRubric
+    .map((item) => item.criterionId)
+    .sort();
+  const reviewerAssignments = [
+    assignment("reviewer-alpha", criterionIds, "a"),
+    assignment("reviewer-beta", criterionIds, "b"),
+  ];
+  const stagePlan = {
+    stageId: "volume-one:editorial_review",
+    volumeId: "volume-one",
+    kind: "editorial_review",
+    owner: "docs_suite",
+    sourceAutomaticExecutionAllowed: false,
+    mode: "machine_consensus",
+    dispatchTarget: "docs_suite",
+    dispatchOperation: "review.evaluate_admission",
+    unattendedExecutionAllowed: true,
+    requiresIndependentConsensus: true,
+    minimumIndependentReviewers: 2,
+    minimumConsensusBasisPoints: 9000,
+    revisionCycleLimit: 8,
+    selectionAuthority: "not_applicable",
+    requiresGovernedAdmissionReceipt: false,
+    requiresExternalEvidence: false,
+    dependencyStageIds: ["volume-one:writing_candidate"],
+    sourceGateIds: ["independent_review"],
+    gateIds: [
+      "independent_review",
+      "independent_text_review_consensus",
+      "minimum_independent_text_reviewers:2",
+      "minimum_text_consensus_basis_points:9000",
+    ],
+  };
+  const unsigned = {
+    outputKind:
+      "evavo_docs_book_unattended_editorial_consensus_programme",
+    schemaVersion: 1,
+    contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+    status: "ready",
+    projectId: "project-alpha",
+    programmeId: "programme-alpha",
+    volumeId: "volume-one",
+    stageId: stagePlan.stageId,
+    stagePlan,
+    unattendedRequestFingerprint: digest("1"),
+    unattendedReadinessFingerprint: digest("2"),
+    unattendedResultFingerprint: digest("3"),
+    volumePlanFingerprint: digest("4"),
+    candidateId,
+    candidateProducerId,
+    candidateTextSha256,
+    candidateStorageReceiptFingerprint: digest("5"),
+    candidateEvidenceIds: ["candidate-evidence-one"],
+    narrativeCraftPacket,
+    phraseOverlapScan,
+    dependencyReceipts: [{
+      stageId: "volume-one:writing_candidate",
+      receiptFingerprint: digest("6"),
+      completedAt: "2026-08-04T08:55:00.000Z",
+    }],
+    reviewerAssignments,
+    unresolvedFindingIds: [],
+    evaluationEvidenceIds: ["editorial-evaluation-evidence"],
+    executionRequestedAt: "2026-08-04T09:05:00.000Z",
+    executionRequestedBy: "book-production-supervisor",
+    minimumIndependentReviewers: 2,
+    minimumConsensusBasisPoints: 9000,
+    providerCallAllowed: true,
+    providerCallPerformed: false,
+    oneProviderAttemptPerReviewerRequired: true,
+    providerFallbackAllowed: false,
+    blindIndependentReviewRequired: true,
+    dissentPreservationRequired: true,
+    authoritativeBookStateWritePerformed: false,
+    canonicalManuscriptMutationPerformed: false,
+    automaticCanonicalAdmissionAllowed: false,
+    artStudioCalled: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  };
+  return {
+    programme: {
+      ...unsigned,
+      programmeFingerprint:
+        await sha256BookText(canonicalBookJson(unsigned)),
+    },
+    evidence,
+  };
+}
+
+function assignment(reviewerProducerId, criterionIds, character) {
+  return {
+    assignmentId: `assignment-${reviewerProducerId}`,
+    assignmentFingerprint: digest(character),
+    reviewerProducerId,
+    reviewerProvider: "other_compatible_model",
+    reviewerModel: `review-model-${reviewerProducerId}`,
+    criterionIds,
+    authoringPacket: {},
+    runtimeRequest: {
+      runtimeRequestFingerprint: digest(
+        character === "a" ? "7" : "8",
+      ),
+    },
+    candidateCompileInput: {},
+    providerAttemptLimit: 1,
+    providerFallbackAllowed: false,
+    reviewerWasCandidateProducer: false,
+  };
+}
+
+async function execution(
+  programme,
+  reviewerProducerId,
+  receipts,
+  options = {},
+) {
+  const assignment = programme.reviewerAssignments.find(
+    (item) => item.reviewerProducerId === reviewerProducerId,
+  );
+  const minorityFindingIds = options.minorityFindingIds ?? [];
+  const payloadUnsigned = {
+    outputKind:
+      "evavo_docs_book_unattended_editorial_reviewer_payload",
+    schemaVersion: 1,
+    contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+    assignmentId: assignment.assignmentId,
+    assignmentFingerprint: assignment.assignmentFingerprint,
+    candidateId: programme.candidateId,
+    candidateTextSha256: programme.candidateTextSha256,
+    reviewerProducerId,
+    reviewerProvider: assignment.reviewerProvider,
+    reviewerModel: assignment.reviewerModel,
+    receipts,
+    minorityFindingIds,
+    completedAt: "2026-08-04T09:01:00.000Z",
+    reviewerWasCandidateProducer: false,
+    canonicalAdmissionAllowed: false,
+    canonicalManuscriptMutationPerformed: false,
+    publicationPerformed: false,
+  };
+  const payload = {
+    ...payloadUnsigned,
+    payloadFingerprint:
+      await fingerprintBookUnattendedEditorialReviewerPayload(
+        payloadUnsigned,
+      ),
+  };
+  const executionUnsigned = {
+    assignmentId: assignment.assignmentId,
+    assignmentFingerprint: assignment.assignmentFingerprint,
+    runtimeRequestFingerprint:
+      assignment.runtimeRequest.runtimeRequestFingerprint,
+    runtimeResultFingerprint:
+      reviewerProducerId === "reviewer-alpha"
+        ? digest("9")
+        : digest("a"),
+    providerRequestId: `provider-request-${reviewerProducerId}`,
+    providerAttemptCount: 1,
+    providerCalled: true,
+    providerFallbackAllowed: false,
+    payload,
+  };
+  return {
+    ...executionUnsigned,
+    executionFingerprint:
+      await fingerprintBookUnattendedEditorialReviewerExecution(
+        executionUnsigned,
+      ),
+  };
+}
+
+test(
+  "accepts exact blind reviewer receipts and reaches unattended editorial consensus",
+  async () => {
+    const { programme, evidence } = await programmeFixture();
+    const executions = [];
+    for (const reviewer of ["reviewer-alpha", "reviewer-beta"]) {
+      executions.push(await execution(
+        programme,
+        reviewer,
+        evidence.map((item) =>
+          item.independentReviews.find(
+            (review) => review.reviewerProducerId === reviewer,
+          ),
+        ),
+      ));
+    }
+    const result = await evaluateBookUnattendedEditorialConsensus({
+      outputKind:
+        "evavo_docs_book_unattended_editorial_consensus_evaluation_input",
+      schemaVersion: 1,
+      contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+      programme,
+      reviewerExecutions: executions,
+    });
+    assert.equal(
+      result.status,
+      "ready_for_governed_admission",
+      JSON.stringify(result.blockers),
+    );
+    assert.equal(result.evaluation.consensusBasisPoints, 10_000);
+    assert.deepEqual(
+      result.evaluation.passingReviewerProducerIds,
+      ["reviewer-alpha", "reviewer-beta"],
+    );
+    assert.deepEqual(
+      result.evaluation.dissentingReviewerProducerIds,

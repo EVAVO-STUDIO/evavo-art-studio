@@ -1,0 +1,250 @@
+}
+
+async function compileReviewerAssignment(
+  value: unknown,
+  index: number,
+  context: Readonly<{
+    projectId: string;
+    programmeId: string;
+    volumeId: string;
+    candidateId: string;
+    candidateProducerId: string;
+    candidateTextSha256: string;
+    rubricCriterionIds: string[];
+    requiredEvidenceIds: string[];
+    executionRequestedAt: string;
+  }>,
+  blockers: string[],
+): Promise<BookUnattendedEditorialReviewerAssignmentV1 | undefined> {
+  const source = strictRecord(value, ASSIGNMENT_KEYS, `Reviewer assignment ${index + 1}`, blockers);
+  const assignmentId = id(source.assignmentId, `reviewerAssignments[${index}].assignmentId`, blockers);
+  const reviewerProducerId = id(
+    source.reviewerProducerId,
+    `reviewerAssignments[${index}].reviewerProducerId`,
+    blockers,
+  );
+  if (reviewerProducerId === context.candidateProducerId) {
+    blockers.push(`Reviewer assignment ${assignmentId} is not independent from the candidate producer.`);
+  }
+  const criterionIds = ids(
+    source.criterionIds,
+    `reviewerAssignments[${index}].criterionIds`,
+    blockers,
+    128,
+    true,
+  ).sort();
+  if (!sameSet(criterionIds, context.rubricCriterionIds)) {
+    blockers.push(`Reviewer assignment ${assignmentId} must cover every applicable narrative criterion exactly once.`);
+  }
+
+  const candidateInput = source.candidateCompileInput;
+  const candidateRecord = record(candidateInput);
+  const packetValidation = await validateAndNormalizeBookAuthoringPacket(candidateRecord.packet);
+  if (packetValidation.status !== "ready" || !packetValidation.packet) {
+    blockers.push(
+      `Reviewer assignment ${assignmentId} requires an exact valid authoring packet.`,
+      ...packetValidation.blockers.map((item) => `Reviewer assignment ${assignmentId}: ${item}`),
+    );
+  }
+  const packet = packetValidation.packet;
+  if (packet) validateReviewPacket(packet, assignmentId, context, blockers);
+
+  const compilation = await compileBookWritingCandidateRuntimeRequest(candidateInput);
+  if (compilation.status !== "ready" || !compilation.runtimeRequest) {
+    blockers.push(
+      `Reviewer assignment ${assignmentId} could not compile an exact Writing runtime request.`,
+      ...compilation.blockers.map((item) => `Reviewer assignment ${assignmentId}: ${item}`),
+    );
+    return undefined;
+  }
+  if (!packet) return undefined;
+  const runtimeRequest = compilation.runtimeRequest;
+  if (runtimeRequest.requestedAt !== context.executionRequestedAt) {
+    blockers.push(`Reviewer assignment ${assignmentId} requestedAt differs from executionRequestedAt.`);
+  }
+  const targetContexts = runtimeRequest.contextBlocks.filter((item) =>
+    item.role === "target_manuscript" && item.textSha256 === context.candidateTextSha256,
+  );
+  if (targetContexts.length !== 1) {
+    blockers.push(`Reviewer assignment ${assignmentId} must contain exactly one candidate-bound target_manuscript context.`);
+  }
+  if (!runtimeRequest.prompt.responseInstruction.includes(REVIEW_RESPONSE_INSTRUCTION_TOKEN)) {
+    blockers.push(`Reviewer assignment ${assignmentId} response instruction does not require the editorial reviewer payload contract.`);
+  }
+  for (const evidenceId of context.requiredEvidenceIds) {
+    if (!runtimeRequest.handoffRequest.requiredEvidenceIds.includes(evidenceId)) {
+      blockers.push(`Reviewer assignment ${assignmentId} is missing required evidence ${evidenceId}.`);
+    }
+  }
+
+  const assignmentUnsigned = {
+    outputKind: "evavo_docs_book_unattended_editorial_reviewer_assignment_identity",
+    schemaVersion: 1,
+    contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+    assignmentId,
+    reviewerProducerId,
+    reviewerProvider: packet.provider,
+    reviewerModel: packet.modelName,
+    criterionIds,
+    packetFingerprint: packet.packetFingerprint,
+    runtimeRequestFingerprint: runtimeRequest.runtimeRequestFingerprint,
+    candidateId: context.candidateId,
+    candidateTextSha256: context.candidateTextSha256,
+  };
+  return {
+    assignmentId,
+    assignmentFingerprint: await sha256BookText(canonicalBookJson(assignmentUnsigned)),
+    reviewerProducerId,
+    reviewerProvider: packet.provider,
+    reviewerModel: packet.modelName,
+    criterionIds,
+    authoringPacket: packet,
+    runtimeRequest,
+    candidateCompileInput: candidateInput as CompileBookWritingCandidateInputV1,
+    providerAttemptLimit: 1,
+    providerFallbackAllowed: false,
+    reviewerWasCandidateProducer: false,
+  };
+}
+
+function validateReviewPacket(
+  packet: BookAuthoringPacketV1,
+  assignmentId: string,
+  context: Readonly<{
+    projectId: string;
+    programmeId: string;
+    volumeId: string;
+    candidateTextSha256: string;
+  }>,
+  blockers: string[],
+): void {
+  if (!REVIEW_OPERATIONS.has(packet.operation)) {
+    blockers.push(`Reviewer assignment ${assignmentId} uses non-review authoring operation ${packet.operation}.`);
+  }
+  if (packet.operation === "custom" && packet.customOperation !== "independent_editorial_review") {
+    blockers.push(`Reviewer assignment ${assignmentId} custom operation must be independent_editorial_review.`);
+  }
+  if (packet.projectId !== context.projectId || packet.programmeId !== context.programmeId) {
+    blockers.push(`Reviewer assignment ${assignmentId} project or programme differs from the unattended plan.`);
+  }
+  if (packet.volumeId !== context.volumeId) {
+    blockers.push(`Reviewer assignment ${assignmentId} volume differs from the selected unattended volume.`);
+  }
+  if (packet.manuscriptSha256 !== context.candidateTextSha256) {
+    blockers.push(`Reviewer assignment ${assignmentId} manuscript digest differs from the exact candidate bytes.`);
+  }
+  if (packet.expectedChangedUnitIds.length || packet.remainingUnitIds.length) {
+    blockers.push(`Reviewer assignment ${assignmentId} cannot request manuscript changes or continuation units.`);
+  }
+}
+
+async function parseReviewerExecution(
+  value: unknown,
+  index: number,
+  programme: BookUnattendedEditorialConsensusProgrammeV1,
+  blockers: string[],
+): Promise<BookUnattendedEditorialReviewerExecutionV1 | undefined> {
+  const source = strictRecord(value, EXECUTION_KEYS, `Reviewer execution ${index + 1}`, blockers);
+  const assignmentId = id(source.assignmentId, `reviewerExecutions[${index}].assignmentId`, blockers);
+  const assignment = programme.reviewerAssignments.find((item) => item.assignmentId === assignmentId);
+  if (!assignment) blockers.push(`Reviewer execution ${assignmentId} does not match a programme assignment.`);
+  const assignmentFingerprint = digest(
+    source.assignmentFingerprint,
+    `reviewerExecutions[${index}].assignmentFingerprint`,
+    blockers,
+  );
+  const runtimeRequestFingerprint = digest(
+    source.runtimeRequestFingerprint,
+    `reviewerExecutions[${index}].runtimeRequestFingerprint`,
+    blockers,
+  );
+  const runtimeResultFingerprint = digest(
+    source.runtimeResultFingerprint,
+    `reviewerExecutions[${index}].runtimeResultFingerprint`,
+    blockers,
+  );
+  const providerRequestId = id(source.providerRequestId, `reviewerExecutions[${index}].providerRequestId`, blockers);
+  if (source.providerAttemptCount !== 1 || source.providerCalled !== true || source.providerFallbackAllowed !== false) {
+    blockers.push(`Reviewer execution ${assignmentId} transport authority is invalid.`);
+  }
+  if (assignment) {
+    if (assignmentFingerprint !== assignment.assignmentFingerprint) {
+      blockers.push(`Reviewer execution ${assignmentId} assignment fingerprint differs from the programme.`);
+    }
+    if (runtimeRequestFingerprint !== assignment.runtimeRequest.runtimeRequestFingerprint) {
+      blockers.push(`Reviewer execution ${assignmentId} runtime request fingerprint differs from the programme.`);
+    }
+  }
+  const payload = await parseReviewerPayload(source.payload, assignment, programme, blockers);
+  if (!assignment || !payload) return undefined;
+  const unsigned: Omit<BookUnattendedEditorialReviewerExecutionV1, "executionFingerprint"> = {
+    assignmentId,
+    assignmentFingerprint,
+    runtimeRequestFingerprint,
+    runtimeResultFingerprint,
+    providerRequestId,
+    providerAttemptCount: 1,
+    providerCalled: true,
+    providerFallbackAllowed: false,
+    payload,
+  };
+  const executionFingerprint = digest(
+    source.executionFingerprint,
+    `reviewerExecutions[${index}].executionFingerprint`,
+    blockers,
+  );
+  if (executionFingerprint !== await fingerprintBookUnattendedEditorialReviewerExecution(unsigned)) {
+    blockers.push(`Reviewer execution ${assignmentId} fingerprint differs from its exact contents.`);
+  }
+  return { ...unsigned, executionFingerprint };
+}
+
+async function parseReviewerPayload(
+  value: unknown,
+  assignment: BookUnattendedEditorialReviewerAssignmentV1 | undefined,
+  programme: BookUnattendedEditorialConsensusProgrammeV1,
+  blockers: string[],
+): Promise<BookUnattendedEditorialReviewerPayloadV1 | undefined> {
+  const source = strictRecord(value, PAYLOAD_KEYS, "Editorial reviewer payload", blockers);
+  literal(source.outputKind, REVIEW_PAYLOAD_OUTPUT_KIND, "Editorial reviewer payload outputKind is invalid.", blockers);
+  literal(source.schemaVersion, 1, "Editorial reviewer payload schemaVersion must be 1.", blockers);
+  literal(source.contract, BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT, "Editorial reviewer payload contract is invalid.", blockers);
+  const assignmentId = id(source.assignmentId, "payload.assignmentId", blockers);
+  const assignmentFingerprint = digest(source.assignmentFingerprint, "payload.assignmentFingerprint", blockers);
+  const candidateId = id(source.candidateId, "payload.candidateId", blockers);
+  const candidateTextSha256 = digest(source.candidateTextSha256, "payload.candidateTextSha256", blockers);
+  const reviewerProducerId = id(source.reviewerProducerId, "payload.reviewerProducerId", blockers);
+  const reviewerProvider = provider(source.reviewerProvider, "payload.reviewerProvider", blockers);
+  const reviewerModel = text(source.reviewerModel, "payload.reviewerModel", blockers, 300);
+  const completedAt = timestamp(source.completedAt, "payload.completedAt", blockers);
+  const minorityFindingIds = ids(source.minorityFindingIds, "payload.minorityFindingIds", blockers, 4_096, false);
+  for (const key of [
+    "reviewerWasCandidateProducer", "canonicalAdmissionAllowed",
+    "canonicalManuscriptMutationPerformed", "publicationPerformed",
+  ]) falseAuthority(source[key], `payload.${key}`, blockers);
+
+  const receiptValues = array(source.receipts, "payload.receipts", blockers, 1, 256);
+  const receipts: BookNarrativeIndependentReviewReceiptV1[] = [];
+  for (const receiptValue of receiptValues) {
+    const receipt = receiptValue as BookNarrativeIndependentReviewReceiptV1;
+    const expectedFingerprint = await fingerprintBookNarrativeIndependentReviewReceipt(receipt);
+    if (receipt.reviewFingerprint !== expectedFingerprint) {
+      blockers.push(`Reviewer payload ${assignmentId} contains a review receipt with an invalid fingerprint.`);
+    }
+    receipts.push(receipt);
+  }
+  receipts.sort((left, right) =>
+    left.criterionId.localeCompare(right.criterionId) || left.reviewId.localeCompare(right.reviewId),
+  );
+  if (assignment) {
+    if (
+      assignmentId !== assignment.assignmentId
+      || assignmentFingerprint !== assignment.assignmentFingerprint
+      || reviewerProducerId !== assignment.reviewerProducerId
+      || reviewerProvider !== assignment.reviewerProvider
+      || reviewerModel !== assignment.reviewerModel
+    ) blockers.push(`Reviewer payload ${assignmentId} identity differs from its exact assignment.`);
+    if (!sameSet(receipts.map((item) => item.criterionId), assignment.criterionIds)) {
+      blockers.push(`Reviewer payload ${assignmentId} must contain one receipt for every assigned criterion.`);
+    }
+    if (duplicates(receipts.map((item) => item.criterionId)).length) {

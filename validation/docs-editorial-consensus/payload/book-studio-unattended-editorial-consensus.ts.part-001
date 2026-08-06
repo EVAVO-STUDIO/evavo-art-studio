@@ -1,0 +1,250 @@
+  canonicalManuscriptMutationPerformed: false;
+  automaticCanonicalAdmissionAllowed: false;
+  publicationPerformed: false;
+}
+
+const PROGRAMME_INPUT_KEYS = new Set([
+  "outputKind", "schemaVersion", "contract", "unattendedProductionInput",
+  "expectedUnattendedResultFingerprint", "volumeId", "stageId", "candidateId",
+  "candidateProducerId", "candidateTextSha256", "candidateStorageReceiptFingerprint",
+  "candidateEvidenceIds", "narrativeCraftPacket", "phraseOverlapScan",
+  "dependencyReceipts", "reviewerAssignments", "unresolvedFindingIds",
+  "evaluationEvidenceIds", "executionRequestedAt", "executionRequestedBy",
+  "providerFallbackAllowed", "authoritativeWritesAllowed",
+  "canonicalManuscriptMutationAllowed", "automaticCanonicalAdmissionAllowed",
+  "automaticPublicationAllowed", "runtimeCutoverApproved", "publicationPerformed",
+]);
+const DEPENDENCY_KEYS = new Set(["stageId", "receiptFingerprint", "completedAt"]);
+const ASSIGNMENT_KEYS = new Set([
+  "assignmentId", "reviewerProducerId", "criterionIds", "candidateCompileInput",
+]);
+const PAYLOAD_KEYS = new Set([
+  "outputKind", "schemaVersion", "contract", "assignmentId", "assignmentFingerprint",
+  "candidateId", "candidateTextSha256", "reviewerProducerId", "reviewerProvider",
+  "reviewerModel", "receipts", "minorityFindingIds", "completedAt",
+  "payloadFingerprint", "reviewerWasCandidateProducer", "canonicalAdmissionAllowed",
+  "canonicalManuscriptMutationPerformed", "publicationPerformed",
+]);
+const EXECUTION_KEYS = new Set([
+  "assignmentId", "assignmentFingerprint", "runtimeRequestFingerprint",
+  "runtimeResultFingerprint", "providerRequestId", "providerAttemptCount",
+  "providerCalled", "providerFallbackAllowed", "payload", "executionFingerprint",
+]);
+const EVALUATION_INPUT_KEYS = new Set([
+  "outputKind", "schemaVersion", "contract", "programme", "reviewerExecutions",
+]);
+
+export async function compileBookUnattendedEditorialConsensusProgramme(
+  input: unknown,
+): Promise<BookUnattendedEditorialConsensusProgrammeResultV1> {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  const source = strictRecord(input, PROGRAMME_INPUT_KEYS, "Editorial consensus programme input", blockers);
+  literal(source.outputKind, "evavo_docs_book_unattended_editorial_consensus_programme_input", "Programme input outputKind is invalid.", blockers);
+  literal(source.schemaVersion, 1, "Programme input schemaVersion must be 1.", blockers);
+  literal(source.contract, BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT, "Programme input contract is invalid.", blockers);
+  for (const key of [
+    "providerFallbackAllowed", "authoritativeWritesAllowed",
+    "canonicalManuscriptMutationAllowed", "automaticCanonicalAdmissionAllowed",
+    "automaticPublicationAllowed", "runtimeCutoverApproved", "publicationPerformed",
+  ]) falseAuthority(source[key], key, blockers);
+
+  const expectedUnattendedResultFingerprint = digest(
+    source.expectedUnattendedResultFingerprint,
+    "expectedUnattendedResultFingerprint",
+    blockers,
+  );
+  const volumeId = id(source.volumeId, "volumeId", blockers);
+  const stageId = id(source.stageId, "stageId", blockers);
+  const candidateId = id(source.candidateId, "candidateId", blockers);
+  const candidateProducerId = id(source.candidateProducerId, "candidateProducerId", blockers);
+  const candidateTextSha256 = digest(source.candidateTextSha256, "candidateTextSha256", blockers);
+  const candidateStorageReceiptFingerprint = digest(
+    source.candidateStorageReceiptFingerprint,
+    "candidateStorageReceiptFingerprint",
+    blockers,
+  );
+  const candidateEvidenceIds = ids(source.candidateEvidenceIds, "candidateEvidenceIds", blockers, 8_192, true);
+  const unresolvedFindingIds = ids(source.unresolvedFindingIds, "unresolvedFindingIds", blockers, 8_192, false);
+  const evaluationEvidenceIds = ids(source.evaluationEvidenceIds, "evaluationEvidenceIds", blockers, 8_192, true);
+  const executionRequestedAt = timestamp(source.executionRequestedAt, "executionRequestedAt", blockers);
+  const executionRequestedBy = id(source.executionRequestedBy, "executionRequestedBy", blockers);
+  const dependencyReceipts = parseDependencyReceipts(source.dependencyReceipts, blockers);
+
+  const unattendedProduction = await compileBookUnattendedProduction(source.unattendedProductionInput);
+  if (unattendedProduction.resultFingerprint !== expectedUnattendedResultFingerprint) {
+    blockers.push("The unattended result fingerprint differs from the exact expected plan.");
+  }
+  if (unattendedProduction.status === "blocked") blockers.push("The unattended production plan is blocked.");
+  if (executionRequestedBy !== unattendedProduction.requestedBy) {
+    blockers.push("executionRequestedBy differs from the unattended plan requester.");
+  }
+  if (Date.parse(executionRequestedAt) < Date.parse(unattendedProduction.requestedAt)) {
+    blockers.push("executionRequestedAt precedes the unattended plan request.");
+  }
+
+  const volume = unattendedProduction.volumes.find((item) => item.volumeId === volumeId);
+  if (!volume) blockers.push(`The unattended plan does not contain volume ${volumeId}.`);
+  const stageMatches = unattendedProduction.volumes
+    .flatMap((item) => item.stagePlans)
+    .filter((item) => item.stageId === stageId);
+  if (stageMatches.length !== 1) blockers.push("stageId must identify exactly one unattended stage.");
+  const stagePlan = stageMatches.length === 1 ? stageMatches[0] : undefined;
+  if (stagePlan) validateEditorialStage(stagePlan, volumeId, dependencyReceipts, executionRequestedAt, blockers);
+
+  const packetBlockers = await validateBookNarrativeCraftPacket(source.narrativeCraftPacket);
+  blockers.push(...packetBlockers.map((item) => `Narrative packet: ${item}`));
+  const narrativeCraftPacket =
+    source.narrativeCraftPacket
+    && typeof source.narrativeCraftPacket === "object"
+    && !Array.isArray(source.narrativeCraftPacket)
+      ? source.narrativeCraftPacket as BookNarrativeCraftPacketV1
+      : undefined;
+  if (!narrativeCraftPacket) {
+    blockers.push("The narrative craft packet must be an object.");
+  } else {
+    if (narrativeCraftPacket.projectId !== unattendedProduction.projectId) {
+      blockers.push("The narrative craft packet project differs from the unattended project.");
+    }
+    if (narrativeCraftPacket.programmeId !== unattendedProduction.programmeId) {
+      blockers.push("The narrative craft packet programme differs from the unattended programme.");
+    }
+    if (narrativeCraftPacket.volumeId !== volumeId) {
+      blockers.push("The narrative craft packet volume differs from the selected unattended volume.");
+    }
+  }
+
+  const phraseOverlapScan =
+    source.phraseOverlapScan
+    && typeof source.phraseOverlapScan === "object"
+    && !Array.isArray(source.phraseOverlapScan)
+      ? source.phraseOverlapScan as BookPhraseOverlapScanV1
+      : undefined;
+  const phraseBlockers = await validateBookPhraseOverlapScanIntegrity(phraseOverlapScan);
+  blockers.push(...phraseBlockers.map((item) => `Phrase overlap: ${item}`));
+  if (!phraseOverlapScan) {
+    blockers.push("The phrase-overlap scan must be an object.");
+  } else {
+    if (phraseOverlapScan.candidateId !== candidateId) {
+      blockers.push("The phrase-overlap scan candidate differs from candidateId.");
+    }
+    if (phraseOverlapScan.candidateTextSha256 !== candidateTextSha256) {
+      blockers.push("The phrase-overlap scan digest differs from candidateTextSha256.");
+    }
+  }
+
+  const rubricCriterionIds = [...(narrativeCraftPacket?.qualityRubric ?? [])]
+    .map((item) => item.criterionId)
+    .sort();
+  const assignmentInputs = array(source.reviewerAssignments, "reviewerAssignments", blockers, 2, 8);
+  const requiredEvidenceIds = stagePlan && volume
+    ? unique([
+        unattendedProduction.requestFingerprint,
+        unattendedProduction.readinessFingerprint,
+        unattendedProduction.resultFingerprint,
+        volume.planFingerprint,
+        stagePlan.stageId,
+        candidateStorageReceiptFingerprint,
+        ...candidateEvidenceIds,
+        ...stagePlan.sourceGateIds,
+        ...stagePlan.gateIds,
+        ...dependencyReceipts.map((item) => item.receiptFingerprint),
+      ]).sort()
+    : [];
+
+  const reviewerAssignments: BookUnattendedEditorialReviewerAssignmentV1[] = [];
+  for (let index = 0; index < assignmentInputs.length; index += 1) {
+    const assignment = await compileReviewerAssignment(
+      assignmentInputs[index],
+      index,
+      {
+        projectId: unattendedProduction.projectId,
+        programmeId: unattendedProduction.programmeId,
+        volumeId,
+        candidateId,
+        candidateProducerId,
+        candidateTextSha256,
+        rubricCriterionIds,
+        requiredEvidenceIds,
+        executionRequestedAt,
+      },
+      blockers,
+    );
+    if (assignment) reviewerAssignments.push(assignment);
+  }
+  reviewerAssignments.sort((left, right) =>
+    left.reviewerProducerId.localeCompare(right.reviewerProducerId)
+      || left.assignmentId.localeCompare(right.assignmentId),
+  );
+
+  const duplicateAssignments = duplicates(reviewerAssignments.map((item) => item.assignmentId));
+  const duplicateReviewers = duplicates(reviewerAssignments.map((item) => item.reviewerProducerId));
+  const duplicateRuntimeFingerprints = duplicates(
+    reviewerAssignments.map((item) => item.runtimeRequest.runtimeRequestFingerprint),
+  );
+  if (duplicateAssignments.length) blockers.push(`Reviewer assignment IDs are duplicated: ${duplicateAssignments.join(", ")}.`);
+  if (duplicateReviewers.length) blockers.push(`Reviewer producer identities are duplicated: ${duplicateReviewers.join(", ")}.`);
+  if (duplicateRuntimeFingerprints.length) blockers.push("Reviewer runtime request fingerprints are duplicated.");
+  if (stagePlan && reviewerAssignments.length < stagePlan.minimumIndependentReviewers) {
+    blockers.push(
+      `Editorial consensus requires at least ${stagePlan.minimumIndependentReviewers} independent reviewer assignments.`,
+    );
+  }
+
+  const uniqueBlockers = unique(blockers).sort();
+  if (
+    uniqueBlockers.length
+    || !volume
+    || !stagePlan
+    || !narrativeCraftPacket
+    || !phraseOverlapScan
+  ) {
+    return programmeResult(unattendedProduction, undefined, uniqueBlockers, warnings);
+  }
+
+  const unsigned: Omit<BookUnattendedEditorialConsensusProgrammeV1, "programmeFingerprint"> = {
+    outputKind: "evavo_docs_book_unattended_editorial_consensus_programme",
+    schemaVersion: 1,
+    contract: BOOK_UNATTENDED_EDITORIAL_CONSENSUS_CONTRACT,
+    status: "ready",
+    projectId: unattendedProduction.projectId,
+    programmeId: unattendedProduction.programmeId,
+    volumeId,
+    stageId,
+    stagePlan,
+    unattendedRequestFingerprint: unattendedProduction.requestFingerprint,
+    unattendedReadinessFingerprint: unattendedProduction.readinessFingerprint,
+    unattendedResultFingerprint: unattendedProduction.resultFingerprint,
+    volumePlanFingerprint: volume.planFingerprint,
+    candidateId,
+    candidateProducerId,
+    candidateTextSha256,
+    candidateStorageReceiptFingerprint,
+    candidateEvidenceIds,
+    narrativeCraftPacket,
+    phraseOverlapScan,
+    dependencyReceipts,
+    reviewerAssignments,
+    unresolvedFindingIds,
+    evaluationEvidenceIds,
+    executionRequestedAt,
+    executionRequestedBy,
+    minimumIndependentReviewers: stagePlan.minimumIndependentReviewers,
+    minimumConsensusBasisPoints: stagePlan.minimumConsensusBasisPoints,
+    providerCallAllowed: true,
+    providerCallPerformed: false,
+    oneProviderAttemptPerReviewerRequired: true,
+    providerFallbackAllowed: false,
+    blindIndependentReviewRequired: true,
+    dissentPreservationRequired: true,
+    authoritativeBookStateWritePerformed: false,
+    canonicalManuscriptMutationPerformed: false,
+    automaticCanonicalAdmissionAllowed: false,
+    artStudioCalled: false,
+    runtimeCutoverApproved: false,
+    publicationPerformed: false,
+  };
+  const programme: BookUnattendedEditorialConsensusProgrammeV1 = {
+    ...unsigned,
+    programmeFingerprint: await sha256BookText(canonicalBookJson(unsigned)),
+  };
