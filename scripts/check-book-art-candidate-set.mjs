@@ -99,6 +99,21 @@ if (!failures.length) {
     '"packages/book-art-runtime/src/candidate-set*.ts"',
   ]) expect(sources.workflow, token, "candidate-set workflow");
   for (const token of [
+    '"plan",',
+    "plan: input.plan",
+    "await compileBookArtCandidateSetProviderRunReceipt",
+  ]) expect(sources.executionRuntime, token, "execution-bound consensus");
+  reject(
+    sources.executionRuntime,
+    '"providerRunReceipt",\n      "consensusInput"',
+    "execution-bound consensus caller authority",
+  );
+  expect(
+    sources.docs,
+    "never trusts a caller-supplied receipt",
+    "execution-evidence documentation",
+  );
+  for (const token of [
     "omits outputs from the governed set",
     "near duplicates",
     "machine-only",
