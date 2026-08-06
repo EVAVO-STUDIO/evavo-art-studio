@@ -16,18 +16,21 @@ on:
   issue_comment:
     types:
       - created
+  schedule:
+    - cron: "0 19 6 8 *"
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: validate-docs-editorial-runtime-evidence-${{ github.event.pull_request.head.sha || format('comment-{0}-{1}', github.event.issue.number, github.event.comment.id) }}
+  group: validate-docs-editorial-runtime-evidence-${{ github.event.pull_request.head.sha || format('{0}-{1}', github.event_name, github.run_id) }}
   cancel-in-progress: true
 
 jobs:
   exact-mirror:
     if: >-
+      github.event_name == 'schedule' ||
       (github.event_name == 'pull_request' && startsWith(github.head_ref, 'validation/docs-editorial-runtime-evidence-mirror-')) ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.user.login == 'EVAVO-STUDIO' && github.event.comment.body == '/validate-docs-editorial-runtime')
     runs-on: windows-latest
@@ -48,14 +51,23 @@ jobs:
           fetch-depth: 0
           ref: refs/pull/${{ github.event.issue.number }}/merge
 
+      - name: Check out scheduled validation pull-request merge ref
+        if: github.event_name == 'schedule'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: refs/pull/153/merge
+
       - name: Prove the selected head branch is a validation mirror
-        if: github.event_name == 'issue_comment'
+        if: github.event_name == 'issue_comment' || github.event_name == 'schedule'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          head_ref="$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }} --jq .head.ref)"
+          pr_number="${{ github.event.issue.number || 153 }}"
+          head_ref="$(gh api repos/${{ github.repository }}/pulls/${pr_number} --jq .head.ref)"
           [[ "$head_ref" == validation/docs-editorial-runtime-evidence-mirror-* ]]
 
       - name: Use current LTS Node.js
