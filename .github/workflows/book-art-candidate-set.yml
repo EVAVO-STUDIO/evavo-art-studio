@@ -4,15 +4,14 @@ on:
   push:
     branches:
       - main
-      - agent/book-candidate-set-quality-20260806
     paths: &candidate_set_paths
       - ".github/workflows/book-art-candidate-set.yml"
       - "packages/contracts/src/book-art-candidate-set*.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-art-candidate-set.test.mjs"
-      - "packages/book-art-runtime/src/candidate-set.ts"
+      - "packages/book-art-runtime/src/candidate-set*.ts"
       - "packages/book-art-runtime/package.json"
-      - "packages/book-art-runtime/test/candidate-set-runtime.test.mjs"
+      - "packages/book-art-runtime/test/candidate-set*.test.mjs"
       - "packages/providers/src/prompt.ts"
       - "packages/providers/test/providers.test.mjs"
       - "scripts/check-image-processing-recipes.mjs"
@@ -70,6 +69,7 @@ jobs:
         run: |
           node --test packages/contracts/test/book-art-candidate-set.test.mjs
           node --test packages/book-art-runtime/test/candidate-set-runtime.test.mjs
+          node --test packages/book-art-runtime/test/candidate-set-execution.test.mjs
           node --test packages/providers/test/providers.test.mjs
 
       - name: Run strict package typechecks

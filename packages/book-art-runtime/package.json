@@ -14,6 +14,10 @@
       "types": "./dist/candidate-set.d.ts",
       "import": "./dist/candidate-set.js"
     },
+    "./candidate-set-execution": {
+      "types": "./dist/candidate-set-execution.d.ts",
+      "import": "./dist/candidate-set-execution.js"
+    },
     "./docs-release": {
       "types": "./dist/docs-release.d.ts",
       "import": "./dist/docs-release.js"
