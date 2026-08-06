@@ -17,7 +17,7 @@ concurrency:
 
 env:
   DOCS_SOURCE_REPOSITORY: EVAVO-STUDIO/evavo-docs-suite
-  DOCS_SOURCE_SHA: 4c00e016663a02aa2257ed1c67e1d60f3acb22db
+  DOCS_SOURCE_SHA: f34c790e04abd000d8af50c3561eebfb7c252874
   DOCS_BASE_SHA: c880df972da9aba30e5adad9dec838e83e7a1a82
 
 jobs:
@@ -167,6 +167,9 @@ jobs:
             "docs-base=${DOCS_BASE_SHA}" \
             'strict-core-and-web-typescript=true' \
             'package-root-assignment-cardinality-bounded=true' \
+            'semantic-validation-precedes-runtime-traversal=true' \
+            'malformed-input-fails-closed=true' \
+            'runtime-chronology-required=true' \
             'duplicate-assignment-executions-allowed=false' \
             'runtime-result-revalidation-required=true' \
             'immutable-reviewer-payload-binding-required=true' \
