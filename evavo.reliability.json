@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "id": "evavo-art-studio",
   "repository": "EVAVO-STUDIO/evavo-art-studio",
   "defaultBranch": "main",
@@ -31,6 +31,13 @@
     "react": "^19.2.8",
     "typescript": "^5.9.2"
   },
+  "imageToolchain": {
+    "python": "3.13.5",
+    "requirements": "requirements-image-pipeline.txt",
+    "pillow": "12.2.0",
+    "install": "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt",
+    "verification": "python tools/verify_brass_creative_evaluation.py"
+  },
   "workspace": {
     "manifest": "pnpm-workspace.yaml",
     "packages": [
@@ -39,6 +46,8 @@
     ]
   },
   "validation": [
+    "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt",
+    "python tools/verify_brass_creative_evaluation.py",
     "node scripts/check-repository-toolchain.mjs",
     "node scripts/test-repository-toolchain.mjs",
     "pnpm install --frozen-lockfile",
@@ -77,6 +86,7 @@
     "The historical review-first baseline remains retained evidence; current installs are governed by the committed lockfile.",
     "The canonical pnpm lockfile is committed source and every install must use pnpm install --frozen-lockfile.",
     "Dependency updates require an explicit reviewed pnpm-lock.yaml change generated with Node.js 22.14.0 and pnpm 10.13.1.",
+    "Raster evidence validation uses Python 3.13.5 and Pillow 12.2.0 exactly; evaluated pixels are decoded from the same retained bytes that are hashed.",
     "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.",
     "Superseded mainline validations are cancelled; a receipt is written only after the candidate is re-proven as current origin/main.",
     "Provider execution, promotion and production effects remain separately authorised operations."

@@ -14,6 +14,7 @@
     "packageManager",
     "dependencyLock",
     "runtime",
+    "imageToolchain",
     "workspace",
     "validation",
     "executedBaseline",
@@ -22,7 +23,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.1"
+      "const": "1.2"
     },
     "id": {
       "const": "evavo-art-studio"
@@ -141,6 +142,34 @@
         },
         "typescript": {
           "const": "^5.9.2"
+        }
+      }
+    },
+    "imageToolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python",
+        "requirements",
+        "pillow",
+        "install",
+        "verification"
+      ],
+      "properties": {
+        "python": {
+          "const": "3.13.5"
+        },
+        "requirements": {
+          "const": "requirements-image-pipeline.txt"
+        },
+        "pillow": {
+          "const": "12.2.0"
+        },
+        "install": {
+          "const": "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt"
+        },
+        "verification": {
+          "const": "python tools/verify_brass_creative_evaluation.py"
         }
       }
     },

@@ -10,6 +10,10 @@ It is designed for large game-art corpora such as Brass & Brine `RAW_ART`. It do
 py -3 -m pip install -r requirements-image-pipeline.txt
 ```
 
+Hosted and governed validation uses Python 3.13.5 with Pillow 12.2.0 exactly;
+`requirements-image-pipeline.txt` is intentionally an exact pin rather than a
+floating compatibility range.
+
 Pillow is the primary cross-platform backend. A bounded Windows `System.Drawing` fallback is provided for opaque PNG canvas, resize and conversion work. It deliberately rejects meaningful-alpha and luminance-alpha jobs rather than producing a lower-fidelity substitute.
 
 ## 1. Build an approved style bank

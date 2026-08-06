@@ -14,12 +14,11 @@ from brass_creative_evaluation import (
     atomic_json,
     contact_sheet_mattes,
     contact_sheet_runtime_scales,
-    file_sha,
     image_features,
     load_contracts,
-    load_rgba,
     load_style_bank,
     profile_style_distance,
+    read_rgba,
     report_hash,
     resolve_inside,
 )
@@ -36,10 +35,15 @@ def evaluate(args: argparse.Namespace) -> dict:
     role = role_profiles[args.role]
     bank, bank_bytes, style_profile = load_style_bank(args.style_bank.resolve(), int(evaluation["limits"]["maximumJsonBytes"]), args.role)
     candidate_path = resolve_inside(candidate_root, args.candidate, "candidate")
-    candidate_sha, candidate_size = file_sha(candidate_path, int(evaluation["limits"]["maximumImageBytes"]))
+    image, candidate_bytes = read_rgba(
+        candidate_path,
+        int(evaluation["limits"]["maximumImageBytes"]),
+        int(evaluation["limits"]["maximumDecodedPixels"]),
+    )
+    candidate_sha = hashlib.sha256(candidate_bytes).hexdigest()
+    candidate_size = len(candidate_bytes)
     if args.expected_candidate_sha256 and candidate_sha != args.expected_candidate_sha256.lower():
         raise ValueError("candidate SHA-256 differs from expected bytes")
-    image = load_rgba(candidate_path, int(evaluation["limits"]["maximumDecodedPixels"]))
     features = image_features(image)
     blockers: list[str] = []
     warnings: list[str] = []
@@ -80,10 +84,8 @@ def evaluate(args: argparse.Namespace) -> dict:
     ]
     runtime_sheet = contact_sheet_runtime_scales(image, scales)
     matte_sheet = contact_sheet_mattes(image, mattes)
-    atomic_image(args.runtime_scale_sheet.resolve(), runtime_sheet, args.replace)
-    atomic_image(args.matte_sheet.resolve(), matte_sheet, args.replace)
-    runtime_sha, runtime_size = file_sha(args.runtime_scale_sheet.resolve(), int(evaluation["limits"]["maximumImageBytes"]))
-    matte_sha, matte_size = file_sha(args.matte_sheet.resolve(), int(evaluation["limits"]["maximumImageBytes"]))
+    runtime_sha, runtime_size = atomic_image(args.runtime_scale_sheet.resolve(), runtime_sheet, args.replace)
+    matte_sha, matte_size = atomic_image(args.matte_sheet.resolve(), matte_sheet, args.replace)
     report = {
         "schema": STATIC_SCHEMA,
         "contract": evaluation["contract"],
@@ -93,6 +95,11 @@ def evaluate(args: argparse.Namespace) -> dict:
         "candidatePath": Path(args.candidate).as_posix(),
         "candidateSha256": candidate_sha,
         "candidateSizeBytes": candidate_size,
+        "sourceBinding": {
+            "descriptorBoundRead": True,
+            "decodedFromRetainedBytes": True,
+            "singleFrameImage": True,
+        },
         "artDirectionContractPath": args.art_contract,
         "artDirectionContractSha256": hashlib.sha256(game_bytes).hexdigest(),
         "evaluationContractSha256": hashlib.sha256(evaluation_bytes).hexdigest(),

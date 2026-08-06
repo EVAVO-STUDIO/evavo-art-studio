@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "contract": "evavo.brass-creative-evaluation.v1",
   "gameContract": "evavo.brass-brine.art-direction-animation.v1",
   "styleBankSchema": "evavo.image-style-reference-bank.v1",
@@ -18,6 +18,11 @@
   "requirements": {
     "exactGameContractBinding": true,
     "exactCandidateBytes": true,
+    "descriptorBoundSourceReads": true,
+    "decodedPixelsFromRetainedSourceBytes": true,
+    "singleFrameSourceImagesOnly": true,
+    "atomicCreateOnlyEvidencePublication": true,
+    "publishedEvidenceByteVerification": true,
     "roleSpecificStyleProfile": true,
     "runtimeScaleContactSheet": true,
     "governedMatteContactSheet": true,
