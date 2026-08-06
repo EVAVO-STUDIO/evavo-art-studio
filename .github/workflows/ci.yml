@@ -30,6 +30,7 @@ jobs:
     env:
       ART_STUDIO_EXPECTED_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_sha || github.sha }}
       ART_STUDIO_REQUEST_SOURCE: ${{ github.event_name == 'workflow_dispatch' && inputs.request_source || 'github-main-push' }}
+      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/python-pycache
     steps:
       - name: Validate governed mainline trigger
         shell: bash
@@ -114,6 +115,14 @@ jobs:
       - name: Verify Brass exact-byte evidence and create-only publication
         run: python tools/verify_brass_creative_evaluation.py
 
+      - name: Prove Python bytecode remains outside the repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "${PYTHONPYCACHEPREFIX}"
+          test ! -e tools/__pycache__
+          test -z "$(find tools -type f -name '*.pyc' -print -quit)"
+
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
@@ -153,6 +162,8 @@ jobs:
           set -euo pipefail
           test -n "${ART_STUDIO_LOCKFILE_SHA256:-}"
           [[ "$(sha256sum pnpm-lock.yaml | awk '{print $1}')" == "${ART_STUDIO_LOCKFILE_SHA256}" ]]
+          test ! -e tools/__pycache__
+          test -z "$(find tools -type f -name '*.pyc' -print -quit)"
           git diff --exit-code -- pnpm-lock.yaml
           git diff --exit-code
           test -z "$(git status --porcelain)"
