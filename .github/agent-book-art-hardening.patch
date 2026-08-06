@@ -1,0 +1,600 @@
+diff --git a/scripts/check-image-processing-recipes.mjs b/scripts/check-image-processing-recipes.mjs
+--- a/scripts/check-image-processing-recipes.mjs
++++ b/scripts/check-image-processing-recipes.mjs
+@@ -151,13 +151,23 @@ const pythonCandidates = process.platform === 'win32'
+       ['py', ['-3']],
+     ];
++const pythonSyntaxCheck = [
++  "from pathlib import Path",
++  "from tempfile import TemporaryDirectory",
++  "import py_compile",
++  "import sys",
++  "with TemporaryDirectory(prefix='evavo-art-py-compile-') as output_dir:",
++  "    for index, source_path in enumerate(sys.argv[1:]):",
++  "        output_path = Path(output_dir) / f'{index}.pyc'",
++  "        py_compile.compile(source_path, cfile=str(output_path), doraise=True)",
++].join("\n");
+ let compiled = false;
+ for (const [executable, prefix] of pythonCandidates) {
+   const result = spawnSync(
+     executable,
+     [
+       ...prefix,
+-      '-m',
+-      'py_compile',
++      '-c',
++      pythonSyntaxCheck,
+       'tools/run_art_delivery_optimizer.py',
+       'tools/process_image_with_pillow.py',
+     ],
+diff --git a/packages/providers/src/prompt.ts b/packages/providers/src/prompt.ts
+--- a/packages/providers/src/prompt.ts
++++ b/packages/providers/src/prompt.ts
+@@ -93,6 +93,32 @@ function continuitySection(request: NormalizedProviderCandidateRequest): string[
+   ];
+ }
+ 
++function bookCandidateSetSection(
++  request: NormalizedProviderCandidateRequest,
++): string[] {
++  const metadata =
++    request.metadata !== null &&
++    typeof request.metadata === "object" &&
++    !Array.isArray(request.metadata)
++      ? (request.metadata as Readonly<Record<string, unknown>>)
++      : undefined;
++  if (
++    request.candidateCount <= 1 ||
++    metadata?.completePairwiseComparisonRequired !== true ||
++    metadata.independentSetReviewRequired !== true ||
++    metadata.generatedTextProhibited !== true
++  ) {
++    return [];
++  }
++  return [
++    "BOOK CANDIDATE-SET DIVERSITY CONTRACT",
++    `- Return exactly ${request.candidateCount} separate candidate files in this one provider attempt.`,
++    "- Every candidate must be a genuinely different visual solution: change the core concept, composition, silhouette, focal hierarchy and negative-space strategy while preserving every manuscript, era, identity, rights, print and style constraint.",
++    "- Do not return palette swaps, crop changes, trivial camera nudges, prop substitutions, seed-only variations or the same template with cosmetic changes.",
++    "- Do not combine alternatives into a contact sheet, comparison grid, storyboard or multi-panel image. Each returned file must contain one complete candidate only.",
++  ];
++}
++
+ function backgroundSection(request: NormalizedProviderCandidateRequest): string[] {
+   if (request.target.transparency === "opaque") {
+     return [
+@@ -130,6 +156,7 @@ function backgroundSection(request: NormalizedProviderCandidateRequest): string[
+ export function compileProviderCandidatePrompt(
+   request: NormalizedProviderCandidateRequest,
+ ): CompiledProviderPrompt {
++  const candidateSetSection = bookCandidateSetSection(request);
+   const lines = [
+     "EVAVO ART STUDIO — GOVERNED CANDIDATE CONTRACT",
+     "",
+@@ -150,5 +177,7 @@ export function compileProviderCandidatePrompt(
+     "",
+     ...continuitySection(request),
+     "",
+-    "STYLE ENVELOPE",
++    ...candidateSetSection,
++    ...(candidateSetSection.length ? [""] : []),
++    "STYLE ENVELOPE",
+     `- Style name: ${request.style.styleName}.`,
+diff --git a/packages/providers/test/providers.test.mjs b/packages/providers/test/providers.test.mjs
+--- a/packages/providers/test/providers.test.mjs
++++ b/packages/providers/test/providers.test.mjs
+@@ -151,6 +151,44 @@ test("compiled prompt preserves shot and layer boundaries", async () => {
+   assert.equal(providerRequestSha256(normalized).length, 64);
+ });
+ 
++test("governed Book candidate sets demand genuinely distinct non-template alternatives", () => {
++  const normalized = validateProviderCandidateRequest(
++    request({
++      assetKind: "illustration",
++      continuityPhase: "independent",
++      target: {
++        width: 1600,
++        height: 900,
++        transparency: "opaque",
++        outputFormat: "png",
++      },
++      background: { strategy: "opaque-source" },
++      candidateCount: 4,
++      references: [],
++      metadata: {
++        candidateSetId: "candidate-set-1234567890abcdef",
++        candidateCount: 4,
++        completePairwiseComparisonRequired: true,
++        independentSetReviewRequired: true,
++        generatedTextProhibited: true,
++        automaticSelectionAllowed: false,
++        publicationPerformed: false,
++      },
++    }),
++  );
++  const compiled = compileProviderCandidatePrompt(normalized);
++  for (const token of [
++    "BOOK CANDIDATE-SET DIVERSITY CONTRACT",
++    "Return exactly 4 separate candidate files",
++    "genuinely different visual solution",
++    "palette swaps",
++    "same template with cosmetic changes",
++    "Each returned file must contain one complete candidate only",
++  ]) {
++    assert.ok(compiled.text.includes(token), `missing diversity contract: ${token}`);
++  }
++});
++
+ test("registry rejects native-alpha work for GPT Image 2 but accepts chroma-key work", async () => {
+   const fixture = await artifactFixture();
+   const openai = new OpenAIImageProviderAdapter({
+diff --git a/packages/contracts/src/book-art-candidate-set.ts b/packages/contracts/src/book-art-candidate-set.ts
+--- a/packages/contracts/src/book-art-candidate-set.ts
++++ b/packages/contracts/src/book-art-candidate-set.ts
+@@ -548,6 +548,7 @@ export interface BookArtCandidateSetConsensusInputV1 {
+   contract: typeof BOOK_ART_CANDIDATE_SET_CONTRACT;
+   candidateSetId: string;
+   workOrderFingerprintSha256: string;
++  expectedCandidateCount: number;
+   providerRunFingerprint: string;
+   candidates: BookArtCandidateSetConsensusCandidateV1[];
+   pairwiseComparisons: BookArtCandidateSetPairwiseComparisonV1[];
+@@ -575,6 +576,7 @@ export interface BookArtCandidateSetConsensusEvaluationV1 {
+   status: "needs_work" | "ready_for_docs_quality_gate";
+   candidateSetId: string;
+   workOrderFingerprintSha256: string;
++  expectedCandidateCount: number;
+   providerRunFingerprint: string;
+   candidates: BookArtCandidateSetConsensusCandidateV1[];
+   pairwiseComparisons: BookArtCandidateSetPairwiseComparisonV1[];
+@@ -644,6 +646,13 @@ export function evaluateBookArtCandidateSetConsensus(
+     "workOrderFingerprintSha256",
+     blockers,
+   );
++  const expectedCandidateCount = integer(
++    input.expectedCandidateCount,
++    BOOK_ART_CANDIDATE_SET_MINIMUM_CANDIDATES,
++    BOOK_ART_CANDIDATE_SET_MAXIMUM_CANDIDATES,
++    "expectedCandidateCount",
++    blockers,
++  );
+   const providerRunFingerprint = digest(
+     input.providerRunFingerprint,
+     "providerRunFingerprint",
+@@ -675,6 +684,14 @@ export function evaluateBookArtCandidateSetConsensus(
+       `Candidate-set consensus requires ${BOOK_ART_CANDIDATE_SET_MINIMUM_CANDIDATES} to ${BOOK_ART_CANDIDATE_SET_MAXIMUM_CANDIDATES} candidates.`,
+     );
+   }
++  if (
++    Array.isArray(input.candidates) &&
++    candidateValues.length !== expectedCandidateCount
++  ) {
++    blockers.push(
++      `Candidate-set consensus requires exactly ${expectedCandidateCount} candidates from the governed work order.`,
++    );
++  }
+   const candidates = candidateValues
+     .map((entry, index) =>
+       parseConsensusCandidate(entry, index, blockers, requiredActions),
+@@ -785,6 +802,7 @@ export function evaluateBookArtCandidateSetConsensus(
+     status,
+     candidateSetId,
+     workOrderFingerprintSha256,
++    expectedCandidateCount,
+     providerRunFingerprint,
+     candidates,
+     pairwiseComparisons: comparisons,
+@@ -873,6 +891,13 @@ export function validateBookArtCandidateSetConsensusEvaluation(
+   const candidates = Array.isArray(evaluation.candidates)
+     ? evaluation.candidates
+     : [];
++  const expectedCandidateCount = integer(
++    evaluation.expectedCandidateCount,
++    BOOK_ART_CANDIDATE_SET_MINIMUM_CANDIDATES,
++    BOOK_ART_CANDIDATE_SET_MAXIMUM_CANDIDATES,
++    "expectedCandidateCount",
++    issues,
++  );
+   if (
+     candidates.length < BOOK_ART_CANDIDATE_SET_MINIMUM_CANDIDATES ||
+     candidates.length > BOOK_ART_CANDIDATE_SET_MAXIMUM_CANDIDATES
+@@ -880,6 +905,12 @@ export function validateBookArtCandidateSetConsensusEvaluation(
+   ) {
+     issues.push("Candidate-set consensus candidate count is invalid.");
+   }
++  if (
++    Array.isArray(evaluation.candidates) &&
++    candidates.length !== expectedCandidateCount
++  ) {
++    issues.push("Candidate-set evaluation does not contain the exact governed candidate count.");
++  }
+   if (
+     !Array.isArray(evaluation.candidateIds) ||
+     canonical(evaluation.candidateIds) !==
+@@ -922,6 +953,49 @@ export function validateBookArtCandidateSetConsensusEvaluation(
+   ) {
+     issues.push("Ready candidate-set consensus cannot retain required actions.");
+   }
++  const replay = evaluateBookArtCandidateSetConsensus({
++    outputKind: "evavo_art_book_candidate_set_consensus_input",
++    schemaVersion: BOOK_ART_CANDIDATE_SET_SCHEMA_VERSION,
++    contract: BOOK_ART_CANDIDATE_SET_CONTRACT,
++    candidateSetId: evaluation.candidateSetId,
++    workOrderFingerprintSha256: evaluation.workOrderFingerprintSha256,
++    expectedCandidateCount: evaluation.expectedCandidateCount,
++    providerRunFingerprint: evaluation.providerRunFingerprint,
++    candidates: evaluation.candidates,
++    pairwiseComparisons: evaluation.pairwiseComparisons,
++    setReviewerId: evaluation.setReviewerId,
++    setReviewMethod: evaluation.setReviewMethod,
++    machineOnlyDecision: evaluation.machineOnlyDecision,
++    requestedAt: "1970-01-01T00:00:00.000Z",
++    requestedBy: "candidate-set-evaluation-validator",
++    providerCallAllowed: false,
++    reviewerFallbackAllowed: false,
++    automaticSelectionAllowed: false,
++    automaticPromotionAllowed: false,
++    bookUseBindingAllowed: false,
++    publicationAllowed: false,
++  });
++  if (replay.status === "blocked" || !replay.evaluation) {
++    issues.push(
++      ...replay.blockers.map(
++        (issue) => `Candidate-set semantic replay: ${issue}`,
++      ),
++    );
++  } else {
++    const {
++      evaluationFingerprint: _observedReplayFingerprint,
++      ...observedReplay
++    } = evaluation as unknown as BookArtCandidateSetConsensusEvaluationV1;
++    const {
++      evaluationFingerprint: _expectedReplayFingerprint,
++      ...expectedReplay
++    } = replay.evaluation;
++    if (canonical(observedReplay) !== canonical(expectedReplay)) {
++      issues.push(
++        "Candidate-set consensus evaluation differs from canonical semantic replay.",
++      );
++    }
++  }
+   const observed = digest(
+     evaluation.evaluationFingerprint,
+     "evaluationFingerprint",
+@@ -1002,6 +1076,7 @@ function parseConsensusCandidate(
+     visualConsensus,
+     {
+       candidateId,
++      candidateProducerId,
+       candidateContentSha256,
+       candidateArtifactFingerprint,
+       planFingerprint,
+@@ -1033,6 +1108,7 @@ function validateVisualConsensus(
+   value: BookIllustrationVisualConsensusEvaluationV1 | undefined,
+   expected: Readonly<{
+     candidateId: string;
++    candidateProducerId: string;
+     candidateContentSha256: string;
+     candidateArtifactFingerprint: string;
+     planFingerprint: string;
+@@ -1072,6 +1148,104 @@ function validateVisualConsensus(
+   ) {
+     blockers.push(`${label}.visualConsensus belongs to different candidate evidence.`);
+   }
++  const reviewFingerprints = stringArray(
++    source.reviewFingerprints,
++    `${label}.visualConsensus.reviewFingerprints`,
++    blockers,
++    2,
++    16,
++  ).map((entry, index) =>
++    digest(
++      entry,
++      `${label}.visualConsensus.reviewFingerprints[${index}]`,
++      blockers,
++    ),
++  );
++  const passingReviewerProducerIds = stringArray(
++    source.passingReviewerProducerIds,
++    `${label}.visualConsensus.passingReviewerProducerIds`,
++    blockers,
++    0,
++    16,
++  ).map((entry, index) =>
++    safeId(
++      entry,
++      `${label}.visualConsensus.passingReviewerProducerIds[${index}]`,
++      blockers,
++    ),
++  );
++  const dissentingReviewerProducerIds = stringArray(
++    source.dissentingReviewerProducerIds,
++    `${label}.visualConsensus.dissentingReviewerProducerIds`,
++    blockers,
++    0,
++    16,
++  ).map((entry, index) =>
++    safeId(
++      entry,
++      `${label}.visualConsensus.dissentingReviewerProducerIds[${index}]`,
++      blockers,
++    ),
++  );
++  const reviewerProducerIds = [
++    ...passingReviewerProducerIds,
++    ...dissentingReviewerProducerIds,
++  ];
++  if (duplicates(reviewFingerprints).length) {
++    blockers.push(`${label}.visualConsensus review fingerprints are duplicated.`);
++  }
++  if (duplicates(reviewerProducerIds).length) {
++    blockers.push(`${label}.visualConsensus reviewer producers are duplicated.`);
++  }
++  if (reviewerProducerIds.includes(expected.candidateProducerId)) {
++    blockers.push(`${label}.visualConsensus is not independent from the candidate producer.`);
++  }
++  if (reviewFingerprints.length !== reviewerProducerIds.length) {
++    blockers.push(`${label}.visualConsensus reviewer summary count is inconsistent.`);
++  }
++  const minimumIndependentReviewers = integer(
++    source.minimumIndependentReviewers,
++    2,
++    16,
++    `${label}.visualConsensus.minimumIndependentReviewers`,
++    blockers,
++  );
++  const minimumConsensusBasisPoints = integer(
++    source.minimumConsensusBasisPoints,
++    5_000,
++    10_000,
++    `${label}.visualConsensus.minimumConsensusBasisPoints`,
++    blockers,
++  );
++  const consensusBasisPoints = integer(
++    source.consensusBasisPoints,
++    0,
++    10_000,
++    `${label}.visualConsensus.consensusBasisPoints`,
++    blockers,
++  );
++  const expectedConsensusBasisPoints = Math.floor(
++    (passingReviewerProducerIds.length * 10_000) /
++      Math.max(reviewerProducerIds.length, 1),
++  );
++  if (consensusBasisPoints !== expectedConsensusBasisPoints) {
++    blockers.push(`${label}.visualConsensus consensus basis points are inconsistent.`);
++  }
++  if (
++    source.consensusReached === true &&
++    (passingReviewerProducerIds.length < minimumIndependentReviewers ||
++      consensusBasisPoints < minimumConsensusBasisPoints)
++  ) {
++    blockers.push(`${label}.visualConsensus cannot claim consensus without the required independent passing reviewers.`);
++  }
++  if (
++    typeof source.minimumPassingReviewerScore !== "number" ||
++    !Number.isFinite(source.minimumPassingReviewerScore) ||
++    source.minimumPassingReviewerScore < 0 ||
++    source.minimumPassingReviewerScore > 100
++  ) {
++    blockers.push(`${label}.visualConsensus minimumPassingReviewerScore is invalid.`);
++  }
+   if (
+     source.providerCallPerformed !== false ||
+     source.reviewerFallbackAllowed !== false ||
+@@ -1315,6 +1489,7 @@ const CONSENSUS_INPUT_KEYS = new Set([
+   "contract",
+   "candidateSetId",
+   "workOrderFingerprintSha256",
++  "expectedCandidateCount",
+   "providerRunFingerprint",
+   "candidates",
+   "pairwiseComparisons",
+@@ -1386,6 +1561,7 @@ const CONSENSUS_EVALUATION_KEYS = new Set([
+   "status",
+   "candidateSetId",
+   "workOrderFingerprintSha256",
++  "expectedCandidateCount",
+   "providerRunFingerprint",
+   "candidates",
+   "pairwiseComparisons",
+diff --git a/packages/contracts/test/book-art-candidate-set.test.mjs b/packages/contracts/test/book-art-candidate-set.test.mjs
+--- a/packages/contracts/test/book-art-candidate-set.test.mjs
++++ b/packages/contracts/test/book-art-candidate-set.test.mjs
+@@ -6,6 +6,7 @@ import {
+   BOOK_ART_CANDIDATE_SET_CONTRACT,
+   BOOK_ART_CANDIDATE_SET_NEAR_DUPLICATE_BASIS_POINTS,
+   evaluateBookArtCandidateSetConsensus,
++  fingerprintBookArtCandidateSetConsensusEvaluation,
+   fingerprintBookIllustrationValue,
+   listBookArtCandidateSetCapabilities,
+   validateBookArtCandidateSetConsensusEvaluation,
+@@ -89,6 +90,7 @@ function consensusInput() {
+     contract: BOOK_ART_CANDIDATE_SET_CONTRACT,
+     candidateSetId: "candidate-set-1234567890abcdef",
+     workOrderFingerprintSha256: digest("a"),
++    expectedCandidateCount: 3,
+     providerRunFingerprint: digest("b"),
+     candidates: [candidate(1), candidate(2), candidate(3)],
+     pairwiseComparisons: [pair(1, 2), pair(1, 3, 10), pair(2, 3, 20)],
+@@ -158,6 +160,14 @@ test("blocks missing or duplicated pair coverage", () => {
+   assert.match(duplicatedResult.blockers.join("\n"), /duplicated/i);
+ });
+ 
++test("blocks candidate review that omits outputs from the governed set", () => {
++  const incomplete = consensusInput();
++  incomplete.expectedCandidateCount = 4;
++  const result = evaluateBookArtCandidateSetConsensus(incomplete);
++  assert.equal(result.status, "blocked");
++  assert.match(result.blockers.join("\n"), /exactly 4 candidates/i);
++});
++
+ test("blocks machine-only approval and producer self-review", () => {
+   const machineOnly = consensusInput();
+   machineOnly.machineOnlyDecision = true;
+@@ -178,6 +188,17 @@ test("blocks stale per-candidate consensus evidence", () => {
+   assert.match(result.blockers.join("\n"), /fingerprint|different candidate/i);
+ });
+ 
++test("blocks candidate-producer participation hidden inside visual consensus", () => {
++  const input = consensusInput();
++  const consensus = input.candidates[0].visualConsensus;
++  consensus.passingReviewerProducerIds[0] = "openai-gpt-image";
++  const { evaluationFingerprint: _discarded, ...unsigned } = consensus;
++  consensus.evaluationFingerprint = fingerprintBookIllustrationValue(unsigned);
++  const result = evaluateBookArtCandidateSetConsensus(input);
++  assert.equal(result.status, "blocked");
++  assert.match(result.blockers.join("\n"), /not independent from the candidate producer/i);
++});
++
+ test("returns needs_work for template variants", () => {
+   const input = consensusInput();
+   input.candidates[1].conceptFingerprint = input.candidates[0].conceptFingerprint;
+@@ -195,3 +216,17 @@ test("detects candidate-set evaluation tampering", () => {
+     /fingerprint/i,
+   );
+ });
++
++test("rejects freshly re-fingerprinted forged ready evaluations", () => {
++  const result = evaluateBookArtCandidateSetConsensus(consensusInput());
++  assert.ok(result.evaluation);
++  const forged = structuredClone(result.evaluation);
++  forged.pairwiseComparisons[0].overallSimilarityBasisPoints =
++    BOOK_ART_CANDIDATE_SET_NEAR_DUPLICATE_BASIS_POINTS;
++  forged.evaluationFingerprint =
++    fingerprintBookArtCandidateSetConsensusEvaluation(forged);
++  assert.match(
++    validateBookArtCandidateSetConsensusEvaluation(forged).join("\n"),
++    /canonical semantic replay/i,
++  );
++});
+diff --git a/scripts/check-book-art-candidate-set.mjs b/scripts/check-book-art-candidate-set.mjs
+--- a/scripts/check-book-art-candidate-set.mjs
++++ b/scripts/check-book-art-candidate-set.mjs
+@@ -13,5 +13,8 @@ const required = {
+   runtimePackage: "packages/book-art-runtime/package.json",
+   runtimeTest: "packages/book-art-runtime/test/candidate-set-runtime.test.mjs",
++  providerPrompt: "packages/providers/src/prompt.ts",
++  providerTest: "packages/providers/test/providers.test.mjs",
++  recipeCheck: "scripts/check-image-processing-recipes.mjs",
+   workflow: ".github/workflows/book-art-candidate-set.yml",
+   docs: "docs/book-art-candidate-set.md",
+ };
+@@ -37,6 +40,6 @@ function reject(source, token, label) {
+ }
+ if (!failures.length) {
+-  const implementation = `${sources.contract}\n${sources.canonicalContract}\n${sources.runtime}`;
++  const implementation = `${sources.contract}\n${sources.canonicalContract}\n${sources.runtime}\n${sources.providerPrompt}`;
+   for (const token of [
+     "evavo_book_art_candidate_set_production_v1",
+     "evavo_book_art_candidate_set_provider_runtime_v1",
+@@ -53,6 +56,9 @@ if (!failures.length) {
+     "completePairwiseComparisonRequired: true",
+     "independentSetReviewRequired: true",
+     "generatedTextProhibited: true",
++    "expectedCandidateCount",
++    "BOOK CANDIDATE-SET DIVERSITY CONTRACT",
++    "canonical semantic replay",
+     "oneProviderAttemptForEntireSet: true",
+     "providerFallbackAllowed: false",
+     "automaticSelectionAllowed: false",
+@@ -94,11 +100,22 @@ if (!failures.length) {
+     "candidate-set workflow dependency build",
+   );
+   for (const token of [
++    "omits outputs from the governed set",
+     "near duplicates",
+     "machine-only",
+     "producer self-review",
++    "candidate-producer participation hidden inside visual consensus",
+     "missing or duplicated pair coverage",
++    "freshly re-fingerprinted forged ready evaluations",
+   ]) expect(sources.contractTest, token, "candidate-set attacks");
++  for (const token of [
++    "genuinely distinct non-template alternatives",
++    "same template with cosmetic changes",
++  ]) expect(sources.providerTest, token, "provider prompt attacks");
++  for (const token of [
++    "TemporaryDirectory",
++    "py_compile.compile",
++  ]) expect(sources.recipeCheck, token, "isolated Python syntax validation");
+   for (const token of [
+     "exact four-output set",
+     "without creating four provider attempts",
+diff --git a/.github/workflows/book-art-candidate-set.yml b/.github/workflows/book-art-candidate-set.yml
+--- a/.github/workflows/book-art-candidate-set.yml
++++ b/.github/workflows/book-art-candidate-set.yml
+@@ -13,5 +13,8 @@ on:
+       - "packages/book-art-runtime/src/candidate-set.ts"
+       - "packages/book-art-runtime/package.json"
+       - "packages/book-art-runtime/test/candidate-set-runtime.test.mjs"
++      - "packages/providers/src/prompt.ts"
++      - "packages/providers/test/providers.test.mjs"
++      - "scripts/check-image-processing-recipes.mjs"
+       - "scripts/check-book-art-candidate-set.mjs"
+       - "docs/book-art-candidate-set.md"
+@@ -48,6 +51,11 @@ jobs:
+       - name: Check permanent candidate-set boundary
+         run: node scripts/check-book-art-candidate-set.mjs
+ 
++      - name: Check deterministic recipe syntax without source mutation
++        run: |
++          node scripts/check-image-processing-recipes.mjs
++          test ! -d tools/__pycache__
++
+       - name: Build exact Art Studio domain dependencies
+         run: pnpm run build:domain
+ 
+@@ -56,15 +64,28 @@ jobs:
+         run: |
+           node --test packages/contracts/test/book-art-candidate-set.test.mjs
+           node --test packages/book-art-runtime/test/candidate-set-runtime.test.mjs
++          node --test packages/providers/test/providers.test.mjs
+ 
+       - name: Run strict package typechecks
+         run: |
+           pnpm --filter @evavo/art-contracts typecheck
+           pnpm --filter @evavo/art-book-runtime typecheck
++          pnpm --filter @evavo/art-providers typecheck
+ 
+       - name: Remove bounded generated lock and prove clean source
+         if: always()
++        shell: bash
+         run: |
++          set -euo pipefail
+           rm -f pnpm-lock.yaml
++          status="$(git status --porcelain=v1 --untracked-files=all)"
++          if [[ -n "$status" ]]; then
++            echo "Detected out-of-band source drift after verification:"
++            printf '%s\n' "$status"
++            echo "Tracked diff summary:"
++            git diff --stat || true
++            echo "Tracked diff:"
++            git diff --no-ext-diff --text || true
++            exit 1
++          fi
+           git diff --exit-code
+-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+diff --git a/docs/book-art-candidate-set.md b/docs/book-art-candidate-set.md
+--- a/docs/book-art-candidate-set.md
++++ b/docs/book-art-candidate-set.md
+@@ -18,7 +18,9 @@
+ 
+ A candidate-set work order requests 3 to 8 alternatives, defaulting to 4. The provider worker receives one standard `art.candidate.generate` job with `candidateCount` set to the exact required number. The existing provider orchestrator already rejects partial output counts, so a provider returning three files for a four-file request fails the job rather than creating an incomplete review set.
+ 
+-The entire set uses one provider attempt, one allow-listed adapter and no fallback. An ambiguous result is not automatically retried. Every output remains an unapproved intermediate artifact.
++The entire set uses one provider attempt, one allow-listed adapter and no fallback. An ambiguous result is not automatically retried. Every output remains an unapproved intermediate artifact. The provider prompt explicitly requires separate non-template alternatives with materially different concepts, compositions, silhouettes, focal hierarchies and negative-space strategies; palette swaps, crop changes, camera nudges, prop substitutions and seed-only variations are prohibited.
++
++The consensus request carries the exact governed candidate count. Reviewing only a convenient subset is a blocking error even when the submitted subset is otherwise technically valid.
+ 
+ ## Quality boundary
+ 
+@@ -33,7 +35,7 @@
+ 7. The set reviewer must be human or human with machine assistance and cannot be a candidate producer.
+ 8. Machine-only approval is prohibited.
+ 
+-The set-level operation returns only `ready_for_docs_quality_gate`. It cannot select a candidate, promote Art, create a Book-use binding or publish anything.
++The set-level operation returns only `ready_for_docs_quality_gate`. It cannot select a candidate, promote Art, create a Book-use binding or publish anything. Downstream validation replays the complete semantic gate from the retained candidate and pairwise evidence, so a modified result cannot become valid merely by recomputing its SHA-256 fingerprint.
+ 
+ ## Runtime use
+ 
