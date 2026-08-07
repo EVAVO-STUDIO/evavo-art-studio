@@ -22,6 +22,11 @@ const MAXIMUM_ROUTING_REASON_LENGTH = 1_000;
 
 const CAPABILITIES = new Set<string>(PROVIDER_CAPABILITIES);
 
+export interface ProviderExecutionRoutingPlan {
+  readonly inspection: ProviderRoutingInspection;
+  readonly eligibleAdapters: readonly ProviderRankedAdapter[];
+}
+
 function invalidAdapter(message: string): never {
   throw new ProviderError(
     "PROVIDER_ADAPTER_INVALID",
@@ -343,6 +348,102 @@ function decisionFor(
   };
 }
 
+function snapshotRankedEntries(
+  request: NormalizedProviderCandidateRequest,
+  ranked: readonly ProviderRankedAdapter[],
+): readonly ProviderRankedAdapter[] {
+  if (!Array.isArray(ranked)) {
+    invalidRouting("Provider routing input must be one ranked adapter array.");
+  }
+  let rankedEntries: readonly ProviderRankedAdapter[];
+  try {
+    rankedEntries = [...ranked];
+  } catch {
+    invalidRouting("Provider routing input could not be snapshotted safely.");
+  }
+
+  const seenAdapterIds = new Set<string>();
+  let ineligibleEncountered = false;
+  const snapshots = rankedEntries.map((entry, index) => {
+    if (!entry || typeof entry !== "object") {
+      invalidRouting(`Provider routing entry ${index + 1} is invalid.`);
+    }
+    let adapterInput: ProviderAdapter;
+    let decisionInput: ProviderSelectionDecision;
+    try {
+      adapterInput = entry.adapter;
+      decisionInput = entry.decision;
+    } catch {
+      invalidRouting(`Provider routing entry ${index + 1} could not be read safely.`);
+    }
+
+    const adapter = snapshotAdapter(adapterInput);
+    const descriptor = adapter.descriptor;
+    if (seenAdapterIds.has(descriptor.id)) {
+      invalidRouting(
+        `Provider routing contains duplicate adapter ${descriptor.id}.`,
+      );
+    }
+    seenAdapterIds.add(descriptor.id);
+
+    const decision = snapshotDecision(
+      decisionInput,
+      descriptor,
+      index + 1,
+    );
+    const staticDecision = decisionFor(adapter, request).decision;
+    if (decision.eligible && !staticDecision.eligible) {
+      invalidRouting(
+        `Provider routing cannot mark adapter ${descriptor.id} eligible because ${staticDecision.reasons.join("; ")}.`,
+      );
+    }
+    if (ineligibleEncountered && decision.eligible) {
+      invalidRouting(
+        "Eligible provider adapters must precede ineligible adapters in routing order.",
+      );
+    }
+    if (!decision.eligible) ineligibleEncountered = true;
+
+    return Object.freeze({ adapter, decision });
+  });
+  return Object.freeze(snapshots);
+}
+
+function inspectionFor(
+  request: NormalizedProviderCandidateRequest,
+  entries: readonly ProviderRankedAdapter[],
+): ProviderRoutingInspection {
+  const adapters = Object.freeze(
+    entries.map((entry) =>
+      Object.freeze({
+        descriptor: entry.adapter.descriptor,
+        decision: entry.decision,
+      }),
+    ),
+  );
+  const eligibleAdapterIds = Object.freeze(
+    entries
+      .filter((entry) => entry.decision.eligible)
+      .map((entry) => entry.adapter.descriptor.id),
+  );
+  const required = Object.freeze([...requiredCapabilities(request)]);
+  return Object.freeze({
+    schemaVersion: "1.0",
+    protocolVersion: PROVIDER_PROTOCOL_VERSION,
+    requestId: request.requestId,
+    requestSha256: providerRequestSha256(request),
+    requiredCapabilities: required,
+    adapters,
+    eligibleAdapterIds,
+    ...(eligibleAdapterIds[0] === undefined
+      ? {}
+      : { firstEligibleAdapterId: eligibleAdapterIds[0] }),
+    outcome: eligibleAdapterIds.length ? "eligible" : "blocked",
+    fallbackAllowed: request.selection.allowFallback,
+    providerCallPerformedByInspection: false,
+  });
+}
+
 export class ProviderRegistry implements ProviderRegistryLike {
   readonly #adapters: readonly ProviderAdapter[];
 
@@ -406,83 +507,31 @@ export function providerRequiredCapabilities(
   return requiredCapabilities(request);
 }
 
+export function compileProviderExecutionRoutingPlan(
+  request: NormalizedProviderCandidateRequest,
+  ranked: readonly ProviderRankedAdapter[],
+): ProviderExecutionRoutingPlan {
+  const entries = snapshotRankedEntries(request, ranked);
+  const inspection = inspectionFor(request, entries);
+  const eligibleAdapters = Object.freeze(
+    entries.filter((entry) => entry.decision.eligible),
+  );
+  return Object.freeze({ inspection, eligibleAdapters });
+}
+
 export function compileProviderRoutingInspection(
   request: NormalizedProviderCandidateRequest,
   ranked: readonly ProviderRankedAdapter[],
 ): ProviderRoutingInspection {
-  if (!Array.isArray(ranked)) {
-    invalidRouting("Provider routing input must be one ranked adapter array.");
-  }
-  let rankedEntries: readonly ProviderRankedAdapter[];
-  try {
-    rankedEntries = [...ranked];
-  } catch {
-    invalidRouting("Provider routing input could not be snapshotted safely.");
-  }
-  const seenAdapterIds = new Set<string>();
-  let ineligibleEncountered = false;
-  const adapters = rankedEntries.map((entry, index) => {
-    if (!entry || typeof entry !== "object") {
-      invalidRouting(`Provider routing entry ${index + 1} is invalid.`);
-    }
-    let adapter: ProviderAdapter;
-    let decisionInput: ProviderSelectionDecision;
-    try {
-      adapter = entry.adapter;
-      decisionInput = entry.decision;
-    } catch {
-      invalidRouting(`Provider routing entry ${index + 1} could not be read safely.`);
-    }
-    if (!adapter || typeof adapter !== "object") {
-      invalidRouting(`Provider routing entry ${index + 1} is invalid.`);
-    }
-    const descriptor = snapshotDescriptor(adapter.descriptor);
-    if (seenAdapterIds.has(descriptor.id)) {
-      invalidRouting(
-        `Provider routing contains duplicate adapter ${descriptor.id}.`,
-      );
-    }
-    seenAdapterIds.add(descriptor.id);
-    const decision = snapshotDecision(
-      decisionInput,
-      descriptor,
-      index + 1,
-    );
-    if (ineligibleEncountered && decision.eligible) {
-      invalidRouting(
-        "Eligible provider adapters must precede ineligible adapters in routing order.",
-      );
-    }
-    if (!decision.eligible) ineligibleEncountered = true;
-    return Object.freeze({ descriptor, decision });
-  });
-  const frozenAdapters = Object.freeze(adapters);
-  const eligibleAdapterIds = Object.freeze(
-    frozenAdapters
-      .filter((entry) => entry.decision.eligible)
-      .map((entry) => entry.descriptor.id),
-  );
-  const required = Object.freeze([...requiredCapabilities(request)]);
-  return Object.freeze({
-    schemaVersion: "1.0",
-    protocolVersion: PROVIDER_PROTOCOL_VERSION,
-    requestId: request.requestId,
-    requestSha256: providerRequestSha256(request),
-    requiredCapabilities: required,
-    adapters: frozenAdapters,
-    eligibleAdapterIds,
-    ...(eligibleAdapterIds[0] === undefined
-      ? {}
-      : { firstEligibleAdapterId: eligibleAdapterIds[0] }),
-    outcome: eligibleAdapterIds.length ? "eligible" : "blocked",
-    fallbackAllowed: request.selection.allowFallback,
-    providerCallPerformedByInspection: false,
-  });
+  return compileProviderExecutionRoutingPlan(request, ranked).inspection;
 }
 
 export function inspectProviderCandidateRouting(
   request: NormalizedProviderCandidateRequest,
   registry: ProviderRegistryLike,
 ): ProviderRoutingInspection {
-  return compileProviderRoutingInspection(request, registry.rank(request));
+  return compileProviderExecutionRoutingPlan(
+    request,
+    registry.rank(request),
+  ).inspection;
 }
