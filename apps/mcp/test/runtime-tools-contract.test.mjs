@@ -13,6 +13,7 @@ test("MCP runtime tools remain governed and write gated", async () => {
     "EVAVO_ART_ARTIFACT_ROOT",
     "EVAVO_ART_ALLOWED_ROOTS",
     "LocalRuntimeRepository",
+    "RuntimeError",
     "LocalArtifactStore",
     "assertPathWithinAllowedRoots",
     '"submit_art_runtime_jobs"',
@@ -24,9 +25,20 @@ test("MCP runtime tools remain governed and write gated", async () => {
     '"inspect_artifact_record"',
     '"manage_artifact_reference"',
     "expectedGeneration",
+    'current?.spec.labels.migrationMode === "book-art-shadow-candidate"',
+    '"RUNTIME_REDRIVE_POLICY_FORBIDDEN"',
+    "immutable at one provider attempt and cannot be redriven",
   ]) {
     assert.ok(source.includes(token), `missing runtime MCP token: ${token}`);
   }
+
+  const readBeforeRedrive = source.indexOf("const current = await runtime.get(jobId);");
+  const policyBeforeRedrive = source.indexOf("RUNTIME_REDRIVE_POLICY_FORBIDDEN");
+  const redrive = source.indexOf("await runtime.redrive(");
+  assert.ok(readBeforeRedrive >= 0, "redrive must inspect the durable job first");
+  assert.ok(policyBeforeRedrive > readBeforeRedrive, "Book Art policy check must follow the durable read");
+  assert.ok(redrive > policyBeforeRedrive, "generic redrive must remain behind the Book Art policy check");
+
   for (const forbidden of [
     "child_process",
     "exec(",
