@@ -7,7 +7,9 @@ import {
 } from "@evavo/art-artifacts";
 
 import {
+  PROVIDER_CAPABILITIES,
   PROVIDER_PROTOCOL_VERSION,
+  PROVIDER_REFERENCE_CAPABILITY_REQUIREMENTS,
   ProviderError,
   type NormalizedProviderCandidateReference,
   type NormalizedProviderCandidateRequest,
@@ -130,6 +132,16 @@ function integer(
   return result;
 }
 
+function booleanValue(
+  value: unknown,
+  fallback: boolean,
+  name: string,
+): boolean {
+  if (value === undefined) return fallback;
+  if (typeof value !== "boolean") fail(`${name} must be a boolean.`);
+  return value;
+}
+
 function finite(
   value: unknown,
   fallback: number,
@@ -203,7 +215,7 @@ function reference(
     artifactId: artifactId(value.artifactId, `${name}.artifactId`),
     role: value.role as ProviderReferenceRole,
     strength: finite(value.strength, 1, 0, 2, `${name}.strength`),
-    required: value.required === undefined ? true : value.required === true,
+    required: booleanValue(value.required, true, `${name}.required`),
     ...(note === undefined ? {} : { note }),
   };
 }
@@ -234,6 +246,13 @@ function hasRole(
   role: ProviderReferenceRole,
 ): boolean {
   return values.some((entry) => entry.role === role);
+}
+
+function hasRequiredRole(
+  values: readonly NormalizedProviderCandidateReference[],
+  role: ProviderReferenceRole,
+): boolean {
+  return values.some((entry) => entry.role === role && entry.required);
 }
 
 function enumValue<T extends string>(
@@ -362,22 +381,23 @@ export function validateProviderCandidateRequest(
     (assetKind === "sprite-frame" || assetKind === "sprite-layer") &&
     continuityPhase !== "independent" &&
     continuityPhase !== "identity-master";
-  if (lockedSprite && !hasRole(normalizedReferences, "canonical-identity")) {
-    fail("Continuity-locked sprite work requires a canonical-identity reference.");
+  if (lockedSprite && !hasRequiredRole(normalizedReferences, "canonical-identity")) {
+    fail("Continuity-locked sprite work requires canonical-identity as a required reference.");
   }
   if (
     continuityPhase === "in-between" &&
-    (!hasRole(normalizedReferences, "previous-key-pose") ||
-      !hasRole(normalizedReferences, "next-key-pose"))
+    (!hasRequiredRole(normalizedReferences, "previous-key-pose") ||
+      !hasRequiredRole(normalizedReferences, "next-key-pose"))
   ) {
-    fail("In-between frames require previous-key-pose and next-key-pose references.");
+    fail("In-between frames require previous-key-pose and next-key-pose as required references.");
   }
   if (operation === "inpaint") {
-    if (!hasRole(normalizedReferences, "base-image")) {
-      fail("Inpaint requests require a base-image reference.");
+    if (!hasRequiredRole(normalizedReferences, "base-image")) {
+      fail("Inpaint requests require base-image as a required reference.");
     }
-    if (normalizedReferences.filter((entry) => entry.role === "mask").length !== 1) {
-      fail("Inpaint requests require exactly one mask reference.");
+    const masks = normalizedReferences.filter((entry) => entry.role === "mask");
+    if (masks.length !== 1 || masks[0]?.required !== true) {
+      fail("Inpaint requests require exactly one required mask reference.");
     }
   } else if (hasRole(normalizedReferences, "mask")) {
     fail("Mask references are only valid for inpaint requests.");
@@ -538,8 +558,12 @@ export function providerProtocolSummary(): JsonValue {
     assetKinds: [...ASSET_KINDS],
     continuityPhases: [...PHASES],
     referenceRoles: [...REFERENCE_ROLES],
+    capabilityVocabulary: PROVIDER_CAPABILITIES,
+    requiredReferenceCapabilities: PROVIDER_REFERENCE_CAPABILITY_REQUIREMENTS,
     rules: [
       "Provider outputs are intermediate candidates, never final deliverables.",
+      "Every required semantic reference role adds its declared adapter capability to provider selection.",
+      "Required pose, edge and depth controls are structural controls and cannot be satisfied by generic reference-image capability alone.",
       "Continuity-locked sprite work requires a canonical identity reference.",
       "In-between frames require both neighbouring key poses.",
       "Inpaint work requires one base image and one mask.",

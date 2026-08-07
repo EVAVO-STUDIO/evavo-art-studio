@@ -134,7 +134,9 @@ The default source repository is:
 EVAVO-STUDIO/evavo-3d-studio
 ```
 
-Direction renders become `pose-control` references. Depth renders become `depth-control` references. Materials remain `material-reference` inputs. Rig and camera artifacts remain mandatory provenance for pre-rendered 2.5D work even when they are not themselves image inputs.
+Direction renders become required `pose-control` references. Depth renders become required `depth-control` references. Materials remain required `material-reference` inputs. Rig and camera artifacts remain mandatory provenance for pre-rendered 2.5D work even when they are not themselves image inputs.
+
+Provider routing now treats those labels as real capability claims. A 3D-assisted finalization request cannot fall through to an adapter that merely accepts generic image references: the selected adapter must explicitly declare `pose-control` and, when depth renders are present, `depth-control`. This intentionally fails closed until a structurally capable adapter is configured rather than silently weakening the 2.5D control contract.
 
 Pre-rendered 2.5D production requires:
 

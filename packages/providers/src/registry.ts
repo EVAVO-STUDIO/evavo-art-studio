@@ -1,5 +1,7 @@
 import {
+  PROVIDER_CAPABILITIES,
   PROVIDER_PROTOCOL_VERSION,
+  PROVIDER_REFERENCE_CAPABILITY_REQUIREMENTS,
   ProviderError,
   type NormalizedProviderCandidateRequest,
   type ProviderAdapter,
@@ -11,6 +13,8 @@ import {
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
+const CAPABILITIES = new Set<ProviderCapability>(PROVIDER_CAPABILITIES);
+
 function requiredCapabilities(
   request: NormalizedProviderCandidateRequest,
 ): readonly ProviderCapability[] {
@@ -20,6 +24,12 @@ function requiredCapabilities(
   ]);
   if (request.references.length > 0) required.add("reference-images");
   if (request.references.length > 1) required.add("multiple-reference-images");
+  for (const reference of request.references) {
+    if (!reference.required) continue;
+    const capability =
+      PROVIDER_REFERENCE_CAPABILITY_REQUIREMENTS[reference.role];
+    if (capability !== null) required.add(capability);
+  }
   if (request.references.some((entry) => entry.role === "mask")) {
     required.add("mask");
   }
@@ -75,7 +85,10 @@ function validateDescriptor(descriptor: ProviderAdapterDescriptor): void {
       "permanent",
     );
   }
-  if (!descriptor.models.length || new Set(descriptor.models).size !== descriptor.models.length) {
+  if (
+    !descriptor.models.length ||
+    new Set(descriptor.models).size !== descriptor.models.length
+  ) {
     throw new ProviderError(
       "PROVIDER_ADAPTER_INVALID",
       `Adapter ${descriptor.id} must declare unique supported models.`,
@@ -86,6 +99,16 @@ function validateDescriptor(descriptor: ProviderAdapterDescriptor): void {
     throw new ProviderError(
       "PROVIDER_ADAPTER_INVALID",
       `Adapter ${descriptor.id} declares duplicate capabilities.`,
+      "permanent",
+    );
+  }
+  const unsupportedCapability = descriptor.capabilities.find(
+    (capability) => !CAPABILITIES.has(capability),
+  );
+  if (unsupportedCapability) {
+    throw new ProviderError(
+      "PROVIDER_ADAPTER_INVALID",
+      `Adapter ${descriptor.id} declares unknown capability ${unsupportedCapability}.`,
       "permanent",
     );
   }
@@ -129,7 +152,9 @@ function decisionFor(
     eligible = false;
     reasons.push(`preferred model ${request.selection.preferredModel} is unsupported`);
   }
-  if (!reasons.length) reasons.push("all declared request capabilities are supported");
+  if (!reasons.length) {
+    reasons.push("all declared request capabilities are supported");
+  }
 
   const preferred = request.selection.preferredAdapterId === descriptor.id;
   const score =
