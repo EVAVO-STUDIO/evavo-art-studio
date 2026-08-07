@@ -308,81 +308,87 @@ function normalizedCapabilityList(
 export function normalizeRuntimeWorkerDescriptor(
   input: RuntimeWorkerDescriptor,
 ): RuntimeWorkerDescriptor {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    throw new RuntimeError(
-      "RUNTIME_WORKER_OPTIONS_INVALID",
-      "Worker descriptor must be an object.",
-    );
-  }
+  const code = "RUNTIME_WORKER_OPTIONS_INVALID";
+  const source = runtimeInputRecord(input, "Worker descriptor", code);
   const id = safeName(
-    input.id,
+    readRuntimeInput(source, "id", "worker", code),
     "worker.id",
-    "RUNTIME_WORKER_OPTIONS_INVALID",
+    code,
   );
   const capabilities = normalizedCapabilityList(
-    input.capabilities,
+    readRuntimeInput(source, "capabilities", "worker", code),
     "worker.capabilities",
-    "RUNTIME_WORKER_OPTIONS_INVALID",
+    code,
     512,
   );
-  const queues = input.queues === undefined
+  const queuesInput = readRuntimeInput(source, "queues", "worker", code);
+  const queues = queuesInput === undefined
     ? undefined
     : normalizedCapabilityList(
-        input.queues,
+        queuesInput,
         "worker.queues",
-        "RUNTIME_WORKER_OPTIONS_INVALID",
+        code,
         256,
       );
-  const profileInputs = input.capabilityProfiles ?? [];
-  if (!Array.isArray(profileInputs) || profileInputs.length > 128) {
-    throw new RuntimeError(
-      "RUNTIME_WORKER_OPTIONS_INVALID",
-      "worker.capabilityProfiles must contain no more than 128 profiles.",
-    );
-  }
+  const profileInputsValue = readRuntimeInput(
+    source,
+    "capabilityProfiles",
+    "worker",
+    code,
+  );
+  const profileInputs = profileInputsValue === undefined
+    ? Object.freeze([])
+    : snapshotRuntimeArray(
+        profileInputsValue,
+        "worker.capabilityProfiles",
+        code,
+        128,
+      );
   const profileIds = new Set<string>();
   const capabilityProfiles: RuntimeWorkerCapabilityProfile[] = profileInputs.map(
     (profile, index) => {
-      if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
-        throw new RuntimeError(
-          "RUNTIME_WORKER_OPTIONS_INVALID",
-          `worker.capabilityProfiles[${index}] must be an object.`,
-        );
-      }
+      const profileName = `worker.capabilityProfiles[${index}]`;
+      const profileSource = runtimeInputRecord(profile, profileName, code);
       const profileId = safeName(
-        profile.id,
-        `worker.capabilityProfiles[${index}].id`,
-        "RUNTIME_WORKER_OPTIONS_INVALID",
+        readRuntimeInput(profileSource, "id", profileName, code),
+        `${profileName}.id`,
+        code,
       );
       if (profileIds.has(profileId)) {
         throw new RuntimeError(
-          "RUNTIME_WORKER_OPTIONS_INVALID",
+          code,
           `Worker capability profile is declared more than once: ${profileId}.`,
         );
       }
       profileIds.add(profileId);
       const profileCapabilities = normalizedCapabilityList(
-        profile.capabilities,
-        `worker.capabilityProfiles[${index}].capabilities`,
-        "RUNTIME_WORKER_OPTIONS_INVALID",
+        readRuntimeInput(profileSource, "capabilities", profileName, code),
+        `${profileName}.capabilities`,
+        code,
         256,
       );
       if (!profileCapabilities.length) {
         throw new RuntimeError(
-          "RUNTIME_WORKER_OPTIONS_INVALID",
+          code,
           `Worker capability profile ${profileId} must declare at least one capability.`,
         );
       }
-      return { id: profileId, capabilities: profileCapabilities };
+      return Object.freeze({
+        id: profileId,
+        capabilities: profileCapabilities,
+      });
     },
   );
   capabilityProfiles.sort((left, right) => left.id.localeCompare(right.id));
-  return {
+  const normalized: RuntimeWorkerDescriptor = {
     id,
     capabilities,
-    ...(capabilityProfiles.length ? { capabilityProfiles } : {}),
+    ...(capabilityProfiles.length
+      ? { capabilityProfiles: Object.freeze(capabilityProfiles) }
+      : {}),
     ...(queues === undefined ? {} : { queues }),
   };
+  return freezeRuntimeValue(normalized);
 }
 
 function timestamp(value: unknown, name: string): string | undefined {

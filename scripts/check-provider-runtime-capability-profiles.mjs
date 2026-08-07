@@ -30,13 +30,24 @@ await includes("packages/runtime/src/local-repository.ts", [
   "normalizeRuntimeWorkerDescriptor(request.worker)",
   "workerCanRun(job, capabilities, capabilityProfiles)",
 ]);
-await includes("packages/runtime/src/worker.ts", [
-  "normalizeRuntimeWorkerDescriptor(options.worker)",
+const runtimeWorker = await includes("packages/runtime/src/worker.ts", [
+  "snapshotRuntimeWorkerOptions",
+  "snapshotHandlers",
+  "normalizeRuntimeWorkerDescriptor(",
+  "readWorkerOption(source, \"worker\", \"options\")",
 ]);
+assert.ok(
+  !runtimeWorker.includes("normalizeRuntimeWorkerDescriptor(options.worker)"),
+  "Runtime worker capability profiles must be bound through the immutable option snapshot.",
+);
 await includes("packages/runtime/test/runtime.test.mjs", [
   "one worker capability profile must satisfy the complete job requirement",
   "worker-split-profiles",
   "worker-complete-profile",
+]);
+await includes("packages/runtime/test/worker-options-integrity-security.test.mjs", [
+  "runtime worker descriptors are snapshotted once before scheduling",
+  "runtime worker options bind execution to one immutable handler snapshot",
 ]);
 await includes("apps/worker/src/provider-handlers.ts", [
   "providerRequiredCapabilities(request)",
@@ -87,6 +98,10 @@ await includes(".github/workflows/provider-control-capabilities.yml", [
   "check-provider-runtime-capability-profiles.mjs",
   "packages/runtime/src/**",
   "packages/sprite-supervisor/src/**",
+]);
+await includes(".github/workflows/runtime-worker-options-integrity.yml", [
+  "worker-options-integrity-security.test.mjs",
+  "check-provider-runtime-capability-profiles.mjs",
 ]);
 
 console.log("Provider runtime capability-profile contract passed.");
