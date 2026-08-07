@@ -81,6 +81,15 @@ const REFERENCE_KEYS = new Set([
   "actor",
 ]);
 
+type DescriptorInputSnapshot = Readonly<{
+  mediaType: unknown;
+  storageClass: unknown;
+  fileName: unknown;
+  sourceArtifacts: unknown;
+  labels: unknown;
+  metadata: unknown;
+}>;
+
 function errorCode(error: unknown): string | undefined {
   return error && typeof error === "object" && "code" in error
     ? String((error as NodeJS.ErrnoException).code)
@@ -103,6 +112,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function invalidDescriptor(message: string): never {
   throw new ArtifactStoreError("ARTIFACT_DESCRIPTOR_INVALID", message);
+}
+
+function invalidDescriptorInput(message: string): never {
+  throw new ArtifactStoreError("ARTIFACT_DESCRIPTOR_INPUT_INVALID", message);
 }
 
 function invalidReference(message: string): never {
@@ -141,9 +154,66 @@ function validateContentHash(value: string): asserts value is ContentHash {
   }
 }
 
-function normalizeMediaType(value: string): string {
+function snapshotDescriptorInput(value: unknown): DescriptorInputSnapshot {
+  let recordLike: boolean;
+  try {
+    recordLike = isRecord(value);
+  } catch {
+    invalidDescriptorInput(
+      "Artifact descriptor input could not be inspected safely.",
+    );
+  }
+  if (!recordLike) {
+    invalidDescriptorInput("Artifact descriptor input must be an object.");
+  }
+  const source = value as Readonly<Record<string, unknown>>;
+  try {
+    const mediaType = source.mediaType;
+    const storageClass = source.storageClass;
+    const fileName = source.fileName;
+    const sourceArtifacts = source.sourceArtifacts;
+    const labels = source.labels;
+    const metadata = source.metadata;
+    return Object.freeze({
+      mediaType,
+      storageClass,
+      fileName,
+      sourceArtifacts,
+      labels,
+      metadata,
+    });
+  } catch {
+    invalidDescriptorInput(
+      "Artifact descriptor input fields could not be read safely.",
+    );
+  }
+}
+
+function normalizeStorageClass(
+  value: unknown,
+): ArtifactDescriptorInput["storageClass"] {
+  if (typeof value !== "string" || !STORAGE_CLASSES.has(value)) {
+    throw new ArtifactStoreError(
+      "ARTIFACT_STORAGE_CLASS_INVALID",
+      "Artifact storageClass must be one supported storage class.",
+    );
+  }
+  return value as ArtifactDescriptorInput["storageClass"];
+}
+
+function normalizeMediaType(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new ArtifactStoreError(
+      "ARTIFACT_MEDIA_TYPE_INVALID",
+      "Artifact mediaType must be a valid type/subtype value.",
+    );
+  }
   const mediaType = value.trim().toLowerCase();
-  if (!/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/.test(mediaType)) {
+  if (
+    !/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/.test(
+      mediaType,
+    )
+  ) {
     throw new ArtifactStoreError(
       "ARTIFACT_MEDIA_TYPE_INVALID",
       "Artifact mediaType must be a valid type/subtype value.",
@@ -152,8 +222,14 @@ function normalizeMediaType(value: string): string {
   return mediaType;
 }
 
-function normalizeFileName(value: string | undefined): string | undefined {
+function normalizeFileName(value: unknown): string | undefined {
   if (value === undefined) return undefined;
+  if (typeof value !== "string") {
+    throw new ArtifactStoreError(
+      "ARTIFACT_FILE_NAME_INVALID",
+      "Artifact fileName must be one safe display file name.",
+    );
+  }
   const fileName = value.trim();
   if (
     !fileName ||
@@ -172,13 +248,69 @@ function normalizeFileName(value: string | undefined): string | undefined {
 }
 
 function normalizeLabels(
-  value: Readonly<Record<string, string>> | undefined,
+  value: unknown,
 ): Readonly<Record<string, string>> {
   const result = Object.create(null) as Record<string, string>;
-  for (const key of Object.keys(value ?? {}).sort()) {
-    const normalizedKey = safeSegment(key, `labels.${key}`);
-    const normalizedValue = value![key]!.trim();
-    if (!normalizedValue || normalizedValue.length > 512 || normalizedValue.includes("\0")) {
+  if (value === undefined) return Object.freeze(result);
+
+  let recordLike: boolean;
+  try {
+    recordLike = isRecord(value);
+  } catch {
+    throw new ArtifactStoreError(
+      "ARTIFACT_LABEL_INVALID",
+      "Artifact labels could not be inspected safely.",
+    );
+  }
+  if (!recordLike) {
+    throw new ArtifactStoreError(
+      "ARTIFACT_LABEL_INVALID",
+      "Artifact labels must be an object containing string values.",
+    );
+  }
+
+  const source = value as Readonly<Record<string, unknown>>;
+  let keys: readonly string[];
+  try {
+    keys = Object.keys(source).sort();
+  } catch {
+    throw new ArtifactStoreError(
+      "ARTIFACT_LABEL_INVALID",
+      "Artifact label keys could not be read safely.",
+    );
+  }
+  for (const key of keys) {
+    let normalizedKey: string;
+    try {
+      normalizedKey = safeSegment(key, `labels.${key}`);
+    } catch {
+      throw new ArtifactStoreError(
+        "ARTIFACT_LABEL_INVALID",
+        "Artifact label keys must be safe path segments.",
+      );
+    }
+
+    let entry: unknown;
+    try {
+      entry = source[key];
+    } catch {
+      throw new ArtifactStoreError(
+        "ARTIFACT_LABEL_INVALID",
+        `Artifact label ${normalizedKey} could not be read safely.`,
+      );
+    }
+    if (typeof entry !== "string") {
+      throw new ArtifactStoreError(
+        "ARTIFACT_LABEL_INVALID",
+        `Artifact label ${normalizedKey} must be a string.`,
+      );
+    }
+    const normalizedValue = entry.trim();
+    if (
+      !normalizedValue ||
+      normalizedValue.length > 512 ||
+      normalizedValue.includes("\0")
+    ) {
       throw new ArtifactStoreError(
         "ARTIFACT_LABEL_INVALID",
         `Artifact label ${normalizedKey} must contain 1 to 512 characters.`,
@@ -191,13 +323,65 @@ function normalizeLabels(
       writable: true,
     });
   }
-  return result;
+  return Object.freeze(result);
 }
 
-function normalizeSources(value: readonly ArtifactId[] | undefined): readonly ArtifactId[] {
-  const result = [...new Set(value ?? [])].sort();
-  result.forEach(validateArtifactId);
-  return result;
+function normalizeSources(value: unknown): readonly ArtifactId[] {
+  if (value === undefined) return Object.freeze([]);
+
+  let arrayLike: boolean;
+  try {
+    arrayLike = Array.isArray(value);
+  } catch {
+    throw new ArtifactStoreError(
+      "ARTIFACT_ID_INVALID",
+      "Artifact sourceArtifacts could not be inspected safely.",
+    );
+  }
+  if (!arrayLike) {
+    throw new ArtifactStoreError(
+      "ARTIFACT_ID_INVALID",
+      "Artifact sourceArtifacts must be an array of artifact IDs.",
+    );
+  }
+
+  const source = value as readonly unknown[];
+  let length: number;
+  try {
+    length = source.length;
+  } catch {
+    throw new ArtifactStoreError(
+      "ARTIFACT_ID_INVALID",
+      "Artifact sourceArtifacts length could not be read safely.",
+    );
+  }
+  if (!Number.isSafeInteger(length) || length < 0) {
+    throw new ArtifactStoreError(
+      "ARTIFACT_ID_INVALID",
+      "Artifact sourceArtifacts length is invalid.",
+    );
+  }
+
+  const snapshot: ArtifactId[] = [];
+  for (let index = 0; index < length; index += 1) {
+    let entry: unknown;
+    try {
+      entry = source[index];
+    } catch {
+      throw new ArtifactStoreError(
+        "ARTIFACT_ID_INVALID",
+        `Artifact sourceArtifacts[${index}] could not be read safely.`,
+      );
+    }
+    if (typeof entry !== "string" || !ARTIFACT_ID.test(entry)) {
+      throw new ArtifactStoreError(
+        "ARTIFACT_ID_INVALID",
+        "Artifact sourceArtifacts must contain artifact_<sha256> values.",
+      );
+    }
+    snapshot.push(entry as ArtifactId);
+  }
+  return Object.freeze([...new Set(snapshot)].sort());
 }
 
 function descriptorBody(
@@ -205,26 +389,29 @@ function descriptorBody(
   sizeBytes: number,
   input: ArtifactDescriptorInput,
 ): JsonValue {
-  if (!STORAGE_CLASSES.has(input.storageClass)) {
-    throw new ArtifactStoreError(
-      "ARTIFACT_STORAGE_CLASS_INVALID",
-      `Unsupported artifact storage class: ${input.storageClass}`,
-    );
-  }
+  const snapshot = snapshotDescriptorInput(input);
+  const storageClass = normalizeStorageClass(snapshot.storageClass);
+  const mediaType = normalizeMediaType(snapshot.mediaType);
+  const sourceArtifacts = normalizeSources(snapshot.sourceArtifacts);
+  const labels = normalizeJson(normalizeLabels(snapshot.labels));
+  const fileName = normalizeFileName(snapshot.fileName);
+  const metadataInput = snapshot.metadata;
+  const metadata =
+    metadataInput === undefined ? undefined : normalizeJson(metadataInput);
+
   const body: Record<string, JsonValue> = {
     schemaVersion: "1.0",
     protocolVersion: ARTIFACT_PROTOCOL_VERSION,
     contentHash,
     contentSha256: contentHash.slice("sha256:".length),
     sizeBytes,
-    mediaType: normalizeMediaType(input.mediaType),
-    storageClass: input.storageClass,
-    sourceArtifacts: normalizeSources(input.sourceArtifacts),
-    labels: normalizeJson(normalizeLabels(input.labels)),
+    mediaType,
+    storageClass,
+    sourceArtifacts,
+    labels,
   };
-  const fileName = normalizeFileName(input.fileName);
   if (fileName !== undefined) body.fileName = fileName;
-  if (input.metadata !== undefined) body.metadata = normalizeJson(input.metadata);
+  if (metadata !== undefined) body.metadata = metadata;
   return body;
 }
 
