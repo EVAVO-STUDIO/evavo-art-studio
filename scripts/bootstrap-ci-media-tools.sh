@@ -93,8 +93,8 @@ fi
 
 media_tools_ready || fail "ffmpeg and ffprobe are not executable after bootstrap."
 
-FFMPEG_VERSION="$(${FFMPEG_PATH} -version | sed -n '1p')"
-FFPROBE_VERSION="$(${FFPROBE_PATH} -version | sed -n '1p')"
+FFMPEG_VERSION="$("${FFMPEG_PATH}" -version | sed -n '1p')"
+FFPROBE_VERSION="$("${FFPROBE_PATH}" -version | sed -n '1p')"
 FFMPEG_SHA256="$(sha256sum "${FFMPEG_PATH}" | awk '{print $1}')"
 FFPROBE_SHA256="$(sha256sum "${FFPROBE_PATH}" | awk '{print $1}')"
 
