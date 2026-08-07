@@ -42,8 +42,10 @@ function reject(name, token) {
 }
 
 if (!failures.length) {
+  expect("types", "evavo_art_book_creative_direction_v1");
+  expect("source", "BOOK_CREATIVE_DIRECTION_CONTRACT");
+
   for (const token of [
-    "evavo_art_book_creative_direction_v1",
     "compileBookCreativeDirection",
     "material_symbol",
     "environmental_pressure",
