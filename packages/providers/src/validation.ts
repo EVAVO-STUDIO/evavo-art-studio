@@ -79,6 +79,23 @@ const REFERENCE_ORDER: Readonly<Record<ProviderReferenceRole, number>> = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+function freezeNormalizedProviderRequest<T>(
+  value: T,
+  seen = new WeakSet<object>(),
+): T {
+  if (value === null || typeof value !== "object") return value;
+  const object = value as object;
+  if (seen.has(object)) return value;
+  seen.add(object);
+  const entries: readonly unknown[] = Array.isArray(value)
+    ? value
+    : Object.values(value as unknown as Record<string, unknown>);
+  for (const entry of entries) {
+    freezeNormalizedProviderRequest(entry, seen);
+  }
+  return Object.freeze(value) as T;
+}
+
 function fail(message: string): never {
   throw new ProviderError(
     "PROVIDER_CANDIDATE_REQUEST_INVALID",
@@ -547,7 +564,8 @@ export function validateProviderCandidateRequest(
       ? deterministicId
       : safeId(input.requestId, "requestId");
 
-  return { ...base, requestId } as NormalizedProviderCandidateRequest;
+  const request = { ...base, requestId } as NormalizedProviderCandidateRequest;
+  return freezeNormalizedProviderRequest(request);
 }
 
 export function providerProtocolSummary(): JsonValue {
