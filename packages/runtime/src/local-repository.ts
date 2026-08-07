@@ -90,6 +90,28 @@ function jobOrThrow(snapshot: MutableRuntimeSnapshot, jobId: string): RuntimeJob
   return job;
 }
 
+function isGovernedSingleAttemptBookArtJob(job: RuntimeJobRecord): boolean {
+  return (
+    job.spec.maximumAttempts === 1 &&
+    job.spec.labels.migrationMode === "book-art-shadow-candidate"
+  );
+}
+
+function executionAttemptLimit(job: RuntimeJobRecord): number {
+  return isGovernedSingleAttemptBookArtJob(job)
+    ? job.spec.maximumAttempts
+    : job.attemptLimit;
+}
+
+function assertExecutionAttemptAllowed(job: RuntimeJobRecord): void {
+  const limit = executionAttemptLimit(job);
+  if (job.attempts.length <= limit) return;
+  throw new RuntimeError(
+    "RUNTIME_ATTEMPT_POLICY_FORBIDDEN",
+    `Governed Book Art provider job ${job.id} cannot execute attempt ${job.attempts.length}; its immutable provider attempt limit is ${limit}.`,
+  );
+}
+
 function validateArtifactIds(values: readonly ArtifactId[]): readonly ArtifactId[] {
   const result = [...new Set(values)].sort();
   for (const artifactId of result) {
@@ -218,7 +240,7 @@ function transitionAvailability(
   if (job.spec.deadline && Date.parse(job.spec.deadline) <= now.getTime()) {
     return deadlineFailure(job, at);
   }
-  if (job.attempts.length >= job.attemptLimit) {
+  if (job.attempts.length >= executionAttemptLimit(job)) {
     return attemptsExhausted(job, at);
   }
 
@@ -419,7 +441,7 @@ function applyFailure(
     };
   }
 
-  if (attempts.length >= job.attemptLimit) {
+  if (attempts.length >= executionAttemptLimit(job)) {
     return {
       ...base,
       state: "dead-letter",
@@ -676,6 +698,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     return this.#journal.transact((snapshot) => {
       const job = jobOrThrow(snapshot, jobId);
       ensureLease(job, leaseToken, ["leased"], now);
+      assertExecutionAttemptAllowed(job);
       if (job.cancellationRequestedAt || job.pauseRequestedAt) {
         throw new RuntimeError(
           "RUNTIME_JOB_CONTROL_REQUESTED",
@@ -712,6 +735,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     return this.#journal.transact((snapshot) => {
       const job = jobOrThrow(snapshot, jobId);
       ensureLease(job, leaseToken, ["running"], now);
+      assertExecutionAttemptAllowed(job);
       const attempt = job.attempts.at(-1)!;
       if (job.spec.deadline && Date.parse(job.spec.deadline) <= now.getTime()) {
         throw new RuntimeError("RUNTIME_JOB_DEADLINE_EXCEEDED", `Deadline elapsed for ${jobId}.`);
@@ -768,6 +792,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
       ensureLease(job, leaseToken, ["running"], now);
+      assertExecutionAttemptAllowed(job);
       let updated: RuntimeJobRecord;
       if (job.cancellationRequestedAt) {
         updated = finishActiveAttempt(
@@ -1036,10 +1061,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
-      if (
-        job.spec.maximumAttempts === 1 &&
-        job.spec.labels.migrationMode === "book-art-shadow-candidate"
-      ) {
+      if (isGovernedSingleAttemptBookArtJob(job)) {
         throw new RuntimeError(
           "RUNTIME_REDRIVE_POLICY_FORBIDDEN",
           `Governed Book Art provider job ${jobId} is immutable at one provider attempt and cannot be redriven.`,
