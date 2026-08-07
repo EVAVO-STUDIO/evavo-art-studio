@@ -20,7 +20,7 @@
     "toolchain:check": "node scripts/check-repository-toolchain.mjs",
     "toolchain:check:installed": "node scripts/check-repository-toolchain.mjs",
     "toolchain:test": "node scripts/test-repository-toolchain.mjs",
-    "ci:media-tools:test": "node --test scripts/test-ci-media-tool-bootstrap.mjs",
+    "ci:media-tools:test": "node --test scripts/test-ci-media-tool-*.mjs",
     "foundation:plan": "node scripts/compile-foundation-media-plan.mjs",
     "foundation:check": "node scripts/check-foundation-media-plan.mjs",
     "foundation:delivery": "node scripts/compile-foundation-delivery-manifest.mjs",
