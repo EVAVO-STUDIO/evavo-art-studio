@@ -19,12 +19,12 @@
       "import": "./dist/candidate-set-execution.js"
     },
     "./creative-candidate-programme": {
-      "types": "./dist/creative-candidate-programme.d.ts",
-      "import": "./dist/creative-candidate-programme.js"
+      "types": "./dist/creative-candidate-programme-boundary.d.ts",
+      "import": "./dist/creative-candidate-programme-boundary.js"
     },
     "./creative-candidate-programme-dispatch": {
-      "types": "./dist/creative-candidate-programme-dispatch.d.ts",
-      "import": "./dist/creative-candidate-programme-dispatch.js"
+      "types": "./dist/creative-candidate-programme-dispatch-boundary.d.ts",
+      "import": "./dist/creative-candidate-programme-dispatch-boundary.js"
     },
     "./docs-release": {
       "types": "./dist/docs-release.d.ts",
