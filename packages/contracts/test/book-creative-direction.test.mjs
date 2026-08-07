@@ -145,3 +145,71 @@ test("preserves compile-only authority", async () => {
   assert.equal(result.publicationPerformed, false);
   assert.equal(result.plan.bookUseBindingCreated, false);
 });
+
+test("fails closed for malformed top-level input without throwing", async () => {
+  for (const value of [null, undefined, "invalid", [], 42]) {
+    const result = await compileBookCreativeDirection(value);
+    assert.equal(result.status, "blocked");
+    assert.match(result.blockers.join(" "), /must be an object/);
+    assert.equal(result.providerCallPerformed, false);
+  }
+});
+
+test("requires an exact requester identity", async () => {
+  for (const requestedBy of [undefined, "", " leading-space", "line\nbreak"]) {
+    const result = await compileBookCreativeDirection(input({ requestedBy }));
+    assert.equal(result.status, "blocked");
+    assert.match(result.blockers.join(" "), /requestedBy is invalid/);
+  }
+});
+
+test("rejects unsupported output enums instead of silently defaulting", async () => {
+  const value = input();
+  value.output = {
+    ...value.output,
+    colourIntent: "cinematic",
+    alpha: "sometimes",
+    textPolicy: "generated_labels",
+  };
+  const result = await compileBookCreativeDirection(value);
+  assert.equal(result.status, "blocked");
+  assert.match(result.blockers.join(" "), /output\.colourIntent is invalid/);
+  assert.match(result.blockers.join(" "), /output\.alpha is invalid/);
+  assert.match(result.blockers.join(" "), /output\.textPolicy is invalid/);
+});
+
+test("rejects mixed valid and unsupported output MIME values", async () => {
+  const value = input();
+  value.output = {
+    ...value.output,
+    allowedMimeTypes: ["image/png", "image/svg+xml"],
+  };
+  const result = await compileBookCreativeDirection(value);
+  assert.equal(result.status, "blocked");
+  assert.match(result.blockers.join(" "), /allowedMimeTypes\[1\] is unsupported/);
+});
+
+test("rejects unsupported process entries rather than filtering them", async () => {
+  const result = await compileBookCreativeDirection(input({
+    allowedProcessFamilies: ["relief_engraving", "provider_magic"],
+  }));
+  assert.equal(result.status, "blocked");
+  assert.match(result.blockers.join(" "), /allowedProcessFamilies\[1\] is unsupported/);
+});
+
+test("requires arrays even when a genre permits zero records", async () => {
+  const result = await compileBookCreativeDirection(input({
+    primaryGenre: "technical",
+    purpose: "diagram",
+    contentClass: "technical reference manual",
+    routeCount: 2,
+    characters: {},
+    motifs: {},
+    scenes: {},
+    aestheticIntent: "orthographic cutaway with measured line hierarchy, material differentiation, failure paths and editable label corridors",
+  }));
+  assert.equal(result.status, "blocked");
+  assert.match(result.blockers.join(" "), /characters must be an array/);
+  assert.match(result.blockers.join(" "), /motifs must be an array/);
+  assert.match(result.blockers.join(" "), /scenes must be an array/);
+});
