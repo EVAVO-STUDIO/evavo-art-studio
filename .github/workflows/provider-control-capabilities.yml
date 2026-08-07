@@ -105,9 +105,13 @@ jobs:
           grep -F 'ProviderRoutingInspection' packages/providers/src/types.ts
           grep -F 'providerCallPerformedByInspection: false' packages/providers/src/registry.ts
           grep -F 'snapshotDescriptor' packages/providers/src/registry.ts
+          grep -F 'compileProviderExecutionRoutingPlan' packages/providers/src/registry.ts
+          grep -F 'Provider routing cannot mark adapter' packages/providers/src/registry.ts
           grep -F 'PROVIDER_ROUTING_INSPECTION_INVALID' packages/providers/src/registry.ts
           grep -F 'must-never-enter-routing-evidence' packages/providers/test/routing-inspection-security.test.mjs
-          grep -F 'compileProviderRoutingInspection' packages/providers/src/orchestrator.ts
+          grep -F 'provider execution uses the exact adapter snapshot recorded by inspection' packages/providers/test/routing-inspection-security.test.mjs
+          grep -F 'compileProviderExecutionRoutingPlan' packages/providers/src/orchestrator.ts
+          grep -F 'routingPlan.eligibleAdapters' packages/providers/src/orchestrator.ts
           grep -F 'routingInspection' packages/providers/src/orchestrator.ts
           grep -F 'requiredAdapterCapabilities' apps/api/src/provider-api.ts
           grep -F 'requiredAdapterCapabilities' apps/cli/src/index.ts
