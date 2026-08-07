@@ -156,23 +156,40 @@ function validateDescriptor(descriptor: ProviderAdapterDescriptor): void {
 function snapshotDescriptor(
   input: ProviderAdapterDescriptor,
 ): ProviderAdapterDescriptor {
+  if (!input || typeof input !== "object") {
+    invalidAdapter("Provider adapter descriptor must be one object.");
+  }
   try {
+    const protocolVersion = input.protocolVersion;
+    const id = input.id;
+    const label = input.label;
+    const version = input.version;
+    const priority = input.priority;
+    const capabilitiesInput = input.capabilities;
+    const modelsInput = input.models;
+    const maximumCandidates = input.maximumCandidates;
+    const maximumReferenceImages = input.maximumReferenceImages;
+    const maximumSourceBytes = input.maximumSourceBytes;
+    const dataPolicyInput = input.dataPolicy;
+    const capabilities = Object.freeze([...capabilitiesInput]);
+    const models = Object.freeze([...modelsInput]);
+    const dataPolicy = Object.freeze({
+      remote: dataPolicyInput.remote,
+      retainedByProvider: dataPolicyInput.retainedByProvider,
+      usedForTraining: dataPolicyInput.usedForTraining,
+    });
     const snapshot: ProviderAdapterDescriptor = {
-      protocolVersion: input.protocolVersion,
-      id: input.id,
-      label: input.label,
-      version: input.version,
-      priority: input.priority,
-      capabilities: Object.freeze([...input.capabilities]),
-      models: Object.freeze([...input.models]),
-      maximumCandidates: input.maximumCandidates,
-      maximumReferenceImages: input.maximumReferenceImages,
-      maximumSourceBytes: input.maximumSourceBytes,
-      dataPolicy: Object.freeze({
-        remote: input.dataPolicy.remote,
-        retainedByProvider: input.dataPolicy.retainedByProvider,
-        usedForTraining: input.dataPolicy.usedForTraining,
-      }),
+      protocolVersion,
+      id,
+      label,
+      version,
+      priority,
+      capabilities,
+      models,
+      maximumCandidates,
+      maximumReferenceImages,
+      maximumSourceBytes,
+      dataPolicy,
     };
     validateDescriptor(snapshot);
     return Object.freeze(snapshot);
@@ -183,18 +200,24 @@ function snapshotDescriptor(
 }
 
 function snapshotAdapter(adapter: ProviderAdapter): ProviderAdapter {
-  if (
-    !adapter ||
-    typeof adapter !== "object" ||
-    typeof adapter.execute !== "function"
-  ) {
+  if (!adapter || typeof adapter !== "object") {
     invalidAdapter("Provider adapter must expose a descriptor and execute function.");
   }
-  const descriptor = snapshotDescriptor(adapter.descriptor);
-  return Object.freeze({
-    descriptor,
-    execute: adapter.execute.bind(adapter),
-  });
+  try {
+    const descriptorInput = adapter.descriptor;
+    const execute = adapter.execute;
+    if (typeof execute !== "function") {
+      invalidAdapter("Provider adapter must expose a descriptor and execute function.");
+    }
+    const descriptor = snapshotDescriptor(descriptorInput);
+    return Object.freeze({
+      descriptor,
+      execute: execute.bind(adapter),
+    });
+  } catch (error: unknown) {
+    if (error instanceof ProviderError) throw error;
+    invalidAdapter("Provider adapter could not be snapshotted safely.");
+  }
 }
 
 function snapshotDecision(
@@ -205,46 +228,59 @@ function snapshotDecision(
   if (!decision || typeof decision !== "object") {
     invalidRouting("Provider routing decision must be one object.");
   }
-  if (
-    typeof decision.adapterId !== "string" ||
-    decision.adapterId !== descriptor.id
-  ) {
+  try {
+    const adapterId = decision.adapterId;
+    const eligible = decision.eligible;
+    const rank = decision.rank;
+    const reasonsInput = decision.reasons;
+    if (!Array.isArray(reasonsInput)) {
+      invalidRouting(
+        `Provider routing reasons are invalid for adapter ${descriptor.id}.`,
+      );
+    }
+    const reasons = [...reasonsInput];
+    if (typeof adapterId !== "string" || adapterId !== descriptor.id) {
+      invalidRouting(
+        `Provider routing decision identity does not match adapter ${descriptor.id}.`,
+      );
+    }
+    if (typeof eligible !== "boolean") {
+      invalidRouting(
+        `Provider routing eligibility is invalid for adapter ${descriptor.id}.`,
+      );
+    }
+    if (!Number.isInteger(rank) || rank !== expectedRank) {
+      invalidRouting(
+        `Provider routing rank for adapter ${descriptor.id} must be ${expectedRank}.`,
+      );
+    }
+    if (
+      !reasons.length ||
+      reasons.length > MAXIMUM_ROUTING_REASONS ||
+      reasons.some(
+        (reason) =>
+          typeof reason !== "string" ||
+          !reason.trim() ||
+          reason.length > MAXIMUM_ROUTING_REASON_LENGTH ||
+          reason.includes("\0"),
+      )
+    ) {
+      invalidRouting(
+        `Provider routing reasons are invalid for adapter ${descriptor.id}.`,
+      );
+    }
+    return Object.freeze({
+      adapterId,
+      eligible,
+      reasons: Object.freeze(reasons),
+      rank,
+    });
+  } catch (error: unknown) {
+    if (error instanceof ProviderError) throw error;
     invalidRouting(
-      `Provider routing decision identity does not match adapter ${descriptor.id}.`,
+      `Provider routing decision for adapter ${descriptor.id} could not be snapshotted safely.`,
     );
   }
-  if (typeof decision.eligible !== "boolean") {
-    invalidRouting(
-      `Provider routing eligibility is invalid for adapter ${descriptor.id}.`,
-    );
-  }
-  if (!Number.isInteger(decision.rank) || decision.rank !== expectedRank) {
-    invalidRouting(
-      `Provider routing rank for adapter ${descriptor.id} must be ${expectedRank}.`,
-    );
-  }
-  if (
-    !Array.isArray(decision.reasons) ||
-    !decision.reasons.length ||
-    decision.reasons.length > MAXIMUM_ROUTING_REASONS ||
-    decision.reasons.some(
-      (reason) =>
-        typeof reason !== "string" ||
-        !reason.trim() ||
-        reason.length > MAXIMUM_ROUTING_REASON_LENGTH ||
-        reason.includes("\0"),
-    )
-  ) {
-    invalidRouting(
-      `Provider routing reasons are invalid for adapter ${descriptor.id}.`,
-    );
-  }
-  return Object.freeze({
-    adapterId: decision.adapterId,
-    eligible: decision.eligible,
-    reasons: Object.freeze([...decision.reasons]),
-    rank: decision.rank,
-  });
 }
 
 function decisionFor(
@@ -377,13 +413,30 @@ export function compileProviderRoutingInspection(
   if (!Array.isArray(ranked)) {
     invalidRouting("Provider routing input must be one ranked adapter array.");
   }
+  let rankedEntries: readonly ProviderRankedAdapter[];
+  try {
+    rankedEntries = [...ranked];
+  } catch {
+    invalidRouting("Provider routing input could not be snapshotted safely.");
+  }
   const seenAdapterIds = new Set<string>();
   let ineligibleEncountered = false;
-  const adapters = ranked.map((entry, index) => {
-    if (!entry || typeof entry !== "object" || !entry.adapter) {
+  const adapters = rankedEntries.map((entry, index) => {
+    if (!entry || typeof entry !== "object") {
       invalidRouting(`Provider routing entry ${index + 1} is invalid.`);
     }
-    const descriptor = snapshotDescriptor(entry.adapter.descriptor);
+    let adapter: ProviderAdapter;
+    let decisionInput: ProviderSelectionDecision;
+    try {
+      adapter = entry.adapter;
+      decisionInput = entry.decision;
+    } catch {
+      invalidRouting(`Provider routing entry ${index + 1} could not be read safely.`);
+    }
+    if (!adapter || typeof adapter !== "object") {
+      invalidRouting(`Provider routing entry ${index + 1} is invalid.`);
+    }
+    const descriptor = snapshotDescriptor(adapter.descriptor);
     if (seenAdapterIds.has(descriptor.id)) {
       invalidRouting(
         `Provider routing contains duplicate adapter ${descriptor.id}.`,
@@ -391,7 +444,7 @@ export function compileProviderRoutingInspection(
     }
     seenAdapterIds.add(descriptor.id);
     const decision = snapshotDecision(
-      entry.decision,
+      decisionInput,
       descriptor,
       index + 1,
     );
