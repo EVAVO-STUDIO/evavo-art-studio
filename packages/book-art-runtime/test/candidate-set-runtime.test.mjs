@@ -11,7 +11,10 @@ import {
   compileBookArtProductionWorkOrder,
   fingerprintBookArtBrief,
 } from "@evavo/art-contracts";
-import { LocalRuntimeRepository } from "@evavo/art-runtime";
+import {
+  LocalRuntimeRepository,
+  RuntimeError,
+} from "@evavo/art-runtime";
 
 import {
   BOOK_ART_CANDIDATE_SET_RUNTIME_CONTRACT,
@@ -127,13 +130,17 @@ test("compiles one durable no-fallback job that requires the exact four-output s
   assert.equal(first.plan.normalizedProviderRequest.candidateCount, 4);
   assert.equal(first.plan.runtimeSubmission.kind, "art.candidate.generate");
   assert.equal(first.plan.runtimeSubmission.maximumAttempts, 1);
+  assert.equal(
+    first.plan.runtimeSubmission.labels.migrationMode,
+    "book-art-candidate-set",
+  );
   assert.equal(first.plan.normalizedProviderRequest.selection.allowFallback, false);
   assert.equal(first.oneProviderAttemptForEntireSet, true);
   assert.equal(first.selectionPerformed, false);
   assert.equal(first.promotionPerformed, false);
 });
 
-test("submits idempotently without creating four provider attempts", async () => {
+test("submits idempotently without creating four provider attempts or allowing redrive", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-book-set-"));
   try {
     const runtime = new LocalRuntimeRepository({ root: path.join(root, "runtime") });
@@ -155,6 +162,50 @@ test("submits idempotently without creating four provider attempts", async () =>
     assert.equal(first.job.attemptLimit, 1);
     assert.equal(first.job.spec.payload.candidateCount, 4);
     assert.equal((await runtime.list()).length, 1);
+
+    const claimed = await runtime.claim({
+      worker: {
+        id: "candidate-set-provider-worker",
+        capabilities: [
+          "evidence.bundle",
+          "provider.candidate-store",
+          "provider.generate",
+        ],
+      },
+      maximumJobs: 1,
+      now: new Date("2026-08-06T00:11:00.000Z"),
+    });
+    assert.equal(claimed.length, 1);
+    const failed = await runtime.fail(
+      first.job.id,
+      claimed[0].lease.token,
+      {
+        classification: "permanent",
+        code: "PROVIDER_FAILED",
+        message: "candidate-set provider attempt failed",
+      },
+      "candidate-set-provider-worker",
+      new Date("2026-08-06T00:11:01.000Z"),
+    );
+    assert.equal(failed.state, "failed");
+    assert.equal(failed.attempts.length, 1);
+
+    await assert.rejects(
+      () =>
+        runtime.redrive(
+          first.job.id,
+          1,
+          "candidate-set-operator",
+          new Date("2026-08-06T00:11:02.000Z"),
+        ),
+      (error) =>
+        error instanceof RuntimeError &&
+        error.code === "RUNTIME_REDRIVE_POLICY_FORBIDDEN",
+    );
+    const unchanged = await runtime.get(first.job.id);
+    assert.equal(unchanged.attemptLimit, 1);
+    assert.equal(unchanged.redriveCount, 0);
+    assert.equal(unchanged.attempts.length, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
