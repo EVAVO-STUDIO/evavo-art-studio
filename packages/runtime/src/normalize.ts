@@ -215,7 +215,7 @@ function normalizeIdempotencyKey(value: unknown): string {
     );
   }
   const result = value.trim();
-  if (!result || result.length > 512 || result.includes("\\0")) {
+  if (!result || result.length > 512 || result.includes("\0")) {
     throw new RuntimeError(
       "RUNTIME_JOB_SPEC_INVALID",
       "idempotencyKey must contain 1 to 512 characters.",
@@ -455,7 +455,7 @@ function labels(values: unknown): Readonly<Record<string, string>> {
     if (
       !normalizedValue ||
       normalizedValue.length > 512 ||
-      normalizedValue.includes("\\0")
+      normalizedValue.includes("\0")
     ) {
       throw new RuntimeError(
         "RUNTIME_JOB_SPEC_INVALID",
@@ -493,7 +493,7 @@ function snapshotRuntimeJobSubmission(
   );
   const idInput = readRuntimeInput(source, "id", "submission");
   const id = idInput === undefined
-    ? `job_${sha256(`${queue}\\0${idempotencyKey}`).slice(0, 40)}`
+    ? `job_${sha256(`${queue}\0${idempotencyKey}`).slice(0, 40)}`
     : safeRuntimeName(idInput, "id");
   const dependencyJobIds = normalizedRuntimeNameList(
     readRuntimeInput(source, "dependencyJobIds", "submission"),

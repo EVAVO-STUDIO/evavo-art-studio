@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { sha256 } from "@evavo/art-artifacts";
+
 import {
   normalizeRuntimeJobSubmission,
   RuntimeError,
@@ -161,6 +163,25 @@ test("runtime job submissions are snapshotted once before validation and hashing
   assert.deepEqual(normalized.spec.inputArtifacts, [ARTIFACT_A]);
   assert.equal(normalized.spec.retryPolicy.baseDelayMs, 100);
   assert.match(normalized.specHash, /^[a-f0-9]{64}$/);
+});
+
+test("derived runtime job IDs retain the canonical NUL delimiter", () => {
+  const normalized = normalizeRuntimeJobSubmission(
+    validSubmission({ id: undefined }),
+  );
+  assert.equal(
+    normalized.spec.id,
+    `job_${sha256("media\0runtime-snapshot-1").slice(0, 40)}`,
+  );
+  assert.throws(
+    () =>
+      normalizeRuntimeJobSubmission(
+        validSubmission({ idempotencyKey: "invalid\0key" }),
+      ),
+    (error) =>
+      error instanceof RuntimeError &&
+      error.code === "RUNTIME_JOB_SPEC_INVALID",
+  );
 });
 
 test("runtime job submission snapshots detach and freeze retained identity", () => {
