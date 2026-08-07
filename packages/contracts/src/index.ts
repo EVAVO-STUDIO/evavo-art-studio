@@ -3,6 +3,7 @@ export {
   compileBookArtCandidateSetWorkOrder,
   validateBookArtCandidateSetWorkOrder,
 } from "./book-art-candidate-set-canonical.js";
+export * from "./book-creative-direction.js";
 export * from "./book-illustration-intelligence.js";
 export * from "./book-production.js";
 export * from "./book-production-profile.js";

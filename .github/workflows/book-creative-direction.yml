@@ -1,0 +1,78 @@
+name: Book Creative Direction
+
+on:
+  push:
+    branches:
+      - main
+      - agent/book-creative-direction-final-20260807
+    paths: &book_creative_direction_paths
+      - ".github/workflows/book-creative-direction.yml"
+      - "package.json"
+      - "packages/contracts/src/book-creative-direction*.ts"
+      - "packages/contracts/src/index.ts"
+      - "packages/contracts/test/book-creative-direction.test.mjs"
+      - "scripts/check-book-creative-direction.mjs"
+      - "docs/book-creative-direction.md"
+  pull_request:
+    branches: [main]
+    paths: *book_creative_direction_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: book-creative-direction-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install FFmpeg media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      - name: Install exact workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify permanent creative boundary
+        run: node scripts/check-book-creative-direction.mjs
+
+      - name: Run contracts tests
+        run: pnpm --filter @evavo/art-contracts test
+
+      - name: Run strict contracts typecheck
+        run: pnpm --filter @evavo/art-contracts typecheck
+
+      - name: Run complete Art Studio verification
+        run: pnpm check
+
+      - name: Prove clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
