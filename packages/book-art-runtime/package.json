@@ -22,6 +22,10 @@
       "types": "./dist/creative-candidate-programme-boundary.d.ts",
       "import": "./dist/creative-candidate-programme-boundary.js"
     },
+    "./creative-candidate-programme-dispatch": {
+      "types": "./dist/creative-candidate-programme-dispatch-boundary.d.ts",
+      "import": "./dist/creative-candidate-programme-dispatch-boundary.js"
+    },
     "./docs-release": {
       "types": "./dist/docs-release.d.ts",
       "import": "./dist/docs-release.js"
