@@ -17,6 +17,7 @@ import { assertPathWithinAllowedRoots, inspectRepository } from "@evavo/art-repo
 
 import { registerBookArtTools } from "./book-art-tools.js";
 import { registerBookCreativeDirectionTools } from "./book-creative-direction-tools.js";
+import { registerBookCreativeProgrammeRuntimeTools } from "./book-creative-programme-runtime-tools.js";
 import { registerProviderTools } from "./provider-tools.js";
 import { registerRuntimeTools } from "./runtime-tools.js";
 import { registerSelectionTools } from "./selection-tools.js";
@@ -31,6 +32,7 @@ registerRuntimeTools(server);
 registerProviderTools(server);
 registerBookArtTools(server);
 registerBookCreativeDirectionTools(server);
+registerBookCreativeProgrammeRuntimeTools(server);
 registerSelectionTools(server);
 registerSpriteFamilyTools(server);
 
