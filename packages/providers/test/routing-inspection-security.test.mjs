@@ -181,3 +181,174 @@ test("routing inspection sanitises custom rank values and rejects inconsistent e
       error.code === "PROVIDER_ROUTING_INSPECTION_INVALID",
   );
 });
+
+test("provider registration snapshots descriptor and execute accessors exactly once", () => {
+  const descriptor = mutableDescriptor("single-read-registry");
+  const execute = async () => {
+    throw new Error("execution is outside this registration-only test");
+  };
+  let descriptorReads = 0;
+  let executeReads = 0;
+  const adapter = {};
+  Object.defineProperties(adapter, {
+    descriptor: {
+      enumerable: true,
+      get() {
+        descriptorReads += 1;
+        if (descriptorReads > 1) {
+          throw new Error("descriptor accessor was read more than once");
+        }
+        return descriptor;
+      },
+    },
+    execute: {
+      enumerable: true,
+      get() {
+        executeReads += 1;
+        if (executeReads > 1) {
+          throw new Error("execute accessor was read more than once");
+        }
+        return execute;
+      },
+    },
+  });
+
+  const registry = new ProviderRegistry([adapter]);
+  const inspection = inspectProviderCandidateRouting(
+    independentRequest(),
+    registry,
+  );
+
+  assert.equal(inspection.firstEligibleAdapterId, "single-read-registry");
+  assert.equal(descriptorReads, 1);
+  assert.equal(executeReads, 1);
+});
+
+test("custom routing snapshots entry, decision and nested descriptor accessors exactly once", () => {
+  const request = independentRequest();
+  const baseDescriptor = mutableDescriptor("single-read-routing");
+  let dataPolicyReads = 0;
+  const descriptor = { ...baseDescriptor };
+  Object.defineProperty(descriptor, "dataPolicy", {
+    enumerable: true,
+    get() {
+      dataPolicyReads += 1;
+      if (dataPolicyReads > 1) {
+        throw new Error("data policy accessor was read more than once");
+      }
+      return baseDescriptor.dataPolicy;
+    },
+  });
+
+  let reasonReads = 0;
+  const reasons = [];
+  Object.defineProperty(reasons, 0, {
+    enumerable: true,
+    get() {
+      reasonReads += 1;
+      if (reasonReads > 1) {
+        throw new Error("routing reason accessor was read more than once");
+      }
+      return "all declared request capabilities are supported";
+    },
+  });
+
+  const decisionReads = {
+    adapterId: 0,
+    eligible: 0,
+    reasons: 0,
+    rank: 0,
+  };
+  const decision = {};
+  Object.defineProperties(decision, {
+    adapterId: {
+      enumerable: true,
+      get() {
+        decisionReads.adapterId += 1;
+        if (decisionReads.adapterId > 1) {
+          throw new Error("adapter id accessor was read more than once");
+        }
+        return "single-read-routing";
+      },
+    },
+    eligible: {
+      enumerable: true,
+      get() {
+        decisionReads.eligible += 1;
+        if (decisionReads.eligible > 1) {
+          throw new Error("eligibility accessor was read more than once");
+        }
+        return true;
+      },
+    },
+    reasons: {
+      enumerable: true,
+      get() {
+        decisionReads.reasons += 1;
+        if (decisionReads.reasons > 1) {
+          throw new Error("reasons accessor was read more than once");
+        }
+        return reasons;
+      },
+    },
+    rank: {
+      enumerable: true,
+      get() {
+        decisionReads.rank += 1;
+        if (decisionReads.rank > 1) {
+          throw new Error("rank accessor was read more than once");
+        }
+        return 1;
+      },
+    },
+  });
+
+  const adapter = {
+    descriptor,
+    execute: async () => {
+      throw new Error("execution is outside this inspection-only test");
+    },
+  };
+  let adapterReads = 0;
+  let decisionObjectReads = 0;
+  const entry = {};
+  Object.defineProperties(entry, {
+    adapter: {
+      enumerable: true,
+      get() {
+        adapterReads += 1;
+        if (adapterReads > 1) {
+          throw new Error("entry adapter accessor was read more than once");
+        }
+        return adapter;
+      },
+    },
+    decision: {
+      enumerable: true,
+      get() {
+        decisionObjectReads += 1;
+        if (decisionObjectReads > 1) {
+          throw new Error("entry decision accessor was read more than once");
+        }
+        return decision;
+      },
+    },
+  });
+
+  const inspection = compileProviderRoutingInspection(request, [entry]);
+
+  assert.equal(inspection.firstEligibleAdapterId, "single-read-routing");
+  assert.deepEqual(inspection.adapters[0].decision.reasons, [
+    "all declared request capabilities are supported",
+  ]);
+  assert.equal(adapterReads, 1);
+  assert.equal(decisionObjectReads, 1);
+  assert.equal(dataPolicyReads, 1);
+  assert.equal(reasonReads, 1);
+  assert.deepEqual(decisionReads, {
+    adapterId: 1,
+    eligible: 1,
+    reasons: 1,
+    rank: 1,
+  });
+});
