@@ -41,6 +41,10 @@
     "./legacy-registration": {
       "types": "./dist/legacy-registration.d.ts",
       "import": "./dist/legacy-registration.js"
+    },
+    "./legacy-registration-readiness": {
+      "types": "./dist/legacy-registration-readiness.d.ts",
+      "import": "./dist/legacy-registration-readiness.js"
     }
   },
   "files": [
