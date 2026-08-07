@@ -1,0 +1,81 @@
+name: CI media tool bootstrap
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/ci-media-tool-bootstrap.yml"
+      - "scripts/bootstrap-ci-media-tools.sh"
+      - "scripts/test-ci-media-tool-bootstrap.mjs"
+      - "package.json"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/ci-media-tool-bootstrap.yml"
+      - "scripts/bootstrap-ci-media-tools.sh"
+      - "scripts/test-ci-media-tool-bootstrap.mjs"
+      - "package.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-media-tool-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Run bounded media bootstrap regressions
+        run: node --test scripts/test-ci-media-tool-bootstrap.mjs
+
+      - name: Bootstrap real media tools with bounded fallback
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify permanent bootstrap contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/bootstrap-ci-media-tools.sh
+          grep -F 'CI_MEDIA_APT_UPDATE_TIMEOUT_SECONDS:-120' scripts/bootstrap-ci-media-tools.sh
+          grep -F 'CI_MEDIA_APT_INSTALL_TIMEOUT_SECONDS:-180' scripts/bootstrap-ci-media-tools.sh
+          grep -F -- '--kill-after=15s' scripts/bootstrap-ci-media-tools.sh
+          grep -F 'Acquire::Retries=3' scripts/bootstrap-ci-media-tools.sh
+          grep -F 'bash scripts/bootstrap-ci-media-tools.sh' .github/workflows/ci.yml
+          ! grep -F 'sudo apt-get update' .github/workflows/ci.yml
+          grep -F 'media bootstrap fails after the configured bounded attempts' scripts/test-ci-media-tool-bootstrap.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
