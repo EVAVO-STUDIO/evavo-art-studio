@@ -132,10 +132,44 @@ function governedSubmission(id, idempotencyKey) {
   });
 }
 
+function candidateSetSubmission(id, idempotencyKey) {
+  return submission({
+    id,
+    idempotencyKey,
+    labels: { migrationMode: "book-art-candidate-set" },
+  });
+}
+
 test("core runtime refuses redrive for governed one-attempt Book Art provider jobs", async () => {
   const runtime = await fixture();
   const job = await runtime.submit(
     governedSubmission("job-book-art-provider", "book-art-provider"),
+    "test",
+    T0,
+  );
+  const failed = await failOnce(runtime, job);
+  assert.equal(failed.state, "failed");
+  assert.equal(failed.attemptLimit, 1);
+  assert.equal(failed.attempts.length, 1);
+
+  await assert.rejects(
+    () => runtime.redrive(job.id, 1, "operator", at(3)),
+    (error) =>
+      error instanceof RuntimeError &&
+      error.code === "RUNTIME_REDRIVE_POLICY_FORBIDDEN",
+  );
+
+  const unchanged = await runtime.get(job.id);
+  assert.equal(unchanged.state, "failed");
+  assert.equal(unchanged.attemptLimit, 1);
+  assert.equal(unchanged.redriveCount, 0);
+  assert.equal(unchanged.attempts.length, 1);
+});
+
+test("core runtime refuses redrive for one-attempt Book Art candidate-set jobs", async () => {
+  const runtime = await fixture();
+  const job = await runtime.submit(
+    candidateSetSubmission("job-book-art-candidate-set", "book-art-candidate-set"),
     "test",
     T0,
   );
@@ -185,6 +219,34 @@ test("historical inflated Book Art attempt limits cannot create a second claim",
   const events = await runtime.events();
   assert.equal(events.filter((event) => event.type === "job.leased").length, 1);
   assert.equal(events.filter((event) => event.type === "job.dead-lettered").length, 1);
+});
+
+test("historical inflated Book Art candidate-set limits cannot create a second claim", async () => {
+  const { runtime, journal } = await fixtureWithJournal();
+  const job = await runtime.submit(
+    candidateSetSubmission(
+      "job-book-art-candidate-set-historical-waiting",
+      "book-art-candidate-set-historical-waiting",
+    ),
+    "test",
+    T0,
+  );
+  await failOnce(runtime, job);
+  await persistHistoricalRedrive(journal, job.id, "waiting");
+
+  const claimed = await runtime.claim({
+    worker: { id: "worker-after-candidate-set-upgrade", capabilities: [] },
+    maximumJobs: 1,
+    now: at(4),
+  });
+  assert.equal(claimed.length, 0);
+
+  const guarded = await runtime.get(job.id);
+  assert.equal(guarded.state, "dead-letter");
+  assert.equal(guarded.attemptLimit, 2);
+  assert.equal(guarded.redriveCount, 1);
+  assert.equal(guarded.attempts.length, 1);
+  assert.equal(guarded.failure.code, "RUNTIME_ATTEMPTS_EXHAUSTED");
 });
 
 test("a historical leased second Book Art attempt cannot start", async () => {
