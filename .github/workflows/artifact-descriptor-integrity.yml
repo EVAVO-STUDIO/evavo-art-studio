@@ -5,6 +5,7 @@ on:
     paths:
       - "packages/artifacts/src/local-store.ts"
       - "packages/artifacts/test/descriptor-integrity-security.test.mjs"
+      - "packages/artifacts/test/descriptor-input-integrity-security.test.mjs"
       - ".github/workflows/artifact-descriptor-integrity.yml"
   push:
     branches:
@@ -12,6 +13,7 @@ on:
     paths:
       - "packages/artifacts/src/local-store.ts"
       - "packages/artifacts/test/descriptor-integrity-security.test.mjs"
+      - "packages/artifacts/test/descriptor-input-integrity-security.test.mjs"
       - ".github/workflows/artifact-descriptor-integrity.yml"
 
 permissions:
@@ -61,19 +63,30 @@ jobs:
           pnpm --filter @evavo/art-artifacts typecheck
 
       - name: Run artifact persistence and hostile descriptor regressions
-        run: node --test packages/artifacts/test/artifacts.test.mjs packages/artifacts/test/json-canonicalization-security.test.mjs packages/artifacts/test/descriptor-integrity-security.test.mjs
+        run: >-
+          node --test
+          packages/artifacts/test/artifacts.test.mjs
+          packages/artifacts/test/json-canonicalization-security.test.mjs
+          packages/artifacts/test/descriptor-integrity-security.test.mjs
+          packages/artifacts/test/descriptor-input-integrity-security.test.mjs
 
       - name: Verify permanent descriptor-integrity contract
         shell: bash
         run: |
           set -euo pipefail
+          grep -F 'snapshotDescriptorInput' packages/artifacts/src/local-store.ts
+          grep -F 'ARTIFACT_DESCRIPTOR_INPUT_INVALID' packages/artifacts/src/local-store.ts
+          grep -F 'const metadataInput = snapshot.metadata' packages/artifacts/src/local-store.ts
           grep -F 'parseDescriptorText' packages/artifacts/src/local-store.ts
           grep -F 'Artifact descriptor artifactId does not match its body.' packages/artifacts/src/local-store.ts
           grep -F 'Artifact descriptor contains a non-canonical storage path.' packages/artifacts/src/local-store.ts
           grep -F 'contentObjectRelativePath(descriptor.contentHash)' packages/artifacts/src/local-store.ts
+          grep -F 'artifact descriptor inputs are snapshotted once before validation and hashing' packages/artifacts/test/descriptor-input-integrity-security.test.mjs
+          grep -F 'hostile artifact descriptor input access fails closed without leaking errors' packages/artifacts/test/descriptor-input-integrity-security.test.mjs
           grep -F 'tampered artifact descriptors cannot redirect reads outside canonical storage' packages/artifacts/test/descriptor-integrity-security.test.mjs
           grep -F 'stored descriptors fail closed on identity, digest, path and shape tampering' packages/artifacts/test/descriptor-integrity-security.test.mjs
           grep -F 'artifact descriptors are returned as deeply immutable canonical data' packages/artifacts/test/descriptor-integrity-security.test.mjs
+          ! grep -F 'STORAGE_CLASSES.has(input.storageClass)' packages/artifacts/src/local-store.ts
           ! grep -F 'path.join(await this.root(), descriptor.objectRelativePath)' packages/artifacts/src/local-store.ts
 
       - name: Run complete Art Studio validation
