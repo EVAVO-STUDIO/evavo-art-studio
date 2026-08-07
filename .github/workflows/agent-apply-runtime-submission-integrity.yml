@@ -34,9 +34,9 @@ jobs:
             .agent/runtime-submission-integrity.part-00 \
             .agent/runtime-submission-integrity.part-01 \
             .agent/runtime-submission-integrity.part-02 \
-            > /tmp/apply-runtime-submission-integrity.py
-          python -m py_compile /tmp/apply-runtime-submission-integrity.py
-          python /tmp/apply-runtime-submission-integrity.py
+            > .agent/apply-runtime-submission-integrity.py
+          python -m py_compile .agent/apply-runtime-submission-integrity.py
+          python .agent/apply-runtime-submission-integrity.py
           grep -F 'snapshotRuntimeJobSubmission' packages/runtime/src/normalize.ts
           grep -F 'const retryPolicy = normalizeRetryPolicy' packages/runtime/src/normalize.ts
           ! grep -F 'input.retryPolicy?.baseDelayMs' packages/runtime/src/normalize.ts
@@ -46,6 +46,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf \
+            .agent/__pycache__ \
+            .agent/apply-runtime-submission-integrity.py
           rm -f \
             .agent/runtime-submission-integrity.part-00 \
             .agent/runtime-submission-integrity.part-01 \
