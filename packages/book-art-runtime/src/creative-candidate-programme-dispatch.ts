@@ -5,6 +5,7 @@ import {
 } from "@evavo/art-artifacts";
 import {
   BOOK_CREATIVE_DIRECTION_CONTRACT,
+  fingerprintBookIllustrationValue,
   validateBookArtProductionWorkOrder,
   type BookArtIdentityV1,
 } from "@evavo/art-contracts";
@@ -647,15 +648,22 @@ async function validateProgramme(
     if (
       route.workOrderFingerprintSha256
         !== route.workOrder.workOrderFingerprintSha256
-      || route.briefFingerprint !== route.workOrder.sourceBriefFingerprint
+      || normalizeSha(route.briefFingerprint)
+        !== normalizeSha(route.workOrder.sourceBriefFingerprint)
     ) {
       blockers.push(
         `Creative route ${route.routeId} work-order binding is invalid.`,
       );
     }
-    if (!sameIdentity(typedIdentity, route.workOrder.identity)) {
+    const expectedRouteIdentity = routeIdentity(typedIdentity, route.routeId);
+    if (!sameIdentity(expectedRouteIdentity, route.workOrder.identity)) {
       blockers.push(
-        `Creative route ${route.routeId} work-order identity differs from the programme.`,
+        `Creative route ${route.routeId} work-order identity differs from its canonical route identity.`,
+      );
+    }
+    if (route.workOrder.purpose !== programme.purpose) {
+      blockers.push(
+        `Creative route ${route.routeId} work-order purpose differs from the programme.`,
       );
     }
     if (
@@ -668,7 +676,7 @@ async function validateProgramme(
     }
 
     blockers.push(
-      ...validateProviderPlan(route, typedIdentity).map(
+      ...validateProviderPlan(route).map(
         (issue) => `Creative route ${route.routeId} provider plan: ${issue}`,
       ),
     );
@@ -705,7 +713,6 @@ async function validateProgramme(
 
 function validateProviderPlan(
   route: BookArtCreativeCandidateRoutePlanV1,
-  programmeIdentity: BookArtIdentityV1,
 ): string[] {
   const blockers: string[] = [];
   const providerRecord = record(route.providerJobPlan);
@@ -719,12 +726,14 @@ function validateProviderPlan(
   ) {
     blockers.push("Provider plan identity or version is invalid.");
   }
-  if (!sameIdentity(plan.identity, programmeIdentity)) {
-    blockers.push("Provider plan identity differs from the creative programme.");
+  if (!sameIdentity(plan.identity, route.workOrder.identity)) {
+    blockers.push("Provider plan identity differs from the route work order.");
   }
   if (
     plan.workOrderFingerprintSha256 !== route.workOrderFingerprintSha256
-    || plan.sourceBriefFingerprint !== route.briefFingerprint
+    || plan.workOrderFingerprintSha256
+      !== route.workOrder.workOrderFingerprintSha256
+    || plan.sourceBriefFingerprint !== route.workOrder.sourceBriefFingerprint
   ) {
     blockers.push("Provider plan is bound to a different route work order.");
   }
@@ -917,6 +926,22 @@ function blockedSubmission(
 
 function fingerprint(value: unknown): string {
   return sha256(stableStringify(normalizeJson(value)));
+}
+function normalizeSha(value: string): string {
+  return value.replace(/^sha256:/u, "");
+}
+function routeIdentity(
+  programmeIdentity: BookArtIdentityV1,
+  routeId: string,
+): BookArtIdentityV1 {
+  const routeHash = fingerprintBookIllustrationValue({
+    base: programmeIdentity.requestId,
+    route: routeId,
+  }).replace(/^sha256:/u, "");
+  return {
+    ...programmeIdentity,
+    requestId: `book-route-${routeHash.slice(0, 32)}`,
+  };
 }
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
