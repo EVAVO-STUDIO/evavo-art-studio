@@ -1,0 +1,94 @@
+name: Runtime journal integrity
+
+on:
+  pull_request:
+    paths:
+      - "packages/runtime/src/journal.ts"
+      - "packages/runtime/src/journal-integrity.ts"
+      - "packages/runtime/test/journal-integrity-security.test.mjs"
+      - ".github/workflows/runtime-journal-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/runtime/src/journal.ts"
+      - "packages/runtime/src/journal-integrity.ts"
+      - "packages/runtime/test/journal-integrity-security.test.mjs"
+      - ".github/workflows/runtime-journal-integrity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-journal-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and type-check runtime journal dependencies
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-runtime build
+          pnpm --filter @evavo/art-runtime typecheck
+
+      - name: Run runtime and hostile journal regressions
+        run: >-
+          node --test
+          packages/runtime/test/runtime.test.mjs
+          packages/runtime/test/redrive-policy.test.mjs
+          packages/runtime/test/journal-integrity-security.test.mjs
+
+      - name: Verify permanent journal-integrity contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'parseRuntimeTransactionText' packages/runtime/src/journal.ts
+          grep -F 'Runtime job specHash does not match its normalized spec.' packages/runtime/src/journal-integrity.ts
+          grep -F 'Runtime idempotency index does not bind canonical job' packages/runtime/src/journal-integrity.ts
+          grep -F 'highest immutable transaction must validate or recovery fails closed' packages/runtime/src/journal.ts
+          grep -F 'persisted job identity is recomputed before runtime state can be used' packages/runtime/test/journal-integrity-security.test.mjs
+          grep -F 'a corrupt highest transaction fails closed instead of rolling runtime state back' packages/runtime/test/journal-integrity-security.test.mjs
+          ! grep -F 'lastError' packages/runtime/src/journal.ts
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
