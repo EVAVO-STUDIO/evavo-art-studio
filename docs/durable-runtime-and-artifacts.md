@@ -91,7 +91,7 @@ Terminal states are `succeeded`, `failed`, `cancelled`, `blocked` and `dead-lett
 
 ## Submission and idempotency
 
-Every submission contains a queue, kind, idempotency key, JSON payload, capability requirements, dependencies, input artifacts and execution policy. The runtime normalises and hashes that specification.
+Every submission contains a queue, kind, idempotency key, JSON payload, flat capability requirements, optional single-profile capability requirements, dependencies, input artifacts and execution policy. The runtime normalises and hashes that specification.
 
 - Repeating the same queue and idempotency key with the same specification returns the existing job.
 - Reusing the key for different work is rejected.
@@ -102,7 +102,7 @@ Every submission contains a queue, kind, idempotency key, JSON payload, capabili
 
 ## Leases and attempts
 
-A claim creates a cryptographically random lease token and a new immutable attempt record. Only a worker with the required capabilities and an allowed queue can claim a job.
+A claim creates a cryptographically random lease token and a new immutable attempt record. Only a worker with the required flat capabilities and an allowed queue can claim a job. When a job declares `requiredCapabilityProfile`, at least one single worker profile must contain the complete set; the scheduler never assembles a match by unioning partial capabilities from multiple adapters or backends.
 
 A valid lease token is required to:
 
@@ -112,6 +112,13 @@ A valid lease token is required to:
 - report failure.
 
 Attempts retain worker ID, lease times, start time, heartbeat count, outcome, failure classification and output artifact IDs. Expired leases are recovered into retry, terminal failure or dead letter according to the original policy.
+
+### Worker capability profiles
+
+`RuntimeWorkerDescriptor.capabilityProfiles` represents independently executable backends. Provider workers advertise one profile per registered adapter. A job can therefore require `identity-reference`, `temporal-reference`, `pose-control` and `depth-control` as one indivisible adapter contract. A worker with identity support in one adapter and pose support in another does not qualify. Jobs without `requiredCapabilityProfile` retain the original flat-capability behavior.
+
+Provider handlers independently recompute the exact profile from the normalized request before execution. Missing, under-declared or forged profiles fail permanently before a provider call.
+
 
 ## Retry policy
 

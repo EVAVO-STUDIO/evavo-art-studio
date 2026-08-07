@@ -286,6 +286,13 @@ test("materialises plan, run and artifact placeholders without losing lineage", 
   );
   assert.equal(child.idempotencyKey, "hero-supervision-run:generate-idle:cycle-0");
   assert.deepEqual(child.inputArtifacts, [IDENTITY]);
+  assert.deepEqual(child.requiredCapabilityProfile, [
+    "cancellation",
+    "candidate-count",
+    "generate",
+    "identity-reference",
+    "reference-images",
+  ]);
 });
 
 test("redrives transient work, then routes repair, then requires review", () => {

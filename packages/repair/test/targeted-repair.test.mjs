@@ -365,6 +365,19 @@ test("masked pixel repair compiles one provider inpaint and protects sibling lay
     "quality.inpaint-mask",
     "evidence.bundle",
   ]);
+  assert.deepEqual(
+    result.packet.providerPlan.runtimeJob.requiredCapabilityProfile,
+    [
+      "cancellation",
+      "candidate-count",
+      "custom-size",
+      "identity-reference",
+      "inpaint",
+      "mask",
+      "multiple-reference-images",
+      "reference-images",
+    ],
+  );
   const stored = await data.store.get(result.packetArtifactId);
   assert.equal(stored.labels.artifactRole, "targeted-repair-packet");
   assert.equal(stored.labels.repairDisposition, "ready");

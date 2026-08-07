@@ -17,6 +17,7 @@ import {
   idempotencyIndexKey,
   isTerminalState,
   normalizeRuntimeJobSubmission,
+  normalizeRuntimeWorkerDescriptor,
   retryDelayMs,
   safeRuntimeName,
   workerCanRun,
@@ -613,13 +614,11 @@ export class LocalRuntimeRepository implements RuntimeRepository {
   }
 
   public async claim(request: RuntimeClaimRequest): Promise<readonly RuntimeClaimedJob[]> {
-    const workerId = safeRuntimeName(request.worker.id, "worker.id");
-    const capabilities = request.worker.capabilities.map((entry) =>
-      safeRuntimeName(entry, "worker.capability"),
-    );
-    const queues = request.worker.queues?.map((entry) =>
-      safeRuntimeName(entry, "worker.queue"),
-    );
+    const worker = normalizeRuntimeWorkerDescriptor(request.worker);
+    const workerId = worker.id;
+    const capabilities = worker.capabilities;
+    const capabilityProfiles = worker.capabilityProfiles ?? [];
+    const queues = worker.queues;
     const maximumJobs = request.maximumJobs ?? 1;
     if (!Number.isInteger(maximumJobs) || maximumJobs < 1 || maximumJobs > 100) {
       throw new RuntimeError(
@@ -637,7 +636,9 @@ export class LocalRuntimeRepository implements RuntimeRepository {
       const candidates = Object.values(snapshot.jobs)
         .filter((job) => job.state === "queued")
         .filter((job) => !allowedQueues || allowedQueues.has(job.spec.queue))
-        .filter((job) => workerCanRun(job, capabilities))
+        .filter((job) =>
+          workerCanRun(job, capabilities, capabilityProfiles),
+        )
         .sort(
           (left, right) =>
             right.spec.priority - left.spec.priority ||

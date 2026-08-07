@@ -75,6 +75,8 @@ This is not a loose prompt. It states what the provider may change, what it must
 
 The API, CLI and MCP compile surfaces also emit `requiredAdapterCapabilities`. This is the exact, deterministically sorted adapter requirement derived from the normalized request. Compilation does not inspect a worker registry, resolve artifact bytes or call a provider.
 
+When a compile surface emits a durable provider job, the same exact array is bound as `requiredCapabilityProfile`. The runtime scheduler requires one worker-advertised adapter profile to satisfy the entire set. It never combines identity support from one adapter with pose, edge or depth support from another. The provider handler recomputes the profile from the normalized request and rejects a missing or altered declaration before provider execution.
+
 ### 3. Inspect compatible adapter routing
 
 Before immutable reference I/O, the worker ranks every registered adapter and compiles a routing inspection containing:
@@ -100,7 +102,7 @@ The registry rejects adapters when they lack a required capability or violate re
 - candidate count;
 - cancellation.
 
-If no adapter is eligible, execution fails with `PROVIDER_ADAPTER_UNAVAILABLE` and the complete blocked routing inspection before the artifact store is asked to resolve or read any reference. A provider is never selected merely because it is available.
+If no adapter is eligible, execution fails with `PROVIDER_ADAPTER_UNAVAILABLE` and the complete blocked routing inspection before the artifact store is asked to resolve or read any reference. A provider is never selected merely because it is available. The runtime scheduler applies the same indivisible-profile rule before claim, so a worker cannot lease work that none of its individual adapters can honour.
 
 ### 4. Resolve immutable references
 

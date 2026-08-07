@@ -5,6 +5,7 @@ import {
   ProviderError,
   ProviderRegistry,
   executeProviderCandidateRequest,
+  providerRequiredCapabilities,
   validateProviderCandidateRequest,
   type NormalizedProviderCandidateRequest,
 } from "@evavo/art-providers";
@@ -13,6 +14,7 @@ import {
   PermanentRuntimeError,
   TransientRuntimeError,
   type RuntimeJobHandler,
+  type RuntimeWorkerCapabilityProfile,
 } from "@evavo/art-runtime";
 
 const OPERATION_KIND = Object.freeze({
@@ -126,6 +128,25 @@ function createHandler(
         `Provider job must require ${requiredCapability}.`,
       );
     }
+    const expectedProfile = providerRequiredCapabilities(request);
+    const declaredProfile = context.job.spec.requiredCapabilityProfile;
+    if (declaredProfile === undefined) {
+      throw new PermanentRuntimeError(
+        "PROVIDER_RUNTIME_CAPABILITY_PROFILE_MISSING",
+        "Provider job must declare the exact adapter capability profile derived from its normalized request.",
+      );
+    }
+    if (
+      declaredProfile.length !== expectedProfile.length ||
+      declaredProfile.some((capability, index) =>
+        capability !== expectedProfile[index],
+      )
+    ) {
+      throw new PermanentRuntimeError(
+        "PROVIDER_RUNTIME_CAPABILITY_PROFILE_MISMATCH",
+        "Provider job adapter capability profile does not match its normalized request.",
+      );
+    }
     try {
       const result = await executeProviderCandidateRequest(request, {
         registry,
@@ -174,4 +195,12 @@ export function providerWorkerCapabilities(
     capabilities.add("evidence.bundle");
   }
   return [...capabilities].sort();
+}
+export function providerWorkerCapabilityProfiles(
+  registry: ProviderRegistry,
+): readonly RuntimeWorkerCapabilityProfile[] {
+  return registry.list().map((adapter) => ({
+    id: adapter.id,
+    capabilities: [...adapter.capabilities].sort(),
+  }));
 }

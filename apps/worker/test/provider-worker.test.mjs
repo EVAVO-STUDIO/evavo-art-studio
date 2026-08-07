@@ -8,11 +8,16 @@ import { LocalArtifactStore } from "@evavo/art-artifacts";
 import {
   FixtureImageProviderAdapter,
   ProviderRegistry,
+  providerRequiredCapabilities,
+  validateProviderCandidateRequest,
 } from "@evavo/art-providers";
 import { LocalRuntimeRepository, RuntimeWorker } from "@evavo/art-runtime";
 
 import { createBuiltinHandlers } from "../dist/index.js";
-import { providerWorkerCapabilities } from "../dist/provider-handlers.js";
+import {
+  providerWorkerCapabilities,
+  providerWorkerCapabilityProfiles,
+} from "../dist/provider-handlers.js";
 
 const spritePng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFklEQVR4nGNgoBo4YaPxHxkPhAKyAQDgPyKxKv0aXwAAAABJRU5ErkJggg==",
@@ -87,17 +92,19 @@ test("durable provider worker preserves identity lineage and stores only unappro
       },
     ],
   };
+  const normalizedRequest = validateProviderCandidateRequest(request);
   const job = await runtime.submit({
     queue: "provider",
     kind: "art.candidate.generate",
     idempotencyKey: "hero-idle-down-key-pose-v1",
-    payload: request,
+    payload: normalizedRequest,
     requiredCapabilities: [
       "provider.generate",
       "provider.reference-lock",
       "provider.candidate-store",
       "evidence.bundle",
     ],
+    requiredCapabilityProfile: providerRequiredCapabilities(normalizedRequest),
     leaseDurationMs: 10_000,
     timeoutMs: 60_000,
   });
@@ -108,6 +115,7 @@ test("durable provider worker preserves identity lineage and stores only unappro
     worker: {
       id: "provider-worker-fixture",
       capabilities,
+      capabilityProfiles: providerWorkerCapabilityProfiles(registry),
       queues: ["provider"],
     },
     handlers: createBuiltinHandlers([root], registry),
@@ -158,4 +166,123 @@ test("durable provider worker preserves identity lineage and stores only unappro
   assert.equal(evidenceBody.resolvedReferences[0].role, "canonical-identity");
   assert.equal(evidenceBody.candidateArtifacts.length, 2);
   assert.ok(evidenceBody.compiledPrompt.includes("KEEP AS SEPARATE ASSETS OR LAYERS"));
+});
+
+test("provider handler rejects a claim whose runtime profile was under-declared", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-provider-profile-"));
+  const runtime = new LocalRuntimeRepository({ root: path.join(root, "runtime") });
+  const artifacts = new LocalArtifactStore({ root: path.join(root, "artifacts") });
+  const canonical = await artifacts.put(spritePng, {
+    mediaType: "image/png",
+    storageClass: "master",
+    fileName: "hero-canonical.png",
+    labels: { artifactRole: "canonical-identity", approvalState: "approved" },
+  });
+  const registry = new ProviderRegistry([new FixtureImageProviderAdapter()]);
+  const normalizedRequest = validateProviderCandidateRequest({
+    schemaVersion: "1.0",
+    operation: "generate",
+    assetKind: "sprite-frame",
+    continuityPhase: "key-pose",
+    assetId: "hero-idle",
+    candidateFamilyId: "hero-idle-profile-guard",
+    creativeIntent: "Preserve the approved identity in one idle key pose.",
+    style: { styleName: "Pixel art", intent: "Stable authored sprite identity." },
+    shot: { subject: "The approved hero only." },
+    target: { width: 128, height: 128, transparency: "required" },
+    background: { strategy: "native-alpha" },
+    candidateCount: 1,
+    references: [
+      {
+        artifactId: canonical.artifactId,
+        role: "canonical-identity",
+        required: true,
+      },
+    ],
+  });
+  const job = await runtime.submit({
+    queue: "provider",
+    kind: "art.candidate.generate",
+    idempotencyKey: "provider-profile-under-declared",
+    payload: normalizedRequest,
+    requiredCapabilities: [
+      "provider.generate",
+      "provider.reference-lock",
+      "provider.candidate-store",
+      "evidence.bundle",
+    ],
+    requiredCapabilityProfile: ["generate"],
+  });
+  const worker = new RuntimeWorker({
+    runtime,
+    artifacts,
+    worker: {
+      id: "provider-worker-profile-guard",
+      capabilities: providerWorkerCapabilities(registry),
+      capabilityProfiles: providerWorkerCapabilityProfiles(registry),
+      queues: ["provider"],
+    },
+    handlers: createBuiltinHandlers([root], registry),
+  });
+  const run = await worker.runOnce();
+  assert.equal(run.claimed, 1);
+  assert.equal(run.failed, 1);
+  const failed = await runtime.get(job.id);
+  assert.equal(failed.state, "failed");
+  assert.equal(
+    failed.failure.code,
+    "PROVIDER_RUNTIME_CAPABILITY_PROFILE_MISMATCH",
+  );
+});
+
+
+test("provider handler rejects a legacy job that omits its adapter capability profile", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-provider-profile-missing-"));
+  const runtime = new LocalRuntimeRepository({ root: path.join(root, "runtime") });
+  const artifacts = new LocalArtifactStore({ root: path.join(root, "artifacts") });
+  const registry = new ProviderRegistry([new FixtureImageProviderAdapter()]);
+  const normalizedRequest = validateProviderCandidateRequest({
+    schemaVersion: "1.0",
+    operation: "generate",
+    assetKind: "illustration",
+    continuityPhase: "independent",
+    assetId: "profile-missing",
+    candidateFamilyId: "profile-missing-v1",
+    creativeIntent: "Create one bounded fixture candidate.",
+    style: { styleName: "Fixture", intent: "Deterministic test output." },
+    shot: { subject: "One fixture subject." },
+    target: { width: 128, height: 128, transparency: "opaque" },
+    background: { strategy: "opaque-source" },
+    candidateCount: 1,
+  });
+  const job = await runtime.submit({
+    queue: "provider",
+    kind: "art.candidate.generate",
+    idempotencyKey: "provider-profile-missing",
+    payload: normalizedRequest,
+    requiredCapabilities: [
+      "provider.generate",
+      "provider.candidate-store",
+      "evidence.bundle",
+    ],
+  });
+  const worker = new RuntimeWorker({
+    runtime,
+    artifacts,
+    worker: {
+      id: "provider-worker-profile-missing",
+      capabilities: providerWorkerCapabilities(registry),
+      capabilityProfiles: providerWorkerCapabilityProfiles(registry),
+      queues: ["provider"],
+    },
+    handlers: createBuiltinHandlers([root], registry),
+  });
+  const run = await worker.runOnce();
+  assert.equal(run.claimed, 1);
+  assert.equal(run.failed, 1);
+  const failed = await runtime.get(job.id);
+  assert.equal(
+    failed.failure.code,
+    "PROVIDER_RUNTIME_CAPABILITY_PROFILE_MISSING",
+  );
 });

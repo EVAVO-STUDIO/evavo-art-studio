@@ -961,6 +961,7 @@ function JobDetail({
           <dt>Next attempt</dt><dd>{job.nextAttemptAt ? absoluteTime(job.nextAttemptAt) : "Not scheduled"}</dd>
           <dt>Deadline</dt><dd>{job.spec.deadline ? absoluteTime(job.spec.deadline) : "No deadline"}</dd>
           <dt>Capabilities</dt><dd>{job.spec.requiredCapabilities.join(", ") || "None declared"}</dd>
+          <dt>Capability profile</dt><dd>{job.spec.requiredCapabilityProfile?.join(", ") || "None declared"}</dd>
         </dl>
         {job.lease ? (
           <div className={styles.leaseCard}>

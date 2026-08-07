@@ -123,6 +123,10 @@ test("shared Book Art runtime compiles the exact no-fallback one-attempt contrac
   assert.deepEqual(first.plan, second.plan);
   assert.equal(first.plan.contract, BOOK_ART_PROVIDER_RUNTIME_CONTRACT);
   assert.equal(first.plan.runtimeSubmission.maximumAttempts, 1);
+  assert.deepEqual(
+    first.plan.runtimeSubmission.requiredCapabilityProfile,
+    first.plan.routingInspection.requiredCapabilities,
+  );
   assert.equal(first.plan.normalizedProviderRequest.candidateCount, 1);
   assert.equal(first.plan.normalizedProviderRequest.selection.allowFallback, false);
   assert.equal(first.providerCallPerformed, false);

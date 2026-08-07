@@ -24,6 +24,7 @@ import {
 import {
   createProviderHandlers,
   providerWorkerCapabilities,
+  providerWorkerCapabilityProfiles,
 } from "../dist/provider-handlers.js";
 
 const sha = (character) => character.repeat(64);
@@ -260,6 +261,7 @@ test("executes one fixture candidate once and leaves it unapproved and intermedi
     worker: {
       id: "book-art-provider-fixture-worker",
       capabilities: providerWorkerCapabilities(registry),
+      capabilityProfiles: providerWorkerCapabilityProfiles(registry),
       queues: ["provider"],
     },
     handlers: createProviderHandlers(registry),

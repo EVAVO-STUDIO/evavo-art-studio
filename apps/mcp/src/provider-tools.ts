@@ -60,6 +60,7 @@ function compiledValue(input: unknown) {
         "provider.candidate-store",
         "evidence.bundle",
       ],
+      requiredCapabilityProfile: providerRequiredCapabilities(request),
       maximumAttempts: 3,
       leaseDurationMs: 300_000,
       timeoutMs: 1_800_000,

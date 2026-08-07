@@ -5,6 +5,7 @@ import {
 } from "@evavo/art-artifacts";
 import {
   ProviderError,
+  providerRequiredCapabilities,
   type ProviderRegistry,
 } from "@evavo/art-providers";
 import {
@@ -198,18 +199,21 @@ function executionJob(
   packet: TargetedRepairPacket,
 ): JsonValue | null {
   if (packet.disposition !== "ready" || !packet.providerPlan) return null;
-  return normalizeJson(
-    compileTargetedRepairExecutionJob({
-      schemaVersion: "1.0",
-      repairPacketArtifactId: packetArtifactId,
-      providerCanvas: {
-        restorationSampling: "nearest-center",
-        paletteMode: "source",
-        alphaMode: "source",
-        requireBinaryMask: true,
-      },
-    }).runtimeJob,
-  );
+  const compiled = compileTargetedRepairExecutionJob({
+    schemaVersion: "1.0",
+    repairPacketArtifactId: packetArtifactId,
+    providerCanvas: {
+      restorationSampling: "nearest-center",
+      paletteMode: "source",
+      alphaMode: "source",
+      requireBinaryMask: true,
+    },
+  }).runtimeJob;
+  return normalizeJson({
+    ...compiled,
+    requiredCapabilityProfile:
+      packet.providerPlan.runtimeJob.requiredCapabilityProfile,
+  });
 }
 
 export function createTargetedRepairHandlers(
@@ -294,7 +298,43 @@ export function createTargetedRepairHandlers(
       context.job.spec.inputArtifacts,
       "art.repair.execute-provider-canvas",
     );
-    await readVerifiedPacket(context, request.repairPacketArtifactId);
+    const packet = await readVerifiedPacket(
+      context,
+      request.repairPacketArtifactId,
+    );
+    const providerPlan = packet.providerPlan;
+    if (!providerPlan) {
+      throw new PermanentRuntimeError(
+        "TARGETED_REPAIR_RUNTIME_PACKET_NOT_READY",
+        "Verified repair packet is missing its provider plan.",
+      );
+    }
+    const expectedProfile = providerRequiredCapabilities(providerPlan.request);
+    const packetProfile = providerPlan.runtimeJob.requiredCapabilityProfile;
+    if (
+      packetProfile.length !== expectedProfile.length ||
+      packetProfile.some((capability, index) =>
+        capability !== expectedProfile[index],
+      )
+    ) {
+      throw new PermanentRuntimeError(
+        "TARGETED_REPAIR_PACKET_CAPABILITY_PROFILE_MISMATCH",
+        "Repair packet provider capability profile does not match its normalized provider request.",
+      );
+    }
+    const declaredProfile = context.job.spec.requiredCapabilityProfile;
+    if (
+      declaredProfile === undefined ||
+      declaredProfile.length !== expectedProfile.length ||
+      declaredProfile.some((capability, index) =>
+        capability !== expectedProfile[index],
+      )
+    ) {
+      throw new PermanentRuntimeError(
+        "TARGETED_REPAIR_RUNTIME_CAPABILITY_PROFILE_MISMATCH",
+        "Repair execution job must declare the exact provider capability profile from its verified packet.",
+      );
+    }
     try {
       const result = await executeTargetedRepairProviderCanvas(request, {
         artifacts: context.artifacts,

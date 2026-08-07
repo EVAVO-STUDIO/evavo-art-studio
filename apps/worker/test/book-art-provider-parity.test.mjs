@@ -28,6 +28,7 @@ import {
 import {
   createProviderHandlers,
   providerWorkerCapabilities,
+  providerWorkerCapabilityProfiles,
 } from "../dist/provider-handlers.js";
 
 const sha = (character) => character.repeat(64);
@@ -172,6 +173,7 @@ test("Book Art parity matches independently observed one-attempt unapproved cand
       worker: {
         id: "book-art-parity-worker",
         capabilities: providerWorkerCapabilities(registry),
+        capabilityProfiles: providerWorkerCapabilityProfiles(registry),
         queues: ["provider"],
       },
       handlers: createProviderHandlers(registry),

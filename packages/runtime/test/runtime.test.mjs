@@ -245,6 +245,96 @@ test("concurrent claims lease a queued job only once", async () => {
   assert.equal(left.length + right.length, 1);
 });
 
+test("one worker capability profile must satisfy the complete job requirement", async () => {
+  const { runtime } = await fixture();
+  const job = await runtime.submit(
+    submission({
+      id: "job-profile",
+      idempotencyKey: "profile",
+      requiredCapabilityProfile: [
+        "identity-reference",
+        "pose-control",
+      ],
+    }),
+    "test",
+    T0,
+  );
+  assert.deepEqual(job.spec.requiredCapabilityProfile, [
+    "identity-reference",
+    "pose-control",
+  ]);
+
+  const splitProfiles = await runtime.claim({
+    worker: {
+      id: "worker-split-profiles",
+      capabilities: ["fixture.echo"],
+      capabilityProfiles: [
+        { id: "identity-only", capabilities: ["identity-reference"] },
+        { id: "pose-only", capabilities: ["pose-control"] },
+      ],
+    },
+    maximumJobs: 1,
+    now: at(1),
+  });
+  assert.equal(splitProfiles.length, 0);
+
+  const completeProfile = await runtime.claim({
+    worker: {
+      id: "worker-complete-profile",
+      capabilities: ["fixture.echo"],
+      capabilityProfiles: [
+        {
+          id: "complete",
+          capabilities: ["pose-control", "identity-reference"],
+        },
+      ],
+    },
+    maximumJobs: 1,
+    now: at(2),
+  });
+  assert.equal(completeProfile.length, 1);
+  assert.equal(completeProfile[0].job.id, job.id);
+});
+
+test("capability profile normalization is deterministic and malformed workers fail closed", async () => {
+  const { runtime } = await fixture();
+  const left = await runtime.submit(
+    submission({
+      id: "job-profile-normalized",
+      idempotencyKey: "profile-normalized",
+      requiredCapabilityProfile: [
+        "pose-control",
+        "identity-reference",
+        "pose-control",
+      ],
+    }),
+    "test",
+    T0,
+  );
+  assert.deepEqual(left.spec.requiredCapabilityProfile, [
+    "identity-reference",
+    "pose-control",
+  ]);
+
+  await assert.rejects(
+    () =>
+      runtime.claim({
+        worker: {
+          id: "worker-invalid-profiles",
+          capabilities: ["fixture.echo"],
+          capabilityProfiles: [
+            { id: "duplicate", capabilities: ["identity-reference"] },
+            { id: "duplicate", capabilities: ["pose-control"] },
+          ],
+        },
+        now: at(1),
+      }),
+    (error) =>
+      error instanceof RuntimeError &&
+      error.code === "RUNTIME_WORKER_OPTIONS_INVALID",
+  );
+});
+
 test("worker records output lineage and persists JSON results as evidence", async () => {
   const { runtime, artifacts } = await fixture();
   const input = await artifacts.put("source", {

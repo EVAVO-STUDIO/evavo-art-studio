@@ -25,6 +25,10 @@ test("worker registers repair planning and execution independently from selectio
     '"provider.inpaint"',
     '"provider.mask"',
     "TARGETED_REPAIR_RUNTIME_PACKET_CLOSURE_INCOMPLETE",
+    "requiredCapabilityProfile",
+    "providerRequiredCapabilities",
+    "TARGETED_REPAIR_PACKET_CAPABILITY_PROFILE_MISMATCH",
+    "TARGETED_REPAIR_RUNTIME_CAPABILITY_PROFILE_MISMATCH",
   ]) {
     assert.ok(combined.includes(token), `missing repair worker invariant: ${token}`);
   }
