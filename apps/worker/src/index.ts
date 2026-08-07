@@ -51,6 +51,7 @@ import {
   createProviderHandlers,
   createProviderRegistryFromEnvironment,
   providerWorkerCapabilities,
+  providerWorkerCapabilityProfiles,
 } from "./provider-handlers.js";
 import {
   createTargetedRepairHandlers,
@@ -312,6 +313,8 @@ async function main(): Promise<void> {
   const configuredQueues = envList("EVAVO_ART_WORKER_QUEUES");
   const providerRegistry = createProviderRegistryFromEnvironment();
   const providerCapabilities = providerWorkerCapabilities(providerRegistry);
+  const providerCapabilityProfiles =
+    providerWorkerCapabilityProfiles(providerRegistry);
   const masteringCapabilities = candidateMasteringWorkerCapabilities();
   const adaptiveCapabilities =
     deterministicMirrorAwareFinalizerWorkerCapabilities();
@@ -350,6 +353,9 @@ async function main(): Promise<void> {
         ...revisionSelectionCapabilities,
         ...providerCapabilities,
       ],
+      ...(providerCapabilityProfiles.length
+        ? { capabilityProfiles: providerCapabilityProfiles }
+        : {}),
       queues: configuredQueues.length ? configuredQueues : defaultQueues,
     },
     handlers: createBuiltinHandlers(roots, providerRegistry, runtime),

@@ -135,5 +135,13 @@
     "assetFamily": "hero-idle-down",
     "continuityPhase": "key-pose",
     "target": "godot-4.6.2"
-  }
+  },
+  "requiredCapabilityProfile": [
+    "cancellation",
+    "candidate-count",
+    "custom-size",
+    "generate",
+    "identity-reference",
+    "reference-images"
+  ]
 }

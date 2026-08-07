@@ -19,6 +19,8 @@ test("OpenAPI contract covers governed production, provider compilation and dura
     "capabilityVocabulary",
     "requiredReferenceCapabilities",
     "requiredAdapterCapabilities",
+    "requiredCapabilityProfile",
+    "one complete capability set",
     "identity-reference",
     "pose-control",
     "edge-control",

@@ -6,6 +6,7 @@ import {
 } from "@evavo/art-artifacts";
 import { preflightInpaintMask } from "@evavo/art-media";
 import {
+  providerRequiredCapabilities,
   validateProviderCandidateRequest,
   type ProviderCandidateReferenceInput,
   type ProviderReferenceRole,
@@ -473,6 +474,7 @@ async function buildProviderPlan(
         "quality.inpaint-mask",
         "evidence.bundle",
       ],
+      requiredCapabilityProfile: providerRequiredCapabilities(normalized),
       maximumAttempts: 3,
       leaseDurationMs: 300_000,
       timeoutMs: 1_800_000,

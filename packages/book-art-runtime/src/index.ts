@@ -12,6 +12,7 @@ import {
 } from "@evavo/art-contracts";
 import {
   providerRequestSha256,
+  providerRequiredCapabilities,
   validateProviderCandidateRequest,
   type NormalizedProviderCandidateRequest,
 } from "@evavo/art-providers";
@@ -285,6 +286,9 @@ export async function compileBookArtProviderShadowJob(
       "provider.candidate-store",
       "provider.generate",
     ],
+    requiredCapabilityProfile: providerRequiredCapabilities(
+      normalizedProviderRequest,
+    ),
     maximumAttempts: 1,
     retryPolicy: {
       baseDelayMs: 0,

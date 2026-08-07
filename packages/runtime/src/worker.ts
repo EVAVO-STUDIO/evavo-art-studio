@@ -5,6 +5,8 @@ import {
   type StoredArtifact,
 } from "@evavo/art-artifacts";
 
+import { normalizeRuntimeWorkerDescriptor } from "./normalize.js";
+
 import {
   CancelledRuntimeError,
   PermanentRuntimeError,
@@ -117,10 +119,10 @@ export class RuntimeWorker {
   readonly #heartbeatIntervalMs: number | undefined;
 
   public constructor(options: RuntimeWorkerOptions) {
-    if (!options.worker.id.trim()) {
-      throw new RuntimeError("RUNTIME_WORKER_OPTIONS_INVALID", "Worker id is required.");
-    }
-    this.#options = options;
+    this.#options = {
+      ...options,
+      worker: normalizeRuntimeWorkerDescriptor(options.worker),
+    };
     this.#concurrency = boundedInteger(options.concurrency, 1, 1, 64, "concurrency");
     this.#heartbeatIntervalMs = options.heartbeatIntervalMs;
     if (

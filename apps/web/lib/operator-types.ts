@@ -47,6 +47,7 @@ export interface OperatorRuntimeSpec {
   readonly idempotencyKey: string;
   readonly payload: unknown;
   readonly requiredCapabilities: readonly string[];
+  readonly requiredCapabilityProfile?: readonly string[];
   readonly dependencyJobIds: readonly string[];
   readonly inputArtifacts: readonly string[];
   readonly priority: number;

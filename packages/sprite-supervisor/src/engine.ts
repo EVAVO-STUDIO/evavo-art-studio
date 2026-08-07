@@ -3,6 +3,11 @@ import {
   type ArtifactId,
   type JsonValue,
 } from "@evavo/art-artifacts";
+import {
+  ProviderError,
+  providerRequiredCapabilities,
+  validateProviderCandidateRequest,
+} from "@evavo/art-providers";
 import type {
   RuntimeJobRecord,
   RuntimeJobSubmission,
@@ -22,6 +27,11 @@ import {
 import { spriteSupervisorSha256 } from "./validation.js";
 
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
+const PROVIDER_TASK_KINDS = new Set([
+  "art.candidate.generate",
+  "art.candidate.edit",
+  "art.candidate.inpaint",
+]);
 
 function nowIso(now: Date): string {
   if (!Number.isFinite(now.getTime())) {
@@ -243,12 +253,32 @@ export function materializeSupervisorChildSubmission(
     ...task.staticInputArtifacts,
     ...task.requiredArtifactRoles.flatMap((role) => roleArtifacts(state, role)),
   ];
+  const payload = materializeSupervisorTaskPayload(request, state, task);
+  let requiredCapabilityProfile: readonly string[] | undefined;
+  if (PROVIDER_TASK_KINDS.has(task.kind)) {
+    try {
+      requiredCapabilityProfile = providerRequiredCapabilities(
+        validateProviderCandidateRequest(payload),
+      );
+    } catch (error: unknown) {
+      if (error instanceof ProviderError) {
+        throw new SpriteSupervisorError(
+          "SPRITE_SUPERVISOR_PROVIDER_PROFILE_INVALID",
+          `Provider task ${task.id} could not compile its adapter capability profile: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
   return {
     queue: task.queue,
     kind: task.kind,
     idempotencyKey: `${request.runId}:${task.id}:cycle-${taskState.cycle}`,
-    payload: materializeSupervisorTaskPayload(request, state, task),
+    payload,
     requiredCapabilities: task.requiredCapabilities,
+    ...(requiredCapabilityProfile === undefined
+      ? {}
+      : { requiredCapabilityProfile }),
     dependencyJobIds: [...new Set(dependencyJobIds)].sort(),
     inputArtifacts: [...new Set(inputArtifacts)].sort(),
     priority: task.priority,

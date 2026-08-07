@@ -130,6 +130,10 @@ test("compiles one durable no-fallback job that requires the exact four-output s
   assert.equal(first.plan.normalizedProviderRequest.candidateCount, 4);
   assert.equal(first.plan.runtimeSubmission.kind, "art.candidate.generate");
   assert.equal(first.plan.runtimeSubmission.maximumAttempts, 1);
+  assert.deepEqual(
+    first.plan.runtimeSubmission.requiredCapabilityProfile,
+    ["cancellation", "candidate-count", "generate"],
+  );
   assert.equal(
     first.plan.runtimeSubmission.labels.migrationMode,
     "book-art-candidate-set",
@@ -170,6 +174,12 @@ test("submits idempotently without creating four provider attempts or allowing r
           "evidence.bundle",
           "provider.candidate-store",
           "provider.generate",
+        ],
+        capabilityProfiles: [
+          {
+            id: "fixture-image",
+            capabilities: first.job.spec.requiredCapabilityProfile,
+          },
         ],
       },
       maximumJobs: 1,

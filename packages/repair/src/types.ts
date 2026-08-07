@@ -172,6 +172,7 @@ export interface TargetedRepairProviderPlan {
     payload: NormalizedProviderCandidateRequest;
     inputArtifacts: readonly ArtifactId[];
     requiredCapabilities: readonly string[];
+    requiredCapabilityProfile: readonly string[];
     maximumAttempts: number;
     leaseDurationMs: number;
     timeoutMs: number;

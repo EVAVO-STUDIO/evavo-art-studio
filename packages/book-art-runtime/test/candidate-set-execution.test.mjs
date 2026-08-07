@@ -154,6 +154,12 @@ async function executeCandidateSet() {
     worker: {
       id: "execution-test-worker",
       capabilities: submission.job.spec.requiredCapabilities,
+      capabilityProfiles: [
+        {
+          id: "distinct-fixture-image",
+          capabilities: submission.job.spec.requiredCapabilityProfile,
+        },
+      ],
       queues: ["provider"],
     },
     maximumJobs: 1,

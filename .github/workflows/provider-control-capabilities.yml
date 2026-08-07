@@ -11,9 +11,27 @@ on:
       - "apps/cli/test/provider-cli.test.mjs"
       - "apps/mcp/src/provider-tools.ts"
       - "apps/mcp/test/provider-tools-contract.test.mjs"
+      - "apps/web/lib/operator-types.ts"
+      - "apps/web/app/operations/runtime-operations-dashboard.tsx"
+      - "apps/worker/src/**"
+      - "apps/worker/test/**"
+      - "packages/runtime/src/**"
+      - "packages/runtime/test/**"
+      - "packages/book-art-runtime/src/**"
+      - "packages/book-art-runtime/test/**"
+      - "packages/repair/src/**"
+      - "packages/repair/test/**"
+      - "packages/sprite-supervisor/package.json"
+      - "packages/sprite-supervisor/src/**"
+      - "packages/sprite-supervisor/test/**"
+      - "packages/sprite-supervisor/tsconfig.json"
+      - "examples/runtime-provider-job.json"
+      - "docs/durable-runtime-and-artifacts.md"
+      - "scripts/check-provider-runtime-capability-profiles.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
       - "packages/providers/src/**"
       - "packages/providers/test/**"
-      - "packages/repair/test/provider-canvas-execution.test.mjs"
       - "docs/governed-provider-candidates.md"
       - "docs/automatic-sprite-finalization.md"
       - ".github/workflows/provider-control-capabilities.yml"
@@ -29,9 +47,27 @@ on:
       - "apps/cli/test/provider-cli.test.mjs"
       - "apps/mcp/src/provider-tools.ts"
       - "apps/mcp/test/provider-tools-contract.test.mjs"
+      - "apps/web/lib/operator-types.ts"
+      - "apps/web/app/operations/runtime-operations-dashboard.tsx"
+      - "apps/worker/src/**"
+      - "apps/worker/test/**"
+      - "packages/runtime/src/**"
+      - "packages/runtime/test/**"
+      - "packages/book-art-runtime/src/**"
+      - "packages/book-art-runtime/test/**"
+      - "packages/repair/src/**"
+      - "packages/repair/test/**"
+      - "packages/sprite-supervisor/package.json"
+      - "packages/sprite-supervisor/src/**"
+      - "packages/sprite-supervisor/test/**"
+      - "packages/sprite-supervisor/tsconfig.json"
+      - "examples/runtime-provider-job.json"
+      - "docs/durable-runtime-and-artifacts.md"
+      - "scripts/check-provider-runtime-capability-profiles.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
       - "packages/providers/src/**"
       - "packages/providers/test/**"
-      - "packages/repair/test/provider-canvas-execution.test.mjs"
       - "docs/governed-provider-candidates.md"
       - "docs/automatic-sprite-finalization.md"
       - ".github/workflows/provider-control-capabilities.yml"
@@ -46,7 +82,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Check out exact source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -83,16 +119,41 @@ jobs:
           pnpm --filter @evavo/art-studio-api build
           pnpm --filter @evavo/art-studio-cli build
           pnpm --filter @evavo/art-studio-mcp build
+          pnpm --filter @evavo/art-studio-worker build
+          pnpm --filter @evavo/art-studio-web build
 
       - name: Type-check provider and control-surface boundaries
         run: |
           pnpm --filter @evavo/art-providers typecheck
+          pnpm --filter @evavo/art-runtime typecheck
+          pnpm --filter @evavo/art-book-runtime typecheck
+          pnpm --filter @evavo/art-repair typecheck
+          pnpm --filter @evavo/art-sprite-supervisor typecheck
           pnpm --filter @evavo/art-studio-api typecheck
           pnpm --filter @evavo/art-studio-cli typecheck
           pnpm --filter @evavo/art-studio-mcp typecheck
+          pnpm --filter @evavo/art-studio-worker typecheck
+          pnpm --filter @evavo/art-studio-web typecheck
 
-      - name: Run provider routing and capability regressions
-        run: node --test packages/providers/test/providers.test.mjs packages/providers/test/openai-preflight.test.mjs packages/providers/test/routing-inspection-security.test.mjs packages/providers/test/request-immutability-security.test.mjs packages/repair/test/provider-canvas-execution.test.mjs
+      - name: Run provider routing and scheduler capability regressions
+        run: >-
+          node --test
+          packages/providers/test/providers.test.mjs
+          packages/providers/test/openai-preflight.test.mjs
+          packages/providers/test/routing-inspection-security.test.mjs
+          packages/providers/test/request-immutability-security.test.mjs
+          packages/runtime/test/runtime.test.mjs
+          packages/book-art-runtime/test/runtime.test.mjs
+          packages/book-art-runtime/test/candidate-set-runtime.test.mjs
+          packages/book-art-runtime/test/candidate-set-execution.test.mjs
+          packages/repair/test/targeted-repair.test.mjs
+          packages/repair/test/provider-canvas-execution.test.mjs
+          packages/sprite-supervisor/test/sprite-supervisor.test.mjs
+          apps/worker/test/provider-worker.test.mjs
+          apps/worker/test/book-art-provider-jobs.test.mjs
+          apps/worker/test/book-art-provider-inspection.test.mjs
+          apps/worker/test/book-art-provider-parity.test.mjs
+          apps/worker/test/repair-registration-contract.test.mjs
 
       - name: Run API, CLI, MCP and OpenAPI capability regressions
         run: node --test apps/api/test/provider-api.test.mjs apps/api/test/openapi-contract.test.mjs apps/cli/test/provider-cli.test.mjs apps/mcp/test/provider-tools-contract.test.mjs
@@ -125,6 +186,14 @@ jobs:
           grep -F 'unknown capability' packages/providers/src/registry.ts
           grep -F 'before the artifact store is asked to resolve or read any reference' docs/governed-provider-candidates.md
           grep -F 'does **not** declare `pose-control`, `edge-control` or `depth-control`' docs/governed-provider-candidates.md
+          grep -F 'requiredCapabilityProfile' packages/runtime/src/types.ts
+          grep -F 'capabilityProfiles.some' packages/runtime/src/normalize.ts
+          grep -F 'PROVIDER_RUNTIME_CAPABILITY_PROFILE_MISMATCH' apps/worker/src/provider-handlers.ts
+          grep -F 'TARGETED_REPAIR_RUNTIME_CAPABILITY_PROFILE_MISMATCH' apps/worker/src/repair-handlers.ts
+          grep -F 'requiredCapabilityProfile: providerRequiredCapabilities' packages/book-art-runtime/src/index.ts
+          grep -F 'requiredCapabilityProfile: providerRequiredCapabilities' packages/book-art-runtime/src/candidate-set.ts
+          grep -F 'SPRITE_SUPERVISOR_PROVIDER_PROFILE_INVALID' packages/sprite-supervisor/src/engine.ts
+          node scripts/check-provider-runtime-capability-profiles.mjs
 
       - name: Run complete Art Studio validation
         run: pnpm check

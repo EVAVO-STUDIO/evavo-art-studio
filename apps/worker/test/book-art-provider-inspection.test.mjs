@@ -24,6 +24,7 @@ import { inspectBookArtProviderShadowJob } from "@evavo/art-book-runtime/inspect
 import {
   createProviderHandlers,
   providerWorkerCapabilities,
+  providerWorkerCapabilityProfiles,
 } from "../dist/provider-handlers.js";
 
 const sha = (character) => character.repeat(64);
@@ -158,6 +159,7 @@ test("Book Art inspection proves absent, queued and successful immutable shadow 
       worker: {
         id: "book-art-inspection-worker",
         capabilities: providerWorkerCapabilities(registry),
+        capabilityProfiles: providerWorkerCapabilityProfiles(registry),
         queues: ["provider"],
       },
       handlers: createProviderHandlers(registry),
@@ -211,6 +213,7 @@ test("Book Art inspection blocks a descriptor that falsely claims candidate appr
       worker: {
         id: "book-art-inspection-tamper-worker",
         capabilities: providerWorkerCapabilities(registry),
+        capabilityProfiles: providerWorkerCapabilityProfiles(registry),
         queues: ["provider"],
       },
       handlers: createProviderHandlers(registry),

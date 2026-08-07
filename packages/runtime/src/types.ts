@@ -46,6 +46,7 @@ export interface RuntimeJobSubmission {
   readonly idempotencyKey: string;
   readonly payload: JsonValue;
   readonly requiredCapabilities?: readonly string[];
+  readonly requiredCapabilityProfile?: readonly string[];
   readonly dependencyJobIds?: readonly string[];
   readonly inputArtifacts?: readonly ArtifactId[];
   readonly priority?: number;
@@ -66,6 +67,7 @@ export interface NormalizedRuntimeJobSpec {
   readonly idempotencyKey: string;
   readonly payload: JsonValue;
   readonly requiredCapabilities: readonly string[];
+  readonly requiredCapabilityProfile?: readonly string[];
   readonly dependencyJobIds: readonly string[];
   readonly inputArtifacts: readonly ArtifactId[];
   readonly priority: number;
@@ -133,9 +135,15 @@ export interface RuntimeJobRecord {
   readonly redriveCount: number;
 }
 
+export interface RuntimeWorkerCapabilityProfile {
+  readonly id: string;
+  readonly capabilities: readonly string[];
+}
+
 export interface RuntimeWorkerDescriptor {
   readonly id: string;
   readonly capabilities: readonly string[];
+  readonly capabilityProfiles?: readonly RuntimeWorkerCapabilityProfile[];
   readonly queues?: readonly string[];
 }
 

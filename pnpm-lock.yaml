@@ -598,6 +598,9 @@ importers:
       '@evavo/art-direction':
         specifier: workspace:*
         version: link:../art-direction
+      '@evavo/art-providers':
+        specifier: workspace:*
+        version: link:../providers
       '@evavo/art-runtime':
         specifier: workspace:*
         version: link:../runtime
