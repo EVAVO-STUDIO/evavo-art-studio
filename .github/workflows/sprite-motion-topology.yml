@@ -6,6 +6,14 @@ on:
       - "packages/sprite-planner/src/motion-topology.ts"
       - "packages/sprite-planner/src/index.ts"
       - "packages/sprite-planner/test/motion-topology.test.mjs"
+      - "packages/sprite-supervisor/src/automatic-motion-topology.ts"
+      - "packages/sprite-supervisor/src/automatic-compiler.ts"
+      - "packages/sprite-supervisor/src/automatic-types.ts"
+      - "packages/sprite-supervisor/src/automatic-protocol.ts"
+      - "packages/sprite-supervisor/src/automatic-mirror-drafts.ts"
+      - "packages/sprite-supervisor/src/automatic-mirror-family.ts"
+      - "packages/sprite-supervisor/test/automatic-workflow.test.mjs"
+      - "packages/sprite-supervisor/test/deterministic-mirroring.test.mjs"
       - "docs/SPRITE_MOTION_TOPOLOGY.md"
       - ".github/workflows/sprite-motion-topology.yml"
   push:
@@ -15,6 +23,14 @@ on:
       - "packages/sprite-planner/src/motion-topology.ts"
       - "packages/sprite-planner/src/index.ts"
       - "packages/sprite-planner/test/motion-topology.test.mjs"
+      - "packages/sprite-supervisor/src/automatic-motion-topology.ts"
+      - "packages/sprite-supervisor/src/automatic-compiler.ts"
+      - "packages/sprite-supervisor/src/automatic-types.ts"
+      - "packages/sprite-supervisor/src/automatic-protocol.ts"
+      - "packages/sprite-supervisor/src/automatic-mirror-drafts.ts"
+      - "packages/sprite-supervisor/src/automatic-mirror-family.ts"
+      - "packages/sprite-supervisor/test/automatic-workflow.test.mjs"
+      - "packages/sprite-supervisor/test/deterministic-mirroring.test.mjs"
       - "docs/SPRITE_MOTION_TOPOLOGY.md"
       - ".github/workflows/sprite-motion-topology.yml"
 
@@ -72,18 +88,34 @@ jobs:
       - name: Run sprite planner and motion topology tests
         run: pnpm --filter @evavo/art-sprite-planner test
 
+      - name: Build sprite supervisor dependency closure
+        run: pnpm --filter @evavo/art-sprite-supervisor... build
+
+      - name: Type-check exact automatic supervisor integration
+        run: pnpm --filter @evavo/art-sprite-supervisor typecheck
+
+      - name: Run automatic supervisor motion regressions
+        run: >-
+          node --test
+          packages/sprite-supervisor/test/automatic-workflow.test.mjs
+          packages/sprite-supervisor/test/deterministic-mirroring.test.mjs
+
       - name: Verify permanent source contract
         shell: bash
         run: |
           set -euo pipefail
           grep -F 'export * from "./motion-topology.js";' packages/sprite-planner/src/index.ts
-          grep -F 'SPRITE_MOTION_TOPOLOGY_PROTOCOL_VERSION = "2026-08-07.1"' packages/sprite-planner/src/motion-topology.ts
+          grep -F 'SPRITE_MOTION_TOPOLOGY_PROTOCOL_VERSION = "2026-08-07.2"' packages/sprite-planner/src/motion-topology.ts
           grep -F 'SPRITE_MOTION_SOURCE_PLAN_HASH_MISMATCH' packages/sprite-planner/src/motion-topology.ts
           grep -F 'SPRITE_MOTION_ISOMETRIC_DIRECTION_COUNT_INVALID' packages/sprite-planner/src/motion-topology.ts
           grep -F 'semantic phases' packages/sprite-planner/src/motion-topology.ts
           grep -F 'providerCalled: false' packages/sprite-planner/src/motion-topology.ts
           grep -F 'targetRepositoryMutated: false' packages/sprite-planner/src/motion-topology.ts
           grep -F 'publicationPerformed: false' packages/sprite-planner/src/motion-topology.ts
+          grep -F 'compileAutomaticSpriteMotionTopology' packages/sprite-supervisor/src/automatic-compiler.ts
+          grep -F 'semantic-phase-grounded-only' packages/sprite-supervisor/src/automatic-compiler.ts
+          grep -F 'motionTopologySha256' packages/sprite-supervisor/src/automatic-mirror-drafts.ts
+          grep -F 'AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION =' packages/sprite-supervisor/src/automatic-types.ts
 
       - name: Run complete Art Studio validation
         run: pnpm check
