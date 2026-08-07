@@ -18,6 +18,10 @@
       "types": "./dist/candidate-set-execution.d.ts",
       "import": "./dist/candidate-set-execution.js"
     },
+    "./creative-candidate-programme": {
+      "types": "./dist/creative-candidate-programme.d.ts",
+      "import": "./dist/creative-candidate-programme.js"
+    },
     "./docs-release": {
       "types": "./dist/docs-release.d.ts",
       "import": "./dist/docs-release.js"
