@@ -91,9 +91,11 @@ function jobOrThrow(snapshot: MutableRuntimeSnapshot, jobId: string): RuntimeJob
 }
 
 function isGovernedSingleAttemptBookArtJob(job: RuntimeJobRecord): boolean {
+  const migrationMode = job.spec.labels.migrationMode;
   return (
     job.spec.maximumAttempts === 1 &&
-    job.spec.labels.migrationMode === "book-art-shadow-candidate"
+    (migrationMode === "book-art-shadow-candidate" ||
+      migrationMode === "book-art-candidate-set")
   );
 }
 
