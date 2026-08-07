@@ -69,6 +69,17 @@ const DESCRIPTOR_KEYS = new Set([
   "objectRelativePath",
   "descriptorRelativePath",
 ]);
+const REFERENCE_KEYS = new Set([
+  "schemaVersion",
+  "namespace",
+  "name",
+  "generation",
+  "artifactId",
+  "contentHash",
+  "previousArtifactId",
+  "updatedAt",
+  "actor",
+]);
 
 function errorCode(error: unknown): string | undefined {
   return error && typeof error === "object" && "code" in error
@@ -92,6 +103,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function invalidDescriptor(message: string): never {
   throw new ArtifactStoreError("ARTIFACT_DESCRIPTOR_INVALID", message);
+}
+
+function invalidReference(message: string): never {
+  throw new ArtifactStoreError("ARTIFACT_REFERENCE_INVALID", message);
 }
 
 function freezeArtifactValue<T>(
@@ -430,31 +445,181 @@ function parseDescriptorText(
   return parseDescriptor(parsed, expectedId);
 }
 
-function parseReference(value: unknown): ArtifactReference {
-  if (!value || typeof value !== "object") {
-    throw new ArtifactStoreError(
-      "ARTIFACT_REFERENCE_INVALID",
-      "Artifact reference must be a JSON object.",
-    );
+function referenceArtifactId(value: unknown, field: string): ArtifactId {
+  if (typeof value !== "string" || !ARTIFACT_ID.test(value)) {
+    invalidReference(`Artifact reference ${field} is invalid.`);
   }
-  const reference = value as Partial<ArtifactReference>;
+  return value as ArtifactId;
+}
+
+function referenceContentHash(value: unknown): ContentHash {
+  if (typeof value !== "string" || !CONTENT_HASH.test(value)) {
+    invalidReference("Artifact reference contentHash is invalid.");
+  }
+  return value as ContentHash;
+}
+
+function referenceNamespace(value: unknown): string {
+  if (typeof value !== "string") {
+    invalidReference("Artifact reference namespace is invalid.");
+  }
+  let normalized: string;
+  try {
+    normalized = safeNamespace(value).join("/");
+  } catch {
+    invalidReference("Artifact reference namespace is invalid.");
+  }
+  if (normalized !== value) {
+    invalidReference("Artifact reference namespace is not canonical.");
+  }
+  return normalized;
+}
+
+function referenceName(value: unknown): string {
+  if (typeof value !== "string") {
+    invalidReference("Artifact reference name is invalid.");
+  }
+  let normalized: string;
+  try {
+    normalized = safeSegment(value, "name");
+  } catch {
+    invalidReference("Artifact reference name is invalid.");
+  }
+  if (normalized !== value) {
+    invalidReference("Artifact reference name is not canonical.");
+  }
+  return normalized;
+}
+
+function referenceTimestamp(value: unknown): string {
+  if (typeof value !== "string") {
+    invalidReference("Artifact reference updatedAt is invalid.");
+  }
+  const timestamp = new Date(value);
   if (
-    reference.schemaVersion !== "1.0" ||
-    typeof reference.namespace !== "string" ||
-    typeof reference.name !== "string" ||
-    typeof reference.generation !== "number" ||
-    typeof reference.artifactId !== "string" ||
-    typeof reference.contentHash !== "string" ||
-    typeof reference.updatedAt !== "string"
+    !Number.isFinite(timestamp.getTime()) ||
+    timestamp.toISOString() !== value
   ) {
-    throw new ArtifactStoreError(
-      "ARTIFACT_REFERENCE_INVALID",
-      "Artifact reference is missing required fields.",
+    invalidReference("Artifact reference updatedAt is not canonical ISO-8601.");
+  }
+  return value;
+}
+
+function referenceActor(value: unknown): string {
+  if (typeof value !== "string") {
+    invalidReference("Artifact reference actor is invalid.");
+  }
+  const actor = value.trim();
+  if (
+    !actor ||
+    actor !== value ||
+    actor.length > 512 ||
+    actor.includes("\0")
+  ) {
+    invalidReference("Artifact reference actor is not canonical.");
+  }
+  return actor;
+}
+
+function optionReferenceActor(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") {
+    invalidReference("Artifact reference actor is invalid.");
+  }
+  const actor = value.trim();
+  if (!actor) return undefined;
+  if (actor.length > 512 || actor.includes("\0")) {
+    invalidReference("Artifact reference actor is invalid.");
+  }
+  return actor;
+}
+
+function optionReferenceTimestamp(value: Date): string {
+  if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+    invalidReference("Artifact reference update time is invalid.");
+  }
+  return value.toISOString();
+}
+
+function serializeReference(reference: ArtifactReference): string {
+  return `${JSON.stringify(reference, null, 2)}\n`;
+}
+
+function parseReference(
+  value: unknown,
+  expectedNamespace: string,
+  expectedName: string,
+): ArtifactReference {
+  if (!isRecord(value)) {
+    invalidReference("Artifact reference must be a JSON object.");
+  }
+  for (const key of Object.keys(value)) {
+    if (!REFERENCE_KEYS.has(key)) {
+      invalidReference(`Artifact reference contains unsupported field ${key}.`);
+    }
+  }
+  if (value.schemaVersion !== "1.0") {
+    invalidReference("Artifact reference schema version is invalid.");
+  }
+
+  const namespace = referenceNamespace(value.namespace);
+  const name = referenceName(value.name);
+  if (namespace !== expectedNamespace || name !== expectedName) {
+    invalidReference("Artifact reference identity does not match its file path.");
+  }
+  if (
+    typeof value.generation !== "number" ||
+    !Number.isSafeInteger(value.generation) ||
+    value.generation < 1
+  ) {
+    invalidReference("Artifact reference generation is invalid.");
+  }
+  const generation = value.generation;
+  const artifactId = referenceArtifactId(value.artifactId, "artifactId");
+  const contentHash = referenceContentHash(value.contentHash);
+  const hasPrevious = Object.hasOwn(value, "previousArtifactId");
+  const previousArtifactId = hasPrevious
+    ? referenceArtifactId(value.previousArtifactId, "previousArtifactId")
+    : undefined;
+  if ((generation === 1 && hasPrevious) || (generation > 1 && !hasPrevious)) {
+    invalidReference(
+      "Artifact reference generation and previousArtifactId are inconsistent.",
     );
   }
-  validateArtifactId(reference.artifactId);
-  validateContentHash(reference.contentHash);
-  return reference as ArtifactReference;
+  const updatedAt = referenceTimestamp(value.updatedAt);
+  const actor = Object.hasOwn(value, "actor")
+    ? referenceActor(value.actor)
+    : undefined;
+
+  return freezeArtifactValue<ArtifactReference>({
+    schemaVersion: "1.0",
+    namespace,
+    name,
+    generation,
+    artifactId,
+    contentHash,
+    ...(previousArtifactId !== undefined ? { previousArtifactId } : {}),
+    updatedAt,
+    ...(actor !== undefined ? { actor } : {}),
+  });
+}
+
+function parseReferenceText(
+  value: string,
+  expectedNamespace: string,
+  expectedName: string,
+): ArtifactReference {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch {
+    invalidReference("Artifact reference is not valid JSON.");
+  }
+  const reference = parseReference(parsed, expectedNamespace, expectedName);
+  if (serializeReference(reference) !== value) {
+    invalidReference("Artifact reference bytes are not canonical.");
+  }
+  return reference;
 }
 
 export class LocalArtifactStore implements ArtifactStore {
@@ -477,6 +642,59 @@ export class LocalArtifactStore implements ArtifactStore {
       timeoutMs: this.#lockTimeoutMs,
       staleAfterMs: this.#staleLockMs,
     });
+  }
+
+  async #referenceTarget(
+    reference: ArtifactReference,
+    field: "artifactId" | "previousArtifactId",
+  ): Promise<StoredArtifact> {
+    const id = field === "artifactId"
+      ? reference.artifactId
+      : reference.previousArtifactId;
+    if (id === undefined) {
+      invalidReference(`Artifact reference ${field} is missing.`);
+    }
+    let descriptor: StoredArtifact | null;
+    try {
+      descriptor = await this.get(id);
+    } catch (error: unknown) {
+      if (
+        error instanceof ArtifactStoreError &&
+        error.code === "ARTIFACT_DESCRIPTOR_INVALID"
+      ) {
+        invalidReference(`Artifact reference ${field} descriptor is invalid.`);
+      }
+      throw error;
+    }
+    if (!descriptor) {
+      invalidReference(`Artifact reference ${field} target was not found.`);
+    }
+    return descriptor;
+  }
+
+  async #readReference(
+    referencePath: string,
+    expectedNamespace: string,
+    expectedName: string,
+  ): Promise<ArtifactReference> {
+    const reference = parseReferenceText(
+      await readFile(referencePath, "utf8"),
+      expectedNamespace,
+      expectedName,
+    );
+    const descriptor = await this.#referenceTarget(reference, "artifactId");
+    if (descriptor.contentHash !== reference.contentHash) {
+      invalidReference(
+        "Artifact reference contentHash does not match its target descriptor.",
+      );
+    }
+    if (
+      reference.previousArtifactId !== undefined &&
+      reference.previousArtifactId !== reference.artifactId
+    ) {
+      await this.#referenceTarget(reference, "previousArtifactId");
+    }
+    return reference;
   }
 
   public async put(
@@ -649,6 +867,8 @@ export class LocalArtifactStore implements ArtifactStore {
     }
     const normalizedNamespace = safeNamespace(namespace).join("/");
     const normalizedName = safeSegment(name, "name");
+    const actor = optionReferenceActor(options.actor);
+    const updatedAt = optionReferenceTimestamp(options.now ?? new Date());
     const root = await this.root();
     const relativePath = referenceRelativePath(normalizedNamespace, normalizedName);
     const referencePath = path.join(root, relativePath);
@@ -656,8 +876,10 @@ export class LocalArtifactStore implements ArtifactStore {
     return this.#lock(`reference:${normalizedNamespace}/${normalizedName}`, async () => {
       let previous: ArtifactReference | null = null;
       try {
-        previous = parseReference(
-          JSON.parse(await readFile(referencePath, "utf8")) as unknown,
+        previous = await this.#readReference(
+          referencePath,
+          normalizedNamespace,
+          normalizedName,
         );
       } catch (error: unknown) {
         if (errorCode(error) !== "ENOENT") throw error;
@@ -680,7 +902,7 @@ export class LocalArtifactStore implements ArtifactStore {
           `Reference artifact changed for ${normalizedNamespace}/${normalizedName}.`,
         );
       }
-      const reference: ArtifactReference = {
+      const reference = freezeArtifactValue<ArtifactReference>({
         schemaVersion: "1.0",
         namespace: normalizedNamespace,
         name: normalizedName,
@@ -688,11 +910,11 @@ export class LocalArtifactStore implements ArtifactStore {
         artifactId: descriptor.artifactId,
         contentHash: descriptor.contentHash,
         ...(previous ? { previousArtifactId: previous.artifactId } : {}),
-        updatedAt: (options.now ?? new Date()).toISOString(),
-        ...(options.actor?.trim() ? { actor: options.actor.trim() } : {}),
-      };
+        updatedAt,
+        ...(actor !== undefined ? { actor } : {}),
+      });
       await mkdir(path.dirname(referencePath), { recursive: true });
-      await atomicWriteFile(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+      await atomicWriteFile(referencePath, serializeReference(reference));
       return reference;
     });
   }
@@ -701,13 +923,17 @@ export class LocalArtifactStore implements ArtifactStore {
     namespace: string,
     name: string,
   ): Promise<ArtifactReference | null> {
+    const normalizedNamespace = safeNamespace(namespace).join("/");
+    const normalizedName = safeSegment(name, "name");
     const referencePath = path.join(
       await this.root(),
-      referenceRelativePath(namespace, name),
+      referenceRelativePath(normalizedNamespace, normalizedName),
     );
     try {
-      return parseReference(
-        JSON.parse(await readFile(referencePath, "utf8")) as unknown,
+      return await this.#readReference(
+        referencePath,
+        normalizedNamespace,
+        normalizedName,
       );
     } catch (error: unknown) {
       if (errorCode(error) === "ENOENT") return null;
@@ -719,23 +945,38 @@ export class LocalArtifactStore implements ArtifactStore {
     namespace: string,
   ): Promise<readonly ArtifactReference[]> {
     const root = await this.root();
-    const directory = path.join(root, "refs", ...safeNamespace(namespace));
+    const normalizedNamespace = safeNamespace(namespace).join("/");
+    const directory = path.join(root, "refs", ...safeNamespace(normalizedNamespace));
     let entries;
     try {
       entries = await readdir(directory, { withFileTypes: true });
     } catch (error: unknown) {
-      if (errorCode(error) === "ENOENT") return [];
+      if (errorCode(error) === "ENOENT") return Object.freeze([]);
       throw error;
     }
     const references: ArtifactReference[] = [];
     for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
       if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+      const expectedName = entry.name.slice(0, -".json".length);
+      let normalizedName: string;
+      try {
+        normalizedName = safeSegment(expectedName, "name");
+      } catch {
+        invalidReference("Artifact reference file name is invalid.");
+      }
+      if (normalizedName !== expectedName) {
+        invalidReference("Artifact reference file name is not canonical.");
+      }
       references.push(
-        parseReference(
-          JSON.parse(await readFile(path.join(directory, entry.name), "utf8")) as unknown,
+        await this.#readReference(
+          path.join(directory, entry.name),
+          normalizedNamespace,
+          normalizedName,
         ),
       );
     }
-    return references.sort((left, right) => left.name.localeCompare(right.name));
+    return Object.freeze(
+      references.sort((left, right) => left.name.localeCompare(right.name)),
+    );
   }
 }
