@@ -17,6 +17,10 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BOOTSTRAP = path.join(ROOT, "scripts/bootstrap-ci-media-tools.sh");
 const MAINLINE_WORKFLOW = path.join(ROOT, ".github/workflows/ci.yml");
+const BOOK_ART_WORKFLOW = path.join(
+  ROOT,
+  ".github/workflows/book-art-provider-runtime.yml",
+);
 const BOOTSTRAP_WORKFLOW = path.join(
   ROOT,
   ".github/workflows/ci-media-tool-bootstrap.yml",
@@ -251,16 +255,31 @@ exit 92
   assert.equal(await exists(paths.ffprobe), false);
 });
 
-test("mainline workflows permanently use the bounded bootstrap contract", async () => {
-  const [mainline, workflow, bootstrap] = await Promise.all([
+test("critical workflows permanently use the bounded bootstrap contract", async () => {
+  const [mainline, bookArt, workflow, bootstrap] = await Promise.all([
     readFile(MAINLINE_WORKFLOW, "utf8"),
+    readFile(BOOK_ART_WORKFLOW, "utf8"),
     readFile(BOOTSTRAP_WORKFLOW, "utf8"),
     readFile(BOOTSTRAP, "utf8"),
   ]);
 
-  assert.match(mainline, /bash scripts\/bootstrap-ci-media-tools\.sh/);
-  assert.doesNotMatch(mainline, /sudo apt-get update/);
+  for (const [name, source] of [
+    ["exact-main", mainline],
+    ["Book Art", bookArt],
+  ]) {
+    assert.match(
+      source,
+      /bash scripts\/bootstrap-ci-media-tools\.sh/,
+      `${name} workflow must use the shared bootstrap`,
+    );
+    assert.doesNotMatch(
+      source,
+      /sudo apt-get update/,
+      `${name} workflow must not perform unbounded apt update`,
+    );
+  }
   assert.match(workflow, /test-ci-media-tool-bootstrap\.mjs/);
+  assert.match(workflow, /book-art-provider-runtime\.yml/);
   assert.match(workflow, /bash scripts\/bootstrap-ci-media-tools\.sh/);
   assert.match(bootstrap, /CI_MEDIA_APT_UPDATE_TIMEOUT_SECONDS:-120/);
   assert.match(bootstrap, /CI_MEDIA_APT_INSTALL_TIMEOUT_SECONDS:-180/);
