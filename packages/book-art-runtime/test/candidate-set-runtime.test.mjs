@@ -132,7 +132,7 @@ test("compiles one durable no-fallback job that requires the exact four-output s
   assert.equal(first.plan.runtimeSubmission.maximumAttempts, 1);
   assert.deepEqual(
     first.plan.runtimeSubmission.requiredCapabilityProfile,
-    first.plan.routingInspection.requiredCapabilities,
+    ["cancellation", "candidate-count", "generate"],
   );
   assert.equal(
     first.plan.runtimeSubmission.labels.migrationMode,

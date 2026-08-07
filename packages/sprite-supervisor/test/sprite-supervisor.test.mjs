@@ -120,6 +120,7 @@ function request(overrides = {}) {
             height: { $plan: "/asset/dimensions/height" },
             transparency: "required",
           },
+          background: { strategy: "chroma-key", matteColour: "#00ff00" },
           references: [
             {
               artifactId: { $artifact: "canonical-identity" },
