@@ -13,57 +13,27 @@ on:
       - "validation/docs-editorial-consensus/**"
       - "validation/docs-editorial-runtime-evidence/**"
       - "validation/docs-narrative-craft/**"
-  issue_comment:
-    types:
-      - created
-  schedule:
-    - cron: "*/5 * * * *"
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: validate-docs-editorial-runtime-evidence-${{ github.event.pull_request.head.sha || format('{0}-{1}', github.event_name, github.run_id) }}
+  group: validate-docs-editorial-runtime-evidence-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: true
 
 jobs:
   exact-mirror:
-    if: >-
-      github.event_name == 'schedule' ||
-      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'validation/docs-editorial-runtime-evidence-mirror-')) ||
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.user.login == 'EVAVO-STUDIO' && github.event.comment.body == '/validate-docs-editorial-runtime')
+    if: startsWith(github.head_ref, 'validation/docs-editorial-runtime-evidence-mirror-')
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
       - name: Check out pull-request head
-        if: github.event_name == 'pull_request'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Check out exact scheduled or comment-selected mirror head
-        if: github.event_name == 'issue_comment' || github.event_name == 'schedule'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-          ref: validation/docs-editorial-runtime-evidence-mirror-20260807
-
-      - name: Prove the selected mirror identity
-        if: github.event_name == 'issue_comment' || github.event_name == 'schedule'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "25364045a30b7f3e8a9463f7b74fd936d7600f95"
-          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            head_ref="$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }} --jq .head.ref)"
-            [[ "$head_ref" == validation/docs-editorial-runtime-evidence-mirror-* ]]
-          fi
 
       - name: Use current LTS Node.js
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
