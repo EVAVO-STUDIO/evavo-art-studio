@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
+
+import { LocalArtifactStore } from "@evavo/art-artifacts";
 
 import {
   FIXTURE_PROVIDER_DESCRIPTOR,
   ProviderError,
   ProviderRegistry,
   compileProviderRoutingInspection,
+  executeProviderCandidateRequest,
   inspectProviderCandidateRouting,
   validateProviderCandidateRequest,
 } from "../dist/index.js";
@@ -303,12 +309,34 @@ test("custom routing snapshots entry, decision and nested descriptor accessors e
     },
   });
 
-  const adapter = {
-    descriptor,
-    execute: async () => {
-      throw new Error("execution is outside this inspection-only test");
-    },
+  const execute = async () => {
+    throw new Error("execution is outside this inspection-only test");
   };
+  let descriptorReads = 0;
+  let executeReads = 0;
+  const adapter = {};
+  Object.defineProperties(adapter, {
+    descriptor: {
+      enumerable: true,
+      get() {
+        descriptorReads += 1;
+        if (descriptorReads > 1) {
+          throw new Error("routing adapter descriptor was read more than once");
+        }
+        return descriptor;
+      },
+    },
+    execute: {
+      enumerable: true,
+      get() {
+        executeReads += 1;
+        if (executeReads > 1) {
+          throw new Error("routing adapter execute was read more than once");
+        }
+        return execute;
+      },
+    },
+  });
   let adapterReads = 0;
   let decisionObjectReads = 0;
   const entry = {};
@@ -343,6 +371,8 @@ test("custom routing snapshots entry, decision and nested descriptor accessors e
   ]);
   assert.equal(adapterReads, 1);
   assert.equal(decisionObjectReads, 1);
+  assert.equal(descriptorReads, 1);
+  assert.equal(executeReads, 1);
   assert.equal(dataPolicyReads, 1);
   assert.equal(reasonReads, 1);
   assert.deepEqual(decisionReads, {
@@ -351,4 +381,125 @@ test("custom routing snapshots entry, decision and nested descriptor accessors e
     reasons: 1,
     rank: 1,
   });
+});
+
+test("provider execution uses the exact adapter snapshot recorded by inspection", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "evavo-provider-routing-binding-"),
+  );
+  try {
+    const descriptor = mutableDescriptor("execution-bound-image");
+    let inspectedExecutions = 0;
+    let swappedExecutions = 0;
+    const outputs = () => [
+      { bytes: Buffer.from("candidate-one"), mediaType: "image/png" },
+      { bytes: Buffer.from("candidate-two"), mediaType: "image/png" },
+    ];
+    const inspectedAdapter = {
+      descriptor,
+      execute: async () => {
+        inspectedExecutions += 1;
+        return {
+          adapterId: descriptor.id,
+          model: descriptor.models[0],
+          outputs: outputs(),
+        };
+      },
+    };
+    const swappedAdapter = {
+      descriptor,
+      execute: async () => {
+        swappedExecutions += 1;
+        return {
+          adapterId: descriptor.id,
+          model: descriptor.models[0],
+          outputs: outputs(),
+        };
+      },
+    };
+    const decision = Object.freeze({
+      adapterId: descriptor.id,
+      eligible: true,
+      reasons: Object.freeze([
+        "all declared request capabilities are supported",
+      ]),
+      rank: 1,
+    });
+    let adapterReads = 0;
+    let decisionReads = 0;
+    const entry = {};
+    Object.defineProperties(entry, {
+      adapter: {
+        enumerable: true,
+        get() {
+          adapterReads += 1;
+          return adapterReads === 1 ? inspectedAdapter : swappedAdapter;
+        },
+      },
+      decision: {
+        enumerable: true,
+        get() {
+          decisionReads += 1;
+          return decision;
+        },
+      },
+    });
+    const registry = {
+      list: () => [descriptor],
+      rank: () => [entry],
+    };
+    const artifacts = new LocalArtifactStore({ root });
+    await artifacts.root();
+
+    const result = await executeProviderCandidateRequest(independentRequest(), {
+      registry,
+      artifacts,
+      signal: new AbortController().signal,
+      now: () => new Date("2026-08-07T08:00:00.000Z"),
+    });
+
+    assert.equal(result.adapterId, "execution-bound-image");
+    assert.equal(result.routingInspection.firstEligibleAdapterId, result.adapterId);
+    assert.equal(result.candidateArtifacts.length, 2);
+    assert.equal(inspectedExecutions, 1);
+    assert.equal(swappedExecutions, 0);
+    assert.equal(adapterReads, 1);
+    assert.equal(decisionReads, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("custom routing cannot mark a statically incompatible adapter eligible", () => {
+  const base = mutableDescriptor("false-eligible-image");
+  const descriptor = {
+    ...base,
+    capabilities: base.capabilities.filter((entry) => entry !== "generate"),
+  };
+  const adapter = {
+    descriptor,
+    execute: async () => {
+      throw new Error("statically incompatible adapter must never execute");
+    },
+  };
+
+  assert.throws(
+    () =>
+      compileProviderRoutingInspection(independentRequest(), [
+        {
+          adapter,
+          decision: {
+            adapterId: descriptor.id,
+            eligible: true,
+            reasons: ["custom registry claimed eligibility"],
+            rank: 1,
+          },
+        },
+      ]),
+    (error) =>
+      error instanceof ProviderError &&
+      error.code === "PROVIDER_ROUTING_INSPECTION_INVALID" &&
+      /cannot mark adapter false-eligible-image eligible/.test(error.message) &&
+      /missing capability generate/.test(error.message),
+  );
 });
