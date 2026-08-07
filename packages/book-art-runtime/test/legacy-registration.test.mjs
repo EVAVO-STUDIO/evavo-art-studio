@@ -228,13 +228,16 @@ test("registers exact legacy artwork bytes once without re-encoding or approval"
 test("blocks checksum and dimension drift before any artifact write", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-legacy-book-art-block-"));
   try {
+    const artifacts = new LocalArtifactStore({ root });
+    await artifacts.root();
+
     const badImport = stateImportInput();
     badImport.qualityAuthority.candidate.expectedSha256 = sha("9");
     badImport.qualityAuthority.governedArtifact.checksumSha256 = sha("9");
     badImport.qualityAuthority.governedArtifact.widthPx = 99;
     badImport.selectionBinding.sourceArtifactSha256 = sha("9");
     const result = await registerLegacyBookArtBytes(input(badImport), PNG, {
-      artifacts: new LocalArtifactStore({ root }),
+      artifacts,
       actor: "legacy-import-test",
     });
     assert.equal(result.status, "blocked");
