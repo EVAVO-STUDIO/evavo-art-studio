@@ -45,6 +45,10 @@
     "./legacy-registration-readiness": {
       "types": "./dist/legacy-registration-readiness.d.ts",
       "import": "./dist/legacy-registration-readiness.js"
+    },
+    "./legacy-registration-readiness-batch": {
+      "types": "./dist/legacy-registration-readiness-batch.d.ts",
+      "import": "./dist/legacy-registration-readiness-batch.js"
     }
   },
   "files": [
