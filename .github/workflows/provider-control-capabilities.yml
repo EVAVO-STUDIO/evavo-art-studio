@@ -28,6 +28,7 @@ on:
       - "examples/runtime-provider-job.json"
       - "docs/durable-runtime-and-artifacts.md"
       - "scripts/check-provider-runtime-capability-profiles.mjs"
+      - "scripts/bootstrap-ci-media-tools.sh"
       - "package.json"
       - "pnpm-lock.yaml"
       - "packages/providers/src/**"
@@ -64,6 +65,7 @@ on:
       - "examples/runtime-provider-job.json"
       - "docs/durable-runtime-and-artifacts.md"
       - "scripts/check-provider-runtime-capability-profiles.mjs"
+      - "scripts/bootstrap-ci-media-tools.sh"
       - "package.json"
       - "pnpm-lock.yaml"
       - "packages/providers/src/**"
@@ -91,13 +93,7 @@ jobs:
           persist-credentials: false
 
       - name: Install and identify audio media tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends ffmpeg
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
+        run: bash scripts/bootstrap-ci-media-tools.sh
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
