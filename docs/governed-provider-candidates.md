@@ -188,6 +188,27 @@ Independent environments, effects, UI assets, illustrations and print candidates
 
 Reference roles remain separate in the compiled contract. The provider is instructed not to average identity, pose, palette and materials into a generic blend.
 
+### Capability-aware reference routing
+
+Reference roles and adapter capabilities are separate contracts. A provider may accept ordinary image inputs without being allowed to claim that it implements a structural control channel. Art Studio therefore derives adapter requirements from every reference whose `required` flag is `true`:
+
+| Required reference role | Required adapter capability |
+|---|---|
+| `canonical-identity` | `identity-reference` |
+| `direction-master` | `direction-reference` |
+| `previous-key-pose`, `next-key-pose` | `temporal-reference` |
+| `palette-reference` | `palette-reference` |
+| `line-reference` | `line-reference` |
+| `material-reference` | `material-reference` |
+| `layer-context` | `layer-context-reference` |
+| `pose-control` | `pose-control` |
+| `edge-control` | `edge-control` |
+| `depth-control` | `depth-control` |
+
+`base-image` and `mask` keep their operation-specific rules. A required mask still requires the adapter `mask` capability. Optional references can be supplied as ordinary reference context without pretending they are hard control guarantees.
+
+The registry fails closed when an adapter descriptor declares an unknown capability or lacks any capability derived from a required reference. The `required` field itself must be a real JSON boolean; malformed values are rejected instead of being coerced to optional.
+
 ## What belongs in one candidate image
 
 A candidate includes only the content declared by the shot contract:
@@ -228,6 +249,8 @@ Art Studio keeps final game dimensions independent from provider source dimensio
 ### Multiple references
 
 Generation without references uses `/v1/images/generations`. Any edit, inpaint or reference-conditioned request uses `/v1/images/edits` with ordered `image[]` parts. A mask is sent separately as `mask`.
+
+The Art Studio OpenAI adapter explicitly declares semantic image-reference capabilities for identity, direction, temporal neighbours, palette, line treatment, materials and layer context because those roles are preserved in its ordered inputs and compiled prompt. It deliberately does **not** declare `pose-control`, `edge-control` or `depth-control`: those are reserved for adapters that implement a genuine structural-control channel rather than treating a control map as an ordinary image reference. A request that marks one of those structural controls as required will therefore not route to the OpenAI adapter.
 
 The adapter deliberately omits an `input_fidelity` override because GPT Image 2 currently processes image inputs with high fidelity automatically.
 

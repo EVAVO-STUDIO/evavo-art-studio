@@ -46,6 +46,7 @@ class PixelRepairFixtureAdapter {
       "inpaint",
       "reference-images",
       "multiple-reference-images",
+      "identity-reference",
       "mask",
       "custom-size",
       "candidate-count",

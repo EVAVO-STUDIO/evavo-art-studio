@@ -15,6 +15,7 @@ import {
   compileProviderCandidatePrompt,
   executeProviderCandidateRequest,
   providerRequestSha256,
+  providerRequiredCapabilities,
   validateProviderCandidateRequest,
 } from "../dist/index.js";
 
@@ -87,6 +88,14 @@ async function artifactFixture() {
     next: await put("next.png", "next-key-pose"),
     base: await put("base.png", "base-image"),
     mask: await put("mask.png", "mask"),
+    direction: await put("direction.png", "direction-master"),
+    pose: await put("pose.png", "pose-control"),
+    edge: await put("edge.png", "edge-control"),
+    depth: await put("depth.png", "depth-control"),
+    palette: await put("palette.png", "palette-reference"),
+    line: await put("line.png", "line-reference"),
+    material: await put("material.png", "material-reference"),
+    layer: await put("layer.png", "layer-context"),
   };
 }
 
@@ -107,6 +116,19 @@ test("continuity-locked sprites require canonical identity and in-between neighb
     () =>
       validateProviderCandidateRequest(
         request({
+          references: [
+            ref(fixture.canonical, "canonical-identity", { required: false }),
+          ],
+        }),
+      ),
+    (error) =>
+      error instanceof ProviderError &&
+      /canonical-identity as a required reference/.test(error.message),
+  );
+  assert.throws(
+    () =>
+      validateProviderCandidateRequest(
+        request({
           continuityPhase: "in-between",
           references: [ref(fixture.canonical, "canonical-identity")],
         }),
@@ -114,6 +136,22 @@ test("continuity-locked sprites require canonical identity and in-between neighb
     (error) =>
       error instanceof ProviderError &&
       /previous-key-pose and next-key-pose/.test(error.message),
+  );
+  assert.throws(
+    () =>
+      validateProviderCandidateRequest(
+        request({
+          continuityPhase: "in-between",
+          references: [
+            ref(fixture.canonical, "canonical-identity"),
+            ref(fixture.previous, "previous-key-pose", { required: false }),
+            ref(fixture.next, "next-key-pose"),
+          ],
+        }),
+      ),
+    (error) =>
+      error instanceof ProviderError &&
+      /previous-key-pose and next-key-pose as required references/.test(error.message),
   );
   const valid = validateProviderCandidateRequest(
     request({
@@ -143,7 +181,20 @@ test("inpaint requests require one base image and one mask", async () => {
   });
   assert.throws(
     () => validateProviderCandidateRequest(base),
-    (error) => error instanceof ProviderError && /exactly one mask/.test(error.message),
+    (error) => error instanceof ProviderError && /exactly one required mask/.test(error.message),
+  );
+  assert.throws(
+    () =>
+      validateProviderCandidateRequest({
+        ...base,
+        references: [
+          ...base.references,
+          ref(fixture.mask, "mask", { required: false }),
+        ],
+      }),
+    (error) =>
+      error instanceof ProviderError &&
+      /exactly one required mask/.test(error.message),
   );
   const valid = validateProviderCandidateRequest({
     ...base,
@@ -211,6 +262,126 @@ test("governed Book candidate sets demand genuinely distinct non-template altern
   ]) {
     assert.ok(compiled.text.includes(token), `missing diversity contract: ${token}`);
   }
+});
+
+
+test("registry binds reference semantics to explicit adapter capabilities and fails closed on structural controls", async () => {
+  const fixture = await artifactFixture();
+  const openai = new OpenAIImageProviderAdapter({
+    apiKey: "test-key-abcdefghijklmnopqrstuvwxyz0123456789",
+    fetch: async () => {
+      throw new Error("not called");
+    },
+  });
+  const semantic = validateProviderCandidateRequest(
+    request({
+      continuityPhase: "in-between",
+      references: [
+        ref(fixture.canonical, "canonical-identity"),
+        ref(fixture.direction, "direction-master"),
+        ref(fixture.previous, "previous-key-pose"),
+        ref(fixture.next, "next-key-pose"),
+        ref(fixture.palette, "palette-reference"),
+        ref(fixture.line, "line-reference"),
+        ref(fixture.material, "material-reference"),
+        ref(fixture.layer, "layer-context"),
+      ],
+    }),
+  );
+  const semanticCapabilities = providerRequiredCapabilities(semantic);
+  for (const capability of [
+    "identity-reference",
+    "direction-reference",
+    "temporal-reference",
+    "palette-reference",
+    "line-reference",
+    "material-reference",
+    "layer-context-reference",
+  ]) {
+    assert.ok(
+      semanticCapabilities.includes(capability),
+      `missing semantic provider capability ${capability}`,
+    );
+  }
+  assert.equal(new ProviderRegistry([openai]).rank(semantic)[0].decision.eligible, true);
+
+  const structural = validateProviderCandidateRequest(
+    request({
+      references: [
+        ref(fixture.canonical, "canonical-identity"),
+        ref(fixture.pose, "pose-control"),
+        ref(fixture.edge, "edge-control"),
+        ref(fixture.depth, "depth-control"),
+      ],
+    }),
+  );
+  assert.deepEqual(
+    providerRequiredCapabilities(structural).filter((entry) => entry.endsWith("control")),
+    ["depth-control", "edge-control", "pose-control"],
+  );
+  const openaiDecision = new ProviderRegistry([openai]).rank(structural)[0].decision;
+  assert.equal(openaiDecision.eligible, false);
+  for (const capability of ["pose-control", "edge-control", "depth-control"]) {
+    assert.ok(
+      openaiDecision.reasons.some((entry) => entry.includes(`missing capability ${capability}`)),
+      `OpenAI adapter must not claim unsupported structural control ${capability}`,
+    );
+  }
+  assert.equal(
+    new ProviderRegistry([new FixtureImageProviderAdapter()]).rank(structural)[0].decision.eligible,
+    true,
+  );
+
+  const optionalPose = validateProviderCandidateRequest(
+    request({
+      references: [
+        ref(fixture.canonical, "canonical-identity"),
+        ref(fixture.pose, "pose-control", { required: false }),
+      ],
+    }),
+  );
+  assert.equal(
+    providerRequiredCapabilities(optionalPose).includes("pose-control"),
+    false,
+  );
+  assert.equal(new ProviderRegistry([openai]).rank(optionalPose)[0].decision.eligible, true);
+});
+
+test("provider reference required flag and adapter capability vocabulary fail closed", async () => {
+  const fixture = await artifactFixture();
+  assert.throws(
+    () =>
+      validateProviderCandidateRequest(
+        request({
+          references: [
+            ref(fixture.canonical, "canonical-identity"),
+            ref(fixture.pose, "pose-control", { required: "false" }),
+          ],
+        }),
+      ),
+    (error) =>
+      error instanceof ProviderError &&
+      error.code === "PROVIDER_CANDIDATE_REQUEST_INVALID" &&
+      /references\[1\]\.required must be a boolean/.test(error.message),
+  );
+
+  class UnknownCapabilityAdapter extends FixtureImageProviderAdapter {
+    descriptor = Object.freeze({
+      ...FIXTURE_PROVIDER_DESCRIPTOR,
+      id: "unknown-capability-provider",
+      capabilities: Object.freeze([
+        ...FIXTURE_PROVIDER_DESCRIPTOR.capabilities,
+        "unregistered-structural-control",
+      ]),
+    });
+  }
+  assert.throws(
+    () => new ProviderRegistry([new UnknownCapabilityAdapter()]),
+    (error) =>
+      error instanceof ProviderError &&
+      error.code === "PROVIDER_ADAPTER_INVALID" &&
+      /unknown capability unregistered-structural-control/.test(error.message),
+  );
 });
 
 test("registry rejects native-alpha work for GPT Image 2 but accepts chroma-key work", async () => {

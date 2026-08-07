@@ -5,7 +5,7 @@ import type {
   StoredArtifact,
 } from "@evavo/art-artifacts";
 
-export const PROVIDER_PROTOCOL_VERSION = "2026-07-29.1" as const;
+export const PROVIDER_PROTOCOL_VERSION = "2026-08-07.2" as const;
 
 export type ProviderOperation = "generate" | "edit" | "inpaint";
 export type ProviderAssetKind =
@@ -50,6 +50,16 @@ export type ProviderCapability =
   | "inpaint"
   | "reference-images"
   | "multiple-reference-images"
+  | "identity-reference"
+  | "direction-reference"
+  | "temporal-reference"
+  | "palette-reference"
+  | "line-reference"
+  | "material-reference"
+  | "layer-context-reference"
+  | "pose-control"
+  | "edge-control"
+  | "depth-control"
   | "mask"
   | "seed"
   | "native-alpha"
@@ -61,6 +71,48 @@ export type ProviderErrorClassification =
   | "permanent"
   | "incompatible"
   | "cancelled";
+
+export const PROVIDER_CAPABILITIES = Object.freeze([
+  "generate",
+  "edit",
+  "inpaint",
+  "reference-images",
+  "multiple-reference-images",
+  "identity-reference",
+  "direction-reference",
+  "temporal-reference",
+  "palette-reference",
+  "line-reference",
+  "material-reference",
+  "layer-context-reference",
+  "pose-control",
+  "edge-control",
+  "depth-control",
+  "mask",
+  "seed",
+  "native-alpha",
+  "custom-size",
+  "candidate-count",
+  "cancellation",
+] as const satisfies readonly ProviderCapability[]);
+
+export const PROVIDER_REFERENCE_CAPABILITY_REQUIREMENTS = Object.freeze({
+  "canonical-identity": "identity-reference",
+  "direction-master": "direction-reference",
+  "previous-key-pose": "temporal-reference",
+  "next-key-pose": "temporal-reference",
+  "base-image": null,
+  mask: null,
+  "pose-control": "pose-control",
+  "edge-control": "edge-control",
+  "depth-control": "depth-control",
+  "palette-reference": "palette-reference",
+  "line-reference": "line-reference",
+  "material-reference": "material-reference",
+  "layer-context": "layer-context-reference",
+} as const satisfies Readonly<
+  Record<ProviderReferenceRole, ProviderCapability | null>
+>);
 
 export interface ProviderCandidateReferenceInput {
   readonly artifactId: ArtifactId;
