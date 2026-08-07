@@ -1,14 +1,157 @@
 import type { BookIllustrationProcessFamily } from "./book-illustration-intelligence.js";
-import type { BookArtBriefV1, BookArtIdentityV1, BookArtManuscriptBindingV1, BookArtOutputRequirementV1, BookArtPurpose } from "./book-production.js";
+import type {
+  BookArtBriefV1,
+  BookArtIdentityV1,
+  BookArtManuscriptBindingV1,
+  BookArtOutputRequirementV1,
+  BookArtPurpose,
+} from "./book-production.js";
 
-export const BOOK_CREATIVE_DIRECTION_CONTRACT = "evavo_art_book_creative_direction_v1" as const;
+export const BOOK_CREATIVE_DIRECTION_CONTRACT =
+  "evavo_art_book_creative_direction_v1" as const;
 export const BOOK_CREATIVE_DIRECTION_SCHEMA_VERSION = 1 as const;
-export type BookCreativeGenre = "literary"|"historical"|"horror"|"mythic"|"grimdark_fantasy"|"science_fiction"|"crime"|"romance"|"children"|"memoir"|"documentary"|"technical"|"reference"|"graphic_novel"|"pulp"|"poetry"|"cookbook"|"academic"|"custom";
-export type BookCreativeRouteKind = "material_symbol"|"environmental_pressure"|"relational_tension"|"consequence_moment"|"systems_cutaway"|"sequential_rhythm";
-export type BookCreativeComposition = "single_anchor_with_counterweight"|"asymmetric_environmental_dominance"|"relational_distance_and_negative_space"|"aftermath_or_preaction_suspension"|"layered_cutaway"|"sequential_depth_rhythm"|"quiet_field_with_precise_intrusion"|"monumental_low_horizon"|"compressed_oblique_geometry";
-export interface BookCreativeEvidenceV1 { evidenceId:string; label:string; meaning:string; importance:number; sourceLocationIds:string[]; visualForms?:string[]; materials?:string[]; architecture?:string[]; role?:string; silhouette?:string; props?:string[]; contradiction?:string; spoilerLevel?:"none"|"minor"|"major"|"ending"; physicalAction?:string; beforeOrAftermath?:string; }
-export interface BookCreativeDirectionInputV1 { outputKind:"evavo_art_book_creative_direction_input"; schemaVersion:1; contract:typeof BOOK_CREATIVE_DIRECTION_CONTRACT; identity:BookArtIdentityV1; purpose:BookArtPurpose; manuscript:BookArtManuscriptBindingV1; output:BookArtOutputRequirementV1; contentClass:string; primaryGenre:BookCreativeGenre; audience:string; centralConflict:string; emotionalPromise:string; themes:BookCreativeEvidenceV1[]; motifs:BookCreativeEvidenceV1[]; settings:BookCreativeEvidenceV1[]; characters:BookCreativeEvidenceV1[]; scenes:BookCreativeEvidenceV1[]; continuityRequirements:string[]; materialRequirements:string[]; rightsEvidenceIds:string[]; aestheticIntent:string; allowedProcessFamilies:BookIllustrationProcessFamily[]; routeCount:2|3|4; titleZone:"top"|"upper_third"|"centre"|"lower_third"; authorZone:"top"|"upper_third"|"centre"|"lower_third"; minimumQuietAreaPercent:number; namedCreatorReferences:string[]; brandedFranchiseReferences:string[]; requestedAt:string; requestedBy:string; providerCallAllowed:false; automaticSelectionAllowed:false; automaticPromotionAllowed:false; publicationAllowed:false; }
-export interface BookCreativeDirectionRouteV1 { routeId:string; routeKind:BookCreativeRouteKind; composition:BookCreativeComposition; label:string; rationale:string; evidenceIds:string[]; sourceLocationIds:string[]; processFamily:BookIllustrationProcessFamily; tonalArchitecture:string; colourLogic:string[]; lightingLogic:string[]; markLogic:string[]; brief:BookArtBriefV1; }
-export interface BookCreativeDirectionPlanV1 { outputKind:"evavo_art_book_creative_direction_plan"; schemaVersion:1; contract:typeof BOOK_CREATIVE_DIRECTION_CONTRACT; identity:BookArtIdentityV1; purpose:BookArtPurpose; genre:BookCreativeGenre; evidenceFingerprint:string; creativeThesis:string; routes:BookCreativeDirectionRouteV1[]; providerInstruction:string; planFingerprint:string; providerCallPerformed:false; selectionPerformed:false; promotionPerformed:false; bookUseBindingCreated:false; publicationPerformed:false; }
-export interface BookCreativeDirectionResultV1 { outputKind:"evavo_art_book_creative_direction_result"; schemaVersion:1; contract:typeof BOOK_CREATIVE_DIRECTION_CONTRACT; status:"blocked"|"ready"; identity:BookArtIdentityV1; plan?:BookCreativeDirectionPlanV1; blockers:string[]; warnings:string[]; providerCallPerformed:false; selectionPerformed:false; promotionPerformed:false; publicationPerformed:false; }
 
+export type BookCreativeGenre =
+  | "literary"
+  | "historical"
+  | "horror"
+  | "mythic"
+  | "grimdark_fantasy"
+  | "science_fiction"
+  | "crime"
+  | "romance"
+  | "children"
+  | "memoir"
+  | "documentary"
+  | "technical"
+  | "reference"
+  | "graphic_novel"
+  | "pulp"
+  | "poetry"
+  | "cookbook"
+  | "academic"
+  | "custom";
+
+export type BookCreativeRouteKind =
+  | "material_symbol"
+  | "environmental_pressure"
+  | "relational_tension"
+  | "consequence_moment"
+  | "systems_cutaway"
+  | "sequential_rhythm";
+
+export type BookCreativeComposition =
+  | "single_anchor_with_counterweight"
+  | "asymmetric_environmental_dominance"
+  | "relational_distance_and_negative_space"
+  | "aftermath_or_preaction_suspension"
+  | "layered_cutaway"
+  | "sequential_depth_rhythm"
+  | "quiet_field_with_precise_intrusion"
+  | "monumental_low_horizon"
+  | "compressed_oblique_geometry";
+
+export interface BookCreativeEvidenceV1 {
+  evidenceId: string;
+  label: string;
+  meaning: string;
+  importance: number;
+  sourceLocationIds: string[];
+  visualForms?: string[] | undefined;
+  materials?: string[] | undefined;
+  architecture?: string[] | undefined;
+  role?: string | undefined;
+  silhouette?: string | undefined;
+  props?: string[] | undefined;
+  contradiction?: string | undefined;
+  spoilerLevel?: "none" | "minor" | "major" | "ending" | undefined;
+  physicalAction?: string | undefined;
+  beforeOrAftermath?: string | undefined;
+}
+
+export interface BookCreativeDirectionInputV1 {
+  outputKind: "evavo_art_book_creative_direction_input";
+  schemaVersion: typeof BOOK_CREATIVE_DIRECTION_SCHEMA_VERSION;
+  contract: typeof BOOK_CREATIVE_DIRECTION_CONTRACT;
+  identity: BookArtIdentityV1;
+  purpose: BookArtPurpose;
+  manuscript: BookArtManuscriptBindingV1;
+  output: BookArtOutputRequirementV1;
+  contentClass: string;
+  primaryGenre: BookCreativeGenre;
+  audience: string;
+  centralConflict: string;
+  emotionalPromise: string;
+  themes: BookCreativeEvidenceV1[];
+  motifs: BookCreativeEvidenceV1[];
+  settings: BookCreativeEvidenceV1[];
+  characters: BookCreativeEvidenceV1[];
+  scenes: BookCreativeEvidenceV1[];
+  continuityRequirements: string[];
+  materialRequirements: string[];
+  rightsEvidenceIds: string[];
+  aestheticIntent: string;
+  allowedProcessFamilies: BookIllustrationProcessFamily[];
+  routeCount: 2 | 3 | 4;
+  titleZone: "top" | "upper_third" | "centre" | "lower_third";
+  authorZone: "top" | "upper_third" | "centre" | "lower_third";
+  minimumQuietAreaPercent: number;
+  namedCreatorReferences: string[];
+  brandedFranchiseReferences: string[];
+  requestedAt: string;
+  requestedBy: string;
+  providerCallAllowed: false;
+  automaticSelectionAllowed: false;
+  automaticPromotionAllowed: false;
+  publicationAllowed: false;
+}
+
+export interface BookCreativeDirectionRouteV1 {
+  routeId: string;
+  routeKind: BookCreativeRouteKind;
+  composition: BookCreativeComposition;
+  label: string;
+  rationale: string;
+  evidenceIds: string[];
+  sourceLocationIds: string[];
+  processFamily: BookIllustrationProcessFamily;
+  tonalArchitecture: string;
+  colourLogic: string[];
+  lightingLogic: string[];
+  markLogic: string[];
+  brief: BookArtBriefV1;
+}
+
+export interface BookCreativeDirectionPlanV1 {
+  outputKind: "evavo_art_book_creative_direction_plan";
+  schemaVersion: typeof BOOK_CREATIVE_DIRECTION_SCHEMA_VERSION;
+  contract: typeof BOOK_CREATIVE_DIRECTION_CONTRACT;
+  identity: BookArtIdentityV1;
+  purpose: BookArtPurpose;
+  genre: BookCreativeGenre;
+  evidenceFingerprint: string;
+  creativeThesis: string;
+  routes: BookCreativeDirectionRouteV1[];
+  providerInstruction: string;
+  planFingerprint: string;
+  providerCallPerformed: false;
+  selectionPerformed: false;
+  promotionPerformed: false;
+  bookUseBindingCreated: false;
+  publicationPerformed: false;
+}
+
+export interface BookCreativeDirectionResultV1 {
+  outputKind: "evavo_art_book_creative_direction_result";
+  schemaVersion: typeof BOOK_CREATIVE_DIRECTION_SCHEMA_VERSION;
+  contract: typeof BOOK_CREATIVE_DIRECTION_CONTRACT;
+  status: "blocked" | "ready";
+  identity: BookArtIdentityV1;
+  plan?: BookCreativeDirectionPlanV1 | undefined;
+  blockers: string[];
+  warnings: string[];
+  providerCallPerformed: false;
+  selectionPerformed: false;
+  promotionPerformed: false;
+  publicationPerformed: false;
+}
