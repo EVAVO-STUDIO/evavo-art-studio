@@ -7,7 +7,7 @@ import {
 } from "./types.js";
 import { spritePlanSha256 } from "./validation.js";
 
-export const SPRITE_MOTION_TOPOLOGY_PROTOCOL_VERSION = "2026-08-07.1" as const;
+export const SPRITE_MOTION_TOPOLOGY_PROTOCOL_VERSION = "2026-08-07.2" as const;
 
 export type SpriteMotionProjection =
   | "auto"
@@ -216,6 +216,21 @@ const PHASES = Object.freeze({
     { id: "collapse", label: "Collapse", weight: 0.55, motionIntent: "Move the silhouette through the complete fall or destruction arc.", groundContact: "transition" },
     { id: "settle", label: "Settle", weight: 0.3, motionIntent: "Reach the final stable pose without rebound or geometry drift.", groundContact: "grounded" },
   ],
+  jumpStart: [
+    { id: "anticipation", label: "Anticipation", weight: 0.42, motionIntent: "Compress on the authored ground anchor before launch.", groundContact: "grounded" },
+    { id: "takeoff", label: "Takeoff", weight: 0.33, motionIntent: "Break ground contact while preserving the launch direction and silhouette.", groundContact: "transition" },
+    { id: "ascent", label: "Ascent", weight: 0.25, motionIntent: "Leave the baseline cleanly and hand off into the airborne loop.", groundContact: "airborne" },
+  ],
+  jumpLoop: [
+    { id: "airborne-hold", label: "Airborne Hold", weight: 1, motionIntent: "Remain fully airborne while preserving the jump-loop silhouette, scale, direction and stable mid-air anchor.", groundContact: "airborne" },
+  ],
+  fall: [
+    { id: "descent", label: "Descent", weight: 1, motionIntent: "Remain airborne and carry the authored falling posture toward a separate landing state.", groundContact: "airborne" },
+  ],
+  land: [
+    { id: "landing", label: "Landing", weight: 0.45, motionIntent: "Re-establish the exact ground anchor and absorb the authored impact.", groundContact: "grounded" },
+    { id: "recovery", label: "Recovery", weight: 0.55, motionIntent: "Stay grounded while resolving landing momentum into the next valid gameplay state.", groundContact: "grounded" },
+  ],
   jump: [
     { id: "anticipation", label: "Anticipation", weight: 0.16, motionIntent: "Compress before leaving the ground.", groundContact: "grounded" },
     { id: "takeoff", label: "Takeoff", weight: 0.17, motionIntent: "Break ground contact at the authored launch frame.", groundContact: "transition" },
@@ -373,7 +388,11 @@ function compileDirections(plan: CompiledSpriteProductionPlan, options: Normaliz
     const counterClockwiseDirection = nearestDirectionName((resolved.angle - step + 360) % 360, angular);
     const oppositeDirection = nearestDirectionName((resolved.angle + 180) % 360, angular);
     const world = worldVector(resolved.angle);
-    const adjacentDirections = [counterClockwiseDirection, clockwiseDirection].filter((name): name is string => name !== undefined && name !== entry.name);
+    const adjacentDirections = [...new Set(
+      [counterClockwiseDirection, clockwiseDirection].filter(
+        (name): name is string => name !== undefined && name !== entry.name,
+      ),
+    )];
     return {
       name: entry.name,
       index: entry.index,
@@ -394,7 +413,11 @@ function compileDirections(plan: CompiledSpriteProductionPlan, options: Normaliz
 function phaseTemplates(clip: SpritePlannedClip): readonly PhaseTemplate[] {
   if (clip.framesPerDirection <= 1) return SINGLE_PHASE;
   const id = clip.id.toLowerCase();
-  if (/(jump|fall|land)/.test(id)) return PHASES.jump;
+  if (/jump[-_: ]?start/.test(id)) return PHASES.jumpStart;
+  if (/jump[-_: ]?loop/.test(id)) return PHASES.jumpLoop;
+  if (/(^|[-_: ])fall($|[-_: ])/.test(id) || id === "fall") return PHASES.fall;
+  if (/(^|[-_: ])land($|[-_: ])/.test(id) || id === "land") return PHASES.land;
+  if (/jump/.test(id)) return PHASES.jump;
   if (/(walk|run|move|swim|fly|climb|crouch-walk|work-loop|particle-loop)/.test(id) || clip.category === "locomotion") return PHASES.locomotion;
   if (/(attack|cast|shoot|fire|reload|parry|block|dodge|interact|use-item|pickup|push|pull|special)/.test(id) || clip.category === "combat") return PHASES.attack;
   if (/(hit|hurt|stun|damaged|damage)/.test(id)) return PHASES.reaction;
@@ -625,6 +648,7 @@ export function spriteMotionTopologyProtocolSummary(): Readonly<{
     ],
     animationRules: [
       "Every clip receives complete, non-overlapping semantic phases rather than an unstructured frame count.",
+      "Split platformer jump-start, jump-loop, fall and land clips retain distinct grounded, transition and airborne contracts instead of being collapsed into one full-jump arc.",
       "Every frame binds its phase, temporal neighbours, directional neighbours and canonical direction master.",
       "Loop continuity is explicit for linear and ping-pong clips.",
       "Phase allocation is deterministic and preserves exact compiled frame durations.",

@@ -1,5 +1,9 @@
 import { normalizeJson, type JsonValue } from "@evavo/art-artifacts";
 
+import {
+  automaticMotionBindingForFrame,
+  automaticMotionGroundContactRequired,
+} from "./automatic-motion-topology.js";
 import { AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION, type AutomaticSpriteProductionUnit, type AutomaticSpriteWorkflowAnalysis, type CompiledAutomaticSpriteWorkflow } from "./automatic-types.js";
 import { FAMILY_MIRROR_PROOF_ROLE, MIRROR_OPERATION, mirrorManifestUnits, mirrorTaskId, type MirrorDraft } from "./automatic-mirror-drafts.js";
 import { DERIVED_DIRECTION_CODE } from "./automatic-mirror-policy.js";
@@ -54,6 +58,10 @@ export function transformMirrorFamilyTask(
           `Derived frame ${frame.id} has no mirrored layers.`,
         );
       }
+      const motion = automaticMotionBindingForFrame(
+        base.motionTopology,
+        frame.id,
+      );
       return normalizeJson({
         id: frame.id,
         animation: frame.clipId,
@@ -63,7 +71,7 @@ export function transformMirrorFamilyTask(
         durationMs: frame.durationMs,
         pivot: base.request.artDirectionContract.production.pivot,
         baseline: base.request.artDirectionContract.production.baseline,
-        groundContact: true,
+        groundContact: automaticMotionGroundContactRequired(motion),
         layers: units.map((draft) => ({
           layerId: token(draft.layerRole, 128),
           artifactId: { $artifact: draft.targetMasterArtifactRole },
@@ -135,6 +143,7 @@ export function transformMirrorFamilyTask(
 }
 
 function derivedMirrorUnits(
+  base: CompiledAutomaticSpriteWorkflow,
   drafts: readonly MirrorDraft[],
 ): readonly AutomaticSpriteProductionUnit[] {
   return drafts.map((draft) => ({
@@ -155,6 +164,14 @@ function derivedMirrorUnits(
     masterArtifactRole: draft.targetMasterArtifactRole,
     dependencyMasterRoles: [draft.sourceMasterArtifactRole],
     dependencyTaskIds: [draft.sourceProducerTaskId],
+    ...(draft.targetFrameId === undefined
+      ? {}
+      : {
+          motion: automaticMotionBindingForFrame(
+            base.motionTopology,
+            draft.targetFrameId,
+          ),
+        }),
     derivation: {
       kind: "horizontal-mirror",
       sourceDirection: draft.sourceDirection,
@@ -191,7 +208,7 @@ export function updatedMirrorAnalysis(
     warnings,
     productionUnits: [
       ...base.analysis.productionUnits,
-      ...derivedMirrorUnits(drafts),
+      ...derivedMirrorUnits(base, drafts),
     ],
     totals: {
       ...base.analysis.totals,

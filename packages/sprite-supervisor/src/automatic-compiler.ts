@@ -8,12 +8,19 @@ import type {
   CompiledArtLayerDecision,
 } from "@evavo/art-direction";
 import type {
+  CompiledSpriteMotionTopology,
   CompiledSpriteProductionPlan,
   SpritePlannedClip,
   SpritePlannedFrame,
 } from "@evavo/art-sprite-planner";
 
 import { resolveAutomaticArtDirection } from "./automatic-art-direction.js";
+import {
+  automaticMotionBindingForFrame,
+  automaticMotionGroundContactRequired,
+  automaticMotionPrompt,
+  compileAutomaticSpriteMotionTopology,
+} from "./automatic-motion-topology.js";
 import {
   AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION,
   type AutomaticSpriteProductionUnit,
@@ -75,6 +82,7 @@ interface UnitDraft {
   readonly selectionReferenceRole: string;
   readonly dependencyMasterRoles: readonly string[];
   readonly masterArtifactRole: string;
+  readonly motion?: AutomaticSpriteProductionUnit["motion"];
 }
 
 interface UnitPipeline {
@@ -299,6 +307,7 @@ function previousAndNextKeyPoses(
 
 function createUnitDrafts(
   request: ResolvedAutomaticSpriteWorkflowCompileRequest,
+  motionTopology: CompiledSpriteMotionTopology,
   layerDecisions: readonly CompiledArtLayerDecision[],
   blockers: AutomaticSpriteWorkflowBlocker[],
   warnings: AutomaticSpriteWorkflowWarning[],
@@ -374,6 +383,7 @@ function createUnitDrafts(
     const directionRole = directionMasterRoles.get(frame.direction);
     const directionUnitId = directionMasterUnitIds.get(frame.direction);
     if (!directionRole || !directionUnitId) continue;
+    const motion = automaticMotionBindingForFrame(motionTopology, frame.id);
     const dependencies = [directionRole];
     let selectionReferenceRole = directionRole;
     const phase = frame.keyPose ? "key-pose" : "in-between";
@@ -419,6 +429,7 @@ function createUnitDrafts(
       layerRole: "identity-core",
       selectionReferenceRole,
       dependencyMasterRoles: [...new Set(dependencies)],
+      motion,
       masterArtifactRole: masterRoleFor(
         "frame",
         frame.direction,
@@ -449,6 +460,7 @@ function createUnitDrafts(
           identityUnit.masterArtifactRole,
           ...identityUnit.dependencyMasterRoles,
         ],
+        ...(identityUnit.motion === undefined ? {} : { motion: identityUnit.motion }),
         masterArtifactRole: masterRoleFor(
           "layer",
           frame.direction,
@@ -750,11 +762,12 @@ function pipelineForUnit(
           unit.frameId ?? token(`direction-master-${unit.direction}`, 128),
         ...(unit.kind === "layer" ? { layerId: token(unit.layerRole, 128) } : {}),
         creativeIntent:
-          unit.phase === "direction-master"
+          (unit.phase === "direction-master"
             ? `Author the canonical ${unit.direction} direction master before any clip frames. Preserve exact identity, projection, palette, materials and ground registration.`
             : unit.phase === "key-pose"
               ? `Author approved key pose ${unit.frameIndex} for ${unit.clipId}/${unit.direction}. Preserve the canonical identity and direction master while making the action silhouette unmistakable.`
-              : `Interpolate frame ${unit.frameIndex} for ${unit.clipId}/${unit.direction} between its approved neighbouring key poses without redesigning identity, costume, equipment, light or camera.`,
+              : `Interpolate frame ${unit.frameIndex} for ${unit.clipId}/${unit.direction} between its approved neighbouring key poses without redesigning identity, costume, equipment, light or camera.`) +
+          automaticMotionPrompt(unit.motion),
         negativeIntent: [
           ...contract.style.mustAvoid,
           ...contract.provider.prohibitedChanges,
@@ -767,7 +780,9 @@ function pipelineForUnit(
           action:
             unit.phase === "direction-master"
               ? "Neutral readable contact pose."
-              : unit.clipId ?? "authored sprite motion",
+              : unit.motion
+                ? `${unit.clipId ?? "authored sprite motion"}: ${unit.motion.phase.label}. ${unit.motion.phase.motionIntent}`
+                : unit.clipId ?? "authored sprite motion",
           direction: unit.direction,
           include: contract.production.shot.include,
           exclude: contract.production.shot.exclude,
@@ -811,6 +826,7 @@ function pipelineForUnit(
           frameIndex: unit.frameIndex ?? null,
           layerRole: unit.layerRole,
           candidateOrdinal: index + 1,
+          ...(unit.motion === undefined ? {} : { motionTopology: unit.motion }),
         },
       }),
       requiredCapabilities: [
@@ -920,6 +936,7 @@ function pipelineForUnit(
         runId: request.runId,
         spritePlanId: request.spritePlan.planId,
         unitId: unit.id,
+        ...(unit.motion === undefined ? {} : { motionTopology: unit.motion }),
       },
     }),
     requiredCapabilities: ["selection.compare", "evidence.bundle"],
@@ -972,6 +989,7 @@ function pipelineForUnit(
         runId: request.runId,
         spritePlanId: request.spritePlan.planId,
         unitId: unit.id,
+        ...(unit.motion === undefined ? {} : { motionTopology: unit.motion }),
       },
     }),
     requiredCapabilities: [
@@ -1018,6 +1036,7 @@ function familyBlendMode(roleName: string): string {
 
 function familyManifest(
   request: ResolvedAutomaticSpriteWorkflowCompileRequest,
+  motionTopology: CompiledSpriteMotionTopology,
   layerDecisions: readonly CompiledArtLayerDecision[],
   units: readonly AutomaticSpriteProductionUnit[],
 ): JsonValue {
@@ -1051,6 +1070,7 @@ function familyManifest(
       const frameUnits = units.filter(
         (unit) => unit.frameId === frame.id && includedRoles.has(unit.layerRole),
       );
+      const motion = automaticMotionBindingForFrame(motionTopology, frame.id);
       return {
         id: frame.id,
         animation: frame.clipId,
@@ -1060,7 +1080,7 @@ function familyManifest(
         durationMs: frame.durationMs,
         pivot: request.artDirectionContract.production.pivot,
         baseline: request.artDirectionContract.production.baseline,
-        groundContact: true,
+        groundContact: automaticMotionGroundContactRequired(motion),
         layers: frameUnits.map((unit) => ({
           layerId: token(unit.layerRole, 128),
           artifactId: { $artifact: unit.masterArtifactRole },
@@ -1121,6 +1141,9 @@ function familyManifest(
       artDirectionContractId: request.artDirectionContract.contractId,
       artDirectionContractSha256:
         request.artDirectionContract.contractSha256,
+      motionTopologyProtocolVersion: motionTopology.protocolVersion,
+      motionTopologySha256: motionTopology.topologySha256,
+      groundContactPolicy: "semantic-phase-grounded-only",
     },
   });
 }
@@ -1170,6 +1193,7 @@ export function analyseAutomaticSpriteWorkflow(
   input: AutomaticSpriteWorkflowCompileRequestInput | unknown,
 ): Readonly<{
   request: ResolvedAutomaticSpriteWorkflowCompileRequest;
+  motionTopology: CompiledSpriteMotionTopology;
   analysis: AutomaticSpriteWorkflowAnalysis;
   layerDecisions: readonly CompiledArtLayerDecision[];
 }> {
@@ -1181,8 +1205,19 @@ export function analyseAutomaticSpriteWorkflow(
       normalized.spritePlan,
     ),
   };
+  const motionTopology = compileAutomaticSpriteMotionTopology(request.spritePlan);
   const blockers: AutomaticSpriteWorkflowBlocker[] = [];
-  const warnings: AutomaticSpriteWorkflowWarning[] = [];
+  const warnings: AutomaticSpriteWorkflowWarning[] = motionTopology.warnings.map(
+    (message) =>
+      warning(
+        "AUTOMATIC_SPRITE_WORKFLOW_MOTION_TOPOLOGY_WARNING",
+        message,
+        normalizeJson({
+          motionTopologyProtocolVersion: motionTopology.protocolVersion,
+          motionTopologySha256: motionTopology.topologySha256,
+        }),
+      ),
+  );
   if (request.artDirectionContract.asset.transparency !== "required") {
     blockers.push(
       blocker(
@@ -1210,6 +1245,7 @@ export function analyseAutomaticSpriteWorkflow(
   const layers = includedLayerDecisions(request, blockers, warnings);
   const drafts = createUnitDrafts(
     request,
+    motionTopology,
     layers.included,
     blockers,
     warnings,
@@ -1232,6 +1268,7 @@ export function analyseAutomaticSpriteWorkflow(
     referenceRole: draft.selectionReferenceRole,
     masterArtifactRole: draft.masterArtifactRole,
     dependencyMasterRoles: draft.dependencyMasterRoles,
+    ...(draft.motion === undefined ? {} : { motion: draft.motion }),
     dependencyTaskIds: draft.dependencyMasterRoles
       .map((masterRole) => provisionalTaskIds.get(masterRole))
       .filter((entry): entry is string => entry !== undefined),
@@ -1268,6 +1305,7 @@ export function analyseAutomaticSpriteWorkflow(
       : "ready";
   return {
     request,
+    motionTopology,
     layerDecisions: layers.included,
     analysis: {
       disposition,
@@ -1344,6 +1382,7 @@ export function compileAutomaticSpriteWorkflow(
       requiredArtifactRoles: frameMasterRoles,
       payloadTemplate: familyManifest(
         request,
+        analysed.motionTopology,
         analysed.layerDecisions,
         analysed.analysis.productionUnits,
       ),
@@ -1425,6 +1464,8 @@ export function compileAutomaticSpriteWorkflow(
       sourceSpritePlanSha256: request.spritePlan.planSha256,
       sourceArtDirectionSha256:
         request.artDirectionContract.contractSha256,
+      motionTopologyProtocolVersion: analysed.motionTopology.protocolVersion,
+      motionTopologySha256: analysed.motionTopology.topologySha256,
       ...(request.metadata === undefined ? {} : { sourceMetadata: request.metadata }),
     }),
   };
@@ -1436,6 +1477,7 @@ export function compileAutomaticSpriteWorkflow(
     protocolVersion: AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION,
     request,
     requestSha256: automaticSpriteWorkflowRequestSha256(request),
+    motionTopology: analysed.motionTopology,
     analysis: analysed.analysis,
     supervisorRequest,
     supervisorWorkflow,
