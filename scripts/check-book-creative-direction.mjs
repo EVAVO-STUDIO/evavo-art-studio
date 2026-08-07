@@ -12,6 +12,7 @@ const files = {
   types: "packages/contracts/src/book-creative-direction-types.ts",
   test: "packages/contracts/test/book-creative-direction.test.mjs",
   index: "packages/contracts/src/index.ts",
+  package: "package.json",
   docs: "docs/book-creative-direction.md",
   workflow: ".github/workflows/book-creative-direction.yml",
 };
@@ -27,11 +28,17 @@ for (const [name, relative] of Object.entries(files)) {
     failures.push(`Required file is missing: ${relative}.`);
   }
 }
+
 function expect(name, token) {
-  if (!sources[name]?.includes(token)) failures.push(`${files[name]} is missing ${JSON.stringify(token)}.`);
+  if (!sources[name]?.includes(token)) {
+    failures.push(`${files[name]} is missing ${JSON.stringify(token)}.`);
+  }
 }
+
 function reject(name, token) {
-  if (sources[name]?.includes(token)) failures.push(`${files[name]} contains prohibited token ${JSON.stringify(token)}.`);
+  if (sources[name]?.includes(token)) {
+    failures.push(`${files[name]} contains prohibited token ${JSON.stringify(token)}.`);
+  }
 }
 
 if (!failures.length) {
@@ -53,6 +60,7 @@ if (!failures.length) {
     "promotionPerformed:false",
     "publicationPerformed:false",
   ]) expect("source", token);
+
   for (const token of [
     "grimdark_fantasy",
     "relief_engraving",
@@ -63,6 +71,7 @@ if (!failures.length) {
     "plastic or waxy materials",
     "generic movie-poster hierarchy",
   ]) expect("profiles", token);
+
   for (const token of [
     "rejects vague provider buzzwords",
     "rejects named creators and branded franchises",
@@ -72,7 +81,11 @@ if (!failures.length) {
     "compiles graphic-novel sequential rhythm while keeping lettering editable",
     "preserves compile-only authority",
   ]) expect("test", token);
+
   expect("index", 'export * from "./book-creative-direction.js";');
+  expect("package", '"book:creative-direction:check": "node scripts/check-book-creative-direction.mjs"');
+  expect("package", "pnpm run book:creative-direction:check");
+
   for (const token of [
     "Evidence before aesthetics",
     "Multiple concept territories",
@@ -80,13 +93,16 @@ if (!failures.length) {
     "Controlled first production use",
     "editable typography",
   ]) expect("docs", token);
+
   for (const token of [
+    '"package.json"',
     "pnpm install --frozen-lockfile",
     "check-book-creative-direction.mjs",
     "@evavo/art-contracts test",
     "@evavo/art-contracts typecheck",
     "pnpm check",
   ]) expect("workflow", token);
+
   for (const token of [
     "automaticSelectionAllowed:true",
     "automaticPromotionAllowed:true",
@@ -95,7 +111,9 @@ if (!failures.length) {
 }
 
 if (failures.length) {
-  for (const failure of failures) console.error(`book_creative_direction_check_failure: ${failure}`);
+  for (const failure of failures) {
+    console.error(`book_creative_direction_check_failure: ${failure}`);
+  }
   process.exitCode = 1;
 } else {
   process.stdout.write(`${JSON.stringify({
@@ -104,6 +122,8 @@ if (failures.length) {
     evidenceBoundSubjects: true,
     genreAwareComposition: true,
     historicalPrintProcesses: true,
+    publicPackageExported: true,
+    permanentRepositoryCheckInstalled: true,
     genericProviderShorthandAllowed: false,
     namedCreatorImitationAllowed: false,
     brandedFranchiseTransferAllowed: false,
