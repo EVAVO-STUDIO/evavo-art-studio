@@ -70,11 +70,8 @@ jobs:
       - name: Run strict contracts typecheck
         run: pnpm --filter @evavo/art-contracts typecheck
 
-      - name: Run MCP tests
-        run: pnpm --filter @evavo/art-studio-mcp test
-
-      - name: Run strict MCP typecheck
-        run: pnpm --filter @evavo/art-studio-mcp typecheck
+      - name: Verify MCP creative-direction boundary
+        run: node --test apps/mcp/test/book-creative-direction-tools-contract.test.mjs
 
       - name: Run complete Art Studio verification
         run: pnpm check
