@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   chmod,
+  mkdir,
   mkdtemp,
   readFile,
   rm,
@@ -39,12 +40,25 @@ async function exists(filePath) {
 async function mediaTool(filePath, label) {
   await executable(
     filePath,
-    `#!/usr/bin/env bash\nset -euo pipefail\nif [[ "${1:-}" == "-version" ]]; then\n  printf '${label} version fixture\\n'\n  exit 0\nfi\nexit 0\n`,
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "-version" ]]; then
+  printf '${label} version fixture\\n'
+  exit 0
+fi
+exit 0
+`,
   );
 }
 
 async function commandForwarder(filePath, body) {
-  await executable(filePath, `#!/usr/bin/env bash\nset -euo pipefail\n${body}\n`);
+  await executable(
+    filePath,
+    `#!/usr/bin/env bash
+set -euo pipefail
+${body}
+`,
+  );
 }
 
 function runBootstrap(environment) {
@@ -68,8 +82,7 @@ async function fixture(t, prefix) {
   const root = await mkdtemp(path.join(os.tmpdir(), prefix));
   const bin = path.join(root, "bin");
   const environment = path.join(root, "github-env");
-  await commandForwarder(path.join(root, "mkdir-bin"), `mkdir -p "${bin}"`);
-  spawnSync(path.join(root, "mkdir-bin"), [], { encoding: "utf8" });
+  await mkdir(bin, { recursive: true });
   t.after(async () => {
     await rm(root, { recursive: true, force: true });
   });
@@ -88,11 +101,19 @@ async function fixture(t, prefix) {
 async function writeForwarders(paths) {
   await commandForwarder(
     paths.sudo,
-    `if [[ "${1:-}" == "-n" ]]; then shift; fi\nif [[ "${1:-}" == "env" ]]; then\n  shift\n  while [[ "${1:-}" == *=* ]]; do export "${1}"; shift; done\nfi\nexec "${@}"`,
+    `if [[ "\${1:-}" == "-n" ]]; then shift; fi
+if [[ "\${1:-}" == "env" ]]; then
+  shift
+  while [[ "\${1:-}" == *=* ]]; do export "$1"; shift; done
+fi
+exec "$@"`,
   );
   await commandForwarder(
     paths.timeout,
-    `while [[ "${1:-}" == --* ]]; do shift; done\nshift\nexec "${@}"`,
+    `while [[ "\${1:-}" == --* ]]; do shift; done
+[[ $# -gt 0 ]] || exit 93
+shift
+exec "$@"`,
   );
 }
 
@@ -103,7 +124,10 @@ test("media bootstrap reuses validated preinstalled tools without apt", async (t
   await mediaTool(paths.ffprobe, "ffprobe");
   await executable(
     paths.aptGet,
-    `#!/usr/bin/env bash\ntouch "${aptMarker}"\nexit 90\n`,
+    `#!/usr/bin/env bash
+touch "${aptMarker}"
+exit 90
+`,
   );
 
   const result = runBootstrap({
@@ -117,8 +141,8 @@ test("media bootstrap reuses validated preinstalled tools without apt", async (t
   assert.match(result.stdout, /package installation was skipped/);
 
   const output = await readFile(paths.environment, "utf8");
-  assert.match(output, new RegExp(`FFMPEG_BIN=${paths.ffmpeg}`));
-  assert.match(output, new RegExp(`FFPROBE_BIN=${paths.ffprobe}`));
+  assert.ok(output.includes(`FFMPEG_BIN=${paths.ffmpeg}`));
+  assert.ok(output.includes(`FFPROBE_BIN=${paths.ffprobe}`));
   assert.match(output, /ART_STUDIO_FFMPEG_VERSION=ffmpeg version fixture/);
   assert.match(output, /ART_STUDIO_FFPROBE_VERSION=ffprobe version fixture/);
   assert.match(output, /ART_STUDIO_FFMPEG_SHA256=[0-9a-f]{64}/);
@@ -132,7 +156,40 @@ test("media bootstrap retries bounded apt work and validates installed tools", a
   await writeForwarders(paths);
   await executable(
     paths.aptGet,
-    `#!/usr/bin/env bash\nset -euo pipefail\ncommand_name=""\nfor argument in "${@}"; do\n  if [[ "${argument}" == "update" || "${argument}" == "install" ]]; then command_name="${argument}"; break; fi\ndone\nif [[ "${command_name}" == "update" ]]; then\n  count=0\n  [[ ! -f "${updateCount}" ]] || count="$(cat "${updateCount}")"\n  count=$((count + 1))\n  printf '%s' "${count}" > "${updateCount}"\n  ((count >= 2))\n  exit\nfi\nif [[ "${command_name}" == "install" ]]; then\n  count=0\n  [[ ! -f "${installCount}" ]] || count="$(cat "${installCount}")"\n  printf '%s' "$((count + 1))" > "${installCount}"\n  cat > "${paths.ffmpeg}" <<'TOOL'\n#!/usr/bin/env bash\nprintf 'ffmpeg version installed-fixture\\n'\nTOOL\n  cat > "${paths.ffprobe}" <<'TOOL'\n#!/usr/bin/env bash\nprintf 'ffprobe version installed-fixture\\n'\nTOOL\n  chmod +x "${paths.ffmpeg}" "${paths.ffprobe}"\n  exit 0\nfi\nexit 91\n`,
+    `#!/usr/bin/env bash
+set -euo pipefail
+command_name=""
+for argument in "$@"; do
+  if [[ "\${argument}" == "update" || "\${argument}" == "install" ]]; then
+    command_name="\${argument}"
+    break
+  fi
+done
+if [[ "\${command_name}" == "update" ]]; then
+  count=0
+  [[ ! -f "${updateCount}" ]] || count="$(cat "${updateCount}")"
+  count=$((count + 1))
+  printf '%s' "\${count}" > "${updateCount}"
+  ((count >= 2))
+  exit
+fi
+if [[ "\${command_name}" == "install" ]]; then
+  count=0
+  [[ ! -f "${installCount}" ]] || count="$(cat "${installCount}")"
+  printf '%s' "$((count + 1))" > "${installCount}"
+  cat > "${paths.ffmpeg}" <<'TOOL'
+#!/usr/bin/env bash
+printf 'ffmpeg version installed-fixture\\n'
+TOOL
+  cat > "${paths.ffprobe}" <<'TOOL'
+#!/usr/bin/env bash
+printf 'ffprobe version installed-fixture\\n'
+TOOL
+  chmod +x "${paths.ffmpeg}" "${paths.ffprobe}"
+  exit 0
+fi
+exit 91
+`,
   );
 
   const result = runBootstrap({
@@ -152,8 +209,14 @@ test("media bootstrap retries bounded apt work and validates installed tools", a
   assert.match(result.stdout, /attempt 2\/2/);
 
   const output = await readFile(paths.environment, "utf8");
-  assert.match(output, /ART_STUDIO_FFMPEG_VERSION=ffmpeg version installed-fixture/);
-  assert.match(output, /ART_STUDIO_FFPROBE_VERSION=ffprobe version installed-fixture/);
+  assert.match(
+    output,
+    /ART_STUDIO_FFMPEG_VERSION=ffmpeg version installed-fixture/,
+  );
+  assert.match(
+    output,
+    /ART_STUDIO_FFPROBE_VERSION=ffprobe version installed-fixture/,
+  );
 });
 
 test("media bootstrap fails after the configured bounded attempts", async (t) => {
@@ -162,7 +225,13 @@ test("media bootstrap fails after the configured bounded attempts", async (t) =>
   await writeForwarders(paths);
   await executable(
     paths.aptGet,
-    `#!/usr/bin/env bash\nset -euo pipefail\ncount=0\n[[ ! -f "${updateCount}" ]] || count="$(cat "${updateCount}")"\nprintf '%s' "$((count + 1))" > "${updateCount}"\nexit 92\n`,
+    `#!/usr/bin/env bash
+set -euo pipefail
+count=0
+[[ ! -f "${updateCount}" ]] || count="$(cat "${updateCount}")"
+printf '%s' "$((count + 1))" > "${updateCount}"
+exit 92
+`,
   );
 
   const result = runBootstrap({
