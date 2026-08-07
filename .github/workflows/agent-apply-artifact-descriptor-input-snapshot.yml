@@ -1,0 +1,56 @@
+name: Apply artifact descriptor input snapshot patch
+
+on:
+  push:
+    branches:
+      - agent/artifact-descriptor-input-snapshot-20260808
+    paths:
+      - ".github/agent-patches/artifact-descriptor-input-snapshot.patch"
+      - ".github/workflows/agent-apply-artifact-descriptor-input-snapshot.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-apply-artifact-descriptor-input-snapshot
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify and apply exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          git diff --exit-code
+          git apply --check .github/agent-patches/artifact-descriptor-input-snapshot.patch
+          git apply .github/agent-patches/artifact-descriptor-input-snapshot.patch
+          rm .github/agent-patches/artifact-descriptor-input-snapshot.patch
+          rm .github/workflows/agent-apply-artifact-descriptor-input-snapshot.yml
+          grep -F 'snapshotDescriptorInput' packages/artifacts/src/local-store.ts
+          grep -F 'ARTIFACT_DESCRIPTOR_INPUT_INVALID' packages/artifacts/src/local-store.ts
+          grep -F 'const metadataInput = snapshot.metadata' packages/artifacts/src/local-store.ts
+          ! grep -F 'STORAGE_CLASSES.has(input.storageClass)' packages/artifacts/src/local-store.ts
+          git diff --check
+
+      - name: Commit exact source and remove carrier
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all -- .github packages/artifacts/src/local-store.ts
+          git commit -m "fix(artifacts): snapshot descriptor inputs"
+          git push origin "HEAD:${BRANCH_NAME}"
