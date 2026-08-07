@@ -7,6 +7,7 @@ import {
 } from "@evavo/art-artifacts";
 
 import { compileProviderCandidatePrompt } from "./prompt.js";
+import { compileProviderRoutingInspection } from "./registry.js";
 import {
   PROVIDER_PROTOCOL_VERSION,
   ProviderError,
@@ -17,13 +18,11 @@ import {
   type ProviderAttemptEvidence,
   type ProviderCandidateRunResult,
   type ProviderErrorClassification,
+  type ProviderRoutingInspection,
   type ResolvedProviderCandidateRequest,
   type ResolvedProviderReference,
 } from "./types.js";
-import {
-  providerRequestSha256,
-  validateProviderCandidateRequest,
-} from "./validation.js";
+import { validateProviderCandidateRequest } from "./validation.js";
 
 const DEFAULT_MAXIMUM_REFERENCE_BYTES = 32 * 1024 * 1024;
 const DEFAULT_MAXIMUM_TOTAL_REFERENCE_BYTES = 128 * 1024 * 1024;
@@ -286,6 +285,7 @@ async function storeCandidateArtifacts(
 async function storeEvidence(
   request: NormalizedProviderCandidateRequest,
   resolved: ResolvedProviderCandidateRequest,
+  routingInspection: ProviderRoutingInspection,
   attempts: readonly ProviderAttemptEvidence[],
   artifacts: ArtifactStore,
   input: Readonly<{
@@ -311,6 +311,7 @@ async function storeEvidence(
     compiledPromptSha256: resolved.compiledPromptSha256,
     compiledPrompt: resolved.compiledPrompt,
     request,
+    routingInspection,
     resolvedReferences: resolved.references.map((entry) => ({
       artifactId: entry.artifactId,
       contentHash: entry.artifact.contentHash,
@@ -371,6 +372,9 @@ async function storeEvidence(
     metadata: {
       requestSha256: resolved.requestSha256,
       compiledPromptSha256: resolved.compiledPromptSha256,
+      routingOutcome: routingInspection.outcome,
+      requiredCapabilityCount: routingInspection.requiredCapabilities.length,
+      eligibleAdapterCount: routingInspection.eligibleAdapterIds.length,
       attemptCount: attempts.length,
       candidateCount: candidateArtifacts.length,
     },
@@ -414,6 +418,22 @@ export async function executeProviderCandidateRequest(
 
   const request = validateProviderCandidateRequest(input);
   const compiled = compileProviderCandidatePrompt(request);
+  const ranked = options.registry.rank(request);
+  const routingInspection = compileProviderRoutingInspection(request, ranked);
+  const eligible = ranked.filter((entry) => entry.decision.eligible);
+  if (!eligible.length) {
+    throw new ProviderError(
+      "PROVIDER_ADAPTER_UNAVAILABLE",
+      "No registered provider adapter satisfies the candidate contract.",
+      "incompatible",
+      {
+        details: normalizeJson({
+          decisions: routingInspection.adapters.map((entry) => entry.decision),
+          routingInspection,
+        }),
+      },
+    );
+  }
   const references = await resolveReferences(
     request,
     options.artifacts,
@@ -422,24 +442,11 @@ export async function executeProviderCandidateRequest(
   );
   const resolved: ResolvedProviderCandidateRequest = {
     request,
-    requestSha256: providerRequestSha256(request),
+    requestSha256: routingInspection.requestSha256,
     compiledPrompt: compiled.text,
     compiledPromptSha256: compiled.sha256,
     references,
   };
-  const ranked = options.registry.rank(request);
-  const eligible = ranked.filter((entry) => entry.decision.eligible);
-  if (!eligible.length) {
-    const details = normalizeJson({
-      decisions: ranked.map((entry) => entry.decision),
-    });
-    throw new ProviderError(
-      "PROVIDER_ADAPTER_UNAVAILABLE",
-      "No registered provider adapter satisfies the candidate contract.",
-      "incompatible",
-      { details },
-    );
-  }
 
   const attempts: ProviderAttemptEvidence[] = [];
   let lastError: ProviderError | undefined;
@@ -489,6 +496,7 @@ export async function executeProviderCandidateRequest(
       const evidence = await storeEvidence(
         request,
         resolved,
+        routingInspection,
         attempts,
         options.artifacts,
         {
@@ -504,6 +512,7 @@ export async function executeProviderCandidateRequest(
         requestId: request.requestId,
         requestSha256: resolved.requestSha256,
         compiledPromptSha256: resolved.compiledPromptSha256,
+        routingInspection,
         adapterId: adapter.descriptor.id,
         model: result.model,
         candidateArtifacts,
@@ -542,6 +551,7 @@ export async function executeProviderCandidateRequest(
   const evidence = await storeEvidence(
     request,
     resolved,
+    routingInspection,
     attempts,
     options.artifacts,
     { failure, completedAt },
@@ -555,6 +565,7 @@ export async function executeProviderCandidateRequest(
       details: normalizeJson({
         evidenceArtifactId: evidence.artifactId,
         attempts,
+        routingInspection,
       }),
     },
   );

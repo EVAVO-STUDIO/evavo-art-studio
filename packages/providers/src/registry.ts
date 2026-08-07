@@ -7,9 +7,12 @@ import {
   type ProviderAdapter,
   type ProviderAdapterDescriptor,
   type ProviderCapability,
+  type ProviderRankedAdapter,
   type ProviderRegistryLike,
+  type ProviderRoutingInspection,
   type ProviderSelectionDecision,
 } from "./types.js";
+import { providerRequestSha256 } from "./validation.js";
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
@@ -221,4 +224,39 @@ export function providerRequiredCapabilities(
   request: NormalizedProviderCandidateRequest,
 ): readonly ProviderCapability[] {
   return requiredCapabilities(request);
+}
+
+export function compileProviderRoutingInspection(
+  request: NormalizedProviderCandidateRequest,
+  ranked: readonly ProviderRankedAdapter[],
+): ProviderRoutingInspection {
+  const adapters = ranked.map((entry) => ({
+    descriptor: entry.adapter.descriptor,
+    decision: entry.decision,
+  }));
+  const eligibleAdapterIds = adapters
+    .filter((entry) => entry.decision.eligible)
+    .map((entry) => entry.descriptor.id);
+  return {
+    schemaVersion: "1.0",
+    protocolVersion: PROVIDER_PROTOCOL_VERSION,
+    requestId: request.requestId,
+    requestSha256: providerRequestSha256(request),
+    requiredCapabilities: requiredCapabilities(request),
+    adapters,
+    eligibleAdapterIds,
+    ...(eligibleAdapterIds[0] === undefined
+      ? {}
+      : { firstEligibleAdapterId: eligibleAdapterIds[0] }),
+    outcome: eligibleAdapterIds.length ? "eligible" : "blocked",
+    fallbackAllowed: request.selection.allowFallback,
+    providerCallPerformedByInspection: false,
+  };
+}
+
+export function inspectProviderCandidateRouting(
+  request: NormalizedProviderCandidateRequest,
+  registry: ProviderRegistryLike,
+): ProviderRoutingInspection {
+  return compileProviderRoutingInspection(request, registry.rank(request));
 }

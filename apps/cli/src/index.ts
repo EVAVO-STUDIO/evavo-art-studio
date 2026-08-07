@@ -14,6 +14,7 @@ import { buildSpriteAtlasPackage } from "@evavo/art-media";
 import {
   compileProviderCandidatePrompt,
   providerProtocolSummary,
+  providerRequiredCapabilities,
   providerRequestSha256,
   validateProviderCandidateRequest,
 } from "@evavo/art-providers";
@@ -277,6 +278,7 @@ async function main(): Promise<void> {
         schemaVersion: "1.0",
         request,
         requestSha256: providerRequestSha256(request),
+        requiredAdapterCapabilities: providerRequiredCapabilities(request),
         compiledPrompt: prompt.text,
         compiledPromptSha256: prompt.sha256,
         executionMode: "durable-worker-only",

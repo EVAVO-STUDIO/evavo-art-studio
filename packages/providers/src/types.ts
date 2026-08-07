@@ -5,7 +5,7 @@ import type {
   StoredArtifact,
 } from "@evavo/art-artifacts";
 
-export const PROVIDER_PROTOCOL_VERSION = "2026-08-07.2" as const;
+export const PROVIDER_PROTOCOL_VERSION = "2026-08-07.3" as const;
 
 export type ProviderOperation = "generate" | "edit" | "inpaint";
 export type ProviderAssetKind =
@@ -322,6 +322,30 @@ export interface ProviderSelectionDecision {
   readonly rank: number;
 }
 
+export interface ProviderRankedAdapter {
+  readonly adapter: ProviderAdapter;
+  readonly decision: ProviderSelectionDecision;
+}
+
+export interface ProviderRoutingAdapterInspection {
+  readonly descriptor: ProviderAdapterDescriptor;
+  readonly decision: ProviderSelectionDecision;
+}
+
+export interface ProviderRoutingInspection {
+  readonly schemaVersion: "1.0";
+  readonly protocolVersion: typeof PROVIDER_PROTOCOL_VERSION;
+  readonly requestId: string;
+  readonly requestSha256: string;
+  readonly requiredCapabilities: readonly ProviderCapability[];
+  readonly adapters: readonly ProviderRoutingAdapterInspection[];
+  readonly eligibleAdapterIds: readonly string[];
+  readonly firstEligibleAdapterId?: string;
+  readonly outcome: "eligible" | "blocked";
+  readonly fallbackAllowed: boolean;
+  readonly providerCallPerformedByInspection: false;
+}
+
 export interface ProviderAttemptEvidence {
   readonly adapterId: string;
   readonly model?: string;
@@ -340,6 +364,7 @@ export interface ProviderCandidateRunResult {
   readonly requestId: string;
   readonly requestSha256: string;
   readonly compiledPromptSha256: string;
+  readonly routingInspection: ProviderRoutingInspection;
   readonly adapterId: string;
   readonly model: string;
   readonly candidateArtifacts: readonly ArtifactId[];
@@ -362,10 +387,7 @@ export interface ProviderRegistryLike {
   list(): readonly ProviderAdapterDescriptor[];
   rank(
     request: NormalizedProviderCandidateRequest,
-  ): readonly Readonly<{
-    adapter: ProviderAdapter;
-    decision: ProviderSelectionDecision;
-  }>[];
+  ): readonly ProviderRankedAdapter[];
 }
 
 export class ProviderError extends Error {

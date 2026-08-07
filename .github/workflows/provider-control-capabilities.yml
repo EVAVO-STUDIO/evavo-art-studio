@@ -3,6 +3,14 @@ name: Provider control capabilities
 on:
   pull_request:
     paths:
+      - "apps/api/openapi.yaml"
+      - "apps/api/src/provider-api.ts"
+      - "apps/api/test/openapi-contract.test.mjs"
+      - "apps/api/test/provider-api.test.mjs"
+      - "apps/cli/src/index.ts"
+      - "apps/cli/test/provider-cli.test.mjs"
+      - "apps/mcp/src/provider-tools.ts"
+      - "apps/mcp/test/provider-tools-contract.test.mjs"
       - "packages/providers/src/**"
       - "packages/providers/test/**"
       - "packages/repair/test/provider-canvas-execution.test.mjs"
@@ -13,6 +21,14 @@ on:
     branches:
       - main
     paths:
+      - "apps/api/openapi.yaml"
+      - "apps/api/src/provider-api.ts"
+      - "apps/api/test/openapi-contract.test.mjs"
+      - "apps/api/test/provider-api.test.mjs"
+      - "apps/cli/src/index.ts"
+      - "apps/cli/test/provider-cli.test.mjs"
+      - "apps/mcp/src/provider-tools.ts"
+      - "apps/mcp/test/provider-tools-contract.test.mjs"
       - "packages/providers/src/**"
       - "packages/providers/test/**"
       - "packages/repair/test/provider-canvas-execution.test.mjs"
@@ -61,31 +77,43 @@ jobs:
       - name: Install frozen dependency graph
         run: pnpm install --frozen-lockfile
 
-      - name: Build provider dependency closure
+      - name: Build provider and control-surface dependency closure
         run: |
-          pnpm --filter @evavo/art-artifacts build
-          pnpm --filter @evavo/art-media build
-          pnpm --filter @evavo/art-providers build
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-api build
+          pnpm --filter @evavo/art-studio-cli build
+          pnpm --filter @evavo/art-studio-mcp build
 
-      - name: Type-check provider capability boundary
-        run: pnpm --filter @evavo/art-providers typecheck
+      - name: Type-check provider and control-surface boundaries
+        run: |
+          pnpm --filter @evavo/art-providers typecheck
+          pnpm --filter @evavo/art-studio-api typecheck
+          pnpm --filter @evavo/art-studio-cli typecheck
+          pnpm --filter @evavo/art-studio-mcp typecheck
 
-      - name: Run provider capability regressions
-        run: node --test packages/providers/test/providers.test.mjs packages/providers/test/openai-preflight.test.mjs
+      - name: Run provider routing and capability regressions
+        run: node --test packages/providers/test/providers.test.mjs packages/providers/test/openai-preflight.test.mjs packages/repair/test/provider-canvas-execution.test.mjs
 
-      - name: Verify permanent capability contract
+      - name: Run API, CLI, MCP and OpenAPI capability regressions
+        run: node --test apps/api/test/provider-api.test.mjs apps/api/test/openapi-contract.test.mjs apps/cli/test/provider-cli.test.mjs apps/mcp/test/provider-tools-contract.test.mjs
+
+      - name: Verify permanent capability and routing contract
         shell: bash
         run: |
           set -euo pipefail
-          grep -F 'PROVIDER_PROTOCOL_VERSION = "2026-08-07.2"' packages/providers/src/types.ts
-          grep -F '"identity-reference"' packages/providers/src/types.ts
-          grep -F '"temporal-reference"' packages/providers/src/types.ts
-          grep -F '"pose-control"' packages/providers/src/types.ts
-          grep -F '"edge-control"' packages/providers/src/types.ts
-          grep -F '"depth-control"' packages/providers/src/types.ts
-          grep -F 'PROVIDER_REFERENCE_CAPABILITY_REQUIREMENTS' packages/providers/src/registry.ts
+          grep -F 'PROVIDER_PROTOCOL_VERSION = "2026-08-07.3"' packages/providers/src/types.ts
+          grep -F 'ProviderRoutingInspection' packages/providers/src/types.ts
+          grep -F 'providerCallPerformedByInspection: false' packages/providers/src/registry.ts
+          grep -F 'compileProviderRoutingInspection' packages/providers/src/orchestrator.ts
+          grep -F 'routingInspection' packages/providers/src/orchestrator.ts
+          grep -F 'requiredAdapterCapabilities' apps/api/src/provider-api.ts
+          grep -F 'requiredAdapterCapabilities' apps/cli/src/index.ts
+          grep -F 'requiredAdapterCapabilities' apps/mcp/src/provider-tools.ts
+          grep -F 'requiredReferenceCapabilities' apps/api/openapi.yaml
+          grep -F 'requiredAdapterCapabilities' apps/api/openapi.yaml
           grep -F 'reference.required' packages/providers/src/registry.ts
           grep -F 'unknown capability' packages/providers/src/registry.ts
+          grep -F 'before the artifact store is asked to resolve or read any reference' docs/governed-provider-candidates.md
           grep -F 'does **not** declare `pose-control`, `edge-control` or `depth-control`' docs/governed-provider-candidates.md
 
       - name: Run complete Art Studio validation
