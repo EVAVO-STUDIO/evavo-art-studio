@@ -259,11 +259,11 @@ export async function compileBookArtCreativeCandidateProgramme(
       continue;
     }
     if (
-      provider.plan.normalizedProviderRequest.metadata.conceptTerritoryId
+      production.workOrder.providerRequest.metadata.conceptTerritoryId
       !== route.routeId
     ) {
       blockers.push(
-        `Route ${route.routeId} provider plan lost its exact creative territory identity.`,
+        `Route ${route.routeId} work order lost its exact creative territory identity.`,
       );
       continue;
     }
