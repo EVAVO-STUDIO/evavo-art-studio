@@ -1,0 +1,88 @@
+name: Artifact descriptor integrity
+
+on:
+  pull_request:
+    paths:
+      - "packages/artifacts/src/local-store.ts"
+      - "packages/artifacts/test/descriptor-integrity-security.test.mjs"
+      - ".github/workflows/artifact-descriptor-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/artifacts/src/local-store.ts"
+      - "packages/artifacts/test/descriptor-integrity-security.test.mjs"
+      - ".github/workflows/artifact-descriptor-integrity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artifact-descriptor-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and type-check artifact persistence
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-artifacts typecheck
+
+      - name: Run artifact persistence and hostile descriptor regressions
+        run: node --test packages/artifacts/test/artifacts.test.mjs packages/artifacts/test/json-canonicalization-security.test.mjs packages/artifacts/test/descriptor-integrity-security.test.mjs
+
+      - name: Verify permanent descriptor-integrity contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'parseDescriptorText' packages/artifacts/src/local-store.ts
+          grep -F 'Artifact descriptor artifactId does not match its body.' packages/artifacts/src/local-store.ts
+          grep -F 'Artifact descriptor contains a non-canonical storage path.' packages/artifacts/src/local-store.ts
+          grep -F 'contentObjectRelativePath(descriptor.contentHash)' packages/artifacts/src/local-store.ts
+          grep -F 'tampered artifact descriptors cannot redirect reads outside canonical storage' packages/artifacts/test/descriptor-integrity-security.test.mjs
+          grep -F 'stored descriptors fail closed on identity, digest, path and shape tampering' packages/artifacts/test/descriptor-integrity-security.test.mjs
+          grep -F 'artifact descriptors are returned as deeply immutable canonical data' packages/artifacts/test/descriptor-integrity-security.test.mjs
+          ! grep -F 'path.join(await this.root(), descriptor.objectRelativePath)' packages/artifacts/src/local-store.ts
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
