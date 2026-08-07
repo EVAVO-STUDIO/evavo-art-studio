@@ -7,6 +7,7 @@ on:
       - agent/book-creative-direction-final-20260807
     paths: &book_creative_direction_paths
       - ".github/workflows/book-creative-direction.yml"
+      - "package.json"
       - "packages/contracts/src/book-creative-direction*.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-creative-direction.test.mjs"
