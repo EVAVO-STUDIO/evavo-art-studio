@@ -20,7 +20,7 @@ const MAXIMUM_DESCRIPTOR_SOURCE_BYTES = 1024 * 1024 * 1024;
 const MAXIMUM_ROUTING_REASONS = 64;
 const MAXIMUM_ROUTING_REASON_LENGTH = 1_000;
 
-const CAPABILITIES = new Set<ProviderCapability>(PROVIDER_CAPABILITIES);
+const CAPABILITIES = new Set<string>(PROVIDER_CAPABILITIES);
 
 function invalidAdapter(message: string): never {
   throw new ProviderError(
