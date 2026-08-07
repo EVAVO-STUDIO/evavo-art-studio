@@ -49,6 +49,26 @@ const STORAGE_CLASSES = new Set([
   "manifest",
   "runtime",
 ]);
+const SHA256_HEX = /^[a-f0-9]{64}$/;
+const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
+const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
+const DESCRIPTOR_KEYS = new Set([
+  "schemaVersion",
+  "protocolVersion",
+  "artifactId",
+  "descriptorSha256",
+  "contentHash",
+  "contentSha256",
+  "sizeBytes",
+  "mediaType",
+  "storageClass",
+  "fileName",
+  "sourceArtifacts",
+  "labels",
+  "metadata",
+  "objectRelativePath",
+  "descriptorRelativePath",
+]);
 
 function errorCode(error: unknown): string | undefined {
   return error && typeof error === "object" && "code" in error
@@ -66,8 +86,30 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function invalidDescriptor(message: string): never {
+  throw new ArtifactStoreError("ARTIFACT_DESCRIPTOR_INVALID", message);
+}
+
+function freezeArtifactValue<T>(
+  value: T,
+  seen = new WeakSet<object>(),
+): T {
+  if (value === null || typeof value !== "object") return value;
+  const object = value as object;
+  if (seen.has(object)) return value;
+  seen.add(object);
+  for (const entry of Object.values(value as Record<string, unknown>)) {
+    freezeArtifactValue(entry, seen);
+  }
+  return Object.freeze(value) as T;
+}
+
 function validateArtifactId(value: string): asserts value is ArtifactId {
-  if (!/^artifact_[a-f0-9]{64}$/.test(value)) {
+  if (!ARTIFACT_ID.test(value)) {
     throw new ArtifactStoreError(
       "ARTIFACT_ID_INVALID",
       "Artifact ID must use artifact_<sha256> format.",
@@ -76,7 +118,7 @@ function validateArtifactId(value: string): asserts value is ArtifactId {
 }
 
 function validateContentHash(value: string): asserts value is ContentHash {
-  if (!/^sha256:[a-f0-9]{64}$/.test(value)) {
+  if (!CONTENT_HASH.test(value)) {
     throw new ArtifactStoreError(
       "ARTIFACT_HASH_INVALID",
       "Content hash must use sha256:<hex> format.",
@@ -117,7 +159,7 @@ function normalizeFileName(value: string | undefined): string | undefined {
 function normalizeLabels(
   value: Readonly<Record<string, string>> | undefined,
 ): Readonly<Record<string, string>> {
-  const result: Record<string, string> = {};
+  const result = Object.create(null) as Record<string, string>;
   for (const key of Object.keys(value ?? {}).sort()) {
     const normalizedKey = safeSegment(key, `labels.${key}`);
     const normalizedValue = value![key]!.trim();
@@ -127,7 +169,12 @@ function normalizeLabels(
         `Artifact label ${normalizedKey} must contain 1 to 512 characters.`,
       );
     }
-    result[normalizedKey] = normalizedValue;
+    Object.defineProperty(result, normalizedKey, {
+      value: normalizedValue,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
   }
   return result;
 }
@@ -166,37 +213,221 @@ function descriptorBody(
   return body;
 }
 
-function parseDescriptor(value: unknown): StoredArtifact {
-  if (!value || typeof value !== "object") {
-    throw new ArtifactStoreError(
-      "ARTIFACT_DESCRIPTOR_INVALID",
-      "Artifact descriptor must be a JSON object.",
-    );
+function storedArtifactId(value: unknown): ArtifactId {
+  if (typeof value !== "string" || !ARTIFACT_ID.test(value)) {
+    invalidDescriptor("Artifact descriptor artifactId is invalid.");
   }
-  const descriptor = value as Partial<StoredArtifact>;
+  return value as ArtifactId;
+}
+
+function storedContentHash(value: unknown): ContentHash {
+  if (typeof value !== "string" || !CONTENT_HASH.test(value)) {
+    invalidDescriptor("Artifact descriptor contentHash is invalid.");
+  }
+  return value as ContentHash;
+}
+
+function storedSources(value: unknown): readonly ArtifactId[] {
+  if (!Array.isArray(value)) {
+    invalidDescriptor("Artifact descriptor sourceArtifacts must be an array.");
+  }
+  const source = value as readonly unknown[];
+  if (source.some((entry) => typeof entry !== "string" || !ARTIFACT_ID.test(entry))) {
+    invalidDescriptor("Artifact descriptor sourceArtifacts contain an invalid artifact ID.");
+  }
+  const normalized = normalizeSources(source as readonly ArtifactId[]);
   if (
-    descriptor.schemaVersion !== "1.0" ||
-    descriptor.protocolVersion !== ARTIFACT_PROTOCOL_VERSION ||
-    typeof descriptor.artifactId !== "string" ||
-    typeof descriptor.contentHash !== "string" ||
-    typeof descriptor.contentSha256 !== "string" ||
-    typeof descriptor.descriptorSha256 !== "string" ||
-    typeof descriptor.sizeBytes !== "number" ||
-    typeof descriptor.mediaType !== "string" ||
-    typeof descriptor.storageClass !== "string" ||
-    !Array.isArray(descriptor.sourceArtifacts) ||
-    !descriptor.labels ||
-    typeof descriptor.objectRelativePath !== "string" ||
-    typeof descriptor.descriptorRelativePath !== "string"
+    normalized.length !== source.length ||
+    normalized.some((entry, index) => entry !== source[index])
   ) {
-    throw new ArtifactStoreError(
-      "ARTIFACT_DESCRIPTOR_INVALID",
-      "Artifact descriptor is missing required fields.",
+    invalidDescriptor(
+      "Artifact descriptor sourceArtifacts must be sorted and unique.",
     );
   }
-  validateArtifactId(descriptor.artifactId);
-  validateContentHash(descriptor.contentHash);
-  return descriptor as StoredArtifact;
+  return normalized;
+}
+
+function storedLabels(value: unknown): Readonly<Record<string, string>> {
+  if (!isRecord(value)) {
+    invalidDescriptor("Artifact descriptor labels must be an object.");
+  }
+  if (Object.values(value).some((entry) => typeof entry !== "string")) {
+    invalidDescriptor("Artifact descriptor labels must contain only strings.");
+  }
+  let normalized: Readonly<Record<string, string>>;
+  try {
+    normalized = normalizeLabels(value as Readonly<Record<string, string>>);
+  } catch {
+    invalidDescriptor("Artifact descriptor labels are invalid.");
+  }
+  if (
+    stableStringify(normalizeJson(value)) !==
+    stableStringify(normalizeJson(normalized))
+  ) {
+    invalidDescriptor("Artifact descriptor labels are not canonical.");
+  }
+  return normalized;
+}
+
+function storedMediaType(value: unknown): string {
+  if (typeof value !== "string") {
+    invalidDescriptor("Artifact descriptor mediaType is invalid.");
+  }
+  let normalized: string;
+  try {
+    normalized = normalizeMediaType(value);
+  } catch {
+    invalidDescriptor("Artifact descriptor mediaType is invalid.");
+  }
+  if (normalized !== value) {
+    invalidDescriptor("Artifact descriptor mediaType is not canonical.");
+  }
+  return normalized;
+}
+
+function storedFileName(value: unknown): string {
+  if (typeof value !== "string") {
+    invalidDescriptor("Artifact descriptor fileName is invalid.");
+  }
+  let normalized: string | undefined;
+  try {
+    normalized = normalizeFileName(value);
+  } catch {
+    invalidDescriptor("Artifact descriptor fileName is invalid.");
+  }
+  if (normalized !== value) {
+    invalidDescriptor("Artifact descriptor fileName is not canonical.");
+  }
+  return normalized;
+}
+
+function parseDescriptor(
+  value: unknown,
+  expectedId?: ArtifactId,
+): StoredArtifact {
+  if (!isRecord(value)) {
+    invalidDescriptor("Artifact descriptor must be a JSON object.");
+  }
+  for (const key of Object.keys(value)) {
+    if (!DESCRIPTOR_KEYS.has(key)) {
+      invalidDescriptor(`Artifact descriptor contains unsupported field ${key}.`);
+    }
+  }
+  if (
+    value.schemaVersion !== "1.0" ||
+    value.protocolVersion !== ARTIFACT_PROTOCOL_VERSION
+  ) {
+    invalidDescriptor("Artifact descriptor schema or protocol version is invalid.");
+  }
+
+  const artifactId = storedArtifactId(value.artifactId);
+  const contentHash = storedContentHash(value.contentHash);
+  if (
+    typeof value.contentSha256 !== "string" ||
+    !SHA256_HEX.test(value.contentSha256) ||
+    value.contentSha256 !== contentHash.slice("sha256:".length)
+  ) {
+    invalidDescriptor("Artifact descriptor contentSha256 is inconsistent.");
+  }
+  if (
+    typeof value.descriptorSha256 !== "string" ||
+    !SHA256_HEX.test(value.descriptorSha256)
+  ) {
+    invalidDescriptor("Artifact descriptor descriptorSha256 is invalid.");
+  }
+  if (
+    typeof value.sizeBytes !== "number" ||
+    !Number.isSafeInteger(value.sizeBytes) ||
+    value.sizeBytes < 0
+  ) {
+    invalidDescriptor("Artifact descriptor sizeBytes is invalid.");
+  }
+  const mediaType = storedMediaType(value.mediaType);
+  if (
+    typeof value.storageClass !== "string" ||
+    !STORAGE_CLASSES.has(value.storageClass)
+  ) {
+    invalidDescriptor("Artifact descriptor storageClass is invalid.");
+  }
+  const sourceArtifacts = storedSources(value.sourceArtifacts);
+  const labels = storedLabels(value.labels);
+  const fileName = Object.hasOwn(value, "fileName")
+    ? storedFileName(value.fileName)
+    : undefined;
+
+  let metadata: JsonValue | undefined;
+  if (Object.hasOwn(value, "metadata")) {
+    try {
+      metadata = normalizeJson(value.metadata);
+    } catch {
+      invalidDescriptor("Artifact descriptor metadata is invalid.");
+    }
+  }
+
+  const body: Record<string, JsonValue> = {
+    schemaVersion: "1.0",
+    protocolVersion: ARTIFACT_PROTOCOL_VERSION,
+    contentHash,
+    contentSha256: value.contentSha256,
+    sizeBytes: value.sizeBytes,
+    mediaType,
+    storageClass: value.storageClass,
+    sourceArtifacts,
+    labels: normalizeJson(labels),
+  };
+  if (fileName !== undefined) body.fileName = fileName;
+  if (metadata !== undefined) body.metadata = metadata;
+
+  const canonicalBody = stableStringify(body);
+  const expectedArtifactId = createArtifactId(body);
+  const expectedDescriptorSha256 = sha256(canonicalBody);
+  const expectedObjectRelativePath = relativePortable(
+    contentObjectRelativePath(contentHash),
+  );
+  const expectedDescriptorRelativePath = relativePortable(
+    descriptorRelativePath(expectedArtifactId),
+  );
+
+  if (artifactId !== expectedArtifactId) {
+    invalidDescriptor("Artifact descriptor artifactId does not match its body.");
+  }
+  if (expectedId !== undefined && artifactId !== expectedId) {
+    invalidDescriptor("Artifact descriptor identity does not match its file path.");
+  }
+  if (value.descriptorSha256 !== expectedDescriptorSha256) {
+    invalidDescriptor("Artifact descriptor digest does not match its body.");
+  }
+  if (
+    value.objectRelativePath !== expectedObjectRelativePath ||
+    value.descriptorRelativePath !== expectedDescriptorRelativePath
+  ) {
+    invalidDescriptor("Artifact descriptor contains a non-canonical storage path.");
+  }
+
+  const descriptor: StoredArtifact = {
+    ...(body as unknown as Omit<
+      ArtifactDescriptor,
+      "artifactId" | "descriptorSha256"
+    >),
+    artifactId,
+    descriptorSha256: expectedDescriptorSha256,
+    objectRelativePath: expectedObjectRelativePath,
+    descriptorRelativePath: expectedDescriptorRelativePath,
+  };
+  return freezeArtifactValue(descriptor);
+}
+
+function parseDescriptorText(
+  value: string,
+  expectedId: ArtifactId,
+): StoredArtifact {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch {
+    invalidDescriptor("Artifact descriptor is not valid JSON.");
+  }
+  return parseDescriptor(parsed, expectedId);
 }
 
 function parseReference(value: unknown): ArtifactReference {
@@ -263,13 +494,13 @@ export class LocalArtifactStore implements ArtifactStore {
     const root = await this.root();
     const objectPath = path.join(root, objectRelativePath);
     const descriptorPath = path.join(root, descriptorPathRelative);
-    const descriptor: StoredArtifact = {
+    const descriptor = freezeArtifactValue<StoredArtifact>({
       ...(body as unknown as Omit<ArtifactDescriptor, "artifactId" | "descriptorSha256">),
       artifactId: id,
       descriptorSha256,
       objectRelativePath: relativePortable(objectRelativePath),
       descriptorRelativePath: relativePortable(descriptorPathRelative),
-    };
+    });
 
     await this.#lock(`object:${hash}`, async () => {
       if (await fileExists(objectPath)) {
@@ -288,8 +519,9 @@ export class LocalArtifactStore implements ArtifactStore {
     await this.#lock(`descriptor:${id}`, async () => {
       const serialized = `${JSON.stringify(descriptor, null, 2)}\n`;
       if (await fileExists(descriptorPath)) {
-        const existing = parseDescriptor(
-          JSON.parse(await readFile(descriptorPath, "utf8")) as unknown,
+        const existing = parseDescriptorText(
+          await readFile(descriptorPath, "utf8"),
+          id,
         );
         if (stableStringify(normalizeJson(existing)) !== stableStringify(normalizeJson(descriptor))) {
           throw new ArtifactStoreError(
@@ -309,9 +541,7 @@ export class LocalArtifactStore implements ArtifactStore {
     validateArtifactId(id);
     const descriptorPath = path.join(await this.root(), descriptorRelativePath(id));
     try {
-      return parseDescriptor(
-        JSON.parse(await readFile(descriptorPath, "utf8")) as unknown,
-      );
+      return parseDescriptorText(await readFile(descriptorPath, "utf8"), id);
     } catch (error: unknown) {
       if (errorCode(error) === "ENOENT") return null;
       throw error;
@@ -326,7 +556,9 @@ export class LocalArtifactStore implements ArtifactStore {
         `Artifact ${id} was not found.`,
       );
     }
-    const bytes = await readFile(path.join(await this.root(), descriptor.objectRelativePath));
+    const bytes = await readFile(
+      path.join(await this.root(), contentObjectRelativePath(descriptor.contentHash)),
+    );
     if (
       bytes.byteLength !== descriptor.sizeBytes ||
       sha256(bytes) !== descriptor.contentSha256
@@ -340,7 +572,25 @@ export class LocalArtifactStore implements ArtifactStore {
   }
 
   public async verify(id: ArtifactId): Promise<ArtifactVerification> {
-    const descriptor = await this.get(id);
+    let descriptor: StoredArtifact | null;
+    try {
+      descriptor = await this.get(id);
+    } catch (error: unknown) {
+      if (
+        error instanceof ArtifactStoreError &&
+        error.code === "ARTIFACT_DESCRIPTOR_INVALID"
+      ) {
+        return {
+          artifactId: id,
+          exists: true,
+          descriptorValid: false,
+          contentValid: false,
+          expectedContentSha256: "",
+          expectedSizeBytes: 0,
+        };
+      }
+      throw error;
+    }
     if (!descriptor) {
       return {
         artifactId: id,
@@ -351,7 +601,10 @@ export class LocalArtifactStore implements ArtifactStore {
         expectedSizeBytes: 0,
       };
     }
-    const objectPath = path.join(await this.root(), descriptor.objectRelativePath);
+    const objectPath = path.join(
+      await this.root(),
+      contentObjectRelativePath(descriptor.contentHash),
+    );
     try {
       const bytes = await readFile(objectPath);
       const actualContentSha256 = sha256(bytes);
