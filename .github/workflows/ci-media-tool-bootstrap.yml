@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/ci.yml"
+      - ".github/workflows/book-art-provider-runtime.yml"
       - ".github/workflows/ci-media-tool-bootstrap.yml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "scripts/test-ci-media-tool-bootstrap.mjs"
@@ -13,6 +14,7 @@ on:
       - main
     paths:
       - ".github/workflows/ci.yml"
+      - ".github/workflows/book-art-provider-runtime.yml"
       - ".github/workflows/ci-media-tool-bootstrap.yml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "scripts/test-ci-media-tool-bootstrap.mjs"
@@ -66,7 +68,10 @@ jobs:
           grep -F -- '--kill-after=15s' scripts/bootstrap-ci-media-tools.sh
           grep -F 'Acquire::Retries=3' scripts/bootstrap-ci-media-tools.sh
           grep -F 'bash scripts/bootstrap-ci-media-tools.sh' .github/workflows/ci.yml
+          grep -F 'bash scripts/bootstrap-ci-media-tools.sh' .github/workflows/book-art-provider-runtime.yml
           ! grep -F 'sudo apt-get update' .github/workflows/ci.yml
+          ! grep -F 'sudo apt-get update' .github/workflows/book-art-provider-runtime.yml
+          grep -F 'critical workflows permanently use the bounded bootstrap contract' scripts/test-ci-media-tool-bootstrap.mjs
           grep -F 'media bootstrap fails after the configured bounded attempts' scripts/test-ci-media-tool-bootstrap.mjs
 
       - name: Run complete Art Studio validation
