@@ -92,7 +92,7 @@ jobs:
           pnpm --filter @evavo/art-studio-mcp typecheck
 
       - name: Run provider routing and capability regressions
-        run: node --test packages/providers/test/providers.test.mjs packages/providers/test/openai-preflight.test.mjs packages/repair/test/provider-canvas-execution.test.mjs
+        run: node --test packages/providers/test/providers.test.mjs packages/providers/test/openai-preflight.test.mjs packages/providers/test/routing-inspection-security.test.mjs packages/repair/test/provider-canvas-execution.test.mjs
 
       - name: Run API, CLI, MCP and OpenAPI capability regressions
         run: node --test apps/api/test/provider-api.test.mjs apps/api/test/openapi-contract.test.mjs apps/cli/test/provider-cli.test.mjs apps/mcp/test/provider-tools-contract.test.mjs
@@ -104,6 +104,9 @@ jobs:
           grep -F 'PROVIDER_PROTOCOL_VERSION = "2026-08-07.3"' packages/providers/src/types.ts
           grep -F 'ProviderRoutingInspection' packages/providers/src/types.ts
           grep -F 'providerCallPerformedByInspection: false' packages/providers/src/registry.ts
+          grep -F 'snapshotDescriptor' packages/providers/src/registry.ts
+          grep -F 'PROVIDER_ROUTING_INSPECTION_INVALID' packages/providers/src/registry.ts
+          grep -F 'must-never-enter-routing-evidence' packages/providers/test/routing-inspection-security.test.mjs
           grep -F 'compileProviderRoutingInspection' packages/providers/src/orchestrator.ts
           grep -F 'routingInspection' packages/providers/src/orchestrator.ts
           grep -F 'requiredAdapterCapabilities' apps/api/src/provider-api.ts
