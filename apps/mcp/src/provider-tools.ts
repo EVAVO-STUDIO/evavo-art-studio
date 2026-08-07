@@ -5,6 +5,7 @@ import {
   ProviderError,
   compileProviderCandidatePrompt,
   providerProtocolSummary,
+  providerRequiredCapabilities,
   providerRequestSha256,
   validateProviderCandidateRequest,
 } from "@evavo/art-providers";
@@ -45,6 +46,7 @@ function compiledValue(input: unknown) {
     schemaVersion: "1.0",
     request,
     requestSha256: providerRequestSha256(request),
+    requiredAdapterCapabilities: providerRequiredCapabilities(request),
     compiledPrompt: prompt.text,
     compiledPromptSha256: prompt.sha256,
     runtimeJob: {
