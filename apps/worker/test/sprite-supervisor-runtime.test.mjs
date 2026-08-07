@@ -138,6 +138,7 @@ function request(identityArtifactId, options = {}) {
             height: { $plan: "/asset/dimensions/height" },
             transparency: "required",
           },
+          background: { strategy: "chroma-key", matteColour: "#00ff00" },
           references: [
             {
               artifactId: { $artifact: "canonical-identity" },
@@ -279,6 +280,18 @@ function workerFor(runtime, artifacts, childHandlers) {
         "repair.plan",
         "artifacts.store",
         "evidence.bundle",
+      ],
+      capabilityProfiles: [
+        {
+          id: "sprite-supervisor-fixture-provider",
+          capabilities: [
+            "cancellation",
+            "candidate-count",
+            "generate",
+            "identity-reference",
+            "reference-images",
+          ],
+        },
       ],
     },
     handlers: {

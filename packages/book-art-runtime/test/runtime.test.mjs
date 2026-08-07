@@ -9,6 +9,7 @@ import {
   compileBookArtProductionWorkOrder,
   fingerprintBookArtBrief,
 } from "@evavo/art-contracts";
+import { providerRequiredCapabilities } from "@evavo/art-providers";
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 
 import {
@@ -125,7 +126,7 @@ test("shared Book Art runtime compiles the exact no-fallback one-attempt contrac
   assert.equal(first.plan.runtimeSubmission.maximumAttempts, 1);
   assert.deepEqual(
     first.plan.runtimeSubmission.requiredCapabilityProfile,
-    first.plan.routingInspection.requiredCapabilities,
+    providerRequiredCapabilities(first.plan.normalizedProviderRequest),
   );
   assert.equal(first.plan.normalizedProviderRequest.candidateCount, 1);
   assert.equal(first.plan.normalizedProviderRequest.selection.allowFallback, false);
