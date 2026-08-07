@@ -1,0 +1,196 @@
+submission_functions = r'''function snapshotRuntimeJobSubmission(
+  input: unknown,
+): RuntimeJobSubmissionSnapshot {
+  const source = runtimeInputRecord(input, "Runtime job submission");
+  const queue = safeRuntimeName(
+    readRuntimeInput(source, "queue", "submission"),
+    "queue",
+  );
+  const kind = safeRuntimeName(
+    readRuntimeInput(source, "kind", "submission"),
+    "kind",
+  );
+  const idempotencyKey = normalizeIdempotencyKey(
+    readRuntimeInput(source, "idempotencyKey", "submission"),
+  );
+  const idInput = readRuntimeInput(source, "id", "submission");
+  const id = idInput === undefined
+    ? `job_${sha256(`${queue}\\0${idempotencyKey}`).slice(0, 40)}`
+    : safeRuntimeName(idInput, "id");
+  const dependencyJobIds = normalizedRuntimeNameList(
+    readRuntimeInput(source, "dependencyJobIds", "submission"),
+    "dependencyJobIds",
+  );
+  if (dependencyJobIds.includes(id)) {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      "A job may not depend on itself.",
+    );
+  }
+
+  const requiredCapabilitiesInput = readRuntimeInput(
+    source,
+    "requiredCapabilities",
+    "submission",
+  );
+  const requiredCapabilities = normalizedCapabilityList(
+    requiredCapabilitiesInput === undefined
+      ? []
+      : requiredCapabilitiesInput,
+    "requiredCapabilities",
+    "RUNTIME_JOB_SPEC_INVALID",
+    256,
+  );
+  const requiredCapabilityProfileInput = readRuntimeInput(
+    source,
+    "requiredCapabilityProfile",
+    "submission",
+  );
+  const requiredCapabilityProfile =
+    requiredCapabilityProfileInput === undefined
+      ? undefined
+      : normalizedCapabilityList(
+          requiredCapabilityProfileInput,
+          "requiredCapabilityProfile",
+          "RUNTIME_JOB_SPEC_INVALID",
+          256,
+        );
+  if (requiredCapabilityProfile !== undefined && !requiredCapabilityProfile.length) {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      "requiredCapabilityProfile must contain at least one capability when supplied.",
+    );
+  }
+
+  const payload = runtimeJson(
+    readRuntimeInput(source, "payload", "submission"),
+    "payload",
+  );
+  const inputArtifacts = artifactIds(
+    readRuntimeInput(source, "inputArtifacts", "submission"),
+  );
+  const priority = integer(
+    readRuntimeInput(source, "priority", "submission"),
+    0,
+    -1000,
+    1000,
+    "priority",
+  );
+  const maximumAttempts = integer(
+    readRuntimeInput(source, "maximumAttempts", "submission"),
+    3,
+    1,
+    50,
+    "maximumAttempts",
+  );
+  const retryPolicy = normalizeRetryPolicy(
+    readRuntimeInput(source, "retryPolicy", "submission"),
+  );
+  const leaseDurationMs = integer(
+    readRuntimeInput(source, "leaseDurationMs", "submission"),
+    60_000,
+    10_000,
+    3_600_000,
+    "leaseDurationMs",
+  );
+  const timeoutMs = integer(
+    readRuntimeInput(source, "timeoutMs", "submission"),
+    900_000,
+    1_000,
+    86_400_000,
+    "timeoutMs",
+  );
+  const notBefore = timestamp(
+    readRuntimeInput(source, "notBefore", "submission"),
+    "notBefore",
+  );
+  const deadline = timestamp(
+    readRuntimeInput(source, "deadline", "submission"),
+    "deadline",
+  );
+  if (
+    notBefore !== undefined &&
+    deadline !== undefined &&
+    Date.parse(deadline) <= Date.parse(notBefore)
+  ) {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      "deadline must be later than notBefore.",
+    );
+  }
+  const normalizedLabels = labels(
+    readRuntimeInput(source, "labels", "submission"),
+  );
+
+  const snapshot: RuntimeJobSubmissionSnapshot = {
+    id,
+    queue,
+    kind,
+    idempotencyKey,
+    payload,
+    requiredCapabilities,
+    ...(requiredCapabilityProfile === undefined
+      ? {}
+      : { requiredCapabilityProfile }),
+    dependencyJobIds,
+    inputArtifacts,
+    priority,
+    maximumAttempts,
+    retryPolicy,
+    leaseDurationMs,
+    timeoutMs,
+    ...(notBefore === undefined ? {} : { notBefore }),
+    ...(deadline === undefined ? {} : { deadline }),
+    labels: normalizedLabels,
+  };
+  return freezeRuntimeValue(snapshot);
+}
+
+export function normalizeRuntimeJobSubmission(
+  input: RuntimeJobSubmission,
+): Readonly<{ spec: NormalizedRuntimeJobSpec; specHash: string }> {
+  const snapshot = snapshotRuntimeJobSubmission(input);
+  const spec: NormalizedRuntimeJobSpec = Object.freeze({
+    schemaVersion: "1.0" as const,
+    id: snapshot.id,
+    queue: snapshot.queue,
+    kind: snapshot.kind,
+    idempotencyKey: snapshot.idempotencyKey,
+    payload: snapshot.payload,
+    requiredCapabilities: snapshot.requiredCapabilities,
+    ...(snapshot.requiredCapabilityProfile === undefined
+      ? {}
+      : { requiredCapabilityProfile: snapshot.requiredCapabilityProfile }),
+    dependencyJobIds: snapshot.dependencyJobIds,
+    inputArtifacts: snapshot.inputArtifacts,
+    priority: snapshot.priority,
+    maximumAttempts: snapshot.maximumAttempts,
+    retryPolicy: snapshot.retryPolicy,
+    leaseDurationMs: snapshot.leaseDurationMs,
+    timeoutMs: snapshot.timeoutMs,
+    ...(snapshot.notBefore === undefined
+      ? {}
+      : { notBefore: snapshot.notBefore }),
+    ...(snapshot.deadline === undefined
+      ? {}
+      : { deadline: snapshot.deadline }),
+    labels: snapshot.labels,
+  });
+  return Object.freeze({
+    spec,
+    specHash: sha256(stableStringify(normalizeJson(spec))),
+  });
+}
+
+'''
+
+text = replace_between(
+    text,
+    "export function normalizeRuntimeJobSubmission(",
+    "export function retryDelayMs",
+    submission_functions,
+    "runtime submission normalization",
+)
+
+NORMALIZE_PATH.write_text(text, encoding="utf-8")
+
