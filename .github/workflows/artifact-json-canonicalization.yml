@@ -1,0 +1,87 @@
+name: Artifact JSON canonicalization
+
+on:
+  pull_request:
+    paths:
+      - "packages/artifacts/src/hash.ts"
+      - "packages/artifacts/test/json-canonicalization-security.test.mjs"
+      - ".github/workflows/artifact-json-canonicalization.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/artifacts/src/hash.ts"
+      - "packages/artifacts/test/json-canonicalization-security.test.mjs"
+      - ".github/workflows/artifact-json-canonicalization.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artifact-json-canonicalization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and type-check artifact canonicalization
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-artifacts typecheck
+
+      - name: Run artifact and hostile canonical JSON regressions
+        run: node --test packages/artifacts/test/artifacts.test.mjs packages/artifacts/test/json-canonicalization-security.test.mjs
+
+      - name: Verify permanent canonicalization contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'readObjectEntry' packages/artifacts/src/hash.ts
+          grep -F 'readArrayEntry' packages/artifacts/src/hash.ts
+          grep -F 'contains a circular JSON reference' packages/artifacts/src/hash.ts
+          grep -F 'Object.defineProperty(result, key' packages/artifacts/src/hash.ts
+          grep -F 'canonical JSON snapshots accessors once and preserves special keys safely' packages/artifacts/test/json-canonicalization-security.test.mjs
+          grep -F 'canonical JSON allows shared acyclic values and rejects unsafe structures' packages/artifacts/test/json-canonicalization-security.test.mjs
+          ! grep -F 'source[key] === undefined' packages/artifacts/src/hash.ts
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
