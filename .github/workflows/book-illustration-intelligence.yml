@@ -8,6 +8,7 @@ on:
       - agent/book-candidate-set-quality-20260806
     paths:
       - ".github/workflows/book-illustration-intelligence.yml"
+      - "scripts/bootstrap-ci-media-tools.sh"
       - "packages/contracts/src/book-illustration-intelligence.ts"
       - "packages/contracts/src/book-art-candidate-set*.ts"
       - "packages/contracts/src/index.ts"
@@ -20,6 +21,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/book-illustration-intelligence.yml"
+      - "scripts/bootstrap-ci-media-tools.sh"
       - "packages/contracts/src/book-illustration-intelligence.ts"
       - "packages/contracts/src/book-art-candidate-set*.ts"
       - "packages/contracts/src/index.ts"
@@ -57,9 +59,7 @@ jobs:
           node-version: 22.14.0
           package-manager-cache: false
       - name: Install FFmpeg media tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends ffmpeg
+        run: bash scripts/bootstrap-ci-media-tools.sh
       - name: Install dependency graph
         run: pnpm install --frozen-lockfile
       - name: Check permanent contract authority

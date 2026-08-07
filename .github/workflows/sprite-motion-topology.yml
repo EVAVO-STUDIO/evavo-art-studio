@@ -14,6 +14,7 @@ on:
       - "packages/sprite-supervisor/src/automatic-mirror-family.ts"
       - "packages/sprite-supervisor/test/automatic-workflow.test.mjs"
       - "packages/sprite-supervisor/test/deterministic-mirroring.test.mjs"
+      - "scripts/bootstrap-ci-media-tools.sh"
       - "docs/SPRITE_MOTION_TOPOLOGY.md"
       - ".github/workflows/sprite-motion-topology.yml"
   push:
@@ -31,6 +32,7 @@ on:
       - "packages/sprite-supervisor/src/automatic-mirror-family.ts"
       - "packages/sprite-supervisor/test/automatic-workflow.test.mjs"
       - "packages/sprite-supervisor/test/deterministic-mirroring.test.mjs"
+      - "scripts/bootstrap-ci-media-tools.sh"
       - "docs/SPRITE_MOTION_TOPOLOGY.md"
       - ".github/workflows/sprite-motion-topology.yml"
 
@@ -53,17 +55,7 @@ jobs:
           persist-credentials: false
 
       - name: Install and identify audio media tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends ffmpeg
-          FFMPEG_PATH="$(command -v ffmpeg)"
-          FFPROBE_PATH="$(command -v ffprobe)"
-          test -x "${FFMPEG_PATH}"
-          test -x "${FFPROBE_PATH}"
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
+        run: bash scripts/bootstrap-ci-media-tools.sh
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
