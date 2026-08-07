@@ -7,6 +7,10 @@ export function automaticSpriteWorkflowProtocolSummary() {
     purpose:
       "Expand one verified art-direction contract and complete sprite-production plan into bounded provider, target-size mastering, deterministic derivation, selection, compare-and-swap promotion and complete family-verification tasks.",
     productionRules: [
+      "The exact hash-bound sprite plan is compiled into deterministic motion topology before any production task graph is expanded.",
+      "Every authored frame and retained visible layer carries its exact semantic phase, phase progress, ground-contact state, temporal neighbours and adjacent-direction continuity into provider, selection and promotion metadata.",
+      "Family verification requires ground contact only for frames whose semantic phase is explicitly grounded; airborne, transition and not-applicable phases are never forced onto the baseline.",
+      "Split jump-start, jump-loop, fall and land clips retain their distinct motion contracts through automatic supervision.",
       "Every authored direction receives an approved direction master before clip frames.",
       "Every clip key pose depends on the approved direction master.",
       "Every authored in-between depends on approved previous and next key poses.",
@@ -40,7 +44,8 @@ export function automaticSpriteWorkflowProtocolSummary() {
       "Existing named-reference generations are not overwritten; revisions use the existing repair and compare-and-swap workflow.",
       "Missing required layer references, unsupported family roles, missing neighbour key poses, incomplete derived sources, task ceilings and incompatible targets block compilation.",
       "Ambiguous deterministic selection or promotion becomes supervisor review-required rather than accepting the highest score blindly.",
-      "No mirror task may relax frame-quality, transparency, lineage or complete-family gates.",
+      "No motion-topology binding or mirror task may relax frame-quality, transparency, lineage, selection or complete-family gates.",
+      "Motion-topology warnings force review-required disposition instead of being silently discarded.",
     ],
     taskKinds: [
       "art.candidate.generate",

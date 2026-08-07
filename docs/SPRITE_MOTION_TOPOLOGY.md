@@ -30,7 +30,7 @@ Clips are no longer treated as only a frame count. The topology assigns complete
 - jumps: anticipation, takeoff, ascent, apex, descent, landing;
 - idle and loops: settle, hold, return.
 
-Specific action identities take precedence over broad clip categories. For example, `jump-start`, `fall` and `land` retain grounded, transition and airborne phases even though the source sprite planner classifies them within locomotion.
+Specific action identities take precedence over broad clip categories. For example, `jump-start`, `jump-loop`, `fall` and `land` retain distinct grounded, transition and airborne contracts even though the source sprite planner classifies them within locomotion. `jump-loop` and `fall` remain airborne throughout; `land` is grounded throughout.
 
 Every phase records its exact frame range, key frame, duration, motion intent and ground-contact state. Phase allocation is deterministic, handles one to many frames, and preserves the source plan’s exact frame durations.
 
@@ -45,6 +45,16 @@ Every runtime frame is bound to:
 - the semantic phase key frame.
 
 These bindings are designed for provider conditioning, consistency review, repair planning and native-engine visual regression. A required animation frame should never be generated as an unrelated prompt-only image.
+
+## Automatic supervisor consumption
+
+`@evavo/art-sprite-supervisor` compiles motion topology from the exact validated sprite plan before expanding automatic production tasks. Every authored frame and retained visible layer carries the topology protocol/hash plus semantic phase, normalized phase progress, ground-contact state, temporal neighbours, adjacent-direction frame identities and direction vectors through provider, selection and promotion metadata.
+
+Those continuity identities are conditioning and evidence, not new execution dependencies. The existing approved direction-master and neighbouring key-pose dependency graph remains authoritative, which avoids creating cycles between same-index adjacent directions. Selection thresholds are not relaxed merely because richer motion context is present.
+
+Complete family verification now enables its ground-contact gate only for semantically `grounded` phases. `airborne`, `transition` and `not-applicable` frames are not falsely forced onto the baseline. Deterministically mirrored directions inherit the target frame's exact motion binding and the same semantic ground-contact rule.
+
+The supervisor workflow, provider tasks, selection tasks, promotion tasks, family-verification payload and mirror tasks all retain the exact motion-topology SHA-256 so downstream evidence can prove which deterministic motion contract governed the frame.
 
 ## Runtime use
 

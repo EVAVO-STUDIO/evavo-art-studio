@@ -23,6 +23,11 @@ async function example() {
 
 test("automatic workflow compiles every authored frame into executable branches", async () => {
   const input = await example();
+  input.spritePlanRequest.clipOverrides = [
+    { id: "jump-loop", include: true },
+    { id: "fall", include: true },
+    { id: "land", include: true },
+  ];
   const first = compileAutomaticSpriteWorkflow(input);
   const second = compileAutomaticSpriteWorkflow(input);
 
@@ -32,6 +37,16 @@ test("automatic workflow compiles every authored frame into executable branches"
   assert.equal(
     first.supervisorWorkflow.workflowSha256,
     second.supervisorWorkflow.workflowSha256,
+  );
+  assert.equal(first.motionTopology.topologySha256, second.motionTopology.topologySha256);
+  assert.equal(first.motionTopology.protocolVersion, "2026-08-07.2");
+  assert.equal(
+    first.supervisorRequest.metadata.motionTopologySha256,
+    first.motionTopology.topologySha256,
+  );
+  assert.equal(
+    first.supervisorRequest.metadata.motionTopologyProtocolVersion,
+    first.motionTopology.protocolVersion,
   );
   assert.ok(first.analysis.totals.authoredDirections >= 2);
   assert.ok(first.analysis.totals.authoredFrames > 0);
@@ -89,6 +104,26 @@ test("automatic workflow compiles every authored frame into executable branches"
     assert.match(task.payloadTemplate.target.namespace, /^projects\//);
   }
 
+  const airborne = providerTasks.find(
+    (task) =>
+      task.payloadTemplate.metadata.clipId === "jump-loop" &&
+      task.payloadTemplate.metadata.layerRole === "identity-core",
+  );
+  assert.ok(airborne);
+  assert.equal(airborne.payloadTemplate.metadata.motionTopology.phase.id, "airborne-hold");
+  assert.equal(
+    airborne.payloadTemplate.metadata.motionTopology.phase.groundContact,
+    "airborne",
+  );
+  assert.deepEqual(
+    airborne.payloadTemplate.metadata.motionTopology.direction.adjacentDirections,
+    ["right"],
+  );
+  assert.match(airborne.payloadTemplate.creativeIntent, /Airborne Hold/);
+  assert.ok(
+    airborne.payloadTemplate.metadata.motionTopology.continuity.canonicalReferenceIds.length > 0,
+  );
+
   const inBetween = providerTasks.find(
     (task) => task.payloadTemplate.continuityPhase === "in-between",
   );
@@ -105,6 +140,32 @@ test("automatic workflow compiles every authored frame into executable branches"
     family.payloadTemplate.frames.length,
     first.analysis.totals.authoredFrames,
   );
+  assert.equal(
+    family.payloadTemplate.frames
+      .filter((entry) => entry.animation === "jump-loop")
+      .every((entry) => entry.groundContact === false),
+    true,
+  );
+  assert.equal(
+    family.payloadTemplate.frames
+      .filter((entry) => entry.animation === "fall")
+      .every((entry) => entry.groundContact === false),
+    true,
+  );
+  assert.equal(
+    family.payloadTemplate.frames
+      .filter((entry) => entry.animation === "land")
+      .every((entry) => entry.groundContact === true),
+    true,
+  );
+  assert.equal(
+    family.payloadTemplate.metadata.motionTopologySha256,
+    first.motionTopology.topologySha256,
+  );
+  assert.equal(
+    family.payloadTemplate.metadata.groundContactPolicy,
+    "semantic-phase-grounded-only",
+  );
   assert.ok(
     family.outputBindings.some(
       (entry) => entry.role === "automatic.family-evidence",
@@ -118,9 +179,15 @@ test("automatic workflow compiles every authored frame into executable branches"
 
 test("automatic protocol states its provider-free and fail-closed boundaries", () => {
   const protocol = automaticSpriteWorkflowProtocolSummary();
-  assert.equal(protocol.protocolVersion, "2026-08-02.1");
+  assert.equal(protocol.protocolVersion, "2026-08-07.2");
   assert.ok(
     protocol.productionRules.some((entry) => entry.includes("target-size")),
+  );
+  assert.ok(
+    protocol.productionRules.some((entry) => entry.includes("ground contact")),
+  );
+  assert.ok(
+    protocol.productionRules.some((entry) => entry.includes("Split jump-start")),
   );
   assert.ok(
     protocol.mirrorRules.some((entry) => entry.includes("RGBA")),

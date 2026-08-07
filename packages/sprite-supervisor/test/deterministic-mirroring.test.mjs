@@ -20,6 +20,11 @@ async function automaticRequest() {
     ),
   );
   input.spritePlanRequest.allowDerivedMirrors = true;
+  input.spritePlanRequest.clipOverrides = [
+    { id: "jump-loop", include: true },
+    { id: "fall", include: true },
+    { id: "land", include: true },
+  ];
   input.spritePlanRequest.artDirectionRequest.asset.asymmetric = false;
   input.references.layerReferenceArtifactIds = {
     shadow: `artifact_${"b".repeat(64)}`,
@@ -78,6 +83,41 @@ test("compiles planner-approved directions into exact deterministic mirror tasks
   assert.equal(
     family.payloadTemplate.metadata.deterministicMirroring.operation,
     "mirror-horizontal",
+  );
+  assert.equal(
+    family.payloadTemplate.metadata.motionTopologySha256,
+    first.motionTopology.topologySha256,
+  );
+  const derivedAirborneFrames = family.payloadTemplate.frames.filter(
+    (frame) =>
+      frame.animation === "jump-loop" &&
+      first.request.spritePlan.directions.some(
+        (direction) => !direction.authored && direction.name === frame.direction,
+      ),
+  );
+  assert.ok(derivedAirborneFrames.length > 0);
+  assert.equal(
+    derivedAirborneFrames.every((frame) => frame.groundContact === false),
+    true,
+  );
+  const derivedAirborneUnits = first.analysis.productionUnits.filter(
+    (unit) =>
+      unit.derivation?.kind === "horizontal-mirror" &&
+      unit.clipId === "jump-loop",
+  );
+  assert.ok(derivedAirborneUnits.length > 0);
+  assert.equal(
+    derivedAirborneUnits.every(
+      (unit) => unit.motion?.phase.groundContact === "airborne",
+    ),
+    true,
+  );
+  assert.ok(
+    mirrors.every(
+      (task) =>
+        task.payloadTemplate.metadata.motionTopologySha256 ===
+        first.motionTopology.topologySha256,
+    ),
   );
   assert.ok(
     first.supervisorRequest.policy.requiredReleaseArtifactRoles.includes(

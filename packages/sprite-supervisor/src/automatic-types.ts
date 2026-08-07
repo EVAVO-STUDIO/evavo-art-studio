@@ -3,7 +3,12 @@ import type {
   ArtDirectionCompileRequestInput,
   CompiledArtDirectionContract,
 } from "@evavo/art-direction";
-import type { CompiledSpriteProductionPlan } from "@evavo/art-sprite-planner";
+import type {
+  CompiledSpriteMotionTopology,
+  CompiledSpriteProductionPlan,
+  SpriteGroundContact,
+  SpriteMotionVector,
+} from "@evavo/art-sprite-planner";
 
 import type {
   CompiledSpriteSupervisorWorkflow,
@@ -11,7 +16,7 @@ import type {
 } from "./types.js";
 
 export const AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION =
-  "2026-08-02.1" as const;
+  "2026-08-07.2" as const;
 
 export type AutomaticSpriteWorkflowDisposition =
   | "ready"
@@ -133,6 +138,32 @@ export interface AutomaticSpriteWorkflowWarning {
   readonly details?: JsonValue;
 }
 
+export interface AutomaticSpriteMotionBinding {
+  readonly topologyProtocolVersion: string;
+  readonly topologySha256: string;
+  readonly phase: Readonly<{
+    readonly id: string;
+    readonly label: string;
+    readonly progress: number;
+    readonly keyFrame: number;
+    readonly motionIntent: string;
+    readonly groundContact: SpriteGroundContact;
+  }>;
+  readonly direction: Readonly<{
+    readonly worldAngleDegrees?: number;
+    readonly worldVector: SpriteMotionVector;
+    readonly screenVector: SpriteMotionVector;
+    readonly adjacentDirections: readonly string[];
+  }>;
+  readonly continuity: Readonly<{
+    readonly previousFrameId?: string;
+    readonly nextFrameId?: string;
+    readonly clockwiseDirectionFrameId?: string;
+    readonly counterClockwiseDirectionFrameId?: string;
+    readonly canonicalReferenceIds: readonly string[];
+  }>;
+}
+
 export interface AutomaticSpriteProductionUnit {
   readonly id: string;
   readonly kind: "direction-master" | "frame" | "layer";
@@ -146,6 +177,7 @@ export interface AutomaticSpriteProductionUnit {
   readonly masterArtifactRole: string;
   readonly dependencyMasterRoles: readonly string[];
   readonly dependencyTaskIds: readonly string[];
+  readonly motion?: AutomaticSpriteMotionBinding;
   readonly derivation?: Readonly<{
     readonly kind: "horizontal-mirror";
     readonly sourceDirection: string;
@@ -183,6 +215,7 @@ export interface CompiledAutomaticSpriteWorkflow {
   readonly protocolVersion: typeof AUTOMATIC_SPRITE_WORKFLOW_PROTOCOL_VERSION;
   readonly request: ResolvedAutomaticSpriteWorkflowCompileRequest;
   readonly requestSha256: string;
+  readonly motionTopology: CompiledSpriteMotionTopology;
   readonly analysis: AutomaticSpriteWorkflowAnalysis;
   readonly supervisorRequest: SpriteSupervisorCompileRequestInput;
   readonly supervisorWorkflow: CompiledSpriteSupervisorWorkflow;

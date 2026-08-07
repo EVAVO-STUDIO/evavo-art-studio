@@ -131,6 +131,58 @@ test("supports sixteen directions and caller-supplied fixed-camera 2.5D bases", 
   assert.equal(topology.warnings.some((entry) => entry.includes("neutral screen basis")), false);
 });
 
+test("keeps split platformer jump lifecycle phases physically distinct", () => {
+  const plan = compiledPlan({
+    directionNames: ["left", "right"],
+    isometric: false,
+    clips: [
+      clip("jump-start", "locomotion", 4),
+      clip("jump-loop", "locomotion", 2, "linear"),
+      clip("fall", "locomotion", 4, "linear"),
+      clip("land", "locomotion", 3),
+    ],
+  });
+  const topology = compileSpriteMotionTopology(plan, { projection: "side" });
+  const jumpStart = topology.clips.find((entry) => entry.clipId === "jump-start");
+  const jumpLoop = topology.clips.find((entry) => entry.clipId === "jump-loop");
+  const fall = topology.clips.find((entry) => entry.clipId === "fall");
+  const land = topology.clips.find((entry) => entry.clipId === "land");
+
+  assert.deepEqual(
+    jumpStart?.phases.map((entry) => [entry.id, entry.groundContact]),
+    [
+      ["anticipation", "grounded"],
+      ["takeoff", "transition"],
+      ["ascent", "airborne"],
+    ],
+  );
+  assert.deepEqual(
+    jumpLoop?.phases.map((entry) => [entry.id, entry.groundContact]),
+    [["airborne-hold", "airborne"]],
+  );
+  assert.deepEqual(
+    fall?.phases.map((entry) => [entry.id, entry.groundContact]),
+    [["descent", "airborne"]],
+  );
+  assert.deepEqual(
+    land?.phases.map((entry) => [entry.id, entry.groundContact]),
+    [
+      ["landing", "grounded"],
+      ["recovery", "grounded"],
+    ],
+  );
+  assert.equal(
+    topology.frameBindings
+      .filter((entry) => entry.clipId === "jump-loop")
+      .every((entry) => entry.phaseId === "airborne-hold"),
+    true,
+  );
+  assert.deepEqual(
+    topology.directions.find((entry) => entry.name === "left")?.adjacentDirections,
+    ["right"],
+  );
+});
+
 test("records dynamic direction fallback but fails closed when strict labels are required", () => {
   const plan = compiledPlan({ directionNames: ["facing-0", "facing-1", "facing-2", "facing-3"], isometric: false });
   assert.throws(() => compileSpriteMotionTopology(plan, { projection: "top-down", strictDirectionLabels: true }), (error) => error instanceof SpritePlannerError && error.code === "SPRITE_MOTION_DIRECTION_LABEL_UNKNOWN");
@@ -153,7 +205,7 @@ test("covers every bounded frame count and rejects a source mutation", () => {
 
 test("publishes an explicit compile-only protocol contract", () => {
   const summary = spriteMotionTopologyProtocolSummary();
-  assert.equal(summary.protocolVersion, "2026-08-07.1");
+  assert.equal(summary.protocolVersion, "2026-08-07.2");
   assert.ok(summary.directionRules.some((entry) => entry.includes("sixteen-direction")));
   assert.ok(summary.animationRules.some((entry) => entry.includes("semantic phases")));
   assert.ok(summary.authorityRules.some((entry) => entry.includes("provider-free")));

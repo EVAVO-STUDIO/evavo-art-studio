@@ -248,6 +248,8 @@ export function createMirrorTask(
         runId: base.request.runId,
         spritePlanId: base.request.spritePlan.planId,
         mirrorUnitId: draft.id,
+        motionTopologyProtocolVersion: base.motionTopology.protocolVersion,
+        motionTopologySha256: base.motionTopology.topologySha256,
       },
     }),
     requiredCapabilities: [
