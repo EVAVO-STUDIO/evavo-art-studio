@@ -699,7 +699,7 @@ components:
           maxItems: 256
           uniqueItems: true
           description: >-
-            One complete capability set that a single worker profile must satisfy.
+            one complete capability set that a single worker profile must satisfy.
             Capabilities may not be assembled across multiple profiles.
           items: { type: string }
         dependencyJobIds:
