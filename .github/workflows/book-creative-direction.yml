@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - agent/book-creative-direction-runtime-20260807
+      - agent/book-creative-programme-dispatch-20260807
     paths: &book_creative_direction_paths
       - ".github/workflows/book-creative-direction.yml"
       - "package.json"
@@ -13,7 +13,9 @@ on:
       - "packages/contracts/test/book-creative-direction.test.mjs"
       - "packages/book-art-runtime/package.json"
       - "packages/book-art-runtime/src/creative-candidate-programme.ts"
+      - "packages/book-art-runtime/src/creative-candidate-programme-dispatch.ts"
       - "packages/book-art-runtime/test/creative-candidate-programme.test.mjs"
+      - "packages/book-art-runtime/test/creative-candidate-programme-dispatch.test.mjs"
       - "apps/mcp/src/book-creative-direction-tools.ts"
       - "apps/mcp/src/index.ts"
       - "apps/mcp/test/book-creative-direction-tools-contract.test.mjs"
@@ -79,7 +81,7 @@ jobs:
         run: pnpm check
 
       - name: Re-run focused route-aware runtime attacks
-        run: node --test packages/book-art-runtime/test/creative-candidate-programme.test.mjs
+        run: node --test packages/book-art-runtime/test/creative-candidate-programme.test.mjs packages/book-art-runtime/test/creative-candidate-programme-dispatch.test.mjs
 
       - name: Prove clean source
         if: always()
