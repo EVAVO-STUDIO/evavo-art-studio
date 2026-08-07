@@ -1,8 +1,5 @@
 import {
   atomicWriteFile,
-  normalizeJson,
-  sha256,
-  stableStringify,
   withFileLock,
   type JsonValue,
 } from "@evavo/art-artifacts";
@@ -14,6 +11,14 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 
+import {
+  parseRuntimeJournalHeadText,
+  parseRuntimeTransactionText,
+  runtimeSnapshotHash,
+  serializeRuntimeJournalHead,
+  serializeRuntimeTransaction,
+  transactionFileName,
+} from "./journal-integrity.js";
 import {
   RUNTIME_PROTOCOL_VERSION,
   RuntimeError,
@@ -45,10 +50,6 @@ export type RuntimeMutationResult<T> = Readonly<{
   changed: boolean;
 }>;
 
-function transactionFileName(sequence: number): string {
-  return `${String(sequence).padStart(16, "0")}.json`;
-}
-
 function emptySnapshot(): MutableRuntimeSnapshot {
   return {
     schemaVersion: "1.0",
@@ -59,39 +60,10 @@ function emptySnapshot(): MutableRuntimeSnapshot {
   };
 }
 
-function snapshotHash(snapshot: RuntimeSnapshot): string {
-  return sha256(stableStringify(normalizeJson(snapshot)));
-}
-
-function parseTransaction(value: unknown): RuntimeTransactionRecord {
-  if (!value || typeof value !== "object") {
-    throw new RuntimeError(
-      "RUNTIME_JOURNAL_INVALID",
-      "Runtime transaction must be a JSON object.",
-    );
-  }
-  const transaction = value as Partial<RuntimeTransactionRecord>;
-  if (
-    transaction.schemaVersion !== "1.0" ||
-    transaction.protocolVersion !== RUNTIME_PROTOCOL_VERSION ||
-    typeof transaction.sequence !== "number" ||
-    typeof transaction.previousSequence !== "number" ||
-    typeof transaction.stateSha256 !== "string" ||
-    !transaction.snapshot ||
-    !Array.isArray(transaction.events)
-  ) {
-    throw new RuntimeError(
-      "RUNTIME_JOURNAL_INVALID",
-      "Runtime transaction is missing required fields.",
-    );
-  }
-  if (snapshotHash(transaction.snapshot) !== transaction.stateSha256) {
-    throw new RuntimeError(
-      "RUNTIME_JOURNAL_HASH_MISMATCH",
-      `Runtime transaction ${transaction.sequence} failed snapshot verification.`,
-    );
-  }
-  return transaction as RuntimeTransactionRecord;
+function errorCode(error: unknown): string | undefined {
+  return error && typeof error === "object" && "code" in error
+    ? String((error as { code: unknown }).code)
+    : undefined;
 }
 
 export class LocalRuntimeJournal {
@@ -122,48 +94,68 @@ export class LocalRuntimeJournal {
       "transactions",
       transactionFileName(sequence),
     );
-    return parseTransaction(
-      JSON.parse(await readFile(filePath, "utf8")) as unknown,
+    return parseRuntimeTransactionText(
+      await readFile(filePath, "utf8"),
+      sequence,
     );
   }
 
-  async #latestTransaction(): Promise<RuntimeTransactionRecord | null> {
-    const root = await this.root();
-    try {
-      const head = JSON.parse(
-        await readFile(path.join(root, "head.json"), "utf8"),
-      ) as unknown;
-      if (
-        head &&
-        typeof head === "object" &&
-        "sequence" in head &&
-        Number.isInteger((head as { sequence: unknown }).sequence)
-      ) {
-        return await this.#readTransaction(
-          Number((head as { sequence: unknown }).sequence),
-        );
-      }
-    } catch {
-      // Fall through to immutable transaction discovery.
-    }
-
-    const entries = await readdir(path.join(root, "transactions"), {
+  async #transactionSequences(): Promise<readonly number[]> {
+    const entries = await readdir(path.join(await this.root(), "transactions"), {
       withFileTypes: true,
     });
     const sequences = entries
       .filter((entry) => entry.isFile() && /^\d{16}\.json$/.test(entry.name))
       .map((entry) => Number(entry.name.slice(0, 16)))
-      .sort((left, right) => right - left);
-    let lastError: unknown;
-    for (const sequence of sequences) {
-      try {
-        return await this.#readTransaction(sequence);
-      } catch (error: unknown) {
-        lastError = error;
+      .sort((left, right) => left - right);
+    for (let index = 0; index < sequences.length; index += 1) {
+      const expected = index + 1;
+      const sequence = sequences[index];
+      if (!Number.isSafeInteger(sequence) || sequence !== expected) {
+        throw new RuntimeError(
+          "RUNTIME_JOURNAL_SEQUENCE_GAP",
+          `Runtime journal transaction sequence is not contiguous at ${expected}.`,
+        );
       }
     }
-    if (lastError) throw lastError;
-    return null;
+    return sequences;
+  }
+
+  async #readAdvisoryHead(): Promise<ReturnType<typeof parseRuntimeJournalHeadText> | null> {
+    try {
+      return parseRuntimeJournalHeadText(
+        await readFile(path.join(await this.root(), "head.json"), "utf8"),
+      );
+    } catch (error: unknown) {
+      if (
+        error instanceof RuntimeError ||
+        errorCode(error) === "ENOENT"
+      ) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async #latestTransaction(): Promise<RuntimeTransactionRecord | null> {
+    const sequences = await this.#transactionSequences();
+    const latestSequence = sequences.at(-1);
+    if (latestSequence === undefined) return null;
+
+    const transaction = await this.#readTransaction(latestSequence);
+    const head = await this.#readAdvisoryHead();
+    if (
+      head &&
+      head.sequence === transaction.sequence &&
+      head.stateSha256 === transaction.stateSha256 &&
+      head.transactionFile === transactionFileName(transaction.sequence)
+    ) {
+      return transaction;
+    }
+
+    // head.json is an advisory cache. A corrupt or stale head may be ignored,
+    // but the highest immutable transaction must validate or recovery fails closed.
+    return transaction;
   }
 
   public async snapshot(): Promise<RuntimeSnapshot> {
@@ -207,7 +199,7 @@ export class LocalRuntimeJournal {
           protocolVersion: RUNTIME_PROTOCOL_VERSION,
           sequence,
           previousSequence: previous?.sequence ?? 0,
-          stateSha256: snapshotHash(immutableSnapshot),
+          stateSha256: runtimeSnapshotHash(immutableSnapshot),
           snapshot: immutableSnapshot,
           events,
         };
@@ -218,20 +210,16 @@ export class LocalRuntimeJournal {
         );
         await atomicWriteFile(
           transactionPath,
-          `${JSON.stringify(transaction, null, 2)}\n`,
+          serializeRuntimeTransaction(transaction),
         );
         await atomicWriteFile(
           path.join(root, "head.json"),
-          `${JSON.stringify(
-            {
-              schemaVersion: "1.0",
-              sequence,
-              stateSha256: transaction.stateSha256,
-              transactionFile: transactionFileName(sequence),
-            },
-            null,
-            2,
-          )}\n`,
+          serializeRuntimeJournalHead({
+            schemaVersion: "1.0",
+            sequence,
+            stateSha256: transaction.stateSha256,
+            transactionFile: transactionFileName(sequence),
+          }),
         );
         return mutation.result;
       },
@@ -245,19 +233,22 @@ export class LocalRuntimeJournal {
   public async events(
     afterTransactionSequence = 0,
   ): Promise<readonly RuntimeEvent[]> {
-    const root = await this.root();
-    const entries = await readdir(path.join(root, "transactions"), {
-      withFileTypes: true,
-    });
-    const sequences = entries
-      .filter((entry) => entry.isFile() && /^\d{16}\.json$/.test(entry.name))
-      .map((entry) => Number(entry.name.slice(0, 16)))
-      .filter((sequence) => sequence > afterTransactionSequence)
-      .sort((left, right) => left - right);
+    if (
+      !Number.isSafeInteger(afterTransactionSequence) ||
+      afterTransactionSequence < 0
+    ) {
+      throw new RuntimeError(
+        "RUNTIME_QUERY_INVALID",
+        "Runtime event cursor must be a non-negative safe integer.",
+      );
+    }
+    const sequences = (await this.#transactionSequences()).filter(
+      (sequence) => sequence > afterTransactionSequence,
+    );
     const events: RuntimeEvent[] = [];
     for (const sequence of sequences) {
       events.push(...(await this.#readTransaction(sequence)).events);
     }
-    return events;
+    return structuredClone(events);
   }
 }
