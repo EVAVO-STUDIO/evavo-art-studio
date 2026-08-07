@@ -24,16 +24,26 @@ const TERMINAL_STATES = new Set<RuntimeJobState>([
   "blocked",
   "dead-letter",
 ]);
+const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
+
+type RuntimeJobSubmissionSnapshot = Readonly<
+  Omit<NormalizedRuntimeJobSpec, "schemaVersion">
+>;
 
 function integer(
-  value: number | undefined,
+  value: unknown,
   fallback: number,
   minimum: number,
   maximum: number,
   name: string,
 ): number {
   const result = value ?? fallback;
-  if (!Number.isInteger(result) || result < minimum || result > maximum) {
+  if (
+    typeof result !== "number" ||
+    !Number.isInteger(result) ||
+    result < minimum ||
+    result > maximum
+  ) {
     throw new RuntimeError(
       "RUNTIME_JOB_SPEC_INVALID",
       `${name} must be an integer between ${minimum} and ${maximum}.`,
@@ -43,14 +53,19 @@ function integer(
 }
 
 function finite(
-  value: number | undefined,
+  value: unknown,
   fallback: number,
   minimum: number,
   maximum: number,
   name: string,
 ): number {
   const result = value ?? fallback;
-  if (!Number.isFinite(result) || result < minimum || result > maximum) {
+  if (
+    typeof result !== "number" ||
+    !Number.isFinite(result) ||
+    result < minimum ||
+    result > maximum
+  ) {
     throw new RuntimeError(
       "RUNTIME_JOB_SPEC_INVALID",
       `${name} must be between ${minimum} and ${maximum}.`,
@@ -80,8 +95,195 @@ function safeName(
   return result;
 }
 
-export function safeRuntimeName(value: string, name: string): string {
+export function safeRuntimeName(value: unknown, name: string): string {
   return safeName(value, name, "RUNTIME_JOB_SPEC_INVALID");
+}
+
+function runtimeInputRecord(
+  value: unknown,
+  name: string,
+  code = "RUNTIME_JOB_SPEC_INVALID",
+): Readonly<Record<string, unknown>> {
+  let recordLike = false;
+  try {
+    recordLike =
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value);
+  } catch {
+    throw new RuntimeError(code, `${name} could not be inspected safely.`);
+  }
+  if (!recordLike) {
+    throw new RuntimeError(code, `${name} must be an object.`);
+  }
+  return value as Readonly<Record<string, unknown>>;
+}
+
+function readRuntimeInput(
+  source: Readonly<Record<string, unknown>>,
+  field: string,
+  name: string,
+  code = "RUNTIME_JOB_SPEC_INVALID",
+): unknown {
+  try {
+    return source[field];
+  } catch {
+    throw new RuntimeError(
+      code,
+      `${name}.${field} could not be read safely.`,
+    );
+  }
+}
+
+function snapshotRuntimeArray(
+  values: unknown,
+  name: string,
+  code: string,
+  maximum: number,
+): readonly unknown[] {
+  let arrayLike = false;
+  try {
+    arrayLike = Array.isArray(values);
+  } catch {
+    throw new RuntimeError(code, `${name} could not be inspected safely.`);
+  }
+  if (!arrayLike) {
+    throw new RuntimeError(code, `${name} must be an array.`);
+  }
+
+  const source = values as readonly unknown[];
+  let length = 0;
+  try {
+    length = source.length;
+  } catch {
+    throw new RuntimeError(code, `${name}.length could not be read safely.`);
+  }
+  if (!Number.isSafeInteger(length) || length < 0 || length > maximum) {
+    throw new RuntimeError(
+      code,
+      `${name} must contain no more than ${maximum} entries.`,
+    );
+  }
+
+  const snapshot: unknown[] = [];
+  for (let index = 0; index < length; index += 1) {
+    try {
+      snapshot.push(source[index]);
+    } catch {
+      throw new RuntimeError(
+        code,
+        `${name}[${index}] could not be read safely.`,
+      );
+    }
+  }
+  return Object.freeze(snapshot);
+}
+
+function freezeRuntimeValue<T>(
+  value: T,
+  seen = new WeakSet<object>(),
+): T {
+  if (value === null || typeof value !== "object") return value;
+  const object = value as object;
+  if (seen.has(object)) return value;
+  seen.add(object);
+  for (const entry of Object.values(
+    value as unknown as Readonly<Record<string, unknown>>,
+  )) {
+    freezeRuntimeValue(entry, seen);
+  }
+  Object.freeze(object);
+  return value;
+}
+
+function runtimeJson(value: unknown, name: string): JsonValue {
+  try {
+    return freezeRuntimeValue(normalizeJson(value));
+  } catch {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      `${name} must contain valid JSON data.`,
+    );
+  }
+}
+
+function normalizeIdempotencyKey(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      "idempotencyKey must contain 1 to 512 characters.",
+    );
+  }
+  const result = value.trim();
+  if (!result || result.length > 512 || result.includes("\0")) {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      "idempotencyKey must contain 1 to 512 characters.",
+    );
+  }
+  return result;
+}
+
+function normalizedRuntimeNameList(
+  values: unknown,
+  name: string,
+  maximum = 10_000,
+): readonly string[] {
+  if (values === undefined) return Object.freeze([]);
+  const snapshot = snapshotRuntimeArray(
+    values,
+    name,
+    "RUNTIME_JOB_SPEC_INVALID",
+    maximum,
+  );
+  const normalized = snapshot.map((entry, index) =>
+    safeRuntimeName(entry, `${name}[${index}]`),
+  );
+  return Object.freeze([...new Set(normalized)].sort());
+}
+
+function normalizeRetryPolicy(
+  value: unknown,
+): NormalizedRuntimeJobSpec["retryPolicy"] {
+  if (value === undefined) {
+    return Object.freeze({
+      baseDelayMs: 5_000,
+      maximumDelayMs: 300_000,
+      multiplier: 2,
+      jitterFraction: 0.15,
+    });
+  }
+  const source = runtimeInputRecord(value, "retryPolicy");
+  return Object.freeze({
+    baseDelayMs: integer(
+      readRuntimeInput(source, "baseDelayMs", "retryPolicy"),
+      5_000,
+      0,
+      86_400_000,
+      "retryPolicy.baseDelayMs",
+    ),
+    maximumDelayMs: integer(
+      readRuntimeInput(source, "maximumDelayMs", "retryPolicy"),
+      300_000,
+      0,
+      604_800_000,
+      "retryPolicy.maximumDelayMs",
+    ),
+    multiplier: finite(
+      readRuntimeInput(source, "multiplier", "retryPolicy"),
+      2,
+      1,
+      16,
+      "retryPolicy.multiplier",
+    ),
+    jitterFraction: finite(
+      readRuntimeInput(source, "jitterFraction", "retryPolicy"),
+      0.15,
+      0,
+      1,
+      "retryPolicy.jitterFraction",
+    ),
+  });
 }
 
 function normalizedCapabilityList(
@@ -90,13 +292,8 @@ function normalizedCapabilityList(
   code: string,
   maximum = 256,
 ): readonly string[] {
-  if (!Array.isArray(values) || values.length > maximum) {
-    throw new RuntimeError(
-      code,
-      `${name} must contain no more than ${maximum} capabilities.`,
-    );
-  }
-  return [...new Set(values.map((entry: unknown, index: number) => {
+  const snapshot = snapshotRuntimeArray(values, name, code, maximum);
+  const normalized = snapshot.map((entry, index) => {
     if (typeof entry !== "string") {
       throw new RuntimeError(
         code,
@@ -104,7 +301,8 @@ function normalizedCapabilityList(
       );
     }
     return safeName(entry, `${name}[${index}]`, code);
-  }))].sort();
+  });
+  return Object.freeze([...new Set(normalized)].sort());
 }
 
 export function normalizeRuntimeWorkerDescriptor(
@@ -187,8 +385,14 @@ export function normalizeRuntimeWorkerDescriptor(
   };
 }
 
-function timestamp(value: string | undefined, name: string): string | undefined {
+function timestamp(value: unknown, name: string): string | undefined {
   if (value === undefined) return undefined;
+  if (typeof value !== "string") {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      `${name} must be a valid timestamp.`,
+    );
+  }
   const milliseconds = Date.parse(value);
   if (!Number.isFinite(milliseconds)) {
     throw new RuntimeError(
@@ -199,79 +403,132 @@ function timestamp(value: string | undefined, name: string): string | undefined 
   return new Date(milliseconds).toISOString();
 }
 
-function artifactIds(values: readonly ArtifactId[] | undefined): readonly ArtifactId[] {
-  const result = [...new Set(values ?? [])].sort();
-  for (const value of result) {
-    if (!/^artifact_[a-f0-9]{64}$/.test(value)) {
+function artifactIds(values: unknown): readonly ArtifactId[] {
+  if (values === undefined) return Object.freeze([]);
+  const snapshot = snapshotRuntimeArray(
+    values,
+    "inputArtifacts",
+    "RUNTIME_JOB_SPEC_INVALID",
+    10_000,
+  );
+  const normalized = snapshot.map((entry, index) => {
+    if (typeof entry !== "string" || !ARTIFACT_ID.test(entry)) {
       throw new RuntimeError(
         "RUNTIME_JOB_SPEC_INVALID",
-        `Invalid input artifact ID: ${value}`,
+        `Invalid input artifact ID at inputArtifacts[${index}].`,
       );
     }
-  }
-  return result;
+    return entry as ArtifactId;
+  });
+  return Object.freeze([...new Set(normalized)].sort());
 }
 
-function labels(
-  values: Readonly<Record<string, string>> | undefined,
-): Readonly<Record<string, string>> {
-  const result: Record<string, string> = {};
-  for (const key of Object.keys(values ?? {}).sort()) {
+function labels(values: unknown): Readonly<Record<string, string>> {
+  const result = Object.create(null) as Record<string, string>;
+  if (values === undefined) return Object.freeze(result);
+  const source = runtimeInputRecord(values, "labels");
+  let keys: readonly string[];
+  try {
+    keys = Object.keys(source).sort();
+  } catch {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      "labels keys could not be read safely.",
+    );
+  }
+  for (const key of keys) {
     const normalizedKey = safeRuntimeName(key, `labels.${key}`);
-    const normalizedValue = values![key]!.trim();
-    if (!normalizedValue || normalizedValue.length > 512 || normalizedValue.includes("\0")) {
+    if (Object.hasOwn(result, normalizedKey)) {
+      throw new RuntimeError(
+        "RUNTIME_JOB_SPEC_INVALID",
+        `Label ${normalizedKey} is declared more than once.`,
+      );
+    }
+    const entry = readRuntimeInput(source, key, "labels");
+    if (typeof entry !== "string") {
+      throw new RuntimeError(
+        "RUNTIME_JOB_SPEC_INVALID",
+        `Label ${normalizedKey} must be a string.`,
+      );
+    }
+    const normalizedValue = entry.trim();
+    if (
+      !normalizedValue ||
+      normalizedValue.length > 512 ||
+      normalizedValue.includes("\0")
+    ) {
       throw new RuntimeError(
         "RUNTIME_JOB_SPEC_INVALID",
         `Label ${normalizedKey} must contain 1 to 512 characters.`,
       );
     }
-    result[normalizedKey] = normalizedValue;
+    Object.defineProperty(result, normalizedKey, {
+      value: normalizedValue,
+      enumerable: true,
+      configurable: false,
+      writable: false,
+    });
   }
-  return result;
+  return Object.freeze(result);
 }
 
 export function idempotencyIndexKey(queue: string, key: string): string {
   return sha256(`${queue}\0${key}`);
 }
 
-export function normalizeRuntimeJobSubmission(
-  input: RuntimeJobSubmission,
-): Readonly<{ spec: NormalizedRuntimeJobSpec; specHash: string }> {
-  const queue = safeRuntimeName(input.queue, "queue");
-  const kind = safeRuntimeName(input.kind, "kind");
-  const idempotencyKey = input.idempotencyKey.trim();
-  if (
-    !idempotencyKey ||
-    idempotencyKey.length > 512 ||
-    idempotencyKey.includes("\0")
-  ) {
-    throw new RuntimeError(
-      "RUNTIME_JOB_SPEC_INVALID",
-      "idempotencyKey must contain 1 to 512 characters.",
-    );
-  }
-  const id = input.id
-    ? safeRuntimeName(input.id, "id")
-    : `job_${sha256(`${queue}\0${idempotencyKey}`).slice(0, 40)}`;
-  const dependencyJobIds = [...new Set(input.dependencyJobIds ?? [])].sort();
-  dependencyJobIds.forEach((entry) => safeRuntimeName(entry, "dependencyJobId"));
+function snapshotRuntimeJobSubmission(
+  input: unknown,
+): RuntimeJobSubmissionSnapshot {
+  const source = runtimeInputRecord(input, "Runtime job submission");
+  const queue = safeRuntimeName(
+    readRuntimeInput(source, "queue", "submission"),
+    "queue",
+  );
+  const kind = safeRuntimeName(
+    readRuntimeInput(source, "kind", "submission"),
+    "kind",
+  );
+  const idempotencyKey = normalizeIdempotencyKey(
+    readRuntimeInput(source, "idempotencyKey", "submission"),
+  );
+  const idInput = readRuntimeInput(source, "id", "submission");
+  const id = idInput === undefined
+    ? `job_${sha256(`${queue}\0${idempotencyKey}`).slice(0, 40)}`
+    : safeRuntimeName(idInput, "id");
+  const dependencyJobIds = normalizedRuntimeNameList(
+    readRuntimeInput(source, "dependencyJobIds", "submission"),
+    "dependencyJobIds",
+  );
   if (dependencyJobIds.includes(id)) {
     throw new RuntimeError(
       "RUNTIME_JOB_SPEC_INVALID",
       "A job may not depend on itself.",
     );
   }
+
+  const requiredCapabilitiesInput = readRuntimeInput(
+    source,
+    "requiredCapabilities",
+    "submission",
+  );
   const requiredCapabilities = normalizedCapabilityList(
-    input.requiredCapabilities ?? [],
+    requiredCapabilitiesInput === undefined
+      ? []
+      : requiredCapabilitiesInput,
     "requiredCapabilities",
     "RUNTIME_JOB_SPEC_INVALID",
     256,
   );
+  const requiredCapabilityProfileInput = readRuntimeInput(
+    source,
+    "requiredCapabilityProfile",
+    "submission",
+  );
   const requiredCapabilityProfile =
-    input.requiredCapabilityProfile === undefined
+    requiredCapabilityProfileInput === undefined
       ? undefined
       : normalizedCapabilityList(
-          input.requiredCapabilityProfile,
+          requiredCapabilityProfileInput,
           "requiredCapabilityProfile",
           "RUNTIME_JOB_SPEC_INVALID",
           256,
@@ -282,9 +539,53 @@ export function normalizeRuntimeJobSubmission(
       "requiredCapabilityProfile must contain at least one capability when supplied.",
     );
   }
-  const payload = normalizeJson(input.payload);
-  const notBefore = timestamp(input.notBefore, "notBefore");
-  const deadline = timestamp(input.deadline, "deadline");
+
+  const payload = runtimeJson(
+    readRuntimeInput(source, "payload", "submission"),
+    "payload",
+  );
+  const inputArtifacts = artifactIds(
+    readRuntimeInput(source, "inputArtifacts", "submission"),
+  );
+  const priority = integer(
+    readRuntimeInput(source, "priority", "submission"),
+    0,
+    -1000,
+    1000,
+    "priority",
+  );
+  const maximumAttempts = integer(
+    readRuntimeInput(source, "maximumAttempts", "submission"),
+    3,
+    1,
+    50,
+    "maximumAttempts",
+  );
+  const retryPolicy = normalizeRetryPolicy(
+    readRuntimeInput(source, "retryPolicy", "submission"),
+  );
+  const leaseDurationMs = integer(
+    readRuntimeInput(source, "leaseDurationMs", "submission"),
+    60_000,
+    10_000,
+    3_600_000,
+    "leaseDurationMs",
+  );
+  const timeoutMs = integer(
+    readRuntimeInput(source, "timeoutMs", "submission"),
+    900_000,
+    1_000,
+    86_400_000,
+    "timeoutMs",
+  );
+  const notBefore = timestamp(
+    readRuntimeInput(source, "notBefore", "submission"),
+    "notBefore",
+  );
+  const deadline = timestamp(
+    readRuntimeInput(source, "deadline", "submission"),
+    "deadline",
+  );
   if (
     notBefore !== undefined &&
     deadline !== undefined &&
@@ -295,9 +596,11 @@ export function normalizeRuntimeJobSubmission(
       "deadline must be later than notBefore.",
     );
   }
+  const normalizedLabels = labels(
+    readRuntimeInput(source, "labels", "submission"),
+  );
 
-  const spec: NormalizedRuntimeJobSpec = {
-    schemaVersion: "1.0",
+  const snapshot: RuntimeJobSubmissionSnapshot = {
     id,
     queue,
     kind,
@@ -308,67 +611,53 @@ export function normalizeRuntimeJobSubmission(
       ? {}
       : { requiredCapabilityProfile }),
     dependencyJobIds,
-    inputArtifacts: artifactIds(input.inputArtifacts),
-    priority: integer(input.priority, 0, -1000, 1000, "priority"),
-    maximumAttempts: integer(
-      input.maximumAttempts,
-      3,
-      1,
-      50,
-      "maximumAttempts",
-    ),
-    retryPolicy: {
-      baseDelayMs: integer(
-        input.retryPolicy?.baseDelayMs,
-        5_000,
-        0,
-        86_400_000,
-        "retryPolicy.baseDelayMs",
-      ),
-      maximumDelayMs: integer(
-        input.retryPolicy?.maximumDelayMs,
-        300_000,
-        0,
-        604_800_000,
-        "retryPolicy.maximumDelayMs",
-      ),
-      multiplier: finite(
-        input.retryPolicy?.multiplier,
-        2,
-        1,
-        16,
-        "retryPolicy.multiplier",
-      ),
-      jitterFraction: finite(
-        input.retryPolicy?.jitterFraction,
-        0.15,
-        0,
-        1,
-        "retryPolicy.jitterFraction",
-      ),
-    },
-    leaseDurationMs: integer(
-      input.leaseDurationMs,
-      60_000,
-      10_000,
-      3_600_000,
-      "leaseDurationMs",
-    ),
-    timeoutMs: integer(
-      input.timeoutMs,
-      900_000,
-      1_000,
-      86_400_000,
-      "timeoutMs",
-    ),
+    inputArtifacts,
+    priority,
+    maximumAttempts,
+    retryPolicy,
+    leaseDurationMs,
+    timeoutMs,
     ...(notBefore === undefined ? {} : { notBefore }),
     ...(deadline === undefined ? {} : { deadline }),
-    labels: labels(input.labels),
+    labels: normalizedLabels,
   };
-  return {
+  return freezeRuntimeValue(snapshot);
+}
+
+export function normalizeRuntimeJobSubmission(
+  input: RuntimeJobSubmission,
+): Readonly<{ spec: NormalizedRuntimeJobSpec; specHash: string }> {
+  const snapshot = snapshotRuntimeJobSubmission(input);
+  const spec: NormalizedRuntimeJobSpec = Object.freeze({
+    schemaVersion: "1.0" as const,
+    id: snapshot.id,
+    queue: snapshot.queue,
+    kind: snapshot.kind,
+    idempotencyKey: snapshot.idempotencyKey,
+    payload: snapshot.payload,
+    requiredCapabilities: snapshot.requiredCapabilities,
+    ...(snapshot.requiredCapabilityProfile === undefined
+      ? {}
+      : { requiredCapabilityProfile: snapshot.requiredCapabilityProfile }),
+    dependencyJobIds: snapshot.dependencyJobIds,
+    inputArtifacts: snapshot.inputArtifacts,
+    priority: snapshot.priority,
+    maximumAttempts: snapshot.maximumAttempts,
+    retryPolicy: snapshot.retryPolicy,
+    leaseDurationMs: snapshot.leaseDurationMs,
+    timeoutMs: snapshot.timeoutMs,
+    ...(snapshot.notBefore === undefined
+      ? {}
+      : { notBefore: snapshot.notBefore }),
+    ...(snapshot.deadline === undefined
+      ? {}
+      : { deadline: snapshot.deadline }),
+    labels: snapshot.labels,
+  });
+  return Object.freeze({
     spec,
     specHash: sha256(stableStringify(normalizeJson(spec))),
-  };
+  });
 }
 
 export function retryDelayMs(job: RuntimeJobRecord): number {
