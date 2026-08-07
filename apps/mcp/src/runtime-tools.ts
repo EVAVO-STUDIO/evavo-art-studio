@@ -12,6 +12,7 @@ import * as z from "zod/v4";
 import { assertPathWithinAllowedRoots } from "@evavo/art-repo-inspector";
 import {
   LocalRuntimeRepository,
+  RuntimeError,
   type RuntimeJobState,
   type RuntimeJobSubmission,
 } from "@evavo/art-runtime";
@@ -190,7 +191,7 @@ export function registerRuntimeTools(server: McpServer): void {
     "control_art_runtime_job",
     {
       description:
-        "Cancel, pause, resume or redrive one durable Art Studio job through its governed state machine.",
+        "Cancel, pause, resume or redrive one durable Art Studio job through its governed state machine. Governed single-attempt Book Art provider jobs may be cancelled, paused or resumed but cannot be redriven into extra provider attempts.",
       inputSchema: z.object({
         jobId: z.string().min(1).max(128),
         action: z.enum(["cancel", "pause", "resume", "redrive"]),
@@ -217,6 +218,13 @@ export function registerRuntimeTools(server: McpServer): void {
         }
         if (action === "resume") {
           return textResult(await runtime.resume(jobId, operator));
+        }
+        const current = await runtime.get(jobId);
+        if (current?.spec.labels.migrationMode === "book-art-shadow-candidate") {
+          throw new RuntimeError(
+            "RUNTIME_REDRIVE_POLICY_FORBIDDEN",
+            `Governed Book Art provider job ${jobId} is immutable at one provider attempt and cannot be redriven. Compile and submit a new governed Book Art request or creative programme instead.`,
+          );
         }
         return textResult(
           await runtime.redrive(
