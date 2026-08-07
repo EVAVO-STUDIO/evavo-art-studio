@@ -1036,6 +1036,15 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
+      if (
+        job.spec.maximumAttempts === 1 &&
+        job.spec.labels.migrationMode === "book-art-shadow-candidate"
+      ) {
+        throw new RuntimeError(
+          "RUNTIME_REDRIVE_POLICY_FORBIDDEN",
+          `Governed Book Art provider job ${jobId} is immutable at one provider attempt and cannot be redriven.`,
+        );
+      }
       if (!isTerminalState(job.state) || job.state === "succeeded") {
         throw new RuntimeError(
           "RUNTIME_REDRIVE_INVALID",
