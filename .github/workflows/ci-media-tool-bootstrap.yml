@@ -8,6 +8,7 @@ on:
       - ".github/workflows/ci-media-tool-bootstrap.yml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "scripts/test-ci-media-tool-bootstrap.mjs"
+      - "scripts/test-ci-media-tool-workflows.mjs"
       - "package.json"
   push:
     branches:
@@ -18,6 +19,7 @@ on:
       - ".github/workflows/ci-media-tool-bootstrap.yml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "scripts/test-ci-media-tool-bootstrap.mjs"
+      - "scripts/test-ci-media-tool-workflows.mjs"
       - "package.json"
 
 permissions:
@@ -45,7 +47,7 @@ jobs:
           package-manager-cache: false
 
       - name: Run bounded media bootstrap regressions
-        run: node --test scripts/test-ci-media-tool-bootstrap.mjs
+        run: node --test scripts/test-ci-media-tool-*.mjs
 
       - name: Bootstrap real media tools with bounded fallback
         run: bash scripts/bootstrap-ci-media-tools.sh
@@ -72,6 +74,7 @@ jobs:
           ! grep -F 'sudo apt-get update' .github/workflows/ci.yml
           ! grep -F 'sudo apt-get update' .github/workflows/book-art-provider-runtime.yml
           grep -F 'critical workflows permanently use the bounded bootstrap contract' scripts/test-ci-media-tool-bootstrap.mjs
+          grep -F 'workflows never perform unbounded apt or direct FFmpeg installation' scripts/test-ci-media-tool-workflows.mjs
           grep -F 'media bootstrap fails after the configured bounded attempts' scripts/test-ci-media-tool-bootstrap.mjs
 
       - name: Run complete Art Studio validation
