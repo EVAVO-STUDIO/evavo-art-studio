@@ -7,6 +7,7 @@ on:
       - agent/book-creative-direction-runtime-20260807
     paths: &book_creative_direction_paths
       - ".github/workflows/book-creative-direction.yml"
+      - "scripts/bootstrap-ci-media-tools.sh"
       - "package.json"
       - "packages/contracts/src/book-creative-direction*.ts"
       - "packages/contracts/src/index.ts"
@@ -54,11 +55,7 @@ jobs:
           package-manager-cache: false
 
       - name: Install FFmpeg media tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends ffmpeg
+        run: bash scripts/bootstrap-ci-media-tools.sh
 
       - name: Install exact workspace
         run: pnpm install --frozen-lockfile
