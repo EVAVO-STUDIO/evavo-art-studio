@@ -5,12 +5,16 @@ on:
     branches:
       - main
       - agent/book-creative-direction-final-20260807
+      - agent/book-creative-direction-mcp-20260807
     paths: &book_creative_direction_paths
       - ".github/workflows/book-creative-direction.yml"
       - "package.json"
       - "packages/contracts/src/book-creative-direction*.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-creative-direction.test.mjs"
+      - "apps/mcp/src/book-creative-direction-tools.ts"
+      - "apps/mcp/src/index.ts"
+      - "apps/mcp/test/book-creative-direction-tools-contract.test.mjs"
       - "scripts/check-book-creative-direction.mjs"
       - "docs/book-creative-direction.md"
   pull_request:
@@ -65,6 +69,9 @@ jobs:
 
       - name: Run strict contracts typecheck
         run: pnpm --filter @evavo/art-contracts typecheck
+
+      - name: Verify MCP creative-direction boundary
+        run: node --test apps/mcp/test/book-creative-direction-tools-contract.test.mjs
 
       - name: Run complete Art Studio verification
         run: pnpm check
