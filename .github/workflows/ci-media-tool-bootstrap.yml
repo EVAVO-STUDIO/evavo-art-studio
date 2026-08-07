@@ -3,9 +3,8 @@ name: CI media tool bootstrap
 on:
   pull_request:
     paths:
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/book-art-provider-runtime.yml"
-      - ".github/workflows/ci-media-tool-bootstrap.yml"
+      - ".github/workflows/*.yml"
+      - ".github/workflows/*.yaml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "scripts/test-ci-media-tool-bootstrap.mjs"
       - "scripts/test-ci-media-tool-workflows.mjs"
@@ -14,9 +13,8 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/book-art-provider-runtime.yml"
-      - ".github/workflows/ci-media-tool-bootstrap.yml"
+      - ".github/workflows/*.yml"
+      - ".github/workflows/*.yaml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "scripts/test-ci-media-tool-bootstrap.mjs"
       - "scripts/test-ci-media-tool-workflows.mjs"
@@ -46,7 +44,7 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Run bounded media bootstrap regressions
+      - name: Run bounded media bootstrap and workflow regressions
         run: node --test scripts/test-ci-media-tool-*.mjs
 
       - name: Bootstrap real media tools with bounded fallback
@@ -71,11 +69,10 @@ jobs:
           grep -F 'Acquire::Retries=3' scripts/bootstrap-ci-media-tools.sh
           grep -F 'bash scripts/bootstrap-ci-media-tools.sh' .github/workflows/ci.yml
           grep -F 'bash scripts/bootstrap-ci-media-tools.sh' .github/workflows/book-art-provider-runtime.yml
-          ! grep -F 'sudo apt-get update' .github/workflows/ci.yml
-          ! grep -F 'sudo apt-get update' .github/workflows/book-art-provider-runtime.yml
           grep -F 'critical workflows permanently use the bounded bootstrap contract' scripts/test-ci-media-tool-bootstrap.mjs
           grep -F 'workflows never perform unbounded apt or direct FFmpeg installation' scripts/test-ci-media-tool-workflows.mjs
           grep -F 'media bootstrap fails after the configured bounded attempts' scripts/test-ci-media-tool-bootstrap.mjs
+          node --test scripts/test-ci-media-tool-*.mjs
 
       - name: Run complete Art Studio validation
         run: pnpm check
