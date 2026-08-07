@@ -46,6 +46,11 @@ test("CLI prints the provider protocol", () => {
   const parsed = JSON.parse(result.stdout);
   assert.ok(parsed.operations.includes("generate"));
   assert.ok(parsed.referenceRoles.includes("canonical-identity"));
+  assert.ok(parsed.capabilityVocabulary.includes("depth-control"));
+  assert.equal(
+    parsed.requiredReferenceCapabilities["layer-context"],
+    "layer-context-reference",
+  );
   assert.ok(parsed.rules.some((entry) => entry.includes("intermediate candidates")));
 });
 
@@ -68,6 +73,15 @@ test("CLI compiles a deterministic worker-only provider contract", async () => {
   const left = JSON.parse(first.stdout);
   const right = JSON.parse(second.stdout);
   assert.equal(left.executionMode, "durable-worker-only");
+  assert.deepEqual(left.requiredAdapterCapabilities, [
+    "cancellation",
+    "candidate-count",
+    "generate",
+  ]);
+  assert.deepEqual(
+    left.requiredAdapterCapabilities,
+    right.requiredAdapterCapabilities,
+  );
   assert.equal(left.requestSha256, right.requestSha256);
   assert.equal(left.compiledPromptSha256, right.compiledPromptSha256);
   assert.ok(left.compiledPrompt.includes("KEEP AS SEPARATE ASSETS OR LAYERS"));

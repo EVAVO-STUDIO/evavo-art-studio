@@ -125,8 +125,9 @@ paths:
       operationId: compileProviderCandidateRequest
       description: >-
         Compiles the validated request into a deterministic provider-neutral art
-        contract and hashes. Execution mode is durable-worker-only; the API does
-        not hold provider credentials or call a provider.
+        contract, hashes and exact adapter capability requirements. Execution
+        mode is durable-worker-only; the API does not hold provider credentials,
+        inspect a worker registry or call a provider.
       requestBody:
         required: true
         content:
@@ -473,9 +474,73 @@ components:
         writesEnabled: { type: boolean }
         runtimeConfigured: { type: boolean }
         artifactStoreConfigured: { type: boolean }
+    ProviderCapability:
+      type: string
+      enum:
+        - generate
+        - edit
+        - inpaint
+        - reference-images
+        - multiple-reference-images
+        - identity-reference
+        - direction-reference
+        - temporal-reference
+        - palette-reference
+        - line-reference
+        - material-reference
+        - layer-context-reference
+        - pose-control
+        - edge-control
+        - depth-control
+        - mask
+        - seed
+        - native-alpha
+        - custom-size
+        - candidate-count
+        - cancellation
+    ProviderReferenceCapabilityMap:
+      type: object
+      required:
+        - canonical-identity
+        - direction-master
+        - previous-key-pose
+        - next-key-pose
+        - base-image
+        - mask
+        - pose-control
+        - edge-control
+        - depth-control
+        - palette-reference
+        - line-reference
+        - material-reference
+        - layer-context
+      properties:
+        canonical-identity: { const: identity-reference }
+        direction-master: { const: direction-reference }
+        previous-key-pose: { const: temporal-reference }
+        next-key-pose: { const: temporal-reference }
+        base-image: { type: "null" }
+        mask: { type: "null" }
+        pose-control: { const: pose-control }
+        edge-control: { const: edge-control }
+        depth-control: { const: depth-control }
+        palette-reference: { const: palette-reference }
+        line-reference: { const: line-reference }
+        material-reference: { const: material-reference }
+        layer-context: { const: layer-context-reference }
+      additionalProperties: false
     ProviderProtocol:
       type: object
-      required: [schemaVersion, protocolVersion, operations, assetKinds, continuityPhases, referenceRoles, rules]
+      required:
+        - schemaVersion
+        - protocolVersion
+        - operations
+        - assetKinds
+        - continuityPhases
+        - referenceRoles
+        - capabilityVocabulary
+        - requiredReferenceCapabilities
+        - rules
       properties:
         schemaVersion: { const: "1.0" }
         protocolVersion: { type: string }
@@ -505,6 +570,11 @@ components:
               - line-reference
               - material-reference
               - layer-context
+        capabilityVocabulary:
+          type: array
+          items: { $ref: "#/components/schemas/ProviderCapability" }
+        requiredReferenceCapabilities:
+          $ref: "#/components/schemas/ProviderReferenceCapabilityMap"
         rules:
           type: array
           items: { type: string }
@@ -593,11 +663,21 @@ components:
       additionalProperties: false
     ProviderCompiledContract:
       type: object
-      required: [schemaVersion, request, requestSha256, compiledPrompt, compiledPromptSha256, executionMode]
+      required:
+        - schemaVersion
+        - request
+        - requestSha256
+        - requiredAdapterCapabilities
+        - compiledPrompt
+        - compiledPromptSha256
+        - executionMode
       properties:
         schemaVersion: { const: "1.0" }
         request: { $ref: "#/components/schemas/ProviderCandidateRequest" }
         requestSha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        requiredAdapterCapabilities:
+          type: array
+          items: { $ref: "#/components/schemas/ProviderCapability" }
         compiledPrompt: { type: string }
         compiledPromptSha256: { type: string, pattern: "^[a-f0-9]{64}$" }
         executionMode: { const: durable-worker-only }

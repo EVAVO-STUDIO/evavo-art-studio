@@ -4,6 +4,7 @@ import {
   ProviderError,
   compileProviderCandidatePrompt,
   providerProtocolSummary,
+  providerRequiredCapabilities,
   providerRequestSha256,
   validateProviderCandidateRequest,
 } from "@evavo/art-providers";
@@ -69,6 +70,8 @@ export async function handleProviderApiRequest(
           schemaVersion: "1.0",
           request: normalized,
           requestSha256: providerRequestSha256(normalized),
+          requiredAdapterCapabilities:
+            providerRequiredCapabilities(normalized),
           compiledPrompt: prompt.text,
           compiledPromptSha256: prompt.sha256,
           executionMode: "durable-worker-only",

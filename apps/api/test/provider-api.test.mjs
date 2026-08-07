@@ -54,6 +54,15 @@ test("provider protocol and compilation are public deterministic contracts", asy
     const protocolBody = await protocol.json();
     assert.ok(protocolBody.referenceRoles.includes("canonical-identity"));
     assert.ok(protocolBody.referenceRoles.includes("previous-key-pose"));
+    assert.ok(protocolBody.capabilityVocabulary.includes("pose-control"));
+    assert.equal(
+      protocolBody.requiredReferenceCapabilities["canonical-identity"],
+      "identity-reference",
+    );
+    assert.equal(
+      protocolBody.requiredReferenceCapabilities["pose-control"],
+      "pose-control",
+    );
 
     const compiled = await fetch(`${base}/v1/providers/compile`, {
       method: "POST",
@@ -66,6 +75,11 @@ test("provider protocol and compilation are public deterministic contracts", asy
     assert.equal(body.executionMode, "durable-worker-only");
     assert.equal(body.request.operation, "generate");
     assert.equal(body.requestSha256.length, 64);
+    assert.deepEqual(body.requiredAdapterCapabilities, [
+      "cancellation",
+      "candidate-count",
+      "generate",
+    ]);
     assert.equal(body.compiledPromptSha256.length, 64);
     assert.ok(body.compiledPrompt.includes("intermediate candidate artwork only"));
   });

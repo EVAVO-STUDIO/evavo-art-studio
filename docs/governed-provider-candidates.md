@@ -57,21 +57,7 @@ The request declares one operation:
 
 It also declares one asset kind, one continuity phase, the target canvas, candidate count, shot contents, excluded contents, elements that must remain separate, and the art-direction envelope.
 
-### 2. Resolve immutable references
-
-Every image reference is an artifact ID, not an arbitrary local path or browser upload URL. Before a provider call, the worker:
-
-1. resolves the artifact descriptor;
-2. verifies the descriptor hash;
-3. verifies the content hash;
-4. checks the media type;
-5. enforces per-reference and total byte limits;
-6. reads the verified bytes;
-7. records the content hash and role in provider evidence.
-
-A missing required reference blocks the request. An optional reference may be omitted only when it was explicitly declared optional.
-
-### 3. Compile a deterministic art contract
+### 2. Compile a deterministic art contract
 
 The compiler produces a stable text contract in a fixed section order:
 
@@ -87,12 +73,26 @@ The compiler produces a stable text contract in a fixed section order:
 
 This is not a loose prompt. It states what the provider may change, what it must preserve, what belongs in the shot, what must remain separate, how the canvas is framed, and why the result remains intermediate.
 
-### 4. Select a compatible adapter
+The API, CLI and MCP compile surfaces also emit `requiredAdapterCapabilities`. This is the exact, deterministically sorted adapter requirement derived from the normalized request. Compilation does not inspect a worker registry, resolve artifact bytes or call a provider.
 
-The registry rejects adapters before execution when they lack a required capability. Capabilities include:
+### 3. Inspect compatible adapter routing
+
+Before immutable reference I/O, the worker ranks every registered adapter and compiles a routing inspection containing:
+
+- the request hash and exact required capabilities;
+- every non-secret adapter descriptor;
+- every eligibility decision, reason and deterministic rank;
+- the complete eligible-adapter order;
+- the first eligible adapter when one exists;
+- the request fallback policy;
+- an explicit record that inspection itself made no provider call.
+
+The registry rejects adapters when they lack a required capability or violate request allow-lists, preferred-model constraints, candidate limits or reference-count limits. Capabilities include:
 
 - generation, editing or inpainting;
 - image references and multiple image references;
+- semantic identity, direction, temporal, palette, line, material and layer-context references;
+- structural pose, edge and depth controls;
 - masks;
 - deterministic seeds;
 - native alpha;
@@ -100,7 +100,21 @@ The registry rejects adapters before execution when they lack a required capabil
 - candidate count;
 - cancellation.
 
-The request may allow-list adapters, prefer one adapter or model, require seed support, and decide whether fallback is allowed. A provider is never selected merely because it is available.
+If no adapter is eligible, execution fails with `PROVIDER_ADAPTER_UNAVAILABLE` and the complete blocked routing inspection before the artifact store is asked to resolve or read any reference. A provider is never selected merely because it is available.
+
+### 4. Resolve immutable references
+
+Every image reference is an artifact ID, not an arbitrary local path or browser upload URL. After routing has established at least one eligible adapter and before a provider call, the worker:
+
+1. resolves the artifact descriptor;
+2. verifies the descriptor hash;
+3. verifies the content hash;
+4. checks the media type;
+5. enforces per-reference and total byte limits;
+6. reads the verified bytes;
+7. records the content hash and role in provider evidence.
+
+A missing required reference blocks the request. An optional reference may be omitted only when it was explicitly declared optional.
 
 ### 5. Execute with cancellation and bounded I/O
 
@@ -124,6 +138,7 @@ Each candidate is stored separately. The evidence artifact records:
 - normalized request;
 - request hash;
 - complete compiled contract and hash;
+- the complete pre-I/O routing inspection, including required capabilities, adapter descriptors, ranks, eligibility reasons, eligible order and fallback policy;
 - verified reference roles and content hashes;
 - selected adapter descriptor and model;
 - every attempted adapter;
@@ -132,7 +147,7 @@ Each candidate is stored separately. The evidence artifact records:
 - candidate artifact IDs;
 - whether deterministic alpha extraction is still required.
 
-Failure evidence is retained even when no candidate succeeds.
+Failure evidence is retained after immutable evidence storage begins, even when no candidate succeeds. A request blocked before reference I/O returns the complete routing inspection in the fail-closed error details and creates no false provider-attempt evidence.
 
 ## Continuity phases
 
@@ -208,6 +223,8 @@ Reference roles and adapter capabilities are separate contracts. A provider may 
 `base-image` and `mask` keep their operation-specific rules. A required mask still requires the adapter `mask` capability. Optional references can be supplied as ordinary reference context without pretending they are hard control guarantees.
 
 The registry fails closed when an adapter descriptor declares an unknown capability or lacks any capability derived from a required reference. The `required` field itself must be a real JSON boolean; malformed values are rejected instead of being coerced to optional.
+
+`requiredAdapterCapabilities` is the provider-adapter contract. It is intentionally separate from generic durable-runtime capabilities such as queue execution, reference locking, candidate storage and evidence bundling. A worker being able to run a provider job does not prove that any registered image adapter can honour the request's semantic or structural controls.
 
 ## What belongs in one candidate image
 
@@ -305,7 +322,7 @@ pnpm art -- provider-compile `
   --output .\provider-request.compiled.json
 ```
 
-These commands never execute a provider.
+These commands never inspect a worker registry or execute a provider. `provider-compile` includes the exact `requiredAdapterCapabilities` array that a worker-side adapter must satisfy.
 
 Submit a durable provider job:
 
@@ -326,7 +343,7 @@ POST /v1/providers/validate
 POST /v1/providers/compile
 ```
 
-The REST routes are deterministic control-plane operations. They do not execute adapters.
+The REST routes are deterministic control-plane operations. Compilation returns `requiredAdapterCapabilities`; the API does not inspect worker adapters or execute them.
 
 ### MCP
 
@@ -337,7 +354,7 @@ compile_provider_candidate_request
 submit_art_runtime_jobs
 ```
 
-The compile tool returns a ready-to-submit durable runtime job. Provider execution still occurs only after submission to a compatible worker.
+The compile tool returns a ready-to-submit durable runtime job plus the exact adapter capability requirements. Provider execution still occurs only after submission to a compatible worker, where routing inspection is compiled and retained before reference bytes are read.
 
 ## Worker configuration
 

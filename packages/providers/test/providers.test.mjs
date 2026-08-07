@@ -14,6 +14,7 @@ import {
   ProviderRegistry,
   compileProviderCandidatePrompt,
   executeProviderCandidateRequest,
+  inspectProviderCandidateRouting,
   providerRequestSha256,
   providerRequiredCapabilities,
   validateProviderCandidateRequest,
@@ -331,6 +332,40 @@ test("registry binds reference semantics to explicit adapter capabilities and fa
     new ProviderRegistry([new FixtureImageProviderAdapter()]).rank(structural)[0].decision.eligible,
     true,
   );
+  const blockedRouting = inspectProviderCandidateRouting(
+    structural,
+    new ProviderRegistry([openai]),
+  );
+  assert.equal(blockedRouting.outcome, "blocked");
+  assert.deepEqual(blockedRouting.eligibleAdapterIds, []);
+  assert.equal(blockedRouting.firstEligibleAdapterId, undefined);
+  assert.equal(blockedRouting.providerCallPerformedByInspection, false);
+  assert.equal(blockedRouting.requestSha256, providerRequestSha256(structural));
+  assert.equal(blockedRouting.adapters.length, 1);
+  assert.equal(blockedRouting.adapters[0].decision.rank, 1);
+  assert.ok(
+    blockedRouting.adapters[0].decision.reasons.some((reason) =>
+      reason.includes("missing capability pose-control"),
+    ),
+  );
+  assert.deepEqual(
+    blockedRouting.requiredCapabilities,
+    providerRequiredCapabilities(structural),
+  );
+
+  const mixedRouting = inspectProviderCandidateRouting(
+    structural,
+    new ProviderRegistry([openai, new FixtureImageProviderAdapter()]),
+  );
+  assert.equal(mixedRouting.outcome, "eligible");
+  assert.equal(mixedRouting.firstEligibleAdapterId, "fixture-image");
+  assert.deepEqual(mixedRouting.eligibleAdapterIds, ["fixture-image"]);
+  const openAIRouting = mixedRouting.adapters.find(
+    (entry) => entry.descriptor.id === "openai-gpt-image",
+  );
+  assert.ok(openAIRouting);
+  assert.equal(openAIRouting.decision.eligible, false);
+  assert.equal(openAIRouting.decision.rank, 2);
 
   const optionalPose = validateProviderCandidateRequest(
     request({
@@ -408,6 +443,51 @@ test("registry rejects native-alpha work for GPT Image 2 but accepts chroma-key 
   assert.ok(alphaDecision.reasons.some((entry) => entry.includes("native-alpha")));
 });
 
+test("provider execution rejects impossible routing before reading immutable artifacts", async () => {
+  const fixture = await artifactFixture();
+  const openai = new OpenAIImageProviderAdapter({
+    apiKey: "test-key-abcdefghijklmnopqrstuvwxyz0123456789",
+    fetch: async () => {
+      throw new Error("provider transport must not run");
+    },
+  });
+  const structural = validateProviderCandidateRequest(
+    request({
+      references: [
+        ref(fixture.canonical, "canonical-identity"),
+        ref(fixture.pose, "pose-control"),
+      ],
+    }),
+  );
+  let artifactReads = 0;
+  await assert.rejects(
+    () =>
+      executeProviderCandidateRequest(structural, {
+        registry: new ProviderRegistry([openai]),
+        artifacts: {
+          get: async () => {
+            artifactReads += 1;
+            throw new Error("artifact access must not run");
+          },
+        },
+        signal: new AbortController().signal,
+      }),
+    (error) => {
+      assert.ok(error instanceof ProviderError);
+      assert.equal(error.code, "PROVIDER_ADAPTER_UNAVAILABLE");
+      assert.equal(error.classification, "incompatible");
+      assert.equal(error.details.routingInspection.outcome, "blocked");
+      assert.deepEqual(error.details.routingInspection.eligibleAdapterIds, []);
+      assert.deepEqual(
+        error.details.decisions,
+        error.details.routingInspection.adapters.map((entry) => entry.decision),
+      );
+      return true;
+    },
+  );
+  assert.equal(artifactReads, 0);
+});
+
 test("fixture orchestration stores unapproved candidates and evidence with complete lineage", async () => {
   const fixture = await artifactFixture();
   const result = await executeProviderCandidateRequest(
@@ -425,6 +505,11 @@ test("fixture orchestration stores unapproved candidates and evidence with compl
   assert.equal(result.candidateArtifacts.length, 2);
   assert.equal(result.requiresAlphaExtraction, false);
   assert.equal(result.attempts.length, 1);
+  assert.equal(result.routingInspection.outcome, "eligible");
+  assert.equal(result.routingInspection.firstEligibleAdapterId, "fixture-image");
+  assert.ok(
+    result.routingInspection.requiredCapabilities.includes("identity-reference"),
+  );
   const candidate = await fixture.store.get(result.candidateArtifacts[0]);
   assert.equal(candidate.storageClass, "intermediate");
   assert.equal(candidate.labels.approvalState, "unapproved");
@@ -438,6 +523,9 @@ test("fixture orchestration stores unapproved candidates and evidence with compl
   assert.equal(evidenceBody.outcome, "candidate-produced");
   assert.deepEqual(evidenceBody.candidateArtifacts, result.candidateArtifacts);
   assert.equal(evidenceBody.resolvedReferences[0].role, "canonical-identity");
+  assert.deepEqual(evidenceBody.routingInspection, result.routingInspection);
+  assert.equal(evidence.metadata.routingOutcome, "eligible");
+  assert.equal(evidence.metadata.eligibleAdapterCount, 1);
 });
 
 test("fallback is bounded to explicitly allowed transient failures", async () => {
