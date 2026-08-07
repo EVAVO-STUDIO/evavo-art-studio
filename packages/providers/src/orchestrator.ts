@@ -7,7 +7,7 @@ import {
 } from "@evavo/art-artifacts";
 
 import { compileProviderCandidatePrompt } from "./prompt.js";
-import { compileProviderRoutingInspection } from "./registry.js";
+import { compileProviderExecutionRoutingPlan } from "./registry.js";
 import {
   PROVIDER_PROTOCOL_VERSION,
   ProviderError,
@@ -419,8 +419,9 @@ export async function executeProviderCandidateRequest(
   const request = validateProviderCandidateRequest(input);
   const compiled = compileProviderCandidatePrompt(request);
   const ranked = options.registry.rank(request);
-  const routingInspection = compileProviderRoutingInspection(request, ranked);
-  const eligible = ranked.filter((entry) => entry.decision.eligible);
+  const routingPlan = compileProviderExecutionRoutingPlan(request, ranked);
+  const routingInspection = routingPlan.inspection;
+  const eligible = routingPlan.eligibleAdapters;
   if (!eligible.length) {
     throw new ProviderError(
       "PROVIDER_ADAPTER_UNAVAILABLE",
