@@ -1,0 +1,200 @@
+    );
+  }
+  return result;
+}
+
+function normalizedRuntimeNameList(
+  values: unknown,
+  name: string,
+  maximum = 10_000,
+): readonly string[] {
+  if (values === undefined) return Object.freeze([]);
+  const snapshot = snapshotRuntimeArray(
+    values,
+    name,
+    "RUNTIME_JOB_SPEC_INVALID",
+    maximum,
+  );
+  const normalized = snapshot.map((entry, index) =>
+    safeRuntimeName(entry, `${name}[${index}]`),
+  );
+  return Object.freeze([...new Set(normalized)].sort());
+}
+
+function normalizeRetryPolicy(
+  value: unknown,
+): NormalizedRuntimeJobSpec["retryPolicy"] {
+  if (value === undefined) {
+    return Object.freeze({
+      baseDelayMs: 5_000,
+      maximumDelayMs: 300_000,
+      multiplier: 2,
+      jitterFraction: 0.15,
+    });
+  }
+  const source = runtimeInputRecord(value, "retryPolicy");
+  return Object.freeze({
+    baseDelayMs: integer(
+      readRuntimeInput(source, "baseDelayMs", "retryPolicy"),
+      5_000,
+      0,
+      86_400_000,
+      "retryPolicy.baseDelayMs",
+    ),
+    maximumDelayMs: integer(
+      readRuntimeInput(source, "maximumDelayMs", "retryPolicy"),
+      300_000,
+      0,
+      604_800_000,
+      "retryPolicy.maximumDelayMs",
+    ),
+    multiplier: finite(
+      readRuntimeInput(source, "multiplier", "retryPolicy"),
+      2,
+      1,
+      16,
+      "retryPolicy.multiplier",
+    ),
+    jitterFraction: finite(
+      readRuntimeInput(source, "jitterFraction", "retryPolicy"),
+      0.15,
+      0,
+      1,
+      "retryPolicy.jitterFraction",
+    ),
+  });
+}'''
+
+text = replace_once(
+    text,
+    safe_runtime_name,
+    runtime_helpers,
+    "runtime input helpers",
+)
+
+capability_function = r'''function normalizedCapabilityList(
+  values: unknown,
+  name: string,
+  code: string,
+  maximum = 256,
+): readonly string[] {
+  const snapshot = snapshotRuntimeArray(values, name, code, maximum);
+  const normalized = snapshot.map((entry, index) => {
+    if (typeof entry !== "string") {
+      throw new RuntimeError(
+        code,
+        `${name}[${index}] must be a string capability.`,
+      );
+    }
+    return safeName(entry, `${name}[${index}]`, code);
+  });
+  return Object.freeze([...new Set(normalized)].sort());
+}
+
+'''
+
+text = replace_between(
+    text,
+    "function normalizedCapabilityList(",
+    "export function normalizeRuntimeWorkerDescriptor",
+    capability_function,
+    "capability list normalization",
+)
+
+timestamp_labels_block = r'''function timestamp(value: unknown, name: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      `${name} must be a valid timestamp.`,
+    );
+  }
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds)) {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      `${name} must be a valid timestamp.`,
+    );
+  }
+  return new Date(milliseconds).toISOString();
+}
+
+function artifactIds(values: unknown): readonly ArtifactId[] {
+  if (values === undefined) return Object.freeze([]);
+  const snapshot = snapshotRuntimeArray(
+    values,
+    "inputArtifacts",
+    "RUNTIME_JOB_SPEC_INVALID",
+    10_000,
+  );
+  const normalized = snapshot.map((entry, index) => {
+    if (typeof entry !== "string" || !ARTIFACT_ID.test(entry)) {
+      throw new RuntimeError(
+        "RUNTIME_JOB_SPEC_INVALID",
+        `Invalid input artifact ID at inputArtifacts[${index}].`,
+      );
+    }
+    return entry as ArtifactId;
+  });
+  return Object.freeze([...new Set(normalized)].sort());
+}
+
+function labels(values: unknown): Readonly<Record<string, string>> {
+  const result = Object.create(null) as Record<string, string>;
+  if (values === undefined) return Object.freeze(result);
+  const source = runtimeInputRecord(values, "labels");
+  let keys: readonly string[];
+  try {
+    keys = Object.keys(source).sort();
+  } catch {
+    throw new RuntimeError(
+      "RUNTIME_JOB_SPEC_INVALID",
+      "labels keys could not be read safely.",
+    );
+  }
+  for (const key of keys) {
+    const normalizedKey = safeRuntimeName(key, `labels.${key}`);
+    if (Object.hasOwn(result, normalizedKey)) {
+      throw new RuntimeError(
+        "RUNTIME_JOB_SPEC_INVALID",
+        `Label ${normalizedKey} is declared more than once.`,
+      );
+    }
+    const entry = readRuntimeInput(source, key, "labels");
+    if (typeof entry !== "string") {
+      throw new RuntimeError(
+        "RUNTIME_JOB_SPEC_INVALID",
+        `Label ${normalizedKey} must be a string.`,
+      );
+    }
+    const normalizedValue = entry.trim();
+    if (
+      !normalizedValue ||
+      normalizedValue.length > 512 ||
+      normalizedValue.includes("\\0")
+    ) {
+      throw new RuntimeError(
+        "RUNTIME_JOB_SPEC_INVALID",
+        `Label ${normalizedKey} must contain 1 to 512 characters.`,
+      );
+    }
+    Object.defineProperty(result, normalizedKey, {
+      value: normalizedValue,
+      enumerable: true,
+      configurable: false,
+      writable: false,
+    });
+  }
+  return Object.freeze(result);
+}
+
+'''
+
+text = replace_between(
+    text,
+    "function timestamp(",
+    "export function idempotencyIndexKey",
+    timestamp_labels_block,
+    "timestamp, artifact and label normalization",
+)
+
