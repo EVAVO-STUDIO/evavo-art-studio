@@ -755,13 +755,14 @@ function validateProviderPlan(
       plan.normalizedProviderRequest,
     );
     const requestHash = providerRequestSha256(request);
+    const requestMetadata = record(request.metadata);
     if (requestHash !== plan.normalizedProviderRequestSha256) {
       blockers.push("Normalized provider request fingerprint is invalid.");
     }
     if (
       request.candidateCount !== 1
       || request.selection.allowFallback !== false
-      || request.metadata.conceptTerritoryId !== route.routeId
+      || requestMetadata?.conceptTerritoryId !== route.routeId
     ) {
       blockers.push(
         "Provider request lost its one-route, one-candidate, no-fallback boundary.",
