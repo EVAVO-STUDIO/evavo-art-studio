@@ -90,6 +90,13 @@ type DescriptorInputSnapshot = Readonly<{
   metadata: unknown;
 }>;
 
+type ReferenceUpdateOptionsSnapshot = Readonly<{
+  expectedGeneration?: number;
+  expectedArtifactId?: ArtifactId;
+  actor?: string;
+  updatedAt: string;
+}>;
+
 function errorCode(error: unknown): string | undefined {
   return error && typeof error === "object" && "code" in error
     ? String((error as NodeJS.ErrnoException).code)
@@ -708,7 +715,7 @@ function referenceActor(value: unknown): string {
   return actor;
 }
 
-function optionReferenceActor(value: string | undefined): string | undefined {
+function optionReferenceActor(value: unknown): string | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== "string") {
     invalidReference("Artifact reference actor is invalid.");
@@ -721,11 +728,91 @@ function optionReferenceActor(value: string | undefined): string | undefined {
   return actor;
 }
 
-function optionReferenceTimestamp(value: Date): string {
-  if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+function optionReferenceTimestamp(value: unknown): string {
+  let time = Number.NaN;
+  try {
+    if (!(value instanceof Date)) {
+      invalidReference("Artifact reference update time is invalid.");
+    }
+    time = Date.prototype.getTime.call(value);
+  } catch {
     invalidReference("Artifact reference update time is invalid.");
   }
-  return value.toISOString();
+  if (!Number.isFinite(time)) {
+    invalidReference("Artifact reference update time is invalid.");
+  }
+  return new Date(time).toISOString();
+}
+
+function snapshotReferenceUpdateOptions(
+  value: unknown,
+): ReferenceUpdateOptionsSnapshot {
+  let recordLike = false;
+  try {
+    recordLike = isRecord(value);
+  } catch {
+    invalidReference(
+      "Artifact reference update options could not be inspected safely.",
+    );
+  }
+  if (!recordLike) {
+    invalidReference("Artifact reference update options must be an object.");
+  }
+
+  const source = value as Readonly<Record<string, unknown>>;
+  let expectedGenerationInput: unknown;
+  let expectedArtifactIdInput: unknown;
+  let actorInput: unknown;
+  let nowInput: unknown;
+  try {
+    expectedGenerationInput = source.expectedGeneration;
+    expectedArtifactIdInput = source.expectedArtifactId;
+    actorInput = source.actor;
+    nowInput = source.now;
+  } catch {
+    invalidReference(
+      "Artifact reference update option fields could not be read safely.",
+    );
+  }
+
+  let expectedGeneration: number | undefined;
+  if (expectedGenerationInput !== undefined) {
+    if (
+      typeof expectedGenerationInput !== "number" ||
+      !Number.isSafeInteger(expectedGenerationInput) ||
+      expectedGenerationInput < 0
+    ) {
+      invalidReference(
+        "Artifact reference expectedGeneration must be a non-negative safe integer.",
+      );
+    }
+    expectedGeneration = expectedGenerationInput;
+  }
+
+  let expectedArtifactId: ArtifactId | undefined;
+  if (expectedArtifactIdInput !== undefined) {
+    if (
+      typeof expectedArtifactIdInput !== "string" ||
+      !ARTIFACT_ID.test(expectedArtifactIdInput)
+    ) {
+      invalidReference(
+        "Artifact reference expectedArtifactId must use artifact_<sha256> format.",
+      );
+    }
+    expectedArtifactId = expectedArtifactIdInput as ArtifactId;
+  }
+
+  const actor = optionReferenceActor(actorInput);
+  const updatedAt = optionReferenceTimestamp(
+    nowInput === undefined ? new Date() : nowInput,
+  );
+
+  return Object.freeze({
+    ...(expectedGeneration === undefined ? {} : { expectedGeneration }),
+    ...(expectedArtifactId === undefined ? {} : { expectedArtifactId }),
+    ...(actor === undefined ? {} : { actor }),
+    updatedAt,
+  });
 }
 
 function serializeReference(reference: ArtifactReference): string {
@@ -1044,6 +1131,12 @@ export class LocalArtifactStore implements ArtifactStore {
     id: ArtifactId,
     options: UpdateArtifactReferenceOptions = {},
   ): Promise<ArtifactReference> {
+    const {
+      expectedGeneration,
+      expectedArtifactId,
+      actor,
+      updatedAt,
+    } = snapshotReferenceUpdateOptions(options);
     validateArtifactId(id);
     const descriptor = await this.get(id);
     if (!descriptor) {
@@ -1054,8 +1147,6 @@ export class LocalArtifactStore implements ArtifactStore {
     }
     const normalizedNamespace = safeNamespace(namespace).join("/");
     const normalizedName = safeSegment(name, "name");
-    const actor = optionReferenceActor(options.actor);
-    const updatedAt = optionReferenceTimestamp(options.now ?? new Date());
     const root = await this.root();
     const relativePath = referenceRelativePath(normalizedNamespace, normalizedName);
     const referencePath = path.join(root, relativePath);
@@ -1072,8 +1163,8 @@ export class LocalArtifactStore implements ArtifactStore {
         if (errorCode(error) !== "ENOENT") throw error;
       }
       if (
-        options.expectedGeneration !== undefined &&
-        options.expectedGeneration !== (previous?.generation ?? 0)
+        expectedGeneration !== undefined &&
+        expectedGeneration !== (previous?.generation ?? 0)
       ) {
         throw new ArtifactStoreError(
           "ARTIFACT_REFERENCE_CONFLICT",
@@ -1081,8 +1172,8 @@ export class LocalArtifactStore implements ArtifactStore {
         );
       }
       if (
-        options.expectedArtifactId !== undefined &&
-        options.expectedArtifactId !== previous?.artifactId
+        expectedArtifactId !== undefined &&
+        expectedArtifactId !== previous?.artifactId
       ) {
         throw new ArtifactStoreError(
           "ARTIFACT_REFERENCE_CONFLICT",
