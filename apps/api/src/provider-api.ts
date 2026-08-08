@@ -2,10 +2,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import {
   ProviderError,
-  compileProviderCandidatePrompt,
+  compileProviderCandidateContract,
   providerProtocolSummary,
-  providerRequiredCapabilities,
-  providerRequestSha256,
   validateProviderCandidateRequest,
 } from "@evavo/art-providers";
 
@@ -55,27 +53,23 @@ export async function handleProviderApiRequest(
       (url.pathname === "/v1/providers/validate" ||
         url.pathname === "/v1/providers/compile")
     ) {
-      const normalized = validateProviderCandidateRequest(
-        await context.readJsonBody(request, context.maximumBodyBytes),
+      const input = await context.readJsonBody(
+        request,
+        context.maximumBodyBytes,
       );
       if (url.pathname === "/v1/providers/validate") {
-        context.writeJson(response, 200, normalized, requestId);
+        context.writeJson(
+          response,
+          200,
+          validateProviderCandidateRequest(input),
+          requestId,
+        );
         return true;
       }
-      const prompt = compileProviderCandidatePrompt(normalized);
       context.writeJson(
         response,
         200,
-        {
-          schemaVersion: "1.0",
-          request: normalized,
-          requestSha256: providerRequestSha256(normalized),
-          requiredAdapterCapabilities:
-            providerRequiredCapabilities(normalized),
-          compiledPrompt: prompt.text,
-          compiledPromptSha256: prompt.sha256,
-          executionMode: "durable-worker-only",
-        },
+        compileProviderCandidateContract(input),
         requestId,
       );
       return true;
