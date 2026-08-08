@@ -38,6 +38,23 @@ jobs:
         with:
           version: 10.13.1
 
+      - name: Limit deterministic patch to source authority
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path(".agent/apply-reference-update-options-integrity.py")
+          text = path.read_text(encoding="utf-8")
+          marker = '\nworkflow = WORKFLOW_PATH.read_text(encoding="utf-8")\n'
+          if text.count(marker) != 1:
+              raise RuntimeError(
+                  f"expected one workflow patch boundary, found {text.count(marker)}"
+              )
+          source_only = text.split(marker, 1)[0].rstrip() + "\n"
+          path.write_text(source_only, encoding="utf-8")
+          PY
+
       - name: Apply exact source and regression changes
         run: python .agent/apply-reference-update-options-integrity.py
 
