@@ -1,0 +1,107 @@
+name: Runtime repository input boundary
+
+on:
+  pull_request:
+    paths:
+      - "packages/runtime/src/index.ts"
+      - "packages/runtime/src/local-repository.ts"
+      - "packages/runtime/src/local-repository-boundary.ts"
+      - "packages/runtime/src/types.ts"
+      - "packages/runtime/test/repository-input-boundary-security.test.mjs"
+      - "scripts/bootstrap-ci-media-tools.sh"
+      - ".github/workflows/runtime-repository-input-boundary.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/runtime/src/index.ts"
+      - "packages/runtime/src/local-repository.ts"
+      - "packages/runtime/src/local-repository-boundary.ts"
+      - "packages/runtime/src/types.ts"
+      - "packages/runtime/test/repository-input-boundary-security.test.mjs"
+      - "scripts/bootstrap-ci-media-tools.sh"
+      - ".github/workflows/runtime-repository-input-boundary.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-repository-input-boundary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and type-check runtime boundary dependencies
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-runtime build
+          pnpm --filter @evavo/art-runtime typecheck
+
+      - name: Run runtime boundary and persistence regressions
+        run: >-
+          node --test
+          packages/runtime/test/runtime.test.mjs
+          packages/runtime/test/redrive-policy.test.mjs
+          packages/runtime/test/journal-integrity-security.test.mjs
+          packages/runtime/test/submission-integrity-security.test.mjs
+          packages/runtime/test/worker-options-integrity-security.test.mjs
+          packages/runtime/test/control-options-integrity-security.test.mjs
+          packages/runtime/test/claim-input-integrity-security.test.mjs
+          packages/runtime/test/transition-clock-integrity-security.test.mjs
+          packages/runtime/test/execution-result-input-integrity-security.test.mjs
+          packages/runtime/test/read-input-integrity-security.test.mjs
+          packages/runtime/test/repository-input-boundary-security.test.mjs
+
+      - name: Verify permanent runtime repository boundary contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'snapshotLocalRuntimeOptions' packages/runtime/src/local-repository-boundary.ts
+          grep -F 'snapshotRuntimeSubmissionBatch' packages/runtime/src/local-repository-boundary.ts
+          grep -F 'snapshotRuntimeJobId' packages/runtime/src/local-repository-boundary.ts
+          grep -F 'snapshotRuntimeActor' packages/runtime/src/local-repository-boundary.ts
+          grep -F 'snapshotRuntimeLeaseToken' packages/runtime/src/local-repository-boundary.ts
+          grep -F 'export { LocalRuntimeRepository } from "./local-repository-boundary.js";' packages/runtime/src/index.ts
+          ! grep -F 'export * from "./local-repository.js";' packages/runtime/src/index.ts
+          grep -F 'local runtime options are read once and fail closed' packages/runtime/test/repository-input-boundary-security.test.mjs
+          grep -F 'submission batch containers are snapshotted by index before journal work' packages/runtime/test/repository-input-boundary-security.test.mjs
+          grep -F 'post-call mutation cannot replace captured submission batch entries' packages/runtime/test/repository-input-boundary-security.test.mjs
+          grep -F 'lifecycle identities normalize before repository work' packages/runtime/test/repository-input-boundary-security.test.mjs
+          grep -F 'hostile repository options, batches and identities fail closed' packages/runtime/test/repository-input-boundary-security.test.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
