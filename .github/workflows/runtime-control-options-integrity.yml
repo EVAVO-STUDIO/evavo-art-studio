@@ -1,10 +1,11 @@
-name: Runtime control option integrity
+name: Runtime control and transition input integrity
 
 on:
   pull_request:
     paths:
       - "packages/runtime/src/local-repository.ts"
       - "packages/runtime/test/control-options-integrity-security.test.mjs"
+      - "packages/runtime/test/transition-clock-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
       - ".github/workflows/runtime-control-options-integrity.yml"
   push:
@@ -13,6 +14,7 @@ on:
     paths:
       - "packages/runtime/src/local-repository.ts"
       - "packages/runtime/test/control-options-integrity-security.test.mjs"
+      - "packages/runtime/test/transition-clock-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
       - ".github/workflows/runtime-control-options-integrity.yml"
 
@@ -57,7 +59,7 @@ jobs:
           pnpm --filter @evavo/art-runtime build
           pnpm --filter @evavo/art-runtime typecheck
 
-      - name: Run runtime control and persistence regressions
+      - name: Run runtime control, transition and persistence regressions
         run: >-
           node --test
           packages/runtime/test/runtime.test.mjs
@@ -66,14 +68,23 @@ jobs:
           packages/runtime/test/submission-integrity-security.test.mjs
           packages/runtime/test/worker-options-integrity-security.test.mjs
           packages/runtime/test/control-options-integrity-security.test.mjs
+          packages/runtime/test/claim-input-integrity-security.test.mjs
+          packages/runtime/test/transition-clock-integrity-security.test.mjs
 
-      - name: Verify permanent runtime control option contract
+      - name: Verify permanent runtime control and transition contract
         shell: bash
         run: |
           set -euo pipefail
           grep -F 'snapshotRuntimeControlOptions' packages/runtime/src/local-repository.ts
           grep -F 'snapshotRuntimeControlDate' packages/runtime/src/local-repository.ts
           grep -F 'RUNTIME_JOB_CONTROL_OPTIONS_INVALID' packages/runtime/src/local-repository.ts
+          grep -F 'snapshotRuntimeTransitionClock' packages/runtime/src/local-repository.ts
+          grep -F 'all journal-backed transition methods snapshot clocks before asynchronous work' packages/runtime/test/transition-clock-integrity-security.test.mjs
+          grep -F 'claim clocks are captured before worker normalization can mutate them' packages/runtime/test/transition-clock-integrity-security.test.mjs
+          grep -F 'post-call clock mutation cannot change submission or execution transitions' packages/runtime/test/transition-clock-integrity-security.test.mjs
+          grep -F 'post-call clock mutation cannot change failure or recovery decisions' packages/runtime/test/transition-clock-integrity-security.test.mjs
+          grep -F 'post-call clock mutation cannot change resume or redrive reconciliation' packages/runtime/test/transition-clock-integrity-security.test.mjs
+          grep -F 'transition clocks fail closed and use intrinsic Date semantics' packages/runtime/test/transition-clock-integrity-security.test.mjs
           grep -F 'cancel and pause options are read exactly once before journal work' packages/runtime/test/control-options-integrity-security.test.mjs
           grep -F 'post-call mutation cannot escalate cooperative cancellation or advance unrelated jobs' packages/runtime/test/control-options-integrity-security.test.mjs
           grep -F 'post-call mutation cannot escalate cooperative pause' packages/runtime/test/control-options-integrity-security.test.mjs
