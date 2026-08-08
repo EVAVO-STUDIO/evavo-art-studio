@@ -1,0 +1,121 @@
+name: RAW ART provider runtime admission
+
+on:
+  pull_request:
+    paths:
+      - "packages/providers/src/contract.ts"
+      - "packages/runtime/src/index.ts"
+      - "packages/runtime/src/local-repository.ts"
+      - "packages/runtime/src/local-repository-boundary.ts"
+      - "packages/runtime/src/normalize.ts"
+      - "packages/runtime/src/types.ts"
+      - "scripts/raw-art-provider/runtime.mjs"
+      - "scripts/raw-art-provider/shared.mjs"
+      - "scripts/raw-art-provider/admission.mjs"
+      - "scripts/compile-raw-art-provider-runtime-batch.mjs"
+      - "scripts/select-raw-art-provider-runtime-jobs.mjs"
+      - "scripts/admit-raw-art-provider-runtime-batch.mjs"
+      - "scripts/check-raw-art-provider-runtime-admission.mjs"
+      - "docs/RAW_ART_PROVIDER_RUNTIME_ADMISSION.md"
+      - "package.json"
+      - ".github/workflows/raw-art-provider-runtime-admission.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/providers/src/contract.ts"
+      - "packages/runtime/src/index.ts"
+      - "packages/runtime/src/local-repository.ts"
+      - "packages/runtime/src/local-repository-boundary.ts"
+      - "packages/runtime/src/normalize.ts"
+      - "packages/runtime/src/types.ts"
+      - "scripts/raw-art-provider/runtime.mjs"
+      - "scripts/raw-art-provider/shared.mjs"
+      - "scripts/raw-art-provider/admission.mjs"
+      - "scripts/compile-raw-art-provider-runtime-batch.mjs"
+      - "scripts/select-raw-art-provider-runtime-jobs.mjs"
+      - "scripts/admit-raw-art-provider-runtime-batch.mjs"
+      - "scripts/check-raw-art-provider-runtime-admission.mjs"
+      - "docs/RAW_ART_PROVIDER_RUNTIME_ADMISSION.md"
+      - "package.json"
+      - ".github/workflows/raw-art-provider-runtime-admission.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: raw-art-provider-runtime-admission-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build complete domain dependency closure
+        run: pnpm run build:domain
+
+      - name: Run durable RAW ART admission regressions
+        run: |
+          node scripts/check-raw-art-provider-runtime-batch.mjs
+          node scripts/check-raw-art-provider-runtime-admission.mjs
+
+      - name: Verify permanent admission authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'validateRawArtProviderRuntimeBatch' scripts/raw-art-provider/admission.mjs
+          grep -F 'compileRawArtProviderRuntimeAdmissionSelection' scripts/raw-art-provider/admission.mjs
+          grep -F 'validateRawArtProviderRuntimeAdmissionSelection' scripts/raw-art-provider/admission.mjs
+          grep -F 'normalizeRuntimeJobSubmission' scripts/raw-art-provider/admission.mjs
+          grep -F 'LocalRuntimeRepository' scripts/raw-art-provider/admission.mjs
+          grep -F 'runtime.submitBatch' scripts/raw-art-provider/admission.mjs
+          grep -F 'durableRuntimeAdmission: true' scripts/raw-art-provider/admission.mjs
+          grep -F 'providerExecution: false' scripts/raw-art-provider/admission.mjs
+          grep -F 'workerClaim: false' scripts/raw-art-provider/admission.mjs
+          grep -F 'deliveryPublication: false' scripts/raw-art-provider/admission.mjs
+          grep -F 'candidatePromotion: false' scripts/raw-art-provider/admission.mjs
+          grep -F 'publication: false' scripts/raw-art-provider/admission.mjs
+          grep -F 'raw-art:provider-select' package.json
+          grep -F 'raw-art:provider-admit' package.json
+          grep -F 'raw-art:provider-admission:check' package.json
+          ! grep -F 'RuntimeWorker' scripts/raw-art-provider/admission.mjs
+          ! grep -F 'PgBossRuntimeDelivery' scripts/raw-art-provider/admission.mjs
+          ! grep -F 'executeProviderCandidateRequest' scripts/raw-art-provider/admission.mjs
+          ! grep -F 'fetch(' scripts/raw-art-provider/admission.mjs
+          ! grep -F 'candidatePromotion: true' scripts/raw-art-provider/admission.mjs
+          ! grep -F 'publication: true' scripts/raw-art-provider/admission.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
