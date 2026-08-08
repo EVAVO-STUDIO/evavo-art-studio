@@ -5,6 +5,7 @@ on:
     paths:
       - "packages/runtime/src/local-repository.ts"
       - "packages/runtime/test/claim-input-integrity-security.test.mjs"
+      - "scripts/check-provider-runtime-capability-profiles.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
       - ".github/workflows/runtime-claim-input-integrity.yml"
   push:
@@ -13,6 +14,7 @@ on:
     paths:
       - "packages/runtime/src/local-repository.ts"
       - "packages/runtime/test/claim-input-integrity-security.test.mjs"
+      - "scripts/check-provider-runtime-capability-profiles.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
       - ".github/workflows/runtime-claim-input-integrity.yml"
 
@@ -77,9 +79,11 @@ jobs:
           grep -F 'claim request fields are read exactly once before journal work' packages/runtime/test/claim-input-integrity-security.test.mjs
           grep -F 'post-call clock mutation cannot advance delayed jobs or extend leases' packages/runtime/test/claim-input-integrity-security.test.mjs
           grep -F 'hostile claim requests fail closed without changing queued jobs' packages/runtime/test/claim-input-integrity-security.test.mjs
+          grep -F 'Runtime claim capability routing must use the immutable request snapshot' scripts/check-provider-runtime-capability-profiles.mjs
           ! grep -F 'request.worker' packages/runtime/src/local-repository.ts
           ! grep -F 'request.maximumJobs' packages/runtime/src/local-repository.ts
           ! grep -F 'request.now' packages/runtime/src/local-repository.ts
+          node scripts/check-provider-runtime-capability-profiles.mjs
 
       - name: Run complete Art Studio validation
         run: pnpm check
