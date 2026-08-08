@@ -1,0 +1,122 @@
+name: RAW ART provider runtime batch
+
+on:
+  pull_request:
+    paths:
+      - "packages/providers/src/contract.ts"
+      - "packages/providers/src/index.ts"
+      - "packages/providers/test/compiled-contract.test.mjs"
+      - "apps/api/src/provider-api.ts"
+      - "apps/cli/src/index.ts"
+      - "apps/mcp/src/provider-tools.ts"
+      - "apps/mcp/test/provider-tools-contract.test.mjs"
+      - "scripts/compile-raw-art-provider-runtime-batch.mjs"
+      - "scripts/check-raw-art-provider-runtime-batch.mjs"
+      - "scripts/raw-art-provider/runtime.mjs"
+      - "scripts/raw-art-provider/shared.mjs"
+      - "scripts/check-raw-art-production-orchestrator.mjs"
+      - "config/raw-art-production-orchestrator.v1.json"
+      - "docs/RAW_ART_AGENT_WORKSHOP.md"
+      - "package.json"
+      - ".github/workflows/raw-art-provider-runtime-batch.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/providers/src/contract.ts"
+      - "packages/providers/src/index.ts"
+      - "packages/providers/test/compiled-contract.test.mjs"
+      - "apps/api/src/provider-api.ts"
+      - "apps/cli/src/index.ts"
+      - "apps/mcp/src/provider-tools.ts"
+      - "apps/mcp/test/provider-tools-contract.test.mjs"
+      - "scripts/compile-raw-art-provider-runtime-batch.mjs"
+      - "scripts/check-raw-art-provider-runtime-batch.mjs"
+      - "scripts/raw-art-provider/runtime.mjs"
+      - "scripts/raw-art-provider/shared.mjs"
+      - "scripts/check-raw-art-production-orchestrator.mjs"
+      - "config/raw-art-production-orchestrator.v1.json"
+      - "docs/RAW_ART_AGENT_WORKSHOP.md"
+      - "package.json"
+      - ".github/workflows/raw-art-provider-runtime-batch.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: raw-art-provider-runtime-batch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and type-check canonical provider contracts
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-media build
+          pnpm --filter @evavo/art-providers build
+          pnpm --filter @evavo/art-providers typecheck
+          pnpm --filter @evavo/art-studio-api build
+          pnpm --filter @evavo/art-studio-cli build
+          pnpm --filter @evavo/art-studio-mcp build
+
+      - name: Run provider and RAW ART runtime-batch regressions
+        run: |
+          node --test packages/providers/test/compiled-contract.test.mjs
+          node scripts/check-raw-art-provider-runtime-batch.mjs
+          node --test apps/api/test/provider-api.test.mjs apps/cli/test/provider-cli.test.mjs apps/mcp/test/provider-tools-contract.test.mjs
+
+      - name: Verify permanent canonical contract boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'compileProviderCandidateContract' packages/providers/src/contract.ts
+          grep -F 'compileProviderCandidateRuntimeContract' packages/providers/src/contract.ts
+          grep -F 'requiredCapabilityProfile: compiled.requiredAdapterCapabilities' packages/providers/src/contract.ts
+          grep -F 'compileProviderCandidateContract(input)' apps/api/src/provider-api.ts
+          grep -F 'compileProviderCandidateRuntimeContract(request)' apps/mcp/src/provider-tools.ts
+          grep -F 'evavo.raw-art-provider-runtime-batch.v1' scripts/raw-art-provider/shared.mjs
+          grep -F 'validateRawArtProviderRequestBatch' scripts/raw-art-provider/runtime.mjs
+          grep -F 'compileRawArtProviderRuntimeBatch' scripts/raw-art-provider/runtime.mjs
+          grep -F 'contractSha256: hashObject(contract)' scripts/raw-art-provider/runtime.mjs
+          grep -F 'runtimeJobSha256: hashObject(contract.runtimeJob)' scripts/raw-art-provider/runtime.mjs
+          grep -F 'provider execution, runtime submission, approval and publication remain false' scripts/check-raw-art-provider-runtime-batch.mjs
+          ! grep -F 'executeProviderCandidateRequest' scripts/raw-art-provider/runtime.mjs
+          ! grep -F 'runtime.submit' scripts/raw-art-provider/runtime.mjs
+          ! grep -F 'fetch(' scripts/raw-art-provider/runtime.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
