@@ -74,8 +74,7 @@ jobs:
           git config user.email "evavo.studio@gmail.com"
           git add \
             packages/runtime/src/local-repository.ts \
-            packages/runtime/test/execution-result-input-integrity-security.test.mjs \
-            .github/workflows/runtime-execution-result-input-integrity.yml
+            packages/runtime/test/execution-result-input-integrity-security.test.mjs
           if git diff --cached --quiet; then
             echo "::error title=No staged hardening changes::The deterministic patch produced no source changes."
             exit 1
