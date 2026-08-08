@@ -14,7 +14,7 @@ complete RAW_ART inventory
 → technically gated approved style bank
 → immutable Art Studio artifacts
 → provider request batch
-→ provider request validation and deterministic prompt compilation
+→ canonical provider validation, prompt compilation and durable job batch
 → explicit durable runtime submission
 → immutable unapproved candidates
 → deterministic candidate evaluation
@@ -91,9 +91,32 @@ The compiler independently verifies:
 
 Evidence-complete entries become `evavo.raw-art-provider-request-batch.v1` requests. Missing evidence is reported per item and does not stop unrelated ready work.
 
+## Compile the canonical provider runtime batch
+
+Build the canonical provider package, then compile the complete bounded request batch in one deterministic pass:
+
+```powershell
+pnpm --filter @evavo/art-providers build
+
+node scripts/compile-raw-art-provider-runtime-batch.mjs `
+  --provider-batch <create-only-provider-request-batch.json> `
+  --output <create-only-provider-runtime-batch.json>
+```
+
+The output schema is `evavo.raw-art-provider-runtime-batch.v1`. For every valid work order it records:
+
+- the normalized provider request and deterministic request ID;
+- the exact request SHA-256;
+- the canonical provider-neutral prompt and prompt SHA-256;
+- the exact adapter capability profile required by routing;
+- the same durable runtime job contract returned by the Art Studio MCP;
+- a runtime-job SHA-256 and complete compiled-contract SHA-256.
+
+The compiler verifies the source request-batch self-hash, run ID, counts, all-false authority, unique work-order, source and target identities, and exact RAW_ART metadata bindings. A malformed provider request becomes a per-item `canonical-provider-contract` blocker and does not stop unrelated valid jobs. The compiler performs no provider call and no runtime submission.
+
 ## Agent execution through the existing Art Studio MCP
 
-After the request batch is compiled, start the existing full Art Studio MCP and durable runtime:
+After the canonical runtime batch is compiled, start the existing full Art Studio MCP and durable runtime:
 
 ```powershell
 pnpm run build:domain
@@ -110,27 +133,27 @@ EVAVO_ART_RUNTIME_ROOT=<runtime-root>
 EVAVO_ART_ALLOW_WRITES=true
 ```
 
-For each compiled request, an authorised agent uses the existing tools in this order:
+For each deliberately selected `jobs[].contract.runtimeJob`, an authorised agent uses the existing tools in this order:
 
 ```text
-validate_provider_candidate_request
-compile_provider_candidate_request
 submit_art_runtime_jobs
 inspect_art_runtime_job
 manage_art_runtime_worker
 prepare_candidate_evidence_bundle
 ```
 
-The first two tools validate continuity references, masks, dimensions, alpha targets, adapter capabilities and the deterministic prompt. Runtime submission remains a separate explicit call. Provider output remains an immutable unapproved candidate.
+The runtime batch has already used the same canonical provider compiler as MCP to validate continuity references, masks, dimensions, alpha targets, adapter capabilities and the deterministic prompt. Runtime submission remains a separate explicit write-enabled call. Provider output remains an immutable unapproved candidate.
 
 ## Permanent regression
 
 ```powershell
 node scripts/check-raw-art-provider-requests.mjs
+pnpm --filter @evavo/art-providers build
+node scripts/check-raw-art-provider-runtime-batch.mjs
 node scripts/check-raw-art-production-orchestrator.mjs
 ```
 
-The regressions prove valid role-aware work compiles, stale queue bindings fail, create-only output cannot be overwritten, approved style artifacts are required, and one incomplete item does not block unrelated ready work.
+The regressions prove valid role-aware work compiles, stale queue and runtime-batch bindings fail, create-only output cannot be overwritten, approved style artifacts are required, canonical prompt and job contracts remain identical across surfaces, and one incomplete item does not block unrelated ready work.
 
 ## Non-negotiable boundaries
 
