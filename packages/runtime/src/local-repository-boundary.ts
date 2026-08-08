@@ -3,6 +3,7 @@ import type { ArtifactId } from "@evavo/art-artifacts";
 import { LocalRuntimeRepository as BaseLocalRuntimeRepository } from "./local-repository.js";
 import {
   RuntimeError,
+  type LocalRuntimeOptions,
   type RuntimeFailureInput,
   type RuntimeHeartbeatResult,
   type RuntimeJobRecord,
@@ -29,12 +30,22 @@ const RUNTIME_JOB_STATES = new Set<RuntimeJobState>([
   "dead-letter",
 ]);
 
+type LocalRuntimeOptionsSnapshot = Readonly<{
+  root: string;
+  lockTimeoutMs?: number;
+  staleLockMs?: number;
+}>;
+
 type RuntimeQuerySnapshot = Readonly<{
   states?: readonly RuntimeJobState[];
   queues?: readonly string[];
   kinds?: readonly string[];
   limit: number;
 }>;
+
+function invalidLocalRuntimeOptions(message: string): never {
+  throw new RuntimeError("RUNTIME_OPTIONS_INVALID", message);
+}
 
 function invalidRuntimeBatchInput(message: string): never {
   throw new RuntimeError("RUNTIME_BATCH_INVALID", message);
@@ -54,6 +65,79 @@ function invalidRuntimeActor(message: string): never {
 
 function invalidRuntimeLeaseToken(message: string): never {
   throw new RuntimeError("RUNTIME_LEASE_TOKEN_INVALID", message);
+}
+
+function snapshotOptionalRuntimeDuration(
+  value: unknown,
+  name: string,
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "number" ||
+    !Number.isSafeInteger(value) ||
+    value < 0
+  ) {
+    invalidLocalRuntimeOptions(
+      `${name} must be a non-negative safe integer.`,
+    );
+  }
+  return value;
+}
+
+function snapshotLocalRuntimeOptions(
+  value: unknown,
+): LocalRuntimeOptionsSnapshot {
+  let recordLike = false;
+  try {
+    recordLike =
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value);
+  } catch {
+    invalidLocalRuntimeOptions(
+      "Local runtime options could not be inspected safely.",
+    );
+  }
+  if (!recordLike) {
+    invalidLocalRuntimeOptions("Local runtime options must be an object.");
+  }
+
+  const source = value as Readonly<Record<string, unknown>>;
+  let rootInput: unknown;
+  let lockTimeoutInput: unknown;
+  let staleLockInput: unknown;
+  try {
+    rootInput = source.root;
+    lockTimeoutInput = source.lockTimeoutMs;
+    staleLockInput = source.staleLockMs;
+  } catch {
+    invalidLocalRuntimeOptions(
+      "Local runtime option fields could not be read safely.",
+    );
+  }
+
+  if (
+    typeof rootInput !== "string" ||
+    rootInput.length > 32_768 ||
+    rootInput.includes("\0")
+  ) {
+    invalidLocalRuntimeOptions(
+      "Local runtime root must be a valid filesystem path string.",
+    );
+  }
+  const lockTimeoutMs = snapshotOptionalRuntimeDuration(
+    lockTimeoutInput,
+    "lockTimeoutMs",
+  );
+  const staleLockMs = snapshotOptionalRuntimeDuration(
+    staleLockInput,
+    "staleLockMs",
+  );
+  return Object.freeze({
+    root: rootInput,
+    ...(lockTimeoutMs === undefined ? {} : { lockTimeoutMs }),
+    ...(staleLockMs === undefined ? {} : { staleLockMs }),
+  });
 }
 
 function snapshotIndexedArray(
@@ -248,6 +332,10 @@ function snapshotRuntimeLeaseToken(value: unknown): string {
 }
 
 export class LocalRuntimeRepository extends BaseLocalRuntimeRepository {
+  public constructor(options: LocalRuntimeOptions) {
+    super(snapshotLocalRuntimeOptions(options));
+  }
+
   public override async submitBatch(
     submissions: readonly RuntimeJobSubmission[],
     actorInput = "system",
