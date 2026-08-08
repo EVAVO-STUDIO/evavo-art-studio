@@ -1,0 +1,136 @@
+name: Runtime lifecycle clock integrity
+
+on:
+  pull_request:
+    paths:
+      - "packages/runtime/src/local-repository.ts"
+      - "packages/runtime/test/lifecycle-clock-integrity-security.test.mjs"
+      - "packages/runtime/test/claim-input-integrity-security.test.mjs"
+      - "packages/runtime/test/control-options-integrity-security.test.mjs"
+      - "packages/book-art-runtime/test/candidate-set-runtime.test.mjs"
+      - "docs/runtime-lifecycle-clock-integrity.md"
+      - "scripts/bootstrap-ci-media-tools.sh"
+      - ".github/workflows/runtime-lifecycle-clock-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/runtime/src/local-repository.ts"
+      - "packages/runtime/test/lifecycle-clock-integrity-security.test.mjs"
+      - "packages/runtime/test/claim-input-integrity-security.test.mjs"
+      - "packages/runtime/test/control-options-integrity-security.test.mjs"
+      - "packages/book-art-runtime/test/candidate-set-runtime.test.mjs"
+      - "docs/runtime-lifecycle-clock-integrity.md"
+      - "scripts/bootstrap-ci-media-tools.sh"
+      - ".github/workflows/runtime-lifecycle-clock-integrity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-lifecycle-clock-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and type-check runtime clock dependencies
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-runtime build
+          pnpm --filter @evavo/art-runtime typecheck
+          pnpm --filter @evavo/art-book-runtime build
+          pnpm --filter @evavo/art-book-runtime typecheck
+
+      - name: Run runtime lifecycle and persistence regressions
+        run: >-
+          node --test
+          packages/runtime/test/runtime.test.mjs
+          packages/runtime/test/redrive-policy.test.mjs
+          packages/runtime/test/journal-integrity-security.test.mjs
+          packages/runtime/test/submission-integrity-security.test.mjs
+          packages/runtime/test/worker-options-integrity-security.test.mjs
+          packages/runtime/test/control-options-integrity-security.test.mjs
+          packages/runtime/test/claim-input-integrity-security.test.mjs
+          packages/runtime/test/lifecycle-clock-integrity-security.test.mjs
+          packages/book-art-runtime/test/candidate-set-runtime.test.mjs
+
+      - name: Verify permanent lifecycle clock contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          source = Path("packages/runtime/src/local-repository.ts").read_text(encoding="utf-8")
+          assert "type RuntimeClockSnapshot" in source
+          assert "Date.prototype.getTime.call(value)" in source
+          assert "snapshotRuntimeClock" in source
+          assert "runtimeClockDate" in source
+
+          method_names = [
+              "submitBatch",
+              "start",
+              "heartbeat",
+              "complete",
+              "fail",
+              "resume",
+              "redrive",
+              "recoverExpiredLeases",
+          ]
+          for index, name in enumerate(method_names):
+              marker = f"  public async {name}("
+              start = source.index(marker)
+              next_method = source.find("\n  public async ", start + len(marker))
+              end = next_method if next_method != -1 else source.index("\n}", start)
+              block = source[start:end]
+              assert "snapshotRuntimeClock(now)" in block, name
+              assert "iso(now)" not in block, name
+              assert "now.getTime()" not in block, name
+
+          submit_start = source.index("  public async submit(")
+          submit_end = source.index("\n  public async submitBatch(", submit_start)
+          submit_block = source[submit_start:submit_end]
+          assert "this.submitBatch([submission], actor, now)" in submit_block
+          PY
+          grep -F 'submission and execution clocks are fixed before journal lock waits' packages/runtime/test/lifecycle-clock-integrity-security.test.mjs
+          grep -F 'failure, resume, redrive and recovery decisions share their clock snapshot' packages/runtime/test/lifecycle-clock-integrity-security.test.mjs
+          grep -F 'all lifecycle methods copy clocks through intrinsic Date semantics' packages/runtime/test/lifecycle-clock-integrity-security.test.mjs
+          grep -F 'invalid lifecycle clocks fail closed before runtime state changes' packages/runtime/test/lifecycle-clock-integrity-security.test.mjs
+          grep -F 'The same clock snapshot controls all effects of one operation' docs/runtime-lifecycle-clock-integrity.md
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
