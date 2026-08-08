@@ -26,10 +26,22 @@ assert.ok(
   !runtimeNormalization.includes("capabilityProfiles.flatMap"),
   "Runtime capability profiles must not be unioned before matching.",
 );
-await includes("packages/runtime/src/local-repository.ts", [
-  "normalizeRuntimeWorkerDescriptor(request.worker)",
+const runtimeRepository = await includes("packages/runtime/src/local-repository.ts", [
+  "snapshotRuntimeClaimRequest(request)",
+  "normalizeRuntimeWorkerDescriptor(",
   "workerCanRun(job, capabilities, capabilityProfiles)",
 ]);
+for (const liveRead of [
+  "normalizeRuntimeWorkerDescriptor(request.worker)",
+  "request.worker",
+  "request.maximumJobs",
+  "request.now",
+]) {
+  assert.ok(
+    !runtimeRepository.includes(liveRead),
+    `Runtime claim capability routing must use the immutable request snapshot, not ${liveRead}.`,
+  );
+}
 const runtimeWorker = await includes("packages/runtime/src/worker.ts", [
   "snapshotRuntimeWorkerOptions",
   "snapshotHandlers",
@@ -48,6 +60,10 @@ await includes("packages/runtime/test/runtime.test.mjs", [
 await includes("packages/runtime/test/worker-options-integrity-security.test.mjs", [
   "runtime worker descriptors are snapshotted once before scheduling",
   "runtime worker options bind execution to one immutable handler snapshot",
+]);
+await includes("packages/runtime/test/claim-input-integrity-security.test.mjs", [
+  "claim request fields are read exactly once before journal work",
+  "post-call clock mutation cannot advance delayed jobs or extend leases",
 ]);
 await includes("apps/worker/src/provider-handlers.ts", [
   "providerRequiredCapabilities(request)",
@@ -101,6 +117,10 @@ await includes(".github/workflows/provider-control-capabilities.yml", [
 ]);
 await includes(".github/workflows/runtime-worker-options-integrity.yml", [
   "worker-options-integrity-security.test.mjs",
+  "check-provider-runtime-capability-profiles.mjs",
+]);
+await includes(".github/workflows/runtime-claim-input-integrity.yml", [
+  "claim-input-integrity-security.test.mjs",
   "check-provider-runtime-capability-profiles.mjs",
 ]);
 
