@@ -11,6 +11,7 @@ export const SCHEMAS = Object.freeze({
   bindings: 'evavo.raw-art-provider-artifact-bindings.v1',
   bindingsTemplate: 'evavo.raw-art-provider-artifact-bindings-template.v1',
   requestBatch: 'evavo.raw-art-provider-request-batch.v1',
+  runtimeBatch: 'evavo.raw-art-provider-runtime-batch.v1',
 });
 
 export const HEX40 = /^[0-9a-f]{40}$/u;
