@@ -1,7 +1,11 @@
 {
-  "schema": "evavo.raw-art-production-orchestrator.v2",
+  "schema": "evavo.raw-art-production-orchestrator.v3",
   "queueSchema": "evavo.raw-art-production-queue.v2",
   "styleProfileSchema": "evavo.approved-style-reference-profile.v2",
+  "technicallyGatedStyleBankSchema": "evavo.image-style-reference-bank.v1",
+  "providerRoleMapSchema": "evavo.brass-brine.raw-art-provider-role-map.v1",
+  "providerArtifactBindingsSchema": "evavo.raw-art-provider-artifact-bindings.v1",
+  "providerRequestBatchSchema": "evavo.raw-art-provider-request-batch.v1",
   "workspaceJobSchema": "evavo.governed-workspace-job.v1",
   "acceptedDecisionSchemas": [
     "evavo.image-reference-work-order.v2",
@@ -22,9 +26,12 @@
   "batch": {
     "defaultSize": 100,
     "maximumSize": 500,
+    "providerDefaultSize": 25,
+    "providerMaximumSize": 100,
     "groupBySemanticRole": true,
     "stableOrdering": true,
-    "targetPathCollisionsRejected": true
+    "targetPathCollisionsRejected": true,
+    "blockedItemsDoNotStopUnrelatedReadyItems": true
   },
   "styleLearning": {
     "metadataOnly": true,
@@ -36,13 +43,34 @@
     "provenanceApprovalRequiredForApprovedStatus": true,
     "creativeApprovalRequiredForApprovedStatus": true,
     "historicalApprovalRequiredForApprovedStatus": true,
-    "maximumExemplarsPerScope": 24
+    "maximumExemplarsPerScope": 24,
+    "technicallyGatedStyleBankRequiredForProviderRequests": true,
+    "approvedStyleReferenceArtifactsRequiredForProviderRequests": true,
+    "technicallyBlockedReferencesExcludedFromProviderRequests": true
+  },
+  "providerWorkflow": {
+    "gameOwnedRoleMapRequired": true,
+    "exactQueueBindingRequired": true,
+    "exactStyleBankBindingRequired": true,
+    "immutableArtifactIdsRequired": true,
+    "explicitCreativeIntentRequired": true,
+    "explicitShotSubjectRequired": true,
+    "baseImageRequiredForEditAndInpaint": true,
+    "maskRequiredForInpaint": true,
+    "canonicalIdentityRequiredForContinuityLockedSprites": true,
+    "providerRequestValidationRequired": true,
+    "promptCompilationRequired": true,
+    "providerExecutionSeparate": true,
+    "runtimeSubmissionSeparate": true,
+    "candidateApprovalSeparate": true,
+    "createOnlyEvidence": true
   },
   "execution": {
     "sourceMutation": false,
     "sourceDeletion": false,
     "targetRepositoryMutation": false,
     "providerExecution": false,
+    "runtimeSubmission": false,
     "publication": false,
     "checkpointResumeSupported": true,
     "exactReceiptBindingRequired": true,
