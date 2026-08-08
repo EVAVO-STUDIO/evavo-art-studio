@@ -8,15 +8,24 @@ const read = (relativePath) =>
 test("MCP exposes provider protocol and deterministic runtime-job compilation", async () => {
   const tools = await read("src/provider-tools.ts");
   const index = await read("src/index.ts");
+  const providerContract = await readFile(
+    new URL(
+      "../../../packages/providers/src/contract.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const combined = `${tools}\n${index}\n${providerContract}`;
   for (const token of [
     "provider_candidate_protocol",
     "validate_provider_candidate_request",
     "compile_provider_candidate_request",
     "compileProviderCandidateRuntimeContract",
+    "requiredCapabilityProfile: compiled.requiredAdapterCapabilities",
     "submit-runtime-job",
     "registerProviderTools(server)",
   ]) {
-    assert.ok(`${tools}\n${index}`.includes(token), `missing MCP provider contract: ${token}`);
+    assert.ok(combined.includes(token), `missing MCP provider contract: ${token}`);
   }
   for (const forbidden of [
     "providerRequestSha256",
@@ -28,6 +37,9 @@ test("MCP exposes provider protocol and deterministic runtime-job compilation", 
     "provider.generate(",
     "child_process",
   ]) {
-    assert.ok(!tools.includes(forbidden), `MCP contract must not duplicate or execute providers: ${forbidden}`);
+    assert.ok(
+      !tools.includes(forbidden),
+      `MCP contract must not duplicate or execute providers: ${forbidden}`,
+    );
   }
 });
