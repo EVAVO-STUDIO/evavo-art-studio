@@ -204,6 +204,9 @@ function snapshotRuntimeClaimRequest(
     );
   }
 
+  const now = nowInput === undefined
+    ? new Date()
+    : snapshotRuntimeClaimDate(nowInput);
   const worker = normalizeRuntimeWorkerDescriptor(
     workerInput as RuntimeClaimRequest["worker"],
   );
@@ -221,15 +224,31 @@ function snapshotRuntimeClaimRequest(
     );
   }
 
-  const now = nowInput === undefined
-    ? new Date()
-    : snapshotRuntimeClaimDate(nowInput);
   return Object.freeze({
     worker,
     maximumJobs,
     now,
     at: iso(now),
   });
+}
+
+function snapshotRuntimeTransitionClock(value: unknown): Date {
+  let milliseconds = Number.NaN;
+  try {
+    milliseconds = Date.prototype.getTime.call(value);
+  } catch {
+    throw new RuntimeError(
+      "RUNTIME_TIME_INVALID",
+      "Runtime transition time must be a valid Date.",
+    );
+  }
+  if (!Number.isFinite(milliseconds)) {
+    throw new RuntimeError(
+      "RUNTIME_TIME_INVALID",
+      "Runtime transition time must be a valid Date.",
+    );
+  }
+  return new Date(milliseconds);
 }
 
 function draft(
@@ -679,6 +698,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     actorInput = "system",
     now = new Date(),
   ): Promise<readonly RuntimeJobRecord[]> {
+    const transitionNow = snapshotRuntimeTransitionClock(now);
     if (submissions.length === 0 || submissions.length > 10_000) {
       throw new RuntimeError(
         "RUNTIME_BATCH_INVALID",
@@ -687,7 +707,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     }
     const actor = actorName(actorInput);
     const normalized = submissions.map(normalizeRuntimeJobSubmission);
-    const at = iso(now);
+    const at = iso(transitionNow);
 
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
@@ -726,7 +746,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
           continue;
         }
 
-        const job = initialJob(entry.specHash, entry.spec, now);
+        const job = initialJob(entry.specHash, entry.spec, transitionNow);
         snapshot.jobs[job.id] = job;
         snapshot.idempotencyIndex[indexKey] = job.id;
         resultIds.push(job.id);
@@ -742,7 +762,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
       }
 
       assertAcyclic(snapshot);
-      changed = reconcileSnapshot(snapshot, actor, now, events) || changed;
+      changed = reconcileSnapshot(snapshot, actor, transitionNow, events) || changed;
       return {
         result: resultIds.map((jobId) => cloneJson(jobOrThrow(snapshot, jobId))),
         events,
@@ -857,11 +877,12 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     actorInput: string,
     now = new Date(),
   ): Promise<RuntimeJobRecord> {
+    const transitionNow = snapshotRuntimeTransitionClock(now);
     const actor = actorName(actorInput);
-    const at = iso(now);
+    const at = iso(transitionNow);
     return this.#journal.transact((snapshot) => {
       const job = jobOrThrow(snapshot, jobId);
-      ensureLease(job, leaseToken, ["leased"], now);
+      ensureLease(job, leaseToken, ["leased"], transitionNow);
       assertExecutionAttemptAllowed(job);
       if (job.cancellationRequestedAt || job.pauseRequestedAt) {
         throw new RuntimeError(
@@ -894,25 +915,26 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     actorInput: string,
     now = new Date(),
   ): Promise<RuntimeHeartbeatResult> {
+    const transitionNow = snapshotRuntimeTransitionClock(now);
     const actor = actorName(actorInput);
-    const at = iso(now);
+    const at = iso(transitionNow);
     return this.#journal.transact((snapshot) => {
       const job = jobOrThrow(snapshot, jobId);
-      ensureLease(job, leaseToken, ["running"], now);
+      ensureLease(job, leaseToken, ["running"], transitionNow);
       assertExecutionAttemptAllowed(job);
       const attempt = job.attempts.at(-1)!;
-      if (job.spec.deadline && Date.parse(job.spec.deadline) <= now.getTime()) {
+      if (job.spec.deadline && Date.parse(job.spec.deadline) <= transitionNow.getTime()) {
         throw new RuntimeError("RUNTIME_JOB_DEADLINE_EXCEEDED", `Deadline elapsed for ${jobId}.`);
       }
       if (
         attempt.startedAt &&
-        Date.parse(attempt.startedAt) + job.spec.timeoutMs <= now.getTime()
+        Date.parse(attempt.startedAt) + job.spec.timeoutMs <= transitionNow.getTime()
       ) {
         throw new RuntimeError("RUNTIME_JOB_TIMEOUT", `Execution timeout elapsed for ${jobId}.`);
       }
       const lease = {
         ...job.lease!,
-        expiresAt: new Date(now.getTime() + job.spec.leaseDurationMs).toISOString(),
+        expiresAt: new Date(transitionNow.getTime() + job.spec.leaseDurationMs).toISOString(),
       };
       const attempts = replaceLastAttempt(job, {
         lastHeartbeatAt: at,
@@ -949,13 +971,14 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     actorInput: string,
     now = new Date(),
   ): Promise<RuntimeJobRecord> {
+    const transitionNow = snapshotRuntimeTransitionClock(now);
     const actor = actorName(actorInput);
-    const at = iso(now);
+    const at = iso(transitionNow);
     const outputArtifacts = validateArtifactIds(outputArtifactsInput);
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
-      ensureLease(job, leaseToken, ["running"], now);
+      ensureLease(job, leaseToken, ["running"], transitionNow);
       assertExecutionAttemptAllowed(job);
       let updated: RuntimeJobRecord;
       if (job.cancellationRequestedAt) {
@@ -1005,7 +1028,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
         );
       }
       snapshot.jobs[jobId] = updated;
-      reconcileSnapshot(snapshot, actor, now, events);
+      reconcileSnapshot(snapshot, actor, transitionNow, events);
       return { result: cloneJson(updated), events, changed: true };
     });
   }
@@ -1017,13 +1040,14 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     actorInput: string,
     now = new Date(),
   ): Promise<RuntimeJobRecord> {
+    const transitionNow = snapshotRuntimeTransitionClock(now);
     const actor = actorName(actorInput);
     const failure = normalizeFailure(failureInput);
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
-      ensureLease(job, leaseToken, ["leased", "running"], now);
-      const updated = applyFailure(job, failure, now);
+      ensureLease(job, leaseToken, ["leased", "running"], transitionNow);
+      const updated = applyFailure(job, failure, transitionNow);
       snapshot.jobs[jobId] = updated;
       events.push(
         draft(
@@ -1045,7 +1069,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
           },
         ),
       );
-      reconcileSnapshot(snapshot, actor, now, events);
+      reconcileSnapshot(snapshot, actor, transitionNow, events);
       return { result: cloneJson(updated), events, changed: true };
     });
   }
@@ -1169,8 +1193,9 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     actorInput: string,
     now = new Date(),
   ): Promise<RuntimeJobRecord> {
+    const transitionNow = snapshotRuntimeTransitionClock(now);
     const actor = actorName(actorInput);
-    const at = iso(now);
+    const at = iso(transitionNow);
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
@@ -1199,7 +1224,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
         updatedAt: at,
       };
       snapshot.jobs[jobId] = resumed;
-      reconcileSnapshot(snapshot, actor, now, events);
+      reconcileSnapshot(snapshot, actor, transitionNow, events);
       const updated = jobOrThrow(snapshot, jobId);
       events.unshift(draft("job.resumed", actor, at, jobId, { state: updated.state }));
       return { result: cloneJson(updated), changed: true, events };
@@ -1212,6 +1237,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     actorInput: string,
     now = new Date(),
   ): Promise<RuntimeJobRecord> {
+    const transitionNow = snapshotRuntimeTransitionClock(now);
     if (!Number.isInteger(additionalAttempts) || additionalAttempts < 1 || additionalAttempts > 50) {
       throw new RuntimeError(
         "RUNTIME_REDRIVE_INVALID",
@@ -1219,7 +1245,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
       );
     }
     const actor = actorName(actorInput);
-    const at = iso(now);
+    const at = iso(transitionNow);
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
@@ -1261,7 +1287,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
           redriveCount: redriven.redriveCount,
         }),
       );
-      reconcileSnapshot(snapshot, actor, now, events);
+      reconcileSnapshot(snapshot, actor, transitionNow, events);
       return {
         result: cloneJson(jobOrThrow(snapshot, jobId)),
         changed: true,
@@ -1274,8 +1300,9 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     actorInput = "runtime-recovery",
     now = new Date(),
   ): Promise<readonly RuntimeJobRecord[]> {
+    const transitionNow = snapshotRuntimeTransitionClock(now);
     const actor = actorName(actorInput);
-    const at = iso(now);
+    const at = iso(transitionNow);
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const recovered: RuntimeJobRecord[] = [];
@@ -1286,11 +1313,11 @@ export class LocalRuntimeRepository implements RuntimeRepository {
         const attempt = job.attempts.at(-1);
         const deadlineElapsed =
           job.spec.deadline !== undefined &&
-          Date.parse(job.spec.deadline) <= now.getTime();
+          Date.parse(job.spec.deadline) <= transitionNow.getTime();
         const timeoutElapsed =
           attempt?.startedAt !== undefined &&
-          Date.parse(attempt.startedAt) + job.spec.timeoutMs <= now.getTime();
-        const leaseElapsed = Date.parse(job.lease.expiresAt) <= now.getTime();
+          Date.parse(attempt.startedAt) + job.spec.timeoutMs <= transitionNow.getTime();
+        const leaseElapsed = Date.parse(job.lease.expiresAt) <= transitionNow.getTime();
         if (!deadlineElapsed && !timeoutElapsed && !leaseElapsed) continue;
 
         let updated: RuntimeJobRecord;
@@ -1336,7 +1363,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
                     code: "RUNTIME_LEASE_EXPIRED",
                     message: "The worker lease expired without a heartbeat.",
                   },
-            now,
+            transitionNow,
           );
         }
         snapshot.jobs[jobId] = updated;
@@ -1350,7 +1377,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
           }),
         );
       }
-      changed = reconcileSnapshot(snapshot, actor, now, events) || changed;
+      changed = reconcileSnapshot(snapshot, actor, transitionNow, events) || changed;
       return { result: recovered, events, changed };
     });
   }
