@@ -49,6 +49,12 @@ const RESUMABLE_STATES = new Set<RuntimeJobState>([
 ]);
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
 
+type RuntimeControlOptionsSnapshot = Readonly<{
+  force: boolean;
+  now: Date;
+  at: string;
+}>;
+
 function iso(now: Date): string {
   if (!Number.isFinite(now.getTime())) {
     throw new RuntimeError("RUNTIME_TIME_INVALID", "Runtime time must be a valid Date.");
@@ -65,6 +71,75 @@ function actorName(value: string | undefined): string {
     );
   }
   return actor;
+}
+
+function invalidRuntimeControlOptions(message: string): never {
+  throw new RuntimeError("RUNTIME_JOB_CONTROL_OPTIONS_INVALID", message);
+}
+
+function snapshotRuntimeControlDate(value: unknown): Date {
+  let milliseconds = Number.NaN;
+  try {
+    milliseconds = Date.prototype.getTime.call(value);
+  } catch {
+    invalidRuntimeControlOptions(
+      "Runtime job control time must be a valid Date.",
+    );
+  }
+  if (!Number.isFinite(milliseconds)) {
+    invalidRuntimeControlOptions(
+      "Runtime job control time must be a valid Date.",
+    );
+  }
+  return new Date(milliseconds);
+}
+
+function snapshotRuntimeControlOptions(
+  value: unknown,
+): RuntimeControlOptionsSnapshot {
+  let recordLike = false;
+  try {
+    recordLike =
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value);
+  } catch {
+    invalidRuntimeControlOptions(
+      "Runtime job control options could not be inspected safely.",
+    );
+  }
+  if (!recordLike) {
+    invalidRuntimeControlOptions(
+      "Runtime job control options must be an object.",
+    );
+  }
+
+  const source = value as Readonly<Record<string, unknown>>;
+  let forceInput: unknown;
+  let nowInput: unknown;
+  try {
+    forceInput = source.force;
+    nowInput = source.now;
+  } catch {
+    invalidRuntimeControlOptions(
+      "Runtime job control option fields could not be read safely.",
+    );
+  }
+
+  let force = false;
+  if (forceInput !== undefined) {
+    if (typeof forceInput !== "boolean") {
+      invalidRuntimeControlOptions(
+        "Runtime job control force must be a boolean.",
+      );
+    }
+    force = forceInput;
+  }
+
+  const now = nowInput === undefined
+    ? new Date()
+    : snapshotRuntimeControlDate(nowInput);
+  return Object.freeze({ force, now, at: iso(now) });
 }
 
 function draft(
@@ -895,8 +970,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     options: Readonly<{ force?: boolean; now?: Date }> = {},
   ): Promise<RuntimeJobRecord> {
     const actor = actorName(actorInput);
-    const now = options.now ?? new Date();
-    const at = iso(now);
+    const { force, now, at } = snapshotRuntimeControlOptions(options);
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
@@ -909,7 +983,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
           `Terminal job ${jobId} cannot be cancelled from ${job.state}.`,
         );
       }
-      if (ACTIVE_STATES.has(job.state) && !options.force) {
+      if (ACTIVE_STATES.has(job.state) && !force) {
         if (job.cancellationRequestedAt) {
           return { result: cloneJson(job), events, changed: false };
         }
@@ -922,7 +996,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
       const failure: RuntimeFailure = {
         classification: "cancelled",
         code: "RUNTIME_JOB_CANCELLED",
-        message: options.force
+        message: force
           ? "Job execution was force-cancelled."
           : "Job was cancelled before execution.",
       };
@@ -937,7 +1011,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
             failure,
           };
       snapshot.jobs[jobId] = updated;
-      events.push(draft("job.cancelled", actor, at, jobId, { forced: options.force ?? false }));
+      events.push(draft("job.cancelled", actor, at, jobId, { forced: force ?? false }));
       reconcileSnapshot(snapshot, actor, now, events);
       return { result: cloneJson(updated), events, changed: true };
     });
@@ -949,8 +1023,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     options: Readonly<{ force?: boolean; now?: Date }> = {},
   ): Promise<RuntimeJobRecord> {
     const actor = actorName(actorInput);
-    const now = options.now ?? new Date();
-    const at = iso(now);
+    const { force, now, at } = snapshotRuntimeControlOptions(options);
     return this.#journal.transact((snapshot) => {
       const job = jobOrThrow(snapshot, jobId);
       if (job.state === "paused") return { result: cloneJson(job), events: [], changed: false };
@@ -960,7 +1033,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
           `Terminal job ${jobId} cannot be paused from ${job.state}.`,
         );
       }
-      if (ACTIVE_STATES.has(job.state) && !options.force) {
+      if (ACTIVE_STATES.has(job.state) && !force) {
         if (job.pauseRequestedAt) {
           return { result: cloneJson(job), events: [], changed: false };
         }
@@ -976,7 +1049,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
       const failure: RuntimeFailure = {
         classification: "cancelled",
         code: "RUNTIME_JOB_PAUSED",
-        message: options.force
+        message: force
           ? "Active execution was stopped to pause the job."
           : "Job was paused before execution.",
       };
@@ -1000,7 +1073,7 @@ export class LocalRuntimeRepository implements RuntimeRepository {
       return {
         result: cloneJson(updated),
         changed: true,
-        events: [draft("job.paused", actor, at, jobId, { forced: options.force ?? false })],
+        events: [draft("job.paused", actor, at, jobId, { forced: force ?? false })],
       };
     });
   }
