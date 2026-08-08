@@ -11,8 +11,8 @@ import {
 } from "./types.js";
 
 const SAFE_RUNTIME_NAME = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const RUNTIME_LEASE_TOKEN = /^lease_[a-f0-9]{32}$/;
 const MAX_RUNTIME_SUBMISSION_BATCH = 10_000;
+const MAX_RUNTIME_LEASE_TOKEN_LENGTH = 256;
 
 type LocalRuntimeOptionsSnapshot = Readonly<{
   root: string;
@@ -194,7 +194,12 @@ function snapshotRuntimeActor(value: unknown): string {
 }
 
 function snapshotRuntimeLeaseToken(value: unknown): string {
-  if (typeof value !== "string" || !RUNTIME_LEASE_TOKEN.test(value)) {
+  if (
+    typeof value !== "string" ||
+    value.length < 1 ||
+    value.length > MAX_RUNTIME_LEASE_TOKEN_LENGTH ||
+    value.includes("\0")
+  ) {
     invalidRuntimeLeaseToken("Runtime lease token is invalid.");
   }
   return value;
