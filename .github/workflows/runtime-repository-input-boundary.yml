@@ -75,6 +75,7 @@ jobs:
           packages/runtime/test/claim-input-integrity-security.test.mjs
           packages/runtime/test/transition-clock-integrity-security.test.mjs
           packages/runtime/test/execution-result-input-integrity-security.test.mjs
+          packages/runtime/test/read-input-integrity-security.test.mjs
           packages/runtime/test/repository-input-boundary-security.test.mjs
 
       - name: Verify permanent runtime repository boundary contract
@@ -83,7 +84,6 @@ jobs:
           set -euo pipefail
           grep -F 'snapshotLocalRuntimeOptions' packages/runtime/src/local-repository-boundary.ts
           grep -F 'snapshotRuntimeSubmissionBatch' packages/runtime/src/local-repository-boundary.ts
-          grep -F 'snapshotRuntimeQuery' packages/runtime/src/local-repository-boundary.ts
           grep -F 'snapshotRuntimeJobId' packages/runtime/src/local-repository-boundary.ts
           grep -F 'snapshotRuntimeActor' packages/runtime/src/local-repository-boundary.ts
           grep -F 'snapshotRuntimeLeaseToken' packages/runtime/src/local-repository-boundary.ts
@@ -91,8 +91,9 @@ jobs:
           ! grep -F 'export * from "./local-repository.js";' packages/runtime/src/index.ts
           grep -F 'local runtime options are read once and fail closed' packages/runtime/test/repository-input-boundary-security.test.mjs
           grep -F 'submission batch containers are snapshotted by index before journal work' packages/runtime/test/repository-input-boundary-security.test.mjs
-          grep -F 'runtime queries are read once and ignore caller iterators' packages/runtime/test/repository-input-boundary-security.test.mjs
-          grep -F 'hostile repository identities and collections fail closed' packages/runtime/test/repository-input-boundary-security.test.mjs
+          grep -F 'post-call mutation cannot replace captured submission batch entries' packages/runtime/test/repository-input-boundary-security.test.mjs
+          grep -F 'lifecycle identities normalize before repository work' packages/runtime/test/repository-input-boundary-security.test.mjs
+          grep -F 'hostile repository options, batches and identities fail closed' packages/runtime/test/repository-input-boundary-security.test.mjs
 
       - name: Run complete Art Studio validation
         run: pnpm check
