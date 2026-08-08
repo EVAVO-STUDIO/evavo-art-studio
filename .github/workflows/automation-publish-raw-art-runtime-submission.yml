@@ -1,0 +1,170 @@
+name: Publish sealed RAW ART runtime submission receipts
+
+on:
+  push:
+    branches:
+      - automation/publish-raw-art-runtime-submission-20260809
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-raw-art-runtime-submission-20260809
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      EXPECTED_MAIN_SHA: 55aff3fce96e25a90021396235334c3f7099db77
+      EXPECTED_TARGET_SHA: 55aff3fce96e25a90021396235334c3f7099db77
+      TARGET_BRANCH: agent/raw-art-runtime-submission-receipts-20260809
+      PAYLOAD_ROOT: .github/automation/raw-art-runtime-submission
+      PAYLOAD_SHA256: d948fa43df622eeb5d53d16db99df2b48cba64689f6162d842b33e85b79a2599
+    steps:
+      - name: Check out exact carrier source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Recover and verify sealed payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t chunks < <(find "$PAYLOAD_ROOT" -maxdepth 1 -type f -name 'chunk-*.b64' -printf '%f\n' | LC_ALL=C sort)
+          expected=(chunk-000.b64 chunk-001.b64 chunk-002.b64 chunk-003.b64)
+          test "${#chunks[@]}" -eq "${#expected[@]}"
+          for index in "${!expected[@]}"; do
+            test "${chunks[$index]}" = "${expected[$index]}"
+          done
+          : > /tmp/raw-art-runtime-submission-payload.b64
+          for chunk in "${chunks[@]}"; do
+            cat "$PAYLOAD_ROOT/$chunk" >> /tmp/raw-art-runtime-submission-payload.b64
+          done
+          base64 --decode /tmp/raw-art-runtime-submission-payload.b64 > /tmp/raw-art-runtime-submission-payload.tar.gz
+          printf '%s  %s\n' "$PAYLOAD_SHA256" /tmp/raw-art-runtime-submission-payload.tar.gz | sha256sum -c -
+          tar -tzf /tmp/raw-art-runtime-submission-payload.tar.gz | LC_ALL=C sort > /tmp/archive-paths.txt
+          cat > /tmp/expected-archive-paths.txt <<'PATHS'
+          ./.github/
+          ./.github/workflows/
+          ./.github/workflows/raw-art-provider-runtime-submission.yml
+          ./docs/
+          ./docs/RAW_ART_RUNTIME_SUBMISSION_RECEIPTS.md
+          ./package.json
+          ./scripts/
+          ./scripts/check-raw-art-provider-runtime-submission.mjs
+          ./scripts/raw-art-provider/
+          ./scripts/raw-art-provider/submission.mjs
+          ./scripts/reconcile-raw-art-provider-runtime-submission.mjs
+          ./scripts/submit-raw-art-provider-runtime-batch.mjs
+          PATHS
+          LC_ALL=C sort -o /tmp/expected-archive-paths.txt /tmp/expected-archive-paths.txt
+          diff -u /tmp/expected-archive-paths.txt /tmp/archive-paths.txt
+
+      - name: Verify exact refs and apply bounded source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$EXPECTED_TARGET_SHA"
+          git switch --force-create "$TARGET_BRANCH" refs/remotes/origin/$TARGET_BRANCH
+          tar -xzf /tmp/raw-art-runtime-submission-payload.tar.gz
+          git diff --check
+          git status --short
+          git diff --name-only | LC_ALL=C sort > /tmp/actual-paths.txt
+          git ls-files --others --exclude-standard | LC_ALL=C sort >> /tmp/actual-paths.txt
+          LC_ALL=C sort -u -o /tmp/actual-paths.txt /tmp/actual-paths.txt
+          cat > /tmp/expected-paths.txt <<'PATHS'
+          .github/workflows/raw-art-provider-runtime-submission.yml
+          docs/RAW_ART_RUNTIME_SUBMISSION_RECEIPTS.md
+          package.json
+          scripts/check-raw-art-provider-runtime-submission.mjs
+          scripts/raw-art-provider/submission.mjs
+          scripts/reconcile-raw-art-provider-runtime-submission.mjs
+          scripts/submit-raw-art-provider-runtime-batch.mjs
+          PATHS
+          LC_ALL=C sort -o /tmp/expected-paths.txt /tmp/expected-paths.txt
+          diff -u /tmp/expected-paths.txt /tmp/actual-paths.txt
+          node --check scripts/raw-art-provider/submission.mjs
+          node --check scripts/submit-raw-art-provider-runtime-batch.mjs
+          node --check scripts/reconcile-raw-art-provider-runtime-submission.mjs
+          node --check scripts/check-raw-art-provider-runtime-submission.mjs
+          node -e "JSON.parse(require('node:fs').readFileSync('package.json','utf8'))"
+
+      - name: Route Python bytecode outside source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/python-pycache"
+          echo "PYTHONPYCACHEPREFIX=$RUNNER_TEMP/python-pycache" >> "$GITHUB_ENV"
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact domain dependency closure
+        run: pnpm run build:domain
+
+      - name: Run focused submission and reconciliation gates
+        run: |
+          pnpm --filter @evavo/art-providers typecheck
+          pnpm --filter @evavo/art-runtime typecheck
+          node scripts/check-raw-art-provider-runtime-batch.mjs
+          node scripts/check-raw-art-provider-runtime-submission.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove validation did not widen the source scope
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test ! -e tools/__pycache__
+          test -z "$(find tools -type f -name '*.pyc' -print -quit)"
+          git diff --name-only | LC_ALL=C sort > /tmp/post-check-paths.txt
+          git ls-files --others --exclude-standard | LC_ALL=C sort >> /tmp/post-check-paths.txt
+          LC_ALL=C sort -u -o /tmp/post-check-paths.txt /tmp/post-check-paths.txt
+          diff -u /tmp/expected-paths.txt /tmp/post-check-paths.txt
+
+      - name: Commit and push exact validated feature
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO Automation"
+          git config user.email "evavo-automation@users.noreply.github.com"
+          mapfile -t paths < /tmp/expected-paths.txt
+          git add -- "${paths[@]}"
+          git diff --cached --check
+          git diff --cached --name-only | LC_ALL=C sort > /tmp/cached-paths.txt
+          diff -u /tmp/expected-paths.txt /tmp/cached-paths.txt
+          git commit -m "feat(raw-art): bind runtime submission receipts"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_TARGET_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git rev-parse HEAD > /tmp/feature-sha.txt
+          git push --force-with-lease="refs/heads/$TARGET_BRANCH:$EXPECTED_TARGET_SHA" origin "HEAD:refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$(cat /tmp/feature-sha.txt)"
+
+      - name: Delete disposable carrier branch
+        if: success()
+        shell: bash
+        run: git push origin --delete "$GITHUB_REF_NAME" || echo "::warning::carrier cleanup deferred"
