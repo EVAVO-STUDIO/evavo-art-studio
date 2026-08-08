@@ -1,0 +1,407 @@
+name: Patch runtime lifecycle clock integrity
+
+on:
+  push:
+    branches:
+      - automation/patch-runtime-lifecycle-clock-integrity-20260808
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-runtime-lifecycle-clock-integrity-20260808
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      TARGET_BRANCH: agent/runtime-lifecycle-clock-integrity-20260808
+      EXPECTED_TARGET_SHA: 9e99c11d8afe4e8cd0914e5cea027748da9c5ca4
+      EXPECTED_MAIN_SHA: c09d8767528e04552fced6a1138b4e5318989584
+    steps:
+      - name: Check out patch authority
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify refs and check out exact target
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$EXPECTED_TARGET_SHA"
+          git switch --force-create "$TARGET_BRANCH" "refs/remotes/origin/$TARGET_BRANCH"
+
+      - name: Snapshot every remaining lifecycle clock
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("packages/runtime/src/local-repository.ts")
+          source = path.read_text(encoding="utf-8")
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label} matched {count} times instead of once")
+              return text.replace(old, new, 1)
+
+          source = replace_once(
+              source,
+              "type RuntimeControlOptionsSnapshot = Readonly<{\n",
+              """type RuntimeClockSnapshot = Readonly<{
+            milliseconds: number;
+            at: string;
+          }>;
+
+          type RuntimeControlOptionsSnapshot = Readonly<{
+          """,
+              "runtime clock snapshot type insertion",
+          )
+
+          source = replace_once(
+              source,
+              """function iso(now: Date): string {
+            if (!Number.isFinite(now.getTime())) {
+              throw new RuntimeError("RUNTIME_TIME_INVALID", "Runtime time must be a valid Date.");
+            }
+            return now.toISOString();
+          }
+          """,
+              """function snapshotRuntimeClock(value: unknown): RuntimeClockSnapshot {
+            let milliseconds = Number.NaN;
+            try {
+              milliseconds = Date.prototype.getTime.call(value);
+            } catch {
+              throw new RuntimeError(
+                "RUNTIME_TIME_INVALID",
+                "Runtime time must be a valid Date.",
+              );
+            }
+            if (!Number.isFinite(milliseconds)) {
+              throw new RuntimeError(
+                "RUNTIME_TIME_INVALID",
+                "Runtime time must be a valid Date.",
+              );
+            }
+            return Object.freeze({
+              milliseconds,
+              at: Date.prototype.toISOString.call(new Date(milliseconds)),
+            });
+          }
+
+          function runtimeClockDate(clock: RuntimeClockSnapshot): Date {
+            return new Date(clock.milliseconds);
+          }
+
+          function iso(now: Date): string {
+            return snapshotRuntimeClock(now).at;
+          }
+          """,
+              "runtime clock helper replacement",
+          )
+
+          def patch_method(name: str, replacements: list[tuple[str, str, int]]) -> None:
+              global source
+              current = source
+              marker = f"  public async {name}("
+              start = current.index(marker)
+              next_method = current.find("\n  public async ", start + len(marker))
+              end = next_method if next_method != -1 else current.index("\n}", start)
+              block = current[start:end]
+              for old, new, expected in replacements:
+                  count = block.count(old)
+                  if count != expected:
+                      raise SystemExit(
+                          f"{name}: {old!r} matched {count} times instead of {expected}"
+                      )
+                  block = block.replace(old, new)
+              source = current[:start] + block + current[end:]
+
+          patch_method(
+              "submitBatch",
+              [
+                  (
+                      """    const actor = actorName(actorInput);
+              const normalized = submissions.map(normalizeRuntimeJobSubmission);
+              const at = iso(now);
+          """,
+                      """    const actor = actorName(actorInput);
+              const normalized = submissions.map(normalizeRuntimeJobSubmission);
+              const clock = snapshotRuntimeClock(now);
+              const runtimeNow = runtimeClockDate(clock);
+              const at = clock.at;
+          """,
+                      1,
+                  ),
+                  (
+                      "        const job = initialJob(entry.specHash, entry.spec, now);",
+                      "        const job = initialJob(entry.specHash, entry.spec, runtimeNow);",
+                      1,
+                  ),
+                  (
+                      "reconcileSnapshot(snapshot, actor, now, events)",
+                      "reconcileSnapshot(snapshot, actor, runtimeNow, events)",
+                      1,
+                  ),
+              ],
+          )
+
+          patch_method(
+              "start",
+              [
+                  (
+                      """    const actor = actorName(actorInput);
+              const at = iso(now);
+          """,
+                      """    const actor = actorName(actorInput);
+              const clock = snapshotRuntimeClock(now);
+              const runtimeNow = runtimeClockDate(clock);
+              const at = clock.at;
+          """,
+                      1,
+                  ),
+                  (
+                      'ensureLease(job, leaseToken, ["leased"], now);',
+                      'ensureLease(job, leaseToken, ["leased"], runtimeNow);',
+                      1,
+                  ),
+              ],
+          )
+
+          patch_method(
+              "heartbeat",
+              [
+                  (
+                      """    const actor = actorName(actorInput);
+              const at = iso(now);
+          """,
+                      """    const actor = actorName(actorInput);
+              const clock = snapshotRuntimeClock(now);
+              const runtimeNow = runtimeClockDate(clock);
+              const at = clock.at;
+          """,
+                      1,
+                  ),
+                  (
+                      'ensureLease(job, leaseToken, ["running"], now);',
+                      'ensureLease(job, leaseToken, ["running"], runtimeNow);',
+                      1,
+                  ),
+                  ("now.getTime()", "clock.milliseconds", 3),
+              ],
+          )
+
+          patch_method(
+              "complete",
+              [
+                  (
+                      """    const actor = actorName(actorInput);
+              const at = iso(now);
+              const outputArtifacts = validateArtifactIds(outputArtifactsInput);
+          """,
+                      """    const actor = actorName(actorInput);
+              const clock = snapshotRuntimeClock(now);
+              const runtimeNow = runtimeClockDate(clock);
+              const at = clock.at;
+              const outputArtifacts = validateArtifactIds(outputArtifactsInput);
+          """,
+                      1,
+                  ),
+                  (
+                      'ensureLease(job, leaseToken, ["running"], now);',
+                      'ensureLease(job, leaseToken, ["running"], runtimeNow);',
+                      1,
+                  ),
+                  (
+                      "reconcileSnapshot(snapshot, actor, now, events)",
+                      "reconcileSnapshot(snapshot, actor, runtimeNow, events)",
+                      1,
+                  ),
+              ],
+          )
+
+          patch_method(
+              "fail",
+              [
+                  (
+                      """    const actor = actorName(actorInput);
+              const failure = normalizeFailure(failureInput);
+          """,
+                      """    const actor = actorName(actorInput);
+              const clock = snapshotRuntimeClock(now);
+              const runtimeNow = runtimeClockDate(clock);
+              const failure = normalizeFailure(failureInput);
+          """,
+                      1,
+                  ),
+                  (
+                      'ensureLease(job, leaseToken, ["leased", "running"], now);',
+                      'ensureLease(job, leaseToken, ["leased", "running"], runtimeNow);',
+                      1,
+                  ),
+                  (
+                      "const updated = applyFailure(job, failure, now);",
+                      "const updated = applyFailure(job, failure, runtimeNow);",
+                      1,
+                  ),
+                  (
+                      "reconcileSnapshot(snapshot, actor, now, events)",
+                      "reconcileSnapshot(snapshot, actor, runtimeNow, events)",
+                      1,
+                  ),
+              ],
+          )
+
+          patch_method(
+              "resume",
+              [
+                  (
+                      """    const actor = actorName(actorInput);
+              const at = iso(now);
+          """,
+                      """    const actor = actorName(actorInput);
+              const clock = snapshotRuntimeClock(now);
+              const runtimeNow = runtimeClockDate(clock);
+              const at = clock.at;
+          """,
+                      1,
+                  ),
+                  (
+                      "reconcileSnapshot(snapshot, actor, now, events)",
+                      "reconcileSnapshot(snapshot, actor, runtimeNow, events)",
+                      1,
+                  ),
+              ],
+          )
+
+          patch_method(
+              "redrive",
+              [
+                  (
+                      """    const actor = actorName(actorInput);
+              const at = iso(now);
+          """,
+                      """    const actor = actorName(actorInput);
+              const clock = snapshotRuntimeClock(now);
+              const runtimeNow = runtimeClockDate(clock);
+              const at = clock.at;
+          """,
+                      1,
+                  ),
+                  (
+                      "reconcileSnapshot(snapshot, actor, now, events)",
+                      "reconcileSnapshot(snapshot, actor, runtimeNow, events)",
+                      1,
+                  ),
+              ],
+          )
+
+          patch_method(
+              "recoverExpiredLeases",
+              [
+                  (
+                      """    const actor = actorName(actorInput);
+              const at = iso(now);
+          """,
+                      """    const actor = actorName(actorInput);
+              const clock = snapshotRuntimeClock(now);
+              const runtimeNow = runtimeClockDate(clock);
+              const at = clock.at;
+          """,
+                      1,
+                  ),
+                  ("now.getTime()", "clock.milliseconds", 3),
+                  (
+                      """            now,
+                    );
+          """,
+                      """            runtimeNow,
+                    );
+          """,
+                      1,
+                  ),
+                  (
+                      "reconcileSnapshot(snapshot, actor, now, events)",
+                      "reconcileSnapshot(snapshot, actor, runtimeNow, events)",
+                      1,
+                  ),
+              ],
+          )
+
+          path.write_text(source, encoding="utf-8")
+          PY
+
+          git diff --check
+          test "$(git diff --name-only)" = "packages/runtime/src/local-repository.ts"
+          grep -F 'type RuntimeClockSnapshot' packages/runtime/src/local-repository.ts
+          grep -F 'snapshotRuntimeClock(now)' packages/runtime/src/local-repository.ts
+          grep -F 'runtimeClockDate(clock)' packages/runtime/src/local-repository.ts
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact runtime dependency closure
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-runtime build
+          pnpm --filter @evavo/art-runtime typecheck
+          pnpm --filter @evavo/art-book-runtime build
+          pnpm --filter @evavo/art-book-runtime typecheck
+
+      - name: Run lifecycle and persistence regressions
+        run: >-
+          node --test
+          packages/runtime/test/runtime.test.mjs
+          packages/runtime/test/redrive-policy.test.mjs
+          packages/runtime/test/journal-integrity-security.test.mjs
+          packages/runtime/test/submission-integrity-security.test.mjs
+          packages/runtime/test/worker-options-integrity-security.test.mjs
+          packages/runtime/test/control-options-integrity-security.test.mjs
+          packages/runtime/test/claim-input-integrity-security.test.mjs
+          packages/runtime/test/lifecycle-clock-integrity-security.test.mjs
+          packages/book-art-runtime/test/candidate-set-runtime.test.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Commit and push bounded runtime correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO Automation"
+          git config user.email "evavo-automation@users.noreply.github.com"
+          git add packages/runtime/src/local-repository.ts
+          git diff --cached --check
+          test "$(git diff --cached --name-only)" = "packages/runtime/src/local-repository.ts"
+          git commit -m "fix(runtime): snapshot lifecycle clocks before journal waits"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_TARGET_SHA"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$(git rev-parse HEAD)"
+
+      - name: Delete disposable patch branch
+        if: success()
+        shell: bash
+        run: git push origin --delete "$GITHUB_REF_NAME" || echo "::warning::patch branch cleanup deferred"
