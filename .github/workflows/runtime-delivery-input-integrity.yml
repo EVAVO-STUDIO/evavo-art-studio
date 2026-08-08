@@ -83,6 +83,7 @@ jobs:
           grep -F 'snapshotClient' packages/runtime/src/pg-boss-delivery.ts
           grep -F 'snapshotDeliveryJob' packages/runtime/src/pg-boss-delivery.ts
           grep -F 'snapshotWorkBatch' packages/runtime/src/pg-boss-delivery.ts
+          grep -F 'typeof connection === "string"' packages/runtime/src/pg-boss-delivery.ts
           grep -F '#queuePreparations' packages/runtime/src/pg-boss-delivery.ts
           grep -F '#subscriptionOperations' packages/runtime/src/pg-boss-delivery.ts
           grep -F '#inFlight' packages/runtime/src/pg-boss-delivery.ts
