@@ -5,6 +5,7 @@ on:
     paths:
       - "packages/artifacts/src/local-store.ts"
       - "packages/artifacts/test/reference-integrity-security.test.mjs"
+      - "packages/artifacts/test/reference-update-input-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
       - ".github/workflows/artifact-reference-integrity.yml"
   push:
@@ -13,6 +14,7 @@ on:
     paths:
       - "packages/artifacts/src/local-store.ts"
       - "packages/artifacts/test/reference-integrity-security.test.mjs"
+      - "packages/artifacts/test/reference-update-input-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
       - ".github/workflows/artifact-reference-integrity.yml"
 
@@ -63,6 +65,7 @@ jobs:
           packages/artifacts/test/json-canonicalization-security.test.mjs
           packages/artifacts/test/descriptor-integrity-security.test.mjs
           packages/artifacts/test/reference-integrity-security.test.mjs
+          packages/artifacts/test/reference-update-input-integrity-security.test.mjs
 
       - name: Verify permanent reference-integrity contract
         shell: bash
@@ -75,6 +78,12 @@ jobs:
           grep -F 'Artifact reference bytes are not canonical.' packages/artifacts/src/local-store.ts
           grep -F 'reference updates reject corrupted prior state and return immutable snapshots' packages/artifacts/test/reference-integrity-security.test.mjs
           grep -F 'reference bytes, file identity and target descriptors are validated before use' packages/artifacts/test/reference-integrity-security.test.mjs
+          grep -F 'snapshotReferenceUpdateOptions' packages/artifacts/src/local-store.ts
+          grep -F 'reference update options are read once and detached before promotion' packages/artifacts/test/reference-update-input-integrity-security.test.mjs
+          grep -F 'reference compare-and-swap binds caller options before asynchronous reads' packages/artifacts/test/reference-update-input-integrity-security.test.mjs
+          grep -F 'hostile reference update options fail closed without leaking errors' packages/artifacts/test/reference-update-input-integrity-security.test.mjs
+          ! grep -F 'options.expectedGeneration' packages/artifacts/src/local-store.ts
+          ! grep -F 'options.expectedArtifactId' packages/artifacts/src/local-store.ts
           ! grep -F 'return reference as ArtifactReference' packages/artifacts/src/local-store.ts
 
       - name: Run complete Art Studio validation
