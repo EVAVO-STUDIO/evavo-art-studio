@@ -1,0 +1,387 @@
+name: Integrate RAW ART provider runtime batch
+
+on:
+  push:
+    branches:
+      - automation/integrate-raw-art-provider-runtime-batch-20260808
+
+permissions:
+  contents: write
+
+concurrency:
+  group: integrate-raw-art-provider-runtime-batch-20260808
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      TARGET_BRANCH: agent/raw-art-provider-runtime-batch-20260808
+      EXPECTED_HEAD_SHA: e11a761774e491fac4e8c67ebb1ae2d1515814f0
+      EXPECTED_MAIN_SHA: ea3385d22af1c29f93bcc0fa05b4afe129da404d
+    steps:
+      - name: Check out integration authority
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify refs and check out exact target
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$EXPECTED_HEAD_SHA"
+          git switch --force-create "$TARGET_BRANCH" refs/remotes/origin/$TARGET_BRANCH
+
+      - name: Apply bounded integration patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from __future__ import annotations
+
+          import json
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              source = file.read_text(encoding="utf-8")
+              if source.count(old) != 1:
+                  raise SystemExit(f"{path}: expected one exact replacement, found {source.count(old)}")
+              file.write_text(source.replace(old, new), encoding="utf-8")
+
+          replace_once(
+              "scripts/raw-art-provider/shared.mjs",
+              "  requestBatch: 'evavo.raw-art-provider-request-batch.v1',\n});",
+              "  requestBatch: 'evavo.raw-art-provider-request-batch.v1',\n"
+              "  runtimeBatch: 'evavo.raw-art-provider-runtime-batch.v1',\n});",
+          )
+
+          replace_once(
+              "package.json",
+              '    "raw-art:workspace-job": "node scripts/compile-raw-art-workspace-job.mjs",\n'
+              '    "mcp:review:build":',
+              '    "raw-art:workspace-job": "node scripts/compile-raw-art-workspace-job.mjs",\n'
+              '    "raw-art:provider-runtime": "node scripts/compile-raw-art-provider-runtime-batch.mjs",\n'
+              '    "raw-art:provider-runtime:check": "node scripts/check-raw-art-provider-runtime-batch.mjs",\n'
+              '    "mcp:review:build":',
+          )
+          replace_once(
+              "package.json",
+              "&& pnpm run provider:runtime-profile:check && pnpm run build:domain && pnpm run sharp-exact-runtime:test",
+              "&& pnpm run provider:runtime-profile:check && pnpm run build:domain && pnpm run raw-art:provider-runtime:check && pnpm run sharp-exact-runtime:test",
+          )
+
+          replace_once(
+              "apps/cli/src/index.ts",
+              '''import {
+  compileProviderCandidatePrompt,
+  providerProtocolSummary,
+  providerRequiredCapabilities,
+  providerRequestSha256,
+  validateProviderCandidateRequest,
+} from "@evavo/art-providers";''',
+              '''import {
+  compileProviderCandidateContract,
+  providerProtocolSummary,
+  validateProviderCandidateRequest,
+} from "@evavo/art-providers";''',
+          )
+          replace_once(
+              "apps/cli/src/index.ts",
+              '''    const request = validateProviderCandidateRequest(
+      await readJson(parsed.values.input),
+    );
+    if (command === "provider-validate") {
+      await emit(request, parsed.values.output);
+      return;
+    }
+    const prompt = compileProviderCandidatePrompt(request);
+    await emit(
+      {
+        schemaVersion: "1.0",
+        request,
+        requestSha256: providerRequestSha256(request),
+        requiredAdapterCapabilities: providerRequiredCapabilities(request),
+        compiledPrompt: prompt.text,
+        compiledPromptSha256: prompt.sha256,
+        executionMode: "durable-worker-only",
+      },
+      parsed.values.output,
+    );
+    return;''',
+              '''    const input = await readJson(parsed.values.input);
+    if (command === "provider-validate") {
+      await emit(
+        validateProviderCandidateRequest(input),
+        parsed.values.output,
+      );
+      return;
+    }
+    await emit(
+      compileProviderCandidateContract(input),
+      parsed.values.output,
+    );
+    return;''',
+          )
+
+          config_path = Path("config/raw-art-production-orchestrator.v1.json")
+          policy = json.loads(config_path.read_text(encoding="utf-8"))
+          policy["schema"] = "evavo.raw-art-production-orchestrator.v4"
+          ordered = {}
+          for key, value in policy.items():
+              ordered[key] = value
+              if key == "providerRequestBatchSchema":
+                  ordered["providerRuntimeBatchSchema"] = (
+                      "evavo.raw-art-provider-runtime-batch.v1"
+                  )
+          workflow = ordered["providerWorkflow"]
+          workflow["canonicalProviderContractRequired"] = True
+          workflow["exactRequestBatchBindingRequired"] = True
+          workflow["deterministicRuntimeBatchRequired"] = True
+          workflow["runtimeBatchSelfHashRequired"] = True
+          workflow["adapterCapabilityProfileRequired"] = True
+          workflow["runtimeBatchCompilerPerformsNoSubmission"] = True
+          workflow["explicitRuntimeSubmissionRequired"] = True
+          config_path.write_text(
+              json.dumps(ordered, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+          replace_once(
+              "scripts/check-raw-art-production-orchestrator.mjs",
+              "const providerCheck = await read('./check-raw-art-provider-requests.mjs');",
+              '''const providerRuntime = (
+  await Promise.all([
+    read('./compile-raw-art-provider-runtime-batch.mjs'),
+    read('./raw-art-provider/runtime.mjs'),
+    read('../packages/providers/src/contract.ts'),
+  ])
+).join('\\n');
+const providerCheck = await read('./check-raw-art-provider-requests.mjs');
+const providerRuntimeCheck = await read('./check-raw-art-provider-runtime-batch.mjs');''',
+          )
+          replace_once(
+              "scripts/check-raw-art-production-orchestrator.mjs",
+              "if (policy.schema !== 'evavo.raw-art-production-orchestrator.v3') {",
+              "if (policy.schema !== 'evavo.raw-art-production-orchestrator.v4') {",
+          )
+          replace_once(
+              "scripts/check-raw-art-production-orchestrator.mjs",
+              "for (const state of [",
+              '''if (
+  policy.providerRuntimeBatchSchema !==
+  'evavo.raw-art-provider-runtime-batch.v1'
+) {
+  errors.push('provider runtime batch identity changed');
+}
+for (const state of [''',
+          )
+          replace_once(
+              "scripts/check-raw-art-production-orchestrator.mjs",
+              '''for (const source of [queue, workspace, style, provider]) {''',
+              '''for (const token of [
+  'evavo.raw-art-provider-runtime-batch.v1',
+  'compileProviderCandidateContract',
+  'compileProviderCandidateRuntimeContract',
+  'validateRawArtProviderRequestBatch',
+  'compileRawArtProviderRuntimeBatch',
+  'requiredCapabilityProfile: compiled.requiredAdapterCapabilities',
+  'contractSha256: hashObject(contract)',
+  'runtimeJobSha256: hashObject(contract.runtimeJob)',
+  'providerExecution: false',
+  'runtimeSubmission: false',
+]) {
+  if (!providerRuntime.includes(token)) {
+    errors.push(`provider runtime compiler lost ${token}`);
+  }
+}
+for (const token of [
+  'canonical provider validation, prompt hashes and runtime jobs passed',
+  'invalid requests remain isolated',
+  'exact MCP runtime-job parity and adapter capability profiles passed',
+  'tampered inputs and create-only output overwrite fail closed',
+  'provider execution, runtime submission, approval and publication remain false',
+]) {
+  if (!providerRuntimeCheck.includes(token)) {
+    errors.push(`provider runtime regression lost ${token}`);
+  }
+}
+for (const source of [queue, workspace, style, provider, providerRuntime]) {''',
+          )
+          replace_once(
+              "scripts/check-raw-art-production-orchestrator.mjs",
+              '''  policy.providerWorkflow.immutableArtifactIdsRequired !== true ||
+  policy.providerWorkflow.providerExecutionSeparate !== true ||''',
+              '''  policy.providerWorkflow.immutableArtifactIdsRequired !== true ||
+  policy.providerWorkflow.canonicalProviderContractRequired !== true ||
+  policy.providerWorkflow.exactRequestBatchBindingRequired !== true ||
+  policy.providerWorkflow.deterministicRuntimeBatchRequired !== true ||
+  policy.providerWorkflow.runtimeBatchSelfHashRequired !== true ||
+  policy.providerWorkflow.adapterCapabilityProfileRequired !== true ||
+  policy.providerWorkflow.runtimeBatchCompilerPerformsNoSubmission !== true ||
+  policy.providerWorkflow.explicitRuntimeSubmissionRequired !== true ||
+  policy.providerWorkflow.providerExecutionSeparate !== true ||''',
+          )
+          replace_once(
+              "scripts/check-raw-art-production-orchestrator.mjs",
+              "console.log('  deterministic staging and governed provider-request bridge passed');",
+              "console.log('  deterministic staging, provider contracts and create-only runtime batches passed');",
+          )
+
+          replace_once(
+              "docs/RAW_ART_AGENT_WORKSHOP.md",
+              '''→ provider request batch
+→ provider request validation and deterministic prompt compilation
+→ explicit durable runtime submission''',
+              '''→ provider request batch
+→ canonical provider validation, prompt compilation and durable job batch
+→ explicit durable runtime submission''',
+          )
+          runtime_section = '''## Compile the canonical provider runtime batch
+
+Build the canonical provider package, then compile the complete bounded request batch in one deterministic pass:
+
+```powershell
+pnpm --filter @evavo/art-providers build
+
+node scripts/compile-raw-art-provider-runtime-batch.mjs `
+  --provider-batch <create-only-provider-request-batch.json> `
+  --output <create-only-provider-runtime-batch.json>
+```
+
+The output schema is `evavo.raw-art-provider-runtime-batch.v1`. For every valid work order it records:
+
+- the normalized provider request and deterministic request ID;
+- the exact request SHA-256;
+- the canonical provider-neutral prompt and prompt SHA-256;
+- the exact adapter capability profile required by routing;
+- the same durable runtime job contract returned by the Art Studio MCP;
+- a runtime-job SHA-256 and complete compiled-contract SHA-256.
+
+The compiler verifies the source request-batch self-hash, run ID, counts, all-false authority, unique work-order/source/target identities and exact RAW_ART metadata bindings. A malformed provider request becomes a per-item `canonical-provider-contract` blocker and does not stop unrelated valid jobs. The compiler performs no provider call and no runtime submission.
+
+'''
+          replace_once(
+              "docs/RAW_ART_AGENT_WORKSHOP.md",
+              "## Agent execution through the existing Art Studio MCP\n",
+              runtime_section + "## Agent execution through the existing Art Studio MCP\n",
+          )
+          replace_once(
+              "docs/RAW_ART_AGENT_WORKSHOP.md",
+              "After the request batch is compiled, start the existing full Art Studio MCP and durable runtime:",
+              "After the canonical runtime batch is compiled, start the existing full Art Studio MCP and durable runtime:",
+          )
+          replace_once(
+              "docs/RAW_ART_AGENT_WORKSHOP.md",
+              '''For each compiled request, an authorised agent uses the existing tools in this order:
+
+```text
+validate_provider_candidate_request
+compile_provider_candidate_request
+submit_art_runtime_jobs
+inspect_art_runtime_job
+manage_art_runtime_worker
+prepare_candidate_evidence_bundle
+```
+
+The first two tools validate continuity references, masks, dimensions, alpha targets, adapter capabilities and the deterministic prompt. Runtime submission remains a separate explicit call. Provider output remains an immutable unapproved candidate.''',
+              '''For each deliberately selected `jobs[].contract.runtimeJob`, an authorised agent uses the existing tools in this order:
+
+```text
+submit_art_runtime_jobs
+inspect_art_runtime_job
+manage_art_runtime_worker
+prepare_candidate_evidence_bundle
+```
+
+The runtime batch has already used the same canonical provider compiler as MCP to validate continuity references, masks, dimensions, alpha targets, adapter capabilities and the deterministic prompt. Runtime submission remains a separate explicit write-enabled call. Provider output remains an immutable unapproved candidate.''',
+          )
+          replace_once(
+              "docs/RAW_ART_AGENT_WORKSHOP.md",
+              '''node scripts/check-raw-art-provider-requests.mjs
+node scripts/check-raw-art-production-orchestrator.mjs''',
+              '''node scripts/check-raw-art-provider-requests.mjs
+pnpm --filter @evavo/art-providers build
+node scripts/check-raw-art-provider-runtime-batch.mjs
+node scripts/check-raw-art-production-orchestrator.mjs''',
+          )
+          replace_once(
+              "docs/RAW_ART_AGENT_WORKSHOP.md",
+              "The regressions prove valid role-aware work compiles, stale queue bindings fail, create-only output cannot be overwritten, approved style artifacts are required, and one incomplete item does not block unrelated ready work.",
+              "The regressions prove valid role-aware work compiles, stale queue and runtime-batch bindings fail, create-only output cannot be overwritten, approved style artifacts are required, canonical prompt and job contracts remain identical across surfaces, and one incomplete item does not block unrelated ready work.",
+          )
+          PY
+
+          git diff --check
+          test "$(git diff --name-only | sort)" = "$(printf '%s\n' \
+            apps/cli/src/index.ts \
+            config/raw-art-production-orchestrator.v1.json \
+            docs/RAW_ART_AGENT_WORKSHOP.md \
+            package.json \
+            scripts/check-raw-art-production-orchestrator.mjs \
+            scripts/raw-art-provider/shared.mjs | sort)"
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact dependency closure
+        run: pnpm run build:domain
+
+      - name: Run focused provider and RAW ART validation
+        run: |
+          pnpm --filter @evavo/art-providers typecheck
+          node --test packages/providers/test/compiled-contract.test.mjs
+          node scripts/check-raw-art-provider-requests.mjs
+          node scripts/check-raw-art-provider-runtime-batch.mjs
+          node scripts/check-raw-art-production-orchestrator.mjs
+          pnpm --filter @evavo/art-studio-api build
+          pnpm --filter @evavo/art-studio-cli build
+          pnpm --filter @evavo/art-studio-mcp build
+          node --test apps/api/test/provider-api.test.mjs apps/cli/test/provider-cli.test.mjs apps/mcp/test/provider-tools-contract.test.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Commit and push integrated contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO Automation"
+          git config user.email "evavo-automation@users.noreply.github.com"
+          git add \
+            apps/cli/src/index.ts \
+            config/raw-art-production-orchestrator.v1.json \
+            docs/RAW_ART_AGENT_WORKSHOP.md \
+            package.json \
+            scripts/check-raw-art-production-orchestrator.mjs \
+            scripts/raw-art-provider/shared.mjs
+          git diff --cached --check
+          git commit -m "feat(raw-art): bind provider requests into runtime batches"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_HEAD_SHA"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$(git rev-parse HEAD)"
+
+      - name: Delete disposable integration branch
+        if: success()
+        shell: bash
+        run: git push origin --delete "$GITHUB_REF_NAME" || echo "::warning::integration branch cleanup deferred"
