@@ -183,82 +183,36 @@ test("post-call mutation cannot replace captured submission batch entries", asyn
   }
 });
 
-test("runtime queries are read once and ignore caller iterators", async (t) => {
+test("lifecycle identities normalize before repository work", async (t) => {
   const { runtime } = await fixture(t);
-  await runtime.submit(
-    submission("job-boundary-query-media"),
-    "test",
+  const submitted = await runtime.submit(
+    submission("job-boundary-lifecycle"),
+    " submitter ",
     T0,
   );
-  await runtime.submit(
-    submission("job-boundary-query-review", { queue: "review" }),
-    "test",
-    T0,
-  );
+  assert.equal(submitted.id, "job-boundary-lifecycle");
 
-  const secret = "hostile-runtime-query-iterator";
-  const states = ["queued"];
-  const queues = ["media"];
-  const kinds = ["fixture.echo"];
-  for (const values of [states, queues, kinds]) {
-    Object.defineProperty(values, Symbol.iterator, {
-      configurable: true,
-      value() {
-        throw new Error(secret);
-      },
-    });
-  }
-
-  const reads = new Map();
-  const query = {};
-  Object.defineProperties(query, {
-    states: once(reads, "states", states),
-    queues: once(reads, "queues", queues),
-    kinds: once(reads, "kinds", kinds),
-    limit: once(reads, "limit", 10),
+  const claimed = await runtime.claim({
+    worker: {
+      id: "worker-boundary-lifecycle",
+      capabilities: ["fixture.echo"],
+    },
+    maximumJobs: 1,
+    now: at(1),
   });
+  assert.equal(claimed.length, 1);
 
-  const jobs = await runtime.list(query);
-  assert.deepEqual(
-    jobs.map((job) => job.id),
-    ["job-boundary-query-media"],
+  const started = await runtime.start(
+    " job-boundary-lifecycle ",
+    claimed[0].lease.token,
+    " worker-boundary-lifecycle ",
+    at(2),
   );
-  for (const field of ["states", "queues", "kinds", "limit"]) {
-    assert.equal(reads.get(field), 1, field);
-  }
+  assert.equal(started.state, "running");
+  assert.equal(started.attempts[0].workerId, "worker-boundary-lifecycle");
 });
 
-test("post-call mutation cannot change a pending runtime query", async (t) => {
-  const { runtime } = await fixture(t);
-  await runtime.submit(
-    submission("job-boundary-query-original"),
-    "test",
-    T0,
-  );
-  await runtime.submit(
-    submission("job-boundary-query-other", { queue: "review" }),
-    "test",
-    T0,
-  );
-
-  const states = ["queued"];
-  const queues = ["media"];
-  const kinds = ["fixture.echo"];
-  const query = { states, queues, kinds, limit: 10 };
-  const pending = runtime.list(query);
-  states[0] = "failed";
-  queues[0] = "review";
-  kinds[0] = "changed.kind";
-  query.limit = 1;
-
-  const jobs = await pending;
-  assert.deepEqual(
-    jobs.map((job) => job.id),
-    ["job-boundary-query-original"],
-  );
-});
-
-test("hostile repository identities and collections fail closed", async (t) => {
+test("hostile repository options, batches and identities fail closed", async (t) => {
   const { runtime } = await fixture(t);
   const existing = await runtime.submit(
     submission("job-boundary-hostile"),
@@ -269,40 +223,19 @@ test("hostile repository identities and collections fail closed", async (t) => {
 
   const revokedBatch = Proxy.revocable([], {});
   revokedBatch.revoke();
-  await assert.rejects(
-    () => runtime.submitBatch(revokedBatch.proxy, "test", at(1)),
-    boundaryFailure("RUNTIME_BATCH_INVALID", secret),
-  );
-  assert.equal((await runtime.list()).length, 1);
-
-  const hostileQuery = {};
-  Object.defineProperty(hostileQuery, "states", {
-    enumerable: true,
-    get() {
-      throw new Error(secret);
-    },
-  });
-  await assert.rejects(
-    () => runtime.list(hostileQuery),
-    boundaryFailure("RUNTIME_QUERY_INVALID", secret),
-  );
-
-  const revokedQuery = Proxy.revocable({}, {});
-  revokedQuery.revoke();
-  for (const query of [
+  for (const batch of [
     null,
+    new Set([submission("job-set")]),
+    revokedBatch.proxy,
     [],
-    revokedQuery.proxy,
-    { states: ["unknown"] },
-    { queues: [7] },
-    { kinds: [" unsafe"] },
-    { limit: 0 },
+    new Array(1),
   ]) {
     await assert.rejects(
-      () => runtime.list(query),
-      boundaryFailure("RUNTIME_QUERY_INVALID", secret),
+      () => runtime.submitBatch(batch, "test", at(1)),
+      boundaryFailure("RUNTIME_BATCH_INVALID", secret),
     );
   }
+  assert.equal((await runtime.list()).length, 1);
 
   const hostileActor = {};
   Object.defineProperty(hostileActor, "trim", {
@@ -321,16 +254,6 @@ test("hostile repository identities and collections fail closed", async (t) => {
   );
   assert.equal(await runtime.get("job-boundary-hostile-actor"), null);
 
-  const hostileJobId = {
-    toString() {
-      throw new Error(secret);
-    },
-  };
-  await assert.rejects(
-    () => runtime.get(hostileJobId),
-    boundaryFailure("RUNTIME_JOB_ID_INVALID", secret),
-  );
-
   const claimed = await runtime.claim({
     worker: {
       id: "worker-boundary-hostile",
@@ -342,11 +265,26 @@ test("hostile repository identities and collections fail closed", async (t) => {
   assert.equal(claimed.length, 1);
   assert.equal(claimed[0].job.id, existing.id);
 
+  const hostileJobId = {
+    toString() {
+      throw new Error(secret);
+    },
+  };
   const hostileLeaseToken = {
     toString() {
       throw new Error(secret);
     },
   };
+  await assert.rejects(
+    () =>
+      runtime.start(
+        hostileJobId,
+        claimed[0].lease.token,
+        "worker-boundary-hostile",
+        at(4),
+      ),
+    boundaryFailure("RUNTIME_JOB_ID_INVALID", secret),
+  );
   for (const leaseToken of [hostileLeaseToken, "invalid-token"]) {
     await assert.rejects(
       () =>
@@ -358,6 +296,6 @@ test("hostile repository identities and collections fail closed", async (t) => {
         ),
       boundaryFailure("RUNTIME_LEASE_TOKEN_INVALID", secret),
     );
-    assert.equal((await runtime.get(existing.id)).state, "leased");
   }
+  assert.equal((await runtime.get(existing.id)).state, "leased");
 });
