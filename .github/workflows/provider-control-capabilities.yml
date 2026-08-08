@@ -173,9 +173,10 @@ jobs:
           grep -F 'compileProviderExecutionRoutingPlan' packages/providers/src/orchestrator.ts
           grep -F 'routingPlan.eligibleAdapters' packages/providers/src/orchestrator.ts
           grep -F 'routingInspection' packages/providers/src/orchestrator.ts
-          grep -F 'requiredAdapterCapabilities' apps/api/src/provider-api.ts
-          grep -F 'requiredAdapterCapabilities' apps/cli/src/index.ts
-          grep -F 'requiredAdapterCapabilities' apps/mcp/src/provider-tools.ts
+          grep -F 'requiredAdapterCapabilities' packages/providers/src/contract.ts
+          grep -F 'compileProviderCandidateContract(input)' apps/api/src/provider-api.ts
+          grep -F 'compileProviderCandidateContract(input)' apps/cli/src/index.ts
+          grep -F 'compileProviderCandidateRuntimeContract(request)' apps/mcp/src/provider-tools.ts
           grep -F 'requiredReferenceCapabilities' apps/api/openapi.yaml
           grep -F 'requiredAdapterCapabilities' apps/api/openapi.yaml
           grep -F 'reference.required' packages/providers/src/registry.ts
