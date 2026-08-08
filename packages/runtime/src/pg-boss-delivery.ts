@@ -400,7 +400,11 @@ function snapshotOptions(
 
 function createClient(connection: string | ConstructorOptions): PgBossDeliveryClient {
   try {
-    return snapshotClient(new PgBoss(connection));
+    const boss =
+    typeof connection === "string"
+      ? new PgBoss(connection)
+      : new PgBoss(connection);
+  return snapshotClient(boss);
   } catch (error: unknown) {
     if (error instanceof RuntimeError) throw error;
     deliveryError(
