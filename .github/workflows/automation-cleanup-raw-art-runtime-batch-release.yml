@@ -1,0 +1,91 @@
+name: Cleanup RAW ART runtime batch release branches
+
+on:
+  push:
+    branches:
+      - automation/cleanup-raw-art-runtime-batch-release-20260808
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cleanup-raw-art-runtime-batch-release-20260808
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      EXPECTED_MAIN_SHA: 55aff3fce96e25a90021396235334c3f7099db77
+      FEATURE_BRANCH: agent/raw-art-provider-runtime-batch-v2-20260808
+      FEATURE_SHA: fced73ef81a4f7a4581eb589490c9e14ba30f44a
+      ABANDONED_BRANCH: agent/raw-art-provider-runtime-batch-20260808
+      ABANDONED_SHA: 2c2d1ae339a2b81399d5ef1f41ec5331891a8f42
+      INTEGRATION_BRANCH: automation/integrate-raw-art-provider-runtime-batch-20260808
+      INTEGRATION_SHA: a97fe498135cb309f771601de8149238ed9f1bfc
+      PATCH_V1_BRANCH: automation/patch-cli-provider-contract-20260808
+      PATCH_V1_SHA: 344643163a5b6ed308c94b59608e3579d085cb73
+      PATCH_V2_BRANCH: automation/patch-cli-provider-contract-v2-20260808
+      PATCH_V2_SHA: a97fe498135cb309f771601de8149238ed9f1bfc
+      PATCH_V3_BRANCH: automation/patch-cli-provider-contract-v3-20260808
+      PATCH_V3_SHA: 7e91a95e8a93f12792a0ac92d85520349bc8e91f
+      PATCH_V4_BRANCH: automation/patch-cli-provider-contract-v4-20260808
+      PATCH_V4_SHA: 103e0aee619397f24204e5784087531d8d7d1381
+    steps:
+      - name: Check out cleanup authority
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify production and exact disposable refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$FEATURE_BRANCH:refs/remotes/origin/$FEATURE_BRANCH" \
+            "+refs/heads/$ABANDONED_BRANCH:refs/remotes/origin/$ABANDONED_BRANCH" \
+            "+refs/heads/$INTEGRATION_BRANCH:refs/remotes/origin/$INTEGRATION_BRANCH" \
+            "+refs/heads/$PATCH_V1_BRANCH:refs/remotes/origin/$PATCH_V1_BRANCH" \
+            "+refs/heads/$PATCH_V2_BRANCH:refs/remotes/origin/$PATCH_V2_BRANCH" \
+            "+refs/heads/$PATCH_V3_BRANCH:refs/remotes/origin/$PATCH_V3_BRANCH" \
+            "+refs/heads/$PATCH_V4_BRANCH:refs/remotes/origin/$PATCH_V4_BRANCH"
+
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          test "$(git rev-parse refs/remotes/origin/$FEATURE_BRANCH)" = "$FEATURE_SHA"
+          test "$(git rev-parse refs/remotes/origin/$ABANDONED_BRANCH)" = "$ABANDONED_SHA"
+          test "$(git rev-parse refs/remotes/origin/$INTEGRATION_BRANCH)" = "$INTEGRATION_SHA"
+          test "$(git rev-parse refs/remotes/origin/$PATCH_V1_BRANCH)" = "$PATCH_V1_SHA"
+          test "$(git rev-parse refs/remotes/origin/$PATCH_V2_BRANCH)" = "$PATCH_V2_SHA"
+          test "$(git rev-parse refs/remotes/origin/$PATCH_V3_BRANCH)" = "$PATCH_V3_SHA"
+          test "$(git rev-parse refs/remotes/origin/$PATCH_V4_BRANCH)" = "$PATCH_V4_SHA"
+
+          test "$(git rev-parse "$EXPECTED_MAIN_SHA^{tree}")" = "$(git rev-parse "$FEATURE_SHA^{tree}")"
+          git merge-base --is-ancestor "$EXPECTED_MAIN_SHA" refs/remotes/origin/main
+          git show "$EXPECTED_MAIN_SHA:packages/providers/src/contract.ts" | grep -F 'compileProviderCandidateRuntimeContract'
+          git show "$EXPECTED_MAIN_SHA:scripts/raw-art-provider/runtime.mjs" | grep -F 'evavo.raw-art-provider-runtime-batch.v1'
+          git show "$EXPECTED_MAIN_SHA:.github/workflows/raw-art-provider-runtime-batch.yml" | grep -F 'Run complete Art Studio validation'
+
+      - name: Delete verified release and carrier branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          for branch in \
+            "$FEATURE_BRANCH" \
+            "$ABANDONED_BRANCH" \
+            "$INTEGRATION_BRANCH" \
+            "$PATCH_V1_BRANCH" \
+            "$PATCH_V2_BRANCH" \
+            "$PATCH_V3_BRANCH" \
+            "$PATCH_V4_BRANCH"
+          do
+            git push origin --delete "$branch"
+            test -z "$(git ls-remote origin "refs/heads/$branch")"
+          done
+
+      - name: Delete disposable cleanup branch
+        if: success()
+        shell: bash
+        run: git push origin --delete "$GITHUB_REF_NAME" || echo "::warning::cleanup branch deletion deferred"
