@@ -48,6 +48,18 @@ const RESUMABLE_STATES = new Set<RuntimeJobState>([
   "retry-wait",
 ]);
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
+const MAX_RUNTIME_OUTPUT_ARTIFACTS = 10_000;
+const RUNTIME_FAILURE_CLASSIFICATIONS = new Set<
+  RuntimeFailure["classification"]
+>([
+  "transient",
+  "permanent",
+  "cancelled",
+  "lease-expired",
+  "deadline-exceeded",
+  "dependency-failed",
+  "timeout",
+]);
 
 type RuntimeControlOptionsSnapshot = Readonly<{
   force: boolean;
@@ -299,34 +311,170 @@ function assertExecutionAttemptAllowed(job: RuntimeJobRecord): void {
   );
 }
 
-function validateArtifactIds(values: readonly ArtifactId[]): readonly ArtifactId[] {
-  const result = [...new Set(values)].sort();
-  for (const artifactId of result) {
-    if (!ARTIFACT_ID.test(artifactId)) {
-      throw new RuntimeError(
-        "RUNTIME_OUTPUT_ARTIFACT_INVALID",
-        `Invalid output artifact ID: ${artifactId}`,
-      );
-    }
-  }
-  return result;
+function invalidRuntimeOutputArtifacts(message: string): never {
+  throw new RuntimeError("RUNTIME_OUTPUT_ARTIFACT_INVALID", message);
 }
 
-function normalizeFailure(input: RuntimeFailureInput): RuntimeFailure {
-  const code = safeRuntimeName(input.code, "failure.code");
-  const message = input.message.trim();
-  if (!message || message.length > 4_096 || message.includes("\0")) {
-    throw new RuntimeError(
-      "RUNTIME_FAILURE_INVALID",
+function snapshotRuntimeOutputArtifacts(
+  value: unknown,
+): readonly ArtifactId[] {
+  let arrayLike = false;
+  try {
+    arrayLike = Array.isArray(value);
+  } catch {
+    invalidRuntimeOutputArtifacts(
+      "Runtime output artifacts could not be inspected safely.",
+    );
+  }
+  if (!arrayLike) {
+    invalidRuntimeOutputArtifacts(
+      "Runtime output artifacts must be an array.",
+    );
+  }
+
+  const source = value as readonly unknown[];
+  let length = 0;
+  try {
+    length = source.length;
+  } catch {
+    invalidRuntimeOutputArtifacts(
+      "Runtime output artifact length could not be read safely.",
+    );
+  }
+  if (
+    !Number.isSafeInteger(length) ||
+    length < 0 ||
+    length > MAX_RUNTIME_OUTPUT_ARTIFACTS
+  ) {
+    invalidRuntimeOutputArtifacts(
+      `Runtime output artifacts must contain no more than ${MAX_RUNTIME_OUTPUT_ARTIFACTS} entries.`,
+    );
+  }
+
+  const snapshot: ArtifactId[] = [];
+  for (let index = 0; index < length; index += 1) {
+    let entry: unknown;
+    try {
+      entry = source[index];
+    } catch {
+      invalidRuntimeOutputArtifacts(
+        `Runtime output artifact ${index} could not be read safely.`,
+      );
+    }
+    if (typeof entry !== "string" || !ARTIFACT_ID.test(entry)) {
+      invalidRuntimeOutputArtifacts(
+        `Runtime output artifact ${index} must be a canonical artifact ID.`,
+      );
+    }
+    snapshot.push(entry as ArtifactId);
+  }
+  return Object.freeze([...new Set(snapshot)].sort());
+}
+
+function invalidRuntimeFailureInput(message: string): never {
+  throw new RuntimeError("RUNTIME_FAILURE_INVALID", message);
+}
+
+function freezeRuntimeJson(value: JsonValue): JsonValue {
+  if (Array.isArray(value)) {
+    for (const entry of value) freezeRuntimeJson(entry);
+    return Object.freeze(value);
+  }
+  if (value !== null && typeof value === "object") {
+    const record = value as Readonly<Record<string, JsonValue>>;
+    for (const key of Object.keys(record)) {
+      freezeRuntimeJson(record[key]!);
+    }
+    return Object.freeze(record);
+  }
+  return value;
+}
+
+function snapshotRuntimeFailureInput(value: unknown): RuntimeFailure {
+  let recordLike = false;
+  try {
+    recordLike =
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value);
+  } catch {
+    invalidRuntimeFailureInput(
+      "Runtime failure input could not be inspected safely.",
+    );
+  }
+  if (!recordLike) {
+    invalidRuntimeFailureInput("Runtime failure input must be an object.");
+  }
+
+  const source = value as Readonly<Record<string, unknown>>;
+  let classificationInput: unknown;
+  let codeInput: unknown;
+  let messageInput: unknown;
+  let detailsInput: unknown;
+  try {
+    classificationInput = source.classification;
+    codeInput = source.code;
+    messageInput = source.message;
+    detailsInput = source.details;
+  } catch {
+    invalidRuntimeFailureInput(
+      "Runtime failure fields could not be read safely.",
+    );
+  }
+
+  if (
+    typeof classificationInput !== "string" ||
+    !RUNTIME_FAILURE_CLASSIFICATIONS.has(
+      classificationInput as RuntimeFailure["classification"],
+    )
+  ) {
+    invalidRuntimeFailureInput(
+      "Runtime failure classification is not supported.",
+    );
+  }
+  const classification =
+    classificationInput as RuntimeFailure["classification"];
+
+  let code = "";
+  try {
+    code = safeRuntimeName(codeInput, "failure.code");
+  } catch {
+    invalidRuntimeFailureInput(
+      "Runtime failure code must contain 1 to 128 safe characters.",
+    );
+  }
+
+  if (typeof messageInput !== "string") {
+    invalidRuntimeFailureInput(
       "Failure message must contain 1 to 4096 characters.",
     );
   }
-  return {
-    classification: input.classification,
+  const message = messageInput.trim();
+  if (!message || message.length > 4_096 || message.includes(" ")) {
+    invalidRuntimeFailureInput(
+      "Failure message must contain 1 to 4096 characters.",
+    );
+  }
+
+  let details: JsonValue | undefined;
+  if (detailsInput !== undefined) {
+    try {
+      details = freezeRuntimeJson(
+        normalizeJson(detailsInput, "$.failure.details"),
+      );
+    } catch {
+      invalidRuntimeFailureInput(
+        "Runtime failure details must contain valid JSON data.",
+      );
+    }
+  }
+
+  return Object.freeze({
+    classification,
     code,
     message,
-    ...(input.details === undefined ? {} : { details: normalizeJson(input.details) }),
-  };
+    ...(details === undefined ? {} : { details }),
+  });
 }
 
 function replaceLastAttempt(
@@ -972,9 +1120,11 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     now = new Date(),
   ): Promise<RuntimeJobRecord> {
     const transitionNow = snapshotRuntimeTransitionClock(now);
+    const outputArtifacts = snapshotRuntimeOutputArtifacts(
+      outputArtifactsInput,
+    );
     const actor = actorName(actorInput);
     const at = iso(transitionNow);
-    const outputArtifacts = validateArtifactIds(outputArtifactsInput);
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
@@ -1041,8 +1191,8 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     now = new Date(),
   ): Promise<RuntimeJobRecord> {
     const transitionNow = snapshotRuntimeTransitionClock(now);
+    const failure = snapshotRuntimeFailureInput(failureInput);
     const actor = actorName(actorInput);
-    const failure = normalizeFailure(failureInput);
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
       const job = jobOrThrow(snapshot, jobId);
