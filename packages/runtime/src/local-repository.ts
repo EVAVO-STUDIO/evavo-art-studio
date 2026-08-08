@@ -49,6 +49,20 @@ const RESUMABLE_STATES = new Set<RuntimeJobState>([
 ]);
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
 const MAX_RUNTIME_OUTPUT_ARTIFACTS = 10_000;
+const MAX_RUNTIME_QUERY_FILTERS = 10_000;
+const RUNTIME_JOB_STATES = new Set<RuntimeJobState>([
+  "waiting",
+  "queued",
+  "leased",
+  "running",
+  "retry-wait",
+  "paused",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "blocked",
+  "dead-letter",
+]);
 const RUNTIME_FAILURE_CLASSIFICATIONS = new Set<
   RuntimeFailure["classification"]
 >([
@@ -72,6 +86,13 @@ type RuntimeClaimRequestSnapshot = Readonly<{
   maximumJobs: number;
   now: Date;
   at: string;
+}>;
+
+type RuntimeQuerySnapshot = Readonly<{
+  states: readonly RuntimeJobState[] | null;
+  queues: readonly string[] | null;
+  kinds: readonly string[] | null;
+  limit: number;
 }>;
 
 function iso(now: Date): string {
@@ -261,6 +282,165 @@ function snapshotRuntimeTransitionClock(value: unknown): Date {
     );
   }
   return new Date(milliseconds);
+}
+
+
+function invalidRuntimeQuery(message: string): never {
+  throw new RuntimeError("RUNTIME_QUERY_INVALID", message);
+}
+
+function snapshotRuntimeQueryName(value: unknown, name: string): string {
+  try {
+    return safeRuntimeName(value, name);
+  } catch {
+    invalidRuntimeQuery(`${name} must contain 1 to 128 safe characters.`);
+  }
+}
+
+function snapshotRuntimeQueryArray<T extends string>(
+  value: unknown,
+  name: "states" | "queues" | "kinds",
+  normalize: (entry: unknown, index: number) => T,
+): readonly T[] | null {
+  if (value === undefined) return null;
+
+  let arrayLike = false;
+  try {
+    arrayLike = Array.isArray(value);
+  } catch {
+    invalidRuntimeQuery(`Runtime query ${name} could not be inspected safely.`);
+  }
+  if (!arrayLike) {
+    invalidRuntimeQuery(`Runtime query ${name} must be an array.`);
+  }
+
+  const source = value as readonly unknown[];
+  let length = 0;
+  try {
+    length = source.length;
+  } catch {
+    invalidRuntimeQuery(`Runtime query ${name} length could not be read safely.`);
+  }
+  if (
+    !Number.isSafeInteger(length) ||
+    length < 0 ||
+    length > MAX_RUNTIME_QUERY_FILTERS
+  ) {
+    invalidRuntimeQuery(
+      `Runtime query ${name} must contain no more than ${MAX_RUNTIME_QUERY_FILTERS} entries.`,
+    );
+  }
+
+  const snapshot: T[] = [];
+  for (let index = 0; index < length; index += 1) {
+    let entry: unknown;
+    try {
+      entry = source[index];
+    } catch {
+      invalidRuntimeQuery(
+        `Runtime query ${name}[${index}] could not be read safely.`,
+      );
+    }
+    if (entry === undefined) {
+      invalidRuntimeQuery(
+        `Runtime query ${name}[${index}] may not be undefined or sparse.`,
+      );
+    }
+    snapshot.push(normalize(entry, index));
+  }
+  return Object.freeze([...new Set(snapshot)].sort());
+}
+
+function snapshotRuntimeQueryStates(
+  value: unknown,
+): readonly RuntimeJobState[] | null {
+  return snapshotRuntimeQueryArray(
+    value,
+    "states",
+    (entry, index) => {
+      if (
+        typeof entry !== "string" ||
+        !RUNTIME_JOB_STATES.has(entry as RuntimeJobState)
+      ) {
+        invalidRuntimeQuery(
+          `Runtime query states[${index}] must be a supported runtime job state.`,
+        );
+      }
+      return entry as RuntimeJobState;
+    },
+  );
+}
+
+function snapshotRuntimeQueryNames(
+  value: unknown,
+  name: "queues" | "kinds",
+): readonly string[] | null {
+  return snapshotRuntimeQueryArray(
+    value,
+    name,
+    (entry, index) => snapshotRuntimeQueryName(entry, `${name}[${index}]`),
+  );
+}
+
+function snapshotRuntimeQuery(value: unknown): RuntimeQuerySnapshot {
+  let recordLike = false;
+  try {
+    recordLike =
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value);
+  } catch {
+    invalidRuntimeQuery("Runtime query could not be inspected safely.");
+  }
+  if (!recordLike) {
+    invalidRuntimeQuery("Runtime query must be an object.");
+  }
+
+  const source = value as Readonly<Record<string, unknown>>;
+  let statesInput: unknown;
+  let queuesInput: unknown;
+  let kindsInput: unknown;
+  let limitInput: unknown;
+  try {
+    statesInput = source.states;
+    queuesInput = source.queues;
+    kindsInput = source.kinds;
+    limitInput = source.limit;
+  } catch {
+    invalidRuntimeQuery("Runtime query fields could not be read safely.");
+  }
+
+  const limit = limitInput === undefined ? 1_000 : limitInput;
+  if (
+    typeof limit !== "number" ||
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    limit > 100_000
+  ) {
+    invalidRuntimeQuery("Runtime query limit must be 1 to 100000.");
+  }
+
+  return Object.freeze({
+    states: snapshotRuntimeQueryStates(statesInput),
+    queues: snapshotRuntimeQueryNames(queuesInput, "queues"),
+    kinds: snapshotRuntimeQueryNames(kindsInput, "kinds"),
+    limit,
+  });
+}
+
+function snapshotRuntimeJobId(value: unknown): string {
+  if (typeof value !== "string") {
+    invalidRuntimeQuery(
+      "Runtime job ID must contain 1 to 128 safe characters.",
+    );
+  }
+  try {
+    return safeRuntimeName(value, "Runtime job ID");
+  } catch {
+    invalidRuntimeQuery(
+      "Runtime job ID must contain 1 to 128 safe characters.",
+    );
+  }
 }
 
 function draft(
@@ -919,19 +1099,23 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     });
   }
 
-  public async get(jobId: string): Promise<RuntimeJobRecord | null> {
+  public async get(jobIdInput: string): Promise<RuntimeJobRecord | null> {
+    const jobId = snapshotRuntimeJobId(jobIdInput);
     const snapshot = await this.#journal.snapshot();
-    return snapshot.jobs[jobId] ? cloneJson(snapshot.jobs[jobId]) : null;
+    const job = snapshot.jobs[jobId];
+    return job ? cloneJson(job) : null;
   }
 
-  public async list(query: RuntimeQuery = {}): Promise<readonly RuntimeJobRecord[]> {
-    const limit = query.limit ?? 1_000;
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100_000) {
-      throw new RuntimeError("RUNTIME_QUERY_INVALID", "Runtime query limit must be 1 to 100000.");
-    }
-    const states = query.states ? new Set(query.states) : null;
-    const queues = query.queues ? new Set(query.queues) : null;
-    const kinds = query.kinds ? new Set(query.kinds) : null;
+  public async list(queryInput: RuntimeQuery = {}): Promise<readonly RuntimeJobRecord[]> {
+    const {
+      states: stateValues,
+      queues: queueValues,
+      kinds: kindValues,
+      limit,
+    } = snapshotRuntimeQuery(queryInput);
+    const states = stateValues === null ? null : new Set(stateValues);
+    const queues = queueValues === null ? null : new Set(queueValues);
+    const kinds = kindValues === null ? null : new Set(kindValues);
     const snapshot = await this.#journal.snapshot();
     return Object.values(snapshot.jobs)
       .filter((job) => !states || states.has(job.state))
@@ -1532,8 +1716,10 @@ export class LocalRuntimeRepository implements RuntimeRepository {
     });
   }
 
-  public async cancellationRequested(jobId: string): Promise<boolean> {
-    return (await this.get(jobId))?.cancellationRequestedAt !== undefined;
+  public async cancellationRequested(jobIdInput: string): Promise<boolean> {
+    const jobId = snapshotRuntimeJobId(jobIdInput);
+    const snapshot = await this.#journal.snapshot();
+    return snapshot.jobs[jobId]?.cancellationRequestedAt !== undefined;
   }
 
   public async snapshot(): Promise<RuntimeSnapshot> {
