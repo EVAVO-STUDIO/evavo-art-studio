@@ -1,99 +1,191 @@
 # RAW_ART agent workshop
 
-This workflow gives ChatGPT, Claude and other authorised agents a governed path from a reviewed `provider-required` RAW_ART item to an immutable provider candidate job.
+This workflow gives ChatGPT, Claude and other authorised agents a governed path from a reviewed `provider-required` RAW_ART item to immutable provider candidates and evidence.
 
-It does not make RAW_ART mutable and it does not turn generated candidates into approved game art.
+It does not make RAW_ART mutable. It does not allow a generated or edited image to become approved game art merely because a provider job succeeded.
 
 ## Complete operating chain
 
 ```text
-complete RAW_ART inventory
-→ role-bound Art Studio review
-→ complete technical admission
-→ reviewed queue decision
+complete RAW_ART and LFS materialisation
+→ exact resumable inventory
+→ role-bound Art Studio technical review
+→ complete technical admission v2
+→ exact creative decision and work order
 → technically gated approved style bank
-→ immutable Art Studio artifacts
-→ provider request batch
+→ production queue v2
+→ campaign revision v3
+→ campaign nextBatch membership and needs-processing stage
+→ immutable Art Studio source, mask, identity and style artifacts
+→ campaign-bound artifact-binding template
+→ finalized self-hashed artifact bindings v2
+→ provider request batch v2
 → provider request validation and deterministic prompt compilation
-→ explicit durable runtime submission
-→ immutable unapproved candidates
-→ deterministic candidate evaluation
+→ separate explicit durable runtime submission
+→ separate Art Studio worker execution
+→ immutable unapproved candidates and provider evidence
+→ candidate mastering and deterministic evaluation
 → Godot Game Test Lab
 → named creative, historical and provenance approvals
 → browser and native composition evidence
 → Development Studio sealed publication
 ```
 
-## Game-owned role map
+A queue entry cannot enter provider execution unless the exact source path and SHA-256 also identify a technically passed campaign-v3 item in the current governed `nextBatch`, and that campaign item is at `needs-processing`.
+
+## Game-owned provider map
 
 Brass & Brine owns the provider mapping in:
 
 ```text
-config/art/brass_raw_art_provider_role_map.v1.json
+config/art/brass_raw_art_provider_role_map.v2.json
 ```
 
 It maps dialogue portraits, standing characters, crew, ships, documents, icons, weather, maps, locations, ship scenes and combat effects to the correct provider asset kind, alpha target, background strategy, continuity phase, candidate count and quality.
 
-The provider compiler rejects an unmapped role. Art Studio must not guess a generic canvas or transparency policy.
+The map also fixes these cross-repository rules:
+
+- campaign revision v3 and complete current-byte technical admission are mandatory;
+- only the current campaign `nextBatch` may compile;
+- the campaign item must be at `needs-processing`;
+- adapter output canvas is derived from the governed target rather than forcing a small RAW_ART canvas onto a provider;
+- provider output and evidence are stored as immutable, unapproved artifacts;
+- provider execution, runtime submission, approval and publication remain separate authorities.
+
+Art Studio rejects an unmapped role. It must not guess a generic canvas, alpha policy, historical treatment or provider operation.
 
 ## Create the artifact-binding template
 
-Build the complete technical queue and approved style bank first. Then run:
+Build and verify the queue, campaign and approved style bank first:
 
 ```powershell
 node scripts/compile-raw-art-provider-requests.mjs template `
   --queue <raw-art-production-queue.json> `
+  --campaign <campaign-v3.json> `
   --bridge <Brass_Brine/config/art/brass_art_studio_bridge.v1.json> `
-  --provider-map <Brass_Brine/config/art/brass_raw_art_provider_role_map.v1.json> `
+  --provider-map <Brass_Brine/config/art/brass_raw_art_provider_role_map.v2.json> `
   --direction <Brass_Brine/config/art/brass_art_direction_animation.v1.json> `
   --style-bank <approved-style-bank.json> `
   --game-head <exact-40-character-Brass-main-sha> `
   --output <create-only-artifact-bindings-template.json>
 ```
 
-The template lists every `provider-required` queue entry and the exact evidence still needed. Typical requirements include:
+The template includes only current campaign-nextBatch items that are both technically passed and ready for processing. It separately reports:
 
-- an immutable base-image artifact for edit and inpaint work;
-- one explicit reviewed mask for inpainting;
+- sources missing from campaign v3;
+- technical-admission or role mismatches;
+- provider-required items outside the current campaign batch;
+- campaign items that are not yet at `needs-processing`.
+
+Each eligible binding states the exact remaining evidence. Typical requirements are:
+
+- a base-image artifact for edit and inpaint work;
+- one reviewed mask artifact for inpainting;
 - a canonical identity artifact for continuity-locked character or ship repair;
-- approved style-reference artifacts drawn from `evavo.image-style-reference-bank.v1`;
+- previous and next key-pose artifacts for true in-between work;
+- approved role style artifacts from `evavo.image-style-reference-bank.v1`;
 - an exact creative intent and shot subject;
-- optional key poses, structural controls and adapter restrictions.
+- optional structural controls, seed policy and adapter restrictions.
 
-The template contains placeholders and cannot be submitted. Materialise the required files into the Art Studio artifact store, replace the placeholders with `artifact_<sha256>` identifiers, change the schema to `evavo.raw-art-provider-artifact-bindings.v1`, set `status` to `ready`, and retain the all-false authority object.
+## Materialise immutable artifacts
+
+Use the full Art Studio MCP with explicit allowed roots and writes enabled only for the external evidence, artifact and runtime locations. For each source or reference file call:
+
+```text
+store_artifact_file
+```
+
+A source descriptor can use this shape:
+
+```json
+{
+  "mediaType": "image/png",
+  "storageClass": "source",
+  "fileName": "sailor-standing-source.png",
+  "sourceArtifacts": [],
+  "labels": {
+    "project": "brass-and-brine",
+    "artifactRole": "raw-art-provider-source",
+    "approvalState": "unapproved"
+  },
+  "metadata": {
+    "sourcePath": "RAW_ART/characters/sailor.png",
+    "sourceSha256": "<exact-source-sha256>",
+    "campaignItemId": "<exact-campaign-item-id>",
+    "finalDeliverable": false
+  }
+}
+```
+
+Read each returned `artifact_<sha256>` record through `inspect_artifact_record` when independent verification is needed. Filenames and labels do not replace the content-addressed artifact identity.
+
+Replace the template placeholders with the returned artifact identifiers and exact creative briefs. Do not manually change the template schema or claim that it is ready.
+
+## Finalize artifact bindings
+
+Finalize the completed template against the current exact inputs:
+
+```powershell
+node scripts/compile-raw-art-provider-requests.mjs finalize `
+  --queue <raw-art-production-queue.json> `
+  --campaign <campaign-v3.json> `
+  --bridge <Brass_Brine/config/art/brass_art_studio_bridge.v1.json> `
+  --provider-map <Brass_Brine/config/art/brass_raw_art_provider_role_map.v2.json> `
+  --direction <Brass_Brine/config/art/brass_art_direction_animation.v1.json> `
+  --style-bank <approved-style-bank.json> `
+  --completed-template <completed-artifact-bindings-template.json> `
+  --output <create-only-finalized-artifact-bindings.json>
+```
+
+The finalizer:
+
+- rejects remaining placeholders;
+- verifies every artifact identifier format;
+- rejects bindings outside the current campaign nextBatch;
+- binds the exact queue, campaign, admission, bridge, provider map, direction and style-bank bytes;
+- writes `evavo.raw-art-provider-artifact-bindings.v2` with a deterministic `bindingsSha256` and `runId`;
+- reports `ready` or `partially-ready` without executing a provider.
 
 ## Compile provider requests
 
 ```powershell
 node scripts/compile-raw-art-provider-requests.mjs compile `
   --queue <raw-art-production-queue.json> `
+  --campaign <campaign-v3.json> `
   --bridge <Brass_Brine/config/art/brass_art_studio_bridge.v1.json> `
-  --provider-map <Brass_Brine/config/art/brass_raw_art_provider_role_map.v1.json> `
+  --provider-map <Brass_Brine/config/art/brass_raw_art_provider_role_map.v2.json> `
   --direction <Brass_Brine/config/art/brass_art_direction_animation.v1.json> `
   --style-bank <approved-style-bank.json> `
-  --artifact-bindings <completed-artifact-bindings.json> `
+  --artifact-bindings <finalized-artifact-bindings.json> `
   --maximum-orders 25 `
   --output <create-only-provider-request-batch.json>
 ```
+
+The requested maximum cannot exceed either the game-owned provider maximum or campaign-v3 `nextBatch.maximumItems`.
 
 The compiler independently verifies:
 
 - queue schema and self-hash;
 - exact bridge bytes used by the queue;
-- the game-owned provider role map;
+- campaign-v3 self-hash, run ID, exact item IDs and all-false effect boundary;
+- complete technical admission with current source bytes reverified;
+- current campaign-nextBatch membership and `needs-processing` stage;
+- the game-owned provider role map v2;
 - the current art-direction contract and all-false authority;
 - style-bank self-hash, explicit approval evidence and all-false effects;
-- exact queue and style-bank identities in the artifact bindings;
-- immutable artifact identifier syntax;
+- finalized binding self-hash and exact input-file identities;
+- immutable artifact identifiers;
 - base-image, mask, identity and key-pose requirements;
 - role canvas, alpha, background and provider-operation compatibility;
 - stable target paths and bounded batch size.
 
-Evidence-complete entries become `evavo.raw-art-provider-request-batch.v1` requests. Missing evidence is reported per item and does not stop unrelated ready work.
+Evidence-complete items become `evavo.raw-art-provider-request-batch.v2` requests. A problem with one current-batch item remains isolated. Provider work outside the current campaign batch is deferred rather than silently executed.
 
-## Agent execution through the existing Art Studio MCP
+The provider request intentionally does not copy the RAW_ART dimensions into `sourceCanvas`. The adapter derives a valid working canvas from the governed target, while the exact original dimensions remain in request metadata. Candidate mastering must restore the governed final canvas and alpha policy before evaluation.
 
-After the request batch is compiled, start the existing full Art Studio MCP and durable runtime:
+## Validate, compile and submit through Art Studio MCP
+
+Start the full MCP after building the domain packages:
 
 ```powershell
 pnpm run build:domain
@@ -101,7 +193,7 @@ pnpm --filter @evavo/art-studio-mcp build
 node apps/mcp/dist/index.js
 ```
 
-Configure explicit roots and write permission only for the evidence, artifact and runtime locations:
+Configure explicit roots and write permission only where required:
 
 ```text
 EVAVO_ART_ALLOWED_ROOTS=<game-root><path-delimiter><evidence-root><path-delimiter><artifact-root>
@@ -110,18 +202,53 @@ EVAVO_ART_RUNTIME_ROOT=<runtime-root>
 EVAVO_ART_ALLOW_WRITES=true
 ```
 
-For each compiled request, an authorised agent uses the existing tools in this order:
+For each compiled request, an authorised agent uses the actual MCP tools in this order:
 
 ```text
 validate_provider_candidate_request
-compile_provider_candidate_request
-submit_art_runtime_jobs
-inspect_art_runtime_job
-manage_art_runtime_worker
-prepare_candidate_evidence_bundle
+→ compile_provider_candidate_request
+→ submit_art_runtime_jobs
+→ get_art_runtime_job or list_art_runtime_jobs
+→ read_art_runtime_events when audit or recovery evidence is needed
 ```
 
-The first two tools validate continuity references, masks, dimensions, alpha targets, adapter capabilities and the deterministic prompt. Runtime submission remains a separate explicit call. Provider output remains an immutable unapproved candidate.
+The first two calls perform no provider execution. The third call is a separate explicit mutation of the durable local runtime only.
+
+## Run the worker separately
+
+The MCP does not pretend to execute queued jobs. Run one of the explicit worker commands in the Art Studio checkout:
+
+```powershell
+pnpm worker:once
+pnpm worker:until-idle
+pnpm dev:worker
+```
+
+Provider credentials and adapter configuration remain outside generated route documents, request batches, evidence and logs. The worker registers only adapters that are actually configured.
+
+After execution, inspect the runtime job again. A successful provider handler automatically stores:
+
+- immutable candidate image artifacts labelled `approvalState=unapproved`;
+- one immutable provider evidence artifact containing the normalized request, prompt hash, routing inspection, exact references, attempts, adapter/model evidence and candidate artifact IDs.
+
+Use `inspect_artifact_record` to hash-verify those records. No separate fabricated evidence-bundle tool is required.
+
+## Candidate completion
+
+Provider candidates are intermediate. Before they can advance, they still require:
+
+```text
+provider-canvas restoration or deterministic mastering where applicable
+→ alpha, crop, halo, silhouette and actual-runtime-scale checks
+→ candidate comparison against source, work order and approved style bank
+→ Brass static or animation evaluation
+→ native Godot Test Lab evidence
+→ named creative, historical and provenance approvals
+→ browser evidence where applicable
+→ sealed Development Studio publication
+```
+
+A failed or blocked candidate does not stop unrelated admitted items.
 
 ## Permanent regression
 
@@ -130,13 +257,25 @@ node scripts/check-raw-art-provider-requests.mjs
 node scripts/check-raw-art-production-orchestrator.mjs
 ```
 
-The regressions prove valid role-aware work compiles, stale queue bindings fail, create-only output cannot be overwritten, approved style artifacts are required, and one incomplete item does not block unrelated ready work.
+The regressions prove:
+
+- campaign-v3 nextBatch and technical admission gating;
+- exact campaign item identity and stage handling;
+- create-only template, finalization and request-batch output;
+- finalized artifact-binding self-hash;
+- stale campaign and input bindings fail closed;
+- an excessive provider batch cannot outrun campaign authority;
+- approved style artifacts, base images, masks and continuity evidence are enforced;
+- small RAW_ART source canvases do not incorrectly become provider output-size constraints;
+- one incomplete item does not block unrelated ready work;
+- provider execution, runtime submission, approval, mutation and publication remain false in all planning artifacts.
 
 ## Non-negotiable boundaries
 
 - RAW_ART source bytes are never overwritten or deleted.
 - A filename is not a creative brief, identity, historical source or style authority.
 - Only technically admitted and explicitly approved style references may influence provider requests.
+- A queue decision cannot bypass campaign v3 or current nextBatch authority.
 - Provider output is an immutable unapproved candidate, not final art.
 - Provider execution, runtime submission, creative approval, historical approval, provenance approval, native acceptance, browser acceptance and publication remain separate authorities.
 - No provider request may publish to the game checkout.

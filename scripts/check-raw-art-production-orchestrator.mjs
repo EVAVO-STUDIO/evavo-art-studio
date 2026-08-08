@@ -15,6 +15,7 @@ const provider = (
     read('./compile-raw-art-provider-requests.mjs'),
     read('./raw-art-provider/shared.mjs'),
     read('./raw-art-provider/template.mjs'),
+    read('./raw-art-provider/finalize.mjs'),
     read('./raw-art-provider/compile.mjs'),
   ])
 ).join('\n');
@@ -23,6 +24,17 @@ const errors = [];
 
 if (policy.schema !== 'evavo.raw-art-production-orchestrator.v3') {
   errors.push('orchestrator identity changed');
+}
+if (
+  policy.campaignSchema !== 'evavo.brass-brine.raw-art-production-campaign-state.v1' ||
+  policy.campaignRevision !== 'evavo.brass-brine.raw-art-production-campaign-revision.v3' ||
+  policy.providerRoleMapSchema !== 'evavo.brass-brine.raw-art-provider-role-map.v2' ||
+  policy.providerArtifactBindingsTemplateSchema !== 'evavo.raw-art-provider-artifact-bindings-template.v2' ||
+  policy.providerArtifactBindingsSchema !== 'evavo.raw-art-provider-artifact-bindings.v2' ||
+  policy.providerRequestBatchSchema !== 'evavo.raw-art-provider-request-batch.v2' ||
+  policy.providerRequestMetadataSchema !== 'evavo.raw-art-provider-request-metadata.v2'
+) {
+  errors.push('orchestrator provider campaign schemas changed');
 }
 for (const state of [
   'blocked-missing-decision',
@@ -82,17 +94,24 @@ for (const token of [
   if (!style.includes(token)) errors.push(`style compiler lost ${token}`);
 }
 for (const token of [
-  'evavo.brass-brine.raw-art-provider-role-map.v1',
-  'evavo.raw-art-provider-artifact-bindings.v1',
-  'evavo.raw-art-provider-request-batch.v1',
+  'evavo.brass-brine.raw-art-provider-role-map.v2',
+  'evavo.raw-art-provider-artifact-bindings-template.v2',
+  'evavo.raw-art-provider-artifact-bindings.v2',
+  'evavo.raw-art-provider-request-batch.v2',
+  'evavo.raw-art-provider-request-metadata.v2',
+  'evavo.brass-brine.raw-art-production-campaign-revision.v3',
   'evavo.image-style-reference-bank.v1',
   'queue is not bound to the supplied Art Studio bridge bytes',
+  'RAW_ART campaign lacks complete current-byte technical admission',
+  'outside-campaign-next-batch',
+  'campaign-stage-not-needs-processing',
+  'campaign-technical-admission-not-passed',
   'approved-style-reference-artifact-missing',
   'canonical-identity-artifact-missing',
   'inpaint-mask-artifact-missing',
-  'blocked',
-  'deferred',
+  'bindingsSha256',
   'batchSha256',
+  'adapter-derived-from-target',
   'providerExecution: false',
   'runtimeSubmission: false',
   'writeCreateOnly',
@@ -100,12 +119,14 @@ for (const token of [
   if (!provider.includes(token)) errors.push(`provider compiler lost ${token}`);
 }
 for (const token of [
-  'game-owned role, canvas, alpha and provider mapping passed',
-  'exact approved style-bank artifacts and immutable source bindings passed',
-  'missing evidence remains isolated',
-  'provider execution, runtime submission, mutation and publication remain false',
+  'campaign v3 nextBatch and technical admission gating passed',
+  'create-only template, finalize and request compilation passed',
+  'adapter-derived provider canvas prevents small source canvases from blocking execution',
+  'immutable candidates and provider evidence remain unapproved and unpublished',
   'output already exists',
   'stale RAW_ART provider artifact bindings',
+  'outside-campaign-next-batch',
+  'campaign-technical-admission-not-passed',
 ]) {
   if (!providerCheck.includes(token)) errors.push(`provider regression lost ${token}`);
 }
@@ -119,6 +140,9 @@ for (const source of [queue, workspace, style, provider]) {
     'providerExecution: true',
     'runtimeSubmission: true',
     'publication: true',
+    'evavo.brass-brine.raw-art-provider-role-map.v1',
+    'evavo.raw-art-provider-artifact-bindings.v1',
+    'evavo.raw-art-provider-request-batch.v1',
   ]) {
     if (source.includes(forbidden)) errors.push(`orchestrator contains forbidden ${forbidden}`);
   }
@@ -148,8 +172,17 @@ if (
 if (
   policy.providerWorkflow.gameOwnedRoleMapRequired !== true ||
   policy.providerWorkflow.exactQueueBindingRequired !== true ||
+  policy.providerWorkflow.exactCampaignBindingRequired !== true ||
+  policy.providerWorkflow.campaignNextBatchMembershipRequired !== true ||
+  policy.providerWorkflow.completeTechnicalAdmissionRequired !== true ||
+  policy.providerWorkflow.technicallyPassedCampaignItemRequired !== true ||
+  policy.providerWorkflow.needsProcessingCampaignStageRequired !== true ||
   policy.providerWorkflow.exactStyleBankBindingRequired !== true ||
+  policy.providerWorkflow.exactBridgeProviderMapDirectionAndStyleFileBindingsRequired !== true ||
+  policy.providerWorkflow.finalizedArtifactBindingsSelfHashRequired !== true ||
   policy.providerWorkflow.immutableArtifactIdsRequired !== true ||
+  policy.providerWorkflow.adapterDerivedProviderCanvasRequired !== true ||
+  policy.providerWorkflow.automaticImmutableCandidateAndProviderEvidenceExpected !== true ||
   policy.providerWorkflow.providerExecutionSeparate !== true ||
   policy.providerWorkflow.runtimeSubmissionSeparate !== true ||
   policy.providerWorkflow.candidateApprovalSeparate !== true ||
