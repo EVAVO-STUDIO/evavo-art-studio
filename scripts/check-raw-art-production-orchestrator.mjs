@@ -18,11 +18,25 @@ const provider = (
     read('./raw-art-provider/compile.mjs'),
   ])
 ).join('\n');
+const providerRuntime = (
+  await Promise.all([
+    read('./compile-raw-art-provider-runtime-batch.mjs'),
+    read('./raw-art-provider/runtime.mjs'),
+    read('../packages/providers/src/contract.ts'),
+  ])
+).join('\n');
 const providerCheck = await read('./check-raw-art-provider-requests.mjs');
+const providerRuntimeCheck = await read('./check-raw-art-provider-runtime-batch.mjs');
 const errors = [];
 
-if (policy.schema !== 'evavo.raw-art-production-orchestrator.v3') {
+if (policy.schema !== 'evavo.raw-art-production-orchestrator.v4') {
   errors.push('orchestrator identity changed');
+}
+if (
+  policy.providerRuntimeBatchSchema !==
+  'evavo.raw-art-provider-runtime-batch.v1'
+) {
+  errors.push('provider runtime batch identity changed');
 }
 for (const state of [
   'blocked-missing-decision',
@@ -109,7 +123,34 @@ for (const token of [
 ]) {
   if (!providerCheck.includes(token)) errors.push(`provider regression lost ${token}`);
 }
-for (const source of [queue, workspace, style, provider]) {
+for (const token of [
+  'evavo.raw-art-provider-runtime-batch.v1',
+  'compileProviderCandidateContract',
+  'compileProviderCandidateRuntimeContract',
+  'validateRawArtProviderRequestBatch',
+  'compileRawArtProviderRuntimeBatch',
+  'requiredCapabilityProfile: compiled.requiredAdapterCapabilities',
+  'contractSha256: hashObject(contract)',
+  'runtimeJobSha256: hashObject(contract.runtimeJob)',
+  'providerExecution: false',
+  'runtimeSubmission: false',
+]) {
+  if (!providerRuntime.includes(token)) {
+    errors.push(`provider runtime compiler lost ${token}`);
+  }
+}
+for (const token of [
+  'canonical provider validation, prompt hashes and runtime jobs passed',
+  'invalid requests remain isolated',
+  'exact MCP runtime-job parity and adapter capability profiles passed',
+  'tampered inputs and create-only output overwrite fail closed',
+  'provider execution, runtime submission, approval and publication remain false',
+]) {
+  if (!providerRuntimeCheck.includes(token)) {
+    errors.push(`provider runtime regression lost ${token}`);
+  }
+}
+for (const source of [queue, workspace, style, provider, providerRuntime]) {
   for (const forbidden of [
     'child_process',
     'spawn(',
@@ -150,6 +191,13 @@ if (
   policy.providerWorkflow.exactQueueBindingRequired !== true ||
   policy.providerWorkflow.exactStyleBankBindingRequired !== true ||
   policy.providerWorkflow.immutableArtifactIdsRequired !== true ||
+  policy.providerWorkflow.canonicalProviderContractRequired !== true ||
+  policy.providerWorkflow.exactRequestBatchBindingRequired !== true ||
+  policy.providerWorkflow.deterministicRuntimeBatchRequired !== true ||
+  policy.providerWorkflow.runtimeBatchSelfHashRequired !== true ||
+  policy.providerWorkflow.adapterCapabilityProfileRequired !== true ||
+  policy.providerWorkflow.runtimeBatchCompilerPerformsNoSubmission !== true ||
+  policy.providerWorkflow.explicitRuntimeSubmissionRequired !== true ||
   policy.providerWorkflow.providerExecutionSeparate !== true ||
   policy.providerWorkflow.runtimeSubmissionSeparate !== true ||
   policy.providerWorkflow.candidateApprovalSeparate !== true ||
@@ -179,4 +227,4 @@ if (providerRegression.status !== 0) {
 console.log('EVAVO RAW_ART production orchestrator');
 for (const error of errors) console.log(`  - ${error}`);
 if (errors.length) process.exit(1);
-console.log('  deterministic staging and governed provider-request bridge passed');
+console.log('  deterministic staging, provider contracts and create-only runtime batches passed');
