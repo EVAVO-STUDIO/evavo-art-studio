@@ -95,9 +95,22 @@ await includes("apps/worker/src/repair-handlers.ts", [
   "TARGETED_REPAIR_PACKET_CAPABILITY_PROFILE_MISMATCH",
   "TARGETED_REPAIR_RUNTIME_CAPABILITY_PROFILE_MISMATCH",
 ]);
-await includes("apps/mcp/src/provider-tools.ts", [
-  "requiredCapabilityProfile: providerRequiredCapabilities(request)",
+const providerContract = await includes("packages/providers/src/contract.ts", [
+  "compileProviderCandidateRuntimeContract",
+  "requiredCapabilityProfile: compiled.requiredAdapterCapabilities",
+  "executionMode: \"submit-runtime-job\"",
 ]);
+assert.ok(
+  !providerContract.includes("capabilityProfiles.flatMap"),
+  "Canonical provider runtime contracts must retain one exact adapter capability profile.",
+);
+const providerMcp = await includes("apps/mcp/src/provider-tools.ts", [
+  "compileProviderCandidateRuntimeContract(request)",
+]);
+assert.ok(
+  !providerMcp.includes("providerRequiredCapabilities"),
+  "MCP must consume the canonical provider runtime contract rather than rebuilding its profile.",
+);
 await includes("apps/api/openapi.yaml", [
   "requiredCapabilityProfile:",
   "Capabilities may not be assembled across multiple profiles.",
