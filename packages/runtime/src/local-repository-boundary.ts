@@ -7,40 +7,17 @@ import {
   type RuntimeFailureInput,
   type RuntimeHeartbeatResult,
   type RuntimeJobRecord,
-  type RuntimeJobState,
   type RuntimeJobSubmission,
-  type RuntimeQuery,
 } from "./types.js";
 
 const SAFE_RUNTIME_NAME = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const RUNTIME_LEASE_TOKEN = /^lease_[a-f0-9]{32}$/;
 const MAX_RUNTIME_SUBMISSION_BATCH = 10_000;
-const MAX_RUNTIME_QUERY_FILTERS = 10_000;
-const RUNTIME_JOB_STATES = new Set<RuntimeJobState>([
-  "waiting",
-  "queued",
-  "leased",
-  "running",
-  "retry-wait",
-  "paused",
-  "succeeded",
-  "failed",
-  "cancelled",
-  "blocked",
-  "dead-letter",
-]);
 
 type LocalRuntimeOptionsSnapshot = Readonly<{
   root: string;
   lockTimeoutMs?: number;
   staleLockMs?: number;
-}>;
-
-type RuntimeQuerySnapshot = Readonly<{
-  states?: readonly RuntimeJobState[];
-  queues?: readonly string[];
-  kinds?: readonly string[];
-  limit: number;
 }>;
 
 function invalidLocalRuntimeOptions(message: string): never {
@@ -49,10 +26,6 @@ function invalidLocalRuntimeOptions(message: string): never {
 
 function invalidRuntimeBatchInput(message: string): never {
   throw new RuntimeError("RUNTIME_BATCH_INVALID", message);
-}
-
-function invalidRuntimeQueryInput(message: string): never {
-  throw new RuntimeError("RUNTIME_QUERY_INVALID", message);
 }
 
 function invalidRuntimeJobId(message: string): never {
@@ -140,177 +113,73 @@ function snapshotLocalRuntimeOptions(
   });
 }
 
-function snapshotIndexedArray(
+function snapshotRuntimeSubmissionBatch(
   value: unknown,
-  name: string,
-  maximum: number,
-  invalid: (message: string) => never,
-): readonly unknown[] {
+): readonly RuntimeJobSubmission[] {
   let arrayLike = false;
   try {
     arrayLike = Array.isArray(value);
   } catch {
-    invalid(`${name} could not be inspected safely.`);
+    invalidRuntimeBatchInput(
+      "Runtime submission batch could not be inspected safely.",
+    );
   }
-  if (!arrayLike) invalid(`${name} must be an array.`);
+  if (!arrayLike) {
+    invalidRuntimeBatchInput("Runtime submission batch must be an array.");
+  }
 
   const source = value as readonly unknown[];
   let length = 0;
   try {
     length = source.length;
   } catch {
-    invalid(`${name}.length could not be read safely.`);
+    invalidRuntimeBatchInput(
+      "Runtime submission batch length could not be read safely.",
+    );
   }
-  if (!Number.isSafeInteger(length) || length < 0 || length > maximum) {
-    invalid(`${name} must contain no more than ${maximum} entries.`);
-  }
-
-  const snapshot: unknown[] = [];
-  for (let index = 0; index < length; index += 1) {
-    try {
-      snapshot.push(source[index]);
-    } catch {
-      invalid(`${name}[${index}] could not be read safely.`);
-    }
-  }
-  return Object.freeze(snapshot);
-}
-
-function snapshotRuntimeSubmissionBatch(
-  value: unknown,
-): readonly RuntimeJobSubmission[] {
-  const snapshot = snapshotIndexedArray(
-    value,
-    "Runtime submission batch",
-    MAX_RUNTIME_SUBMISSION_BATCH,
-    invalidRuntimeBatchInput,
-  );
-  if (snapshot.length === 0) {
+  if (
+    !Number.isSafeInteger(length) ||
+    length < 1 ||
+    length > MAX_RUNTIME_SUBMISSION_BATCH
+  ) {
     invalidRuntimeBatchInput(
       "Runtime submission batch must contain 1 to 10000 jobs.",
     );
   }
-  return snapshot as readonly RuntimeJobSubmission[];
-}
 
-function snapshotCanonicalRuntimeName(
-  value: unknown,
-  name: string,
-  invalid: (message: string) => never,
-): string {
-  if (typeof value !== "string") {
-    invalid(`${name} must be a string containing 1 to 128 safe characters.`);
-  }
-  const trimmed = value.trim();
-  if (trimmed !== value || !SAFE_RUNTIME_NAME.test(value)) {
-    invalid(`${name} must be a canonical runtime name.`);
-  }
-  return value;
-}
-
-function snapshotRuntimeQueryNames(
-  value: unknown,
-  name: "queues" | "kinds",
-): readonly string[] | undefined {
-  if (value === undefined) return undefined;
-  const snapshot = snapshotIndexedArray(
-    value,
-    `Runtime query ${name}`,
-    MAX_RUNTIME_QUERY_FILTERS,
-    invalidRuntimeQueryInput,
-  );
-  const result: string[] = [];
-  for (let index = 0; index < snapshot.length; index += 1) {
-    result.push(
-      snapshotCanonicalRuntimeName(
-        snapshot[index],
-        `Runtime query ${name}[${index}]`,
-        invalidRuntimeQueryInput,
-      ),
-    );
-  }
-  return Object.freeze([...new Set(result)].sort());
-}
-
-function snapshotRuntimeQueryStates(
-  value: unknown,
-): readonly RuntimeJobState[] | undefined {
-  if (value === undefined) return undefined;
-  const snapshot = snapshotIndexedArray(
-    value,
-    "Runtime query states",
-    MAX_RUNTIME_QUERY_FILTERS,
-    invalidRuntimeQueryInput,
-  );
-  const result: RuntimeJobState[] = [];
-  for (let index = 0; index < snapshot.length; index += 1) {
-    const state = snapshot[index];
-    if (
-      typeof state !== "string" ||
-      !RUNTIME_JOB_STATES.has(state as RuntimeJobState)
-    ) {
-      invalidRuntimeQueryInput(
-        `Runtime query states[${index}] is not a supported job state.`,
+  const snapshot: RuntimeJobSubmission[] = [];
+  for (let index = 0; index < length; index += 1) {
+    let entry: unknown;
+    try {
+      entry = source[index];
+    } catch {
+      invalidRuntimeBatchInput(
+        `Runtime submission batch[${index}] could not be read safely.`,
       );
     }
-    result.push(state as RuntimeJobState);
+    if (entry === undefined) {
+      invalidRuntimeBatchInput(
+        `Runtime submission batch[${index}] may not be undefined or sparse.`,
+      );
+    }
+    snapshot.push(entry as RuntimeJobSubmission);
   }
-  return Object.freeze([...new Set(result)].sort());
-}
-
-function snapshotRuntimeQuery(value: unknown): RuntimeQuerySnapshot {
-  let recordLike = false;
-  try {
-    recordLike =
-      typeof value === "object" &&
-      value !== null &&
-      !Array.isArray(value);
-  } catch {
-    invalidRuntimeQueryInput("Runtime query could not be inspected safely.");
-  }
-  if (!recordLike) invalidRuntimeQueryInput("Runtime query must be an object.");
-
-  const source = value as Readonly<Record<string, unknown>>;
-  let statesInput: unknown;
-  let queuesInput: unknown;
-  let kindsInput: unknown;
-  let limitInput: unknown;
-  try {
-    statesInput = source.states;
-    queuesInput = source.queues;
-    kindsInput = source.kinds;
-    limitInput = source.limit;
-  } catch {
-    invalidRuntimeQueryInput("Runtime query fields could not be read safely.");
-  }
-
-  const limit = limitInput === undefined ? 1_000 : limitInput;
-  if (
-    typeof limit !== "number" ||
-    !Number.isInteger(limit) ||
-    limit < 1 ||
-    limit > 100_000
-  ) {
-    invalidRuntimeQueryInput("Runtime query limit must be 1 to 100000.");
-  }
-
-  const states = snapshotRuntimeQueryStates(statesInput);
-  const queues = snapshotRuntimeQueryNames(queuesInput, "queues");
-  const kinds = snapshotRuntimeQueryNames(kindsInput, "kinds");
-  return Object.freeze({
-    ...(states === undefined ? {} : { states }),
-    ...(queues === undefined ? {} : { queues }),
-    ...(kinds === undefined ? {} : { kinds }),
-    limit,
-  });
+  return Object.freeze(snapshot);
 }
 
 function snapshotRuntimeJobId(value: unknown): string {
-  return snapshotCanonicalRuntimeName(
-    value,
-    "Runtime job ID",
-    invalidRuntimeJobId,
-  );
+  if (typeof value !== "string") {
+    invalidRuntimeJobId(
+      "Runtime job ID must contain 1 to 128 safe characters.",
+    );
+  }
+  const jobId = value.trim();
+  if (!SAFE_RUNTIME_NAME.test(jobId)) {
+    invalidRuntimeJobId(
+      "Runtime job ID must contain 1 to 128 safe characters.",
+    );
+  }
+  return jobId;
 }
 
 function snapshotRuntimeActor(value: unknown): string {
@@ -344,16 +213,6 @@ export class LocalRuntimeRepository extends BaseLocalRuntimeRepository {
     const batch = snapshotRuntimeSubmissionBatch(submissions);
     const actor = snapshotRuntimeActor(actorInput);
     return super.submitBatch(batch, actor, now);
-  }
-
-  public override async get(jobId: string): Promise<RuntimeJobRecord | null> {
-    return super.get(snapshotRuntimeJobId(jobId));
-  }
-
-  public override async list(
-    query: RuntimeQuery = {},
-  ): Promise<readonly RuntimeJobRecord[]> {
-    return super.list(snapshotRuntimeQuery(query));
   }
 
   public override async start(
