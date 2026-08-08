@@ -55,6 +55,13 @@ type RuntimeControlOptionsSnapshot = Readonly<{
   at: string;
 }>;
 
+type RuntimeClaimRequestSnapshot = Readonly<{
+  worker: ReturnType<typeof normalizeRuntimeWorkerDescriptor>;
+  maximumJobs: number;
+  now: Date;
+  at: string;
+}>;
+
 function iso(now: Date): string {
   if (!Number.isFinite(now.getTime())) {
     throw new RuntimeError("RUNTIME_TIME_INVALID", "Runtime time must be a valid Date.");
@@ -140,6 +147,89 @@ function snapshotRuntimeControlOptions(
     ? new Date()
     : snapshotRuntimeControlDate(nowInput);
   return Object.freeze({ force, now, at: iso(now) });
+}
+
+function invalidRuntimeClaimRequest(message: string): never {
+  throw new RuntimeError("RUNTIME_CLAIM_INVALID", message);
+}
+
+function snapshotRuntimeClaimDate(value: unknown): Date {
+  let milliseconds = Number.NaN;
+  try {
+    milliseconds = Date.prototype.getTime.call(value);
+  } catch {
+    invalidRuntimeClaimRequest(
+      "Runtime claim time must be a valid Date.",
+    );
+  }
+  if (!Number.isFinite(milliseconds)) {
+    invalidRuntimeClaimRequest(
+      "Runtime claim time must be a valid Date.",
+    );
+  }
+  return new Date(milliseconds);
+}
+
+function snapshotRuntimeClaimRequest(
+  value: unknown,
+): RuntimeClaimRequestSnapshot {
+  let recordLike = false;
+  try {
+    recordLike =
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value);
+  } catch {
+    invalidRuntimeClaimRequest(
+      "Runtime claim request could not be inspected safely.",
+    );
+  }
+  if (!recordLike) {
+    invalidRuntimeClaimRequest(
+      "Runtime claim request must be an object.",
+    );
+  }
+
+  const source = value as Readonly<Record<string, unknown>>;
+  let workerInput: unknown;
+  let maximumJobsInput: unknown;
+  let nowInput: unknown;
+  try {
+    workerInput = source.worker;
+    maximumJobsInput = source.maximumJobs;
+    nowInput = source.now;
+  } catch {
+    invalidRuntimeClaimRequest(
+      "Runtime claim request fields could not be read safely.",
+    );
+  }
+
+  const worker = normalizeRuntimeWorkerDescriptor(
+    workerInput as RuntimeClaimRequest["worker"],
+  );
+  const maximumJobs = maximumJobsInput === undefined
+    ? 1
+    : maximumJobsInput;
+  if (
+    typeof maximumJobs !== "number" ||
+    !Number.isInteger(maximumJobs) ||
+    maximumJobs < 1 ||
+    maximumJobs > 100
+  ) {
+    invalidRuntimeClaimRequest(
+      "maximumJobs must be an integer between 1 and 100.",
+    );
+  }
+
+  const now = nowInput === undefined
+    ? new Date()
+    : snapshotRuntimeClaimDate(nowInput);
+  return Object.freeze({
+    worker,
+    maximumJobs,
+    now,
+    at: iso(now),
+  });
 }
 
 function draft(
@@ -689,20 +779,16 @@ export class LocalRuntimeRepository implements RuntimeRepository {
   }
 
   public async claim(request: RuntimeClaimRequest): Promise<readonly RuntimeClaimedJob[]> {
-    const worker = normalizeRuntimeWorkerDescriptor(request.worker);
+    const {
+      worker,
+      maximumJobs,
+      now,
+      at,
+    } = snapshotRuntimeClaimRequest(request);
     const workerId = worker.id;
     const capabilities = worker.capabilities;
     const capabilityProfiles = worker.capabilityProfiles ?? [];
     const queues = worker.queues;
-    const maximumJobs = request.maximumJobs ?? 1;
-    if (!Number.isInteger(maximumJobs) || maximumJobs < 1 || maximumJobs > 100) {
-      throw new RuntimeError(
-        "RUNTIME_CLAIM_INVALID",
-        "maximumJobs must be an integer between 1 and 100.",
-      );
-    }
-    const now = request.now ?? new Date();
-    const at = iso(now);
 
     return this.#journal.transact((snapshot) => {
       const events: RuntimeEventDraft[] = [];
