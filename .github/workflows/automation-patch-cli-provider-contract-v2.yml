@@ -1,0 +1,99 @@
+name: Patch canonical CLI provider contract v2
+
+on:
+  push:
+    branches:
+      - automation/patch-cli-provider-contract-v2-20260808
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-cli-provider-contract-v2-20260808
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      TARGET_BRANCH: agent/raw-art-provider-runtime-batch-v2-20260808
+      EXPECTED_HEAD_SHA: 1e95a6bd156507fb53bcd1546779b64b74c41a14
+    steps:
+      - name: Check out patch authority
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify and check out exact target
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$EXPECTED_HEAD_SHA"
+          git switch --force-create "$TARGET_BRANCH" refs/remotes/origin/$TARGET_BRANCH
+
+      - name: Use the canonical provider compiler in CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -c "import base64; exec(base64.b64decode('ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgpwYXRoID0gUGF0aCgiYXBwcy9jbGkvc3JjL2luZGV4LnRzIikKc291cmNlID0gcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKCm9sZF9pbXBvcnQgPSAiIiJpbXBvcnQgewogIGNvbXBpbGVQcm92aWRlckNhbmRpZGF0ZVByb21wdCwKICBwcm92aWRlclByb3RvY29sU3VtbWFyeSwKICBwcm92aWRlclJlcXVpcmVkQ2FwYWJpbGl0aWVzLAogIHByb3ZpZGVyUmVxdWVzdFNoYTI1NiwKICB2YWxpZGF0ZVByb3ZpZGVyQ2FuZGlkYXRlUmVxdWVzdCwKfSBmcm9tICJAZXZhdm8vYXJ0LXByb3ZpZGVycyI7IiIiCm5ld19pbXBvcnQgPSAiIiJpbXBvcnQgewogIGNvbXBpbGVQcm92aWRlckNhbmRpZGF0ZUNvbnRyYWN0LAogIHByb3ZpZGVyUHJvdG9jb2xTdW1tYXJ5LAogIHZhbGlkYXRlUHJvdmlkZXJDYW5kaWRhdGVSZXF1ZXN0LAp9IGZyb20gIkBldmF2by9hcnQtcHJvdmlkZXJzIjsiIiIKaWYgc291cmNlLmNvdW50KG9sZF9pbXBvcnQpICE9IDE6CiAgICByYWlzZSBTeXN0ZW1FeGl0KGYicHJvdmlkZXIgaW1wb3J0IGJsb2NrIG1hdGNoZWQge3NvdXJjZS5jb3VudChvbGRfaW1wb3J0KX0gdGltZXMiKQpzb3VyY2UgPSBzb3VyY2UucmVwbGFjZShvbGRfaW1wb3J0LCBuZXdfaW1wb3J0KQoKb2xkX2Jsb2NrID0gIiIiICAgIGNvbnN0IHJlcXVlc3QgPSB2YWxpZGF0ZVByb3ZpZGVyQ2FuZGlkYXRlUmVxdWVzdCgKICAgICAgYXdhaXQgcmVhZEpzb24ocGFyc2VkLnZhbHVlcy5pbnB1dCksCiAgICApOwogICAgaWYgKGNvbW1hbmQgPT09ICJwcm92aWRlci12YWxpZGF0ZSIpIHsKICAgICAgYXdhaXQgZW1pdChyZXF1ZXN0LCBwYXJzZWQudmFsdWVzLm91dHB1dCk7CiAgICAgIHJldHVybjsKICAgIH0KICAgIGNvbnN0IHByb21wdCA9IGNvbXBpbGVQcm92aWRlckNhbmRpZGF0ZVByb21wdChyZXF1ZXN0KTsKICAgIGF3YWl0IGVtaXQoCiAgICAgIHsKICAgICAgICBzY2hlbWFWZXJzaW9uOiAiMS4wIiwKICAgICAgICByZXF1ZXN0LAogICAgICAgIHJlcXVlc3RTaGEyNTY6IHByb3ZpZGVyUmVxdWVzdFNoYTI1NihyZXF1ZXN0KSwKICAgICAgICByZXF1aXJlZEFkYXB0ZXJDYXBhYmlsaXRpZXM6IHByb3ZpZGVyUmVxdWlyZWRDYXBhYmlsaXRpZXMocmVxdWVzdCksCiAgICAgICAgY29tcGlsZWRQcm9tcHQ6IHByb21wdC50ZXh0LAogICAgICAgIGNvbXBpbGVkUHJvbXB0U2hhMjU2OiBwcm9tcHQuc2hhMjU2LAogICAgICAgIGV4ZWN1dGlvbk1vZGU6ICJkdXJhYmxlLXdvcmtlci1vbmx5IiwKICAgICAgfSwKICAgICAgcGFyc2VkLnZhbHVlcy5vdXRwdXQsCiAgICApOwogICAgcmV0dXJuOyIiIgpuZXdfYmxvY2sgPSAiIiIgICAgY29uc3QgaW5wdXQgPSBhd2FpdCByZWFkSnNvbihwYXJzZWQudmFsdWVzLmlucHV0KTsKICAgIGlmIChjb21tYW5kID09PSAicHJvdmlkZXItdmFsaWRhdGUiKSB7CiAgICAgIGF3YWl0IGVtaXQoCiAgICAgICAgdmFsaWRhdGVQcm92aWRlckNhbmRpZGF0ZVJlcXVlc3QoaW5wdXQpLAogICAgICAgIHBhcnNlZC52YWx1ZXMub3V0cHV0LAogICAgICApOwogICAgICByZXR1cm47CiAgICB9CiAgICBhd2FpdCBlbWl0KAogICAgICBjb21waWxlUHJvdmlkZXJDYW5kaWRhdGVDb250cmFjdChpbnB1dCksCiAgICAgIHBhcnNlZC52YWx1ZXMub3V0cHV0LAogICAgKTsKICAgIHJldHVybjsiIiIKaWYgc291cmNlLmNvdW50KG9sZF9ibG9jaykgIT0gMToKICAgIHJhaXNlIFN5c3RlbUV4aXQoZiJwcm92aWRlciBjb21waWxlIGJsb2NrIG1hdGNoZWQge3NvdXJjZS5jb3VudChvbGRfYmxvY2spfSB0aW1lcyIpCnNvdXJjZSA9IHNvdXJjZS5yZXBsYWNlKG9sZF9ibG9jaywgbmV3X2Jsb2NrKQpwYXRoLndyaXRlX3RleHQoc291cmNlLCBlbmNvZGluZz0idXRmLTgiKQo='))"
+          git diff --check
+          test "$(git diff --name-only)" = "apps/cli/src/index.ts"
+          grep -F 'compileProviderCandidateContract' apps/cli/src/index.ts
+          ! grep -F 'compileProviderCandidatePrompt' apps/cli/src/index.ts
+          ! grep -F 'providerRequestSha256' apps/cli/src/index.ts
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and validate canonical provider contracts
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-media build
+          pnpm --filter @evavo/art-providers build
+          pnpm --filter @evavo/art-studio-api build
+          pnpm --filter @evavo/art-studio-cli build
+          pnpm --filter @evavo/art-studio-mcp build
+          pnpm --filter @evavo/art-studio-cli typecheck
+          node --test packages/providers/test/compiled-contract.test.mjs
+          node --test apps/api/test/provider-api.test.mjs apps/cli/test/provider-cli.test.mjs apps/mcp/test/provider-tools-contract.test.mjs
+          node scripts/check-raw-art-provider-runtime-batch.mjs
+          node scripts/check-raw-art-production-orchestrator.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Commit and push bounded correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO Automation"
+          git config user.email "evavo-automation@users.noreply.github.com"
+          git add apps/cli/src/index.ts
+          git diff --cached --check
+          git commit -m "refactor(providers): use canonical compiled contract in CLI"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_HEAD_SHA"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$(git rev-parse HEAD)"
+
+      - name: Delete disposable patch branch
+        if: success()
+        shell: bash
+        run: git push origin --delete "$GITHUB_REF_NAME" || echo "::warning::patch branch cleanup deferred"
