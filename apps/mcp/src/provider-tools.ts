@@ -3,10 +3,8 @@ import * as z from "zod/v4";
 
 import {
   ProviderError,
-  compileProviderCandidatePrompt,
+  compileProviderCandidateRuntimeContract,
   providerProtocolSummary,
-  providerRequiredCapabilities,
-  providerRequestSha256,
   validateProviderCandidateRequest,
 } from "@evavo/art-providers";
 
@@ -36,42 +34,6 @@ function toolError(error: unknown) {
         ),
       },
     ],
-  };
-}
-
-function compiledValue(input: unknown) {
-  const request = validateProviderCandidateRequest(input);
-  const prompt = compileProviderCandidatePrompt(request);
-  return {
-    schemaVersion: "1.0",
-    request,
-    requestSha256: providerRequestSha256(request),
-    requiredAdapterCapabilities: providerRequiredCapabilities(request),
-    compiledPrompt: prompt.text,
-    compiledPromptSha256: prompt.sha256,
-    runtimeJob: {
-      queue: "provider",
-      kind: `art.candidate.${request.operation}`,
-      idempotencyKey: `provider:${request.requestId}`,
-      payload: request,
-      requiredCapabilities: [
-        `provider.${request.operation}`,
-        "provider.reference-lock",
-        "provider.candidate-store",
-        "evidence.bundle",
-      ],
-      requiredCapabilityProfile: providerRequiredCapabilities(request),
-      maximumAttempts: 3,
-      leaseDurationMs: 300_000,
-      timeoutMs: 1_800_000,
-      labels: {
-        providerRequestId: request.requestId,
-        candidateFamilyId: request.candidateFamilyId,
-        assetId: request.assetId,
-        continuityPhase: request.continuityPhase,
-      },
-    },
-    executionMode: "submit-runtime-job",
   };
 }
 
@@ -114,7 +76,7 @@ export function registerProviderTools(server: McpServer): void {
     },
     async ({ request }) => {
       try {
-        return textResult(compiledValue(request));
+        return textResult(compileProviderCandidateRuntimeContract(request));
       } catch (error: unknown) {
         return toolError(error);
       }

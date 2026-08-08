@@ -1,5 +1,5 @@
 {
-  "schema": "evavo.raw-art-production-orchestrator.v3",
+  "schema": "evavo.raw-art-production-orchestrator.v4",
   "queueSchema": "evavo.raw-art-production-queue.v2",
   "styleProfileSchema": "evavo.approved-style-reference-profile.v2",
   "technicallyGatedStyleBankSchema": "evavo.image-style-reference-bank.v1",
@@ -10,6 +10,7 @@
   "providerArtifactBindingsSchema": "evavo.raw-art-provider-artifact-bindings.v2",
   "providerRequestBatchSchema": "evavo.raw-art-provider-request-batch.v2",
   "providerRequestMetadataSchema": "evavo.raw-art-provider-request-metadata.v2",
+  "providerRuntimeBatchSchema": "evavo.raw-art-provider-runtime-batch.v1",
   "workspaceJobSchema": "evavo.governed-workspace-job.v1",
   "acceptedDecisionSchemas": [
     "evavo.image-reference-work-order.v2",
@@ -64,6 +65,13 @@
     "canonicalIdentityRequiredForContinuityLockedSprites": true,
     "providerRequestValidationRequired": true,
     "promptCompilationRequired": true,
+    "canonicalProviderContractRequired": true,
+    "exactRequestBatchBindingRequired": true,
+    "deterministicRuntimeBatchRequired": true,
+    "runtimeBatchSelfHashRequired": true,
+    "adapterCapabilityProfileRequired": true,
+    "runtimeBatchCompilerPerformsNoSubmission": true,
+    "explicitRuntimeSubmissionRequired": true,
     "providerExecutionSeparate": true,
     "runtimeSubmissionSeparate": true,
     "candidateApprovalSeparate": true,

@@ -12,10 +12,8 @@ import {
 } from "@evavo/art-godot";
 import { buildSpriteAtlasPackage } from "@evavo/art-media";
 import {
-  compileProviderCandidatePrompt,
+  compileProviderCandidateContract,
   providerProtocolSummary,
-  providerRequiredCapabilities,
-  providerRequestSha256,
   validateProviderCandidateRequest,
 } from "@evavo/art-providers";
 import {
@@ -262,31 +260,23 @@ async function main(): Promise<void> {
   }
 
   if (command === "provider-validate" || command === "provider-compile") {
-    if (!parsed.values.input) {
-      throw new Error(`--input is required for ${command}.`);
-    }
-    const request = validateProviderCandidateRequest(
-      await readJson(parsed.values.input),
-    );
-    if (command === "provider-validate") {
-      await emit(request, parsed.values.output);
-      return;
-    }
-    const prompt = compileProviderCandidatePrompt(request);
+  if (!parsed.values.input) {
+    throw new Error(`--input is required for ${command}.`);
+  }
+  const input = await readJson(parsed.values.input);
+  if (command === "provider-validate") {
     await emit(
-      {
-        schemaVersion: "1.0",
-        request,
-        requestSha256: providerRequestSha256(request),
-        requiredAdapterCapabilities: providerRequiredCapabilities(request),
-        compiledPrompt: prompt.text,
-        compiledPromptSha256: prompt.sha256,
-        executionMode: "durable-worker-only",
-      },
+      validateProviderCandidateRequest(input),
       parsed.values.output,
     );
     return;
   }
+  await emit(
+    compileProviderCandidateContract(input),
+    parsed.values.output,
+  );
+  return;
+}
 
   if (command === "inspect") {
     if (!parsed.values.repo) throw new Error("--repo is required for inspect.");

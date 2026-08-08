@@ -19,10 +19,21 @@ const provider = (
     read('./raw-art-provider/compile.mjs'),
   ])
 ).join('\n');
+const providerRuntime = (
+  await Promise.all([
+    read('./compile-raw-art-provider-runtime-batch.mjs'),
+    read('./raw-art-provider/runtime.mjs'),
+    read('../packages/providers/src/contract.ts'),
+    read('../apps/api/src/provider-api.ts'),
+    read('../apps/cli/src/index.ts'),
+    read('../apps/mcp/src/provider-tools.ts'),
+  ])
+).join('\n');
 const providerCheck = await read('./check-raw-art-provider-requests.mjs');
+const providerRuntimeCheck = await read('./check-raw-art-provider-runtime-batch.mjs');
 const errors = [];
 
-if (policy.schema !== 'evavo.raw-art-production-orchestrator.v3') {
+if (policy.schema !== 'evavo.raw-art-production-orchestrator.v4') {
   errors.push('orchestrator identity changed');
 }
 if (
@@ -32,7 +43,8 @@ if (
   policy.providerArtifactBindingsTemplateSchema !== 'evavo.raw-art-provider-artifact-bindings-template.v2' ||
   policy.providerArtifactBindingsSchema !== 'evavo.raw-art-provider-artifact-bindings.v2' ||
   policy.providerRequestBatchSchema !== 'evavo.raw-art-provider-request-batch.v2' ||
-  policy.providerRequestMetadataSchema !== 'evavo.raw-art-provider-request-metadata.v2'
+  policy.providerRequestMetadataSchema !== 'evavo.raw-art-provider-request-metadata.v2' ||
+  policy.providerRuntimeBatchSchema !== 'evavo.raw-art-provider-runtime-batch.v1'
 ) {
   errors.push('orchestrator provider campaign schemas changed');
 }
@@ -130,7 +142,39 @@ for (const token of [
 ]) {
   if (!providerCheck.includes(token)) errors.push(`provider regression lost ${token}`);
 }
-for (const source of [queue, workspace, style, provider]) {
+for (const token of [
+  'evavo.raw-art-provider-runtime-batch.v1',
+  'compileProviderCandidateContract',
+  'compileProviderCandidateRuntimeContract',
+  'validateRawArtProviderRequestBatch',
+  'compileRawArtProviderRuntimeBatch',
+  'campaignNextBatchItemIds',
+  'technicalAdmissionSha256',
+  'bindingsSha256',
+  'adapter-derived-from-target',
+  'requiredCapabilityProfile: compiled.requiredAdapterCapabilities',
+  'contractSha256: hashObject(contract)',
+  'runtimeJobSha256: hashObject(contract.runtimeJob)',
+  'providerExecution: false',
+  'runtimeSubmission: false',
+]) {
+  if (!providerRuntime.includes(token)) {
+    errors.push(`provider runtime compiler lost ${token}`);
+  }
+}
+for (const token of [
+  'campaign v3 request-batch v2 bindings and self-hashes passed',
+  'canonical provider validation, prompt hashes and runtime jobs passed',
+  'invalid requests remain isolated',
+  'exact MCP runtime-job parity and adapter capability profiles passed',
+  'tampered inputs and create-only output overwrite fail closed',
+  'provider execution, runtime submission, approval and publication remain false',
+]) {
+  if (!providerRuntimeCheck.includes(token)) {
+    errors.push(`provider runtime regression lost ${token}`);
+  }
+}
+for (const source of [queue, workspace, style, provider, providerRuntime]) {
   for (const forbidden of [
     'child_process',
     'spawn(',
@@ -183,6 +227,13 @@ if (
   policy.providerWorkflow.immutableArtifactIdsRequired !== true ||
   policy.providerWorkflow.adapterDerivedProviderCanvasRequired !== true ||
   policy.providerWorkflow.automaticImmutableCandidateAndProviderEvidenceExpected !== true ||
+  policy.providerWorkflow.canonicalProviderContractRequired !== true ||
+  policy.providerWorkflow.exactRequestBatchBindingRequired !== true ||
+  policy.providerWorkflow.deterministicRuntimeBatchRequired !== true ||
+  policy.providerWorkflow.runtimeBatchSelfHashRequired !== true ||
+  policy.providerWorkflow.adapterCapabilityProfileRequired !== true ||
+  policy.providerWorkflow.runtimeBatchCompilerPerformsNoSubmission !== true ||
+  policy.providerWorkflow.explicitRuntimeSubmissionRequired !== true ||
   policy.providerWorkflow.providerExecutionSeparate !== true ||
   policy.providerWorkflow.runtimeSubmissionSeparate !== true ||
   policy.providerWorkflow.candidateApprovalSeparate !== true ||
@@ -212,4 +263,4 @@ if (providerRegression.status !== 0) {
 console.log('EVAVO RAW_ART production orchestrator');
 for (const error of errors) console.log(`  - ${error}`);
 if (errors.length) process.exit(1);
-console.log('  deterministic staging and governed provider-request bridge passed');
+console.log('  campaign-gated staging, canonical provider contracts and create-only runtime batches passed');

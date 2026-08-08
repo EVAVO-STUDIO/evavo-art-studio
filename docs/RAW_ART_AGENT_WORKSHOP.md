@@ -20,7 +20,7 @@ complete RAW_ART and LFS materialisation
 → campaign-bound artifact-binding template
 → finalized self-hashed artifact bindings v2
 → provider request batch v2
-→ provider request validation and deterministic prompt compilation
+→ canonical provider validation, prompt compilation and durable job batch
 → separate explicit durable runtime submission
 → separate Art Studio worker execution
 → immutable unapproved candidates and provider evidence
@@ -183,7 +183,33 @@ Evidence-complete items become `evavo.raw-art-provider-request-batch.v2` request
 
 The provider request intentionally does not copy the RAW_ART dimensions into `sourceCanvas`. The adapter derives a valid working canvas from the governed target, while the exact original dimensions remain in request metadata. Candidate mastering must restore the governed final canvas and alpha policy before evaluation.
 
-## Validate, compile and submit through Art Studio MCP
+## Compile the canonical provider runtime batch
+
+Build the shared provider contract, then compile the complete request batch in one deterministic, create-only pass:
+
+```powershell
+pnpm --filter @evavo/art-providers build
+
+node scripts/compile-raw-art-provider-runtime-batch.mjs `
+  --provider-batch <create-only-provider-request-batch.json> `
+  --output <create-only-provider-runtime-batch.json>
+```
+
+The output schema is `evavo.raw-art-provider-runtime-batch.v1`. For every valid current-batch work order it records:
+
+- the campaign item ID and exact source/target identity;
+- the normalized provider request and deterministic request ID;
+- the request SHA-256;
+- the canonical provider-neutral prompt and prompt SHA-256;
+- the exact adapter capability profile required by routing;
+- the same durable runtime job contract returned by the Art Studio MCP;
+- a complete compiled-contract SHA-256 and runtime-job SHA-256.
+
+The runtime compiler independently verifies the request-batch v2 self-hash, run ID, counts, campaign-nextBatch membership, campaign/admission/style/bindings hashes, metadata v2, adapter-derived canvas policy, unique work-order/source/target identities and all-false authority. A malformed provider request becomes a per-item `canonical-provider-contract` blocker and does not stop unrelated valid jobs.
+
+The compiler performs no provider call, artifact read, runtime submission, candidate selection, promotion, approval or publication.
+
+## Submit selected runtime jobs through Art Studio MCP
 
 Start the full MCP after building the domain packages:
 
@@ -202,17 +228,15 @@ EVAVO_ART_RUNTIME_ROOT=<runtime-root>
 EVAVO_ART_ALLOW_WRITES=true
 ```
 
-For each compiled request, an authorised agent uses the actual MCP tools in this order:
+For each deliberately selected `jobs[].contract.runtimeJob`, an authorised agent uses the actual MCP tools in this order:
 
 ```text
-validate_provider_candidate_request
-→ compile_provider_candidate_request
-→ submit_art_runtime_jobs
+submit_art_runtime_jobs
 → get_art_runtime_job or list_art_runtime_jobs
 → read_art_runtime_events when audit or recovery evidence is needed
 ```
 
-The first two calls perform no provider execution. The third call is a separate explicit mutation of the durable local runtime only.
+The runtime batch has already used the same canonical compiler as `validate_provider_candidate_request` and `compile_provider_candidate_request`. Those tools remain available for one-off inspection, but repeating them for every compiled batch item is no longer required. Runtime submission remains a separate explicit mutation of the durable local runtime only.
 
 ## Run the worker separately
 
@@ -224,7 +248,7 @@ pnpm worker:until-idle
 pnpm dev:worker
 ```
 
-Provider credentials and adapter configuration remain outside generated route documents, request batches, evidence and logs. The worker registers only adapters that are actually configured.
+Provider credentials and adapter configuration remain outside generated route documents, request batches, runtime batches, evidence and logs. The worker registers only adapters that are actually configured.
 
 After execution, inspect the runtime job again. A successful provider handler automatically stores:
 
@@ -254,6 +278,8 @@ A failed or blocked candidate does not stop unrelated admitted items.
 
 ```powershell
 node scripts/check-raw-art-provider-requests.mjs
+pnpm --filter @evavo/art-providers build
+node scripts/check-raw-art-provider-runtime-batch.mjs
 node scripts/check-raw-art-production-orchestrator.mjs
 ```
 
@@ -261,13 +287,14 @@ The regressions prove:
 
 - campaign-v3 nextBatch and technical admission gating;
 - exact campaign item identity and stage handling;
-- create-only template, finalization and request-batch output;
-- finalized artifact-binding self-hash;
-- stale campaign and input bindings fail closed;
+- create-only template, finalization, request-batch and runtime-batch output;
+- finalized artifact-binding and provider-runtime self-hashes;
+- canonical provider prompt and runtime-job parity across package, REST, CLI and MCP surfaces;
+- stale campaign, request-batch and metadata bindings fail closed;
 - an excessive provider batch cannot outrun campaign authority;
 - approved style artifacts, base images, masks and continuity evidence are enforced;
 - small RAW_ART source canvases do not incorrectly become provider output-size constraints;
-- one incomplete item does not block unrelated ready work;
+- one incomplete provider contract does not block unrelated ready jobs;
 - provider execution, runtime submission, approval, mutation and publication remain false in all planning artifacts.
 
 ## Non-negotiable boundaries
@@ -276,7 +303,8 @@ The regressions prove:
 - A filename is not a creative brief, identity, historical source or style authority.
 - Only technically admitted and explicitly approved style references may influence provider requests.
 - A queue decision cannot bypass campaign v3 or current nextBatch authority.
+- A provider runtime batch is a create-only job plan, not permission to submit or execute jobs.
 - Provider output is an immutable unapproved candidate, not final art.
 - Provider execution, runtime submission, creative approval, historical approval, provenance approval, native acceptance, browser acceptance and publication remain separate authorities.
-- No provider request may publish to the game checkout.
+- No provider request or runtime batch may publish to the game checkout.
 - Only independently accepted candidates may enter Development Studio's sealed non-forced publication flow.
