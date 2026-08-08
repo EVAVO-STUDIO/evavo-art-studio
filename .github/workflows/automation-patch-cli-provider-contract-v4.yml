@@ -1,0 +1,157 @@
+name: Patch canonical CLI provider contract v4
+
+on:
+  push:
+    branches:
+      - automation/patch-cli-provider-contract-v4-20260808
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-cli-provider-contract-v4-20260808
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      TARGET_BRANCH: agent/raw-art-provider-runtime-batch-v2-20260808
+      EXPECTED_HEAD_SHA: 99da3a7f4b3450bbdcfaa6b5b2b4e0d9e0b06ce2
+    steps:
+      - name: Check out patch authority
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify and check out exact target
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin \
+            "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$EXPECTED_HEAD_SHA"
+          git switch --force-create "$TARGET_BRANCH" refs/remotes/origin/$TARGET_BRANCH
+
+      - name: Use the canonical provider compiler in CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/cli/src/index.ts")
+          source = path.read_text(encoding="utf-8")
+          old_import = '''import {
+            compileProviderCandidatePrompt,
+            providerProtocolSummary,
+            providerRequiredCapabilities,
+            providerRequestSha256,
+            validateProviderCandidateRequest,
+          } from "@evavo/art-providers";'''
+          old_import = "\n".join(line[10:] if line.startswith("          ") else line for line in old_import.splitlines())
+          new_import = '''import {
+            compileProviderCandidateContract,
+            providerProtocolSummary,
+            validateProviderCandidateRequest,
+          } from "@evavo/art-providers";'''
+          new_import = "\n".join(line[10:] if line.startswith("          ") else line for line in new_import.splitlines())
+          if source.count(old_import) != 1:
+              raise SystemExit(
+                  f"provider import block matched {source.count(old_import)} times"
+              )
+          source = source.replace(old_import, new_import)
+
+          start_marker = (
+              '  if (command === "provider-validate" || '
+              'command === "provider-compile") {'
+          )
+          end_marker = '\n\n  if (command === "inspect") {'
+          if source.count(start_marker) != 1:
+              raise SystemExit(
+                  f"provider command marker matched {source.count(start_marker)} times"
+              )
+          start = source.index(start_marker)
+          end = source.index(end_marker, start)
+          replacement = '''  if (command === "provider-validate" || command === "provider-compile") {
+            if (!parsed.values.input) {
+              throw new Error(`--input is required for ${command}.`);
+            }
+            const input = await readJson(parsed.values.input);
+            if (command === "provider-validate") {
+              await emit(
+                validateProviderCandidateRequest(input),
+                parsed.values.output,
+              );
+              return;
+            }
+            await emit(
+              compileProviderCandidateContract(input),
+              parsed.values.output,
+            );
+            return;
+          }'''
+          replacement = "\n".join(line[10:] if line.startswith("          ") else line for line in replacement.splitlines())
+          source = source[:start] + replacement + source[end:]
+          path.write_text(source, encoding="utf-8")
+          PY
+          git diff --check
+          test "$(git diff --name-only)" = "apps/cli/src/index.ts"
+          grep -F 'compileProviderCandidateContract' apps/cli/src/index.ts
+          ! grep -F 'compileProviderCandidatePrompt' apps/cli/src/index.ts
+          ! grep -F 'providerRequestSha256' apps/cli/src/index.ts
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build complete domain dependency closure
+        run: pnpm run build:domain
+
+      - name: Build control surfaces and validate canonical contracts
+        run: |
+          pnpm --filter @evavo/art-studio-api build
+          pnpm --filter @evavo/art-studio-cli build
+          pnpm --filter @evavo/art-studio-mcp build
+          pnpm --filter @evavo/art-studio-cli typecheck
+          node --test packages/providers/test/compiled-contract.test.mjs
+          node --test apps/api/test/provider-api.test.mjs apps/cli/test/provider-cli.test.mjs apps/mcp/test/provider-tools-contract.test.mjs
+          node scripts/check-raw-art-provider-runtime-batch.mjs
+          node scripts/check-raw-art-production-orchestrator.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Commit and push bounded correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO Automation"
+          git config user.email "evavo-automation@users.noreply.github.com"
+          git add apps/cli/src/index.ts
+          git diff --cached --check
+          test "$(git diff --cached --name-only)" = "apps/cli/src/index.ts"
+          git commit -m "refactor(providers): use canonical compiled contract in CLI"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_HEAD_SHA"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$(git rev-parse HEAD)"
+
+      - name: Delete disposable patch branch
+        if: success()
+        shell: bash
+        run: git push origin --delete "$GITHUB_REF_NAME" || echo "::warning::patch branch cleanup deferred"
