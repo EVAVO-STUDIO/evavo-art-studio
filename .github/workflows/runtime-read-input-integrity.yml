@@ -1,0 +1,99 @@
+name: Runtime read input integrity
+
+on:
+  pull_request:
+    paths:
+      - "packages/runtime/src/local-repository.ts"
+      - "packages/runtime/test/read-input-integrity-security.test.mjs"
+      - "scripts/bootstrap-ci-media-tools.sh"
+      - ".github/workflows/runtime-read-input-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/runtime/src/local-repository.ts"
+      - "packages/runtime/test/read-input-integrity-security.test.mjs"
+      - "scripts/bootstrap-ci-media-tools.sh"
+      - ".github/workflows/runtime-read-input-integrity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-read-input-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and type-check runtime read dependencies
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-runtime build
+          pnpm --filter @evavo/art-runtime typecheck
+
+      - name: Run runtime read and persistence regressions
+        run: >-
+          node --test
+          packages/runtime/test/runtime.test.mjs
+          packages/runtime/test/redrive-policy.test.mjs
+          packages/runtime/test/journal-integrity-security.test.mjs
+          packages/runtime/test/submission-integrity-security.test.mjs
+          packages/runtime/test/worker-options-integrity-security.test.mjs
+          packages/runtime/test/control-options-integrity-security.test.mjs
+          packages/runtime/test/claim-input-integrity-security.test.mjs
+          packages/runtime/test/transition-clock-integrity-security.test.mjs
+          packages/runtime/test/execution-result-input-integrity-security.test.mjs
+          packages/runtime/test/read-input-integrity-security.test.mjs
+
+      - name: Verify permanent runtime read contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'snapshotRuntimeQuery(queryInput)' packages/runtime/src/local-repository.ts
+          grep -F 'snapshotRuntimeJobId(jobIdInput)' packages/runtime/src/local-repository.ts
+          grep -F 'list query fields are read exactly once before snapshot work' packages/runtime/test/read-input-integrity-security.test.mjs
+          grep -F 'list filters use bounded indexed snapshots instead of caller iterators' packages/runtime/test/read-input-integrity-security.test.mjs
+          grep -F 'hostile and malformed list queries fail closed without leaking errors' packages/runtime/test/read-input-integrity-security.test.mjs
+          grep -F 'list filter snapshots are detached from later caller mutation' packages/runtime/test/read-input-integrity-security.test.mjs
+          grep -F 'get validates and snapshots job IDs before asynchronous reads' packages/runtime/test/read-input-integrity-security.test.mjs
+          ! grep -F 'const limit = query.limit' packages/runtime/src/local-repository.ts
+          ! grep -F 'new Set(query.states)' packages/runtime/src/local-repository.ts
+          ! grep -F 'new Set(query.queues)' packages/runtime/src/local-repository.ts
+          ! grep -F 'new Set(query.kinds)' packages/runtime/src/local-repository.ts
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
