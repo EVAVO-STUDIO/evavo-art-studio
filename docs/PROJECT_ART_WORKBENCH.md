@@ -271,6 +271,16 @@ flip-vertical
 rotate-90
 rotate-180
 rotate-270
+translate
+colour-replace
+brightness
+contrast
+saturation
+sharpness
+gaussian-blur
+unsharp-mask
+alpha-erode
+alpha-dilate
 alpha-threshold
 connected-matte-to-alpha
 edge-decontaminate
@@ -288,6 +298,11 @@ Important behavior:
 
 - `resize` supports contained, covered, and filled canvases with explicit sampling.
 - `pixel-resize` always uses nearest-neighbour sampling and can require integer scale factors.
+- `translate` repositions pixels inside the existing canvas without mutating the source.
+- `colour-replace` performs bounded RGB-distance replacement while preserving source alpha by default.
+- `brightness`, `contrast`, `saturation`, and `sharpness` adjust RGB while retaining the original alpha channel.
+- `gaussian-blur` and `unsharp-mask` provide bounded local filtering without changing alpha.
+- `alpha-erode` and `alpha-dilate` support deterministic matte tightening/expansion for cleanup and mask preparation.
 - `connected-matte-to-alpha` removes only matching matte connected to the image border.
 - `edge-decontaminate` removes a named matte colour from partially transparent edge pixels.
 - `hidden-rgb-rebuild` propagates retained edge colour into transparent pixels to reduce sampling fringes in engines and atlases.
@@ -299,13 +314,14 @@ Every operation records before and after decoded-pixel identities in the executi
 
 ## 3. Sprite-sheet and animation work
 
-The sandbox has four task kinds:
+The sandbox has five task kinds:
 
 ```text
 image
 slice-sheet
 assemble-sheet
 sequence-review
+image-compare
 ```
 
 ### Slice a sheet
@@ -359,6 +375,29 @@ The task publishes exact frame rectangles, hashes, dimensions, alpha statistics,
 ```
 
 Strict cells prevent accidental frame resampling. `contain` and `cover` remain available when an explicit normalization step is intended.
+
+### Compare two exact images
+
+`image-compare` is the deterministic similarity gate for before/after edits and provider-generated matching assets or frames. It binds exactly two source images, records decoded-pixel identities, changed-pixel fraction, mean/max channel delta and alpha-change fraction, and can produce difference and 50/50 overlay previews. Threshold failures block the task but never imply creative approval.
+
+```json
+{
+  "id": "compare-frame",
+  "kind": "image-compare",
+  "sources": [
+    { "taskId": "slice-attack", "outputIndex": 0 },
+    { "taskId": "slice-attack", "outputIndex": 1 }
+  ],
+  "targetDirectory": "review/frame-comparison",
+  "requireSameDimensions": true,
+  "thresholds": {
+    "maximumChangedFraction": 0.45,
+    "maximumMeanChannelDelta": 80,
+    "maximumAlphaChangedFraction": 0.2
+  },
+  "preview": { "difference": true, "overlay": true }
+}
+```
 
 ### Review a sequence
 

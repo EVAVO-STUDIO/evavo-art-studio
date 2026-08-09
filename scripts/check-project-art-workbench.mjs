@@ -55,6 +55,16 @@ const expectedOperations = [
   'rotate-90',
   'rotate-180',
   'rotate-270',
+  'translate',
+  'colour-replace',
+  'brightness',
+  'contrast',
+  'saturation',
+  'sharpness',
+  'gaussian-blur',
+  'unsharp-mask',
+  'alpha-erode',
+  'alpha-dilate',
   'alpha-threshold',
   'connected-matte-to-alpha',
   'edge-decontaminate',
@@ -68,7 +78,7 @@ const expectedOperations = [
   'optimize',
 ];
 assert.deepEqual(registry.operations.map((operation) => operation.id), expectedOperations);
-assert.deepEqual(registry.taskKinds, ['image', 'slice-sheet', 'assemble-sheet', 'sequence-review']);
+assert.deepEqual(registry.taskKinds, ['image', 'slice-sheet', 'assemble-sheet', 'sequence-review', 'image-compare']);
 
 const sourceAssertions = {
   'scripts/project-art/intelligence.mjs': [

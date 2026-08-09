@@ -377,10 +377,36 @@ try {
             { op: 'trim-alpha', margin: 1 },
             { op: 'pad-canvas', width: 8, height: 8, anchor: 'bottom-centre' },
             { op: 'hidden-rgb-rebuild' },
+            { op: 'translate', x: 0, y: 0 },
+            { op: 'colour-replace', fromColour: '#ff0000', toColour: '#ff0000', distance: 0 },
+            { op: 'brightness', factor: 1 },
+            { op: 'contrast', factor: 1 },
+            { op: 'saturation', factor: 1 },
+            { op: 'sharpness', factor: 1 },
+            { op: 'gaussian-blur', radius: 0 },
+            { op: 'unsharp-mask', radius: 1, percent: 0, threshold: 0 },
+            { op: 'alpha-dilate', width: 1 },
+            { op: 'alpha-erode', width: 1 },
             { op: 'outline', colour: '#000000ff', width: 1 },
             { op: 'optimize' },
           ],
           expected: { width: 8, height: 8, meaningfulAlpha: true },
+        },
+        {
+          id: 'compare-clean-hero',
+          kind: 'image-compare',
+          sources: [
+            { path: 'art/hero.png' },
+            { taskId: 'clean-hero' },
+          ],
+          targetDirectory: 'comparison/hero',
+          requireSameDimensions: true,
+          thresholds: {
+            maximumChangedFraction: 1,
+            maximumMeanChannelDelta: 255,
+            maximumAlphaChangedFraction: 1,
+          },
+          preview: { difference: true, overlay: true },
         },
         {
           id: 'slice-walk',
@@ -450,8 +476,19 @@ try {
       await readFile(path.join(outputRoot, '_evavo', 'project-art-sandbox-receipt.json'), 'utf8'),
     );
     assert.equal(receipt.status, 'passed');
-    assert.equal(receipt.tasks.length, 4);
+    assert.equal(receipt.tasks.length, 5);
     assert.ok(receipt.outputs.some((output) => output.path === 'review/contact-sheet.png'));
+    assert.ok(receipt.outputs.some((output) => output.path === 'comparison/hero/difference.png'));
+    const compareResult = receipt.tasks.find((task) => task.taskId === 'compare-clean-hero');
+    assert.equal(compareResult.kind, 'image-compare');
+    assert.equal(compareResult.status, 'passed');
+    assert.equal(compareResult.metrics.sameDimensions, true);
+    const comparisonManifest = JSON.parse(
+      await readFile(path.join(outputRoot, 'comparison', 'hero', 'comparison.json'), 'utf8'),
+    );
+    assert.equal(comparisonManifest.schema, 'evavo.project-art-image-comparison.v1');
+    assert.equal(comparisonManifest.creativeApprovalPerformed, false);
+    assert.equal(comparisonManifest.identityApprovalPerformed, false);
     assert.equal(receipt.effects.sourceMutation, false);
     verifyDocumentHash(receipt);
 
