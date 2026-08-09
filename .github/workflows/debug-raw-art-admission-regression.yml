@@ -1,0 +1,65 @@
+name: Debug RAW ART admission regression
+
+on:
+  push:
+    branches:
+      - agent/raw-art-provider-execution-authority-20260809
+    paths:
+      - ".github/workflows/debug-raw-art-admission-regression.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: debug-raw-art-admission-regression
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact domain dependencies
+        run: pnpm run build:domain
+
+      - name: Capture admission regression output
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "${RUNNER_TEMP}/raw-art-admission-diagnostics"
+          node scripts/check-raw-art-provider-runtime-admission.mjs \
+            > "${RUNNER_TEMP}/raw-art-admission-diagnostics/admission.log" 2>&1
+          status=$?
+          printf '{"headSha":"%s","status":%s}\n' "${GITHUB_SHA}" "${status}" \
+            > "${RUNNER_TEMP}/raw-art-admission-diagnostics/status.json"
+          cat "${RUNNER_TEMP}/raw-art-admission-diagnostics/status.json"
+          cat "${RUNNER_TEMP}/raw-art-admission-diagnostics/admission.log"
+
+      - name: Upload admission diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: raw-art-admission-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/raw-art-admission-diagnostics
+          if-no-files-found: error
+          retention-days: 1
