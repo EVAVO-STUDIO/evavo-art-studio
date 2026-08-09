@@ -143,7 +143,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add --all
           git commit -m 'feat(project-art): add universal image workbench'
-          git diff --name-only 05a4cb423befe2c32ca33bfafab95fcee0e2e2ead9...HEAD | sort > "$RUNNER_TEMP/final-paths.txt"
+          git diff --name-only 05a4cb423befe2c32ca33bfafab95fcee0e2ead9...HEAD | sort > "$RUNNER_TEMP/final-paths.txt"
           sort "$RUNNER_TEMP/expected-paths.txt" > "$RUNNER_TEMP/expected-final-paths.txt"
           diff -u "$RUNNER_TEMP/expected-final-paths.txt" "$RUNNER_TEMP/final-paths.txt"
           test "$(git status --porcelain)" = ""
