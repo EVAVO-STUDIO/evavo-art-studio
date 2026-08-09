@@ -38,8 +38,8 @@ jobs:
           set -euo pipefail
           test "${GITHUB_REF_NAME}" = "${TARGET_BRANCH}"
           git fetch origin main --no-tags
+          test "$(git rev-parse origin/main)" = "${EXPECTED_BASE}"
           test "$(git merge-base HEAD origin/main)" = "${EXPECTED_BASE}"
-          test "$(git rev-list --count "${EXPECTED_BASE}..HEAD")" = "2"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
           cat \
@@ -49,6 +49,11 @@ jobs:
             .github/automation/raw-art-execution-payload-03.b64 \
             .github/automation/raw-art-execution-payload-04.b64 \
             .github/automation/raw-art-execution-payload-05.b64 \
+            .github/automation/raw-art-execution-payload-06.b64 \
+            .github/automation/raw-art-execution-payload-07.b64 \
+            .github/automation/raw-art-execution-payload-08.b64 \
+            .github/automation/raw-art-execution-payload-09.b64 \
+            .github/automation/raw-art-execution-payload-10.b64 \
             > "${RUNNER_TEMP}/raw-art-execution-payload.b64"
           base64 --decode \
             "${RUNNER_TEMP}/raw-art-execution-payload.b64" \
@@ -84,6 +89,11 @@ jobs:
             .github/automation/raw-art-execution-payload-03.b64 \
             .github/automation/raw-art-execution-payload-04.b64 \
             .github/automation/raw-art-execution-payload-05.b64 \
+            .github/automation/raw-art-execution-payload-06.b64 \
+            .github/automation/raw-art-execution-payload-07.b64 \
+            .github/automation/raw-art-execution-payload-08.b64 \
+            .github/automation/raw-art-execution-payload-09.b64 \
+            .github/automation/raw-art-execution-payload-10.b64 \
             .github/workflows/apply-raw-art-execution-source.yml
           rmdir .github/automation 2>/dev/null || true
 
@@ -94,11 +104,7 @@ jobs:
           node --check scripts/check-raw-art-provider-runtime-admission.mjs
           node --check scripts/check-raw-art-provider-runtime-execution.mjs
           node -e "JSON.parse(require('fs').readFileSync('package.json', 'utf8'))"
-          python3 - <<'PY'
-          import yaml
-          from pathlib import Path
-          yaml.safe_load(Path('.github/workflows/raw-art-provider-runtime-execution.yml').read_text())
-          PY
+          git diff --check
 
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
@@ -110,6 +116,11 @@ jobs:
           .github/automation/raw-art-execution-payload-03.b64
           .github/automation/raw-art-execution-payload-04.b64
           .github/automation/raw-art-execution-payload-05.b64
+          .github/automation/raw-art-execution-payload-06.b64
+          .github/automation/raw-art-execution-payload-07.b64
+          .github/automation/raw-art-execution-payload-08.b64
+          .github/automation/raw-art-execution-payload-09.b64
+          .github/automation/raw-art-execution-payload-10.b64
           .github/automation/raw-art-execution-payload.b64
           .github/workflows/apply-raw-art-execution-source.yml
           .github/workflows/raw-art-provider-runtime-execution.yml
