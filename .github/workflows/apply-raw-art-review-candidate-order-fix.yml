@@ -28,7 +28,7 @@ jobs:
       - name: Apply descriptor-index candidate ordering correction
         shell: bash
         env:
-          EXPECTED_PARENT: e65c3508564c9570d2f3b4ee91457286d81e0cd6
+          EXPECTED_PARENT: c565584d3c988959dbdc00521740324c269b1c38
           EXPECTED_BLOB: 09ad8e9fc0c5f069f9998ed2515d6dc530bd27af
           WORKFLOW_PATH: .github/workflows/apply-raw-art-review-candidate-order-fix.yml
         run: |
@@ -113,11 +113,14 @@ jobs:
           node --check scripts/check-raw-art-provider-review.mjs
           test "$(git hash-object scripts/check-raw-art-provider-review.mjs)" = "${EXPECTED_BLOB}"
           git rm "${WORKFLOW_PATH}"
-          test "$(git diff --name-only)" = $'scripts/check-raw-art-provider-review.mjs\n.github/workflows/apply-raw-art-review-candidate-order-fix.yml' || \
-            test "$(git diff --name-only)" = $'.github/workflows/apply-raw-art-review-candidate-order-fix.yml\nscripts/check-raw-art-provider-review.mjs'
+          git add scripts/check-raw-art-provider-review.mjs
+
+          mapfile -t staged_paths < <(git diff --cached --name-only)
+          test "${#staged_paths[@]}" -eq 2
+          printf '%s\n' "${staged_paths[@]}" | grep -Fx "${WORKFLOW_PATH}"
+          printf '%s\n' "${staged_paths[@]}" | grep -Fx 'scripts/check-raw-art-provider-review.mjs'
 
           git config user.name "EVAVO Studio Automation"
           git config user.email "evavo.studio@gmail.com"
-          git add scripts/check-raw-art-provider-review.mjs
           git commit -m "test(raw-art): bind review fixtures by candidate index"
           git push origin HEAD:agent/raw-art-provider-review-repair-20260809
