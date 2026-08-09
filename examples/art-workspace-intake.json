@@ -1,0 +1,12 @@
+{
+  "workspaceRoot": "C:\\GitRepos\\evavo-avatar-runtime",
+  "projectId": "eva-female",
+  "idempotencyKey": "eva-female-chat-intake-20260809-001",
+  "sources": [
+    {
+      "kind": "path",
+      "path": "C:\\EVAVO-Attachments\\eva-frame-001.png",
+      "name": "eva-frame-001.png"
+    }
+  ]
+}

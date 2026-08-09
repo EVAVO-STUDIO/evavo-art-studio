@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./workspace-writer": {
+      "types": "./dist/workspace-writer.d.ts",
+      "import": "./dist/workspace-writer.js"
     }
   },
   "files": ["dist"],

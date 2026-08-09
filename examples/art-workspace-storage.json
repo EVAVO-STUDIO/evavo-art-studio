@@ -1,0 +1,9 @@
+{
+  "workspaceRoot": "C:\\GitRepos\\evavo-avatar-runtime",
+  "source": "assets/eva-female/working/idle/eva_idle_001.png",
+  "vault": "art-source",
+  "logicalPath": "Avatar Runtime/EVA Female/v1/working/eva_idle_001.png",
+  "title": "EVA Female idle frame 001",
+  "idempotencyKey": "eva-female-idle-001-storage-v1",
+  "mode": "put"
+}

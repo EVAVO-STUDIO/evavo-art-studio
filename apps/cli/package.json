@@ -5,6 +5,7 @@
   "type": "module",
   "bin": {
     "evavo-art": "./dist/index.js",
+    "evavo-art-workspace": "./dist/workspace-writer-cli.js",
     "evavo-book-art-legacy-readiness-batch": "./dist/legacy-readiness-cli.js"
   },
   "scripts": {
@@ -12,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build --silent && node --test test/*.test.mjs",
     "start": "node dist/index.js",
+    "start:workspace": "node dist/workspace-writer-cli.js",
     "start:legacy-readiness": "node dist/legacy-readiness-cli.js"
   },
   "dependencies": {

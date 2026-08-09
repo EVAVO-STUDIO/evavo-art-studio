@@ -1,0 +1,15 @@
+{
+  "workspaceRoot": "C:\\GitRepos\\evavo-avatar-runtime",
+  "idempotencyKey": "organise-eva-idle-001",
+  "operations": [
+    {
+      "type": "copy",
+      "source": ".art-studio/intake/eva-female/intake_example/001-eva-frame-001.png",
+      "target": "assets/eva-female/working/idle/eva_idle_001.png"
+    },
+    {
+      "type": "trash",
+      "source": "assets/eva-female/working/repair-required/eva_bad_hands_004.png"
+    }
+  ]
+}
