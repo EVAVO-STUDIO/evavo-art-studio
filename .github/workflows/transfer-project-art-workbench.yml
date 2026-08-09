@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   transfer:
-    if: github.repository == 'EVAVO-STUDIO/evavo-art-studio'
+    if: github.repository == 'EVAVO-STUDIO/evavo-art-studio' && github.event.head_commit.message != 'feat(project-art): stage universal image workbench source'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -38,38 +38,16 @@ jobs:
         with:
           python-version: 3.13.5
 
-      - name: Verify branch and carrier ancestry
+      - name: Verify carrier and extract exact source
         shell: bash
         run: |
           set -euo pipefail
           test "${GITHUB_REF_NAME}" = "agent/project-art-workbench-release-20260809"
           git merge-base --is-ancestor 05a4cb423befe2c32ca33bfafab95fcee0e2ead9 HEAD
           test "$(git status --porcelain)" = ""
-
-      - name: Reassemble and verify release archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > "$RUNNER_TEMP/chunk-sha256.txt" <<'EOF'
-          d109d1f89121c378f6b7b0679aa8d318215f1736c40a57a05c5d98e28e741d17  carrier/project-art-release/chunk-00
-          92a446fc59c70543e2a08ad1db527dd761754c8cb0b92b699668676b7da1702b  carrier/project-art-release/chunk-01
-          b19dedd16d190afcc98b88a12709fce7aec185fa190d7dd5cccbaca369d35bdc  carrier/project-art-release/chunk-02
-          71a1e6a1488d755852db474606b18f12b4aa302f67063ca4d723ce394c1fab0f  carrier/project-art-release/chunk-03
-          8fba758021f2674d085efbb9ac5f1b5e729859235a9b726170f8db5ad70fe6e4  carrier/project-art-release/chunk-04
-          208a7fadd83d554b2a3087c1146b5ed4e7330d696255753ff104f56b9630aca5  carrier/project-art-release/chunk-05
-          3783e526af7bd745bde9cd018a1d6d6b92b005e72228c4669c0a4b81b322c8f6  carrier/project-art-release/chunk-06
-          2e3b1ca823e1a6f99c40b9d0aa12d896a2d274c9a7f498b2c66f557495816e85  carrier/project-art-release/chunk-07
-          c8c77211842cab065bf508f11720bd428a88c76a25dd449f62a7dfdb2822c256  carrier/project-art-release/chunk-08
-          EOF
-          sha256sum --check "$RUNNER_TEMP/chunk-sha256.txt"
           cat carrier/project-art-release/chunk-* | base64 --decode > "$RUNNER_TEMP/project-art-release.tar.gz"
           echo '78dbb2b945e6880893d241ae5a2a88fa44eaa2c117f6413a37442f7412b84777  '"$RUNNER_TEMP"'/project-art-release.tar.gz' | sha256sum --check
-
-      - name: Verify and extract exact source tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > "$RUNNER_TEMP/expected-paths.txt" <<'EOF'
+          cat > "$RUNNER_TEMP/archive-paths.expected" <<'EOF'
           .github/workflows/project-art-workbench.yml
           config/project-art-operations.v1.json
           docs/PROJECT_ART_WORKBENCH.md
@@ -86,40 +64,13 @@ jobs:
           scripts/test-project-art-workbench.mjs
           tools/run_project_art_sandbox.py
           EOF
-          tar -tzf "$RUNNER_TEMP/project-art-release.tar.gz" | sed 's#^\./##' | sed '/^$/d' | sort > "$RUNNER_TEMP/archive-paths.txt"
-          sort "$RUNNER_TEMP/expected-paths.txt" > "$RUNNER_TEMP/expected-paths.sorted.txt"
-          diff -u "$RUNNER_TEMP/expected-paths.sorted.txt" "$RUNNER_TEMP/archive-paths.txt"
+          tar -tzf "$RUNNER_TEMP/project-art-release.tar.gz" | sed 's#^\./##' | sed '/^$/d' | sort > "$RUNNER_TEMP/archive-paths.actual"
+          sort "$RUNNER_TEMP/archive-paths.expected" > "$RUNNER_TEMP/archive-paths.expected.sorted"
+          diff -u "$RUNNER_TEMP/archive-paths.expected.sorted" "$RUNNER_TEMP/archive-paths.actual"
           mkdir -p "$RUNNER_TEMP/project-art-release"
           tar -xzf "$RUNNER_TEMP/project-art-release.tar.gz" -C "$RUNNER_TEMP/project-art-release"
-          cat > "$RUNNER_TEMP/source-sha256.txt" <<'EOF'
-          cd50284d0957fe016aa0bf41ea57cf7b274dab3053d807744834957e628f5c0b  .github/workflows/project-art-workbench.yml
-          d7c37f362b01f218006103abc8018c1c35b123c30b7e083fe04414364a77f99a  config/project-art-operations.v1.json
-          0970956bfea743250c7766f29cbb6b87c2524ee7aa4965e2b1afd485a81cd4f3  docs/PROJECT_ART_WORKBENCH.md
-          b1847bcd79fd0efcb0488940ce40feb290a7085d4e574d0ac1eb3930548971a1  package.json
-          e3dcffdb6c432b23bef016c8a697f39f781752b4986920c676bc9edfa64f8f0c  scripts/check-project-art-workbench.mjs
-          cb9439a92fd7c53414676464692fcd9692c3187cf4ba2a7b96bdb12bdf651617  scripts/compile-project-art-intelligence.mjs
-          b73a5cb9b317e83ba253d7a1d3f5d76cb3781fc7511b35a58faf1e96ca727e1e  scripts/compile-project-art-sandbox.mjs
-          9e614930aa26d72f401ff8c572cd86a42a73c832a0ef0e489d69df4467dc03c8  scripts/compile-reference-derived-image-plan.mjs
-          95e81215357c2fad958091966c4f862480e3cd20a269a3582d53772bf174f3ea  scripts/project-art/common.mjs
-          aa64f72ace0b654fa317dccaffc0125b576f0a1ceb4cfe1b9edb2af4aa43ed08  scripts/project-art/intelligence.mjs
-          f472b63fffc743924950eb8aa335c14e5a351c30ee4ee2a66d09db58b17e92c3  scripts/project-art/reference-derived.mjs
-          89277572356154e5bdd6a2336780ddcd20699b08fa441105eb9cb3df57c82283  scripts/project-art/sandbox.mjs
-          1c3b51af2358d5f537a19dfd8fa95e03e808ac4ac026943a0973f2567c7bef3c  scripts/stage-reference-derived-artifacts.mjs
-          b18e2cf9e3857aada9983c29b3cecf2874388b9dadc97c84707c39968ddc48fb  scripts/test-project-art-workbench.mjs
-          a6b79733511b5c627f7cebfd075684dd7441dab489a626eea47521be594f276f  tools/run_project_art_sandbox.py
-          EOF
-          (
-            cd "$RUNNER_TEMP/project-art-release"
-            sha256sum --check "$RUNNER_TEMP/source-sha256.txt"
-          )
           rsync -a "$RUNNER_TEMP/project-art-release/" ./
-
-      - name: Remove transfer carrier
-        shell: bash
-        run: |
-          set -euo pipefail
           rm -rf carrier/project-art-release
-          rm -f .github/workflows/transfer-project-art-workbench.yml
 
       - name: Validate transferred workbench
         shell: bash
@@ -135,16 +86,34 @@ jobs:
           python -m py_compile tools/run_project_art_sandbox.py
           rm -rf tools/__pycache__
 
-      - name: Commit clean source tree
+      - name: Publish non-workflow source
         shell: bash
         run: |
           set -euo pipefail
+          rm -f .github/workflows/project-art-workbench.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add --all
-          git commit -m 'feat(project-art): add universal image workbench'
-          git diff --name-only 05a4cb423befe2c32ca33bfafab95fcee0e2ead9...HEAD | sort > "$RUNNER_TEMP/final-paths.txt"
-          sort "$RUNNER_TEMP/expected-paths.txt" > "$RUNNER_TEMP/expected-final-paths.txt"
-          diff -u "$RUNNER_TEMP/expected-final-paths.txt" "$RUNNER_TEMP/final-paths.txt"
+          git commit -m 'feat(project-art): stage universal image workbench source'
+          cat > "$RUNNER_TEMP/final-paths.expected" <<'EOF'
+          .github/workflows/transfer-project-art-workbench.yml
+          config/project-art-operations.v1.json
+          docs/PROJECT_ART_WORKBENCH.md
+          package.json
+          scripts/check-project-art-workbench.mjs
+          scripts/compile-project-art-intelligence.mjs
+          scripts/compile-project-art-sandbox.mjs
+          scripts/compile-reference-derived-image-plan.mjs
+          scripts/project-art/common.mjs
+          scripts/project-art/intelligence.mjs
+          scripts/project-art/reference-derived.mjs
+          scripts/project-art/sandbox.mjs
+          scripts/stage-reference-derived-artifacts.mjs
+          scripts/test-project-art-workbench.mjs
+          tools/run_project_art_sandbox.py
+          EOF
+          git diff --name-only 05a4cb423befe2c32ca33bfafab95fcee0e2ead9...HEAD | sort > "$RUNNER_TEMP/final-paths.actual"
+          sort "$RUNNER_TEMP/final-paths.expected" > "$RUNNER_TEMP/final-paths.expected.sorted"
+          diff -u "$RUNNER_TEMP/final-paths.expected.sorted" "$RUNNER_TEMP/final-paths.actual"
           test "$(git status --porcelain)" = ""
           git push origin "HEAD:${GITHUB_REF_NAME}"
