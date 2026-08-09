@@ -543,7 +543,10 @@ async function main() {
     const conflictBatch = runtimeBatch();
     const conflictSelectionJob = {
       ...selection.jobs[1],
-      batchEntry: conflictBatch.jobs[1],
+      batchEntry: {
+        ...conflictBatch.jobs[1],
+        runtimeJob: conflictBatch.jobs[1].contract.runtimeJob,
+      },
     };
     const conflictJob = structuredClone(
       compileRawArtProviderAdmittedRuntimeJob(
