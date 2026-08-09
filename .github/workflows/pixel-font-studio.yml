@@ -1,0 +1,48 @@
+name: Pixel Font Studio
+
+on:
+  pull_request:
+    paths:
+      - "tools/pixel_font_studio*.py"
+      - "tools/test_pixel_font_studio.py"
+      - "tools/pixel-font-mcp.mjs"
+      - "tools/test-pixel-font-mcp.mjs"
+      - "config/pixel-font-*.json"
+      - "examples/brass-brine-pixel-font-family.v1.json"
+      - "docs/pixel-font-studio.md"
+      - "scripts/check-pixel-font-studio.mjs"
+      - ".github/workflows/pixel-font-studio.yml"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pixel-font-studio-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Validate deterministic pixel-font pipeline
+        run: node scripts/check-pixel-font-studio.mjs
+      - name: Prove source remains clean
+        if: always()
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
