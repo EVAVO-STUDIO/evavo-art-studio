@@ -1,0 +1,91 @@
+name: Debug RAW ART provider execution build
+
+on:
+  push:
+    branches:
+      - agent/raw-art-provider-execution-authority-20260809
+    paths:
+      - ".github/workflows/debug-raw-art-provider-execution-build.yml"
+      - "apps/worker/src/provider-handlers.ts"
+      - "scripts/raw-art-provider/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: debug-raw-art-provider-execution-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Capture exact build diagnostics
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "${RUNNER_TEMP}/raw-art-build-diagnostics"
+
+          pnpm run build:domain > "${RUNNER_TEMP}/raw-art-build-diagnostics/01-build-domain.log" 2>&1
+          domain_status=$?
+
+          if [ "${domain_status}" -eq 0 ]; then
+            pnpm --filter @evavo/art-studio-worker build > "${RUNNER_TEMP}/raw-art-build-diagnostics/02-worker-build.log" 2>&1
+            worker_build_status=$?
+          else
+            worker_build_status=125
+            printf 'Skipped because build:domain failed with status %s.\n' "${domain_status}" > "${RUNNER_TEMP}/raw-art-build-diagnostics/02-worker-build.log"
+          fi
+
+          if [ "${domain_status}" -eq 0 ] && [ "${worker_build_status}" -eq 0 ]; then
+            pnpm --filter @evavo/art-studio-worker typecheck > "${RUNNER_TEMP}/raw-art-build-diagnostics/03-worker-typecheck.log" 2>&1
+            worker_typecheck_status=$?
+          else
+            worker_typecheck_status=125
+            printf 'Skipped because an earlier build stage failed.\n' > "${RUNNER_TEMP}/raw-art-build-diagnostics/03-worker-typecheck.log"
+          fi
+
+          cat > "${RUNNER_TEMP}/raw-art-build-diagnostics/status.json" <<JSON
+          {
+            "headSha": "${GITHUB_SHA}",
+            "buildDomain": ${domain_status},
+            "workerBuild": ${worker_build_status},
+            "workerTypecheck": ${worker_typecheck_status}
+          }
+          JSON
+
+          cat "${RUNNER_TEMP}/raw-art-build-diagnostics/status.json"
+          for file in "${RUNNER_TEMP}"/raw-art-build-diagnostics/*.log; do
+            printf '\n===== %s =====\n' "$(basename "${file}")"
+            cat "${file}"
+          done
+
+      - name: Upload exact build diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: raw-art-provider-execution-build-${{ github.sha }}
+          path: ${{ runner.temp }}/raw-art-build-diagnostics
+          if-no-files-found: error
+          retention-days: 1
