@@ -12,7 +12,7 @@ A configured API key is not sufficient authority. Admitted RAW_ART jobs use an i
 4. Admit them into the durable runtime and retain the v2 admission receipt.
 5. Compile a short-lived execution authorisation.
 6. Run the dedicated authorised worker.
-7. Inspect provider evidence and unapproved candidate artifacts.
+7. Compile the exact candidate review and repair plan from the execution receipt and immutable artifacts.
 8. Continue through mastering, evaluation, independent approval, promotion, game integration, and publication as separate governed stages.
 
 ## Compile an authorisation
@@ -39,7 +39,7 @@ pnpm run raw-art:provider-authorize -- `
   --expires-at 2026-08-09T03:00:00.000Z `
   --authorized-by greg `
   --reason "Permit this exact reviewed RAW_ART batch to create unapproved provider candidates and evidence." `
-  --allowed-adapters openai-image `
+  --allowed-adapters openai-gpt-image `
   --output C:\EVAVO\staging\raw-art-provider-execution-authorization.json
 ```
 
@@ -97,6 +97,8 @@ The create-only `evavo.raw-art-provider-runtime-execution-receipt.v1` receipt re
 
 Provider candidates must remain `intermediate`, `unapproved`, and `finalDeliverable: false`. The receipt fails closed if candidate artifacts cross that boundary or if any output artifact fails immutable verification.
 
+Continue with [RAW_ART provider candidate review and repair planning](./RAW_ART_PROVIDER_REVIEW_AND_REPAIR.md) to bind every review decision to the exact runtime state, candidate bytes, provider evidence, and any compiled repair request.
+
 ## Authority retained outside execution
 
 Execution may create unapproved candidate images and immutable evidence. It may not:
@@ -118,7 +120,10 @@ A failed execution consumes the job’s one authorised attempt. Recovery require
 ```powershell
 pnpm run raw-art:provider-admission:check
 pnpm run raw-art:provider-execution:check
+pnpm run raw-art:provider-review:check
 pnpm check
 ```
 
 The permanent execution regression uses only the deterministic fixture adapter. It proves that generic workers cannot claim isolated jobs, and that expired, unavailable-adapter, freshly re-fingerprinted forged, repeated, and already-started executions fail before a second provider call. It also verifies immutable unapproved candidates, provider evidence, create-only authorisations and receipts, and the retained false approval, promotion, repository-mutation, and publication authority.
+
+The review regression reconstructs candidate order from each immutable artifact descriptor’s `candidateIndex` label rather than trusting provider or receipt array order.
