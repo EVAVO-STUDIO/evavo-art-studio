@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "evavo-project-art-review": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_review_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ART_REVIEW_ROOTS": "C:\\GitRepos;C:\\EVAVO-Attachments;D:\\EVAVO-Evidence",
+        "EVAVO_ART_REVIEW_MCP_ALLOW_WRITE": "false"
+      }
+    }
+  }
+}
