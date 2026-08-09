@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "evavo-game-art-campaign-planner": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\scripts\\game-art-campaign-planner-mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_GAME_ART_CAMPAIGN_MODE": "read-write",
+        "EVAVO_GAME_ART_CAMPAIGN_ALLOW_WRITES": "true",
+        "EVAVO_GAME_ART_CAMPAIGN_ALLOWED_ROOTS": "C:\\GitRepos\\evavo-art-studio;D:\\EVAVO-Evidence\\Game-Art"
+      }
+    }
+  }
+}

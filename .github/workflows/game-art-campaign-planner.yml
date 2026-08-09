@@ -1,0 +1,89 @@
+name: Game Art Campaign Planner
+
+on:
+  pull_request:
+    paths:
+      - "scripts/game-art-campaign/**"
+      - "scripts/game-art-campaign-planner.mjs"
+      - "scripts/game-art-campaign-planner-mcp.mjs"
+      - "scripts/game-art-campaign-planner.test.mjs"
+      - "config/game-art-campaign-planner.v1.json"
+      - "config/game-art-campaign.four-games.v1.json"
+      - "config/game-art-campaign.four-games.v1.payload.b64.part-*"
+      - "config/mcp.game-art-campaign-planner.windows.example.json"
+      - "docs/GAME_ART_CAMPAIGN_PLANNER.md"
+      - "package.json"
+      - ".github/workflows/game-art-campaign-planner.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/game-art-campaign/**"
+      - "scripts/game-art-campaign-planner.mjs"
+      - "scripts/game-art-campaign-planner-mcp.mjs"
+      - "scripts/game-art-campaign-planner.test.mjs"
+      - "config/game-art-campaign-planner.v1.json"
+      - "config/game-art-campaign.four-games.v1.json"
+      - "config/game-art-campaign.four-games.v1.payload.b64.part-*"
+      - "config/mcp.game-art-campaign-planner.windows.example.json"
+      - "docs/GAME_ART_CAMPAIGN_PLANNER.md"
+      - "package.json"
+      - ".github/workflows/game-art-campaign-planner.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-art-campaign-planner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Check campaign planner syntax
+        run: |
+          node --check scripts/game-art-campaign/common.mjs
+          node --check scripts/game-art-campaign/compiler.mjs
+          node --check scripts/game-art-campaign/markdown.mjs
+          node --check scripts/game-art-campaign-planner.mjs
+          node --check scripts/game-art-campaign-planner-mcp.mjs
+          node --check scripts/game-art-campaign-planner.test.mjs
+
+      - name: Run deterministic and adversarial campaign tests
+        run: node --test scripts/game-art-campaign-planner.test.mjs
+
+      - name: Compile exact campaign plan
+        run: |
+          node scripts/game-art-campaign-planner.mjs compile \
+            --request config/game-art-campaign.four-games.v1.json \
+            --output "$RUNNER_TEMP/game-art-campaign-plan.json" \
+            --markdown "$RUNNER_TEMP/game-art-campaign-plan.md"
+
+      - name: Prove source tree remains clean
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Upload exact campaign plan
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: game-art-campaign-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/game-art-campaign-plan.json
+            ${{ runner.temp }}/game-art-campaign-plan.md

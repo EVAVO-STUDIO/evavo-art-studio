@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1.0",
+  "contract": "evavo.game-art-campaign-planner.v1",
+  "requestSchema": "evavo.game-art-campaign-request.v1",
+  "planSchema": "evavo.game-art-campaign-plan.v1",
+  "summarySchema": "evavo.game-art-campaign-summary.v1",
+  "protocolVersion": "2026-08-09.1",
+  "canonicalRequest": "config/game-art-campaign.four-games.v1.json",
+  "entrypoints": {
+    "cli": "scripts/game-art-campaign-planner.mjs",
+    "mcp": "scripts/game-art-campaign-planner-mcp.mjs"
+  },
+  "tools": [
+    "evavo_game_art_campaign_summary",
+    "evavo_game_art_campaign_batch",
+    "evavo_game_art_campaign_write_plan"
+  ],
+  "requirements": {
+    "exactBatchSize": 10,
+    "familyLockedBatchesRequired": true,
+    "crossGameMixingForbidden": true,
+    "crossFamilyMixingForbidden": true,
+    "paddingGenerationForbidden": true,
+    "oneSeparateImagePerUnitRequired": true,
+    "nativeDimensionsRequired": true,
+    "integerAuthoringScaleRequired": true,
+    "nearestFilteringRequired": true,
+    "pixelSnapRequired": true,
+    "alphaPolicyRequired": true,
+    "deterministicFileNamesRequired": true,
+    "continuityKeysRequired": true,
+    "frameSpecificPromptsRequired": true,
+    "readableGeneratedTextForbidden": true,
+    "referenceBytesForbidden": true,
+    "humanApprovalRequired": true,
+    "automaticPromotionForbidden": true,
+    "selfHashedPlanRequired": true,
+    "createOnlyPlanWritesRequired": true,
+    "allowedRootBoundaryRequired": true,
+    "writeEnvironmentGateRequired": true,
+    "writePerCallConfirmationRequired": true,
+    "bundleCompressedAndUncompressedHashVerificationRequired": true,
+    "canonicalRegularSingleLinkSourcesRequired": true,
+    "sourceIdentityStableDuringReadRequired": true,
+    "canonicalBase64PayloadPartsRequired": true
+  },
+  "authority": {
+    "providerExecution": false,
+    "sourceImageMutation": false,
+    "candidateAssembly": false,
+    "targetRepositoryMutation": false,
+    "creativeApproval": false,
+    "candidatePromotion": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "forcePush": false
+  },
+  "bundleSchema": "evavo.game-art-campaign-bundle.v1",
+  "bundleCompression": "gzip+base64-parts"
+}

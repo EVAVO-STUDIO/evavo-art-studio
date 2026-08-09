@@ -1,0 +1,39 @@
+{
+  "schema": "evavo.game-art-campaign-bundle.v1",
+  "version": "1.0.0",
+  "compression": "gzip",
+  "encoding": "base64",
+  "payloadParts": [
+    {
+      "path": "game-art-campaign.four-games.v1.payload.b64.part-001",
+      "bytes": 10001,
+      "sha256": "263cdc84de87c5f722fb6fa8e9b527610a457bd1ce8015b6207b6d0e1f76d5f2"
+    },
+    {
+      "path": "game-art-campaign.four-games.v1.payload.b64.part-002",
+      "bytes": 10001,
+      "sha256": "d527d7dc115fc6981e31c74d0c8a12e9402f9d5d1cc39cf69be3a9d0a80bdfb3"
+    },
+    {
+      "path": "game-art-campaign.four-games.v1.payload.b64.part-003",
+      "bytes": 10001,
+      "sha256": "e9facfad10bb7f1c8711405316fb2cab58d371ddfed78d82a9758480ec05f88d"
+    },
+    {
+      "path": "game-art-campaign.four-games.v1.payload.b64.part-004",
+      "bytes": 10001,
+      "sha256": "09c2bba66b807b1e5a3485a6593a4f30db0bc1f5836fda0d93ceff7e41e67230"
+    },
+    {
+      "path": "game-art-campaign.four-games.v1.payload.b64.part-005",
+      "bytes": 9449,
+      "sha256": "6e7c8033c2d898bb685e2a2c5d1d5cd44fe4b6f2c3fe36e02bd62cc5932e5576"
+    }
+  ],
+  "encodedBytes": 49453,
+  "payloadBytes": 37086,
+  "payloadSha256": "97d2c90f32c7caeea95694b58a88405c2720bf1cc391f318be67eddc71a97c40",
+  "requestSha256": "23b1722589efd50dd4d8a07cb9b22850b1c90f97ce1de405443feb5289bdc951",
+  "uncompressedBytes": 443697,
+  "purpose": "Deterministic compressed canonical request for EVAVO Shell 95 and the four Foundation games."
+}
