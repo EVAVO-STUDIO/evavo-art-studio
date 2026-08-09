@@ -1,0 +1,156 @@
+{
+  "schema": "evavo.project-art-operations.v1",
+  "maximumTasks": 2000,
+  "maximumExternalSources": 10000,
+  "maximumSourceBytes": 2147483648,
+  "maximumDecodedPixels": 220000000,
+  "operations": [
+    {
+      "id": "inspect",
+      "kind": "analysis",
+      "deterministic": true
+    },
+    {
+      "id": "trim-alpha",
+      "kind": "geometry",
+      "deterministic": true
+    },
+    {
+      "id": "crop",
+      "kind": "geometry",
+      "deterministic": true,
+      "required": ["x", "y", "width", "height"]
+    },
+    {
+      "id": "pad-canvas",
+      "kind": "geometry",
+      "deterministic": true,
+      "required": ["width", "height"]
+    },
+    {
+      "id": "resize",
+      "kind": "geometry",
+      "deterministic": true,
+      "required": ["width", "height"]
+    },
+    {
+      "id": "pixel-resize",
+      "kind": "geometry",
+      "deterministic": true,
+      "required": ["width", "height"]
+    },
+    {
+      "id": "flip-horizontal",
+      "kind": "geometry",
+      "deterministic": true
+    },
+    {
+      "id": "flip-vertical",
+      "kind": "geometry",
+      "deterministic": true
+    },
+    {
+      "id": "rotate-90",
+      "kind": "geometry",
+      "deterministic": true
+    },
+    {
+      "id": "rotate-180",
+      "kind": "geometry",
+      "deterministic": true
+    },
+    {
+      "id": "rotate-270",
+      "kind": "geometry",
+      "deterministic": true
+    },
+    {
+      "id": "alpha-threshold",
+      "kind": "alpha",
+      "deterministic": true
+    },
+    {
+      "id": "connected-matte-to-alpha",
+      "kind": "alpha",
+      "deterministic": true,
+      "required": ["matteColour"]
+    },
+    {
+      "id": "edge-decontaminate",
+      "kind": "alpha",
+      "deterministic": true,
+      "required": ["matteColour"]
+    },
+    {
+      "id": "hidden-rgb-rebuild",
+      "kind": "alpha",
+      "deterministic": true
+    },
+    {
+      "id": "palette-normalize",
+      "kind": "colour",
+      "deterministic": true,
+      "required": ["mode"]
+    },
+    {
+      "id": "quantize",
+      "kind": "colour",
+      "deterministic": true
+    },
+    {
+      "id": "autocontrast",
+      "kind": "colour",
+      "deterministic": true
+    },
+    {
+      "id": "levels",
+      "kind": "colour",
+      "deterministic": true
+    },
+    {
+      "id": "outline",
+      "kind": "pixel-effect",
+      "deterministic": true,
+      "required": ["colour"]
+    },
+    {
+      "id": "convert",
+      "kind": "encoding",
+      "deterministic": true
+    },
+    {
+      "id": "optimize",
+      "kind": "encoding",
+      "deterministic": true
+    }
+  ],
+  "taskKinds": [
+    "image",
+    "slice-sheet",
+    "assemble-sheet",
+    "sequence-review"
+  ],
+  "outputFormats": [
+    "png",
+    "webp",
+    "jpeg",
+    "gif",
+    "json"
+  ],
+  "rules": {
+    "sourceOverwriteAllowed": false,
+    "sourceDeletionAllowed": false,
+    "outputRootMustNotExist": true,
+    "wholeRunAtomicPublication": true,
+    "symbolicLinksAllowed": false,
+    "exactSourceHashRequired": true,
+    "createOnlyReceipt": true,
+    "providerExecution": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "targetRepositoryMutation": false,
+    "publication": false,
+    "deployment": false,
+    "forcePush": false
+  }
+}
