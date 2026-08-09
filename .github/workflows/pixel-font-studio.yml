@@ -10,6 +10,9 @@ on:
       - "scripts/pixel-font-studio.test.mjs"
       - "scripts/pixel-font-brass-brine.test.mjs"
       - "scripts/check-pixel-font-studio.mjs"
+      - "scripts/check-repository-toolchain.mjs"
+      - "scripts/test-repository-toolchain.mjs"
+      - "schemas/repository-owned-reliability-profile.schema.json"
       - "config/pixel-font-studio.v1.json"
       - "config/pixel-font-family.example.v1.json"
       - "config/pixel-font-family.brass-brine.v1.json"
@@ -30,6 +33,9 @@ on:
       - "scripts/pixel-font-studio.test.mjs"
       - "scripts/pixel-font-brass-brine.test.mjs"
       - "scripts/check-pixel-font-studio.mjs"
+      - "scripts/check-repository-toolchain.mjs"
+      - "scripts/test-repository-toolchain.mjs"
+      - "schemas/repository-owned-reliability-profile.schema.json"
       - "config/pixel-font-studio.v1.json"
       - "config/pixel-font-family.example.v1.json"
       - "config/pixel-font-family.brass-brine.v1.json"
@@ -91,6 +97,20 @@ jobs:
           path: |
             ${{ runner.temp }}/brass-brine-pixel-font/**
             ${{ runner.temp }}/brass-brine-pixel-font.plan.json
+
+      - name: Upload exact font governance source
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixel-font-governance-source-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            scripts/check-repository-toolchain.mjs
+            scripts/test-repository-toolchain.mjs
+            schemas/repository-owned-reliability-profile.schema.json
+            scripts/check-pixel-font-studio.mjs
+            config/pixel-font-studio.v1.json
+            config/pixel-font-family.brass-brine.v1.json
 
       - name: Prove source tree remains clean
         run: |
