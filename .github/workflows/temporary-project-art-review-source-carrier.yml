@@ -1,0 +1,115 @@
+name: Temporary project art review source carrier
+
+on:
+  push:
+    branches:
+      - agent/project-art-review-studio-20260809
+    paths:
+      - ".github/workflows/temporary-project-art-review-source-carrier.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-project-art-review-source-carrier
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact carrier branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reconstruct and validate exact source
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: 8ad4b9f2dd6e8be2a9b9346efcdd31fbbbed9e95
+          EXPECTED_ARCHIVE_SHA256: 028f54e9100ddda6ed6114ad1a7a2bd32ab0be288822b91bddf955fb5fc134b3
+        run: |
+          set -euo pipefail
+
+          [[ "${GITHUB_REF_NAME}" == "agent/project-art-review-studio-20260809" ]]
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          [[ "$(git rev-parse refs/remotes/origin/main)" == "${EXPECTED_BASE_SHA}" ]]
+          [[ "$(git merge-base "${EXPECTED_BASE_SHA}" HEAD)" == "${EXPECTED_BASE_SHA}" ]]
+
+          cat \
+            .evavo-source/project-art-review/part-00a.b64 \
+            .evavo-source/project-art-review/part-00b.b64 \
+            .evavo-source/project-art-review/part-01.b64 \
+            .evavo-source/project-art-review/part-02.b64 \
+            .evavo-source/project-art-review/part-03.b64 \
+            > project-art-review-source.b64
+
+          base64 --decode project-art-review-source.b64 > project-art-review-source.zip
+          echo "${EXPECTED_ARCHIVE_SHA256}  project-art-review-source.zip" | sha256sum --check -
+          unzip -q -o project-art-review-source.zip -d .
+
+          rm -rf .evavo-source
+          rm -f project-art-review-source.b64 project-art-review-source.zip
+          rm -f .github/workflows/temporary-project-art-review-source-carrier.yml
+
+          test ! -e .evavo-source
+          test ! -e .github/workflows/temporary-project-art-review-source-carrier.yml
+
+      - name: Validate review studio source and adversarial regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check scripts/project-art/review-studio.mjs
+          node --check scripts/compile-project-art-review.mjs
+          node --check scripts/build-project-art-review.mjs
+          node --check scripts/finalize-project-art-review.mjs
+          node --check scripts/check-project-art-review.mjs
+          node --check scripts/test-project-art-review.mjs
+          node --check tools/project_art_review_mcp.mjs
+          node -e "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')); JSON.parse(require('node:fs').readFileSync('config/mcp.project-art-review.windows.example.json', 'utf8'));"
+
+          node scripts/check-project-art-review.mjs
+          node scripts/test-project-art-review.mjs
+
+      - name: Publish exact feature source and remove carrier
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "EVAVO Automation"
+          git config user.email "evavo.studio@gmail.com"
+          git add --all
+
+          cat > "${RUNNER_TEMP}/expected-review-paths.txt" <<'EOF'
+          .evavo-source/project-art-review/part-00a.b64
+          .evavo-source/project-art-review/part-00b.b64
+          .evavo-source/project-art-review/part-01.b64
+          .evavo-source/project-art-review/part-02.b64
+          .evavo-source/project-art-review/part-03.b64
+          .github/workflows/project-art-review-studio.yml
+          .github/workflows/temporary-project-art-review-source-carrier.yml
+          config/mcp.project-art-review.windows.example.json
+          docs/PROJECT_ART_REVIEW_STUDIO.md
+          package.json
+          scripts/build-project-art-review.mjs
+          scripts/check-project-art-review.mjs
+          scripts/compile-project-art-review.mjs
+          scripts/finalize-project-art-review.mjs
+          scripts/project-art/review-studio.mjs
+          scripts/test-project-art-review.mjs
+          tools/project_art_review_mcp.mjs
+          EOF
+
+          git diff --cached --name-only | LC_ALL=C sort > "${RUNNER_TEMP}/actual-review-paths.txt"
+          LC_ALL=C sort "${RUNNER_TEMP}/expected-review-paths.txt" -o "${RUNNER_TEMP}/expected-review-paths.txt"
+          diff -u "${RUNNER_TEMP}/expected-review-paths.txt" "${RUNNER_TEMP}/actual-review-paths.txt"
+
+          test ! -e .evavo-source
+          test ! -e .github/workflows/temporary-project-art-review-source-carrier.yml
+          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -E 'project-art-review-source\.(b64|zip)$' || true)"
+
+          git commit -m "feat(project-art): add offline visual review studio"
+          git push origin HEAD:refs/heads/agent/project-art-review-studio-20260809
