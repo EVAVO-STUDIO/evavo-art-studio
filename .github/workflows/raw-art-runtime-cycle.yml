@@ -1,0 +1,48 @@
+name: RAW ART runtime cycle validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/execute-raw-art-runtime-cycle.mjs"
+      - "scripts/check-raw-art-runtime-cycle.mjs"
+      - "docs/RAW_ART_RUNTIME_CYCLE.md"
+      - ".github/workflows/raw-art-runtime-cycle.yml"
+  pull_request:
+    paths:
+      - "scripts/execute-raw-art-runtime-cycle.mjs"
+      - "scripts/check-raw-art-runtime-cycle.mjs"
+      - "docs/RAW_ART_RUNTIME_CYCLE.md"
+      - ".github/workflows/raw-art-runtime-cycle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: raw-art-runtime-cycle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate runtime-cycle authority
+        run: node scripts/check-raw-art-runtime-cycle.mjs
+
+      - name: Confirm validation made no source changes
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"

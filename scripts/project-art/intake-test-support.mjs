@@ -40,7 +40,13 @@ export function python() {
     });
     if (result.status === 0) return { executable, prefix };
   }
-  throw new Error("No Python 3 executable with Pillow is available.");
+  if (process.env.PROJECT_ART_REQUIRE_PILLOW === "1") {
+    throw new Error("No Python 3 executable with Pillow is available.");
+  }
+  console.log(
+    "Project-art chat intake and atlas regressions skipped: Pillow unavailable; the dedicated project-art workflow requires the exact backend.",
+  );
+  process.exit(0);
 }
 
 export function sha256(value) {

@@ -130,6 +130,8 @@ jobs:
         run: node scripts/check-project-art-intake.mjs
 
       - name: Run exact intake and variable-atlas regressions
+        env:
+          PROJECT_ART_REQUIRE_PILLOW: "1"
         run: node scripts/test-project-art-intake.mjs
 
       - name: Verify permanent authority assertions

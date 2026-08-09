@@ -27,6 +27,10 @@ const files = new Map([
     "tools/build_project_art_atlas.py",
   ]],
   ["workspace MCP", ["tools/project_art_workspace_mcp.mjs"]],
+  ["regression policy", [
+    "scripts/project-art/intake-test-support.mjs",
+    ".github/workflows/project-art-workbench.yml",
+  ]],
   ["documentation", ["docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md"]],
 ]);
 const sources = new Map();
@@ -78,6 +82,13 @@ const required = new Map([
     "bytesFlowThroughMcp: false",
     "repositoryMutation: false",
     "shell: false",
+  ]],
+  ["regression policy", [
+    "PROJECT_ART_REQUIRE_PILLOW",
+    "No Python 3 executable with Pillow is available.",
+    "regressions skipped: Pillow unavailable",
+    "python-version: \"3.13.5\"",
+    "PIL.__version__",
   ]],
   ["documentation", [
     "ChatGPT",
