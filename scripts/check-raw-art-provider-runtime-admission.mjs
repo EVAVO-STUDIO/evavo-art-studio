@@ -14,6 +14,10 @@ import {
   PROVIDER_PROTOCOL_VERSION,
   compileProviderCandidateRuntimeContract,
 } from '../packages/providers/dist/index.js';
+import {
+  RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
+  compileRawArtProviderAdmittedRuntimeJob,
+} from './raw-art-provider/admission.mjs';
 import { hashObject } from './raw-art-provider/shared.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -301,7 +305,7 @@ async function main() {
     verifySelfHash(receipt, 'admissionSha256');
     if (
       receipt.schema !==
-        'evavo.raw-art-provider-runtime-admission-receipt.v1' ||
+        'evavo.raw-art-provider-runtime-admission-receipt.v2' ||
       receipt.status !== 'admitted' ||
       receipt.counts.admittedRuntimeJobs !== 2 ||
       receipt.authority.durableRuntimeAdmission !== true ||
@@ -314,20 +318,47 @@ async function main() {
     ) {
       throw new Error('admission receipt authority or counts are invalid');
     }
+    if (
+      receipt.executionIsolation.mode !== 'explicit-authorization-required' ||
+      receipt.executionIsolation.requiredCapability !==
+        RAW_ART_PROVIDER_EXECUTION_CAPABILITY ||
+      receipt.executionIsolation.maximumAttempts !== 1 ||
+      receipt.executionIsolation.genericProviderWorkerMayClaim !== false ||
+      receipt.executionIsolation.queue !==
+        `raw-art.provider.${selection.runId}`
+    ) {
+      throw new Error('admission receipt did not isolate provider execution');
+    }
 
     const runtime = new LocalRuntimeRepository({ root: runtimeRoot });
     const admittedJobs = await runtime.list({ limit: 10 });
     if (admittedJobs.length !== 2) {
       throw new Error('durable runtime did not retain exactly two admitted jobs');
     }
-    for (const entry of runtimeBatch().jobs) {
-      const normalized = normalizeRuntimeJobSubmission(entry.contract.runtimeJob);
+    const currentBatch = runtimeBatch();
+    for (const [index, entry] of currentBatch.jobs.entries()) {
+      const selected = {
+        ...selection.jobs[index],
+        batchEntry: entry,
+      };
+      const admitted = compileRawArtProviderAdmittedRuntimeJob(
+        selection,
+        selected,
+      );
+      const normalized = normalizeRuntimeJobSubmission(admitted);
       const retained = admittedJobs.find((job) => job.id === normalized.spec.id);
       if (
         !retained ||
         retained.specHash !== normalized.specHash ||
         retained.state !== 'queued' ||
-        retained.attempts.length !== 0
+        retained.attempts.length !== 0 ||
+        retained.spec.queue !== receipt.executionIsolation.queue ||
+        retained.spec.maximumAttempts !== 1 ||
+        !retained.spec.requiredCapabilities.includes(
+          RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
+        ) ||
+        receipt.jobs[index].admittedRuntimeJobSha256 !==
+          hashObject(admitted)
       ) {
         throw new Error('admitted runtime job drifted or began execution');
       }
@@ -506,7 +537,17 @@ async function main() {
 
     const conflictRoot = path.join(root, 'conflict-runtime');
     const conflictRuntime = new LocalRuntimeRepository({ root: conflictRoot });
-    const conflictJob = structuredClone(runtimeBatch().jobs[1].contract.runtimeJob);
+    const conflictBatch = runtimeBatch();
+    const conflictSelectionJob = {
+      ...selection.jobs[1],
+      batchEntry: conflictBatch.jobs[1],
+    };
+    const conflictJob = structuredClone(
+      compileRawArtProviderAdmittedRuntimeJob(
+        selection,
+        conflictSelectionJob,
+      ),
+    );
     conflictJob.labels = { ...conflictJob.labels, continuityPhase: 'conflict' };
     await conflictRuntime.submit(
       conflictJob,
