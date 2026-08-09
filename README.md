@@ -18,6 +18,7 @@ This repository is intentionally broader than an image generator. It is the shar
 - deterministic provider prompt compilation for identity, style, shot, layer, target and alpha boundaries;
 - capability-matched provider selection with explicit allow-lists, bounded fallback and cancellation;
 - an OpenAI GPT Image 2 adapter using ordered references and masks, with chroma-key extraction required for transparent targets;
+- governed ComfyUI workflow-profile adapters for local generation, editing, inpainting, matching assets and matching animation frames, bound to exact workflow, model, runtime, node and reference hashes;
 - decoded mask preflight that proves matching image format, dimensions, page count, alpha and editable coverage before remote inpaint;
 - unapproved provider candidates stored as immutable intermediate artifacts with complete attempt and provenance evidence;
 - border-connected chroma segmentation, matte colour unmixing, antialiased edge recovery and bounded transparent RGB bleed;
@@ -157,6 +158,21 @@ Leaving `EVAVO_ART_WORKER_QUEUES` empty lets the worker add `provider` automatic
 A provider response is stored as an unapproved `intermediate`, never as a final master. Identity-locked sprite work requires a canonical identity artifact. In-between frames also require the approved previous and next key poses. Inpaint work requires an approved base image and exactly one mask.
 
 The OpenAI adapter decodes the actual base and mask before transport. Mismatched formats or dimensions, multiple pages, missing alpha and masks with no editable pixels fail before a remote request is made.
+
+For governed local ComfyUI execution, first export one reviewed workflow in API format, place it in a catalog draft, then compile the exact self-hashed catalog:
+
+```powershell
+pnpm run provider:comfyui:catalog:compile -- `
+  --input C:\EVAVO\comfyui\catalog.draft.json `
+  --output C:\EVAVO\comfyui\catalog.json
+
+$env:EVAVO_ART_COMFYUI_CATALOG = "C:\EVAVO\comfyui\catalog.json"
+$env:EVAVO_ART_COMFYUI_CATALOG_ROOT = "C:\EVAVO\comfyui"
+$env:EVAVO_ART_COMFYUI_BASE_URL = "http://127.0.0.1:8188"
+$env:EVAVO_ART_COMFYUI_DEDICATED_INSTANCE = "true"
+```
+
+Each catalog profile becomes one exact adapter ID such as `comfyui:sprite-match`. The worker does not accept arbitrary workflow JSON. It revalidates catalog, profile, workflow, model, runtime and node identities; verifies and uploads exact immutable reference bytes; preflights required node classes through ComfyUI; binds only declared mutable inputs; downloads bounded outputs; and records unapproved candidate provenance. Remote endpoints require explicit opt-in and HTTPS. Execution still requires the existing durable admission and short-lived RAW_ART execution authorisation. See [`docs/COMFYUI_PROVIDER_ADAPTER.md`](./docs/COMFYUI_PROVIDER_ADAPTER.md).
 
 GPT Image 2 does not currently support transparent backgrounds, so transparency-required requests use a declared flat chroma matte. The chroma candidate remains an intermediate and must pass deterministic alpha mastering, edge cleanup and hostile-matte QA.
 

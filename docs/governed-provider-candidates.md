@@ -393,3 +393,13 @@ This slice produces governed candidate artifacts. It does not yet:
 - provide a browser candidate-comparison workbench.
 
 Those stages remain separate so generation cannot bypass mastering, measured consistency evidence or approval policy.
+
+## Governed local ComfyUI profiles
+
+ComfyUI participates through exact compiled workflow profiles rather than caller-supplied graphs. Each profile is registered independently as `comfyui:<profileId>` and declares only the operations, reference roles, structural controls, candidate count, source size and cancellation behavior that its reviewed API-format workflow actually implements.
+
+The compiled catalog binds exact workflow, profile, node, model and runtime inventory hashes. Before a provider call, the adapter queries the live ComfyUI node definitions, verifies every required class, re-verifies immutable reference bytes, uploads only exact role-bound references, and mutates only declared workflow inputs. Generated, edited, inpainted, matching-image and matching-frame outputs remain immutable unapproved candidates with provenance evidence.
+
+A running ComfyUI instance or local GPU does not grant runtime authority. RAW_ART jobs still require exact selection, fresh durable admission and a short-lived execution authorisation that names the exact ComfyUI profile adapter. Follow-up edits, variations and in-between frames repeat that authority cycle. The adapter cannot approve, promote, update game references, mutate a repository, deploy or publish.
+
+See [COMFYUI_PROVIDER_ADAPTER.md](./COMFYUI_PROVIDER_ADAPTER.md).
