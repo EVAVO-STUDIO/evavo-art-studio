@@ -1,0 +1,21 @@
+{
+  "schema": "evavo.pixel-font-family.v1",
+  "familyId": "brass-brine-dos",
+  "displayName": "Brass & Brine DOS",
+  "description": "Original coordinated pixel-font family for the 1871 maritime strategy and adventure interface.",
+  "glyphMasterSha256": "6443605e7d83336e97550918a08ad0de8bae70e323880c9d7341bc674d73ca1a",
+  "glyphSets": ["ascii-printable", "extended-text", "box-drawing"],
+  "atlas": {"padding": 1, "maxWidth": 512, "powerOfTwo": true},
+  "palette": {"black": "#000000", "white": "#f4f1e8", "signal": "#ff244e", "mid": "#55545a"},
+  "godot": {"minimumVersion": "4.4", "testedVersion": "4.6.2", "textureFilter": "nearest", "integerScales": [1, 2, 3, 4]},
+  "delivery": {"includeSpecimens": false, "includeGlyphSheets": false},
+  "sampleText": "SAIL • SELL • SURVIVE — 1871",
+  "fonts": [
+    {"id":"bb_dos_display","role":"display","style":{"scaleX":2,"scaleY":2,"boldX":1,"slantRows":0,"tracking":2,"spaceWidth":3,"monospace":false,"uppercaseOnly":true},"theme":{"fontSize":32,"outlineSize":2,"outlineColour":"#000000","shadowColour":"#000000b0","shadowOffsetX":2,"shadowOffsetY":2}},
+    {"id":"bb_dos_ui","role":"ui","style":{"scaleX":1,"scaleY":1,"boldX":0,"slantRows":0,"tracking":1,"spaceWidth":3,"monospace":false,"uppercaseOnly":false},"theme":{"fontSize":18,"outlineSize":0,"outlineColour":"#000000","shadowColour":"#00000000","shadowOffsetX":0,"shadowOffsetY":0}},
+    {"id":"bb_dos_ledger","role":"ledger","style":{"scaleX":1,"scaleY":1,"boldX":0,"slantRows":0,"tracking":1,"spaceWidth":5,"monospace":true,"uppercaseOnly":false},"theme":{"fontSize":18,"outlineSize":0,"outlineColour":"#000000","shadowColour":"#00000000","shadowOffsetX":0,"shadowOffsetY":0}},
+    {"id":"bb_dos_micro","role":"micro","style":{"scaleX":1,"scaleY":1,"boldX":0,"slantRows":0,"tracking":0,"spaceWidth":2,"monospace":false,"uppercaseOnly":false},"theme":{"fontSize":9,"outlineSize":0,"outlineColour":"#000000","shadowColour":"#00000000","shadowOffsetX":0,"shadowOffsetY":0}},
+    {"id":"bb_dos_symbols","role":"symbols","glyphSets":["ascii-printable","box-drawing","brass-symbols"],"style":{"scaleX":2,"scaleY":2,"boldX":0,"slantRows":0,"tracking":2,"spaceWidth":3,"monospace":true,"uppercaseOnly":false},"theme":{"fontSize":32,"outlineSize":1,"outlineColour":"#000000","shadowColour":"#00000080","shadowOffsetX":1,"shadowOffsetY":1}}
+  ],
+  "license": "Copyright EVAVO Studio. Original project font artwork."
+}
