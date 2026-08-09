@@ -45,8 +45,7 @@ def canonical_json(value: Any) -> str:
     fail(f"unsupported canonical JSON value: {type(value).__name__}")
 
 def hash_document(value: Mapping[str, Any], field: str) -> dict[str, Any]:
-    body = dict(value)
-    body.pop(field, None)
+    body = dict(value); body.pop(field, None)
     body[field] = hashlib.sha256(canonical_json(body).encode("utf-8")).hexdigest()
     return body
 
@@ -54,8 +53,7 @@ def verify_document_hash(value: Mapping[str, Any], field: str) -> str:
     digest = value.get(field)
     if not isinstance(digest, str) or not HASH_RE.fullmatch(digest):
         fail(f"{field} must be a lowercase SHA-256 digest")
-    body = dict(value)
-    body.pop(field, None)
+    body = dict(value); body.pop(field, None)
     observed = hashlib.sha256(canonical_json(body).encode("utf-8")).hexdigest()
     if observed != digest:
         fail(f"{field} does not match canonical document content")
@@ -66,105 +64,78 @@ def sha256_bytes(value: bytes) -> str:
 
 def sha256_file(path: Path, maximum: int = 256 * 1024 * 1024) -> tuple[str, int]:
     state = path.lstat()
-    if not path.is_file() or path.is_symlink():
-        fail(f"expected regular non-symbolic file: {path}")
-    if state.st_size > maximum:
-        fail(f"file exceeds {maximum} byte limit: {path}")
-    digest = hashlib.sha256()
+    if not path.is_file() or path.is_symlink(): fail(f"expected regular non-symbolic file: {path}")
+    if state.st_size > maximum: fail(f"file exceeds {maximum} byte limit: {path}")
+    digest=hashlib.sha256()
     with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
+        for chunk in iter(lambda: handle.read(1024*1024), b""): digest.update(chunk)
     return digest.hexdigest(), state.st_size
 
 def read_json(path: Path, maximum: int = MAX_SPEC_BYTES) -> tuple[bytes, dict[str, Any]]:
-    if not path.is_file() or path.is_symlink():
-        fail(f"JSON input must be a regular non-symbolic file: {path}")
-    data = path.read_bytes()
-    if not data or len(data) > maximum:
-        fail(f"JSON input must contain 1..{maximum} bytes: {path}")
-    try:
-        value = json.loads(data.decode("utf-8-sig"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise PixelFontError(f"invalid JSON in {path}: {exc}") from exc
-    if not isinstance(value, dict):
-        fail(f"JSON root must be an object: {path}")
-    return data, value
+    if not path.is_file() or path.is_symlink(): fail(f"JSON input must be a regular non-symbolic file: {path}")
+    data=path.read_bytes()
+    if not data or len(data)>maximum: fail(f"JSON input must contain 1..{maximum} bytes: {path}")
+    try: value=json.loads(data.decode("utf-8-sig"))
+    except (UnicodeDecodeError,json.JSONDecodeError) as exc: raise PixelFontError(f"invalid JSON in {path}: {exc}") from exc
+    if not isinstance(value,dict): fail(f"JSON root must be an object: {path}")
+    return data,value
 
-def parse_colour(value: Any, label: str) -> tuple[int, int, int, int]:
-    if not isinstance(value, str) or not HEX_RE.fullmatch(value):
-        fail(f"{label} must use #RRGGBB or #RRGGBBAA")
-    rgb = tuple(int(value[index:index + 2], 16) for index in (1, 3, 5))
-    alpha = int(value[7:9], 16) if len(value) == 9 else 255
-    return rgb[0], rgb[1], rgb[2], alpha
+def parse_colour(value: Any, label: str) -> tuple[int,int,int,int]:
+    if not isinstance(value,str) or not HEX_RE.fullmatch(value): fail(f"{label} must use #RRGGBB or #RRGGBBAA")
+    rgb=tuple(int(value[index:index+2],16) for index in (1,3,5)); alpha=int(value[7:9],16) if len(value)==9 else 255
+    return rgb[0],rgb[1],rgb[2],alpha
 
-def checked_int(value: Any, label: str, minimum: int, maximum: int) -> int:
-    if not isinstance(value, int) or isinstance(value, bool) or value < minimum or value > maximum:
-        fail(f"{label} must be an integer from {minimum} to {maximum}")
+def checked_int(value: Any,label: str,minimum: int,maximum: int)->int:
+    if not isinstance(value,int) or isinstance(value,bool) or value<minimum or value>maximum: fail(f"{label} must be an integer from {minimum} to {maximum}")
     return value
 
-def checked_id(value: Any, label: str) -> str:
-    if not isinstance(value, str) or len(value) > 96 or not ID_RE.fullmatch(value):
-        fail(f"{label} must be a lowercase kebab/snake identifier")
+def checked_id(value: Any,label: str)->str:
+    if not isinstance(value,str) or len(value)>96 or not ID_RE.fullmatch(value): fail(f"{label} must be a lowercase kebab/snake identifier")
     return value
 
-def checked_text(value: Any, label: str, minimum: int = 1, maximum: int = 4096) -> str:
-    if not isinstance(value, str) or not minimum <= len(value) <= maximum or "\x00" in value:
-        fail(f"{label} must be a bounded text string")
+def checked_text(value: Any,label: str,minimum: int=1,maximum: int=4096)->str:
+    if not isinstance(value,str) or not minimum<=len(value)<=maximum or "\x00" in value: fail(f"{label} must be a bounded text string")
     return value
 
-def next_power_of_two(value: int) -> int:
-    return 1 if value <= 1 else 1 << (value - 1).bit_length()
+def next_power_of_two(value:int)->int:
+    return 1 if value<=1 else 1<<(value-1).bit_length()
 
-def _pattern(*rows: str) -> tuple[str, ...]:
-    if len(rows) != 7 or any(len(row) != 5 or set(row) - {".", "#"} for row in rows):
-        fail("glyph master must contain seven 5-pixel rows")
+def _pattern(*rows:str)->tuple[str,...]:
+    if len(rows)!=7 or any(len(row)!=5 or set(row)-{".","#"} for row in rows): fail("glyph master must contain seven 5-pixel rows")
     return tuple(rows)
 
-GLYPH_MASTER_PATH = Path(__file__).resolve().parents[1] / "config" / "pixel-font-master-5x7.v1.json"
+GLYPH_MASTER_PATH=Path(__file__).resolve().parents[1]/"config"/"pixel-font-master-5x7.v1.json"
 
-def load_glyph_master() -> tuple[dict[str, tuple[str, ...]], str]:
-    master_bytes, document = read_json(GLYPH_MASTER_PATH, 2 * 1024 * 1024)
-    if document.get("schema") != "evavo.pixel-font-master.v1":
-        fail("unexpected pixel-font glyph master schema")
-    glyphs = document.get("glyphs")
-    if not isinstance(glyphs, dict) or len(glyphs) < 95:
-        fail("pixel-font glyph master is incomplete")
-    result: dict[str, tuple[str, ...]] = {}
-    for codepoint_text, rows in glyphs.items():
-        if not isinstance(codepoint_text, str) or not codepoint_text.isdigit():
-            fail("pixel-font glyph master codepoint is invalid")
-        codepoint = int(codepoint_text)
-        if codepoint < 32 or codepoint > 0x10FFFF or 0xD800 <= codepoint <= 0xDFFF:
-            fail("pixel-font glyph master codepoint is out of range")
-        if not isinstance(rows, list):
-            fail("pixel-font glyph master rows are invalid")
-        pattern = _pattern(*rows)
-        char = chr(codepoint)
-        if char in result:
-            fail("pixel-font glyph master contains duplicate codepoints")
-        result[char] = pattern
-    return result, sha256_bytes(master_bytes)
+def load_glyph_master()->tuple[dict[str,tuple[str,...]],str]:
+    master_bytes,document=read_json(GLYPH_MASTER_PATH,2*1024*1024)
+    if document.get("schema")!="evavo.pixel-font-master.v1": fail("unexpected pixel-font glyph master schema")
+    glyphs=document.get("glyphs")
+    if not isinstance(glyphs,dict) or len(glyphs)<95: fail("pixel-font glyph master is incomplete")
+    result={}
+    for codepoint_text,rows in glyphs.items():
+        if not isinstance(codepoint_text,str) or not codepoint_text.isdigit(): fail("pixel-font glyph master codepoint is invalid")
+        codepoint=int(codepoint_text)
+        if codepoint<32 or codepoint>0x10FFFF or 0xD800<=codepoint<=0xDFFF: fail("pixel-font glyph master codepoint is out of range")
+        if isinstance(rows,str):
+            if len(rows)!=35 or set(rows)-{".","#"}: fail("pixel-font compact glyph master rows are invalid")
+            rows=[rows[index:index+5] for index in range(0,35,5)]
+        if not isinstance(rows,list): fail("pixel-font glyph master rows are invalid")
+        char=chr(codepoint)
+        if char in result: fail("pixel-font glyph master contains duplicate codepoints")
+        result[char]=_pattern(*rows)
+    return result,sha256_bytes(master_bytes)
 
-MASTER_5X7, GLYPH_MASTER_SHA256 = load_glyph_master()
-ASCII_PRINTABLE = [chr(value) for value in range(32, 127)]
-EXTENDED_TEXT = ["£", "¢", "¥", "€", "•", "—", "‘", "’", "“", "”", "←", "→", "↑", "↓"]
-BOX_DRAWING = ["─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼", "═", "║", "╔", "╗", "╚", "╝"]
-BRASS_SYMBOLS = ["⚓", "⚠", "☠", "◆", "◇", "☼", "☂", "≈", "¤"]
-GLYPH_SETS = {"ascii-printable": ASCII_PRINTABLE, "extended-text": EXTENDED_TEXT, "box-drawing": BOX_DRAWING, "brass-symbols": BRASS_SYMBOLS}
+MASTER_5X7,GLYPH_MASTER_SHA256=load_glyph_master()
+ASCII_PRINTABLE=[chr(value) for value in range(32,127)]
+EXTENDED_TEXT=["£","¢","¥","€","•","—","‘","’","“","”","←","→","↑","↓"]
+BOX_DRAWING=["─","│","┌","┐","└","┘","├","┤","┬","┴","┼","═","║","╔","╗","╚","╝"]
+BRASS_SYMBOLS=["⚓","⚠","☠","◆","◇","☼","☂","≈","¤"]
+GLYPH_SETS={"ascii-printable":ASCII_PRINTABLE,"extended-text":EXTENDED_TEXT,"box-drawing":BOX_DRAWING,"brass-symbols":BRASS_SYMBOLS}
 
 @dataclass(frozen=True)
 class Glyph:
-    char: str
-    codepoint: int
-    pixels: tuple[tuple[int, ...], ...]
-    width: int
-    height: int
-    xoffset: int
-    yoffset: int
-    xadvance: int
+    char:str; codepoint:int; pixels:tuple[tuple[int,...],...]; width:int; height:int; xoffset:int; yoffset:int; xadvance:int
 
 @dataclass(frozen=True)
 class PackedGlyph:
-    glyph: Glyph
-    x: int
-    y: int
+    glyph:Glyph; x:int; y:int
