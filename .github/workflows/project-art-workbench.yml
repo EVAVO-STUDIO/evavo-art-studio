@@ -12,6 +12,7 @@ on:
       - "scripts/stage-reference-derived-artifacts.mjs"
       - "scripts/check-project-art-workbench.mjs"
       - "scripts/test-project-art-workbench.mjs"
+      - "scripts/test-project-art-workspace-mcp.mjs"
       - "scripts/check-project-art-intake.mjs"
       - "scripts/test-project-art-intake.mjs"
       - "tools/run_project_art_sandbox.py"
@@ -21,6 +22,7 @@ on:
       - "tools/project_art_atlas_*.py"
       - "tools/project_art_workspace_mcp.mjs"
       - "config/project-art-operations.v1.json"
+      - "config/mcp.project-art-workspace.windows.example.json"
       - "docs/PROJECT_ART_WORKBENCH.md"
       - "docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md"
       - "package.json"
@@ -39,6 +41,7 @@ on:
       - "scripts/stage-reference-derived-artifacts.mjs"
       - "scripts/check-project-art-workbench.mjs"
       - "scripts/test-project-art-workbench.mjs"
+      - "scripts/test-project-art-workspace-mcp.mjs"
       - "scripts/check-project-art-intake.mjs"
       - "scripts/test-project-art-intake.mjs"
       - "tools/run_project_art_sandbox.py"
@@ -48,6 +51,7 @@ on:
       - "tools/project_art_atlas_*.py"
       - "tools/project_art_workspace_mcp.mjs"
       - "config/project-art-operations.v1.json"
+      - "config/mcp.project-art-workspace.windows.example.json"
       - "docs/PROJECT_ART_WORKBENCH.md"
       - "docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md"
       - "package.json"
@@ -126,6 +130,12 @@ jobs:
           PROJECT_ART_REQUIRE_PROVIDER_VALIDATION: "1"
         run: node scripts/test-project-art-workbench.mjs
 
+      - name: Run callable project-art workspace MCP regressions
+        env:
+          PROJECT_ART_REQUIRE_PILLOW: "1"
+          PROJECT_ART_REQUIRE_PROVIDER_VALIDATION: "1"
+        run: node scripts/test-project-art-workspace-mcp.mjs
+
       - name: Verify chat intake, storage handoff, atlas and MCP contracts
         run: node scripts/check-project-art-intake.mjs
 
@@ -146,7 +156,15 @@ jobs:
           grep -F 'evavo.storage-art-ingest-request.v1' tools/project_art_intake_contract.py
           grep -F 'evavo.project-art-atlas-plan.v1' scripts/project-art/atlas-contract.mjs
           grep -F 'evavo.project-art-godot-region-map.v1' tools/project_art_atlas_execution.py
+          grep -F 'evavo.project-art-workspace-capabilities.v1' tools/project_art_workspace_mcp.mjs
+          grep -F 'evavo_art_run_sandbox' tools/project_art_workspace_mcp.mjs
+          grep -F 'evavo_art_compile_reference_plan' tools/project_art_workspace_mcp.mjs
           grep -F 'EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE' tools/project_art_workspace_mcp.mjs
+          grep -F 'shell: false' tools/project_art_workspace_mcp.mjs
+          grep -F 'bytesFlowThroughMcp: false' tools/project_art_workspace_mcp.mjs
+          grep -F 'credentialsForwardedToSubprocess: false' tools/project_art_workspace_mcp.mjs
+          grep -F 'rawCommandOutputReturned: false' tools/project_art_workspace_mcp.mjs
+          grep -F 'contains a symbolic-link component' tools/project_art_workspace_mcp.mjs
           grep -F '"providerExecution": False' tools/run_project_art_sandbox.py
           grep -F '"targetRepositoryMutation": False' tools/run_project_art_sandbox.py
           grep -F '"repositoryMutation": False' tools/project_art_intake_execution.py
@@ -157,6 +175,10 @@ jobs:
           ! grep -F 'git push' tools/run_project_art_sandbox.py
           ! grep -F 'git push' tools/run_project_art_intake.py
           ! grep -F 'git push' tools/build_project_art_atlas.py
+          ! grep -F 'candidateApproval: true' tools/project_art_workspace_mcp.mjs
+          ! grep -F 'candidatePromotion: true' tools/project_art_workspace_mcp.mjs
+          ! grep -F 'forcePush: true' tools/project_art_workspace_mcp.mjs
+          ! grep -F 'git push' tools/project_art_workspace_mcp.mjs
 
       - name: Run complete Art Studio validation
         run: pnpm check
