@@ -143,6 +143,27 @@ function normalizedOperation(value, index, registry) {
     if (parameters.whitePoint !== undefined) boundedNumber(parameters.whitePoint, 'levels.whitePoint', 1, 255);
     if (parameters.gamma !== undefined) boundedNumber(parameters.gamma, 'levels.gamma', 0.05, 10);
   }
+  if (op === 'translate') {
+    if (parameters.x !== undefined) boundedInteger(parameters.x, 'translate.x', -65_536, 65_536);
+    if (parameters.y !== undefined) boundedInteger(parameters.y, 'translate.y', -65_536, 65_536);
+  }
+  if (op === 'colour-replace') {
+    if (parameters.distance !== undefined) boundedNumber(parameters.distance, 'colour-replace.distance', 0, 441);
+  }
+  if (['brightness', 'contrast', 'saturation', 'sharpness'].includes(op) && parameters.factor !== undefined) {
+    boundedNumber(parameters.factor, `${op}.factor`, 0, 16);
+  }
+  if (op === 'gaussian-blur' && parameters.radius !== undefined) {
+    boundedNumber(parameters.radius, 'gaussian-blur.radius', 0, 256);
+  }
+  if (op === 'unsharp-mask') {
+    if (parameters.radius !== undefined) boundedNumber(parameters.radius, 'unsharp-mask.radius', 0, 256);
+    if (parameters.percent !== undefined) boundedInteger(parameters.percent, 'unsharp-mask.percent', 0, 1000);
+    if (parameters.threshold !== undefined) boundedInteger(parameters.threshold, 'unsharp-mask.threshold', 0, 255);
+  }
+  if (['alpha-erode', 'alpha-dilate'].includes(op) && parameters.width !== undefined) {
+    boundedInteger(parameters.width, `${op}.width`, 1, 32);
+  }
   return Object.freeze({ op, ...parameters });
 }
 
@@ -324,6 +345,46 @@ function normalizeReviewTask(task, taskIndex, targetClaims) {
   };
 }
 
+function normalizeCompareTask(task, taskIndex, targetClaims) {
+  const targetDirectory = normalizeTargetPath(task.targetDirectory, `tasks[${taskIndex}].targetDirectory`, targetClaims);
+  const sources = normalizeSources(task.sources, `tasks[${taskIndex}].sources`);
+  if (sources.length !== 2) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].sources must contain exactly two images.`);
+  }
+  const thresholds = isRecord(task.thresholds) ? task.thresholds : {};
+  return {
+    id: safeId(task.id, `tasks[${taskIndex}].id`),
+    kind: 'image-compare',
+    sources,
+    targetDirectory,
+    requireSameDimensions: task.requireSameDimensions !== false,
+    thresholds: {
+      maximumChangedFraction: boundedNumber(
+        thresholds.maximumChangedFraction ?? 1,
+        `tasks[${taskIndex}].thresholds.maximumChangedFraction`,
+        0,
+        1,
+      ),
+      maximumMeanChannelDelta: boundedNumber(
+        thresholds.maximumMeanChannelDelta ?? 255,
+        `tasks[${taskIndex}].thresholds.maximumMeanChannelDelta`,
+        0,
+        255,
+      ),
+      maximumAlphaChangedFraction: boundedNumber(
+        thresholds.maximumAlphaChangedFraction ?? 1,
+        `tasks[${taskIndex}].thresholds.maximumAlphaChangedFraction`,
+        0,
+        1,
+      ),
+    },
+    preview: {
+      difference: task.preview?.difference !== false,
+      overlay: task.preview?.overlay !== false,
+    },
+  };
+}
+
 async function bindExternalSource(workspaceRoot, descriptor, sourceMap, registry) {
   if (descriptor.kind !== 'external') return descriptor;
   if (sourceMap.has(descriptor.path)) {
@@ -398,7 +459,8 @@ export async function compileProjectArtSandbox({
     if (kind === 'image') normalized = normalizeImageTask(task, index, registry, targetClaims);
     else if (kind === 'slice-sheet') normalized = normalizeSliceTask(task, index, targetClaims);
     else if (kind === 'assemble-sheet') normalized = normalizeAssembleTask(task, index, targetClaims);
-    else normalized = normalizeReviewTask(task, index, targetClaims);
+    else if (kind === 'sequence-review') normalized = normalizeReviewTask(task, index, targetClaims);
+    else normalized = normalizeCompareTask(task, index, targetClaims);
     if (taskIds.has(normalized.id)) fail('PROJECT_ART_SANDBOX_TASK_DUPLICATE', `Duplicate task id: ${normalized.id}.`);
     taskIds.add(normalized.id);
     return normalized;

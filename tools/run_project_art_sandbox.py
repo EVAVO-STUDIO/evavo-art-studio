@@ -19,6 +19,7 @@ try:
         Image,
         ImageChops,
         ImageDraw,
+        ImageEnhance,
         ImageFilter,
         ImageOps,
         __version__ as PILLOW_VERSION,
@@ -480,6 +481,45 @@ def outline(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
     return layer
 
 
+def colour_distance(left: tuple[int, int, int], right: tuple[int, int, int]) -> float:
+    return math.sqrt(sum((left[index] - right[index]) ** 2 for index in range(3)))
+
+
+def colour_replace(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    source = parse_colour(operation["fromColour"], "colour-replace.fromColour", allow_alpha=False)[:3]
+    target = parse_colour(operation["toColour"], "colour-replace.toColour")
+    distance = float(operation.get("distance", 0))
+    if not 0 <= distance <= 441:
+        fail("colour-replace.distance must be between 0 and 441")
+    preserve_alpha = operation.get("preserveAlpha", True) is not False
+    output = image.copy().convert("RGBA")
+    pixels = output.load()
+    for y in range(output.height):
+        for x in range(output.width):
+            current = pixels[x, y]
+            if colour_distance(current[:3], source) <= distance:
+                alpha = current[3] if preserve_alpha else target[3]
+                pixels[x, y] = (target[0], target[1], target[2], alpha)
+    return output
+
+
+def translate_image(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    dx = int(operation.get("x", 0))
+    dy = int(operation.get("y", 0))
+    if abs(dx) > 65536 or abs(dy) > 65536:
+        fail("translate offsets exceed the bounded canvas range")
+    canvas = Image.new("RGBA", image.size, parse_colour(operation.get("background", "#00000000"), "translate.background"))
+    canvas.alpha_composite(image, (dx, dy))
+    return canvas
+
+
+def adjust_rgb_channels(image: Image.Image, enhancer: Any, factor: float) -> Image.Image:
+    alpha = image.getchannel("A")
+    rgb = enhancer(image.convert("RGB")).enhance(factor).convert("RGBA")
+    rgb.putalpha(alpha)
+    return rgb
+
+
 def apply_operation(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
     op = operation["op"]
     if op in {"inspect", "convert", "optimize"}:
@@ -525,6 +565,42 @@ def apply_operation(image: Image.Image, operation: dict[str, Any]) -> Image.Imag
         return image.transpose(Image.Transpose.ROTATE_180)
     if op == "rotate-270":
         return image.transpose(Image.Transpose.ROTATE_270)
+    if op == "translate":
+        return translate_image(image, operation)
+    if op == "colour-replace":
+        return colour_replace(image, operation)
+    if op == "brightness":
+        return adjust_rgb_channels(image, ImageEnhance.Brightness, float(operation.get("factor", 1.0)))
+    if op == "contrast":
+        return adjust_rgb_channels(image, ImageEnhance.Contrast, float(operation.get("factor", 1.0)))
+    if op == "saturation":
+        return adjust_rgb_channels(image, ImageEnhance.Color, float(operation.get("factor", 1.0)))
+    if op == "sharpness":
+        return adjust_rgb_channels(image, ImageEnhance.Sharpness, float(operation.get("factor", 1.0)))
+    if op == "gaussian-blur":
+        radius = float(operation.get("radius", 1.0))
+        alpha = image.getchannel("A")
+        result = image.convert("RGB").filter(ImageFilter.GaussianBlur(radius=radius)).convert("RGBA")
+        result.putalpha(alpha)
+        return result
+    if op == "unsharp-mask":
+        radius = float(operation.get("radius", 2.0))
+        percent = int(operation.get("percent", 150))
+        threshold = int(operation.get("threshold", 3))
+        alpha = image.getchannel("A")
+        result = image.convert("RGB").filter(ImageFilter.UnsharpMask(radius=radius, percent=percent, threshold=threshold)).convert("RGBA")
+        result.putalpha(alpha)
+        return result
+    if op == "alpha-erode":
+        width = int(operation.get("width", 1))
+        result = image.copy()
+        result.putalpha(result.getchannel("A").filter(ImageFilter.MinFilter(width * 2 + 1)))
+        return result
+    if op == "alpha-dilate":
+        width = int(operation.get("width", 1))
+        result = image.copy()
+        result.putalpha(result.getchannel("A").filter(ImageFilter.MaxFilter(width * 2 + 1)))
+        return result
     if op == "alpha-threshold":
         threshold = int(operation.get("threshold", 128))
         output = image.copy()
@@ -1002,6 +1078,99 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
     )
 
 
+def image_compare_metrics(left: Image.Image, right: Image.Image) -> dict[str, Any]:
+    if left.size != right.size:
+        return {
+            "sameDimensions": False,
+            "changedPixelFraction": 1.0,
+            "meanAbsoluteChannelDelta": 255.0,
+            "maximumChannelDelta": 255,
+            "alphaChangedPixelFraction": 1.0,
+        }
+    left_rgba = left.convert("RGBA")
+    right_rgba = right.convert("RGBA")
+    difference = ImageChops.difference(left_rgba, right_rgba)
+    raw = difference.tobytes()
+    changed = 0
+    alpha_changed = 0
+    total_delta = 0
+    maximum_delta = 0
+    for offset in range(0, len(raw), 4):
+        values = raw[offset:offset + 4]
+        if any(values):
+            changed += 1
+        if values[3]:
+            alpha_changed += 1
+        total_delta += sum(values)
+        maximum_delta = max(maximum_delta, *values)
+    pixels = max(1, left_rgba.width * left_rgba.height)
+    return {
+        "sameDimensions": True,
+        "changedPixelFraction": changed / pixels,
+        "meanAbsoluteChannelDelta": total_delta / (pixels * 4),
+        "maximumChannelDelta": maximum_delta,
+        "alphaChangedPixelFraction": alpha_changed / pixels,
+    }
+
+
+def execute_compare_task(context: RuntimeContext, task: dict[str, Any]) -> None:
+    source_paths = [context.resolve_source_path(source) for source in task["sources"]]
+    if len(source_paths) != 2:
+        fail(f"image-compare task {task['id']} requires exactly two sources")
+    left = load_image(source_paths[0])
+    right = load_image(source_paths[1])
+    metrics = image_compare_metrics(left, right)
+    thresholds = task["thresholds"]
+    issues: list[dict[str, Any]] = []
+    if task.get("requireSameDimensions", True) and not metrics["sameDimensions"]:
+        issues.append({"code": "dimensions-mismatch", "left": list(left.size), "right": list(right.size)})
+    if metrics["changedPixelFraction"] > float(thresholds["maximumChangedFraction"]):
+        issues.append({"code": "changed-fraction-exceeded", "observed": metrics["changedPixelFraction"], "maximum": thresholds["maximumChangedFraction"]})
+    if metrics["meanAbsoluteChannelDelta"] > float(thresholds["maximumMeanChannelDelta"]):
+        issues.append({"code": "mean-channel-delta-exceeded", "observed": metrics["meanAbsoluteChannelDelta"], "maximum": thresholds["maximumMeanChannelDelta"]})
+    if metrics["alphaChangedPixelFraction"] > float(thresholds["maximumAlphaChangedFraction"]):
+        issues.append({"code": "alpha-change-exceeded", "observed": metrics["alphaChangedPixelFraction"], "maximum": thresholds["maximumAlphaChangedFraction"]})
+    target_directory = target_path(context.staging, task["targetDirectory"], f"task {task['id']} targetDirectory")
+    target_directory.mkdir(parents=True, exist_ok=False)
+    manifest = {
+        "schema": "evavo.project-art-image-comparison.v1",
+        "taskId": task["id"],
+        "status": "passed" if not issues else "blocked",
+        "sources": [str(value) for value in source_paths],
+        "left": {"dimensions": {"width": left.width, "height": left.height}, "pixelSha256": image_pixel_sha256(left)},
+        "right": {"dimensions": {"width": right.width, "height": right.height}, "pixelSha256": image_pixel_sha256(right)},
+        "metrics": metrics,
+        "thresholds": thresholds,
+        "issues": issues,
+        "creativeApprovalPerformed": False,
+        "identityApprovalPerformed": False,
+    }
+    manifest_path = target_directory / "comparison.json"
+    write_json_create_only(manifest_path, manifest)
+    outputs = [output_record(context.staging, manifest_path, role="comparison-manifest")]
+    output_paths = [manifest_path]
+    if task["preview"]["difference"] and left.size == right.size:
+        difference = ImageChops.difference(left.convert("RGBA"), right.convert("RGBA"))
+        difference_path = target_directory / "difference.png"
+        save_image(difference, difference_path, "png")
+        outputs.append(output_record(context.staging, difference_path, difference, role="comparison-difference"))
+        output_paths.append(difference_path)
+    if task["preview"]["overlay"] and left.size == right.size:
+        overlay = Image.blend(left.convert("RGBA"), right.convert("RGBA"), 0.5)
+        overlay_path = target_directory / "overlay.png"
+        save_image(overlay, overlay_path, "png")
+        outputs.append(output_record(context.staging, overlay_path, overlay, role="comparison-overlay"))
+        output_paths.append(overlay_path)
+    context.remember(task["id"], {
+        "taskId": task["id"],
+        "kind": task["kind"],
+        "status": manifest["status"],
+        "issueCount": len(issues),
+        "metrics": metrics,
+        "outputs": outputs,
+    }, output_paths)
+
+
 def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[str, Any]:
     if plan.get("schema") != PLAN_SCHEMA:
         fail(f"plan must use {PLAN_SCHEMA}")
@@ -1050,6 +1219,8 @@ def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, outpu
                 execute_assemble_task(context, task)
             elif kind == "sequence-review":
                 execute_review_task(context, task)
+            elif kind == "image-compare":
+                execute_compare_task(context, task)
             else:
                 fail(f"unsupported task kind entered runtime: {kind}")
         context.verify_sources()

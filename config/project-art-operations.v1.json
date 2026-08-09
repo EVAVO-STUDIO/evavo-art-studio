@@ -19,25 +19,39 @@
       "id": "crop",
       "kind": "geometry",
       "deterministic": true,
-      "required": ["x", "y", "width", "height"]
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ]
     },
     {
       "id": "pad-canvas",
       "kind": "geometry",
       "deterministic": true,
-      "required": ["width", "height"]
+      "required": [
+        "width",
+        "height"
+      ]
     },
     {
       "id": "resize",
       "kind": "geometry",
       "deterministic": true,
-      "required": ["width", "height"]
+      "required": [
+        "width",
+        "height"
+      ]
     },
     {
       "id": "pixel-resize",
       "kind": "geometry",
       "deterministic": true,
-      "required": ["width", "height"]
+      "required": [
+        "width",
+        "height"
+      ]
     },
     {
       "id": "flip-horizontal",
@@ -65,6 +79,60 @@
       "deterministic": true
     },
     {
+      "id": "translate",
+      "kind": "geometry",
+      "deterministic": true
+    },
+    {
+      "id": "colour-replace",
+      "kind": "colour",
+      "deterministic": true,
+      "required": [
+        "fromColour",
+        "toColour"
+      ]
+    },
+    {
+      "id": "brightness",
+      "kind": "colour",
+      "deterministic": true
+    },
+    {
+      "id": "contrast",
+      "kind": "colour",
+      "deterministic": true
+    },
+    {
+      "id": "saturation",
+      "kind": "colour",
+      "deterministic": true
+    },
+    {
+      "id": "sharpness",
+      "kind": "colour",
+      "deterministic": true
+    },
+    {
+      "id": "gaussian-blur",
+      "kind": "filter",
+      "deterministic": true
+    },
+    {
+      "id": "unsharp-mask",
+      "kind": "filter",
+      "deterministic": true
+    },
+    {
+      "id": "alpha-erode",
+      "kind": "alpha",
+      "deterministic": true
+    },
+    {
+      "id": "alpha-dilate",
+      "kind": "alpha",
+      "deterministic": true
+    },
+    {
       "id": "alpha-threshold",
       "kind": "alpha",
       "deterministic": true
@@ -73,13 +141,17 @@
       "id": "connected-matte-to-alpha",
       "kind": "alpha",
       "deterministic": true,
-      "required": ["matteColour"]
+      "required": [
+        "matteColour"
+      ]
     },
     {
       "id": "edge-decontaminate",
       "kind": "alpha",
       "deterministic": true,
-      "required": ["matteColour"]
+      "required": [
+        "matteColour"
+      ]
     },
     {
       "id": "hidden-rgb-rebuild",
@@ -90,7 +162,9 @@
       "id": "palette-normalize",
       "kind": "colour",
       "deterministic": true,
-      "required": ["mode"]
+      "required": [
+        "mode"
+      ]
     },
     {
       "id": "quantize",
@@ -111,7 +185,9 @@
       "id": "outline",
       "kind": "pixel-effect",
       "deterministic": true,
-      "required": ["colour"]
+      "required": [
+        "colour"
+      ]
     },
     {
       "id": "convert",
@@ -128,7 +204,8 @@
     "image",
     "slice-sheet",
     "assemble-sheet",
-    "sequence-review"
+    "sequence-review",
+    "image-compare"
   ],
   "outputFormats": [
     "png",
