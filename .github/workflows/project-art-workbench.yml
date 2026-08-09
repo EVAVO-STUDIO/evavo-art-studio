@@ -88,6 +88,9 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
+      - name: Bootstrap real media tools with bounded fallback
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
       - name: Install frozen dependency graph
         run: pnpm install --frozen-lockfile
 
