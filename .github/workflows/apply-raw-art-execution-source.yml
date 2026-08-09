@@ -5,8 +5,6 @@ on:
     branches:
       - agent/raw-art-provider-execution-authority-20260809
     paths:
-      - ".github/automation/raw-art-execution-payload.b64"
-      - ".github/automation/raw-art-execution-payload-*.b64"
       - ".github/workflows/apply-raw-art-execution-source.yml"
 
 permissions:
@@ -94,7 +92,7 @@ jobs:
             .github/automation/raw-art-execution-payload-08.b64 \
             .github/automation/raw-art-execution-payload-09.b64 \
             .github/automation/raw-art-execution-payload-10.b64 \
-            .github/workflows/apply-raw-art-execution-source.yml
+            .github/workflows/raw-art-provider-runtime-execution.yml
           rmdir .github/automation 2>/dev/null || true
 
           node --check scripts/raw-art-provider/admission.mjs
@@ -122,8 +120,6 @@ jobs:
           .github/automation/raw-art-execution-payload-09.b64
           .github/automation/raw-art-execution-payload-10.b64
           .github/automation/raw-art-execution-payload.b64
-          .github/workflows/apply-raw-art-execution-source.yml
-          .github/workflows/raw-art-provider-runtime-execution.yml
           apps/worker/src/provider-handlers.ts
           docs/RAW_ART_PROVIDER_RUNTIME_ADMISSION.md
           docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md
@@ -138,5 +134,5 @@ jobs:
           git diff --cached --name-only | sort > "${RUNNER_TEMP}/actual-diff.txt"
           sort -o "${RUNNER_TEMP}/expected-diff.txt" "${RUNNER_TEMP}/expected-diff.txt"
           diff -u "${RUNNER_TEMP}/expected-diff.txt" "${RUNNER_TEMP}/actual-diff.txt"
-          git commit -m "feat(raw-art): authorize exact provider execution"
+          git commit -m "feat(raw-art): authorize exact provider execution core"
           git push origin "HEAD:${TARGET_BRANCH}"
