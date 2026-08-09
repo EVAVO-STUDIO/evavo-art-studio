@@ -1,0 +1,108 @@
+name: Apply RAW ART execution authority source
+
+on:
+  push:
+    branches:
+      - agent/raw-art-provider-execution-authority-20260809
+    paths:
+      - ".github/automation/raw-art-execution-payload.b64"
+      - ".github/workflows/apply-raw-art-execution-source.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-raw-art-execution-source
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact carrier commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify, apply, and publish exact permanent source
+        shell: bash
+        env:
+          EXPECTED_BASE: 08063967bfdded01b2940fd927062720925cc237
+          EXPECTED_PAYLOAD_SHA256: 6d26af09a28b703d67d6140ede10f5998595ed01d9551a9aee20e1263f51ceeb
+          TARGET_BRANCH: agent/raw-art-provider-execution-authority-20260809
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "${TARGET_BRANCH}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_BASE}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+          base64 --decode \
+            .github/automation/raw-art-execution-payload.b64 \
+            > "${RUNNER_TEMP}/raw-art-execution-payload.tgz"
+          echo "${EXPECTED_PAYLOAD_SHA256}  ${RUNNER_TEMP}/raw-art-execution-payload.tgz" \
+            | sha256sum --check --strict
+
+          cat > "${RUNNER_TEMP}/expected-files.txt" <<'FILES'
+          .github/workflows/raw-art-provider-runtime-execution.yml
+          apps/worker/src/provider-handlers.ts
+          docs/RAW_ART_PROVIDER_RUNTIME_ADMISSION.md
+          docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md
+          package.json
+          scripts/authorize-raw-art-provider-runtime-execution.mjs
+          scripts/check-raw-art-provider-runtime-admission.mjs
+          scripts/check-raw-art-provider-runtime-execution.mjs
+          scripts/raw-art-provider/admission.mjs
+          scripts/raw-art-provider/execution.mjs
+          scripts/run-authorized-raw-art-provider-worker.mjs
+          FILES
+          tar -tzf "${RUNNER_TEMP}/raw-art-execution-payload.tgz" \
+            | sed 's#^\./##' \
+            | sort > "${RUNNER_TEMP}/actual-files.txt"
+          sort -o "${RUNNER_TEMP}/expected-files.txt" "${RUNNER_TEMP}/expected-files.txt"
+          diff -u "${RUNNER_TEMP}/expected-files.txt" "${RUNNER_TEMP}/actual-files.txt"
+
+          tar -xzf "${RUNNER_TEMP}/raw-art-execution-payload.tgz" -C .
+          rm -f \
+            .github/automation/raw-art-execution-payload.b64 \
+            .github/workflows/apply-raw-art-execution-source.yml
+          rmdir .github/automation 2>/dev/null || true
+
+          node --check scripts/raw-art-provider/admission.mjs
+          node --check scripts/raw-art-provider/execution.mjs
+          node --check scripts/authorize-raw-art-provider-runtime-execution.mjs
+          node --check scripts/run-authorized-raw-art-provider-worker.mjs
+          node --check scripts/check-raw-art-provider-runtime-admission.mjs
+          node --check scripts/check-raw-art-provider-runtime-execution.mjs
+          node -e "JSON.parse(require('fs').readFileSync('package.json', 'utf8'))"
+          python3 - <<'PY'
+          import yaml
+          from pathlib import Path
+          yaml.safe_load(Path('.github/workflows/raw-art-provider-runtime-execution.yml').read_text())
+          PY
+
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add -A
+          cat > "${RUNNER_TEMP}/expected-diff.txt" <<'FILES'
+          .github/automation/raw-art-execution-payload.b64
+          .github/workflows/apply-raw-art-execution-source.yml
+          .github/workflows/raw-art-provider-runtime-execution.yml
+          apps/worker/src/provider-handlers.ts
+          docs/RAW_ART_PROVIDER_RUNTIME_ADMISSION.md
+          docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md
+          package.json
+          scripts/authorize-raw-art-provider-runtime-execution.mjs
+          scripts/check-raw-art-provider-runtime-admission.mjs
+          scripts/check-raw-art-provider-runtime-execution.mjs
+          scripts/raw-art-provider/admission.mjs
+          scripts/raw-art-provider/execution.mjs
+          scripts/run-authorized-raw-art-provider-worker.mjs
+          FILES
+          git diff --cached --name-only | sort > "${RUNNER_TEMP}/actual-diff.txt"
+          sort -o "${RUNNER_TEMP}/expected-diff.txt" "${RUNNER_TEMP}/expected-diff.txt"
+          diff -u "${RUNNER_TEMP}/expected-diff.txt" "${RUNNER_TEMP}/actual-diff.txt"
+          git commit -m "feat(raw-art): authorize exact provider execution"
+          git push origin "HEAD:${TARGET_BRANCH}"
