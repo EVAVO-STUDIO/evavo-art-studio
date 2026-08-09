@@ -46,6 +46,8 @@
     "pixel-font:build": "node scripts/pixel-font-studio.mjs build",
     "pixel-font:validate": "node scripts/pixel-font-studio.mjs validate",
     "pixel-font:mcp": "node scripts/pixel-font-studio-mcp.mjs",
+    "pixel-font:brass:build": "node scripts/build-brass-brine-pixel-font-family.mjs",
+    "pixel-font:brass:test": "node --test scripts/pixel-font-brass-brine.test.mjs",
     "pixel-font:check": "node scripts/check-pixel-font-studio.mjs",
     "governed-workspace-handoff:check": "node scripts/check-governed-workspace-handoff.mjs",
     "raw-art:production:check": "node scripts/check-raw-art-production-orchestrator.mjs",

@@ -6,12 +6,16 @@ on:
       - "scripts/pixel-font/**"
       - "scripts/pixel-font-studio.mjs"
       - "scripts/pixel-font-studio-mcp.mjs"
+      - "scripts/build-brass-brine-pixel-font-family.mjs"
       - "scripts/pixel-font-studio.test.mjs"
+      - "scripts/pixel-font-brass-brine.test.mjs"
       - "scripts/check-pixel-font-studio.mjs"
       - "config/pixel-font-studio.v1.json"
       - "config/pixel-font-family.example.v1.json"
+      - "config/pixel-font-family.brass-brine.v1.json"
       - "config/mcp.pixel-font-studio.windows.example.json"
       - "docs/PIXEL_FONT_STUDIO.md"
+      - "docs/BRASS_BRINE_PIXEL_FONT_FAMILY.md"
       - "evavo.reliability.json"
       - "package.json"
       - ".github/workflows/pixel-font-studio.yml"
@@ -22,12 +26,16 @@ on:
       - "scripts/pixel-font/**"
       - "scripts/pixel-font-studio.mjs"
       - "scripts/pixel-font-studio-mcp.mjs"
+      - "scripts/build-brass-brine-pixel-font-family.mjs"
       - "scripts/pixel-font-studio.test.mjs"
+      - "scripts/pixel-font-brass-brine.test.mjs"
       - "scripts/check-pixel-font-studio.mjs"
       - "config/pixel-font-studio.v1.json"
       - "config/pixel-font-family.example.v1.json"
+      - "config/pixel-font-family.brass-brine.v1.json"
       - "config/mcp.pixel-font-studio.windows.example.json"
       - "docs/PIXEL_FONT_STUDIO.md"
+      - "docs/BRASS_BRINE_PIXEL_FONT_FAMILY.md"
       - "evavo.reliability.json"
       - "package.json"
       - ".github/workflows/pixel-font-studio.yml"
@@ -43,10 +51,10 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out exact source
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -66,6 +74,23 @@ jobs:
 
       - name: Verify Pixel Font Studio
         run: pnpm run pixel-font:check
+
+      - name: Build exact Brass & Brine production family
+        run: |
+          set -euo pipefail
+          node scripts/build-brass-brine-pixel-font-family.mjs \
+            --output "$RUNNER_TEMP/brass-brine-pixel-font" \
+            --plan-output "$RUNNER_TEMP/brass-brine-pixel-font.plan.json"
+
+      - name: Upload exact generated Brass & Brine family
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: brass-brine-pixel-font-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/brass-brine-pixel-font/**
+            ${{ runner.temp }}/brass-brine-pixel-font.plan.json
 
       - name: Prove source tree remains clean
         run: |
