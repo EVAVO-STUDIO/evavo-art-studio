@@ -8,14 +8,34 @@ import {
   providerRequiredCapabilities,
   validateProviderCandidateRequest,
   type NormalizedProviderCandidateRequest,
+  type ProviderRegistryLike,
 } from "@evavo/art-providers";
 import {
   CancelledRuntimeError,
   PermanentRuntimeError,
   TransientRuntimeError,
   type RuntimeJobHandler,
+  type RuntimeJobRecord,
   type RuntimeWorkerCapabilityProfile,
 } from "@evavo/art-runtime";
+
+export const RAW_ART_PROVIDER_EXECUTION_CAPABILITY =
+  "raw-art.execution-authorized" as const;
+const RAW_ART_PROVIDER_REQUEST_METADATA_SCHEMA =
+  "evavo.raw-art-provider-request-metadata.v2";
+
+export interface RawArtProviderExecutionAuthorizer {
+  readonly authorizationSha256: string;
+  readonly allowedAdapterIds: readonly string[];
+  readonly queues: readonly string[];
+  readonly requiredCapability: typeof RAW_ART_PROVIDER_EXECUTION_CAPABILITY;
+  adapterAllowed(adapterId: string): boolean;
+  assertJobAuthorized(
+    job: RuntimeJobRecord,
+    request: NormalizedProviderCandidateRequest,
+    now?: Date,
+  ): unknown;
+}
 
 const OPERATION_KIND = Object.freeze({
   generate: "art.candidate.generate",
@@ -103,9 +123,62 @@ function providerFailure(error: ProviderError): Error {
   return new PermanentRuntimeError(error.code, error.message, error.details);
 }
 
+type JsonObject = Readonly<{ [key: string]: JsonValue }>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
+function rawArtRequest(
+  request: NormalizedProviderCandidateRequest,
+): boolean {
+  const metadata = request.metadata;
+  return (
+    isJsonObject(metadata) &&
+    metadata.schema === RAW_ART_PROVIDER_REQUEST_METADATA_SCHEMA
+  );
+}
+
+function requireRawArtExecutionAuthorization(
+  job: RuntimeJobRecord,
+  request: NormalizedProviderCandidateRequest,
+  authorization: RawArtProviderExecutionAuthorizer | undefined,
+): void {
+  const metadataGoverned = rawArtRequest(request);
+  const capabilityGoverned = job.spec.requiredCapabilities.includes(
+    RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
+  );
+  if (!metadataGoverned && !capabilityGoverned) return;
+  if (!metadataGoverned || !capabilityGoverned) {
+    throw new PermanentRuntimeError(
+      "RAW_ART_PROVIDER_EXECUTION_CONTRACT_MISMATCH",
+      "RAW_ART provider execution metadata and runtime capability must be declared together.",
+    );
+  }
+  if (!authorization) {
+    throw new PermanentRuntimeError(
+      "RAW_ART_PROVIDER_EXECUTION_UNAUTHORIZED",
+      "RAW_ART provider jobs require an exact active execution authorization before any provider call.",
+    );
+  }
+  try {
+    authorization.assertJobAuthorized(job, request, new Date());
+  } catch (error: unknown) {
+    throw new PermanentRuntimeError(
+      "RAW_ART_PROVIDER_EXECUTION_UNAUTHORIZED",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
 function createHandler(
-  registry: ProviderRegistry,
+  registry: ProviderRegistryLike,
   kind: (typeof OPERATION_KIND)[keyof typeof OPERATION_KIND],
+  authorization?: RawArtProviderExecutionAuthorizer,
 ): RuntimeJobHandler {
   return async (context) => {
     let request: NormalizedProviderCandidateRequest;
@@ -147,6 +220,11 @@ function createHandler(
         "Provider job adapter capability profile does not match its normalized request.",
       );
     }
+    requireRawArtExecutionAuthorization(
+      context.job,
+      request,
+      authorization,
+    );
     try {
       const result = await executeProviderCandidateRequest(request, {
         registry,
@@ -168,17 +246,30 @@ function createHandler(
 }
 
 export function createProviderHandlers(
-  registry: ProviderRegistry,
+  registry: ProviderRegistryLike,
+  authorization?: RawArtProviderExecutionAuthorizer,
 ): Readonly<Record<string, RuntimeJobHandler>> {
   return Object.freeze({
-    "art.candidate.generate": createHandler(registry, "art.candidate.generate"),
-    "art.candidate.edit": createHandler(registry, "art.candidate.edit"),
-    "art.candidate.inpaint": createHandler(registry, "art.candidate.inpaint"),
+    "art.candidate.generate": createHandler(
+      registry,
+      "art.candidate.generate",
+      authorization,
+    ),
+    "art.candidate.edit": createHandler(
+      registry,
+      "art.candidate.edit",
+      authorization,
+    ),
+    "art.candidate.inpaint": createHandler(
+      registry,
+      "art.candidate.inpaint",
+      authorization,
+    ),
   });
 }
 
 export function providerWorkerCapabilities(
-  registry: ProviderRegistry,
+  registry: ProviderRegistryLike,
 ): readonly string[] {
   const capabilities = new Set<string>();
   for (const adapter of registry.list()) {
@@ -197,10 +288,39 @@ export function providerWorkerCapabilities(
   return [...capabilities].sort();
 }
 export function providerWorkerCapabilityProfiles(
-  registry: ProviderRegistry,
+  registry: ProviderRegistryLike,
 ): readonly RuntimeWorkerCapabilityProfile[] {
   return registry.list().map((adapter) => ({
     id: adapter.id,
     capabilities: [...adapter.capabilities].sort(),
   }));
+}
+
+export function restrictProviderRegistry(
+  registry: ProviderRegistryLike,
+  allowedAdapterIds: readonly string[],
+): ProviderRegistryLike {
+  const allowed = new Set(allowedAdapterIds);
+  if (!allowed.size) {
+    throw new Error("RAW_ART provider execution requires at least one allowed adapter.");
+  }
+  const descriptors = registry
+    .list()
+    .filter((entry) => allowed.has(entry.id));
+  const available = new Set(descriptors.map((entry) => entry.id));
+  const missing = [...allowed].filter((adapterId) => !available.has(adapterId));
+  if (missing.length) {
+    throw new Error(
+      `RAW_ART provider execution authorization names unavailable adapters: ${missing.join(", ")}`,
+    );
+  }
+  return Object.freeze({
+    list: () => Object.freeze([...descriptors]),
+    rank: (request: NormalizedProviderCandidateRequest) =>
+      Object.freeze(
+        registry
+          .rank(request)
+          .filter((entry) => allowed.has(entry.adapter.descriptor.id)),
+      ),
+  });
 }

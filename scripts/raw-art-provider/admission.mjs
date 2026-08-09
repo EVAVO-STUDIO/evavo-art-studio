@@ -29,7 +29,9 @@ import {
 export const RAW_ART_PROVIDER_RUNTIME_ADMISSION_SELECTION_SCHEMA =
   'evavo.raw-art-provider-runtime-admission-selection.v1';
 export const RAW_ART_PROVIDER_RUNTIME_ADMISSION_RECEIPT_SCHEMA =
-  'evavo.raw-art-provider-runtime-admission-receipt.v1';
+  'evavo.raw-art-provider-runtime-admission-receipt.v2';
+export const RAW_ART_PROVIDER_EXECUTION_CAPABILITY =
+  'raw-art.execution-authorized';
 
 const RUNTIME_BATCH_STATUSES = new Set([
   'ready',
@@ -39,6 +41,10 @@ const RUNTIME_BATCH_STATUSES = new Set([
 ]);
 const MAXIMUM_RUNTIME_JOBS = 100;
 const MAXIMUM_REPORTED_PROBLEMS = 10_000;
+
+function executionQueue(selectionRunId) {
+  return `raw-art.provider.${selectionRunId}`;
+}
 
 function requiredHex(value, pattern, label) {
   if (typeof value !== 'string' || !pattern.test(value)) {
@@ -473,6 +479,13 @@ function receiptAuthority() {
   });
 }
 
+function assertReceiptAuthority(value) {
+  const expected = receiptAuthority();
+  if (!isObject(value) || canonical(value) !== canonical(expected)) {
+    fail('RAW_ART provider runtime admission receipt authority is invalid');
+  }
+}
+
 function snapshotSelectionInput(options) {
   if (!isObject(options)) fail('runtime admission selection options are invalid');
   const selectedAt = canonicalTimestamp(options.selectedAt, 'selectedAt');
@@ -674,6 +687,47 @@ export function validateRawArtProviderRuntimeAdmissionSelection(
   });
 }
 
+export function compileRawArtProviderAdmittedRuntimeJob(
+  selection,
+  selectionJob,
+) {
+  if (!selection || typeof selection !== 'object') {
+    fail('validated runtime admission selection is required');
+  }
+  if (!selectionJob || typeof selectionJob !== 'object') {
+    fail('validated runtime admission selection job is required');
+  }
+  const source = selectionJob.batchEntry?.runtimeJob;
+  if (!isObject(source)) {
+    fail('selected runtime job lacks its canonical provider submission');
+  }
+  const queue = executionQueue(selection.runId);
+  const requiredCapabilities = Object.freeze(
+    [...new Set([
+      ...(source.requiredCapabilities ?? []),
+      RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
+    ])].sort(),
+  );
+  const labels = Object.freeze({
+    ...(source.labels ?? {}),
+    rawArtAdmissionMode: 'explicit-execution-authorization',
+    rawArtSelectionRunId: selection.runId,
+    rawArtSelectionSha256: selection.selectionSha256,
+    rawArtWorkOrderId: selectionJob.workOrderId,
+    rawArtCampaignItemId: selectionJob.campaignItemId,
+    rawArtCanonicalRuntimeJobSha256: selectionJob.runtimeJobSha256,
+  });
+  return Object.freeze({
+    ...source,
+    queue,
+    idempotencyKey:
+      `raw-art:${selection.runId}:${selectionJob.providerRequestId}`,
+    requiredCapabilities,
+    maximumAttempts: 1,
+    labels,
+  });
+}
+
 async function prepareRuntimeRoot(value) {
   const rootInput = boundedText(value, 'runtimeRoot', 1, 32_768);
   if (rootInput.includes('\0')) fail('runtimeRoot is invalid');
@@ -715,8 +769,12 @@ function verifyAdmissionRecords(records, expected) {
       providerRequestId: target.selectionJob.providerRequestId,
       contractSha256: target.selectionJob.contractSha256,
       runtimeJobSha256: target.selectionJob.runtimeJobSha256,
+      admittedRuntimeJobSha256: hashObject(target.runtimeJob),
       jobId: record.id,
       specSha256: record.specHash,
+      executionQueue: record.spec.queue,
+      executionCapability: RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
+      maximumAttempts: record.spec.maximumAttempts,
       createdAt,
     });
   });
@@ -739,15 +797,17 @@ export async function admitRawArtProviderRuntimeSelection(
   }
 
   const expected = selection.jobs.map((selectionJob) => {
-    const normalized = normalizeRuntimeJobSubmission(
-      selectionJob.batchEntry.runtimeJob,
+    const runtimeJob = compileRawArtProviderAdmittedRuntimeJob(
+      selection,
+      selectionJob,
     );
-    return Object.freeze({ selectionJob, normalized });
+    const normalized = normalizeRuntimeJobSubmission(runtimeJob);
+    return Object.freeze({ selectionJob, runtimeJob, normalized });
   });
   const runtimeRoot = await prepareRuntimeRoot(options.runtimeRoot);
   const runtime = new LocalRuntimeRepository({ root: runtimeRoot });
   const records = await runtime.submitBatch(
-    expected.map((entry) => entry.selectionJob.batchEntry.runtimeJob),
+    expected.map((entry) => entry.runtimeJob),
     actor,
     new Date(admittedAt),
   );
@@ -791,10 +851,17 @@ export async function admitRawArtProviderRuntimeSelection(
       selectedRuntimeJobs: selection.jobs.length,
       admittedRuntimeJobs: jobs.length,
     },
+    executionIsolation: {
+      mode: 'explicit-authorization-required',
+      queue: executionQueue(selection.runId),
+      requiredCapability: RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
+      maximumAttempts: 1,
+      genericProviderWorkerMayClaim: false,
+    },
     jobs,
     nextActions: [
-      'Keep the durable runtime repository stopped until provider execution is deliberately authorised.',
-      'Start a compatible Art Studio worker separately and inspect immutable provider evidence plus unapproved candidate artifacts.',
+      'Compile a self-hashed RAW_ART provider execution authorization for these exact isolated runtime jobs.',
+      'Run only the dedicated authorized RAW_ART provider worker and inspect immutable provider evidence plus unapproved candidate artifacts.',
       'Master, evaluate and independently approve candidates before any target-repository mutation, promotion or publication.',
     ],
     authority: receiptAuthority(),
@@ -804,5 +871,189 @@ export async function admitRawArtProviderRuntimeSelection(
     ...receipt,
     admissionSha256,
     runId: admissionSha256.slice(0, 20),
+  });
+}
+
+export function validateRawArtProviderRuntimeAdmissionReceipt(
+  receiptRecord,
+  runtimeBatchRecord,
+  selectionRecord,
+  expectedRuntimeRoot,
+) {
+  const selection = validateRawArtProviderRuntimeAdmissionSelection(
+    selectionRecord,
+    runtimeBatchRecord,
+  );
+  if (!isObject(receiptRecord) || !isObject(receiptRecord.value)) {
+    fail('RAW_ART provider runtime admission receipt record is invalid');
+  }
+  const receipt = receiptRecord.value;
+  if (
+    receipt.schema !== RAW_ART_PROVIDER_RUNTIME_ADMISSION_RECEIPT_SCHEMA ||
+    receipt.status !== 'admitted'
+  ) {
+    fail('unexpected RAW_ART provider runtime admission receipt v2');
+  }
+  const admissionSha256 = verifySelfHash(
+    receipt,
+    'admissionSha256',
+    'RAW_ART provider runtime admission receipt',
+  );
+  assertReceiptAuthority(receipt.authority);
+  if (
+    receipt.runtimeProtocolVersion !== RUNTIME_PROTOCOL_VERSION ||
+    receipt.providerProtocolVersion !== selection.batch.providerProtocolVersion
+  ) {
+    fail('runtime admission receipt protocol binding is invalid');
+  }
+
+  const admittedAt = canonicalTimestamp(receipt.admittedAt, 'admittedAt');
+  if (Date.parse(admittedAt) < Date.parse(selection.selectedAt)) {
+    fail('runtime admission receipt predates its selection');
+  }
+  const actor = runtimeActor(receipt.actor);
+  const runtimeRootInput = boundedText(
+    receipt.runtimeRoot,
+    'runtimeRoot',
+    1,
+    32_768,
+  );
+  if (runtimeRootInput.includes('\0')) fail('runtimeRoot is invalid');
+  const runtimeRoot = path.resolve(runtimeRootInput);
+  if (runtimeRoot !== runtimeRootInput) {
+    fail('runtime admission receipt runtimeRoot must be absolute and normalized');
+  }
+  if (
+    expectedRuntimeRoot !== undefined &&
+    path.resolve(expectedRuntimeRoot) !== runtimeRoot
+  ) {
+    fail('runtime admission receipt is bound to another runtime root');
+  }
+  if (receipt.runtimeRootSha256 !== sha256(Buffer.from(runtimeRoot, 'utf8'))) {
+    fail('runtime admission receipt runtimeRootSha256 mismatch');
+  }
+
+  const expectedRuntimeBatchSource = {
+    path: runtimeBatchRecord.path,
+    fileSha256: runtimeBatchRecord.fileSha256,
+    documentSha256: selection.batch.runtimeBatchSha256,
+    runId: selection.batch.runId,
+  };
+  if (
+    !isObject(receipt.sourceRuntimeBatch) ||
+    canonical(receipt.sourceRuntimeBatch) !==
+      canonical(expectedRuntimeBatchSource)
+  ) {
+    fail('runtime admission receipt does not bind the exact runtime batch file');
+  }
+
+  const expectedSelection = {
+    path: selectionRecord.path,
+    fileSha256: selectionRecord.fileSha256,
+    documentSha256: selection.selectionSha256,
+    runId: selection.runId,
+    selectedAt: selection.selectedAt,
+    selectedBy: selection.selectedBy,
+    reason: selection.reason,
+  };
+  if (
+    !isObject(receipt.selection) ||
+    canonical(receipt.selection) !== canonical(expectedSelection)
+  ) {
+    fail('runtime admission receipt does not bind the exact selection file');
+  }
+
+  const expectedCampaign = {
+    gameHead: selection.batch.gameHead,
+    queueSha256: selection.batch.queueSha256,
+    campaignSha256: selection.batch.campaignSha256,
+    campaignRunId: selection.batch.campaignRunId,
+    technicalAdmissionSha256: selection.batch.technicalAdmissionSha256,
+    styleBankSha256: selection.batch.styleBankSha256,
+    bindingsSha256: selection.batch.bindingsSha256,
+  };
+  if (
+    !isObject(receipt.campaign) ||
+    canonical(receipt.campaign) !== canonical(expectedCampaign)
+  ) {
+    fail('runtime admission receipt campaign binding is invalid');
+  }
+
+  if (
+    !isObject(receipt.counts) ||
+    receipt.counts.selectedRuntimeJobs !== selection.jobs.length ||
+    receipt.counts.admittedRuntimeJobs !== selection.jobs.length
+  ) {
+    fail('runtime admission receipt count reconciliation failed');
+  }
+  const expectedIsolation = {
+    mode: 'explicit-authorization-required',
+    queue: executionQueue(selection.runId),
+    requiredCapability: RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
+    maximumAttempts: 1,
+    genericProviderWorkerMayClaim: false,
+  };
+  if (
+    !isObject(receipt.executionIsolation) ||
+    canonical(receipt.executionIsolation) !== canonical(expectedIsolation)
+  ) {
+    fail('runtime admission receipt execution isolation is invalid');
+  }
+
+  const values = boundedArray(
+    receipt.jobs,
+    'runtime admission receipt jobs',
+    MAXIMUM_RUNTIME_JOBS,
+  );
+  if (values.length !== selection.jobs.length) {
+    fail('runtime admission receipt job count mismatch');
+  }
+  const jobs = selection.jobs.map((selectionJob, index) => {
+    const runtimeJob = compileRawArtProviderAdmittedRuntimeJob(
+      selection,
+      selectionJob,
+    );
+    const normalized = normalizeRuntimeJobSubmission(runtimeJob);
+    const createdAt = canonicalTimestamp(
+      values[index]?.createdAt,
+      `runtime admission receipt jobs[${index}].createdAt`,
+    );
+    if (createdAt !== admittedAt) {
+      fail(`runtime admission receipt jobs[${index}] creation time drifted`);
+    }
+    const expected = {
+      workOrderId: selectionJob.workOrderId,
+      campaignItemId: selectionJob.campaignItemId,
+      providerRequestId: selectionJob.providerRequestId,
+      contractSha256: selectionJob.contractSha256,
+      runtimeJobSha256: selectionJob.runtimeJobSha256,
+      admittedRuntimeJobSha256: hashObject(runtimeJob),
+      jobId: normalized.spec.id,
+      specSha256: normalized.specHash,
+      executionQueue: normalized.spec.queue,
+      executionCapability: RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
+      maximumAttempts: 1,
+      createdAt,
+    };
+    if (!isObject(values[index]) || canonical(values[index]) !== canonical(expected)) {
+      fail(`runtime admission receipt jobs[${index}] does not bind the exact admitted job`);
+    }
+    return Object.freeze({
+      ...expected,
+      runtimeJob,
+      normalized,
+      selectionJob,
+    });
+  });
+
+  return Object.freeze({
+    value: receipt,
+    admissionSha256,
+    runId: receipt.runId,
+    admittedAt,
+    actor,
+    runtimeRoot,
+    selection,
+    jobs: Object.freeze(jobs),
   });
 }
