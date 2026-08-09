@@ -6,6 +6,7 @@ on:
       - agent/raw-art-provider-execution-authority-20260809
     paths:
       - ".github/automation/raw-art-execution-payload.b64"
+      - ".github/automation/raw-art-execution-payload-*.b64"
       - ".github/workflows/apply-raw-art-execution-source.yml"
 
 permissions:
@@ -36,11 +37,21 @@ jobs:
         run: |
           set -euo pipefail
           test "${GITHUB_REF_NAME}" = "${TARGET_BRANCH}"
-          test "$(git rev-parse HEAD^)" = "${EXPECTED_BASE}"
+          git fetch origin main --no-tags
+          test "$(git merge-base HEAD origin/main)" = "${EXPECTED_BASE}"
+          test "$(git rev-list --count "${EXPECTED_BASE}..HEAD")" = "2"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
+          cat \
+            .github/automation/raw-art-execution-payload-00.b64 \
+            .github/automation/raw-art-execution-payload-01.b64 \
+            .github/automation/raw-art-execution-payload-02.b64 \
+            .github/automation/raw-art-execution-payload-03.b64 \
+            .github/automation/raw-art-execution-payload-04.b64 \
+            .github/automation/raw-art-execution-payload-05.b64 \
+            > "${RUNNER_TEMP}/raw-art-execution-payload.b64"
           base64 --decode \
-            .github/automation/raw-art-execution-payload.b64 \
+            "${RUNNER_TEMP}/raw-art-execution-payload.b64" \
             > "${RUNNER_TEMP}/raw-art-execution-payload.tgz"
           echo "${EXPECTED_PAYLOAD_SHA256}  ${RUNNER_TEMP}/raw-art-execution-payload.tgz" \
             | sha256sum --check --strict
@@ -67,6 +78,12 @@ jobs:
           tar -xzf "${RUNNER_TEMP}/raw-art-execution-payload.tgz" -C .
           rm -f \
             .github/automation/raw-art-execution-payload.b64 \
+            .github/automation/raw-art-execution-payload-00.b64 \
+            .github/automation/raw-art-execution-payload-01.b64 \
+            .github/automation/raw-art-execution-payload-02.b64 \
+            .github/automation/raw-art-execution-payload-03.b64 \
+            .github/automation/raw-art-execution-payload-04.b64 \
+            .github/automation/raw-art-execution-payload-05.b64 \
             .github/workflows/apply-raw-art-execution-source.yml
           rmdir .github/automation 2>/dev/null || true
 
@@ -87,6 +104,12 @@ jobs:
           git config user.email "evavo.studio@gmail.com"
           git add -A
           cat > "${RUNNER_TEMP}/expected-diff.txt" <<'FILES'
+          .github/automation/raw-art-execution-payload-00.b64
+          .github/automation/raw-art-execution-payload-01.b64
+          .github/automation/raw-art-execution-payload-02.b64
+          .github/automation/raw-art-execution-payload-03.b64
+          .github/automation/raw-art-execution-payload-04.b64
+          .github/automation/raw-art-execution-payload-05.b64
           .github/automation/raw-art-execution-payload.b64
           .github/workflows/apply-raw-art-execution-source.yml
           .github/workflows/raw-art-provider-runtime-execution.yml
