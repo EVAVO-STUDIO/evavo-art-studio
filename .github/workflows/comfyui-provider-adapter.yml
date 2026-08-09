@@ -1,0 +1,159 @@
+name: ComfyUI provider adapter
+
+on:
+  pull_request:
+    paths:
+      - "packages/providers/src/adapters/comfyui.ts"
+      - "packages/providers/src/index.ts"
+      - "packages/providers/test/comfyui.test.mjs"
+      - "apps/worker/src/provider-handlers.ts"
+      - "apps/worker/test/comfyui-provider-registry.test.mjs"
+      - "scripts/compile-comfyui-workflow-catalog.mjs"
+      - "scripts/check-comfyui-provider-adapter.mjs"
+      - "docs/COMFYUI_PROVIDER_ADAPTER.md"
+      - "docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md"
+      - "docs/governed-provider-candidates.md"
+      - ".env.example"
+      - "README.md"
+      - "package.json"
+      - ".github/workflows/comfyui-provider-adapter.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/providers/src/adapters/comfyui.ts"
+      - "packages/providers/src/index.ts"
+      - "packages/providers/test/comfyui.test.mjs"
+      - "apps/worker/src/provider-handlers.ts"
+      - "apps/worker/test/comfyui-provider-registry.test.mjs"
+      - "scripts/compile-comfyui-workflow-catalog.mjs"
+      - "scripts/check-comfyui-provider-adapter.mjs"
+      - "docs/COMFYUI_PROVIDER_ADAPTER.md"
+      - "docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md"
+      - "docs/governed-provider-candidates.md"
+      - ".env.example"
+      - "README.md"
+      - "package.json"
+      - ".github/workflows/comfyui-provider-adapter.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: comfyui-provider-adapter-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact provider and worker dependency closure
+        run: |
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
+
+      - name: Type-check provider and worker boundaries
+        run: |
+          pnpm --filter @evavo/art-providers typecheck
+          pnpm --filter @evavo/art-studio-worker typecheck
+
+      - name: Verify governed ComfyUI static contract
+        run: node scripts/check-comfyui-provider-adapter.mjs
+
+      - name: Run governed ComfyUI adapter regressions
+        run: node --test packages/providers/test/comfyui.test.mjs apps/worker/test/comfyui-provider-registry.test.mjs
+
+      - name: Prove create-only catalog compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/comfyui-catalog"
+          mkdir -p "${root}"
+          DRAFT_PATH="${root}/draft.json" node --input-type=module <<'NODE'
+          import { writeFile } from "node:fs/promises";
+          const draft = {
+            schemaVersion: "evavo.comfyui-workflow-catalog-draft.v1",
+            catalogId: "ci-comfyui-catalog",
+            catalogVersion: "1.0.0",
+            profiles: [{
+              profileId: "ci-generate",
+              label: "CI generate fixture",
+              description: "Fixture-only exact workflow catalog publication proof.",
+              version: "1.0.0",
+              priority: 1,
+              operations: ["generate"],
+              assetKinds: ["illustration"],
+              continuityPhases: ["independent"],
+              capabilities: ["generate", "seed", "custom-size", "candidate-count", "cancellation"],
+              modelId: "ci-checkpoint",
+              workflow: {
+                "1": { class_type: "CLIPTextEncode", inputs: { text: "prompt" } },
+                "2": { class_type: "EmptyLatentImage", inputs: { width: 512, height: 512, batch_size: 1 } },
+                "3": { class_type: "KSampler", inputs: { seed: 1 } },
+                "4": { class_type: "SaveImage", inputs: { filename_prefix: "ci", images: ["3", 0] } },
+                "5": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: "ci.safetensors" } }
+              },
+              bindings: {
+                positivePrompt: { nodeId: "1", input: "text" },
+                width: { nodeId: "2", input: "width" },
+                height: { nodeId: "2", input: "height" },
+                candidateCount: { nodeId: "2", input: "batch_size" },
+                seed: { nodeId: "3", input: "seed" },
+                filenamePrefix: { nodeId: "4", input: "filename_prefix" },
+                referenceImages: []
+              },
+              outputNodeIds: ["4"],
+              modelInventory: [{ id: "ci-checkpoint", kind: "checkpoint", sha256: "a".repeat(64) }],
+              runtimeInventory: [{ id: "comfyui", version: "ci-1.0.0", sha256: "b".repeat(64) }],
+              limits: { maximumCandidates: 4, maximumReferenceImages: 0, maximumSourceBytes: 1048576 }
+            }]
+          };
+          await writeFile(process.env.DRAFT_PATH, `${JSON.stringify(draft, null, 2)}\n`);
+          NODE
+          pnpm run provider:comfyui:catalog:compile -- --input "${root}/draft.json" --output "${root}/catalog.json"
+          test -s "${root}/catalog.json"
+          if pnpm run provider:comfyui:catalog:compile -- --input "${root}/draft.json" --output "${root}/catalog.json"; then
+            echo "catalog compiler overwrote an existing output" >&2
+            exit 1
+          fi
+          CATALOG_PATH="${root}/catalog.json" node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          import { validateComfyUIWorkflowCatalog } from "./packages/providers/dist/index.js";
+          const catalog = validateComfyUIWorkflowCatalog(JSON.parse(await readFile(process.env.CATALOG_PATH, "utf8")));
+          if (catalog.profiles.length !== 1 || catalog.catalogSha256.length !== 64) process.exit(1);
+          NODE
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Verify immutable lockfile and clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
