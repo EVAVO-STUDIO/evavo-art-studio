@@ -408,11 +408,25 @@ async function main() {
     verifySelfHash(execution, 'executionSha256');
     assert.equal(execution.status, 'succeeded');
     const job = execution.jobs[0];
-    const candidates = job.outputArtifacts
+    const candidateOutputs = job.outputArtifacts
       .filter((entry) => entry.artifactRole === 'provider-candidate');
-    assert.equal(candidates.length, 7);
+    assert.equal(candidateOutputs.length, 7);
 
     const artifacts = new LocalArtifactStore({ root: artifactRoot });
+    const candidates = [];
+    for (const output of candidateOutputs) {
+      const descriptor = await artifacts.get(output.artifactId);
+      assert.ok(descriptor);
+      const candidateIndex = Number(descriptor.labels.candidateIndex);
+      assert.ok(Number.isSafeInteger(candidateIndex));
+      candidates.push({ ...output, candidateIndex });
+    }
+    candidates.sort((left, right) => left.candidateIndex - right.candidateIndex);
+    assert.deepEqual(
+      candidates.map((entry) => entry.candidateIndex),
+      [1, 2, 3, 4, 5, 6, 7],
+    );
+
     const maskBytes = await artifacts.read(candidates[2].artifactId);
     const mask = await artifacts.put(maskBytes, {
       mediaType: 'image/png',
@@ -427,13 +441,26 @@ async function main() {
     });
 
     const decisions = [
-      reviewCandidate(candidates[0], 1, 'keep'),
-      reviewCandidate(candidates[1], 2, 'edit'),
-      reviewCandidate(candidates[2], 3, 'edit', mask.artifactId),
-      reviewCandidate(candidates[3], 4, 'recreate'),
-      reviewCandidate(candidates[4], 5, 'generate-variation'),
-      reviewCandidate(candidates[5], 6, 'reference-only'),
-      reviewCandidate(candidates[6], 7, 'reject'),
+      reviewCandidate(candidates[0], candidates[0].candidateIndex, 'keep'),
+      reviewCandidate(candidates[1], candidates[1].candidateIndex, 'edit'),
+      reviewCandidate(
+        candidates[2],
+        candidates[2].candidateIndex,
+        'edit',
+        mask.artifactId,
+      ),
+      reviewCandidate(candidates[3], candidates[3].candidateIndex, 'recreate'),
+      reviewCandidate(
+        candidates[4],
+        candidates[4].candidateIndex,
+        'generate-variation',
+      ),
+      reviewCandidate(
+        candidates[5],
+        candidates[5].candidateIndex,
+        'reference-only',
+      ),
+      reviewCandidate(candidates[6], candidates[6].candidateIndex, 'reject'),
     ];
     for (const decision of decisions) {
       decision.jobId = job.jobId;
