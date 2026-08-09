@@ -1,4 +1,4 @@
-name: Debug RAW ART admission regression
+name: Apply final RAW ART admission fixture correction
 
 on:
   push:
@@ -8,58 +8,54 @@ on:
       - ".github/workflows/debug-raw-art-admission-regression.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: debug-raw-art-admission-regression
+  group: apply-final-raw-art-admission-fixture-correction
   cancel-in-progress: true
 
 jobs:
-  diagnose:
+  apply:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
-      - name: Check out exact source
+      - name: Check out exact correction source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
 
-      - name: Set up pnpm 10.13.1
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-        with:
-          version: 10.13.1
-
-      - name: Set up Node.js 22.14.0
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
-        with:
-          node-version: "22.14.0"
-          package-manager-cache: false
-
-      - name: Install frozen dependency graph
-        run: pnpm install --frozen-lockfile
-
-      - name: Build exact domain dependencies
-        run: pnpm run build:domain
-
-      - name: Capture admission regression output
+      - name: Bind conflict fixture to canonical provider submission
         shell: bash
+        env:
+          EXPECTED_PARENT: 6c1689ddde1489a1e931ed8cb7179f5bbe35c481
+          TARGET_BRANCH: agent/raw-art-provider-execution-authority-20260809
         run: |
-          set +e
-          mkdir -p "${RUNNER_TEMP}/raw-art-admission-diagnostics"
-          node scripts/check-raw-art-provider-runtime-admission.mjs \
-            > "${RUNNER_TEMP}/raw-art-admission-diagnostics/admission.log" 2>&1
-          status=$?
-          printf '{"headSha":"%s","status":%s}\n' "${GITHUB_SHA}" "${status}" \
-            > "${RUNNER_TEMP}/raw-art-admission-diagnostics/status.json"
-          cat "${RUNNER_TEMP}/raw-art-admission-diagnostics/status.json"
-          cat "${RUNNER_TEMP}/raw-art-admission-diagnostics/admission.log"
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "${TARGET_BRANCH}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
-      - name: Upload admission diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: raw-art-admission-diagnostics-${{ github.sha }}
-          path: ${{ runner.temp }}/raw-art-admission-diagnostics
-          if-no-files-found: error
-          retention-days: 1
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/check-raw-art-provider-runtime-admission.mjs')
+          source = path.read_text(encoding='utf-8')
+          old = """    const conflictSelectionJob = {\n      ...selection.jobs[1],\n      batchEntry: conflictBatch.jobs[1],\n    };\n"""
+          new = """    const conflictSelectionJob = {\n      ...selection.jobs[1],\n      batchEntry: {\n        ...conflictBatch.jobs[1],\n        runtimeJob: conflictBatch.jobs[1].contract.runtimeJob,\n      },\n    };\n"""
+          if source.count(old) != 1:
+              raise SystemExit('expected one legacy conflict fixture')
+          path.write_text(source.replace(old, new), encoding='utf-8')
+          PY
+
+          node --check scripts/check-raw-art-provider-runtime-admission.mjs
+          git diff --check
+          test "$(git diff --name-only)" = "scripts/check-raw-art-provider-runtime-admission.mjs"
+          test "$(grep -c 'runtimeJob: .*contract.runtimeJob' scripts/check-raw-art-provider-runtime-admission.mjs)" = "2"
+
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add scripts/check-raw-art-provider-runtime-admission.mjs
+          git commit -m "test(raw-art): bind conflict fixture to provider submission"
+          git push origin "HEAD:${TARGET_BRANCH}"
