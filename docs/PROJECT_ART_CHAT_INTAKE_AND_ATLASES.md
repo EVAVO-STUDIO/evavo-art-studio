@@ -187,7 +187,57 @@ The TexturePacker and Phaser files use JSON Hash frame records. The Godot region
 
 This is a sprite atlas rather than only a uniform sprite sheet. Existing Art Studio sheet slicing and sheet assembly remain available for fixed-cell workflows.
 
-## 5. Repository organisation and publication
+## 5. Use the complete workbench from ChatGPT or Claude
+
+The project-art workspace MCP now exposes intake, deterministic editing, sprite work, project intelligence, reference-derived planning and atlas construction through one guarded path-only server.
+
+Start from:
+
+```text
+config/mcp.project-art-workspace.windows.example.json
+```
+
+Read-only capability discovery is always available:
+
+```text
+evavo_art_workspace_capabilities
+```
+
+The trusted write gate enables these additional tools:
+
+```text
+evavo_art_compile_project_intelligence
+evavo_art_compile_sandbox
+evavo_art_run_sandbox
+evavo_art_compile_reference_plan
+evavo_art_stage_reference_artifacts
+evavo_art_compile_intake
+evavo_art_run_intake
+evavo_art_compile_atlas
+evavo_art_run_atlas
+```
+
+Set `EVAVO_ART_WORKSPACE_ROOTS` to the exact repository, incoming-art and workspace roots the agent may use. Set `EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE=true` only for a trusted local deployment. The tool server never accepts an arbitrary executable or shell command. Image bytes never travel through MCP; only paths, hashes, byte counts, bounded summaries and receipt identities do.
+
+Configured roots must already exist as non-symbolic directories. A path containing a symlink or junction below an allowed root is rejected before work starts, and the underlying compiler or executor performs its own exact-path revalidation as a second boundary.
+
+The example also sets `EVAVO_ART_WORKSPACE_MCP_TIMEOUT_MS=600000`. Every fixed child command is time-bounded, raw command output is not returned as a successful tool result, and provider, Git, storage and deployment credentials are removed from the child environment. Use the dedicated `project-art:review:mcp` surface for offline visual decisions and the separately gated workspace writer for repository publication.
+
+This means an attached or generated image can now move through the full local working path:
+
+```text
+chat attachment or generated image
+→ exact intake
+→ immutable original plus editable working copy
+→ deterministic crop, alpha, halo, canvas, palette, sheet or sequence work
+→ matching-image or matching-frame plan when provider-backed visual work is required
+→ offline visual review
+→ EVAVO Storage or governed repository writer
+```
+
+Provider execution, candidate approval, promotion, Git mutation and publication remain separate governed boundaries.
+
+## 6. Repository organisation and publication
 
 Art Studio workspaces can contain renamed, repaired, assembled and atlas-ready files, but this boundary never edits a Git repository itself.
 

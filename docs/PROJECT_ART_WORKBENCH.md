@@ -530,7 +530,84 @@ independentApprovalPerformed = false
 
 Its provider request conforms to the repository-owned provider request input contract and is validated against that implementation in the permanent CI fixture.
 
-## 5. Exact authority boundary
+## 5. Callable agent workbench
+
+The project-art workspace MCP now exposes the complete path-only workbench to ChatGPT, Claude and other trusted local agents instead of limiting them to intake and atlas creation.
+
+Use the Windows example configuration:
+
+```text
+config/mcp.project-art-workspace.windows.example.json
+```
+
+The server starts read-only by default. The capability tool remains available without write authority:
+
+```text
+evavo_art_workspace_capabilities
+```
+
+It reports the exact deterministic operation registry, task kinds, reference-derived operations, configured root count and whether the explicit write gate is enabled. It does not scan a project or create any file.
+
+The complete callable surface is:
+
+```text
+evavo_art_compile_project_intelligence
+evavo_art_compile_sandbox
+evavo_art_run_sandbox
+evavo_art_compile_reference_plan
+evavo_art_stage_reference_artifacts
+evavo_art_compile_intake
+evavo_art_run_intake
+evavo_art_compile_atlas
+evavo_art_run_atlas
+```
+
+Enable write-capable tools only on a trusted local deployment:
+
+```text
+EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE=true
+```
+
+Confine every readable and writable path through:
+
+```text
+EVAVO_ART_WORKSPACE_ROOTS=C:\GitRepos;C:\EVAVO\ArtWorkspaces;C:\EVAVO\Incoming Art
+```
+
+Every configured root must already exist as a real, non-symbolic directory. The server rejects symbolic-link or junction components beneath those roots before invoking a compiler or executor, and each underlying workbench boundary independently revalidates its exact source and output paths.
+
+On Windows, the optional Python launcher can be selected explicitly:
+
+```text
+EVAVO_ART_WORKSPACE_PYTHON=py
+```
+
+Each fixed child command is bounded by a ten-minute timeout by default. A trusted deployment may select a value from one second through thirty minutes:
+
+```text
+EVAVO_ART_WORKSPACE_MCP_TIMEOUT_MS=600000
+```
+
+The MCP carries only paths, bounded arguments, exact identities, summaries and receipt hashes. Image bytes and raw child-process output never travel through MCP. All subprocesses use fixed repository-owned entrypoints with `shell: false`, a bounded output buffer, a bounded timeout and a credential-redacted environment; callers cannot choose a script, inject a command, enable provider execution, approve a candidate, mutate a Git repository, deploy or publish.
+
+Visual review remains on the dedicated path-only Review Studio MCP at `tools/project_art_review_mcp.mjs`. Repository publication remains on the independently gated workspace-writer surface. The capability response identifies both related boundaries so an agent can move through the complete workflow without collapsing their authority.
+
+A practical agent flow is now:
+
+```text
+capability inspection
+→ project intelligence
+→ exact intake where needed
+→ sandbox plan compilation
+→ atomic deterministic image or sprite execution
+→ reference-derived plan compilation for visual work that cannot be deterministic
+→ immutable reference staging
+→ separate provider selection, admission and short-lived authorisation
+→ Project Art Review Studio
+→ independent approval and governed repository writing
+```
+
+## 6. Exact authority boundary
 
 ### Intelligence
 
@@ -570,7 +647,7 @@ force push
 
 The generated pixels, edited pixels, sequence evidence, and provider candidates all remain unapproved until the existing independent approval and promotion boundaries are completed.
 
-## 6. Validation
+## 7. Validation
 
 The permanent regression suite covers:
 
@@ -601,6 +678,12 @@ The permanent regression suite covers:
 - reference topology requirements;
 - immutable artifact staging;
 - compatibility with the repository provider validator;
+- read-only MCP capability discovery;
+- explicit MCP write gating and allowed-root confinement;
+- callable project intelligence, sandbox compilation and sandbox execution;
+- callable reference-derived planning and immutable reference staging;
+- fixed shell-free entrypoints with no image bytes in model context;
+- bounded child execution with raw-output suppression and credential-environment isolation;
 - retained false provider, approval, promotion, repository-mutation, deployment, publication, and force-push authority.
 
 CI uses fixture images and the local artifact store. It makes no live or paid provider request.

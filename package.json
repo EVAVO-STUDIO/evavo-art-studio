@@ -35,7 +35,7 @@
     "project-art:sandbox:run": "python tools/run_project_art_sandbox.py",
     "project-art:reference:compile": "node scripts/compile-reference-derived-image-plan.mjs",
     "project-art:reference:stage": "node scripts/stage-reference-derived-artifacts.mjs",
-    "project-art:check": "node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs",
+    "project-art:check": "node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs && pnpm run project-art:workspace:mcp:check",
     "project-art:intake:compile": "node scripts/compile-project-art-intake.mjs",
     "project-art:intake:run": "python tools/run_project_art_intake.py",
     "project-art:atlas:compile": "node scripts/compile-project-art-atlas.mjs",
@@ -95,7 +95,8 @@
     "audio:optimize": "pnpm --filter @evavo/art-audio-delivery build && pnpm --filter @evavo/art-audio-delivery start --",
     "sprite-effects": "pnpm --filter @evavo/art-godot-sprite-effects build && pnpm --filter @evavo/art-godot-sprite-effects start --",
     "media:check": "pnpm --filter @evavo/art-delivery-optimizer test && pnpm --filter @evavo/art-audio-delivery test && pnpm --filter @evavo/art-godot-sprite-effects test",
-    "sharp-exact-runtime:test": "node scripts/test-sharp-exact-canvas-runtime.mjs"
+    "sharp-exact-runtime:test": "node scripts/test-sharp-exact-canvas-runtime.mjs",
+    "project-art:workspace:mcp:check": "node scripts/test-project-art-workspace-mcp.mjs"
   },
   "workspaces": [
     "apps/*",
