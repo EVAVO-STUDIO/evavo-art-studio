@@ -6,7 +6,6 @@ on:
       - agent/project-art-workbench-release-20260809
     paths:
       - .github/workflows/transfer-project-art-workbench.yml
-      - carrier/project-art-release/**
 
 permissions:
   contents: write
@@ -17,7 +16,7 @@ concurrency:
 
 jobs:
   transfer:
-    if: github.repository == 'EVAVO-STUDIO/evavo-art-studio' && github.event.head_commit.message != 'feat(project-art): stage universal image workbench source'
+    if: github.repository == 'EVAVO-STUDIO/evavo-art-studio'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
