@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.3",
+  "schemaVersion": "1.4",
   "id": "evavo-art-studio",
   "repository": "EVAVO-STUDIO/evavo-art-studio",
   "defaultBranch": "main",
@@ -52,6 +52,16 @@
     "writeEnvironmentGateRequired": true,
     "writePerCallConfirmationRequired": true,
     "allowedRootBoundaryRequired": true,
+    "independentValidation": {
+      "allGeneratedPathsConstrainedToFamilyRoot": true,
+      "canonicalRegularFilesRequired": true,
+      "strictPngStructureAndCrcRequired": true,
+      "bmFontHeaderCountPageCoverageAndBoundsRequired": true,
+      "godotResourcePathBindingRequired": true,
+      "exactRoleMapBindingRequired": true,
+      "authorityReverificationRequired": true,
+      "rehashDoesNotBypassValidation": true
+    },
     "godotPolicy": {
       "minimumVersion": "4.0",
       "targetVersion": "4.6.2",
@@ -59,6 +69,33 @@
       "integerScaleOnly": true,
       "subpixelPositioning": false,
       "mipmaps": false
+    },
+    "productionFamilies": {
+      "brass-brine-dos": {
+        "request": "config/pixel-font-family.brass-brine.v1.json",
+        "buildEntrypoint": "scripts/build-brass-brine-pixel-font-family.mjs",
+        "requiredFaces": [
+          "bb_dos_display",
+          "bb_dos_ui",
+          "bb_dos_ledger",
+          "bb_dos_micro",
+          "bb_dos_symbols"
+        ],
+        "requiredRuntimeRoles": [
+          "title",
+          "body",
+          "button",
+          "numeric_hud",
+          "caption",
+          "symbols",
+          "weather",
+          "wind"
+        ],
+        "resourceBasePath": "assets/fonts/evavo/brass-brine-dos",
+        "minimumGodot": "4.6.2",
+        "workflow": ".github/workflows/pixel-font-studio.yml",
+        "workflowArtifactPrefix": "brass-brine-pixel-font-"
+      }
     },
     "authority": {
       "providerExecution": false,
@@ -101,6 +138,7 @@
     "node scripts/check-repository-toolchain.mjs",
     "node scripts/test-repository-toolchain.mjs",
     "node scripts/check-pixel-font-studio.mjs",
+    "node --test scripts/pixel-font-brass-brine.test.mjs",
     "pnpm run build:domain",
     "pnpm typecheck",
     "pnpm test",
@@ -120,6 +158,7 @@
       "validate real media fixtures",
       "build packages and applications",
       "build original deterministic bitmap-font candidates",
+      "build exact Brass and Brine display, UI, ledger, micro and symbol font evidence",
       "retain bounded source-validation evidence"
     ],
     "validationDoesNotAuthorize": [
@@ -140,6 +179,8 @@
     "Dependency updates require an explicit reviewed pnpm-lock.yaml change generated with Node.js 22.14.0 and pnpm 10.13.1.",
     "Raster evidence validation uses Python 3.13.5 and Pillow 12.2.0 exactly; evaluated pixels are decoded from the same retained bytes that are hashed.",
     "Pixel Font Studio generates original EVAVO bitmap glyphs without tracing, converting, subsetting or redistributing an external font binary.",
+    "The canonical Brass & Brine family contains coordinated display, UI, ledger, micro and symbol faces and is rebuilt from source by the dedicated workflow.",
+    "Every generated relative path, BMFont page, Godot resource and role binding is independently reopened and verified; rehashing redirected evidence does not create a pass.",
     "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.",
     "Superseded mainline validations are cancelled; a receipt is written only after the candidate is re-proven as current origin/main.",
     "Provider execution, promotion, game mutation and production effects remain separately authorised operations."

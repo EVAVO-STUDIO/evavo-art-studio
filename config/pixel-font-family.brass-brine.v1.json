@@ -1,0 +1,137 @@
+{
+  "schema": "evavo.pixel-font-family-request.v1",
+  "familyId": "brass-brine-dos",
+  "displayName": "Brass & Brine DOS",
+  "version": "1.0.0",
+  "copyright": "Copyright 2026 EVAVO Studio. All rights reserved.",
+  "license": {
+    "type": "EVAVO Original Game Asset License",
+    "holder": "EVAVO Studio",
+    "terms": "Original bitmap-font family for Brass & Brine and authorised EVAVO game projects. Redistribution outside an authorised EVAVO project requires written approval."
+  },
+  "sourceGrid": "evavo-5x7-v1",
+  "characterSets": [
+    "basic-latin",
+    "currency-core",
+    "punctuation-extended",
+    "arrows",
+    "box-drawing"
+  ],
+  "additionalGlyphs": [
+    "✓",
+    "✕",
+    "⚓"
+  ],
+  "faces": [
+    {
+      "id": "bb_dos_display",
+      "displayName": "Brass & Brine DOS Display",
+      "role": "display",
+      "preset": "dos-display",
+      "fill": "#FFFFFFFF",
+      "outlineColor": "#080305FF",
+      "shadowColor": "#8C1624DD"
+    },
+    {
+      "id": "bb_dos_ui",
+      "displayName": "Brass & Brine DOS UI",
+      "role": "ui",
+      "preset": "dos-ui",
+      "fill": "#FFFFFFFF",
+      "outlineColor": "#080305FF",
+      "shadowColor": "#000000AA"
+    },
+    {
+      "id": "bb_dos_ledger",
+      "displayName": "Brass & Brine DOS Ledger",
+      "role": "ledger",
+      "preset": "dos-ledger",
+      "fill": "#FFFFFFFF",
+      "outlineColor": "#080305FF",
+      "shadowColor": "#000000AA"
+    },
+    {
+      "id": "bb_dos_micro",
+      "displayName": "Brass & Brine DOS Micro",
+      "role": "micro",
+      "preset": "dos-micro",
+      "fill": "#FFFFFFFF",
+      "outlineColor": "#080305FF",
+      "shadowColor": "#00000000"
+    },
+    {
+      "id": "bb_dos_symbols",
+      "displayName": "Brass & Brine DOS Symbols",
+      "role": "symbols",
+      "preset": "dos-symbols",
+      "characterSets": [
+        "arrows",
+        "box-drawing",
+        "evavo-symbols"
+      ],
+      "additionalGlyphs": [
+        "✓",
+        "✕",
+        "⚓"
+      ],
+      "fill": "#FFFFFFFF",
+      "outlineColor": "#080305FF",
+      "shadowColor": "#8C1624AA"
+    }
+  ],
+  "roleMap": {
+    "title": "bb_dos_display",
+    "header": "bb_dos_display",
+    "masthead": "bb_dos_display",
+    "subtitle": "bb_dos_ui",
+    "body": "bb_dos_ui",
+    "dialogue": "bb_dos_ui",
+    "button": "bb_dos_ui",
+    "input": "bb_dos_ui",
+    "selector": "bb_dos_ui",
+    "menu": "bb_dos_ui",
+    "ledger": "bb_dos_ledger",
+    "table": "bb_dos_ledger",
+    "numeric_hud": "bb_dos_ledger",
+    "cash": "bb_dos_ledger",
+    "date": "bb_dos_ledger",
+    "caption": "bb_dos_micro",
+    "hint": "bb_dos_micro",
+    "status": "bb_dos_micro",
+    "tooltip": "bb_dos_micro",
+    "map_label": "bb_dos_micro",
+    "micro": "bb_dos_micro",
+    "symbols": "bb_dos_symbols",
+    "icon_marker": "bb_dos_symbols",
+    "weather": "bb_dos_symbols",
+    "wind": "bb_dos_symbols"
+  },
+  "specimenLines": [
+    "BRASS & BRINE",
+    "SAIL • SELL • SURVIVE",
+    "The quick brown fox jumps over the lazy dog.",
+    "CASH £12,450  DATE 01 JAN 1871",
+    "ROUTE ← NEW YORK → LIVERPOOL",
+    "HULL 087%  WIND WNW  FORCE 6",
+    "[CAPTAIN] 'HOLD FAST — WEATHER AHEAD.'"
+  ],
+  "godot": {
+    "minimumVersion": "4.6.2",
+    "targetVersion": "4.6.2",
+    "resourceBasePath": "assets/fonts/evavo/brass-brine-dos",
+    "textureFilter": "nearest",
+    "integerScaleOnly": true,
+    "subpixelPositioning": false,
+    "mipmaps": false
+  },
+  "quality": {
+    "maximumAtlasEdge": 2048,
+    "maximumGlyphs": 512,
+    "minimumVisiblePixels": 1,
+    "requireDistinctConfusables": true
+  },
+  "delivery": {
+    "includeSpecimens": true,
+    "includeDetailedGlyphRecords": true
+  }
+}

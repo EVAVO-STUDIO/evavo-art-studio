@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "contract": "evavo.pixel-font-studio.v1",
   "requestSchema": "evavo.pixel-font-family-request.v1",
   "planSchema": "evavo.pixel-font-family-plan.v1",
@@ -9,7 +9,8 @@
   "receiptSchema": "evavo.pixel-font-build-receipt.v1",
   "entrypoints": {
     "cli": "scripts/pixel-font-studio.mjs",
-    "mcp": "scripts/pixel-font-studio-mcp.mjs"
+    "mcp": "scripts/pixel-font-studio-mcp.mjs",
+    "brassBuild": "scripts/build-brass-brine-pixel-font-family.mjs"
   },
   "tools": [
     "evavo_pixel_font_catalog",
@@ -23,19 +24,26 @@
     "deterministicBuildRequired": true,
     "createOnlyOutputsRequired": true,
     "strictPngVerificationRequired": true,
+    "allGeneratedPathsConstrainedToFamilyRootRequired": true,
+    "canonicalRegularFilesRequired": true,
     "exactBmFontCoverageRequired": true,
+    "exactBmFontHeaderCountPageAndBoundsRequired": true,
+    "exactGodotResourcePathRequired": true,
     "exactGodotRoleMapRequired": true,
     "nearestTextureFilteringRequired": true,
     "integerScalingRequired": true,
     "subpixelPositioningDisabled": true,
     "mipmapsDisabled": true,
     "confusableGlyphQaRequired": true,
+    "rehashDoesNotBypassIndependentValidationRequired": true,
     "writeEnvironmentGateRequired": true,
     "writePerCallConfirmationRequired": true,
     "allowedRootBoundaryRequired": true,
     "specimenReviewCapabilityRequired": true,
     "compactRuntimeDeliverySupported": true,
-    "exactBmFontCoverageRetainedWithoutDetailedGlyphRecords": true
+    "exactBmFontCoverageRetainedWithoutDetailedGlyphRecords": true,
+    "brassDisplayUiLedgerMicroAndSymbolFamilyRequired": true,
+    "workflowBuildArtifactRequired": true
   },
   "authority": {
     "providerExecution": false,
