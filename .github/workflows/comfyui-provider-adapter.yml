@@ -134,9 +134,9 @@ jobs:
           };
           await writeFile(process.env.DRAFT_PATH, `${JSON.stringify(draft, null, 2)}\n`);
           NODE
-          pnpm run provider:comfyui:catalog:compile -- --input "${root}/draft.json" --output "${root}/catalog.json"
+          pnpm run provider:comfyui:catalog:compile --input "${root}/draft.json" --output "${root}/catalog.json"
           test -s "${root}/catalog.json"
-          if pnpm run provider:comfyui:catalog:compile -- --input "${root}/draft.json" --output "${root}/catalog.json"; then
+          if pnpm run provider:comfyui:catalog:compile --input "${root}/draft.json" --output "${root}/catalog.json"; then
             echo "catalog compiler overwrote an existing output" >&2
             exit 1
           fi
