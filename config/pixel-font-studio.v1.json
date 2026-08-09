@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0",
+  "contract": "evavo.pixel-font-studio.v1",
+  "requestSchema": "evavo.pixel-font-family-request.v1",
+  "planSchema": "evavo.pixel-font-family-plan.v1",
+  "faceSchema": "evavo.pixel-font-face.v1",
+  "familySchema": "evavo.pixel-font-family.v1",
+  "validationSchema": "evavo.pixel-font-validation.v1",
+  "receiptSchema": "evavo.pixel-font-build-receipt.v1",
+  "entrypoints": {
+    "cli": "scripts/pixel-font-studio.mjs",
+    "mcp": "scripts/pixel-font-studio-mcp.mjs"
+  },
+  "tools": [
+    "evavo_pixel_font_catalog",
+    "evavo_pixel_font_plan",
+    "evavo_pixel_font_build",
+    "evavo_pixel_font_validate"
+  ],
+  "requirements": {
+    "originalGlyphPrimitivesRequired": true,
+    "externalFontBinaryForbidden": true,
+    "deterministicBuildRequired": true,
+    "createOnlyOutputsRequired": true,
+    "strictPngVerificationRequired": true,
+    "exactBmFontCoverageRequired": true,
+    "exactGodotRoleMapRequired": true,
+    "nearestTextureFilteringRequired": true,
+    "integerScalingRequired": true,
+    "subpixelPositioningDisabled": true,
+    "mipmapsDisabled": true,
+    "confusableGlyphQaRequired": true,
+    "writeEnvironmentGateRequired": true,
+    "writePerCallConfirmationRequired": true,
+    "allowedRootBoundaryRequired": true,
+    "specimenReviewCapabilityRequired": true,
+    "compactRuntimeDeliverySupported": true,
+    "exactBmFontCoverageRetainedWithoutDetailedGlyphRecords": true
+  },
+  "authority": {
+    "providerExecution": false,
+    "creativeApproval": false,
+    "historicalApproval": false,
+    "nativeGodotApproval": false,
+    "candidatePromotion": false,
+    "sourceMutation": false,
+    "sourceDeletion": false,
+    "targetRepositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "forcePush": false
+  }
+}

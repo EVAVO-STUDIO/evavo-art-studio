@@ -1,0 +1,71 @@
+name: Pixel Font Studio
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pixel-font/**"
+      - "scripts/pixel-font-studio.mjs"
+      - "scripts/pixel-font-studio-mcp.mjs"
+      - "scripts/pixel-font-studio.test.mjs"
+      - "scripts/check-pixel-font-studio.mjs"
+      - "config/pixel-font-studio.v1.json"
+      - "config/pixel-font-family.example.v1.json"
+      - "config/mcp.pixel-font-studio.windows.example.json"
+      - "docs/PIXEL_FONT_STUDIO.md"
+      - "evavo.reliability.json"
+      - "package.json"
+      - ".github/workflows/pixel-font-studio.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/pixel-font/**"
+      - "scripts/pixel-font-studio.mjs"
+      - "scripts/pixel-font-studio-mcp.mjs"
+      - "scripts/pixel-font-studio.test.mjs"
+      - "scripts/check-pixel-font-studio.mjs"
+      - "config/pixel-font-studio.v1.json"
+      - "config/pixel-font-family.example.v1.json"
+      - "config/mcp.pixel-font-studio.windows.example.json"
+      - "docs/PIXEL_FONT_STUDIO.md"
+      - "evavo.reliability.json"
+      - "package.json"
+      - ".github/workflows/pixel-font-studio.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pixel-font-studio-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          cache: pnpm
+
+      - name: Enable pinned pnpm
+        run: corepack enable
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Pixel Font Studio
+        run: pnpm run pixel-font:check
+
+      - name: Prove source tree remains clean
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"

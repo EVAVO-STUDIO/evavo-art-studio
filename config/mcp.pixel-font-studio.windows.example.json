@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "evavo-pixel-font-studio": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\scripts\\pixel-font-studio-mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_PIXEL_FONT_STUDIO_MODE": "read-write",
+        "EVAVO_PIXEL_FONT_STUDIO_ALLOW_WRITES": "true",
+        "EVAVO_PIXEL_FONT_ALLOWED_ROOTS": "C:\\EVAVO-Evidence"
+      }
+    }
+  }
+}

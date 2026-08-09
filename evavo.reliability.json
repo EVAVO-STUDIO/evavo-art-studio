@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.2",
+  "schemaVersion": "1.3",
   "id": "evavo-art-studio",
   "repository": "EVAVO-STUDIO/evavo-art-studio",
   "defaultBranch": "main",
@@ -38,6 +38,53 @@
     "install": "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt",
     "verification": "python tools/verify_brass_creative_evaluation.py"
   },
+  "pixelFontStudio": {
+    "contract": "evavo.pixel-font-studio.v1",
+    "requestSchema": "evavo.pixel-font-family-request.v1",
+    "familySchema": "evavo.pixel-font-family.v1",
+    "validationSchema": "evavo.pixel-font-validation.v1",
+    "runtimeFormat": "AngelCode BMFont text plus RGBA PNG atlas",
+    "sourceGrid": "evavo-5x7-v1",
+    "externalFontBinaryUsed": false,
+    "deterministic": true,
+    "createOnly": true,
+    "mcpDefaultMode": "read-only",
+    "writeEnvironmentGateRequired": true,
+    "writePerCallConfirmationRequired": true,
+    "allowedRootBoundaryRequired": true,
+    "godotPolicy": {
+      "minimumVersion": "4.0",
+      "targetVersion": "4.6.2",
+      "textureFilter": "nearest",
+      "integerScaleOnly": true,
+      "subpixelPositioning": false,
+      "mipmaps": false
+    },
+    "authority": {
+      "providerExecution": false,
+      "creativeApproval": false,
+      "historicalApproval": false,
+      "nativeGodotApproval": false,
+      "candidatePromotion": false,
+      "sourceMutation": false,
+      "sourceDeletion": false,
+      "targetRepositoryMutation": false,
+      "gitCommit": false,
+      "gitPush": false,
+      "publication": false,
+      "forcePush": false
+    },
+    "deliveryProfiles": {
+      "review": {
+        "includeSpecimens": true,
+        "includeDetailedGlyphRecords": true
+      },
+      "runtime": {
+        "includeSpecimens": false,
+        "includeDetailedGlyphRecords": false
+      }
+    }
+  },
   "workspace": {
     "manifest": "pnpm-workspace.yaml",
     "packages": [
@@ -53,6 +100,7 @@
     "pnpm install --frozen-lockfile",
     "node scripts/check-repository-toolchain.mjs",
     "node scripts/test-repository-toolchain.mjs",
+    "node scripts/check-pixel-font-studio.mjs",
     "pnpm run build:domain",
     "pnpm typecheck",
     "pnpm test",
@@ -71,12 +119,16 @@
       "compile repository-owned protocols",
       "validate real media fixtures",
       "build packages and applications",
+      "build original deterministic bitmap-font candidates",
       "retain bounded source-validation evidence"
     ],
     "validationDoesNotAuthorize": [
       "live provider requests",
       "artifact promotion",
       "named reference mutation",
+      "game repository mutation",
+      "creative or historical approval",
+      "native Godot approval",
       "production deployment",
       "credential mutation",
       "external communication"
@@ -87,8 +139,9 @@
     "The canonical pnpm lockfile is committed source and every install must use pnpm install --frozen-lockfile.",
     "Dependency updates require an explicit reviewed pnpm-lock.yaml change generated with Node.js 22.14.0 and pnpm 10.13.1.",
     "Raster evidence validation uses Python 3.13.5 and Pillow 12.2.0 exactly; evaluated pixels are decoded from the same retained bytes that are hashed.",
+    "Pixel Font Studio generates original EVAVO bitmap glyphs without tracing, converting, subsetting or redistributing an external font binary.",
     "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.",
     "Superseded mainline validations are cancelled; a receipt is written only after the candidate is re-proven as current origin/main.",
-    "Provider execution, promotion and production effects remain separately authorised operations."
+    "Provider execution, promotion, game mutation and production effects remain separately authorised operations."
   ]
 }

@@ -1,0 +1,74 @@
+{
+  "schema": "evavo.pixel-font-family-request.v1",
+  "familyId": "example-dos-family",
+  "displayName": "Example DOS Family",
+  "version": "1.0.0",
+  "copyright": "Copyright 2026 EVAVO Studio. All rights reserved.",
+  "license": {
+    "type": "EVAVO Original Game Asset License",
+    "holder": "EVAVO Studio",
+    "terms": "Use according to the project-specific EVAVO asset licence."
+  },
+  "sourceGrid": "evavo-5x7-v1",
+  "characterSets": [
+    "basic-latin",
+    "currency-core",
+    "punctuation-extended",
+    "arrows",
+    "box-drawing"
+  ],
+  "additionalGlyphs": [
+    "✓",
+    "✕",
+    "⚓"
+  ],
+  "faces": [
+    {
+      "id": "example_display",
+      "displayName": "Example Display",
+      "role": "display",
+      "preset": "dos-display",
+      "fill": "#F3E4C2FF",
+      "outlineColor": "#12070AFF",
+      "shadowColor": "#8C1624DD"
+    },
+    {
+      "id": "example_ui",
+      "displayName": "Example UI",
+      "role": "ui",
+      "preset": "dos-ui",
+      "fill": "#FFFFFFFF",
+      "outlineColor": "#12070AFF",
+      "shadowColor": "#000000AA"
+    }
+  ],
+  "roleMap": {
+    "title": "example_display",
+    "body": "example_ui",
+    "button": "example_ui"
+  },
+  "specimenLines": [
+    "EXAMPLE DOS GAME",
+    "The quick brown fox jumps over the lazy dog.",
+    "CASH £12,450  ROUTE →  PORT ←"
+  ],
+  "godot": {
+    "minimumVersion": "4.0",
+    "targetVersion": "4.6.2",
+    "resourceBasePath": "assets/fonts/evavo/example_dos_family",
+    "textureFilter": "nearest",
+    "integerScaleOnly": true,
+    "subpixelPositioning": false,
+    "mipmaps": false
+  },
+  "quality": {
+    "maximumAtlasEdge": 2048,
+    "maximumGlyphs": 512,
+    "minimumVisiblePixels": 1,
+    "requireDistinctConfusables": true
+  },
+  "delivery": {
+    "includeSpecimens": true,
+    "includeDetailedGlyphRecords": true
+  }
+}
