@@ -125,7 +125,7 @@ function providerFailure(error: ProviderError): Error {
 
 type JsonObject = Readonly<{ [key: string]: JsonValue }>;
 
-function isJsonObject(value: JsonValue): value is JsonObject {
+function isJsonObject(value: unknown): value is JsonObject {
   return (
     typeof value === "object" &&
     value !== null &&
