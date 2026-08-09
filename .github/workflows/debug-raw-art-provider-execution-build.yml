@@ -1,4 +1,4 @@
-name: Debug RAW ART provider execution build
+name: Apply RAW ART admission fixture correction
 
 on:
   push:
@@ -6,104 +6,56 @@ on:
       - agent/raw-art-provider-execution-authority-20260809
     paths:
       - ".github/workflows/debug-raw-art-provider-execution-build.yml"
-      - "apps/worker/src/provider-handlers.ts"
-      - "scripts/raw-art-provider/**"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: debug-raw-art-provider-execution-build-${{ github.ref }}
+  group: apply-raw-art-admission-fixture-correction
   cancel-in-progress: true
 
 jobs:
-  diagnose:
+  apply:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 10
     steps:
-      - name: Check out exact source
+      - name: Check out exact correction source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
 
-      - name: Install and identify media tools
-        run: bash scripts/bootstrap-ci-media-tools.sh
-
-      - name: Set up pnpm 10.13.1
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-        with:
-          version: 10.13.1
-
-      - name: Set up Node.js 22.14.0
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
-        with:
-          node-version: "22.14.0"
-          package-manager-cache: false
-
-      - name: Install frozen dependency graph
-        run: pnpm install --frozen-lockfile
-
-      - name: Capture exact build and focused regression diagnostics
+      - name: Apply exact canonical-provider-submission fixture correction
         shell: bash
+        env:
+          EXPECTED_PARENT: d839514c007ded4b741ad0e4696584a4e12e4e65
+          TARGET_BRANCH: agent/raw-art-provider-execution-authority-20260809
         run: |
-          set +e
-          root="${RUNNER_TEMP}/raw-art-execution-diagnostics"
-          mkdir -p "${root}"
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "${TARGET_BRANCH}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
-          run_stage() {
-            stage="$1"
-            shift
-            "$@" > "${root}/${stage}.log" 2>&1
-            status=$?
-            printf '%s' "${status}" > "${root}/${stage}.status"
-            return 0
-          }
+          python3 - <<'PY'
+          from pathlib import Path
 
-          run_stage 01-build-domain pnpm run build:domain
-          domain_status="$(cat "${root}/01-build-domain.status")"
-
-          if [ "${domain_status}" -eq 0 ]; then
-            run_stage 02-worker-build pnpm --filter @evavo/art-studio-worker build
-            run_stage 03-worker-typecheck pnpm --filter @evavo/art-studio-worker typecheck
-            run_stage 04-runtime-batch node scripts/check-raw-art-provider-runtime-batch.mjs
-            run_stage 05-runtime-admission node scripts/check-raw-art-provider-runtime-admission.mjs
-            run_stage 06-runtime-execution node scripts/check-raw-art-provider-runtime-execution.mjs
-            run_stage 07-worker-provider-tests node --test apps/worker/test/provider-worker.test.mjs
-          else
-            for stage in 02-worker-build 03-worker-typecheck 04-runtime-batch 05-runtime-admission 06-runtime-execution 07-worker-provider-tests; do
-              printf '125' > "${root}/${stage}.status"
-              printf 'Skipped because build:domain failed with status %s.\n' "${domain_status}" > "${root}/${stage}.log"
-            done
-          fi
-
-          python3 - "${root}" "${GITHUB_SHA}" <<'PY'
-          import json
-          import pathlib
-          import sys
-
-          root = pathlib.Path(sys.argv[1])
-          head = sys.argv[2]
-          statuses = {
-              path.stem: int(path.read_text())
-              for path in sorted(root.glob("*.status"))
-          }
-          (root / "status.json").write_text(
-              json.dumps({"headSha": head, "statuses": statuses}, indent=2) + "\n"
-          )
+          path = Path('scripts/check-raw-art-provider-runtime-admission.mjs')
+          source = path.read_text(encoding='utf-8')
+          old = """      const selected = {\n        ...selection.jobs[index],\n        batchEntry: entry,\n      };\n"""
+          new = """      const selected = {\n        ...selection.jobs[index],\n        batchEntry: {\n          ...entry,\n          runtimeJob: entry.contract.runtimeJob,\n        },\n      };\n"""
+          if source.count(old) != 1:
+              raise SystemExit('expected one legacy direct-helper fixture')
+          path.write_text(source.replace(old, new), encoding='utf-8')
           PY
 
-          cat "${root}/status.json"
-          for file in "${root}"/*.log; do
-            printf '\n===== %s =====\n' "$(basename "${file}")"
-            cat "${file}"
-          done
+          node --check scripts/check-raw-art-provider-runtime-admission.mjs
+          git diff --check
+          test "$(git diff --name-only)" = "scripts/check-raw-art-provider-runtime-admission.mjs"
+          grep -F 'runtimeJob: entry.contract.runtimeJob' scripts/check-raw-art-provider-runtime-admission.mjs
 
-      - name: Upload exact execution diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: raw-art-provider-execution-diagnostics-${{ github.sha }}
-          path: ${{ runner.temp }}/raw-art-execution-diagnostics
-          if-no-files-found: error
-          retention-days: 1
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add scripts/check-raw-art-provider-runtime-admission.mjs
+          git commit -m "test(raw-art): bind admission fixture to provider submission"
+          git push origin "HEAD:${TARGET_BRANCH}"
