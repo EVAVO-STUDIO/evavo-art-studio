@@ -339,7 +339,10 @@ async function main() {
     for (const [index, entry] of currentBatch.jobs.entries()) {
       const selected = {
         ...selection.jobs[index],
-        batchEntry: entry,
+        batchEntry: {
+          ...entry,
+          runtimeJob: entry.contract.runtimeJob,
+        },
       };
       const admitted = compileRawArtProviderAdmittedRuntimeJob(
         selection,
