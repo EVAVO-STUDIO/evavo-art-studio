@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://art.evavo.com.au/schemas/pixel-font-family.v1.schema.json",
+  "title": "EVAVO Pixel Font Family v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "familyId", "displayName", "description", "glyphMasterSha256", "license", "glyphSets", "atlas", "palette", "godot", "sampleText", "fonts"],
+  "properties": {
+    "schema": {"const": "evavo.pixel-font-family.v1"},
+    "familyId": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$", "maxLength": 96},
+    "displayName": {"type": "string", "minLength": 1, "maxLength": 160},
+    "description": {"type": "string", "minLength": 1, "maxLength": 2048},
+    "glyphMasterSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "license": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "sampleText": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "glyphSets": {"$ref": "#/$defs/glyphSets"},
+    "atlas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["padding", "maxWidth", "powerOfTwo"],
+      "properties": {
+        "padding": {"type": "integer", "minimum": 0, "maximum": 16},
+        "maxWidth": {"type": "integer", "minimum": 32, "maximum": 4096},
+        "powerOfTwo": {"type": "boolean"}
+      }
+    },
+    "palette": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"},
+      "required": ["black", "white", "signal", "mid"]
+    },
+    "godot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumVersion", "testedVersion", "textureFilter", "integerScales"],
+      "properties": {
+        "minimumVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"},
+        "testedVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"},
+        "textureFilter": {"const": "nearest"},
+        "integerScales": {"type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": {"type": "integer", "minimum": 1, "maximum": 16}}
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "includeSpecimens": {"type": "boolean"},
+        "includeGlyphSheets": {"type": "boolean"}
+      }
+    },
+    "fonts": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"$ref": "#/$defs/font"}}
+  },
+  "$defs": {
+    "glyphSets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {"enum": ["ascii-printable", "extended-text", "box-drawing", "brass-symbols"]}
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role", "style", "theme"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$", "maxLength": 96},
+        "role": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$", "maxLength": 96},
+        "glyphSets": {"$ref": "#/$defs/glyphSets"},
+        "extraGlyphs": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 1}},
+        "style": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scaleX", "scaleY", "boldX", "slantRows", "tracking", "spaceWidth", "monospace", "uppercaseOnly"],
+          "properties": {
+            "scaleX": {"type": "integer", "minimum": 1, "maximum": 8},
+            "scaleY": {"type": "integer", "minimum": 1, "maximum": 8},
+            "boldX": {"type": "integer", "minimum": 0, "maximum": 3},
+            "slantRows": {"type": "integer", "minimum": 0, "maximum": 8},
+            "tracking": {"type": "integer", "minimum": 0, "maximum": 16},
+            "spaceWidth": {"type": "integer", "minimum": 1, "maximum": 16},
+            "monospace": {"type": "boolean"},
+            "uppercaseOnly": {"type": "boolean"}
+          }
+        },
+        "theme": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fontSize", "outlineSize", "outlineColour", "shadowColour", "shadowOffsetX", "shadowOffsetY"],
+          "properties": {
+            "fontSize": {"type": "integer", "minimum": 4, "maximum": 256},
+            "outlineSize": {"type": "integer", "minimum": 0, "maximum": 32},
+            "outlineColour": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"},
+            "shadowColour": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"},
+            "shadowOffsetX": {"type": "integer", "minimum": -32, "maximum": 32},
+            "shadowOffsetY": {"type": "integer", "minimum": -32, "maximum": 32}
+          }
+        }
+      }
+    }
+  }
+}
