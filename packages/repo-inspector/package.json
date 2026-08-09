@@ -19,7 +19,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build --silent && node --test test/*.test.mjs"
+    "test": "pnpm --filter @evavo/art-contracts build && npm run build --silent && node --test test/*.test.mjs"
   },
   "dependencies": {
     "@evavo/art-contracts": "workspace:*"
