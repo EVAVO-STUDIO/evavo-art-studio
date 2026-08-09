@@ -123,14 +123,22 @@ function providerFailure(error: ProviderError): Error {
   return new PermanentRuntimeError(error.code, error.message, error.details);
 }
 
+type JsonObject = Readonly<{ [key: string]: JsonValue }>;
+
+function isJsonObject(value: JsonValue): value is JsonObject {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
 function rawArtRequest(
   request: NormalizedProviderCandidateRequest,
 ): boolean {
   const metadata = request.metadata;
   return (
-    typeof metadata === "object" &&
-    metadata !== null &&
-    !Array.isArray(metadata) &&
+    isJsonObject(metadata) &&
     metadata.schema === RAW_ART_PROVIDER_REQUEST_METADATA_SCHEMA
   );
 }
