@@ -78,7 +78,7 @@ const expectedOperations = [
   'optimize',
 ];
 assert.deepEqual(registry.operations.map((operation) => operation.id), expectedOperations);
-assert.deepEqual(registry.taskKinds, ['image', 'slice-sheet', 'assemble-sheet', 'sequence-review', 'image-compare']);
+assert.deepEqual(registry.taskKinds, ['image', 'slice-sheet', 'assemble-sheet', 'sequence-review', 'image-composite', 'image-compare']);
 
 const sourceAssertions = {
   'scripts/project-art/intelligence.mjs': [

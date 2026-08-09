@@ -393,6 +393,31 @@ try {
           expected: { width: 8, height: 8, meaningfulAlpha: true },
         },
         {
+          id: 'compose-hero',
+          kind: 'image-composite',
+          sources: [
+            { taskId: 'clean-hero' },
+            { path: 'art/hero.png' },
+          ],
+          targetPath: 'composite/hero-pair.png',
+          canvas: { width: 16, height: 8, background: '#00000000' },
+          layers: [
+            { sourceIndex: 0, x: 0, y: 0, opacity: 1, blendMode: 'normal' },
+            {
+              sourceIndex: 1,
+              maskSourceIndex: 0,
+              maskChannel: 'alpha',
+              x: 8,
+              y: 0,
+              width: 8,
+              height: 8,
+              sampling: 'nearest',
+              opacity: 0.75,
+              blendMode: 'screen',
+            },
+          ],
+        },
+        {
           id: 'compare-clean-hero',
           kind: 'image-compare',
           sources: [
@@ -476,9 +501,14 @@ try {
       await readFile(path.join(outputRoot, '_evavo', 'project-art-sandbox-receipt.json'), 'utf8'),
     );
     assert.equal(receipt.status, 'passed');
-    assert.equal(receipt.tasks.length, 5);
+    assert.equal(receipt.tasks.length, 6);
     assert.ok(receipt.outputs.some((output) => output.path === 'review/contact-sheet.png'));
     assert.ok(receipt.outputs.some((output) => output.path === 'comparison/hero/difference.png'));
+    assert.ok(receipt.outputs.some((output) => output.path === 'composite/hero-pair.png'));
+    const compositeResult = receipt.tasks.find((task) => task.taskId === 'compose-hero');
+    assert.equal(compositeResult.kind, 'image-composite');
+    assert.equal(compositeResult.layerCount, 2);
+    assert.equal(compositeResult.status, 'passed');
     const compareResult = receipt.tasks.find((task) => task.taskId === 'compare-clean-hero');
     assert.equal(compareResult.kind, 'image-compare');
     assert.equal(compareResult.status, 'passed');
