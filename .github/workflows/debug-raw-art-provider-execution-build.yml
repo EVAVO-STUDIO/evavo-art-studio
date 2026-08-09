@@ -19,13 +19,16 @@ concurrency:
 jobs:
   diagnose:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Check out exact source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Install and identify media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -41,51 +44,66 @@ jobs:
       - name: Install frozen dependency graph
         run: pnpm install --frozen-lockfile
 
-      - name: Capture exact build diagnostics
+      - name: Capture exact build and focused regression diagnostics
         shell: bash
         run: |
           set +e
-          mkdir -p "${RUNNER_TEMP}/raw-art-build-diagnostics"
+          root="${RUNNER_TEMP}/raw-art-execution-diagnostics"
+          mkdir -p "${root}"
 
-          pnpm run build:domain > "${RUNNER_TEMP}/raw-art-build-diagnostics/01-build-domain.log" 2>&1
-          domain_status=$?
+          run_stage() {
+            stage="$1"
+            shift
+            "$@" > "${root}/${stage}.log" 2>&1
+            status=$?
+            printf '%s' "${status}" > "${root}/${stage}.status"
+            return 0
+          }
+
+          run_stage 01-build-domain pnpm run build:domain
+          domain_status="$(cat "${root}/01-build-domain.status")"
 
           if [ "${domain_status}" -eq 0 ]; then
-            pnpm --filter @evavo/art-studio-worker build > "${RUNNER_TEMP}/raw-art-build-diagnostics/02-worker-build.log" 2>&1
-            worker_build_status=$?
+            run_stage 02-worker-build pnpm --filter @evavo/art-studio-worker build
+            run_stage 03-worker-typecheck pnpm --filter @evavo/art-studio-worker typecheck
+            run_stage 04-runtime-batch node scripts/check-raw-art-provider-runtime-batch.mjs
+            run_stage 05-runtime-admission node scripts/check-raw-art-provider-runtime-admission.mjs
+            run_stage 06-runtime-execution node scripts/check-raw-art-provider-runtime-execution.mjs
+            run_stage 07-worker-provider-tests node --test apps/worker/test/provider-worker.test.mjs
           else
-            worker_build_status=125
-            printf 'Skipped because build:domain failed with status %s.\n' "${domain_status}" > "${RUNNER_TEMP}/raw-art-build-diagnostics/02-worker-build.log"
+            for stage in 02-worker-build 03-worker-typecheck 04-runtime-batch 05-runtime-admission 06-runtime-execution 07-worker-provider-tests; do
+              printf '125' > "${root}/${stage}.status"
+              printf 'Skipped because build:domain failed with status %s.\n' "${domain_status}" > "${root}/${stage}.log"
+            done
           fi
 
-          if [ "${domain_status}" -eq 0 ] && [ "${worker_build_status}" -eq 0 ]; then
-            pnpm --filter @evavo/art-studio-worker typecheck > "${RUNNER_TEMP}/raw-art-build-diagnostics/03-worker-typecheck.log" 2>&1
-            worker_typecheck_status=$?
-          else
-            worker_typecheck_status=125
-            printf 'Skipped because an earlier build stage failed.\n' > "${RUNNER_TEMP}/raw-art-build-diagnostics/03-worker-typecheck.log"
-          fi
+          python3 - "${root}" "${GITHUB_SHA}" <<'PY'
+          import json
+          import pathlib
+          import sys
 
-          cat > "${RUNNER_TEMP}/raw-art-build-diagnostics/status.json" <<JSON
-          {
-            "headSha": "${GITHUB_SHA}",
-            "buildDomain": ${domain_status},
-            "workerBuild": ${worker_build_status},
-            "workerTypecheck": ${worker_typecheck_status}
+          root = pathlib.Path(sys.argv[1])
+          head = sys.argv[2]
+          statuses = {
+              path.stem: int(path.read_text())
+              for path in sorted(root.glob("*.status"))
           }
-          JSON
+          (root / "status.json").write_text(
+              json.dumps({"headSha": head, "statuses": statuses}, indent=2) + "\n"
+          )
+          PY
 
-          cat "${RUNNER_TEMP}/raw-art-build-diagnostics/status.json"
-          for file in "${RUNNER_TEMP}"/raw-art-build-diagnostics/*.log; do
+          cat "${root}/status.json"
+          for file in "${root}"/*.log; do
             printf '\n===== %s =====\n' "$(basename "${file}")"
             cat "${file}"
           done
 
-      - name: Upload exact build diagnostics
+      - name: Upload exact execution diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: raw-art-provider-execution-build-${{ github.sha }}
-          path: ${{ runner.temp }}/raw-art-build-diagnostics
+          name: raw-art-provider-execution-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/raw-art-execution-diagnostics
           if-no-files-found: error
           retention-days: 1
