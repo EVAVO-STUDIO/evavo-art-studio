@@ -15,6 +15,7 @@
     "dependencyLock",
     "runtime",
     "imageToolchain",
+    "pixelFontStudio",
     "workspace",
     "validation",
     "executedBaseline",
@@ -170,6 +171,199 @@
         },
         "verification": {
           "const": "python tools/verify_brass_creative_evaluation.py"
+        }
+      }
+    },
+    "pixelFontStudio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "requestSchema",
+        "familySchema",
+        "validationSchema",
+        "runtimeFormat",
+        "sourceGrid",
+        "externalFontBinaryUsed",
+        "deterministic",
+        "createOnly",
+        "mcpDefaultMode",
+        "writeEnvironmentGateRequired",
+        "writePerCallConfirmationRequired",
+        "allowedRootBoundaryRequired",
+        "godotPolicy",
+        "authority",
+        "deliveryProfiles"
+      ],
+      "properties": {
+        "contract": {
+          "const": "evavo.pixel-font-studio.v1"
+        },
+        "requestSchema": {
+          "const": "evavo.pixel-font-family-request.v1"
+        },
+        "familySchema": {
+          "const": "evavo.pixel-font-family.v1"
+        },
+        "validationSchema": {
+          "const": "evavo.pixel-font-validation.v1"
+        },
+        "runtimeFormat": {
+          "const": "AngelCode BMFont text plus RGBA PNG atlas"
+        },
+        "sourceGrid": {
+          "const": "evavo-5x7-v1"
+        },
+        "externalFontBinaryUsed": {
+          "const": false
+        },
+        "deterministic": {
+          "const": true
+        },
+        "createOnly": {
+          "const": true
+        },
+        "mcpDefaultMode": {
+          "const": "read-only"
+        },
+        "writeEnvironmentGateRequired": {
+          "const": true
+        },
+        "writePerCallConfirmationRequired": {
+          "const": true
+        },
+        "allowedRootBoundaryRequired": {
+          "const": true
+        },
+        "godotPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimumVersion",
+            "targetVersion",
+            "textureFilter",
+            "integerScaleOnly",
+            "subpixelPositioning",
+            "mipmaps"
+          ],
+          "properties": {
+            "minimumVersion": {
+              "const": "4.0"
+            },
+            "targetVersion": {
+              "const": "4.6.2"
+            },
+            "textureFilter": {
+              "const": "nearest"
+            },
+            "integerScaleOnly": {
+              "const": true
+            },
+            "subpixelPositioning": {
+              "const": false
+            },
+            "mipmaps": {
+              "const": false
+            }
+          }
+        },
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "providerExecution",
+            "creativeApproval",
+            "historicalApproval",
+            "nativeGodotApproval",
+            "candidatePromotion",
+            "sourceMutation",
+            "sourceDeletion",
+            "targetRepositoryMutation",
+            "gitCommit",
+            "gitPush",
+            "publication",
+            "forcePush"
+          ],
+          "properties": {
+            "providerExecution": {
+              "const": false
+            },
+            "creativeApproval": {
+              "const": false
+            },
+            "historicalApproval": {
+              "const": false
+            },
+            "nativeGodotApproval": {
+              "const": false
+            },
+            "candidatePromotion": {
+              "const": false
+            },
+            "sourceMutation": {
+              "const": false
+            },
+            "sourceDeletion": {
+              "const": false
+            },
+            "targetRepositoryMutation": {
+              "const": false
+            },
+            "gitCommit": {
+              "const": false
+            },
+            "gitPush": {
+              "const": false
+            },
+            "publication": {
+              "const": false
+            },
+            "forcePush": {
+              "const": false
+            }
+          }
+        },
+        "deliveryProfiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "review",
+            "runtime"
+          ],
+          "properties": {
+            "review": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "includeSpecimens",
+                "includeDetailedGlyphRecords"
+              ],
+              "properties": {
+                "includeSpecimens": {
+                  "const": true
+                },
+                "includeDetailedGlyphRecords": {
+                  "const": true
+                }
+              }
+            },
+            "runtime": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "includeSpecimens",
+                "includeDetailedGlyphRecords"
+              ],
+              "properties": {
+                "includeSpecimens": {
+                  "const": false
+                },
+                "includeDetailedGlyphRecords": {
+                  "const": false
+                }
+              }
+            }
+          }
         }
       }
     },
