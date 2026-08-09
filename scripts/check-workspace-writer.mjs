@@ -1,0 +1,185 @@
+#!/usr/bin/env node
+import { readFile } from "node:fs/promises";
+
+const files = {
+  types: "packages/repo-inspector/src/workspace-writer-types.ts",
+  foundation: "packages/repo-inspector/src/workspace-writer-foundation.ts",
+  filesystem: "packages/repo-inspector/src/workspace-writer-filesystem.ts",
+  media: "packages/repo-inspector/src/workspace-writer-media.ts",
+  intakeSource: "packages/repo-inspector/src/workspace-writer-intake-source.ts",
+  preview: "packages/repo-inspector/src/workspace-writer-preview.ts",
+  requests: "packages/repo-inspector/src/workspace-writer-requests.ts",
+  intakeRequests: "packages/repo-inspector/src/workspace-writer-intake-requests.ts",
+  planRequest: "packages/repo-inspector/src/workspace-writer-plan-request.ts",
+  planParser: "packages/repo-inspector/src/workspace-writer-plan-parser.ts",
+  storageRequest: "packages/repo-inspector/src/workspace-writer-storage-request.ts",
+  intake: "packages/repo-inspector/src/workspace-writer-intake.ts",
+  plan: "packages/repo-inspector/src/workspace-writer-plan.ts",
+  operations: "packages/repo-inspector/src/workspace-writer-operations.ts",
+  rollback: "packages/repo-inspector/src/workspace-writer-rollback.ts",
+  apply: "packages/repo-inspector/src/workspace-writer-apply.ts",
+  policy: "packages/repo-inspector/src/workspace-writer-policy.ts",
+  storage: "packages/repo-inspector/src/workspace-writer-storage.ts",
+  index: "packages/repo-inspector/src/workspace-writer.ts",
+  package: "packages/repo-inspector/package.json",
+  mcp: "apps/mcp/src/workspace-writer.ts",
+  mcpPackage: "apps/mcp/package.json",
+  cli: "apps/cli/src/workspace-writer-cli.ts",
+  cliPackage: "apps/cli/package.json",
+  intakeTests: "packages/repo-inspector/test/workspace-writer-intake.test.mjs",
+  fileOperationTests: "packages/repo-inspector/test/workspace-writer-file-operations.test.mjs",
+  policyStorageTests: "packages/repo-inspector/test/workspace-writer-policy-storage.test.mjs",
+  docs: "docs/ART_WORKSPACE_WRITER.md",
+  operationsDocs: "docs/ART_WORKSPACE_WRITER_OPERATIONS.md",
+  rootPackage: "package.json",
+  environment: ".env.example",
+};
+
+const source = Object.fromEntries(
+  await Promise.all(
+    Object.entries(files).map(async ([name, file]) => [
+      name,
+      await readFile(new URL(`../${file}`, import.meta.url), "utf8"),
+    ]),
+  ),
+);
+const implementation = [
+  source.types,
+  source.foundation,
+  source.filesystem,
+  source.media,
+  source.intakeSource,
+  source.preview,
+  source.requests,
+  source.intakeRequests,
+  source.planRequest,
+  source.planParser,
+  source.storageRequest,
+  source.intake,
+  source.plan,
+  source.operations,
+  source.rollback,
+  source.apply,
+  source.policy,
+  source.storage,
+  source.index,
+].join("\n");
+const errors = [];
+
+function requireTokens(label, content, tokens) {
+  for (const token of tokens) {
+    if (!content.includes(token)) errors.push(`${label} is missing ${token}`);
+  }
+}
+
+function forbidTokens(label, content, tokens) {
+  for (const token of tokens) {
+    if (content.includes(token)) errors.push(`${label} contains forbidden ${token}`);
+  }
+}
+
+requireTokens("workspace writer", implementation, [
+  "evavo_art_workspace_intake_receipt_v1",
+  "evavo_art_workspace_file_plan_v1",
+  "evavo_art_workspace_file_receipt_v1",
+  "evavo_art_workspace_storage_receipt_v1",
+  "intakeArtWorkspaceFiles",
+  "readArtWorkspaceMediaPreview",
+  "compileArtWorkspaceFilePlan",
+  "applyArtWorkspaceFilePlan",
+  "archiveArtWorkspaceFileToStorage",
+  "COPYFILE_EXCL",
+  "expectedTargetSha256",
+  "reversible-trash",
+  "ART_WORKSPACE_INTAKE_IMMUTABLE",
+  "rollback-required",
+  "shell: false",
+  "EVAVO_STORAGE_",
+  "providerCredentialExposed: false",
+  "gitCommitCreated: false",
+  "gitPushPerformed: false",
+  "publicationAuthority: false",
+]);
+requireTokens("repo package", source.package, [
+  '"./workspace-writer"',
+  '"./dist/workspace-writer.js"',
+]);
+requireTokens("workspace MCP", source.mcp, [
+  "art_workspace_writer_capabilities",
+  "art_workspace_preview_image",
+  "art_workspace_intake_files",
+  "art_workspace_compile_file_plan",
+  "art_workspace_apply_file_plan",
+  "art_workspace_archive_to_evavo_storage",
+  'type: "image" as const',
+]);
+requireTokens("MCP package", source.mcpPackage, [
+  '"start:workspace-writer"',
+  "dist/workspace-writer.js",
+]);
+requireTokens("workspace CLI", source.cli, [
+  "evavo-art-workspace intake",
+  "evavo-art-workspace plan",
+  "evavo-art-workspace apply",
+  "evavo-art-workspace archive",
+]);
+requireTokens("CLI package", source.cliPackage, [
+  '"evavo-art-workspace"',
+  "dist/workspace-writer-cli.js",
+]);
+requireTokens("workspace tests", `${source.intakeTests}
+${source.fileOperationTests}
+${source.policyStorageTests}`, [
+  "base64 intake is create-only",
+  "intake originals are immutable",
+  "copy is no-overwrite and detects a target race",
+  "reversible trash and exact restore",
+  "replace retains exact previous bytes",
+  "excludes provider credentials",
+]);
+requireTokens("workspace documentation", `${source.docs}\n${source.operationsDocs}`, [
+  "ChatGPT and Claude attachment intake",
+  "EVAVO Storage",
+  "Development Studio",
+  "Sprite sheets, atlases and animation sequences",
+  "No arbitrary shell",
+]);
+requireTokens("root scripts", source.rootPackage, [
+  '"dev:mcp:workspace-writer"',
+  '"workspace-writer:check"',
+  '"workspace-writer"',
+]);
+requireTokens("environment", source.environment, [
+  "EVAVO_ART_IMPORT_ROOTS",
+  "EVAVO_ART_ALLOW_STORAGE_WRITES",
+  "EVAVO_STORAGE_OPERATOR_COMMAND_JSON",
+]);
+
+forbidTokens("workspace writer", implementation, [
+  "git push",
+  "git commit",
+  "--force",
+  "shell: true",
+  "eval(",
+  "new Function(",
+]);
+forbidTokens("workspace MCP", source.mcp, [
+  "child_process",
+  "process.env.OPENAI_API_KEY",
+  "git push",
+]);
+forbidTokens("workspace CLI", source.cli, ["child_process", "git push"]);
+
+if (errors.length) {
+  console.error("EVAVO Art Studio callable workspace writer contract failed:\n");
+  for (const error of errors) console.error(`- ${error}`);
+  process.exit(1);
+}
+
+console.log("EVAVO Art Studio callable workspace writer contract passed.");
+console.log("- mounted and bounded base64 art intake is create-only and SHA-256 bound");
+console.log("- intake originals remain immutable while working files stay fully organisable");
+console.log("- image preview returns exact MCP image content without mutation");
+console.log("- copy, move, replace, reversible trash and restore are stale-detecting and no-overwrite");
+console.log("- EVAVO Storage handoff uses one fixed shell-free server-side operator command");
+console.log("- repository publication remains a separate Development Studio or owner action");

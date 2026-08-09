@@ -9,13 +9,17 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./workspace-writer": {
+      "types": "./dist/workspace-writer.d.ts",
+      "import": "./dist/workspace-writer.js"
     }
   },
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build --silent && node --test test/*.test.mjs"
+    "test": "pnpm --filter @evavo/art-contracts build && npm run build --silent && node --test test/*.test.mjs"
   },
   "dependencies": {
     "@evavo/art-contracts": "workspace:*"
