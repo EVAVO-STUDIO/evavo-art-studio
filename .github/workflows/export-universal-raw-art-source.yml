@@ -1,0 +1,54 @@
+name: Export exact main source for universal RAW ART
+
+on:
+  push:
+    branches:
+      - automation/export-universal-raw-art-source-20260809
+    paths:
+      - ".github/workflows/export-universal-raw-art-source.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: export-universal-raw-art-source
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_MAIN_SHA: 05a4cb423befe2c32ca33bfafab95fcee0e2ead9
+      WORKFLOW_PATH: .github/workflows/export-universal-raw-art-source.yml
+    steps:
+      - name: Check out exact export carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify carrier and archive exact production main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "automation/export-universal-raw-art-source-20260809"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_MAIN_SHA}"
+          test "$(git diff --name-only HEAD^ HEAD)" = "${WORKFLOW_PATH}"
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          test "$(git rev-parse refs/remotes/origin/main)" = "${EXPECTED_MAIN_SHA}"
+          ARCHIVE="${RUNNER_TEMP}/evavo-art-studio-${EXPECTED_MAIN_SHA}.tar.gz"
+          git archive --format=tar.gz --prefix=evavo-art-studio/ --output "${ARCHIVE}" "${EXPECTED_MAIN_SHA}"
+          sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
+          printf '%s\n' "repository=EVAVO-STUDIO/evavo-art-studio" "sha=${EXPECTED_MAIN_SHA}" > "${RUNNER_TEMP}/SOURCE.txt"
+
+      - name: Upload exact source archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evavo-art-studio-source-${{ env.EXPECTED_MAIN_SHA }}
+          path: |
+            ${{ runner.temp }}/evavo-art-studio-${{ env.EXPECTED_MAIN_SHA }}.tar.gz
+            ${{ runner.temp }}/evavo-art-studio-${{ env.EXPECTED_MAIN_SHA }}.tar.gz.sha256
+            ${{ runner.temp }}/SOURCE.txt
+          if-no-files-found: error
+          retention-days: 1
