@@ -52,10 +52,10 @@ jobs:
 
           rm -rf .evavo-source
           rm -f project-art-review-source.b64 project-art-review-source.zip
-          rm -f .github/workflows/temporary-project-art-review-source-carrier.yml
 
           test ! -e .evavo-source
-          test ! -e .github/workflows/temporary-project-art-review-source-carrier.yml
+          test -e .github/workflows/temporary-project-art-review-source-carrier.yml
+          test -e .github/workflows/project-art-review-studio.yml
 
       - name: Validate review studio source and adversarial regressions
         shell: bash
@@ -74,10 +74,15 @@ jobs:
           node scripts/check-project-art-review.mjs
           node scripts/test-project-art-review.mjs
 
-      - name: Publish exact feature source and remove carrier
+      - name: Publish non-workflow source and remove source carrier
         shell: bash
         run: |
           set -euo pipefail
+
+          # The Actions token has contents:write but deliberately lacks workflow-file authority.
+          # The authenticated GitHub control plane adds the permanent workflow and removes this
+          # temporary carrier in a separately guarded commit after this source commit lands.
+          rm -f .github/workflows/project-art-review-studio.yml
 
           git config user.name "EVAVO Automation"
           git config user.email "evavo.studio@gmail.com"
@@ -89,8 +94,6 @@ jobs:
           .evavo-source/project-art-review/part-01.b64
           .evavo-source/project-art-review/part-02.b64
           .evavo-source/project-art-review/part-03.b64
-          .github/workflows/project-art-review-studio.yml
-          .github/workflows/temporary-project-art-review-source-carrier.yml
           config/mcp.project-art-review.windows.example.json
           docs/PROJECT_ART_REVIEW_STUDIO.md
           package.json
@@ -108,8 +111,9 @@ jobs:
           diff -u "${RUNNER_TEMP}/expected-review-paths.txt" "${RUNNER_TEMP}/actual-review-paths.txt"
 
           test ! -e .evavo-source
-          test ! -e .github/workflows/temporary-project-art-review-source-carrier.yml
+          test ! -e .github/workflows/project-art-review-studio.yml
+          test -e .github/workflows/temporary-project-art-review-source-carrier.yml
           test -z "$(git status --porcelain=v1 --untracked-files=all | grep -E 'project-art-review-source\.(b64|zip)$' || true)"
 
-          git commit -m "feat(project-art): add offline visual review studio"
+          git commit -m "feat(project-art): add offline visual review studio source"
           git push origin HEAD:refs/heads/agent/project-art-review-studio-20260809
