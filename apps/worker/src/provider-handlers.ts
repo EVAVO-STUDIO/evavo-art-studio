@@ -2,12 +2,14 @@ import type { JsonValue } from "@evavo/art-artifacts";
 import {
   FixtureImageProviderAdapter,
   OpenAIImageProviderAdapter,
+  loadComfyUIProviderAdaptersFromCatalogFile,
   ProviderError,
   ProviderRegistry,
   executeProviderCandidateRequest,
   providerRequiredCapabilities,
   validateProviderCandidateRequest,
   type NormalizedProviderCandidateRequest,
+  type ProviderAdapter,
   type ProviderRegistryLike,
 } from "@evavo/art-providers";
 import {
@@ -69,12 +71,91 @@ function envInteger(
   return parsed;
 }
 
+function envBoolean(
+  value: string | undefined,
+  fallback: boolean,
+  name: string,
+): boolean {
+  if (value === undefined || !value.trim()) return fallback;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`${name} must be exactly true or false.`);
+}
+
 export function createProviderRegistryFromEnvironment(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): ProviderRegistry {
-  const adapters = [];
+  const adapters: ProviderAdapter[] = [];
   if (environment.EVAVO_ART_ENABLE_FIXTURE_PROVIDER === "true") {
     adapters.push(new FixtureImageProviderAdapter());
+  }
+  const comfyCatalogPath = environment.EVAVO_ART_COMFYUI_CATALOG?.trim();
+  if (comfyCatalogPath) {
+    const dedicatedInstance = envBoolean(
+      environment.EVAVO_ART_COMFYUI_DEDICATED_INSTANCE,
+      false,
+      "EVAVO_ART_COMFYUI_DEDICATED_INSTANCE",
+    );
+    if (!dedicatedInstance) {
+      throw new Error(
+        "EVAVO_ART_COMFYUI_DEDICATED_INSTANCE=true is required because ComfyUI cancellation uses the instance-wide interrupt endpoint.",
+      );
+    }
+    adapters.push(
+      ...loadComfyUIProviderAdaptersFromCatalogFile({
+        catalogPath: comfyCatalogPath,
+        ...(environment.EVAVO_ART_COMFYUI_CATALOG_ROOT?.trim()
+          ? { allowedRoot: environment.EVAVO_ART_COMFYUI_CATALOG_ROOT.trim() }
+          : {}),
+        dedicatedInstance,
+        allowRemote: envBoolean(
+          environment.EVAVO_ART_COMFYUI_ALLOW_REMOTE,
+          false,
+          "EVAVO_ART_COMFYUI_ALLOW_REMOTE",
+        ),
+        ...(environment.EVAVO_ART_COMFYUI_BASE_URL?.trim()
+          ? { baseUrl: environment.EVAVO_ART_COMFYUI_BASE_URL.trim() }
+          : {}),
+        ...(environment.EVAVO_ART_COMFYUI_API_TOKEN?.trim()
+          ? { apiToken: environment.EVAVO_ART_COMFYUI_API_TOKEN.trim() }
+          : {}),
+        pollIntervalMs: envInteger(
+          environment.EVAVO_ART_COMFYUI_POLL_INTERVAL_MS,
+          500,
+          50,
+          60_000,
+          "EVAVO_ART_COMFYUI_POLL_INTERVAL_MS",
+        ),
+        executionTimeoutMs: envInteger(
+          environment.EVAVO_ART_COMFYUI_EXECUTION_TIMEOUT_MS,
+          1_800_000,
+          1_000,
+          1_800_000,
+          "EVAVO_ART_COMFYUI_EXECUTION_TIMEOUT_MS",
+        ),
+        maximumJsonBytes: envInteger(
+          environment.EVAVO_ART_COMFYUI_MAX_JSON_BYTES,
+          4 * 1024 * 1024,
+          1_024,
+          64 * 1024 * 1024,
+          "EVAVO_ART_COMFYUI_MAX_JSON_BYTES",
+        ),
+        maximumOutputBytes: envInteger(
+          environment.EVAVO_ART_COMFYUI_MAX_OUTPUT_BYTES,
+          128 * 1024 * 1024,
+          1_024,
+          512 * 1024 * 1024,
+          "EVAVO_ART_COMFYUI_MAX_OUTPUT_BYTES",
+        ),
+        maximumUploadBytes: envInteger(
+          environment.EVAVO_ART_COMFYUI_MAX_UPLOAD_BYTES,
+          64 * 1024 * 1024,
+          1_024,
+          512 * 1024 * 1024,
+          "EVAVO_ART_COMFYUI_MAX_UPLOAD_BYTES",
+        ),
+      }),
+    );
   }
   const apiKey = environment.OPENAI_API_KEY?.trim();
   if (apiKey) {

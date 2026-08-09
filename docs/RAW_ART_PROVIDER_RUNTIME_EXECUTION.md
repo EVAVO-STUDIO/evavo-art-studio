@@ -83,6 +83,40 @@ The command loads the source files named by the authorisation and verifies their
 
 The worker descriptor contains only the authorisation’s queues, the permitted provider capabilities, and `raw-art.execution-authorized`. Provider routing is filtered to the explicit adapter allowlist before the provider orchestrator sees it. The provider handler independently rechecks the active authorisation, job ID, specification SHA-256, request SHA-256, campaign item, campaign SHA-256, queue, kind, attempt count, redrive count, and capability immediately before `executeProviderCandidateRequest(...)`.
 
+## Run an exact ComfyUI profile
+
+ComfyUI uses the same durable admission and short-lived execution-authorisation boundary as every other provider. A running local instance is not authority by itself.
+
+Compile a reviewed API-format workflow catalog first:
+
+```powershell
+pnpm run provider:comfyui:catalog:compile -- `
+  --input C:\EVAVO\comfyui\catalog.draft.json `
+  --output C:\EVAVO\comfyui\catalog.json
+```
+
+Configure the dedicated authorised worker:
+
+```powershell
+$env:EVAVO_ART_COMFYUI_CATALOG = "C:\EVAVO\comfyui\catalog.json"
+$env:EVAVO_ART_COMFYUI_CATALOG_ROOT = "C:\EVAVO\comfyui"
+$env:EVAVO_ART_COMFYUI_BASE_URL = "http://127.0.0.1:8188"
+$env:EVAVO_ART_COMFYUI_DEDICATED_INSTANCE = "true"
+$env:EVAVO_ART_COMFYUI_ALLOW_REMOTE = "false"
+```
+
+Then name the exact workflow-profile adapter in the execution authorisation:
+
+```powershell
+--allowed-adapters comfyui:sprite-match
+```
+
+The worker revalidates the catalog, exact workflow hash, model and runtime inventories, required node classes, immutable reference bytes and request capability profile before it can call ComfyUI. It uploads only explicitly bound references, mutates only declared workflow inputs, accepts outputs only from declared nodes and records exact execution provenance. Matching images and matching animation frames use role-specific references such as `canonical-identity`, `previous-key-pose` and `next-key-pose` rather than loose filenames.
+
+Cancellation uses ComfyUI's instance-wide interrupt endpoint, so `EVAVO_ART_COMFYUI_DEDICATED_INSTANCE=true` is mandatory. Remote endpoints need explicit opt-in and HTTPS. Every repair or follow-up frame remains a new provider request requiring fresh durable admission and fresh execution authorisation.
+
+See [the governed ComfyUI provider adapter](./COMFYUI_PROVIDER_ADAPTER.md) for the full catalog, binding, endpoint and evidence contract.
+
 ## Execution receipt
 
 The create-only `evavo.raw-art-provider-runtime-execution-receipt.v1` receipt records:
@@ -120,6 +154,7 @@ A failed execution consumes the job’s one authorised attempt. Recovery require
 ```powershell
 pnpm run raw-art:provider-admission:check
 pnpm run raw-art:provider-execution:check
+pnpm run provider:comfyui:check
 pnpm run raw-art:provider-review:check
 pnpm check
 ```
