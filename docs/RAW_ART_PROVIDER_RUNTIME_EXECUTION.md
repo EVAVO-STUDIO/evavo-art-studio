@@ -125,3 +125,5 @@ pnpm check
 ```
 
 The permanent execution regression uses only the deterministic fixture adapter. It proves that generic workers cannot claim isolated jobs, and that expired, unavailable-adapter, freshly re-fingerprinted forged, repeated, and already-started executions fail before a second provider call. It also verifies immutable unapproved candidates, provider evidence, create-only authorisations and receipts, and the retained false approval, promotion, repository-mutation, and publication authority.
+
+The review regression reconstructs candidate order from each immutable artifact descriptor’s `candidateIndex` label rather than trusting provider or receipt array order.
