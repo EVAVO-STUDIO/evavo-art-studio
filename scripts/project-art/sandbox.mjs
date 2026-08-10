@@ -23,6 +23,8 @@ export const PROJECT_ART_SANDBOX_REQUEST_SCHEMA = 'evavo.project-art-sandbox-req
 export const PROJECT_ART_SANDBOX_PLAN_SCHEMA = 'evavo.project-art-sandbox-plan.v1';
 export const PROJECT_ART_OPERATIONS_SCHEMA = 'evavo.project-art-operations.v1';
 
+const MAXIMUM_DECODED_PIXELS = 220_000_000;
+
 const OUTPUT_EXTENSIONS = Object.freeze({
   png: new Set(['.png']),
   webp: new Set(['.webp']),
@@ -91,7 +93,22 @@ function validateRegistry(value) {
     maximumTasks: boundedInteger(value.maximumTasks, 'registry.maximumTasks', 1, 100_000),
     maximumExternalSources: boundedInteger(value.maximumExternalSources, 'registry.maximumExternalSources', 1, 1_000_000),
     maximumSourceBytes: boundedInteger(value.maximumSourceBytes, 'registry.maximumSourceBytes', 1, Number.MAX_SAFE_INTEGER),
+    maximumDecodedPixels: boundedInteger(
+      value.maximumDecodedPixels,
+      'registry.maximumDecodedPixels',
+      1,
+      MAXIMUM_DECODED_PIXELS,
+    ),
   };
+}
+
+function assertDecodedPixelLimit(width, height, label, maximumDecodedPixels) {
+  if (width * height > maximumDecodedPixels) {
+    fail(
+      'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
+      `${label} exceeds the ${maximumDecodedPixels}-pixel decoded-image boundary.`,
+    );
+  }
 }
 
 function normalizedOperation(value, index, registry) {
@@ -292,7 +309,7 @@ function normalizeAssembleTask(task, taskIndex, targetClaims) {
 }
 
 
-function normalizeCompositeTask(task, taskIndex, targetClaims) {
+function normalizeCompositeTask(task, taskIndex, targetClaims, registry) {
   const targetPath = normalizeTargetPath(task.targetPath, `tasks[${taskIndex}].targetPath`, targetClaims);
   const outputFormat = task.outputFormat || extensionFormat(targetPath);
   if (!['png', 'webp', 'jpeg'].includes(outputFormat) || !OUTPUT_EXTENSIONS[outputFormat]?.has(path.posix.extname(targetPath).toLowerCase())) {
@@ -315,6 +332,14 @@ function normalizeCompositeTask(task, taskIndex, targetClaims) {
     const height = layer.height === undefined ? null : boundedInteger(layer.height, `tasks[${taskIndex}].layers[${layerIndex}].height`, 1, 65_536);
     if ((width === null) !== (height === null)) {
       fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].layers[${layerIndex}] must provide width and height together.`);
+    }
+    if (width !== null) {
+      assertDecodedPixelLimit(
+        width,
+        height,
+        `tasks[${taskIndex}].layers[${layerIndex}]`,
+        registry.maximumDecodedPixels,
+      );
     }
     const blendMode = layer.blendMode ?? 'normal';
     if (!['normal', 'multiply', 'screen', 'add', 'subtract', 'darken', 'lighten'].includes(blendMode)) {
@@ -341,6 +366,14 @@ function normalizeCompositeTask(task, taskIndex, targetClaims) {
       ...(width === null ? {} : { width, height }),
     };
   });
+  const canvasWidth = boundedInteger(task.canvas?.width, `tasks[${taskIndex}].canvas.width`, 1, 65_536);
+  const canvasHeight = boundedInteger(task.canvas?.height, `tasks[${taskIndex}].canvas.height`, 1, 65_536);
+  assertDecodedPixelLimit(
+    canvasWidth,
+    canvasHeight,
+    `tasks[${taskIndex}].canvas`,
+    registry.maximumDecodedPixels,
+  );
   return {
     id: safeId(task.id, `tasks[${taskIndex}].id`),
     kind: 'image-composite',
@@ -348,8 +381,8 @@ function normalizeCompositeTask(task, taskIndex, targetClaims) {
     targetPath,
     outputFormat,
     canvas: {
-      width: boundedInteger(task.canvas?.width, `tasks[${taskIndex}].canvas.width`, 1, 65_536),
-      height: boundedInteger(task.canvas?.height, `tasks[${taskIndex}].canvas.height`, 1, 65_536),
+      width: canvasWidth,
+      height: canvasHeight,
       background: task.canvas?.background ?? '#00000000',
     },
     layers,
@@ -525,7 +558,7 @@ export async function compileProjectArtSandbox({
     else if (kind === 'slice-sheet') normalized = normalizeSliceTask(task, index, targetClaims);
     else if (kind === 'assemble-sheet') normalized = normalizeAssembleTask(task, index, targetClaims);
     else if (kind === 'sequence-review') normalized = normalizeReviewTask(task, index, targetClaims);
-    else if (kind === 'image-composite') normalized = normalizeCompositeTask(task, index, targetClaims);
+    else if (kind === 'image-composite') normalized = normalizeCompositeTask(task, index, targetClaims, registry);
     else normalized = normalizeCompareTask(task, index, targetClaims);
     if (taskIds.has(normalized.id)) fail('PROJECT_ART_SANDBOX_TASK_DUPLICATE', `Duplicate task id: ${normalized.id}.`);
     taskIds.add(normalized.id);
@@ -576,7 +609,7 @@ export async function compileProjectArtSandbox({
       maximumTasks: registry.maximumTasks,
       maximumExternalSources: registry.maximumExternalSources,
       maximumSourceBytes: registry.maximumSourceBytes,
-      maximumDecodedPixels: rawRegistry.maximumDecodedPixels,
+      maximumDecodedPixels: registry.maximumDecodedPixels,
     },
     execution: {
       runtime: 'python-pillow',

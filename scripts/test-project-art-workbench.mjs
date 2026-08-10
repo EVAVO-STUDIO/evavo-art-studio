@@ -160,6 +160,46 @@ try {
   assert.equal(sandboxPlan.authority.sourceMutation, false);
   verifyDocumentHash(sandboxPlan);
 
+  const oversizedCompositeCases = [
+    {
+      id: 'oversized-composite-canvas',
+      canvas: { width: 65_536, height: 65_536, background: '#00000000' },
+      layers: [{ sourceIndex: 0 }],
+    },
+    {
+      id: 'oversized-composite-layer',
+      canvas: { width: 8, height: 8, background: '#00000000' },
+      layers: [{ sourceIndex: 0, width: 65_536, height: 65_536 }],
+    },
+  ];
+  for (const testCase of oversizedCompositeCases) {
+    const oversizedRequest = {
+      ...sandboxRequest,
+      sandboxId: testCase.id,
+      tasks: [
+        {
+          id: testCase.id,
+          kind: 'image-composite',
+          sources: [{ path: 'art/hero.png' }],
+          targetPath: `${testCase.id}.png`,
+          canvas: testCase.canvas,
+          layers: testCase.layers,
+        },
+      ],
+    };
+    await expectProjectArtError(
+      compileProjectArtSandbox({
+        workspaceRoot: workspace,
+        request: oversizedRequest,
+        requestBytes: Buffer.from(JSON.stringify(oversizedRequest)),
+        registry,
+        registryBytes,
+        compiledAt: fixedTime,
+      }),
+      'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
+    );
+  }
+
   await expectProjectArtError(
     compileProjectArtSandbox({
       workspaceRoot: workspace,
@@ -521,6 +561,54 @@ try {
     assert.equal(comparisonManifest.identityApprovalPerformed, false);
     assert.equal(receipt.effects.sourceMutation, false);
     verifyDocumentHash(receipt);
+
+    const oversizedRuntimeCases = [
+      {
+        id: 'runtime-oversized-composite-canvas',
+        mutate: (task) => ({
+          ...task,
+          canvas: { ...task.canvas, width: 65_536, height: 65_536 },
+        }),
+      },
+      {
+        id: 'runtime-oversized-composite-layer',
+        mutate: (task) => ({
+          ...task,
+          layers: task.layers.map((layer, index) =>
+            index === 1 ? { ...layer, width: 65_536, height: 65_536 } : layer,
+          ),
+        }),
+      },
+    ];
+    for (const testCase of oversizedRuntimeCases) {
+      const oversizedPlan = withDocumentHash({
+        ...fullPlan,
+        sandboxId: testCase.id,
+        runId: `project-art-sandbox:${testCase.id}`,
+        tasks: fullPlan.tasks.map((task) =>
+          task.id === 'compose-hero' ? testCase.mutate(task) : task,
+        ),
+      });
+      const oversizedPlanPath = path.join(workspace, `${testCase.id}.json`);
+      await writeJsonCreateOnly(oversizedPlanPath, oversizedPlan);
+      const oversizedOutputRoot = path.join(workspace, `${testCase.id}-output`);
+      const oversizedExecution = run(
+        python.command,
+        [
+          ...python.prefix,
+          path.join(root, 'tools', 'run_project_art_sandbox.py'),
+          '--workspace-root',
+          workspace,
+          '--plan',
+          path.basename(oversizedPlanPath),
+          '--output-root',
+          path.basename(oversizedOutputRoot),
+        ],
+      );
+      assert.notEqual(oversizedExecution.status, 0);
+      assert.match(oversizedExecution.stderr, /decoded-image boundary/u);
+      await assert.rejects(access(oversizedOutputRoot), (error) => error?.code === 'ENOENT');
+    }
 
     const replay = run(
       python.command,
