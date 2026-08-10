@@ -1,1 +1,0 @@
-PR #210 authenticated permanent-gate refresh after canonical receipt repair.
