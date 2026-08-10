@@ -191,6 +191,32 @@ def parse_colour(value: Any, label: str, allow_alpha: bool = True) -> tuple[int,
         raise SandboxError(f"{label} must contain hexadecimal colour bytes") from exc
 
 
+def bounded_plan_limit(
+    plan: dict[str, Any],
+    field: str,
+    default: int,
+    maximum: int,
+) -> int:
+    limits = plan.get("limits", {})
+    if not isinstance(limits, dict):
+        fail("plan limits must be an object")
+    value = limits.get(field, default)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > maximum:
+        fail(f"plan {field} is outside the runtime boundary")
+    return value
+
+
+def require_pixel_budget(
+    width: int,
+    height: int,
+    label: str,
+    maximum_pixels: int,
+) -> tuple[int, int]:
+    if width < 1 or height < 1 or width * height > maximum_pixels:
+        fail(f"{label} exceeds the {maximum_pixels}-pixel decoded-image boundary")
+    return width, height
+
+
 def load_image(value: Path) -> Image.Image:
     with Image.open(value) as opened:
         opened.load()
@@ -726,7 +752,18 @@ class RuntimeContext:
         self.source_paths: dict[str, Path] = {}
         self.task_results: dict[str, dict[str, Any]] = {}
         self.task_output_paths: dict[str, list[Path]] = {}
-        self.maximum_source_bytes = int(plan.get("limits", {}).get("maximumSourceBytes", MAXIMUM_SOURCE_BYTES))
+        self.maximum_source_bytes = bounded_plan_limit(
+            plan,
+            "maximumSourceBytes",
+            MAXIMUM_SOURCE_BYTES,
+            MAXIMUM_SOURCE_BYTES,
+        )
+        self.maximum_decoded_pixels = bounded_plan_limit(
+            plan,
+            "maximumDecodedPixels",
+            MAXIMUM_PIXELS,
+            MAXIMUM_PIXELS,
+        )
 
     def verify_sources(self) -> None:
         for source_id, source in self.sources.items():
@@ -1138,9 +1175,15 @@ def _blend_overlap(base: Image.Image, layer: Image.Image, mode: str) -> Image.Im
 def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> None:
     source_paths = [context.resolve_source_path(source) for source in task["sources"]]
     canvas_spec = task["canvas"]
+    canvas_width, canvas_height = require_pixel_budget(
+        int(canvas_spec["width"]),
+        int(canvas_spec["height"]),
+        "image-composite canvas",
+        context.maximum_decoded_pixels,
+    )
     canvas = Image.new(
         "RGBA",
-        (int(canvas_spec["width"]), int(canvas_spec["height"])),
+        (canvas_width, canvas_height),
         parse_colour(canvas_spec.get("background", "#00000000"), "image-composite.canvas.background"),
     )
     applied_layers: list[dict[str, Any]] = []
@@ -1150,8 +1193,14 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
             fail(f"image-composite layer {index} sourceIndex escaped the source list")
         image = load_image(source_paths[source_index]).convert("RGBA")
         if layer.get("width") is not None:
+            layer_width, layer_height = require_pixel_budget(
+                int(layer["width"]),
+                int(layer["height"]),
+                f"image-composite layer {index}",
+                context.maximum_decoded_pixels,
+            )
             image = image.resize(
-                (int(layer["width"]), int(layer["height"])),
+                (layer_width, layer_height),
                 _resample(layer.get("sampling", "nearest")),
             )
         mask_image = None

@@ -384,6 +384,8 @@ Strict cells prevent accidental frame resampling. `contain` and `cover` remain a
 
 `image-composite` builds a new candidate from an ordered set of exact source images without mutating any source. Each layer can declare position, optional resize, nearest or Lanczos sampling, opacity, a blend mode, and an optional alpha/luminance mask sourced from another exact sandbox input. Supported blend modes are `normal`, `multiply`, `screen`, `add`, `subtract`, `darken`, and `lighten`.
 
+The compiler rejects any composite canvas or explicitly resized layer whose area exceeds the registry's `maximumDecodedPixels` boundary. The Python runtime independently rechecks that decoded-image boundary before allocating a canvas or resize target, so a hash-valid plan that bypasses or tampers with compiler output fails closed before large image memory is reserved.
+
 This is intended for UI assembly, VFX overlays, sprite/accessory layers, controlled matte repairs, mockups, and other deterministic composites. Compositing remains a sandbox effect only: it does not approve the visual result, promote it, or write it into a target repository.
 
 ```json

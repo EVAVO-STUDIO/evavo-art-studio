@@ -36,6 +36,7 @@ for (const relative of relativeFiles) {
 
 const registry = JSON.parse(contents.get('config/project-art-operations.v1.json'));
 assert.equal(registry.schema, 'evavo.project-art-operations.v1');
+assert.equal(registry.maximumDecodedPixels, 220_000_000);
 assert.equal(registry.rules.sourceOverwriteAllowed, false);
 assert.equal(registry.rules.wholeRunAtomicPublication, true);
 assert.equal(registry.rules.providerExecution, false);
@@ -97,6 +98,8 @@ const sourceAssertions = {
     'sourceHashesRevalidatedAfterExecution: true',
     'providerExecution: false',
     'candidateApproval: false',
+    'maximumDecodedPixels: boundedInteger',
+    'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
   ],
   'scripts/project-art/reference-derived.mjs': [
     'evavo.reference-derived-image-request.v1',
@@ -141,6 +144,8 @@ const sourceAssertions = {
     'candidateApproval": False',
     'targetRepositoryMutation": False',
     'os.replace(staging, output_root)',
+    'maximum_decoded_pixels',
+    'require_pixel_budget',
   ],
   'docs/PROJECT_ART_WORKBENCH.md': [
     'Project intelligence',
@@ -153,6 +158,7 @@ const sourceAssertions = {
     'credential-redacted environment',
     'non-symbolic',
     'project_art_review_mcp.mjs',
+    'decoded-image boundary',
   ],
   '.github/workflows/project-art-workbench.yml': [
     'PROJECT_ART_REQUIRE_PILLOW: "1"',
