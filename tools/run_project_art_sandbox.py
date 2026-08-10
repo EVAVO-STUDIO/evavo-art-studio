@@ -1170,7 +1170,7 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
             "maskSourceIndex": layer.get("maskSourceIndex"),
             "x": int(layer.get("x", 0)),
             "y": int(layer.get("y", 0)),
-            "opacity": float(layer.get("opacity", 1.0)),
+            "opacity": layer.get("opacity", 1),
             "blendMode": layer.get("blendMode", "normal"),
             "width": prepared.width,
             "height": prepared.height,
