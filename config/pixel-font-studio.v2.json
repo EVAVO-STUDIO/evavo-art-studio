@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "2.0",
+  "familyMasterSchema": "evavo.pixel-font-family-master.v2",
+  "faceMasterSchema": "evavo.pixel-font-face-master.v2",
+  "familyOutputSchema": "evavo.pixel-font-family.v2",
+  "canonicalRuntime": ["AngelCode BMFont .fnt", "RGBA PNG atlas"],
+  "godot": {
+    "targetVersion": "4.6.2",
+    "textureFilter": "nearest",
+    "integerScaleOnly": true,
+    "subpixelPositioning": false,
+    "mipmaps": false,
+    "systemFallback": false
+  },
+  "requirements": {
+    "independentFaceMasters": true,
+    "arbitraryGlyphDimensions": true,
+    "perGlyphOffsetsAndAdvances": true,
+    "perFaceKerning": true,
+    "unicodeCoverage": true,
+    "printableAsciiRequired": true,
+    "binaryPixelMasters": true,
+    "confusableQa": true,
+    "createOnlyBuilds": true,
+    "nativeResolutionReview": true,
+    "externalFontBinaryRequired": false
+  }
+}

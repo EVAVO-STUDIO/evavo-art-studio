@@ -10,10 +10,12 @@
     "test": "npm run build --silent && node --test test/*.test.mjs",
     "dev": "node --watch dist/index.js",
     "dev:workspace-writer": "node --watch dist/workspace-writer.js",
+    "dev:asset-transfer": "node --watch dist/asset-transfer.js",
     "start": "node dist/index.js",
     "start:review": "node dist/review.js",
     "start:production": "node dist/production.js",
-    "start:workspace-writer": "node dist/workspace-writer.js"
+    "start:workspace-writer": "node dist/workspace-writer.js",
+    "start:asset-transfer": "node dist/asset-transfer.js"
   },
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",

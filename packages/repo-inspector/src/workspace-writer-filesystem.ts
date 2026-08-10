@@ -26,6 +26,32 @@ export interface ExistingFileEvidence {
   readonly sizeBytes: number;
 }
 
+function filesystemErrorCode(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || !("code" in value)) {
+    return undefined;
+  }
+  const code = (value as { readonly code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
+function rethrowCreateOnlyError(error: unknown, target: string): never {
+  if (filesystemErrorCode(error) === "EEXIST") {
+    fail(
+      "ART_WORKSPACE_TARGET_EXISTS",
+      `Create-only target already exists: ${target}`,
+    );
+  }
+  throw error;
+}
+
+async function openCreateOnly(target: string) {
+  try {
+    return await open(target, "wx", 0o600);
+  } catch (error: unknown) {
+    rethrowCreateOnlyError(error, target);
+  }
+}
+
 async function ordinaryDirectory(directoryPath: string, label: string): Promise<string> {
   const evidence = await lstat(directoryPath).catch(() => undefined);
   if (!evidence?.isDirectory() || evidence.isSymbolicLink()) {
@@ -202,7 +228,7 @@ export async function readHeader(filePath: string, maximum = 64 * 1024): Promise
 }
 
 export async function writeJsonCreateOnly(filePath: string, value: unknown): Promise<void> {
-  const handle = await open(filePath, "wx", 0o600);
+  const handle = await openCreateOnly(filePath);
   let completed = false;
   try {
     await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8");
@@ -219,7 +245,7 @@ export async function writeBufferCreateOnly(
   bytes: Buffer,
   expectedSha256: string,
 ): Promise<void> {
-  const handle = await open(target, "wx", 0o600);
+  const handle = await openCreateOnly(target);
   let completed = false;
   try {
     await handle.writeFile(bytes);
@@ -243,7 +269,11 @@ export async function copyCreateOnly(
   target: string,
   expectedSha256: string,
 ): Promise<void> {
-  await copyFile(source, target, fsConstants.COPYFILE_EXCL);
+  try {
+    await copyFile(source, target, fsConstants.COPYFILE_EXCL);
+  } catch (error: unknown) {
+    rethrowCreateOnlyError(error, target);
+  }
   try {
     const [sourceHash, targetHash] = await Promise.all([
       sha256File(source),

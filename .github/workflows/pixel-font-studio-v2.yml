@@ -1,0 +1,47 @@
+name: Pixel Font Studio v2
+
+on:
+  pull_request:
+    paths:
+      - "tools/pixel_font_studio_v2.py"
+      - "docs/PIXEL_FONT_STUDIO_V2.md"
+      - "config/pixel-font-studio.v2.json"
+      - ".github/workflows/pixel-font-studio-v2.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/pixel_font_studio_v2.py"
+      - "docs/PIXEL_FONT_STUDIO_V2.md"
+      - "config/pixel-font-studio.v2.json"
+      - ".github/workflows/pixel-font-studio-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13.5"
+      - name: Syntax and catalog contract
+        run: |
+          python -m py_compile tools/pixel_font_studio_v2.py
+          python tools/pixel_font_studio_v2.py catalog > "$RUNNER_TEMP/pixel-font-v2-catalog.json"
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path('${{ runner.temp }}/pixel-font-v2-catalog.json')
+          v=json.loads(p.read_text())
+          assert v['schema']=='evavo.pixel-font-family-master.v2'
+          assert 'arbitrary glyph matrices' in v['supports']
+          PY
+      - name: Source tree remains clean
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"

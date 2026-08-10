@@ -20,17 +20,21 @@ const files = {
   apply: "packages/repo-inspector/src/workspace-writer-apply.ts",
   policy: "packages/repo-inspector/src/workspace-writer-policy.ts",
   storage: "packages/repo-inspector/src/workspace-writer-storage.ts",
+  transfer: "packages/repo-inspector/src/workspace-writer-transfer.ts",
   index: "packages/repo-inspector/src/workspace-writer.ts",
   package: "packages/repo-inspector/package.json",
   mcp: "apps/mcp/src/workspace-writer.ts",
+  transferMcp: "apps/mcp/src/asset-transfer.ts",
   mcpPackage: "apps/mcp/package.json",
   cli: "apps/cli/src/workspace-writer-cli.ts",
   cliPackage: "apps/cli/package.json",
   intakeTests: "packages/repo-inspector/test/workspace-writer-intake.test.mjs",
   fileOperationTests: "packages/repo-inspector/test/workspace-writer-file-operations.test.mjs",
   policyStorageTests: "packages/repo-inspector/test/workspace-writer-policy-storage.test.mjs",
+  transferTests: "packages/repo-inspector/test/workspace-writer-transfer.test.mjs",
   docs: "docs/ART_WORKSPACE_WRITER.md",
   operationsDocs: "docs/ART_WORKSPACE_WRITER_OPERATIONS.md",
+  transferDocs: "docs/ART_ASSET_TRANSFER.md",
   rootPackage: "package.json",
   environment: ".env.example",
 };
@@ -62,6 +66,7 @@ const implementation = [
   source.apply,
   source.policy,
   source.storage,
+  source.transfer,
   source.index,
 ].join("\n");
 const errors = [];
@@ -83,18 +88,26 @@ requireTokens("workspace writer", implementation, [
   "evavo_art_workspace_file_plan_v1",
   "evavo_art_workspace_file_receipt_v1",
   "evavo_art_workspace_storage_receipt_v1",
+  "evavo_art_workspace_transfer_bundle_v1",
+  "evavo_art_workspace_transfer_receipt_v1",
+  "evavo.storage-art-ingest-request.v1",
+  "evavo.repository-asset-write-request.v1",
   "intakeArtWorkspaceFiles",
   "readArtWorkspaceMediaPreview",
   "compileArtWorkspaceFilePlan",
   "applyArtWorkspaceFilePlan",
   "archiveArtWorkspaceFileToStorage",
+  "compileArtWorkspaceTransferBundle",
+  "writeArtWorkspaceTransferBundle",
   "COPYFILE_EXCL",
   "expectedTargetSha256",
   "reversible-trash",
   "ART_WORKSPACE_INTAKE_IMMUTABLE",
+  "ART_WORKSPACE_TRANSFER_REPOSITORY_FILE_TOO_LARGE",
   "rollback-required",
   "shell: false",
   "EVAVO_STORAGE_",
+  "bytesFlowThroughMcp: false",
   "providerCredentialExposed: false",
   "gitCommitCreated: false",
   "gitPushPerformed: false",
@@ -113,9 +126,22 @@ requireTokens("workspace MCP", source.mcp, [
   "art_workspace_archive_to_evavo_storage",
   'type: "image" as const',
 ]);
+requireTokens("asset transfer MCP", source.transferMcp, [
+  "art_workspace_transfer_capabilities",
+  "art_workspace_compile_transfer_bundle",
+  "art_workspace_write_transfer_bundle",
+  "storage_verify_art_handoff then storage_ingest_art_handoff",
+  "evavo_git_compile_asset_write then evavo_git_apply_asset_write",
+  "bytesFlowThroughMcp: false",
+  "repositoryWritePerformed: false",
+  "storageWritePerformed: false",
+  "publicationAuthority: false",
+]);
 requireTokens("MCP package", source.mcpPackage, [
   '"start:workspace-writer"',
   "dist/workspace-writer.js",
+  '"start:asset-transfer"',
+  "dist/asset-transfer.js",
 ]);
 requireTokens("workspace CLI", source.cli, [
   "evavo-art-workspace intake",
@@ -127,23 +153,36 @@ requireTokens("CLI package", source.cliPackage, [
   '"evavo-art-workspace"',
   "dist/workspace-writer-cli.js",
 ]);
-requireTokens("workspace tests", `${source.intakeTests}
-${source.fileOperationTests}
-${source.policyStorageTests}`, [
-  "base64 intake is create-only",
-  "intake originals are immutable",
-  "copy is no-overwrite and detects a target race",
-  "reversible trash and exact restore",
-  "replace retains exact previous bytes",
-  "excludes provider credentials",
-]);
-requireTokens("workspace documentation", `${source.docs}\n${source.operationsDocs}`, [
-  "ChatGPT and Claude attachment intake",
-  "EVAVO Storage",
-  "Development Studio",
-  "Sprite sheets, atlases and animation sequences",
-  "No arbitrary shell",
-]);
+requireTokens(
+  "workspace tests",
+  `${source.intakeTests}\n${source.fileOperationTests}\n${source.policyStorageTests}\n${source.transferTests}`,
+  [
+    "base64 intake is create-only",
+    "intake originals are immutable",
+    "copy is no-overwrite and detects a target race",
+    "reversible trash and exact restore",
+    "replace retains exact previous bytes",
+    "excludes provider credentials",
+    "small reviewed assets compile to a path-only governed repository request",
+    "automatic routing sends oversized ordinary Git assets to EVAVO Storage",
+    "explicit repository routing never silently bypasses Git size limits",
+  ],
+);
+requireTokens(
+  "workspace documentation",
+  `${source.docs}\n${source.operationsDocs}\n${source.transferDocs}`,
+  [
+    "ChatGPT and Claude attachment intake",
+    "EVAVO Storage",
+    "Development Studio",
+    "Sprite sheets, atlases and animation sequences",
+    "No arbitrary shell",
+    "Art workspace transfer orchestration",
+    "evavo.repository-asset-write-request.v1",
+    "evavo.storage-art-ingest-request.v1",
+    "image bytes through Chat, Claude or MCP payloads",
+  ],
+);
 requireTokens("root scripts", source.rootPackage, [
   '"dev:mcp:workspace-writer"',
   '"workspace-writer:check"',
@@ -168,6 +207,13 @@ forbidTokens("workspace MCP", source.mcp, [
   "process.env.OPENAI_API_KEY",
   "git push",
 ]);
+forbidTokens("asset transfer MCP", source.transferMcp, [
+  "child_process",
+  "process.env.OPENAI_API_KEY",
+  "git push",
+  "git commit",
+  "fetch(",
+]);
 forbidTokens("workspace CLI", source.cli, ["child_process", "git push"]);
 
 if (errors.length) {
@@ -181,5 +227,6 @@ console.log("- mounted and bounded base64 art intake is create-only and SHA-256 
 console.log("- intake originals remain immutable while working files stay fully organisable");
 console.log("- image preview returns exact MCP image content without mutation");
 console.log("- copy, move, replace, reversible trash and restore are stale-detecting and no-overwrite");
-console.log("- EVAVO Storage handoff uses one fixed shell-free server-side operator command");
-console.log("- repository publication remains a separate Development Studio or owner action");
+console.log("- Storage and repository transfer manifests are path-only, self-hashed and create-only");
+console.log("- oversized ordinary Git payloads route to EVAVO Storage without silent Git bloat");
+console.log("- downstream storage, repository publication and mainline mutation remain separately authorised");
