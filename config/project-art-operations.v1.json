@@ -205,6 +205,7 @@
     "slice-sheet",
     "assemble-sheet",
     "sequence-review",
+    "image-composite",
     "image-compare"
   ],
   "outputFormats": [

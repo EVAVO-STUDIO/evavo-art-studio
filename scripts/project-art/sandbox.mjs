@@ -291,6 +291,71 @@ function normalizeAssembleTask(task, taskIndex, targetClaims) {
   };
 }
 
+
+function normalizeCompositeTask(task, taskIndex, targetClaims) {
+  const targetPath = normalizeTargetPath(task.targetPath, `tasks[${taskIndex}].targetPath`, targetClaims);
+  const outputFormat = task.outputFormat || extensionFormat(targetPath);
+  if (!['png', 'webp', 'jpeg'].includes(outputFormat) || !OUTPUT_EXTENSIONS[outputFormat]?.has(path.posix.extname(targetPath).toLowerCase())) {
+    fail('PROJECT_ART_SANDBOX_TARGET_INVALID', `Composite target extension does not match outputFormat: ${targetPath}.`);
+  }
+  const sources = normalizeSources(task.sources, `tasks[${taskIndex}].sources`);
+  if (sources.length > 128) {
+    fail('PROJECT_ART_SANDBOX_SOURCE_INVALID', `tasks[${taskIndex}].sources must contain at most 128 images.`);
+  }
+  if (!Array.isArray(task.layers) || task.layers.length < 1 || task.layers.length > 128) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].layers must contain 1-128 entries.`);
+  }
+  const layers = task.layers.map((layer, layerIndex) => {
+    if (!isRecord(layer)) fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].layers[${layerIndex}] must be an object.`);
+    const sourceIndex = boundedInteger(layer.sourceIndex, `tasks[${taskIndex}].layers[${layerIndex}].sourceIndex`, 0, sources.length - 1);
+    const maskSourceIndex = layer.maskSourceIndex === undefined
+      ? null
+      : boundedInteger(layer.maskSourceIndex, `tasks[${taskIndex}].layers[${layerIndex}].maskSourceIndex`, 0, sources.length - 1);
+    const width = layer.width === undefined ? null : boundedInteger(layer.width, `tasks[${taskIndex}].layers[${layerIndex}].width`, 1, 65_536);
+    const height = layer.height === undefined ? null : boundedInteger(layer.height, `tasks[${taskIndex}].layers[${layerIndex}].height`, 1, 65_536);
+    if ((width === null) !== (height === null)) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].layers[${layerIndex}] must provide width and height together.`);
+    }
+    const blendMode = layer.blendMode ?? 'normal';
+    if (!['normal', 'multiply', 'screen', 'add', 'subtract', 'darken', 'lighten'].includes(blendMode)) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported composite blend mode: ${blendMode}.`);
+    }
+    const maskChannel = layer.maskChannel ?? 'alpha';
+    if (!['alpha', 'luminance'].includes(maskChannel)) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported composite mask channel: ${maskChannel}.`);
+    }
+    const sampling = layer.sampling ?? 'nearest';
+    if (!['nearest', 'lanczos'].includes(sampling)) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported composite sampling mode: ${sampling}.`);
+    }
+    return {
+      sourceIndex,
+      maskSourceIndex,
+      x: boundedInteger(layer.x ?? 0, `tasks[${taskIndex}].layers[${layerIndex}].x`, -65_536, 65_536),
+      y: boundedInteger(layer.y ?? 0, `tasks[${taskIndex}].layers[${layerIndex}].y`, -65_536, 65_536),
+      opacity: boundedNumber(layer.opacity ?? 1, `tasks[${taskIndex}].layers[${layerIndex}].opacity`, 0, 1),
+      blendMode,
+      maskChannel,
+      invertMask: layer.invertMask === true,
+      sampling,
+      ...(width === null ? {} : { width, height }),
+    };
+  });
+  return {
+    id: safeId(task.id, `tasks[${taskIndex}].id`),
+    kind: 'image-composite',
+    sources,
+    targetPath,
+    outputFormat,
+    canvas: {
+      width: boundedInteger(task.canvas?.width, `tasks[${taskIndex}].canvas.width`, 1, 65_536),
+      height: boundedInteger(task.canvas?.height, `tasks[${taskIndex}].canvas.height`, 1, 65_536),
+      background: task.canvas?.background ?? '#00000000',
+    },
+    layers,
+  };
+}
+
 function normalizeReviewTask(task, taskIndex, targetClaims) {
   const targetDirectory = normalizeTargetPath(task.targetDirectory, `tasks[${taskIndex}].targetDirectory`, targetClaims);
   const thresholds = isRecord(task.thresholds) ? task.thresholds : {};
@@ -460,6 +525,7 @@ export async function compileProjectArtSandbox({
     else if (kind === 'slice-sheet') normalized = normalizeSliceTask(task, index, targetClaims);
     else if (kind === 'assemble-sheet') normalized = normalizeAssembleTask(task, index, targetClaims);
     else if (kind === 'sequence-review') normalized = normalizeReviewTask(task, index, targetClaims);
+    else if (kind === 'image-composite') normalized = normalizeCompositeTask(task, index, targetClaims);
     else normalized = normalizeCompareTask(task, index, targetClaims);
     if (taskIds.has(normalized.id)) fail('PROJECT_ART_SANDBOX_TASK_DUPLICATE', `Duplicate task id: ${normalized.id}.`);
     taskIds.add(normalized.id);

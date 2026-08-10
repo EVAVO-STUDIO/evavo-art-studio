@@ -380,6 +380,12 @@ Strict cells prevent accidental frame resampling. `contain` and `cover` remain a
 
 `image-compare` is the deterministic similarity gate for before/after edits and provider-generated matching assets or frames. It binds exactly two source images, records decoded-pixel identities, changed-pixel fraction, mean/max channel delta and alpha-change fraction, and can produce difference and 50/50 overlay previews. Threshold failures block the task but never imply creative approval.
 
+### Multi-layer compositing
+
+`image-composite` builds a new candidate from an ordered set of exact source images without mutating any source. Each layer can declare position, optional resize, nearest or Lanczos sampling, opacity, a blend mode, and an optional alpha/luminance mask sourced from another exact sandbox input. Supported blend modes are `normal`, `multiply`, `screen`, `add`, `subtract`, `darken`, and `lighten`.
+
+This is intended for UI assembly, VFX overlays, sprite/accessory layers, controlled matte repairs, mockups, and other deterministic composites. Compositing remains a sandbox effect only: it does not approve the visual result, promote it, or write it into a target repository.
+
 ```json
 {
   "id": "compare-frame",

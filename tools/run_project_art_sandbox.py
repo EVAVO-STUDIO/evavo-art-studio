@@ -1078,6 +1078,115 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
     )
 
 
+
+def _resample(name: str) -> int:
+    if name == "nearest":
+        return Image.Resampling.NEAREST
+    if name == "lanczos":
+        return Image.Resampling.LANCZOS
+    fail(f"unsupported sampling mode: {name}")
+
+
+def _apply_layer_mask(image: Image.Image, mask_image: Image.Image | None, layer: dict[str, Any]) -> Image.Image:
+    result = image.convert("RGBA")
+    alpha = result.getchannel("A")
+    if mask_image is not None:
+        mask = mask_image.convert("RGBA")
+        if mask.size != result.size:
+            mask = mask.resize(result.size, _resample(layer.get("sampling", "nearest")))
+        if layer.get("maskChannel", "alpha") == "alpha":
+            mask_channel = mask.getchannel("A")
+        else:
+            mask_channel = ImageOps.grayscale(mask.convert("RGB"))
+        if layer.get("invertMask") is True:
+            mask_channel = ImageOps.invert(mask_channel)
+        alpha = ImageChops.multiply(alpha, mask_channel)
+    opacity = float(layer.get("opacity", 1.0))
+    if opacity < 1.0:
+        alpha = alpha.point(lambda value: round(value * opacity))
+    result.putalpha(alpha)
+    return result
+
+
+def _blend_overlap(base: Image.Image, layer: Image.Image, mode: str) -> Image.Image:
+    base = base.convert("RGBA")
+    layer = layer.convert("RGBA")
+    normal = Image.alpha_composite(base, layer)
+    if mode == "normal":
+        return normal
+    base_rgb = base.convert("RGB")
+    layer_rgb = layer.convert("RGB")
+    if mode == "multiply":
+        blended_rgb = ImageChops.multiply(base_rgb, layer_rgb)
+    elif mode == "screen":
+        blended_rgb = ImageChops.screen(base_rgb, layer_rgb)
+    elif mode == "add":
+        blended_rgb = ImageChops.add(base_rgb, layer_rgb, scale=1.0, offset=0)
+    elif mode == "subtract":
+        blended_rgb = ImageChops.subtract(base_rgb, layer_rgb, scale=1.0, offset=0)
+    elif mode == "darken":
+        blended_rgb = ImageChops.darker(base_rgb, layer_rgb)
+    elif mode == "lighten":
+        blended_rgb = ImageChops.lighter(base_rgb, layer_rgb)
+    else:
+        fail(f"unsupported composite blend mode: {mode}")
+    candidate = Image.merge("RGBA", (*blended_rgb.split(), normal.getchannel("A")))
+    overlap = ImageChops.multiply(base.getchannel("A"), layer.getchannel("A"))
+    return Image.composite(candidate, normal, overlap)
+
+
+def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> None:
+    source_paths = [context.resolve_source_path(source) for source in task["sources"]]
+    canvas_spec = task["canvas"]
+    canvas = Image.new(
+        "RGBA",
+        (int(canvas_spec["width"]), int(canvas_spec["height"])),
+        parse_colour(canvas_spec.get("background", "#00000000"), "image-composite.canvas.background"),
+    )
+    applied_layers: list[dict[str, Any]] = []
+    for index, layer in enumerate(task["layers"]):
+        source_index = int(layer["sourceIndex"])
+        if source_index < 0 or source_index >= len(source_paths):
+            fail(f"image-composite layer {index} sourceIndex escaped the source list")
+        image = load_image(source_paths[source_index]).convert("RGBA")
+        if layer.get("width") is not None:
+            image = image.resize(
+                (int(layer["width"]), int(layer["height"])),
+                _resample(layer.get("sampling", "nearest")),
+            )
+        mask_image = None
+        if layer.get("maskSourceIndex") is not None:
+            mask_index = int(layer["maskSourceIndex"])
+            if mask_index < 0 or mask_index >= len(source_paths):
+                fail(f"image-composite layer {index} maskSourceIndex escaped the source list")
+            mask_image = load_image(source_paths[mask_index])
+        prepared = _apply_layer_mask(image, mask_image, layer)
+        layer_canvas = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+        layer_canvas.alpha_composite(prepared, dest=(int(layer.get("x", 0)), int(layer.get("y", 0))))
+        canvas = _blend_overlap(canvas, layer_canvas, layer.get("blendMode", "normal"))
+        applied_layers.append({
+            "index": index,
+            "sourceIndex": source_index,
+            "maskSourceIndex": layer.get("maskSourceIndex"),
+            "x": int(layer.get("x", 0)),
+            "y": int(layer.get("y", 0)),
+            "opacity": layer.get("opacity", 1),
+            "blendMode": layer.get("blendMode", "normal"),
+            "width": prepared.width,
+            "height": prepared.height,
+        })
+    target = target_path(context.staging, task["targetPath"], f"task {task['id']} targetPath")
+    save_image(canvas, target, task["outputFormat"])
+    output = output_record(context.staging, target, canvas, role="composite-image")
+    context.remember(task["id"], {
+        "taskId": task["id"],
+        "kind": task["kind"],
+        "status": "passed",
+        "layerCount": len(applied_layers),
+        "layers": applied_layers,
+        "outputs": [output],
+    }, [target])
+
 def image_compare_metrics(left: Image.Image, right: Image.Image) -> dict[str, Any]:
     if left.size != right.size:
         return {
@@ -1219,6 +1328,8 @@ def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, outpu
                 execute_assemble_task(context, task)
             elif kind == "sequence-review":
                 execute_review_task(context, task)
+            elif kind == "image-composite":
+                execute_composite_task(context, task)
             elif kind == "image-compare":
                 execute_compare_task(context, task)
             else:
