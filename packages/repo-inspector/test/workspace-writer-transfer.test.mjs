@@ -104,9 +104,20 @@ test("automatic routing sends oversized ordinary Git assets to EVAVO Storage", a
     await readFile(path.join(f.workspace, receipt.storageManifest), "utf8"),
   );
   assert.equal(storage.items[0].sha256, bundle.decisions[0].sha256);
+  const firstBundleBytes = await readFile(
+    path.join(f.workspace, receipt.bundleManifest),
+  );
   await assert.rejects(
     writeArtWorkspaceTransferBundle(bundle, f.policy),
-    (error) => error instanceof ArtWorkspaceWriterError,
+    (error) => {
+      assert.ok(error instanceof ArtWorkspaceWriterError);
+      assert.equal(error.code, "ART_WORKSPACE_TARGET_EXISTS");
+      return true;
+    },
+  );
+  assert.deepEqual(
+    await readFile(path.join(f.workspace, receipt.bundleManifest)),
+    firstBundleBytes,
   );
 });
 
