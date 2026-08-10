@@ -8,3 +8,4 @@ export { compileArtDirectionContract } from "./public-compiler.js";
 export * from "./protocol.js";
 export { ART_DIRECTION_COMPILE_CAPABILITIES } from "./jobs.js";
 export { compileArtDirectionJob } from "./public-jobs.js";
+export * from "./layered-production.js";
