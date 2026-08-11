@@ -150,6 +150,8 @@ requireTokens('Loop-closure runtime', source.runtime, [
   'wholeRunAtomicPublication',
   'creativeApprovalPerformed',
   'runtimeApprovalPerformed',
+  '"targetRepositoryMutation",',
+  '{key: False for key in AUTHORITY_KEYS}',
 ]);
 forbidTokens('Loop-closure runtime', source.runtime, [
   'import requests',
@@ -216,7 +218,8 @@ requireTokens('Project Art workflow loop boundary', source.workflow, [
   "grep -F 'evavo.project-art-loop-closure-plan.v1' scripts/compile-project-art-loop-closure.mjs",
   "grep -F 'PROJECT_ART_LOOP_CLOSURE_REQUEST_BYTES_MISMATCH' scripts/compile-project-art-loop-closure.mjs",
   "grep -F 'sourceHashesRevalidatedAfterExecution' tools/run_project_art_loop_closure.py",
-  "grep -F '\"targetRepositoryMutation\": False' tools/run_project_art_loop_closure.py",
+  "grep -F '\"targetRepositoryMutation\",' tools/run_project_art_loop_closure.py",
+  "grep -F '{key: False for key in AUTHORITY_KEYS}' tools/run_project_art_loop_closure.py",
   "! grep -F 'git push' tools/run_project_art_loop_closure.py",
 ]);
 
@@ -279,5 +282,6 @@ console.log('- exact identical endpoints remain valid for deliberate seamless lo
 console.log('- excessive pixel, channel, alpha and centroid seam drift blocks review');
 console.log('- source hashes are revalidated before and after atomic evidence publication');
 console.log('- every loop implementation file is a first-class pull-request and main-push workflow trigger');
+console.log('- the canonical false-authority map is checked semantically rather than through a nonexistent literal');
 console.log('- the focused adversary is mandatory inside the Project Art workbench chain');
 console.log('- no creative approval, source mutation, provider, repository, Git, deployment or publication authority was introduced');
