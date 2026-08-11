@@ -1,0 +1,19 @@
+diff --git a/tools/pixel_font_v2/build.py b/tools/pixel_font_v2/build.py
+index 1c48d85..0000000 100644
+--- a/tools/pixel_font_v2/build.py
++++ b/tools/pixel_font_v2/build.py
+@@ -275,8 +275,13 @@ func _ready() -> void:
+         add_child(label)
+         labels.append(label)
+         y += int(parsed.get("metrics", {{}}).get("lineHeight", 10)) + 14
++    print("EVAVO_PIXEL_FONT_STAGE: layout")
+     await get_tree().process_frame
+-    await RenderingServer.frame_post_draw
++    print("EVAVO_PIXEL_FONT_STAGE: force_draw")
++    RenderingServer.force_draw(false)
++    RenderingServer.force_sync()
++    await get_tree().process_frame
++    print("EVAVO_PIXEL_FONT_STAGE: capture")
+     var image := get_viewport().get_texture().get_image()
+     var non_binary := 0
+     for yy in range(image.get_height()):
