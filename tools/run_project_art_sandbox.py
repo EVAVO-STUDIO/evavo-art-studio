@@ -72,8 +72,11 @@ def sha256_file(value: Path, maximum_bytes: int = MAXIMUM_SOURCE_BYTES) -> tuple
 
 def canonical_json(value: Any) -> str:
     if value is None or isinstance(value, (str, int, float, bool)):
-        if isinstance(value, float) and not math.isfinite(value):
-            fail("canonical JSON cannot contain non-finite numbers")
+        if isinstance(value, float):
+            if not math.isfinite(value):
+                fail("canonical JSON cannot contain non-finite numbers")
+            if value.is_integer():
+                value = int(value)
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     if isinstance(value, list):
         return "[" + ",".join(canonical_json(item) for item in value) + "]"
@@ -622,9 +625,395 @@ def translate_image(image: Image.Image, operation: dict[str, Any]) -> Image.Imag
 
 def adjust_rgb_channels(image: Image.Image, enhancer: Any, factor: float) -> Image.Image:
     alpha = image.getchannel("A")
-    rgb = enhancer(image.convert("RGB")).enhance(factor).convert("RGBA")
-    rgb.putalpha(alpha)
-    return rgb
+    source = image.convert("RGB")
+    try:
+        result = enhancer(source).enhance(factor).convert("RGBA")
+        result.putalpha(alpha)
+        return result
+    finally:
+        source.close()
+        alpha.close()
+
+
+def _preserve_alpha_filter(image: Image.Image, image_filter: ImageFilter.Filter) -> Image.Image:
+    alpha = image.getchannel("A")
+    rgb = image.convert("RGB")
+    try:
+        result = rgb.filter(image_filter).convert("RGBA")
+        result.putalpha(alpha)
+        return result
+    finally:
+        rgb.close()
+        alpha.close()
+
+
+def _blend_filtered_rgb(image: Image.Image, image_filter: ImageFilter.Filter, blend: float) -> Image.Image:
+    if not 0 <= blend <= 1:
+        fail("filter blend must be between 0 and 1")
+    filtered = _preserve_alpha_filter(image, image_filter)
+    if blend >= 1:
+        return filtered
+    if blend <= 0:
+        filtered.close()
+        return image.copy()
+    result = Image.blend(image, filtered, blend)
+    filtered.close()
+    return result
+
+
+def _arbitrary_rotate(image: Image.Image, operation: dict[str, Any], maximum_pixels: int) -> Image.Image:
+    angle = float(operation["angle"])
+    expand = bool(operation.get("expand", False))
+    background = parse_colour(operation.get("background", "#00000000"), "rotate.background")
+    result = image.rotate(
+        angle,
+        resample=sampling(operation.get("sampling", "bicubic")),
+        expand=expand,
+        fillcolor=background,
+    )
+    require_pixel_budget(result.width, result.height, "rotate target", maximum_pixels)
+    return result
+
+
+def _transform_image(image: Image.Image, operation: dict[str, Any], transform: Image.Transform, key: str, maximum_pixels: int) -> Image.Image:
+    width = int(operation.get("width", image.width))
+    height = int(operation.get("height", image.height))
+    require_pixel_budget(width, height, f"{operation['op']} target", maximum_pixels)
+    coefficients = tuple(float(value) for value in operation[key])
+    return image.transform(
+        (width, height),
+        transform,
+        coefficients,
+        resample=sampling(operation.get("sampling", "bicubic")),
+        fillcolor=parse_colour(operation.get("background", "#00000000"), f"{operation['op']}.background"),
+    )
+
+
+def _grayscale(image: Image.Image, mode: str) -> Image.Image:
+    alpha = image.getchannel("A")
+    rgb = image.convert("RGB")
+    try:
+        if mode == "average":
+            red, green, blue = rgb.split()
+            try:
+                values = bytes(
+                    round((r + g + b) / 3)
+                    for r, g, b in zip(red.tobytes(), green.tobytes(), blue.tobytes())
+                )
+                gray = Image.frombytes("L", image.size, values)
+            finally:
+                red.close()
+                green.close()
+                blue.close()
+        else:
+            gray = ImageOps.grayscale(rgb)
+        try:
+            return Image.merge("RGBA", (gray, gray, gray, alpha))
+        finally:
+            gray.close()
+    finally:
+        rgb.close()
+        alpha.close()
+
+
+def _invert_rgb(image: Image.Image) -> Image.Image:
+    alpha = image.getchannel("A")
+    rgb = image.convert("RGB")
+    try:
+        inverted = ImageOps.invert(rgb).convert("RGBA")
+        inverted.putalpha(alpha)
+        return inverted
+    finally:
+        rgb.close()
+        alpha.close()
+
+
+def _posterize(image: Image.Image, bits: int) -> Image.Image:
+    alpha = image.getchannel("A")
+    rgb = image.convert("RGB")
+    try:
+        result = ImageOps.posterize(rgb, bits).convert("RGBA")
+        result.putalpha(alpha)
+        return result
+    finally:
+        rgb.close()
+        alpha.close()
+
+
+def _threshold_rgb(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    threshold = int(operation["threshold"])
+    low = parse_colour(operation.get("lowColour", "#000000"), "threshold.lowColour")
+    high = parse_colour(operation.get("highColour", "#ffffff"), "threshold.highColour")
+    alpha = image.getchannel("A")
+    rgb = image.convert("RGB")
+    try:
+        gray = ImageOps.grayscale(rgb)
+        try:
+            selector = gray.point(lambda value: 255 if value >= threshold else 0)
+            try:
+                low_image = Image.new("RGBA", image.size, low)
+                high_image = Image.new("RGBA", image.size, high)
+                try:
+                    result = Image.composite(high_image, low_image, selector)
+                    result.putalpha(alpha)
+                    return result
+                finally:
+                    low_image.close()
+                    high_image.close()
+            finally:
+                selector.close()
+        finally:
+            gray.close()
+    finally:
+        rgb.close()
+        alpha.close()
+
+
+def _gamma_rgb(image: Image.Image, gamma_value: float) -> Image.Image:
+    lookup = [round(((value / 255.0) ** (1.0 / gamma_value)) * 255.0) for value in range(256)]
+    red, green, blue, alpha = image.split()
+    outputs = [red.point(lookup), green.point(lookup), blue.point(lookup)]
+    try:
+        return Image.merge("RGBA", (*outputs, alpha))
+    finally:
+        for output in outputs:
+            output.close()
+        red.close()
+        green.close()
+        blue.close()
+        alpha.close()
+
+
+def _hue_shift(image: Image.Image, degrees: float) -> Image.Image:
+    alpha = image.getchannel("A")
+    rgb_source = image.convert("RGB")
+    try:
+        hsv = rgb_source.convert("HSV")
+        try:
+            hue, saturation_channel, value_channel = hsv.split()
+            try:
+                offset = round((degrees % 360) * 255.0 / 360.0)
+                shifted_hue = hue.point(lambda value: (value + offset) % 256)
+                try:
+                    rgb = Image.merge("HSV", (shifted_hue, saturation_channel, value_channel)).convert("RGB").convert("RGBA")
+                    rgb.putalpha(alpha)
+                    return rgb
+                finally:
+                    shifted_hue.close()
+            finally:
+                hue.close()
+                saturation_channel.close()
+                value_channel.close()
+        finally:
+            hsv.close()
+    finally:
+        rgb_source.close()
+        alpha.close()
+
+
+def _curve_lookup(points: list[dict[str, Any]]) -> list[int]:
+    result: list[int] = []
+    segment = 0
+    for value in range(256):
+        while segment + 1 < len(points) - 1 and value > int(points[segment + 1]["input"]):
+            segment += 1
+        left = points[segment]
+        right = points[segment + 1]
+        span = int(right["input"]) - int(left["input"])
+        amount = 0 if span == 0 else (value - int(left["input"])) / span
+        output = float(left["output"]) + (float(right["output"]) - float(left["output"])) * amount
+        result.append(max(0, min(255, round(output))))
+    return result
+
+
+def _curves(image: Image.Image, channels: dict[str, Any]) -> Image.Image:
+    red, green, blue, alpha = image.split()
+    channel_images = {"red": red, "green": green, "blue": blue, "alpha": alpha}
+    try:
+        master = _curve_lookup(channels["master"]) if "master" in channels else list(range(256))
+        outputs: list[Image.Image] = []
+        for name in ("red", "green", "blue", "alpha"):
+            lookup = master
+            if name in channels:
+                channel_lookup = _curve_lookup(channels[name])
+                lookup = [channel_lookup[master[value]] for value in range(256)] if name != "alpha" else channel_lookup
+            elif name == "alpha":
+                lookup = list(range(256))
+            outputs.append(channel_images[name].point(lookup))
+        try:
+            return Image.merge("RGBA", tuple(outputs))
+        finally:
+            for output in outputs:
+                output.close()
+    finally:
+        red.close()
+        green.close()
+        blue.close()
+        alpha.close()
+
+
+def _channel_mixer(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    matrix: list[float] = []
+    offsets = operation.get("offsets", [0, 0, 0])
+    for index, name in enumerate(("red", "green", "blue")):
+        matrix.extend(float(value) for value in operation[name])
+        matrix.append(float(offsets[index]))
+    alpha = image.getchannel("A")
+    rgb = image.convert("RGB")
+    try:
+        mixed = rgb.convert("RGB", tuple(matrix)).convert("RGBA")
+        mixed.putalpha(alpha)
+        return mixed
+    finally:
+        rgb.close()
+        alpha.close()
+
+
+def _motion_blur(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    radius = float(operation.get("radius", 8))
+    samples = int(operation.get("samples", 17))
+    angle = math.radians(float(operation.get("angle", 0)))
+    accumulator: Image.Image | None = None
+    for index in range(samples):
+        position = -1.0 + 2.0 * index / max(1, samples - 1)
+        dx = round(math.cos(angle) * radius * position)
+        dy = round(math.sin(angle) * radius * position)
+        sample = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        sample.alpha_composite(image, (dx, dy))
+        if accumulator is None:
+            accumulator = sample
+        else:
+            blended = Image.blend(accumulator, sample, 1.0 / (index + 1))
+            accumulator.close()
+            sample.close()
+            accumulator = blended
+    if accumulator is None:
+        fail("motion-blur requires at least one sample")
+    return accumulator
+
+
+def _alpha_feather(image: Image.Image, radius: float) -> Image.Image:
+    result = image.copy()
+    source_alpha = image.getchannel("A")
+    try:
+        alpha = source_alpha.filter(ImageFilter.GaussianBlur(radius=radius))
+        try:
+            result.putalpha(alpha)
+        finally:
+            alpha.close()
+    finally:
+        source_alpha.close()
+    return result
+
+
+def _defringe(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    radius = int(operation.get("radius", 1))
+    maximum_alpha = int(operation.get("maximumAlpha", 254))
+    strength = float(operation.get("strength", 1))
+    rebuilt = hidden_rgb_rebuild(
+        image,
+        {"maximumPixels": min(MAXIMUM_HIDDEN_RGB_PIXELS, image.width * image.height)},
+    )
+    matte = None
+    if operation.get("matteColour") is not None:
+        matte = parse_colour(operation["matteColour"], "defringe.matteColour", allow_alpha=False)[:3]
+    source = image.load()
+    output = rebuilt.load()
+    for y in range(image.height):
+        for x in range(image.width):
+            red, green, blue, alpha = source[x, y]
+            if alpha <= 0 or alpha > maximum_alpha:
+                continue
+            neighbours: list[tuple[int, int, int]] = []
+            for yy in range(max(0, y - radius), min(image.height, y + radius + 1)):
+                for xx in range(max(0, x - radius), min(image.width, x + radius + 1)):
+                    candidate = source[xx, yy]
+                    if candidate[3] == 255:
+                        neighbours.append(candidate[:3])
+            if neighbours:
+                replacement = tuple(round(sum(value[channel] for value in neighbours) / len(neighbours)) for channel in range(3))
+            else:
+                replacement = output[x, y][:3]
+            if matte is not None:
+                fraction = alpha / 255.0
+                corrected = tuple(
+                    max(0, min(255, round((channel - matte_channel * (1.0 - fraction)) / max(fraction, 1 / 255))))
+                    for channel, matte_channel in zip((red, green, blue), matte)
+                )
+                replacement = tuple(round(replacement[index] * (1 - strength) + corrected[index] * strength) for index in range(3))
+            else:
+                replacement = tuple(round((red, green, blue)[index] * (1 - strength) + replacement[index] * strength) for index in range(3))
+            output[x, y] = (*replacement, alpha)
+    return rebuilt
+
+
+def _drop_shadow(image: Image.Image, operation: dict[str, Any], maximum_pixels: int) -> Image.Image:
+    offset_x = int(operation.get("offsetX", 4))
+    offset_y = int(operation.get("offsetY", 4))
+    radius = float(operation.get("radius", 4))
+    opacity = float(operation.get("opacity", 0.5))
+    colour = parse_colour(operation.get("colour", "#000000"), "drop-shadow.colour")
+    margin = math.ceil(radius * 3 + max(abs(offset_x), abs(offset_y))) if operation.get("expandCanvas", False) else 0
+    width, height = require_pixel_budget(image.width + margin * 2, image.height + margin * 2, "drop-shadow target", maximum_pixels)
+    alpha = image.getchannel("A")
+    blurred_base = alpha.filter(ImageFilter.GaussianBlur(radius=radius))
+    blurred = blurred_base
+    try:
+        if opacity != 1:
+            blurred = blurred_base.point(lambda value: round(value * opacity))
+        shadow = Image.new("RGBA", (width, height), (*colour[:3], 0))
+        shadow_mask = Image.new("L", (width, height), 0)
+        try:
+            shadow_mask.paste(blurred, (margin + offset_x, margin + offset_y))
+            shadow.putalpha(shadow_mask)
+            shadow.alpha_composite(image, (margin, margin))
+            return shadow
+        finally:
+            shadow_mask.close()
+    finally:
+        if blurred is not blurred_base:
+            blurred.close()
+        blurred_base.close()
+        alpha.close()
+
+
+def _outer_glow(image: Image.Image, operation: dict[str, Any], maximum_pixels: int) -> Image.Image:
+    radius = float(operation.get("radius", 4))
+    spread = float(operation.get("spread", 0))
+    opacity = float(operation.get("opacity", 0.5))
+    colour = parse_colour(operation.get("colour", "#ffffff"), "outer-glow.colour")
+    margin = math.ceil(radius * 3 + spread) if operation.get("expandCanvas", False) else 0
+    width, height = require_pixel_budget(image.width + margin * 2, image.height + margin * 2, "outer-glow target", maximum_pixels)
+    source_alpha = image.getchannel("A")
+    spread_alpha = source_alpha
+    try:
+        if spread > 0:
+            filter_size = min(129, max(3, int(spread) * 2 + 1))
+            if filter_size % 2 == 0:
+                filter_size += 1
+            spread_alpha = source_alpha.filter(ImageFilter.MaxFilter(filter_size))
+        blurred_base = spread_alpha.filter(ImageFilter.GaussianBlur(radius=radius))
+        blurred = blurred_base
+        try:
+            if opacity != 1:
+                blurred = blurred_base.point(lambda value: round(value * opacity))
+            glow = Image.new("RGBA", (width, height), (*colour[:3], 0))
+            mask = Image.new("L", (width, height), 0)
+            try:
+                mask.paste(blurred, (margin, margin))
+                glow.putalpha(mask)
+                glow.alpha_composite(image, (margin, margin))
+                return glow
+            finally:
+                mask.close()
+        finally:
+            if blurred is not blurred_base:
+                blurred.close()
+            blurred_base.close()
+    finally:
+        if spread_alpha is not source_alpha:
+            spread_alpha.close()
+        source_alpha.close()
 
 
 def apply_operation(
@@ -639,6 +1028,7 @@ def apply_operation(
         threshold = int(operation.get("threshold", 0))
         alpha = image.getchannel("A").point(lambda value: 255 if value > threshold else 0)
         bbox = alpha.getbbox()
+        alpha.close()
         if bbox is None:
             if operation.get("allowBlank", False):
                 return image.copy()
@@ -651,22 +1041,12 @@ def apply_operation(
         return image.crop((left, top, right, bottom))
     if op == "crop":
         x, y = int(operation["x"]), int(operation["y"])
-        width, height = require_pixel_budget(
-            int(operation["width"]),
-            int(operation["height"]),
-            "crop target",
-            maximum_pixels,
-        )
+        width, height = require_pixel_budget(int(operation["width"]), int(operation["height"]), "crop target", maximum_pixels)
         if x < 0 or y < 0 or width < 1 or height < 1 or x + width > image.width or y + height > image.height:
             fail("crop rectangle must be inside the source image")
         return image.crop((x, y, x + width, y + height))
     if op == "pad-canvas":
-        width, height = require_pixel_budget(
-            int(operation["width"]),
-            int(operation["height"]),
-            "pad-canvas target",
-            maximum_pixels,
-        )
+        width, height = require_pixel_budget(int(operation["width"]), int(operation["height"]), "pad-canvas target", maximum_pixels)
         if width < image.width or height < image.height:
             fail("pad-canvas cannot crop the source image")
         canvas = Image.new("RGBA", (width, height), parse_colour(operation.get("background", "#00000000"), "pad-canvas.background"))
@@ -686,6 +1066,12 @@ def apply_operation(
         return image.transpose(Image.Transpose.ROTATE_180)
     if op == "rotate-270":
         return image.transpose(Image.Transpose.ROTATE_270)
+    if op == "rotate":
+        return _arbitrary_rotate(image, operation, maximum_pixels)
+    if op == "affine-transform":
+        return _transform_image(image, operation, Image.Transform.AFFINE, "matrix", maximum_pixels)
+    if op == "perspective-transform":
+        return _transform_image(image, operation, Image.Transform.PERSPECTIVE, "coefficients", maximum_pixels)
     if op == "translate":
         return translate_image(image, operation)
     if op == "colour-replace":
@@ -698,39 +1084,74 @@ def apply_operation(
         return adjust_rgb_channels(image, ImageEnhance.Color, float(operation.get("factor", 1.0)))
     if op == "sharpness":
         return adjust_rgb_channels(image, ImageEnhance.Sharpness, float(operation.get("factor", 1.0)))
+    if op == "grayscale":
+        return _grayscale(image, str(operation.get("mode", "luminance")))
+    if op == "invert":
+        return _invert_rgb(image)
+    if op == "posterize":
+        return _posterize(image, int(operation["bits"]))
+    if op == "threshold":
+        return _threshold_rgb(image, operation)
+    if op == "gamma":
+        return _gamma_rgb(image, float(operation["gamma"]))
+    if op == "hue-shift":
+        return _hue_shift(image, float(operation["degrees"]))
+    if op == "curves":
+        return _curves(image, operation["channels"])
+    if op == "channel-mixer":
+        return _channel_mixer(image, operation)
     if op == "gaussian-blur":
-        radius = float(operation.get("radius", 1.0))
-        alpha = image.getchannel("A")
-        result = image.convert("RGB").filter(ImageFilter.GaussianBlur(radius=radius)).convert("RGBA")
-        result.putalpha(alpha)
-        return result
+        return _preserve_alpha_filter(image, ImageFilter.GaussianBlur(radius=float(operation.get("radius", 1.0))))
+    if op == "box-blur":
+        return _preserve_alpha_filter(image, ImageFilter.BoxBlur(radius=float(operation.get("radius", 1.0))))
+    if op == "median-filter":
+        return _preserve_alpha_filter(image, ImageFilter.MedianFilter(size=int(operation.get("size", 3))))
+    if op == "motion-blur":
+        return _motion_blur(image, operation)
+    if op == "emboss":
+        return _blend_filtered_rgb(image, ImageFilter.EMBOSS, float(operation.get("blend", 1.0)))
+    if op == "find-edges":
+        return _blend_filtered_rgb(image, ImageFilter.FIND_EDGES, float(operation.get("blend", 1.0)))
+    if op == "edge-enhance":
+        return _blend_filtered_rgb(image, ImageFilter.EDGE_ENHANCE_MORE, float(operation.get("blend", 1.0)))
     if op == "unsharp-mask":
-        radius = float(operation.get("radius", 2.0))
-        percent = int(operation.get("percent", 150))
-        threshold = int(operation.get("threshold", 3))
-        alpha = image.getchannel("A")
-        result = image.convert("RGB").filter(ImageFilter.UnsharpMask(radius=radius, percent=percent, threshold=threshold)).convert("RGBA")
-        result.putalpha(alpha)
-        return result
+        return _preserve_alpha_filter(
+            image,
+            ImageFilter.UnsharpMask(
+                radius=float(operation.get("radius", 2.0)),
+                percent=int(operation.get("percent", 150)),
+                threshold=int(operation.get("threshold", 3)),
+            ),
+        )
     if op == "alpha-erode":
         width = int(operation.get("width", 1))
         result = image.copy()
-        result.putalpha(result.getchannel("A").filter(ImageFilter.MinFilter(width * 2 + 1)))
+        alpha = result.getchannel("A").filter(ImageFilter.MinFilter(width * 2 + 1))
+        result.putalpha(alpha)
+        alpha.close()
         return result
     if op == "alpha-dilate":
         width = int(operation.get("width", 1))
         result = image.copy()
-        result.putalpha(result.getchannel("A").filter(ImageFilter.MaxFilter(width * 2 + 1)))
+        alpha = result.getchannel("A").filter(ImageFilter.MaxFilter(width * 2 + 1))
+        result.putalpha(alpha)
+        alpha.close()
         return result
     if op == "alpha-threshold":
         threshold = int(operation.get("threshold", 128))
         output = image.copy()
-        output.putalpha(output.getchannel("A").point(lambda value: 255 if value >= threshold else 0))
+        alpha = output.getchannel("A").point(lambda value: 255 if value >= threshold else 0)
+        output.putalpha(alpha)
+        alpha.close()
         return output
+    if op == "alpha-feather":
+        return _alpha_feather(image, float(operation.get("radius", 1)))
     if op == "connected-matte-to-alpha":
         return connected_matte_to_alpha(image, operation)
     if op == "edge-decontaminate":
         return edge_decontaminate(image, operation)
+    if op == "defringe":
+        return _defringe(image, operation)
     if op == "hidden-rgb-rebuild":
         return hidden_rgb_rebuild(image, operation)
     if op == "palette-normalize":
@@ -744,23 +1165,30 @@ def apply_operation(
             method=Image.Quantize.FASTOCTREE,
             dither=Image.Dither.FLOYDSTEINBERG if operation.get("dither", False) else Image.Dither.NONE,
         )
-        return quantized.convert("RGBA")
+        result = quantized.convert("RGBA")
+        quantized.close()
+        return result
     if op == "autocontrast":
         red, green, blue, alpha = image.split()
         cutoff = float(operation.get("cutoff", 0.0))
-        return Image.merge(
-            "RGBA",
-            (
-                ImageOps.autocontrast(red, cutoff=cutoff),
-                ImageOps.autocontrast(green, cutoff=cutoff),
-                ImageOps.autocontrast(blue, cutoff=cutoff),
-                alpha,
-            ),
-        )
+        channels = (ImageOps.autocontrast(red, cutoff=cutoff), ImageOps.autocontrast(green, cutoff=cutoff), ImageOps.autocontrast(blue, cutoff=cutoff), alpha)
+        try:
+            return Image.merge("RGBA", channels)
+        finally:
+            for channel in channels[:3]:
+                channel.close()
+            red.close()
+            green.close()
+            blue.close()
+            alpha.close()
     if op == "levels":
         return levels(image, operation)
     if op == "outline":
         return outline(image, operation)
+    if op == "drop-shadow":
+        return _drop_shadow(image, operation, maximum_pixels)
+    if op == "outer-glow":
+        return _outer_glow(image, operation, maximum_pixels)
     fail(f"unsupported operation entered runtime: {op}")
 
 
@@ -1145,6 +1573,10 @@ def maximum_task_output_files(context: RuntimeContext, task: dict[str, Any]) -> 
     if kind == "image-compare":
         preview = task["preview"]
         return 1 + (1 if preview["difference"] else 0) + (1 if preview["overlay"] else 0)
+    if kind == "image-master":
+        return 2
+    if kind == "motion-sequence":
+        return int(task["frameCount"]) + 1 + (1 if task["preview"]["animatedGif"] else 0)
     return 1
 
 
@@ -1634,6 +2066,8 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
 def _resample(name: str) -> int:
     if name == "nearest":
         return Image.Resampling.NEAREST
+    if name == "bicubic":
+        return Image.Resampling.BICUBIC
     if name == "lanczos":
         return Image.Resampling.LANCZOS
     fail(f"unsupported sampling mode: {name}")
@@ -1983,6 +2417,478 @@ def execute_compare_task(context: RuntimeContext, task: dict[str, Any]) -> None:
 
 
 
+MASTERING_REPORT_SCHEMA = "evavo.project-art-mastering-report.v1"
+MOTION_MANIFEST_SCHEMA = "evavo.project-art-motion-sequence.v1"
+
+
+def _mastering_metrics(image: Image.Image, profile: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    total = image.width * image.height
+    transparent = 0
+    partial = 0
+    opaque = 0
+    transparent_rgb = 0
+    visible = 0
+    shadow = 0
+    highlight = 0
+    minimum_luminance = 255.0
+    maximum_luminance = 0.0
+    matte = parse_colour(profile.get("edgeMatteColour", "#ffffff"), "image-master.profile.edgeMatteColour", allow_alpha=False)[:3]
+    matte_distance = float(profile.get("maximumEdgeMatteDistance", 16))
+    matte_edges = 0
+    partial_edges = 0
+    maximum_colours = int(profile.get("maximumUniqueColours", 1_000_000))
+    colours: set[tuple[int, int, int, int]] = set()
+    colours_overflow = False
+    shadow_threshold = int(profile.get("shadowThreshold", 0))
+    highlight_threshold = int(profile.get("highlightThreshold", 255))
+
+    for pixel in image.getdata():
+        red, green, blue, alpha = pixel
+        if not colours_overflow:
+            colours.add((red, green, blue, alpha))
+            if len(colours) > maximum_colours:
+                colours_overflow = True
+                colours.clear()
+        if alpha == 0:
+            transparent += 1
+            if red or green or blue:
+                transparent_rgb += 1
+            continue
+        visible += 1
+        if alpha == 255:
+            opaque += 1
+        else:
+            partial += 1
+            partial_edges += 1
+            if colour_distance((red, green, blue), matte) <= matte_distance:
+                matte_edges += 1
+        luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        minimum_luminance = min(minimum_luminance, luminance)
+        maximum_luminance = max(maximum_luminance, luminance)
+        if luminance <= shadow_threshold:
+            shadow += 1
+        if luminance >= highlight_threshold:
+            highlight += 1
+
+    bbox = alpha_bbox(image)
+    alpha_mode = profile.get("alphaMode", "preserve")
+    issues: list[str] = []
+    if profile.get("exactWidth") is not None and (
+        image.width != int(profile["exactWidth"]) or image.height != int(profile["exactHeight"])
+    ):
+        issues.append("mastering-dimensions-mismatch")
+    if alpha_mode == "required" and transparent + partial == 0:
+        issues.append("mastering-alpha-required")
+    if alpha_mode == "forbidden" and transparent + partial > 0:
+        issues.append("mastering-alpha-forbidden")
+    transparent_rgb_fraction = transparent_rgb / max(1, transparent)
+    semi_transparent_fraction = partial / max(1, total)
+    opaque_fraction = opaque / max(1, total)
+    shadow_fraction = shadow / max(1, visible)
+    highlight_fraction = highlight / max(1, visible)
+    edge_matte_fraction = matte_edges / max(1, partial_edges)
+    luminance_span = (maximum_luminance - minimum_luminance) if visible else 0.0
+    if transparent_rgb_fraction > float(profile.get("maximumTransparentRgbFraction", 1)):
+        issues.append("mastering-hidden-rgb-contamination")
+    if semi_transparent_fraction > float(profile.get("maximumSemiTransparentFraction", 1)):
+        issues.append("mastering-semitransparent-fraction-exceeded")
+    if opaque_fraction < float(profile.get("minimumOpaqueFraction", 0)):
+        issues.append("mastering-opaque-fraction-below-minimum")
+    if colours_overflow:
+        issues.append("mastering-unique-colour-limit-exceeded")
+    if shadow_fraction > float(profile.get("maximumShadowClippingFraction", 1)):
+        issues.append("mastering-shadow-clipping-exceeded")
+    if highlight_fraction > float(profile.get("maximumHighlightClippingFraction", 1)):
+        issues.append("mastering-highlight-clipping-exceeded")
+    if luminance_span < float(profile.get("minimumLuminanceSpan", 0)):
+        issues.append("mastering-luminance-span-below-minimum")
+    if edge_matte_fraction > float(profile.get("maximumEdgeMatteFraction", 1)):
+        issues.append("mastering-edge-matte-fraction-exceeded")
+    expected_bbox = profile.get("expectedAlphaBounds")
+    if expected_bbox is not None:
+        if bbox is None:
+            issues.append("mastering-alpha-bounds-missing")
+        else:
+            observed = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+            expected = [
+                int(expected_bbox["x"]),
+                int(expected_bbox["y"]),
+                int(expected_bbox["width"]),
+                int(expected_bbox["height"]),
+            ]
+            tolerance = int(expected_bbox.get("tolerance", 0))
+            if any(abs(observed[index] - expected[index]) > tolerance for index in range(4)):
+                issues.append("mastering-alpha-bounds-mismatch")
+    if visible == 0:
+        issues.append("mastering-blank-image")
+
+    metrics = {
+        "dimensions": {"width": image.width, "height": image.height},
+        "totalPixels": total,
+        "visiblePixels": visible,
+        "transparentPixels": transparent,
+        "semiTransparentPixels": partial,
+        "opaquePixels": opaque,
+        "transparentRgbPixels": transparent_rgb,
+        "transparentRgbFraction": transparent_rgb_fraction,
+        "semiTransparentFraction": semi_transparent_fraction,
+        "opaqueFraction": opaque_fraction,
+        "alphaBoundingBox": bbox,
+        "uniqueColourCount": None if colours_overflow else len(colours),
+        "uniqueColourCountAtLeast": maximum_colours + 1 if colours_overflow else len(colours),
+        "shadowClippingFraction": shadow_fraction,
+        "highlightClippingFraction": highlight_fraction,
+        "minimumVisibleLuminance": minimum_luminance if visible else None,
+        "maximumVisibleLuminance": maximum_luminance if visible else None,
+        "visibleLuminanceSpan": luminance_span,
+        "edgeMattePixelCount": matte_edges,
+        "partialEdgePixelCount": partial_edges,
+        "edgeMatteFraction": edge_matte_fraction,
+        "pixelSha256": image_pixel_sha256(image),
+    }
+    return metrics, issues
+
+
+def _run_operation_pipeline(
+    image: Image.Image,
+    operations: list[dict[str, Any]],
+    task_id: str,
+    maximum_pixels: int,
+) -> tuple[Image.Image, list[dict[str, Any]]]:
+    evidence: list[dict[str, Any]] = []
+    current = image
+    for operation in operations:
+        before_hash = image_pixel_sha256(current)
+        next_image = apply_operation(current, operation, maximum_pixels)
+        require_pixel_budget(next_image.width, next_image.height, f"task {task_id} operation {operation['op']}", maximum_pixels)
+        if next_image is not current:
+            current.close()
+            current = next_image
+        evidence.append(
+            {
+                "op": operation["op"],
+                "beforePixelSha256": before_hash,
+                "afterPixelSha256": image_pixel_sha256(current),
+                "dimensions": {"width": current.width, "height": current.height},
+            }
+        )
+    return current, evidence
+
+
+def execute_master_task(context: RuntimeContext, task: dict[str, Any]) -> None:
+    source_path = context.resolve_source_path(task["source"])
+    image = load_image(source_path, context.maximum_decoded_pixels, f"image-master task {task['id']} source")
+    try:
+        before = {
+            "dimensions": {"width": image.width, "height": image.height},
+            "alpha": alpha_statistics(image),
+            "alphaBoundingBox": alpha_bbox(image),
+            "pixelSha256": image_pixel_sha256(image),
+        }
+        image, operation_evidence = _run_operation_pipeline(
+            image,
+            task.get("operations", []),
+            task["id"],
+            context.maximum_decoded_pixels,
+        )
+        metrics, issues = _mastering_metrics(image, task["profile"])
+        if issues and task["profile"].get("enforce", True):
+            fail("PROJECT_ART_MASTERING_PROFILE_FAILED: " + ", ".join(issues))
+        target = target_path(context.staging, task["targetPath"], f"task {task['id']} targetPath")
+        report_path = target_path(context.staging, task["reportPath"], f"task {task['id']} reportPath")
+        context.preflight_output_count(2, f"image-master task {task['id']}")
+        save_image(context, image, target, task["outputFormat"])
+        image_output = output_record(context.staging, target, image, role="mastered-image")
+        report = with_document_hash(
+            {
+                "schema": MASTERING_REPORT_SCHEMA,
+                "taskId": task["id"],
+                "profile": task["profile"],
+                "status": "passed" if not issues else "blocked",
+                "issues": issues,
+                "source": {
+                    "path": str(source_path),
+                    "sha256": sha256_file(source_path, context.maximum_source_bytes)[0],
+                },
+                "before": before,
+                "operations": operation_evidence,
+                "metrics": metrics,
+                "output": image_output,
+                "authority": {
+                    "creativeApproval": False,
+                    "candidatePromotion": False,
+                    "storageWrite": False,
+                    "targetRepositoryMutation": False,
+                    "publication": False,
+                },
+            }
+        )
+        write_json_create_only(context, report_path, report)
+        report_output = output_record(context.staging, report_path, role="mastering-report")
+        context.remember(
+            task["id"],
+            {
+                "taskId": task["id"],
+                "kind": task["kind"],
+                "status": "passed" if not issues else "blocked",
+                "issues": issues,
+                "profile": task["profile"]["name"],
+                "outputs": [image_output, report_output],
+            },
+            [target, report_path],
+        )
+    finally:
+        image.close()
+
+
+def _eased_amount(amount: float, easing: str) -> float:
+    amount = max(0.0, min(1.0, amount))
+    if easing == "hold":
+        return 0.0
+    if easing == "ease-in":
+        return amount * amount
+    if easing == "ease-out":
+        return 1.0 - (1.0 - amount) * (1.0 - amount)
+    if easing == "ease-in-out":
+        return 2 * amount * amount if amount < 0.5 else 1 - ((-2 * amount + 2) ** 2) / 2
+    return amount
+
+
+def _motion_state(keyframes: list[dict[str, Any]], position: float) -> dict[str, float]:
+    if position <= float(keyframes[0]["frame"]):
+        return {key: float(keyframes[0][key]) for key in ("x", "y", "scaleX", "scaleY", "rotation", "opacity")}
+    if position >= float(keyframes[-1]["frame"]):
+        return {key: float(keyframes[-1][key]) for key in ("x", "y", "scaleX", "scaleY", "rotation", "opacity")}
+    left = keyframes[0]
+    right = keyframes[-1]
+    for index in range(len(keyframes) - 1):
+        if float(keyframes[index]["frame"]) <= position <= float(keyframes[index + 1]["frame"]):
+            left = keyframes[index]
+            right = keyframes[index + 1]
+            break
+    span = float(right["frame"]) - float(left["frame"])
+    amount = _eased_amount(0.0 if span <= 0 else (position - float(left["frame"])) / span, str(left.get("easing", "linear")))
+    return {
+        key: float(left[key]) + (float(right[key]) - float(left[key])) * amount
+        for key in ("x", "y", "scaleX", "scaleY", "rotation", "opacity")
+    }
+
+
+def _prepared_motion_layer(
+    context: RuntimeContext,
+    task: dict[str, Any],
+    source_paths: list[Path],
+    layer: dict[str, Any],
+    layer_index: int,
+    position: float,
+) -> tuple[Image.Image, dict[str, Any]]:
+    state = _motion_state(layer["keyframes"], position)
+    source_index = int(layer["sourceIndex"])
+    image = load_image(
+        source_paths[source_index],
+        context.maximum_decoded_pixels,
+        f"motion task {task['id']} layer {layer_index} source",
+    )
+    mask_image: Image.Image | None = None
+    prepared: Image.Image | None = None
+    try:
+        mask_index = layer.get("maskSourceIndex")
+        if mask_index is not None:
+            mask_image = load_image(
+                source_paths[int(mask_index)],
+                context.maximum_decoded_pixels,
+                f"motion task {task['id']} layer {layer_index} mask",
+            )
+        prepared = _apply_layer_mask(
+            image,
+            mask_image,
+            {
+                **layer,
+                "opacity": state["opacity"],
+            },
+        )
+        width = max(1, round(prepared.width * state["scaleX"]))
+        height = max(1, round(prepared.height * state["scaleY"]))
+        require_pixel_budget(width, height, f"motion task {task['id']} layer {layer_index} scaled image", context.maximum_decoded_pixels)
+        if prepared.size != (width, height):
+            resized = prepared.resize((width, height), _resample(layer.get("sampling", "bicubic")))
+            prepared.close()
+            prepared = resized
+        if abs(state["rotation"] % 360) > 1e-9:
+            rotated = prepared.rotate(
+                state["rotation"],
+                resample=_resample(layer.get("sampling", "bicubic")),
+                expand=True,
+                fillcolor=(0, 0, 0, 0),
+            )
+            prepared.close()
+            prepared = rotated
+            require_pixel_budget(prepared.width, prepared.height, f"motion task {task['id']} layer {layer_index} rotated image", context.maximum_decoded_pixels)
+        anchor = layer["anchor"]
+        destination = (
+            round(state["x"] - prepared.width * float(anchor["x"])),
+            round(state["y"] - prepared.height * float(anchor["y"])),
+        )
+        evidence = {
+            "layerIndex": layer_index,
+            "sourceIndex": source_index,
+            "position": position,
+            "state": state,
+            "destination": {"x": destination[0], "y": destination[1]},
+            "dimensions": {"width": prepared.width, "height": prepared.height},
+            "blendMode": layer.get("blendMode", "normal"),
+            "pixelSha256": image_pixel_sha256(prepared),
+        }
+        return prepared, {**evidence, "destinationTuple": destination}
+    except Exception:
+        if prepared is not None:
+            prepared.close()
+        raise
+    finally:
+        if mask_image is not None:
+            mask_image.close()
+        image.close()
+
+
+def _render_motion_frame(
+    context: RuntimeContext,
+    task: dict[str, Any],
+    source_paths: list[Path],
+    position: float,
+) -> tuple[Image.Image, list[dict[str, Any]]]:
+    canvas = Image.new(
+        "RGBA",
+        (int(task["canvas"]["width"]), int(task["canvas"]["height"])),
+        parse_colour(task["canvas"].get("background", "#00000000"), "motion-sequence.canvas.background"),
+    )
+    evidence: list[dict[str, Any]] = []
+    try:
+        for layer_index, layer in enumerate(task["layers"]):
+            prepared, layer_evidence = _prepared_motion_layer(context, task, source_paths, layer, layer_index, position)
+            layer_canvas = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+            try:
+                destination = layer_evidence.pop("destinationTuple")
+                layer_canvas.alpha_composite(prepared, destination)
+                next_canvas = _blend_overlap(canvas, layer_canvas, layer.get("blendMode", "normal"))
+                canvas.close()
+                canvas = next_canvas
+                evidence.append(layer_evidence)
+            finally:
+                layer_canvas.close()
+                prepared.close()
+        return canvas, evidence
+    except Exception:
+        canvas.close()
+        raise
+
+
+def _render_motion_with_blur(
+    context: RuntimeContext,
+    task: dict[str, Any],
+    source_paths: list[Path],
+    frame_index: int,
+) -> tuple[Image.Image, list[dict[str, Any]]]:
+    samples = int(task["motionBlur"]["samples"])
+    shutter = float(task["motionBlur"]["shutterFraction"])
+    accumulator: Image.Image | None = None
+    centre_evidence: list[dict[str, Any]] = []
+    for sample_index in range(samples):
+        offset = 0.0 if samples == 1 else ((sample_index / (samples - 1)) - 0.5) * shutter
+        position = max(0.0, min(float(task["frameCount"] - 1), frame_index + offset))
+        rendered, evidence = _render_motion_frame(context, task, source_paths, position)
+        if sample_index == samples // 2:
+            centre_evidence = evidence
+        if accumulator is None:
+            accumulator = rendered
+        else:
+            blended = Image.blend(accumulator, rendered, 1.0 / (sample_index + 1))
+            accumulator.close()
+            rendered.close()
+            accumulator = blended
+    if accumulator is None:
+        fail("motion sequence did not render a frame")
+    return accumulator, centre_evidence
+
+
+def execute_motion_task(context: RuntimeContext, task: dict[str, Any]) -> None:
+    source_paths = [context.resolve_source_path(source) for source in task["sources"]]
+    output_count = int(task["frameCount"]) + 1 + (1 if task["preview"]["animatedGif"] else 0)
+    context.preflight_output_count(output_count, f"motion-sequence task {task['id']}")
+    directory = target_path(context.staging, task["targetDirectory"], f"task {task['id']} targetDirectory")
+    directory.mkdir(parents=True, exist_ok=False)
+    output_records: list[dict[str, Any]] = []
+    output_paths: list[Path] = []
+    frame_documents: list[dict[str, Any]] = []
+    gif_frames: list[Image.Image] = []
+    try:
+        for frame_offset in range(int(task["frameCount"])):
+            frame, layer_evidence = _render_motion_with_blur(context, task, source_paths, frame_offset)
+            try:
+                frame_index = int(task["startIndex"]) + frame_offset
+                file_name = task["fileNamePattern"].replace("{index}", f"{frame_index:04d}")
+                target = directory / file_name
+                save_image(context, frame, target, "png")
+                record = output_record(context.staging, target, frame, role="motion-frame")
+                output_records.append(record)
+                output_paths.append(target)
+                frame_documents.append(
+                    {
+                        "sequenceIndex": frame_offset,
+                        "frameIndex": frame_index,
+                        "timeSeconds": frame_offset / float(task["fps"]),
+                        "layers": layer_evidence,
+                        "output": record,
+                    }
+                )
+                if task["preview"]["animatedGif"]:
+                    gif_frames.append(frame.copy())
+            finally:
+                frame.close()
+        manifest_path = directory / task["manifestName"]
+        manifest = with_document_hash(
+            {
+                "schema": MOTION_MANIFEST_SCHEMA,
+                "taskId": task["id"],
+                "frameCount": int(task["frameCount"]),
+                "fps": float(task["fps"]),
+                "canvas": task["canvas"],
+                "motionBlur": task["motionBlur"],
+                "sources": [str(value) for value in source_paths],
+                "frames": frame_documents,
+                "authority": {
+                    "creativeApproval": False,
+                    "candidatePromotion": False,
+                    "storageWrite": False,
+                    "targetRepositoryMutation": False,
+                    "publication": False,
+                },
+            }
+        )
+        write_json_create_only(context, manifest_path, manifest)
+        output_records.append(output_record(context.staging, manifest_path, role="motion-manifest"))
+        output_paths.append(manifest_path)
+        if task["preview"]["animatedGif"]:
+            preview_path = directory / task["previewName"]
+            save_animation(context, gif_frames, preview_path, max(1, round(1000 / float(task["fps"]))))
+            output_records.append(output_record(context.staging, preview_path, role="motion-preview"))
+            output_paths.append(preview_path)
+        context.remember(
+            task["id"],
+            {
+                "taskId": task["id"],
+                "kind": task["kind"],
+                "status": "passed",
+                "frameCount": int(task["frameCount"]),
+                "fps": float(task["fps"]),
+                "outputs": output_records,
+            },
+            output_paths,
+        )
+    finally:
+        for frame in gif_frames:
+            frame.close()
+
+
 def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[str, Any]:
     if plan.get("schema") != PLAN_SCHEMA:
         fail(f"plan must use {PLAN_SCHEMA}")
@@ -2046,6 +2952,10 @@ def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, outpu
                 execute_composite_task(context, task)
             elif kind == "image-compare":
                 execute_compare_task(context, task)
+            elif kind == "image-master":
+                execute_master_task(context, task)
+            elif kind == "motion-sequence":
+                execute_motion_task(context, task)
             else:
                 fail(f"unsupported task kind entered runtime: {kind}")
         context.verify_sources()

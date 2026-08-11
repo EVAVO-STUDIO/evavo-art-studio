@@ -180,6 +180,120 @@ function assertActiveDecodedPixelLimit(pixelCounts, label, maximumDecodedPixels)
   return total;
 }
 
+
+function boundedNumberArray(value, label, length, minimum, maximum) {
+  if (!Array.isArray(value) || value.length !== length) {
+    fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${label} must contain exactly ${length} numbers.`);
+  }
+  return value.map((entry, index) => boundedNumber(entry, `${label}[${index}]`, minimum, maximum));
+}
+
+function normalizedSampling(value, label, fallback = 'bicubic') {
+  const sampling = value ?? fallback;
+  if (!['nearest', 'bicubic', 'lanczos'].includes(sampling)) {
+    fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${label} must be nearest, bicubic, or lanczos.`);
+  }
+  return sampling;
+}
+
+function normalizedColour(value, label, fallback) {
+  return boundedString(value ?? fallback, label, 64);
+}
+
+function normalizedDimensions(parameters, op, registry) {
+  const width = parameters.width === undefined
+    ? null
+    : boundedInteger(parameters.width, `${op}.width`, 1, MAXIMUM_IMAGE_DIMENSION);
+  const height = parameters.height === undefined
+    ? null
+    : boundedInteger(parameters.height, `${op}.height`, 1, MAXIMUM_IMAGE_DIMENSION);
+  if ((width === null) !== (height === null)) {
+    fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${op} must provide width and height together.`);
+  }
+  if (width !== null) assertDecodedPixelLimit(width, height, op, registry.maximumDecodedPixels);
+  return width === null ? {} : { width, height };
+}
+
+function normalizedCurveChannels(value, label) {
+  if (!isRecord(value) || Object.keys(value).length < 1) {
+    fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${label} must define at least one curve.`);
+  }
+  const allowed = new Set(['master', 'red', 'green', 'blue', 'alpha']);
+  const result = {};
+  for (const [channel, rawPoints] of Object.entries(value)) {
+    if (!allowed.has(channel)) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${label}.${channel} is not a supported channel.`);
+    }
+    if (!Array.isArray(rawPoints) || rawPoints.length < 2 || rawPoints.length > 32) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${label}.${channel} must contain 2-32 points.`);
+    }
+    const points = rawPoints.map((rawPoint, index) => {
+      const point = Array.isArray(rawPoint)
+        ? { input: rawPoint[0], output: rawPoint[1] }
+        : rawPoint;
+      if (!isRecord(point)) {
+        fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${label}.${channel}[${index}] must be [input, output] or an object.`);
+      }
+      return {
+        input: boundedInteger(point.input, `${label}.${channel}[${index}].input`, 0, 255),
+        output: boundedInteger(point.output, `${label}.${channel}[${index}].output`, 0, 255),
+      };
+    });
+    for (let index = 1; index < points.length; index += 1) {
+      if (points[index].input <= points[index - 1].input) {
+        fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${label}.${channel} inputs must be strictly increasing.`);
+      }
+    }
+    if (points[0].input !== 0 || points.at(-1).input !== 255) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${label}.${channel} must start at input 0 and end at input 255.`);
+    }
+    result[channel] = points;
+  }
+  return result;
+}
+
+function operationWorkingSetMultiplier(operations) {
+  let multiplier = 3;
+  for (const operation of operations) {
+    if (['rotate', 'affine-transform', 'perspective-transform'].includes(operation.op)) multiplier = Math.max(multiplier, 5);
+    if (['box-blur', 'median-filter', 'gaussian-blur', 'unsharp-mask', 'find-edges', 'emboss', 'edge-enhance'].includes(operation.op)) multiplier = Math.max(multiplier, 5);
+    if (operation.op === 'motion-blur') multiplier = Math.max(multiplier, 6);
+    if (['drop-shadow', 'outer-glow', 'defringe', 'alpha-feather'].includes(operation.op)) multiplier = Math.max(multiplier, 8);
+  }
+  return multiplier;
+}
+
+function imageOperationDimensions(initial, operations) {
+  let width = initial.width;
+  let height = initial.height;
+  for (const operation of operations) {
+    if (['crop', 'pad-canvas', 'resize', 'pixel-resize'].includes(operation.op)) {
+      width = operation.width;
+      height = operation.height;
+    } else if (['affine-transform', 'perspective-transform'].includes(operation.op) && operation.width !== undefined) {
+      width = operation.width;
+      height = operation.height;
+    } else if (operation.op === 'rotate' && operation.expand === true) {
+      const radians = Math.abs(operation.angle) * Math.PI / 180;
+      const cosine = Math.abs(Math.cos(radians));
+      const sine = Math.abs(Math.sin(radians));
+      const nextWidth = Math.max(1, Math.ceil(width * cosine + height * sine));
+      const nextHeight = Math.max(1, Math.ceil(width * sine + height * cosine));
+      width = nextWidth;
+      height = nextHeight;
+    } else if (operation.op === 'drop-shadow' && operation.expandCanvas === true) {
+      const margin = Math.ceil(operation.radius * 3 + Math.max(Math.abs(operation.offsetX), Math.abs(operation.offsetY)));
+      width += margin * 2;
+      height += margin * 2;
+    } else if (operation.op === 'outer-glow' && operation.expandCanvas === true) {
+      const margin = Math.ceil(operation.radius * 3 + operation.spread);
+      width += margin * 2;
+      height += margin * 2;
+    }
+  }
+  return { width, height, pixels: width * height };
+}
+
 function normalizedOperation(value, index, registry) {
   const input = typeof value === 'string' ? { op: value } : value;
   if (!isRecord(input)) {
@@ -206,22 +320,18 @@ function normalizedOperation(value, index, registry) {
       fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `${op} requires parameter ${required}.`);
     }
   }
+
   if (['crop', 'pad-canvas', 'resize', 'pixel-resize'].includes(op)) {
     for (const key of ['width', 'height']) {
-      if (parameters[key] !== undefined) boundedInteger(parameters[key], `${op}.${key}`, 1, 65_536);
+      if (parameters[key] !== undefined) boundedInteger(parameters[key], `${op}.${key}`, 1, MAXIMUM_IMAGE_DIMENSION);
     }
     if (parameters.width !== undefined && parameters.height !== undefined) {
-      assertDecodedPixelLimit(
-        parameters.width,
-        parameters.height,
-        op,
-        registry.maximumDecodedPixels,
-      );
+      assertDecodedPixelLimit(parameters.width, parameters.height, op, registry.maximumDecodedPixels);
     }
   }
   if (op === 'crop') {
-    boundedInteger(parameters.x, 'crop.x', 0, 65_535);
-    boundedInteger(parameters.y, 'crop.y', 0, 65_535);
+    boundedInteger(parameters.x, 'crop.x', 0, MAXIMUM_IMAGE_DIMENSION - 1);
+    boundedInteger(parameters.y, 'crop.y', 0, MAXIMUM_IMAGE_DIMENSION - 1);
   }
   if (op === 'alpha-threshold' && parameters.threshold !== undefined) {
     boundedInteger(parameters.threshold, 'alpha-threshold.threshold', 0, 255);
@@ -238,11 +348,11 @@ function normalizedOperation(value, index, registry) {
     if (parameters.gamma !== undefined) boundedNumber(parameters.gamma, 'levels.gamma', 0.05, 10);
   }
   if (op === 'translate') {
-    if (parameters.x !== undefined) boundedInteger(parameters.x, 'translate.x', -65_536, 65_536);
-    if (parameters.y !== undefined) boundedInteger(parameters.y, 'translate.y', -65_536, 65_536);
+    if (parameters.x !== undefined) boundedInteger(parameters.x, 'translate.x', -MAXIMUM_IMAGE_DIMENSION, MAXIMUM_IMAGE_DIMENSION);
+    if (parameters.y !== undefined) boundedInteger(parameters.y, 'translate.y', -MAXIMUM_IMAGE_DIMENSION, MAXIMUM_IMAGE_DIMENSION);
   }
-  if (op === 'colour-replace') {
-    if (parameters.distance !== undefined) boundedNumber(parameters.distance, 'colour-replace.distance', 0, 441);
+  if (op === 'colour-replace' && parameters.distance !== undefined) {
+    boundedNumber(parameters.distance, 'colour-replace.distance', 0, 441);
   }
   if (['brightness', 'contrast', 'saturation', 'sharpness'].includes(op) && parameters.factor !== undefined) {
     boundedNumber(parameters.factor, `${op}.factor`, 0, 16);
@@ -258,6 +368,85 @@ function normalizedOperation(value, index, registry) {
   if (['alpha-erode', 'alpha-dilate'].includes(op) && parameters.width !== undefined) {
     boundedInteger(parameters.width, `${op}.width`, 1, 32);
   }
+
+  if (op === 'rotate') {
+    parameters.angle = boundedNumber(parameters.angle, 'rotate.angle', -3600, 3600);
+    parameters.expand = parameters.expand === true;
+    parameters.sampling = normalizedSampling(parameters.sampling, 'rotate.sampling');
+    parameters.background = normalizedColour(parameters.background, 'rotate.background', '#00000000');
+  }
+  if (op === 'affine-transform') {
+    parameters.matrix = boundedNumberArray(parameters.matrix, 'affine-transform.matrix', 6, -1_000_000, 1_000_000);
+    Object.assign(parameters, normalizedDimensions(parameters, op, registry));
+    parameters.sampling = normalizedSampling(parameters.sampling, 'affine-transform.sampling');
+    parameters.background = normalizedColour(parameters.background, 'affine-transform.background', '#00000000');
+  }
+  if (op === 'perspective-transform') {
+    parameters.coefficients = boundedNumberArray(parameters.coefficients, 'perspective-transform.coefficients', 8, -1_000_000, 1_000_000);
+    Object.assign(parameters, normalizedDimensions(parameters, op, registry));
+    parameters.sampling = normalizedSampling(parameters.sampling, 'perspective-transform.sampling');
+    parameters.background = normalizedColour(parameters.background, 'perspective-transform.background', '#00000000');
+  }
+  if (op === 'grayscale') {
+    parameters.mode = parameters.mode ?? 'luminance';
+    if (!['luminance', 'average'].includes(parameters.mode)) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'grayscale.mode must be luminance or average.');
+    }
+  }
+  if (op === 'posterize') parameters.bits = boundedInteger(parameters.bits, 'posterize.bits', 1, 8);
+  if (op === 'threshold') {
+    parameters.threshold = boundedInteger(parameters.threshold, 'threshold.threshold', 0, 255);
+    parameters.lowColour = normalizedColour(parameters.lowColour, 'threshold.lowColour', '#000000');
+    parameters.highColour = normalizedColour(parameters.highColour, 'threshold.highColour', '#ffffff');
+  }
+  if (op === 'gamma') parameters.gamma = boundedNumber(parameters.gamma, 'gamma.gamma', 0.05, 10);
+  if (op === 'hue-shift') parameters.degrees = boundedNumber(parameters.degrees, 'hue-shift.degrees', -3600, 3600);
+  if (op === 'curves') parameters.channels = normalizedCurveChannels(parameters.channels, 'curves.channels');
+  if (op === 'channel-mixer') {
+    parameters.red = boundedNumberArray(parameters.red, 'channel-mixer.red', 3, -4, 4);
+    parameters.green = boundedNumberArray(parameters.green, 'channel-mixer.green', 3, -4, 4);
+    parameters.blue = boundedNumberArray(parameters.blue, 'channel-mixer.blue', 3, -4, 4);
+    parameters.offsets = parameters.offsets === undefined
+      ? [0, 0, 0]
+      : boundedNumberArray(parameters.offsets, 'channel-mixer.offsets', 3, -255, 255);
+  }
+  if (op === 'box-blur') parameters.radius = boundedNumber(parameters.radius ?? 1, 'box-blur.radius', 0, 256);
+  if (op === 'median-filter') {
+    parameters.size = boundedInteger(parameters.size ?? 3, 'median-filter.size', 3, 31);
+    if (parameters.size % 2 === 0) fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'median-filter.size must be odd.');
+  }
+  if (op === 'motion-blur') {
+    parameters.radius = boundedNumber(parameters.radius ?? 8, 'motion-blur.radius', 0, 256);
+    parameters.angle = boundedNumber(parameters.angle ?? 0, 'motion-blur.angle', -3600, 3600);
+    parameters.samples = boundedInteger(parameters.samples ?? 17, 'motion-blur.samples', 3, 65);
+    if (parameters.samples % 2 === 0) fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'motion-blur.samples must be odd.');
+  }
+  if (['emboss', 'find-edges', 'edge-enhance'].includes(op)) {
+    parameters.blend = boundedNumber(parameters.blend ?? 1, `${op}.blend`, 0, 1);
+  }
+  if (op === 'alpha-feather') parameters.radius = boundedNumber(parameters.radius ?? 1, 'alpha-feather.radius', 0, 64);
+  if (op === 'defringe') {
+    parameters.radius = boundedInteger(parameters.radius ?? 1, 'defringe.radius', 1, 32);
+    parameters.maximumAlpha = boundedInteger(parameters.maximumAlpha ?? 254, 'defringe.maximumAlpha', 1, 254);
+    parameters.strength = boundedNumber(parameters.strength ?? 1, 'defringe.strength', 0, 1);
+    if (parameters.matteColour !== undefined) parameters.matteColour = normalizedColour(parameters.matteColour, 'defringe.matteColour', '#ffffff');
+  }
+  if (op === 'drop-shadow') {
+    parameters.offsetX = boundedInteger(parameters.offsetX ?? 4, 'drop-shadow.offsetX', -4096, 4096);
+    parameters.offsetY = boundedInteger(parameters.offsetY ?? 4, 'drop-shadow.offsetY', -4096, 4096);
+    parameters.radius = boundedNumber(parameters.radius ?? 4, 'drop-shadow.radius', 0, 256);
+    parameters.opacity = boundedNumber(parameters.opacity ?? 0.5, 'drop-shadow.opacity', 0, 1);
+    parameters.colour = normalizedColour(parameters.colour, 'drop-shadow.colour', '#000000');
+    parameters.expandCanvas = parameters.expandCanvas === true;
+  }
+  if (op === 'outer-glow') {
+    parameters.radius = boundedNumber(parameters.radius ?? 4, 'outer-glow.radius', 0, 256);
+    parameters.spread = boundedNumber(parameters.spread ?? 0, 'outer-glow.spread', 0, 64);
+    parameters.opacity = boundedNumber(parameters.opacity ?? 0.5, 'outer-glow.opacity', 0, 1);
+    parameters.colour = normalizedColour(parameters.colour, 'outer-glow.colour', '#ffffff');
+    parameters.expandCanvas = parameters.expandCanvas === true;
+  }
+
   return Object.freeze({ op, ...parameters });
 }
 
@@ -623,6 +812,196 @@ function normalizeCompareTask(task, taskIndex, targetClaims) {
   };
 }
 
+
+function normalizeMasterProfile(value, taskIndex) {
+  const profile = value === undefined ? {} : value;
+  if (!isRecord(profile)) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].profile must be an object.`);
+  }
+  const exactWidth = profile.exactWidth === undefined
+    ? null
+    : boundedInteger(profile.exactWidth, `tasks[${taskIndex}].profile.exactWidth`, 1, MAXIMUM_IMAGE_DIMENSION);
+  const exactHeight = profile.exactHeight === undefined
+    ? null
+    : boundedInteger(profile.exactHeight, `tasks[${taskIndex}].profile.exactHeight`, 1, MAXIMUM_IMAGE_DIMENSION);
+  if ((exactWidth === null) !== (exactHeight === null)) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].profile must provide exactWidth and exactHeight together.`);
+  }
+  const alphaMode = profile.alphaMode ?? 'preserve';
+  if (!['preserve', 'required', 'forbidden'].includes(alphaMode)) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].profile.alphaMode is invalid.`);
+  }
+  let expectedAlphaBounds;
+  if (profile.expectedAlphaBounds !== undefined) {
+    if (!isRecord(profile.expectedAlphaBounds)) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].profile.expectedAlphaBounds must be an object.`);
+    }
+    expectedAlphaBounds = {
+      x: boundedInteger(profile.expectedAlphaBounds.x, `tasks[${taskIndex}].profile.expectedAlphaBounds.x`, 0, MAXIMUM_IMAGE_DIMENSION),
+      y: boundedInteger(profile.expectedAlphaBounds.y, `tasks[${taskIndex}].profile.expectedAlphaBounds.y`, 0, MAXIMUM_IMAGE_DIMENSION),
+      width: boundedInteger(profile.expectedAlphaBounds.width, `tasks[${taskIndex}].profile.expectedAlphaBounds.width`, 1, MAXIMUM_IMAGE_DIMENSION),
+      height: boundedInteger(profile.expectedAlphaBounds.height, `tasks[${taskIndex}].profile.expectedAlphaBounds.height`, 1, MAXIMUM_IMAGE_DIMENSION),
+      tolerance: boundedInteger(profile.expectedAlphaBounds.tolerance ?? 0, `tasks[${taskIndex}].profile.expectedAlphaBounds.tolerance`, 0, MAXIMUM_IMAGE_DIMENSION),
+    };
+  }
+  return {
+    name: boundedString(profile.name ?? 'production-master', `tasks[${taskIndex}].profile.name`, 256),
+    enforce: profile.enforce !== false,
+    alphaMode,
+    ...(exactWidth === null ? {} : { exactWidth, exactHeight }),
+    maximumTransparentRgbFraction: boundedNumber(profile.maximumTransparentRgbFraction ?? 1, `tasks[${taskIndex}].profile.maximumTransparentRgbFraction`, 0, 1),
+    maximumSemiTransparentFraction: boundedNumber(profile.maximumSemiTransparentFraction ?? 1, `tasks[${taskIndex}].profile.maximumSemiTransparentFraction`, 0, 1),
+    minimumOpaqueFraction: boundedNumber(profile.minimumOpaqueFraction ?? 0, `tasks[${taskIndex}].profile.minimumOpaqueFraction`, 0, 1),
+    maximumUniqueColours: boundedInteger(profile.maximumUniqueColours ?? 1_000_000, `tasks[${taskIndex}].profile.maximumUniqueColours`, 1, 1_000_000),
+    shadowThreshold: boundedInteger(profile.shadowThreshold ?? 0, `tasks[${taskIndex}].profile.shadowThreshold`, 0, 255),
+    highlightThreshold: boundedInteger(profile.highlightThreshold ?? 255, `tasks[${taskIndex}].profile.highlightThreshold`, 0, 255),
+    maximumShadowClippingFraction: boundedNumber(profile.maximumShadowClippingFraction ?? 1, `tasks[${taskIndex}].profile.maximumShadowClippingFraction`, 0, 1),
+    maximumHighlightClippingFraction: boundedNumber(profile.maximumHighlightClippingFraction ?? 1, `tasks[${taskIndex}].profile.maximumHighlightClippingFraction`, 0, 1),
+    minimumLuminanceSpan: boundedNumber(profile.minimumLuminanceSpan ?? 0, `tasks[${taskIndex}].profile.minimumLuminanceSpan`, 0, 255),
+    maximumEdgeMatteFraction: boundedNumber(profile.maximumEdgeMatteFraction ?? 1, `tasks[${taskIndex}].profile.maximumEdgeMatteFraction`, 0, 1),
+    maximumEdgeMatteDistance: boundedNumber(profile.maximumEdgeMatteDistance ?? 16, `tasks[${taskIndex}].profile.maximumEdgeMatteDistance`, 0, 441),
+    edgeMatteColour: normalizedColour(profile.edgeMatteColour, `tasks[${taskIndex}].profile.edgeMatteColour`, '#ffffff'),
+    ...(expectedAlphaBounds ? { expectedAlphaBounds } : {}),
+  };
+}
+
+function normalizeMasterTask(task, taskIndex, registry, targetClaims) {
+  const targetPath = normalizeTargetPath(task.targetPath, `tasks[${taskIndex}].targetPath`, targetClaims);
+  const outputFormat = task.outputFormat || extensionFormat(targetPath);
+  if (!['png', 'webp', 'jpeg'].includes(outputFormat) || !OUTPUT_EXTENSIONS[outputFormat]?.has(path.posix.extname(targetPath).toLowerCase())) {
+    fail('PROJECT_ART_SANDBOX_TARGET_INVALID', `Master target extension does not match outputFormat: ${targetPath}.`);
+  }
+  const extension = path.posix.extname(targetPath);
+  const defaultReportPath = `${targetPath.slice(0, -extension.length)}.mastering.json`;
+  const reportPath = normalizeTargetPath(task.reportPath ?? defaultReportPath, `tasks[${taskIndex}].reportPath`, targetClaims);
+  if (path.posix.extname(reportPath).toLowerCase() !== '.json') {
+    fail('PROJECT_ART_SANDBOX_TARGET_INVALID', `Master reportPath must end in .json: ${reportPath}.`);
+  }
+  if (!Array.isArray(task.operations) || task.operations.length > 100) {
+    fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', `tasks[${taskIndex}].operations must contain 0-100 entries.`);
+  }
+  return {
+    id: safeId(task.id, `tasks[${taskIndex}].id`),
+    kind: 'image-master',
+    source: normalizedSourceDescriptor(task.source, `tasks[${taskIndex}].source`),
+    targetPath,
+    reportPath,
+    outputFormat,
+    operations: task.operations.map((operation, index) => normalizedOperation(operation, index, registry)),
+    profile: normalizeMasterProfile(task.profile, taskIndex),
+  };
+}
+
+function normalizeMotionKeyframes(value, taskIndex, layerIndex, frameCount) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 1_000) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].layers[${layerIndex}].keyframes must contain 1-1,000 entries.`);
+  }
+  const easingModes = new Set(['linear', 'ease-in', 'ease-out', 'ease-in-out', 'hold']);
+  const result = value.map((keyframe, keyframeIndex) => {
+    if (!isRecord(keyframe)) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].layers[${layerIndex}].keyframes[${keyframeIndex}] must be an object.`);
+    }
+    const easing = keyframe.easing ?? 'linear';
+    if (!easingModes.has(easing)) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported motion easing: ${easing}.`);
+    }
+    return {
+      frame: boundedInteger(keyframe.frame, `tasks[${taskIndex}].layers[${layerIndex}].keyframes[${keyframeIndex}].frame`, 0, frameCount - 1),
+      x: boundedNumber(keyframe.x ?? 0, `tasks[${taskIndex}].layers[${layerIndex}].keyframes[${keyframeIndex}].x`, -131_072, 131_072),
+      y: boundedNumber(keyframe.y ?? 0, `tasks[${taskIndex}].layers[${layerIndex}].keyframes[${keyframeIndex}].y`, -131_072, 131_072),
+      scaleX: boundedNumber(keyframe.scaleX ?? 1, `tasks[${taskIndex}].layers[${layerIndex}].keyframes[${keyframeIndex}].scaleX`, 0.01, 64),
+      scaleY: boundedNumber(keyframe.scaleY ?? 1, `tasks[${taskIndex}].layers[${layerIndex}].keyframes[${keyframeIndex}].scaleY`, 0.01, 64),
+      rotation: boundedNumber(keyframe.rotation ?? 0, `tasks[${taskIndex}].layers[${layerIndex}].keyframes[${keyframeIndex}].rotation`, -3600, 3600),
+      opacity: boundedNumber(keyframe.opacity ?? 1, `tasks[${taskIndex}].layers[${layerIndex}].keyframes[${keyframeIndex}].opacity`, 0, 1),
+      easing,
+    };
+  });
+  for (let index = 1; index < result.length; index += 1) {
+    if (result[index].frame <= result[index - 1].frame) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Motion keyframe frames must be strictly increasing.`);
+    }
+  }
+  return result;
+}
+
+function normalizeMotionTask(task, taskIndex, registry, targetClaims) {
+  const targetDirectory = normalizeTargetPath(task.targetDirectory, `tasks[${taskIndex}].targetDirectory`, targetClaims);
+  const sources = normalizeSources(task.sources, `tasks[${taskIndex}].sources`);
+  if (sources.length > 128) {
+    fail('PROJECT_ART_SANDBOX_SOURCE_INVALID', `tasks[${taskIndex}].sources must contain at most 128 images.`);
+  }
+  const frameCount = boundedInteger(task.frameCount, `tasks[${taskIndex}].frameCount`, 1, 600);
+  const fps = boundedNumber(task.fps ?? 12, `tasks[${taskIndex}].fps`, 1, 120);
+  const fileNamePattern = boundedString(task.fileNamePattern ?? 'frame-{index}.png', `tasks[${taskIndex}].fileNamePattern`, 512);
+  if (!fileNamePattern.includes('{index}') || fileNamePattern.includes('/') || !fileNamePattern.endsWith('.png')) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', 'motion-sequence fileNamePattern must contain {index}, contain no slash, and end in .png.');
+  }
+  const manifestName = boundedString(task.manifestName ?? 'motion-sequence.json', `tasks[${taskIndex}].manifestName`, 256);
+  const previewName = boundedString(task.previewName ?? 'motion-preview.gif', `tasks[${taskIndex}].previewName`, 256);
+  if (manifestName.includes('/') || !manifestName.endsWith('.json') || previewName.includes('/') || !previewName.endsWith('.gif')) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', 'motion manifestName and previewName must be leaf .json/.gif names.');
+  }
+  const canvasWidth = boundedInteger(task.canvas?.width, `tasks[${taskIndex}].canvas.width`, 1, MAXIMUM_IMAGE_DIMENSION);
+  const canvasHeight = boundedInteger(task.canvas?.height, `tasks[${taskIndex}].canvas.height`, 1, MAXIMUM_IMAGE_DIMENSION);
+  assertDecodedPixelLimit(canvasWidth, canvasHeight, `tasks[${taskIndex}].canvas`, registry.maximumDecodedPixels);
+  if (!Array.isArray(task.layers) || task.layers.length < 1 || task.layers.length > 128) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].layers must contain 1-128 entries.`);
+  }
+  const layers = task.layers.map((layer, layerIndex) => {
+    if (!isRecord(layer)) fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].layers[${layerIndex}] must be an object.`);
+    const sourceIndex = boundedInteger(layer.sourceIndex, `tasks[${taskIndex}].layers[${layerIndex}].sourceIndex`, 0, sources.length - 1);
+    const maskSourceIndex = layer.maskSourceIndex === undefined
+      ? null
+      : boundedInteger(layer.maskSourceIndex, `tasks[${taskIndex}].layers[${layerIndex}].maskSourceIndex`, 0, sources.length - 1);
+    const blendMode = layer.blendMode ?? 'normal';
+    if (!['normal', 'multiply', 'screen', 'add', 'subtract', 'darken', 'lighten'].includes(blendMode)) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported motion blend mode: ${blendMode}.`);
+    }
+    const maskChannel = layer.maskChannel ?? 'alpha';
+    if (!['alpha', 'luminance'].includes(maskChannel)) {
+      fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported motion mask channel: ${maskChannel}.`);
+    }
+    return {
+      sourceIndex,
+      maskSourceIndex,
+      maskChannel,
+      invertMask: layer.invertMask === true,
+      blendMode,
+      sampling: normalizedSampling(layer.sampling, `tasks[${taskIndex}].layers[${layerIndex}].sampling`),
+      anchor: {
+        x: boundedNumber(layer.anchor?.x ?? 0.5, `tasks[${taskIndex}].layers[${layerIndex}].anchor.x`, 0, 1),
+        y: boundedNumber(layer.anchor?.y ?? 0.5, `tasks[${taskIndex}].layers[${layerIndex}].anchor.y`, 0, 1),
+      },
+      keyframes: normalizeMotionKeyframes(layer.keyframes, taskIndex, layerIndex, frameCount),
+    };
+  });
+  const preview = task.preview?.animatedGif === true;
+  const motionBlurSamples = boundedInteger(task.motionBlur?.samples ?? 1, `tasks[${taskIndex}].motionBlur.samples`, 1, 5);
+  return {
+    id: safeId(task.id, `tasks[${taskIndex}].id`),
+    kind: 'motion-sequence',
+    sources,
+    targetDirectory,
+    fileNamePattern,
+    manifestName,
+    previewName,
+    startIndex: boundedInteger(task.startIndex ?? 0, `tasks[${taskIndex}].startIndex`, 0, 1_000_000),
+    frameCount,
+    fps,
+    canvas: {
+      width: canvasWidth,
+      height: canvasHeight,
+      background: normalizedColour(task.canvas?.background, `tasks[${taskIndex}].canvas.background`, '#00000000'),
+    },
+    layers,
+    preview: { animatedGif: preview },
+    motionBlur: {
+      samples: motionBlurSamples,
+      shutterFraction: boundedNumber(task.motionBlur?.shutterFraction ?? 0.5, `tasks[${taskIndex}].motionBlur.shutterFraction`, 0, 1),
+    },
+  };
+}
+
 async function bindExternalSource(
   workspaceRoot,
   descriptor,
@@ -718,6 +1097,59 @@ function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
   const dimensions = externalTaskDimensions(task, externalById);
   if (!dimensions) return;
 
+  if (task.kind === 'image' || task.kind === 'image-master') {
+    const output = imageOperationDimensions(dimensions[0], task.operations);
+    assertDecodedPixelLimit(output.width, output.height, `Task ${task.id} image output`, maximumDecodedPixels);
+    assertActiveDecodedPixelLimit(
+      [dimensions[0].pixels, output.pixels * operationWorkingSetMultiplier(task.operations)],
+      `Task ${task.id} operation working set`,
+      maximumDecodedPixels,
+    );
+    return;
+  }
+
+  if (task.kind === 'motion-sequence') {
+    const canvasPixels = task.canvas.width * task.canvas.height;
+    for (const [index, layer] of task.layers.entries()) {
+      const source = dimensions[layer.sourceIndex];
+      const maximumScaleX = Math.max(...layer.keyframes.map((keyframe) => keyframe.scaleX));
+      const maximumScaleY = Math.max(...layer.keyframes.map((keyframe) => keyframe.scaleY));
+      const scaledWidth = Math.max(1, Math.ceil(source.width * maximumScaleX));
+      const scaledHeight = Math.max(1, Math.ceil(source.height * maximumScaleY));
+      assertDecodedPixelLimit(scaledWidth, scaledHeight, `Task ${task.id} layer ${index} scaled source`, maximumDecodedPixels);
+      const maximumRotatedPixels = Math.max(
+        ...layer.keyframes.map((keyframe) => {
+          const radians = Math.abs(keyframe.rotation) * Math.PI / 180;
+          const rotatedWidth = Math.ceil(scaledWidth * Math.abs(Math.cos(radians)) + scaledHeight * Math.abs(Math.sin(radians)));
+          const rotatedHeight = Math.ceil(scaledWidth * Math.abs(Math.sin(radians)) + scaledHeight * Math.abs(Math.cos(radians)));
+          assertDecodedPixelLimit(rotatedWidth, rotatedHeight, `Task ${task.id} layer ${index} rotated source`, maximumDecodedPixels);
+          return rotatedWidth * rotatedHeight;
+        }),
+      );
+      const mask = layer.maskSourceIndex === null ? null : dimensions[layer.maskSourceIndex];
+      assertActiveDecodedPixelLimit(
+        [canvasPixels * 9, source.pixels, maximumRotatedPixels * 5, mask?.pixels ?? 0],
+        `Task ${task.id} layer ${index} working set`,
+        maximumDecodedPixels,
+      );
+    }
+    if (task.motionBlur.samples > 1) {
+      assertActiveDecodedPixelLimit(
+        [canvasPixels * 3],
+        `Task ${task.id} motion-blur frame working set`,
+        maximumDecodedPixels,
+      );
+    }
+    if (task.preview.animatedGif) {
+      assertActiveDecodedPixelLimit(
+        [canvasPixels * task.frameCount, canvasPixels * 2],
+        `Task ${task.id} animation-preview retained frame set`,
+        maximumDecodedPixels,
+      );
+    }
+    return;
+  }
+
   if (task.kind === 'image-composite') {
     const canvasPixels = task.canvas.width * task.canvas.height;
     for (const [index, layer] of task.layers.entries()) {
@@ -728,11 +1160,7 @@ function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
       const canvasMultiplier = layer.blendMode === 'normal' ? 3 : 9;
       const layerMultiplier = mask ? 6 : 4;
       assertActiveDecodedPixelLimit(
-        [
-          canvasPixels * canvasMultiplier,
-          layerWidth * layerHeight * layerMultiplier,
-          mask?.pixels ?? 0,
-        ],
+        [canvasPixels * canvasMultiplier, layerWidth * layerHeight * layerMultiplier, mask?.pixels ?? 0],
         `Task ${task.id} layer ${index} working set`,
         maximumDecodedPixels,
       );
@@ -746,12 +1174,7 @@ function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
     const rows = Math.ceil(dimensions.length / task.columns);
     const sheetWidth = task.padding * 2 + task.columns * cellWidth;
     const sheetHeight = task.padding * 2 + rows * cellHeight;
-    assertDecodedPixelLimit(
-      sheetWidth,
-      sheetHeight,
-      `Task ${task.id} assembled sheet`,
-      maximumDecodedPixels,
-    );
+    assertDecodedPixelLimit(sheetWidth, sheetHeight, `Task ${task.id} assembled sheet`, maximumDecodedPixels);
     const maximumSourcePixels = Math.max(...dimensions.map((value) => value.pixels));
     const preparedPixels = task.cell && task.cell.fit !== 'strict' ? cellWidth * cellHeight * 2 : 0;
     assertActiveDecodedPixelLimit(
@@ -764,18 +1187,10 @@ function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
 
   if (task.kind === 'sequence-review') {
     const sourcePixels = dimensions.map((value) => value.pixels);
-    const sourceTotal = assertActiveDecodedPixelLimit(
-      sourcePixels,
-      `Task ${task.id} frame set`,
-      maximumDecodedPixels,
-    );
+    const sourceTotal = assertActiveDecodedPixelLimit(sourcePixels, `Task ${task.id} frame set`, maximumDecodedPixels);
     const maximumFramePixels = Math.max(...sourcePixels);
     if (dimensions.length > 1) {
-      assertActiveDecodedPixelLimit(
-        [sourceTotal, maximumFramePixels],
-        `Task ${task.id} transition working set`,
-        maximumDecodedPixels,
-      );
+      assertActiveDecodedPixelLimit([sourceTotal, maximumFramePixels], `Task ${task.id} transition working set`, maximumDecodedPixels);
     }
     if (task.preview.contactSheet) {
       const columns = Math.min(task.preview.columns, dimensions.length);
@@ -784,51 +1199,23 @@ function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
       const cellHeight = Math.max(...dimensions.map((value) => value.height));
       const sheetWidth = columns * cellWidth;
       const sheetHeight = rows * (cellHeight + REVIEW_LABEL_HEIGHT);
-      assertDecodedPixelLimit(
-        sheetWidth,
-        sheetHeight,
-        `Task ${task.id} contact sheet`,
-        maximumDecodedPixels,
-      );
-      assertActiveDecodedPixelLimit(
-        [sourceTotal, sheetWidth * sheetHeight * 2],
-        `Task ${task.id} contact-sheet working set`,
-        maximumDecodedPixels,
-      );
+      assertDecodedPixelLimit(sheetWidth, sheetHeight, `Task ${task.id} contact sheet`, maximumDecodedPixels);
+      assertActiveDecodedPixelLimit([sourceTotal, sheetWidth * sheetHeight * 2], `Task ${task.id} contact-sheet working set`, maximumDecodedPixels);
     }
     if (task.preview.animatedGif) {
-      assertActiveDecodedPixelLimit(
-        [sourceTotal, maximumFramePixels * 2],
-        `Task ${task.id} animation-preview working set`,
-        maximumDecodedPixels,
-      );
+      assertActiveDecodedPixelLimit([sourceTotal, maximumFramePixels * 2], `Task ${task.id} animation-preview working set`, maximumDecodedPixels);
     }
     if (task.preview.onionSkins && dimensions.length > 1) {
-      assertActiveDecodedPixelLimit(
-        [sourceTotal, maximumFramePixels * 5],
-        `Task ${task.id} onion-skin working set`,
-        maximumDecodedPixels,
-      );
+      assertActiveDecodedPixelLimit([sourceTotal, maximumFramePixels * 5], `Task ${task.id} onion-skin working set`, maximumDecodedPixels);
     }
     return;
   }
 
   if (task.kind === 'image-compare') {
     const sourcePixels = dimensions.map((value) => value.pixels);
-    const sourceTotal = assertActiveDecodedPixelLimit(
-      sourcePixels,
-      `Task ${task.id} comparison sources`,
-      maximumDecodedPixels,
-    );
-    if (
-      dimensions[0].width === dimensions[1].width &&
-      dimensions[0].height === dimensions[1].height
-    ) {
-      assertActiveDecodedPixelLimit(
-        [sourceTotal, dimensions[0].pixels * 2],
-        `Task ${task.id} comparison working set`,
-        maximumDecodedPixels,
-      );
+    const sourceTotal = assertActiveDecodedPixelLimit(sourcePixels, `Task ${task.id} comparison sources`, maximumDecodedPixels);
+    if (dimensions[0].width === dimensions[1].width && dimensions[0].height === dimensions[1].height) {
+      assertActiveDecodedPixelLimit([sourceTotal, dimensions[0].pixels * 2], `Task ${task.id} comparison working set`, maximumDecodedPixels);
     }
   }
 }
@@ -858,15 +1245,14 @@ function maximumTaskOutputFiles(task, externalById, maximumDecodedPixels) {
     return maximumSliceOutputFrames(task, externalById, maximumDecodedPixels) + 1;
   }
   if (task.kind === 'sequence-review') {
-    return (
-      1 +
-      (task.preview.contactSheet ? 1 : 0) +
-      (task.preview.animatedGif ? 1 : 0) +
-      (task.preview.onionSkins ? Math.max(0, task.sources.length - 1) : 0)
-    );
+    return 1 + (task.preview.contactSheet ? 1 : 0) + (task.preview.animatedGif ? 1 : 0) + (task.preview.onionSkins ? Math.max(0, task.sources.length - 1) : 0);
   }
   if (task.kind === 'image-compare') {
     return 1 + (task.preview.difference ? 1 : 0) + (task.preview.overlay ? 1 : 0);
+  }
+  if (task.kind === 'image-master') return 2;
+  if (task.kind === 'motion-sequence') {
+    return task.frameCount + 1 + (task.preview.animatedGif ? 1 : 0);
   }
   return 1;
 }
@@ -934,7 +1320,9 @@ export async function compileProjectArtSandbox({
     else if (kind === 'assemble-sheet') normalized = normalizeAssembleTask(task, index, registry, targetClaims);
     else if (kind === 'sequence-review') normalized = normalizeReviewTask(task, index, registry, targetClaims);
     else if (kind === 'image-composite') normalized = normalizeCompositeTask(task, index, targetClaims, registry);
-    else normalized = normalizeCompareTask(task, index, targetClaims);
+    else if (kind === 'image-compare') normalized = normalizeCompareTask(task, index, targetClaims);
+    else if (kind === 'image-master') normalized = normalizeMasterTask(task, index, registry, targetClaims);
+    else normalized = normalizeMotionTask(task, index, registry, targetClaims);
     if (taskIds.has(normalized.id)) fail('PROJECT_ART_SANDBOX_TASK_DUPLICATE', `Duplicate task id: ${normalized.id}.`);
     taskIds.add(normalized.id);
     return normalized;

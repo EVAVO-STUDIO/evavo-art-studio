@@ -307,6 +307,63 @@ const tools = Object.freeze([
       ['planPath', 'outputRoot'],
     ),
   },
+  {
+    name: 'evavo_art_compile_workspace_create',
+    description:
+      'Compile a create-only persistent Artist Workspace with immutable source, working, version, mask, review, master, export, manifest and journal areas.',
+    inputSchema: objectSchema(
+      {
+        parentRoot: pathField,
+        requestPath: pathField,
+        planPath: pathField,
+        compiledAt: timestampField,
+      },
+      ['parentRoot', 'requestPath', 'planPath'],
+    ),
+  },
+  {
+    name: 'evavo_art_run_workspace_create',
+    description:
+      'Atomically create an exact persistent Artist Workspace from a validated plan. No image bytes travel through MCP.',
+    inputSchema: objectSchema({ planPath: pathField }, ['planPath']),
+  },
+  {
+    name: 'evavo_art_compile_workspace_snapshot',
+    description:
+      'Compile an append-only exact working-file snapshot into a persistent Artist Workspace version plan.',
+    inputSchema: objectSchema(
+      {
+        workspaceRoot: pathField,
+        requestPath: pathField,
+        planPath: pathField,
+        compiledAt: timestampField,
+      },
+      ['workspaceRoot', 'requestPath', 'planPath'],
+    ),
+  },
+  {
+    name: 'evavo_art_run_workspace_snapshot',
+    description:
+      'Publish an exact append-only workspace version after revalidating source bytes before, during and after copying.',
+    inputSchema: objectSchema(
+      { workspaceRoot: pathField, planPath: pathField },
+      ['workspaceRoot', 'planPath'],
+    ),
+  },
+  {
+    name: 'evavo_art_prepare_storage_handoff',
+    description:
+      'Prepare a self-hashed EVAVO Storage ingest request for exact workspace files. This does not authorise or perform the Storage write.',
+    inputSchema: objectSchema(
+      {
+        workspaceRoot: pathField,
+        requestPath: pathField,
+        outputPath: pathField,
+        compiledAt: timestampField,
+      },
+      ['workspaceRoot', 'requestPath', 'outputPath'],
+    ),
+  },
 ]);
 const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
 
@@ -383,7 +440,7 @@ function run(executable, args, effects = {}) {
 function capabilities() {
   return summaryEnvelope({
     schema: 'evavo.project-art-workspace-capabilities.v1',
-    version: '2026-08-10.1',
+    version: '2026-08-11.2',
     writeEnabled,
     allowedRootCount: allowedRoots.length,
     commandTimeoutMs,
@@ -398,12 +455,16 @@ function capabilities() {
       'sheet-extension',
     ],
     workflow: [
+      'persistent-artist-workspace',
       'project-intelligence',
       'chat-or-local-intake',
       'deterministic-sandbox',
+      'professional-mastering',
+      'keyframed-motion-sequence',
       'sprite-sheet-and-atlas',
       'reference-derived-planning',
       'offline-visual-review',
+      'evavo-storage-handoff',
       'governed-repository-writer',
     ],
     relatedServers: {
@@ -596,6 +657,75 @@ function callTool(name, input) {
       ],
       { workspaceWrite: true },
     );
+  }
+
+  const persistentEntrypoint = path.join(artStudioRoot, 'scripts', 'persistent-artist-workspace.mjs');
+  if (name === 'evavo_art_compile_workspace_create') {
+    const args = [
+      persistentEntrypoint,
+      'compile-create',
+      '--parent-root',
+      confined(input.parentRoot, 'parentRoot'),
+      '--request',
+      confined(input.requestPath, 'requestPath'),
+      '--output',
+      confined(input.planPath, 'planPath'),
+    ];
+    if (input.compiledAt !== undefined) args.push('--compiled-at', optionalBoundedString(input.compiledAt, 'compiledAt', 64));
+    return run(process.execPath, args, { workspaceWrite: true });
+  }
+
+  if (name === 'evavo_art_run_workspace_create') {
+    return run(
+      process.execPath,
+      [persistentEntrypoint, 'run-create', '--plan', confined(input.planPath, 'planPath')],
+      { workspaceWrite: true },
+    );
+  }
+
+  if (name === 'evavo_art_compile_workspace_snapshot') {
+    const args = [
+      persistentEntrypoint,
+      'compile-snapshot',
+      '--workspace-root',
+      confined(input.workspaceRoot, 'workspaceRoot'),
+      '--request',
+      confined(input.requestPath, 'requestPath'),
+      '--output',
+      confined(input.planPath, 'planPath'),
+    ];
+    if (input.compiledAt !== undefined) args.push('--compiled-at', optionalBoundedString(input.compiledAt, 'compiledAt', 64));
+    return run(process.execPath, args, { workspaceWrite: true });
+  }
+
+  if (name === 'evavo_art_run_workspace_snapshot') {
+    return run(
+      process.execPath,
+      [
+        persistentEntrypoint,
+        'run-snapshot',
+        '--workspace-root',
+        confined(input.workspaceRoot, 'workspaceRoot'),
+        '--plan',
+        confined(input.planPath, 'planPath'),
+      ],
+      { workspaceWrite: true },
+    );
+  }
+
+  if (name === 'evavo_art_prepare_storage_handoff') {
+    const args = [
+      persistentEntrypoint,
+      'storage-handoff',
+      '--workspace-root',
+      confined(input.workspaceRoot, 'workspaceRoot'),
+      '--request',
+      confined(input.requestPath, 'requestPath'),
+      '--output',
+      confined(input.outputPath, 'outputPath'),
+    ];
+    if (input.compiledAt !== undefined) args.push('--compiled-at', optionalBoundedString(input.compiledAt, 'compiledAt', 64));
+    return run(process.execPath, args, { workspaceWrite: true });
   }
 }
 
