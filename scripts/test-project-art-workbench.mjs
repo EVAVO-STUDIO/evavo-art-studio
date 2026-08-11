@@ -158,7 +158,89 @@ try {
   assert.equal(sandboxPlan.tasks[0].source.kind, 'external');
   assert.equal(sandboxPlan.execution.wholeRunAtomicPublication, true);
   assert.equal(sandboxPlan.authority.sourceMutation, false);
+  assert.equal(
+    sandboxPlan.limits.boundExternalSourceBytes,
+    sandboxPlan.externalSources[0].bytes,
+  );
+  assert.equal(sandboxPlan.limits.plannedMaximumOutputFiles, 2);
   verifyDocumentHash(sandboxPlan);
+
+  const sourceByteBoundRegistry = {
+    ...registry,
+    maximumTotalSourceBytes: sandboxPlan.externalSources[0].bytes - 1,
+  };
+  await expectProjectArtError(
+    compileProjectArtSandbox({
+      workspaceRoot: workspace,
+      request: sandboxRequest,
+      requestBytes: sandboxBytes,
+      registry: sourceByteBoundRegistry,
+      registryBytes: Buffer.from(JSON.stringify(sourceByteBoundRegistry)),
+      compiledAt: fixedTime,
+    }),
+    'PROJECT_ART_SANDBOX_SOURCE_BYTES_LIMIT',
+  );
+
+  const outputCountBoundRegistry = {
+    ...registry,
+    maximumOutputFiles: 4,
+  };
+  const outputCountRequest = {
+    ...sandboxRequest,
+    sandboxId: 'output-count-limit',
+    tasks: [
+      {
+        id: 'output-count-limit',
+        kind: 'slice-sheet',
+        source: 'art/sheet.png',
+        targetDirectory: 'output-count-limit',
+        frameWidth: 8,
+        frameHeight: 8,
+        count: 3,
+      },
+    ],
+  };
+  await expectProjectArtError(
+    compileProjectArtSandbox({
+      workspaceRoot: workspace,
+      request: outputCountRequest,
+      requestBytes: Buffer.from(JSON.stringify(outputCountRequest)),
+      registry: outputCountBoundRegistry,
+      registryBytes: Buffer.from(JSON.stringify(outputCountBoundRegistry)),
+      compiledAt: fixedTime,
+    }),
+    'PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT',
+  );
+
+  const implicitOutputCountRegistry = {
+    ...registry,
+    maximumOutputFiles: 3,
+  };
+  const implicitOutputCountRequest = {
+    ...sandboxRequest,
+    sandboxId: 'implicit-output-count-limit',
+    tasks: [
+      {
+        id: 'implicit-output-count-limit',
+        kind: 'slice-sheet',
+        source: 'art/sheet.png',
+        targetDirectory: 'implicit-output-count-limit',
+        frameWidth: 8,
+        frameHeight: 8,
+      },
+    ],
+  };
+  await expectProjectArtError(
+    compileProjectArtSandbox({
+      workspaceRoot: workspace,
+      request: implicitOutputCountRequest,
+      requestBytes: Buffer.from(JSON.stringify(implicitOutputCountRequest)),
+      registry: implicitOutputCountRegistry,
+      registryBytes: Buffer.from(JSON.stringify(implicitOutputCountRegistry)),
+      compiledAt: fixedTime,
+    }),
+    'PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT',
+  );
 
   const oversizedCompositeCases = [
     {
@@ -671,7 +753,108 @@ try {
     assert.equal(comparisonManifest.creativeApprovalPerformed, false);
     assert.equal(comparisonManifest.identityApprovalPerformed, false);
     assert.equal(receipt.effects.sourceMutation, false);
+    assert.equal(receipt.resourceUsage.externalSourceFiles, fullPlan.externalSources.length);
+    assert.equal(
+      receipt.resourceUsage.externalSourceBytes,
+      fullPlan.limits.boundExternalSourceBytes,
+    );
+    assert.equal(receipt.resourceUsage.taskOutputFiles, receipt.outputs.length);
+    assert.equal(
+      receipt.resourceUsage.taskOutputBytes,
+      receipt.outputs.reduce((total, output) => total + output.bytes, 0),
+    );
+    assert.equal(receipt.resourceUsage.receiptExcludedFromTaskOutputTotals, true);
     verifyDocumentHash(receipt);
+
+    const runtimePublicationBudgetCases = [
+      {
+        id: 'runtime-total-source-byte-budget',
+        limits: {
+          maximumTotalSourceBytes: fullPlan.limits.boundExternalSourceBytes - 1,
+        },
+        expected: /PROJECT_ART_SANDBOX_SOURCE_BYTES_LIMIT/u,
+      },
+      {
+        id: 'runtime-bound-source-byte-evidence',
+        limits: {
+          boundExternalSourceBytes: fullPlan.limits.boundExternalSourceBytes + 1,
+        },
+        expected: /PROJECT_ART_SANDBOX_SOURCE_BYTES_LIMIT/u,
+      },
+      {
+        id: 'runtime-bound-output-count-evidence',
+        limits: {
+          plannedMaximumOutputFiles: fullPlan.limits.plannedMaximumOutputFiles - 1,
+        },
+        expected: /PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT/u,
+      },
+      {
+        id: 'runtime-raised-output-policy',
+        limits: {
+          maximumOutputFiles: 20_001,
+        },
+        expected: /maximumOutputFiles is outside the runtime boundary/u,
+      },
+      {
+        id: 'runtime-raised-task-policy',
+        limits: {
+          maximumTasks: 2_001,
+        },
+        expected: /maximumTasks is outside the runtime boundary/u,
+      },
+      {
+        id: 'runtime-output-file-budget',
+        limits: {
+          maximumOutputFiles: 1,
+          plannedMaximumOutputFiles: 1,
+        },
+        expected: /PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT/u,
+      },
+      {
+        id: 'runtime-per-output-byte-budget',
+        limits: {
+          maximumOutputBytes: 32,
+        },
+        expected: /PROJECT_ART_SANDBOX_OUTPUT_BYTES_LIMIT/u,
+      },
+      {
+        id: 'runtime-total-output-byte-budget',
+        limits: {
+          maximumTotalOutputBytes: 32,
+        },
+        expected: /PROJECT_ART_SANDBOX_TOTAL_OUTPUT_BYTES_LIMIT/u,
+      },
+    ];
+    for (const testCase of runtimePublicationBudgetCases) {
+      const boundedPlan = withDocumentHash({
+        ...fullPlan,
+        sandboxId: testCase.id,
+        runId: `project-art-sandbox:${testCase.id}`,
+        limits: {
+          ...fullPlan.limits,
+          ...testCase.limits,
+        },
+      });
+      const boundedPlanPath = path.join(workspace, `${testCase.id}.json`);
+      await writeJsonCreateOnly(boundedPlanPath, boundedPlan);
+      const boundedOutputRoot = path.join(workspace, `${testCase.id}-output`);
+      const boundedExecution = run(
+        python.command,
+        [
+          ...python.prefix,
+          path.join(root, 'tools', 'run_project_art_sandbox.py'),
+          '--workspace-root',
+          workspace,
+          '--plan',
+          path.basename(boundedPlanPath),
+          '--output-root',
+          path.basename(boundedOutputRoot),
+        ],
+      );
+      assert.notEqual(boundedExecution.status, 0);
+      assert.match(boundedExecution.stderr, testCase.expected);
+      await assert.rejects(access(boundedOutputRoot), (error) => error?.code === 'ENOENT');
+    }
 
     const runtimeWorkingSetCases = [
       {

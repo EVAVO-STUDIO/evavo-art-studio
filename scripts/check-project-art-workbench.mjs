@@ -37,6 +37,10 @@ for (const relative of relativeFiles) {
 const registry = JSON.parse(contents.get('config/project-art-operations.v1.json'));
 assert.equal(registry.schema, 'evavo.project-art-operations.v1');
 assert.equal(registry.maximumDecodedPixels, 220_000_000);
+assert.equal(registry.maximumTotalSourceBytes, 17_179_869_184);
+assert.equal(registry.maximumOutputFiles, 20_000);
+assert.equal(registry.maximumOutputBytes, 2_147_483_648);
+assert.equal(registry.maximumTotalOutputBytes, 17_179_869_184);
 assert.equal(registry.rules.sourceOverwriteAllowed, false);
 assert.equal(registry.rules.wholeRunAtomicPublication, true);
 assert.equal(registry.rules.providerExecution, false);
@@ -101,6 +105,15 @@ const sourceAssertions = {
     'maximumDecodedPixels: boundedInteger',
     'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
     'PROJECT_ART_SANDBOX_AGGREGATE_PIXEL_LIMIT',
+    'PROJECT_ART_SANDBOX_SOURCE_BYTES_LIMIT',
+    'PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT',
+    'plannedMaximumOutputFiles',
+    'PROJECT_ART_SANDBOX_SOURCE_IDENTITY_CHANGED',
+    'const MAXIMUM_TASKS = 2_000',
+    'const MAXIMUM_EXTERNAL_SOURCES = 10_000',
+    'const MAXIMUM_TOTAL_SOURCE_BYTES = 16 * 1024 * 1024 * 1024',
+    'const MAXIMUM_OUTPUT_FILES = 20_000',
+    'const MAXIMUM_TOTAL_OUTPUT_BYTES = 16 * 1024 * 1024 * 1024',
     'assertBoundTaskPixelBudgets',
     'MAXIMUM_IMAGE_DIMENSION',
   ],
@@ -151,6 +164,18 @@ const sourceAssertions = {
     'require_pixel_budget',
     'require_active_pixel_budget',
     'preflight_image_set',
+    'maximum_total_source_bytes',
+    'maximum_output_files',
+    'maximum_total_output_bytes',
+    'bound_external_source_bytes',
+    'planned_output_files',
+    'MAXIMUM_TASKS = 2_000',
+    'MAXIMUM_EXTERNAL_SOURCES = 10_000',
+    'MAXIMUM_TOTAL_SOURCE_BYTES = 16 * 1024 * 1024 * 1024',
+    'MAXIMUM_OUTPUT_FILES = 20_000',
+    'MAXIMUM_TOTAL_OUTPUT_BYTES = 16 * 1024 * 1024 * 1024',
+    'PROJECT_ART_SANDBOX_OUTPUT_BYTES_LIMIT',
+    'PROJECT_ART_SANDBOX_TOTAL_OUTPUT_BYTES_LIMIT',
   ],
   'docs/PROJECT_ART_WORKBENCH.md': [
     'Project intelligence',
@@ -165,6 +190,8 @@ const sourceAssertions = {
     'project_art_review_mcp.mjs',
     'decoded-image boundary',
     'active decoded-image working set',
+    'aggregate source-byte boundary',
+    'create-only output-file and output-byte budgets',
   ],
   '.github/workflows/project-art-workbench.yml': [
     'PROJECT_ART_REQUIRE_PILLOW: "1"',
