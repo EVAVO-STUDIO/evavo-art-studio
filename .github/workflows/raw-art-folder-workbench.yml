@@ -1,0 +1,70 @@
+name: RAW ART folder workbench
+
+on:
+  pull_request:
+    paths:
+      - "scripts/raw-art-folder-workbench.mjs"
+      - "scripts/raw-art-folder/**"
+      - "scripts/check-raw-art-folder-workbench.mjs"
+      - "scripts/test-raw-art-folder-workbench.mjs"
+      - "tools/raw_art_folder_mcp.mjs"
+      - "docs/RAW_ART_FOLDER_WORKBENCH.md"
+      - "config/mcp.raw-art-folder.windows.example.json"
+      - ".github/workflows/raw-art-folder-workbench.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/raw-art-folder-workbench.mjs"
+      - "scripts/raw-art-folder/**"
+      - "scripts/check-raw-art-folder-workbench.mjs"
+      - "scripts/test-raw-art-folder-workbench.mjs"
+      - "tools/raw_art_folder_mcp.mjs"
+      - "docs/RAW_ART_FOLDER_WORKBENCH.md"
+      - "config/mcp.raw-art-folder.windows.example.json"
+      - ".github/workflows/raw-art-folder-workbench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: raw-art-folder-workbench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Parse RAW_ART folder tools
+        run: |
+          node --check scripts/raw-art-folder-workbench.mjs
+          node --check scripts/raw-art-folder/lib.mjs
+          node --check scripts/raw-art-folder/scan.mjs
+          node --check scripts/raw-art-folder/plan.mjs
+          node --check scripts/raw-art-folder/session.mjs
+          node --check scripts/check-raw-art-folder-workbench.mjs
+          node --check scripts/test-raw-art-folder-workbench.mjs
+          node --check tools/raw_art_folder_mcp.mjs
+
+      - name: Run exact contract and adversarial tests
+        run: node scripts/check-raw-art-folder-workbench.mjs
+
+      - name: Prove source remains clean
+        if: always()
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "evavo-raw-art-folder-workbench": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\raw_art_folder_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_RAW_ART_FOLDER_ALLOWED_ROOTS": "C:\\GitRepos;D:\\EVAVO-Evidence;D:\\EVAVO-Art-Workspaces",
+        "EVAVO_RAW_ART_FOLDER_MCP_MODE": "read-write",
+        "EVAVO_RAW_ART_FOLDER_MCP_ALLOW_WRITES": "true"
+      }
+    }
+  }
+}
