@@ -376,6 +376,8 @@ The task publishes exact frame rectangles, hashes, dimensions, alpha statistics,
 
 Strict cells prevent accidental frame resampling. `contain` and `cover` remain available when an explicit normalization step is intended.
 
+`maximumDecodedPixels` is also the active decoded-image working set boundary for multi-image tasks, while preserving the existing per-image decoded-image boundary. Sheet assembly streams one source frame at a time and proves that the output sheet, current source and any resized cell fit together inside that budget before allocating the sheet. Sequence review bounds the complete decoded frame set plus transition, contact-sheet, animation or onion-skin preview overhead. Image comparison bounds both sources plus its difference or overlay surface. These checks run against exact external-source dimensions during compilation when possible and are independently repeated from image headers at runtime, including for task-output sources and correctly rehashed plans.
+
 ### Compare two exact images
 
 `image-compare` is the deterministic similarity gate for before/after edits and provider-generated matching assets or frames. It binds exactly two source images, records decoded-pixel identities, changed-pixel fraction, mean/max channel delta and alpha-change fraction, and can produce difference and 50/50 overlay previews. Threshold failures block the task but never imply creative approval.
@@ -384,7 +386,7 @@ Strict cells prevent accidental frame resampling. `contain` and `cover` remain a
 
 `image-composite` builds a new candidate from an ordered set of exact source images without mutating any source. Each layer can declare position, optional resize, nearest or Lanczos sampling, opacity, a blend mode, and an optional alpha/luminance mask sourced from another exact sandbox input. Supported blend modes are `normal`, `multiply`, `screen`, `add`, `subtract`, `darken`, and `lighten`.
 
-The compiler rejects any composite canvas or explicitly resized layer whose area exceeds the registry's `maximumDecodedPixels` boundary. The Python runtime independently rechecks that decoded-image boundary before allocating a canvas or resize target, so a hash-valid plan that bypasses or tampers with compiler output fails closed before large image memory is reserved.
+The compiler rejects any composite canvas or explicitly resized layer whose area exceeds the registry's `maximumDecodedPixels` boundary. It also accounts for the active canvas, source, prepared layer, optional mask and blend-mode intermediates as one bounded working set. The Python runtime independently repeats both checks before allocating the canvas, resize target or blend surfaces, closes superseded Pillow images as each layer completes, and therefore fails closed when a hash-valid plan bypasses or tampers with compiler output.
 
 This is intended for UI assembly, VFX overlays, sprite/accessory layers, controlled matte repairs, mockups, and other deterministic composites. Compositing remains a sandbox effect only: it does not approve the visual result, promote it, or write it into a target repository.
 

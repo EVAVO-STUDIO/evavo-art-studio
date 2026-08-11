@@ -200,6 +200,117 @@ try {
     );
   }
 
+  const decodedPixelBudgetCases = [
+    {
+      id: 'oversized-image-operation',
+      maximumDecodedPixels: 100,
+      expectedCode: 'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
+      task: {
+        id: 'oversized-image-operation',
+        kind: 'image',
+        source: 'art/hero.png',
+        targetPath: 'oversized-image-operation.png',
+        operations: [{ op: 'resize', width: 11, height: 10 }],
+      },
+    },
+    {
+      id: 'oversized-slice-frame',
+      maximumDecodedPixels: 100,
+      expectedCode: 'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
+      task: {
+        id: 'oversized-slice-frame',
+        kind: 'slice-sheet',
+        source: 'art/sheet.png',
+        targetDirectory: 'oversized-slice-frame',
+        frameWidth: 11,
+        frameHeight: 10,
+      },
+    },
+    {
+      id: 'assemble-working-set-limit',
+      maximumDecodedPixels: 800,
+      expectedCode: 'PROJECT_ART_SANDBOX_AGGREGATE_PIXEL_LIMIT',
+      task: {
+        id: 'assemble-working-set-limit',
+        kind: 'assemble-sheet',
+        sources: [{ path: 'art/hero.png' }],
+        targetPath: 'assemble-working-set-limit.png',
+        columns: 1,
+        padding: 10,
+      },
+    },
+    {
+      id: 'review-source-set-limit',
+      maximumDecodedPixels: 100,
+      expectedCode: 'PROJECT_ART_SANDBOX_AGGREGATE_PIXEL_LIMIT',
+      task: {
+        id: 'review-source-set-limit',
+        kind: 'sequence-review',
+        sources: [{ path: 'art/hero.png' }, { path: 'art/hero.png' }],
+        targetDirectory: 'review-source-set-limit',
+        preview: { contactSheet: false, animatedGif: false },
+      },
+    },
+    {
+      id: 'review-contact-sheet-limit',
+      maximumDecodedPixels: 500,
+      expectedCode: 'PROJECT_ART_SANDBOX_AGGREGATE_PIXEL_LIMIT',
+      task: {
+        id: 'review-contact-sheet-limit',
+        kind: 'sequence-review',
+        sources: [{ path: 'art/hero.png' }, { path: 'art/hero.png' }],
+        targetDirectory: 'review-contact-sheet-limit',
+        preview: { contactSheet: true, animatedGif: false, columns: 1 },
+      },
+    },
+    {
+      id: 'compare-working-set-limit',
+      maximumDecodedPixels: 150,
+      expectedCode: 'PROJECT_ART_SANDBOX_AGGREGATE_PIXEL_LIMIT',
+      task: {
+        id: 'compare-working-set-limit',
+        kind: 'image-compare',
+        sources: [{ path: 'art/hero.png' }, { path: 'art/hero.png' }],
+        targetDirectory: 'compare-working-set-limit',
+      },
+    },
+    {
+      id: 'composite-working-set-limit',
+      maximumDecodedPixels: 300,
+      expectedCode: 'PROJECT_ART_SANDBOX_AGGREGATE_PIXEL_LIMIT',
+      task: {
+        id: 'composite-working-set-limit',
+        kind: 'image-composite',
+        sources: [{ path: 'art/hero.png' }],
+        targetPath: 'composite-working-set-limit.png',
+        canvas: { width: 8, height: 8 },
+        layers: [{ sourceIndex: 0 }],
+      },
+    },
+  ];
+  for (const testCase of decodedPixelBudgetCases) {
+    const boundedRegistry = {
+      ...registry,
+      maximumDecodedPixels: testCase.maximumDecodedPixels,
+    };
+    const boundedRequest = {
+      ...sandboxRequest,
+      sandboxId: testCase.id,
+      tasks: [testCase.task],
+    };
+    await expectProjectArtError(
+      compileProjectArtSandbox({
+        workspaceRoot: workspace,
+        request: boundedRequest,
+        requestBytes: Buffer.from(JSON.stringify(boundedRequest)),
+        registry: boundedRegistry,
+        registryBytes: Buffer.from(JSON.stringify(boundedRegistry)),
+        compiledAt: fixedTime,
+      }),
+      testCase.expectedCode,
+    );
+  }
+
   await expectProjectArtError(
     compileProjectArtSandbox({
       workspaceRoot: workspace,
@@ -561,6 +672,157 @@ try {
     assert.equal(comparisonManifest.identityApprovalPerformed, false);
     assert.equal(receipt.effects.sourceMutation, false);
     verifyDocumentHash(receipt);
+
+    const runtimeWorkingSetCases = [
+      {
+        id: 'runtime-image-operation-budget',
+        maximumDecodedPixels: 100,
+        tasks: [
+          {
+            id: 'runtime-image-operation-budget',
+            kind: 'image',
+            source: 'art/hero.png',
+            targetPath: 'runtime-image-operation-budget.png',
+            operations: [{ op: 'resize', width: 11, height: 10 }],
+          },
+        ],
+      },
+      {
+        id: 'runtime-assemble-task-output-working-set',
+        maximumDecodedPixels: 150,
+        tasks: [
+          {
+            id: 'runtime-assemble-slice',
+            kind: 'slice-sheet',
+            source: 'art/sheet.png',
+            targetDirectory: 'runtime-assemble-frames',
+            frameWidth: 8,
+            frameHeight: 8,
+            count: 2,
+          },
+          {
+            id: 'runtime-assemble-task-output-working-set',
+            kind: 'assemble-sheet',
+            sources: [
+              { taskId: 'runtime-assemble-slice', outputIndex: 0 },
+              { taskId: 'runtime-assemble-slice', outputIndex: 1 },
+            ],
+            targetPath: 'runtime-assemble-task-output-working-set.png',
+            columns: 2,
+          },
+        ],
+      },
+      {
+        id: 'runtime-review-task-output-working-set',
+        maximumDecodedPixels: 150,
+        tasks: [
+          {
+            id: 'runtime-review-slice',
+            kind: 'slice-sheet',
+            source: 'art/sheet.png',
+            targetDirectory: 'runtime-review-frames',
+            frameWidth: 8,
+            frameHeight: 8,
+            count: 2,
+          },
+          {
+            id: 'runtime-review-task-output-working-set',
+            kind: 'sequence-review',
+            sources: [
+              { taskId: 'runtime-review-slice', outputIndex: 0 },
+              { taskId: 'runtime-review-slice', outputIndex: 1 },
+            ],
+            targetDirectory: 'runtime-review-task-output-working-set',
+            preview: { contactSheet: false, animatedGif: false },
+          },
+        ],
+      },
+      {
+        id: 'runtime-review-contact-sheet-working-set',
+        maximumDecodedPixels: 500,
+        tasks: [
+          {
+            id: 'runtime-review-contact-sheet-working-set',
+            kind: 'sequence-review',
+            sources: [{ path: 'art/hero.png' }, { path: 'art/hero.png' }],
+            targetDirectory: 'runtime-review-contact-sheet-working-set',
+            preview: { contactSheet: true, animatedGif: false, columns: 1 },
+          },
+        ],
+      },
+      {
+        id: 'runtime-compare-working-set',
+        maximumDecodedPixels: 150,
+        tasks: [
+          {
+            id: 'runtime-compare-working-set',
+            kind: 'image-compare',
+            sources: [{ path: 'art/hero.png' }, { path: 'art/hero.png' }],
+            targetDirectory: 'runtime-compare-working-set',
+          },
+        ],
+      },
+      {
+        id: 'runtime-composite-working-set',
+        maximumDecodedPixels: 300,
+        tasks: [
+          {
+            id: 'runtime-composite-working-set',
+            kind: 'image-composite',
+            sources: [{ path: 'art/hero.png' }],
+            targetPath: 'runtime-composite-working-set.png',
+            canvas: { width: 8, height: 8 },
+            layers: [{ sourceIndex: 0 }],
+          },
+        ],
+      },
+    ];
+    for (const testCase of runtimeWorkingSetCases) {
+      const request = {
+        schema: 'evavo.project-art-sandbox-request.v1',
+        sandboxId: `${testCase.id}-source`,
+        projectId: 'fixture-game',
+        purpose: 'Compile a plan used to prove runtime decoded-pixel enforcement.',
+        tasks: testCase.tasks,
+        authority: { providerExecution: false, candidateApproval: false },
+      };
+      const sourcePlan = await compileProjectArtSandbox({
+        workspaceRoot: workspace,
+        request,
+        requestBytes: Buffer.from(JSON.stringify(request)),
+        registry,
+        registryBytes,
+        compiledAt: fixedTime,
+      });
+      const boundedPlan = withDocumentHash({
+        ...sourcePlan,
+        sandboxId: testCase.id,
+        runId: `project-art-sandbox:${testCase.id}`,
+        limits: {
+          ...sourcePlan.limits,
+          maximumDecodedPixels: testCase.maximumDecodedPixels,
+        },
+      });
+      const boundedPlanPath = path.join(workspace, `${testCase.id}.json`);
+      await writeJsonCreateOnly(boundedPlanPath, boundedPlan);
+      const boundedOutputRoot = path.join(workspace, `${testCase.id}-output`);
+      const boundedExecution = run(
+        python.command,
+        [
+          ...python.prefix,
+          path.join(root, 'tools', 'run_project_art_sandbox.py'),
+          '--workspace-root',
+          workspace,
+          '--plan',
+          path.basename(boundedPlanPath),
+          '--output-root',
+          path.basename(boundedOutputRoot),
+        ],
+      );
+      assert.notEqual(boundedExecution.status, 0);
+      assert.match(boundedExecution.stderr, /decoded-image boundary/u);
+      await assert.rejects(access(boundedOutputRoot), (error) => error?.code === 'ENOENT');
+    }
 
     const oversizedRuntimeCases = [
       {

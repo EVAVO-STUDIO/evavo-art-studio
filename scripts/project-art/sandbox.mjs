@@ -24,6 +24,8 @@ export const PROJECT_ART_SANDBOX_PLAN_SCHEMA = 'evavo.project-art-sandbox-plan.v
 export const PROJECT_ART_OPERATIONS_SCHEMA = 'evavo.project-art-operations.v1';
 
 const MAXIMUM_DECODED_PIXELS = 220_000_000;
+const MAXIMUM_IMAGE_DIMENSION = 65_536;
+const REVIEW_LABEL_HEIGHT = 18;
 
 const OUTPUT_EXTENSIONS = Object.freeze({
   png: new Set(['.png']),
@@ -103,12 +105,38 @@ function validateRegistry(value) {
 }
 
 function assertDecodedPixelLimit(width, height, label, maximumDecodedPixels) {
-  if (width * height > maximumDecodedPixels) {
+  if (
+    width < 1 ||
+    height < 1 ||
+    width > MAXIMUM_IMAGE_DIMENSION ||
+    height > MAXIMUM_IMAGE_DIMENSION ||
+    width * height > maximumDecodedPixels
+  ) {
     fail(
       'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
       `${label} exceeds the ${maximumDecodedPixels}-pixel decoded-image boundary.`,
     );
   }
+}
+
+function assertActiveDecodedPixelLimit(pixelCounts, label, maximumDecodedPixels) {
+  let total = 0;
+  for (const [index, value] of pixelCounts.entries()) {
+    const pixels = boundedInteger(
+      value,
+      `${label}.pixelCounts[${index}]`,
+      0,
+      Number.MAX_SAFE_INTEGER,
+    );
+    total += pixels;
+    if (total > maximumDecodedPixels) {
+      fail(
+        'PROJECT_ART_SANDBOX_AGGREGATE_PIXEL_LIMIT',
+        `${label} exceeds the ${maximumDecodedPixels}-pixel active decoded-image boundary.`,
+      );
+    }
+  }
+  return total;
 }
 
 function normalizedOperation(value, index, registry) {
@@ -140,6 +168,14 @@ function normalizedOperation(value, index, registry) {
   if (['crop', 'pad-canvas', 'resize', 'pixel-resize'].includes(op)) {
     for (const key of ['width', 'height']) {
       if (parameters[key] !== undefined) boundedInteger(parameters[key], `${op}.${key}`, 1, 65_536);
+    }
+    if (parameters.width !== undefined && parameters.height !== undefined) {
+      assertDecodedPixelLimit(
+        parameters.width,
+        parameters.height,
+        op,
+        registry.maximumDecodedPixels,
+      );
     }
   }
   if (op === 'crop') {
@@ -248,21 +284,29 @@ function normalizeImageTask(task, taskIndex, registry, targetClaims) {
   };
 }
 
-function normalizeSliceTask(task, taskIndex, targetClaims) {
+function normalizeSliceTask(task, taskIndex, registry, targetClaims) {
   const targetDirectory = normalizeTargetPath(task.targetDirectory, `tasks[${taskIndex}].targetDirectory`, targetClaims);
   const fileNamePattern = task.fileNamePattern ?? 'frame-{index}.png';
   boundedString(fileNamePattern, `tasks[${taskIndex}].fileNamePattern`, 512);
   if (!fileNamePattern.includes('{index}') || fileNamePattern.includes('/') || !fileNamePattern.endsWith('.png')) {
     fail('PROJECT_ART_SANDBOX_TASK_INVALID', 'slice-sheet fileNamePattern must contain {index}, contain no slash, and end in .png.');
   }
+  const frameWidth = boundedInteger(task.frameWidth, `tasks[${taskIndex}].frameWidth`, 1, 65_536);
+  const frameHeight = boundedInteger(task.frameHeight, `tasks[${taskIndex}].frameHeight`, 1, 65_536);
+  assertDecodedPixelLimit(
+    frameWidth,
+    frameHeight,
+    `tasks[${taskIndex}] frame`,
+    registry.maximumDecodedPixels,
+  );
   return {
     id: safeId(task.id, `tasks[${taskIndex}].id`),
     kind: 'slice-sheet',
     source: normalizedSourceDescriptor(task.source, `tasks[${taskIndex}].source`),
     targetDirectory,
     fileNamePattern,
-    frameWidth: boundedInteger(task.frameWidth, `tasks[${taskIndex}].frameWidth`, 1, 65_536),
-    frameHeight: boundedInteger(task.frameHeight, `tasks[${taskIndex}].frameHeight`, 1, 65_536),
+    frameWidth,
+    frameHeight,
     margin: boundedInteger(task.margin ?? 0, `tasks[${taskIndex}].margin`, 0, 65_536),
     spacing: boundedInteger(task.spacing ?? 0, `tasks[${taskIndex}].spacing`, 0, 65_536),
     ...(task.count === undefined
@@ -280,30 +324,50 @@ function normalizeSources(values, label) {
   return values.map((source, index) => normalizedSourceDescriptor(source, `${label}[${index}]`));
 }
 
-function normalizeAssembleTask(task, taskIndex, targetClaims) {
+function normalizeAssembleTask(task, taskIndex, registry, targetClaims) {
   const targetPath = normalizeTargetPath(task.targetPath, `tasks[${taskIndex}].targetPath`, targetClaims);
   if (path.posix.extname(targetPath).toLowerCase() !== '.png') {
     fail('PROJECT_ART_SANDBOX_TARGET_INVALID', 'assemble-sheet targetPath must end in .png.');
   }
   const cell = task.cell === undefined ? null : task.cell;
   if (cell !== null && !isRecord(cell)) fail('PROJECT_ART_SANDBOX_TASK_INVALID', 'assemble-sheet cell must be an object.');
+  const sources = normalizeSources(task.sources, `tasks[${taskIndex}].sources`);
+  const columns = boundedInteger(task.columns, `tasks[${taskIndex}].columns`, 1, 10_000);
+  const padding = boundedInteger(task.padding ?? 0, `tasks[${taskIndex}].padding`, 0, 4096);
+  let normalizedCell;
+  if (cell) {
+    const width = boundedInteger(cell.width, `tasks[${taskIndex}].cell.width`, 1, 65_536);
+    const height = boundedInteger(cell.height, `tasks[${taskIndex}].cell.height`, 1, 65_536);
+    assertDecodedPixelLimit(
+      width,
+      height,
+      `tasks[${taskIndex}].cell`,
+      registry.maximumDecodedPixels,
+    );
+    normalizedCell = {
+      width,
+      height,
+      fit: ['strict', 'contain', 'cover'].includes(cell.fit) ? cell.fit : 'strict',
+      sampling: ['nearest', 'lanczos'].includes(cell.sampling) ? cell.sampling : 'nearest',
+    };
+    const rows = Math.ceil(sources.length / columns);
+    const outputWidth = padding * 2 + columns * width;
+    const outputHeight = padding * 2 + rows * height;
+    assertDecodedPixelLimit(
+      outputWidth,
+      outputHeight,
+      `tasks[${taskIndex}] assembled sheet`,
+      registry.maximumDecodedPixels,
+    );
+  }
   return {
     id: safeId(task.id, `tasks[${taskIndex}].id`),
     kind: 'assemble-sheet',
-    sources: normalizeSources(task.sources, `tasks[${taskIndex}].sources`),
+    sources,
     targetPath,
-    columns: boundedInteger(task.columns, `tasks[${taskIndex}].columns`, 1, 10_000),
-    ...(cell
-      ? {
-          cell: {
-            width: boundedInteger(cell.width, `tasks[${taskIndex}].cell.width`, 1, 65_536),
-            height: boundedInteger(cell.height, `tasks[${taskIndex}].cell.height`, 1, 65_536),
-            fit: ['strict', 'contain', 'cover'].includes(cell.fit) ? cell.fit : 'strict',
-            sampling: ['nearest', 'lanczos'].includes(cell.sampling) ? cell.sampling : 'nearest',
-          },
-        }
-      : {}),
-    padding: boundedInteger(task.padding ?? 0, `tasks[${taskIndex}].padding`, 0, 4096),
+    columns,
+    ...(normalizedCell ? { cell: normalizedCell } : {}),
+    padding,
     background: task.background ?? '#00000000',
   };
 }
@@ -389,22 +453,68 @@ function normalizeCompositeTask(task, taskIndex, targetClaims, registry) {
   };
 }
 
-function normalizeReviewTask(task, taskIndex, targetClaims) {
+function normalizeReviewTask(task, taskIndex, registry, targetClaims) {
   const targetDirectory = normalizeTargetPath(task.targetDirectory, `tasks[${taskIndex}].targetDirectory`, targetClaims);
   const thresholds = isRecord(task.thresholds) ? task.thresholds : {};
+  const sources = normalizeSources(task.sources, `tasks[${taskIndex}].sources`);
+  const expectedWidth =
+    task.expectedWidth === undefined
+      ? null
+      : boundedInteger(task.expectedWidth, `tasks[${taskIndex}].expectedWidth`, 1, 65_536);
+  const expectedHeight =
+    task.expectedHeight === undefined
+      ? null
+      : boundedInteger(task.expectedHeight, `tasks[${taskIndex}].expectedHeight`, 1, 65_536);
+  const preview = {
+    contactSheet: task.preview?.contactSheet !== false,
+    animatedGif: task.preview?.animatedGif !== false,
+    onionSkins: task.preview?.onionSkins === true,
+    frameDurationMs: boundedInteger(
+      task.preview?.frameDurationMs ?? 100,
+      `tasks[${taskIndex}].preview.frameDurationMs`,
+      20,
+      10_000,
+    ),
+    columns: boundedInteger(task.preview?.columns ?? 8, `tasks[${taskIndex}].preview.columns`, 1, 100),
+  };
+  if (expectedWidth !== null && expectedHeight !== null) {
+    const framePixels = expectedWidth * expectedHeight;
+    assertDecodedPixelLimit(
+      expectedWidth,
+      expectedHeight,
+      `tasks[${taskIndex}] expected frame`,
+      registry.maximumDecodedPixels,
+    );
+    assertActiveDecodedPixelLimit(
+      Array.from({ length: sources.length }, () => framePixels),
+      `tasks[${taskIndex}] expected frame set`,
+      registry.maximumDecodedPixels,
+    );
+    if (preview.contactSheet) {
+      const columns = Math.min(preview.columns, sources.length);
+      const rows = Math.ceil(sources.length / columns);
+      const sheetWidth = columns * expectedWidth;
+      const sheetHeight = rows * (expectedHeight + REVIEW_LABEL_HEIGHT);
+      assertDecodedPixelLimit(
+        sheetWidth,
+        sheetHeight,
+        `tasks[${taskIndex}] contact sheet`,
+        registry.maximumDecodedPixels,
+      );
+      assertActiveDecodedPixelLimit(
+        [sources.length * framePixels, sheetWidth * sheetHeight],
+        `tasks[${taskIndex}] contact-sheet working set`,
+        registry.maximumDecodedPixels,
+      );
+    }
+  }
   return {
     id: safeId(task.id, `tasks[${taskIndex}].id`),
     kind: 'sequence-review',
-    sources: normalizeSources(task.sources, `tasks[${taskIndex}].sources`),
+    sources,
     targetDirectory,
-    expectedWidth:
-      task.expectedWidth === undefined
-        ? null
-        : boundedInteger(task.expectedWidth, `tasks[${taskIndex}].expectedWidth`, 1, 65_536),
-    expectedHeight:
-      task.expectedHeight === undefined
-        ? null
-        : boundedInteger(task.expectedHeight, `tasks[${taskIndex}].expectedHeight`, 1, 65_536),
+    expectedWidth,
+    expectedHeight,
     requireAlpha: task.requireAlpha === true,
     rejectBlankFrames: task.rejectBlankFrames !== false,
     rejectIdenticalAdjacentFrames: task.rejectIdenticalAdjacentFrames !== false,
@@ -428,18 +538,7 @@ function normalizeReviewTask(task, taskIndex, targetClaims) {
         1_000_000,
       ),
     },
-    preview: {
-      contactSheet: task.preview?.contactSheet !== false,
-      animatedGif: task.preview?.animatedGif !== false,
-      onionSkins: task.preview?.onionSkins === true,
-      frameDurationMs: boundedInteger(
-        task.preview?.frameDurationMs ?? 100,
-        `tasks[${taskIndex}].preview.frameDurationMs`,
-        20,
-        10_000,
-      ),
-      columns: boundedInteger(task.preview?.columns ?? 8, `tasks[${taskIndex}].preview.columns`, 1, 100),
-    },
+    preview,
   };
 }
 
@@ -501,6 +600,12 @@ async function bindExternalSource(workspaceRoot, descriptor, sourceMap, registry
   if (!image) {
     fail('PROJECT_ART_SANDBOX_SOURCE_INVALID', `Sandbox sources must be supported images: ${descriptor.path}.`);
   }
+  assertDecodedPixelLimit(
+    image.width,
+    image.height,
+    `Sandbox source ${descriptor.path}`,
+    registry.maximumDecodedPixels,
+  );
   const source = {
     sourceId: `source_${sha256(`${descriptor.path}\0${identity.sha256}`).slice(0, 32)}`,
     path: descriptor.path,
@@ -514,6 +619,146 @@ async function bindExternalSource(workspaceRoot, descriptor, sourceMap, registry
     fail('PROJECT_ART_SANDBOX_SOURCE_LIMIT', 'Sandbox exceeded the external-source limit.');
   }
   return { kind: 'external', sourceId: source.sourceId };
+}
+
+function externalTaskDimensions(task, externalById) {
+  const descriptors = task.source ? [task.source] : task.sources || [];
+  if (descriptors.length === 0 || descriptors.some((source) => source.kind !== 'external')) {
+    return null;
+  }
+  return descriptors.map((source, index) => {
+    const external = externalById.get(source.sourceId);
+    if (!external) {
+      fail(
+        'PROJECT_ART_SANDBOX_SOURCE_INVALID',
+        `tasks.${task.id}.sources[${index}] refers to an unknown external source.`,
+      );
+    }
+    return {
+      width: external.image.width,
+      height: external.image.height,
+      pixels: external.image.width * external.image.height,
+    };
+  });
+}
+
+function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
+  const dimensions = externalTaskDimensions(task, externalById);
+  if (!dimensions) return;
+
+  if (task.kind === 'image-composite') {
+    const canvasPixels = task.canvas.width * task.canvas.height;
+    for (const [index, layer] of task.layers.entries()) {
+      const source = dimensions[layer.sourceIndex];
+      const layerWidth = layer.width ?? source.width;
+      const layerHeight = layer.height ?? source.height;
+      const mask = layer.maskSourceIndex === null ? null : dimensions[layer.maskSourceIndex];
+      const canvasMultiplier = layer.blendMode === 'normal' ? 3 : 9;
+      const layerMultiplier = mask ? 6 : 4;
+      assertActiveDecodedPixelLimit(
+        [
+          canvasPixels * canvasMultiplier,
+          layerWidth * layerHeight * layerMultiplier,
+          mask?.pixels ?? 0,
+        ],
+        `Task ${task.id} layer ${index} working set`,
+        maximumDecodedPixels,
+      );
+    }
+    return;
+  }
+
+  if (task.kind === 'assemble-sheet') {
+    const cellWidth = task.cell?.width ?? dimensions[0].width;
+    const cellHeight = task.cell?.height ?? dimensions[0].height;
+    const rows = Math.ceil(dimensions.length / task.columns);
+    const sheetWidth = task.padding * 2 + task.columns * cellWidth;
+    const sheetHeight = task.padding * 2 + rows * cellHeight;
+    assertDecodedPixelLimit(
+      sheetWidth,
+      sheetHeight,
+      `Task ${task.id} assembled sheet`,
+      maximumDecodedPixels,
+    );
+    const maximumSourcePixels = Math.max(...dimensions.map((value) => value.pixels));
+    const preparedPixels = task.cell && task.cell.fit !== 'strict' ? cellWidth * cellHeight * 2 : 0;
+    assertActiveDecodedPixelLimit(
+      [sheetWidth * sheetHeight, maximumSourcePixels, preparedPixels],
+      `Task ${task.id} assembly working set`,
+      maximumDecodedPixels,
+    );
+    return;
+  }
+
+  if (task.kind === 'sequence-review') {
+    const sourcePixels = dimensions.map((value) => value.pixels);
+    const sourceTotal = assertActiveDecodedPixelLimit(
+      sourcePixels,
+      `Task ${task.id} frame set`,
+      maximumDecodedPixels,
+    );
+    const maximumFramePixels = Math.max(...sourcePixels);
+    if (dimensions.length > 1) {
+      assertActiveDecodedPixelLimit(
+        [sourceTotal, maximumFramePixels],
+        `Task ${task.id} transition working set`,
+        maximumDecodedPixels,
+      );
+    }
+    if (task.preview.contactSheet) {
+      const columns = Math.min(task.preview.columns, dimensions.length);
+      const rows = Math.ceil(dimensions.length / columns);
+      const cellWidth = Math.max(...dimensions.map((value) => value.width));
+      const cellHeight = Math.max(...dimensions.map((value) => value.height));
+      const sheetWidth = columns * cellWidth;
+      const sheetHeight = rows * (cellHeight + REVIEW_LABEL_HEIGHT);
+      assertDecodedPixelLimit(
+        sheetWidth,
+        sheetHeight,
+        `Task ${task.id} contact sheet`,
+        maximumDecodedPixels,
+      );
+      assertActiveDecodedPixelLimit(
+        [sourceTotal, sheetWidth * sheetHeight * 2],
+        `Task ${task.id} contact-sheet working set`,
+        maximumDecodedPixels,
+      );
+    }
+    if (task.preview.animatedGif) {
+      assertActiveDecodedPixelLimit(
+        [sourceTotal, maximumFramePixels * 2],
+        `Task ${task.id} animation-preview working set`,
+        maximumDecodedPixels,
+      );
+    }
+    if (task.preview.onionSkins && dimensions.length > 1) {
+      assertActiveDecodedPixelLimit(
+        [sourceTotal, maximumFramePixels * 5],
+        `Task ${task.id} onion-skin working set`,
+        maximumDecodedPixels,
+      );
+    }
+    return;
+  }
+
+  if (task.kind === 'image-compare') {
+    const sourcePixels = dimensions.map((value) => value.pixels);
+    const sourceTotal = assertActiveDecodedPixelLimit(
+      sourcePixels,
+      `Task ${task.id} comparison sources`,
+      maximumDecodedPixels,
+    );
+    if (
+      dimensions[0].width === dimensions[1].width &&
+      dimensions[0].height === dimensions[1].height
+    ) {
+      assertActiveDecodedPixelLimit(
+        [sourceTotal, dimensions[0].pixels * 2],
+        `Task ${task.id} comparison working set`,
+        maximumDecodedPixels,
+      );
+    }
+  }
 }
 
 function validateTaskDependency(source, taskIndexById, currentIndex, label) {
@@ -555,9 +800,9 @@ export async function compileProjectArtSandbox({
     if (!registry.taskKinds.has(kind)) fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported task kind: ${kind}.`);
     let normalized;
     if (kind === 'image') normalized = normalizeImageTask(task, index, registry, targetClaims);
-    else if (kind === 'slice-sheet') normalized = normalizeSliceTask(task, index, targetClaims);
-    else if (kind === 'assemble-sheet') normalized = normalizeAssembleTask(task, index, targetClaims);
-    else if (kind === 'sequence-review') normalized = normalizeReviewTask(task, index, targetClaims);
+    else if (kind === 'slice-sheet') normalized = normalizeSliceTask(task, index, registry, targetClaims);
+    else if (kind === 'assemble-sheet') normalized = normalizeAssembleTask(task, index, registry, targetClaims);
+    else if (kind === 'sequence-review') normalized = normalizeReviewTask(task, index, registry, targetClaims);
     else if (kind === 'image-composite') normalized = normalizeCompositeTask(task, index, targetClaims, registry);
     else normalized = normalizeCompareTask(task, index, targetClaims);
     if (taskIds.has(normalized.id)) fail('PROJECT_ART_SANDBOX_TASK_DUPLICATE', `Duplicate task id: ${normalized.id}.`);
@@ -589,6 +834,10 @@ export async function compileProjectArtSandbox({
     }
   }
   const externalSources = [...sourceMap.values()].sort((left, right) => left.sourceId.localeCompare(right.sourceId));
+  const externalById = new Map(externalSources.map((source) => [source.sourceId, source]));
+  for (const task of boundTasks) {
+    assertBoundTaskPixelBudgets(task, externalById, registry.maximumDecodedPixels);
+  }
   const plan = withDocumentHash({
     schema: PROJECT_ART_SANDBOX_PLAN_SCHEMA,
     sandboxId,
