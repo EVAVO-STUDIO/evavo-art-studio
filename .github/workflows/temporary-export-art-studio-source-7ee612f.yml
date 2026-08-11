@@ -1,0 +1,43 @@
+name: Temporary export exact Art Studio source 7ee612f
+
+on:
+  push:
+    branches:
+      - automation/export-art-studio-source-7ee612f-20260811
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify and archive exact production tree
+        shell: bash
+        env:
+          EXPECTED_MAIN: 7ee612f74e7c7097b5ccd93fd29c73e82667c88c
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN"
+          git diff --exit-code "$EXPECTED_MAIN" -- . ':(exclude).github/workflows/temporary-export-art-studio-source-7ee612f.yml'
+          git archive --format=tar.gz --prefix=evavo-art-studio/ --output="$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz" "$EXPECTED_MAIN"
+          test -s "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz"
+          sha256sum "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz" > "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.sha256"
+
+      - name: Upload exact source archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evavo-art-studio-source-7ee612f74e7c7097b5ccd93fd29c73e82667c88c
+          path: |
+            ${{ runner.temp }}/evavo-art-studio-source-7ee612f.tar.gz
+            ${{ runner.temp }}/evavo-art-studio-source-7ee612f.sha256
+          if-no-files-found: error
+          retention-days: 1
