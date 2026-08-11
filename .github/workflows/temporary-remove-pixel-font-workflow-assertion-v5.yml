@@ -1,0 +1,120 @@
+name: Temporary finalize Pixel Font backend portability
+
+on:
+  push:
+    branches:
+      - automation/apply-pixel-font-optional-backend-20260811-v2
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-finalize-pixel-font-portability-v5
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull-request branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/persistent-artist-mastering-motion-v3-20260811
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify expected target head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "fbf32c0549172ea27d841ef39a2570cbf30d99a6"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Remove unnecessary workflow-diff assertion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          script = Path('scripts/check-pixel-font-studio-v2.mjs')
+          text = script.read_text(encoding='utf-8')
+          block = '''const dedicatedWorkflowSource = await readFile(
+            path.join(root, ".github", "workflows", "pixel-font-studio-v2.yml"),
+            "utf8",
+          );
+          assert.match(
+            dedicatedWorkflowSource,
+            /EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS:\\s*["']1["']/u,
+            "the dedicated Pixel Font Studio v2 workflow must require the exact fontTools backend",
+          );
+
+          '''
+          if text.count(block) != 1:
+              raise SystemExit(f'expected one dedicated-workflow assertion block, found {text.count(block)}')
+          script.write_text(text.replace(block, '', 1), encoding='utf-8')
+          PY
+          node --check scripts/check-pixel-font-studio-v2.mjs
+
+      - name: Validate optional and strict backend behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv --without-pip "$RUNNER_TEMP/no-fonttools"
+          rm -rf "$RUNNER_TEMP/pixel-font-optional-report" "$RUNNER_TEMP/pixel-font-strict-missing"
+          EVAVO_PIXEL_FONT_PYTHON="$RUNNER_TEMP/no-fonttools/bin/python" \
+          EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=0 \
+          EVAVO_PIXEL_FONT_CHECK_OUTPUT="$RUNNER_TEMP/pixel-font-optional-report" \
+            node scripts/check-pixel-font-studio-v2.mjs
+          grep -F '"status": "skipped"' "$RUNNER_TEMP/pixel-font-optional-report/check-report.json"
+          grep -F '"expectedVersion": "4.63.0"' "$RUNNER_TEMP/pixel-font-optional-report/check-report.json"
+
+          set +e
+          EVAVO_PIXEL_FONT_PYTHON="$RUNNER_TEMP/no-fonttools/bin/python" \
+          EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=1 \
+          EVAVO_PIXEL_FONT_CHECK_OUTPUT="$RUNNER_TEMP/pixel-font-strict-missing" \
+            node scripts/check-pixel-font-studio-v2.mjs >"$RUNNER_TEMP/strict-missing.log" 2>&1
+          strict_status=$?
+          set -e
+          test "$strict_status" -ne 0
+          grep -F 'EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=1 requires fontTools 4.63.0; observed unavailable.' "$RUNNER_TEMP/strict-missing.log"
+
+      - name: Install exact fontTools backend and run complete suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
+          test "$(python -c 'import fontTools; print(fontTools.__version__)')" = "4.63.0"
+          EVAVO_PIXEL_FONT_PYTHON=python node scripts/check-pixel-font-studio-v2.mjs
+
+      - name: Verify exact one-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff --name-only)" = "scripts/check-pixel-font-studio-v2.mjs"
+          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -v '^ M scripts/check-pixel-font-studio-v2.mjs$' || true)"
+
+      - name: Commit and push exact finalization without force
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "fbf32c0549172ea27d841ef39a2570cbf30d99a6"
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add scripts/check-pixel-font-studio-v2.mjs
+          git commit -m "fix(pixel-font): keep exact backend workflow-independent"
+          git push origin HEAD:refs/heads/agent/persistent-artist-mastering-motion-v3-20260811
+          git rev-parse HEAD
