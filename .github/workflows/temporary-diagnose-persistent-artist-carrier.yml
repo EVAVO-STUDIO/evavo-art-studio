@@ -1,0 +1,36 @@
+name: Temporary diagnose persistent Artist Workspace carrier
+
+on:
+  push:
+    branches:
+      - automation/publish-persistent-artist-mastering-motion-20260811
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Report exact carrier identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRANSFER_DIR=.evavo-transfer/persistent-artist-mastering-motion
+          for file in "${TRANSFER_DIR}"/part-*.b64; do
+            printf '%s bytes=' "$(basename "${file}")"
+            wc -c < "${file}" | tr -d '\n'
+            printf ' sha256='
+            sha256sum "${file}" | awk '{print $1}'
+          done
+          cat "${TRANSFER_DIR}"/part-*.b64 > "${RUNNER_TEMP}/combined.b64"
+          printf 'combined bytes='
+          wc -c < "${RUNNER_TEMP}/combined.b64" | tr -d '\n'
+          printf ' sha256='
+          sha256sum "${RUNNER_TEMP}/combined.b64" | awk '{print $1}'
