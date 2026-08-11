@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -15,369 +16,14 @@ import {
   verifyLayeredProductionStyleProofApprovalReceipt,
 } from "../dist/index.js";
 
-function unit(id, kind, width, height, fileName, targetPath, extra = {}) {
-  return {
-    id,
-    kind,
-    purpose: `Author the isolated ${id} source unit.`,
-    dimensions: { width, height },
-    continuityKey: `jonez-${id}`,
-    include: [`only the ${id} artwork`],
-    exclude: ["all other scene layers", "readable signage"],
-    fileName,
-    targetPath,
-    ...extra,
-  };
-}
+const FIXTURE = new URL(
+  "../../../config/jonez-layered-production-style-proof.v1.json",
+  import.meta.url,
+);
+const FIXTURE_REQUEST = JSON.parse(await readFile(FIXTURE, "utf8"));
 
 function request() {
-  return {
-    schemaVersion: "1.0",
-    kind: "evavo.layered-production.request",
-    planId: "jonez-market-district-proof",
-    revision: "1.0.0",
-    intent: "runtime-source",
-    project: {
-      projectId: "godot-game-foundation-kit",
-      title: "Godot Game Foundation Kit",
-      gameId: "jonez",
-      gameTitle: "JONEZ",
-      targetRepository: "EVAVO-STUDIO/GodotGameFoundationKit",
-      engine: "Godot",
-      engineVersion: "4.6.2",
-      runtimeRoot: "examples/city_life_board_sim/assets/final",
-    },
-    canvas: {
-      width: 320,
-      height: 200,
-      worldWidth: 960,
-      worldHeight: 600,
-      coordinateSystem: "top-left-integer",
-      pixelAspect: "dos-vga-4:3-corrected",
-      presentationScale: 2,
-      filtering: "nearest",
-    },
-    style: {
-      styleId: "jonez-1991-vga-story-city",
-      title: "JONEZ 1991 VGA living city",
-      authoredEra: "1991-1993 DOS VGA social simulation",
-      renderingMode: "isometric-pixel",
-      projection: "dimetric",
-      camera: {
-        fixed: true,
-        yawDegrees: 45,
-        pitchDegrees: 30,
-        rollDegrees: 0,
-        orthographicScale: 1,
-      },
-      lighting: {
-        fixed: true,
-        keyDirectionDegrees: 315,
-        keyElevationDegrees: 45,
-        shadowDirectionDegrees: 135,
-        frameVariation: "forbidden",
-      },
-      palette: {
-        mode: "indexed",
-        maximumSceneColours: 256,
-        maximumLocalColours: 32,
-        preserveIndices: true,
-        colours: [
-          "#101018",
-          "#263248",
-          "#4B5D72",
-          "#8B6A4D",
-          "#C49A65",
-          "#E1C68A",
-          "#295A46",
-          "#4E8A57",
-          "#32739A",
-          "#6A4C93",
-          "#B54D4D",
-          "#E3A646",
-        ],
-      },
-      pixelGrammar: {
-        deliberateClusters: true,
-        fixedPixelDensity: true,
-        antialias: "none",
-        subpixelMotion: "forbidden",
-        gradientPolicy: "forbidden",
-        textureNoise: "forbidden",
-        dithering: "manual",
-        outline: "selective",
-      },
-      materialVocabulary: [
-        "weathered brick",
-        "painted civic stone",
-        "aged concrete",
-        "striped canvas awnings",
-        "dark iron street furniture",
-      ],
-      lineRules: [
-        "one-pixel selective dark contours",
-        "cluster-shaped corners rather than smooth vector curves",
-        "details simplify by distance and gameplay importance",
-      ],
-      compositionRules: [
-        "dense but readable micro-stories",
-        "board route embedded into believable paving",
-        "clear silhouettes at native 320x200 scale",
-        "blank sign fields for live text",
-      ],
-      distinctiveMotifs: [
-        "colour-coded destination medallions embedded in paving",
-        "recurring civic blue and market ochre accents",
-        "small visual jokes carried by crowds and props",
-      ],
-      forbiddenModernTraits: [
-        "glossy mobile-game rendering",
-        "cinematic bloom",
-        "volumetric light",
-        "soft gradient shading",
-        "airbrush highlights",
-        "modern flat-design cards",
-        "high-resolution painterly texture",
-        "neon cyberpunk lighting",
-      ],
-      forbiddenGenericTraits: [
-        "generic AI concept-art city",
-        "random micro-detail confetti",
-        "plastic isometric mobile game buildings",
-        "identical repeated crowd faces",
-        "fake readable signage",
-      ],
-      references: [
-        {
-          id: "jonez-grammar",
-          role: "composition",
-          uri: "artifact:jonez-approved-style-proof",
-          rights: "project-owned",
-          note: "Approved EVAVO style proof; grammar only.",
-        },
-      ],
-    },
-    sourcePolicy: {
-      oneImagePerProviderJob: true,
-      oneLayerRolePerSourceUnit: true,
-      conceptArtAsRuntimeSourceForbidden: true,
-      collagesAsRuntimeSourceForbidden: true,
-      contactSheetsAsRuntimeSourceForbidden: true,
-      readableGeneratedTextForbidden: true,
-      automaticAssemblyForbidden: true,
-      automaticPromotionForbidden: true,
-      humanApprovalRequired: true,
-      styleProofApprovalRequired: true,
-      maximumProviderImagesPerJob: 1,
-    },
-    styleProof: {
-      required: true,
-      approvalBeforeExpansion: true,
-      maximumUnitsBeforeApproval: 8,
-      unitIds: [
-        "ground-base",
-        "route-base",
-        "architecture-back",
-        "cafe-building",
-        "player-idle-se",
-        "fountain-f001",
-      ],
-    },
-    layers: [
-      {
-        id: "ground",
-        role: "ground-base",
-        zOrder: 0,
-        alpha: "opaque",
-        assemblyMode: "full-canvas",
-        ySortMode: "none",
-        include: ["road, paving, grass and canal base only"],
-        exclude: ["route markings, buildings, props, people and UI"],
-        units: [
-          unit(
-            "ground-base",
-            "full-canvas-layer",
-            320,
-            200,
-            "jonez__market__ground_base.png",
-            "examples/city_life_board_sim/assets/final/environment/jonez__market__ground_base.png",
-            { position: { x: 0, y: 0 } },
-          ),
-        ],
-      },
-      {
-        id: "route",
-        role: "route-base",
-        zOrder: 10,
-        alpha: "transparent",
-        assemblyMode: "full-canvas",
-        ySortMode: "none",
-        dependsOn: ["ground"],
-        include: ["embedded board-route paving and destination sockets only"],
-        exclude: [
-          "ground fill, buildings, props, characters and active highlights",
-        ],
-        units: [
-          unit(
-            "route-base",
-            "full-canvas-layer",
-            320,
-            200,
-            "jonez__market__route_base.png",
-            "examples/city_life_board_sim/assets/final/environment/jonez__market__route_base.png",
-            { position: { x: 0, y: 0 } },
-          ),
-        ],
-      },
-      {
-        id: "architecture-back",
-        role: "architecture-back",
-        zOrder: 20,
-        alpha: "transparent",
-        assemblyMode: "full-canvas",
-        ySortMode: "none",
-        dependsOn: ["ground", "route"],
-        include: [
-          "rear facades, rooftops and non-interactive distant architecture only",
-        ],
-        exclude: [
-          "destination buildings, props, people, foreground occluders and UI",
-        ],
-        units: [
-          unit(
-            "architecture-back",
-            "full-canvas-layer",
-            320,
-            200,
-            "jonez__market__architecture_back.png",
-            "examples/city_life_board_sim/assets/final/environment/jonez__market__architecture_back.png",
-            { position: { x: 0, y: 0 } },
-          ),
-        ],
-      },
-      {
-        id: "destinations",
-        role: "destination-structure",
-        zOrder: 30,
-        alpha: "transparent",
-        assemblyMode: "positioned",
-        ySortMode: "none",
-        dependsOn: ["architecture-back"],
-        include: ["one isolated destination structure with blank sign fields"],
-        exclude: ["street ground, crowd, props, route and UI"],
-        units: [
-          unit(
-            "cafe-building",
-            "sprite",
-            96,
-            80,
-            "jonez__destination__cafe.png",
-            "examples/city_life_board_sim/assets/final/environment/jonez__destination__cafe.png",
-            { position: { x: 42, y: 34 }, pivot: { x: 48, y: 76 } },
-          ),
-          unit(
-            "market-building",
-            "sprite",
-            112,
-            88,
-            "jonez__destination__market.png",
-            "examples/city_life_board_sim/assets/final/environment/jonez__destination__market.png",
-            { position: { x: 168, y: 28 }, pivot: { x: 56, y: 84 } },
-          ),
-        ],
-      },
-      {
-        id: "player",
-        role: "player-character",
-        zOrder: 50,
-        alpha: "transparent",
-        assemblyMode: "y-sorted",
-        ySortMode: "ground-contact",
-        dependsOn: ["route"],
-        include: ["the isolated active player sprite only"],
-        exclude: [
-          "cast shadow, scenery, props, crowds, route markers and UI",
-        ],
-        units: [
-          unit(
-            "player-idle-se",
-            "animation-frame",
-            24,
-            36,
-            "jonez__player__idle_se__f001.png",
-            "examples/city_life_board_sim/assets/final/characters/jonez__player__idle_se__f001.png",
-            {
-              pivot: { x: 12, y: 33 },
-              ySortOrigin: { x: 12, y: 33 },
-              continuityKey: "jonez-player",
-              frame: {
-                clipId: "idle-se",
-                frameNumber: 1,
-                frameCount: 2,
-                framesPerSecond: 4,
-                loop: true,
-                pose: "settled south-east idle with weight on the back foot",
-              },
-            },
-          ),
-          unit(
-            "player-walk-se-f001",
-            "animation-frame",
-            24,
-            36,
-            "jonez__player__walk_se__f001.png",
-            "examples/city_life_board_sim/assets/final/characters/jonez__player__walk_se__f001.png",
-            {
-              pivot: { x: 12, y: 33 },
-              ySortOrigin: { x: 12, y: 33 },
-              continuityKey: "jonez-player",
-              frame: {
-                clipId: "walk-se",
-                frameNumber: 1,
-                frameCount: 4,
-                framesPerSecond: 8,
-                loop: true,
-                pose: "south-east contact pose, front foot planted and rear arm forward",
-              },
-            },
-          ),
-        ],
-      },
-      {
-        id: "ambient-fx",
-        role: "ambient-effect",
-        zOrder: 70,
-        alpha: "transparent",
-        assemblyMode: "positioned",
-        ySortMode: "none",
-        dependsOn: ["ground"],
-        include: ["one isolated fountain water animation frame only"],
-        exclude: ["fountain masonry, scenery, people, glow and UI"],
-        units: [
-          unit(
-            "fountain-f001",
-            "animation-frame",
-            32,
-            32,
-            "jonez__fx__fountain__f001.png",
-            "examples/city_life_board_sim/assets/final/effects/jonez__fx__fountain__f001.png",
-            {
-              position: { x: 144, y: 86 },
-              pivot: { x: 16, y: 28 },
-              frame: {
-                clipId: "fountain",
-                frameNumber: 1,
-                frameCount: 4,
-                framesPerSecond: 6,
-                loop: true,
-                pose: "lowest water crest with two compact upward jets",
-              },
-            },
-          ),
-        ],
-      },
-    ],
-  };
+  return structuredClone(FIXTURE_REQUEST);
 }
 
 function digest(value) {
@@ -443,6 +89,12 @@ function approvePlan(pending) {
   };
 }
 
+function sourceArtifact(receipt, unitId) {
+  const evidence = receipt.evidence.find((entry) => entry.unitId === unitId);
+  assert.ok(evidence, `missing receipt evidence for ${unitId}`);
+  return evidence.sourceArtifactId;
+}
+
 test("compiles one exclusive provider job per layered runtime source", () => {
   const plan = compileLayeredProductionPlan(request());
   assert.equal(plan.kind, "evavo.layered-production.plan");
@@ -475,8 +127,14 @@ test("blocks non-proof retrieval until a content-addressed proof receipt is appl
   const { receipt, approved } = approvePlan(pending);
   assert.equal(verifyLayeredProductionStyleProofApprovalReceipt(receipt), true);
   assert.equal(approved.styleProof.status, "approved");
-  assert.equal(approved.styleProof.approval.receiptSha256, receipt.receiptSha256);
-  assert.equal(getLayeredProductionUnit(approved, "market-building").id, "market-building");
+  assert.equal(
+    approved.styleProof.approval.receiptSha256,
+    receipt.receiptSha256,
+  );
+  assert.equal(
+    getLayeredProductionUnit(approved, "market-building").id,
+    "market-building",
+  );
 });
 
 test("rejects legacy inline approval instead of trusting an arbitrary hash", () => {
@@ -555,7 +213,7 @@ test("tampered approval receipts and approved plans fail closed", () => {
 
 test("is deterministic and self-hashed", () => {
   const left = compileLayeredProductionPlan(request());
-  const right = compileLayeredProductionPlan(structuredClone(request()));
+  const right = compileLayeredProductionPlan(request());
   assert.equal(left.requestSha256, right.requestSha256);
   assert.equal(left.styleFingerprintSha256, right.styleFingerprintSha256);
   assert.equal(left.planSha256, right.planSha256);
@@ -639,7 +297,10 @@ test("verifies the canonical plan hash and rejects a tampered pending plan", () 
 
 test("compiles a provider-protocol request for a pending proof source unit", () => {
   const plan = compileLayeredProductionPlan(request());
-  const bridge = compileLayeredProviderCandidateRequest(plan, "player-idle-se");
+  const bridge = compileLayeredProviderCandidateRequest(
+    plan,
+    "player-idle-se",
+  );
   assert.equal(bridge.request.operation, "generate");
   assert.equal(bridge.request.assetKind, "sprite-frame");
   assert.equal(bridge.request.continuityPhase, "identity-master");
@@ -652,37 +313,102 @@ test("compiles a provider-protocol request for a pending proof source unit", () 
   assert.match(bridge.request.negativeIntent, /concept sheet/);
 });
 
-test("requires an approved canonical identity artifact for later character frames", () => {
+test("binds later character frames to the exact approved identity-master source", () => {
   const pending = compileLayeredProductionPlan(request());
-  const { approved } = approvePlan(pending);
-  assert.equal(approved.styleProof.status, "approved");
+  const { receipt, approved } = approvePlan(pending);
+  const identityArtifact = sourceArtifact(receipt, "player-idle-se");
+  const wrongApprovedArtifact = sourceArtifact(receipt, "fountain-f001");
+
   assert.throws(
-    () => compileLayeredProviderCandidateRequest(approved, "player-walk-se-f001"),
+    () =>
+      compileLayeredProviderCandidateRequest(
+        approved,
+        "player-walk-se-f001",
+      ),
     (error) =>
       error instanceof ArtDirectionError &&
       error.code === "LAYERED_PRODUCTION_PROVIDER_REFERENCE_REQUIRED",
   );
+
+  assert.throws(
+    () =>
+      compileLayeredProviderCandidateRequest(
+        approved,
+        "player-walk-se-f001",
+        [
+          {
+            artifactId: `artifact_${"b".repeat(64)}`,
+            role: "canonical-identity",
+            required: true,
+            note: "A note cannot turn an invented hash into approved evidence.",
+          },
+        ],
+      ),
+    (error) =>
+      error instanceof ArtDirectionError &&
+      error.code === "LAYERED_PRODUCTION_PROVIDER_REFERENCE_NOT_APPROVED",
+  );
+
+  assert.throws(
+    () =>
+      compileLayeredProviderCandidateRequest(
+        approved,
+        "player-walk-se-f001",
+        [
+          {
+            artifactId: wrongApprovedArtifact,
+            role: "canonical-identity",
+            required: true,
+          },
+        ],
+      ),
+    (error) =>
+      error instanceof ArtDirectionError &&
+      error.code === "LAYERED_PRODUCTION_PROVIDER_REFERENCE_ROLE_MISMATCH",
+  );
+
+  assert.throws(
+    () =>
+      compileLayeredProviderCandidateRequest(
+        approved,
+        "player-walk-se-f001",
+        [
+          {
+            artifactId: identityArtifact,
+            role: "canonical-identity",
+            required: true,
+          },
+          {
+            artifactId: wrongApprovedArtifact,
+            role: "canonical-identity",
+            required: false,
+          },
+        ],
+      ),
+    (error) =>
+      error instanceof ArtDirectionError &&
+      error.code === "LAYERED_PRODUCTION_PROVIDER_REFERENCE_AMBIGUOUS",
+  );
+
   const bridge = compileLayeredProviderCandidateRequest(
     approved,
     "player-walk-se-f001",
     [
       {
-        artifactId: `artifact_${"b".repeat(64)}`,
+        artifactId: identityArtifact,
         role: "canonical-identity",
         required: true,
-        note: "Approved player identity-master source.",
+        note: "Exact receipt-bound player identity-master source.",
       },
     ],
   );
   assert.equal(bridge.request.continuityPhase, "key-pose");
   assert.deepEqual(bridge.requiredReferenceRoles, ["canonical-identity"]);
-  assert.equal(
-    bridge.request.references[0]?.artifactId,
-    `artifact_${"b".repeat(64)}`,
-  );
+  assert.equal(bridge.request.references[0]?.artifactId, identityArtifact);
+  assert.equal(bridge.request.metadata.planSha256, approved.planSha256);
 });
 
-test("protocol makes concept and runtime-source boundaries explicit", () => {
+test("protocol makes concept, runtime-source and reference-authority boundaries explicit", () => {
   const protocol = layeredProductionProtocolSummary();
   assert.equal(protocol.protocolVersion, "2026-08-10.1");
   assert.ok(
@@ -690,6 +416,11 @@ test("protocol makes concept and runtime-source boundaries explicit", () => {
   );
   assert.ok(
     protocol.sourceRules.some((rule) => rule.includes("exactly one image")),
+  );
+  assert.ok(
+    protocol.sourceRules.some((rule) =>
+      rule.includes("exact source artifacts in the embedded style-proof receipt"),
+    ),
   );
   assert.equal(protocol.authority.providerExecution, false);
 });

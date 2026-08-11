@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  ArtDirectionError,
   applyLayeredProductionStyleProofApproval,
   compileLayeredProductionPlan,
   compileLayeredProductionStyleProofApprovalReceipt,
@@ -72,6 +73,12 @@ function approvalInput(plan) {
   };
 }
 
+function sourceArtifact(receipt, unitId) {
+  const evidence = receipt.evidence.find((entry) => entry.unitId === unitId);
+  assert.ok(evidence, `missing receipt evidence for ${unitId}`);
+  return evidence.sourceArtifactId;
+}
+
 test("layered identity proof compiles through the provider-neutral runtime contract", async () => {
   const plan = compileLayeredProductionPlan(await fixture());
   const bridge = compileLayeredProviderCandidateRequest(plan, "player-idle-se");
@@ -88,7 +95,7 @@ test("layered identity proof compiles through the provider-neutral runtime contr
   assert.match(contract.compiledPrompt, /one image only/i);
 });
 
-test("later JONEZ frame requires a receipt-bound style proof and approved identity reference", async () => {
+test("later JONEZ frame requires the exact receipt-bound identity source", async () => {
   const pendingPlan = compileLayeredProductionPlan(await fixture());
   const receipt = compileLayeredProductionStyleProofApprovalReceipt(
     pendingPlan,
@@ -98,12 +105,32 @@ test("later JONEZ frame requires a receipt-bound style proof and approved identi
     pendingPlan,
     receipt,
   );
+  const identityArtifact = sourceArtifact(receipt, "player-idle-se");
+
+  assert.throws(
+    () =>
+      compileLayeredProviderCandidateRequest(
+        plan,
+        "player-walk-se-f001",
+        [
+          {
+            artifactId: `artifact_${"b".repeat(64)}`,
+            role: "canonical-identity",
+            required: true,
+          },
+        ],
+      ),
+    (error) =>
+      error instanceof ArtDirectionError &&
+      error.code === "LAYERED_PRODUCTION_PROVIDER_REFERENCE_NOT_APPROVED",
+  );
+
   const bridge = compileLayeredProviderCandidateRequest(
     plan,
     "player-walk-se-f001",
     [
       {
-        artifactId: `artifact_${"b".repeat(64)}`,
+        artifactId: identityArtifact,
         role: "canonical-identity",
         required: true,
         note: "Exact approved JONEZ identity-master source.",
@@ -112,9 +139,13 @@ test("later JONEZ frame requires a receipt-bound style proof and approved identi
   );
   const contract = compileProviderCandidateRuntimeContract(bridge.request);
 
-  assert.equal(plan.styleProof.approval.receiptSha256, receipt.receiptSha256);
+  assert.equal(
+    plan.styleProof.approval.receiptSha256,
+    receipt.receiptSha256,
+  );
   assert.equal(contract.request.continuityPhase, "key-pose");
   assert.equal(contract.request.references[0]?.role, "canonical-identity");
+  assert.equal(contract.request.references[0]?.artifactId, identityArtifact);
   assert.ok(contract.requiredAdapterCapabilities.includes("identity-reference"));
   assert.equal(contract.runtimeJob.payload.metadata.styleProofStatus, "approved");
   assert.equal(contract.runtimeJob.payload.metadata.approvals.source, false);
