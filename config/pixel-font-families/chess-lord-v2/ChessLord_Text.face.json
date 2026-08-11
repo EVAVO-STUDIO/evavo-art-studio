@@ -1,0 +1,7322 @@
+{
+  "schema": "evavo.pixel-font-face-master.v2",
+  "familyId": "chess-lord-90s",
+  "faceId": "ChessLord_Text",
+  "displayName": "Chess Lord Text",
+  "version": "2.1.0",
+  "metrics": {
+    "ascent": 10,
+    "descent": 4,
+    "baseline": 10,
+    "lineHeight": 15,
+    "capHeight": 7,
+    "xHeight": 5,
+    "spaceAdvance": 4
+  },
+  "coverage": {
+    "requiredProfiles": [
+      "western-latin",
+      "arrows",
+      "chess",
+      "ui-symbols",
+      "box-drawing-core"
+    ],
+    "requiredCodepoints": []
+  },
+  "qa": {
+    "allowedCollisions": [],
+    "allowedExactDuplicates": []
+  },
+  "glyphCount": 397,
+  "glyphs": [
+    {
+      "codepoint": 32,
+      "character": " ",
+      "width": 1,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 9,
+      "xAdvance": 4,
+      "bitmap": [
+        "."
+      ]
+    },
+    {
+      "codepoint": 33,
+      "character": "!",
+      "width": 1,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 2,
+      "bitmap": [
+        "#",
+        "#",
+        "#",
+        "#",
+        "#",
+        ".",
+        "#"
+      ]
+    },
+    {
+      "codepoint": 34,
+      "character": "\"",
+      "width": 3,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 4,
+      "bitmap": [
+        "#.#",
+        "#.#",
+        "#.#"
+      ]
+    },
+    {
+      "codepoint": 35,
+      "character": "#",
+      "width": 5,
+      "height": 6,
+      "xOffset": 0,
+      "yOffset": 4,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "#####",
+        ".#.#.",
+        ".#.#.",
+        "#####",
+        ".#.#."
+      ]
+    },
+    {
+      "codepoint": 36,
+      "character": "$",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".####",
+        "#.#..",
+        ".###.",
+        "..#.#",
+        "####.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 37,
+      "character": "%",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "##..#",
+        "##.#.",
+        "...#.",
+        "..#..",
+        ".#...",
+        ".#.##",
+        "#..##"
+      ]
+    },
+    {
+      "codepoint": 38,
+      "character": "&",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".##..",
+        "#..#.",
+        "#.#..",
+        ".##..",
+        "#.#.#",
+        "#..#.",
+        ".##.#"
+      ]
+    },
+    {
+      "codepoint": 39,
+      "character": "'",
+      "width": 2,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 3,
+      "bitmap": [
+        ".#",
+        ".#",
+        "#."
+      ]
+    },
+    {
+      "codepoint": 40,
+      "character": "(",
+      "width": 3,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 4,
+      "bitmap": [
+        "..#",
+        ".#.",
+        "#..",
+        "#..",
+        "#..",
+        ".#.",
+        "..#"
+      ]
+    },
+    {
+      "codepoint": 41,
+      "character": ")",
+      "width": 3,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 4,
+      "bitmap": [
+        "#..",
+        ".#.",
+        "..#",
+        "..#",
+        "..#",
+        ".#.",
+        "#.."
+      ]
+    },
+    {
+      "codepoint": 42,
+      "character": "*",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#.#.#",
+        ".###.",
+        "#####",
+        ".###.",
+        "#.#.#"
+      ]
+    },
+    {
+      "codepoint": 43,
+      "character": "+",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        "..#..",
+        "#####",
+        "..#..",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 44,
+      "character": ",",
+      "width": 3,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 4,
+      "bitmap": [
+        ".##",
+        ".#.",
+        "#.."
+      ]
+    },
+    {
+      "codepoint": 45,
+      "character": "-",
+      "width": 3,
+      "height": 1,
+      "xOffset": 1,
+      "yOffset": 7,
+      "xAdvance": 5,
+      "bitmap": [
+        "###"
+      ]
+    },
+    {
+      "codepoint": 46,
+      "character": ".",
+      "width": 2,
+      "height": 2,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 3,
+      "bitmap": [
+        "##",
+        "##"
+      ]
+    },
+    {
+      "codepoint": 47,
+      "character": "/",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "....#",
+        "...#.",
+        "...#.",
+        "..#..",
+        ".#...",
+        ".#...",
+        "#...."
+      ]
+    },
+    {
+      "codepoint": 48,
+      "character": "0",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#..##",
+        "#.#.#",
+        "##..#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 49,
+      "character": "1",
+      "width": 3,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 4,
+      "bitmap": [
+        ".#.",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 50,
+      "character": "2",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "....#",
+        "...#.",
+        "..#..",
+        ".#...",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 51,
+      "character": "3",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "####.",
+        "....#",
+        "...#.",
+        "..##.",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 52,
+      "character": "4",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..##.",
+        ".#.#.",
+        "#..#.",
+        "#####",
+        "...#.",
+        "...#."
+      ]
+    },
+    {
+      "codepoint": 53,
+      "character": "5",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "#....",
+        "####.",
+        "....#",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 54,
+      "character": "6",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#....",
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 55,
+      "character": "7",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "....#",
+        "...#.",
+        "..#..",
+        ".#...",
+        ".#...",
+        ".#..."
+      ]
+    },
+    {
+      "codepoint": 56,
+      "character": "8",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#...#",
+        ".###.",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 57,
+      "character": "9",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "...#.",
+        ".##.."
+      ]
+    },
+    {
+      "codepoint": 58,
+      "character": ":",
+      "width": 2,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 3,
+      "bitmap": [
+        "##",
+        "##",
+        "..",
+        "##",
+        "##"
+      ]
+    },
+    {
+      "codepoint": 59,
+      "character": ";",
+      "width": 3,
+      "height": 6,
+      "xOffset": 0,
+      "yOffset": 4,
+      "xAdvance": 4,
+      "bitmap": [
+        ".##",
+        ".##",
+        "...",
+        ".##",
+        ".#.",
+        "#.."
+      ]
+    },
+    {
+      "codepoint": 60,
+      "character": "<",
+      "width": 4,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        "...#",
+        "..#.",
+        ".#..",
+        "#...",
+        ".#..",
+        "..#.",
+        "...#"
+      ]
+    },
+    {
+      "codepoint": 61,
+      "character": "=",
+      "width": 5,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        ".....",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 62,
+      "character": ">",
+      "width": 4,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        "#...",
+        ".#..",
+        "..#.",
+        "...#",
+        "..#.",
+        ".#..",
+        "#..."
+      ]
+    },
+    {
+      "codepoint": 63,
+      "character": "?",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "....#",
+        "...#.",
+        "..#..",
+        ".....",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 64,
+      "character": "@",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#.###",
+        "#.#.#",
+        "#.###",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 65,
+      "character": "A",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 66,
+      "character": "B",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "######",
+        ".#...#",
+        ".#...#",
+        ".####.",
+        ".#...#",
+        ".#...#",
+        "######"
+      ]
+    },
+    {
+      "codepoint": 67,
+      "character": "C",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "######",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "######"
+      ]
+    },
+    {
+      "codepoint": 68,
+      "character": "D",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "######",
+        ".#...#",
+        ".#...#",
+        ".#...#",
+        ".#...#",
+        ".#...#",
+        "######"
+      ]
+    },
+    {
+      "codepoint": 69,
+      "character": "E",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 70,
+      "character": "F",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "###...."
+      ]
+    },
+    {
+      "codepoint": 71,
+      "character": "G",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "######",
+        "#.....",
+        "#.....",
+        "#.###.",
+        "#...#.",
+        "#...#.",
+        "#####."
+      ]
+    },
+    {
+      "codepoint": 72,
+      "character": "H",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 73,
+      "character": "I",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 74,
+      "character": "J",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        ".#####",
+        "...#..",
+        "...#..",
+        "...#..",
+        "...#..",
+        "#..#..",
+        "####.."
+      ]
+    },
+    {
+      "codepoint": 75,
+      "character": "K",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".#..#..",
+        ".#.#...",
+        ".##....",
+        ".#.#...",
+        ".#..#..",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 76,
+      "character": "L",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 77,
+      "character": "M",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".##.##.",
+        ".#.#.#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 78,
+      "character": "N",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".##..#.",
+        ".##..#.",
+        ".#.#.#.",
+        ".#..##.",
+        ".#..##.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 79,
+      "character": "O",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 80,
+      "character": "P",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "######",
+        ".#...#",
+        ".#...#",
+        ".####.",
+        ".#....",
+        ".#....",
+        "###..."
+      ]
+    },
+    {
+      "codepoint": 81,
+      "character": "Q",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "#####.",
+        "#...#.",
+        "#...#.",
+        "#...#.",
+        "#.#.#.",
+        "#..#..",
+        "######"
+      ]
+    },
+    {
+      "codepoint": 82,
+      "character": "R",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "######.",
+        ".#...#.",
+        ".#...#.",
+        ".####..",
+        ".#.#...",
+        ".#..#..",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 83,
+      "character": "S",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        ".######",
+        ".#.....",
+        ".#.....",
+        "..###..",
+        ".....#.",
+        ".....#.",
+        "######."
+      ]
+    },
+    {
+      "codepoint": 84,
+      "character": "T",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "..###.."
+      ]
+    },
+    {
+      "codepoint": 85,
+      "character": "U",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 86,
+      "character": "V",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        "..#.#..",
+        "..###.."
+      ]
+    },
+    {
+      "codepoint": 87,
+      "character": "W",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#.#.#.",
+        ".#.#.#.",
+        ".##.##.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 88,
+      "character": "X",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".#...#.",
+        "..#.#..",
+        "...#...",
+        "..#.#..",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 89,
+      "character": "Y",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".#...#.",
+        "..#.#..",
+        "...#...",
+        "...#...",
+        "...#...",
+        "..###.."
+      ]
+    },
+    {
+      "codepoint": 90,
+      "character": "Z",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        ".....#.",
+        "....#..",
+        "...#...",
+        "..#....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 91,
+      "character": "[",
+      "width": 3,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 4,
+      "bitmap": [
+        "###",
+        "#..",
+        "#..",
+        "#..",
+        "#..",
+        "#..",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 92,
+      "character": "\\",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#....",
+        ".#...",
+        ".#...",
+        "..#..",
+        "...#.",
+        "...#.",
+        "....#"
+      ]
+    },
+    {
+      "codepoint": 93,
+      "character": "]",
+      "width": 3,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 4,
+      "bitmap": [
+        "###",
+        "..#",
+        "..#",
+        "..#",
+        "..#",
+        "..#",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 94,
+      "character": "^",
+      "width": 5,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 95,
+      "character": "_",
+      "width": 5,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 13,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 96,
+      "character": "`",
+      "width": 2,
+      "height": 2,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 3,
+      "bitmap": [
+        "#.",
+        ".#"
+      ]
+    },
+    {
+      "codepoint": 97,
+      "character": "a",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 98,
+      "character": "b",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#....",
+        "#....",
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "####."
+      ]
+    },
+    {
+      "codepoint": 99,
+      "character": "c",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".####",
+        "#....",
+        "#....",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 100,
+      "character": "d",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "....#",
+        "....#",
+        ".####",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 101,
+      "character": "e",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 102,
+      "character": "f",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "..##.",
+        ".#..#",
+        ".#...",
+        "###..",
+        ".#...",
+        ".#...",
+        ".#..."
+      ]
+    },
+    {
+      "codepoint": 103,
+      "character": "g",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 104,
+      "character": "h",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#....",
+        "#....",
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 105,
+      "character": "i",
+      "width": 3,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 4,
+      "bitmap": [
+        ".#.",
+        "...",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 106,
+      "character": "j",
+      "width": 3,
+      "height": 7,
+      "xOffset": -1,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        "..#",
+        "...",
+        ".##",
+        "..#",
+        "..#",
+        "#.#",
+        ".##"
+      ]
+    },
+    {
+      "codepoint": 107,
+      "character": "k",
+      "width": 4,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        "#...",
+        "#...",
+        "#..#",
+        "#.#.",
+        "##..",
+        "#.#.",
+        "#..#"
+      ]
+    },
+    {
+      "codepoint": 108,
+      "character": "l",
+      "width": 3,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 4,
+      "bitmap": [
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 109,
+      "character": "m",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "##.#.",
+        "#.#.#",
+        "#.#.#",
+        "#...#",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 110,
+      "character": "n",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 111,
+      "character": "o",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 112,
+      "character": "p",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#...#",
+        "####.",
+        "#....",
+        "#....",
+        "#...."
+      ]
+    },
+    {
+      "codepoint": 113,
+      "character": "q",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "....#",
+        "....#"
+      ]
+    },
+    {
+      "codepoint": 114,
+      "character": "r",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#.##.",
+        "##..#",
+        "#....",
+        "#....",
+        "#...."
+      ]
+    },
+    {
+      "codepoint": 115,
+      "character": "s",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".####",
+        "#....",
+        ".###.",
+        "....#",
+        "####."
+      ]
+    },
+    {
+      "codepoint": 116,
+      "character": "t",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#...",
+        ".#...",
+        "###..",
+        ".#...",
+        ".#...",
+        ".#..#",
+        "..##."
+      ]
+    },
+    {
+      "codepoint": 117,
+      "character": "u",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 118,
+      "character": "v",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        "#...#",
+        "#...#",
+        ".#.#.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 119,
+      "character": "w",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        "#...#",
+        "#.#.#",
+        "##.##",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 120,
+      "character": "x",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        ".#.#.",
+        "..#..",
+        ".#.#.",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 121,
+      "character": "y",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 122,
+      "character": "z",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "...#.",
+        "..#..",
+        ".#...",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 123,
+      "character": "{",
+      "width": 4,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        "..##",
+        ".#..",
+        ".#..",
+        "#...",
+        ".#..",
+        ".#..",
+        "..##"
+      ]
+    },
+    {
+      "codepoint": 124,
+      "character": "|",
+      "width": 1,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 2,
+      "bitmap": [
+        "#",
+        "#",
+        "#",
+        "#",
+        "#",
+        "#",
+        "#"
+      ]
+    },
+    {
+      "codepoint": 125,
+      "character": "}",
+      "width": 4,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        "##..",
+        "..#.",
+        "..#.",
+        "...#",
+        "..#.",
+        "..#.",
+        "##.."
+      ]
+    },
+    {
+      "codepoint": 126,
+      "character": "~",
+      "width": 5,
+      "height": 2,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 6,
+      "bitmap": [
+        ".##.#",
+        "#.##."
+      ]
+    },
+    {
+      "codepoint": 160,
+      "character": " ",
+      "width": 1,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 9,
+      "xAdvance": 4,
+      "bitmap": [
+        "."
+      ]
+    },
+    {
+      "codepoint": 161,
+      "character": "¡",
+      "width": 1,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 2,
+      "bitmap": [
+        "#",
+        ".",
+        "#",
+        "#",
+        "#",
+        "#",
+        "#"
+      ]
+    },
+    {
+      "codepoint": 162,
+      "character": "¢",
+      "width": 5,
+      "height": 6,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".####",
+        "#.#..",
+        "#.#..",
+        ".####",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 163,
+      "character": "£",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..##.",
+        ".#..#",
+        ".#...",
+        "###..",
+        ".#...",
+        ".#...",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 164,
+      "character": "¤",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        ".###.",
+        "#...#",
+        ".###.",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 165,
+      "character": "¥",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        ".#.#.",
+        "..#..",
+        "#####",
+        "..#..",
+        "#####",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 167,
+      "character": "§",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#....",
+        ".###.",
+        "....#",
+        ".###.",
+        "#....",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 169,
+      "character": "©",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#.###",
+        "#.#.#",
+        "#.###",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 171,
+      "character": "«",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 7,
+      "bitmap": [
+        "..#.#",
+        ".#.#.",
+        "#.#..",
+        ".#.#.",
+        "..#.#"
+      ]
+    },
+    {
+      "codepoint": 173,
+      "character": "­",
+      "width": 1,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 9,
+      "xAdvance": 5,
+      "bitmap": [
+        "."
+      ]
+    },
+    {
+      "codepoint": 174,
+      "character": "®",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#.##.",
+        "#.#.#",
+        "#.##.",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 176,
+      "character": "°",
+      "width": 4,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 5,
+      "bitmap": [
+        ".##.",
+        "#..#",
+        ".##."
+      ]
+    },
+    {
+      "codepoint": 177,
+      "character": "±",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        "#####",
+        "..#..",
+        ".....",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 183,
+      "character": "·",
+      "width": 1,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 2,
+      "bitmap": [
+        "#"
+      ]
+    },
+    {
+      "codepoint": 187,
+      "character": "»",
+      "width": 5,
+      "height": 5,
+      "xOffset": 1,
+      "yOffset": 5,
+      "xAdvance": 7,
+      "bitmap": [
+        "#.#..",
+        ".#.#.",
+        "..#.#",
+        ".#.#.",
+        "#.#.."
+      ]
+    },
+    {
+      "codepoint": 191,
+      "character": "¿",
+      "width": 5,
+      "height": 6,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".....",
+        "..#..",
+        ".#...",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 192,
+      "character": "À",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#....",
+        "...#...",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 193,
+      "character": "Á",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 194,
+      "character": "Â",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 195,
+      "character": "Ã",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..##...",
+        "...##..",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 196,
+      "character": "Ä",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 197,
+      "character": "Å",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        "...#...",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 198,
+      "character": "Æ",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        ".####.",
+        "#.#...",
+        "#.#...",
+        "######",
+        "#.#...",
+        "#.#...",
+        "#.####"
+      ]
+    },
+    {
+      "codepoint": 199,
+      "character": "Ç",
+      "width": 6,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "######",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "######",
+        "..#...",
+        ".#....",
+        "..#..."
+      ]
+    },
+    {
+      "codepoint": 200,
+      "character": "È",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#....",
+        "...#...",
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 201,
+      "character": "É",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 202,
+      "character": "Ê",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 203,
+      "character": "Ë",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 204,
+      "character": "Ì",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#....",
+        "...#...",
+        ".......",
+        ".......",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 205,
+      "character": "Í",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        ".......",
+        ".......",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 206,
+      "character": "Î",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        ".......",
+        ".......",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 207,
+      "character": "Ï",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        ".......",
+        ".......",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 208,
+      "character": "Ð",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        ".####.",
+        ".#...#",
+        "###..#",
+        ".#...#",
+        ".#...#",
+        ".#...#",
+        ".####."
+      ]
+    },
+    {
+      "codepoint": 209,
+      "character": "Ñ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..##...",
+        "...##..",
+        "###.###",
+        ".##..#.",
+        ".##..#.",
+        ".#.#.#.",
+        ".#..##.",
+        ".#..##.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 210,
+      "character": "Ò",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#...",
+        "..#..",
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 211,
+      "character": "Ó",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 212,
+      "character": "Ô",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 213,
+      "character": "Õ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".##..",
+        "..##.",
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 214,
+      "character": "Ö",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 216,
+      "character": "Ø",
+      "width": 5,
+      "height": 6,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#..##",
+        "#.#.#",
+        "##..#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 217,
+      "character": "Ù",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#....",
+        "...#...",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 218,
+      "character": "Ú",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 219,
+      "character": "Û",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 220,
+      "character": "Ü",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 221,
+      "character": "Ý",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        "###.###",
+        ".#...#.",
+        "..#.#..",
+        "...#...",
+        "...#...",
+        "...#...",
+        "..###.."
+      ]
+    },
+    {
+      "codepoint": 222,
+      "character": "Þ",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "#.....",
+        "#####.",
+        "#....#",
+        "#####.",
+        "#.....",
+        "#.....",
+        "#....."
+      ]
+    },
+    {
+      "codepoint": 223,
+      "character": "ß",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#.##.",
+        "#..##",
+        "#...#",
+        "#...#",
+        "#.##."
+      ]
+    },
+    {
+      "codepoint": 224,
+      "character": "à",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#...",
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 225,
+      "character": "á",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 226,
+      "character": "â",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        ".....",
+        ".....",
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 227,
+      "character": "ã",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".##..",
+        "..##.",
+        ".....",
+        ".....",
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 228,
+      "character": "ä",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        ".....",
+        ".....",
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 229,
+      "character": "å",
+      "width": 5,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 230,
+      "character": "æ",
+      "width": 6,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 7,
+      "bitmap": [
+        ".####.",
+        "....#.",
+        ".#####",
+        "#.#...",
+        ".#####"
+      ]
+    },
+    {
+      "codepoint": 231,
+      "character": "ç",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".####",
+        "#....",
+        "#....",
+        "#....",
+        ".####",
+        "..#..",
+        ".#...",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 232,
+      "character": "è",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#...",
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 233,
+      "character": "é",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 234,
+      "character": "ê",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 235,
+      "character": "ë",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 236,
+      "character": "ì",
+      "width": 3,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 4,
+      "bitmap": [
+        "#..",
+        ".#.",
+        "...",
+        "...",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 237,
+      "character": "í",
+      "width": 3,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 4,
+      "bitmap": [
+        "..#",
+        ".#.",
+        "...",
+        "...",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 238,
+      "character": "î",
+      "width": 3,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 4,
+      "bitmap": [
+        ".#.",
+        "#.#",
+        "...",
+        "...",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 239,
+      "character": "ï",
+      "width": 3,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 4,
+      "bitmap": [
+        "#.#",
+        "...",
+        "...",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 240,
+      "character": "ð",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..##.",
+        ".#...",
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 241,
+      "character": "ñ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".##..",
+        "..##.",
+        ".....",
+        ".....",
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 242,
+      "character": "ò",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#...",
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 243,
+      "character": "ó",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 244,
+      "character": "ô",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 245,
+      "character": "õ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".##..",
+        "..##.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 246,
+      "character": "ö",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 248,
+      "character": "ø",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".####",
+        "#..##",
+        "#.#.#",
+        "##..#",
+        "####."
+      ]
+    },
+    {
+      "codepoint": 249,
+      "character": "ù",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#...",
+        "..#..",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 250,
+      "character": "ú",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 251,
+      "character": "û",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 252,
+      "character": "ü",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 253,
+      "character": "ý",
+      "width": 5,
+      "height": 11,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 254,
+      "character": "þ",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#....",
+        "#....",
+        "####.",
+        "#...#",
+        "####.",
+        "#....",
+        "#...."
+      ]
+    },
+    {
+      "codepoint": 255,
+      "character": "ÿ",
+      "width": 5,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 256,
+      "character": "Ā",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "..###..",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 257,
+      "character": "ā",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        ".....",
+        ".....",
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 258,
+      "character": "Ă",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...##..",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 259,
+      "character": "ă",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..##.",
+        ".....",
+        ".....",
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 260,
+      "character": "Ą",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###",
+        "......#",
+        ".....#.",
+        "......#"
+      ]
+    },
+    {
+      "codepoint": 261,
+      "character": "ą",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "....#",
+        ".####",
+        "#...#",
+        ".####",
+        "....#",
+        "...#.",
+        "....#"
+      ]
+    },
+    {
+      "codepoint": 262,
+      "character": "Ć",
+      "width": 6,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 7,
+      "bitmap": [
+        "...#..",
+        "..#...",
+        "######",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "######"
+      ]
+    },
+    {
+      "codepoint": 263,
+      "character": "ć",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        ".####",
+        "#....",
+        "#....",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 264,
+      "character": "Ĉ",
+      "width": 6,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 7,
+      "bitmap": [
+        "..#...",
+        ".#.#..",
+        "######",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "######"
+      ]
+    },
+    {
+      "codepoint": 265,
+      "character": "ĉ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        ".....",
+        ".....",
+        ".####",
+        "#....",
+        "#....",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 266,
+      "character": "Ċ",
+      "width": 6,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 7,
+      "bitmap": [
+        "..#...",
+        "######",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "######"
+      ]
+    },
+    {
+      "codepoint": 267,
+      "character": "ċ",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".....",
+        ".....",
+        ".####",
+        "#....",
+        "#....",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 268,
+      "character": "Č",
+      "width": 6,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 7,
+      "bitmap": [
+        ".#.#..",
+        "..#...",
+        "######",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "#.....",
+        "######"
+      ]
+    },
+    {
+      "codepoint": 269,
+      "character": "č",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..#..",
+        ".....",
+        ".....",
+        ".####",
+        "#....",
+        "#....",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 270,
+      "character": "Ď",
+      "width": 6,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 7,
+      "bitmap": [
+        ".#.#..",
+        "..#...",
+        "######",
+        ".#...#",
+        ".#...#",
+        ".#...#",
+        ".#...#",
+        ".#...#",
+        "######"
+      ]
+    },
+    {
+      "codepoint": 271,
+      "character": "ď",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..#..",
+        "....#",
+        "....#",
+        ".####",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 272,
+      "character": "Đ",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "####..",
+        "#...#.",
+        "#....#",
+        "#####.",
+        "#....#",
+        "#...#.",
+        "####.."
+      ]
+    },
+    {
+      "codepoint": 273,
+      "character": "đ",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "....#",
+        "....#",
+        ".####",
+        "##..#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 274,
+      "character": "Ē",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "..###..",
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 275,
+      "character": "ē",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 276,
+      "character": "Ĕ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...##..",
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 277,
+      "character": "ĕ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..##.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 278,
+      "character": "Ė",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 279,
+      "character": "ė",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 280,
+      "character": "Ę",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######",
+        "......#",
+        ".....#.",
+        "......#"
+      ]
+    },
+    {
+      "codepoint": 281,
+      "character": "ę",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####",
+        "....#",
+        "...#.",
+        "....#"
+      ]
+    },
+    {
+      "codepoint": 282,
+      "character": "Ě",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...#...",
+        "#######",
+        ".#.....",
+        ".#.....",
+        ".####..",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 283,
+      "character": "ě",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#####",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 284,
+      "character": "Ĝ",
+      "width": 6,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 7,
+      "bitmap": [
+        "..#...",
+        ".#.#..",
+        "######",
+        "#.....",
+        "#.....",
+        "#.###.",
+        "#...#.",
+        "#...#.",
+        "#####."
+      ]
+    },
+    {
+      "codepoint": 285,
+      "character": "ĝ",
+      "width": 5,
+      "height": 11,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 286,
+      "character": "Ğ",
+      "width": 6,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 7,
+      "bitmap": [
+        ".#.#..",
+        "..##..",
+        "######",
+        "#.....",
+        "#.....",
+        "#.###.",
+        "#...#.",
+        "#...#.",
+        "#####."
+      ]
+    },
+    {
+      "codepoint": 287,
+      "character": "ğ",
+      "width": 5,
+      "height": 11,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..##.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 288,
+      "character": "Ġ",
+      "width": 6,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 7,
+      "bitmap": [
+        "..#...",
+        "######",
+        "#.....",
+        "#.....",
+        "#.###.",
+        "#...#.",
+        "#...#.",
+        "#####."
+      ]
+    },
+    {
+      "codepoint": 289,
+      "character": "ġ",
+      "width": 5,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 290,
+      "character": "Ģ",
+      "width": 6,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        "######",
+        "#.....",
+        "#.....",
+        "#.###.",
+        "#...#.",
+        "#...#.",
+        "#####.",
+        "..#...",
+        ".#....",
+        "..#..."
+      ]
+    },
+    {
+      "codepoint": 291,
+      "character": "ģ",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "#.#.#",
+        ".###.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 292,
+      "character": "Ĥ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        ".#...#.",
+        ".#...#.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 293,
+      "character": "ĥ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "#....",
+        "#....",
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 294,
+      "character": "Ħ",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        "#...#",
+        "#####",
+        "#...#",
+        "#####",
+        "#...#",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 295,
+      "character": "ħ",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#....",
+        "#####",
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 296,
+      "character": "Ĩ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..##...",
+        "...##..",
+        ".......",
+        ".......",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 297,
+      "character": "ĩ",
+      "width": 3,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 4,
+      "bitmap": [
+        "##.",
+        ".##",
+        "...",
+        "...",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 298,
+      "character": "Ī",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "..###..",
+        ".......",
+        ".......",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 299,
+      "character": "ī",
+      "width": 3,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 4,
+      "bitmap": [
+        "###",
+        "...",
+        "...",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 300,
+      "character": "Ĭ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...##..",
+        ".......",
+        ".......",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 301,
+      "character": "ĭ",
+      "width": 3,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 4,
+      "bitmap": [
+        "#.#",
+        ".##",
+        "...",
+        "...",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 302,
+      "character": "Į",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######",
+        "......#",
+        ".....#.",
+        "......#"
+      ]
+    },
+    {
+      "codepoint": 303,
+      "character": "į",
+      "width": 3,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 4,
+      "bitmap": [
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###",
+        "..#",
+        ".#.",
+        "..#"
+      ]
+    },
+    {
+      "codepoint": 304,
+      "character": "İ",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        ".......",
+        ".......",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 305,
+      "character": "ı",
+      "width": 3,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 4,
+      "bitmap": [
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 306,
+      "character": "Ĳ",
+      "width": 13,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 14,
+      "bitmap": [
+        "#######.#####",
+        "...#......#..",
+        "...#......#..",
+        "...#......#..",
+        "...#......#..",
+        "...#...#..#..",
+        "###########.."
+      ]
+    },
+    {
+      "codepoint": 307,
+      "character": "ĳ",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        ".#...#",
+        "......",
+        "##..##",
+        ".#...#",
+        ".#...#",
+        ".#.#.#",
+        "###.##"
+      ]
+    },
+    {
+      "codepoint": 308,
+      "character": "Ĵ",
+      "width": 4,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 7,
+      "bitmap": [
+        ".#..",
+        "#.#.",
+        "....",
+        "....",
+        "...#",
+        "...#",
+        "...#",
+        "#..#",
+        "####"
+      ]
+    },
+    {
+      "codepoint": 309,
+      "character": "ĵ",
+      "width": 3,
+      "height": 9,
+      "xOffset": -1,
+      "yOffset": 1,
+      "xAdvance": 5,
+      "bitmap": [
+        ".#.",
+        "#.#",
+        "...",
+        "...",
+        ".##",
+        "..#",
+        "..#",
+        "#.#",
+        ".##"
+      ]
+    },
+    {
+      "codepoint": 310,
+      "character": "Ķ",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".#..#..",
+        ".#.#...",
+        ".##....",
+        ".#.#...",
+        ".#..#..",
+        "###.###",
+        "...#...",
+        "..#....",
+        "...#..."
+      ]
+    },
+    {
+      "codepoint": 311,
+      "character": "ķ",
+      "width": 4,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        "#...",
+        "#...",
+        "#..#",
+        "#.#.",
+        "##..",
+        "#.#.",
+        "#..#",
+        ".#..",
+        "#...",
+        ".#.."
+      ]
+    },
+    {
+      "codepoint": 312,
+      "character": "ĸ",
+      "width": 4,
+      "height": 6,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 5,
+      "bitmap": [
+        "#...",
+        "#..#",
+        "#.#.",
+        "##..",
+        "#.#.",
+        "#..#"
+      ]
+    },
+    {
+      "codepoint": 313,
+      "character": "Ĺ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        "###....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 314,
+      "character": "ĺ",
+      "width": 3,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 4,
+      "bitmap": [
+        "..#",
+        ".#.",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 315,
+      "character": "Ļ",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        "#######",
+        "...#...",
+        "..#....",
+        "...#..."
+      ]
+    },
+    {
+      "codepoint": 316,
+      "character": "ļ",
+      "width": 3,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 4,
+      "bitmap": [
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###",
+        ".#.",
+        "#..",
+        ".#."
+      ]
+    },
+    {
+      "codepoint": 317,
+      "character": "Ľ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...#...",
+        "###....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 318,
+      "character": "ľ",
+      "width": 3,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 4,
+      "bitmap": [
+        "#.#",
+        ".#.",
+        "##.",
+        ".#.",
+        ".#.",
+        ".#.",
+        ".#.",
+        ".#.",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 319,
+      "character": "Ŀ",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#....",
+        "#....",
+        "#..#.",
+        "#....",
+        "#....",
+        "#....",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 320,
+      "character": "ŀ",
+      "width": 4,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "##..",
+        ".#..",
+        ".#.#",
+        ".#..",
+        ".#..",
+        ".#..",
+        "###."
+      ]
+    },
+    {
+      "codepoint": 321,
+      "character": "Ł",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#....",
+        "#....",
+        "#.#..",
+        "##...",
+        "#....",
+        "#....",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 322,
+      "character": "ł",
+      "width": 4,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 5,
+      "bitmap": [
+        "##..",
+        ".#..",
+        ".#.#",
+        "..#.",
+        ".#..",
+        ".#..",
+        "####"
+      ]
+    },
+    {
+      "codepoint": 323,
+      "character": "Ń",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        "###.###",
+        ".##..#.",
+        ".##..#.",
+        ".#.#.#.",
+        ".#..##.",
+        ".#..##.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 324,
+      "character": "ń",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 325,
+      "character": "Ņ",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".##..#.",
+        ".##..#.",
+        ".#.#.#.",
+        ".#..##.",
+        ".#..##.",
+        "###.###",
+        "...#...",
+        "..#....",
+        "...#..."
+      ]
+    },
+    {
+      "codepoint": 326,
+      "character": "ņ",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "..#..",
+        ".#...",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 327,
+      "character": "Ň",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...#...",
+        "###.###",
+        ".##..#.",
+        ".##..#.",
+        ".#.#.#.",
+        ".#..##.",
+        ".#..##.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 328,
+      "character": "ň",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..#..",
+        ".....",
+        ".....",
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 329,
+      "character": "ŉ",
+      "width": 8,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 9,
+      "bitmap": [
+        "...####.",
+        "...#...#",
+        ".#.#...#",
+        ".#.#...#",
+        "#..#...#"
+      ]
+    },
+    {
+      "codepoint": 330,
+      "character": "Ŋ",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        "##..#",
+        "#.#.#",
+        "#..##",
+        "#...#",
+        "....#",
+        "...#."
+      ]
+    },
+    {
+      "codepoint": 331,
+      "character": "ŋ",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "####.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "....#",
+        "...#."
+      ]
+    },
+    {
+      "codepoint": 332,
+      "character": "Ō",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 333,
+      "character": "ō",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 334,
+      "character": "Ŏ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..##.",
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 335,
+      "character": "ŏ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..##.",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 336,
+      "character": "Ő",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "#.#..",
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 337,
+      "character": "ő",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "#.#..",
+        ".....",
+        ".....",
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 338,
+      "character": "Œ",
+      "width": 6,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 7,
+      "bitmap": [
+        ".#####",
+        "#..#..",
+        "#..#..",
+        "#..###",
+        "#..#..",
+        "#..#..",
+        ".#####"
+      ]
+    },
+    {
+      "codepoint": 339,
+      "character": "œ",
+      "width": 6,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 7,
+      "bitmap": [
+        ".#####",
+        "#.#..#",
+        "#.####",
+        "#.#...",
+        ".#####"
+      ]
+    },
+    {
+      "codepoint": 340,
+      "character": "Ŕ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        "######.",
+        ".#...#.",
+        ".#...#.",
+        ".####..",
+        ".#.#...",
+        ".#..#..",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 341,
+      "character": "ŕ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        "#.##.",
+        "##..#",
+        "#....",
+        "#....",
+        "#...."
+      ]
+    },
+    {
+      "codepoint": 342,
+      "character": "Ŗ",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "######.",
+        ".#...#.",
+        ".#...#.",
+        ".####..",
+        ".#.#...",
+        ".#..#..",
+        "###.###",
+        "...#...",
+        "..#....",
+        "...#..."
+      ]
+    },
+    {
+      "codepoint": 343,
+      "character": "ŗ",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#.##.",
+        "##..#",
+        "#....",
+        "#....",
+        "#....",
+        "..#..",
+        ".#...",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 344,
+      "character": "Ř",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...#...",
+        "######.",
+        ".#...#.",
+        ".#...#.",
+        ".####..",
+        ".#.#...",
+        ".#..#..",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 345,
+      "character": "ř",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..#..",
+        ".....",
+        ".....",
+        "#.##.",
+        "##..#",
+        "#....",
+        "#....",
+        "#...."
+      ]
+    },
+    {
+      "codepoint": 346,
+      "character": "Ś",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        ".######",
+        ".#.....",
+        ".#.....",
+        "..###..",
+        ".....#.",
+        ".....#.",
+        "######."
+      ]
+    },
+    {
+      "codepoint": 347,
+      "character": "ś",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        ".####",
+        "#....",
+        ".###.",
+        "....#",
+        "####."
+      ]
+    },
+    {
+      "codepoint": 348,
+      "character": "Ŝ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        ".######",
+        ".#.....",
+        ".#.....",
+        "..###..",
+        ".....#.",
+        ".....#.",
+        "######."
+      ]
+    },
+    {
+      "codepoint": 349,
+      "character": "ŝ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        ".....",
+        ".....",
+        ".####",
+        "#....",
+        ".###.",
+        "....#",
+        "####."
+      ]
+    },
+    {
+      "codepoint": 350,
+      "character": "Ş",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        ".######",
+        ".#.....",
+        ".#.....",
+        "..###..",
+        ".....#.",
+        ".....#.",
+        "######.",
+        "...#...",
+        "..#....",
+        "...#..."
+      ]
+    },
+    {
+      "codepoint": 351,
+      "character": "ş",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".####",
+        "#....",
+        ".###.",
+        "....#",
+        "####.",
+        "..#..",
+        ".#...",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 352,
+      "character": "Š",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...#...",
+        ".######",
+        ".#.....",
+        ".#.....",
+        "..###..",
+        ".....#.",
+        ".....#.",
+        "######."
+      ]
+    },
+    {
+      "codepoint": 353,
+      "character": "š",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..#..",
+        ".....",
+        ".....",
+        ".####",
+        "#....",
+        ".###.",
+        "....#",
+        "####."
+      ]
+    },
+    {
+      "codepoint": 354,
+      "character": "Ţ",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "..###..",
+        "...#...",
+        "..#....",
+        "...#..."
+      ]
+    },
+    {
+      "codepoint": 355,
+      "character": "ţ",
+      "width": 5,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#...",
+        ".#...",
+        "###..",
+        ".#...",
+        ".#...",
+        ".#..#",
+        "..##.",
+        "..#..",
+        ".#...",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 356,
+      "character": "Ť",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...#...",
+        "#######",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "...#...",
+        "..###.."
+      ]
+    },
+    {
+      "codepoint": 357,
+      "character": "ť",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..#..",
+        ".#...",
+        ".#...",
+        "###..",
+        ".#...",
+        ".#...",
+        ".#..#",
+        "..##."
+      ]
+    },
+    {
+      "codepoint": 358,
+      "character": "Ŧ",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "..#..",
+        ".###.",
+        "..#..",
+        "..#..",
+        "..#..",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 359,
+      "character": "ŧ",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#...",
+        "###..",
+        ".###.",
+        ".#...",
+        ".#...",
+        ".#..#",
+        "..##."
+      ]
+    },
+    {
+      "codepoint": 360,
+      "character": "Ũ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..##...",
+        "...##..",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 361,
+      "character": "ũ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".##..",
+        "..##.",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 362,
+      "character": "Ū",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "..###..",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 363,
+      "character": "ū",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 364,
+      "character": "Ŭ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...##..",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 365,
+      "character": "ŭ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..##.",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 366,
+      "character": "Ů",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        "...#...",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 367,
+      "character": "ů",
+      "width": 5,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "..#..",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 368,
+      "character": "Ű",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        ".#.#...",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 369,
+      "character": "ű",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "#.#..",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 370,
+      "character": "Ų",
+      "width": 7,
+      "height": 10,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 8,
+      "bitmap": [
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#...#.",
+        ".#####.",
+        "......#",
+        ".....#.",
+        "......#"
+      ]
+    },
+    {
+      "codepoint": 371,
+      "character": "ų",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "...#.",
+        "....#"
+      ]
+    },
+    {
+      "codepoint": 372,
+      "character": "Ŵ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        "###.###",
+        ".#...#.",
+        ".#...#.",
+        ".#.#.#.",
+        ".#.#.#.",
+        ".##.##.",
+        "###.###"
+      ]
+    },
+    {
+      "codepoint": 373,
+      "character": "ŵ",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#.#.#",
+        "##.##",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 374,
+      "character": "Ŷ",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "..#.#..",
+        "###.###",
+        ".#...#.",
+        "..#.#..",
+        "...#...",
+        "...#...",
+        "...#...",
+        "..###.."
+      ]
+    },
+    {
+      "codepoint": 375,
+      "character": "ŷ",
+      "width": 5,
+      "height": 11,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        ".....",
+        ".....",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".####",
+        "....#",
+        "#...#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 376,
+      "character": "Ÿ",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "###.###",
+        ".#...#.",
+        "..#.#..",
+        "...#...",
+        "...#...",
+        "...#...",
+        "..###.."
+      ]
+    },
+    {
+      "codepoint": 377,
+      "character": "Ź",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "....#..",
+        "...#...",
+        "#######",
+        ".....#.",
+        "....#..",
+        "...#...",
+        "..#....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 378,
+      "character": "ź",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        "...#.",
+        "..#..",
+        ".....",
+        ".....",
+        "#####",
+        "...#.",
+        "..#..",
+        ".#...",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 379,
+      "character": "Ż",
+      "width": 7,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "#######",
+        ".....#.",
+        "....#..",
+        "...#...",
+        "..#....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 380,
+      "character": "ż",
+      "width": 5,
+      "height": 8,
+      "xOffset": 0,
+      "yOffset": 2,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".....",
+        ".....",
+        "#####",
+        "...#.",
+        "..#..",
+        ".#...",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 381,
+      "character": "Ž",
+      "width": 7,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 8,
+      "bitmap": [
+        "..#.#..",
+        "...#...",
+        "#######",
+        ".....#.",
+        "....#..",
+        "...#...",
+        "..#....",
+        ".#.....",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 382,
+      "character": "ž",
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "..#..",
+        ".....",
+        ".....",
+        "#####",
+        "...#.",
+        "..#..",
+        ".#...",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 383,
+      "character": "ſ",
+      "width": 4,
+      "height": 7,
+      "xOffset": 1,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".##.",
+        "#..#",
+        "#...",
+        "#...",
+        "#...",
+        "#...",
+        "#..."
+      ]
+    },
+    {
+      "codepoint": 8208,
+      "character": "‐",
+      "width": 3,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 5,
+      "bitmap": [
+        "###"
+      ]
+    },
+    {
+      "codepoint": 8209,
+      "character": "‑",
+      "width": 4,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 6,
+      "bitmap": [
+        "####"
+      ]
+    },
+    {
+      "codepoint": 8210,
+      "character": "‒",
+      "width": 5,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 7,
+      "bitmap": [
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 8211,
+      "character": "–",
+      "width": 6,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 8,
+      "bitmap": [
+        "######"
+      ]
+    },
+    {
+      "codepoint": 8212,
+      "character": "—",
+      "width": 8,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 10,
+      "bitmap": [
+        "########"
+      ]
+    },
+    {
+      "codepoint": 8213,
+      "character": "―",
+      "width": 9,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 7,
+      "xAdvance": 11,
+      "bitmap": [
+        "#########"
+      ]
+    },
+    {
+      "codepoint": 8216,
+      "character": "‘",
+      "width": 2,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 3,
+      "bitmap": [
+        ".#",
+        ".#",
+        "#."
+      ]
+    },
+    {
+      "codepoint": 8217,
+      "character": "’",
+      "width": 2,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 3,
+      "bitmap": [
+        "#.",
+        "#.",
+        ".#"
+      ]
+    },
+    {
+      "codepoint": 8218,
+      "character": "‚",
+      "width": 3,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 11,
+      "xAdvance": 4,
+      "bitmap": [
+        ".##",
+        ".#.",
+        "#.."
+      ]
+    },
+    {
+      "codepoint": 8219,
+      "character": "‛",
+      "width": 2,
+      "height": 6,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 3,
+      "bitmap": [
+        "#.",
+        "..",
+        "..",
+        "#.",
+        "#.",
+        ".#"
+      ]
+    },
+    {
+      "codepoint": 8220,
+      "character": "“",
+      "width": 4,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        ".#.#",
+        "#.#.",
+        "#.#."
+      ]
+    },
+    {
+      "codepoint": 8221,
+      "character": "”",
+      "width": 4,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        "#.#.",
+        ".#.#",
+        ".#.#"
+      ]
+    },
+    {
+      "codepoint": 8222,
+      "character": "„",
+      "width": 3,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 11,
+      "xAdvance": 4,
+      "bitmap": [
+        "#.#",
+        "#.#",
+        "#.#"
+      ]
+    },
+    {
+      "codepoint": 8224,
+      "character": "†",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        "#####",
+        "..#..",
+        "..#..",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 8225,
+      "character": "‡",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        "#####",
+        "..#..",
+        "#####",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 8226,
+      "character": "•",
+      "width": 5,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#####",
+        "#####",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 8230,
+      "character": "…",
+      "width": 5,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#.#.#"
+      ]
+    },
+    {
+      "codepoint": 8240,
+      "character": "‰",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "##..#",
+        "##.#.",
+        "..#..",
+        ".#.##",
+        "#..##"
+      ]
+    },
+    {
+      "codepoint": 8242,
+      "character": "′",
+      "width": 3,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 4,
+      "bitmap": [
+        ".##",
+        ".#.",
+        "#.."
+      ]
+    },
+    {
+      "codepoint": 8243,
+      "character": "″",
+      "width": 4,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 5,
+      "bitmap": [
+        ".#.#",
+        ".##.",
+        "#.#."
+      ]
+    },
+    {
+      "codepoint": 8249,
+      "character": "‹",
+      "width": 3,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 5,
+      "bitmap": [
+        "..#",
+        ".#.",
+        "#..",
+        ".#.",
+        "..#"
+      ]
+    },
+    {
+      "codepoint": 8250,
+      "character": "›",
+      "width": 3,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 5,
+      "bitmap": [
+        "#..",
+        ".#.",
+        "..#",
+        ".#.",
+        "#.."
+      ]
+    },
+    {
+      "codepoint": 8260,
+      "character": "⁄",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "....#",
+        "...#.",
+        "..#..",
+        ".#...",
+        "#...."
+      ]
+    },
+    {
+      "codepoint": 8364,
+      "character": "€",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".####",
+        "#....",
+        "####.",
+        "#....",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 8592,
+      "character": "←",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#...",
+        "#####",
+        ".#...",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 8593,
+      "character": "↑",
+      "width": 5,
+      "height": 6,
+      "xOffset": 0,
+      "yOffset": 4,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "#...#",
+        "..#..",
+        "..#..",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 8594,
+      "character": "→",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        "...#.",
+        "#####",
+        "...#.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 8595,
+      "character": "↓",
+      "width": 5,
+      "height": 6,
+      "xOffset": 0,
+      "yOffset": 4,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        "..#..",
+        "..#..",
+        "#...#",
+        ".#.#.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 8596,
+      "character": "↔",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        ".#.#.",
+        "#...#",
+        "#####",
+        "#...#",
+        ".#.#."
+      ]
+    },
+    {
+      "codepoint": 8597,
+      "character": "↕",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "#...#",
+        "..#..",
+        "#...#",
+        ".#.#.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 8617,
+      "character": "↩",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#....",
+        "#....",
+        "#.###",
+        "##..#",
+        "#...#",
+        "....#",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 8618,
+      "character": "↪",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "....#",
+        "....#",
+        "###.#",
+        "#..##",
+        "#...#",
+        "#....",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 8656,
+      "character": "⇐",
+      "width": 5,
+      "height": 5,
+      "xOffset": 1,
+      "yOffset": 5,
+      "xAdvance": 7,
+      "bitmap": [
+        "..#..",
+        ".##..",
+        "#####",
+        ".##..",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 8658,
+      "character": "⇒",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 7,
+      "bitmap": [
+        "..#..",
+        "..##.",
+        "#####",
+        "..##.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 9472,
+      "character": "─",
+      "width": 7,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 9474,
+      "character": "│",
+      "width": 1,
+      "height": 7,
+      "xOffset": 3,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "#",
+        "#",
+        "#",
+        "#",
+        "#",
+        "#",
+        "#"
+      ]
+    },
+    {
+      "codepoint": 9484,
+      "character": "┌",
+      "width": 4,
+      "height": 4,
+      "xOffset": 3,
+      "yOffset": 8,
+      "xAdvance": 8,
+      "bitmap": [
+        "####",
+        "#...",
+        "#...",
+        "#..."
+      ]
+    },
+    {
+      "codepoint": 9488,
+      "character": "┐",
+      "width": 4,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 8,
+      "bitmap": [
+        "####",
+        "...#",
+        "...#",
+        "...#"
+      ]
+    },
+    {
+      "codepoint": 9492,
+      "character": "└",
+      "width": 4,
+      "height": 4,
+      "xOffset": 3,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "#...",
+        "#...",
+        "#...",
+        "####"
+      ]
+    },
+    {
+      "codepoint": 9496,
+      "character": "┘",
+      "width": 4,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#",
+        "...#",
+        "...#",
+        "####"
+      ]
+    },
+    {
+      "codepoint": 9500,
+      "character": "├",
+      "width": 4,
+      "height": 7,
+      "xOffset": 3,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "#...",
+        "#...",
+        "#...",
+        "####",
+        "#...",
+        "#...",
+        "#..."
+      ]
+    },
+    {
+      "codepoint": 9508,
+      "character": "┤",
+      "width": 4,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#",
+        "...#",
+        "...#",
+        "####",
+        "...#",
+        "...#",
+        "...#"
+      ]
+    },
+    {
+      "codepoint": 9516,
+      "character": "┬",
+      "width": 7,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        "...#...",
+        "...#...",
+        "...#..."
+      ]
+    },
+    {
+      "codepoint": 9524,
+      "character": "┴",
+      "width": 7,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 9532,
+      "character": "┼",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "...#...",
+        "...#...",
+        "#######",
+        "...#...",
+        "...#...",
+        "...#..."
+      ]
+    },
+    {
+      "codepoint": 9552,
+      "character": "═",
+      "width": 7,
+      "height": 2,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 9553,
+      "character": "║",
+      "width": 2,
+      "height": 7,
+      "xOffset": 3,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "##",
+        "##",
+        "##",
+        "##",
+        "##",
+        "##",
+        "##"
+      ]
+    },
+    {
+      "codepoint": 9556,
+      "character": "╔",
+      "width": 4,
+      "height": 4,
+      "xOffset": 3,
+      "yOffset": 8,
+      "xAdvance": 8,
+      "bitmap": [
+        "####",
+        "####",
+        "##..",
+        "##.."
+      ]
+    },
+    {
+      "codepoint": 9559,
+      "character": "╗",
+      "width": 5,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 8,
+      "bitmap": [
+        "#####",
+        "#####",
+        "...##",
+        "...##"
+      ]
+    },
+    {
+      "codepoint": 9562,
+      "character": "╚",
+      "width": 4,
+      "height": 5,
+      "xOffset": 3,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "##..",
+        "##..",
+        "##..",
+        "####",
+        "####"
+      ]
+    },
+    {
+      "codepoint": 9565,
+      "character": "╝",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...##",
+        "...##",
+        "...##",
+        "#####",
+        "####."
+      ]
+    },
+    {
+      "codepoint": 9568,
+      "character": "╠",
+      "width": 4,
+      "height": 7,
+      "xOffset": 3,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "##..",
+        "##..",
+        "##..",
+        "####",
+        "####",
+        "##..",
+        "##.."
+      ]
+    },
+    {
+      "codepoint": 9571,
+      "character": "╣",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...##",
+        "...##",
+        "...##",
+        "#####",
+        "#####",
+        "...##",
+        "...##"
+      ]
+    },
+    {
+      "codepoint": 9574,
+      "character": "╦",
+      "width": 7,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        "#######",
+        "...##..",
+        "...##.."
+      ]
+    },
+    {
+      "codepoint": 9577,
+      "character": "╩",
+      "width": 7,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...##..",
+        "...##..",
+        "...##..",
+        "#######",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 9580,
+      "character": "╬",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...##..",
+        "...##..",
+        "...##..",
+        "#######",
+        "#######",
+        "...##..",
+        "...##.."
+      ]
+    },
+    {
+      "codepoint": 9600,
+      "character": "▀",
+      "width": 7,
+      "height": 3,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        "#######",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 9604,
+      "character": "▄",
+      "width": 7,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 8,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        "#######",
+        "#######",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 9608,
+      "character": "█",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "#######",
+        "#######",
+        "#######",
+        "#######",
+        "#######",
+        "#######",
+        "#######"
+      ]
+    },
+    {
+      "codepoint": 9612,
+      "character": "▌",
+      "width": 3,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "###",
+        "###",
+        "###",
+        "###",
+        "###",
+        "###",
+        "###"
+      ]
+    },
+    {
+      "codepoint": 9616,
+      "character": "▐",
+      "width": 4,
+      "height": 7,
+      "xOffset": 3,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "####",
+        "####",
+        "####",
+        "####",
+        "####",
+        "####",
+        "####"
+      ]
+    },
+    {
+      "codepoint": 9617,
+      "character": "░",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "#...#..",
+        "...#...",
+        "..#...#",
+        ".#...#.",
+        "#...#..",
+        "...#...",
+        "..#...#"
+      ]
+    },
+    {
+      "codepoint": 9618,
+      "character": "▒",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "#.#.#.#",
+        ".#.#.#.",
+        "#.#.#.#",
+        ".#.#.#.",
+        "#.#.#.#",
+        ".#.#.#.",
+        "#.#.#.#"
+      ]
+    },
+    {
+      "codepoint": 9619,
+      "character": "▓",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        ".###.##",
+        "###.###",
+        "##.###.",
+        "#.###.#",
+        ".###.##",
+        "###.###",
+        "##.###."
+      ]
+    },
+    {
+      "codepoint": 9632,
+      "character": "■",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "#####",
+        "#####",
+        "#####",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 9633,
+      "character": "□",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 9650,
+      "character": "▲",
+      "width": 5,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".###.",
+        "#####",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 9651,
+      "character": "△",
+      "width": 5,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "#...#",
+        "#####"
+      ]
+    },
+    {
+      "codepoint": 9654,
+      "character": "▶",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#....",
+        "###..",
+        "#####",
+        "###..",
+        "#...."
+      ]
+    },
+    {
+      "codepoint": 9655,
+      "character": "▷",
+      "width": 3,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#..",
+        "##.",
+        "#.#",
+        "##.",
+        "#.."
+      ]
+    },
+    {
+      "codepoint": 9660,
+      "character": "▼",
+      "width": 5,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "#####",
+        ".###.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 9661,
+      "character": "▽",
+      "width": 5,
+      "height": 4,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "#...#",
+        ".#.#.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 9664,
+      "character": "◀",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "....#",
+        "..###",
+        "#####",
+        "..###",
+        "....#"
+      ]
+    },
+    {
+      "codepoint": 9665,
+      "character": "◁",
+      "width": 3,
+      "height": 5,
+      "xOffset": 2,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#",
+        ".##",
+        "#.#",
+        ".##",
+        "..#"
+      ]
+    },
+    {
+      "codepoint": 9670,
+      "character": "◆",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".###.",
+        "#####",
+        ".###.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 9671,
+      "character": "◇",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "#...#",
+        ".#.#.",
+        "..#.."
+      ]
+    },
+    {
+      "codepoint": 9675,
+      "character": "○",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        ".#####.",
+        "#.....#",
+        "#.....#",
+        "#.....#",
+        "#.....#",
+        "#.....#",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 9679,
+      "character": "●",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        ".#####.",
+        "#######",
+        "#######",
+        "#######",
+        "#######",
+        "#######",
+        ".#####."
+      ]
+    },
+    {
+      "codepoint": 9733,
+      "character": "★",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "...#...",
+        "#..#..#",
+        ".#####.",
+        "#######",
+        ".#####.",
+        "#..#..#",
+        "...#..."
+      ]
+    },
+    {
+      "codepoint": 9734,
+      "character": "☆",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#.#.#",
+        ".###.",
+        "##.##",
+        ".###.",
+        "#.#.#"
+      ]
+    },
+    {
+      "codepoint": 9812,
+      "character": "♔",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".###.",
+        "..#..",
+        ".###.",
+        "#.#.#",
+        "#####",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 9813,
+      "character": "♕",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#.#.#",
+        ".###.",
+        "..#..",
+        ".###.",
+        "#.#.#",
+        "#####",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 9814,
+      "character": "♖",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#.#.#",
+        "#####",
+        ".###.",
+        ".###.",
+        ".###.",
+        "#####",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 9815,
+      "character": "♗",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "..#..",
+        ".#.#.",
+        "..#..",
+        ".###.",
+        "..#..",
+        "#####",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 9816,
+      "character": "♘",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".##..",
+        "###..",
+        "#.#..",
+        "..##.",
+        "..##.",
+        "#####",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 9817,
+      "character": "♙",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "#...#",
+        ".###.",
+        "..#..",
+        ".###.",
+        "#####",
+        ".###."
+      ]
+    },
+    {
+      "codepoint": 9818,
+      "character": "♚",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "..##.",
+        ".####",
+        "..##.",
+        ".####",
+        "#####",
+        "#####",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 9819,
+      "character": "♛",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        ".####",
+        "..##.",
+        ".####",
+        "#####",
+        "#####",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 9820,
+      "character": "♜",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "#####",
+        "#####",
+        ".####",
+        ".####",
+        ".####",
+        "#####",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 9821,
+      "character": "♝",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        "..##.",
+        ".####",
+        "..##.",
+        ".####",
+        "..##.",
+        "#####",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 9822,
+      "character": "♞",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".###.",
+        "####.",
+        "####.",
+        "..###",
+        "..###",
+        "#####",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 9823,
+      "character": "♟",
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 3,
+      "xAdvance": 6,
+      "bitmap": [
+        ".####",
+        "##..#",
+        ".####",
+        "..##.",
+        ".####",
+        "#####",
+        ".####"
+      ]
+    },
+    {
+      "codepoint": 10003,
+      "character": "✓",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "....#",
+        "...#.",
+        "#.#..",
+        ".##..",
+        ".#..."
+      ]
+    },
+    {
+      "codepoint": 10005,
+      "character": "✕",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "#.....#",
+        ".#...#.",
+        "..#.#..",
+        "...#...",
+        "..#.#..",
+        ".#...#.",
+        "#.....#"
+      ]
+    },
+    {
+      "codepoint": 10006,
+      "character": "✖",
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 6,
+      "bitmap": [
+        "#...#",
+        ".###.",
+        "..#..",
+        ".###.",
+        "#...#"
+      ]
+    },
+    {
+      "codepoint": 10007,
+      "character": "✗",
+      "width": 7,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 5,
+      "xAdvance": 8,
+      "bitmap": [
+        "##...##",
+        ".##.##.",
+        "..###..",
+        "...#...",
+        "..###..",
+        ".##.##.",
+        "##...##"
+      ]
+    }
+  ],
+  "kerning": [
+    {
+      "first": 65,
+      "second": 86,
+      "amount": -1
+    },
+    {
+      "first": 65,
+      "second": 87,
+      "amount": -1
+    },
+    {
+      "first": 65,
+      "second": 89,
+      "amount": -1
+    },
+    {
+      "first": 70,
+      "second": 65,
+      "amount": -1
+    },
+    {
+      "first": 76,
+      "second": 84,
+      "amount": -1
+    },
+    {
+      "first": 76,
+      "second": 86,
+      "amount": -1
+    },
+    {
+      "first": 80,
+      "second": 65,
+      "amount": -1
+    },
+    {
+      "first": 84,
+      "second": 44,
+      "amount": -1
+    },
+    {
+      "first": 84,
+      "second": 46,
+      "amount": -1
+    },
+    {
+      "first": 84,
+      "second": 65,
+      "amount": -1
+    },
+    {
+      "first": 84,
+      "second": 101,
+      "amount": -1
+    },
+    {
+      "first": 84,
+      "second": 111,
+      "amount": -1
+    },
+    {
+      "first": 84,
+      "second": 114,
+      "amount": -1
+    },
+    {
+      "first": 84,
+      "second": 117,
+      "amount": -1
+    },
+    {
+      "first": 84,
+      "second": 121,
+      "amount": -1
+    },
+    {
+      "first": 86,
+      "second": 44,
+      "amount": -1
+    },
+    {
+      "first": 86,
+      "second": 46,
+      "amount": -1
+    },
+    {
+      "first": 86,
+      "second": 65,
+      "amount": -1
+    },
+    {
+      "first": 86,
+      "second": 97,
+      "amount": -1
+    },
+    {
+      "first": 86,
+      "second": 101,
+      "amount": -1
+    },
+    {
+      "first": 86,
+      "second": 111,
+      "amount": -1
+    },
+    {
+      "first": 87,
+      "second": 44,
+      "amount": -1
+    },
+    {
+      "first": 87,
+      "second": 46,
+      "amount": -1
+    },
+    {
+      "first": 87,
+      "second": 65,
+      "amount": -1
+    },
+    {
+      "first": 87,
+      "second": 97,
+      "amount": -1
+    },
+    {
+      "first": 87,
+      "second": 111,
+      "amount": -1
+    },
+    {
+      "first": 89,
+      "second": 44,
+      "amount": -1
+    },
+    {
+      "first": 89,
+      "second": 46,
+      "amount": -1
+    },
+    {
+      "first": 89,
+      "second": 65,
+      "amount": -1
+    },
+    {
+      "first": 89,
+      "second": 111,
+      "amount": -1
+    }
+  ]
+}

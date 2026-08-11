@@ -8,7 +8,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 export const SERVER_NAME = "evavo-pixel-font-studio-v2";
-export const SERVER_VERSION = "2.2.0";
+export const SERVER_VERSION = "2.1.0";
 const TOOL_PATH = fileURLToPath(new URL("../tools/pixel_font_studio_v2.py", import.meta.url));
 const MAX_PATH = 4096;
 const MAX_DOCUMENT_BYTES = 32 * 1024 * 1024;
@@ -154,7 +154,6 @@ function spawnTool(current, args, { stdinValue } = {}) {
         USERPROFILE: process.env.USERPROFILE ?? "",
         PYTHONUTF8: "1",
         PYTHONHASHSEED: "0",
-        PYTHONDONTWRITEBYTECODE: "1",
         SOURCE_DATE_EPOCH: "1577836800",
       },
       stdio: ["pipe", "pipe", "pipe"],
@@ -228,7 +227,7 @@ export function toolDefinitions(current = policy()) {
   const tools = [
     {
       name: TOOLS.catalog,
-      description: "Describe the complete Pixel Font Studio v2 authored-master, QA, BDF, atlas-map, grid-sheet, TTF and Godot 4.6.2 contract.",
+      description: "Describe the complete Pixel Font Studio v2 authored-master, QA, TTF and Godot 4.6.2 contract.",
       inputSchema: schema(),
     },
     {
@@ -243,7 +242,7 @@ export function toolDefinitions(current = policy()) {
     },
     {
       name: TOOLS.validate,
-      description: "Validate a generated family, every file hash, BMFont atlas, BDF, atlas JSON, grid sheet, exact specimens and optional TTF cmap/kerning.",
+      description: "Validate a generated family, every file hash, BMFont atlas, exact specimens and optional TTF cmap/kerning.",
       inputSchema: schema({ familyPath: filePath }, ["familyPath"]),
     },
     {
@@ -256,7 +255,7 @@ export function toolDefinitions(current = policy()) {
     tools.push(
       {
         name: TOOLS.build,
-        description: "Create a complete BMFont/PNG/Godot/specimen family, BDF and engine-neutral atlas/grid forms, plus optional TTF derivatives. Output is create-only.",
+        description: "Create a complete BMFont/PNG/Godot/specimen family and optional TTF derivatives. Output is create-only.",
         inputSchema: schema(
           { masterPath: filePath, outputRoot: filePath, confirmWrite },
           ["masterPath", "outputRoot", "confirmWrite"],
@@ -371,7 +370,7 @@ export async function handleRequest(request, context = {}) {
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
       instructions:
-        "Author explicit per-face glyph masters. Audit before sealing, inspect control glyphs, build create-only outputs, validate identities, and use the operator-pinned Godot verifier. BMFont + packed PNG is canonical; BDF, atlas JSON, grid sheets and TTF are interoperable derivatives.",
+        "Author explicit per-face glyph masters. Audit before sealing, inspect control glyphs, build create-only outputs, validate identities, and use the operator-pinned Godot verifier. BMFont + PNG is canonical; TTF is a convenience derivative.",
     });
   }
   if (request.method === "ping") return response(request.id, {});

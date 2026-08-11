@@ -138,25 +138,3 @@ The agent cannot select an arbitrary executable, invoke a shell, overwrite retai
 7. Audit, inspect confusables, build specimens, validate and compare two clean builds.
 8. Run the Godot verifier before promotion into a game repository.
 9. Keep the JSON masters as the editable source of truth.
-
-
-## Additional interoperable outputs
-
-Every v2.2 production face now includes:
-
-- a BDF 2.1 bitmap font containing the exact authored glyph pixels and advances;
-- an engine-neutral atlas JSON file mapping every Unicode code point to the packed PNG rectangle and metrics;
-- a transparent fixed-cell review grid PNG and companion JSON map for manual sprite-sheet workflows;
-- the canonical packed PNG plus AngelCode `.fnt` pair for efficient Godot use;
-- the optional deterministic `.ttf` convenience font for desktop and design applications.
-
-The fixed-cell grid is provided for inspection and custom tooling. It is not more efficient than the packed runtime atlas.
-
-
-## Compact retained masters
-
-Large complete face masters may be retained as deterministic `.json.gz` files with gzip timestamp zero. The studio expands them transparently, validates the exact JSON document, and emits a readable `.master.json` snapshot in every build. This keeps repository transport compact without changing the authored glyph source or runtime outputs.
-
-## Repository integration
-
-The stable CLI entry point is `tools/pixel_font_studio_v2.py`; its reviewed implementation is split into the `tools/pixel_font_v2/` package so format writers, validation, build orchestration and CLI concerns can evolve independently. `scripts/integrate-pixel-font-studio-v2.mjs` idempotently adds v2 commands to `package.json` and records the complete v2 authority and QA contract in `evavo.reliability.json`.

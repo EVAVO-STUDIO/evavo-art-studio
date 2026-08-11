@@ -1,7 +1,7 @@
 {
   "contract": "evavo.pixel-font-studio.v2",
   "schemaVersion": "2.1.0",
-  "toolVersion": "2.2.0",
+  "toolVersion": "2.1.0",
   "familyMasterSchema": "evavo.pixel-font-family-master.v2",
   "faceMasterSchema": "evavo.pixel-font-face-master.v2",
   "familyOutputSchema": "evavo.pixel-font-family.v2",
@@ -53,10 +53,7 @@
     "ttfCmapVerification": true,
     "ttfKerningVerification": true,
     "godotImportAndRenderFixture": true,
-    "ttfEmbeddingPermissionVerification": true,
-    "bdfInterchangeRequired": true,
-    "engineNeutralAtlasMapRequired": true,
-    "fixedCellReviewGridRequired": true
+    "ttfEmbeddingPermissionVerification": true
   },
   "godot": {
     "targetVersion": "4.6.2",
@@ -95,22 +92,5 @@
     "gitPush": false,
     "publication": false,
     "forcePush": false
-  },
-  "interchangeFormats": {
-    "bdf": {
-      "format": "BDF 2.1",
-      "canonicalRuntime": false,
-      "exactBitmapSource": true
-    },
-    "atlasJson": {
-      "schema": "evavo.pixel-font-atlas.v1",
-      "canonicalRuntime": false,
-      "engineNeutral": true
-    },
-    "gridSheet": {
-      "schema": "evavo.pixel-font-grid-sheet.v1",
-      "canonicalRuntime": false,
-      "transparentPng": true
-    }
   }
 }

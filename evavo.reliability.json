@@ -104,7 +104,9 @@
     "pnpm typecheck",
     "pnpm test",
     "pnpm build",
-    "git diff --exit-code -- pnpm-lock.yaml && git diff --exit-code && test -z \"$(git status --porcelain)\""
+    "git diff --exit-code -- pnpm-lock.yaml && git diff --exit-code && test -z \"$(git status --porcelain)\"",
+    "python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt",
+    "node scripts/check-pixel-font-studio-v2.mjs"
   ],
   "executedBaseline": {
     "workflow": ".github/workflows/ci.yml",
@@ -124,7 +126,8 @@
       "retain bounded source-validation evidence",
       "build independently authored proportional pixel-font families",
       "emit deterministic BMFont, BDF, atlas JSON, grid sheets and TrueType convenience derivatives",
-      "run exact Godot 4.6.2 bitmap-font import and render verification"
+      "run exact Godot 4.6.2 bitmap-font import and render verification",
+      "build and verify independent authored pixel-font faces, native specimens and optional TTF derivatives"
     ],
     "validationDoesNotAuthorize": [
       "live provider requests",
@@ -135,7 +138,8 @@
       "native Godot approval",
       "production deployment",
       "credential mutation",
-      "external communication"
+      "external communication",
+      "automatic creative approval or target-game font promotion"
     ]
   },
   "notes": [
@@ -149,35 +153,26 @@
     "Superseded mainline validations are cancelled; a receipt is written only after the candidate is re-proven as current origin/main.",
     "Provider execution, promotion, game mutation and production effects remain separately authorised operations.",
     "Pixel Font Studio v2.2 retains independent per-face masters and emits canonical BMFont/PNG runtime assets plus BDF, atlas JSON, fixed-cell grids and optional deterministic TTF derivatives.",
-    "Pixel Font Studio v2.2 native CI downloads the official Godot 4.6.2 Linux archive only after verifying its exact SHA-256."
+    "Pixel Font Studio v2.2 native CI downloads the official Godot 4.6.2 Linux archive only after verifying its exact SHA-256.",
+    "Pixel Font Studio v2 retains explicit per-face masters and treats BMFont plus PNG as canonical; TTF output remains a verified convenience derivative."
   ],
   "pixelFontStudioV2": {
     "contract": "evavo.pixel-font-studio.v2",
-    "toolVersion": "2.2.0",
     "familyMasterSchema": "evavo.pixel-font-family-master.v2",
     "faceMasterSchema": "evavo.pixel-font-face-master.v2",
-    "familyOutputSchema": "evavo.pixel-font-family.v2",
-    "canonicalRuntime": [
-      "AngelCode BMFont text .fnt",
-      "binary RGBA PNG atlas"
-    ],
-    "interchangeAndAuthoringOutputs": [
-      "BDF 2.1 bitmap font",
-      "engine-neutral atlas JSON",
-      "fixed-cell transparent grid PNG and JSON",
-      "deterministic TrueType convenience derivative",
-      "Godot FontVariation .tres",
-      "native and integer-scaled specimen PNGs"
-    ],
-    "authoredMasters": {
-      "independentPerFace": true,
-      "variableGlyphDimensions": true,
-      "perGlyphOffsetsAndAdvances": true,
-      "perFaceKerning": true,
-      "unicodeCoverage": true,
-      "deterministicGzipTransportSupported": true,
-      "externalFontBinaryUsed": false
-    },
+    "familySchema": "evavo.pixel-font-family.v2",
+    "auditSchema": "evavo.pixel-font-audit.v2",
+    "validationSchema": "evavo.pixel-font-validation.v2",
+    "canonicalRuntime": "AngelCode BMFont text plus RGBA PNG atlas",
+    "optionalDerivative": "deterministic TrueType with cmap, GPOS and kern verification",
+    "externalFontBinaryUsed": false,
+    "independentFaceMasters": true,
+    "arbitraryGlyphDimensions": true,
+    "realVerticalMetrics": true,
+    "perGlyphOffsetsAndAdvances": true,
+    "perFaceKerning": true,
+    "unicodeCoverageProfiles": true,
+    "exhaustivePairCollisionQa": true,
     "deterministic": true,
     "createOnly": true,
     "mcpDefaultMode": "read-only",
@@ -186,30 +181,19 @@
     "allowedRootBoundaryRequired": true,
     "godotPolicy": {
       "targetVersion": "4.6.2",
-      "officialLinuxArchiveSha256": "30e6b6d141f0cd5bebd629ad1d0ef1324e60091bb20662d026b402ba58c59937",
       "textureFilter": "nearest",
       "integerScaleOnly": true,
       "subpixelPositioning": false,
       "mipmaps": false,
       "systemFallback": false,
-      "nativeImportAndRenderVerificationRequired": true
-    },
-    "qa": {
-      "printableAsciiRequired": true,
-      "westernLatinRequired": true,
-      "confusableSequencesRequired": true,
-      "exhaustiveOrderedPairCollisionChecks": true,
-      "duplicateGlyphAllowlistRequired": true,
-      "exactRebuildComparisonRequired": true,
-      "ttfCmapAndKerningValidationRequired": true,
-      "bdfCoverageAndAdvanceValidationRequired": true,
-      "atlasAndGridMetadataValidationRequired": true
+      "officialLinuxArchiveSha256": "30e6b6d141f0cd5bebd629ad1d0ef1324e60091bb20662d026b402ba58c59937"
     },
     "authority": {
       "providerExecution": false,
       "creativeApproval": false,
-      "historicalApproval": false,
+      "nativeGodotApproval": false,
       "candidatePromotion": false,
+      "sourceOverwrite": false,
       "sourceDeletion": false,
       "targetRepositoryMutation": false,
       "gitCommit": false,
