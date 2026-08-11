@@ -5,7 +5,7 @@ on:
     branches:
       - automation/publish-persistent-workspace-ingest-20260812
     paths:
-      - ".evavo-transfer/persistent-workspace-ingest/READY"
+      - ".evavo-transfer/persistent-workspace-ingest/READY-2"
 
 permissions:
   contents: write
@@ -37,7 +37,7 @@ jobs:
             exit 1
           fi
           transfer=.evavo-transfer/persistent-workspace-ingest
-          test "$(tr -d '\r\n' < "$transfer/READY")" = "$EXPECTED_BUNDLE_SHA256"
+          test "$(tr -d '\r\n' < "$transfer/READY-2")" = "$EXPECTED_BUNDLE_SHA256"
           test -s "$transfer/CHUNKS.sha256"
           test "$(find "$transfer" -maxdepth 1 -type f -name 'part-*.b64' | wc -l)" -eq 10
 
@@ -83,19 +83,19 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Run focused external-ingest validation
+      - name: Run focused external-ingest validation on all nine files
         shell: bash
         run: |
           set -euo pipefail
           test "$(node --version)" = "v22.14.0"
           node scripts/check-persistent-artist-workspace-ingest.mjs
 
-      - name: Verify exact nine-file product scope
+      - name: Prepare the token-permitted eight-file push
         shell: bash
         run: |
           set -euo pipefail
+          rm -- .github/workflows/persistent-artist-workspace-ingest.yml
           cat > /tmp/expected-files <<'FILES'
-          .github/workflows/persistent-artist-workspace-ingest.yml
           config/mcp.persistent-artist-workspace-ingest.windows.example.json
           docs/PERSISTENT_ARTIST_WORKSPACE_INGEST.md
           scripts/check-persistent-artist-workspace-ingest.mjs
@@ -109,14 +109,13 @@ jobs:
           sort /tmp/expected-files -o /tmp/expected-files
           diff -u /tmp/expected-files /tmp/actual-files
 
-      - name: Commit and push without force
+      - name: Commit and push eight ordinary files without force
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
           git add -- \
-            .github/workflows/persistent-artist-workspace-ingest.yml \
             config/mcp.persistent-artist-workspace-ingest.windows.example.json \
             docs/PERSISTENT_ARTIST_WORKSPACE_INGEST.md \
             scripts/check-persistent-artist-workspace-ingest.mjs \
@@ -129,4 +128,4 @@ jobs:
           feature_sha="$(git rev-parse HEAD)"
           test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN"
           git push origin "HEAD:refs/heads/$FEATURE_BRANCH"
-          printf 'Published `%s` at `%s`.\n' "$FEATURE_BRANCH" "$feature_sha" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Published ordinary files to `%s` at `%s`; the validated workflow file is added separately through the authenticated GitHub connector.\n' "$FEATURE_BRANCH" "$feature_sha" >> "$GITHUB_STEP_SUMMARY"
