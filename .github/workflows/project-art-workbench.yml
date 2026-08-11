@@ -10,12 +10,16 @@ on:
       - "scripts/compile-project-art-atlas.mjs"
       - "scripts/compile-reference-derived-image-plan.mjs"
       - "scripts/stage-reference-derived-artifacts.mjs"
+      - "scripts/compile-project-art-loop-closure.mjs"
+      - "scripts/check-project-art-loop-closure.mjs"
+      - "scripts/test-project-art-loop-closure.mjs"
       - "scripts/check-project-art-workbench.mjs"
       - "scripts/test-project-art-workbench.mjs"
       - "scripts/test-project-art-workspace-mcp.mjs"
       - "scripts/check-project-art-intake.mjs"
       - "scripts/test-project-art-intake.mjs"
       - "tools/run_project_art_sandbox.py"
+      - "tools/run_project_art_loop_closure.py"
       - "tools/run_project_art_intake.py"
       - "tools/project_art_intake_*.py"
       - "tools/build_project_art_atlas.py"
@@ -24,6 +28,7 @@ on:
       - "config/project-art-operations.v1.json"
       - "config/mcp.project-art-workspace.windows.example.json"
       - "docs/PROJECT_ART_WORKBENCH.md"
+      - "docs/PROJECT_ART_LOOP_CLOSURE.md"
       - "docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md"
       - "package.json"
       - "requirements-image-pipeline.txt"
@@ -39,12 +44,16 @@ on:
       - "scripts/compile-project-art-atlas.mjs"
       - "scripts/compile-reference-derived-image-plan.mjs"
       - "scripts/stage-reference-derived-artifacts.mjs"
+      - "scripts/compile-project-art-loop-closure.mjs"
+      - "scripts/check-project-art-loop-closure.mjs"
+      - "scripts/test-project-art-loop-closure.mjs"
       - "scripts/check-project-art-workbench.mjs"
       - "scripts/test-project-art-workbench.mjs"
       - "scripts/test-project-art-workspace-mcp.mjs"
       - "scripts/check-project-art-intake.mjs"
       - "scripts/test-project-art-intake.mjs"
       - "tools/run_project_art_sandbox.py"
+      - "tools/run_project_art_loop_closure.py"
       - "tools/run_project_art_intake.py"
       - "tools/project_art_intake_*.py"
       - "tools/build_project_art_atlas.py"
@@ -53,6 +62,7 @@ on:
       - "config/project-art-operations.v1.json"
       - "config/mcp.project-art-workspace.windows.example.json"
       - "docs/PROJECT_ART_WORKBENCH.md"
+      - "docs/PROJECT_ART_LOOP_CLOSURE.md"
       - "docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md"
       - "package.json"
       - "requirements-image-pipeline.txt"
@@ -124,6 +134,12 @@ jobs:
       - name: Verify project-art contracts and static authority boundary
         run: node scripts/check-project-art-workbench.mjs
 
+      - name: Run final-to-first loop-closure adversary
+        env:
+          PROJECT_ART_REQUIRE_PILLOW: "1"
+          PROJECT_ART_REQUIRE_PROVIDER_VALIDATION: "1"
+        run: pnpm run project-art:loop:check
+
       - name: Run image, sheet, sequence, artifact, and provider regressions
         env:
           PROJECT_ART_REQUIRE_PILLOW: "1"
@@ -152,6 +168,10 @@ jobs:
           grep -F 'wholeRunAtomicPublication: true' scripts/project-art/sandbox.mjs
           grep -F 'requiresFreshExecutionAuthorization: true' scripts/project-art/reference-derived.mjs
           grep -F 'independentApprovalPerformed: false' scripts/project-art/reference-derived.mjs
+          grep -F 'evavo.project-art-loop-closure-plan.v1' scripts/compile-project-art-loop-closure.mjs
+          grep -F 'PROJECT_ART_LOOP_CLOSURE_REQUEST_BYTES_MISMATCH' scripts/compile-project-art-loop-closure.mjs
+          grep -F 'sourceHashesRevalidatedAfterExecution' tools/run_project_art_loop_closure.py
+          grep -F '"targetRepositoryMutation": False' tools/run_project_art_loop_closure.py
           grep -F 'evavo.project-art-intake-plan.v1' scripts/project-art/intake-contract.mjs
           grep -F 'evavo.storage-art-ingest-request.v1' tools/project_art_intake_contract.py
           grep -F 'evavo.project-art-atlas-plan.v1' scripts/project-art/atlas-contract.mjs
@@ -173,6 +193,7 @@ jobs:
           ! grep -F 'candidatePromotion: true' scripts/project-art/reference-derived.mjs
           ! grep -F 'forcePush: true' scripts/project-art/reference-derived.mjs
           ! grep -F 'git push' tools/run_project_art_sandbox.py
+          ! grep -F 'git push' tools/run_project_art_loop_closure.py
           ! grep -F 'git push' tools/run_project_art_intake.py
           ! grep -F 'git push' tools/build_project_art_atlas.py
           ! grep -F 'candidateApproval: true' tools/project_art_workspace_mcp.mjs
