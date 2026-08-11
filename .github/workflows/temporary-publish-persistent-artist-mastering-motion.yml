@@ -1,0 +1,180 @@
+name: Temporary publish persistent Artist Workspace and mastering motion
+
+on:
+  push:
+    branches:
+      - automation/publish-persistent-artist-mastering-motion-20260811
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      EXPECTED_MAIN: 88532b7683ebaefd3f0b43f0df4cf199ebdd13e5
+      EXPECTED_BASE_TREE: 09d6b4a3e65d0cdfc3c1feaac677351dfe0b351d
+      FEATURE_BRANCH: agent/persistent-artist-mastering-motion-20260811
+      B64_SHA256: c1dab775c81d2c75234e311c7090976c3be251490e52bca2ad5ce18e8f10cdf2
+      GZIP_SHA256: c4592347a7900ef10997ee7a3429ca8bd2a42d9a45df3461b4bfb900c0a4aaa8
+      PATCH_SHA256: ea5e724cf30fb6f2475b3cb89036fe5255d190dedb3f7054d11f6bcec7fbe907
+    steps:
+      - name: Check out exact publication carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reconstruct and verify exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRANSFER_DIR=.evavo-transfer/persistent-artist-mastering-motion
+          cat "${TRANSFER_DIR}"/part-*.b64 > "${RUNNER_TEMP}/product.patch.gz.b64"
+          echo "${B64_SHA256}  ${RUNNER_TEMP}/product.patch.gz.b64" | sha256sum --check --strict
+          base64 --decode "${RUNNER_TEMP}/product.patch.gz.b64" > "${RUNNER_TEMP}/product.patch.gz"
+          echo "${GZIP_SHA256}  ${RUNNER_TEMP}/product.patch.gz" | sha256sum --check --strict
+          gzip --decompress --stdout "${RUNNER_TEMP}/product.patch.gz" > "${RUNNER_TEMP}/product.patch"
+          echo "${PATCH_SHA256}  ${RUNNER_TEMP}/product.patch" | sha256sum --check --strict
+          test "$(git rev-parse refs/remotes/origin/main)" = "${EXPECTED_MAIN}"
+          test "$(git rev-parse refs/remotes/origin/${FEATURE_BRANCH})" = "${EXPECTED_MAIN}"
+          test "$(git show -s --format=%T "${EXPECTED_MAIN}")" = "${EXPECTED_BASE_TREE}"
+
+      - name: Materialise exact product commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch --detach "${EXPECTED_MAIN}"
+          git config user.name EVAVO-STUDIO
+          git config user.email evavo.studio@gmail.com
+          git am "${RUNNER_TEMP}/product.patch"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_MAIN}"
+          test "$(git show -s --format=%s HEAD)" = "feat(project-art): add persistent artist mastering workspace"
+          git diff-tree --no-commit-id --name-only -r HEAD | sort > "${RUNNER_TEMP}/actual-paths.txt"
+          cat > "${RUNNER_TEMP}/expected-paths.txt" <<'PATHS'
+          .github/workflows/project-art-workbench.yml
+          README.md
+          config/project-art-operations.v1.json
+          docs/PERSISTENT_ARTIST_WORKSPACE.md
+          docs/PROJECT_ART_MASTERING_AND_MOTION.md
+          package.json
+          scripts/check-persistent-artist-workspace.mjs
+          scripts/check-project-art-mastering-and-motion.mjs
+          scripts/check-project-art-workbench.mjs
+          scripts/persistent-artist-workspace.mjs
+          scripts/project-art/persistent-workspace.mjs
+          scripts/project-art/sandbox.mjs
+          scripts/test-persistent-artist-workspace.mjs
+          scripts/test-project-art-mastering-and-motion.mjs
+          scripts/test-project-art-workspace-mcp.mjs
+          tools/project_art_workspace_mcp.mjs
+          tools/run_project_art_sandbox.py
+          PATHS
+          sort -o "${RUNNER_TEMP}/expected-paths.txt" "${RUNNER_TEMP}/expected-paths.txt"
+          diff -u "${RUNNER_TEMP}/expected-paths.txt" "${RUNNER_TEMP}/actual-paths.txt"
+          test "$(wc -l < "${RUNNER_TEMP}/actual-paths.txt")" -eq 17
+          git diff --exit-code "${EXPECTED_MAIN}" -- pnpm-lock.yaml
+
+      - name: Route Python bytecode outside the repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON_CACHE_ROOT="${RUNNER_TEMP}/persistent-artist-workspace-pycache"
+          mkdir -p "${PYTHON_CACHE_ROOT}"
+          echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: pip
+          cache-dependency-path: |
+            requirements-image-pipeline.txt
+            requirements/pixel-font-studio-v2.txt
+
+      - name: Install exact Python validation backends
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
+          python - <<'PY'
+          import PIL
+          import fontTools
+          assert PIL.__version__ == "12.2.0", PIL.__version__
+          assert fontTools.__version__ == "4.63.0", fontTools.__version__
+          PY
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Bootstrap real media tools
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact domain implementations
+        run: pnpm run build:domain
+
+      - name: Run focused persistent artist workspace gates
+        env:
+          PROJECT_ART_REQUIRE_PILLOW: "1"
+          PROJECT_ART_REQUIRE_PROVIDER_VALIDATION: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-project-art-workbench.mjs
+          pnpm run project-art:workspace:persistent:check
+          pnpm run project-art:mastering:check
+          pnpm run project-art:loop:check
+          node scripts/test-project-art-workbench.mjs
+          node scripts/test-project-art-workspace-mcp.mjs
+          node scripts/check-project-art-intake.mjs
+          node scripts/test-project-art-intake.mjs
+
+      - name: Run complete Art Studio validation
+        run: pnpm check
+
+      - name: Prove exact product source remains clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${PYTHONPYCACHEPREFIX:-}" in
+            "${RUNNER_TEMP}"/*) ;;
+            *) exit 1 ;;
+          esac
+          test -z "$(find tools scripts -type d -name '__pycache__' -print -quit)"
+          test -z "$(find tools scripts -type f -name '*.pyc' -print -quit)"
+          git diff --exit-code
+          git diff --exit-code "${EXPECTED_MAIN}" -- pnpm-lock.yaml
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test "$(git rev-parse refs/remotes/origin/main)" = "${EXPECTED_MAIN}"
+
+      - name: Publish exact feature commit without force
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:refs/heads/${FEATURE_BRANCH}"
+          git fetch origin "refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/${FEATURE_BRANCH})"
+          printf '{\n  "schema": "evavo.persistent-artist-workspace-publisher-receipt.v1",\n  "baseSha": "%s",\n  "featureSha": "%s",\n  "patchSha256": "%s",\n  "changedFiles": 17,\n  "lockfileChanged": false,\n  "forcePush": false,\n  "validation": "passed"\n}\n' \
+            "${EXPECTED_MAIN}" "$(git rev-parse HEAD)" "${PATCH_SHA256}" \
+            > "${RUNNER_TEMP}/publisher-receipt.json"
+
+      - name: Upload bounded publisher receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: persistent-artist-workspace-publisher-receipt
+          path: ${{ runner.temp }}/publisher-receipt.json
+          if-no-files-found: error
+          retention-days: 14
