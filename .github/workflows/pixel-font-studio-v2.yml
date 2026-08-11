@@ -111,6 +111,7 @@ jobs:
 
       - name: Run complete reusable font pipeline and Godot verification
         env:
+          EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS: "1"
           EVAVO_PIXEL_FONT_GODOT: ${{ runner.temp }}/godot/Godot_v4.6.2-stable_linux.x86_64
           EVAVO_PIXEL_FONT_CHECK_OUTPUT: ${{ runner.temp }}/pixel-font-studio-v2-check
         run: node scripts/check-pixel-font-studio-v2.mjs
