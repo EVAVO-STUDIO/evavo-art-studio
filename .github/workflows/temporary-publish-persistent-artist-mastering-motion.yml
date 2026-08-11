@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     env:
-      EXPECTED_MAIN: 88532b7683ebaefd3f0b43f0df4cf199ebdd13e5
-      EXPECTED_BASE_TREE: 09d6b4a3e65d0cdfc3c1feaac677351dfe0b351d
-      FEATURE_BRANCH: agent/persistent-artist-mastering-motion-20260811
+      EXPECTED_MAIN: 8454e18aecfc847c7a69bfc4814e3311dc0f8d10
+      EXPECTED_BASE_TREE: 99304074faa244a6f07b89b5c050db4119dd6006
+      FEATURE_BRANCH: agent/persistent-artist-mastering-motion-v2-20260811
       B64_SHA256: c1dab775c81d2c75234e311c7090976c3be251490e52bca2ad5ce18e8f10cdf2
       GZIP_SHA256: c4592347a7900ef10997ee7a3429ca8bd2a42d9a45df3461b4bfb900c0a4aaa8
       PATCH_SHA256: ea5e724cf30fb6f2475b3cb89036fe5255d190dedb3f7054d11f6bcec7fbe907
@@ -56,14 +56,14 @@ jobs:
           test "$(git rev-parse refs/remotes/origin/${FEATURE_BRANCH})" = "${EXPECTED_MAIN}"
           test "$(git show -s --format=%T "${EXPECTED_MAIN}")" = "${EXPECTED_BASE_TREE}"
 
-      - name: Materialise exact product commit
+      - name: Materialise exact 17-file product commit
         shell: bash
         run: |
           set -euo pipefail
           git switch --detach "${EXPECTED_MAIN}"
           git config user.name EVAVO-STUDIO
           git config user.email evavo.studio@gmail.com
-          git am "${RUNNER_TEMP}/product.patch"
+          git am --3way "${RUNNER_TEMP}/product.patch"
           test "$(git rev-parse HEAD^)" = "${EXPECTED_MAIN}"
           test "$(git show -s --format=%s HEAD)" = "feat(project-art): add persistent artist mastering workspace"
           git diff-tree --no-commit-id --name-only -r HEAD | sort > "${RUNNER_TEMP}/actual-paths.txt"
@@ -156,11 +156,14 @@ jobs:
           node scripts/test-project-art-workspace-mcp.mjs
           node scripts/check-project-art-intake.mjs
           node scripts/test-project-art-intake.mjs
+          node scripts/check-project-art-avatar-sequence.mjs
+          node scripts/test-project-art-avatar-sequence.mjs
+          node scripts/test-project-art-avatar-sequence-mcp.mjs
 
       - name: Run complete Art Studio validation
         run: pnpm check
 
-      - name: Prove exact product source remains clean
+      - name: Prove exact 17-file product source remains clean
         shell: bash
         run: |
           set -euo pipefail
@@ -175,21 +178,43 @@ jobs:
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           test "$(git rev-parse refs/remotes/origin/main)" = "${EXPECTED_MAIN}"
 
-      - name: Publish exact feature commit without force
+      - name: Prepare workflow file for authenticated connector publication
         shell: bash
         run: |
           set -euo pipefail
+          cp .github/workflows/project-art-workbench.yml "${RUNNER_TEMP}/project-art-workbench.yml"
+          sha256sum "${RUNNER_TEMP}/project-art-workbench.yml" > "${RUNNER_TEMP}/project-art-workbench.yml.sha256"
+          git checkout "${EXPECTED_MAIN}" -- .github/workflows/project-art-workbench.yml
+          git add .github/workflows/project-art-workbench.yml
+          git commit --amend --no-edit
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_MAIN}"
+          git diff-tree --no-commit-id --name-only -r HEAD | sort > "${RUNNER_TEMP}/published-paths.txt"
+          ! grep -Fx '.github/workflows/project-art-workbench.yml' "${RUNNER_TEMP}/published-paths.txt"
+          test "$(wc -l < "${RUNNER_TEMP}/published-paths.txt")" -eq 16
+          git diff --exit-code "${EXPECTED_MAIN}" -- pnpm-lock.yaml
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Publish exact 16-file feature commit without force
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse refs/remotes/origin/main)" = "${EXPECTED_MAIN}"
+          test "$(git rev-parse refs/remotes/origin/${FEATURE_BRANCH})" = "${EXPECTED_MAIN}"
           git push origin "HEAD:refs/heads/${FEATURE_BRANCH}"
           git fetch origin "refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
           test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/${FEATURE_BRANCH})"
-          printf '{\n  "schema": "evavo.persistent-artist-workspace-publisher-receipt.v1",\n  "baseSha": "%s",\n  "featureSha": "%s",\n  "patchSha256": "%s",\n  "changedFiles": 17,\n  "lockfileChanged": false,\n  "forcePush": false,\n  "validation": "passed"\n}\n' \
-            "${EXPECTED_MAIN}" "$(git rev-parse HEAD)" "${PATCH_SHA256}" \
+          WORKFLOW_SHA256="$(cut -d' ' -f1 "${RUNNER_TEMP}/project-art-workbench.yml.sha256")"
+          printf '{\n  "schema": "evavo.persistent-artist-workspace-publisher-receipt.v1",\n  "baseSha": "%s",\n  "featureSha": "%s",\n  "patchSha256": "%s",\n  "workflowSha256": "%s",\n  "publishedChangedFiles": 16,\n  "finalExpectedChangedFiles": 17,\n  "lockfileChanged": false,\n  "forcePush": false,\n  "validation": "passed"\n}\n' \
+            "${EXPECTED_MAIN}" "$(git rev-parse HEAD)" "${PATCH_SHA256}" "${WORKFLOW_SHA256}" \
             > "${RUNNER_TEMP}/publisher-receipt.json"
 
-      - name: Upload bounded publisher receipt
+      - name: Upload bounded publisher and workflow evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: persistent-artist-workspace-publisher-receipt
-          path: ${{ runner.temp }}/publisher-receipt.json
+          name: persistent-artist-workspace-publisher-receipt-v2
+          path: |
+            ${{ runner.temp }}/publisher-receipt.json
+            ${{ runner.temp }}/project-art-workbench.yml
+            ${{ runner.temp }}/project-art-workbench.yml.sha256
           if-no-files-found: error
           retention-days: 14
