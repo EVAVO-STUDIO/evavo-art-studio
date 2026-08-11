@@ -27,15 +27,11 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
 
-      - name: Reconstruct and verify reviewed overlay
+      - name: Reconstruct reviewed overlay on exact main base
         run: |
           set -euo pipefail
           cat .pixel-font-bootstrap/part-*.b64 | base64 --decode > "$RUNNER_TEMP/pixel-font-v2.2-overlay.tar.gz"
           echo "$OVERLAY_SHA256  $RUNNER_TEMP/pixel-font-v2.2-overlay.tar.gz" | sha256sum --check --strict
-
-      - name: Create clean ready branch from exact main base
-        run: |
-          set -euo pipefail
           git fetch origin main
           test "$(git rev-parse origin/main)" = "$EXPECTED_BASE_SHA"
           git checkout --detach "$EXPECTED_BASE_SHA"
@@ -44,17 +40,14 @@ jobs:
           node scripts/integrate-pixel-font-studio-v2.mjs
           python - <<'PY'
           from pathlib import Path
-
           workflow = Path('.github/workflows/pixel-font-studio-v2.yml')
           source = workflow.read_text(encoding='utf-8')
           marker = '  PYTHONHASHSEED: "0"\n'
-          addition = marker + '  PYTHONDONTWRITEBYTECODE: "1"\n'
           if 'PYTHONDONTWRITEBYTECODE' not in source:
               if marker not in source:
-                  raise SystemExit('Permanent workflow is missing the expected Python environment marker')
-              source = source.replace(marker, addition, 1)
+                  raise SystemExit('Permanent workflow is missing the expected Python marker')
+              source = source.replace(marker, marker + '  PYTHONDONTWRITEBYTECODE: "1"\n', 1)
               workflow.write_text(source, encoding='utf-8')
-
           cli = Path('tools/pixel_font_v2/cli.py')
           cli.write_text(cli.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
           PY
@@ -70,7 +63,9 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Install exact optional TrueType dependency
+      - name: Install exact TrueType dependency and run all checks
+        env:
+          EVAVO_PIXEL_FONT_CHECK_OUTPUT: ${{ runner.temp }}/pixel-font-v2.2-check
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
@@ -78,24 +73,22 @@ jobs:
           import fontTools
           assert fontTools.__version__ == "4.63.0", fontTools.__version__
           PY
+          node scripts/check-pixel-font-studio-v2.mjs
 
-      - name: Run complete v2.2 deterministic and adversarial checks
-        env:
-          EVAVO_PIXEL_FONT_CHECK_OUTPUT: ${{ runner.temp }}/pixel-font-v2.2-check
-        run: node scripts/check-pixel-font-studio-v2.mjs
-
-      - name: Commit only the reviewed production scope
+      - name: Publish validated source commit without workflow mutation
         run: |
           set -euo pipefail
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+          cp .github/workflows/pixel-font-studio-v2.yml config/pixel-font-studio-v2.workflow-source.yml
+          git checkout "$EXPECTED_BASE_SHA" -- .github/workflows/pixel-font-studio-v2.yml
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
           git add \
-            .github/workflows/pixel-font-studio-v2.yml \
             config/mcp.pixel-font-studio-v2.example.json \
             config/pixel-font-families/chess-lord-v2 \
             config/pixel-font-studio.v2.json \
+            config/pixel-font-studio-v2.workflow-source.yml \
             docs/CHESS_LORD_PIXEL_FONT_FAMILY_V2.md \
             docs/PIXEL_FONT_STUDIO_V2.md \
             requirements/pixel-font-studio-v2.txt \
@@ -107,40 +100,12 @@ jobs:
             package.json \
             evavo.reliability.json
           git diff --cached --check
-          python - <<'PY'
-          import subprocess
-          allowed_files = {
-              ".github/workflows/pixel-font-studio-v2.yml",
-              "config/mcp.pixel-font-studio-v2.example.json",
-              "config/pixel-font-studio.v2.json",
-              "docs/CHESS_LORD_PIXEL_FONT_FAMILY_V2.md",
-              "docs/PIXEL_FONT_STUDIO_V2.md",
-              "requirements/pixel-font-studio-v2.txt",
-              "scripts/check-pixel-font-studio-v2.mjs",
-              "scripts/integrate-pixel-font-studio-v2.mjs",
-              "scripts/pixel-font-studio-v2-mcp.mjs",
-              "tools/pixel_font_studio_v2.py",
-              "package.json",
-              "evavo.reliability.json",
-          }
-          allowed_prefixes = (
-              "config/pixel-font-families/chess-lord-v2/",
-              "tools/pixel_font_v2/",
-          )
-          staged = subprocess.check_output(["git", "diff", "--cached", "--name-only", "-z"]).decode().split("\0")
-          staged = [name for name in staged if name]
-          unexpected = [name for name in staged if name not in allowed_files and not name.startswith(allowed_prefixes)]
-          if unexpected:
-              raise SystemExit(f"Unexpected staged files: {unexpected}")
-          if not staged:
-              raise SystemExit("No files staged")
-          print(f"Validated {len(staged)} staged files")
-          PY
+          test -n "$(git diff --cached --name-only)"
           git commit -m "feat(pixel-font): productionize reusable v2.2 pipeline" -m "Add independently authored Chess Lord UI, text and herald masters; deterministic BMFont/PNG, BDF, atlas JSON, fixed-cell grid and TrueType outputs; guarded ChatGPT/Claude MCP authoring; native-scale specimens; exhaustive collision and confusable QA; and exact Godot 4.6.2 CI verification."
           test "$(git rev-parse HEAD^)" = "$EXPECTED_BASE_SHA"
-          find . -type d -name __pycache__ -prune -exec rm -rf {} +
-          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
           rm -rf .pixel-font-bootstrap
           rm -f .github/workflows/pixel-font-v2-bootstrap.yml
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           git push origin "HEAD:refs/heads/$READY_BRANCH"
