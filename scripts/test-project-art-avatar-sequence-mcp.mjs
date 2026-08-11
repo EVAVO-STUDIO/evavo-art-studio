@@ -218,6 +218,7 @@ try {
   };
   const requestPath = path.join(workspace, 'avatar-sequence-request.json');
   const planPath = path.join(workspace, 'avatar-sequence-plan.json');
+  const bundleRoot = path.join(workspace, 'evidence', 'avatar-sequence-bundle');
   await writeFile(requestPath, `${JSON.stringify(request, null, 2)}\n`);
 
   const capabilitiesResponse = rpc(
@@ -233,6 +234,8 @@ try {
     [
       'evavo_art_avatar_sequence_capabilities',
       'evavo_art_compile_avatar_sequence',
+      'evavo_art_write_avatar_sequence_bundle',
+      'evavo_art_verify_avatar_sequence_bundle',
     ],
   );
   const capabilities = capabilitiesResponse.call.result.structuredContent;
@@ -243,6 +246,18 @@ try {
   assert.equal(capabilities.summary.writeEnabled, false);
   assert.equal(capabilities.summary.assignmentMode, 'owner-declared-only');
   assert.equal(capabilities.summary.runtimeActivationAllowed, false);
+  assert.equal(
+    capabilities.summary.bundleManifestSchema,
+    'evavo.project-art-avatar-sequence-bundle-manifest.v1',
+  );
+  assert.equal(
+    capabilities.summary.bundleReceiptSchema,
+    'evavo.project-art-avatar-sequence-bundle-receipt.v1',
+  );
+  assert.equal(capabilities.summary.bundleWritesAreCreateOnly, true);
+  assert.equal(capabilities.summary.wholeRunAtomicMaterialization, true);
+  assert.equal(capabilities.summary.sourceIdentitiesRevalidated, true);
+  assert.equal(capabilities.summary.sourceImageBytesIncluded, false);
   assert.equal(capabilities.bytesFlowThroughMcp, false);
   assert.equal(capabilities.credentialsForwardedToSubprocess, false);
 
@@ -285,6 +300,67 @@ try {
   assert.equal(plan.finalizationRequirements.runtimeActivationAllowed, false);
   assert.equal(plan.workspaceFilePlanRequest.operations.length, 4);
 
+  const gatedBundle = rpc('evavo_art_write_avatar_sequence_bundle', {
+    planPath,
+    bundleRoot,
+    createdAt: '2026-08-11T06:45:00.000Z',
+  });
+  assert.match(gatedBundle.call.error.message, /bundle writes are disabled/iu);
+  await mkdir(path.dirname(bundleRoot), { recursive: true });
+
+  const bundledResponse = rpc(
+    'evavo_art_write_avatar_sequence_bundle',
+    {
+      planPath,
+      bundleRoot,
+      createdAt: '2026-08-11T06:45:00.000Z',
+    },
+    { write: true },
+  );
+  const bundled = bundledResponse.call.result.structuredContent;
+  assert.equal(bundled.summary.status, 'materialized');
+  assert.equal(bundled.summary.sourceImageBytesIncluded, false);
+  assert.equal(bundled.summary.workspaceFilePlanApplied, false);
+  assert.equal(bundled.summary.runtimeActivationAllowed, false);
+  assert.equal(bundled.effects.bundleWrite, true);
+  assert.equal(bundled.effects.sourceMutation, false);
+  assert.equal(bundled.effects.repositoryMutation, false);
+  assert.equal(bundled.command.shell, false);
+  assert.equal(bundled.command.credentialsForwarded, false);
+
+  const verifiedResponse = rpc(
+    'evavo_art_verify_avatar_sequence_bundle',
+    { bundleRoot },
+  );
+  const verified = verifiedResponse.call.result.structuredContent;
+  assert.equal(verified.summary.status, 'passed');
+  assert.equal(verified.summary.sourceIdentitiesRevalidated, true);
+  assert.equal(verified.summary.sourceImageBytesIncluded, false);
+  assert.equal(verified.summary.runtimeActivationAllowed, false);
+  assert.equal(verified.effects.verificationRead, true);
+  assert.equal(verified.effects.bundleWrite, false);
+  assert.equal(verified.effects.sourceMutation, false);
+
+  const bundleReplay = rpc(
+    'evavo_art_write_avatar_sequence_bundle',
+    { planPath, bundleRoot, createdAt: '2026-08-11T06:45:00.000Z' },
+    { write: true },
+  );
+  assert.match(bundleReplay.call.error.message, /create-only and already exists/iu);
+
+  const escapedBundle = rpc(
+    'evavo_art_write_avatar_sequence_bundle',
+    {
+      planPath,
+      bundleRoot: path.join(os.tmpdir(), 'escaped-avatar-sequence-bundle'),
+    },
+    { write: true },
+  );
+  assert.match(
+    escapedBundle.call.error.message,
+    /outside EVAVO_ART_AVATAR_SEQUENCE_ROOTS/u,
+  );
+
   const replay = rpc(
     'evavo_art_compile_avatar_sequence',
     { workspaceRoot: workspace, requestPath, planPath, compiledAt: fixedTime },
@@ -314,7 +390,8 @@ try {
 
   console.log('Project Art avatar-sequence MCP tests passed.');
   console.log('- the compiler is callable through a bounded path-only MCP surface');
-  console.log('- plan writes remain opt-in and create-only');
+  console.log('- plan and bundle writes remain opt-in, create-only and atomic');
+  console.log('- bundle verification is read-only and revalidates exact source identities');
   console.log('- credentials and image bytes do not flow through MCP');
   console.log('- runtime activation, provider, repository, Git and publication authority remain false');
 } finally {

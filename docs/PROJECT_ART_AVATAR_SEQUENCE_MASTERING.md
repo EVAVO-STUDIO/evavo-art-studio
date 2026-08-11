@@ -135,11 +135,52 @@ It exposes:
 ```text
 evavo_art_avatar_sequence_capabilities
 evavo_art_compile_avatar_sequence
+evavo_art_write_avatar_sequence_bundle
+evavo_art_verify_avatar_sequence_bundle
 ```
 
-The write gate authorizes only creation of the JSON mastering plan. Source image bytes do not flow through MCP. The subprocess receives a credential-redacted environment, uses `shell: false`, and returns a bounded JSON summary rather than raw command output.
+The write gate authorizes only creation of the JSON mastering plan or the atomic create-only JSON evidence bundle. Bundle verification is read-only. Source image bytes do not flow through MCP. The subprocess receives a credential-redacted environment, uses `shell: false`, and returns a bounded JSON summary rather than raw command output.
 
 See `config/mcp.project-art-avatar-sequence.windows.example.json` for a connection example.
+
+
+## Atomic evidence bundle
+
+After compilation, materialize every JSON handoff as one atomic create-only JSON evidence bundle:
+
+```powershell
+node scripts/build-project-art-avatar-sequence-bundle.mjs `
+  --plan C:\EVAVO\staging\eva-sequence-mastering-plan.json `
+  --output C:\GitRepos\evavo-avatar-runtime\.evavo\sequence-bundles\eva-v1 `
+  --created-at 2026-08-11T06:45:00.000Z
+```
+
+The output directory is staged privately, every file is created with exclusive semantics, every source PNG identity is revalidated, and the complete inventory is checked before one final atomic rename. A replay into the same output path fails closed.
+
+The bundle contains only JSON evidence:
+
+```text
+mastering-plan.json
+handoffs/workspace-file-plan.json
+handoffs/runtime-draft.json
+handoffs/finalization-requirements.json
+handoffs/loop-closure/001-<clip-id>.json
+bundle-manifest.json
+bundle-receipt.json
+```
+
+`bundle-manifest.json` binds every payload path, byte count and SHA-256. `bundle-receipt.json` binds the manifest, the final output location and the complete non-receipt inventory. Both documents are self-hashed.
+
+Source image bytes are not copied into the bundle. The bundle does not apply the workspace file plan, run loop review, perform independent approval, seal a release, or activate the runtime.
+
+Verify an existing bundle independently:
+
+```powershell
+node scripts/verify-project-art-avatar-sequence-bundle.mjs `
+  --bundle-root C:\GitRepos\evavo-avatar-runtime\.evavo\sequence-bundles\eva-v1
+```
+
+Verification rejects missing or additional files, payload drift, manifest or receipt tampering, symlinks, hard links, a moved bundle, stale source PNGs, resealed authority escalation, or runtime activation.
 
 ## Output handoffs
 

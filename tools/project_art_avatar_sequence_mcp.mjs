@@ -13,6 +13,16 @@ const compiler = path.join(
   'scripts',
   'compile-project-art-avatar-sequence.mjs',
 );
+const bundleBuilder = path.join(
+  artStudioRoot,
+  'scripts',
+  'build-project-art-avatar-sequence-bundle.mjs',
+);
+const bundleVerifier = path.join(
+  artStudioRoot,
+  'scripts',
+  'verify-project-art-avatar-sequence-bundle.mjs',
+);
 const maximumDiagnosticCharacters = 8 * 1024;
 const maximumOutputBytes = 16 * 1024 * 1024;
 
@@ -159,10 +169,10 @@ function confined(value, label) {
   return candidate;
 }
 
-function requireWrite() {
+function requireWrite(kind) {
   if (!writeEnabled) {
     throw new Error(
-      'Avatar-sequence plan writes are disabled. Set EVAVO_ART_AVATAR_SEQUENCE_MCP_ALLOW_WRITE=true on the trusted local MCP deployment.',
+      `Avatar-sequence ${kind} writes are disabled. Set EVAVO_ART_AVATAR_SEQUENCE_MCP_ALLOW_WRITE=true on the trusted local MCP deployment.`,
     );
   }
 }
@@ -208,6 +218,28 @@ const tools = Object.freeze([
       ['workspaceRoot', 'requestPath', 'planPath'],
     ),
   },
+  {
+    name: 'evavo_art_write_avatar_sequence_bundle',
+    description:
+      'Materialize one compiled mastering plan as an atomic create-only JSON evidence bundle containing the exact plan, path-only workspace handoff, inert runtime draft, finalization requirements, loop requests, manifest and receipt. Requires the local bundle-write gate; copies no image bytes and performs no downstream action.',
+    inputSchema: objectSchema(
+      {
+        planPath: pathField,
+        bundleRoot: pathField,
+        createdAt: timestampField,
+      },
+      ['planPath', 'bundleRoot'],
+    ),
+  },
+  {
+    name: 'evavo_art_verify_avatar_sequence_bundle',
+    description:
+      'Independently verify an existing avatar-sequence evidence bundle, every payload hash, manifest, receipt, source identity and inert authority boundary. Read-only and does not require the write gate.',
+    inputSchema: objectSchema(
+      { bundleRoot: pathField },
+      ['bundleRoot'],
+    ),
+  },
 ]);
 const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
 
@@ -216,6 +248,8 @@ function envelope(summary, effects = {}) {
     summary,
     effects: {
       planWrite: effects.planWrite === true,
+      bundleWrite: effects.bundleWrite === true,
+      verificationRead: effects.verificationRead === true,
       sourceMutation: false,
       sourceDeletion: false,
       targetImageWrite: false,
@@ -239,12 +273,16 @@ function envelope(summary, effects = {}) {
 function capabilities() {
   return envelope({
     schema: 'evavo.project-art-avatar-sequence-capabilities.v1',
-    version: '2026-08-11.1',
+    version: '2026-08-12.1',
     writeEnabled,
     allowedRootCount: allowedRoots.length,
     commandTimeoutMs,
     requestSchema: 'evavo.project-art-avatar-sequence-request.v1',
     planSchema: 'evavo.project-art-avatar-sequence-mastering-plan.v1',
+    bundleManifestSchema:
+      'evavo.project-art-avatar-sequence-bundle-manifest.v1',
+    bundleReceiptSchema:
+      'evavo.project-art-avatar-sequence-bundle-receipt.v1',
     targetPackSchema: 'evavo_avatar_sequence_pack_v2',
     loopRequestSchema: 'evavo.project-art-loop-closure-request.v1',
     targetLoopEvidenceSchema:
@@ -253,6 +291,10 @@ function capabilities() {
     semanticInferencePerformed: false,
     timestampOrderingUsedAsSemantics: false,
     workspaceFileOperationsArePathOnly: true,
+    bundleWritesAreCreateOnly: true,
+    wholeRunAtomicMaterialization: true,
+    sourceIdentitiesRevalidated: true,
+    sourceImageBytesIncluded: false,
     runtimeActivationAllowed: false,
   });
 }
@@ -279,19 +321,7 @@ function boundedDiagnostic(value) {
     : `${text.slice(0, maximumDiagnosticCharacters)}\n[diagnostic truncated]`;
 }
 
-function runCompiler(input) {
-  requireWrite();
-  const args = [
-    compiler,
-    '--workspace-root',
-    confined(input.workspaceRoot, 'workspaceRoot'),
-    '--request',
-    confined(input.requestPath, 'requestPath'),
-    '--output',
-    confined(input.planPath, 'planPath'),
-  ];
-  const compiledAt = optionalTimestamp(input.compiledAt, 'compiledAt');
-  if (compiledAt) args.push('--compiled-at', compiledAt);
+function runJsonCommand(args, effects, label) {
   const result = spawnSync(process.execPath, args, {
     cwd: artStudioRoot,
     encoding: 'utf8',
@@ -312,14 +342,14 @@ function runCompiler(input) {
     summary = JSON.parse(lines.at(-1) || 'null');
   } catch (error) {
     throw new Error(
-      `Avatar-sequence compiler did not end with a JSON summary: ${boundedDiagnostic(error.message)}`,
+      `${label} did not end with a JSON summary: ${boundedDiagnostic(error.message)}`,
     );
   }
   if (!summary || typeof summary !== 'object' || Array.isArray(summary)) {
-    throw new Error('Avatar-sequence compiler summary must be an object.');
+    throw new Error(`${label} summary must be an object.`);
   }
   return {
-    ...envelope(summary, { planWrite: true }),
+    ...envelope(summary, effects),
     command: {
       executable: path.basename(process.execPath),
       argumentCount: args.length,
@@ -330,12 +360,69 @@ function runCompiler(input) {
   };
 }
 
+function runCompiler(input) {
+  requireWrite('plan');
+  const args = [
+    compiler,
+    '--workspace-root',
+    confined(input.workspaceRoot, 'workspaceRoot'),
+    '--request',
+    confined(input.requestPath, 'requestPath'),
+    '--output',
+    confined(input.planPath, 'planPath'),
+  ];
+  const compiledAt = optionalTimestamp(input.compiledAt, 'compiledAt');
+  if (compiledAt) args.push('--compiled-at', compiledAt);
+  return runJsonCommand(
+    args,
+    { planWrite: true },
+    'Avatar-sequence compiler',
+  );
+}
+
+function runBundleWriter(input) {
+  requireWrite('bundle');
+  const args = [
+    bundleBuilder,
+    '--plan',
+    confined(input.planPath, 'planPath'),
+    '--output',
+    confined(input.bundleRoot, 'bundleRoot'),
+  ];
+  const createdAt = optionalTimestamp(input.createdAt, 'createdAt');
+  if (createdAt) args.push('--created-at', createdAt);
+  return runJsonCommand(
+    args,
+    { bundleWrite: true },
+    'Avatar-sequence bundle writer',
+  );
+}
+
+function runBundleVerifier(input) {
+  const args = [
+    bundleVerifier,
+    '--bundle-root',
+    confined(input.bundleRoot, 'bundleRoot'),
+  ];
+  return runJsonCommand(
+    args,
+    { verificationRead: true },
+    'Avatar-sequence bundle verifier',
+  );
+}
+
 function callTool(name, input) {
   const definition = toolsByName.get(name);
   if (!definition) throw new Error(`Unknown tool: ${name}`);
   validateInput(definition, input);
   if (name === 'evavo_art_avatar_sequence_capabilities') return capabilities();
   if (name === 'evavo_art_compile_avatar_sequence') return runCompiler(input);
+  if (name === 'evavo_art_write_avatar_sequence_bundle') {
+    return runBundleWriter(input);
+  }
+  if (name === 'evavo_art_verify_avatar_sequence_bundle') {
+    return runBundleVerifier(input);
+  }
   throw new Error(`Unknown tool: ${name}`);
 }
 
@@ -368,7 +455,7 @@ for await (const line of input) {
         capabilities: { tools: {} },
         serverInfo: {
           name: 'evavo-project-art-avatar-sequence',
-          version: '1.0.0',
+          version: '1.1.0',
         },
       });
     } else if (request.method === 'notifications/initialized') {
