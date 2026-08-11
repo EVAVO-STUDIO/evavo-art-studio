@@ -1,0 +1,39 @@
+name: Temporary export avatar sequence mastering recovery
+
+on:
+  push:
+    branches:
+      - automation/avatar-sequence-mastering-recovery-20260811
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact recovery candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Package exact candidate source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          git archive --format=tar.gz --prefix=evavo-art-studio/ --output="${RUNNER_TEMP}/evavo-art-studio-avatar-sequence-recovery.tar.gz" "${GITHUB_SHA}"
+          test -s "${RUNNER_TEMP}/evavo-art-studio-avatar-sequence-recovery.tar.gz"
+          sha256sum "${RUNNER_TEMP}/evavo-art-studio-avatar-sequence-recovery.tar.gz" > "${RUNNER_TEMP}/evavo-art-studio-avatar-sequence-recovery.sha256"
+
+      - name: Upload exact recovery source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evavo-art-studio-avatar-sequence-recovery-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/evavo-art-studio-avatar-sequence-recovery.tar.gz
+            ${{ runner.temp }}/evavo-art-studio-avatar-sequence-recovery.sha256
+          if-no-files-found: error
+          retention-days: 1

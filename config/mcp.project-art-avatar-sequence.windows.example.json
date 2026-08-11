@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "evavo-project-art-avatar-sequence": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_sequence_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ART_AVATAR_SEQUENCE_ROOTS": "C:\\GitRepos\\evavo-avatar-runtime;C:\\EVAVO\\staging",
+        "EVAVO_ART_AVATAR_SEQUENCE_MCP_ALLOW_WRITE": "false",
+        "EVAVO_ART_AVATAR_SEQUENCE_MCP_TIMEOUT_MS": "600000"
+      }
+    }
+  }
+}
