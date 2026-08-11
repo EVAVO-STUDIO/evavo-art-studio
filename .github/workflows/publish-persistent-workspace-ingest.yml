@@ -1,0 +1,120 @@
+name: Temporary publish persistent workspace ingest
+
+on:
+  push:
+    branches:
+      - automation/publish-persistent-workspace-ingest-20260812
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_MAIN: e428304ce306703a95efe88b4e86eda589391bc9
+  EXPECTED_BUNDLE_SHA256: 8fd13a0216f964496c213b54214027c07892a444a263e58a6c017ddc77a46cd6
+  FEATURE_BRANCH: agent/persistent-workspace-external-ingest-20260812
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact carrier branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify exact release base and unused feature ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "$current_main" = "$EXPECTED_MAIN"
+          if git ls-remote --exit-code origin "refs/heads/$FEATURE_BRANCH" >/dev/null 2>&1; then
+            echo "Feature branch already exists: $FEATURE_BRANCH" >&2
+            exit 1
+          fi
+          test -s .evavo-transfer/persistent-workspace-ingest/release.tar.gz.b64
+
+      - name: Decode and verify exact source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/evavo-persistent-ingest
+          base64 --decode .evavo-transfer/persistent-workspace-ingest/release.tar.gz.b64 > /tmp/evavo-persistent-ingest/release.tar.gz
+          echo "$EXPECTED_BUNDLE_SHA256  /tmp/evavo-persistent-ingest/release.tar.gz" | sha256sum --check --strict
+          if tar -tzf /tmp/evavo-persistent-ingest/release.tar.gz | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo "Bundle contains an unsafe path" >&2
+            exit 1
+          fi
+          mkdir /tmp/evavo-persistent-ingest/payload
+          tar -xzf /tmp/evavo-persistent-ingest/release.tar.gz -C /tmp/evavo-persistent-ingest/payload
+          cd /tmp/evavo-persistent-ingest/payload
+          sha256sum --check --strict MANIFEST.sha256
+          test "$(wc -l < MANIFEST.sha256)" -eq 9
+
+      - name: Build clean feature branch from exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch --detach "$EXPECTED_MAIN"
+          git switch -c "$FEATURE_BRANCH"
+          while read -r digest relative; do
+            relative="${relative#./}"
+            source="/tmp/evavo-persistent-ingest/payload/$relative"
+            test -f "$source"
+            mkdir -p "$(dirname "$relative")"
+            cp -- "$source" "$relative"
+          done < /tmp/evavo-persistent-ingest/payload/MANIFEST.sha256
+          git diff --check
+          git diff --exit-code -- pnpm-lock.yaml
+
+      - name: Run focused external-ingest validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          test "$(node --version)" = "v22.14.0"
+          node scripts/check-persistent-artist-workspace-ingest.mjs
+
+      - name: Verify exact nine-file product scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/expected-files <<'FILES'
+          .github/workflows/persistent-artist-workspace-ingest.yml
+          config/mcp.persistent-artist-workspace-ingest.windows.example.json
+          docs/PERSISTENT_ARTIST_WORKSPACE_INGEST.md
+          scripts/check-persistent-artist-workspace-ingest.mjs
+          scripts/persistent-artist-workspace-ingest.mjs
+          scripts/project-art/persistent-workspace-ingest.mjs
+          scripts/test-persistent-artist-workspace-ingest.mjs
+          scripts/test-project-art-workspace-ingest-mcp.mjs
+          tools/project_art_workspace_ingest_mcp.mjs
+          FILES
+          git status --porcelain=v1 --untracked-files=all | sed -E 's/^.. //' | sort > /tmp/actual-files
+          sort /tmp/expected-files -o /tmp/expected-files
+          diff -u /tmp/expected-files /tmp/actual-files
+
+      - name: Commit and push without force
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add -- \
+            .github/workflows/persistent-artist-workspace-ingest.yml \
+            config/mcp.persistent-artist-workspace-ingest.windows.example.json \
+            docs/PERSISTENT_ARTIST_WORKSPACE_INGEST.md \
+            scripts/check-persistent-artist-workspace-ingest.mjs \
+            scripts/persistent-artist-workspace-ingest.mjs \
+            scripts/project-art/persistent-workspace-ingest.mjs \
+            scripts/test-persistent-artist-workspace-ingest.mjs \
+            scripts/test-project-art-workspace-ingest-mcp.mjs \
+            tools/project_art_workspace_ingest_mcp.mjs
+          git commit -m "feat(project-art): ingest external workspace assets"
+          feature_sha="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN"
+          git push origin "HEAD:refs/heads/$FEATURE_BRANCH"
+          echo "feature_sha=$feature_sha" >> "$GITHUB_OUTPUT"
+          printf 'Published `%s` at `%s`.\n' "$FEATURE_BRANCH" "$feature_sha" >> "$GITHUB_STEP_SUMMARY"
