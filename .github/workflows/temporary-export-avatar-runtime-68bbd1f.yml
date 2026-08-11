@@ -1,0 +1,41 @@
+name: Temporary export exact avatar runtime 68bbd1f
+
+on:
+  push:
+    branches:
+      - automation/export-art-studio-source-3604fc8-candidate-20260811
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Export exact avatar runtime source
+        shell: bash
+        env:
+          EXPECTED_RUNTIME: 68bbd1fbf91bfcac8f17c5148a34f82400ebed11
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/EVAVO-STUDIO/evavo-avatar-runtime.git "$RUNNER_TEMP/avatar-runtime"
+          git -C "$RUNNER_TEMP/avatar-runtime" checkout --detach "$EXPECTED_RUNTIME"
+          test "$(git -C "$RUNNER_TEMP/avatar-runtime" rev-parse HEAD)" = "$EXPECTED_RUNTIME"
+          git -C "$RUNNER_TEMP/avatar-runtime" archive --format=tar.gz --prefix=evavo-avatar-runtime/ --output="$RUNNER_TEMP/evavo-avatar-runtime-68bbd1f.tar.gz" "$EXPECTED_RUNTIME"
+          sha256sum "$RUNNER_TEMP/evavo-avatar-runtime-68bbd1f.tar.gz" > "$RUNNER_TEMP/evavo-avatar-runtime-68bbd1f.sha256"
+
+      - name: Upload exact runtime source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evavo-avatar-runtime-source-68bbd1fbf91bfcac8f17c5148a34f82400ebed11
+          path: |
+            ${{ runner.temp }}/evavo-avatar-runtime-68bbd1f.tar.gz
+            ${{ runner.temp }}/evavo-avatar-runtime-68bbd1f.sha256
+          if-no-files-found: error
+          retention-days: 1
