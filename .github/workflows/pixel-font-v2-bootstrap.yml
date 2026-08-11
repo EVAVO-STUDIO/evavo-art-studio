@@ -141,7 +141,6 @@ jobs:
           expected="$RUNNER_TEMP/expected-font-files.txt"
           cat > "$expected" <<'EOF'
           .github/workflows/pixel-font-studio-v2.yml
-          config/mcp.pixel-font-studio-v2.example.json
           config/pixel-font-families/chess-lord-v2/ChessLord_Herald.face.json
           config/pixel-font-families/chess-lord-v2/ChessLord_Text.face.json
           config/pixel-font-families/chess-lord-v2/ChessLord_UI.face.json
@@ -151,7 +150,6 @@ jobs:
           docs/PIXEL_FONT_STUDIO_V2.md
           evavo.reliability.json
           package.json
-          requirements/pixel-font-studio-v2.txt
           scripts/check-pixel-font-studio-v2.mjs
           scripts/pixel-font-studio-v2-mcp.mjs
           tools/pixel_font_studio_v2.py
