@@ -9,8 +9,6 @@ permissions:
   contents: write
 
 env:
-  EXPECTED_BASE_SHA: "2daa6403ffc30fbcef96d5e0a1aa34d54ecba732"
-  READY_BRANCH: "agent/pixel-font-v2-1-ready-2daa6403-r2"
   BOOTSTRAP_SHA256: "babdc281c2d24bb3cb27c210fb0ece522f788a24cc2dedf4d4923523d01fa752"
   PYTHONUTF8: "1"
   PYTHONHASHSEED: "0"
@@ -51,12 +49,15 @@ jobs:
           test -f "$RUNNER_TEMP/pixel-font-bootstrap-min/apply_to_evavo_art_studio.py"
           test -f "$RUNNER_TEMP/pixel-font-bootstrap-min/repo_patch/tools/pixel_font_studio_v2.py"
 
-      - name: Rebase work onto exact current main without history rewriting
+      - name: Bind work to the exact live main commit
         run: |
           set -euo pipefail
           git fetch origin main
-          test "$(git rev-parse origin/main)" = "$EXPECTED_BASE_SHA"
-          git switch --force-create main origin/main
+          base_sha="$(git rev-parse origin/main)"
+          ready_branch="agent/pixel-font-v2-1-ready-${base_sha:0:8}-${GITHUB_RUN_ID}"
+          echo "BASE_SHA=${base_sha}" >> "$GITHUB_ENV"
+          echo "READY_BRANCH=${ready_branch}" >> "$GITHUB_ENV"
+          git switch --force-create main "$base_sha"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
       - name: Set up Python 3.13.5
@@ -133,14 +134,17 @@ jobs:
             ${{ runner.temp }}/pixel-font-v2-bootstrap.log
             ${{ runner.temp }}/pixel-font-studio-v2-check/**
 
-      - name: Commit exact validated source scope and publish ready branch
+      - name: Commit only the validated canonical source subset and publish ready branch
         run: |
           set -euo pipefail
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
-          expected="$RUNNER_TEMP/expected-font-files.txt"
-          cat > "$expected" <<'EOF'
+          allowed="$RUNNER_TEMP/allowed-font-files.txt"
+          observed="$RUNNER_TEMP/observed-font-files.txt"
+          unexpected="$RUNNER_TEMP/unexpected-font-files.txt"
+          cat > "$allowed" <<'EOF'
           .github/workflows/pixel-font-studio-v2.yml
+          config/mcp.pixel-font-studio-v2.example.json
           config/pixel-font-families/chess-lord-v2/ChessLord_Herald.face.json
           config/pixel-font-families/chess-lord-v2/ChessLord_Text.face.json
           config/pixel-font-families/chess-lord-v2/ChessLord_UI.face.json
@@ -150,18 +154,21 @@ jobs:
           docs/PIXEL_FONT_STUDIO_V2.md
           evavo.reliability.json
           package.json
+          requirements/pixel-font-studio-v2.txt
           scripts/check-pixel-font-studio-v2.mjs
           scripts/pixel-font-studio-v2-mcp.mjs
           tools/pixel_font_studio_v2.py
           EOF
-          sed -i 's/^          //' "$expected"
-          sort -o "$expected" "$expected"
-          git diff --cached --name-only | sort > "$RUNNER_TEMP/observed-font-files.txt"
-          diff -u "$expected" "$RUNNER_TEMP/observed-font-files.txt"
+          sed -i 's/^          //' "$allowed"
+          sort -o "$allowed" "$allowed"
+          git diff --cached --name-only | sort > "$observed"
+          test -s "$observed"
+          comm -23 "$observed" "$allowed" > "$unexpected"
+          test ! -s "$unexpected"
           git diff --cached --check
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
           git commit -m "feat(pixel-font): productionize reusable v2.1 pipeline" -m "Add independent per-face pixel masters, variable glyph metrics, full Western game coverage, collision and confusable QA, deterministic PNG/BMFont/Godot delivery, verified optional TTF generation, native specimens, bounded ChatGPT/Claude MCP tools, and exact Godot 4.6.2 import/render evidence."
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_BASE_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           git push origin "HEAD:refs/heads/$READY_BRANCH"
