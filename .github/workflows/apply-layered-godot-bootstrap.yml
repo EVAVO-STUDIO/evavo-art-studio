@@ -86,6 +86,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          pnpm run build:domain
           pnpm --filter @evavo/art-direction test
           pnpm --filter @evavo/art-studio-mcp test
           node --check packages/art-direction/test/layered-godot.test.mjs
