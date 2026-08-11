@@ -1,0 +1,49 @@
+name: Temporary fix avatar sequence bundle publisher
+
+on:
+  push:
+    branches:
+      - agent/avatar-sequence-atomic-bundle-20260812
+    paths:
+      - ".github/workflows/temporary-fix-avatar-sequence-bundle-publisher.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Correct the base-relative scope check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/temporary-publish-avatar-sequence-atomic-bundle.yml')
+          source = path.read_text(encoding='utf-8')
+          old = """          git status --porcelain=v1 --untracked-files=all | sed -E 's/^.. //' | LC_ALL=C sort > \"$RUNNER_TEMP/actual-paths.txt\"\n          diff -u \"$RUNNER_TEMP/expected-sorted.txt\" \"$RUNNER_TEMP/actual-paths.txt\"\n"""
+          new = """          git add -A\n          git diff --cached --name-only \"$EXPECTED_BASE\" | LC_ALL=C sort > \"$RUNNER_TEMP/actual-paths.txt\"\n          diff -u \"$RUNNER_TEMP/expected-sorted.txt\" \"$RUNNER_TEMP/actual-paths.txt\"\n          git reset\n"""
+          if old not in source:
+              raise SystemExit('publisher scope block differs')
+          path.write_text(source.replace(old, new), encoding='utf-8')
+          PY
+          rm .github/workflows/temporary-fix-avatar-sequence-bundle-publisher.yml
+          git diff --check
+
+      - name: Commit and push corrected publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add -A
+          git commit -m "fix: compare bundle carrier scope to main"
+          git push origin HEAD:agent/avatar-sequence-atomic-bundle-20260812
