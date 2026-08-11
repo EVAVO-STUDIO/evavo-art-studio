@@ -67,7 +67,7 @@ jobs:
           tar -xzf "$RUNNER_TEMP/avatar-sequence-atomic-bundle.tar.gz"
           rm -rf .github/avatar-sequence-bundle-payload
           rm .github/workflows/temporary-publish-avatar-sequence-atomic-bundle.yml
-          git diff --name-only "$EXPECTED_BASE" | LC_ALL=C sort > "$RUNNER_TEMP/actual-paths.txt"
+          git status --porcelain=v1 --untracked-files=all | sed -E 's/^.. //' | LC_ALL=C sort > "$RUNNER_TEMP/actual-paths.txt"
           diff -u "$RUNNER_TEMP/expected-sorted.txt" "$RUNNER_TEMP/actual-paths.txt"
 
       - name: Run complete avatar sequence validation
