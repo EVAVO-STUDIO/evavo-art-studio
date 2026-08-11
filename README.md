@@ -39,6 +39,9 @@ This repository is intentionally broader than an image generator. It is the shar
 - an optional pg-boss transport adapter that keeps delivery separate from authoritative runtime and artifact evidence;
 - protected owner operations UI with signed HttpOnly sessions, bounded server-side API proxying, secret redaction and durable job controls;
 - safe local repository inspector with Godot project and existing-art detection;
+- persistent Artist Workspaces for ChatGPT, Claude and trusted agents, separating immutable originals, editable working copies, append-only versions, masks, scratch, review, masters, exports and exact EVAVO Storage handoffs;
+- deterministic professional mastering with arbitrary rotation, affine and perspective transforms, curves, channel mixing, tonal adjustment, blur and edge filters, alpha feathering, defringing, shadows, glows and release-profile evidence;
+- bounded keyframed 2D motion rendering with layer masks, blend modes, anchors, easing, subframe motion blur, PNG sequences, GIF previews and exact motion manifests;
 - JSON-first CLI for planning, provider compilation, alpha mastering, candidate selection, promotion, repository inspection, sprite QA, engine delivery, runtime control and artifact governance;
 - versioned REST API for planning, provider and selection contracts, QA, authenticated atlas writes and authenticated runtime or artifact operations;
 - Next.js control plane with the continuity-aware production compiler, browser QA workbenches and private operations control room;
@@ -138,6 +141,14 @@ pnpm dev:worker
 ```
 
 The web workspace starts at `http://localhost:4200`. The private owner control room is at `http://localhost:4200/operations`. The standalone API starts on `127.0.0.1:4100` by default.
+
+## Persistent Artist Workspace and professional mastering
+
+ChatGPT, Claude and trusted EVAVO agents can create a path-confined persistent workspace, preserve immutable originals, make append-only working snapshots, compile deterministic image or motion plans and prepare exact EVAVO Storage handoffs without sending image bytes through MCP arguments. Workspace writes require the explicit local write gate and remain separate from provider execution, creative approval, repository mutation and publication.
+
+The Project Art sandbox includes the deterministic operation families needed for professional finishing: crop, pad, translate, pixel-safe and continuous-tone resize, arbitrary rotation, affine and perspective transforms, colour replacement, grayscale, inversion, posterisation, thresholding, gamma, hue, curves, channel mixing, multiple blur and edge filters, alpha morphology, feathering, defringing, halo and matte cleanup, ordered compositing, shadows and glows. `image-master` applies a release profile and emits a self-hashed mastering report. `motion-sequence` renders bounded keyframed layers to PNG frames, an exact manifest and an optional GIF preview.
+
+See [`docs/PERSISTENT_ARTIST_WORKSPACE.md`](./docs/PERSISTENT_ARTIST_WORKSPACE.md) and [`docs/PROJECT_ART_MASTERING_AND_MOTION.md`](./docs/PROJECT_ART_MASTERING_AND_MOTION.md).
 
 ## Provider candidate execution
 

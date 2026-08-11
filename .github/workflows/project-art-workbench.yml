@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "scripts/project-art/**"
+      - "scripts/project-art/persistent-workspace.mjs"
       - "scripts/compile-project-art-intelligence.mjs"
       - "scripts/compile-project-art-sandbox.mjs"
       - "scripts/compile-project-art-intake.mjs"
@@ -16,6 +17,11 @@ on:
       - "scripts/check-project-art-workbench.mjs"
       - "scripts/test-project-art-workbench.mjs"
       - "scripts/test-project-art-workspace-mcp.mjs"
+      - "scripts/persistent-artist-workspace.mjs"
+      - "scripts/check-persistent-artist-workspace.mjs"
+      - "scripts/test-persistent-artist-workspace.mjs"
+      - "scripts/check-project-art-mastering-and-motion.mjs"
+      - "scripts/test-project-art-mastering-and-motion.mjs"
       - "scripts/check-project-art-intake.mjs"
       - "scripts/test-project-art-intake.mjs"
       - "tools/run_project_art_sandbox.py"
@@ -28,6 +34,8 @@ on:
       - "config/project-art-operations.v1.json"
       - "config/mcp.project-art-workspace.windows.example.json"
       - "docs/PROJECT_ART_WORKBENCH.md"
+      - "docs/PERSISTENT_ARTIST_WORKSPACE.md"
+      - "docs/PROJECT_ART_MASTERING_AND_MOTION.md"
       - "docs/PROJECT_ART_LOOP_CLOSURE.md"
       - "docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md"
       - "package.json"
@@ -38,6 +46,7 @@ on:
       - main
     paths:
       - "scripts/project-art/**"
+      - "scripts/project-art/persistent-workspace.mjs"
       - "scripts/compile-project-art-intelligence.mjs"
       - "scripts/compile-project-art-sandbox.mjs"
       - "scripts/compile-project-art-intake.mjs"
@@ -50,6 +59,11 @@ on:
       - "scripts/check-project-art-workbench.mjs"
       - "scripts/test-project-art-workbench.mjs"
       - "scripts/test-project-art-workspace-mcp.mjs"
+      - "scripts/persistent-artist-workspace.mjs"
+      - "scripts/check-persistent-artist-workspace.mjs"
+      - "scripts/test-persistent-artist-workspace.mjs"
+      - "scripts/check-project-art-mastering-and-motion.mjs"
+      - "scripts/test-project-art-mastering-and-motion.mjs"
       - "scripts/check-project-art-intake.mjs"
       - "scripts/test-project-art-intake.mjs"
       - "tools/run_project_art_sandbox.py"
@@ -62,6 +76,8 @@ on:
       - "config/project-art-operations.v1.json"
       - "config/mcp.project-art-workspace.windows.example.json"
       - "docs/PROJECT_ART_WORKBENCH.md"
+      - "docs/PERSISTENT_ARTIST_WORKSPACE.md"
+      - "docs/PROJECT_ART_MASTERING_AND_MOTION.md"
       - "docs/PROJECT_ART_LOOP_CLOSURE.md"
       - "docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md"
       - "package.json"
@@ -99,10 +115,16 @@ jobs:
         with:
           python-version: "3.13.5"
           cache: pip
-          cache-dependency-path: requirements-image-pipeline.txt
+          cache-dependency-path: |
+            requirements-image-pipeline.txt
+            requirements/pixel-font-studio-v2.txt
 
-      - name: Install exact image backend
-        run: python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
+      - name: Install exact Python validation backends
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
 
       - name: Verify exact Python image toolchain
         shell: bash
@@ -110,6 +132,7 @@ jobs:
           set -euo pipefail
           [[ "$(python -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')" == "3.13.5" ]]
           [[ "$(python -c 'import PIL; print(PIL.__version__)')" == "12.2.0" ]]
+          [[ "$(python -c 'import fontTools; print(fontTools.__version__)')" == "4.63.0" ]]
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -133,6 +156,17 @@ jobs:
 
       - name: Verify project-art contracts and static authority boundary
         run: node scripts/check-project-art-workbench.mjs
+
+      - name: Verify persistent Artist Workspace contracts and regressions
+        env:
+          PROJECT_ART_REQUIRE_PILLOW: "1"
+        run: pnpm run project-art:workspace:persistent:check
+
+      - name: Run professional mastering and keyframed motion adversary
+        env:
+          PROJECT_ART_REQUIRE_PILLOW: "1"
+          PROJECT_ART_REQUIRE_PROVIDER_VALIDATION: "1"
+        run: pnpm run project-art:mastering:check
 
       - name: Run final-to-first loop-closure adversary
         env:
@@ -178,6 +212,12 @@ jobs:
           grep -F 'evavo.project-art-atlas-plan.v1' scripts/project-art/atlas-contract.mjs
           grep -F 'evavo.project-art-godot-region-map.v1' tools/project_art_atlas_execution.py
           grep -F 'evavo.project-art-workspace-capabilities.v1' tools/project_art_workspace_mcp.mjs
+          grep -F 'evavo.persistent-artist-workspace-manifest.v1' scripts/project-art/persistent-workspace.mjs
+          grep -F 'evavo.storage-art-ingest-request.v1' scripts/project-art/persistent-workspace.mjs
+          grep -F 'evavo.project-art-mastering-report.v1' tools/run_project_art_sandbox.py
+          grep -F 'evavo.project-art-motion-sequence.v1' tools/run_project_art_sandbox.py
+          grep -F 'evavo_art_compile_workspace_create' tools/project_art_workspace_mcp.mjs
+          grep -F 'evavo_art_prepare_storage_handoff' tools/project_art_workspace_mcp.mjs
           grep -F 'evavo_art_run_sandbox' tools/project_art_workspace_mcp.mjs
           grep -F 'evavo_art_compile_reference_plan' tools/project_art_workspace_mcp.mjs
           grep -F 'EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE' tools/project_art_workspace_mcp.mjs
@@ -194,6 +234,8 @@ jobs:
           ! grep -F 'candidatePromotion: true' scripts/project-art/reference-derived.mjs
           ! grep -F 'forcePush: true' scripts/project-art/reference-derived.mjs
           ! grep -F 'git push' tools/run_project_art_sandbox.py
+          ! grep -F 'git push' scripts/project-art/persistent-workspace.mjs
+          ! grep -F 'storageWrite: true' scripts/project-art/persistent-workspace.mjs
           ! grep -F 'git push' tools/run_project_art_loop_closure.py
           ! grep -F 'git push' tools/run_project_art_intake.py
           ! grep -F 'git push' tools/build_project_art_atlas.py
