@@ -18,6 +18,7 @@ const files = Object.freeze({
   runtime: 'tools/run_project_art_loop_closure.py',
   tests: 'scripts/test-project-art-loop-closure.mjs',
   documentation: 'docs/PROJECT_ART_LOOP_CLOSURE.md',
+  workflow: '.github/workflows/project-art-workbench.yml',
   package: 'package.json',
 });
 
@@ -79,6 +80,10 @@ function read(relative) {
   return source;
 }
 
+function count(source, token) {
+  return source.split(token).length - 1;
+}
+
 function requireTokens(label, source, tokens) {
   for (const token of tokens) {
     if (!source.includes(token)) errors.push(`${label} is missing: ${token}`);
@@ -104,6 +109,9 @@ requireTokens('Loop-closure compiler', source.compiler, [
   'identicalClosureAccepted: true',
   'PROJECT_ART_LOOP_CLOSURE_SOURCE_HASH_MISMATCH',
   'PROJECT_ART_LOOP_CLOSURE_REQUEST_INVALID',
+  'PROJECT_ART_LOOP_CLOSURE_REQUEST_BYTES_MISMATCH',
+  'canonicalJson(requestFromBytes) !== canonicalJson(request)',
+  'requestSha256: hashBytes(requestBytes)',
   'PROJECT_ART_LOOP_CLOSURE_PATH_SYMLINK',
   'PROJECT_ART_LOOP_CLOSURE_DIMENSION_DRIFT',
   'PROJECT_ART_LOOP_CLOSURE_PIXEL_BUDGET_EXCEEDED',
@@ -142,6 +150,8 @@ requireTokens('Loop-closure runtime', source.runtime, [
   'wholeRunAtomicPublication',
   'creativeApprovalPerformed',
   'runtimeApprovalPerformed',
+  '"targetRepositoryMutation",',
+  '{key: False for key in AUTHORITY_KEYS}',
 ]);
 forbidTokens('Loop-closure runtime', source.runtime, [
   'import requests',
@@ -160,6 +170,8 @@ requireTokens('Loop-closure adversarial tests', source.tests, [
   'identical first/last closure is accepted',
   'loop-closure-excessive-frame-change',
   'loop-closure-centroid-shift-exceeded',
+  'PROJECT_ART_LOOP_CLOSURE_REQUEST_BYTES_MISMATCH',
+  'different-request-bytes',
   'PROJECT_ART_LOOP_CLOSURE_SOURCE_IDENTITY_MISMATCH',
   'PROJECT_ART_LOOP_CLOSURE_FRAME_COUNT_INVALID',
   'PROJECT_ART_LOOP_CLOSURE_AUTHORITY_INVALID',
@@ -173,6 +185,7 @@ requireTokens('Loop-closure documentation', source.documentation, [
   '# Project Art loop-closure review',
   'final frame back to frame zero',
   'Exact identical endpoints are valid',
+  'request bytes',
   'maximumChangedFraction',
   'maximumMeanChannelDelta',
   'maximumAlphaChangedFraction',
@@ -182,6 +195,32 @@ requireTokens('Loop-closure documentation', source.documentation, [
   'onion-skin.png',
   'No creative approval',
   'No source, provider, repository, Git, deployment or publication authority',
+]);
+
+const workflowPaths = [
+  'scripts/compile-project-art-loop-closure.mjs',
+  'scripts/check-project-art-loop-closure.mjs',
+  'scripts/test-project-art-loop-closure.mjs',
+  'tools/run_project_art_loop_closure.py',
+  'docs/PROJECT_ART_LOOP_CLOSURE.md',
+];
+for (const workflowPath of workflowPaths) {
+  const token = `- "${workflowPath}"`;
+  if (count(source.workflow, token) !== 2) {
+    errors.push(
+      `Project Art workflow must trigger on pull_request and main push for ${workflowPath}`,
+    );
+  }
+}
+requireTokens('Project Art workflow loop boundary', source.workflow, [
+  'Run final-to-first loop-closure adversary',
+  'pnpm run project-art:loop:check',
+  "grep -F 'evavo.project-art-loop-closure-plan.v1' scripts/compile-project-art-loop-closure.mjs",
+  "grep -F 'PROJECT_ART_LOOP_CLOSURE_REQUEST_BYTES_MISMATCH' scripts/compile-project-art-loop-closure.mjs",
+  "grep -F 'sourceHashesRevalidatedAfterExecution' tools/run_project_art_loop_closure.py",
+  "grep -F '\"targetRepositoryMutation\",' tools/run_project_art_loop_closure.py",
+  "grep -F '{key: False for key in AUTHORITY_KEYS}' tools/run_project_art_loop_closure.py",
+  "! grep -F 'git push' tools/run_project_art_loop_closure.py",
 ]);
 
 let manifest;
@@ -238,8 +277,11 @@ if (errors.length) {
 
 console.log('Project Art loop-closure guard passed.');
 console.log('- final-to-first seam review is explicit, content-addressed and bounded');
+console.log('- request object, request bytes and recorded request SHA-256 remain one exact identity');
 console.log('- exact identical endpoints remain valid for deliberate seamless loops');
 console.log('- excessive pixel, channel, alpha and centroid seam drift blocks review');
 console.log('- source hashes are revalidated before and after atomic evidence publication');
+console.log('- every loop implementation file is a first-class pull-request and main-push workflow trigger');
+console.log('- the canonical false-authority map is checked semantically rather than through a nonexistent literal');
 console.log('- the focused adversary is mandatory inside the Project Art workbench chain');
 console.log('- no creative approval, source mutation, provider, repository, Git, deployment or publication authority was introduced');

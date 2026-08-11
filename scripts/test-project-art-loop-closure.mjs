@@ -155,6 +155,21 @@ for name, x in frames.items():
   assert.equal(goodPlan.authority.targetRepositoryMutation, false);
   assert.match(goodPlan.documentSha256, /^[a-f0-9]{64}$/u);
 
+  await expectCompileError(
+    compileProjectArtLoopClosure({
+      workspaceRoot: workspace,
+      request: goodRequest,
+      requestBytes: Buffer.from(
+        JSON.stringify({
+          ...goodRequest,
+          reviewId: 'different-request-bytes',
+        }),
+      ),
+      compiledAt: fixedTime,
+    }),
+    'PROJECT_ART_LOOP_CLOSURE_REQUEST_BYTES_MISMATCH',
+  );
+
   const requestPath = path.join(workspace, 'good-request.json');
   const planPath = path.join(workspace, 'good-plan.json');
   await writeFile(requestPath, goodRequestText);
@@ -374,11 +389,11 @@ for name, x in frames.items():
   }
 
   console.log('Project Art loop-closure tests passed.');
-  console.log('- exact final-to-first seam identity is compiled and revalidated');
+  console.log('- exact request bytes, final-to-first seam identity and source bytes are independently bound');
   console.log('- an identical first/last closure is accepted as a valid seamless endpoint');
   console.log('- excessive pixel, alpha, channel and centroid seam drift blocks the review');
   console.log('- difference, overlay and onion-skin evidence is create-only and atomic');
-  console.log('- stale sources, rehashed limit drift, symlinks, bad hashes, unknown keys, single-frame requests and false authority fail closed');
+  console.log('- mismatched request bytes, stale sources, rehashed limit drift, symlinks, bad hashes, unknown keys, single-frame requests and false authority fail closed');
   console.log('- no provider, source, repository, Git, deployment or publication mutation occurred');
 } finally {
   await rm(temporary, { recursive: true, force: true });

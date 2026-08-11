@@ -176,6 +176,26 @@ function hashBytes(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function parseRequestBytes(value) {
+  let text;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(value);
+  } catch {
+    fail(
+      'PROJECT_ART_LOOP_CLOSURE_UTF8_INVALID',
+      'requestBytes are not valid UTF-8.',
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    fail(
+      'PROJECT_ART_LOOP_CLOSURE_REQUEST_INVALID',
+      'requestBytes are not valid JSON.',
+    );
+  }
+}
+
 export function withProjectArtLoopClosureDocumentHash(value) {
   const document = { ...value };
   delete document.documentSha256;
@@ -496,6 +516,7 @@ export async function compileProjectArtLoopClosure({
       'requestBytes must remain inside the request boundary.',
     );
   }
+  const requestFromBytes = parseRequestBytes(requestBytes);
   if (!isRecord(request) || request.schema !== PROJECT_ART_LOOP_CLOSURE_REQUEST_SCHEMA) {
     fail(
       'PROJECT_ART_LOOP_CLOSURE_REQUEST_INVALID',
@@ -618,6 +639,12 @@ export async function compileProjectArtLoopClosure({
     fail(
       'PROJECT_ART_LOOP_CLOSURE_PIXEL_BUDGET_EXCEEDED',
       'Loop-closure seam and preview surfaces exceed the active decoded-image boundary.',
+    );
+  }
+  if (canonicalJson(requestFromBytes) !== canonicalJson(request)) {
+    fail(
+      'PROJECT_ART_LOOP_CLOSURE_REQUEST_BYTES_MISMATCH',
+      'requestBytes must encode the exact supplied request object.',
     );
   }
 

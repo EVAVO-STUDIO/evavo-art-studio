@@ -83,6 +83,18 @@ A frame may also be expressed as an object with an owner-supplied expected hash:
 
 The compiler rejects duplicate paths, single-frame requests, non-PNG masters, symbolic path components, hard-linked files, source changes during hashing, dimension drift, invalid expected hashes and false authority claims.
 
+## Exact request-byte admission
+
+The compiler does not trust an in-memory request object and a separate request byte stream as interchangeable inputs. It decodes the supplied request bytes as strict UTF-8 JSON, canonicalises that decoded document and compares it with the supplied request object before a plan may be emitted.
+
+The plan’s `requestSha256` is therefore the SHA-256 of the exact admitted request bytes whose decoded meaning matches the compiled request. A module caller cannot supply one request object while recording the hash of another document. Valid JSON with different semantic content fails with:
+
+```text
+PROJECT_ART_LOOP_CLOSURE_REQUEST_BYTES_MISMATCH
+```
+
+Invalid UTF-8 or invalid JSON fails before any plan is published. Formatting and JSON object-key order may differ because admission compares canonical semantic content, while the receipt still preserves the exact admitted byte hash.
+
 ## Compile the exact plan
 
 ```bash
@@ -175,12 +187,13 @@ This runs the source guard and executable adversary. It proves that:
 
 - an exact identical closure passes;
 - an excessive final-to-first jump is blocked;
+- request bytes cannot claim the identity of a different request object;
 - difference, overlay and onion-skin outputs are produced atomically;
 - source tampering after compilation fails before publication;
 - single-frame requests, bad hashes, symlinks and false authority fail closed;
 - no provider or repository mutation is introduced.
 
-The loop-closure guard is also part of `pnpm run project-art:check`.
+The loop-closure guard is also part of `pnpm run project-art:check`. Every loop compiler, runtime, test and operator-contract file is an explicit pull-request and `main`-push path trigger for the permanent Project Art workflow.
 
 ## Authority boundary
 
