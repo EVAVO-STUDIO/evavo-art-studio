@@ -17,14 +17,19 @@ const relativeFiles = [
   'scripts/compile-project-art-sandbox.mjs',
   'scripts/compile-reference-derived-image-plan.mjs',
   'scripts/stage-reference-derived-artifacts.mjs',
+  'scripts/compile-project-art-loop-closure.mjs',
+  'scripts/check-project-art-loop-closure.mjs',
+  'scripts/test-project-art-loop-closure.mjs',
   'scripts/check-project-art-workbench.mjs',
   'scripts/test-project-art-workbench.mjs',
   'scripts/test-project-art-workspace-mcp.mjs',
   'tools/run_project_art_sandbox.py',
+  'tools/run_project_art_loop_closure.py',
   'tools/project_art_workspace_mcp.mjs',
   'config/project-art-operations.v1.json',
   'config/mcp.project-art-workspace.windows.example.json',
   'docs/PROJECT_ART_WORKBENCH.md',
+  'docs/PROJECT_ART_LOOP_CLOSURE.md',
   'docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md',
   '.github/workflows/project-art-workbench.yml',
   'package.json',
@@ -128,6 +133,48 @@ const sourceAssertions = {
     'independentApprovalPerformed: false',
     'providerExecution: false',
   ],
+  'scripts/compile-project-art-loop-closure.mjs': [
+    'evavo.project-art-loop-closure-request.v1',
+    'evavo.project-art-loop-closure-plan.v1',
+    'fromFrameIndex: frames.length - 1',
+    'toFrameIndex: 0',
+    'identicalClosureAccepted: true',
+    'sourceHashesRevalidatedBeforeExecution: true',
+    'sourceHashesRevalidatedAfterExecution: true',
+    'wholeRunAtomicPublication: true',
+    'providerExecution',
+    'targetRepositoryMutation',
+  ],
+  'scripts/check-project-art-loop-closure.mjs': [
+    'Project Art loop-closure guard passed.',
+    'project-art:loop:compile',
+    'project-art:loop:run',
+    'project-art:loop:check',
+    'pnpm run project-art:loop:check',
+  ],
+  'scripts/test-project-art-loop-closure.mjs': [
+    'Project Art loop-closure tests passed.',
+    'identical first/last closure is accepted',
+    'loop-closure-excessive-frame-change',
+    'loop-closure-centroid-shift-exceeded',
+    'PROJECT_ART_LOOP_CLOSURE_SOURCE_IDENTITY_MISMATCH',
+    'PROJECT_ART_LOOP_CLOSURE_LIMIT_DRIFT',
+  ],
+  'tools/run_project_art_loop_closure.py': [
+    'evavo.project-art-loop-closure-review.v1',
+    'evavo.project-art-loop-closure-receipt.v1',
+    'loop-closure-excessive-frame-change',
+    'loop-closure-mean-channel-delta-exceeded',
+    'loop-closure-alpha-change-exceeded',
+    'loop-closure-centroid-shift-exceeded',
+    'identicalClosureAccepted',
+    'difference.png',
+    'overlay.png',
+    'onion-skin.png',
+    'os.replace(staging, output)',
+    'creativeApprovalPerformed',
+    'runtimeApprovalPerformed',
+  ],
   'tools/project_art_workspace_mcp.mjs': [
     'evavo.project-art-workspace-capabilities.v1',
     'evavo_art_workspace_capabilities',
@@ -193,6 +240,17 @@ const sourceAssertions = {
     'aggregate source-byte boundary',
     'create-only output-file and output-byte budgets',
   ],
+  'docs/PROJECT_ART_LOOP_CLOSURE.md': [
+    '# Project Art loop-closure review',
+    'final frame back to frame zero',
+    'Exact identical endpoints are valid',
+    'maximumChangedFraction',
+    'maximumMeanChannelDelta',
+    'maximumAlphaChangedFraction',
+    'maximumCentroidShiftPixels',
+    'No creative approval',
+    'No source, provider, repository, Git, deployment or publication authority',
+  ],
   '.github/workflows/project-art-workbench.yml': [
     'PROJECT_ART_REQUIRE_PILLOW: "1"',
     'PROJECT_ART_REQUIRE_PROVIDER_VALIDATION: "1"',
@@ -214,6 +272,7 @@ for (const relative of [
   'scripts/project-art/intelligence.mjs',
   'scripts/project-art/sandbox.mjs',
   'scripts/project-art/reference-derived.mjs',
+  'scripts/compile-project-art-loop-closure.mjs',
 ]) {
   const source = contents.get(relative);
   for (const forbidden of [
@@ -227,8 +286,13 @@ for (const relative of [
     assert.ok(!source.includes(forbidden), `${relative} contains forbidden authority: ${forbidden}`);
   }
 }
-assert.ok(!contents.get('tools/run_project_art_sandbox.py').includes('git push'));
-assert.ok(!contents.get('tools/run_project_art_sandbox.py').includes('subprocess'));
+for (const relative of [
+  'tools/run_project_art_sandbox.py',
+  'tools/run_project_art_loop_closure.py',
+]) {
+  assert.ok(!contents.get(relative).includes('git push'), `${relative} contains git push`);
+  assert.ok(!contents.get(relative).includes('subprocess'), `${relative} contains subprocess`);
+}
 for (const forbidden of ['git push', 'candidateApproval: true', 'candidatePromotion: true', 'repositoryMutation: true', 'forcePush: true']) {
   assert.ok(!contents.get('tools/project_art_workspace_mcp.mjs').includes(forbidden), `workspace MCP contains forbidden token: ${forbidden}`);
 }
@@ -240,12 +304,26 @@ const expectedScripts = {
   'project-art:sandbox:run': 'python tools/run_project_art_sandbox.py',
   'project-art:reference:compile': 'node scripts/compile-reference-derived-image-plan.mjs',
   'project-art:reference:stage': 'node scripts/stage-reference-derived-artifacts.mjs',
+  'project-art:loop:compile': 'node scripts/compile-project-art-loop-closure.mjs',
+  'project-art:loop:run': 'python tools/run_project_art_loop_closure.py',
+  'project-art:loop:check': 'node scripts/check-project-art-loop-closure.mjs && node scripts/test-project-art-loop-closure.mjs',
   'project-art:workspace:mcp:check': 'node scripts/test-project-art-workspace-mcp.mjs',
-  'project-art:check': 'node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs && pnpm run project-art:workspace:mcp:check',
+  'project-art:check': 'node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs && pnpm run project-art:loop:check && pnpm run project-art:workspace:mcp:check',
 };
 for (const [name, command] of Object.entries(expectedScripts)) {
   assert.equal(packageJson.scripts[name], command, `package script ${name} changed`);
 }
+const projectArtCheck = packageJson.scripts['project-art:check'];
+assert.ok(
+  projectArtCheck.indexOf('node scripts/test-project-art-workbench.mjs') <
+    projectArtCheck.indexOf('pnpm run project-art:loop:check'),
+  'loop-closure review must run after the general workbench adversary',
+);
+assert.ok(
+  projectArtCheck.indexOf('pnpm run project-art:loop:check') <
+    projectArtCheck.indexOf('pnpm run project-art:workspace:mcp:check'),
+  'loop-closure review must run before workspace MCP verification',
+);
 assert.ok(packageJson.scripts.check.includes('pnpm run project-art:check'));
 
 for (const relative of relativeFiles.filter((value) => value.endsWith('.mjs'))) {
@@ -273,21 +351,26 @@ for (const [command, prefix] of pythonCandidates) {
     break;
   }
 }
-assert.ok(python, 'Python 3 is required to syntax-check the project-art sandbox runtime.');
+assert.ok(python, 'Python 3 is required to syntax-check the project-art runtimes.');
 const pycache = await mkdtemp(path.join(os.tmpdir(), 'evavo-project-art-pycache-'));
 try {
-  const compiled = spawnSync(
-    python.command,
-    [...python.prefix, '-m', 'py_compile', path.join(root, 'tools', 'run_project_art_sandbox.py')],
-    {
-      cwd: root,
-      encoding: 'utf8',
-      shell: false,
-      windowsHide: true,
-      env: { ...process.env, PYTHONPYCACHEPREFIX: pycache },
-    },
-  );
-  assert.equal(compiled.status, 0, compiled.stderr || compiled.stdout);
+  for (const relative of [
+    'tools/run_project_art_sandbox.py',
+    'tools/run_project_art_loop_closure.py',
+  ]) {
+    const compiled = spawnSync(
+      python.command,
+      [...python.prefix, '-m', 'py_compile', path.join(root, relative)],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        shell: false,
+        windowsHide: true,
+        env: { ...process.env, PYTHONPYCACHEPREFIX: pycache },
+      },
+    );
+    assert.equal(compiled.status, 0, `${relative} failed py_compile:\n${compiled.stderr || compiled.stdout}`);
+  }
 } finally {
   await rm(pycache, { recursive: true, force: true });
 }
