@@ -4,32 +4,46 @@ on:
   pull_request:
     paths:
       - "scripts/compile-project-art-avatar-sequence.mjs"
+      - "scripts/build-project-art-avatar-sequence-bundle.mjs"
+      - "scripts/verify-project-art-avatar-sequence-bundle.mjs"
       - "scripts/project-art/avatar-sequence-common.mjs"
       - "scripts/project-art/avatar-sequence-filesystem.mjs"
       - "scripts/project-art/avatar-sequence-contract.mjs"
+      - "scripts/project-art/avatar-sequence-plan.mjs"
+      - "scripts/project-art/avatar-sequence-bundle.mjs"
       - "scripts/check-project-art-avatar-sequence.mjs"
+      - "scripts/check-project-art-workbench.mjs"
       - "scripts/test-project-art-avatar-sequence.mjs"
+      - "scripts/test-project-art-avatar-sequence-bundle.mjs"
       - "scripts/test-project-art-avatar-sequence-mcp.mjs"
       - "scripts/compile-project-art-loop-closure.mjs"
       - "tools/project_art_avatar_sequence_mcp.mjs"
       - "docs/PROJECT_ART_AVATAR_SEQUENCE_MASTERING.md"
       - "config/mcp.project-art-avatar-sequence.windows.example.json"
+      - "package.json"
       - ".github/workflows/project-art-avatar-sequence.yml"
   push:
     branches:
       - main
     paths:
       - "scripts/compile-project-art-avatar-sequence.mjs"
+      - "scripts/build-project-art-avatar-sequence-bundle.mjs"
+      - "scripts/verify-project-art-avatar-sequence-bundle.mjs"
       - "scripts/project-art/avatar-sequence-common.mjs"
       - "scripts/project-art/avatar-sequence-filesystem.mjs"
       - "scripts/project-art/avatar-sequence-contract.mjs"
+      - "scripts/project-art/avatar-sequence-plan.mjs"
+      - "scripts/project-art/avatar-sequence-bundle.mjs"
       - "scripts/check-project-art-avatar-sequence.mjs"
+      - "scripts/check-project-art-workbench.mjs"
       - "scripts/test-project-art-avatar-sequence.mjs"
+      - "scripts/test-project-art-avatar-sequence-bundle.mjs"
       - "scripts/test-project-art-avatar-sequence-mcp.mjs"
       - "scripts/compile-project-art-loop-closure.mjs"
       - "tools/project_art_avatar_sequence_mcp.mjs"
       - "docs/PROJECT_ART_AVATAR_SEQUENCE_MASTERING.md"
       - "config/mcp.project-art-avatar-sequence.windows.example.json"
+      - "package.json"
       - ".github/workflows/project-art-avatar-sequence.yml"
 
 permissions:
@@ -42,13 +56,18 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out exact source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
 
       - name: Set up Node.js 22.14.0
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
@@ -61,11 +80,17 @@ jobs:
         run: |
           set -euo pipefail
           node --check scripts/compile-project-art-avatar-sequence.mjs
+          node --check scripts/build-project-art-avatar-sequence-bundle.mjs
+          node --check scripts/verify-project-art-avatar-sequence-bundle.mjs
           node --check scripts/project-art/avatar-sequence-common.mjs
           node --check scripts/project-art/avatar-sequence-filesystem.mjs
           node --check scripts/project-art/avatar-sequence-contract.mjs
+          node --check scripts/project-art/avatar-sequence-plan.mjs
+          node --check scripts/project-art/avatar-sequence-bundle.mjs
           node --check scripts/check-project-art-avatar-sequence.mjs
+          node --check scripts/check-project-art-workbench.mjs
           node --check scripts/test-project-art-avatar-sequence.mjs
+          node --check scripts/test-project-art-avatar-sequence-bundle.mjs
           node --check scripts/test-project-art-avatar-sequence-mcp.mjs
           node --check tools/project_art_avatar_sequence_mcp.mjs
 
@@ -75,11 +100,17 @@ jobs:
       - name: Run explicit-assignment and source-identity adversaries
         run: node scripts/test-project-art-avatar-sequence.mjs
 
+      - name: Run atomic bundle materialization and verification adversaries
+        run: node scripts/test-project-art-avatar-sequence-bundle.mjs
+
       - name: Run callable MCP boundary adversaries
         run: node scripts/test-project-art-avatar-sequence-mcp.mjs
 
       - name: Recheck downstream final-to-first compiler contract
         run: node scripts/check-project-art-loop-closure.mjs
+
+      - name: Re-run the package-level avatar sequence chain
+        run: pnpm run project-art:avatar-sequence:check
 
       - name: Verify permanent false-authority assertions
         shell: bash
@@ -87,19 +118,21 @@ jobs:
           set -euo pipefail
           grep -F 'evavo.project-art-avatar-sequence-request.v1' scripts/project-art/avatar-sequence-common.mjs
           grep -F 'evavo.project-art-avatar-sequence-mastering-plan.v1' scripts/project-art/avatar-sequence-common.mjs
-          grep -F 'evavo_avatar_sequence_pack_v2' scripts/project-art/avatar-sequence-common.mjs
-          grep -F "assignmentMode !== 'owner-declared-only'" scripts/compile-project-art-avatar-sequence.mjs
-          grep -F 'semanticInferencePerformed: false' scripts/compile-project-art-avatar-sequence.mjs
-          grep -F 'timestampOrderingUsedAsSemantics: false' scripts/compile-project-art-avatar-sequence.mjs
-          grep -F 'workspaceFilePlanRequest' scripts/compile-project-art-avatar-sequence.mjs
-          grep -F 'runtimeActivationAllowed: false' scripts/compile-project-art-avatar-sequence.mjs
-          grep -F 'evavo.project-art-loop-closure-request.v1' scripts/project-art/avatar-sequence-common.mjs
+          grep -F 'evavo.project-art-avatar-sequence-bundle-manifest.v1' scripts/project-art/avatar-sequence-bundle.mjs
+          grep -F 'evavo.project-art-avatar-sequence-bundle-receipt.v1' scripts/project-art/avatar-sequence-bundle.mjs
+          grep -F 'wholeRunAtomicMaterialization: true' scripts/project-art/avatar-sequence-bundle.mjs
+          grep -F 'sourceIdentitiesRevalidated: true' scripts/project-art/avatar-sequence-bundle.mjs
+          grep -F 'sourceImageBytesIncluded: false' scripts/project-art/avatar-sequence-bundle.mjs
+          grep -F 'workspaceFilePlanApplied: false' scripts/project-art/avatar-sequence-bundle.mjs
+          grep -F 'runtimeActivationAllowed: false' scripts/project-art/avatar-sequence-bundle.mjs
+          grep -F 'evavo_art_write_avatar_sequence_bundle' tools/project_art_avatar_sequence_mcp.mjs
+          grep -F 'evavo_art_verify_avatar_sequence_bundle' tools/project_art_avatar_sequence_mcp.mjs
           grep -F 'bytesFlowThroughMcp: false' tools/project_art_avatar_sequence_mcp.mjs
           grep -F 'credentialsForwardedToSubprocess: false' tools/project_art_avatar_sequence_mcp.mjs
           grep -F 'shell: false' tools/project_art_avatar_sequence_mcp.mjs
-          ! grep -F 'providerExecution: true' scripts/compile-project-art-avatar-sequence.mjs
-          ! grep -F 'targetRepositoryMutation: true' scripts/compile-project-art-avatar-sequence.mjs
-          ! grep -F 'git push' scripts/compile-project-art-avatar-sequence.mjs
+          ! grep -F 'providerExecution: true' scripts/project-art/avatar-sequence-bundle.mjs
+          ! grep -F 'runtimeActivationAllowed: true' scripts/project-art/avatar-sequence-bundle.mjs
+          ! grep -F 'repositoryMutation: true' tools/project_art_avatar_sequence_mcp.mjs
           ! grep -F 'git push' tools/project_art_avatar_sequence_mcp.mjs
 
       - name: Prove source remains clean
