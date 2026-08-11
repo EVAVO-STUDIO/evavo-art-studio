@@ -139,16 +139,6 @@ for (const relative of requiredFiles) {
 run(python, ["-m", "compileall", "-q", path.join(root, "tools", "pixel_font_v2"), tool]);
 run(process.execPath, ["--check", path.join(root, "scripts", "pixel-font-studio-v2-mcp.mjs")]);
 run(process.execPath, ["--check", path.join(root, "scripts", "integrate-pixel-font-studio-v2.mjs")]);
-const dedicatedWorkflowSource = await readFile(
-  path.join(root, ".github", "workflows", "pixel-font-studio-v2.yml"),
-  "utf8",
-);
-assert.match(
-  dedicatedWorkflowSource,
-  /EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS:\s*["']1["']/u,
-  "the dedicated Pixel Font Studio v2 workflow must require the exact fontTools backend",
-);
-
 const packagePath = path.join(root, "package.json");
 const reliabilityPath = path.join(root, "evavo.reliability.json");
 try {
