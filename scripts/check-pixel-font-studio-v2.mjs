@@ -3,7 +3,6 @@
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm, writeFile, cp, lstat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
-import { gunzipSync } from "node:zlib";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -79,12 +78,6 @@ function runJson(args, options = {}) {
   return JSON.parse(result.stdout);
 }
 
-async function readSourceJson(sourcePath) {
-  const bytes = await readFile(sourcePath);
-  const decoded = sourcePath.endsWith(".gz") ? gunzipSync(bytes) : bytes;
-  return JSON.parse(decoded.toString("utf8"));
-}
-
 function expectFailure(args, pattern) {
   const result = execute(python, [tool, ...args]);
   assert.notEqual(result.status, 0, `Expected failure: ${args.join(" ")}`);
@@ -98,20 +91,13 @@ function stage(label) {
 stage("checking source inventory and syntax");
 const requiredFiles = [
   "tools/pixel_font_studio_v2.py",
-  "tools/pixel_font_v2/__init__.py",
-  "tools/pixel_font_v2/common.py",
-  "tools/pixel_font_v2/schema.py",
-  "tools/pixel_font_v2/formats.py",
-  "tools/pixel_font_v2/build.py",
-  "tools/pixel_font_v2/cli.py",
   "scripts/pixel-font-studio-v2-mcp.mjs",
   "scripts/check-pixel-font-studio-v2.mjs",
-  "scripts/integrate-pixel-font-studio-v2.mjs",
   "config/pixel-font-studio.v2.json",
   "config/mcp.pixel-font-studio-v2.example.json",
-  "config/pixel-font-families/chess-lord-v2/ChessLord_UI.face.json.gz",
-  "config/pixel-font-families/chess-lord-v2/ChessLord_Text.face.json.gz",
-  "config/pixel-font-families/chess-lord-v2/ChessLord_Herald.face.json.gz",
+  "config/pixel-font-families/chess-lord-v2/ChessLord_UI.face.json",
+  "config/pixel-font-families/chess-lord-v2/ChessLord_Text.face.json",
+  "config/pixel-font-families/chess-lord-v2/ChessLord_Herald.face.json",
   "config/pixel-font-families/chess-lord-v2/chess-lord.family.json",
   "docs/PIXEL_FONT_STUDIO_V2.md",
   "docs/CHESS_LORD_PIXEL_FONT_FAMILY_V2.md",
@@ -126,28 +112,13 @@ for (const relative of requiredFiles) {
   assert.ok(state.size > 0 && state.size < 32 * 1024 * 1024, `${relative} has invalid size`);
 }
 
-run(python, ["-m", "compileall", "-q", path.join(root, "tools", "pixel_font_v2"), tool]);
+run(python, ["-m", "py_compile", tool]);
 run(process.execPath, ["--check", path.join(root, "scripts", "pixel-font-studio-v2-mcp.mjs")]);
-run(process.execPath, ["--check", path.join(root, "scripts", "integrate-pixel-font-studio-v2.mjs")]);
-
-const packagePath = path.join(root, "package.json");
-const reliabilityPath = path.join(root, "evavo.reliability.json");
-try {
-  const packageDocument = JSON.parse(await readFile(packagePath, "utf8"));
-  assert.equal(packageDocument.scripts?.["pixel-font:v2:check"], "node scripts/check-pixel-font-studio-v2.mjs");
-  assert.match(packageDocument.scripts?.["pixel-font:check"] ?? "", /check-pixel-font-studio-v2/u);
-  const reliability = JSON.parse(await readFile(reliabilityPath, "utf8"));
-  assert.equal(reliability.pixelFontStudioV2?.toolVersion, "2.2.0");
-  assert.equal(reliability.pixelFontStudioV2?.godotPolicy?.targetVersion, "4.6.2");
-  assert.equal(Object.values(reliability.pixelFontStudioV2?.authority ?? {}).every((value) => value === false), true);
-} catch (error) {
-  if (error?.code !== "ENOENT") throw error;
-}
 
 stage("checking contract and catalog");
 const contract = JSON.parse(await readFile(path.join(root, "config", "pixel-font-studio.v2.json"), "utf8"));
 assert.equal(contract.contract, "evavo.pixel-font-studio.v2");
-assert.equal(contract.toolVersion, "2.2.0");
+assert.equal(contract.toolVersion, "2.1.0");
 assert.equal(contract.canonicalRuntime.externalFontBinaryUsed, false);
 assert.equal(contract.optionalDerivatives.ttf.canonicalRuntime, false);
 assert.equal(contract.optionalDerivatives.ttf.dependency, "fonttools==4.63.0");
@@ -161,11 +132,8 @@ assert.equal(
 
 const catalog = runJson(["catalog"]);
 assert.equal(catalog.schema, "evavo.pixel-font-family-master.v2");
-assert.equal(catalog.toolVersion, "2.2.0");
+assert.equal(catalog.toolVersion, "2.1.0");
 assert.ok(catalog.optionalDerivatives.some((item) => item.includes("TrueType")));
-assert.ok(catalog.interchangeFormats.some((item) => item.includes("BDF")));
-assert.ok(catalog.interchangeFormats.some((item) => item.includes("atlas JSON")));
-assert.ok(catalog.interchangeFormats.some((item) => item.includes("grid")));
 assert.equal(catalog.godot.targetVersion, "4.6.2");
 assert.equal(catalog.godot.officialLinuxArchiveSha256, contract.godot.officialLinuxArchiveSha256);
 
@@ -181,7 +149,7 @@ for (const faceAudit of audit.faces) {
   assert.equal(faceAudit.coverage["western-latin"].present, 325);
 }
 
-const uiFace = path.join(path.dirname(family), "ChessLord_UI.face.json.gz");
+const uiFace = path.join(path.dirname(family), "ChessLord_UI.face.json");
 const g = runJson(["inspect", "--face", uiFace, "--codepoint", "U+0067"]);
 const q = runJson(["inspect", "--face", uiFace, "--codepoint", "U+0071"]);
 assert.notDeepEqual(g.glyph.bitmap, q.glyph.bitmap);
@@ -196,7 +164,6 @@ const buildResult = runJson(["build", "--master", family, "--output", buildA]);
 assert.equal(buildResult.schema, "evavo.pixel-font-family.v2");
 assert.equal(buildResult.faces.length, 3);
 assert.equal(buildResult.optionalDerivatives.includes("TrueType .ttf"), true);
-assert.ok(buildResult.interchangeFormats.some((item) => item.includes("BDF")));
 
 const validation = runJson(["validate", "--family", path.join(buildA, "pixel-font-family.json")]);
 assert.equal(validation.status, "passed");
@@ -205,9 +172,6 @@ assert.equal(validation.systemFallback, false);
 for (const face of validation.faces) {
   assert.equal(face.glyphCount, 397);
   assert.equal(face.kerningPairCount, 30);
-  assert.equal(face.bdf.status, "passed");
-  assert.equal(face.atlasJson.status, "passed");
-  assert.equal(face.gridSheet.status, "passed");
   assert.equal(face.ttf.kerningPresent, true);
   assert.equal(face.ttf.embeddingFsType, 0);
   assert.deepEqual(face.ttf.missing, []);
@@ -218,7 +182,7 @@ stage("building family B and comparing exact bytes");
 runJson(["build", "--master", family, "--output", buildB]);
 const reproducibility = runJson(["compare", "--first", buildA, "--second", buildB]);
 assert.equal(reproducibility.status, "passed");
-assert.equal(reproducibility.fileCount, 52);
+assert.equal(reproducibility.fileCount, 37);
 expectFailure(["build", "--master", family, "--output", buildA], /must not already exist/u);
 
 stage("proving fail-closed master and output validation");
@@ -231,7 +195,7 @@ await writeFile(invalidFamilyPath, `${JSON.stringify(invalidFamily, null, 2)}\n`
 expectFailure(["audit", "--family", invalidFamilyPath], /systemFallback must be false/u);
 
 const invalidFacePath = path.join(workspace, "invalid-face.json");
-const invalidFace = await readSourceJson(uiFace);
+const invalidFace = JSON.parse(await readFile(uiFace, "utf8"));
 const glyphByCodepoint = new Map(invalidFace.glyphs.map((glyph) => [glyph.codepoint, glyph]));
 const sourceG = glyphByCodepoint.get("g".codePointAt(0));
 const targetQ = glyphByCodepoint.get("q".codePointAt(0));
@@ -271,7 +235,7 @@ const initial = await handleRequest(
 assert.equal(initial.result.serverInfo.name, SERVER_NAME);
 assert.equal(initial.result.serverInfo.version, SERVER_VERSION);
 const mcpCatalog = await callTool("evavo_pixel_font_v2_catalog", {}, { policy: readOnly });
-assert.equal(mcpCatalog.toolVersion, "2.2.0");
+assert.equal(mcpCatalog.toolVersion, "2.1.0");
 const mcpAudit = await callTool("evavo_pixel_font_v2_audit", { familyPath: family }, { policy: readOnly });
 assert.equal(mcpAudit.status, "passed");
 const mcpInspect = await callTool(
@@ -336,7 +300,7 @@ if (godotExecutable) {
 stage("writing final evidence report");
 const report = {
   schema: "evavo.pixel-font-studio-v2-check.v1",
-  toolVersion: "2.2.0",
+  toolVersion: "2.1.0",
   familyId: audit.familyId,
   faceCount: audit.faces.length,
   glyphsPerFace: audit.faces.map((item) => item.glyphCount),
@@ -361,7 +325,7 @@ console.log("EVAVO Pixel Font Studio v2 checks passed.");
 console.log(`- workspace: ${workspace}`);
 console.log("- 3 independent Chess Lord faces, 397 glyphs each, 30 kerning pairs each");
 console.log("- zero unapproved duplicate groups and exhaustive ordered-pair collision QA passed");
-console.log("- BMFont, packed/grid PNG atlases, BDF, atlas JSON, Godot resources, native specimens and TTF cmap/kerning validated");
+console.log("- BMFont, RGBA atlas, Godot resources, native specimens and TTF cmap/kerning validated");
 console.log(`- deterministic tree: ${reproducibility.treeSha256}`);
 console.log(`- actual Godot 4.6.2 verification: ${godot ? "passed" : "not configured for this run"}`);
 
