@@ -3,10 +3,12 @@ import * as z from "zod/v4";
 
 import {
   ArtDirectionError,
+  applyLayeredProductionStyleProofApproval,
   artDirectionProtocolSummary,
   compileArtDirectionContract,
   compileArtDirectionJob,
   compileLayeredProductionPlan,
+  compileLayeredProductionStyleProofApprovalReceipt,
   compileLayeredProviderCandidateRequest,
   getLayeredProductionUnit,
   layeredProductionProtocolSummary,
@@ -61,6 +63,28 @@ function toolError(error: unknown) {
   };
 }
 
+function compileLayeredPlan(
+  request: unknown,
+  styleProofApproval: unknown | undefined,
+) {
+  const pendingPlan = compileLayeredProductionPlan(request);
+  if (styleProofApproval === undefined) {
+    return { plan: pendingPlan, approvalReceipt: null };
+  }
+  const approvalReceipt =
+    compileLayeredProductionStyleProofApprovalReceipt(
+      pendingPlan,
+      styleProofApproval,
+    );
+  return {
+    plan: applyLayeredProductionStyleProofApproval(
+      pendingPlan,
+      approvalReceipt,
+    ),
+    approvalReceipt,
+  };
+}
+
 export function registerArtDirectionTools(server: McpServer): void {
   registerSpritePlanTools(server);
 
@@ -78,7 +102,7 @@ export function registerArtDirectionTools(server: McpServer): void {
     "layered_production_protocol",
     {
       description:
-        "Describe the runtime-source boundary for layered game art: one exclusive source image per provider job, style-proof approval before expansion, approval-gated assembly and anti-collage/anti-generic rules.",
+        "Describe the runtime-source boundary for layered game art: one exclusive source image per provider job, content-addressed style-proof approval before expansion, approval-gated assembly and anti-collage/anti-generic rules.",
       inputSchema: z.object({}),
     },
     async () => textResult(layeredProductionProtocolSummary()),
@@ -152,7 +176,7 @@ export function registerArtDirectionTools(server: McpServer): void {
     "validate_layered_production_request",
     {
       description:
-        "Validate a scene or district source plan before any image generation. It rejects concept collages, multi-image provider calls, mixed layer ownership, loose pixel style, unsafe paths and incomplete style-proof coverage.",
+        "Validate a scene or district source plan before any image generation. It rejects concept collages, multi-image provider calls, mixed layer ownership, loose pixel style, unsafe paths, incomplete style-proof coverage and insecure inline approval.",
       inputSchema: z.object({ request: z.unknown() }),
     },
     async ({ request }) => {
@@ -165,19 +189,63 @@ export function registerArtDirectionTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "compile_layered_style_proof_approval",
+    {
+      description:
+        "Seal an already-made named human style-proof decision into a deterministic receipt bound to the exact pending plan, source PNG artifact hashes, provider jobs, sealed per-unit review receipts, review bundles and cross-unit style evidence. This tool does not inspect images or make the creative decision itself.",
+      inputSchema: z.object({
+        request: z.unknown(),
+        approvalEvidence: z.unknown(),
+      }),
+    },
+    async ({ request, approvalEvidence }) => {
+      try {
+        const pendingPlan = compileLayeredProductionPlan(request);
+        const approvalReceipt =
+          compileLayeredProductionStyleProofApprovalReceipt(
+            pendingPlan,
+            approvalEvidence,
+          );
+        const approvedPlan = applyLayeredProductionStyleProofApproval(
+          pendingPlan,
+          approvalReceipt,
+        );
+        return textResult({
+          schemaVersion: "1.0",
+          pendingPlanSha256: pendingPlan.planSha256,
+          approvalReceipt,
+          approvedPlan,
+          executionBoundary:
+            "Evidence-sealing only: the named human decision and external review hashes must already exist. No image inspection, creative approval, provider call, assembly, promotion, repository mutation, commit, push or publication is performed.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     "compile_layered_production_plan",
     {
       description:
-        "Compile a deterministic layered runtime-source plan. Every unit becomes one provider-ready image job with exclusive layer ownership, exact dimensions, alpha policy, anti-generic style locks, review gates and approval-gated assembly metadata. This tool does not execute a provider.",
-      inputSchema: z.object({ request: z.unknown() }),
+        "Compile a deterministic layered runtime-source plan. Every unit becomes one provider-ready image job with exclusive layer ownership, exact dimensions, alpha policy, anti-generic style locks, review gates and approval-gated assembly metadata. Optional style-proof approval evidence is sealed into a verified receipt; this tool does not execute a provider.",
+      inputSchema: z.object({
+        request: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+      }),
     },
-    async ({ request }) => {
+    async ({ request, styleProofApproval }) => {
       try {
+        const { plan, approvalReceipt } = compileLayeredPlan(
+          request,
+          styleProofApproval,
+        );
         return textResult({
           schemaVersion: "1.0",
-          compiledPlan: compileLayeredProductionPlan(request),
+          compiledPlan: plan,
+          ...(approvalReceipt === null ? {} : { approvalReceipt }),
           executionBoundary:
-            "Plan-only: no image generation, composite assembly, approval, target-repository mutation, commit, push or publication.",
+            "Plan-only: no image generation, image inspection, creative approval, composite assembly, target-repository mutation, commit, push or publication.",
         });
       } catch (error: unknown) {
         return toolError(error);
@@ -189,20 +257,28 @@ export function registerArtDirectionTools(server: McpServer): void {
     "get_layered_production_unit",
     {
       description:
-        "Compile a layered plan and return one exact one-image provider job by unit ID. Use this instead of asking a provider for a concept sheet or flattened scene.",
-      inputSchema: z.object({ request: z.unknown(), unitId: z.string().min(1).max(160) }),
+        "Compile a layered plan and return one exact one-image provider job by unit ID. Expansion beyond the proof set requires exact content-addressed style-proof approval evidence. Use this instead of asking a provider for a concept sheet or flattened scene.",
+      inputSchema: z.object({
+        request: z.unknown(),
+        unitId: z.string().min(1).max(160),
+        styleProofApproval: z.unknown().optional(),
+      }),
     },
-    async ({ request, unitId }) => {
+    async ({ request, unitId, styleProofApproval }) => {
       try {
-        const plan = compileLayeredProductionPlan(request);
+        const { plan, approvalReceipt } = compileLayeredPlan(
+          request,
+          styleProofApproval,
+        );
         return textResult({
           schemaVersion: "1.0",
           planId: plan.planId,
           planSha256: plan.planSha256,
           styleProofStatus: plan.styleProof.status,
+          ...(approvalReceipt === null ? {} : { approvalReceipt }),
           unit: getLayeredProductionUnit(plan, unitId),
           executionBoundary:
-            "Retrieval-only: this is one candidate source job, not provider execution or approval.",
+            "Retrieval-only: this is one candidate source job, not provider execution, image inspection or creative approval.",
         });
       } catch (error: unknown) {
         return toolError(error);
@@ -214,16 +290,20 @@ export function registerArtDirectionTools(server: McpServer): void {
     "compile_layered_production_provider_request",
     {
       description:
-        "Bind approved continuity artifact references to one layered source unit and compile it through the existing provider-neutral candidate contract. Candidate count remains one; this tool does not call an image provider.",
+        "Bind approved continuity artifact references to one layered source unit and compile it through the existing provider-neutral candidate contract. Candidate count remains one; expansion requires exact content-addressed style-proof approval evidence. This tool does not call an image provider.",
       inputSchema: z.object({
         request: z.unknown(),
         unitId: z.string().min(1).max(160),
         references: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
       }),
     },
-    async ({ request, unitId, references }) => {
+    async ({ request, unitId, references, styleProofApproval }) => {
       try {
-        const plan = compileLayeredProductionPlan(request);
+        const { plan, approvalReceipt } = compileLayeredPlan(
+          request,
+          styleProofApproval,
+        );
         const bridge = compileLayeredProviderCandidateRequest(
           plan,
           unitId,
@@ -234,12 +314,13 @@ export function registerArtDirectionTools(server: McpServer): void {
           planId: plan.planId,
           planSha256: plan.planSha256,
           styleProofStatus: plan.styleProof.status,
+          ...(approvalReceipt === null ? {} : { approvalReceipt }),
           layeredProviderRequest: bridge,
           compiledProviderContract: compileProviderCandidateRuntimeContract(
             bridge.request,
           ),
           executionBoundary:
-            "Compile-only: no provider call, candidate bytes, approval, assembly, target-repository mutation, commit, push or publication.",
+            "Compile-only: no provider call, candidate bytes, image inspection, creative approval, assembly, target-repository mutation, commit, push or publication.",
         });
       } catch (error: unknown) {
         return toolError(error);

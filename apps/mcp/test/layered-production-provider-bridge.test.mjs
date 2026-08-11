@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  applyLayeredProductionStyleProofApproval,
   compileLayeredProductionPlan,
+  compileLayeredProductionStyleProofApprovalReceipt,
   compileLayeredProviderCandidateRequest,
 } from "@evavo/art-direction";
 import { compileProviderCandidateRuntimeContract } from "@evavo/art-providers";
@@ -15,6 +18,58 @@ const FIXTURE = new URL(
 
 async function fixture() {
   return JSON.parse(await readFile(FIXTURE, "utf8"));
+}
+
+function digest(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function approvalInput(plan) {
+  return {
+    schemaVersion: "1.0",
+    kind: "evavo.layered-production.style-proof-approval.request",
+    planId: plan.planId,
+    pendingPlanSha256: plan.planSha256,
+    styleFingerprintSha256: plan.styleFingerprintSha256,
+    reviewer: "Greg Parker",
+    reviewedAt: "2026-08-11T03:45:00.000Z",
+    evidence: plan.styleProof.unitIds.map((unitId, index) => {
+      const unit = plan.layers
+        .flatMap((layer) => layer.units)
+        .find((entry) => entry.id === unitId);
+      assert.ok(unit);
+      const sourceSha256 = digest(`source:${unitId}`);
+      const sealedReviewReceiptSha256 = digest(`sealed-review:${unitId}`);
+      const reviewBundleSha256 = digest(`review-bundle:${unitId}`);
+      return {
+        unitId,
+        sourceArtifactId: `artifact_${sourceSha256}`,
+        sourceSha256,
+        sourceBytes: 2048 + index,
+        width: unit.dimensions.width,
+        height: unit.dimensions.height,
+        providerJobIdempotencyKey: unit.providerJob.idempotencyKey,
+        providerRequestSha256: digest(`provider-request:${unitId}`),
+        sealedReviewArtifactId: `artifact_${sealedReviewReceiptSha256}`,
+        sealedReviewReceiptSha256,
+        reviewBundleArtifactId: `artifact_${reviewBundleSha256}`,
+        reviewBundleSha256,
+        decision: "approved",
+      };
+    }),
+    crossUnitReview: {
+      decision: "approved",
+      styleFingerprintSha256: plan.styleFingerprintSha256,
+      cameraConsistency: "approved",
+      lightingConsistency: "approved",
+      paletteConsistency: "approved",
+      pixelGrammarConsistency: "approved",
+      layerSeparation: "approved",
+      antiGenericQuality: "approved",
+      evidenceArtifactId: `artifact_${digest("jonez-cross-unit-review")}`,
+      evidenceSha256: digest("jonez-cross-unit-review"),
+    },
+  };
 }
 
 test("layered identity proof compiles through the provider-neutral runtime contract", async () => {
@@ -33,16 +88,16 @@ test("layered identity proof compiles through the provider-neutral runtime contr
   assert.match(contract.compiledPrompt, /one image only/i);
 });
 
-test("later JONEZ frame requires and retains approved identity reference capability", async () => {
-  const request = await fixture();
-  request.styleProof.approval = {
-    approved: true,
-    reviewer: "Greg Parker",
-    reviewedAt: "2026-08-10T11:00:00.000Z",
-    evidenceSha256: "a".repeat(64),
-    approvedUnitIds: [...request.styleProof.unitIds],
-  };
-  const plan = compileLayeredProductionPlan(request);
+test("later JONEZ frame requires a receipt-bound style proof and approved identity reference", async () => {
+  const pendingPlan = compileLayeredProductionPlan(await fixture());
+  const receipt = compileLayeredProductionStyleProofApprovalReceipt(
+    pendingPlan,
+    approvalInput(pendingPlan),
+  );
+  const plan = applyLayeredProductionStyleProofApproval(
+    pendingPlan,
+    receipt,
+  );
   const bridge = compileLayeredProviderCandidateRequest(
     plan,
     "player-walk-se-f001",
@@ -57,10 +112,15 @@ test("later JONEZ frame requires and retains approved identity reference capabil
   );
   const contract = compileProviderCandidateRuntimeContract(bridge.request);
 
+  assert.equal(plan.styleProof.approval.receiptSha256, receipt.receiptSha256);
   assert.equal(contract.request.continuityPhase, "key-pose");
   assert.equal(contract.request.references[0]?.role, "canonical-identity");
   assert.ok(contract.requiredAdapterCapabilities.includes("identity-reference"));
   assert.equal(contract.runtimeJob.payload.metadata.styleProofStatus, "approved");
   assert.equal(contract.runtimeJob.payload.metadata.approvals.source, false);
-  assert.ok(Object.values(contract.runtimeJob.payload.metadata.approvals).every((value) => value === false));
+  assert.ok(
+    Object.values(contract.runtimeJob.payload.metadata.approvals).every(
+      (value) => value === false,
+    ),
+  );
 });
