@@ -58,6 +58,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Route Python bytecode to runner-temporary storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON_CACHE_ROOT="${RUNNER_TEMP}/pixel-font-python-pycache"
+          mkdir -p "${PYTHON_CACHE_ROOT}"
+          echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"
+
       - name: Set up Python 3.13.5
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
@@ -108,6 +116,16 @@ jobs:
             ${{ runner.temp }}/brass-brine-pixel-font.plan.json
 
       - name: Prove source tree remains clean
+        shell: bash
         run: |
+          set -euo pipefail
+          test -n "${PYTHONPYCACHEPREFIX:-}"
+          test -d "${PYTHONPYCACHEPREFIX}"
+          test -z "$(find . -path './.git' -prune -o -type d -name '__pycache__' -print -quit)"
+          test -z "$(find . -path './.git' -prune -o -type f -name '*.pyc' -print -quit)"
           git diff --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          SOURCE_STATUS="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -n "${SOURCE_STATUS}" ]]; then
+            printf '%s\n' "${SOURCE_STATUS}" >&2
+            exit 1
+          fi
