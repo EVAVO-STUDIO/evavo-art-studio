@@ -38,18 +38,86 @@ def compare_builds(first: Path, second: Path) -> dict[str, Any]:
     }
 
 
+def _bounded_process(
+    command: Sequence[str],
+    *,
+    label: str,
+    timeout: int,
+    env: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            list(command),
+            text=True,
+            capture_output=True,
+            shell=False,
+            timeout=timeout,
+            check=False,
+            env=None if env is None else dict(env),
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout.decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        stderr = exc.stderr.decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+        details = (stderr or stdout)[-4000:]
+        fail(f"{label} timed out after {timeout} seconds: {details}")
+
+
+def _godot_render_command(
+    godot_executable: Path,
+    runtime_fixture: Path,
+    env: dict[str, str],
+) -> tuple[list[str], str, str | None]:
+    # Godot's --headless display driver disables rendering. Importing can stay
+    # headless, but pixel-output verification needs a real display-backed frame.
+    command = [
+        str(godot_executable),
+        "--audio-driver",
+        "Dummy",
+        "--rendering-method",
+        "gl_compatibility",
+        "--disable-vsync",
+        "--fixed-fps",
+        "60",
+        "--quit-after",
+        "600",
+        "--path",
+        str(runtime_fixture),
+    ]
+    if not sys.platform.startswith("linux") or env.get("DISPLAY"):
+        return command, "native-display", None
+
+    configured = env.get("EVAVO_PIXEL_FONT_XVFB_RUN", "").strip()
+    discovered = configured or (shutil.which("xvfb-run") or "")
+    if not discovered:
+        fail("Godot render verification requires xvfb-run on Linux when DISPLAY is unavailable")
+    xvfb_run = require_regular_file(Path(discovered).expanduser().resolve(), "xvfb-run executable", max_bytes=1024 * 1024)
+    if not os.access(xvfb_run, os.X_OK):
+        fail(f"xvfb-run executable is not executable: {xvfb_run}")
+    if shutil.which("xauth") is None:
+        fail("Godot render verification requires xauth when using xvfb-run")
+    env["LIBGL_ALWAYS_SOFTWARE"] = "1"
+    return (
+        [
+            str(xvfb_run),
+            "-a",
+            "-s",
+            "-screen 0 640x480x24 -nolisten tcp",
+            *command,
+        ],
+        "xvfb-software-opengl",
+        sha256_file(xvfb_run),
+    )
+
+
 def verify_godot(manifest_path: Path, godot_executable: Path, evidence_root: Path, expected_sha256: str | None) -> dict[str, Any]:
     manifest_path = require_regular_file(manifest_path, "family manifest")
     godot_executable = require_regular_file(godot_executable, "Godot executable", max_bytes=512 * 1024 * 1024)
     if expected_sha256 and sha256_file(godot_executable) != expected_sha256:
         fail("Godot executable SHA-256 does not match the configured digest")
-    version = subprocess.run(
+    version = _bounded_process(
         [str(godot_executable), "--version"],
-        text=True,
-        capture_output=True,
-        shell=False,
+        label="Godot version check",
         timeout=60,
-        check=False,
     )
     observed_version = (version.stdout or version.stderr).strip()
     if version.returncode != 0 or not observed_version.startswith(EXPECTED_GODOT_VERSION):
@@ -67,31 +135,23 @@ def verify_godot(manifest_path: Path, godot_executable: Path, evidence_root: Pat
         **os.environ,
         "EVAVO_PIXEL_FONT_EVIDENCE_ROOT": str(evidence_root),
     }
-    import_run = subprocess.run(
+    import_run = _bounded_process(
         [str(godot_executable), "--headless", "--editor", "--path", str(runtime_fixture), "--quit"],
-        text=True,
-        capture_output=True,
-        shell=False,
+        label="Godot import",
         timeout=180,
-        check=False,
         env=env,
     )
     if import_run.returncode != 0:
         fail(f"Godot import failed: {(import_run.stderr or import_run.stdout)[-4000:]}")
-    render_run = subprocess.run(
-        [
-            str(godot_executable),
-            "--headless",
-            "--rendering-method",
-            "gl_compatibility",
-            "--path",
-            str(runtime_fixture),
-        ],
-        text=True,
-        capture_output=True,
-        shell=False,
+    render_command, render_strategy, xvfb_run_sha256 = _godot_render_command(
+        godot_executable,
+        runtime_fixture,
+        env,
+    )
+    render_run = _bounded_process(
+        render_command,
+        label="Godot render verification",
         timeout=180,
-        check=False,
         env=env,
     )
     report_path = evidence_root / "godot-4.6.2-report.json"
@@ -108,6 +168,8 @@ def verify_godot(manifest_path: Path, godot_executable: Path, evidence_root: Pat
         "observedVersion": observed_version,
         "importExitCode": import_run.returncode,
         "renderExitCode": render_run.returncode,
+        "renderStrategy": render_strategy,
+        "xvfbRunSha256": xvfb_run_sha256,
         "engineReport": report,
         "logs": {
             "importStdout": import_run.stdout[-8000:],
@@ -171,6 +233,8 @@ def catalog() -> dict[str, Any]:
             "subpixelPositioning": False,
             "mipmaps": False,
             "systemFallback": False,
+            "linuxRenderStrategy": "xvfb-software-opengl-when-display-unavailable",
+            "headlessRenderAllowed": False,
         },
     }
 
