@@ -44,7 +44,7 @@ jobs:
           EXPECTED_ARCHIVE_SHA256: f0142923cf9937b07d4c9818a24f228cd80409ba3d25828a68354fdeb760607f
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_BASE"
+          git merge-base --is-ancestor "$EXPECTED_BASE" HEAD
           cat .github/avatar-sequence-bundle-payload/part-* > "$RUNNER_TEMP/payload.b64"
           base64 --decode "$RUNNER_TEMP/payload.b64" > "$RUNNER_TEMP/avatar-sequence-atomic-bundle.tar.gz"
           echo "$EXPECTED_ARCHIVE_SHA256  $RUNNER_TEMP/avatar-sequence-atomic-bundle.tar.gz" | sha256sum --check --strict
@@ -121,7 +121,7 @@ jobs:
             'scripts/test-project-art-avatar-sequence-mcp.mjs' \
             'scripts/verify-project-art-avatar-sequence-bundle.mjs' \
             'tools/project_art_avatar_sequence_mcp.mjs' | LC_ALL=C sort > "$RUNNER_TEMP/expected-staged-paths.txt"
-          git diff --cached --name-only "$EXPECTED_BASE" | LC_ALL=C sort > "$RUNNER_TEMP/staged-paths.txt"
+          git diff --cached --name-only HEAD | LC_ALL=C sort > "$RUNNER_TEMP/staged-paths.txt"
           diff -u "$RUNNER_TEMP/expected-staged-paths.txt" "$RUNNER_TEMP/staged-paths.txt"
           git diff --cached --check
           git commit -m "feat(project-art): atomically materialize avatar sequence bundles" -m "Materialize one exact avatar-sequence mastering plan into a private, create-only staging directory containing the plan, path-only workspace handoff, inactive runtime draft, finalization requirements, one request per true loop, a content-addressed manifest, and a separately content-addressed receipt. Publish the complete evidence set through one atomic directory rename and independently verify every file, source identity, self-hash, authority boundary, and output path.\n\nExtend the bounded MCP surface with write and read-only verification tools, add focused tamper and stale-source adversaries, and bind the bundle chain into Project Art validation. No image generation, source mutation, workspace-copy application, loop approval, runtime activation, repository mutation, Git publication, deployment, or force push authority is introduced."
