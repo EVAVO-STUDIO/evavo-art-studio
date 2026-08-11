@@ -154,6 +154,7 @@ function spawnTool(current, args, { stdinValue } = {}) {
         USERPROFILE: process.env.USERPROFILE ?? "",
         PYTHONUTF8: "1",
         PYTHONHASHSEED: "0",
+        PYTHONDONTWRITEBYTECODE: "1",
         SOURCE_DATE_EPOCH: "1577836800",
       },
       stdio: ["pipe", "pipe", "pipe"],

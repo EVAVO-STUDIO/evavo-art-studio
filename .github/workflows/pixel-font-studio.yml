@@ -10,15 +10,27 @@ on:
       - "scripts/pixel-font-studio.test.mjs"
       - "scripts/pixel-font-brass-brine.test.mjs"
       - "scripts/check-pixel-font-studio.mjs"
+      - "scripts/pixel-font-studio-v2-mcp.mjs"
+      - "scripts/check-pixel-font-studio-v2.mjs"
+      - "scripts/integrate-pixel-font-studio-v2.mjs"
+      - "tools/pixel_font_studio_v2.py"
+      - "tools/pixel_font_v2/**"
       - "config/pixel-font-studio.v1.json"
+      - "config/pixel-font-studio.v2.json"
       - "config/pixel-font-family.example.v1.json"
       - "config/pixel-font-family.brass-brine.v1.json"
       - "config/mcp.pixel-font-studio.windows.example.json"
+      - "config/mcp.pixel-font-studio-v2.example.json"
+      - "config/pixel-font-families/chess-lord-v2/**"
       - "docs/PIXEL_FONT_STUDIO.md"
       - "docs/BRASS_BRINE_PIXEL_FONT_FAMILY.md"
+      - "docs/PIXEL_FONT_STUDIO_V2.md"
+      - "docs/CHESS_LORD_PIXEL_FONT_FAMILY_V2.md"
+      - "requirements/pixel-font-studio-v2.txt"
       - "evavo.reliability.json"
       - "package.json"
       - ".github/workflows/pixel-font-studio.yml"
+      - ".github/workflows/pixel-font-studio-v2.yml"
   push:
     branches:
       - main
@@ -30,15 +42,27 @@ on:
       - "scripts/pixel-font-studio.test.mjs"
       - "scripts/pixel-font-brass-brine.test.mjs"
       - "scripts/check-pixel-font-studio.mjs"
+      - "scripts/pixel-font-studio-v2-mcp.mjs"
+      - "scripts/check-pixel-font-studio-v2.mjs"
+      - "scripts/integrate-pixel-font-studio-v2.mjs"
+      - "tools/pixel_font_studio_v2.py"
+      - "tools/pixel_font_v2/**"
       - "config/pixel-font-studio.v1.json"
+      - "config/pixel-font-studio.v2.json"
       - "config/pixel-font-family.example.v1.json"
       - "config/pixel-font-family.brass-brine.v1.json"
       - "config/mcp.pixel-font-studio.windows.example.json"
+      - "config/mcp.pixel-font-studio-v2.example.json"
+      - "config/pixel-font-families/chess-lord-v2/**"
       - "docs/PIXEL_FONT_STUDIO.md"
       - "docs/BRASS_BRINE_PIXEL_FONT_FAMILY.md"
+      - "docs/PIXEL_FONT_STUDIO_V2.md"
+      - "docs/CHESS_LORD_PIXEL_FONT_FAMILY_V2.md"
+      - "requirements/pixel-font-studio-v2.txt"
       - "evavo.reliability.json"
       - "package.json"
       - ".github/workflows/pixel-font-studio.yml"
+      - ".github/workflows/pixel-font-studio-v2.yml"
   workflow_dispatch:
 
 permissions:
@@ -47,6 +71,12 @@ permissions:
 concurrency:
   group: pixel-font-studio-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONHASHSEED: "0"
+  PYTHONDONTWRITEBYTECODE: "1"
+  SOURCE_DATE_EPOCH: "1577836800"
 
 jobs:
   verify:
