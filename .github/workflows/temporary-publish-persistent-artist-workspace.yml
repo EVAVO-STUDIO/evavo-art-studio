@@ -1,0 +1,217 @@
+name: Temporary publish persistent Artist Workspace
+
+on:
+  push:
+    branches:
+      - automation/publish-persistent-artist-workspace-20260811
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-publish-persistent-artist-workspace-20260811
+  cancel-in-progress: false
+
+env:
+  EXPECTED_BASE_SHA: 8e77f81a6d38ad0ead5b56c084d8d097fe411b32
+  FEATURE_BRANCH: agent/persistent-artist-workspace-20260811
+  PAYLOAD_PART_GLOB: .evavo-release/persistent-artist-workspace-files.tar.gz.b64.part-*
+  MANIFEST_PATH: .evavo-release/persistent-artist-workspace-manifest.json
+  EXPECTED_PAYLOAD_SHA256: 16b34d24a10596a655bf9f7578fc265fbc102fcc0a60422d32378d3c2a084e59
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact carrier and payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$EXPECTED_BASE_SHA" HEAD
+          test -f "$MANIFEST_PATH"
+          mapfile -t PAYLOAD_PARTS < <(compgen -G "$PAYLOAD_PART_GLOB" | sort)
+          test "${#PAYLOAD_PARTS[@]}" -ge 1
+          PAYLOAD_PATH="${RUNNER_TEMP}/persistent-artist-workspace-files.tar.gz"
+          cat "${PAYLOAD_PARTS[@]}" | base64 --decode > "$PAYLOAD_PATH"
+          test -s "$PAYLOAD_PATH"
+          echo "PAYLOAD_PATH=$PAYLOAD_PATH" >> "$GITHUB_ENV"
+          test "$(sha256sum "$PAYLOAD_PATH" | awk '{print $1}')" = "$EXPECTED_PAYLOAD_SHA256"
+          PAYLOAD_PATH="$PAYLOAD_PATH" node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST_PATH, 'utf8'));
+          if (manifest.schema !== 'evavo.artist-workspace-release-payload.v1') throw new Error('Unexpected release manifest schema.');
+          if (manifest.baseSha !== process.env.EXPECTED_BASE_SHA) throw new Error('Release base changed.');
+          if (manifest.featureBranch !== process.env.FEATURE_BRANCH) throw new Error('Release feature branch changed.');
+          const bytes = fs.readFileSync(process.env.PAYLOAD_PATH);
+          const digest = crypto.createHash('sha256').update(bytes).digest('hex');
+          if (digest !== manifest.archiveSha256 || digest !== process.env.EXPECTED_PAYLOAD_SHA256) throw new Error('Release payload digest changed.');
+          if (!Array.isArray(manifest.files) || manifest.files.length !== 17) throw new Error('Release file count changed.');
+          const paths = manifest.files.map((entry) => entry.path);
+          if (new Set(paths).size !== paths.length) throw new Error('Duplicate release path.');
+          for (const file of manifest.files) {
+            if (typeof file.path !== 'string' || file.path.startsWith('/') || file.path.includes('..')) throw new Error(`Unsafe release path: ${file.path}`);
+            if (!/^[a-f0-9]{64}$/.test(file.sha256) || !Number.isSafeInteger(file.bytes) || file.bytes < 1) throw new Error(`Invalid release identity: ${file.path}`);
+          }
+          NODE
+          if tar -tzf "$PAYLOAD_PATH" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo 'Unsafe archive path detected.' >&2
+            exit 1
+          fi
+
+      - name: Route Python bytecode outside the repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON_CACHE_ROOT="${RUNNER_TEMP}/persistent-artist-workspace-pycache"
+          mkdir -p "$PYTHON_CACHE_ROOT"
+          echo "PYTHONPYCACHEPREFIX=$PYTHON_CACHE_ROOT" >> "$GITHUB_ENV"
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: pip
+          cache-dependency-path: |
+            requirements-image-pipeline.txt
+            requirements/pixel-font-studio-v2.txt
+
+      - name: Install exact Python validation backends
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
+          python - <<'PY'
+          import PIL
+          import fontTools
+          assert PIL.__version__ == '12.2.0', PIL.__version__
+          assert fontTools.__version__ == '4.63.0', fontTools.__version__
+          PY
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Prepare exact feature worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
+          FEATURE_ROOT="${RUNNER_TEMP}/persistent-artist-workspace-feature"
+          git worktree add --detach "$FEATURE_ROOT" "refs/remotes/origin/${FEATURE_BRANCH}"
+          echo "FEATURE_ROOT=$FEATURE_ROOT" >> "$GITHUB_ENV"
+          test "$(git -C "$FEATURE_ROOT" rev-parse HEAD)" = "$EXPECTED_BASE_SHA"
+          test -z "$(git -C "$FEATURE_ROOT" status --porcelain=v1 --untracked-files=all)"
+          tar -xzf "$PAYLOAD_PATH" -C "$FEATURE_ROOT"
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import crypto from 'node:crypto';
+          const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST_PATH, 'utf8'));
+          for (const entry of manifest.files) {
+            const absolute = path.join(process.env.FEATURE_ROOT, entry.path);
+            const bytes = fs.readFileSync(absolute);
+            if (bytes.length !== entry.bytes) throw new Error(`Byte count changed: ${entry.path}`);
+            const sha = crypto.createHash('sha256').update(bytes).digest('hex');
+            if (sha !== entry.sha256) throw new Error(`SHA-256 changed: ${entry.path}`);
+          }
+          const expected = manifest.files.map((entry) => entry.path).sort();
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'persistent-artist-workspace-expected-paths.txt'), `${expected.join('\n')}\n`);
+          NODE
+          mapfile -t RELEASE_PATHS < "${RUNNER_TEMP}/persistent-artist-workspace-expected-paths.txt"
+          git -C "$FEATURE_ROOT" add -N -- "${RELEASE_PATHS[@]}"
+          git -C "$FEATURE_ROOT" status --porcelain=v1 --untracked-files=all
+          git -C "$FEATURE_ROOT" diff --check
+          git -C "$FEATURE_ROOT" diff --name-only "$EXPECTED_BASE_SHA" | sort > "${RUNNER_TEMP}/persistent-artist-workspace-actual-paths.txt"
+          diff -u "${RUNNER_TEMP}/persistent-artist-workspace-expected-paths.txt" "${RUNNER_TEMP}/persistent-artist-workspace-actual-paths.txt"
+
+      - name: Bootstrap real media tools with bounded fallback
+        working-directory: ${{ env.FEATURE_ROOT }}
+        run: bash scripts/bootstrap-ci-media-tools.sh
+
+      - name: Install frozen dependency graph
+        working-directory: ${{ env.FEATURE_ROOT }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact domain implementations
+        working-directory: ${{ env.FEATURE_ROOT }}
+        run: pnpm run build:domain
+
+      - name: Run focused Artist Workspace validation
+        working-directory: ${{ env.FEATURE_ROOT }}
+        env:
+          PROJECT_ART_REQUIRE_PILLOW: "1"
+          PROJECT_ART_REQUIRE_PROVIDER_VALIDATION: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-project-art-workbench.mjs
+          node scripts/test-project-art-workbench.mjs
+          node scripts/test-project-art-workspace-mcp.mjs
+          node scripts/test-project-art-loop-closure.mjs
+
+      - name: Run complete Art Studio validation
+        working-directory: ${{ env.FEATURE_ROOT }}
+        run: pnpm check
+
+      - name: Prove exact release scope and clean validation state
+        working-directory: ${{ env.FEATURE_ROOT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code -- pnpm-lock.yaml
+          test -z "$(find tools scripts -type d -name '__pycache__' -print -quit)"
+          test -z "$(find tools scripts -type f -name '*.pyc' -print -quit)"
+          git diff --name-only "$EXPECTED_BASE_SHA" | sort > "${RUNNER_TEMP}/persistent-artist-workspace-actual-paths.txt"
+          diff -u "${RUNNER_TEMP}/persistent-artist-workspace-expected-paths.txt" "${RUNNER_TEMP}/persistent-artist-workspace-actual-paths.txt"
+          SOURCE_STATUS="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -z "$SOURCE_STATUS" ]]; then
+            echo 'Expected staged release changes are missing.' >&2
+            exit 1
+          fi
+
+      - name: Commit and push exact feature branch
+        working-directory: ${{ env.FEATURE_ROOT }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mapfile -t RELEASE_PATHS < "${RUNNER_TEMP}/persistent-artist-workspace-expected-paths.txt"
+          git config user.name 'EVAVO-STUDIO'
+          git config user.email 'evavo.studio@gmail.com'
+          git add -- "${RELEASE_PATHS[@]}"
+          git diff --cached --check
+          git diff --cached --name-only | sort > "${RUNNER_TEMP}/persistent-artist-workspace-staged-paths.txt"
+          diff -u "${RUNNER_TEMP}/persistent-artist-workspace-expected-paths.txt" "${RUNNER_TEMP}/persistent-artist-workspace-staged-paths.txt"
+          git commit -m 'feat(project-art): add persistent artist workspace'
+          FEATURE_SHA="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_BASE_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          REMOTE_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push "$REMOTE_URL" "HEAD:refs/heads/${FEATURE_BRANCH}"
+          printf '%s\n' "$FEATURE_SHA" > "${RUNNER_TEMP}/persistent-artist-workspace-feature-sha.txt"
+
+      - name: Upload bounded publication receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: persistent-artist-workspace-publication
+          path: ${{ runner.temp }}/persistent-artist-workspace-feature-sha.txt
+          if-no-files-found: error
+          retention-days: 14
