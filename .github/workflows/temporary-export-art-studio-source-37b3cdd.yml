@@ -1,0 +1,45 @@
+name: Temporary export exact Art Studio source 37b3cdd
+
+on:
+  push:
+    branches:
+      - automation/export-art-studio-source-37b3cdd-20260811
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Package exact production commit
+        shell: bash
+        env:
+          EXPECTED_COMMIT: 37b3cdd0c1ed403880379534744c0528d65cab16
+        run: |
+          set -euo pipefail
+          git cat-file -e "$EXPECTED_COMMIT^{commit}"
+          git switch --detach "$EXPECTED_COMMIT"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+          mkdir -p "$RUNNER_TEMP/evavo-art-studio"
+          rsync -a --delete --exclude='.git' ./ "$RUNNER_TEMP/evavo-art-studio/"
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/evavo-art-studio-source-37b3cdd.tar.gz" evavo-art-studio
+          test -s "$RUNNER_TEMP/evavo-art-studio-source-37b3cdd.tar.gz"
+          sha256sum "$RUNNER_TEMP/evavo-art-studio-source-37b3cdd.tar.gz" > "$RUNNER_TEMP/evavo-art-studio-source-37b3cdd.sha256"
+
+      - name: Upload exact source archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evavo-art-studio-source-37b3cdd0c1ed403880379534744c0528d65cab16
+          path: |
+            ${{ runner.temp }}/evavo-art-studio-source-37b3cdd.tar.gz
+            ${{ runner.temp }}/evavo-art-studio-source-37b3cdd.sha256
+          if-no-files-found: error
+          retention-days: 1
