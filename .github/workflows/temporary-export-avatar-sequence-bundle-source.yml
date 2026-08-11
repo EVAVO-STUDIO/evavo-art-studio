@@ -1,0 +1,39 @@
+name: Temporary export avatar sequence bundle source
+
+on:
+  push:
+    branches:
+      - automation/avatar-sequence-bundle-source-20260812
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Package exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          git archive --format=tar.gz --prefix=evavo-art-studio/ --output="${RUNNER_TEMP}/evavo-art-studio-source.tar.gz" "${GITHUB_SHA}"
+          test -s "${RUNNER_TEMP}/evavo-art-studio-source.tar.gz"
+          sha256sum "${RUNNER_TEMP}/evavo-art-studio-source.tar.gz" > "${RUNNER_TEMP}/evavo-art-studio-source.sha256"
+
+      - name: Upload exact source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evavo-art-studio-source-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/evavo-art-studio-source.tar.gz
+            ${{ runner.temp }}/evavo-art-studio-source.sha256
+          if-no-files-found: error
+          retention-days: 1
