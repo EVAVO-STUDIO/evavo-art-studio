@@ -1,0 +1,317 @@
+name: Temporary converge persistent Artist Workspace release
+
+on:
+  push:
+    branches:
+      - automation/converge-persistent-artist-workspace-20260811
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: temporary-converge-persistent-artist-workspace-20260811
+  cancel-in-progress: false
+
+env:
+  API_ROOT: https://api.github.com/repos/EVAVO-STUDIO/evavo-art-studio
+  FEATURE_REF: agent/persistent-artist-workspace-20260811
+  PUBLISHER_REF: automation/publish-persistent-artist-workspace-20260811
+  EXPORT_REF: automation/export-art-studio-source-58c6311-artist-workspace
+  PRIMARY_REF: automation/release-persistent-artist-workspace-20260811
+  RECOVERY_REF: automation/recover-persistent-artist-workspace-20260811
+  CONVERGE_REF: automation/converge-persistent-artist-workspace-20260811
+  EXPECTED_CHANGED_FILES: "17"
+
+jobs:
+  converge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out convergence carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve current release state
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28')
+          main_sha="$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')"
+          pulls="$(curl -fsSL "${auth[@]}" "${API_ROOT}/pulls?state=all&head=EVAVO-STUDIO:${FEATURE_REF}&base=main&per_page=10")"
+          pr_number="$(jq -r '.[0].number // empty' <<<"${pulls}")"
+          merged_at="$(jq -r '.[0].merged_at // empty' <<<"${pulls}")"
+          merge_sha="$(jq -r '.[0].merge_commit_sha // empty' <<<"${pulls}")"
+
+          if [[ -n "${merged_at}" ]]; then
+            test "${merge_sha}" =~ ^[0-9a-f]{40}$
+            ancestry="$(curl -fsSL "${auth[@]}" "${API_ROOT}/compare/${merge_sha}...${main_sha}" | jq -r '.status')"
+            case "${ancestry}" in identical|ahead) ;; *) exit 1 ;; esac
+            echo "NEEDS_MERGE=false" >> "${GITHUB_ENV}"
+            echo "PR_NUMBER=${pr_number}" >> "${GITHUB_ENV}"
+            echo "RELEASE_SHA=${merge_sha}" >> "${GITHUB_ENV}"
+            echo "VALIDATION_SHA=${main_sha}" >> "${GITHUB_ENV}"
+            exit 0
+          fi
+
+          feature_sha=''
+          for attempt in $(seq 1 180); do
+            status="$(curl -sS -o /tmp/feature.json -w '%{http_code}' "${auth[@]}" "${API_ROOT}/git/ref/heads/${FEATURE_REF}")"
+            if [[ "${status}" == 200 ]]; then
+              feature_sha="$(jq -r '.object.sha' /tmp/feature.json)"
+              [[ "${feature_sha}" != "${main_sha}" ]] && break
+            fi
+            sleep 5
+          done
+          test "${feature_sha}" =~ ^[0-9a-f]{40}$
+
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main" "+refs/heads/${FEATURE_REF}:refs/remotes/origin/${FEATURE_REF}"
+          test "$(git rev-parse refs/remotes/origin/main)" = "${main_sha}"
+          test "$(git rev-parse refs/remotes/origin/${FEATURE_REF})" = "${feature_sha}"
+          git checkout -B converge-feature "${feature_sha}"
+          git config user.name EVAVO-STUDIO
+          git config user.email evavo.studio@gmail.com
+          if ! git merge-base --is-ancestor "${main_sha}" HEAD; then
+            git merge --no-edit "${main_sha}"
+          fi
+          integrated_sha="$(git rev-parse HEAD)"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test "$(git diff --name-only "${main_sha}...${integrated_sha}" | wc -l | tr -d ' ')" = "${EXPECTED_CHANGED_FILES}"
+          test -z "$(git diff --name-only "${main_sha}...${integrated_sha}" -- pnpm-lock.yaml)"
+          test -z "$(git diff --name-only "${main_sha}...${integrated_sha}" | grep '^\.github/workflows/temporary-' || true)"
+
+          echo "NEEDS_MERGE=true" >> "${GITHUB_ENV}"
+          echo "MAIN_SHA=${main_sha}" >> "${GITHUB_ENV}"
+          echo "ORIGINAL_FEATURE_SHA=${feature_sha}" >> "${GITHUB_ENV}"
+          echo "FEATURE_SHA=${integrated_sha}" >> "${GITHUB_ENV}"
+          echo "PR_NUMBER=${pr_number}" >> "${GITHUB_ENV}"
+
+      - name: Route Python bytecode outside checkout
+        if: env.NEEDS_MERGE == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cache_root="${RUNNER_TEMP}/artist-workspace-converge-pycache"
+          mkdir -p "${cache_root}"
+          echo "PYTHONPYCACHEPREFIX=${cache_root}" >> "${GITHUB_ENV}"
+
+      - name: Set up Python 3.13.5
+        if: env.NEEDS_MERGE == 'true'
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: pip
+          cache-dependency-path: |
+            requirements-image-pipeline.txt
+            requirements/pixel-font-studio-v2.txt
+
+      - name: Install exact Python image backends
+        if: env.NEEDS_MERGE == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
+          python - <<'PY'
+          import PIL, fontTools
+          assert PIL.__version__ == '12.2.0'
+          assert fontTools.__version__ == '4.63.0'
+          PY
+
+      - name: Set up pnpm 10.13.1
+        if: env.NEEDS_MERGE == 'true'
+        uses: pnpm/action-setup@d4bc53e3007c5c22cc58fc14cba6859f64b229f8 # v4.2.0
+        with:
+          version: 10.13.1
+          run_install: false
+
+      - name: Set up Node.js 22.14.0
+        if: env.NEEDS_MERGE == 'true'
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Run complete exact-feature validation
+        if: env.NEEDS_MERGE == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v ffmpeg
+          command -v ffprobe
+          pnpm install --frozen-lockfile
+          pnpm check
+          git diff --exit-code -- pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test "$(git rev-parse HEAD)" = "${FEATURE_SHA}"
+
+      - name: Publish exact integrated feature and ensure audit PR
+        if: env.NEEDS_MERGE == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28')
+          remote_sha="$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/${FEATURE_REF}" | jq -r '.object.sha')"
+          test "${remote_sha}" = "${ORIGINAL_FEATURE_SHA}"
+          if [[ "${FEATURE_SHA}" != "${ORIGINAL_FEATURE_SHA}" ]]; then
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/EVAVO-STUDIO/evavo-art-studio.git"
+            git push origin "${FEATURE_SHA}:refs/heads/${FEATURE_REF}"
+          fi
+          test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/${FEATURE_REF}" | jq -r '.object.sha')" = "${FEATURE_SHA}"
+
+          if [[ -z "${PR_NUMBER:-}" ]]; then
+            payload="$(jq -n --arg head "${FEATURE_REF}" '{title:"feat(project-art): add persistent artist workspace and mastering suite",head:$head,base:"main",body:"Adds the persistent EVAVO Artist Workspace for ChatGPT, Claude and governed agents: immutable originals and editable workspaces, exact provenance, broad deterministic image and motion operations, style and identity locking, sprite and sequence tooling, cleanup and final mastering, callable MCP surfaces and EVAVO Storage handoff. Complete current-main validation passed; approval, promotion, repository mutation, deployment and publication remain separate.",draft:false,maintainer_can_modify:false}')"
+            pr="$(curl -fsSL -X POST "${auth[@]}" -d "${payload}" "${API_ROOT}/pulls")"
+            PR_NUMBER="$(jq -r '.number' <<<"${pr}")"
+            echo "PR_NUMBER=${PR_NUMBER}" >> "${GITHUB_ENV}"
+          fi
+
+      - name: Recheck state and guarded squash merge
+        if: env.NEEDS_MERGE == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28')
+          pr="$(curl -fsSL "${auth[@]}" "${API_ROOT}/pulls/${PR_NUMBER}")"
+          if [[ "$(jq -r '.merged' <<<"${pr}")" == true ]]; then
+            release_sha="$(jq -r '.merge_commit_sha' <<<"${pr}")"
+            current_main="$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')"
+            ancestry="$(curl -fsSL "${auth[@]}" "${API_ROOT}/compare/${release_sha}...${current_main}" | jq -r '.status')"
+            case "${ancestry}" in identical|ahead) ;; *) exit 1 ;; esac
+            echo "RELEASE_SHA=${release_sha}" >> "${GITHUB_ENV}"
+            echo "VALIDATION_SHA=${current_main}" >> "${GITHUB_ENV}"
+            exit 0
+          fi
+
+          test "$(jq -r '.state' <<<"${pr}")" = open
+          test "$(jq -r '.head.sha' <<<"${pr}")" = "${FEATURE_SHA}"
+          test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')" = "${MAIN_SHA}"
+          payload="$(jq -n --arg sha "${FEATURE_SHA}" '{commit_title:"feat(project-art): add persistent artist workspace and mastering suite",commit_message:"Add the persistent source-preserving EVAVO Artist Workspace, comprehensive deterministic image and motion operations, project-specific style and identity locks, sprite and sequence tooling, technical cleanup and final mastering, callable ChatGPT and Claude surfaces, and exact EVAVO Storage handoff while preserving separate approval and publication authority.",merge_method:"squash",sha:$sha}')"
+          merge="$(curl -fsSL -X PUT "${auth[@]}" -d "${payload}" "${API_ROOT}/pulls/${PR_NUMBER}/merge")"
+          test "$(jq -r '.merged' <<<"${merge}")" = true
+          release_sha="$(jq -r '.sha' <<<"${merge}")"
+          test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')" = "${release_sha}"
+          echo "RELEASE_SHA=${release_sha}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_SHA=${release_sha}" >> "${GITHUB_ENV}"
+
+      - name: Dispatch and require exact-current-main validation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28')
+          current_main="$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')"
+          validation_sha="${current_main}"
+          expected_name="art-studio-validation-${validation_sha}"
+          runs="$(curl -fsSL "${auth[@]}" "${API_ROOT}/actions/runs?head_sha=${validation_sha}&per_page=100")"
+          exact_id="$(jq -r '[.workflow_runs[] | select(.name == "Art Studio exact mainline validation" and .status == "completed" and .conclusion == "success")] | sort_by(.created_at) | reverse | .[0].id // empty' <<<"${runs}")"
+          if [[ -z "${exact_id}" ]]; then
+            payload="$(jq -n --arg sha "${validation_sha}" '{ref:"main",inputs:{expected_sha:$sha,request_source:"evavo-development-studio"}}')"
+            code="$(curl -sS -o /tmp/dispatch.json -w '%{http_code}' -X POST "${auth[@]}" -d "${payload}" "${API_ROOT}/actions/workflows/ci.yml/dispatches")"
+            if [[ "${code}" != 204 ]]; then
+              payload="$(jq -n --arg sha "${validation_sha}" '{ref:"main",inputs:{expected_sha:$sha}}')"
+              code="$(curl -sS -o /tmp/dispatch.json -w '%{http_code}' -X POST "${auth[@]}" -d "${payload}" "${API_ROOT}/actions/workflows/ci.yml/dispatches")"
+            fi
+            test "${code}" = 204
+            for attempt in $(seq 1 300); do
+              test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')" = "${validation_sha}"
+              runs="$(curl -fsSL "${auth[@]}" "${API_ROOT}/actions/runs?head_sha=${validation_sha}&event=workflow_dispatch&per_page=100")"
+              exact_id="$(jq -r '[.workflow_runs[] | select(.name == "Art Studio exact mainline validation")] | sort_by(.created_at) | reverse | .[0].id // empty' <<<"${runs}")"
+              status="$(jq -r '[.workflow_runs[] | select(.name == "Art Studio exact mainline validation")] | sort_by(.created_at) | reverse | .[0].status // empty' <<<"${runs}")"
+              conclusion="$(jq -r '[.workflow_runs[] | select(.name == "Art Studio exact mainline validation")] | sort_by(.created_at) | reverse | .[0].conclusion // empty' <<<"${runs}")"
+              if [[ -n "${exact_id}" && "${status}" == completed ]]; then
+                test "${conclusion}" = success
+                break
+              fi
+              sleep 5
+            done
+          fi
+          test "${exact_id}" =~ ^[0-9]+$
+          artifacts="$(curl -fsSL "${auth[@]}" "${API_ROOT}/actions/runs/${exact_id}/artifacts?per_page=100")"
+          artifact_id="$(jq -r --arg n "${expected_name}" '.artifacts[] | select(.name == $n and .expired == false) | .id' <<<"${artifacts}" | head -1)"
+          artifact_digest="$(jq -r --arg n "${expected_name}" '.artifacts[] | select(.name == $n and .expired == false) | .digest' <<<"${artifacts}" | head -1)"
+          test "${artifact_id}" =~ ^[0-9]+$
+          test "${artifact_digest}" =~ ^sha256:[0-9a-f]{64}$
+          echo "VALIDATION_SHA=${validation_sha}" >> "${GITHUB_ENV}"
+          echo "EXACT_MAIN_RUN_ID=${exact_id}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_ARTIFACT_ID=${artifact_id}" >> "${GITHUB_ENV}"
+          echo "VALIDATION_ARTIFACT_DIGEST=${artifact_digest}" >> "${GITHUB_ENV}"
+
+      - name: Write convergence receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const value = {
+            schema: 'evavo.persistent-artist-workspace-convergence.v1',
+            repository: 'EVAVO-STUDIO/evavo-art-studio',
+            pullRequest: Number(process.env.PR_NUMBER || 0),
+            releaseSha: process.env.RELEASE_SHA,
+            validatedCurrentMainSha: process.env.VALIDATION_SHA,
+            exactMainRunId: Number(process.env.EXACT_MAIN_RUN_ID),
+            validationArtifactId: Number(process.env.VALIDATION_ARTIFACT_ID),
+            validationArtifactDigest: process.env.VALIDATION_ARTIFACT_DIGEST,
+            changedFileCount: 17,
+            lockfileChanged: false,
+            validation: 'passed',
+            liveProviderRequest: false,
+            candidateApproval: false,
+            candidatePromotion: false,
+            storageWrite: false,
+            targetRepositoryMutation: false,
+            deployment: false,
+            publication: false,
+            forcePush: false,
+          };
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'persistent-artist-workspace-convergence.json'), `${JSON.stringify(value, null, 2)}\n`);
+          NODE
+
+      - name: Upload convergence receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: persistent-artist-workspace-convergence-${{ env.VALIDATION_SHA }}
+          path: ${{ runner.temp }}/persistent-artist-workspace-convergence.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Delete all temporary release refs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28')
+          test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')" = "${VALIDATION_SHA}"
+          delete_ref() {
+            local ref="$1" code
+            code="$(curl -sS -o /dev/null -w '%{http_code}' "${auth[@]}" "${API_ROOT}/git/ref/heads/${ref}")"
+            [[ "${code}" == 404 ]] && return 0
+            test "${code}" = 200
+            code="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "${auth[@]}" "${API_ROOT}/git/refs/heads/${ref}")"
+            test "${code}" = 204
+            for attempt in $(seq 1 30); do
+              code="$(curl -sS -o /dev/null -w '%{http_code}' "${auth[@]}" "${API_ROOT}/git/ref/heads/${ref}")"
+              [[ "${code}" == 404 ]] && return 0
+              sleep 1
+            done
+            return 1
+          }
+          delete_ref "${FEATURE_REF}"
+          delete_ref "${PUBLISHER_REF}"
+          delete_ref "${EXPORT_REF}"
+          delete_ref "${PRIMARY_REF}"
+          delete_ref "${RECOVERY_REF}"
+          delete_ref "${CONVERGE_REF}"
