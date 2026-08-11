@@ -104,7 +104,9 @@
     "pnpm typecheck",
     "pnpm test",
     "pnpm build",
-    "git diff --exit-code -- pnpm-lock.yaml && git diff --exit-code && test -z \"$(git status --porcelain)\""
+    "git diff --exit-code -- pnpm-lock.yaml && git diff --exit-code && test -z \"$(git status --porcelain)\"",
+    "python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt",
+    "node scripts/check-pixel-font-studio-v2.mjs"
   ],
   "executedBaseline": {
     "workflow": ".github/workflows/ci.yml",
@@ -121,7 +123,10 @@
       "build original deterministic bitmap-font candidates",
       "create bounded project-art intake workspaces",
       "build deterministic sprite atlases and engine metadata",
-      "retain bounded source-validation evidence"
+      "retain bounded source-validation evidence",
+      "build independently authored proportional pixel-font families",
+      "emit deterministic BMFont, BDF, atlas JSON, grid sheets and TrueType convenience derivatives",
+      "run exact Godot 4.6.2 bitmap-font import and render verification"
     ],
     "validationDoesNotAuthorize": [
       "live provider requests",
@@ -144,6 +149,75 @@
     "Project-art intake and sprite-atlas validation is path-only and does not transfer image bytes through MCP or model context.",
     "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.",
     "Superseded mainline validations are cancelled; a receipt is written only after the candidate is re-proven as current origin/main.",
-    "Provider execution, promotion, game mutation and production effects remain separately authorised operations."
-  ]
+    "Provider execution, promotion, game mutation and production effects remain separately authorised operations.",
+    "Pixel Font Studio v2.2 retains independent per-face masters and emits canonical BMFont/PNG runtime assets plus BDF, atlas JSON, fixed-cell grids and optional deterministic TTF derivatives.",
+    "Pixel Font Studio v2.2 native CI downloads the official Godot 4.6.2 Linux archive only after verifying its exact SHA-256."
+  ],
+  "pixelFontStudioV2": {
+    "contract": "evavo.pixel-font-studio.v2",
+    "toolVersion": "2.2.0",
+    "familyMasterSchema": "evavo.pixel-font-family-master.v2",
+    "faceMasterSchema": "evavo.pixel-font-face-master.v2",
+    "familyOutputSchema": "evavo.pixel-font-family.v2",
+    "canonicalRuntime": [
+      "AngelCode BMFont text .fnt",
+      "binary RGBA PNG atlas"
+    ],
+    "interchangeAndAuthoringOutputs": [
+      "BDF 2.1 bitmap font",
+      "engine-neutral atlas JSON",
+      "fixed-cell transparent grid PNG and JSON",
+      "deterministic TrueType convenience derivative",
+      "Godot FontVariation .tres",
+      "native and integer-scaled specimen PNGs"
+    ],
+    "authoredMasters": {
+      "independentPerFace": true,
+      "variableGlyphDimensions": true,
+      "perGlyphOffsetsAndAdvances": true,
+      "perFaceKerning": true,
+      "unicodeCoverage": true,
+      "deterministicGzipTransportSupported": true,
+      "externalFontBinaryUsed": false
+    },
+    "deterministic": true,
+    "createOnly": true,
+    "mcpDefaultMode": "read-only",
+    "writeEnvironmentGateRequired": true,
+    "writePerCallConfirmationRequired": true,
+    "allowedRootBoundaryRequired": true,
+    "godotPolicy": {
+      "targetVersion": "4.6.2",
+      "officialLinuxArchiveSha256": "30e6b6d141f0cd5bebd629ad1d0ef1324e60091bb20662d026b402ba58c59937",
+      "textureFilter": "nearest",
+      "integerScaleOnly": true,
+      "subpixelPositioning": false,
+      "mipmaps": false,
+      "systemFallback": false,
+      "nativeImportAndRenderVerificationRequired": true
+    },
+    "qa": {
+      "printableAsciiRequired": true,
+      "westernLatinRequired": true,
+      "confusableSequencesRequired": true,
+      "exhaustiveOrderedPairCollisionChecks": true,
+      "duplicateGlyphAllowlistRequired": true,
+      "exactRebuildComparisonRequired": true,
+      "ttfCmapAndKerningValidationRequired": true,
+      "bdfCoverageAndAdvanceValidationRequired": true,
+      "atlasAndGridMetadataValidationRequired": true
+    },
+    "authority": {
+      "providerExecution": false,
+      "creativeApproval": false,
+      "historicalApproval": false,
+      "candidatePromotion": false,
+      "sourceDeletion": false,
+      "targetRepositoryMutation": false,
+      "gitCommit": false,
+      "gitPush": false,
+      "publication": false,
+      "forcePush": false
+    }
+  }
 }

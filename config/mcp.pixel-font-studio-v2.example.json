@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "evavo-pixel-font-studio-v2": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\scripts\\pixel-font-studio-v2-mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_PIXEL_FONT_STUDIO_MODE": "read-only",
+        "EVAVO_PIXEL_FONT_STUDIO_ALLOW_WRITES": "false",
+        "EVAVO_PIXEL_FONT_ALLOWED_ROOTS": "C:\\GitRepos\\evavo-art-studio;C:\\EVAVO\\font-workspaces",
+        "EVAVO_PIXEL_FONT_PYTHON": "python",
+        "EVAVO_PIXEL_FONT_TIMEOUT_MS": "240000"
+      }
+    }
+  }
+}

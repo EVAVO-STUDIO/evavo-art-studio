@@ -63,7 +63,7 @@
     "pixel-font:mcp": "node scripts/pixel-font-studio-mcp.mjs",
     "pixel-font:brass:build": "node scripts/build-brass-brine-pixel-font-family.mjs",
     "pixel-font:brass:test": "node --test scripts/pixel-font-brass-brine.test.mjs",
-    "pixel-font:check": "node scripts/check-pixel-font-studio.mjs",
+    "pixel-font:check": "node scripts/check-pixel-font-studio.mjs && node scripts/check-pixel-font-studio-v2.mjs",
     "governed-workspace-handoff:check": "node scripts/check-governed-workspace-handoff.mjs",
     "workspace-writer:check": "node scripts/check-workspace-writer.mjs && pnpm --filter @evavo/art-repo-inspector test",
     "raw-art:production:check": "node scripts/check-raw-art-production-orchestrator.mjs",
@@ -101,7 +101,15 @@
     "sprite-effects": "pnpm --filter @evavo/art-godot-sprite-effects build && pnpm --filter @evavo/art-godot-sprite-effects start --",
     "media:check": "pnpm --filter @evavo/art-delivery-optimizer test && pnpm --filter @evavo/art-audio-delivery test && pnpm --filter @evavo/art-godot-sprite-effects test",
     "sharp-exact-runtime:test": "node scripts/test-sharp-exact-canvas-runtime.mjs",
-    "project-art:workspace:mcp:check": "node scripts/test-project-art-workspace-mcp.mjs"
+    "project-art:workspace:mcp:check": "node scripts/test-project-art-workspace-mcp.mjs",
+    "pixel-font:v2:catalog": "python tools/pixel_font_studio_v2.py catalog",
+    "pixel-font:v2:audit": "python tools/pixel_font_studio_v2.py audit",
+    "pixel-font:v2:build": "python tools/pixel_font_studio_v2.py build",
+    "pixel-font:v2:validate": "python tools/pixel_font_studio_v2.py validate",
+    "pixel-font:v2:compare": "python tools/pixel_font_studio_v2.py compare",
+    "pixel-font:v2:mcp": "node scripts/pixel-font-studio-v2-mcp.mjs",
+    "pixel-font:v2:chess-lord:audit": "python tools/pixel_font_studio_v2.py audit --family config/pixel-font-families/chess-lord-v2/chess-lord.family.json",
+    "pixel-font:v2:check": "node scripts/check-pixel-font-studio-v2.mjs"
   },
   "workspaces": [
     "apps/*",

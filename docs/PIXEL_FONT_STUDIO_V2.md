@@ -1,51 +1,162 @@
 # EVAVO Pixel Font Studio v2
 
-Pixel Font Studio v2 adds an authored-master path for production bitmap typefaces while keeping the v1 5x7 families backward compatible.
+Pixel Font Studio v2 is the reusable production path for authored game typefaces. It keeps the older 5×7 generator available for its existing families, but removes that shared-grid limitation for new games.
 
-## Why v2 exists
+## Production model
 
-A real game font is not a scaled effect applied to one generic alphabet. Each face owns its glyph matrices, dimensions, offsets, advances and kerning. This supports compact UI faces, readable proportional text faces and larger display faces that share an art direction without sharing the same pixel geometry.
+A face master is explicit JSON using `evavo.pixel-font-face-master.v2`. Each face owns its complete glyph set. Every glyph records:
 
-## Authoritative source
+- a Unicode codepoint and exact binary pixel matrix;
+- arbitrary width and height;
+- real `xOffset`, `yOffset` and `xAdvance` values;
+- placement inside a face-level ascent, descent, baseline and line-height model.
 
-The source of truth is JSON using `evavo.pixel-font-face-master.v2`. Every glyph declares Unicode codepoint, exact `. #` bitmap rows, width, height, x/y offset and x advance. Faces also declare cap height, x-height, baseline, line height and space advance. Kerning belongs to the face.
+Kerning belongs to each face. A family master binds independent face masters to roles, coverage requirements, output policy, specimens, licensing and the exact Godot policy.
 
-The family master `evavo.pixel-font-family-master.v2` binds the face masters and the exact Godot runtime policy.
+This design prevents a display face, text face and compact UI face from becoming scaled effects applied to one generic alphabet.
 
-## Canonical runtime output
+## Canonical game output
 
-Godot 4.6.2 should consume AngelCode BMFont text `.fnt` beside the generated RGBA PNG atlas. A `FontVariation` `.tres` is generated as a stable game-facing resource wrapper.
+The canonical Godot runtime is:
 
-Required pixel policy:
+1. AngelCode BMFont text metadata (`.fnt`);
+2. an exact RGBA PNG atlas beside the `.fnt`;
+3. an optional `FontVariation` wrapper (`.tres`).
 
-- nearest texture filtering;
-- integer-only UI/render scaling;
-- subpixel positioning disabled;
-- mipmaps disabled;
-- automatic system-font fallback disabled for production verification;
-- no source antialiasing;
-- no glyph rotation or resampling.
+The PNG is emitted without antialiasing, rotation, resampling or colour interpolation. Godot projects must use nearest filtering, integer scaling, disabled mipmaps, disabled subpixel positioning and disabled system fallback during verification.
 
-Optional TTF/OTF conversions are convenience derivatives only. They are not the canonical pixel source because host renderers may apply antialiasing or hinting.
+## Optional TrueType output
 
-## Coverage policy
+A `.ttf` can be generated from the same pixel master when `output.includeTtf` is true. It is useful for mockups, design applications, desktop tools and pipelines that require an installable font.
 
-Production faces must contain printable ASCII. Game families should normally add Western Latin accents, typographic punctuation, currencies and game-specific symbols. Chess Lord additionally includes chess-piece symbols. Missing characters should fail QA rather than silently depend on a system font.
+The TTF is a convenience derivative, not the canonical in-game source. Host software may antialias or hint scalable outlines. Pixel-perfect Godot rendering should continue to use `.fnt + .png`.
+
+TTF generation includes:
+
+- deterministic square pixel contours;
+- Unicode `cmap` parity with the face master;
+- OpenType GPOS kerning;
+- legacy `kern` kerning;
+- deterministic font timestamps;
+- reopen-and-verify checks through `fontTools`.
+
+## Coverage profiles
+
+The tool supports composable coverage gates:
+
+- `printable-ascii`;
+- `western-latin` — printable ASCII, Latin-1 letters and symbols, complete Latin Extended-A, typographic punctuation and common currencies;
+- `arrows`;
+- `chess`;
+- `ui-symbols`;
+- `box-drawing-core`.
+
+A family may also require explicit additional codepoints. Missing codepoints fail before output is created.
+
+## Quality gates
+
+Every face audit checks:
+
+- dimensions against the exact bitmap;
+- line-box and horizontal-overhang boundaries;
+- required coverage;
+- duplicate codepoints and duplicate kerning pairs;
+- unapproved identical letter and number forms;
+- configured confusable groups such as `0/O`, `1/I/l/|`, `5/S`, `2/Z`, `8/B`, `g/q` and `m/rn`;
+- every ordered glyph pair for pixel collisions after advance and kerning;
+- real use of offsets, metrics and face-specific kerning.
+
+Every family build additionally checks deterministic atlas packing, exact file identities, BMFont metadata, specimen dimensions, PNG binary pixels, TTF cmap/kerning and byte-for-byte reproducibility.
+
+## Native specimens
+
+Each specimen is rendered directly from the authored glyph matrices at its declared native resolution. The builder also emits exact 2× and 4× nearest-neighbour versions. These images are review evidence, not screenshots generated by a system font.
 
 ## CLI
 
+Install the optional TTF dependency:
+
 ```powershell
-python tools/pixel_font_studio_v2.py catalog
-python tools/pixel_font_studio_v2.py build --master C:\work\family.master.json --output C:\work\font-build
-python tools/pixel_font_studio_v2.py validate --family C:\work\font-build\pixel-font-family.json
+python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
 ```
 
-Builds are create-only. The master remains editable and diffable in Git.
+Inspect the contract and audit masters:
 
-## ChatGPT / Claude use
+```powershell
+python tools/pixel_font_studio_v2.py catalog
+python tools/pixel_font_studio_v2.py audit --face C:\font-work\ui.face.json
+python tools/pixel_font_studio_v2.py audit --family C:\font-work\game.family.json
+python tools/pixel_font_studio_v2.py inspect --face C:\font-work\ui.face.json --codepoint U+0067
+```
 
-Agents should edit the explicit glyph-master JSON, not a packed atlas. Work in control glyphs first, validate confusables and native-size specimens, then expand coverage. The builder converts approved masters into deterministic game artifacts. Provider-generated lettering is reference material only and must not be accepted as a full alphabet without glyph-by-glyph authoring and review.
+Build, validate and prove reproducibility:
 
-## Godot verification
+```powershell
+python tools/pixel_font_studio_v2.py build --master C:\font-work\game.family.json --output C:\font-work\build-a
+python tools/pixel_font_studio_v2.py validate --family C:\font-work\build-a\pixel-font-family.json
+python tools/pixel_font_studio_v2.py build --master C:\font-work\game.family.json --output C:\font-work\build-b
+python tools/pixel_font_studio_v2.py compare --first C:\font-work\build-a --second C:\font-work\build-b
+```
 
-A downstream Godot 4.6.2 fixture should load every `.fnt` as `FontFile`, disable `allow_system_fallback`, disable subpixel positioning and mipmaps, then assert required Unicode coverage. Native 320x200 and integer-scaled specimen screenshots remain the creative review authority.
+Builds and sealed masters are create-only. Existing files and non-empty output roots are rejected.
+
+## Godot 4.6.2 verification
+
+Each family build contains an isolated Godot fixture. The verifier:
+
+- checks the executable reports exactly Godot 4.6.2;
+- imports every `.fnt` and atlas through the editor;
+- disables system fallback, mipmaps and subpixel positioning;
+- asserts every required character is present through `Font.has_char()`;
+- renders representative strings at native scale with nearest filtering;
+- rejects non-binary rendered pixels;
+- stores a PNG render proof and a machine-readable report.
+
+The dedicated workflow downloads the official Linux x86-64 Godot 4.6.2 archive and verifies its published SHA-256 before execution.
+
+## ChatGPT and Claude MCP
+
+`scripts/pixel-font-studio-v2-mcp.mjs` exposes bounded tools for catalogue, audit, glyph inspection, build validation, reproducibility comparison, sealing, building and operator-pinned Godot verification.
+
+The server is read-only by default. Writes require all of the following:
+
+- `EVAVO_PIXEL_FONT_STUDIO_MODE=read-write`;
+- `EVAVO_PIXEL_FONT_STUDIO_ALLOW_WRITES=true`;
+- an explicit `EVAVO_PIXEL_FONT_ALLOWED_ROOTS` boundary;
+- `confirmWrite=true` on each write call.
+
+The agent cannot select an arbitrary executable, invoke a shell, overwrite retained masters, commit, push, publish or mutate another repository.
+
+## Adding a family for another game
+
+1. Create a new directory under `config/pixel-font-families/<family-id>/`.
+2. Author independent face masters rather than copying one complete alphabet into every role.
+3. Establish control glyphs first: `H O n o 0 1 I l g q m r`, punctuation, numerals and game-specific symbols.
+4. Define real vertical metrics and intentional advances before broad character expansion.
+5. Add coverage profiles and exact game-specific codepoints.
+6. Add face-specific kerning.
+7. Audit, inspect confusables, build specimens, validate and compare two clean builds.
+8. Run the Godot verifier before promotion into a game repository.
+9. Keep the JSON masters as the editable source of truth.
+
+
+## Additional interoperable outputs
+
+Every v2.2 production face now includes:
+
+- a BDF 2.1 bitmap font containing the exact authored glyph pixels and advances;
+- an engine-neutral atlas JSON file mapping every Unicode code point to the packed PNG rectangle and metrics;
+- a transparent fixed-cell review grid PNG and companion JSON map for manual sprite-sheet workflows;
+- the canonical packed PNG plus AngelCode `.fnt` pair for efficient Godot use;
+- the optional deterministic `.ttf` convenience font for desktop and design applications.
+
+The fixed-cell grid is provided for inspection and custom tooling. It is not more efficient than the packed runtime atlas.
+
+
+## Compact retained masters
+
+Large complete face masters may be retained as deterministic `.json.gz` files with gzip timestamp zero. The studio expands them transparently, validates the exact JSON document, and emits a readable `.master.json` snapshot in every build. This keeps repository transport compact without changing the authored glyph source or runtime outputs.
+
+## Repository integration
+
+The stable CLI entry point is `tools/pixel_font_studio_v2.py`; its reviewed implementation is split into the `tools/pixel_font_v2/` package so format writers, validation, build orchestration and CLI concerns can evolve independently. `scripts/integrate-pixel-font-studio-v2.mjs` idempotently adds v2 commands to `package.json` and records the complete v2 authority and QA contract in `evavo.reliability.json`.

@@ -1,28 +1,116 @@
 {
-  "schemaVersion": "2.0",
+  "contract": "evavo.pixel-font-studio.v2",
+  "schemaVersion": "2.1.0",
+  "toolVersion": "2.2.0",
   "familyMasterSchema": "evavo.pixel-font-family-master.v2",
   "faceMasterSchema": "evavo.pixel-font-face-master.v2",
   "familyOutputSchema": "evavo.pixel-font-family.v2",
-  "canonicalRuntime": ["AngelCode BMFont .fnt", "RGBA PNG atlas"],
+  "auditSchema": "evavo.pixel-font-audit.v2",
+  "validationSchema": "evavo.pixel-font-validation.v2",
+  "canonicalRuntime": {
+    "metadata": "AngelCode BMFont text .fnt",
+    "atlas": "RGBA PNG",
+    "godotResource": "FontVariation .tres",
+    "externalFontBinaryUsed": false
+  },
+  "optionalDerivatives": {
+    "ttf": {
+      "enabled": true,
+      "canonicalRuntime": false,
+      "source": "same explicit glyph masters",
+      "kerning": [
+        "OpenType GPOS",
+        "legacy kern"
+      ],
+      "dependency": "fonttools==4.63.0",
+      "embeddingFsType": 0
+    }
+  },
+  "coverageProfiles": [
+    "printable-ascii",
+    "western-latin",
+    "arrows",
+    "chess",
+    "ui-symbols",
+    "box-drawing-core"
+  ],
+  "requirements": {
+    "independentFaceMasters": true,
+    "arbitraryGlyphDimensions": true,
+    "realAscentDescentBaseline": true,
+    "perGlyphOffsetsAndAdvances": true,
+    "perFaceKerning": true,
+    "unicodeCoverageProfiles": true,
+    "binaryPixelMasters": true,
+    "confusableQa": true,
+    "exactDuplicateQa": true,
+    "exhaustivePairCollisionQa": true,
+    "nativeResolutionSpecimens": true,
+    "integerScaleSpecimens": true,
+    "noFallbackVerification": true,
+    "deterministicBuilds": true,
+    "createOnlyBuilds": true,
+    "ttfCmapVerification": true,
+    "ttfKerningVerification": true,
+    "godotImportAndRenderFixture": true,
+    "ttfEmbeddingPermissionVerification": true,
+    "bdfInterchangeRequired": true,
+    "engineNeutralAtlasMapRequired": true,
+    "fixedCellReviewGridRequired": true
+  },
   "godot": {
     "targetVersion": "4.6.2",
+    "officialLinuxArchive": "Godot_v4.6.2-stable_linux.x86_64.zip",
+    "officialLinuxArchiveSha256": "30e6b6d141f0cd5bebd629ad1d0ef1324e60091bb20662d026b402ba58c59937",
     "textureFilter": "nearest",
     "integerScaleOnly": true,
     "subpixelPositioning": false,
     "mipmaps": false,
     "systemFallback": false
   },
-  "requirements": {
-    "independentFaceMasters": true,
-    "arbitraryGlyphDimensions": true,
-    "perGlyphOffsetsAndAdvances": true,
-    "perFaceKerning": true,
-    "unicodeCoverage": true,
-    "printableAsciiRequired": true,
-    "binaryPixelMasters": true,
-    "confusableQa": true,
-    "createOnlyBuilds": true,
-    "nativeResolutionReview": true,
-    "externalFontBinaryRequired": false
+  "limits": {
+    "maximumInputBytes": 33554432,
+    "maximumGlyphsPerFace": 4096,
+    "maximumKerningPairsPerFace": 100000,
+    "maximumAtlasEdge": 4096,
+    "maximumSpecimenEdge": 4096
+  },
+  "mcp": {
+    "defaultMode": "read-only",
+    "allowedRootsRequired": true,
+    "writeEnvironmentGateRequired": true,
+    "writePerCallConfirmationRequired": true,
+    "callerSelectedExecutableAllowed": false,
+    "shellExecutionAllowed": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "creativeApproval": false,
+    "nativeGodotApproval": false,
+    "candidatePromotion": false,
+    "sourceOverwrite": false,
+    "sourceDeletion": false,
+    "targetRepositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "forcePush": false
+  },
+  "interchangeFormats": {
+    "bdf": {
+      "format": "BDF 2.1",
+      "canonicalRuntime": false,
+      "exactBitmapSource": true
+    },
+    "atlasJson": {
+      "schema": "evavo.pixel-font-atlas.v1",
+      "canonicalRuntime": false,
+      "engineNeutral": true
+    },
+    "gridSheet": {
+      "schema": "evavo.pixel-font-grid-sheet.v1",
+      "canonicalRuntime": false,
+      "transparentPng": true
+    }
   }
 }

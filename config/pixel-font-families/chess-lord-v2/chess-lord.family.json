@@ -1,0 +1,84 @@
+{
+  "schema": "evavo.pixel-font-family-master.v2",
+  "familyId": "chess-lord-90s",
+  "displayName": "Chess Lord 90s Pixel Family",
+  "version": "2.2.0",
+  "godot": {
+    "targetVersion": "4.6.2",
+    "resourceBasePath": "assets/fonts/chess_lord",
+    "textureFilter": "nearest",
+    "integerScaleOnly": true,
+    "subpixelPositioning": false,
+    "mipmaps": false,
+    "systemFallback": false
+  },
+  "output": {
+    "includeTtf": true,
+    "includeSpecimens": true,
+    "atlasMaximumEdge": 2048,
+    "atlasPadding": 1,
+    "ttfPixelUnits": 64,
+    "includeBdf": true,
+    "includeAtlasJson": true,
+    "includeGridSheet": true
+  },
+  "license": {
+    "copyright": "Copyright 2026 EVAVO Studio. All rights reserved.",
+    "text": "Proprietary EVAVO Studio game typeface. Licensed for use in EVAVO Studio projects and authorised deliverables.",
+    "url": "https://evavo.com.au"
+  },
+  "faces": [
+    {
+      "role": "ui",
+      "master": "ChessLord_UI.face.json.gz"
+    },
+    {
+      "role": "text",
+      "master": "ChessLord_Text.face.json.gz"
+    },
+    {
+      "role": "display",
+      "master": "ChessLord_Herald.face.json.gz"
+    }
+  ],
+  "specimens": [
+    {
+      "faceId": "ChessLord_UI",
+      "width": 320,
+      "height": 200,
+      "lines": [
+        "CHESS LORD  UI  1994",
+        "NEW GAME  LOAD  OPTIONS",
+        "WHITE 12:34  BLACK 09:58",
+        "A1 B2 C3 D4  CHECK!",
+        "ÀÉÑÖ ČŘŠŽ ŁŒ  €£¥",
+        "♔♕♖♗♘♙  ♚♛♜♝♞♟",
+        "← ↑ → ↓  ✓ ✕  ◆ ◇"
+      ]
+    },
+    {
+      "faceId": "ChessLord_Text",
+      "width": 320,
+      "height": 200,
+      "lines": [
+        "CHESS LORD  TOURNAMENT",
+        "The black king waits beyond",
+        "the torchlit hall. Choose",
+        "your move with care.",
+        "ÀÉÑÖ ČŘŠŽ ŁŒ  €£¥",
+        "♔♕♖♗♘♙  ♚♛♜♝♞♟"
+      ]
+    },
+    {
+      "faceId": "ChessLord_Herald",
+      "width": 320,
+      "height": 200,
+      "lines": [
+        "CHESS LORD",
+        "CHECKMATE",
+        "ROYAL MATCH",
+        "1994  ♔  ♛"
+      ]
+    }
+  ]
+}
