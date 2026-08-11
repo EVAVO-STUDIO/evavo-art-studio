@@ -68,7 +68,9 @@ test("rejects disconnected routes, duplicate edges and out-of-bounds placement",
   const plan = compileLayeredProductionPlan(productionRequest());
   const disconnected = assemblyRequest();
   disconnected.routeGraph.edges = disconnected.routeGraph.edges.filter(
-    (edge) => edge.id !== "edge-north-east-east",
+    (edge) =>
+      edge.id !== "edge-north-north-east" &&
+      edge.id !== "edge-north-east-east",
   );
   assert.throws(
     () => compileLayeredAssemblyManifest(plan, disconnected),
