@@ -1,0 +1,43 @@
+{
+  "schema": "evavo.game-art-campaign-bundle.v1",
+  "campaignId": "heavy-metal-fighting-launch-four",
+  "version": "1.0.0",
+  "compression": "gzip",
+  "encoding": "base64",
+  "payloadSha256": "75ed5a3d5dd737a4cf9a0a309540a33927da124dd6c7c6790eb4291f9bc66236",
+  "requestSha256": "c9112ef38833d3972ac3dc6c63fe89eb2642900a1172b9e0e984a94820b4891e",
+  "encodedBytes": 23644,
+  "payloadBytes": 17512,
+  "payloadParts": [
+    {
+      "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-001",
+      "bytes": 4050,
+      "sha256": "956a9541921438a894cba3c6e5f2700ba4bc16f4287d80a389d8b9ce11e80dac"
+    },
+    {
+      "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-002",
+      "bytes": 4050,
+      "sha256": "eb867a1c891e09a3c36de6ead3c98cff05357ecd313e2613fc4d74c78bf39c97"
+    },
+    {
+      "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-003",
+      "bytes": 4050,
+      "sha256": "014c6af20014421ac360d5d22eff1a0d8e3898960a8308fb508d6965466a103c"
+    },
+    {
+      "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-004",
+      "bytes": 4050,
+      "sha256": "780085e991bb5b4953d77f3a6b9a0790e3167019290c3a847ff6d5e391eaef33"
+    },
+    {
+      "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-005",
+      "bytes": 4050,
+      "sha256": "13905388e82792d1ec2e09e380781ad4f142130f3837fe5297f1308d9611264c"
+    },
+    {
+      "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-006",
+      "bytes": 3394,
+      "sha256": "e520c05f82bb7552482f083c2b0fe893bf0ba7ae24e7212ae1be6f6ff8aaa5c0"
+    }
+  ]
+}
