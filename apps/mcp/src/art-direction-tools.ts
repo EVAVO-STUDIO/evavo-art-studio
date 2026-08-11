@@ -7,15 +7,18 @@ import {
   artDirectionProtocolSummary,
   compileArtDirectionContract,
   compileArtDirectionJob,
+  compileLayeredAssemblyManifest,
   compileLayeredProductionPlan,
   compileLayeredProductionStyleProofApprovalReceipt,
   compileLayeredProviderCandidateRequest,
   getLayeredProductionUnit,
+  layeredAssemblyProtocolSummary,
   layeredProductionProtocolSummary,
   listArtDirectionOutputProfiles,
   listArtDirectionPresets,
   validateArtDirectionCompileRequest,
   validateLayeredProductionRequest,
+  verifyLayeredAssemblyManifest,
 } from "@evavo/art-direction";
 import type { LayeredProviderReferenceInput } from "@evavo/art-direction";
 import {
@@ -106,6 +109,16 @@ export function registerArtDirectionTools(server: McpServer): void {
       inputSchema: z.object({}),
     },
     async () => textResult(layeredProductionProtocolSummary()),
+  );
+
+  server.registerTool(
+    "layered_assembly_protocol",
+    {
+      description:
+        "Describe the logical district-assembly boundary for separate source layers, route graphs, placements, Y-sort, animation sets, foreground occlusion and integer camera zoom. This tool has no provider, approval, image mutation or repository-write authority.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(layeredAssemblyProtocolSummary()),
   );
 
   server.registerTool(
@@ -246,6 +259,80 @@ export function registerArtDirectionTools(server: McpServer): void {
           ...(approvalReceipt === null ? {} : { approvalReceipt }),
           executionBoundary:
             "Plan-only: no image generation, image inspection, creative approval, composite assembly, target-repository mutation, commit, push or publication.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_layered_assembly_manifest",
+    {
+      description:
+        "Compile and self-verify a logical district assembly from an exact layered-production plan plus candidate or approved source bindings. It validates native placement, route reachability, travel costs, animation completeness, Y-sort, occlusion and integer camera zoom without reading or combining image bytes.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        assemblyRequest: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+      }),
+    },
+    async ({ productionRequest, assemblyRequest, styleProofApproval }) => {
+      try {
+        const { plan, approvalReceipt } = compileLayeredPlan(
+          productionRequest,
+          styleProofApproval,
+        );
+        const manifest = compileLayeredAssemblyManifest(plan, assemblyRequest);
+        verifyLayeredAssemblyManifest(manifest, plan);
+        return textResult({
+          schemaVersion: "1.0",
+          planId: plan.planId,
+          planSha256: plan.planSha256,
+          styleProofStatus: plan.styleProof.status,
+          ...(approvalReceipt === null ? {} : { approvalReceipt }),
+          assemblyManifest: manifest,
+          executionBoundary:
+            "Manifest-only: no provider call, image reads, image mutation, creative approval, composite rendering, Godot scene write, target-repository mutation, commit, push or publication.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "verify_layered_assembly_manifest",
+    {
+      description:
+        "Semantically verify a retained self-hashed layered assembly manifest against the exact production plan. It does not read source artifacts or grant runtime approval.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        assemblyManifest: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+      }),
+    },
+    async ({ productionRequest, assemblyManifest, styleProofApproval }) => {
+      try {
+        const { plan, approvalReceipt } = compileLayeredPlan(
+          productionRequest,
+          styleProofApproval,
+        );
+        verifyLayeredAssemblyManifest(
+          assemblyManifest as ReturnType<typeof compileLayeredAssemblyManifest>,
+          plan,
+        );
+        return textResult({
+          schemaVersion: "1.0",
+          planId: plan.planId,
+          planSha256: plan.planSha256,
+          ...(approvalReceipt === null ? {} : { approvalReceipt }),
+          manifestSha256: (
+            assemblyManifest as ReturnType<typeof compileLayeredAssemblyManifest>
+          ).manifestSha256,
+          status: "passed",
+          executionBoundary:
+            "Verification-only: no source artifact reads, provider call, image mutation, creative approval, scene assembly, target-repository mutation, commit, push or publication.",
         });
       } catch (error: unknown) {
         return toolError(error);

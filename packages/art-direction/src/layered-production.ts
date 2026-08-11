@@ -1,5 +1,7 @@
 export * from "./layered-production-types.js";
 export * from "./layered-production-approval.js";
+export * from "./layered-production-assembly-types.js";
+export * from "./layered-production-assembly.js";
 export { validateLayeredProductionRequest } from "./layered-production-validation.js";
 export {
   compileLayeredProductionPlan,

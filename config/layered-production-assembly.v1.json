@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.0",
+  "contract": "evavo.layered-production.assembly.v1",
+  "protocolVersion": "2026-08-11.1",
+  "requestKind": "evavo.layered-production.assembly-request",
+  "manifestKind": "evavo.layered-production.assembly-manifest",
+  "scopes": [
+    "style-proof-review",
+    "runtime-candidate"
+  ],
+  "sourceAuthority": "exact retained layered-production source artifacts",
+  "requirements": {
+    "selfHashedProductionPlanRequired": true,
+    "selfHashedAssemblyManifestRequired": true,
+    "oneSourceBindingPerPlanUnit": true,
+    "contentAddressedSourceArtifactsRequired": true,
+    "contentAddressedApprovalReceiptsRequiredForRuntime": true,
+    "styleProofBoundaryRequired": true,
+    "reviewCompositeNeverRuntimeSource": true,
+    "fullCanvasPlacementExactlyOnceRequired": true,
+    "integerDistrictGeometryRequired": true,
+    "integerCameraZoomRequired": true,
+    "journeyFollowStartActorRequired": true,
+    "completeRuntimeAnimationSetsRequired": true,
+    "stablePivotAndYSortOriginsRequired": true,
+    "logicalRouteGraphRequired": true,
+    "routeReachabilityRequired": true,
+    "explicitTravelCostsRequired": true,
+    "destinationSceneBindingsRequired": true,
+    "foregroundOcclusionContractsRequired": true,
+    "repositoryRelativeOutputPathsRequired": true,
+    "humanApprovalBeforeIntegrationRequired": true
+  },
+  "camera": {
+    "overview": {
+      "nativeZoom": 1,
+      "completeDistrictBoundsRequired": true
+    },
+    "journeyFollow": {
+      "integerZoomRange": [
+        2,
+        4
+      ],
+      "allowedFollowRoles": [
+        "player-character",
+        "crowd-character"
+      ],
+      "deadZoneRequired": true,
+      "lookAheadRequired": true
+    },
+    "destinationClose": {
+      "integerZoomRange": [
+        2,
+        4
+      ],
+      "boundedTransitionFramesRequired": true
+    }
+  },
+  "assembly": {
+    "allowedPlacementModes": [
+      "baked",
+      "static",
+      "dynamic",
+      "overlay"
+    ],
+    "sourceReferences": [
+      "unit",
+      "animation-set"
+    ],
+    "automaticAssembly": false,
+    "automaticPromotion": false,
+    "reviewCompositeIsRuntimeSource": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "creativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "automaticPromotion": false,
+    "targetRepositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "forcePush": false
+  }
+}
