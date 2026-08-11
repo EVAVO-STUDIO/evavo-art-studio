@@ -1,0 +1,49 @@
+name: Exact game-asset delivery contract
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact current main SHA to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-asset-delivery-${{ inputs.expected_sha }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Require exact current main
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          current="$(git ls-remote "https://github.com/${REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+          test "$current" = "$EXPECTED_SHA"
+
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+
+      - name: Validate exact delivery boundary
+        run: node scripts/check-game-asset-delivery.mjs
+
+      - name: Confirm source tree remains clean
+        run: git diff --exit-code && test -z "$(git status --porcelain=v1 --untracked-files=all)"
