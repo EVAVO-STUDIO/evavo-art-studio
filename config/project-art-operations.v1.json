@@ -194,6 +194,140 @@
       ]
     },
     {
+      "id": "rotate",
+      "kind": "geometry",
+      "deterministic": true,
+      "required": [
+        "angle"
+      ]
+    },
+    {
+      "id": "affine-transform",
+      "kind": "geometry",
+      "deterministic": true,
+      "required": [
+        "matrix"
+      ]
+    },
+    {
+      "id": "perspective-transform",
+      "kind": "geometry",
+      "deterministic": true,
+      "required": [
+        "coefficients"
+      ]
+    },
+    {
+      "id": "grayscale",
+      "kind": "colour",
+      "deterministic": true
+    },
+    {
+      "id": "invert",
+      "kind": "colour",
+      "deterministic": true
+    },
+    {
+      "id": "posterize",
+      "kind": "colour",
+      "deterministic": true,
+      "required": [
+        "bits"
+      ]
+    },
+    {
+      "id": "threshold",
+      "kind": "colour",
+      "deterministic": true,
+      "required": [
+        "threshold"
+      ]
+    },
+    {
+      "id": "gamma",
+      "kind": "colour",
+      "deterministic": true,
+      "required": [
+        "gamma"
+      ]
+    },
+    {
+      "id": "hue-shift",
+      "kind": "colour",
+      "deterministic": true,
+      "required": [
+        "degrees"
+      ]
+    },
+    {
+      "id": "curves",
+      "kind": "colour",
+      "deterministic": true,
+      "required": [
+        "channels"
+      ]
+    },
+    {
+      "id": "channel-mixer",
+      "kind": "colour",
+      "deterministic": true,
+      "required": [
+        "red",
+        "green",
+        "blue"
+      ]
+    },
+    {
+      "id": "box-blur",
+      "kind": "filter",
+      "deterministic": true
+    },
+    {
+      "id": "median-filter",
+      "kind": "filter",
+      "deterministic": true
+    },
+    {
+      "id": "motion-blur",
+      "kind": "filter",
+      "deterministic": true
+    },
+    {
+      "id": "emboss",
+      "kind": "filter",
+      "deterministic": true
+    },
+    {
+      "id": "find-edges",
+      "kind": "filter",
+      "deterministic": true
+    },
+    {
+      "id": "edge-enhance",
+      "kind": "filter",
+      "deterministic": true
+    },
+    {
+      "id": "alpha-feather",
+      "kind": "alpha",
+      "deterministic": true
+    },
+    {
+      "id": "defringe",
+      "kind": "alpha",
+      "deterministic": true
+    },
+    {
+      "id": "drop-shadow",
+      "kind": "pixel-effect",
+      "deterministic": true
+    },
+    {
+      "id": "outer-glow",
+      "kind": "pixel-effect",
+      "deterministic": true
+    },
+    {
       "id": "convert",
       "kind": "encoding",
       "deterministic": true
@@ -210,7 +344,9 @@
     "assemble-sheet",
     "sequence-review",
     "image-composite",
-    "image-compare"
+    "image-compare",
+    "image-master",
+    "motion-sequence"
   ],
   "outputFormats": [
     "png",
