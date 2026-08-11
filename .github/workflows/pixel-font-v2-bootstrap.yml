@@ -44,6 +44,7 @@ jobs:
           node scripts/integrate-pixel-font-studio-v2.mjs
           python - <<'PY'
           from pathlib import Path
+
           workflow = Path('.github/workflows/pixel-font-studio-v2.yml')
           source = workflow.read_text(encoding='utf-8')
           marker = '  PYTHONHASHSEED: "0"\n'
@@ -53,6 +54,9 @@ jobs:
                   raise SystemExit('Permanent workflow is missing the expected Python environment marker')
               source = source.replace(marker, addition, 1)
               workflow.write_text(source, encoding='utf-8')
+
+          cli = Path('tools/pixel_font_v2/cli.py')
+          cli.write_text(cli.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
           PY
 
       - name: Set up Python 3.13.5
