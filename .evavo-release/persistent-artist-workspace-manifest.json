@@ -1,0 +1,94 @@
+{
+  "schema": "evavo.artist-workspace-release-payload.v1",
+  "repository": "EVAVO-STUDIO/evavo-art-studio",
+  "baseSha": "8e77f81a6d38ad0ead5b56c084d8d097fe411b32",
+  "featureBranch": "agent/persistent-artist-workspace-20260811",
+  "files": [
+    {
+      "path": ".github/workflows/project-art-workbench.yml",
+      "bytes": 12210,
+      "sha256": "107664efbde59ebdda1dea0f53a0088b9006adc93673047fd44ef748278e5a5b"
+    },
+    {
+      "path": "config/artist-mastering-presets.v1.json",
+      "bytes": 5463,
+      "sha256": "9288603fd21fd147b0644544dab89e29ead539e017977eb315c2825ba2997ecb"
+    },
+    {
+      "path": "config/project-art-operations.v1.json",
+      "bytes": 8652,
+      "sha256": "613cbb2c790e609e52282ab727c1ff5ff298b67ad66f202f7b169227f76cbc1e"
+    },
+    {
+      "path": "docs/PROJECT_ART_ARTIST_WORKSPACE.md",
+      "bytes": 23884,
+      "sha256": "6485206e89f699ddff87b17b0cba7cfaa260f5a651a6d1e75d36492ab433a003"
+    },
+    {
+      "path": "scripts/check-artist-workspace.mjs",
+      "bytes": 4511,
+      "sha256": "92a5b2b2c7933ffc7dc2d76c51a9a56fe85e4aebdb0577b09d62d1d8745865b5"
+    },
+    {
+      "path": "scripts/check-project-art-workbench.mjs",
+      "bytes": 16021,
+      "sha256": "8f494e544650d8397216e37d56ccaac45b7a672b8fbde8453aa25b56343753fe"
+    },
+    {
+      "path": "scripts/manage-artist-workspace.mjs",
+      "bytes": 6668,
+      "sha256": "b86a7cf2bc2ba366ed8f799fd84e364f388de997b684e0ebbdd9d99d237bf6ca"
+    },
+    {
+      "path": "scripts/project-art/artist-operations.mjs",
+      "bytes": 15748,
+      "sha256": "2f4bd8e54b73d6ee79a5746ba9d3d1b5799656954e31d0f5e2d9abfcf5b05900"
+    },
+    {
+      "path": "scripts/project-art/artist-workspace.mjs",
+      "bytes": 60257,
+      "sha256": "780dcf826936bf2b7a548a0899655759cec8dd004bbc863c12a82996453db2fc"
+    },
+    {
+      "path": "scripts/project-art/sandbox.mjs",
+      "bytes": 50699,
+      "sha256": "ad771b08869bf1a2717aee62777ef3968d8fe9ac5e938f3f9cfaa8d0e1f06086"
+    },
+    {
+      "path": "scripts/test-artist-operations.mjs",
+      "bytes": 14251,
+      "sha256": "e1bd154e2e5c46429a06596bd1eec4d9775f629d1436b8dd261d7a71a774205e"
+    },
+    {
+      "path": "scripts/test-artist-workspace.mjs",
+      "bytes": 17387,
+      "sha256": "07b2a366ca2460dd091698ddcc90fc71e2a486a936c2efb7d276e6251e5ca294"
+    },
+    {
+      "path": "scripts/test-project-art-workbench.mjs",
+      "bytes": 40329,
+      "sha256": "1716c5b3530519157fbc3a255cfa23981e92f4c8dc80c512d81a105db0a72d84"
+    },
+    {
+      "path": "scripts/test-project-art-workspace-mcp.mjs",
+      "bytes": 23696,
+      "sha256": "1ed8bc3f621a1a87a75a221a51fcd9a48c71781146153f573c029df7351acfbf"
+    },
+    {
+      "path": "tools/project_art_artist_operations.py",
+      "bytes": 35451,
+      "sha256": "4ca76dc7bcad3cd263a330330209d93f1ccacb2788637b3b1bf904592d47570a"
+    },
+    {
+      "path": "tools/project_art_workspace_mcp.mjs",
+      "bytes": 29170,
+      "sha256": "12df60dc3c2551b51674364ead307856719f520ff397632ed2637630065c7e75"
+    },
+    {
+      "path": "tools/run_project_art_sandbox.py",
+      "bytes": 105305,
+      "sha256": "8479255ee65eb44b72c33a9248558bf4547b2cc2ee90f8bd45eec797f9b125a2"
+    }
+  ],
+  "archiveSha256": "16b34d24a10596a655bf9f7578fc265fbc102fcc0a60422d32378d3c2a084e59"
+}
