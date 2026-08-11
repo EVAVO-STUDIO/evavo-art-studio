@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0",
+  "contract": "evavo.layered-production.godot-integration.v1",
+  "protocolVersion": "2026-08-11.1",
+  "requestKind": "evavo.layered-production.godot-integration-request",
+  "planKind": "evavo.layered-production.godot-integration-plan",
+  "engine": {
+    "name": "Godot",
+    "version": "4.6.2",
+    "sceneFormat": 3,
+    "renderers": [
+      "gl_compatibility",
+      "mobile",
+      "forward_plus"
+    ]
+  },
+  "requirements": {
+    "verifiedProductionPlanRequired": true,
+    "verifiedAssemblyManifestRequired": true,
+    "exactAssemblyIdentityRequired": true,
+    "exactTargetRepositoryRequired": true,
+    "exactRuntimeRootRequired": true,
+    "separateTextureResourcesRequired": true,
+    "flattenedReviewCompositeForbidden": true,
+    "orderedSpriteFramesRequired": true,
+    "stableAnimationTimingRequired": true,
+    "groundContactActorPlacementRequired": true,
+    "integerNodePositionsRequired": true,
+    "nearestCanvasItemFilteringRequired": true,
+    "disabledCanvasItemRepeatRequired": true,
+    "losslessTextureImportRequired": true,
+    "disabledMipmapsRequired": true,
+    "pixelTransformSnappingRequired": true,
+    "dataDrivenRouteResourceRequired": true,
+    "dataDrivenPlacementResourceRequired": true,
+    "dataDrivenAnimationResourceRequired": true,
+    "dataDrivenCameraResourceRequired": true,
+    "destinationSceneBindingsRequired": true,
+    "exactByteResourceHashesRequired": true,
+    "selfHashedIntegrationPlanRequired": true,
+    "boundedWriteIntentsRequired": true,
+    "explicitRepositoryWriterRequired": true,
+    "separateRuntimeActivationRequired": true,
+    "styleProofRemainsReviewOnly": true
+  },
+  "resourceDrafts": [
+    "scene-draft",
+    "route-graph",
+    "placements",
+    "animations",
+    "cameras",
+    "import-policy",
+    "integration-manifest"
+  ],
+  "writeIntent": {
+    "operation": "create-or-replace",
+    "exactContentRequired": true,
+    "exactSha256Required": true,
+    "exactByteCountRequired": true,
+    "automaticExecution": false
+  },
+  "authority": {
+    "artifactRead": false,
+    "fileWrite": false,
+    "targetRepositoryMutation": false,
+    "runtimeActivation": false,
+    "deployment": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "forcePush": false
+  }
+}

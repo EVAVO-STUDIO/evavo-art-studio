@@ -9,6 +9,7 @@ import {
 } from "@evavo/art-providers";
 
 import { registerArtDirectionTools } from "./art-direction-tools.js";
+import { registerLayeredGodotTools } from "./layered-godot-tools.js";
 import { registerSelectionTools } from "./selection-tools.js";
 
 const textResult = (value: unknown) => ({
@@ -39,6 +40,7 @@ function toolError(error: unknown) {
 
 export function registerProviderTools(server: McpServer): void {
   registerArtDirectionTools(server);
+  registerLayeredGodotTools(server);
   registerSelectionTools(server);
 
   server.registerTool(
