@@ -18,6 +18,7 @@ jobs:
       OVERLAY_SHA256: edb7f1a71d0f1618e6d5007a4defa7ddcc9534bf0878d3ee234cb8049fe3bc80
       PYTHONUTF8: "1"
       PYTHONHASHSEED: "0"
+      PYTHONDONTWRITEBYTECODE: "1"
       SOURCE_DATE_EPOCH: "1577836800"
     steps:
       - name: Check out bootstrap transport
@@ -41,6 +42,18 @@ jobs:
           git switch -c "$READY_BRANCH"
           tar -xzf "$RUNNER_TEMP/pixel-font-v2.2-overlay.tar.gz" -C .
           node scripts/integrate-pixel-font-studio-v2.mjs
+          python - <<'PY'
+          from pathlib import Path
+          workflow = Path('.github/workflows/pixel-font-studio-v2.yml')
+          source = workflow.read_text(encoding='utf-8')
+          marker = '  PYTHONHASHSEED: "0"\n'
+          addition = marker + '  PYTHONDONTWRITEBYTECODE: "1"\n'
+          if 'PYTHONDONTWRITEBYTECODE' not in source:
+              if marker not in source:
+                  raise SystemExit('Permanent workflow is missing the expected Python environment marker')
+              source = source.replace(marker, addition, 1)
+              workflow.write_text(source, encoding='utf-8')
+          PY
 
       - name: Set up Python 3.13.5
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -70,6 +83,8 @@ jobs:
       - name: Commit only the reviewed production scope
         run: |
           set -euo pipefail
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
           git add \
@@ -119,5 +134,7 @@ jobs:
           PY
           git commit -m "feat(pixel-font): productionize reusable v2.2 pipeline" -m "Add independently authored Chess Lord UI, text and herald masters; deterministic BMFont/PNG, BDF, atlas JSON, fixed-cell grid and TrueType outputs; guarded ChatGPT/Claude MCP authoring; native-scale specimens; exhaustive collision and confusable QA; and exact Godot 4.6.2 CI verification."
           test "$(git rev-parse HEAD^)" = "$EXPECTED_BASE_SHA"
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           git push origin "HEAD:refs/heads/$READY_BRANCH"
