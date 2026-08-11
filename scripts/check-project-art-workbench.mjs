@@ -13,6 +13,7 @@ const relativeFiles = [
   'scripts/project-art/intelligence.mjs',
   'scripts/project-art/sandbox.mjs',
   'scripts/project-art/reference-derived.mjs',
+  'scripts/project-art/persistent-workspace.mjs',
   'scripts/compile-project-art-intelligence.mjs',
   'scripts/compile-project-art-sandbox.mjs',
   'scripts/compile-reference-derived-image-plan.mjs',
@@ -23,12 +24,19 @@ const relativeFiles = [
   'scripts/check-project-art-workbench.mjs',
   'scripts/test-project-art-workbench.mjs',
   'scripts/test-project-art-workspace-mcp.mjs',
+  'scripts/persistent-artist-workspace.mjs',
+  'scripts/check-persistent-artist-workspace.mjs',
+  'scripts/test-persistent-artist-workspace.mjs',
+  'scripts/check-project-art-mastering-and-motion.mjs',
+  'scripts/test-project-art-mastering-and-motion.mjs',
   'tools/run_project_art_sandbox.py',
   'tools/run_project_art_loop_closure.py',
   'tools/project_art_workspace_mcp.mjs',
   'config/project-art-operations.v1.json',
   'config/mcp.project-art-workspace.windows.example.json',
   'docs/PROJECT_ART_WORKBENCH.md',
+  'docs/PERSISTENT_ARTIST_WORKSPACE.md',
+  'docs/PROJECT_ART_MASTERING_AND_MOTION.md',
   'docs/PROJECT_ART_LOOP_CLOSURE.md',
   'docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md',
   '.github/workflows/project-art-workbench.yml',
@@ -84,11 +92,32 @@ const expectedOperations = [
   'autocontrast',
   'levels',
   'outline',
+  'rotate',
+  'affine-transform',
+  'perspective-transform',
+  'grayscale',
+  'invert',
+  'posterize',
+  'threshold',
+  'gamma',
+  'hue-shift',
+  'curves',
+  'channel-mixer',
+  'box-blur',
+  'median-filter',
+  'motion-blur',
+  'emboss',
+  'find-edges',
+  'edge-enhance',
+  'alpha-feather',
+  'defringe',
+  'drop-shadow',
+  'outer-glow',
   'convert',
   'optimize',
 ];
 assert.deepEqual(registry.operations.map((operation) => operation.id), expectedOperations);
-assert.deepEqual(registry.taskKinds, ['image', 'slice-sheet', 'assemble-sheet', 'sequence-review', 'image-composite', 'image-compare']);
+assert.deepEqual(registry.taskKinds, ['image', 'slice-sheet', 'assemble-sheet', 'sequence-review', 'image-composite', 'image-compare', 'image-master', 'motion-sequence']);
 
 const sourceAssertions = {
   'scripts/project-art/intelligence.mjs': [
@@ -121,6 +150,55 @@ const sourceAssertions = {
     'const MAXIMUM_TOTAL_OUTPUT_BYTES = 16 * 1024 * 1024 * 1024',
     'assertBoundTaskPixelBudgets',
     'MAXIMUM_IMAGE_DIMENSION',
+    "kind: 'image-master'",
+    "kind: 'motion-sequence'",
+    'normalizeMasterTask',
+    'normalizeMotionTask',
+    'operationWorkingSetMultiplier',
+    'imageOperationDimensions',
+    'maximumUniqueColours',
+    'motionBlurSamples',
+  ],
+  'scripts/project-art/persistent-workspace.mjs': [
+    'evavo.persistent-artist-workspace-create-request.v1',
+    'evavo.persistent-artist-workspace-manifest.v1',
+    'evavo.persistent-artist-workspace-snapshot-plan.v1',
+    'evavo.storage-art-ingest-request.v1',
+    'appendOnlyVersions: true',
+    'PERSISTENT_ARTIST_WORKSPACE_REQUEST_BYTES_MISMATCH',
+    'PERSISTENT_ARTIST_WORKSPACE_SOURCE_IDENTITY_CHANGED',
+    'storageWrite: false',
+    'repositoryMutation: false',
+    'bytesFlowThroughMcp: false',
+  ],
+  'scripts/persistent-artist-workspace.mjs': [
+    'evavo.persistent-artist-workspace-capabilities.v1',
+    'compile-create',
+    'run-create',
+    'compile-snapshot',
+    'run-snapshot',
+    'storage-handoff',
+  ],
+  'scripts/check-persistent-artist-workspace.mjs': [
+    'Persistent Artist Workspace guard passed.',
+    'project-art:workspace:persistent:check',
+    'EVAVO Storage handoffs remain exact and independently authorised',
+  ],
+  'scripts/test-persistent-artist-workspace.mjs': [
+    'Persistent Artist Workspace regressions passed.',
+    'append-only exact snapshots',
+    'evavo.storage-art-ingest-request.v1',
+  ],
+  'scripts/check-project-art-mastering-and-motion.mjs': [
+    'Project Art mastering and motion guard passed.',
+    'evavo.project-art-mastering-report.v1',
+    'evavo.project-art-motion-sequence.v1',
+    'project-art:mastering:check',
+  ],
+  'scripts/test-project-art-mastering-and-motion.mjs': [
+    'Project Art mastering and motion regressions passed.',
+    'PROJECT_ART_MASTERING_PROFILE_FAILED',
+    'correctly rehashed output-count attacks fail closed',
   ],
   'scripts/project-art/reference-derived.mjs': [
     'evavo.reference-derived-image-request.v1',
@@ -183,6 +261,15 @@ const sourceAssertions = {
     'evavo_art_run_sandbox',
     'evavo_art_compile_reference_plan',
     'evavo_art_stage_reference_artifacts',
+    'evavo_art_compile_workspace_create',
+    'evavo_art_run_workspace_create',
+    'evavo_art_compile_workspace_snapshot',
+    'evavo_art_run_workspace_snapshot',
+    'evavo_art_prepare_storage_handoff',
+    'persistent-artist-workspace',
+    'professional-mastering',
+    'keyframed-motion-sequence',
+    'evavo-storage-handoff',
     'EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE',
     'EVAVO_ART_WORKSPACE_MCP_TIMEOUT_MS',
     'bytesFlowThroughMcp: false',
@@ -223,6 +310,13 @@ const sourceAssertions = {
     'MAXIMUM_TOTAL_OUTPUT_BYTES = 16 * 1024 * 1024 * 1024',
     'PROJECT_ART_SANDBOX_OUTPUT_BYTES_LIMIT',
     'PROJECT_ART_SANDBOX_TOTAL_OUTPUT_BYTES_LIMIT',
+    'MASTERING_REPORT_SCHEMA = "evavo.project-art-mastering-report.v1"',
+    'MOTION_MANIFEST_SCHEMA = "evavo.project-art-motion-sequence.v1"',
+    'PROJECT_ART_MASTERING_PROFILE_FAILED',
+    'execute_master_task',
+    'execute_motion_task',
+    'drop-shadow target',
+    'outer-glow target',
   ],
   'docs/PROJECT_ART_WORKBENCH.md': [
     'Project intelligence',
@@ -240,6 +334,29 @@ const sourceAssertions = {
     'aggregate source-byte boundary',
     'create-only output-file and output-byte budgets',
   ],
+  'docs/PERSISTENT_ARTIST_WORKSPACE.md': [
+    '# Persistent Artist Workspace',
+    'immutable originals',
+    'append-only versions',
+    'masters/',
+    'exports/',
+    'EVAVO Storage',
+    'ChatGPT',
+    'Claude',
+    'technical pass is not creative approval',
+  ],
+  'docs/PROJECT_ART_MASTERING_AND_MOTION.md': [
+    '# Project Art mastering and motion',
+    'image-master',
+    'motion-sequence',
+    'edge-decontaminate',
+    'defringe',
+    'drop-shadow',
+    'outer-glow',
+    'technical pass is not creative approval',
+    'EVAVO Storage',
+    'No arbitrary shell',
+  ],
   'docs/PROJECT_ART_LOOP_CLOSURE.md': [
     '# Project Art loop-closure review',
     'final frame back to frame zero',
@@ -254,6 +371,10 @@ const sourceAssertions = {
   '.github/workflows/project-art-workbench.yml': [
     'PROJECT_ART_REQUIRE_PILLOW: "1"',
     'PROJECT_ART_REQUIRE_PROVIDER_VALIDATION: "1"',
+    'Verify persistent Artist Workspace contracts and regressions',
+    'Run professional mastering and keyframed motion adversary',
+    'pnpm run project-art:workspace:persistent:check',
+    'pnpm run project-art:mastering:check',
     'Run callable project-art workspace MCP regressions',
     'credentialsForwardedToSubprocess: false',
     'pnpm run build:domain',
@@ -272,6 +393,7 @@ for (const relative of [
   'scripts/project-art/intelligence.mjs',
   'scripts/project-art/sandbox.mjs',
   'scripts/project-art/reference-derived.mjs',
+  'scripts/project-art/persistent-workspace.mjs',
   'scripts/compile-project-art-loop-closure.mjs',
 ]) {
   const source = contents.get(relative);
@@ -308,22 +430,28 @@ const expectedScripts = {
   'project-art:loop:run': 'python tools/run_project_art_loop_closure.py',
   'project-art:loop:check': 'node scripts/check-project-art-loop-closure.mjs && node scripts/test-project-art-loop-closure.mjs',
   'project-art:workspace:mcp:check': 'node scripts/test-project-art-workspace-mcp.mjs',
-  'project-art:check': 'node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs && pnpm run project-art:loop:check && pnpm run project-art:workspace:mcp:check',
+  'project-art:workspace:persistent': 'node scripts/persistent-artist-workspace.mjs',
+  'project-art:workspace:persistent:check': 'node scripts/check-persistent-artist-workspace.mjs && node scripts/test-persistent-artist-workspace.mjs',
+  'project-art:mastering:check': 'node scripts/check-project-art-mastering-and-motion.mjs && node scripts/test-project-art-mastering-and-motion.mjs',
+  'project-art:check': 'node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs && pnpm run project-art:mastering:check && pnpm run project-art:workspace:persistent:check && pnpm run project-art:loop:check && pnpm run project-art:workspace:mcp:check',
 };
 for (const [name, command] of Object.entries(expectedScripts)) {
   assert.equal(packageJson.scripts[name], command, `package script ${name} changed`);
 }
 const projectArtCheck = packageJson.scripts['project-art:check'];
-assert.ok(
-  projectArtCheck.indexOf('node scripts/test-project-art-workbench.mjs') <
-    projectArtCheck.indexOf('pnpm run project-art:loop:check'),
-  'loop-closure review must run after the general workbench adversary',
-);
-assert.ok(
-  projectArtCheck.indexOf('pnpm run project-art:loop:check') <
-    projectArtCheck.indexOf('pnpm run project-art:workspace:mcp:check'),
-  'loop-closure review must run before workspace MCP verification',
-);
+const orderedCommands = [
+  'node scripts/test-project-art-workbench.mjs',
+  'pnpm run project-art:mastering:check',
+  'pnpm run project-art:workspace:persistent:check',
+  'pnpm run project-art:loop:check',
+  'pnpm run project-art:workspace:mcp:check',
+];
+for (let index = 1; index < orderedCommands.length; index += 1) {
+  assert.ok(
+    projectArtCheck.indexOf(orderedCommands[index - 1]) < projectArtCheck.indexOf(orderedCommands[index]),
+    `${orderedCommands[index - 1]} must run before ${orderedCommands[index]}`,
+  );
+}
 assert.ok(packageJson.scripts.check.includes('pnpm run project-art:check'));
 
 for (const relative of relativeFiles.filter((value) => value.endsWith('.mjs'))) {

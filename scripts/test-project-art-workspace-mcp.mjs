@@ -108,12 +108,22 @@ try {
     'evavo_art_run_intake',
     'evavo_art_compile_atlas',
     'evavo_art_run_atlas',
+    'evavo_art_compile_workspace_create',
+    'evavo_art_run_workspace_create',
+    'evavo_art_compile_workspace_snapshot',
+    'evavo_art_run_workspace_snapshot',
+    'evavo_art_prepare_storage_handoff',
   ]);
   const capabilities = structured(capabilitiesResponse);
   assert.equal(capabilities.summary.schema, 'evavo.project-art-workspace-capabilities.v1');
   assert.equal(capabilities.summary.writeEnabled, false);
   assert.equal(capabilities.summary.commandTimeoutMs, 600000);
   assert.ok(capabilities.summary.operations.includes('connected-matte-to-alpha'));
+  assert.ok(capabilities.summary.operations.includes('defringe'));
+  assert.ok(capabilities.summary.operations.includes('perspective-transform'));
+  assert.ok(capabilities.summary.taskKinds.includes('image-master'));
+  assert.ok(capabilities.summary.taskKinds.includes('motion-sequence'));
+  assert.ok(capabilities.summary.workflow.includes('persistent-artist-workspace'));
   assert.ok(capabilities.summary.referenceOperations.includes('in-between-frame'));
   assert.equal(capabilities.summary.relatedServers.visualReview, 'tools/project_art_review_mcp.mjs');
   assert.equal(capabilities.bytesFlowThroughMcp, false);
@@ -307,6 +317,87 @@ try {
     await access(path.join(atlasOutputRoot, 'mcp-hero-atlas.png'));
   }
 
+  const persistentCreateRequestPath = path.join(workspace, 'persistent-create-request.json');
+  const persistentCreatePlanPath = path.join(workspace, 'persistent-create-plan.json');
+  await writeFile(persistentCreateRequestPath, `${JSON.stringify({
+    schema: 'evavo.persistent-artist-workspace-create-request.v1',
+    workspaceId: 'mcp-persistent-artist-workspace',
+    projectId: 'mcp-fixture',
+    directoryName: 'mcp-persistent-artist-workspace',
+    title: 'MCP persistent artist workspace fixture',
+    createdBy: 'workspace-mcp-regression',
+    storage: {
+      enabled: true,
+      vaultId: 'art',
+      logicalPrefix: 'Projects/McpFixture/Art',
+    },
+  }, null, 2)}\n`);
+  const persistentCompile = structured(rpc('evavo_art_compile_workspace_create', {
+    parentRoot: temporary,
+    requestPath: persistentCreateRequestPath,
+    planPath: persistentCreatePlanPath,
+    compiledAt: fixedTime,
+  }, { write: true }));
+  assert.equal(persistentCompile.summary.schema, 'evavo.persistent-artist-workspace-create-plan.v1');
+  assert.equal(persistentCompile.effects.workspaceWrite, true);
+  const persistentCreate = structured(rpc('evavo_art_run_workspace_create', {
+    planPath: persistentCreatePlanPath,
+  }, { write: true }));
+  const persistentRoot = persistentCreate.summary.workspaceRoot;
+  await access(path.join(persistentRoot, 'manifests', 'workspace.json'));
+  await access(path.join(persistentRoot, 'versions'));
+  await mkdir(path.join(persistentRoot, 'working', 'characters'), { recursive: true });
+  const persistentWorkingFile = path.join(persistentRoot, 'working', 'characters', 'hero.png');
+  await writeFile(persistentWorkingFile, png8);
+  const persistentSnapshotRequestPath = path.join(workspace, 'persistent-snapshot-request.json');
+  const persistentSnapshotPlanPath = path.join(workspace, 'persistent-snapshot-plan.json');
+  await writeFile(persistentSnapshotRequestPath, `${JSON.stringify({
+    schema: 'evavo.persistent-artist-workspace-snapshot-request.v1',
+    workspaceId: 'mcp-persistent-artist-workspace',
+    assetId: 'hero-working-frame',
+    versionId: 'v001',
+    sourcePath: 'working/characters/hero.png',
+    role: 'sprite-frame-working-version',
+    createdBy: 'workspace-mcp-regression',
+  }, null, 2)}\n`);
+  const persistentSnapshotCompile = structured(rpc('evavo_art_compile_workspace_snapshot', {
+    workspaceRoot: persistentRoot,
+    requestPath: persistentSnapshotRequestPath,
+    planPath: persistentSnapshotPlanPath,
+    compiledAt: fixedTime,
+  }, { write: true }));
+  assert.equal(persistentSnapshotCompile.summary.schema, 'evavo.persistent-artist-workspace-snapshot-plan.v1');
+  const persistentSnapshot = structured(rpc('evavo_art_run_workspace_snapshot', {
+    workspaceRoot: persistentRoot,
+    planPath: persistentSnapshotPlanPath,
+  }, { write: true }));
+  await access(path.join(persistentRoot, ...persistentSnapshot.summary.versionPath.split('/')));
+  const persistentHandoffRequestPath = path.join(workspace, 'persistent-handoff-request.json');
+  const persistentHandoffOutputPath = path.join(persistentRoot, 'manifests', 'storage-handoffs', 'mcp-fixture-v1.json');
+  await writeFile(persistentHandoffRequestPath, `${JSON.stringify({
+    schema: 'evavo.persistent-artist-workspace-storage-handoff-request.v1',
+    workspaceId: 'mcp-persistent-artist-workspace',
+    handoffId: 'mcp-fixture-v1',
+    vaultId: 'art',
+    logicalPrefix: 'Projects/McpFixture/Art',
+    items: [{
+      assetId: 'hero-v001',
+      path: persistentSnapshot.summary.versionPath,
+      logicalPath: 'characters/hero/hero.png',
+      title: 'Hero exact working version',
+      role: 'sprite-frame-master-source',
+    }],
+  }, null, 2)}\n`);
+  const persistentHandoff = structured(rpc('evavo_art_prepare_storage_handoff', {
+    workspaceRoot: persistentRoot,
+    requestPath: persistentHandoffRequestPath,
+    outputPath: persistentHandoffOutputPath,
+    compiledAt: fixedTime,
+  }, { write: true }));
+  assert.equal(persistentHandoff.summary.schema, 'evavo.storage-art-ingest-request.v1');
+  assert.equal(persistentHandoff.effects.storageWrite, false);
+  await access(persistentHandoffOutputPath);
+
   const referenceRequestPath = path.join(workspace, 'reference-request.json');
   const referencePlanPath = path.join(workspace, 'reference-plan.json');
   await writeFile(referenceRequestPath, `${JSON.stringify({
@@ -398,6 +489,7 @@ try {
   console.log('- read-only capabilities, root confinement and explicit write gate verified');
   console.log('- project intelligence, deterministic sandbox and source immutability verified');
   console.log('- exact intake and variable-size atlas MCP execution verified');
+  console.log('- persistent workspace creation, append-only snapshots and EVAVO Storage handoff verified');
   console.log('- reference-derived planning and optional immutable artifact staging verified');
   console.log('- image bytes, provider calls, repository mutation, approval and publication remain outside MCP');
 } finally {
