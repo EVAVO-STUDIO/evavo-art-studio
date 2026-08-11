@@ -1,0 +1,125 @@
+name: Temporary persistent workspace hardening publisher v2
+
+on:
+  push:
+    branches:
+      - automation/persistent-workspace-hardening-20260811
+    paths:
+      - ".github/workflows/temporary-persistent-workspace-hardening-v2.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: persistent-workspace-hardening-publisher-v2
+  cancel-in-progress: false
+
+jobs:
+  harden:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install exact Pillow backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --disable-pip-version-check Pillow==12.2.0
+
+      - name: Apply corrected fail-closed hardening patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/temporary-persistent-workspace-hardening.yml').read_text(encoding='utf-8')
+          start_marker = "          python3 <<'PY'\n"
+          end_marker = "\n          PY\n\n      - name: Run focused persistent workspace validation"
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          patch_program = textwrap.dedent(workflow[start:end])
+
+          broken_start_marker = '''source = replace_once(
+              source,
+              """export async function loadRequestFile(filePath) {'''
+          broken_end_marker = '''    "stable request and plan readers",
+          )
+          '''
+          broken_start = patch_program.index(broken_start_marker)
+          broken_end = patch_program.index(broken_end_marker, broken_start) + len(broken_end_marker)
+          corrected = '''request_start = source.index("export async function loadRequestFile(filePath) {")
+          plan_start = source.index("export async function loadPlanFile(filePath, expectedSchema) {", request_start)
+          source = (
+              source[:request_start]
+              + "export async function loadRequestFile(filePath) {\\n"
+              + "  return readStableJsonFile(filePath, 'persistent workspace request');\\n"
+              + "}\\n\\n"
+              + source[plan_start:]
+          )
+          source = replace_once(
+              source,
+              "  const { value } = await readJsonFileBounded(path.resolve(filePath), 'persistent workspace plan');\\n",
+              "  const { value } = await readStableJsonFile(filePath, 'persistent workspace plan');\\n",
+              "stable plan reader",
+          )
+          '''
+          patch_program = patch_program[:broken_start] + corrected + patch_program[broken_end:]
+          exec(compile(patch_program, '<persistent-workspace-hardening>', 'exec'), {})
+          PY
+
+      - name: Run focused persistent workspace validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$PWD/.venv/bin:$PATH"
+          export PROJECT_ART_REQUIRE_PILLOW=1
+          node --check scripts/project-art/persistent-workspace.mjs
+          node --check scripts/test-persistent-artist-workspace.mjs
+          node --check scripts/check-persistent-artist-workspace.mjs
+          node scripts/test-persistent-artist-workspace.mjs
+          node scripts/check-persistent-artist-workspace.mjs
+          node scripts/test-project-art-workspace-mcp.mjs
+          node scripts/check-project-art-workbench.mjs
+          git diff --check
+
+      - name: Verify exact scope and publish hardening commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm \
+            .github/workflows/temporary-persistent-workspace-hardening.yml \
+            .github/workflows/temporary-persistent-workspace-hardening-v2.yml
+          git diff --check
+          git diff --name-only HEAD | sort > /tmp/changed-paths.txt
+          cat > /tmp/expected-paths.txt <<'EOF'
+          .github/workflows/temporary-persistent-workspace-hardening-v2.yml
+          .github/workflows/temporary-persistent-workspace-hardening.yml
+          scripts/check-persistent-artist-workspace.mjs
+          scripts/project-art/persistent-workspace.mjs
+          scripts/test-persistent-artist-workspace.mjs
+          EOF
+          diff -u /tmp/expected-paths.txt /tmp/changed-paths.txt
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add \
+            .github/workflows/temporary-persistent-workspace-hardening.yml \
+            .github/workflows/temporary-persistent-workspace-hardening-v2.yml \
+            scripts/check-persistent-artist-workspace.mjs \
+            scripts/project-art/persistent-workspace.mjs \
+            scripts/test-persistent-artist-workspace.mjs
+          git commit -m "fix(project-art): harden persistent workspace paths" -m "Reject symbolic or multiply-linked request, plan and manifest inputs; bind stable file identity across reads; and prevent nested version-path symlinks from redirecting append-only snapshots outside the workspace. Preserve create-only atomic publication, exact Storage handoffs and all existing false-authority boundaries."
+          git push origin HEAD:automation/persistent-workspace-hardening-20260811
