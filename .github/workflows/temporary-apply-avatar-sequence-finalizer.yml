@@ -1,0 +1,139 @@
+name: Temporary apply avatar sequence finalizer
+
+on:
+  push:
+    branches:
+      - automation/apply-avatar-sequence-finalizer-20260811
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-apply-avatar-sequence-finalizer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Verify carrier parent and payload
+        shell: bash
+        env:
+          EXPECTED_PARENT: 5f8d11f4f5b55cc30ccb11c44250fa11f4b403ee
+          EXPECTED_PAYLOAD_SHA256: 1b4cc09df4a72b7ce35c1d7b6aa04dbbcf7f7cc7c9364f65b051ab6113f1cec4
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -f .evavo/automation/avatar-sequence-finalizer-files.tar.gz
+          test "$(sha256sum .evavo/automation/avatar-sequence-finalizer-files.tar.gz | awk '{print $1}')" = "$EXPECTED_PAYLOAD_SHA256"
+
+      - name: Apply exact reviewed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf .evavo/automation/avatar-sequence-finalizer-files.tar.gz -C .
+          git rm -f \
+            .github/workflows/temporary-apply-avatar-sequence-finalizer.yml \
+            .evavo/automation/avatar-sequence-finalizer-files.tar.gz
+          git add \
+            .github/workflows/project-art-avatar-sequence-finalization.yml \
+            .github/workflows/project-art-workbench.yml \
+            config/mcp.project-art-avatar-sequence-finalizer.windows.example.json \
+            docs/PROJECT_ART_AVATAR_SEQUENCE_FINALIZATION.md \
+            package.json \
+            scripts/check-project-art-avatar-sequence-finalization.mjs \
+            scripts/check-project-art-workbench.mjs \
+            scripts/finalize-project-art-avatar-sequence.mjs \
+            scripts/project-art/avatar-sequence-finalization-common.mjs \
+            scripts/project-art/avatar-sequence-finalization-evidence.mjs \
+            scripts/test-project-art-avatar-sequence-finalization.mjs \
+            scripts/test-project-art-avatar-sequence-finalizer-mcp.mjs \
+            tools/project_art_avatar_sequence_finalizer_mcp.mjs
+          git diff --cached --check
+          mapfile -t actual < <(git diff --cached --name-only | sort)
+          expected=(
+            .evavo/automation/avatar-sequence-finalizer-files.tar.gz
+            .github/workflows/project-art-avatar-sequence-finalization.yml
+            .github/workflows/project-art-workbench.yml
+            .github/workflows/temporary-apply-avatar-sequence-finalizer.yml
+            config/mcp.project-art-avatar-sequence-finalizer.windows.example.json
+            docs/PROJECT_ART_AVATAR_SEQUENCE_FINALIZATION.md
+            package.json
+            scripts/check-project-art-avatar-sequence-finalization.mjs
+            scripts/check-project-art-workbench.mjs
+            scripts/finalize-project-art-avatar-sequence.mjs
+            scripts/project-art/avatar-sequence-finalization-common.mjs
+            scripts/project-art/avatar-sequence-finalization-evidence.mjs
+            scripts/test-project-art-avatar-sequence-finalization.mjs
+            scripts/test-project-art-avatar-sequence-finalizer-mcp.mjs
+            tools/project_art_avatar_sequence_finalizer_mcp.mjs
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          diff -u <(printf '%s\n' "${expected_sorted[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Route Python bytecode outside the repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON_CACHE_ROOT="${RUNNER_TEMP}/avatar-sequence-finalizer-pycache"
+          mkdir -p "${PYTHON_CACHE_ROOT}"
+          echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: pip
+          cache-dependency-path: requirements-image-pipeline.txt
+
+      - name: Install exact Pillow runtime
+        run: python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
+
+      - name: Verify exact Python image toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(python -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')" == "3.13.5" ]]
+          [[ "$(python -c 'import PIL; print(PIL.__version__)')" == "12.2.0" ]]
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Validate affected sequence boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-project-art-avatar-sequence.mjs
+          node scripts/test-project-art-avatar-sequence.mjs
+          node scripts/test-project-art-avatar-sequence-mcp.mjs
+          node scripts/check-project-art-avatar-sequence-finalization.mjs
+          node scripts/test-project-art-avatar-sequence-finalization.mjs
+          node scripts/test-project-art-avatar-sequence-finalizer-mcp.mjs
+          node scripts/check-project-art-loop-closure.mjs
+          node scripts/test-project-art-loop-closure.mjs
+          node scripts/check-project-art-workbench.mjs
+          node scripts/test-project-art-workbench.mjs
+          node scripts/check-persistent-artist-workspace.mjs
+          node scripts/test-persistent-artist-workspace.mjs
+          node scripts/check-project-art-mastering-and-motion.mjs
+          node scripts/test-project-art-mastering-and-motion.mjs
+          node -e 'JSON.parse(require("node:fs").readFileSync("package.json", "utf8"));'
+
+      - name: Commit and push reviewed candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO Studio Automation"
+          git config user.email "evavo.studio@gmail.com"
+          git commit -m "feat(project-art): finalize reviewed avatar sequences" -m "Bind exact mastering plans, applied workspace receipts, full loop request-plan-review-receipt chains, reviewed target bytes, and independent art, animation, and runtime approvals into a parser-ready avatar-runtime 0.7.0 candidate. Add a bounded two-phase MCP surface and permanent Project Art validation while keeping activation, release sealing, provider execution, repository mutation, Git publication, deployment, publication, and force-push authority false."
+          git push origin "HEAD:${GITHUB_REF_NAME}"
