@@ -68,6 +68,11 @@ jobs:
         run: |
           set -euo pipefail
           tar -xzf "$RUNNER_TEMP/avatar-sequence-finalizer-files.tar.gz" -C .
+          python -c "from pathlib import Path; p=Path('scripts/check-project-art-avatar-sequence-finalization.mjs'); s=p.read_text(encoding='utf-8'); a=\"  'workspace-copy',\\n\"; b=\"  'parseWorkspacePlanAndReceipt',\\n\"; c=\"  'workspace plan and receipt',\\n\"; d=\"  'workspaceFilePlanApplicationRequired',\\n\"; assert s.count(a)==1 and s.count(c)==1; p.write_text(s.replace(a,b).replace(c,d), encoding='utf-8', newline='\\n')"
+          grep -F "'parseWorkspacePlanAndReceipt'," scripts/check-project-art-avatar-sequence-finalization.mjs
+          grep -F "'workspaceFilePlanApplicationRequired'," scripts/check-project-art-avatar-sequence-finalization.mjs
+          ! grep -F "'workspace-copy'," scripts/check-project-art-avatar-sequence-finalization.mjs
+          ! grep -F "'workspace plan and receipt'," scripts/check-project-art-avatar-sequence-finalization.mjs
           git rm -rf \
             .evavo/automation/avatar-sequence-finalizer-parts \
             .github/workflows/temporary-apply-avatar-sequence-finalizer-v2.yml
