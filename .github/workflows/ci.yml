@@ -82,6 +82,16 @@ jobs:
       - name: Install exact image backend
         run: python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
 
+      - name: Install exact Pixel Font Studio v2 TTF dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
+          python - <<'PY'
+          import fontTools
+          assert fontTools.__version__ == "4.63.0", fontTools.__version__
+          PY
+
       - name: Verify exact Python image toolchain
         shell: bash
         run: |
