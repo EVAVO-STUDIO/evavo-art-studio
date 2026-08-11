@@ -19,15 +19,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify and archive exact production tree
+      - name: Verify and package exact production tree
         shell: bash
         env:
           EXPECTED_MAIN: 7ee612f74e7c7097b5ccd93fd29c73e82667c88c
         run: |
           set -euo pipefail
           test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN"
-          git cat-file -e "$EXPECTED_MAIN^{commit}"
-          git archive --format=tar.gz --prefix=evavo-art-studio/ --output="$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz" "$EXPECTED_MAIN"
+          git switch --detach "$EXPECTED_MAIN"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_MAIN"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          mkdir -p "$RUNNER_TEMP/evavo-art-studio"
+          rsync -a --delete --exclude='.git' ./ "$RUNNER_TEMP/evavo-art-studio/"
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz" evavo-art-studio
           test -s "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz"
           sha256sum "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz" > "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.sha256"
 
