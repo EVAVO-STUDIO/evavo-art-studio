@@ -33,7 +33,9 @@ PROCESSOR_ID = "python-pillow-project-art-sandbox"
 MAXIMUM_PLAN_BYTES = 64 * 1024 * 1024
 MAXIMUM_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
 MAXIMUM_PIXELS = 220_000_000
+MAXIMUM_IMAGE_DIMENSION = 65_536
 MAXIMUM_HIDDEN_RGB_PIXELS = 4_000_000
+REVIEW_LABEL_HEIGHT = 18
 SHA256_CHARS = set("0123456789abcdef")
 Image.MAX_IMAGE_PIXELS = MAXIMUM_PIXELS
 
@@ -212,17 +214,81 @@ def require_pixel_budget(
     label: str,
     maximum_pixels: int,
 ) -> tuple[int, int]:
-    if width < 1 or height < 1 or width * height > maximum_pixels:
+    if (
+        width < 1
+        or height < 1
+        or width > MAXIMUM_IMAGE_DIMENSION
+        or height > MAXIMUM_IMAGE_DIMENSION
+        or width * height > maximum_pixels
+    ):
         fail(f"{label} exceeds the {maximum_pixels}-pixel decoded-image boundary")
     return width, height
 
 
-def load_image(value: Path) -> Image.Image:
+def require_active_pixel_budget(
+    pixel_counts: Iterable[int],
+    label: str,
+    maximum_pixels: int,
+) -> int:
+    total = 0
+    for index, value in enumerate(pixel_counts):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            fail(f"{label} pixel count {index} is invalid")
+        total += value
+        if total > maximum_pixels:
+            fail(f"{label} exceeds the {maximum_pixels}-pixel active decoded-image boundary")
+    return total
+
+
+def image_dimensions(
+    value: Path,
+    maximum_pixels: int = MAXIMUM_PIXELS,
+    label: str = "image",
+) -> tuple[int, int]:
     with Image.open(value) as opened:
+        return require_pixel_budget(
+            int(opened.width),
+            int(opened.height),
+            f"{label}: {value}",
+            maximum_pixels,
+        )
+
+
+def load_image(
+    value: Path,
+    maximum_pixels: int = MAXIMUM_PIXELS,
+    label: str = "image",
+) -> Image.Image:
+    with Image.open(value) as opened:
+        require_pixel_budget(
+            int(opened.width),
+            int(opened.height),
+            f"{label}: {value}",
+            maximum_pixels,
+        )
         opened.load()
-        if opened.width < 1 or opened.height < 1 or opened.width * opened.height > MAXIMUM_PIXELS:
-            fail(f"image dimensions exceed the sandbox boundary: {value}")
         return ImageOps.exif_transpose(opened).convert("RGBA")
+
+
+def preflight_image_set(
+    values: Iterable[Path],
+    maximum_pixels: int,
+    label: str,
+) -> tuple[list[tuple[int, int]], int, int]:
+    dimensions: list[tuple[int, int]] = []
+    pixel_counts: list[int] = []
+    for index, value in enumerate(values):
+        width, height = image_dimensions(
+            value,
+            maximum_pixels,
+            f"{label} source {index}",
+        )
+        dimensions.append((width, height))
+        pixel_counts.append(width * height)
+    if not pixel_counts:
+        fail(f"{label} has no source images")
+    total = require_active_pixel_budget(pixel_counts, f"{label} source set", maximum_pixels)
+    return dimensions, total, max(pixel_counts)
 
 
 def alpha_statistics(image: Image.Image) -> dict[str, int]:
@@ -296,11 +362,19 @@ def anchored_position(canvas: tuple[int, int], subject: tuple[int, int], anchor:
     return horizontal, vertical
 
 
-def resized_canvas(image: Image.Image, operation: dict[str, Any], *, pixel: bool = False) -> Image.Image:
-    width = int(operation["width"])
-    height = int(operation["height"])
-    if width < 1 or height < 1 or width * height > MAXIMUM_PIXELS:
-        fail("resize dimensions exceed the sandbox boundary")
+def resized_canvas(
+    image: Image.Image,
+    operation: dict[str, Any],
+    *,
+    pixel: bool = False,
+    maximum_pixels: int = MAXIMUM_PIXELS,
+) -> Image.Image:
+    width, height = require_pixel_budget(
+        int(operation["width"]),
+        int(operation["height"]),
+        "resize target",
+        maximum_pixels,
+    )
     if pixel and operation.get("integerScaleRequired", False):
         ratios = (width / image.width, height / image.height)
         if any(abs(ratio - round(ratio)) > 1e-9 for ratio in ratios):
@@ -546,7 +620,11 @@ def adjust_rgb_channels(image: Image.Image, enhancer: Any, factor: float) -> Ima
     return rgb
 
 
-def apply_operation(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+def apply_operation(
+    image: Image.Image,
+    operation: dict[str, Any],
+    maximum_pixels: int = MAXIMUM_PIXELS,
+) -> Image.Image:
     op = operation["op"]
     if op in {"inspect", "convert", "optimize"}:
         return image
@@ -566,21 +644,31 @@ def apply_operation(image: Image.Image, operation: dict[str, Any]) -> Image.Imag
         return image.crop((left, top, right, bottom))
     if op == "crop":
         x, y = int(operation["x"]), int(operation["y"])
-        width, height = int(operation["width"]), int(operation["height"])
+        width, height = require_pixel_budget(
+            int(operation["width"]),
+            int(operation["height"]),
+            "crop target",
+            maximum_pixels,
+        )
         if x < 0 or y < 0 or width < 1 or height < 1 or x + width > image.width or y + height > image.height:
             fail("crop rectangle must be inside the source image")
         return image.crop((x, y, x + width, y + height))
     if op == "pad-canvas":
-        width, height = int(operation["width"]), int(operation["height"])
+        width, height = require_pixel_budget(
+            int(operation["width"]),
+            int(operation["height"]),
+            "pad-canvas target",
+            maximum_pixels,
+        )
         if width < image.width or height < image.height:
             fail("pad-canvas cannot crop the source image")
         canvas = Image.new("RGBA", (width, height), parse_colour(operation.get("background", "#00000000"), "pad-canvas.background"))
         canvas.alpha_composite(image, anchored_position(canvas.size, image.size, str(operation.get("anchor", "centre"))))
         return canvas
     if op == "resize":
-        return resized_canvas(image, operation)
+        return resized_canvas(image, operation, maximum_pixels=maximum_pixels)
     if op == "pixel-resize":
-        return resized_canvas(image, operation, pixel=True)
+        return resized_canvas(image, operation, pixel=True, maximum_pixels=maximum_pixels)
     if op == "flip-horizontal":
         return ImageOps.mirror(image)
     if op == "flip-vertical":
@@ -679,8 +767,13 @@ def save_image(image: Image.Image, target: Path, output_format: str) -> None:
         image.save(target, format="WEBP", lossless=True, quality=100, method=6)
     elif output_format == "jpeg":
         flattened = Image.new("RGB", image.size, (0, 0, 0))
-        flattened.paste(image.convert("RGB"), mask=image.getchannel("A"))
-        flattened.save(target, format="JPEG", quality=95, optimize=True, progressive=False)
+        converted = image.convert("RGB")
+        try:
+            flattened.paste(converted, mask=image.getchannel("A"))
+            flattened.save(target, format="JPEG", quality=95, optimize=True, progressive=False)
+        finally:
+            converted.close()
+            flattened.close()
     elif output_format == "gif":
         image.save(target, format="GIF", optimize=True)
     else:
@@ -710,28 +803,39 @@ def output_record(staging_root: Path, target: Path, image: Image.Image | None = 
 def difference_fraction(left: Image.Image, right: Image.Image) -> float:
     if left.size != right.size:
         return 1.0
-    difference = ImageChops.difference(left.convert("RGBA"), right.convert("RGBA"))
-    pixels = difference.tobytes()
-    changed = 0
-    for offset in range(0, len(pixels), 4):
-        if pixels[offset] or pixels[offset + 1] or pixels[offset + 2] or pixels[offset + 3]:
-            changed += 1
-    return changed / max(1, left.width * left.height)
+    difference = ImageChops.difference(left, right)
+    try:
+        changed = sum(1 for pixel in difference.getdata() if any(pixel))
+        return changed / max(1, left.width * left.height)
+    finally:
+        difference.close()
 
 
-def create_contact_sheet(frames: list[Image.Image], columns: int) -> Image.Image:
+def contact_sheet_dimensions(frames: list[Image.Image], columns: int) -> tuple[int, int]:
     columns = max(1, min(columns, len(frames)))
     rows = math.ceil(len(frames) / columns)
     cell_width = max(frame.width for frame in frames)
     cell_height = max(frame.height for frame in frames)
-    label_height = 18
-    sheet = Image.new("RGBA", (columns * cell_width, rows * (cell_height + label_height)), (0, 0, 0, 255))
+    return columns * cell_width, rows * (cell_height + REVIEW_LABEL_HEIGHT)
+
+
+def create_contact_sheet(
+    frames: list[Image.Image],
+    columns: int,
+    maximum_pixels: int,
+) -> Image.Image:
+    width, height = contact_sheet_dimensions(frames, columns)
+    require_pixel_budget(width, height, "sequence-review contact sheet", maximum_pixels)
+    columns = max(1, min(columns, len(frames)))
+    cell_width = max(frame.width for frame in frames)
+    cell_height = max(frame.height for frame in frames)
+    sheet = Image.new("RGBA", (width, height), (0, 0, 0, 255))
     draw = ImageDraw.Draw(sheet)
     for index, frame in enumerate(frames):
         column = index % columns
         row = index // columns
         x = column * cell_width + (cell_width - frame.width) // 2
-        y = row * (cell_height + label_height)
+        y = row * (cell_height + REVIEW_LABEL_HEIGHT)
         sheet.alpha_composite(frame, (x, y))
         draw.text((column * cell_width + 4, y + cell_height + 2), f"{index:04d}", fill=(255, 255, 255, 255))
     return sheet
@@ -799,58 +903,84 @@ class RuntimeContext:
 
 def execute_image_task(context: RuntimeContext, task: dict[str, Any]) -> None:
     source_path = context.resolve_source_path(task["source"])
-    image = load_image(source_path)
-    before = {
-        "dimensions": {"width": image.width, "height": image.height},
-        "alpha": alpha_statistics(image),
-        "alphaBoundingBox": alpha_bbox(image),
-        "pixelSha256": image_pixel_sha256(image),
-    }
-    operation_evidence = []
-    for operation in task["operations"]:
-        operation_before = image_pixel_sha256(image)
-        image = apply_operation(image, operation)
-        if image.width * image.height > MAXIMUM_PIXELS:
-            fail(f"task {task['id']} exceeded the decoded-pixel boundary")
-        operation_evidence.append(
-            {
-                "op": operation["op"],
-                "beforePixelSha256": operation_before,
-                "afterPixelSha256": image_pixel_sha256(image),
-                "dimensions": {"width": image.width, "height": image.height},
-            }
-        )
-    expected = task.get("expected") or {}
-    if expected.get("width") is not None and image.width != int(expected["width"]):
-        fail(f"task {task['id']} did not satisfy expected width")
-    if expected.get("height") is not None and image.height != int(expected["height"]):
-        fail(f"task {task['id']} did not satisfy expected height")
-    alpha = alpha_statistics(image)
-    if expected.get("meaningfulAlpha") is True and alpha["transparentPixels"] + alpha["partialPixels"] == 0:
-        fail(f"task {task['id']} requires meaningful alpha")
-    target = target_path(context.staging, task["targetPath"], f"task {task['id']} target")
-    save_image(image, target, task["outputFormat"])
-    output = output_record(context.staging, target, image)
-    context.remember(
-        task["id"],
-        {
-            "taskId": task["id"],
-            "kind": task["kind"],
-            "status": "passed",
-            "source": str(source_path),
-            "before": before,
-            "operations": operation_evidence,
-            "outputs": [output],
-        },
-        [target],
+    image = load_image(
+        source_path,
+        context.maximum_decoded_pixels,
+        f"task {task['id']} source",
     )
+    try:
+        before = {
+            "dimensions": {"width": image.width, "height": image.height},
+            "alpha": alpha_statistics(image),
+            "alphaBoundingBox": alpha_bbox(image),
+            "pixelSha256": image_pixel_sha256(image),
+        }
+        operation_evidence = []
+        for operation in task["operations"]:
+            operation_before = image_pixel_sha256(image)
+            next_image = apply_operation(
+                image,
+                operation,
+                context.maximum_decoded_pixels,
+            )
+            require_pixel_budget(
+                next_image.width,
+                next_image.height,
+                f"task {task['id']} operation {operation['op']}",
+                context.maximum_decoded_pixels,
+            )
+            if next_image is not image:
+                image.close()
+                image = next_image
+            operation_evidence.append(
+                {
+                    "op": operation["op"],
+                    "beforePixelSha256": operation_before,
+                    "afterPixelSha256": image_pixel_sha256(image),
+                    "dimensions": {"width": image.width, "height": image.height},
+                }
+            )
+        expected = task.get("expected") or {}
+        if expected.get("width") is not None and image.width != int(expected["width"]):
+            fail(f"task {task['id']} did not satisfy expected width")
+        if expected.get("height") is not None and image.height != int(expected["height"]):
+            fail(f"task {task['id']} did not satisfy expected height")
+        alpha = alpha_statistics(image)
+        if expected.get("meaningfulAlpha") is True and alpha["transparentPixels"] + alpha["partialPixels"] == 0:
+            fail(f"task {task['id']} requires meaningful alpha")
+        target = target_path(context.staging, task["targetPath"], f"task {task['id']} target")
+        save_image(image, target, task["outputFormat"])
+        output = output_record(context.staging, target, image)
+        context.remember(
+            task["id"],
+            {
+                "taskId": task["id"],
+                "kind": task["kind"],
+                "status": "passed",
+                "source": str(source_path),
+                "before": before,
+                "operations": operation_evidence,
+                "outputs": [output],
+            },
+            [target],
+        )
+    finally:
+        image.close()
 
 
 def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
     source_path = context.resolve_source_path(task["source"])
-    image = load_image(source_path)
-    frame_width = int(task["frameWidth"])
-    frame_height = int(task["frameHeight"])
+    image = load_image(
+        source_path,
+        context.maximum_decoded_pixels,
+        f"task {task['id']} source",
+    )
+    frame_width, frame_height = require_pixel_budget(
+        int(task["frameWidth"]),
+        int(task["frameHeight"]),
+        f"task {task['id']} frame",
+        context.maximum_decoded_pixels,
+    )
     margin = int(task["margin"])
     spacing = int(task["spacing"])
     usable_width = image.width - margin * 2
@@ -894,6 +1024,7 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                 "output": record,
             }
         )
+        frame.close()
     manifest_path = directory / "frames.json"
     write_json_create_only(
         manifest_path,
@@ -920,13 +1051,22 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
         },
         output_paths,
     )
+    image.close()
 
 
-def fitted_cell(image: Image.Image, width: int, height: int, fit: str, sample: str) -> Image.Image:
+def fitted_cell(
+    image: Image.Image,
+    width: int,
+    height: int,
+    fit: str,
+    sample: str,
+    maximum_pixels: int,
+) -> Image.Image:
+    require_pixel_budget(width, height, "assemble-sheet cell", maximum_pixels)
     if fit == "strict":
         if image.size != (width, height):
             fail(f"strict sheet cell expected {width}x{height}, received {image.width}x{image.height}")
-        return image.copy()
+        return image
     operation = {
         "width": width,
         "height": height,
@@ -934,13 +1074,25 @@ def fitted_cell(image: Image.Image, width: int, height: int, fit: str, sample: s
         "sampling": sample,
         "background": "#00000000",
     }
-    return resized_canvas(image, operation, pixel=sample == "nearest")
+    return resized_canvas(
+        image,
+        operation,
+        pixel=sample == "nearest",
+        maximum_pixels=maximum_pixels,
+    )
 
 
 def execute_assemble_task(context: RuntimeContext, task: dict[str, Any]) -> None:
     source_paths = [context.resolve_source_path(source) for source in task["sources"]]
-    frames = [load_image(value) for value in source_paths]
-    if not frames:
+    dimensions = [
+        image_dimensions(
+            value,
+            context.maximum_decoded_pixels,
+            f"assemble-sheet task {task['id']} source {index}",
+        )
+        for index, value in enumerate(source_paths)
+    ]
+    if not dimensions:
         fail(f"assemble-sheet task {task['id']} has no sources")
     cell = task.get("cell")
     if cell:
@@ -949,170 +1101,281 @@ def execute_assemble_task(context: RuntimeContext, task: dict[str, Any]) -> None
         fit = cell["fit"]
         sample = cell["sampling"]
     else:
-        cell_width, cell_height = frames[0].size
+        cell_width, cell_height = dimensions[0]
         fit, sample = "strict", "nearest"
-    prepared = [fitted_cell(frame, cell_width, cell_height, fit, sample) for frame in frames]
-    columns = int(task["columns"])
-    rows = math.ceil(len(prepared) / columns)
-    padding = int(task["padding"])
-    width = padding * 2 + columns * cell_width
-    height = padding * 2 + rows * cell_height
-    if width * height > MAXIMUM_PIXELS:
-        fail(f"assemble-sheet task {task['id']} exceeds the decoded-pixel boundary")
-    sheet = Image.new("RGBA", (width, height), parse_colour(task["background"], "assemble-sheet.background"))
-    for index, frame in enumerate(prepared):
-        x = padding + (index % columns) * cell_width
-        y = padding + (index // columns) * cell_height
-        sheet.alpha_composite(frame, (x, y))
-    target = target_path(context.staging, task["targetPath"], f"task {task['id']} target")
-    save_image(sheet, target, "png")
-    context.remember(
-        task["id"],
-        {
-            "taskId": task["id"],
-            "kind": task["kind"],
-            "status": "passed",
-            "sourceCount": len(source_paths),
-            "columns": columns,
-            "rows": rows,
-            "cell": {"width": cell_width, "height": cell_height, "fit": fit, "sampling": sample},
-            "outputs": [output_record(context.staging, target, sheet, role="sprite-sheet")],
-        },
-        [target],
+    require_pixel_budget(
+        cell_width,
+        cell_height,
+        f"assemble-sheet task {task['id']} cell",
+        context.maximum_decoded_pixels,
     )
+    if fit == "strict":
+        for index, observed in enumerate(dimensions):
+            if observed != (cell_width, cell_height):
+                fail(
+                    f"assemble-sheet task {task['id']} source {index} has dimensions "
+                    f"{observed[0]}x{observed[1]}, expected {cell_width}x{cell_height}"
+                )
+    columns = int(task["columns"])
+    rows = math.ceil(len(source_paths) / columns)
+    padding = int(task["padding"])
+    width, height = require_pixel_budget(
+        padding * 2 + columns * cell_width,
+        padding * 2 + rows * cell_height,
+        f"assemble-sheet task {task['id']} output",
+        context.maximum_decoded_pixels,
+    )
+    maximum_source_pixels = max(source_width * source_height for source_width, source_height in dimensions)
+    prepared_pixels = 0 if fit == "strict" else cell_width * cell_height * 2
+    require_active_pixel_budget(
+        [width * height, maximum_source_pixels, prepared_pixels],
+        f"assemble-sheet task {task['id']} working set",
+        context.maximum_decoded_pixels,
+    )
+    sheet = Image.new("RGBA", (width, height), parse_colour(task["background"], "assemble-sheet.background"))
+    try:
+        for index, source_path in enumerate(source_paths):
+            frame = load_image(
+                source_path,
+                context.maximum_decoded_pixels,
+                f"assemble-sheet task {task['id']} source {index}",
+            )
+            prepared = frame
+            try:
+                prepared = fitted_cell(
+                    frame,
+                    cell_width,
+                    cell_height,
+                    fit,
+                    sample,
+                    context.maximum_decoded_pixels,
+                )
+                x = padding + (index % columns) * cell_width
+                y = padding + (index // columns) * cell_height
+                sheet.alpha_composite(prepared, (x, y))
+            finally:
+                if prepared is not frame:
+                    prepared.close()
+                frame.close()
+        target = target_path(context.staging, task["targetPath"], f"task {task['id']} target")
+        save_image(sheet, target, "png")
+        context.remember(
+            task["id"],
+            {
+                "taskId": task["id"],
+                "kind": task["kind"],
+                "status": "passed",
+                "sourceCount": len(source_paths),
+                "columns": columns,
+                "rows": rows,
+                "cell": {"width": cell_width, "height": cell_height, "fit": fit, "sampling": sample},
+                "outputs": [output_record(context.staging, target, sheet, role="sprite-sheet")],
+            },
+            [target],
+        )
+    finally:
+        sheet.close()
 
 
 def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
     source_paths = [context.resolve_source_path(source) for source in task["sources"]]
-    frames = [load_image(value) for value in source_paths]
-    if not frames:
-        fail(f"sequence-review task {task['id']} has no frames")
-    target_directory = target_path(context.staging, task["targetDirectory"], f"task {task['id']} targetDirectory")
-    target_directory.mkdir(parents=True, exist_ok=False)
-    issues: list[dict[str, Any]] = []
-    frame_records = []
-    expected_width = task.get("expectedWidth")
-    expected_height = task.get("expectedHeight")
-    first_size = frames[0].size
-    for index, (source_path, frame) in enumerate(zip(source_paths, frames)):
-        alpha = alpha_statistics(frame)
-        bbox = alpha_bbox(frame)
-        centroid = alpha_centroid(frame)
-        if expected_width is not None and frame.width != int(expected_width):
-            issues.append({"code": "width-mismatch", "frameIndex": index, "expected": expected_width, "actual": frame.width})
-        if expected_height is not None and frame.height != int(expected_height):
-            issues.append({"code": "height-mismatch", "frameIndex": index, "expected": expected_height, "actual": frame.height})
-        if frame.size != first_size:
-            issues.append({"code": "sequence-dimension-drift", "frameIndex": index, "expected": list(first_size), "actual": list(frame.size)})
-        if task.get("requireAlpha", False) and alpha["transparentPixels"] + alpha["partialPixels"] == 0:
-            issues.append({"code": "alpha-required", "frameIndex": index})
-        if bbox is None and task.get("rejectBlankFrames", True):
-            issues.append({"code": "blank-frame", "frameIndex": index})
-        frame_records.append(
-            {
-                "frameIndex": index,
-                "source": str(source_path),
-                "pixelSha256": image_pixel_sha256(frame),
-                "dimensions": {"width": frame.width, "height": frame.height},
-                "alpha": alpha,
-                "alphaBoundingBox": bbox,
-                "alphaCentroid": centroid,
-            }
-        )
-    transitions = []
-    thresholds = task["thresholds"]
-    for index in range(1, len(frames)):
-        changed = difference_fraction(frames[index - 1], frames[index])
-        previous_centroid = frame_records[index - 1]["alphaCentroid"]
-        current_centroid = frame_records[index]["alphaCentroid"]
-        shift = None
-        if previous_centroid and current_centroid:
-            shift = math.dist(
-                (previous_centroid["x"], previous_centroid["y"]),
-                (current_centroid["x"], current_centroid["y"]),
-            )
-        transition = {
-            "fromFrameIndex": index - 1,
-            "toFrameIndex": index,
-            "changedPixelFraction": changed,
-            "alphaCentroidShiftPixels": shift,
-        }
-        transitions.append(transition)
-        if task.get("rejectIdenticalAdjacentFrames", True) and changed == 0:
-            issues.append({"code": "identical-adjacent-frames", "fromFrameIndex": index - 1, "toFrameIndex": index})
-        if changed < float(thresholds["minimumChangedFraction"]):
-            issues.append({"code": "insufficient-frame-change", **transition})
-        if changed > float(thresholds["maximumChangedFraction"]):
-            issues.append({"code": "excessive-frame-change", **transition})
-        if shift is not None and shift > float(thresholds["maximumCentroidShiftPixels"]):
-            issues.append({"code": "centroid-shift-exceeded", **transition})
-    manifest = {
-        "schema": "evavo.project-art-sequence-review.v1",
-        "taskId": task["id"],
-        "status": "passed" if not issues else "blocked",
-        "frames": frame_records,
-        "transitions": transitions,
-        "issues": issues,
-        "creativeApprovalPerformed": False,
-        "runtimeApprovalPerformed": False,
-    }
-    manifest_path = target_directory / "sequence-review.json"
-    write_json_create_only(manifest_path, manifest)
-    outputs = [output_record(context.staging, manifest_path, role="review-manifest")]
-    output_paths = [manifest_path]
-    preview = task["preview"]
-    if preview["contactSheet"]:
-        sheet = create_contact_sheet(frames, int(preview["columns"]))
-        value = target_directory / "contact-sheet.png"
-        save_image(sheet, value, "png")
-        outputs.append(output_record(context.staging, value, sheet, role="review-contact-sheet"))
-        output_paths.append(value)
-    if preview["animatedGif"]:
-        value = target_directory / "animation-preview.gif"
-        duration = int(preview["frameDurationMs"])
-        gif_frames = [frame.convert("RGBA") for frame in frames]
-        gif_frames[0].save(
-            value,
-            format="GIF",
-            save_all=True,
-            append_images=gif_frames[1:],
-            duration=duration,
-            loop=0,
-            disposal=2,
-            optimize=False,
-            transparency=0,
-        )
-        outputs.append(output_record(context.staging, value, role="review-animation"))
-        output_paths.append(value)
-    if preview["onionSkins"] and len(frames) > 1:
-        onion_directory = target_directory / "onion-skins"
-        onion_directory.mkdir(parents=True, exist_ok=False)
-        for index in range(1, len(frames)):
-            previous = frames[index - 1].copy()
-            current = frames[index].copy()
-            red = Image.new("RGBA", previous.size, (255, 0, 0, 0))
-            red.putalpha(previous.getchannel("A").point(lambda value: round(value * 0.45)))
-            cyan = Image.new("RGBA", current.size, (0, 255, 255, 0))
-            cyan.putalpha(current.getchannel("A").point(lambda value: round(value * 0.55)))
-            onion = Image.new("RGBA", previous.size, (0, 0, 0, 255))
-            onion.alpha_composite(red)
-            onion.alpha_composite(cyan)
-            value = onion_directory / f"{index - 1:04d}-{index:04d}.png"
-            save_image(onion, value, "png")
-            outputs.append(output_record(context.staging, value, onion, role="review-onion-skin"))
-            output_paths.append(value)
-    context.remember(
-        task["id"],
-        {
-            "taskId": task["id"],
-            "kind": task["kind"],
-            "status": manifest["status"],
-            "frameCount": len(frames),
-            "issueCount": len(issues),
-            "outputs": outputs,
-        },
-        output_paths,
+    dimensions, source_pixels, maximum_frame_pixels = preflight_image_set(
+        source_paths,
+        context.maximum_decoded_pixels,
+        f"sequence-review task {task['id']}",
     )
+    preview = task["preview"]
+    transition_pixels = max(
+        (
+            width * height
+            for (width, height), next_size in zip(dimensions, dimensions[1:])
+            if (width, height) == next_size
+        ),
+        default=0,
+    )
+    if transition_pixels:
+        require_active_pixel_budget(
+            [source_pixels, transition_pixels],
+            f"sequence-review task {task['id']} transition working set",
+            context.maximum_decoded_pixels,
+        )
+    if preview["contactSheet"]:
+        columns = max(1, min(int(preview["columns"]), len(dimensions)))
+        rows = math.ceil(len(dimensions) / columns)
+        cell_width = max(width for width, _ in dimensions)
+        cell_height = max(height for _, height in dimensions)
+        sheet_width, sheet_height = require_pixel_budget(
+            columns * cell_width,
+            rows * (cell_height + REVIEW_LABEL_HEIGHT),
+            f"sequence-review task {task['id']} contact sheet",
+            context.maximum_decoded_pixels,
+        )
+        require_active_pixel_budget(
+            [source_pixels, sheet_width * sheet_height * 2],
+            f"sequence-review task {task['id']} contact-sheet working set",
+            context.maximum_decoded_pixels,
+        )
+    if preview["animatedGif"]:
+        require_active_pixel_budget(
+            [source_pixels, maximum_frame_pixels * 2],
+            f"sequence-review task {task['id']} animation-preview working set",
+            context.maximum_decoded_pixels,
+        )
+    if preview["onionSkins"] and len(dimensions) > 1:
+        require_active_pixel_budget(
+            [source_pixels, maximum_frame_pixels * 5],
+            f"sequence-review task {task['id']} onion-skin working set",
+            context.maximum_decoded_pixels,
+        )
+
+    frames = [
+        load_image(
+            value,
+            context.maximum_decoded_pixels,
+            f"sequence-review task {task['id']} source {index}",
+        )
+        for index, value in enumerate(source_paths)
+    ]
+    try:
+        target_directory = target_path(context.staging, task["targetDirectory"], f"task {task['id']} targetDirectory")
+        target_directory.mkdir(parents=True, exist_ok=False)
+        issues: list[dict[str, Any]] = []
+        frame_records = []
+        expected_width = task.get("expectedWidth")
+        expected_height = task.get("expectedHeight")
+        first_size = frames[0].size
+        for index, (source_path, frame) in enumerate(zip(source_paths, frames)):
+            alpha = alpha_statistics(frame)
+            bbox = alpha_bbox(frame)
+            centroid = alpha_centroid(frame)
+            if expected_width is not None and frame.width != int(expected_width):
+                issues.append({"code": "width-mismatch", "frameIndex": index, "expected": expected_width, "actual": frame.width})
+            if expected_height is not None and frame.height != int(expected_height):
+                issues.append({"code": "height-mismatch", "frameIndex": index, "expected": expected_height, "actual": frame.height})
+            if frame.size != first_size:
+                issues.append({"code": "sequence-dimension-drift", "frameIndex": index, "expected": list(first_size), "actual": list(frame.size)})
+            if task.get("requireAlpha", False) and alpha["transparentPixels"] + alpha["partialPixels"] == 0:
+                issues.append({"code": "alpha-required", "frameIndex": index})
+            if bbox is None and task.get("rejectBlankFrames", True):
+                issues.append({"code": "blank-frame", "frameIndex": index})
+            frame_records.append(
+                {
+                    "frameIndex": index,
+                    "source": str(source_path),
+                    "pixelSha256": image_pixel_sha256(frame),
+                    "dimensions": {"width": frame.width, "height": frame.height},
+                    "alpha": alpha,
+                    "alphaBoundingBox": bbox,
+                    "alphaCentroid": centroid,
+                }
+            )
+        transitions = []
+        thresholds = task["thresholds"]
+        for index in range(1, len(frames)):
+            changed = difference_fraction(frames[index - 1], frames[index])
+            previous_centroid = frame_records[index - 1]["alphaCentroid"]
+            current_centroid = frame_records[index]["alphaCentroid"]
+            shift = None
+            if previous_centroid and current_centroid:
+                shift = math.dist(
+                    (previous_centroid["x"], previous_centroid["y"]),
+                    (current_centroid["x"], current_centroid["y"]),
+                )
+            transition = {
+                "fromFrameIndex": index - 1,
+                "toFrameIndex": index,
+                "changedPixelFraction": changed,
+                "alphaCentroidShiftPixels": shift,
+            }
+            transitions.append(transition)
+            if task.get("rejectIdenticalAdjacentFrames", True) and changed == 0:
+                issues.append({"code": "identical-adjacent-frames", "fromFrameIndex": index - 1, "toFrameIndex": index})
+            if changed < float(thresholds["minimumChangedFraction"]):
+                issues.append({"code": "insufficient-frame-change", **transition})
+            if changed > float(thresholds["maximumChangedFraction"]):
+                issues.append({"code": "excessive-frame-change", **transition})
+            if shift is not None and shift > float(thresholds["maximumCentroidShiftPixels"]):
+                issues.append({"code": "centroid-shift-exceeded", **transition})
+        manifest = {
+            "schema": "evavo.project-art-sequence-review.v1",
+            "taskId": task["id"],
+            "status": "passed" if not issues else "blocked",
+            "frames": frame_records,
+            "transitions": transitions,
+            "issues": issues,
+            "creativeApprovalPerformed": False,
+            "runtimeApprovalPerformed": False,
+        }
+        manifest_path = target_directory / "sequence-review.json"
+        write_json_create_only(manifest_path, manifest)
+        outputs = [output_record(context.staging, manifest_path, role="review-manifest")]
+        output_paths = [manifest_path]
+        if preview["contactSheet"]:
+            sheet = create_contact_sheet(
+                frames,
+                int(preview["columns"]),
+                context.maximum_decoded_pixels,
+            )
+            try:
+                value = target_directory / "contact-sheet.png"
+                save_image(sheet, value, "png")
+                outputs.append(output_record(context.staging, value, sheet, role="review-contact-sheet"))
+                output_paths.append(value)
+            finally:
+                sheet.close()
+        if preview["animatedGif"]:
+            value = target_directory / "animation-preview.gif"
+            duration = int(preview["frameDurationMs"])
+            frames[0].save(
+                value,
+                format="GIF",
+                save_all=True,
+                append_images=frames[1:],
+                duration=duration,
+                loop=0,
+                disposal=2,
+                optimize=False,
+                transparency=0,
+            )
+            outputs.append(output_record(context.staging, value, role="review-animation"))
+            output_paths.append(value)
+        if preview["onionSkins"] and len(frames) > 1:
+            onion_directory = target_directory / "onion-skins"
+            onion_directory.mkdir(parents=True, exist_ok=False)
+            for index in range(1, len(frames)):
+                previous = frames[index - 1]
+                current = frames[index]
+                red = Image.new("RGBA", previous.size, (255, 0, 0, 0))
+                cyan = Image.new("RGBA", current.size, (0, 255, 255, 0))
+                onion = Image.new("RGBA", previous.size, (0, 0, 0, 255))
+                try:
+                    red.putalpha(previous.getchannel("A").point(lambda value: round(value * 0.45)))
+                    cyan.putalpha(current.getchannel("A").point(lambda value: round(value * 0.55)))
+                    onion.alpha_composite(red)
+                    onion.alpha_composite(cyan)
+                    value = onion_directory / f"{index - 1:04d}-{index:04d}.png"
+                    save_image(onion, value, "png")
+                    outputs.append(output_record(context.staging, value, onion, role="review-onion-skin"))
+                    output_paths.append(value)
+                finally:
+                    red.close()
+                    cyan.close()
+                    onion.close()
+        context.remember(
+            task["id"],
+            {
+                "taskId": task["id"],
+                "kind": task["kind"],
+                "status": manifest["status"],
+                "frameCount": len(frames),
+                "issueCount": len(issues),
+                "outputs": outputs,
+            },
+            output_paths,
+        )
+    finally:
+        for frame in frames:
+            frame.close()
 
 
 
@@ -1129,47 +1392,90 @@ def _apply_layer_mask(image: Image.Image, mask_image: Image.Image | None, layer:
     alpha = result.getchannel("A")
     if mask_image is not None:
         mask = mask_image.convert("RGBA")
-        if mask.size != result.size:
-            mask = mask.resize(result.size, _resample(layer.get("sampling", "nearest")))
-        if layer.get("maskChannel", "alpha") == "alpha":
-            mask_channel = mask.getchannel("A")
-        else:
-            mask_channel = ImageOps.grayscale(mask.convert("RGB"))
-        if layer.get("invertMask") is True:
-            mask_channel = ImageOps.invert(mask_channel)
-        alpha = ImageChops.multiply(alpha, mask_channel)
+        try:
+            if mask.size != result.size:
+                resized_mask = mask.resize(result.size, _resample(layer.get("sampling", "nearest")))
+                mask.close()
+                mask = resized_mask
+            if layer.get("maskChannel", "alpha") == "alpha":
+                mask_channel = mask.getchannel("A")
+            else:
+                mask_rgb = mask.convert("RGB")
+                try:
+                    mask_channel = ImageOps.grayscale(mask_rgb)
+                finally:
+                    mask_rgb.close()
+            try:
+                if layer.get("invertMask") is True:
+                    inverted = ImageOps.invert(mask_channel)
+                    mask_channel.close()
+                    mask_channel = inverted
+                multiplied = ImageChops.multiply(alpha, mask_channel)
+                alpha.close()
+                alpha = multiplied
+            finally:
+                mask_channel.close()
+        finally:
+            mask.close()
     opacity = float(layer.get("opacity", 1.0))
     if opacity < 1.0:
-        alpha = alpha.point(lambda value: round(value * opacity))
+        adjusted = alpha.point(lambda value: round(value * opacity))
+        alpha.close()
+        alpha = adjusted
     result.putalpha(alpha)
+    alpha.close()
     return result
 
 
 def _blend_overlap(base: Image.Image, layer: Image.Image, mode: str) -> Image.Image:
-    base = base.convert("RGBA")
-    layer = layer.convert("RGBA")
     normal = Image.alpha_composite(base, layer)
     if mode == "normal":
         return normal
     base_rgb = base.convert("RGB")
     layer_rgb = layer.convert("RGB")
-    if mode == "multiply":
-        blended_rgb = ImageChops.multiply(base_rgb, layer_rgb)
-    elif mode == "screen":
-        blended_rgb = ImageChops.screen(base_rgb, layer_rgb)
-    elif mode == "add":
-        blended_rgb = ImageChops.add(base_rgb, layer_rgb, scale=1.0, offset=0)
-    elif mode == "subtract":
-        blended_rgb = ImageChops.subtract(base_rgb, layer_rgb, scale=1.0, offset=0)
-    elif mode == "darken":
-        blended_rgb = ImageChops.darker(base_rgb, layer_rgb)
-    elif mode == "lighten":
-        blended_rgb = ImageChops.lighter(base_rgb, layer_rgb)
-    else:
-        fail(f"unsupported composite blend mode: {mode}")
-    candidate = Image.merge("RGBA", (*blended_rgb.split(), normal.getchannel("A")))
-    overlap = ImageChops.multiply(base.getchannel("A"), layer.getchannel("A"))
-    return Image.composite(candidate, normal, overlap)
+    try:
+        if mode == "multiply":
+            blended_rgb = ImageChops.multiply(base_rgb, layer_rgb)
+        elif mode == "screen":
+            blended_rgb = ImageChops.screen(base_rgb, layer_rgb)
+        elif mode == "add":
+            blended_rgb = ImageChops.add(base_rgb, layer_rgb, scale=1.0, offset=0)
+        elif mode == "subtract":
+            blended_rgb = ImageChops.subtract(base_rgb, layer_rgb, scale=1.0, offset=0)
+        elif mode == "darken":
+            blended_rgb = ImageChops.darker(base_rgb, layer_rgb)
+        elif mode == "lighten":
+            blended_rgb = ImageChops.lighter(base_rgb, layer_rgb)
+        else:
+            normal.close()
+            fail(f"unsupported composite blend mode: {mode}")
+        try:
+            normal_alpha = normal.getchannel("A")
+            channels = blended_rgb.split()
+            try:
+                candidate = Image.merge("RGBA", (*channels, normal_alpha))
+            finally:
+                for channel in channels:
+                    channel.close()
+                normal_alpha.close()
+            base_alpha = base.getchannel("A")
+            layer_alpha = layer.getchannel("A")
+            try:
+                overlap = ImageChops.multiply(base_alpha, layer_alpha)
+            finally:
+                base_alpha.close()
+                layer_alpha.close()
+            try:
+                return Image.composite(candidate, normal, overlap)
+            finally:
+                candidate.close()
+                overlap.close()
+                normal.close()
+        finally:
+            blended_rgb.close()
+    finally:
+        base_rgb.close()
+        layer_rgb.close()
 
 
 def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> None:
@@ -1181,62 +1487,123 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
         "image-composite canvas",
         context.maximum_decoded_pixels,
     )
+    canvas_pixels = canvas_width * canvas_height
     canvas = Image.new(
         "RGBA",
         (canvas_width, canvas_height),
         parse_colour(canvas_spec.get("background", "#00000000"), "image-composite.canvas.background"),
     )
     applied_layers: list[dict[str, Any]] = []
-    for index, layer in enumerate(task["layers"]):
-        source_index = int(layer["sourceIndex"])
-        if source_index < 0 or source_index >= len(source_paths):
-            fail(f"image-composite layer {index} sourceIndex escaped the source list")
-        image = load_image(source_paths[source_index]).convert("RGBA")
-        if layer.get("width") is not None:
-            layer_width, layer_height = require_pixel_budget(
-                int(layer["width"]),
-                int(layer["height"]),
-                f"image-composite layer {index}",
+    try:
+        for index, layer in enumerate(task["layers"]):
+            source_index = int(layer["sourceIndex"])
+            if source_index < 0 or source_index >= len(source_paths):
+                fail(f"image-composite layer {index} sourceIndex escaped the source list")
+            source_width, source_height = image_dimensions(
+                source_paths[source_index],
+                context.maximum_decoded_pixels,
+                f"image-composite task {task['id']} layer {index} source",
+            )
+            layer_width = int(layer.get("width", source_width))
+            layer_height = int(layer.get("height", source_height))
+            require_pixel_budget(
+                layer_width,
+                layer_height,
+                f"image-composite task {task['id']} layer {index}",
                 context.maximum_decoded_pixels,
             )
-            image = image.resize(
-                (layer_width, layer_height),
-                _resample(layer.get("sampling", "nearest")),
+            mask_pixels = 0
+            mask_index = layer.get("maskSourceIndex")
+            if mask_index is not None:
+                mask_index = int(mask_index)
+                if mask_index < 0 or mask_index >= len(source_paths):
+                    fail(f"image-composite layer {index} maskSourceIndex escaped the source list")
+                mask_width, mask_height = image_dimensions(
+                    source_paths[mask_index],
+                    context.maximum_decoded_pixels,
+                    f"image-composite task {task['id']} layer {index} mask",
+                )
+                mask_pixels = mask_width * mask_height
+            blend_mode = layer.get("blendMode", "normal")
+            canvas_multiplier = 3 if blend_mode == "normal" else 9
+            layer_multiplier = 6 if mask_index is not None else 4
+            require_active_pixel_budget(
+                [
+                    canvas_pixels * canvas_multiplier,
+                    layer_width * layer_height * layer_multiplier,
+                    mask_pixels,
+                ],
+                f"image-composite task {task['id']} layer {index} working set",
+                context.maximum_decoded_pixels,
             )
-        mask_image = None
-        if layer.get("maskSourceIndex") is not None:
-            mask_index = int(layer["maskSourceIndex"])
-            if mask_index < 0 or mask_index >= len(source_paths):
-                fail(f"image-composite layer {index} maskSourceIndex escaped the source list")
-            mask_image = load_image(source_paths[mask_index])
-        prepared = _apply_layer_mask(image, mask_image, layer)
-        layer_canvas = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-        layer_canvas.alpha_composite(prepared, dest=(int(layer.get("x", 0)), int(layer.get("y", 0))))
-        canvas = _blend_overlap(canvas, layer_canvas, layer.get("blendMode", "normal"))
-        applied_layers.append({
-            "index": index,
-            "sourceIndex": source_index,
-            "maskSourceIndex": layer.get("maskSourceIndex"),
-            "x": int(layer.get("x", 0)),
-            "y": int(layer.get("y", 0)),
-            "opacity": layer.get("opacity", 1),
-            "blendMode": layer.get("blendMode", "normal"),
-            "width": prepared.width,
-            "height": prepared.height,
-        })
-    target = target_path(context.staging, task["targetPath"], f"task {task['id']} targetPath")
-    save_image(canvas, target, task["outputFormat"])
-    output = output_record(context.staging, target, canvas, role="composite-image")
-    context.remember(task["id"], {
-        "taskId": task["id"],
-        "kind": task["kind"],
-        "status": "passed",
-        "layerCount": len(applied_layers),
-        "layers": applied_layers,
-        "outputs": [output],
-    }, [target])
 
-def image_compare_metrics(left: Image.Image, right: Image.Image) -> dict[str, Any]:
+            image = load_image(
+                source_paths[source_index],
+                context.maximum_decoded_pixels,
+                f"image-composite task {task['id']} layer {index} source",
+            )
+            mask_image = None
+            prepared = None
+            layer_canvas = None
+            try:
+                if layer.get("width") is not None:
+                    resized = image.resize(
+                        (layer_width, layer_height),
+                        _resample(layer.get("sampling", "nearest")),
+                    )
+                    image.close()
+                    image = resized
+                if mask_index is not None:
+                    mask_image = load_image(
+                        source_paths[mask_index],
+                        context.maximum_decoded_pixels,
+                        f"image-composite task {task['id']} layer {index} mask",
+                    )
+                prepared = _apply_layer_mask(image, mask_image, layer)
+                layer_canvas = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+                layer_canvas.alpha_composite(prepared, dest=(int(layer.get("x", 0)), int(layer.get("y", 0))))
+                next_canvas = _blend_overlap(canvas, layer_canvas, blend_mode)
+                canvas.close()
+                canvas = next_canvas
+                applied_layers.append({
+                    "index": index,
+                    "sourceIndex": source_index,
+                    "maskSourceIndex": layer.get("maskSourceIndex"),
+                    "x": int(layer.get("x", 0)),
+                    "y": int(layer.get("y", 0)),
+                    "opacity": layer.get("opacity", 1),
+                    "blendMode": blend_mode,
+                    "width": prepared.width,
+                    "height": prepared.height,
+                })
+            finally:
+                if layer_canvas is not None:
+                    layer_canvas.close()
+                if prepared is not None:
+                    prepared.close()
+                if mask_image is not None:
+                    mask_image.close()
+                image.close()
+        target = target_path(context.staging, task["targetPath"], f"task {task['id']} targetPath")
+        save_image(canvas, target, task["outputFormat"])
+        output = output_record(context.staging, target, canvas, role="composite-image")
+        context.remember(task["id"], {
+            "taskId": task["id"],
+            "kind": task["kind"],
+            "status": "passed",
+            "layerCount": len(applied_layers),
+            "layers": applied_layers,
+            "outputs": [output],
+        }, [target])
+    finally:
+        canvas.close()
+
+
+def image_compare_metrics(
+    left: Image.Image,
+    right: Image.Image,
+    difference: Image.Image | None = None,
+) -> dict[str, Any]:
     if left.size != right.size:
         return {
             "sameDimensions": False,
@@ -1245,88 +1612,123 @@ def image_compare_metrics(left: Image.Image, right: Image.Image) -> dict[str, An
             "maximumChannelDelta": 255,
             "alphaChangedPixelFraction": 1.0,
         }
-    left_rgba = left.convert("RGBA")
-    right_rgba = right.convert("RGBA")
-    difference = ImageChops.difference(left_rgba, right_rgba)
-    raw = difference.tobytes()
-    changed = 0
-    alpha_changed = 0
-    total_delta = 0
-    maximum_delta = 0
-    for offset in range(0, len(raw), 4):
-        values = raw[offset:offset + 4]
-        if any(values):
-            changed += 1
-        if values[3]:
-            alpha_changed += 1
-        total_delta += sum(values)
-        maximum_delta = max(maximum_delta, *values)
-    pixels = max(1, left_rgba.width * left_rgba.height)
-    return {
-        "sameDimensions": True,
-        "changedPixelFraction": changed / pixels,
-        "meanAbsoluteChannelDelta": total_delta / (pixels * 4),
-        "maximumChannelDelta": maximum_delta,
-        "alphaChangedPixelFraction": alpha_changed / pixels,
-    }
+    owns_difference = difference is None
+    if difference is None:
+        difference = ImageChops.difference(left, right)
+    try:
+        changed = 0
+        alpha_changed = 0
+        total_delta = 0
+        maximum_delta = 0
+        for values in difference.getdata():
+            if any(values):
+                changed += 1
+            if values[3]:
+                alpha_changed += 1
+            total_delta += sum(values)
+            maximum_delta = max(maximum_delta, *values)
+        pixels = max(1, left.width * left.height)
+        return {
+            "sameDimensions": True,
+            "changedPixelFraction": changed / pixels,
+            "meanAbsoluteChannelDelta": total_delta / (pixels * 4),
+            "maximumChannelDelta": maximum_delta,
+            "alphaChangedPixelFraction": alpha_changed / pixels,
+        }
+    finally:
+        if owns_difference:
+            difference.close()
 
 
 def execute_compare_task(context: RuntimeContext, task: dict[str, Any]) -> None:
     source_paths = [context.resolve_source_path(source) for source in task["sources"]]
     if len(source_paths) != 2:
         fail(f"image-compare task {task['id']} requires exactly two sources")
-    left = load_image(source_paths[0])
-    right = load_image(source_paths[1])
-    metrics = image_compare_metrics(left, right)
-    thresholds = task["thresholds"]
-    issues: list[dict[str, Any]] = []
-    if task.get("requireSameDimensions", True) and not metrics["sameDimensions"]:
-        issues.append({"code": "dimensions-mismatch", "left": list(left.size), "right": list(right.size)})
-    if metrics["changedPixelFraction"] > float(thresholds["maximumChangedFraction"]):
-        issues.append({"code": "changed-fraction-exceeded", "observed": metrics["changedPixelFraction"], "maximum": thresholds["maximumChangedFraction"]})
-    if metrics["meanAbsoluteChannelDelta"] > float(thresholds["maximumMeanChannelDelta"]):
-        issues.append({"code": "mean-channel-delta-exceeded", "observed": metrics["meanAbsoluteChannelDelta"], "maximum": thresholds["maximumMeanChannelDelta"]})
-    if metrics["alphaChangedPixelFraction"] > float(thresholds["maximumAlphaChangedFraction"]):
-        issues.append({"code": "alpha-change-exceeded", "observed": metrics["alphaChangedPixelFraction"], "maximum": thresholds["maximumAlphaChangedFraction"]})
-    target_directory = target_path(context.staging, task["targetDirectory"], f"task {task['id']} targetDirectory")
-    target_directory.mkdir(parents=True, exist_ok=False)
-    manifest = {
-        "schema": "evavo.project-art-image-comparison.v1",
-        "taskId": task["id"],
-        "status": "passed" if not issues else "blocked",
-        "sources": [str(value) for value in source_paths],
-        "left": {"dimensions": {"width": left.width, "height": left.height}, "pixelSha256": image_pixel_sha256(left)},
-        "right": {"dimensions": {"width": right.width, "height": right.height}, "pixelSha256": image_pixel_sha256(right)},
-        "metrics": metrics,
-        "thresholds": thresholds,
-        "issues": issues,
-        "creativeApprovalPerformed": False,
-        "identityApprovalPerformed": False,
-    }
-    manifest_path = target_directory / "comparison.json"
-    write_json_create_only(manifest_path, manifest)
-    outputs = [output_record(context.staging, manifest_path, role="comparison-manifest")]
-    output_paths = [manifest_path]
-    if task["preview"]["difference"] and left.size == right.size:
-        difference = ImageChops.difference(left.convert("RGBA"), right.convert("RGBA"))
-        difference_path = target_directory / "difference.png"
-        save_image(difference, difference_path, "png")
-        outputs.append(output_record(context.staging, difference_path, difference, role="comparison-difference"))
-        output_paths.append(difference_path)
-    if task["preview"]["overlay"] and left.size == right.size:
-        overlay = Image.blend(left.convert("RGBA"), right.convert("RGBA"), 0.5)
-        overlay_path = target_directory / "overlay.png"
-        save_image(overlay, overlay_path, "png")
-        outputs.append(output_record(context.staging, overlay_path, overlay, role="comparison-overlay"))
-        output_paths.append(overlay_path)
-    context.remember(task["id"], {
-        "taskId": task["id"],
-        "kind": task["kind"],
-        "status": manifest["status"],
-        "issueCount": len(issues),
-        "metrics": metrics,
-        "outputs": outputs,
-    }, output_paths)
+    dimensions, source_pixels, _ = preflight_image_set(
+        source_paths,
+        context.maximum_decoded_pixels,
+        f"image-compare task {task['id']}",
+    )
+    same_dimensions = dimensions[0] == dimensions[1]
+    if same_dimensions:
+        require_active_pixel_budget(
+            [source_pixels, dimensions[0][0] * dimensions[0][1] * 2],
+            f"image-compare task {task['id']} working set",
+            context.maximum_decoded_pixels,
+        )
+    left = load_image(
+        source_paths[0],
+        context.maximum_decoded_pixels,
+        f"image-compare task {task['id']} left source",
+    )
+    right = load_image(
+        source_paths[1],
+        context.maximum_decoded_pixels,
+        f"image-compare task {task['id']} right source",
+    )
+    difference = ImageChops.difference(left, right) if same_dimensions else None
+    try:
+        metrics = image_compare_metrics(left, right, difference)
+        thresholds = task["thresholds"]
+        issues: list[dict[str, Any]] = []
+        if task.get("requireSameDimensions", True) and not metrics["sameDimensions"]:
+            issues.append({"code": "dimensions-mismatch", "left": list(left.size), "right": list(right.size)})
+        if metrics["changedPixelFraction"] > float(thresholds["maximumChangedFraction"]):
+            issues.append({"code": "changed-fraction-exceeded", "observed": metrics["changedPixelFraction"], "maximum": thresholds["maximumChangedFraction"]})
+        if metrics["meanAbsoluteChannelDelta"] > float(thresholds["maximumMeanChannelDelta"]):
+            issues.append({"code": "mean-channel-delta-exceeded", "observed": metrics["meanAbsoluteChannelDelta"], "maximum": thresholds["maximumMeanChannelDelta"]})
+        if metrics["alphaChangedPixelFraction"] > float(thresholds["maximumAlphaChangedFraction"]):
+            issues.append({"code": "alpha-change-exceeded", "observed": metrics["alphaChangedPixelFraction"], "maximum": thresholds["maximumAlphaChangedFraction"]})
+        target_directory = target_path(context.staging, task["targetDirectory"], f"task {task['id']} targetDirectory")
+        target_directory.mkdir(parents=True, exist_ok=False)
+        manifest = {
+            "schema": "evavo.project-art-image-comparison.v1",
+            "taskId": task["id"],
+            "status": "passed" if not issues else "blocked",
+            "sources": [str(value) for value in source_paths],
+            "left": {"dimensions": {"width": left.width, "height": left.height}, "pixelSha256": image_pixel_sha256(left)},
+            "right": {"dimensions": {"width": right.width, "height": right.height}, "pixelSha256": image_pixel_sha256(right)},
+            "metrics": metrics,
+            "thresholds": thresholds,
+            "issues": issues,
+            "creativeApprovalPerformed": False,
+            "identityApprovalPerformed": False,
+        }
+        manifest_path = target_directory / "comparison.json"
+        write_json_create_only(manifest_path, manifest)
+        outputs = [output_record(context.staging, manifest_path, role="comparison-manifest")]
+        output_paths = [manifest_path]
+        if task["preview"]["difference"] and difference is not None:
+            difference_path = target_directory / "difference.png"
+            save_image(difference, difference_path, "png")
+            outputs.append(output_record(context.staging, difference_path, difference, role="comparison-difference"))
+            output_paths.append(difference_path)
+        if difference is not None:
+            difference.close()
+            difference = None
+        if task["preview"]["overlay"] and same_dimensions:
+            overlay = Image.blend(left, right, 0.5)
+            try:
+                overlay_path = target_directory / "overlay.png"
+                save_image(overlay, overlay_path, "png")
+                outputs.append(output_record(context.staging, overlay_path, overlay, role="comparison-overlay"))
+                output_paths.append(overlay_path)
+            finally:
+                overlay.close()
+        context.remember(task["id"], {
+            "taskId": task["id"],
+            "kind": task["kind"],
+            "status": manifest["status"],
+            "issueCount": len(issues),
+            "metrics": metrics,
+            "outputs": outputs,
+        }, output_paths)
+    finally:
+        if difference is not None:
+            difference.close()
+        left.close()
+        right.close()
+
 
 
 def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[str, Any]:

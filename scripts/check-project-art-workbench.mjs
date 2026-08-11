@@ -100,6 +100,9 @@ const sourceAssertions = {
     'candidateApproval: false',
     'maximumDecodedPixels: boundedInteger',
     'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
+    'PROJECT_ART_SANDBOX_AGGREGATE_PIXEL_LIMIT',
+    'assertBoundTaskPixelBudgets',
+    'MAXIMUM_IMAGE_DIMENSION',
   ],
   'scripts/project-art/reference-derived.mjs': [
     'evavo.reference-derived-image-request.v1',
@@ -146,6 +149,8 @@ const sourceAssertions = {
     'os.replace(staging, output_root)',
     'maximum_decoded_pixels',
     'require_pixel_budget',
+    'require_active_pixel_budget',
+    'preflight_image_set',
   ],
   'docs/PROJECT_ART_WORKBENCH.md': [
     'Project intelligence',
@@ -159,6 +164,7 @@ const sourceAssertions = {
     'non-symbolic',
     'project_art_review_mcp.mjs',
     'decoded-image boundary',
+    'active decoded-image working set',
   ],
   '.github/workflows/project-art-workbench.yml': [
     'PROJECT_ART_REQUIRE_PILLOW: "1"',
