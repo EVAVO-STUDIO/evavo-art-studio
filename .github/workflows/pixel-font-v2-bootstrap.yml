@@ -134,16 +134,17 @@ jobs:
             ${{ runner.temp }}/pixel-font-v2-bootstrap.log
             ${{ runner.temp }}/pixel-font-studio-v2-check/**
 
-      - name: Commit only the validated canonical source subset and publish ready branch
+      - name: Commit validated non-workflow source and publish ready branch
         run: |
           set -euo pipefail
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+          git restore --staged -- .github/workflows/pixel-font-studio-v2.yml
+          git restore --source="$BASE_SHA" --worktree -- .github/workflows/pixel-font-studio-v2.yml
           allowed="$RUNNER_TEMP/allowed-font-files.txt"
           observed="$RUNNER_TEMP/observed-font-files.txt"
           unexpected="$RUNNER_TEMP/unexpected-font-files.txt"
           cat > "$allowed" <<'EOF'
-          .github/workflows/pixel-font-studio-v2.yml
           config/mcp.pixel-font-studio-v2.example.json
           config/pixel-font-families/chess-lord-v2/ChessLord_Herald.face.json
           config/pixel-font-families/chess-lord-v2/ChessLord_Text.face.json
