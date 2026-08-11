@@ -38,6 +38,212 @@ def compare_builds(first: Path, second: Path) -> dict[str, Any]:
     }
 
 
+GODOT_EVIDENCE_SIZE = (320, 200)
+GODOT_REPORT_NAME = "godot-4.6.2-report.json"
+GODOT_SCREENSHOT_NAME = "godot-4.6.2-render.png"
+GODOT_MIN_FOREGROUND_PIXELS = 64
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def _paeth_predictor(left: int, up: int, upper_left: int) -> int:
+    estimate = left + up - upper_left
+    distance_left = abs(estimate - left)
+    distance_up = abs(estimate - up)
+    distance_upper_left = abs(estimate - upper_left)
+    if distance_left <= distance_up and distance_left <= distance_upper_left:
+        return left
+    if distance_up <= distance_upper_left:
+        return up
+    return upper_left
+
+
+def _decode_rgba_png(path: Path, label: str) -> tuple[int, int, bytes]:
+    resolved = require_regular_file(path, label, max_bytes=16 * 1024 * 1024)
+    data = resolved.read_bytes()
+    if not data.startswith(PNG_SIGNATURE):
+        fail(f"{label} signature is invalid")
+
+    offset = len(PNG_SIGNATURE)
+    width: int | None = None
+    height: int | None = None
+    compressed = bytearray()
+    saw_header = False
+    saw_image_data = False
+    image_data_closed = False
+    saw_end = False
+
+    while offset < len(data):
+        if offset + 12 > len(data):
+            fail(f"{label} has a truncated chunk header")
+        length = struct.unpack(">I", data[offset : offset + 4])[0]
+        chunk_end = offset + 12 + length
+        if length > MAX_FILE_BYTES or chunk_end > len(data):
+            fail(f"{label} has an invalid or truncated PNG chunk")
+        kind = data[offset + 4 : offset + 8]
+        payload = data[offset + 8 : offset + 8 + length]
+        stored_crc = struct.unpack(">I", data[offset + 8 + length : chunk_end])[0]
+        if zlib.crc32(kind + payload) & 0xFFFFFFFF != stored_crc:
+            fail(f"{label} PNG chunk CRC mismatch")
+        offset = chunk_end
+
+        if kind == b"IHDR":
+            if saw_header or length != 13 or offset != len(PNG_SIGNATURE) + 25:
+                fail(f"{label} has an invalid IHDR")
+            width, height, depth, colour, compression, filtering, interlace = struct.unpack(
+                ">IIBBBBB",
+                payload,
+            )
+            if width < 1 or height < 1 or width > MAX_SPECIMEN_EDGE or height > MAX_SPECIMEN_EDGE:
+                fail(f"{label} dimensions are outside the supported boundary")
+            if (depth, colour, compression, filtering, interlace) != (8, 6, 0, 0, 0):
+                fail(f"{label} must be 8-bit RGBA, non-interlaced PNG")
+            saw_header = True
+        elif kind == b"IDAT":
+            if not saw_header or image_data_closed or saw_end:
+                fail(f"{label} has invalid IDAT ordering")
+            if len(compressed) + len(payload) > MAX_FILE_BYTES:
+                fail(f"{label} compressed image data exceeds the bounded size")
+            compressed.extend(payload)
+            saw_image_data = True
+        elif kind == b"IEND":
+            if not saw_header or not saw_image_data or saw_end or length != 0:
+                fail(f"{label} has an invalid IEND")
+            saw_end = True
+            break
+        else:
+            if saw_image_data:
+                image_data_closed = True
+            if kind not in {b"PLTE"} and kind[0] & 0x20 == 0:
+                fail(f"{label} contains unsupported critical PNG chunk {kind!r}")
+
+    if not saw_header or not saw_image_data or not saw_end or offset != len(data):
+        fail(f"{label} PNG framing is incomplete or has trailing data")
+    assert width is not None and height is not None
+
+    stride = width * 4
+    expected = height * (stride + 1)
+    try:
+        decompressor = zlib.decompressobj()
+        raw = decompressor.decompress(bytes(compressed), expected + 1)
+        if len(raw) > expected or decompressor.unconsumed_tail:
+            fail(f"{label} decoded data exceeds the expected size")
+        raw += decompressor.flush()
+    except zlib.error as exc:
+        fail(f"{label} has invalid compressed image data: {exc}")
+    if len(raw) != expected or not decompressor.eof or decompressor.unused_data:
+        fail(f"{label} decoded length or zlib framing is invalid")
+
+    output = bytearray(width * height * 4)
+    previous = bytes(stride)
+    for row_index in range(height):
+        source = raw[row_index * (stride + 1) : (row_index + 1) * (stride + 1)]
+        filter_type = source[0]
+        filtered = source[1:]
+        reconstructed = bytearray(stride)
+        for index, value in enumerate(filtered):
+            left = reconstructed[index - 4] if index >= 4 else 0
+            up = previous[index]
+            upper_left = previous[index - 4] if index >= 4 else 0
+            if filter_type == 0:
+                predictor = 0
+            elif filter_type == 1:
+                predictor = left
+            elif filter_type == 2:
+                predictor = up
+            elif filter_type == 3:
+                predictor = (left + up) // 2
+            elif filter_type == 4:
+                predictor = _paeth_predictor(left, up, upper_left)
+            else:
+                fail(f"{label} uses unsupported PNG filter {filter_type}")
+            reconstructed[index] = (value + predictor) & 0xFF
+        start = row_index * stride
+        output[start : start + stride] = reconstructed
+        previous = bytes(reconstructed)
+    return width, height, bytes(output)
+
+
+def _validate_godot_engine_report(
+    report: Any,
+    *,
+    report_path: Path,
+    screenshot_path: Path,
+    expected_face_count: int,
+) -> None:
+    if not isinstance(report, dict):
+        fail("Godot report must be a JSON object")
+    if report.get("schema") != GODOT_REPORT_SCHEMA:
+        fail("Godot report schema mismatch")
+    if report.get("expectedVersion") != EXPECTED_GODOT_VERSION:
+        fail("Godot report expected-version mismatch")
+    if report.get("observedVersion") != EXPECTED_GODOT_VERSION:
+        fail("Godot report observed-version mismatch")
+    if report.get("faceCount") != expected_face_count:
+        fail("Godot report face-count mismatch")
+    if report.get("nonBinaryPixelCount") != 0:
+        fail("Godot report records non-binary rendered pixels")
+    if report.get("failures") != []:
+        fail(f"Godot report failed: {report.get('failures')}")
+    if report.get("status") != "passed":
+        fail(f"Godot report status is not passed: {report.get('status')!r}")
+
+    reported_screenshot = report.get("screenshot")
+    if not isinstance(reported_screenshot, str) or not reported_screenshot:
+        fail("Godot report screenshot path is missing")
+    try:
+        reported_path = Path(reported_screenshot).expanduser().resolve()
+    except (OSError, RuntimeError) as exc:
+        fail(f"Godot report screenshot path is invalid: {exc}")
+    if reported_path != screenshot_path.resolve():
+        fail("Godot report screenshot path does not match the retained evidence file")
+    if report_path.parent.resolve() != screenshot_path.parent.resolve():
+        fail("Godot report and screenshot must share the isolated evidence root")
+
+
+def _validate_godot_screenshot(path: Path) -> dict[str, Any]:
+    width, height, rgba = _decode_rgba_png(path, "Godot render proof")
+    if (width, height) != GODOT_EVIDENCE_SIZE:
+        fail(
+            f"Godot render proof must be {GODOT_EVIDENCE_SIZE[0]}x{GODOT_EVIDENCE_SIZE[1]}, "
+            f"observed {width}x{height}"
+        )
+
+    foreground = 0
+    background = 0
+    unexpected = 0
+    for index in range(0, len(rgba), 4):
+        pixel = rgba[index : index + 4]
+        if pixel == b"\xff\xff\xff\xff":
+            foreground += 1
+        elif pixel == b"\x00\x00\x00\xff":
+            background += 1
+        else:
+            unexpected += 1
+    if unexpected:
+        fail(f"Godot render proof contains {unexpected} pixels outside the opaque black/white palette")
+    if foreground < GODOT_MIN_FOREGROUND_PIXELS:
+        fail(
+            f"Godot render proof contains only {foreground} foreground pixels; "
+            f"at least {GODOT_MIN_FOREGROUND_PIXELS} are required"
+        )
+    if background < 1:
+        fail("Godot render proof contains no opaque black background pixels")
+
+    resolved = require_regular_file(path, "Godot render proof", max_bytes=16 * 1024 * 1024)
+    return {
+        "path": resolved.name,
+        "sha256": sha256_file(resolved),
+        "width": width,
+        "height": height,
+        "pixelCount": width * height,
+        "foregroundPixelCount": foreground,
+        "backgroundPixelCount": background,
+        "unexpectedPixelCount": unexpected,
+        "palette": ["#000000ff", "#ffffffff"],
+        "status": "passed",
+    }
+
+
 def _bounded_process(
     command: Sequence[str],
     *,
@@ -111,6 +317,7 @@ def _godot_render_command(
 
 def verify_godot(manifest_path: Path, godot_executable: Path, evidence_root: Path, expected_sha256: str | None) -> dict[str, Any]:
     manifest_path = require_regular_file(manifest_path, "family manifest")
+    preflight = validate_output(manifest_path)
     godot_executable = require_regular_file(godot_executable, "Godot executable", max_bytes=512 * 1024 * 1024)
     if expected_sha256 and sha256_file(godot_executable) != expected_sha256:
         fail("Godot executable SHA-256 does not match the configured digest")
@@ -122,6 +329,7 @@ def verify_godot(manifest_path: Path, godot_executable: Path, evidence_root: Pat
     observed_version = (version.stdout or version.stderr).strip()
     if version.returncode != 0 or not observed_version.startswith(EXPECTED_GODOT_VERSION):
         fail(f"expected Godot {EXPECTED_GODOT_VERSION}, observed {observed_version!r}")
+
     root = manifest_path.parent.resolve()
     source_fixture = root / "godot_fixture"
     evidence_root = evidence_root.resolve()
@@ -135,6 +343,7 @@ def verify_godot(manifest_path: Path, godot_executable: Path, evidence_root: Pat
         **os.environ,
         "EVAVO_PIXEL_FONT_EVIDENCE_ROOT": str(evidence_root),
     }
+
     import_run = _bounded_process(
         [str(godot_executable), "--headless", "--editor", "--path", str(runtime_fixture), "--quit"],
         label="Godot import",
@@ -143,6 +352,7 @@ def verify_godot(manifest_path: Path, godot_executable: Path, evidence_root: Pat
     )
     if import_run.returncode != 0:
         fail(f"Godot import failed: {(import_run.stderr or import_run.stdout)[-4000:]}")
+
     render_command, render_strategy, xvfb_run_sha256 = _godot_render_command(
         godot_executable,
         runtime_fixture,
@@ -154,23 +364,39 @@ def verify_godot(manifest_path: Path, godot_executable: Path, evidence_root: Pat
         timeout=180,
         env=env,
     )
-    report_path = evidence_root / "godot-4.6.2-report.json"
+    report_path = evidence_root / GODOT_REPORT_NAME
+    screenshot_path = evidence_root / GODOT_SCREENSHOT_NAME
     if render_run.returncode != 0 or not report_path.is_file():
         fail(f"Godot render verification failed: {(render_run.stderr or render_run.stdout)[-4000:]}")
+
     report, _ = load_json(report_path, "Godot report")
-    if report.get("status") != "passed":
-        fail(f"Godot report failed: {report.get('failures')}")
+    _validate_godot_engine_report(
+        report,
+        report_path=report_path,
+        screenshot_path=screenshot_path,
+        expected_face_count=preflight["faceCount"],
+    )
+    render_proof = _validate_godot_screenshot(screenshot_path)
     result = {
         "schema": GODOT_REPORT_SCHEMA,
         "toolVersion": TOOL_VERSION,
-        "familyId": json.loads(manifest_path.read_text(encoding="utf-8"))["familyId"],
+        "familyId": preflight["familyId"],
         "godotExecutableSha256": sha256_file(godot_executable),
         "observedVersion": observed_version,
         "importExitCode": import_run.returncode,
         "renderExitCode": render_run.returncode,
         "renderStrategy": render_strategy,
         "xvfbRunSha256": xvfb_run_sha256,
+        "preflightValidation": {
+            "familyId": preflight["familyId"],
+            "faceCount": preflight["faceCount"],
+            "identityFileCount": preflight["identityFileCount"],
+            "status": preflight["status"],
+        },
+        "engineReportSha256": sha256_file(report_path),
         "engineReport": report,
+        "renderProof": render_proof,
+        "evidenceIndependentlyVerified": True,
         "logs": {
             "importStdout": import_run.stdout[-8000:],
             "importStderr": import_run.stderr[-8000:],
@@ -223,6 +449,7 @@ def catalog() -> dict[str, Any]:
             "optional pixel-outline TrueType derivatives",
             "no-system-fallback Godot fixture",
             "pinned Godot 4.6.2 import and render verification",
+            "independent PNG evidence decoding, palette validation and SHA-256 retention",
             "create-only builds and sealed masters",
         ],
         "godot": {
@@ -235,6 +462,11 @@ def catalog() -> dict[str, Any]:
             "systemFallback": False,
             "linuxRenderStrategy": "xvfb-software-opengl-when-display-unavailable",
             "headlessRenderAllowed": False,
+            "evidenceViewport": list(GODOT_EVIDENCE_SIZE),
+            "independentPngEvidenceValidation": True,
+            "opaqueBinaryEvidencePalette": True,
+            "nonEmptyForegroundRequired": True,
+            "evidenceHashesRequired": True,
         },
     }
 

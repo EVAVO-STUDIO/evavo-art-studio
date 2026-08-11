@@ -56,7 +56,9 @@
     "ttfEmbeddingPermissionVerification": true,
     "bdfInterchangeRequired": true,
     "engineNeutralAtlasMapRequired": true,
-    "fixedCellReviewGridRequired": true
+    "fixedCellReviewGridRequired": true,
+    "independentGodotEvidenceValidation": true,
+    "godotEvidenceHashRetention": true
   },
   "godot": {
     "targetVersion": "4.6.2",
@@ -66,7 +68,17 @@
     "integerScaleOnly": true,
     "subpixelPositioning": false,
     "mipmaps": false,
-    "systemFallback": false
+    "systemFallback": false,
+    "linuxRenderStrategy": "xvfb-software-opengl-when-display-unavailable",
+    "headlessRenderAllowed": false,
+    "evidenceViewport": [
+      320,
+      200
+    ],
+    "independentPngEvidenceValidation": true,
+    "opaqueBinaryEvidencePalette": true,
+    "nonEmptyForegroundRequired": true,
+    "evidenceHashesRequired": true
   },
   "limits": {
     "maximumInputBytes": 33554432,

@@ -158,6 +158,13 @@ assert.equal(
   contract.godot.officialLinuxArchiveSha256,
   "30e6b6d141f0cd5bebd629ad1d0ef1324e60091bb20662d026b402ba58c59937",
 );
+assert.equal(contract.requirements.independentGodotEvidenceValidation, true);
+assert.equal(contract.requirements.godotEvidenceHashRetention, true);
+assert.deepEqual(contract.godot.evidenceViewport, [320, 200]);
+assert.equal(contract.godot.independentPngEvidenceValidation, true);
+assert.equal(contract.godot.opaqueBinaryEvidencePalette, true);
+assert.equal(contract.godot.nonEmptyForegroundRequired, true);
+assert.equal(contract.godot.evidenceHashesRequired, true);
 
 const catalog = runJson(["catalog"]);
 assert.equal(catalog.schema, "evavo.pixel-font-family-master.v2");
@@ -168,6 +175,12 @@ assert.ok(catalog.interchangeFormats.some((item) => item.includes("atlas JSON"))
 assert.ok(catalog.interchangeFormats.some((item) => item.includes("grid")));
 assert.equal(catalog.godot.targetVersion, "4.6.2");
 assert.equal(catalog.godot.officialLinuxArchiveSha256, contract.godot.officialLinuxArchiveSha256);
+assert.ok(catalog.supports.some((item) => item.includes("independent PNG evidence")));
+assert.deepEqual(catalog.godot.evidenceViewport, contract.godot.evidenceViewport);
+assert.equal(catalog.godot.independentPngEvidenceValidation, true);
+assert.equal(catalog.godot.opaqueBinaryEvidencePalette, true);
+assert.equal(catalog.godot.nonEmptyForegroundRequired, true);
+assert.equal(catalog.godot.evidenceHashesRequired, true);
 
 stage("auditing independent face masters");
 const audit = runJson(["audit", "--family", family]);
@@ -331,6 +344,38 @@ if (godotExecutable) {
   godot = runJson(args, { timeout: 600_000 });
   assert.equal(godot.status, "passed");
   assert.equal(godot.observedVersion.startsWith("4.6.2"), true);
+  assert.equal(godot.evidenceIndependentlyVerified, true);
+  assert.equal(godot.preflightValidation.status, "passed");
+  assert.equal(godot.preflightValidation.familyId, "chess-lord-90s");
+  assert.equal(godot.preflightValidation.faceCount, 3);
+  assert.match(godot.engineReportSha256, /^[0-9a-f]{64}$/u);
+  assert.equal(godot.engineReport.status, "passed");
+  assert.equal(godot.engineReport.nonBinaryPixelCount, 0);
+  assert.equal(godot.renderProof.status, "passed");
+  assert.equal(godot.renderProof.width, 320);
+  assert.equal(godot.renderProof.height, 200);
+  assert.equal(godot.renderProof.pixelCount, 320 * 200);
+  assert.ok(godot.renderProof.foregroundPixelCount >= 64);
+  assert.ok(godot.renderProof.backgroundPixelCount > 0);
+  assert.equal(
+    godot.renderProof.foregroundPixelCount + godot.renderProof.backgroundPixelCount,
+    godot.renderProof.pixelCount,
+  );
+  assert.equal(godot.renderProof.unexpectedPixelCount, 0);
+  assert.deepEqual(godot.renderProof.palette, ["#000000ff", "#ffffffff"]);
+  assert.match(godot.renderProof.sha256, /^[0-9a-f]{64}$/u);
+  expectFailure(
+    [
+      "verify-godot",
+      "--family",
+      path.join(corruptRoot, "pixel-font-family.json"),
+      "--godot",
+      godotExecutable,
+      "--evidence",
+      path.join(workspace, "corrupt-godot-evidence"),
+    ],
+    /identity mismatch/u,
+  );
 }
 
 stage("writing final evidence report");
@@ -362,6 +407,7 @@ console.log(`- workspace: ${workspace}`);
 console.log("- 3 independent Chess Lord faces, 397 glyphs each, 30 kerning pairs each");
 console.log("- zero unapproved duplicate groups and exhaustive ordered-pair collision QA passed");
 console.log("- BMFont, packed/grid PNG atlases, BDF, atlas JSON, Godot resources, native specimens and TTF cmap/kerning validated");
+console.log("- Godot render evidence is independently decoded, palette-checked, foreground-checked and SHA-256 retained");
 console.log(`- deterministic tree: ${reproducibility.treeSha256}`);
 console.log(`- actual Godot 4.6.2 verification: ${godot ? "passed" : "not configured for this run"}`);
 

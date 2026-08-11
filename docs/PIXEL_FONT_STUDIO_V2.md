@@ -104,15 +104,19 @@ Builds and sealed masters are create-only. Existing files and non-empty output r
 
 Each family build contains an isolated Godot fixture. The verifier:
 
+- validates the complete generated family and exact retained identities before launching Godot;
 - checks the executable reports exactly Godot 4.6.2;
 - imports every `.fnt` and atlas through the editor;
 - disables system fallback, mipmaps and subpixel positioning;
 - asserts every required character is present through `Font.has_char()`;
 - renders representative strings at native scale with nearest filtering;
-- rejects non-binary rendered pixels;
-- stores a PNG render proof and a machine-readable report.
+- rejects non-binary rendered pixels inside Godot;
+- independently decodes the resulting 320×200 PNG outside Godot, including PNG chunk CRCs and all standard scanline filters;
+- requires the proof to contain only opaque black and opaque white pixels, a non-empty foreground and a non-empty background;
+- verifies the engine report schema, version, face count, failure list and retained screenshot path;
+- stores SHA-256 identities for both the engine report and render proof in the create-only verification summary.
 
-The dedicated workflow downloads the official Linux x86-64 Godot 4.6.2 archive and verifies its published SHA-256 before execution.
+This prevents a successful engine exit, a spoofed report or an empty black frame from being accepted as native render evidence. The dedicated workflow downloads the official Linux x86-64 Godot 4.6.2 archive, verifies its published SHA-256 and runs the render through Xvfb-backed software OpenGL when a native display is unavailable.
 
 ## ChatGPT and Claude MCP
 
