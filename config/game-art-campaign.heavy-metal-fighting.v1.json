@@ -6,38 +6,38 @@
   "encoding": "base64",
   "payloadSha256": "75ed5a3d5dd737a4cf9a0a309540a33927da124dd6c7c6790eb4291f9bc66236",
   "requestSha256": "c9112ef38833d3972ac3dc6c63fe89eb2642900a1172b9e0e984a94820b4891e",
-  "encodedBytes": 23644,
+  "encodedBytes": 23358,
   "payloadBytes": 17512,
   "payloadParts": [
     {
       "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-001",
-      "bytes": 4050,
-      "sha256": "956a9541921438a894cba3c6e5f2700ba4bc16f4287d80a389d8b9ce11e80dac"
+      "bytes": 4001,
+      "sha256": "f78f5ecc95ed733087c9db87d622b6b4a542af8dce55ed60ee073d1733e128bd"
     },
     {
       "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-002",
-      "bytes": 4050,
-      "sha256": "eb867a1c891e09a3c36de6ead3c98cff05357ecd313e2613fc4d74c78bf39c97"
+      "bytes": 4001,
+      "sha256": "38f60a2bbeec0eadaffa5599ce15efa5e6ba9a13619f14e7021477d9d3b35e4c"
     },
     {
       "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-003",
-      "bytes": 4050,
-      "sha256": "014c6af20014421ac360d5d22eff1a0d8e3898960a8308fb508d6965466a103c"
+      "bytes": 4001,
+      "sha256": "1f9d72f560dd4bfa4efb1e779a82b22f565608bc6eb00d9a660df80536f5722b"
     },
     {
       "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-004",
-      "bytes": 4050,
-      "sha256": "780085e991bb5b4953d77f3a6b9a0790e3167019290c3a847ff6d5e391eaef33"
+      "bytes": 4001,
+      "sha256": "7de6f5043d0fb9012a765cd04cac6e8ebcf3814b9c950c644f8e7e07958fa8ef"
     },
     {
       "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-005",
-      "bytes": 4050,
-      "sha256": "13905388e82792d1ec2e09e380781ad4f142130f3837fe5297f1308d9611264c"
+      "bytes": 4001,
+      "sha256": "a2cef4daa9ce3fec50b2b27545cf632c76f492106cd4419ae1c880a50f4caaea"
     },
     {
       "path": "game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-006",
-      "bytes": 3394,
-      "sha256": "e520c05f82bb7552482f083c2b0fe893bf0ba7ae24e7212ae1be6f6ff8aaa5c0"
+      "bytes": 3353,
+      "sha256": "9b03cb461853ffb247b7ac9481bbbe2f836b20539375329973aa7e3a6840d9c2"
     }
   ]
 }
