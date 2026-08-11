@@ -1,322 +1,215 @@
-#!/usr/bin/env node
+# Project Art avatar-sequence mastering
 
-import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import process from 'node:process';
-import { spawnSync } from 'node:child_process';
-import { deflateSync } from 'node:zlib';
-import { fileURLToPath } from 'node:url';
+This boundary turns **explicit owner assignments over existing PNG frames** into a deterministic mastering plan for `@evavo/avatar-runtime` sequence-pack v2.
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const server = path.join(root, 'tools', 'project_art_avatar_sequence_mcp.mjs');
-const temporary = await mkdtemp(path.join(os.tmpdir(), 'evavo-avatar-sequence-mcp-'));
-const workspace = path.join(temporary, 'workspace');
-const fixedTime = '2026-08-11T06:40:00.000Z';
-const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+It does not generate an image, infer an animation from a filename, treat timestamp order as meaning, approve a candidate, mutate a repository, or activate a runtime release.
 
-function crc32(bytes) {
-  let crc = 0xffffffff;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) {
-      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
-    }
+## Why this exists
+
+The wider Art Studio already provides:
+
+- mounted ChatGPT and Claude file intake;
+- deterministic image repair and optimization;
+- copy, move, rename, replace, reversible trash and exact restore;
+- sprite-sheet and atlas construction;
+- visual sequence review;
+- final-frame-to-frame-zero loop review;
+- path-only EVAVO Storage and repository handoffs.
+
+The missing boundary was the exact handoff between reviewed frame files and the avatar runtime's clip model. A chronological source folder is not an animation contract. A generated filename is not an idle, talking, listening or gesture assignment.
+
+The avatar-sequence compiler therefore accepts only `assignmentMode: "owner-declared-only"` and requires:
+
+```text
+semanticInferencePerformed: false
+timestampOrderingUsedAsSemantics: false
+```
+
+## Contracts
+
+```text
+evavo.project-art-avatar-sequence-request.v1
+evavo.project-art-avatar-sequence-mastering-plan.v1
+evavo_avatar_sequence_pack_v2
+evavo.project-art-loop-closure-request.v1
+evavo_avatar_sequence_loop_closure_evidence_v1
+```
+
+The mastering plan is not a production release. Its runtime draft deliberately contains:
+
+```text
+review: null
+loopClosures: []
+runtimeActivationAllowed: false
+```
+
+Independent art, animation and runtime review, exact loop evidence and a separate release seal remain mandatory.
+
+## Existing-frame request
+
+Every frame binds one exact source identity to one reviewed runtime path:
+
+```json
+{
+  "id": "idle-a",
+  "sourcePath": "assets/eva-female/ChatGPT Image Aug 9, 2026, 01_50_47 PM (1).png",
+  "targetPath": "assets/eva-female/reviewed/idle-a.png",
+  "expectedSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+}
+```
+
+A source may retain its original timestamp name as immutable evidence. The runtime target may not. Targets must use the exact frame identity under one of these reviewed roots:
+
+```text
+assets/<character-id>/reviewed/<frame-id>.png
+characters/<character-id>/sequences/<frame-id>.png
+```
+
+The compiler verifies each source as a bounded, single-link, non-symbolic, non-animated, non-interlaced 8-bit alpha PNG. It binds the exact SHA-256, byte count and canvas before any plan is returned.
+
+Exact duplicate frame bytes must use one frame identity and be reused by ID inside clips. They may not be copied into multiple apparently distinct runtime frames.
+
+## Explicit clip semantics
+
+A clip declares its kind, loop mode, exact ordered frame IDs, per-frame durations, neutral frame and optional emotion:
+
+```json
+{
+  "id": "talk-main",
+  "kind": "talk-loop",
+  "loopMode": "loop",
+  "frames": [
+    { "frameId": "talk-a", "durationMs": 80 },
+    { "frameId": "talk-b", "durationMs": 80 }
+  ],
+  "neutralFrameId": "talk-a",
+  "emotion": null,
+  "loopThresholds": {
+    "maximumChangedFraction": 0.2,
+    "maximumMeanChannelDelta": 32,
+    "maximumAlphaChangedFraction": 0.15,
+    "maximumCentroidShiftPixels": 20
   }
-  return (crc ^ 0xffffffff) >>> 0;
 }
+```
 
-function chunk(type, data) {
-  const typeBytes = Buffer.from(type, 'ascii');
-  const output = Buffer.alloc(12 + data.length);
-  output.writeUInt32BE(data.length, 0);
-  typeBytes.copy(output, 4);
-  data.copy(output, 8);
-  output.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])), 8 + data.length);
-  return output;
-}
+Every true `loop` clip must contain at least two distinct frame identities and one explicit threshold set. The compiler emits one exact downstream loop-closure request for each such clip.
 
-function png(red) {
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(2, 0);
-  ihdr.writeUInt32BE(2, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 6;
-  const row = (offset) => Buffer.from([0, red + offset, 20, 30, 255, red + offset, 20, 30, 255]);
-  return Buffer.concat([
-    signature,
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(Buffer.concat([row(0), row(1)]))),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-}
+`once` and `ping-pong` clips must set `loopThresholds` to `null`. They never receive a false final-to-first requirement.
 
-function sha256(bytes) {
-  return createHash('sha256').update(bytes).digest('hex');
-}
+The default idle and talk rail must retain the avatar runtime contract:
 
-function rpc(toolName, argumentsValue, { write = false } = {}) {
-  const requests = [
-    {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2025-03-26',
-        capabilities: {},
-        clientInfo: { name: 'fixture', version: '1' },
-      },
-    },
-    { jsonrpc: '2.0', method: 'notifications/initialized' },
-    { jsonrpc: '2.0', id: 2, method: 'tools/list' },
-    {
-      jsonrpc: '2.0',
-      id: 3,
-      method: 'tools/call',
-      params: { name: toolName, arguments: argumentsValue },
-    },
-  ];
-  const result = spawnSync(process.execPath, [server], {
-    cwd: root,
-    encoding: 'utf8',
-    shell: false,
-    windowsHide: true,
-    maxBuffer: 32 * 1024 * 1024,
-    input: `${requests.map((entry) => JSON.stringify(entry)).join('\n')}\n`,
-    env: {
-      ...process.env,
-      EVAVO_ART_AVATAR_SEQUENCE_ROOTS: temporary,
-      EVAVO_ART_AVATAR_SEQUENCE_MCP_ALLOW_WRITE: write ? 'true' : 'false',
-    },
-  });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
-  const messages = result.stdout
-    .trim()
-    .split(/\r?\n/u)
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-  return {
-    initialize: messages.find((entry) => entry.id === 1),
-    list: messages.find((entry) => entry.id === 2),
-    call: messages.find((entry) => entry.id === 3),
-  };
-}
+```text
+idle:      kind idle, loop mode loop
+talk in:   kind talk-in, loop mode once
+talk loop: kind talk-loop, loop mode loop
+talk out:  kind talk-out, loop mode once
+```
 
-try {
-  await mkdir(path.join(workspace, 'raw'), { recursive: true });
-  const definitions = [
-    ['idle-a', 10],
-    ['idle-b', 20],
-    ['talk-a', 30],
-    ['talk-b', 40],
-  ];
-  const frames = [];
-  for (const [id, red] of definitions) {
-    const bytes = png(red);
-    const sourcePath = `raw/${id}.png`;
-    await writeFile(path.join(workspace, sourcePath), bytes);
-    frames.push({
-      id,
-      sourcePath,
-      targetPath: `assets/eva-female/reviewed/${id}.png`,
-      expectedSha256: sha256(bytes),
-    });
-  }
-  const loopThresholds = {
-    maximumChangedFraction: 0.25,
-    maximumMeanChannelDelta: 48,
-    maximumAlphaChangedFraction: 0.2,
-    maximumCentroidShiftPixels: 24,
-  };
-  const request = {
-    schema: 'evavo.project-art-avatar-sequence-request.v1',
-    assignmentId: 'mcp-eva-assignment-v1',
-    characterId: 'eva-female',
-    revision: 1,
-    purpose: 'Compile an explicit MCP fixture sequence without semantic inference.',
-    assignmentMode: 'owner-declared-only',
-    semanticInferencePerformed: false,
-    timestampOrderingUsedAsSemantics: false,
-    canvas: { width: 2, height: 2, requireAlpha: true },
-    frames,
-    clips: [
-      {
-        id: 'idle-main',
-        kind: 'idle',
-        loopMode: 'loop',
-        frames: [
-          { frameId: 'idle-a', durationMs: 80 },
-          { frameId: 'idle-b', durationMs: 80 },
-        ],
-        neutralFrameId: 'idle-a',
-        emotion: null,
-        loopThresholds,
-      },
-      {
-        id: 'talk-enter',
-        kind: 'talk-in',
-        loopMode: 'once',
-        frames: [
-          { frameId: 'idle-a', durationMs: 80 },
-          { frameId: 'talk-a', durationMs: 80 },
-        ],
-        neutralFrameId: 'idle-a',
-        emotion: null,
-        loopThresholds: null,
-      },
-      {
-        id: 'talk-main',
-        kind: 'talk-loop',
-        loopMode: 'loop',
-        frames: [
-          { frameId: 'talk-a', durationMs: 80 },
-          { frameId: 'talk-b', durationMs: 80 },
-        ],
-        neutralFrameId: 'talk-a',
-        emotion: null,
-        loopThresholds,
-      },
-      {
-        id: 'talk-exit',
-        kind: 'talk-out',
-        loopMode: 'once',
-        frames: [
-          { frameId: 'talk-b', durationMs: 80 },
-          { frameId: 'idle-a', durationMs: 80 },
-        ],
-        neutralFrameId: 'idle-a',
-        emotion: null,
-        loopThresholds: null,
-      },
-    ],
-    defaults: {
-      idleClipId: 'idle-main',
-      talk: {
-        inClipId: 'talk-enter',
-        loopClipId: 'talk-main',
-        outClipId: 'talk-exit',
-      },
-      presence: { idle: 'idle-main' },
-      events: {},
-      emotions: {},
-    },
-    authority: {
-      providerExecution: false,
-      sourceMutation: false,
-      sourceDeletion: false,
-      candidateApproval: false,
-      candidatePromotion: false,
-      targetRepositoryMutation: false,
-      gitCommit: false,
-      gitPush: false,
-      publication: false,
-      deployment: false,
-      forcePush: false,
-    },
-  };
-  const requestPath = path.join(workspace, 'avatar-sequence-request.json');
-  const planPath = path.join(workspace, 'avatar-sequence-plan.json');
-  await writeFile(requestPath, `${JSON.stringify(request, null, 2)}\n`);
+Presence, event and emotion maps are explicit clip-ID maps. The compiler does not invent missing mappings.
 
-  const capabilitiesResponse = rpc(
-    'evavo_art_avatar_sequence_capabilities',
-    {},
-  );
-  assert.equal(
-    capabilitiesResponse.initialize.result.serverInfo.name,
-    'evavo-project-art-avatar-sequence',
-  );
-  assert.deepEqual(
-    capabilitiesResponse.list.result.tools.map((tool) => tool.name),
-    [
-      'evavo_art_avatar_sequence_capabilities',
-      'evavo_art_compile_avatar_sequence',
-    ],
-  );
-  const capabilities = capabilitiesResponse.call.result.structuredContent;
-  assert.equal(
-    capabilities.summary.schema,
-    'evavo.project-art-avatar-sequence-capabilities.v1',
-  );
-  assert.equal(capabilities.summary.writeEnabled, false);
-  assert.equal(capabilities.summary.assignmentMode, 'owner-declared-only');
-  assert.equal(capabilities.summary.runtimeActivationAllowed, false);
-  assert.equal(capabilities.bytesFlowThroughMcp, false);
-  assert.equal(capabilities.credentialsForwardedToSubprocess, false);
+## Compile from the command line
 
-  const gated = rpc('evavo_art_compile_avatar_sequence', {
-    workspaceRoot: workspace,
-    requestPath,
-    planPath,
-    compiledAt: fixedTime,
-  });
-  assert.match(gated.call.error.message, /plan writes are disabled/iu);
+```powershell
+node scripts/compile-project-art-avatar-sequence.mjs `
+  --workspace-root C:\GitRepos\evavo-avatar-runtime `
+  --request C:\EVAVO\staging\eva-sequence-assignment.json `
+  --output C:\EVAVO\staging\eva-sequence-mastering-plan.json `
+  --compiled-at 2026-08-11T06:30:00.000Z
+```
 
-  const compiledResponse = rpc(
-    'evavo_art_compile_avatar_sequence',
-    {
-      workspaceRoot: workspace,
-      requestPath,
-      planPath,
-      compiledAt: fixedTime,
-    },
-    { write: true },
-  );
-  const compiled = compiledResponse.call.result.structuredContent;
-  assert.equal(
-    compiled.summary.schema,
-    'evavo.project-art-avatar-sequence-mastering-plan.v1',
-  );
-  assert.equal(compiled.summary.frameCount, 4);
-  assert.equal(compiled.summary.loopClipCount, 2);
-  assert.equal(compiled.summary.semanticInferencePerformed, false);
-  assert.equal(compiled.effects.planWrite, true);
-  assert.equal(compiled.effects.sourceMutation, false);
-  assert.equal(compiled.effects.repositoryMutation, false);
-  assert.equal(compiled.effects.gitPush, false);
-  assert.equal(compiled.effects.publication, false);
-  assert.equal(compiled.command.shell, false);
-  assert.equal(compiled.command.credentialsForwarded, false);
-  const plan = JSON.parse(await readFile(planPath, 'utf8'));
-  assert.equal(plan.runtimeDraft.review, null);
-  assert.equal(plan.runtimeDraft.loopClosures.length, 0);
-  assert.equal(plan.finalizationRequirements.runtimeActivationAllowed, false);
-  assert.equal(plan.workspaceFilePlanRequest.operations.length, 4);
+The output is create-only and written with private file permissions. Replaying into an existing path fails closed.
 
-  const replay = rpc(
-    'evavo_art_compile_avatar_sequence',
-    { workspaceRoot: workspace, requestPath, planPath, compiledAt: fixedTime },
-    { write: true },
-  );
-  assert.match(replay.call.error.message, /create-only and already exists/iu);
+## Callable ChatGPT or Claude boundary
 
-  const escaped = rpc(
-    'evavo_art_compile_avatar_sequence',
-    {
-      workspaceRoot: workspace,
-      requestPath,
-      planPath: path.join(os.tmpdir(), 'escaped-avatar-sequence-plan.json'),
-    },
-    { write: true },
-  );
-  assert.match(
-    escaped.call.error.message,
-    /outside EVAVO_ART_AVATAR_SEQUENCE_ROOTS/u,
-  );
+Start the dedicated MCP server:
 
-  const unknown = rpc(
-    'evavo_art_avatar_sequence_capabilities',
-    { unexpected: true },
-  );
-  assert.match(unknown.call.error.message, /unknown argument unexpected/u);
+```powershell
+$env:EVAVO_ART_AVATAR_SEQUENCE_ROOTS = "C:\GitRepos\evavo-avatar-runtime;C:\EVAVO\staging"
+$env:EVAVO_ART_AVATAR_SEQUENCE_MCP_ALLOW_WRITE = "true"
+node C:\GitRepos\evavo-art-studio\tools\project_art_avatar_sequence_mcp.mjs
+```
 
-  console.log('Project Art avatar-sequence MCP tests passed.');
-  console.log('- the compiler is callable through a bounded path-only MCP surface');
-  console.log('- plan writes remain opt-in and create-only');
-  console.log('- credentials and image bytes do not flow through MCP');
-  console.log('- runtime activation, provider, repository, Git and publication authority remain false');
-} finally {
-  await rm(temporary, { recursive: true, force: true });
-}
+It exposes:
+
+```text
+evavo_art_avatar_sequence_capabilities
+evavo_art_compile_avatar_sequence
+```
+
+The write gate authorizes only creation of the JSON mastering plan. Source image bytes do not flow through MCP. The subprocess receives a credential-redacted environment, uses `shell: false`, and returns a bounded JSON summary rather than raw command output.
+
+See `config/mcp.project-art-avatar-sequence.windows.example.json` for a connection example.
+
+## Output handoffs
+
+The plan contains four separate, non-authoritative handoffs.
+
+### 1. Workspace file-plan request
+
+`workspaceFilePlanRequest` is ready for the existing workspace writer. It uses path-only `copy` operations with `expectedSourceSha256`. It never overwrites a target and does not perform the copy by itself.
+
+When source and reviewed target are already the same exact path, no copy operation is emitted.
+
+### 2. Runtime draft
+
+`runtimeDraft` binds the reviewed target paths, frame hashes, byte counts, canvas, ordered clips, derived durations and defaults for target schema `evavo_avatar_sequence_pack_v2`.
+
+It is intentionally incomplete. It has no sealed review and no loop receipts.
+
+### 3. Loop-closure requests
+
+`loopClosureRequests` contains one `evavo.project-art-loop-closure-request.v1` document per true loop. Each request binds the reviewed paths, exact source SHA-256 values, canvas and owner-selected thresholds.
+
+After the workspace copy plan is applied, compile and run each request through the existing loop-review boundary:
+
+```powershell
+node scripts/compile-project-art-loop-closure.mjs `
+  --workspace-root C:\GitRepos\evavo-avatar-runtime `
+  --request C:\EVAVO\staging\eva-idle-loop-request.json `
+  --output C:\EVAVO\staging\eva-idle-loop-plan.json
+
+python tools/run_project_art_loop_closure.py `
+  --workspace-root C:\GitRepos\evavo-avatar-runtime `
+  --plan C:\EVAVO\staging\eva-idle-loop-plan.json `
+  --output-root C:\GitRepos\evavo-avatar-runtime\.evavo\reviews\eva-idle-loop-v1
+```
+
+### 4. Finalization requirements
+
+A final runtime pack still requires:
+
+- the path-only workspace file plan to be applied where needed;
+- one passed loop receipt for every true loop;
+- independent art, animation and runtime review;
+- a sealed candidate review;
+- exact sequence-pack canonical SHA-256;
+- an independently approved sequence release.
+
+## Fail-closed behavior
+
+The compiler rejects:
+
+- request-object and request-byte mismatch;
+- inferred semantics or timestamp-derived ordering;
+- absolute, escaping, non-canonical or symbolic paths;
+- hard-linked source files;
+- missing, animated, interlaced, non-alpha or non-PNG masters;
+- stale source SHA-256 values;
+- canvas drift;
+- duplicate frame IDs, paths, targets or exact bytes;
+- raw or timestamp-named runtime target paths;
+- invalid clip kinds, loop modes, durations or neutral frames;
+- duplicate ordered frame identities in a true loop;
+- final-to-first thresholds on `once` or `ping-pong` clips;
+- missing idle or talk runtime defaults;
+- any provider, source, approval, repository, Git, deployment, publication or force-push authority;
+- an existing output plan or reviewed target.
+
+## Authority boundary
+
+The compiler and MCP server perform no image generation and no source editing.
+
+They do not execute a provider, apply workspace file operations, run loop review, approve a candidate, create a runtime release, mutate EVAVO Storage, change a target repository, create a Git commit, push, force push, deploy or publish.
+
+No source, provider, repository, Git, deployment or publication authority is granted by this mastering boundary.

@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -281,7 +281,8 @@ try {
   assert.equal(compiled.command.credentialsForwarded, false);
   const plan = JSON.parse(await readFile(planPath, 'utf8'));
   assert.equal(plan.runtimeDraft.review, null);
-  assert.equal(plan.finalizationRequirements.runtimeActivationAlowed, false);
+  assert.equal(plan.runtimeDraft.loopClosures.length, 0);
+  assert.equal(plan.finalizationRequirements.runtimeActivationAllowed, false);
   assert.equal(plan.workspaceFilePlanRequest.operations.length, 4);
 
   const replay = rpc(
@@ -293,12 +294,12 @@ try {
 
   const escaped = rpc(
     'evavo_art_compile_avatar_sequence',
-   {
+    {
       workspaceRoot: workspace,
       requestPath,
       planPath: path.join(os.tmpdir(), 'escaped-avatar-sequence-plan.json'),
     },
-   { write: true },
+    { write: true },
   );
   assert.match(
     escaped.call.error.message,
