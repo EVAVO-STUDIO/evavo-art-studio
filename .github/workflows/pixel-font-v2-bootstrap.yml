@@ -136,5 +136,7 @@ jobs:
           test "$(git rev-parse HEAD^)" = "$EXPECTED_BASE_SHA"
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+          rm -rf .pixel-font-bootstrap
+          rm -f .github/workflows/pixel-font-v2-bootstrap.yml
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           git push origin "HEAD:refs/heads/$READY_BRANCH"
