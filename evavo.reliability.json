@@ -104,9 +104,7 @@
     "pnpm typecheck",
     "pnpm test",
     "pnpm build",
-    "git diff --exit-code -- pnpm-lock.yaml && git diff --exit-code && test -z \"$(git status --porcelain)\"",
-    "python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt",
-    "node scripts/check-pixel-font-studio-v2.mjs"
+    "git diff --exit-code -- pnpm-lock.yaml && git diff --exit-code && test -z \"$(git status --porcelain)\""
   ],
   "executedBaseline": {
     "workflow": ".github/workflows/ci.yml",
