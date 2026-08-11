@@ -1,0 +1,109 @@
+name: Materialize layered Godot integration
+
+on:
+  push:
+    branches:
+      - automation/layered-godot-integration-20260811-1
+    paths:
+      - ".evavo-bootstrap/layered-godot/**"
+      - ".github/workflows/apply-layered-godot-bootstrap.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: layered-godot-bootstrap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact bootstrap branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Verify and extract exact feature payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/layered-godot-feature.tar.gz"
+          cat .evavo-bootstrap/layered-godot/payload.part-* > "$payload"
+          echo "502400c5f4911ac13bb564bcbf21a311501832a61314b2bc6777ce9feee02a6b  $payload" | sha256sum -c -
+          PAYLOAD="$payload" python - <<'PY'
+          import os
+          import pathlib
+          import tarfile
+
+          expected = {
+              "packages/art-direction/src/layered-production-godot-types.ts",
+              "packages/art-direction/src/layered-production-godot-compiler.ts",
+              "packages/art-direction/src/layered-production-godot-verification.ts",
+              "packages/art-direction/src/layered-production-godot.ts",
+              "packages/art-direction/src/layered-production.ts",
+              "packages/art-direction/test/layered-godot.test.mjs",
+              "config/layered-production-godot-integration.v1.json",
+              "config/jonez-layered-godot-integration.v1.json",
+              "docs/LAYERED_GODOT_INTEGRATION.md",
+              "apps/mcp/src/layered-godot-tools.ts",
+              "apps/mcp/src/provider-tools.ts",
+              "apps/mcp/test/layered-godot-tools.test.mjs",
+          }
+          payload = os.environ["PAYLOAD"]
+          with tarfile.open(payload, "r:gz") as archive:
+              members = archive.getmembers()
+              names = {member.name for member in members}
+              if names != expected:
+                  raise SystemExit(f"payload path mismatch: {sorted(names ^ expected)}")
+              for member in members:
+                  path = pathlib.PurePosixPath(member.name)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit(f"unsafe archive path: {member.name}")
+                  if not member.isfile() or member.issym() or member.islnk():
+                      raise SystemExit(f"non-regular archive member: {member.name}")
+              archive.extractall(".")
+          PY
+          rm -rf .evavo-bootstrap/layered-godot
+          rm .github/workflows/apply-layered-godot-bootstrap.yml
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Run focused layered Godot validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @evavo/art-direction test
+          pnpm --filter @evavo/art-studio-mcp test
+          node --check packages/art-direction/test/layered-godot.test.mjs
+          node --check apps/mcp/test/layered-godot-tools.test.mjs
+          node -e 'for (const path of process.argv.slice(1)) JSON.parse(require("node:fs").readFileSync(path, "utf8"));' \
+            config/layered-production-godot-integration.v1.json \
+            config/jonez-layered-godot-integration.v1.json
+
+      - name: Commit clean feature tree to temporary branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No feature changes were materialized." >&2
+            exit 1
+          fi
+          git commit -m "build(art-direction): materialize layered Godot integration"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
