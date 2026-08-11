@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "evavo.layered-production.godot-integration-request",
+  "integrationId": "jonez-market-district-godot",
+  "revision": "1.0.0",
+  "assemblyId": "jonez-market-district-proof-assembly",
+  "target": {
+    "engine": "Godot",
+    "engineVersion": "4.6.2",
+    "renderer": "gl_compatibility",
+    "runtimeRoot": "examples/city_life_board_sim/assets/final",
+    "rootNodeName": "MarketDistrict",
+    "rootNodeType": "Node2D"
+  },
+  "pixelPolicy": {
+    "textureFilter": "nearest",
+    "textureRepeat": "disabled",
+    "mipmaps": false,
+    "compression": "lossless",
+    "snapTransformsToPixel": true,
+    "snapVerticesToPixel": false,
+    "centeredSprites": false,
+    "integerPositions": true
+  },
+  "runtime": {
+    "rootScriptPath": "examples/city_life_board_sim/scripts/world/market_district.gd",
+    "routeControllerScriptPath": "examples/city_life_board_sim/scripts/world/route_controller.gd",
+    "cameraControllerScriptPath": "examples/city_life_board_sim/scripts/world/district_camera_controller.gd",
+    "destinationTriggerScriptPath": "examples/city_life_board_sim/scripts/world/destination_trigger.gd",
+    "actorControllerScriptPath": "examples/city_life_board_sim/scripts/world/route_actor.gd",
+    "actorPlacementId": "player-placement",
+    "defaultCameraMode": "overview",
+    "routeTravelUnit": "turn"
+  },
+  "outputs": {
+    "scenePath": "examples/city_life_board_sim/scenes/world/market_district.tscn",
+    "integrationManifestPath": "examples/city_life_board_sim/assets/final/manifests/jonez-market-district-proof.godot-integration.json",
+    "routeResourcePath": "examples/city_life_board_sim/assets/final/manifests/jonez-market-district-proof.route.json",
+    "placementResourcePath": "examples/city_life_board_sim/assets/final/manifests/jonez-market-district-proof.placements.json",
+    "animationResourcePath": "examples/city_life_board_sim/assets/final/manifests/jonez-market-district-proof.animations.json",
+    "cameraResourcePath": "examples/city_life_board_sim/assets/final/manifests/jonez-market-district-proof.cameras.json",
+    "importPolicyPath": "examples/city_life_board_sim/assets/final/manifests/jonez-market-district-proof.imports.json"
+  },
+  "metadata": {
+    "purpose": "Compile the verified JONEZ market district assembly into exact Godot 4.6.2 scene and data drafts without writing to the target game repository.",
+    "reviewOnlyUntilRuntimeCandidate": true
+  }
+}
