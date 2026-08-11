@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
+import { constants as fsConstants } from 'node:fs';
 import {
   copyFile,
   lstat,
   mkdir,
-  readFile,
+  open,
   realpath,
   rename,
   rm,
-  stat,
 } from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
@@ -21,7 +21,6 @@ import {
   inspectImageFile,
   isRecord,
   mediaTypeFromPath,
-  readJsonFileBounded,
   requireDirectoryNoSymlink,
   resolveExistingWithinRoot,
   safeId,
@@ -46,6 +45,119 @@ export const STORAGE_INGEST_REQUEST_SCHEMA = 'evavo.storage-art-ingest-request.v
 const MAXIMUM_REQUEST_BYTES = 16 * 1024 * 1024;
 const MAXIMUM_SOURCE_BYTES = 2 * 1024 * 1024 * 1024;
 const MAXIMUM_HANDOFF_ITEMS = 10_000;
+
+function fileSnapshot(metadata) {
+  return {
+    device: metadata.dev,
+    inode: metadata.ino,
+    mode: metadata.mode,
+    links: metadata.nlink,
+    size: metadata.size,
+    modifiedMs: metadata.mtimeMs,
+    changedMs: metadata.ctimeMs,
+  };
+}
+
+function sameFileSnapshot(left, right) {
+  return Object.keys(left).every((key) => left[key] === right[key]);
+}
+
+async function readStableJsonFile(filePath, label) {
+  const absolute = path.resolve(filePath);
+  const pathBefore = await lstat(absolute).catch((error) => {
+    fail('PERSISTENT_ARTIST_WORKSPACE_INPUT_INVALID', `${label} could not be inspected: ${error.message}`);
+  });
+  if (pathBefore.isSymbolicLink() || !pathBefore.isFile()) {
+    fail('PERSISTENT_ARTIST_WORKSPACE_INPUT_INVALID', `${label} must be a regular non-symbolic file.`);
+  }
+  if (pathBefore.nlink !== 1) {
+    fail('PERSISTENT_ARTIST_WORKSPACE_INPUT_MULTIPLY_LINKED', `${label} must have exactly one filesystem link.`);
+  }
+  if (pathBefore.size < 2 || pathBefore.size > MAXIMUM_REQUEST_BYTES) {
+    fail('PERSISTENT_ARTIST_WORKSPACE_INPUT_INVALID', `${label} must be 2-${MAXIMUM_REQUEST_BYTES} bytes.`);
+  }
+
+  const flags = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0);
+  let handle;
+  try {
+    handle = await open(absolute, flags);
+  } catch (error) {
+    if (error?.code === 'ELOOP') {
+      fail('PERSISTENT_ARTIST_WORKSPACE_INPUT_INVALID', `${label} became symbolic before it could be opened.`);
+    }
+    throw error;
+  }
+
+  try {
+    const handleBefore = await handle.stat();
+    if (
+      handleBefore.nlink !== 1 ||
+      !sameFileSnapshot(fileSnapshot(pathBefore), fileSnapshot(handleBefore))
+    ) {
+      fail('PERSISTENT_ARTIST_WORKSPACE_REQUEST_CHANGED', `${label} changed before it could be read.`);
+    }
+    const bytes = await handle.readFile();
+    const [handleAfter, pathAfter] = await Promise.all([
+      handle.stat(),
+      lstat(absolute),
+    ]);
+    if (
+      pathAfter.isSymbolicLink() ||
+      pathAfter.nlink !== 1 ||
+      !sameFileSnapshot(fileSnapshot(pathBefore), fileSnapshot(handleAfter)) ||
+      !sameFileSnapshot(fileSnapshot(pathBefore), fileSnapshot(pathAfter)) ||
+      bytes.length !== pathBefore.size
+    ) {
+      fail('PERSISTENT_ARTIST_WORKSPACE_REQUEST_CHANGED', `${label} changed while it was being read.`);
+    }
+    let value;
+    try {
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/u, '');
+      value = JSON.parse(text);
+    } catch (error) {
+      fail('PERSISTENT_ARTIST_WORKSPACE_INPUT_INVALID', `${label} is not valid UTF-8 JSON: ${error.message}`);
+    }
+    return { value, bytes };
+  } finally {
+    await handle.close();
+  }
+}
+
+function insideRoot(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+async function safeDirectoryChain(root, relativeDirectory, { create = false, label = 'directory' } = {}) {
+  const canonical = canonicalRelativePath(relativeDirectory, label);
+  let current = root;
+  for (const part of canonical.split('/')) {
+    const next = path.join(current, part);
+    let metadata;
+    try {
+      metadata = await lstat(next);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      if (!create) return next;
+      try {
+        await mkdir(next, { recursive: false, mode: 0o700 });
+      } catch (createError) {
+        if (createError?.code !== 'EEXIST') throw createError;
+      }
+      metadata = await lstat(next);
+    }
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+      fail('PERSISTENT_ARTIST_WORKSPACE_DIRECTORY_INVALID', `${label} contains a symbolic or non-directory component: ${next}`);
+    }
+    const resolved = await realpath(next);
+    if (!insideRoot(root, resolved)) {
+      fail('PERSISTENT_ARTIST_WORKSPACE_PATH_INVALID', `${label} escaped the workspace root.`);
+    }
+    current = resolved;
+  }
+  return current;
+}
+
 const WORKSPACE_DIRECTORIES = Object.freeze([
   'sources',
   'working',
@@ -211,7 +323,7 @@ async function safeFileSummary(root, relative, label) {
 async function loadWorkspaceManifest(workspaceRoot) {
   const root = await requireDirectoryNoSymlink(workspaceRoot, 'workspace-root');
   const manifestPath = path.join(root, 'manifests', 'workspace.json');
-  const { value: manifest } = await readJsonFileBounded(manifestPath, 'persistent workspace manifest');
+  const { value: manifest } = await readStableJsonFile(manifestPath, 'persistent workspace manifest');
   if (!isRecord(manifest) || manifest.schema !== WORKSPACE_MANIFEST_SCHEMA) {
     fail('PERSISTENT_ARTIST_WORKSPACE_MANIFEST_INVALID', `Workspace manifest must use ${WORKSPACE_MANIFEST_SCHEMA}.`);
   }
@@ -390,6 +502,9 @@ export async function compileWorkspaceSnapshot({ workspaceRoot, request, request
   const fileName = path.posix.basename(sourcePath);
   const versionDirectory = `versions/${assetId}/${versionId}`;
   const versionPath = `${versionDirectory}/${fileName}`;
+  await safeDirectoryChain(root, path.posix.dirname(versionDirectory), {
+    label: 'version parent',
+  });
   try {
     await lstat(path.join(root, ...versionDirectory.split('/')));
     fail('PERSISTENT_ARTIST_WORKSPACE_VERSION_EXISTS', `Version directory already exists: ${versionDirectory}.`);
@@ -455,15 +570,22 @@ export async function runWorkspaceSnapshot(workspaceRoot, planInput) {
   if (!versionPath.startsWith(`${versionDirectory}/`)) {
     fail('PERSISTENT_ARTIST_WORKSPACE_PLAN_INVALID', 'versionPath must be inside versionDirectory.');
   }
-  const finalDirectory = path.join(root, ...versionDirectory.split('/'));
+  const parentRelative = path.posix.dirname(versionDirectory);
+  const parent = await safeDirectoryChain(root, parentRelative, {
+    create: true,
+    label: 'version parent',
+  });
+  const finalDirectory = path.join(parent, path.posix.basename(versionDirectory));
+  const expectedFinalDirectory = path.join(root, ...versionDirectory.split('/'));
+  if (path.resolve(finalDirectory) !== path.resolve(expectedFinalDirectory)) {
+    fail('PERSISTENT_ARTIST_WORKSPACE_PATH_INVALID', 'Version directory resolved outside its declared workspace path.');
+  }
   try {
     await lstat(finalDirectory);
     fail('PERSISTENT_ARTIST_WORKSPACE_VERSION_EXISTS', `Version directory already exists: ${versionDirectory}.`);
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error;
   }
-  const parent = path.dirname(finalDirectory);
-  await mkdir(parent, { recursive: true });
   const staging = path.join(parent, `.${path.basename(finalDirectory)}.staging-${randomUUID()}`);
   await mkdir(staging, { recursive: false });
   try {
@@ -643,24 +765,11 @@ export async function prepareWorkspaceStorageHandoff({ workspaceRoot, request, r
 }
 
 export async function loadRequestFile(filePath) {
-  const absolute = path.resolve(filePath);
-  const metadata = await stat(absolute);
-  if (!metadata.isFile() || metadata.size < 2 || metadata.size > MAXIMUM_REQUEST_BYTES) {
-    fail('PERSISTENT_ARTIST_WORKSPACE_REQUEST_INVALID', `Request file must be 2-${MAXIMUM_REQUEST_BYTES} bytes.`);
-  }
-  const bytes = await readFile(absolute);
-  let value;
-  try {
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/u, '');
-    value = JSON.parse(text);
-  } catch (error) {
-    fail('PERSISTENT_ARTIST_WORKSPACE_REQUEST_INVALID', `Request file is not valid UTF-8 JSON: ${error.message}`);
-  }
-  return { value, bytes };
+  return readStableJsonFile(filePath, 'persistent workspace request');
 }
 
 export async function loadPlanFile(filePath, expectedSchema) {
-  const { value } = await readJsonFileBounded(path.resolve(filePath), 'persistent workspace plan');
+  const { value } = await readStableJsonFile(filePath, 'persistent workspace plan');
   if (!isRecord(value) || value.schema !== expectedSchema) {
     fail('PERSISTENT_ARTIST_WORKSPACE_PLAN_INVALID', `Plan must use ${expectedSchema}.`);
   }
