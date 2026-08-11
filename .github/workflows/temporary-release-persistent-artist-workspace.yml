@@ -1,0 +1,466 @@
+name: Temporary release persistent Artist Workspace
+
+on:
+  push:
+    branches:
+      - automation/release-persistent-artist-workspace-20260811
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: temporary-release-persistent-artist-workspace-20260811
+  cancel-in-progress: false
+
+env:
+  API_ROOT: https://api.github.com/repos/EVAVO-STUDIO/evavo-art-studio
+  FEATURE_REF: agent/persistent-artist-workspace-20260811
+  PUBLISHER_REF: automation/publish-persistent-artist-workspace-20260811
+  EXPORT_REF: automation/export-art-studio-source-58c6311-artist-workspace
+  RELEASE_REF: automation/release-persistent-artist-workspace-20260811
+  EXPECTED_CHANGED_FILES: "17"
+  PYTHON_VERSION: "3.13.5"
+  PILLOW_VERSION: "12.2.0"
+  FONTTOOLS_VERSION: "4.63.0"
+  NODE_VERSION: "22.14.0"
+  PNPM_VERSION: "10.13.1"
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact release carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve clean publisher, exact feature scope, and pull request
+        id: resolve
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H 'Accept: application/vnd.github+json'
+            -H 'X-GitHub-Api-Version: 2022-11-28'
+          )
+
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+          feature_sha=''
+          publisher_run_id=''
+          for attempt in $(seq 1 240); do
+            feature_status="$(curl -sS -o /tmp/feature-ref.json -w '%{http_code}' "${auth[@]}" "${API_ROOT}/git/ref/heads/${FEATURE_REF}")"
+            runs_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/actions/runs?branch=${PUBLISHER_REF}&event=push&per_page=20")"
+            publisher_run_id="$(jq -r --arg branch "${PUBLISHER_REF}" '[.workflow_runs[] | select(.head_branch == $branch)] | sort_by(.created_at) | reverse | .[0].id // empty' <<<"${runs_json}")"
+            publisher_status="$(jq -r --arg branch "${PUBLISHER_REF}" '[.workflow_runs[] | select(.head_branch == $branch)] | sort_by(.created_at) | reverse | .[0].status // empty' <<<"${runs_json}")"
+            publisher_conclusion="$(jq -r --arg branch "${PUBLISHER_REF}" '[.workflow_runs[] | select(.head_branch == $branch)] | sort_by(.created_at) | reverse | .[0].conclusion // empty' <<<"${runs_json}")"
+            if [[ "${feature_status}" == '200' && "${publisher_status}" == 'completed' ]]; then
+              test "${publisher_conclusion}" = 'success'
+              feature_sha="$(jq -r '.object.sha' /tmp/feature-ref.json)"
+              break
+            fi
+            sleep 5
+          done
+          test "${feature_sha}" =~ ^[0-9a-f]{40}$
+          test "${publisher_run_id}" =~ ^[0-9]+$
+
+          main_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main")"
+          main_sha="$(jq -r '.object.sha' <<<"${main_json}")"
+          test "${main_sha}" =~ ^[0-9a-f]{40}$
+          test "${feature_sha}" != "${main_sha}"
+
+          compare_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/compare/${main_sha}...${feature_sha}")"
+          test "$(jq -r '.status' <<<"${compare_json}")" = 'ahead'
+          test "$(jq -r '.behind_by' <<<"${compare_json}")" = '0'
+          test "$(jq -r '.files | length' <<<"${compare_json}")" = "${EXPECTED_CHANGED_FILES}"
+          jq -e '[.files[].filename] | all(. != "pnpm-lock.yaml")' <<<"${compare_json}" >/dev/null
+          jq -e '[.files[].filename] | all(startswith(".github/workflows/temporary-") | not)' <<<"${compare_json}" >/dev/null
+          jq -r '.files[].filename' <<<"${compare_json}" | LC_ALL=C sort > /tmp/artist-workspace-files.txt
+
+          feature_commit="$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/commits/${feature_sha}")"
+          test "$(jq -r '.parents | length' <<<"${feature_commit}")" = '1'
+          test "$(jq -r '.parents[0].sha' <<<"${feature_commit}")" = "${main_sha}"
+
+          pulls_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/pulls?state=open&head=EVAVO-STUDIO:${FEATURE_REF}&base=main&per_page=10")"
+          pr_number="$(jq -r '.[0].number // empty' <<<"${pulls_json}")"
+          if [[ -z "${pr_number}" ]]; then
+            create_payload="$(jq -n \
+              --arg title 'feat(project-art): add persistent artist workspace and mastering suite' \
+              --arg head "${FEATURE_REF}" \
+              --arg base 'main' \
+              --arg body 'Adds the persistent EVAVO Artist Workspace for ChatGPT, Claude and governed agents: immutable originals and editable working copies, project-specific style locks, deterministic layer/mask/selection/colour/filter/transform/motion operations, sprite and sequence tooling, edge and alpha cleanup, final mastering profiles, callable MCP surfaces, and exact EVAVO Storage handoff. The clean publisher validated the exact focused 17-file scope on current main with the complete repository suite. Approval, candidate promotion, target-repository mutation, deployment, publication and force-push authority remain separate and disabled.' \
+              '{title:$title, head:$head, base:$base, body:$body, draft:false, maintainer_can_modify:false}')"
+            pr_json="$(curl -fsSL -X POST "${auth[@]}" -d "${create_payload}" "${API_ROOT}/pulls")"
+            pr_number="$(jq -r '.number' <<<"${pr_json}")"
+          fi
+          test "${pr_number}" =~ ^[0-9]+$
+
+          pr_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/pulls/${pr_number}")"
+          test "$(jq -r '.state' <<<"${pr_json}")" = 'open'
+          test "$(jq -r '.head.sha' <<<"${pr_json}")" = "${feature_sha}"
+          test "$(jq -r '.base.sha' <<<"${pr_json}")" = "${main_sha}"
+          test "$(jq -r '.changed_files' <<<"${pr_json}")" = "${EXPECTED_CHANGED_FILES}"
+
+          {
+            echo "FEATURE_SHA=${feature_sha}"
+            echo "MAIN_SHA=${main_sha}"
+            echo "PR_NUMBER=${pr_number}"
+            echo "PUBLISHER_RUN_ID=${publisher_run_id}"
+          } >> "${GITHUB_ENV}"
+          {
+            echo "feature_sha=${feature_sha}"
+            echo "main_sha=${main_sha}"
+            echo "pr_number=${pr_number}"
+            echo "publisher_run_id=${publisher_run_id}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Check out exact validated feature
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "+refs/heads/${FEATURE_REF}:refs/remotes/origin/${FEATURE_REF}" \
+            "+refs/heads/main:refs/remotes/origin/main"
+          test "$(git rev-parse refs/remotes/origin/${FEATURE_REF})" = "${FEATURE_SHA}"
+          test "$(git rev-parse refs/remotes/origin/main)" = "${MAIN_SHA}"
+          git checkout --detach "${FEATURE_SHA}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test "$(git diff --name-only "${MAIN_SHA}...${FEATURE_SHA}" | wc -l | tr -d ' ')" = "${EXPECTED_CHANGED_FILES}"
+          test -z "$(git diff --name-only "${MAIN_SHA}...${FEATURE_SHA}" -- pnpm-lock.yaml)"
+
+      - name: Route Python bytecode to runner-temporary storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          cache_root="${RUNNER_TEMP}/persistent-artist-workspace-pycache"
+          mkdir -p "${cache_root}"
+          echo "PYTHONPYCACHEPREFIX=${cache_root}" >> "${GITHUB_ENV}"
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: pip
+          cache-dependency-path: |
+            requirements-image-pipeline.txt
+            requirements/pixel-font-studio-v2.txt
+
+      - name: Install exact Python artist backends
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
+          python - <<'PY'
+          import PIL
+          import fontTools
+          assert PIL.__version__ == "12.2.0", PIL.__version__
+          assert fontTools.__version__ == "4.63.0", fontTools.__version__
+          PY
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@d4bc53e3007c5c22cc58fc14cba6859f64b229f8 # v4.2.0
+        with:
+          version: 10.13.1
+          run_install: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Verify media tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v ffmpeg
+          command -v ffprobe
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Install frozen dependency graph
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Run exact Artist Workspace and complete repository validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check
+
+      - name: Prove exact feature source remains immutable and clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${PYTHONPYCACHEPREFIX:-}" in
+            "${RUNNER_TEMP}"/*) ;;
+            *) echo 'Python cache escaped runner-temporary storage.' >&2; exit 1 ;;
+          esac
+          test -z "$(find tools -type d -name '__pycache__' -print -quit)"
+          test -z "$(find tools -type f -name '*.pyc' -print -quit)"
+          git diff --exit-code -- pnpm-lock.yaml
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test "$(git rev-parse HEAD)" = "${FEATURE_SHA}"
+
+      - name: Require stable base and successful pull-request checks
+        id: pr_checks
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H 'Accept: application/vnd.github+json'
+            -H 'X-GitHub-Api-Version: 2022-11-28'
+          )
+
+          observed_project_art=false
+          for attempt in $(seq 1 240); do
+            current_main="$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')"
+            current_feature="$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/${FEATURE_REF}" | jq -r '.object.sha')"
+            test "${current_main}" = "${MAIN_SHA}"
+            test "${current_feature}" = "${FEATURE_SHA}"
+
+            runs_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/actions/runs?head_sha=${FEATURE_SHA}&per_page=100")"
+            run_count="$(jq '.workflow_runs | length' <<<"${runs_json}")"
+            unfinished="$(jq '[.workflow_runs[] | select(.status != "completed")] | length' <<<"${runs_json}")"
+            failures="$(jq '[.workflow_runs[] | select(.status == "completed" and (.conclusion | IN("success", "neutral", "skipped") | not))] | length' <<<"${runs_json}")"
+            project_art_success="$(jq '[.workflow_runs[] | select(.name == "Project art workbench" and .status == "completed" and .conclusion == "success")] | length' <<<"${runs_json}")"
+            if [[ "${project_art_success}" -gt 0 ]]; then
+              observed_project_art=true
+            fi
+            if [[ "${run_count}" -gt 0 && "${unfinished}" -eq 0 ]]; then
+              test "${failures}" -eq 0
+              break
+            fi
+            sleep 5
+          done
+
+          test "${observed_project_art}" = true
+          pr_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/pulls/${PR_NUMBER}")"
+          test "$(jq -r '.state' <<<"${pr_json}")" = 'open'
+          test "$(jq -r '.head.sha' <<<"${pr_json}")" = "${FEATURE_SHA}"
+          test "$(jq -r '.base.sha' <<<"${pr_json}")" = "${MAIN_SHA}"
+          mergeable_state="$(jq -r '.mergeable_state' <<<"${pr_json}")"
+          case "${mergeable_state}" in
+            clean|has_hooks|unstable) ;;
+            *) echo "PR is not safely mergeable: ${mergeable_state}" >&2; exit 1 ;;
+          esac
+
+      - name: Guarded squash merge into current main
+        id: merge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H 'Accept: application/vnd.github+json'
+            -H 'X-GitHub-Api-Version: 2022-11-28'
+          )
+          test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')" = "${MAIN_SHA}"
+          test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/${FEATURE_REF}" | jq -r '.object.sha')" = "${FEATURE_SHA}"
+
+          payload="$(jq -n \
+            --arg title 'feat(project-art): add persistent artist workspace and mastering suite' \
+            --arg message 'Add a persistent, source-preserving Artist Workspace for ChatGPT, Claude and governed agents. Provide exact project workspaces, broad deterministic image and motion operations, style and identity locking, sprite and sequence tooling, technical cleanup and final mastering, callable MCP surfaces, and exact EVAVO Storage handoff while keeping approval, promotion, repository mutation, deployment, publication and force-push authority separate.' \
+            --arg sha "${FEATURE_SHA}" \
+            '{commit_title:$title, commit_message:$message, merge_method:"squash", sha:$sha}')"
+          merge_json="$(curl -fsSL -X PUT "${auth[@]}" -d "${payload}" "${API_ROOT}/pulls/${PR_NUMBER}/merge")"
+          test "$(jq -r '.merged' <<<"${merge_json}")" = 'true'
+          merge_sha="$(jq -r '.sha' <<<"${merge_json}")"
+          test "${merge_sha}" =~ ^[0-9a-f]{40}$
+          test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')" = "${merge_sha}"
+          echo "MERGE_SHA=${merge_sha}" >> "${GITHUB_ENV}"
+          echo "merge_sha=${merge_sha}" >> "${GITHUB_OUTPUT}"
+
+      - name: Dispatch authoritative exact-main validation
+        id: dispatch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H 'Accept: application/vnd.github+json'
+            -H 'X-GitHub-Api-Version: 2022-11-28'
+          )
+          dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          payload="$(jq -n --arg sha "${MERGE_SHA}" '{ref:"main",inputs:{expected_sha:$sha,request_source:"evavo-development-studio"}}')"
+          status="$(curl -sS -o /tmp/dispatch.json -w '%{http_code}' -X POST "${auth[@]}" -d "${payload}" "${API_ROOT}/actions/workflows/ci.yml/dispatches")"
+          if [[ "${status}" != '204' ]]; then
+            payload="$(jq -n --arg sha "${MERGE_SHA}" '{ref:"main",inputs:{expected_sha:$sha}}')"
+            status="$(curl -sS -o /tmp/dispatch.json -w '%{http_code}' -X POST "${auth[@]}" -d "${payload}" "${API_ROOT}/actions/workflows/ci.yml/dispatches")"
+          fi
+          test "${status}" = '204'
+          echo "DISPATCHED_AT=${dispatched_at}" >> "${GITHUB_ENV}"
+
+      - name: Require exact-main validation and evidence receipt
+        id: exact_main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H 'Accept: application/vnd.github+json'
+            -H 'X-GitHub-Api-Version: 2022-11-28'
+          )
+
+          exact_run_id=''
+          for attempt in $(seq 1 300); do
+            test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')" = "${MERGE_SHA}"
+            runs_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/actions/runs?head_sha=${MERGE_SHA}&event=workflow_dispatch&per_page=100")"
+            exact_run_id="$(jq -r '[.workflow_runs[] | select(.name == "Art Studio exact mainline validation")] | sort_by(.created_at) | reverse | .[0].id // empty' <<<"${runs_json}")"
+            exact_status="$(jq -r '[.workflow_runs[] | select(.name == "Art Studio exact mainline validation")] | sort_by(.created_at) | reverse | .[0].status // empty' <<<"${runs_json}")"
+            exact_conclusion="$(jq -r '[.workflow_runs[] | select(.name == "Art Studio exact mainline validation")] | sort_by(.created_at) | reverse | .[0].conclusion // empty' <<<"${runs_json}")"
+            if [[ -n "${exact_run_id}" && "${exact_status}" == 'completed' ]]; then
+              test "${exact_conclusion}" = 'success'
+              break
+            fi
+            sleep 5
+          done
+          test "${exact_run_id}" =~ ^[0-9]+$
+
+          expected_name="art-studio-validation-${MERGE_SHA}"
+          artifacts_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/actions/runs/${exact_run_id}/artifacts?per_page=100")"
+          artifact_id="$(jq -r --arg name "${expected_name}" '.artifacts[] | select(.name == $name and .expired == false) | .id' <<<"${artifacts_json}" | head -1)"
+          artifact_digest="$(jq -r --arg name "${expected_name}" '.artifacts[] | select(.name == $name and .expired == false) | .digest' <<<"${artifacts_json}" | head -1)"
+          test "${artifact_id}" =~ ^[0-9]+$
+          test "${artifact_digest}" =~ ^sha256:[0-9a-f]{64}$
+
+          artifact_json="$(curl -fsSL "${auth[@]}" "${API_ROOT}/actions/artifacts/${artifact_id}")"
+          test "$(jq -r '.workflow_run.id' <<<"${artifact_json}")" = "${exact_run_id}"
+          test "$(jq -r '.workflow_run.head_branch' <<<"${artifact_json}")" = 'main'
+          test "$(jq -r '.workflow_run.head_sha' <<<"${artifact_json}")" = "${MERGE_SHA}"
+          test "$(jq -r '.digest' <<<"${artifact_json}")" = "${artifact_digest}"
+
+          {
+            echo "EXACT_MAIN_RUN_ID=${exact_run_id}"
+            echo "VALIDATION_ARTIFACT_ID=${artifact_id}"
+            echo "VALIDATION_ARTIFACT_NAME=${expected_name}"
+            echo "VALIDATION_ARTIFACT_DIGEST=${artifact_digest}"
+          } >> "${GITHUB_ENV}"
+          {
+            echo "exact_main_run_id=${exact_run_id}"
+            echo "artifact_id=${artifact_id}"
+            echo "artifact_digest=${artifact_digest}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Write bounded release and cleanup receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+
+          const files = fs.readFileSync('/tmp/artist-workspace-files.txt', 'utf8').trim().split(/\r?\n/u).filter(Boolean);
+          const receipt = {
+            schema: 'evavo.persistent-artist-workspace-release.v1',
+            repository: 'EVAVO-STUDIO/evavo-art-studio',
+            pullRequest: Number(process.env.PR_NUMBER),
+            baseSha: process.env.MAIN_SHA,
+            featureSha: process.env.FEATURE_SHA,
+            productionSha: process.env.MERGE_SHA,
+            changedFiles: files,
+            changedFileCount: files.length,
+            publisherRunId: Number(process.env.PUBLISHER_RUN_ID),
+            exactMainRunId: Number(process.env.EXACT_MAIN_RUN_ID),
+            validationArtifact: {
+              id: Number(process.env.VALIDATION_ARTIFACT_ID),
+              name: process.env.VALIDATION_ARTIFACT_NAME,
+              digest: process.env.VALIDATION_ARTIFACT_DIGEST,
+            },
+            validation: 'passed',
+            lockfileChanged: false,
+            liveProviderRequest: false,
+            candidateApproval: false,
+            candidatePromotion: false,
+            storageWrite: false,
+            targetRepositoryMutation: false,
+            deployment: false,
+            publication: false,
+            forcePush: false,
+            cleanupRefs: [
+              process.env.FEATURE_REF,
+              process.env.PUBLISHER_REF,
+              process.env.EXPORT_REF,
+              process.env.RELEASE_REF,
+            ],
+          };
+          const target = path.join(process.env.RUNNER_TEMP, 'persistent-artist-workspace-release-receipt.json');
+          fs.writeFileSync(target, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+          NODE
+
+      - name: Upload bounded release receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: persistent-artist-workspace-release-${{ env.MERGE_SHA }}
+          path: ${{ runner.temp }}/persistent-artist-workspace-release-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Delete exact feature, publisher, export, and release refs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H 'Accept: application/vnd.github+json'
+            -H 'X-GitHub-Api-Version: 2022-11-28'
+          )
+          test "$(curl -fsSL "${auth[@]}" "${API_ROOT}/git/ref/heads/main" | jq -r '.object.sha')" = "${MERGE_SHA}"
+
+          delete_ref() {
+            local ref="$1"
+            local expected="$2"
+            local status current
+            status="$(curl -sS -o /tmp/ref.json -w '%{http_code}' "${auth[@]}" "${API_ROOT}/git/ref/heads/${ref}")"
+            if [[ "${status}" == '404' ]]; then
+              return 0
+            fi
+            test "${status}" = '200'
+            current="$(jq -r '.object.sha' /tmp/ref.json)"
+            test "${current}" = "${expected}"
+            status="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "${auth[@]}" "${API_ROOT}/git/refs/heads/${ref}")"
+            test "${status}" = '204'
+            for attempt in $(seq 1 30); do
+              status="$(curl -sS -o /dev/null -w '%{http_code}' "${auth[@]}" "${API_ROOT}/git/ref/heads/${ref}")"
+              [[ "${status}" == '404' ]] && return 0
+              sleep 1
+            done
+            return 1
+          }
+
+          publisher_sha="$(curl -fsSL "${auth[@]}" "${API_ROOT}/actions/runs/${PUBLISHER_RUN_ID}" | jq -r '.head_sha')"
+          export_status="$(curl -sS -o /tmp/export-ref.json -w '%{http_code}' "${auth[@]}" "${API_ROOT}/git/ref/heads/${EXPORT_REF}")"
+          export_sha=''
+          if [[ "${export_status}" == '200' ]]; then
+            export_sha="$(jq -r '.object.sha' /tmp/export-ref.json)"
+          else
+            test "${export_status}" = '404'
+          fi
+
+          delete_ref "${FEATURE_REF}" "${FEATURE_SHA}"
+          delete_ref "${PUBLISHER_REF}" "${publisher_sha}"
+          if [[ -n "${export_sha}" ]]; then
+            delete_ref "${EXPORT_REF}" "${export_sha}"
+          fi
+          delete_ref "${RELEASE_REF}" "${GITHUB_SHA}"
