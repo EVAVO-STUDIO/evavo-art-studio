@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   copyFile,
+  link,
   lstat,
   mkdir,
   mkdtemp,
@@ -106,6 +107,59 @@ try {
   assert.equal(createPlan.authority.storageWrite, false);
   assert.equal(createPlan.authority.targetRepositoryMutation, false);
 
+
+  if (process.platform !== 'win32') {
+    const requestSymlinkPath = path.join(temporary, 'create-request-symlink.json');
+    await symlink(createRequestPath, requestSymlinkPath);
+    const requestSymlink = run(process.execPath, [
+      'scripts/persistent-artist-workspace.mjs',
+      'compile-create',
+      '--parent-root',
+      parent,
+      '--request',
+      requestSymlinkPath,
+      '--output',
+      path.join(temporary, 'request-symlink-plan.json'),
+    ], { expectFailure: true });
+    assert.match(`${requestSymlink.stderr}\n${requestSymlink.stdout}`, /regular non-symbolic file/iu);
+
+    const requestHardLinkPath = path.join(temporary, 'create-request-hardlink.json');
+    await link(createRequestPath, requestHardLinkPath);
+    const requestHardLink = run(process.execPath, [
+      'scripts/persistent-artist-workspace.mjs',
+      'compile-create',
+      '--parent-root',
+      parent,
+      '--request',
+      requestHardLinkPath,
+      '--output',
+      path.join(temporary, 'request-hardlink-plan.json'),
+    ], { expectFailure: true });
+    assert.match(`${requestHardLink.stderr}\n${requestHardLink.stdout}`, /exactly one filesystem link/iu);
+    await rm(requestHardLinkPath);
+
+    const planSymlinkPath = path.join(temporary, 'create-plan-symlink.json');
+    await symlink(createPlanPath, planSymlinkPath);
+    const planSymlink = run(process.execPath, [
+      'scripts/persistent-artist-workspace.mjs',
+      'run-create',
+      '--plan',
+      planSymlinkPath,
+    ], { expectFailure: true });
+    assert.match(`${planSymlink.stderr}\n${planSymlink.stdout}`, /regular non-symbolic file/iu);
+
+    const planHardLinkPath = path.join(temporary, 'create-plan-hardlink.json');
+    await link(createPlanPath, planHardLinkPath);
+    const planHardLink = run(process.execPath, [
+      'scripts/persistent-artist-workspace.mjs',
+      'run-create',
+      '--plan',
+      planHardLinkPath,
+    ], { expectFailure: true });
+    assert.match(`${planHardLink.stderr}\n${planHardLink.stdout}`, /exactly one filesystem link/iu);
+    await rm(planHardLinkPath);
+  }
+
   const runCreate = run(process.execPath, [
     'scripts/persistent-artist-workspace.mjs',
     'run-create',
@@ -204,6 +258,44 @@ try {
     '--plan',
     snapshotPlanPath,
   ], { expectFailure: true });
+
+
+  if (process.platform !== 'win32') {
+    const lateRequestPath = path.join(temporary, 'late-link-snapshot-request.json');
+    const latePlanPath = path.join(temporary, 'late-link-snapshot-plan.json');
+    const lateRequest = {
+      ...snapshotRequest,
+      assetId: 'late-link',
+      versionId: 'v001',
+    };
+    await writeFile(lateRequestPath, `${JSON.stringify(lateRequest, null, 2)}\n`);
+    run(process.execPath, [
+      'scripts/persistent-artist-workspace.mjs',
+      'compile-snapshot',
+      '--workspace-root',
+      workspace,
+      '--request',
+      lateRequestPath,
+      '--output',
+      latePlanPath,
+    ]);
+    const outsideVersions = path.join(temporary, 'outside-versions');
+    await mkdir(outsideVersions);
+    await symlink(outsideVersions, path.join(workspace, 'versions', 'late-link'), 'dir');
+    const lateRun = run(process.execPath, [
+      'scripts/persistent-artist-workspace.mjs',
+      'run-snapshot',
+      '--workspace-root',
+      workspace,
+      '--plan',
+      latePlanPath,
+    ], { expectFailure: true });
+    assert.match(`${lateRun.stderr}\n${lateRun.stdout}`, /symbolic or non-directory component/iu);
+    await assert.rejects(
+      lstat(path.join(outsideVersions, 'v001')),
+      (error) => error?.code === 'ENOENT',
+    );
+  }
 
   const handoffRequestPath = path.join(temporary, 'handoff-request.json');
   const handoffOutput = path.join(workspace, 'manifests', 'storage-handoffs', 'battle-chess-master-v1.json');
@@ -329,6 +421,8 @@ try {
   console.log('- append-only exact snapshots with source revalidation and atomic publication');
   console.log('- exact EVAVO Storage handoff with storageWrite=false');
   console.log('- duplicate, tampered, escaped and symbolic requests fail closed');
+  console.log('- symbolic and multiply-linked request/plan inputs fail closed');
+  console.log('- nested version symlinks cannot redirect append-only writes outside the workspace');
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }

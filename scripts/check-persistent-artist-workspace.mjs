@@ -36,6 +36,10 @@ requireTokens('library', contents.get('library'), [
   'appendOnlyVersions: true',
   'PERSISTENT_ARTIST_WORKSPACE_REQUEST_BYTES_MISMATCH',
   'PERSISTENT_ARTIST_WORKSPACE_SOURCE_IDENTITY_CHANGED',
+  'PERSISTENT_ARTIST_WORKSPACE_REQUEST_CHANGED',
+  'PERSISTENT_ARTIST_WORKSPACE_INPUT_MULTIPLY_LINKED',
+  'O_NOFOLLOW',
+  'safeDirectoryChain',
   'storageWrite: false',
   'repositoryMutation: false',
   'bytesFlowThroughMcp: false',
@@ -54,6 +58,8 @@ requireTokens('tests', contents.get('tests'), [
   "process.env.PROJECT_ART_REQUIRE_PILLOW === '1'",
   'PROJECT_ART_REQUIRE_PILLOW=1 but no Python 3 executable with Pillow was found for the Persistent Artist Workspace.',
   'Persistent Artist Workspace runtime regressions skipped: Pillow unavailable; the dedicated Project Art workflow requires the exact backend.',
+  'symbolic and multiply-linked request/plan inputs fail closed',
+  'nested version symlinks cannot redirect append-only writes outside the workspace',
 ]);
 requireTokens('documentation', contents.get('documentation'), [
   '# Persistent Artist Workspace',
@@ -94,6 +100,7 @@ forbidTokens('library', contents.get('library'), [
   'repositoryMutation: true',
   'publication: true',
   'forcePush: true',
+  'await mkdir(parent, { recursive: true });',
 ]);
 console.log('Persistent Artist Workspace guard passed.');
 console.log('- create-only workspace manifests and append-only versions are exact and atomic');
