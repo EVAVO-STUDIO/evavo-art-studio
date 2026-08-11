@@ -51,6 +51,9 @@ requireTokens('tests', contents.get('tests'), [
   'Persistent Artist Workspace regressions passed.',
   'append-only exact snapshots',
   'evavo.storage-art-ingest-request.v1',
+  "process.env.PROJECT_ART_REQUIRE_PILLOW === '1'",
+  'PROJECT_ART_REQUIRE_PILLOW=1 but no Python 3 executable with Pillow was found for the Persistent Artist Workspace.',
+  'Persistent Artist Workspace runtime regressions skipped: Pillow unavailable; the dedicated Project Art workflow requires the exact backend.',
 ]);
 requireTokens('documentation', contents.get('documentation'), [
   '# Persistent Artist Workspace',

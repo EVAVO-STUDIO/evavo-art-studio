@@ -39,9 +39,30 @@ function parseSummary(result) {
   return JSON.parse(lines.at(-1));
 }
 
+function pythonCommand() {
+  const candidates = process.platform === 'win32'
+    ? [['py', ['-3']], ['python', []], ['python3', []]]
+    : [['python', []], ['python3', []], ['py', ['-3']]];
+  for (const [name, prefix] of candidates) {
+    const result = spawnSync(name, [...prefix, '-c', 'import PIL,sys;print(sys.version_info[0])'], {
+      encoding: 'utf8',
+      shell: false,
+      windowsHide: true,
+    });
+    if (result.status === 0 && result.stdout.trim() === '3') return { name, prefix };
+  }
+  if (process.env.PROJECT_ART_REQUIRE_PILLOW === '1') {
+    throw new Error('PROJECT_ART_REQUIRE_PILLOW=1 but no Python 3 executable with Pillow was found for the Persistent Artist Workspace.');
+  }
+  return null;
+}
+
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const python = process.platform === 'win32' ? 'py' : 'python3';
-const pythonPrefix = process.platform === 'win32' ? ['-3'] : [];
+const python = pythonCommand();
+if (!python) {
+  console.log('Persistent Artist Workspace runtime regressions skipped: Pillow unavailable; the dedicated Project Art workflow requires the exact backend.');
+  process.exit(0);
+}
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'evavo-persistent-artist-workspace-'));
 try {
   const parent = path.join(temporary, 'workspaces');
@@ -121,7 +142,7 @@ try {
     'draw.rectangle((6, 20, 25, 30), fill=(100, 40, 50, 255))',
     'image.save(target)',
   ].join('\n');
-  run(python, [...pythonPrefix, '-c', fixture]);
+  run(python.name, [...python.prefix, '-c', fixture]);
   const sourceBytes = await readFile(workingImage);
   const sourceSha256 = sha256(sourceBytes);
 
