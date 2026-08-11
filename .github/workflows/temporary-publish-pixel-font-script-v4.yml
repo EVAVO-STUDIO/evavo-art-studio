@@ -1,0 +1,141 @@
+name: Temporary publish validated Pixel Font script fix
+
+on:
+  push:
+    branches:
+      - automation/apply-pixel-font-optional-backend-20260811-v2
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-publish-pixel-font-script-v4
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out publisher carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: automation/apply-pixel-font-optional-backend-20260811-v2
+          path: publisher
+          persist-credentials: false
+
+      - name: Check out exact pull-request branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/persistent-artist-mastering-motion-v3-20260811
+          path: target
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify expected target head
+        working-directory: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "ac9ebb892066c78d336f149a3691a2b6f9c50c9e"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Recover and apply exact script-only patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from base64 import b64decode
+          from pathlib import Path
+
+          carrier = Path('publisher/.github/workflows/temporary-apply-pixel-font-optional-backend-v2.yml')
+          line = next(
+              item for item in carrier.read_text(encoding='utf-8').splitlines()
+              if item.lstrip().startswith('PATCH_B64: ')
+          )
+          encoded = line.split('PATCH_B64: ', 1)[1].strip()
+          Path('pixel-font-optional.patch').write_bytes(b64decode(encoded, validate=True))
+          PY
+          git -C target apply --check --include='scripts/check-pixel-font-studio-v2.mjs' ../pixel-font-optional.patch
+          git -C target apply --include='scripts/check-pixel-font-studio-v2.mjs' ../pixel-font-optional.patch
+          python - <<'PY'
+          from pathlib import Path
+
+          script = Path('target/scripts/check-pixel-font-studio-v2.mjs')
+          text = script.read_text(encoding='utf-8')
+          bad = "/EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS:\\s*[#']1[\"']/u"
+          quote = chr(34)
+          good = "/EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS:\\s*[" + quote + "']1[" + quote + "']/u"
+          if text.count(bad) != 1:
+              raise SystemExit(f'expected one malformed assertion, found {text.count(bad)}')
+          script.write_text(text.replace(bad, good, 1), encoding='utf-8')
+          PY
+
+      - name: Validate optional and strict backend behavior
+        working-directory: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/check-pixel-font-studio-v2.mjs
+          python -m venv --without-pip "$RUNNER_TEMP/no-fonttools"
+          rm -rf "$RUNNER_TEMP/pixel-font-optional-report" "$RUNNER_TEMP/pixel-font-strict-missing"
+          EVAVO_PIXEL_FONT_PYTHON="$RUNNER_TEMP/no-fonttools/bin/python" \
+          EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=0 \
+          EVAVO_PIXEL_FONT_CHECK_OUTPUT="$RUNNER_TEMP/pixel-font-optional-report" \
+            node scripts/check-pixel-font-studio-v2.mjs
+          grep -F '"status": "skipped"' "$RUNNER_TEMP/pixel-font-optional-report/check-report.json"
+          grep -F '"expectedVersion": "4.63.0"' "$RUNNER_TEMP/pixel-font-optional-report/check-report.json"
+
+          set +e
+          EVAVO_PIXEL_FONT_PYTHON="$RUNNER_TEMP/no-fonttools/bin/python" \
+          EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=1 \
+          EVAVO_PIXEL_FONT_CHECK_OUTPUT="$RUNNER_TEMP/pixel-font-strict-missing" \
+            node scripts/check-pixel-font-studio-v2.mjs >"$RUNNER_TEMP/strict-missing.log" 2>&1
+          strict_status=$?
+          set -e
+          test "$strict_status" -ne 0
+          grep -F 'EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=1 requires fontTools 4.63.0; observed unavailable.' "$RUNNER_TEMP/strict-missing.log"
+
+      - name: Install exact fontTools backend and run complete suite
+        working-directory: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
+          test "$(python -c 'import fontTools; print(fontTools.__version__)')" = "4.63.0"
+          EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=1 \
+          EVAVO_PIXEL_FONT_PYTHON=python \
+            node scripts/check-pixel-font-studio-v2.mjs
+
+      - name: Verify exact one-file scope
+        working-directory: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff --name-only)" = "scripts/check-pixel-font-studio-v2.mjs"
+          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -v '^ M scripts/check-pixel-font-studio-v2.mjs$' || true)"
+
+      - name: Commit and push exact script repair without force
+        working-directory: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "ac9ebb892066c78d336f149a3691a2b6f9c50c9e"
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add scripts/check-pixel-font-studio-v2.mjs
+          git commit -m "fix(pixel-font): gate optional fontTools backend"
+          git push origin HEAD:refs/heads/agent/persistent-artist-mastering-motion-v3-20260811
+          git rev-parse HEAD
