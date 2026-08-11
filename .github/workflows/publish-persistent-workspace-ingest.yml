@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - automation/publish-persistent-workspace-ingest-20260812
+    paths:
+      - ".evavo-transfer/persistent-workspace-ingest/READY"
 
 permissions:
   contents: write
@@ -34,14 +36,20 @@ jobs:
             echo "Feature branch already exists: $FEATURE_BRANCH" >&2
             exit 1
           fi
-          test -s .evavo-transfer/persistent-workspace-ingest/release.tar.gz.b64
+          transfer=.evavo-transfer/persistent-workspace-ingest
+          test "$(tr -d '\r\n' < "$transfer/READY")" = "$EXPECTED_BUNDLE_SHA256"
+          test -s "$transfer/CHUNKS.sha256"
+          test "$(find "$transfer" -maxdepth 1 -type f -name 'part-*.b64' | wc -l)" -eq 10
 
-      - name: Decode and verify exact source bundle
+      - name: Reassemble and verify exact source bundle
         shell: bash
         run: |
           set -euo pipefail
+          transfer="$GITHUB_WORKSPACE/.evavo-transfer/persistent-workspace-ingest"
           mkdir -p /tmp/evavo-persistent-ingest
-          base64 --decode .evavo-transfer/persistent-workspace-ingest/release.tar.gz.b64 > /tmp/evavo-persistent-ingest/release.tar.gz
+          cd "$transfer"
+          sha256sum --check --strict CHUNKS.sha256
+          cat part-*.b64 | base64 --decode > /tmp/evavo-persistent-ingest/release.tar.gz
           echo "$EXPECTED_BUNDLE_SHA256  /tmp/evavo-persistent-ingest/release.tar.gz" | sha256sum --check --strict
           if tar -tzf /tmp/evavo-persistent-ingest/release.tar.gz | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
             echo "Bundle contains an unsafe path" >&2
@@ -69,11 +77,16 @@ jobs:
           git diff --check
           git diff --exit-code -- pnpm-lock.yaml
 
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
       - name: Run focused external-ingest validation
         shell: bash
         run: |
           set -euo pipefail
-          node --version
           test "$(node --version)" = "v22.14.0"
           node scripts/check-persistent-artist-workspace-ingest.mjs
 
@@ -116,5 +129,4 @@ jobs:
           feature_sha="$(git rev-parse HEAD)"
           test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN"
           git push origin "HEAD:refs/heads/$FEATURE_BRANCH"
-          echo "feature_sha=$feature_sha" >> "$GITHUB_OUTPUT"
           printf 'Published `%s` at `%s`.\n' "$FEATURE_BRANCH" "$feature_sha" >> "$GITHUB_STEP_SUMMARY"
