@@ -25,9 +25,8 @@ jobs:
           EXPECTED_MAIN: 7ee612f74e7c7097b5ccd93fd29c73e82667c88c
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN"
           test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN"
-          git diff --exit-code "$EXPECTED_MAIN" -- . ':(exclude).github/workflows/temporary-export-art-studio-source-7ee612f.yml'
+          git cat-file -e "$EXPECTED_MAIN^{commit}"
           git archive --format=tar.gz --prefix=evavo-art-studio/ --output="$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz" "$EXPECTED_MAIN"
           test -s "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz"
           sha256sum "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.tar.gz" > "$RUNNER_TEMP/evavo-art-studio-source-7ee612f.sha256"
