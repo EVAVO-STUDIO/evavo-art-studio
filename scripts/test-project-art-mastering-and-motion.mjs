@@ -54,7 +54,10 @@ function pythonCommand() {
     });
     if (result.status === 0 && result.stdout.trim() === '3') return { name, prefix };
   }
-  throw new Error('Python 3 with Pillow is required.');
+  if (process.env.PROJECT_ART_REQUIRE_PILLOW === '1') {
+    throw new Error('PROJECT_ART_REQUIRE_PILLOW=1 but no Python 3 executable with Pillow was found.');
+  }
+  return null;
 }
 
 function rehash(document) {
@@ -64,10 +67,15 @@ function rehash(document) {
   return result;
 }
 
+const python = pythonCommand();
+if (!python) {
+  console.log('Project Art mastering and motion runtime regressions skipped: Pillow unavailable; the dedicated Project Art workflow requires the exact backend.');
+  process.exit(0);
+}
+
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'evavo-project-art-mastering-motion-'));
 const workspace = path.join(temporary, 'workspace');
 await mkdir(workspace, { recursive: true });
-const python = pythonCommand();
 
 try {
   const source = path.join(workspace, 'source.png');

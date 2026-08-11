@@ -103,6 +103,9 @@ requireTokens('runtime', contents.get('runtime'), [
 assert.ok(count(contents.get('runtime'), 'context.verify_sources()') >= 2, 'runtime must revalidate sources before and after execution');
 requireTokens('tests', contents.get('tests'), [
   'Project Art mastering and motion regressions passed.',
+  "process.env.PROJECT_ART_REQUIRE_PILLOW === '1'",
+  'PROJECT_ART_REQUIRE_PILLOW=1 but no Python 3 executable with Pillow was found.',
+  'Project Art mastering and motion runtime regressions skipped: Pillow unavailable; the dedicated Project Art workflow requires the exact backend.',
   'professional geometry, colour, filter, alpha and layer-effect operations execute deterministically',
   'evavo.project-art-mastering-report.v1',
   'evavo.project-art-motion-sequence.v1',
