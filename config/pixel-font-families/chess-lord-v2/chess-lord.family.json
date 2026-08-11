@@ -2,7 +2,7 @@
   "schema": "evavo.pixel-font-family-master.v2",
   "familyId": "chess-lord-90s",
   "displayName": "Chess Lord 90s Pixel Family",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "godot": {
     "targetVersion": "4.6.2",
     "resourceBasePath": "assets/fonts/chess_lord",
@@ -17,7 +17,10 @@
     "includeSpecimens": true,
     "atlasMaximumEdge": 2048,
     "atlasPadding": 1,
-    "ttfPixelUnits": 64
+    "ttfPixelUnits": 64,
+    "includeBdf": true,
+    "includeAtlasJson": true,
+    "includeGridSheet": true
   },
   "license": {
     "copyright": "Copyright 2026 EVAVO Studio. All rights reserved.",
@@ -27,15 +30,15 @@
   "faces": [
     {
       "role": "ui",
-      "master": "ChessLord_UI.face.json"
+      "master": "ChessLord_UI.face.json.gz"
     },
     {
       "role": "text",
-      "master": "ChessLord_Text.face.json"
+      "master": "ChessLord_Text.face.json.gz"
     },
     {
       "role": "display",
-      "master": "ChessLord_Herald.face.json"
+      "master": "ChessLord_Herald.face.json.gz"
     }
   ],
   "specimens": [
