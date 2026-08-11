@@ -20,6 +20,16 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const python = process.env.EVAVO_PIXEL_FONT_PYTHON || (process.platform === "win32" ? "python" : "python3");
+const fontToolsRequirement = process.env.EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS?.trim();
+assert.ok(
+  fontToolsRequirement === undefined ||
+    fontToolsRequirement === "" ||
+    fontToolsRequirement === "0" ||
+    fontToolsRequirement === "1",
+  "EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS must be 0 or 1 when supplied",
+);
+const requireFontTools = fontToolsRequirement === "1";
+const expectedFontToolsVersion = "4.63.0";
 const tool = path.join(root, "tools", "pixel_font_studio_v2.py");
 const family = path.join(
   root,
@@ -129,6 +139,15 @@ for (const relative of requiredFiles) {
 run(python, ["-m", "compileall", "-q", path.join(root, "tools", "pixel_font_v2"), tool]);
 run(process.execPath, ["--check", path.join(root, "scripts", "pixel-font-studio-v2-mcp.mjs")]);
 run(process.execPath, ["--check", path.join(root, "scripts", "integrate-pixel-font-studio-v2.mjs")]);
+const dedicatedWorkflowSource = await readFile(
+  path.join(root, ".github", "workflows", "pixel-font-studio-v2.yml"),
+  "utf8",
+);
+assert.match(
+  dedicatedWorkflowSource,
+  /EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS:\s*["']1["']/u,
+  "the dedicated Pixel Font Studio v2 workflow must require the exact fontTools backend",
+);
 
 const packagePath = path.join(root, "package.json");
 const reliabilityPath = path.join(root, "evavo.reliability.json");
@@ -201,7 +220,63 @@ assert.notDeepEqual(g.glyph.bitmap, q.glyph.bitmap);
 assert.equal(g.glyph.yOffset < 10, true);
 assert.equal(q.glyph.height >= 7, true);
 
-stage("building and validating deterministic family A");
+stage("checking optional fontTools backend");
+const fontToolsProbe = execute(python, [
+  "-c",
+  "import fontTools; print(fontTools.__version__)",
+]);
+const observedFontToolsVersion =
+  fontToolsProbe.status === 0 ? fontToolsProbe.stdout.trim() : null;
+const fontToolsReady = observedFontToolsVersion === expectedFontToolsVersion;
+if (requireFontTools && !fontToolsReady) {
+  if (temporary) await rm(workspace, { recursive: true, force: true });
+  throw new Error(
+    `EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=1 requires fontTools ${expectedFontToolsVersion}; observed ${observedFontToolsVersion ?? "unavailable"}.`,
+  );
+}
+
+if (!fontToolsReady) {
+  stage("skipping optional fontTools-backed build verification");
+  const optionalBackendReport = {
+    schema: "evavo.pixel-font-studio-v2-check.v1",
+    toolVersion: "2.2.0",
+    familyId: audit.familyId,
+    faceCount: audit.faces.length,
+    glyphsPerFace: audit.faces.map((item) => item.glyphCount),
+    kerningPairsPerFace: audit.faces.map((item) => item.kerningPairCount),
+    duplicateGroups: audit.faces.map((item) => item.duplicateGroups.length),
+    pairCollisionChecks: audit.faces.map((item) => item.collisionChecks),
+    optionalBackends: {
+      fontTools: {
+        required: false,
+        status: "skipped",
+        expectedVersion: expectedFontToolsVersion,
+        observedVersion: observedFontToolsVersion,
+        reason:
+          observedFontToolsVersion === null
+            ? "fontTools is not installed in this workflow"
+            : "the installed fontTools version is not the pinned reproducible backend",
+      },
+    },
+    status: "passed",
+  };
+  await writeFile(
+    path.join(workspace, "check-report.json"),
+    `${JSON.stringify(optionalBackendReport, null, 2)}\n`,
+    "utf8",
+  );
+  console.log("EVAVO Pixel Font Studio v2 structural checks passed.");
+  console.log(`- workspace: ${workspace}`);
+  console.log("- source inventory, syntax, contract, catalog and independent face audits passed");
+  console.log(
+    `- optional TTF/build verification skipped because fontTools ${expectedFontToolsVersion} is unavailable in this workflow`,
+  );
+  console.log(
+    "- the dedicated Pixel Font Studio v2 workflow requires the exact backend and still runs the complete build, reproducibility, MCP and Godot suite",
+  );
+  if (temporary) await rm(workspace, { recursive: true, force: true });
+} else {
+  stage("building and validating deterministic family A");
 const buildA = path.join(workspace, "build-a");
 const buildB = path.join(workspace, "build-b");
 const buildC = path.join(workspace, "build-mcp");
@@ -413,4 +488,5 @@ console.log(`- actual Godot 4.6.2 verification: ${godot ? "passed" : "not config
 
 if (temporary) {
   await rm(workspace, { recursive: true, force: true });
+}
 }
