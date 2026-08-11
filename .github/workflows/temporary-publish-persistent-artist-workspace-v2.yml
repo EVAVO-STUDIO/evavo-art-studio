@@ -1,0 +1,58 @@
+name: Temporary publish persistent Artist Workspace v2
+
+on:
+  push:
+    branches:
+      - automation/publish-persistent-artist-workspace-20260811
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-publish-persistent-artist-workspace-v2-20260811
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out full carrier history
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: pip
+          cache-dependency-path: |
+            requirements-image-pipeline.txt
+            requirements/pixel-font-studio-v2.txt
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Reconstruct, validate, commit and publish exact release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .evavo-release/publish-persistent-artist-workspace-v2.sh
+
+      - name: Upload bounded publication receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: persistent-artist-workspace-publication-v2
+          path: ${{ runner.temp }}/persistent-artist-workspace-feature-sha.txt
+          if-no-files-found: error
+          retention-days: 14
