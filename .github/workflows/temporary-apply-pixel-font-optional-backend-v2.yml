@@ -1,0 +1,114 @@
+name: Temporary publish encoded Pixel Font backend fix
+
+on:
+  push:
+    branches:
+      - automation/apply-pixel-font-optional-backend-20260811-v2
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-publish-pixel-font-optional-backend-v2
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull-request branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: agent/persistent-artist-mastering-motion-v3-20260811
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify expected target head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "ddb016a263f1e31dbda06a17ba76fecb8e1c2c96"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Apply exact encoded two-file patch
+        shell: bash
+        env:
+          PATCH_B64: ZGlmZiAtLWdpdCBhLy5naXRodWIvd29ya2Zsb3dzL3BpeGVsLWZvbnQtc3R1ZGlvLXYyLnltbCBiLy5naXRodWIvd29ya2Zsb3dzL3BpeGVsLWZvbnQtc3R1ZGlvLXYyLnltbAppbmRleCA1NDI5MmIwLi4yOWNlNTA4IDEwMDY0NAotLS0gYS8uZ2l0aHViL3dvcmtmbG93cy9waXhlbC1mb250LXN0dWRpby12Mi55bWwKKysrIGIvLmdpdGh1Yi93b3JrZmxvd3MvcGl4ZWwtZm9udC1zdHVkaW8tdjIueW1sCkBAIC0xMTEsNiArMTExLDcgQEAgam9iczoKIAogICAgICAgLSBuYW1lOiBSdW4gY29tcGxldGUgcmV1c2FibGUgZm9udCBwaXBlbGluZSBhbmQgR29kb3QgdmVyaWZpY2F0aW9uCiAgICAgICAgIGVudjoKKyAgICAgICAgICBFVkFWT19QSVhFTF9GT05UX1JFUVVJUkVfRk9OVFRPT0xTOiAiMSIKICAgICAgICAgICBFVkFWT19QSVhFTF9GT05UX0dPRE9UOiAke3sgcnVubmVyLnRlbXAgfX0vZ29kb3QvR29kb3RfdjQuNi4yLXN0YWJsZV9saW51eC54ODZfNjQKICAgICAgICAgICBFVkFWT19QSVhFTF9GT05UX0NIRUNLX09VVFBVVDogJHt7IHJ1bm5lci50ZW1wIH19L3BpeGVsLWZvbnQtc3R1ZGlvLXYyLWNoZWNrCiAgICAgICAgIHJ1bjogbm9kZSBzY3JpcHRzL2NoZWNrLXBpeGVsLWZvbnQtc3R1ZGlvLXYyLm1qcwpkaWZmIC0tZ2l0IGEvc2NyaXB0cy9jaGVjay1waXhlbC1mb250LXN0dWRpby12Mi5tanMgYi9zY3JpcHRzL2NoZWNrLXBpeGVsLWZvbnQtc3R1ZGlvLXYyLm1qcwppbmRleCAwNDBkNDk2Li42MzgzYzQxIDEwMDY0NAotLS0gYS9zY3JpcHRzL2NoZWNrLXBpeGVsLWZvbnQtc3R1ZGlvLXYyLm1qcworKysgYi9zY3JpcHRzL2NoZWNrLXBpeGVsLWZvbnQtc3R1ZGlvLXYyLm1qcwpAQCAtMjAsNiArMjAsMTYgQEAgaW1wb3J0IHsKIAogY29uc3Qgcm9vdCA9IHBhdGgucmVzb2x2ZShwYXRoLmRpcm5hbWUoZmlsZVVSTFRvUGF0aChpbXBvcnQubWV0YS51cmwpKSwgIi4uIik7CiBjb25zdCBweXRob24gPSBwcm9jZXNzLmVudi5FVkFWT19QSVhFTF9GT05UX1BZVEhPTiB8fCAocHJvY2Vzcy5wbGF0Zm9ybSA9PT0gIndpbjMyIiA/ICJweXRob24iIDogInB5dGhvbjMiKTsKK2NvbnN0IGZvbnRUb29sc1JlcXVpcmVtZW50ID0gcHJvY2Vzcy5lbnYuRVZBVk9fUElYRUxfRk9OVF9SRVFVSVJFX0ZPTlRUT09MUz8udHJpbSgpOworYXNzZXJ0Lm9rKAorICBmb250VG9vbHNSZXF1aXJlbWVudCA9PT0gdW5kZWZpbmVkIHx8CisgICAgZm9udFRvb2xzUmVxdWlyZW1lbnQgPT09ICIiIHx8CisgICAgZm9udFRvb2xzUmVxdWlyZW1lbnQgPT09ICIwIiB8fAorICAgIGZvbnRUb29sc1JlcXVpcmVtZW50ID09PSAiMSIsCisgICJFVkFWT19QSVhFTF9GT05UX1JFUVVJUkVfRk9OVFRPT0xTIG11c3QgYmUgMCBvciAxIHdoZW4gc3VwcGxpZWQiLAorKTsKK2NvbnN0IHJlcXVpcmVGb250VG9vbHMgPSBmb250VG9vbHNSZXF1aXJlbWVudCA9PT0gIjEiOworY29uc3QgZXhwZWN0ZWRGb250VG9vbHNWZXJzaW9uID0gIjQuNjMuMCI7CiBjb25zdCB0b29sID0gcGF0aC5qb2luKHJvb3QsICJ0b29scyIsICJwaXhlbF9mb250X3N0dWRpb192Mi5weSIpOwogY29uc3QgZmFtaWx5ID0gcGF0aC5qb2luKAogICByb290LApAQCAtMTI5LDYgKzEzOSwxNSBAQCBmb3IgKGNvbnN0IHJlbGF0aXZlIG9mIHJlcXVpcmVkRmlsZXMpIHsKIHJ1bihweXRob24sIFsiLW0iLCAiY29tcGlsZWFsbCIsICItcSIsIHBhdGguam9pbihyb290LCAidG9vbHMiLCAicGl4ZWxfZm9udF92MiIpLCB0b29sXSk7CiBydW4ocHJvY2Vzcy5leGVjUGF0aCwgWyItLWNoZWNrIiwgcGF0aC5qb2luKHJvb3QsICJzY3JpcHRzIiwgInBpeGVsLWZvbnQtc3R1ZGlvLXYyLW1jcC5tanMiKV0pOwogcnVuKHByb2Nlc3MuZXhlY1BhdGgsIFsiLS1jaGVjayIsIHBhdGguam9pbihyb290LCAic2NyaXB0cyIsICJpbnRlZ3JhdGUtcGl4ZWwtZm9udC1zdHVkaW8tdjIubWpzIildKTsKK2NvbnN0IGRlZGljYXRlZFdvcmtmbG93U291cmNlID0gYXdhaXQgcmVhZEZpbGUoCisgIHBhdGguam9pbihyb290LCAiLmdpdGh1YiIsICJ3b3JrZmxvd3MiLCAicGl4ZWwtZm9udC1zdHVkaW8tdjIueW1sIiksCisgICJ1dGY4IiwKKyk7Cithc3NlcnQubWF0Y2goCisgIGRlZGljYXRlZFdvcmtmbG93U291cmNlLAorICAvRVZBVk9fUElYRUxfRk9OVF9SRVFVSVJFX0ZPTlRUT09MUzpccypbIyddMVsiJ10vdSwKKyAgInRoZSBkZWRpY2F0ZWQgUGl4ZWwgRm9udCBTdHVkaW8gdjIgd29ya2Zsb3cgbXVzdCByZXF1aXJlIHRoZSBleGFjdCBmb250VG9vbHMgYmFja2VuZCIsCispOwogCiBjb25zdCBwYWNrYWdlUGF0aCA9IHBhdGguam9pbihyb290LCAicGFja2FnZS5qc29uIik7CiBjb25zdCByZWxpYWJpbGl0eVBhdGggPSBwYXRoLmpvaW4ocm9vdCwgImV2YXZvLnJlbGlhYmlsaXR5Lmpzb24iKTsKQEAgLTIwMSw3ICsyMjAsNjMgQEAgYXNzZXJ0Lm5vdERlZXBFcXVhbChnLmdseXBoLmJpdG1hcCwgcS5nbHlwaC5iaXRtYXApOwogYXNzZXJ0LmVxdWFsKGcuZ2x5cGgueU9mZnNldCA8IDEwLCB0cnVlKTsKIGFzc2VydC5lcXVhbChxLmdseXBoLmhlaWdodCA+PSA3LCB0cnVlKTsKIAotc3RhZ2UoImJ1aWxkaW5nIGFuZCB2YWxpZGF0aW5nIGRldGVybWluaXN0aWMgZmFtaWx5IEEiKTsKK3N0YWdlKCJjaGVja2luZyBvcHRpb25hbCBmb250VG9vbHMgYmFja2VuZCIpOworY29uc3QgZm9udFRvb2xzUHJvYmUgPSBleGVjdXRlKHB5dGhvbiwgWworICAiLWMiLAorICAiaW1wb3J0IGZvbnRUb29sczsgcHJpbnQoZm9udFRvb2xzLl9fdmVyc2lvbl9fKSIsCitdKTsKK2NvbnN0IG9ic2VydmVkRm9udFRvb2xzVmVyc2lvbiA9CisgIGZvbnRUb29sc1Byb2JlLnN0YXR1cyA9PT0gMCA/IGZvbnRUb29sc1Byb2JlLnN0ZG91dC50cmltKCkgOiBudWxsOworY29uc3QgZm9udFRvb2xzUmVhZHkgPSBvYnNlcnZlZEZvbnRUb29sc1ZlcnNpb24gPT09IGV4cGVjdGVkRm9udFRvb2xzVmVyc2lvbjsKK2lmIChyZXF1aXJlRm9udFRvb2xzICYmICFmb250VG9vbHNSZWFkeSkgeworICBpZiAodGVtcG9yYXJ5KSBhd2FpdCBybSh3b3Jrc3BhY2UsIHsgcmVjdXJzaXZlOiB0cnVlLCBmb3JjZTogdHJ1ZSB9KTsKKyAgdGhyb3cgbmV3IEVycm9yKAorICAgIGBFVkFWT19QSVhFTF9GT05UX1JFUVVJUkVfRk9OVFRPT0xTPTEgcmVxdWlyZXMgZm9udFRvb2xzICR7ZXhwZWN0ZWRGb250VG9vbHNWZXJzaW9ufTsgb2JzZXJ2ZWQgJHtvYnNlcnZlZEZvbnRUb29sc1ZlcnNpb24gPz8gInVuYXZhaWxhYmxlIn0uYCwKKyAgKTsKK30KKworaWYgKCFmb250VG9vbHNSZWFkeSkgeworICBzdGFnZSgic2tpcHBpbmcgb3B0aW9uYWwgZm9udFRvb2xzLWJhY2tlZCBidWlsZCB2ZXJpZmljYXRpb24iKTsKKyAgY29uc3Qgb3B0aW9uYWxCYWNrZW5kUmVwb3J0ID0geworICAgIHNjaGVtYTogImV2YXZvLnBpeGVsLWZvbnQtc3R1ZGlvLXYyLWNoZWNrLnYxIiwKKyAgICB0b29sVmVyc2lvbjogIjIuMi4wIiwKKyAgICBmYW1pbHlJZDogYXVkaXQuZmFtaWx5SWQsCisgICAgZmFjZUNvdW50OiBhdWRpdC5mYWNlcy5sZW5ndGgsCisgICAgZ2x5cGhzUGVyRmFjZTogYXVkaXQuZmFjZXMubWFwKChpdGVtKSA9PiBpdGVtLmdseXBoQ291bnQpLAorICAgIGtlcm5pbmdQYWlyc1BlckZhY2U6IGF1ZGl0LmZhY2VzLm1hcCgoaXRlbSkgPT4gaXRlbS5rZXJuaW5nUGFpckNvdW50KSwKKyAgICBkdXBsaWNhdGVHcm91cHM6IGF1ZGl0LmZhY2VzLm1hcCgoaXRlbSkgPT4gaXRlbS5kdXBsaWNhdGVHcm91cHMubGVuZ3RoKSwKKyAgICBwYWlyQ29sbGlzaW9uQ2hlY2tzOiBhdWRpdC5mYWNlcy5tYXAoKGl0ZW0pID0+IGl0ZW0uY29sbGlzaW9uQ2hlY2tzKSwKKyAgICBvcHRpb25hbEJhY2tlbmRzOiB7CisgICAgICBmb250VG9vbHM6IHsKKyAgICAgICAgcmVxdWlyZWQ6IGZhbHNlLAorICAgICAgICBzdGF0dXM6ICJza2lwcGVkIiwKKyAgICAgICAgZXhwZWN0ZWRWZXJzaW9uOiBleHBlY3RlZEZvbnRUb29sc1ZlcnNpb24sCisgICAgICAgIG9ic2VydmVkVmVyc2lvbjogb2JzZXJ2ZWRGb250VG9vbHNWZXJzaW9uLAorICAgICAgICByZWFzb246CisgICAgICAgICAgb2JzZXJ2ZWRGb250VG9vbHNWZXJzaW9uID09PSBudWxsCisgICAgICAgICAgICA/ICJmb250VG9vbHMgaXMgbm90IGluc3RhbGxlZCBpbiB0aGlzIHdvcmtmbG93IgorICAgICAgICAgICAgOiAidGhlIGluc3RhbGxlZCBmb250VG9vbHMgdmVyc2lvbiBpcyBub3QgdGhlIHBpbm5lZCByZXByb2R1Y2libGUgYmFja2VuZCIsCisgICAgICB9LAorICAgIH0sCisgICAgc3RhdHVzOiAicGFzc2VkIiwKKyAgfTsKKyAgYXdhaXQgd3JpdGVGaWxlKAorICAgIHBhdGguam9pbih3b3Jrc3BhY2UsICJjaGVjay1yZXBvcnQuanNvbiIpLAorICAgIGAke0pTT04uc3RyaW5naWZ5KG9wdGlvbmFsQmFja2VuZFJlcG9ydCwgbnVsbCwgMil9XG5gLAorICAgICJ1dGY4IiwKKyAgKTsKKyAgY29uc29sZS5sb2coIkVWQVZPIFBpeGVsIEZvbnQgU3R1ZGlvIHYyIHN0cnVjdHVyYWwgY2hlY2tzIHBhc3NlZC4iKTsKKyAgY29uc29sZS5sb2coYC0gd29ya3NwYWNlOiAke3dvcmtzcGFjZX1gKTsKKyAgY29uc29sZS5sb2coIi0gc291cmNlIGludmVudG9yeSwgc3ludGF4LCBjb250cmFjdCwgY2F0YWxvZyBhbmQgaW5kZXBlbmRlbnQgZmFjZSBhdWRpdHMgcGFzc2VkIik7CisgIGNvbnNvbGUubG9nKAorICAgIGAtIG9wdGlvbmFsIFRURi9idWlsZCB2ZXJpZmljYXRpb24gc2tpcHBlZCBiZWNhdXNlIGZvbnRUb29scyAke2V4cGVjdGVkRm9udFRvb2xzVmVyc2lvbn0gaXMgdW5hdmFpbGFibGUgaW4gdGhpcyB3b3JrZmxvd2AsCisgICk7CisgIGNvbnNvbGUubG9nKAorICAgICItIHRoZSBkZWRpY2F0ZWQgUGl4ZWwgRm9udCBTdHVkaW8gdjIgd29ya2Zsb3cgcmVxdWlyZXMgdGhlIGV4YWN0IGJhY2tlbmQgYW5kIHN0aWxsIHJ1bnMgdGhlIGNvbXBsZXRlIGJ1aWxkLCByZXByb2R1Y2liaWxpdHksIE1DUCBhbmQgR29kb3Qgc3VpdGUiLAorICApOworICBpZiAodGVtcG9yYXJ5KSBhd2FpdCBybSh3b3Jrc3BhY2UsIHsgcmVjdXJzaXZlOiB0cnVlLCBmb3JjZTogdHJ1ZSB9KTsKK30gZWxzZSB7CisgIHN0YWdlKCJidWlsZGluZyBhbmQgdmFsaWRhdGluZyBkZXRlcm1pbmlzdGljIGZhbWlseSBBIik7CiBjb25zdCBidWlsZEEgPSBwYXRoLmpvaW4od29ya3NwYWNlLCAiYnVpbGQtYSIpOwogY29uc3QgYnVpbGRCID0gcGF0aC5qb2luKHdvcmtzcGFjZSwgImJ1aWxkLWIiKTsKIGNvbnN0IGJ1aWxkQyA9IHBhdGguam9pbih3b3Jrc3BhY2UsICJidWlsZC1tY3AiKTsKQEAgLTQxNCwzICs0ODksNCBAQCBjb25zb2xlLmxvZyhgLSBhY3R1YWwgR29kb3QgNC42LjIgdmVyaWZpY2F0aW9uOiAke2dvZG90ID8gInBhc3NlZCIgOiAibm90IGNvbmZpZwogaWYgKHRlbXBvcmFyeSkgewogICBhd2FpdCBybSh3b3Jrc3BhY2UsIHsgcmVjdXJzaXZlOiB0cnVlLCBmb3JjZTogdHJ1ZSB9KTsKIH0KK30K
+        run: |
+          set -euo pipefail
+          printf '%s' "$PATCH_B64" | base64 --decode > "$RUNNER_TEMP/pixel-font-optional.patch"
+          git apply --check "$RUNNER_TEMP/pixel-font-optional.patch"
+          git apply "$RUNNER_TEMP/pixel-font-optional.patch"
+
+      - name: Validate optional and strict backend behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/check-pixel-font-studio-v2.mjs
+          python -m venv --without-pip "$RUNNER_TEMP/no-fonttools"
+          rm -rf "$RUNNER_TEMP/pixel-font-optional-report" "$RUNNER_TEMP/pixel-font-strict-missing"
+          EVAVO_PIXEL_FONT_PYTHON="$RUNNER_TEMP/no-fonttools/bin/python" \
+          EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=0 \
+          EVAVO_PIXEL_FONT_CHECK_OUTPUT="$RUNNER_TEMP/pixel-font-optional-report" \
+            node scripts/check-pixel-font-studio-v2.mjs
+          grep -F '"status": "skipped"' "$RUNNER_TEMP/pixel-font-optional-report/check-report.json"
+          grep -F '"expectedVersion": "4.63.0"' "$RUNNER_TEMP/pixel-font-optional-report/check-report.json"
+
+          set +e
+          EVAVO_PIXEL_FONT_PYTHON="$RUNNER_TEMP/no-fonttools/bin/python" \
+          EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=1 \
+          EVAVO_PIXEL_FONT_CHECK_OUTPUT="$RUNNER_TEMP/pixel-font-strict-missing" \
+            node scripts/check-pixel-font-studio-v2.mjs >"$RUNNER_TEMP/strict-missing.log" 2>&1
+          strict_status=$?
+          set -e
+          test "$strict_status" -ne 0
+          grep -F 'EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=1 requires fontTools 4.63.0; observed unavailable.' "$RUNNER_TEMP/strict-missing.log"
+
+      - name: Install exact fontTools backend and run complete suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-studio-v2.txt
+          test "$(python -c 'import fontTools; print(fontTools.__version__)')" = "4.63.0"
+          EVAVO_PIXEL_FONT_REQUIRE_FONTTOOLS=1 \
+          EVAVO_PIXEL_FONT_PYTHON=python \
+            node scripts/check-pixel-font-studio-v2.mjs
+
+      - name: Verify exact two-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          mapfile -t changed < <(git diff --name-only | sort)
+          expected=(
+            ".github/workflows/pixel-font-studio-v2.yml"
+            "scripts/check-pixel-font-studio-v2.mjs"
+          )
+          test "${#changed[@]}" -eq "${#expected[@]}"
+          for index in "${!expected[@]}"; do
+            test "${changed[$index]}" = "${expected[$index]}"
+          done
+
+      - name: Commit and push exact repair without force
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "ddb016a263f1e31dbda06a17ba76fecb8e1c2c96"
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add .github/workflows/pixel-font-studio-v2.yml scripts/check-pixel-font-studio-v2.mjs
+          git commit -m "fix(pixel-font): gate optional fontTools backend"
+          git push origin HEAD:refs/heads/agent/persistent-artist-mastering-motion-v3-20260811
+          git rev-parse HEAD
