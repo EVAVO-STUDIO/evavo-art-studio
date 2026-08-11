@@ -314,13 +314,14 @@ Every operation records before and after decoded-pixel identities in the executi
 
 ## 3. Sprite-sheet and animation work
 
-The sandbox has five task kinds:
+The sandbox has six task kinds:
 
 ```text
 image
 slice-sheet
 assemble-sheet
 sequence-review
+image-composite
 image-compare
 ```
 
@@ -377,6 +378,10 @@ The task publishes exact frame rectangles, hashes, dimensions, alpha statistics,
 Strict cells prevent accidental frame resampling. `contain` and `cover` remain available when an explicit normalization step is intended.
 
 `maximumDecodedPixels` is also the active decoded-image working set boundary for multi-image tasks, while preserving the existing per-image decoded-image boundary. Sheet assembly streams one source frame at a time and proves that the output sheet, current source and any resized cell fit together inside that budget before allocating the sheet. Sequence review bounds the complete decoded frame set plus transition, contact-sheet, animation or onion-skin preview overhead. Image comparison bounds both sources plus its difference or overlay surface. These checks run against exact external-source dimensions during compilation when possible and are independently repeated from image headers at runtime, including for task-output sources and correctly rehashed plans.
+
+The registry also establishes an aggregate source-byte boundary and create-only output-file and output-byte budgets. Compilation sums exact external-source sizes before hashing the next source and rejects a plan whose maximum file fan-out exceeds `maximumOutputFiles`; omitted `slice-sheet.count` values are derived from the exact source grid when possible and otherwise receive a conservative upper bound. Runtime independently checks task and source counts, preflights exact source sizes before hashing, enforces a per-output byte ceiling, and tracks the complete output tree against `maximumTotalOutputBytes`, including the final receipt. A failed byte or file-count check removes the staging tree and publishes nothing.
+
+The production registry currently permits at most 2,000 tasks, 10,000 exact external sources, 2 GiB per source, 16 GiB of aggregate external source bytes, 20,000 output files, 2 GiB per output file, and 16 GiB across the complete output tree. These are also code-owned runtime ceilings: a correctly rehashed plan cannot raise them above production policy. Runtime must reproduce the compiler-bound source-byte total and planned output count exactly before execution. Explicit slice counts are strongly recommended because they make both review scope and file-system impact exact before execution.
 
 ### Compare two exact images
 

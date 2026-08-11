@@ -23,8 +23,15 @@ export const PROJECT_ART_SANDBOX_REQUEST_SCHEMA = 'evavo.project-art-sandbox-req
 export const PROJECT_ART_SANDBOX_PLAN_SCHEMA = 'evavo.project-art-sandbox-plan.v1';
 export const PROJECT_ART_OPERATIONS_SCHEMA = 'evavo.project-art-operations.v1';
 
+const MAXIMUM_TASKS = 2_000;
+const MAXIMUM_EXTERNAL_SOURCES = 10_000;
+const MAXIMUM_SOURCE_BYTES = 2 * 1024 * 1024 * 1024;
+const MAXIMUM_TOTAL_SOURCE_BYTES = 16 * 1024 * 1024 * 1024;
 const MAXIMUM_DECODED_PIXELS = 220_000_000;
 const MAXIMUM_IMAGE_DIMENSION = 65_536;
+const MAXIMUM_OUTPUT_FILES = 20_000;
+const MAXIMUM_OUTPUT_BYTES = 2 * 1024 * 1024 * 1024;
+const MAXIMUM_TOTAL_OUTPUT_BYTES = 16 * 1024 * 1024 * 1024;
 const REVIEW_LABEL_HEIGHT = 18;
 
 const OUTPUT_EXTENSIONS = Object.freeze({
@@ -92,14 +99,48 @@ function validateRegistry(value) {
   return {
     operations,
     taskKinds: new Set(value.taskKinds.map((item, index) => safeId(item, `taskKinds[${index}]`))),
-    maximumTasks: boundedInteger(value.maximumTasks, 'registry.maximumTasks', 1, 100_000),
-    maximumExternalSources: boundedInteger(value.maximumExternalSources, 'registry.maximumExternalSources', 1, 1_000_000),
-    maximumSourceBytes: boundedInteger(value.maximumSourceBytes, 'registry.maximumSourceBytes', 1, Number.MAX_SAFE_INTEGER),
+    maximumTasks: boundedInteger(value.maximumTasks, 'registry.maximumTasks', 1, MAXIMUM_TASKS),
+    maximumExternalSources: boundedInteger(
+      value.maximumExternalSources,
+      'registry.maximumExternalSources',
+      1,
+      MAXIMUM_EXTERNAL_SOURCES,
+    ),
+    maximumSourceBytes: boundedInteger(
+      value.maximumSourceBytes,
+      'registry.maximumSourceBytes',
+      1,
+      MAXIMUM_SOURCE_BYTES,
+    ),
+    maximumTotalSourceBytes: boundedInteger(
+      value.maximumTotalSourceBytes,
+      'registry.maximumTotalSourceBytes',
+      1,
+      MAXIMUM_TOTAL_SOURCE_BYTES,
+    ),
     maximumDecodedPixels: boundedInteger(
       value.maximumDecodedPixels,
       'registry.maximumDecodedPixels',
       1,
       MAXIMUM_DECODED_PIXELS,
+    ),
+    maximumOutputFiles: boundedInteger(
+      value.maximumOutputFiles,
+      'registry.maximumOutputFiles',
+      1,
+      MAXIMUM_OUTPUT_FILES,
+    ),
+    maximumOutputBytes: boundedInteger(
+      value.maximumOutputBytes,
+      'registry.maximumOutputBytes',
+      1,
+      MAXIMUM_OUTPUT_BYTES,
+    ),
+    maximumTotalOutputBytes: boundedInteger(
+      value.maximumTotalOutputBytes,
+      'registry.maximumTotalOutputBytes',
+      1,
+      MAXIMUM_TOTAL_OUTPUT_BYTES,
     ),
   };
 }
@@ -582,7 +623,13 @@ function normalizeCompareTask(task, taskIndex, targetClaims) {
   };
 }
 
-async function bindExternalSource(workspaceRoot, descriptor, sourceMap, registry) {
+async function bindExternalSource(
+  workspaceRoot,
+  descriptor,
+  sourceMap,
+  sourceByteTotal,
+  registry,
+) {
   if (descriptor.kind !== 'external') return descriptor;
   if (sourceMap.has(descriptor.path)) {
     const existing = sourceMap.get(descriptor.path);
@@ -592,7 +639,31 @@ async function bindExternalSource(workspaceRoot, descriptor, sourceMap, registry
     return { kind: 'external', sourceId: existing.sourceId };
   }
   const resolved = await resolveExistingWithinRoot(workspaceRoot, descriptor.path, 'sandbox source');
+  const sourceBytes = boundedInteger(
+    resolved.metadata.size,
+    `source ${descriptor.path} bytes`,
+    0,
+    registry.maximumSourceBytes,
+  );
+  if (sourceByteTotal.value + sourceBytes > registry.maximumTotalSourceBytes) {
+    fail(
+      'PROJECT_ART_SANDBOX_SOURCE_BYTES_LIMIT',
+      `Sandbox sources exceed the ${registry.maximumTotalSourceBytes}-byte aggregate source boundary.`,
+    );
+  }
   const identity = await hashFileBounded(resolved.absolutePath, registry.maximumSourceBytes);
+  if (identity.bytes !== sourceBytes) {
+    fail(
+      'PROJECT_ART_SANDBOX_SOURCE_IDENTITY_CHANGED',
+      `Source size changed while binding: ${descriptor.path}.`,
+    );
+  }
+  if (sourceByteTotal.value + identity.bytes > registry.maximumTotalSourceBytes) {
+    fail(
+      'PROJECT_ART_SANDBOX_SOURCE_BYTES_LIMIT',
+      `Sandbox sources exceed the ${registry.maximumTotalSourceBytes}-byte aggregate source boundary.`,
+    );
+  }
   if (descriptor.expectedSha256 && descriptor.expectedSha256 !== identity.sha256) {
     fail('PROJECT_ART_SANDBOX_SOURCE_HASH_MISMATCH', `Source SHA-256 mismatch: ${descriptor.path}.`);
   }
@@ -615,6 +686,7 @@ async function bindExternalSource(workspaceRoot, descriptor, sourceMap, registry
     image,
   };
   sourceMap.set(descriptor.path, source);
+  sourceByteTotal.value += identity.bytes;
   if (sourceMap.size > registry.maximumExternalSources) {
     fail('PROJECT_ART_SANDBOX_SOURCE_LIMIT', 'Sandbox exceeded the external-source limit.');
   }
@@ -761,6 +833,64 @@ function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
   }
 }
 
+function maximumSliceOutputFrames(task, externalById, maximumDecodedPixels) {
+  if (task.count !== undefined) return task.count;
+  const dimensions = externalTaskDimensions(task, externalById);
+  if (dimensions) {
+    const [source] = dimensions;
+    const usableWidth = source.width - task.margin * 2;
+    const usableHeight = source.height - task.margin * 2;
+    const columns = Math.floor((usableWidth + task.spacing) / (task.frameWidth + task.spacing));
+    const rows = Math.floor((usableHeight + task.spacing) / (task.frameHeight + task.spacing));
+    if (columns < 1 || rows < 1) {
+      fail(
+        'PROJECT_ART_SANDBOX_TASK_INVALID',
+        `Task ${task.id} has no complete slice cells.`,
+      );
+    }
+    return columns * rows;
+  }
+  return Math.floor(maximumDecodedPixels / (task.frameWidth * task.frameHeight));
+}
+
+function maximumTaskOutputFiles(task, externalById, maximumDecodedPixels) {
+  if (task.kind === 'slice-sheet') {
+    return maximumSliceOutputFrames(task, externalById, maximumDecodedPixels) + 1;
+  }
+  if (task.kind === 'sequence-review') {
+    return (
+      1 +
+      (task.preview.contactSheet ? 1 : 0) +
+      (task.preview.animatedGif ? 1 : 0) +
+      (task.preview.onionSkins ? Math.max(0, task.sources.length - 1) : 0)
+    );
+  }
+  if (task.kind === 'image-compare') {
+    return 1 + (task.preview.difference ? 1 : 0) + (task.preview.overlay ? 1 : 0);
+  }
+  return 1;
+}
+
+function assertOutputFileBudget(
+  tasks,
+  externalById,
+  maximumDecodedPixels,
+  maximumOutputFiles,
+) {
+  let total = 1; // create-only sandbox receipt
+  for (const task of tasks) {
+    total += maximumTaskOutputFiles(task, externalById, maximumDecodedPixels);
+    if (total > maximumOutputFiles) {
+      fail(
+        'PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT',
+        `Sandbox outputs exceed the ${maximumOutputFiles}-file publication boundary. ` +
+          'Provide an explicit slice count or split the request into smaller sandboxes.',
+      );
+    }
+  }
+  return total;
+}
+
 function validateTaskDependency(source, taskIndexById, currentIndex, label) {
   if (source.kind !== 'task-output') return;
   const dependencyIndex = taskIndexById.get(source.taskId);
@@ -818,17 +948,32 @@ export async function compileProjectArtSandbox({
   }
 
   const sourceMap = new Map();
+  const sourceByteTotal = { value: 0 };
   const boundTasks = [];
   for (const task of normalizedTasks) {
     if (task.source) {
       boundTasks.push({
         ...task,
-        source: await bindExternalSource(root, task.source, sourceMap, registry),
+        source: await bindExternalSource(
+          root,
+          task.source,
+          sourceMap,
+          sourceByteTotal,
+          registry,
+        ),
       });
     } else {
       const sources = [];
       for (const source of task.sources) {
-        sources.push(await bindExternalSource(root, source, sourceMap, registry));
+        sources.push(
+          await bindExternalSource(
+            root,
+            source,
+            sourceMap,
+            sourceByteTotal,
+            registry,
+          ),
+        );
       }
       boundTasks.push({ ...task, sources });
     }
@@ -838,6 +983,12 @@ export async function compileProjectArtSandbox({
   for (const task of boundTasks) {
     assertBoundTaskPixelBudgets(task, externalById, registry.maximumDecodedPixels);
   }
+  const plannedMaximumOutputFiles = assertOutputFileBudget(
+    boundTasks,
+    externalById,
+    registry.maximumDecodedPixels,
+    registry.maximumOutputFiles,
+  );
   const plan = withDocumentHash({
     schema: PROJECT_ART_SANDBOX_PLAN_SCHEMA,
     sandboxId,
@@ -858,7 +1009,13 @@ export async function compileProjectArtSandbox({
       maximumTasks: registry.maximumTasks,
       maximumExternalSources: registry.maximumExternalSources,
       maximumSourceBytes: registry.maximumSourceBytes,
+      maximumTotalSourceBytes: registry.maximumTotalSourceBytes,
       maximumDecodedPixels: registry.maximumDecodedPixels,
+      maximumOutputFiles: registry.maximumOutputFiles,
+      maximumOutputBytes: registry.maximumOutputBytes,
+      maximumTotalOutputBytes: registry.maximumTotalOutputBytes,
+      boundExternalSourceBytes: sourceByteTotal.value,
+      plannedMaximumOutputFiles,
     },
     execution: {
       runtime: 'python-pillow',

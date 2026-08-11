@@ -31,9 +31,16 @@ PLAN_SCHEMA = "evavo.project-art-sandbox-plan.v1"
 RECEIPT_SCHEMA = "evavo.project-art-sandbox-receipt.v1"
 PROCESSOR_ID = "python-pillow-project-art-sandbox"
 MAXIMUM_PLAN_BYTES = 64 * 1024 * 1024
+MAXIMUM_TASKS = 2_000
+MAXIMUM_EXTERNAL_SOURCES = 10_000
 MAXIMUM_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
+MAXIMUM_TOTAL_SOURCE_BYTES = 16 * 1024 * 1024 * 1024
 MAXIMUM_PIXELS = 220_000_000
 MAXIMUM_IMAGE_DIMENSION = 65_536
+MAXIMUM_OUTPUT_FILES = 20_000
+MAXIMUM_OUTPUT_BYTES = 2 * 1024 * 1024 * 1024
+MAXIMUM_TOTAL_OUTPUT_BYTES = 16 * 1024 * 1024 * 1024
+OUTPUT_ENCODING_OVERHEAD_BYTES = 1024 * 1024
 MAXIMUM_HIDDEN_RGB_PIXELS = 4_000_000
 REVIEW_LABEL_HEIGHT = 18
 SHA256_CHARS = set("0123456789abcdef")
@@ -757,10 +764,25 @@ def apply_operation(
     fail(f"unsupported operation entered runtime: {op}")
 
 
-def save_image(image: Image.Image, target: Path, output_format: str) -> None:
+def estimated_image_output_bytes(images: Iterable[Image.Image]) -> int:
+    pixels = sum(image.width * image.height for image in images)
+    return pixels * 5 + OUTPUT_ENCODING_OVERHEAD_BYTES
+
+
+def save_image(
+    context: "RuntimeContext",
+    image: Image.Image,
+    target: Path,
+    output_format: str,
+) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
         fail(f"target already exists inside staging root: {target}")
+    context.preflight_output(
+        target,
+        estimated_image_output_bytes([image]),
+        f"image output {target}",
+    )
     if output_format == "png":
         image.save(target, format="PNG", optimize=True, compress_level=9)
     elif output_format == "webp":
@@ -778,6 +800,35 @@ def save_image(image: Image.Image, target: Path, output_format: str) -> None:
         image.save(target, format="GIF", optimize=True)
     else:
         fail(f"unsupported output format: {output_format}")
+    context.register_output(target, f"image output {target}")
+
+
+def save_animation(
+    context: "RuntimeContext",
+    frames: list[Image.Image],
+    target: Path,
+    duration_ms: int,
+) -> None:
+    if not frames:
+        fail("animation output requires at least one frame")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    context.preflight_output(
+        target,
+        estimated_image_output_bytes(frames),
+        f"animation output {target}",
+    )
+    frames[0].save(
+        target,
+        format="GIF",
+        save_all=True,
+        append_images=frames[1:],
+        duration=duration_ms,
+        loop=0,
+        disposal=2,
+        optimize=False,
+        transparency=0,
+    )
+    context.register_output(target, f"animation output {target}")
 
 
 def output_record(staging_root: Path, target: Path, image: Image.Image | None = None, *, role: str = "image") -> dict[str, Any]:
@@ -841,10 +892,13 @@ def create_contact_sheet(
     return sheet
 
 
-def write_json_create_only(target: Path, value: Any) -> None:
+def write_json_create_only(context: "RuntimeContext", target: Path, value: Any) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("x", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+    payload = (json.dumps(value, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    context.preflight_output(target, len(payload), f"JSON output {target}")
+    with target.open("xb") as handle:
+        handle.write(payload)
+    context.register_output(target, f"JSON output {target}")
 
 
 class RuntimeContext:
@@ -852,15 +906,36 @@ class RuntimeContext:
         self.workspace = workspace
         self.staging = staging
         self.plan = plan
-        self.sources = {source["sourceId"]: source for source in plan["externalSources"]}
         self.source_paths: dict[str, Path] = {}
         self.task_results: dict[str, dict[str, Any]] = {}
         self.task_output_paths: dict[str, list[Path]] = {}
+        self.output_paths: set[Path] = set()
+        self.output_files = 0
+        self.output_bytes = 0
+        self.total_source_bytes = 0
+        self.maximum_tasks = bounded_plan_limit(
+            plan,
+            "maximumTasks",
+            MAXIMUM_TASKS,
+            MAXIMUM_TASKS,
+        )
+        self.maximum_external_sources = bounded_plan_limit(
+            plan,
+            "maximumExternalSources",
+            MAXIMUM_EXTERNAL_SOURCES,
+            MAXIMUM_EXTERNAL_SOURCES,
+        )
         self.maximum_source_bytes = bounded_plan_limit(
             plan,
             "maximumSourceBytes",
             MAXIMUM_SOURCE_BYTES,
             MAXIMUM_SOURCE_BYTES,
+        )
+        self.maximum_total_source_bytes = bounded_plan_limit(
+            plan,
+            "maximumTotalSourceBytes",
+            MAXIMUM_TOTAL_SOURCE_BYTES,
+            MAXIMUM_TOTAL_SOURCE_BYTES,
         )
         self.maximum_decoded_pixels = bounded_plan_limit(
             plan,
@@ -868,14 +943,146 @@ class RuntimeContext:
             MAXIMUM_PIXELS,
             MAXIMUM_PIXELS,
         )
+        self.maximum_output_files = bounded_plan_limit(
+            plan,
+            "maximumOutputFiles",
+            MAXIMUM_OUTPUT_FILES,
+            MAXIMUM_OUTPUT_FILES,
+        )
+        self.maximum_output_bytes = bounded_plan_limit(
+            plan,
+            "maximumOutputBytes",
+            MAXIMUM_OUTPUT_BYTES,
+            MAXIMUM_OUTPUT_BYTES,
+        )
+        self.maximum_total_output_bytes = bounded_plan_limit(
+            plan,
+            "maximumTotalOutputBytes",
+            MAXIMUM_TOTAL_OUTPUT_BYTES,
+            MAXIMUM_TOTAL_OUTPUT_BYTES,
+        )
+        raw_sources = plan.get("externalSources")
+        if not isinstance(raw_sources, list) or len(raw_sources) > self.maximum_external_sources:
+            fail("plan externalSources exceed the runtime source-count boundary")
+        self.sources: dict[str, dict[str, Any]] = {}
+        for index, source in enumerate(raw_sources):
+            if not isinstance(source, dict):
+                fail(f"externalSources[{index}] must be an object")
+            source_id = source.get("sourceId")
+            if not isinstance(source_id, str) or not source_id:
+                fail(f"externalSources[{index}].sourceId is invalid")
+            if source_id in self.sources:
+                fail(f"duplicate external source id: {source_id}")
+            declared_bytes = source.get("bytes")
+            if (
+                isinstance(declared_bytes, bool)
+                or not isinstance(declared_bytes, int)
+                or declared_bytes < 0
+                or declared_bytes > self.maximum_source_bytes
+            ):
+                fail(f"externalSources[{index}].bytes is outside the runtime boundary")
+            self.sources[source_id] = source
+
+        limits = plan.get("limits", {})
+        if not isinstance(limits, dict):
+            fail("plan limits must be an object")
+        bound_external_source_bytes = limits.get("boundExternalSourceBytes")
+        if (
+            isinstance(bound_external_source_bytes, bool)
+            or not isinstance(bound_external_source_bytes, int)
+            or bound_external_source_bytes < 0
+            or bound_external_source_bytes > self.maximum_total_source_bytes
+        ):
+            fail(
+                "PROJECT_ART_SANDBOX_SOURCE_BYTES_LIMIT: "
+                "plan boundExternalSourceBytes is outside the runtime boundary"
+            )
+        self.bound_external_source_bytes = bound_external_source_bytes
+
+        planned_output_files = limits.get("plannedMaximumOutputFiles")
+        if (
+            isinstance(planned_output_files, bool)
+            or not isinstance(planned_output_files, int)
+            or planned_output_files < 1
+            or planned_output_files > self.maximum_output_files
+        ):
+            fail(
+                "PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT: "
+                "plan plannedMaximumOutputFiles is outside the runtime boundary"
+            )
+        self.planned_output_files = planned_output_files
 
     def verify_sources(self) -> None:
+        resolved_sources: list[tuple[str, dict[str, Any], Path, int]] = []
+        total_bytes = 0
         for source_id, source in self.sources.items():
             value = secure_existing_file(self.workspace, source["path"], f"source {source_id}")
-            digest, size = sha256_file(value, self.maximum_source_bytes)
-            if digest != source["sha256"] or size != source["bytes"]:
+            size = value.stat().st_size
+            if size != source["bytes"] or size > self.maximum_source_bytes:
+                fail(f"source identity changed: {source['path']}")
+            total_bytes += size
+            if total_bytes > self.maximum_total_source_bytes:
+                fail(
+                    "PROJECT_ART_SANDBOX_SOURCE_BYTES_LIMIT: "
+                    f"sources exceed the {self.maximum_total_source_bytes}-byte aggregate boundary"
+                )
+            resolved_sources.append((source_id, source, value, size))
+
+        for source_id, source, value, size in resolved_sources:
+            digest, observed_size = sha256_file(value, self.maximum_source_bytes)
+            if digest != source["sha256"] or observed_size != size:
                 fail(f"source identity changed: {source['path']}")
             self.source_paths[source_id] = value
+        if total_bytes != self.bound_external_source_bytes:
+            fail(
+                "PROJECT_ART_SANDBOX_SOURCE_BYTES_LIMIT: "
+                "boundExternalSourceBytes does not match the verified source set"
+            )
+        self.total_source_bytes = total_bytes
+
+    def preflight_output_count(self, additional_files: int, label: str) -> None:
+        if isinstance(additional_files, bool) or not isinstance(additional_files, int) or additional_files < 0:
+            fail(f"{label} output count is invalid")
+        if self.output_files + additional_files > self.maximum_output_files:
+            fail(
+                "PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT: "
+                f"{label} exceeds the {self.maximum_output_files}-file publication boundary"
+            )
+
+    def preflight_output(self, target: Path, estimated_bytes: int, label: str) -> None:
+        self.preflight_output_count(1, label)
+        if target in self.output_paths or target.exists():
+            fail(f"duplicate or existing output path: {target}")
+        if isinstance(estimated_bytes, bool) or not isinstance(estimated_bytes, int) or estimated_bytes < 0:
+            fail(f"{label} byte estimate is invalid")
+        if estimated_bytes > self.maximum_output_bytes:
+            fail(
+                "PROJECT_ART_SANDBOX_OUTPUT_BYTES_LIMIT: "
+                f"{label} exceeds the {self.maximum_output_bytes}-byte per-file boundary"
+            )
+        if self.output_bytes + estimated_bytes > self.maximum_total_output_bytes:
+            fail(
+                "PROJECT_ART_SANDBOX_TOTAL_OUTPUT_BYTES_LIMIT: "
+                f"{label} exceeds the {self.maximum_total_output_bytes}-byte aggregate output boundary"
+            )
+
+    def register_output(self, target: Path, label: str) -> None:
+        if target in self.output_paths:
+            fail(f"duplicate output registration: {target}")
+        size = target.stat().st_size
+        if size > self.maximum_output_bytes:
+            fail(
+                "PROJECT_ART_SANDBOX_OUTPUT_BYTES_LIMIT: "
+                f"{label} exceeds the {self.maximum_output_bytes}-byte per-file boundary"
+            )
+        if self.output_bytes + size > self.maximum_total_output_bytes:
+            fail(
+                "PROJECT_ART_SANDBOX_TOTAL_OUTPUT_BYTES_LIMIT: "
+                f"{label} exceeds the {self.maximum_total_output_bytes}-byte aggregate output boundary"
+            )
+        self.output_paths.add(target)
+        self.output_files += 1
+        self.output_bytes += size
 
     def resolve_source_path(self, descriptor: dict[str, Any]) -> Path:
         if descriptor["kind"] == "external":
@@ -899,6 +1106,59 @@ class RuntimeContext:
             fail(f"duplicate task result: {task_id}")
         self.task_results[task_id] = result
         self.task_output_paths[task_id] = output_paths
+
+
+def maximum_slice_output_frames(context: RuntimeContext, task: dict[str, Any]) -> int:
+    if task.get("count") is not None:
+        return int(task["count"])
+    source = task["source"]
+    if source.get("kind") == "external":
+        source_path = context.resolve_source_path(source)
+        width, height = image_dimensions(
+            source_path,
+            context.maximum_decoded_pixels,
+            f"slice-sheet task {task['id']} source",
+        )
+        margin = int(task["margin"])
+        spacing = int(task["spacing"])
+        columns = (width - margin * 2 + spacing) // (int(task["frameWidth"]) + spacing)
+        rows = (height - margin * 2 + spacing) // (int(task["frameHeight"]) + spacing)
+        if columns < 1 or rows < 1:
+            fail(f"slice-sheet task {task['id']} has no complete cells")
+        return columns * rows
+    frame_pixels = int(task["frameWidth"]) * int(task["frameHeight"])
+    return context.maximum_decoded_pixels // frame_pixels
+
+
+def maximum_task_output_files(context: RuntimeContext, task: dict[str, Any]) -> int:
+    kind = task.get("kind")
+    if kind == "slice-sheet":
+        return maximum_slice_output_frames(context, task) + 1
+    if kind == "sequence-review":
+        preview = task["preview"]
+        return (
+            1
+            + (1 if preview["contactSheet"] else 0)
+            + (1 if preview["animatedGif"] else 0)
+            + (max(0, len(task["sources"]) - 1) if preview["onionSkins"] else 0)
+        )
+    if kind == "image-compare":
+        preview = task["preview"]
+        return 1 + (1 if preview["difference"] else 0) + (1 if preview["overlay"] else 0)
+    return 1
+
+
+def maximum_plan_output_files(context: RuntimeContext, tasks: list[dict[str, Any]]) -> int:
+    total = 1  # create-only sandbox receipt
+    for task in tasks:
+        total += maximum_task_output_files(context, task)
+        if total > context.maximum_output_files:
+            fail(
+                "PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT: "
+                f"plan exceeds the {context.maximum_output_files}-file publication boundary; "
+                "provide an explicit slice count or split the request"
+            )
+    return total
 
 
 def execute_image_task(context: RuntimeContext, task: dict[str, Any]) -> None:
@@ -949,7 +1209,7 @@ def execute_image_task(context: RuntimeContext, task: dict[str, Any]) -> None:
         if expected.get("meaningfulAlpha") is True and alpha["transparentPixels"] + alpha["partialPixels"] == 0:
             fail(f"task {task['id']} requires meaningful alpha")
         target = target_path(context.staging, task["targetPath"], f"task {task['id']} target")
-        save_image(image, target, task["outputFormat"])
+        save_image(context, image, target, task["outputFormat"])
         output = output_record(context.staging, target, image)
         context.remember(
             task["id"],
@@ -993,6 +1253,7 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
     count = int(task.get("count", available))
     if count > available:
         fail(f"slice-sheet task {task['id']} requests {count} frames but only {available} fit")
+    context.preflight_output_count(count + 1, f"slice-sheet task {task['id']}")
     directory = target_path(context.staging, task["targetDirectory"], f"task {task['id']} targetDirectory")
     directory.mkdir(parents=True, exist_ok=False)
     outputs: list[dict[str, Any]] = []
@@ -1010,7 +1271,7 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
         index = int(task["startIndex"]) + offset
         file_name = task["fileNamePattern"].replace("{index}", f"{index:04d}")
         target = directory / file_name
-        save_image(frame, target, "png")
+        save_image(context, frame, target, "png")
         record = output_record(context.staging, target, frame, role="sprite-frame")
         outputs.append(record)
         output_paths.append(target)
@@ -1027,6 +1288,7 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
         frame.close()
     manifest_path = directory / "frames.json"
     write_json_create_only(
+        context,
         manifest_path,
         {
             "schema": "evavo.project-art-sliced-sheet.v1",
@@ -1158,7 +1420,7 @@ def execute_assemble_task(context: RuntimeContext, task: dict[str, Any]) -> None
                     prepared.close()
                 frame.close()
         target = target_path(context.staging, task["targetPath"], f"task {task['id']} target")
-        save_image(sheet, target, "png")
+        save_image(context, sheet, target, "png")
         context.remember(
             task["id"],
             {
@@ -1307,7 +1569,7 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
             "runtimeApprovalPerformed": False,
         }
         manifest_path = target_directory / "sequence-review.json"
-        write_json_create_only(manifest_path, manifest)
+        write_json_create_only(context, manifest_path, manifest)
         outputs = [output_record(context.staging, manifest_path, role="review-manifest")]
         output_paths = [manifest_path]
         if preview["contactSheet"]:
@@ -1318,7 +1580,7 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
             )
             try:
                 value = target_directory / "contact-sheet.png"
-                save_image(sheet, value, "png")
+                save_image(context, sheet, value, "png")
                 outputs.append(output_record(context.staging, value, sheet, role="review-contact-sheet"))
                 output_paths.append(value)
             finally:
@@ -1326,17 +1588,7 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
         if preview["animatedGif"]:
             value = target_directory / "animation-preview.gif"
             duration = int(preview["frameDurationMs"])
-            frames[0].save(
-                value,
-                format="GIF",
-                save_all=True,
-                append_images=frames[1:],
-                duration=duration,
-                loop=0,
-                disposal=2,
-                optimize=False,
-                transparency=0,
-            )
+            save_animation(context, frames, value, duration)
             outputs.append(output_record(context.staging, value, role="review-animation"))
             output_paths.append(value)
         if preview["onionSkins"] and len(frames) > 1:
@@ -1354,7 +1606,7 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                     onion.alpha_composite(red)
                     onion.alpha_composite(cyan)
                     value = onion_directory / f"{index - 1:04d}-{index:04d}.png"
-                    save_image(onion, value, "png")
+                    save_image(context, onion, value, "png")
                     outputs.append(output_record(context.staging, value, onion, role="review-onion-skin"))
                     output_paths.append(value)
                 finally:
@@ -1585,7 +1837,7 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
                     mask_image.close()
                 image.close()
         target = target_path(context.staging, task["targetPath"], f"task {task['id']} targetPath")
-        save_image(canvas, target, task["outputFormat"])
+        save_image(context, canvas, target, task["outputFormat"])
         output = output_record(context.staging, target, canvas, role="composite-image")
         context.remember(task["id"], {
             "taskId": task["id"],
@@ -1695,12 +1947,12 @@ def execute_compare_task(context: RuntimeContext, task: dict[str, Any]) -> None:
             "identityApprovalPerformed": False,
         }
         manifest_path = target_directory / "comparison.json"
-        write_json_create_only(manifest_path, manifest)
+        write_json_create_only(context, manifest_path, manifest)
         outputs = [output_record(context.staging, manifest_path, role="comparison-manifest")]
         output_paths = [manifest_path]
         if task["preview"]["difference"] and difference is not None:
             difference_path = target_directory / "difference.png"
-            save_image(difference, difference_path, "png")
+            save_image(context, difference, difference_path, "png")
             outputs.append(output_record(context.staging, difference_path, difference, role="comparison-difference"))
             output_paths.append(difference_path)
         if difference is not None:
@@ -1710,7 +1962,7 @@ def execute_compare_task(context: RuntimeContext, task: dict[str, Any]) -> None:
             overlay = Image.blend(left, right, 0.5)
             try:
                 overlay_path = target_directory / "overlay.png"
-                save_image(overlay, overlay_path, "png")
+                save_image(context, overlay, overlay_path, "png")
                 outputs.append(output_record(context.staging, overlay_path, overlay, role="comparison-overlay"))
                 output_paths.append(overlay_path)
             finally:
@@ -1769,6 +2021,17 @@ def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, outpu
         tasks = plan.get("tasks")
         if not isinstance(tasks, list) or not tasks:
             fail("plan has no tasks")
+        if len(tasks) > context.maximum_tasks:
+            fail(
+                f"plan exceeds the {context.maximum_tasks}-task runtime boundary"
+            )
+        planned_output_files = maximum_plan_output_files(context, tasks)
+        if planned_output_files != context.planned_output_files:
+            fail(
+                "PROJECT_ART_SANDBOX_OUTPUT_COUNT_LIMIT: "
+                "plannedMaximumOutputFiles does not match the verified task graph"
+            )
+        context.preflight_output_count(planned_output_files, "plan")
         for task in tasks:
             kind = task.get("kind")
             if kind == "image":
@@ -1818,6 +2081,14 @@ def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, outpu
                 ],
                 "tasks": task_results,
                 "outputs": sorted(all_outputs, key=lambda output: output["path"]),
+                "resourceUsage": {
+                    "externalSourceFiles": len(context.sources),
+                    "externalSourceBytes": context.total_source_bytes,
+                    "plannedMaximumOutputFiles": planned_output_files,
+                    "taskOutputFiles": context.output_files,
+                    "taskOutputBytes": context.output_bytes,
+                    "receiptExcludedFromTaskOutputTotals": True,
+                },
                 "effects": {
                     "sandboxExecution": True,
                     "createOnlyOutputRoot": True,
@@ -1836,7 +2107,7 @@ def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, outpu
             }
         )
         receipt_path = staging / "_evavo" / "project-art-sandbox-receipt.json"
-        write_json_create_only(receipt_path, receipt)
+        write_json_create_only(context, receipt_path, receipt)
         os.replace(staging, output_root)
         published = True
         return receipt

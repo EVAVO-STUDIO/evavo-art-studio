@@ -3,7 +3,11 @@
   "maximumTasks": 2000,
   "maximumExternalSources": 10000,
   "maximumSourceBytes": 2147483648,
+  "maximumTotalSourceBytes": 17179869184,
   "maximumDecodedPixels": 220000000,
+  "maximumOutputFiles": 20000,
+  "maximumOutputBytes": 2147483648,
+  "maximumTotalOutputBytes": 17179869184,
   "operations": [
     {
       "id": "inspect",
