@@ -1,0 +1,41 @@
+name: Temporary export exact Art Studio source 8462d7b for avatar finalization
+
+on:
+  push:
+    branches:
+      - automation/export-art-studio-source-8462d7b-finalization-20260811
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Package exact production parent
+        shell: bash
+        env:
+          EXPECTED_MAIN: 8462d7bc45ab88eece861efc302a3b6b41092b39
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN"
+          git archive --format=tar.gz --prefix=evavo-art-studio/ --output="$RUNNER_TEMP/evavo-art-studio-source-8462d7b.tar.gz" "$EXPECTED_MAIN"
+          test -s "$RUNNER_TEMP/evavo-art-studio-source-8462d7b.tar.gz"
+          sha256sum "$RUNNER_TEMP/evavo-art-studio-source-8462d7b.tar.gz" > "$RUNNER_TEMP/evavo-art-studio-source-8462d7b.sha256"
+
+      - name: Upload exact source archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evavo-art-studio-source-8462d7bc45ab88eece861efc302a3b6b41092b39
+          path: |
+            ${{ runner.temp }}/evavo-art-studio-source-8462d7b.tar.gz
+            ${{ runner.temp }}/evavo-art-studio-source-8462d7b.sha256
+          if-no-files-found: error
+          retention-days: 1
