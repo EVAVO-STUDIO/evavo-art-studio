@@ -20,10 +20,10 @@ jobs:
       - name: Check out exact carrier
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: true
 
-      - name: Reconstruct and verify exact reviewed payload
+      - name: Verify carrier scope and reconstruct reviewed payload
         shell: bash
         env:
           EXPECTED_PARENT: 5f8d11f4f5b55cc30ccb11c44250fa11f4b403ee
@@ -31,7 +31,13 @@ jobs:
           EXPECTED_PAYLOAD_SHA256: 1b4cc09df4a72b7ce35c1d7b6aa04dbbcf7f7cc7c9364f65b051ab6113f1cec4
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          git merge-base --is-ancestor "$EXPECTED_PARENT" HEAD
+          mapfile -t actual_carrier < <(git diff --name-only "$EXPECTED_PARENT"...HEAD | sort)
+          {
+            printf '%s\n' .github/workflows/temporary-apply-avatar-sequence-finalizer-v2.yml
+            printf '.evavo/automation/avatar-sequence-finalizer-parts/part-%s\n' {aa..aq}
+          } | sort > "$RUNNER_TEMP/expected-carrier-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-carrier-paths.txt" <(printf '%s\n' "${actual_carrier[@]}")
           parts=(.evavo/automation/avatar-sequence-finalizer-parts/part-{aa..aq})
           test "${#parts[@]}" -eq 17
           for part in "${parts[@]}"; do test -s "$part"; done
@@ -40,22 +46,21 @@ jobs:
           base64 --decode "$RUNNER_TEMP/avatar-sequence-finalizer-files.tar.gz.b64" > "$RUNNER_TEMP/avatar-sequence-finalizer-files.tar.gz"
           test "$(sha256sum "$RUNNER_TEMP/avatar-sequence-finalizer-files.tar.gz" | awk '{print $1}')" = "$EXPECTED_PAYLOAD_SHA256"
           tar -tzf "$RUNNER_TEMP/avatar-sequence-finalizer-files.tar.gz" | sort > "$RUNNER_TEMP/payload-paths.txt"
-          cat > "$RUNNER_TEMP/expected-payload-paths.txt" <<'PATHS'
-.github/workflows/project-art-avatar-sequence-finalization.yml
-.github/workflows/project-art-workbench.yml
-config/mcp.project-art-avatar-sequence-finalizer.windows.example.json
-docs/PROJECT_ART_AVATAR_SEQUENCE_FINALIZATION.md
-package.json
-scripts/check-project-art-avatar-sequence-finalization.mjs
-scripts/check-project-art-workbench.mjs
-scripts/finalize-project-art-avatar-sequence.mjs
-scripts/project-art/avatar-sequence-finalization-common.mjs
-scripts/project-art/avatar-sequence-finalization-evidence.mjs
-scripts/test-project-art-avatar-sequence-finalization.mjs
-scripts/test-project-art-avatar-sequence-finalizer-mcp.mjs
-tools/project_art_avatar_sequence_finalizer_mcp.mjs
-PATHS
-          sort -o "$RUNNER_TEMP/expected-payload-paths.txt" "$RUNNER_TEMP/expected-payload-paths.txt"
+          printf '%s\n' \
+            .github/workflows/project-art-avatar-sequence-finalization.yml \
+            .github/workflows/project-art-workbench.yml \
+            config/mcp.project-art-avatar-sequence-finalizer.windows.example.json \
+            docs/PROJECT_ART_AVATAR_SEQUENCE_FINALIZATION.md \
+            package.json \
+            scripts/check-project-art-avatar-sequence-finalization.mjs \
+            scripts/check-project-art-workbench.mjs \
+            scripts/finalize-project-art-avatar-sequence.mjs \
+            scripts/project-art/avatar-sequence-finalization-common.mjs \
+            scripts/project-art/avatar-sequence-finalization-evidence.mjs \
+            scripts/test-project-art-avatar-sequence-finalization.mjs \
+            scripts/test-project-art-avatar-sequence-finalizer-mcp.mjs \
+            tools/project_art_avatar_sequence_finalizer_mcp.mjs \
+            | sort > "$RUNNER_TEMP/expected-payload-paths.txt"
           diff -u "$RUNNER_TEMP/expected-payload-paths.txt" "$RUNNER_TEMP/payload-paths.txt"
 
       - name: Apply exact reviewed files
