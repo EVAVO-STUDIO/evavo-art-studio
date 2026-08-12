@@ -93,7 +93,16 @@ test("every launch Frame retains exactly 120 separate native sprite cels", async
 
   const plannedUtility = units.filter((unit) => unit.clipId === "utility-v2-planned");
   assert.equal(plannedUtility.length, 48, "The non-authoritative atlas-v2 pose studies must remain 12 per Frame");
-  assert.ok(plannedUtility.every((unit) => unit.prompt.includes("planned study")));
+  for (const [subjectId] of EXPECTED_FRAME_CELS) {
+    const subjectUtility = plannedUtility.filter((unit) => unit.subjectId === subjectId);
+    assert.equal(subjectUtility.length, 12, `${subjectId} must retain 12 non-authoritative atlas-v2 pose studies`);
+    assert.ok(subjectUtility.every((unit) => unit.framesInClip === 12));
+    assert.deepEqual(
+      subjectUtility.map((unit) => unit.frameIndex).sort((left, right) => left - right),
+      Array.from({ length: 12 }, (_, index) => index),
+      `${subjectId} atlas-v2 utility source indexes drifted`,
+    );
+  }
 });
 
 test("the intro, batching and one-image work-unit boundaries cannot collapse into generated sheets", async () => {
