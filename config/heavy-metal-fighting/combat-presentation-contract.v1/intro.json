@@ -1,0 +1,365 @@
+{
+  "openingIntro": {
+    "expectedCount": 30,
+    "shots": [
+      {
+        "index": 1,
+        "id": "corporate-megacity-rain",
+        "holdTicks": 42,
+        "camera": "wide establishing cel",
+        "overlays": [
+          "rain",
+          "distant-broadcast-flicker"
+        ],
+        "direction": "Oppressive city scale; no cyberpunk neon collage."
+      },
+      {
+        "index": 2,
+        "id": "broadcast-towers-turn",
+        "holdTicks": 24,
+        "camera": "slow horizontal pan",
+        "overlays": [
+          "tower-lamp-step"
+        ],
+        "direction": "Telecommunications and surveillance, built like heavy infrastructure."
+      },
+      {
+        "index": 3,
+        "id": "dominion-feed-building-face",
+        "holdTicks": 24,
+        "camera": "hard cut and slight push",
+        "overlays": [
+          "broadcast-tear"
+        ],
+        "direction": "Public spectacle occupies architecture."
+      },
+      {
+        "index": 4,
+        "id": "crowd-watches-frame-ko",
+        "holdTicks": 22,
+        "camera": "held impact cel",
+        "overlays": [
+          "screen-flash",
+          "crowd-reaction"
+        ],
+        "direction": "Frame violence is entertainment."
+      },
+      {
+        "index": 5,
+        "id": "corporate-presenter-freeze",
+        "holdTicks": 24,
+        "camera": "medium close-up",
+        "overlays": [
+          "smile-mouth-cel",
+          "ticker"
+        ],
+        "direction": "Propaganda polish with an unsettling hard hold."
+      },
+      {
+        "index": 6,
+        "id": "transit-gate-scans-commuters",
+        "holdTicks": 30,
+        "camera": "side-stage pan",
+        "overlays": [
+          "scan-line"
+        ],
+        "direction": "Routine aptitude harvesting."
+      },
+      {
+        "index": 7,
+        "id": "candidate-receives-red-mark",
+        "holdTicks": 18,
+        "camera": "close-up cut",
+        "overlays": [
+          "red-index-lamp"
+        ],
+        "direction": "No dramatic kidnapping yet; the system marks them silently."
+      },
+      {
+        "index": 8,
+        "id": "recovery-agents-corridor",
+        "holdTicks": 30,
+        "camera": "low-angle corridor cel",
+        "overlays": [
+          "door-light-step"
+        ],
+        "direction": "Agents look like infrastructure auditors, not generic commandos."
+      },
+      {
+        "index": 9,
+        "id": "candidate-eye-hand-scan",
+        "holdTicks": 24,
+        "camera": "two-part close-up",
+        "overlays": [
+          "scanner-pulse"
+        ],
+        "direction": "Natural aptitude extraction."
+      },
+      {
+        "index": 10,
+        "id": "contract-name-becomes-index",
+        "holdTicks": 20,
+        "camera": "screen insert",
+        "overlays": [
+          "text-replace-wipe"
+        ],
+        "direction": "Human name replaced by corporate index; all text separately authored."
+      },
+      {
+        "index": 11,
+        "id": "crew-lockers-open",
+        "holdTicks": 24,
+        "camera": "front-on service room",
+        "overlays": [
+          "locker-light-step"
+        ],
+        "direction": "The people behind the machines."
+      },
+      {
+        "index": 12,
+        "id": "branka-link-collar",
+        "holdTicks": 20,
+        "camera": "pilot close-up",
+        "overlays": [
+          "collar-lock"
+        ],
+        "direction": "Direct, practical, no glamour pose."
+      },
+      {
+        "index": 13,
+        "id": "miho-service-visor",
+        "holdTicks": 20,
+        "camera": "pilot close-up",
+        "overlays": [
+          "visor-lamp"
+        ],
+        "direction": "Route-reading identity."
+      },
+      {
+        "index": 14,
+        "id": "esi-crew-position-check",
+        "holdTicks": 22,
+        "camera": "medium command cel",
+        "overlays": [
+          "crew-lamp-sequence"
+        ],
+        "direction": "Crew command responsibility."
+      },
+      {
+        "index": 15,
+        "id": "parvaneh-phase-diagnostic-fails",
+        "holdTicks": 24,
+        "camera": "laboratory cel",
+        "overlays": [
+          "calibration-break"
+        ],
+        "direction": "Technology is unreliable and dangerous."
+      },
+      {
+        "index": 16,
+        "id": "bastion-dormant-in-cradle",
+        "holdTicks": 42,
+        "camera": "full-height reveal pan",
+        "overlays": [
+          "service-lamps"
+        ],
+        "direction": "Frame scale and maintenance logic."
+      },
+      {
+        "index": 17,
+        "id": "technicians-seal-armour",
+        "holdTicks": 24,
+        "camera": "detail montage cel",
+        "overlays": [
+          "armour-lock"
+        ],
+        "direction": "Panels close along declared access routes."
+      },
+      {
+        "index": 18,
+        "id": "reactor-engineer-enables-external-power",
+        "holdTicks": 24,
+        "camera": "console and cable cel",
+        "overlays": [
+          "core-charge-step"
+        ],
+        "direction": "External power before independent CORE."
+      },
+      {
+        "index": 19,
+        "id": "pilot-capsule-closes",
+        "holdTicks": 24,
+        "camera": "cockpit framing cel",
+        "overlays": [
+          "seal-lights"
+        ],
+        "direction": "Human enclosed by machine."
+      },
+      {
+        "index": 20,
+        "id": "crew-station-lamps-green",
+        "holdTicks": 28,
+        "camera": "interior status strip",
+        "overlays": [
+          "lamp-sequence"
+        ],
+        "direction": "Multiple lives aboard."
+      },
+      {
+        "index": 21,
+        "id": "umbilical-unlocks",
+        "holdTicks": 18,
+        "camera": "rear three-quarter Frame cel",
+        "overlays": [
+          "lock-release"
+        ],
+        "direction": "Mechanical anticipation."
+      },
+      {
+        "index": 22,
+        "id": "umbilical-retracts-arc",
+        "holdTicks": 18,
+        "camera": "hard action cel",
+        "overlays": [
+          "electrical-arc"
+        ],
+        "direction": "One controlled arc, not constant lightning."
+      },
+      {
+        "index": 23,
+        "id": "sensor-line-ignites",
+        "holdTicks": 20,
+        "camera": "head and torso close-up",
+        "overlays": [
+          "sensor-step"
+        ],
+        "direction": "Awakening through a single iconic light."
+      },
+      {
+        "index": 24,
+        "id": "first-foot-leaves-cradle",
+        "holdTicks": 28,
+        "camera": "low-angle weight cel",
+        "overlays": [
+          "floor-dust"
+        ],
+        "direction": "Mass before speed."
+      },
+      {
+        "index": 25,
+        "id": "arena-blast-doors-open",
+        "holdTicks": 24,
+        "camera": "tunnel cel",
+        "overlays": [
+          "door-light"
+        ],
+        "direction": "Threshold into spectacle."
+      },
+      {
+        "index": 26,
+        "id": "electrified-cage-powers",
+        "holdTicks": 24,
+        "camera": "arena-wide cel",
+        "overlays": [
+          "cage-pulse"
+        ],
+        "direction": "Containment, not random lightning."
+      },
+      {
+        "index": 27,
+        "id": "frames-enter-opposite-tunnels",
+        "holdTicks": 36,
+        "camera": "symmetrical arena cel",
+        "overlays": [
+          "walk-holds",
+          "audience-lamps"
+        ],
+        "direction": "Two distinct silhouettes and scales."
+      },
+      {
+        "index": 28,
+        "id": "pilot-portrait-slash",
+        "holdTicks": 24,
+        "camera": "three-strip montage",
+        "overlays": [
+          "portrait-wipe"
+        ],
+        "direction": "Pilot identities punctuate the machines."
+      },
+      {
+        "index": 29,
+        "id": "first-heavy-contact",
+        "holdTicks": 24,
+        "camera": "impact freeze cel",
+        "overlays": [
+          "impact-flash",
+          "metal-debris"
+        ],
+        "direction": "A readable body contact before effects."
+      },
+      {
+        "index": 30,
+        "id": "title-lock",
+        "holdTicks": 72,
+        "camera": "title screen lock",
+        "overlays": [
+          "title-rail",
+          "press-fire"
+        ],
+        "direction": "HEAVY METAL FIGHTING closes the sequence."
+      }
+    ],
+    "totalHoldTicks": 798,
+    "targetDurationSecondsAt60Hz": 13.3
+  },
+  "attractMode": {
+    "status": "launch-required-reuse-plan",
+    "rule": "Attract mode reuses approved title, selection, match and result assets; it does not create a second ungoverned art inventory.",
+    "segments": [
+      {
+        "id": "title-hold",
+        "targetSeconds": 7,
+        "content": [
+          "title-attract service bay",
+          "PRESS FIRE",
+          "low-rate maintenance loops"
+        ]
+      },
+      {
+        "id": "pilot-frame-billing",
+        "targetSeconds": 8,
+        "content": [
+          "one Pilot card",
+          "default Frame card",
+          "crew and CORE billing",
+          "arena card"
+        ]
+      },
+      {
+        "id": "demo-fight",
+        "targetSeconds": 18,
+        "content": [
+          "governed AI match excerpt",
+          "one normal contact",
+          "one guard event",
+          "one special or Overdrive excerpt"
+        ]
+      },
+      {
+        "id": "circuit-record",
+        "targetSeconds": 7,
+        "content": [
+          "Black Crown holder",
+          "records rail",
+          "corporate broadcast sign-off"
+        ]
+      }
+    ],
+    "transitionRules": [
+      "hard broadcast shutters",
+      "one or two palette wipes",
+      "no smooth video cross-fades",
+      "skip immediately on any confirm input"
+    ]
+  }
+}
