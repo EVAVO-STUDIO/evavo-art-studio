@@ -7,11 +7,14 @@ on:
       - "config/game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-*"
       - "config/heavy-metal-fighting/**"
       - "config/mcp.heavy-metal-fighting-art-studio.windows.example.json"
+      - "config/mcp.heavy-metal-fighting-production.windows.example.json"
       - "scripts/game-art-campaign/**"
       - "scripts/game-art-campaign-heavy-metal-fighting.test.mjs"
       - "scripts/heavy-metal-fighting/**"
       - "scripts/heavy-metal-fighting-art-studio.mjs"
       - "scripts/heavy-metal-fighting-art-studio-mcp.mjs"
+      - "scripts/heavy-metal-fighting-production-mcp.mjs"
+      - "scripts/heavy-metal-fighting-production-mcp.test.mjs"
       - "scripts/heavy-metal-fighting-production-workspace.mjs"
       - "scripts/heavy-metal-fighting-art-studio-core.test.mjs"
       - "scripts/heavy-metal-fighting-art-studio.test.mjs"
@@ -28,11 +31,14 @@ on:
       - "config/game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-*"
       - "config/heavy-metal-fighting/**"
       - "config/mcp.heavy-metal-fighting-art-studio.windows.example.json"
+      - "config/mcp.heavy-metal-fighting-production.windows.example.json"
       - "scripts/game-art-campaign/**"
       - "scripts/game-art-campaign-heavy-metal-fighting.test.mjs"
       - "scripts/heavy-metal-fighting/**"
       - "scripts/heavy-metal-fighting-art-studio.mjs"
       - "scripts/heavy-metal-fighting-art-studio-mcp.mjs"
+      - "scripts/heavy-metal-fighting-production-mcp.mjs"
+      - "scripts/heavy-metal-fighting-production-mcp.test.mjs"
       - "scripts/heavy-metal-fighting-production-workspace.mjs"
       - "scripts/heavy-metal-fighting-art-studio-core.test.mjs"
       - "scripts/heavy-metal-fighting-art-studio.test.mjs"
@@ -67,12 +73,14 @@ jobs:
           find scripts/heavy-metal-fighting -name '*.mjs' -print0 | xargs -0 -n1 node --check
           node --check scripts/heavy-metal-fighting-art-studio.mjs
           node --check scripts/heavy-metal-fighting-art-studio-mcp.mjs
+          node --check scripts/heavy-metal-fighting-production-mcp.mjs
+          node --check scripts/heavy-metal-fighting-production-mcp.test.mjs
           node --check scripts/heavy-metal-fighting-production-workspace.mjs
           node --check scripts/heavy-metal-fighting-art-studio-core.test.mjs
           node --check scripts/heavy-metal-fighting-art-studio.test.mjs
           node --check scripts/heavy-metal-fighting-production-design.test.mjs
           node --check scripts/game-art-campaign-heavy-metal-fighting.test.mjs
-      - name: Run governed HMF campaign, mechanical, sprite, design, workspace and work-order tests
+      - name: Run governed HMF campaign, mechanical, sprite, design, workspace, work-order and MCP tests
         run: |
           node --test \
             scripts/game-art-campaign-heavy-metal-fighting.test.mjs \
@@ -80,6 +88,7 @@ jobs:
             scripts/heavy-metal-fighting-production-design.test.mjs \
             scripts/heavy-metal-fighting/art-production-workspace.test.mjs \
             scripts/heavy-metal-fighting/work-orders.test.mjs \
+            scripts/heavy-metal-fighting-production-mcp.test.mjs \
             scripts/heavy-metal-fighting-art-studio.test.mjs
       - name: Compile exact production evidence
         run: |
@@ -114,6 +123,7 @@ jobs:
           node scripts/heavy-metal-fighting-production-workspace.mjs receipt-template hmf.frame-animation.bastion.slot-000 > "$RUNNER_TEMP/heavy-metal-fighting-receipt-template.json"
           node scripts/heavy-metal-fighting-production-workspace.mjs repair-template hmf.frame-animation.bastion.slot-000 --candidate-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --failure-codes random-greebles,pivot-drift --attempt 1 > "$RUNNER_TEMP/heavy-metal-fighting-repair-template.json"
           node scripts/heavy-metal-fighting-production-workspace.mjs resume-batch hmf-b0001 > "$RUNNER_TEMP/heavy-metal-fighting-resume-batch-0001.json"
+          node --input-type=module -e 'import { callTool, VERIFY_TOOL } from "./scripts/heavy-metal-fighting-production-mcp.mjs"; console.log(JSON.stringify(await callTool(VERIFY_TOOL), null, 2));' > "$RUNNER_TEMP/heavy-metal-fighting-production-mcp-verification.json"
       - name: Prove source tree remains clean
         run: |
           git diff --exit-code
@@ -156,3 +166,4 @@ jobs:
             ${{ runner.temp }}/heavy-metal-fighting-receipt-template.json
             ${{ runner.temp }}/heavy-metal-fighting-repair-template.json
             ${{ runner.temp }}/heavy-metal-fighting-resume-batch-0001.json
+            ${{ runner.temp }}/heavy-metal-fighting-production-mcp-verification.json
