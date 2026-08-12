@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "evavo-project-art-workspace-jobs": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_jobs_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ART_WORKSPACE_JOB_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
+        "EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE": "false"
+      }
+    }
+  }
+}

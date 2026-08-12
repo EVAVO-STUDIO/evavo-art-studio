@@ -8,15 +8,16 @@ Use:
 config/mcp.project-art-workspace.windows.example.json
 ```
 
-That one configuration registers three deliberately separate path-only servers:
+That one configuration registers four deliberately separate path-only servers:
 
 ```text
 evavo-project-art-workspace
 evavo-project-art-workspace-ingest
 evavo-project-art-workspace-catalog
+evavo-project-art-workspace-jobs
 ```
 
-The primary server owns project inspection, deterministic image operations, sprite and atlas work, persistent workspace creation, append-only snapshots and EVAVO Storage handoff preparation. The ingest server owns exact placement of mounted chat attachments, generated images and approved local files into an existing workspace. The catalog server gives agents a content-addressed, queryable view of what the workspace actually contains and whether it has drifted.
+The primary server owns project inspection, deterministic image operations, sprite and atlas work, persistent workspace creation, append-only snapshots and EVAVO Storage handoff preparation. The ingest server owns exact placement of mounted chat attachments, generated images and approved local files into an existing workspace. The catalog server gives agents a content-addressed, queryable view of what the workspace actually contains and whether it has drifted. The jobs server adds append-only, crash-resumable execution checkpoints so another agent can continue the exact next step without reconstructing state from conversation memory.
 
 ## End-to-end flow
 
@@ -28,7 +29,13 @@ ChatGPT / Claude attachment or generated image
 → editable working copy under working/
 → content-addressed workspace catalog
 → bounded discovery by area, path, media type, dimensions, alpha, animation or SHA-256
+→ create-only resumable production job
+→ exact input fingerprint + dependency check
+→ bounded lease claim
 → deterministic cleanup, mastering, compositing, sprites or animation work
+→ append-only success/failure checkpoint
+→ exact output-evidence verification
+→ safe resume after interruption
 → append-only workspace snapshot
 → catalog verification or a new catalog showing exact drift
 → visual review and explicit creative decision
@@ -49,18 +56,9 @@ Entrypoint:
 tools/project_art_workspace_mcp.mjs
 ```
 
-Core capabilities include:
+Core capabilities include project and repository art intelligence; deterministic image and sprite sandbox plans; cleanup, transparency repair, compositing and mastering; reference-derived matching-image and matching-frame planning; temporary intake and variable-size sprite atlases; persistent workspace creation; append-only workspace snapshots; and exact EVAVO Storage handoff preparation.
 
-- project and repository art intelligence;
-- deterministic image and sprite sandbox plans;
-- cleanup, transparency repair, compositing and mastering;
-- reference-derived matching-image and matching-frame planning;
-- temporary intake and variable-size sprite atlases;
-- persistent workspace creation;
-- append-only workspace snapshots;
-- exact EVAVO Storage handoff preparation.
-
-Write operations require the independent local gate:
+Write operations require:
 
 ```text
 EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE=true
@@ -74,23 +72,16 @@ Entrypoint:
 tools/project_art_workspace_ingest_mcp.mjs
 ```
 
-Core capabilities include:
+It provides exact external-source and destination-plan compilation, atomic ingest, immutable source-copy and editable working-copy creation, provenance receipts and full rollback on late collision or byte mismatch.
 
-- read-only capability inspection;
-- exact external-source and destination-plan compilation;
-- atomic ingest into an existing persistent workspace;
-- immutable source-copy and editable working-copy creation;
-- exact provenance, receipt and commit-marker publication;
-- complete rollback if any late target collision or byte mismatch occurs.
-
-It requires independent workspace and source allowlists:
+Independent allowlists:
 
 ```text
 EVAVO_ART_WORKSPACE_INGEST_ROOTS
 EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS
 ```
 
-Write operations require a separate local gate:
+Write gate:
 
 ```text
 EVAVO_ART_WORKSPACE_INGEST_MCP_ALLOW_WRITE=true
@@ -104,46 +95,83 @@ Entrypoint:
 tools/project_art_workspace_catalog_mcp.mjs
 ```
 
-Core capabilities include:
+It provides create-only content-addressed inventories, exact SHA-256 and byte-length identity, image dimensions/alpha/animation metadata, duplicate groups, bounded queries and missing/changed/unexpected drift verification.
 
-- create-only, content-addressed workspace inventories;
-- exact SHA-256, byte length, area, media type and file-kind discovery;
-- bounded image-header metadata including dimensions, alpha and animation state;
-- exact duplicate groups without moving image bytes through MCP;
-- bounded catalog queries by path, extension, area, dimensions, alpha, animation or digest;
-- verification of missing, changed and unexpected files after edits or agent sessions.
-
-Read-only query and verification tools are always safe within the configured roots. Catalog compilation and publication require:
+Write gate:
 
 ```text
 EVAVO_PERSISTENT_CATALOG_MCP_ALLOW_WRITE=true
 ```
 
-Catalog paths are confined by:
+Catalog roots:
 
 ```text
 EVAVO_PERSISTENT_CATALOG_ROOTS
 ```
 
-A catalog is technical evidence, not creative approval. Prior catalog evidence is excluded from later scans so inventories do not recursively catalogue themselves.
+A catalog is technical evidence, not creative approval.
+
+### `evavo-project-art-workspace-jobs`
+
+Entrypoint:
+
+```text
+tools/project_art_workspace_jobs_mcp.mjs
+```
+
+It provides:
+
+- create-only job plans with exact source fingerprints;
+- validated acyclic step dependencies;
+- append-only, self-hashed and hash-chained checkpoint events;
+- short-lived agent claims with stale-lease recovery;
+- exact next-step inspection after interruption;
+- retryable failed steps with attempt counts;
+- exact succeeded-output evidence;
+- drift blocking when completed evidence changes;
+- pause, resume and cancellation checkpoints without mutable state files.
+
+Canonical tools:
+
+```text
+evavo_art_workspace_job_capabilities
+evavo_art_compile_workspace_job
+evavo_art_create_workspace_job
+evavo_art_inspect_workspace_job
+evavo_art_checkpoint_workspace_job
+```
+
+Write gate:
+
+```text
+EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE=true
+```
+
+Job roots:
+
+```text
+EVAVO_ART_WORKSPACE_JOB_ROOTS
+```
+
+The job server does not execute providers or arbitrary shell commands. The actual step is still performed by an existing governed Art Studio tool. The job layer only proves that the step is ready and records exact evidence afterward.
 
 ## Safe deployment defaults
 
-The canonical example keeps all three write gates set to `false`. Enable only the server needed for the current operation and only on the trusted local workstation.
+The canonical example keeps all four write gates set to `false`. Enable only the server needed for the current operation and only on the trusted local workstation.
 
-Workspace roots control where plans, evidence and persistent workspaces may be read or written. The ingest source-root list separately controls which external files may be read. Keep those allowlists explicit rather than granting broad drive access.
+Workspace roots control where plans, evidence, catalogs, job journals and persistent workspaces may be read or written. The ingest source-root list separately controls which external files may be read. Keep these allowlists explicit rather than granting broad drive access.
 
-Image bytes remain in local files. MCP carries bounded paths, hashes, dimensions, identifiers, plans, duplicate evidence, drift summaries and receipts; it does not transport image payloads through the language-model context.
+Image bytes remain in local files. MCP carries bounded paths, hashes, dimensions, identifiers, plans, duplicate evidence, drift summaries, job state and receipts; it does not transport image payloads through the language-model context.
 
 ## EVAVO Storage
 
 `evavo_art_prepare_storage_handoff` creates an exact self-hashed request for selected workspace files. It does not perform the Storage write.
 
-The actual EVAVO Storage ingest remains a separate authority that independently verifies path, byte length, SHA-256, logical destination and provenance. A successful workspace operation or catalog publication is not Storage admission.
+The actual EVAVO Storage ingest remains a separate authority that independently verifies path, byte length, SHA-256, logical destination and provenance. A successful workspace operation, catalog publication or job checkpoint is not Storage admission.
 
 ## Creative and publication authority
 
-Technical image processing and catalog verification do not grant creative approval. Ingest does not make an image final, a catalog does not decide which duplicate is correct, and a successful mastering check does not promote a candidate.
+Technical image processing, catalog verification and job completion do not grant creative approval. Ingest does not make an image final, a catalog does not decide which duplicate is correct, and a job success event only records technical evidence for the declared step.
 
 The suite performs no automatic:
 

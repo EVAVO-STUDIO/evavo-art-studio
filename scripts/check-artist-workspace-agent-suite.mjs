@@ -10,16 +10,21 @@ const requiredFiles = [
   'config/artist-workspace-agent-suite.v1.json',
   'config/mcp.project-art-workspace.windows.example.json',
   'config/mcp.persistent-artist-workspace-catalog.windows.example.json',
+  'config/mcp.persistent-artist-workspace-jobs.windows.example.json',
   'docs/ARTIST_WORKSPACE_AGENT_SUITE.md',
   'docs/PERSISTENT_ARTIST_WORKSPACE_CATALOG.md',
+  'docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md',
   'tools/project_art_workspace_mcp.mjs',
   'tools/project_art_workspace_ingest_mcp.mjs',
   'tools/project_art_workspace_catalog_mcp.mjs',
+  'tools/project_art_workspace_jobs_mcp.mjs',
   'scripts/persistent-artist-workspace.mjs',
   'scripts/persistent-artist-workspace-ingest.mjs',
   'scripts/persistent-artist-workspace-catalog.mjs',
+  'scripts/persistent-artist-workspace-jobs.mjs',
   'scripts/check-persistent-artist-workspace-ingest.mjs',
   'scripts/check-persistent-artist-workspace-catalog.mjs',
+  'scripts/check-persistent-artist-workspace-jobs.mjs',
   '.github/workflows/artist-workspace-agent-suite.yml',
 ];
 
@@ -39,10 +44,13 @@ for (const relative of requiredFiles) {
 for (const relative of [
   'scripts/check-artist-workspace-agent-suite.mjs',
   'scripts/check-persistent-artist-workspace-catalog.mjs',
+  'scripts/check-persistent-artist-workspace-jobs.mjs',
   'scripts/persistent-artist-workspace-catalog.mjs',
+  'scripts/persistent-artist-workspace-jobs.mjs',
   'tools/project_art_workspace_mcp.mjs',
   'tools/project_art_workspace_ingest_mcp.mjs',
   'tools/project_art_workspace_catalog_mcp.mjs',
+  'tools/project_art_workspace_jobs_mcp.mjs',
   'scripts/persistent-artist-workspace.mjs',
   'scripts/persistent-artist-workspace-ingest.mjs',
 ]) {
@@ -65,10 +73,12 @@ assert.deepEqual(
     'evavo-project-art-workspace',
     'evavo-project-art-workspace-ingest',
     'evavo-project-art-workspace-catalog',
+    'evavo-project-art-workspace-jobs',
   ],
 );
 assert.equal(manifest.servers.every((entry) => entry.defaultWriteEnabled === false), true);
 for (const value of Object.values(manifest.authority)) assert.equal(value, false);
+
 const catalogFlow = manifest.flows.find((entry) => entry.id === 'persistent-workspace-discovery-and-drift');
 assert.ok(catalogFlow, 'Agent-suite manifest must define workspace discovery and drift verification.');
 for (const tool of [
@@ -81,23 +91,40 @@ for (const tool of [
   assert.equal(catalogFlow.steps.includes(tool), true, `Catalog flow is missing ${tool}`);
 }
 
+const jobFlow = manifest.flows.find((entry) => entry.id === 'resumable-persistent-workspace-production');
+assert.ok(jobFlow, 'Agent-suite manifest must define crash-resumable production.');
+for (const tool of [
+  'evavo_art_workspace_job_capabilities',
+  'evavo_art_compile_workspace_job',
+  'evavo_art_create_workspace_job',
+  'evavo_art_inspect_workspace_job',
+  'evavo_art_checkpoint_workspace_job',
+]) {
+  assert.equal(jobFlow.steps.includes(tool), true, `Resumable job flow is missing ${tool}`);
+}
+
 const config = JSON.parse(content.get('config/mcp.project-art-workspace.windows.example.json'));
 const workspaceServer = config.mcpServers?.['evavo-project-art-workspace'];
 const ingestServer = config.mcpServers?.['evavo-project-art-workspace-ingest'];
 const catalogServer = config.mcpServers?.['evavo-project-art-workspace-catalog'];
+const jobsServer = config.mcpServers?.['evavo-project-art-workspace-jobs'];
 assert.ok(workspaceServer, 'Canonical Windows MCP config must register the project-art workspace server.');
 assert.ok(ingestServer, 'Canonical Windows MCP config must register the persistent ingest server.');
 assert.ok(catalogServer, 'Canonical Windows MCP config must register the workspace catalog server.');
+assert.ok(jobsServer, 'Canonical Windows MCP config must register the resumable workspace jobs server.');
 assert.deepEqual(workspaceServer.args, ['C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_mcp.mjs']);
 assert.deepEqual(ingestServer.args, ['C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_ingest_mcp.mjs']);
 assert.deepEqual(catalogServer.args, ['C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_catalog_mcp.mjs']);
+assert.deepEqual(jobsServer.args, ['C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_jobs_mcp.mjs']);
 assert.equal(workspaceServer.env.EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE, 'false');
 assert.equal(ingestServer.env.EVAVO_ART_WORKSPACE_INGEST_MCP_ALLOW_WRITE, 'false');
 assert.equal(catalogServer.env.EVAVO_PERSISTENT_CATALOG_MCP_ALLOW_WRITE, 'false');
+assert.equal(jobsServer.env.EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE, 'false');
 assert.ok(workspaceServer.env.EVAVO_ART_WORKSPACE_ROOTS.includes('ArtWorkspaces'));
 assert.ok(ingestServer.env.EVAVO_ART_WORKSPACE_INGEST_ROOTS.includes('ArtWorkspaces'));
 assert.ok(ingestServer.env.EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS.includes('Incoming Art'));
 assert.ok(catalogServer.env.EVAVO_PERSISTENT_CATALOG_ROOTS.includes('ArtWorkspaces'));
+assert.ok(jobsServer.env.EVAVO_ART_WORKSPACE_JOB_ROOTS.includes('ArtWorkspaces'));
 assert.notEqual(
   ingestServer.env.EVAVO_ART_WORKSPACE_INGEST_ROOTS,
   ingestServer.env.EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS,
@@ -155,6 +182,25 @@ for (const token of [
   assert.equal(catalogMcp.includes(token), true, `Workspace catalog MCP is missing ${token}`);
 }
 
+const jobsMcp = content.get('tools/project_art_workspace_jobs_mcp.mjs');
+for (const token of [
+  'evavo_art_workspace_job_capabilities',
+  'evavo_art_compile_workspace_job',
+  'evavo_art_create_workspace_job',
+  'evavo_art_inspect_workspace_job',
+  'evavo_art_checkpoint_workspace_job',
+  'EVAVO_ART_WORKSPACE_JOB_ROOTS',
+  'EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE',
+  'imageBytesThroughMcp: false',
+  'providerExecution: false',
+  'storageWrite: false',
+  'targetRepositoryMutation: false',
+  'gitPublication: false',
+  'forcePush: false',
+]) {
+  assert.equal(jobsMcp.includes(token), true, `Workspace jobs MCP is missing ${token}`);
+}
+
 const docs = content.get('docs/ARTIST_WORKSPACE_AGENT_SUITE.md');
 for (const token of [
   'ChatGPT',
@@ -162,13 +208,14 @@ for (const token of [
   'immutable original',
   'editable working copy',
   'content-addressed workspace catalog',
-  'duplicate',
-  'drift',
+  'crash-resumable',
+  'stale-lease recovery',
+  'output-evidence verification',
   'EVAVO Storage',
   'separate authority',
   'config/mcp.project-art-workspace.windows.example.json',
 ]) {
-  assert.equal(docs.includes(token), true, `Agent-suite documentation is missing ${token}`);
+  assert.equal(docs.toLowerCase().includes(token.toLowerCase()), true, `Agent-suite documentation is missing ${token}`);
 }
 
 const workflow = content.get('.github/workflows/artist-workspace-agent-suite.yml');
@@ -179,7 +226,9 @@ for (const token of [
   'contents: read',
   'persist-credentials: false',
   'tools/project_art_workspace_catalog_mcp.mjs',
+  'tools/project_art_workspace_jobs_mcp.mjs',
   'scripts/check-persistent-artist-workspace-catalog.mjs',
+  'scripts/check-persistent-artist-workspace-jobs.mjs',
   'node scripts/check-artist-workspace-agent-suite.mjs',
 ]) {
   assert.equal(workflow.includes(token), true, `Agent-suite workflow is missing ${token}`);
@@ -188,6 +237,7 @@ for (const token of [
 for (const [label, script] of [
   ['persistent ingest', 'scripts/check-persistent-artist-workspace-ingest.mjs'],
   ['persistent catalog', 'scripts/check-persistent-artist-workspace-catalog.mjs'],
+  ['persistent jobs', 'scripts/check-persistent-artist-workspace-jobs.mjs'],
 ]) {
   const result = spawnSync(process.execPath, [path.join(root, script)], {
     cwd: root,
@@ -201,9 +251,9 @@ for (const [label, script] of [
 }
 
 console.log('Artist Workspace agent suite guard passed.');
-console.log('- canonical MCP configuration exposes workspace, external-ingest and catalog servers');
+console.log('- canonical MCP configuration exposes workspace, external-ingest, catalog and resumable-job servers');
 console.log('- write authority remains disabled by default and independently gated per server');
-console.log('- agents can discover exact files, dimensions, alpha, animation and duplicates without guessing');
-console.log('- catalog drift verification detects missing, changed and unexpected workspace files');
+console.log('- agents can discover exact files and resume exact next production steps without conversation-memory guesses');
+console.log('- job checkpoints are append-only, lease-bounded, input-bound and output-drift-verifiable');
 console.log('- snapshot, mastering, atlas and EVAVO Storage handoff remain discoverable in one deployment');
 console.log('- image bytes, provider authority, Storage writes and Git publication remain outside MCP');

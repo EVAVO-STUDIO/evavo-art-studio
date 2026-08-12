@@ -5,13 +5,17 @@ on:
     paths:
       - "config/artist-workspace-agent-suite.v1.json"
       - "config/mcp.project-art-workspace.windows.example.json"
+      - "config/mcp.persistent-artist-workspace-jobs.windows.example.json"
       - "docs/ARTIST_WORKSPACE_AGENT_SUITE.md"
+      - "docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md"
       - "scripts/check-artist-workspace-agent-suite.mjs"
       - "scripts/check-persistent-artist-workspace-ingest.mjs"
+      - "scripts/check-persistent-artist-workspace-catalog.mjs"
+      - "scripts/check-persistent-artist-workspace-jobs.mjs"
       - "tools/project_art_workspace_mcp.mjs"
       - "tools/project_art_workspace_ingest_mcp.mjs"
       - "tools/project_art_workspace_catalog_mcp.mjs"
-      - "scripts/check-persistent-artist-workspace-catalog.mjs"
+      - "tools/project_art_workspace_jobs_mcp.mjs"
       - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
       - ".github/workflows/artist-workspace-agent-suite.yml"
   push:
@@ -20,13 +24,17 @@ on:
     paths:
       - "config/artist-workspace-agent-suite.v1.json"
       - "config/mcp.project-art-workspace.windows.example.json"
+      - "config/mcp.persistent-artist-workspace-jobs.windows.example.json"
       - "docs/ARTIST_WORKSPACE_AGENT_SUITE.md"
+      - "docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md"
       - "scripts/check-artist-workspace-agent-suite.mjs"
       - "scripts/check-persistent-artist-workspace-ingest.mjs"
+      - "scripts/check-persistent-artist-workspace-catalog.mjs"
+      - "scripts/check-persistent-artist-workspace-jobs.mjs"
       - "tools/project_art_workspace_mcp.mjs"
       - "tools/project_art_workspace_ingest_mcp.mjs"
       - "tools/project_art_workspace_catalog_mcp.mjs"
-      - "scripts/check-persistent-artist-workspace-catalog.mjs"
+      - "tools/project_art_workspace_jobs_mcp.mjs"
       - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
       - ".github/workflows/artist-workspace-agent-suite.yml"
   workflow_dispatch:
@@ -41,7 +49,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 18
+    timeout-minutes: 20
     steps:
       - name: Check out exact source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
