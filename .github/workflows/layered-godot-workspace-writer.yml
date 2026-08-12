@@ -20,16 +20,22 @@ on:
       - "scripts/layered-godot-repository-review/**"
       - "scripts/check-layered-godot-repository-review.mjs"
       - "scripts/test-layered-godot-repository-review.mjs"
+      - "scripts/layered-godot-git-operator.mjs"
+      - "scripts/layered-godot-git-operator/**"
+      - "scripts/check-layered-godot-git-operator.mjs"
+      - "scripts/test-layered-godot-git-operator.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
       - "config/layered-production-godot-workspace-auditor.v1.json"
       - "config/layered-production-godot-runtime-validator.v1.json"
       - "config/layered-production-godot-handoff-gate.v1.json"
       - "config/layered-production-godot-repository-review.v1.json"
+      - "config/layered-production-godot-git-operator.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
       - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
       - "docs/LAYERED_GODOT_RUNTIME_VALIDATOR.md"
       - "docs/LAYERED_GODOT_HANDOFF_GATE.md"
       - "docs/LAYERED_GODOT_REPOSITORY_REVIEW.md"
+      - "docs/LAYERED_GODOT_GIT_OPERATOR.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   push:
     branches:
@@ -52,16 +58,22 @@ on:
       - "scripts/layered-godot-repository-review/**"
       - "scripts/check-layered-godot-repository-review.mjs"
       - "scripts/test-layered-godot-repository-review.mjs"
+      - "scripts/layered-godot-git-operator.mjs"
+      - "scripts/layered-godot-git-operator/**"
+      - "scripts/check-layered-godot-git-operator.mjs"
+      - "scripts/test-layered-godot-git-operator.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
       - "config/layered-production-godot-workspace-auditor.v1.json"
       - "config/layered-production-godot-runtime-validator.v1.json"
       - "config/layered-production-godot-handoff-gate.v1.json"
       - "config/layered-production-godot-repository-review.v1.json"
+      - "config/layered-production-godot-git-operator.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
       - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
       - "docs/LAYERED_GODOT_RUNTIME_VALIDATOR.md"
       - "docs/LAYERED_GODOT_HANDOFF_GATE.md"
       - "docs/LAYERED_GODOT_REPOSITORY_REVIEW.md"
+      - "docs/LAYERED_GODOT_GIT_OPERATOR.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   workflow_dispatch:
 
@@ -103,6 +115,9 @@ jobs:
 
       - name: Run read-only Git repository review regressions
         run: node scripts/check-layered-godot-repository-review.mjs
+
+      - name: Run explicit Git commit operator regressions
+        run: node scripts/check-layered-godot-git-operator.mjs
 
       - name: Prove exact source remains clean
         if: always()
