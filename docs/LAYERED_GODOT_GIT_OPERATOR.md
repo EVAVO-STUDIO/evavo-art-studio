@@ -12,6 +12,26 @@ forcePush: false
 
 A push is deliberately outside this operator. Successful commit creation therefore does not imply remote publication.
 
+## Immutable admission and ownership
+
+Before any dynamic import, workspace inspection, review recomputation or Git command, the operator captures the complete caller input and dependency override object synchronously.
+
+Dependency overrides must be a plain non-Proxy object with only the documented fields. Accessors are rejected without being invoked, symbolic and unsupported fields are rejected, `complete` must be boolean, and every resolved executable dependency must be a non-Proxy function. Mutating the original dependency object after the API call cannot replace the captured verifier, reviewer, filesystem or Git functions.
+
+The operator also takes ownership of every value that can cross an asynchronous or mutation boundary:
+
+1. the workspace-root result is reduced to immutable `path` and `realPath` data properties;
+2. the writer-verifier result is inspected without invoking accessors;
+3. all seven verifier-owned resource buffers are copied before the asynchronous repository review;
+4. shared-memory buffers are rejected;
+5. every copied resource must agree across UTF-8 content, byte count and SHA-256;
+6. the recomputed repository-review receipt is captured as immutable JSON before semantic comparison;
+7. stable filesystem read results and Git subprocess results are copied and validated before use.
+
+This means a caller cannot change approved bytes after verification and have those later bytes staged or committed. The operator uses only its private exact-byte copies for blob creation, index verification and committed-tree verification.
+
+These admission changes do not alter the receipt protocol or grant broader authority. The operator protocol remains `2026-08-13.1`, and push, deployment, publication and force push remain false.
+
 ## Exact commit transaction
 
 Before touching Git state, the operator captures its full input as one bounded immutable JSON snapshot and re-runs the repository review. The supplied review must still match semantically, including the reviewed `HEAD`, branch, origin, seven-resource classification and false Git authority.
@@ -25,13 +45,13 @@ For a changed handoff it then:
 5. rechecks `filter`, `working-tree-encoding` and `ident` attributes;
 6. proves `HEAD` and branch still equal the reviewed identities before comparing the staged index;
 7. proves the index contains exactly the reviewed changed resource paths;
-8. reads each staged blob and working-tree file back and compares it byte-for-byte with the approved integration resource;
+8. reads each staged blob and working-tree file back and compares it byte-for-byte with the owned approved integration resource;
 9. requires no unrelated unstaged or untracked work;
 10. commits with an empty temporary `core.hooksPath`, `core.fsmonitor=false`, signing disabled, `--no-verify`, `--no-gpg-sign`, and `--cleanup=verbatim`;
 11. proves the commit message exactly equals the authorized single line;
 12. proves the new commit is one direct child of the reviewed `HEAD` on the reviewed branch;
 13. proves the commit changes exactly the reviewed path set;
-14. proves all seven `HEAD:path` blobs equal the approved integration bytes; and
+14. proves all seven `HEAD:path` blobs equal the owned approved integration bytes; and
 15. requires a clean repository immediately afterward.
 
 ## Rollback safety
