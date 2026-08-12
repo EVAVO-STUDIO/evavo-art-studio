@@ -22,8 +22,8 @@ import {
   heavyMetalFightingProductionReceiptTemplate,
   heavyMetalFightingProductionRepairTemplate,
   heavyMetalFightingProductionWorkOrder,
-  verifyHmfProductionWorkOrders,
 } from "./heavy-metal-fighting/work-orders.mjs";
+import { verifyHmfProductionWorkOrders } from "./heavy-metal-fighting/work-order-verification.mjs";
 
 function option(argv, name) {
   const index = argv.indexOf(name);

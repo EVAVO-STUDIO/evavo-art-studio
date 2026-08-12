@@ -8,8 +8,8 @@ import {
   heavyMetalFightingProductionReceiptTemplate,
   heavyMetalFightingProductionRepairTemplate,
   heavyMetalFightingProductionWorkOrder,
-  verifyHmfProductionWorkOrders,
 } from "./work-orders.mjs";
+import { verifyHmfProductionWorkOrders } from "./work-order-verification.mjs";
 
 const EVIDENCE = (digit) => String(digit).repeat(64);
 const CANDIDATE = "a".repeat(64);
@@ -27,15 +27,15 @@ test("numbered production batches compile into immutable one-image work orders",
   assert.ok(bundle.workOrders.every((order) => order.authority.providerExecution === false));
 });
 
-test("production-v3 body work orders bind native dimensions, Frame identity, continuity and anti-generic gates", async () => {
-  const order = await heavyMetalFightingProductionWorkOrder("hmf.frame-animation.bastion.slot-000");
+test("production-v3 body work orders bind native dimensions, Frame identity, within-bank continuity and anti-generic gates", async () => {
+  const order = await heavyMetalFightingProductionWorkOrder("hmf.frame-animation.bastion.slot-001");
   assert.equal(order.assetContract.nativeDimensions.width, 160);
   assert.equal(order.assetContract.nativeDimensions.height, 160);
   assert.deepEqual(order.assetContract.pivot, {x:80,y:152});
   assert.equal(order.subjectContract.type, "frame");
   assert.equal(order.subjectContract.id, "bastion");
   assert.equal(order.subjectContract.motionIdentity, "hydraulic-weight");
-  assert.equal(order.referenceBindings.previousCel, undefined);
+  assert.ok(order.referenceBindings.previousCel.startsWith("working/frames/bastion/sprites/"));
   assert.ok(order.referenceBindings.nextCel.startsWith("working/frames/bastion/sprites/"));
   assert.ok(order.providerPrompt.includes("effects remain separate") || order.providerPrompt.includes("Effects remain separate"));
   assert.ok(order.failureCodes.style.includes("random-greebles"));
