@@ -30,9 +30,7 @@ function freeze(value) {
 }
 function sorted(value) {
   if (Array.isArray(value)) return value.map(sorted);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sorted(value[key])]));
-  }
+  if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sorted(value[key])]));
   return value;
 }
 function canonical(value) {
@@ -59,6 +57,12 @@ function assertNoAuthority(authority, label, extra = []) {
     assert(authority[key] === false, `${label} gained prohibited ${key} authority.`);
   }
 }
+function safeCandidatePath(value, manifest) {
+  assert(typeof value === "string" && value === manifest.candidateOutputPath, `${manifest.unitId} candidate output path drifted from its submission manifest.`);
+  assert(value.startsWith(`scratch/provider/${manifest.batchId}/`) && value.endsWith("-cand-01.png"), `${manifest.unitId} candidate output path escaped its governed batch root.`);
+  assert(!value.includes("\\") && !value.split("/").includes(".."), `${manifest.unitId} candidate output path is unsafe.`);
+  return value;
+}
 function authorizedManifest(manifest) {
   assert(manifest?.schema === HMF_PROVIDER_SUBMISSION_MANIFEST_SCHEMA, "provider submission manifest schema drifted.");
   assert(manifest.protocolVersion === HMF_PROVIDER_SUBMISSION_PROTOCOL_VERSION, "provider submission manifest protocol drifted.");
@@ -66,6 +70,7 @@ function authorizedManifest(manifest) {
   assert(manifest.status === "authorized-for-explicit-runtime-submission", `${manifest.unitId ?? "work unit"} is not authorized for explicit runtime submission.`);
   assert(manifest.manifestReady === true && manifest.blockers?.length === 0, `${manifest.unitId} submission manifest is not ready.`);
   assert(manifest.submissionAuthorization?.actorClass === "human" && SHA256.test(String(manifest.submissionAuthorization?.authorizationSha256 ?? "")), `${manifest.unitId} lacks named-human submission authorization.`);
+  assert(Number.isInteger(manifest.submissionAuthorization?.attempt) && manifest.submissionAuthorization.attempt >= 1, `${manifest.unitId} submission authorization attempt is invalid.`);
   const instruction = selfHashed(manifest.runtimeSubmissionInstruction, "runtimeSubmissionInstructionSha256", `${manifest.unitId} runtime submission instruction`);
   assert(instruction.providerCompiler?.package === "@evavo/art-providers" && instruction.providerCompiler?.export === "compileProviderCandidateRuntimeContract", `${manifest.unitId} generic provider compiler binding drifted.`);
   assert(instruction.providerCompiler?.validationRequiredAtSubmission === true, `${manifest.unitId} runtime compiler validation gate was removed.`);
@@ -77,7 +82,7 @@ function authorizedManifest(manifest) {
   assert(instruction.providerRequestInputSha256 === hash(request), `${manifest.unitId} provider request input hash drifted.`);
   assert(SUBMISSION_KEY.test(String(instruction.submissionIdempotencyKey ?? "")), `${manifest.unitId} submission idempotency key is invalid.`);
   assert(instruction.expectedNextReceiptState === "candidates-admitted", `${manifest.unitId} expected receipt state drifted.`);
-  assert(typeof instruction.candidateOutputPath === "string" && instruction.candidateOutputPath.includes(manifest.unitId), `${manifest.unitId} candidate output path is not unit-bound.`);
+  safeCandidatePath(instruction.candidateOutputPath, manifest);
   assertNoAuthority(instruction.authority, `${manifest.unitId} runtime instruction`, ["providerExecution", "runtimeEnqueue"]);
   assertNoAuthority(manifest.authority, `${manifest.unitId} submission manifest`, ["providerExecution", "runtimeEnqueue"]);
   return manifest;
@@ -99,7 +104,7 @@ export async function compileHmfProviderRuntimeDispatch(unitId, options = {}) {
     batchId: manifest.batchId,
     frameId: manifest.frameId,
     bodySlot: manifest.bodySlot,
-    attempt: manifest.attempt,
+    attempt: manifest.submissionAuthorization.attempt,
     submissionManifestSha256: manifest.submissionManifestSha256,
     submissionAuthorizationSha256: manifest.submissionAuthorization.authorizationSha256,
     executionEnvelopeSha256: manifest.executionEnvelopeSha256,
@@ -170,9 +175,7 @@ export function validateHmfCompiledProviderRuntimeContract(dispatchInput, compil
   assert(job?.idempotencyKey === `provider:${request.requestId}`, "generic provider runtime idempotency key drifted.");
   assert(job?.maximumAttempts === 3 && job?.leaseDurationMs === 300_000 && job?.timeoutMs === 1_800_000, "generic provider runtime retry, lease or timeout contract drifted.");
   assert(canonical(job?.payload) === canonical(request), "generic provider runtime payload differs from its normalized request.");
-  for (const capability of dispatch.expectedRuntimeContract.requiredCapabilities) {
-    assert(job?.requiredCapabilities?.includes(capability), `generic provider runtime job is missing ${capability}.`);
-  }
+  for (const capability of dispatch.expectedRuntimeContract.requiredCapabilities) assert(job?.requiredCapabilities?.includes(capability), `generic provider runtime job is missing ${capability}.`);
   assert(job?.labels?.assetId === dispatch.unitId && job?.labels?.continuityPhase === request.continuityPhase, "generic provider runtime labels drifted.");
   assert(compiled.requiredAdapterCapabilities?.includes("generate"), "generic provider runtime adapter profile lost generate.");
   const body = {
@@ -200,16 +203,7 @@ export function validateHmfCompiledProviderRuntimeContract(dispatchInput, compil
       labels: job.labels,
     }),
     candidateOutputPath: dispatch.candidateAdmission.candidateOutputPath,
-    authority: freeze({
-      runtimeEnqueue: false,
-      providerExecution: false,
-      receiptPersistence: false,
-      candidateApproval: false,
-      candidatePromotion: false,
-      targetRepositoryMutation: false,
-      gitMutation: false,
-      publication: false,
-    }),
+    authority: freeze({ runtimeEnqueue: false, providerExecution: false, receiptPersistence: false, candidateApproval: false, candidatePromotion: false, targetRepositoryMutation: false, gitMutation: false, publication: false }),
   };
   return freeze({ ...body, runtimeBindingSha256: hash(body) });
 }
@@ -222,18 +216,7 @@ function bindingFor(dispatch, binding) {
   return binding;
 }
 function outcomeAuthority() {
-  return freeze({
-    candidateMaterialization: false,
-    receiptPersistence: false,
-    deterministicQa: false,
-    creativeReview: false,
-    candidateApproval: false,
-    candidatePromotion: false,
-    targetRepositoryMutation: false,
-    gitMutation: false,
-    deployment: false,
-    publication: false,
-  });
+  return freeze({ candidateMaterialization: false, receiptPersistence: false, deterministicQa: false, creativeReview: false, candidateApproval: false, candidatePromotion: false, targetRepositoryMutation: false, gitMutation: false, deployment: false, publication: false });
 }
 
 export function compileHmfProviderRuntimeOutcome(dispatchInput, bindingInput, outcome) {
@@ -244,7 +227,6 @@ export function compileHmfProviderRuntimeOutcome(dispatchInput, bindingInput, ou
   timestamp(outcome.completedAt, "provider runtime outcome completedAt");
   assert(outcome.providerCallCount === 1, "provider runtime outcome must record exactly one provider call.");
   assert(["candidate-run-result", "provider-failure"].includes(outcome.kind), "provider runtime outcome kind is unsupported.");
-
   let result;
   if (outcome.kind === "candidate-run-result") {
     const run = outcome.result;
@@ -263,21 +245,8 @@ export function compileHmfProviderRuntimeOutcome(dispatchInput, bindingInput, ou
       adapterId: run.adapterId,
       model: run.model,
       requiresAlphaExtraction: run.requiresAlphaExtraction === true,
-      candidateMaterialization: freeze({
-        sourceArtifactId: run.candidateArtifacts[0],
-        targetPath: dispatch.candidateAdmission.candidateOutputPath,
-        expectedMediaType: "image/png",
-        expectedWidth: 160,
-        expectedHeight: 160,
-        oneImageOnly: true,
-      }),
-      nextReceiptTemplate: freeze({
-        state: "candidates-admitted",
-        attempt: dispatch.attempt,
-        actorClass: "runtime",
-        evidenceArtifactId: run.evidenceArtifact,
-        evidenceSha256Source: "provider-runtime-outcome-sha256",
-      }),
+      candidateMaterialization: freeze({ sourceArtifactId: run.candidateArtifacts[0], targetPath: dispatch.candidateAdmission.candidateOutputPath, expectedMediaType: "image/png", expectedWidth: 160, expectedHeight: 160, oneImageOnly: true }),
+      nextReceiptTemplate: freeze({ state: "candidates-admitted", attempt: dispatch.attempt, actorClass: "runtime", evidenceArtifactId: run.evidenceArtifact, evidenceSha256Source: "provider-runtime-outcome-sha256" }),
     });
   } else {
     const failure = outcome.failure;
@@ -289,20 +258,8 @@ export function compileHmfProviderRuntimeOutcome(dispatchInput, bindingInput, ou
     result = freeze({
       status: "provider-failure-record-ready",
       candidateCount: 0,
-      failure: freeze({
-        code: failure.code.trim(),
-        classification: failure.classification,
-        message: failure.message.trim(),
-        adapterId: typeof failure.adapterId === "string" ? failure.adapterId.trim() : null,
-        model: typeof failure.model === "string" ? failure.model.trim() : null,
-        attemptCount: 1,
-      }),
-      nextReceiptTemplate: freeze({
-        state: "provider-failed",
-        attempt: dispatch.attempt,
-        actorClass: "runtime",
-        evidenceSha256Source: "provider-runtime-outcome-sha256",
-      }),
+      failure: freeze({ code: failure.code.trim(), classification: failure.classification, message: failure.message.trim(), adapterId: typeof failure.adapterId === "string" ? failure.adapterId.trim() : null, model: typeof failure.model === "string" ? failure.model.trim() : null, attemptCount: 1 }),
+      failureRecordTemplate: freeze({ recordKind: "provider-failure", attempt: dispatch.attempt, actorClass: "runtime", evidenceSha256Source: "provider-runtime-outcome-sha256", productionReceiptStateUnchanged: "generation-authorized", retryRequiresFreshGenerationAndSubmissionAuthorization: true }),
     });
   }
   const body = {
@@ -337,11 +294,5 @@ export async function verifyHmfProviderRuntimeDispatch() {
     freeze({ id: "no-execution-or-approval-authority", passed: blocked.authority?.providerExecution === false && blocked.authority?.candidateApproval === false }),
   ]);
   const failed = freeze(checks.filter((check) => !check.passed));
-  return freeze({
-    schema: "evavo.heavy-metal-fighting-provider-runtime-dispatch-verification.v1",
-    status: failed.length ? "failed" : "passed",
-    sampleUnitId: unitId,
-    checks,
-    failed,
-  });
+  return freeze({ schema: "evavo.heavy-metal-fighting-provider-runtime-dispatch-verification.v1", status: failed.length ? "failed" : "passed", sampleUnitId: unitId, checks, failed });
 }

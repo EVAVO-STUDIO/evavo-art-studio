@@ -8,9 +8,7 @@ import {
   validateHmfCompiledProviderRuntimeContract,
   verifyHmfProviderRuntimeDispatch,
 } from "./frame-body-provider-runtime-dispatch.mjs";
-import {
-  createHmfProviderSubmissionAuthorization,
-} from "./frame-body-provider-submission-manifest.mjs";
+import { createHmfProviderSubmissionAuthorization } from "./frame-body-provider-submission-manifest.mjs";
 import { heavyMetalFightingProviderExecutionEnvelope } from "./frame-body-provider-execution-envelope.mjs";
 import { createHmfProductionReceipt } from "./work-orders.mjs";
 
@@ -50,10 +48,7 @@ async function authorizedEvidence() {
     actorId: "named-human-reviewer",
     occurredAt: "2026-08-13T05:02:00.000Z",
   }, referencesLocked);
-  const evidence = {
-    receipts: [referencesLocked, generationAuthorized],
-    artifactBindings: artifactBindings(blocked),
-  };
+  const evidence = { receipts: [referencesLocked, generationAuthorized], artifactBindings: artifactBindings(blocked) };
   const envelope = await heavyMetalFightingProviderExecutionEnvelope(UNIT_ID, evidence);
   const submissionAuthorization = createHmfProviderSubmissionAuthorization(envelope, {
     actorClass: "human",
@@ -67,11 +62,7 @@ async function authorizedEvidence() {
 
 function fakeCompiledRuntimeContract(dispatch) {
   const requestId = `provider_${sha256(dispatch.providerCompiler.input).slice(0, 40)}`;
-  const request = Object.freeze({
-    ...dispatch.providerCompiler.input,
-    protocolVersion: "2026-08-07.3",
-    requestId,
-  });
+  const request = Object.freeze({ ...dispatch.providerCompiler.input, protocolVersion: "2026-08-07.3", requestId });
   const compiledPrompt = `EVAVO ART STUDIO — GOVERNED CANDIDATE CONTRACT\n\n${request.creativeIntent}\n`;
   return Object.freeze({
     schemaVersion: "1.0",
@@ -90,12 +81,7 @@ function fakeCompiledRuntimeContract(dispatch) {
       maximumAttempts: 3,
       leaseDurationMs: 300_000,
       timeoutMs: 1_800_000,
-      labels: Object.freeze({
-        providerRequestId: requestId,
-        candidateFamilyId: request.candidateFamilyId,
-        assetId: request.assetId,
-        continuityPhase: request.continuityPhase,
-      }),
+      labels: Object.freeze({ providerRequestId: requestId, candidateFamilyId: request.candidateFamilyId, assetId: request.assetId, continuityPhase: request.continuityPhase }),
     }),
     executionMode: "submit-runtime-job",
   });
@@ -113,31 +99,19 @@ function candidateRunResult(binding) {
       requestId: binding.normalizedProviderRequestId,
       requestSha256: binding.normalizedProviderRequestSha256,
       compiledPromptSha256: binding.compiledPromptSha256,
-      routingInspection: {
-        outcome: "eligible",
-        providerCallPerformedByInspection: false,
-      },
+      routingInspection: { outcome: "eligible", providerCallPerformedByInspection: false },
       adapterId: "test-adapter",
       model: "test-model",
       candidateArtifacts: [`artifact_${"a".repeat(64)}`],
       evidenceArtifact: `artifact_${"b".repeat(64)}`,
-      attempts: [{
-        adapterId: "test-adapter",
-        model: "test-model",
-        startedAt: "2026-08-13T05:04:00.000Z",
-        completedAt: "2026-08-13T05:05:00.000Z",
-        outcome: "succeeded",
-      }],
+      attempts: [{ adapterId: "test-adapter", model: "test-model", startedAt: "2026-08-13T05:04:00.000Z", completedAt: "2026-08-13T05:05:00.000Z", outcome: "succeeded" }],
       requiresAlphaExtraction: false,
     },
   };
 }
 
 test("runtime dispatch cannot compile before both human provider gates are satisfied", async () => {
-  await assert.rejects(
-    compileHmfProviderRuntimeDispatch(UNIT_ID),
-    /not authorized for explicit runtime submission|provider-execution-envelope-not-submit-ready/,
-  );
+  await assert.rejects(compileHmfProviderRuntimeDispatch(UNIT_ID), /not authorized for explicit runtime submission|provider-execution-envelope-not-submit-ready/);
 });
 
 test("authorized manifest compiles one immutable generic-provider runtime dispatch", async () => {
@@ -145,6 +119,7 @@ test("authorized manifest compiles one immutable generic-provider runtime dispat
   assert.equal(dispatch.unitId, UNIT_ID);
   assert.equal(dispatch.frameId, "bastion");
   assert.equal(dispatch.bodySlot, 121);
+  assert.equal(dispatch.attempt, 1);
   assert.equal(dispatch.providerCompiler.package, "@evavo/art-providers");
   assert.equal(dispatch.providerCompiler.export, "compileProviderCandidateRuntimeContract");
   assert.equal(dispatch.providerCompiler.input.candidateCount, 1);
@@ -152,6 +127,7 @@ test("authorized manifest compiles one immutable generic-provider runtime dispat
   assert.equal(dispatch.expectedRuntimeContract.kind, "art.candidate.generate");
   assert.equal(dispatch.expectedRuntimeContract.maximumAttempts, 3);
   assert.equal(dispatch.candidateAdmission.expectedCandidateArtifacts, 1);
+  assert.match(dispatch.candidateAdmission.candidateOutputPath, /^scratch\/provider\/hmf-b\d{4}\//);
   assert.match(dispatch.submissionIdempotencyKey, /^hmf-provider-submit:[0-9a-f]{40}$/);
   assert.match(dispatch.runtimeDispatchSha256, /^[0-9a-f]{64}$/);
   assert.equal(dispatch.authority.providerExecution, false);
@@ -171,10 +147,9 @@ test("generic provider compiler output is bound back to the exact HMF dispatch",
   assert.match(binding.normalizedProviderRequestId, /^provider_[0-9a-f]{40}$/);
   assert.match(binding.runtimeBindingSha256, /^[0-9a-f]{64}$/);
   assert.equal(binding.authority.providerExecution, false);
-
   const tampered = structuredClone(compiled);
   tampered.runtimeJob.maximumAttempts = 4;
-  assert.throws(() => validateHmfCompiledProviderRuntimeContract(dispatch, tampered), /maximumAttempts drifted/);
+  assert.throws(() => validateHmfCompiledProviderRuntimeContract(dispatch, tampered), /retry, lease or timeout contract drifted/);
 });
 
 test("one successful runtime result becomes a non-persisting candidate-admission plan", async () => {
@@ -194,7 +169,7 @@ test("one successful runtime result becomes a non-persisting candidate-admission
   assert.equal(outcome.authority.candidateApproval, false);
 });
 
-test("provider failure becomes a bounded failure record and never fabricates a candidate", async () => {
+test("provider failure becomes a separate bounded failure record and never fabricates a candidate or invalid lifecycle state", async () => {
   const dispatch = await compileHmfProviderRuntimeDispatch(UNIT_ID, await authorizedEvidence());
   const binding = validateHmfCompiledProviderRuntimeContract(dispatch, fakeCompiledRuntimeContract(dispatch));
   const outcome = compileHmfProviderRuntimeOutcome(dispatch, binding, {
@@ -202,20 +177,15 @@ test("provider failure becomes a bounded failure record and never fabricates a c
     submissionIdempotencyKey: dispatch.submissionIdempotencyKey,
     providerCallCount: 1,
     completedAt: "2026-08-13T05:05:00.000Z",
-    failure: {
-      code: "PROVIDER_TIMEOUT",
-      classification: "transient",
-      message: "The single governed provider call timed out.",
-      attemptCount: 1,
-      candidateCount: 0,
-      adapterId: "test-adapter",
-      model: "test-model",
-    },
+    failure: { code: "PROVIDER_TIMEOUT", classification: "transient", message: "The single governed provider call timed out.", attemptCount: 1, candidateCount: 0, adapterId: "test-adapter", model: "test-model" },
   });
   assert.equal(outcome.result.status, "provider-failure-record-ready");
   assert.equal(outcome.result.candidateCount, 0);
   assert.equal(outcome.result.failure.code, "PROVIDER_TIMEOUT");
-  assert.equal(outcome.result.nextReceiptTemplate.state, "provider-failed");
+  assert.equal(outcome.result.failureRecordTemplate.recordKind, "provider-failure");
+  assert.equal(outcome.result.failureRecordTemplate.productionReceiptStateUnchanged, "generation-authorized");
+  assert.equal(outcome.result.failureRecordTemplate.retryRequiresFreshGenerationAndSubmissionAuthorization, true);
+  assert.equal(outcome.result.nextReceiptTemplate, undefined);
   assert.equal(outcome.authority.candidatePromotion, false);
 });
 
@@ -224,12 +194,10 @@ test("runtime outcome rejects multiple candidates, fallback attempts and idempot
   const binding = validateHmfCompiledProviderRuntimeContract(dispatch, fakeCompiledRuntimeContract(dispatch));
   const multiple = candidateRunResult(binding);
   multiple.result.candidateArtifacts.push(`artifact_${"c".repeat(64)}`);
-  assert.throws(() => compileHmfProviderRuntimeOutcome(dispatch, binding, multiple), /exactly one candidate artifact/);
-
+  assert.throws(() => compileHmfProviderRuntimeOutcome(dispatch, binding, multiple), /exactly one valid candidate artifact/);
   const fallback = candidateRunResult(binding);
   fallback.result.attempts.push({ ...fallback.result.attempts[0], adapterId: "fallback-adapter" });
   assert.throws(() => compileHmfProviderRuntimeOutcome(dispatch, binding, fallback), /exactly one successful attempt/);
-
   const drifted = candidateRunResult(binding);
   drifted.submissionIdempotencyKey = `hmf-provider-submit:${"f".repeat(40)}`;
   assert.throws(() => compileHmfProviderRuntimeOutcome(dispatch, binding, drifted), /idempotency key drifted/);
