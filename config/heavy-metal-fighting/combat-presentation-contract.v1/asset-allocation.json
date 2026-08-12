@@ -1,0 +1,616 @@
+{
+  "assetAllocation": {
+    "title-and-shell": {
+      "expectedCount": 42,
+      "items": [
+        {
+          "id": "primary-title-master",
+          "group": "logo"
+        },
+        {
+          "id": "compact-broadcast-mark",
+          "group": "logo"
+        },
+        {
+          "id": "one-colour-title",
+          "group": "logo"
+        },
+        {
+          "id": "four-colour-title",
+          "group": "logo"
+        },
+        {
+          "id": "subtitle-lockup",
+          "group": "logo"
+        },
+        {
+          "id": "press-fire-prompt",
+          "group": "logo"
+        },
+        {
+          "id": "menu-far-city",
+          "group": "menu-background"
+        },
+        {
+          "id": "menu-bay-opening",
+          "group": "menu-background"
+        },
+        {
+          "id": "menu-service-cradle",
+          "group": "menu-background"
+        },
+        {
+          "id": "menu-technicians",
+          "group": "menu-background"
+        },
+        {
+          "id": "menu-foreground-console",
+          "group": "menu-background"
+        },
+        {
+          "id": "menu-rain-overlay",
+          "group": "menu-background"
+        },
+        {
+          "id": "menu-diagnostic-overlay",
+          "group": "menu-background"
+        },
+        {
+          "id": "attract-demo-window",
+          "group": "menu-background"
+        },
+        {
+          "id": "main-menu-frame",
+          "group": "menu-ui"
+        },
+        {
+          "id": "main-menu-cursor",
+          "group": "menu-ui"
+        },
+        {
+          "id": "main-menu-item-inactive",
+          "group": "menu-ui"
+        },
+        {
+          "id": "main-menu-item-active",
+          "group": "menu-ui"
+        },
+        {
+          "id": "main-menu-description-panel",
+          "group": "menu-ui"
+        },
+        {
+          "id": "main-menu-help-rail",
+          "group": "menu-ui"
+        },
+        {
+          "id": "main-menu-save-status",
+          "group": "menu-ui"
+        },
+        {
+          "id": "front-end-transition-shutter",
+          "group": "menu-ui"
+        },
+        {
+          "id": "pilot-select-frame",
+          "group": "select-ui"
+        },
+        {
+          "id": "pilot-grid-cell",
+          "group": "select-ui"
+        },
+        {
+          "id": "pilot-focus-plate",
+          "group": "select-ui"
+        },
+        {
+          "id": "pilot-stat-rail",
+          "group": "select-ui"
+        },
+        {
+          "id": "frame-select-frame",
+          "group": "select-ui"
+        },
+        {
+          "id": "frame-card-shell",
+          "group": "select-ui"
+        },
+        {
+          "id": "frame-silhouette-viewport",
+          "group": "select-ui"
+        },
+        {
+          "id": "frame-stat-bar-set",
+          "group": "select-ui"
+        },
+        {
+          "id": "crew-core-badge-set",
+          "group": "select-ui"
+        },
+        {
+          "id": "pilot-frame-compatibility-indicator",
+          "group": "select-ui"
+        },
+        {
+          "id": "versus-split-frame",
+          "group": "versus-hud-results"
+        },
+        {
+          "id": "arena-rules-plate",
+          "group": "versus-hud-results"
+        },
+        {
+          "id": "hud-left-frame",
+          "group": "versus-hud-results"
+        },
+        {
+          "id": "hud-right-frame",
+          "group": "versus-hud-results"
+        },
+        {
+          "id": "timer-round-housing",
+          "group": "versus-hud-results"
+        },
+        {
+          "id": "core-segment-rail",
+          "group": "versus-hud-results"
+        },
+        {
+          "id": "guard-integrity-rail",
+          "group": "versus-hud-results"
+        },
+        {
+          "id": "super-cut-in-frame",
+          "group": "versus-hud-results"
+        },
+        {
+          "id": "round-result-plate",
+          "group": "versus-hud-results"
+        },
+        {
+          "id": "ending-credits-rail",
+          "group": "versus-hud-results"
+        }
+      ]
+    },
+    "pilot-portraits": {
+      "expectedCount": 60,
+      "perPilot": {
+        "count": 15,
+        "slots": [
+          "identity-front",
+          "identity-three-quarter",
+          "select-idle",
+          "select-focus",
+          "versus",
+          "hud-small",
+          "comms-neutral",
+          "comms-warning",
+          "comms-pain",
+          "super-charge",
+          "super-call",
+          "super-resolve",
+          "victory",
+          "defeat",
+          "dossier-ending"
+        ]
+      },
+      "pilots": [
+        "branka-kovac",
+        "miho-tagawa",
+        "esi-quartey",
+        "parvaneh-razi"
+      ]
+    },
+    "frame-construction": {
+      "expectedCount": 40,
+      "perFrame": {
+        "count": 10,
+        "slots": [
+          "front-construction",
+          "side-construction",
+          "three-quarter-construction",
+          "rear-service-construction",
+          "one-colour-silhouette",
+          "mechanical-landmark-map",
+          "pilot-crew-access-diagram",
+          "hardpoint-upgrade-clearance",
+          "damage-zone-map",
+          "hero-frame-card"
+        ]
+      },
+      "frames": [
+        "bastion",
+        "viper",
+        "citadel",
+        "mirage"
+      ]
+    },
+    "frame-animation": {
+      "expectedCount": 480,
+      "perFrame": {
+        "count": 120,
+        "sourceOfTruth": "mechanical-sprite-contract source topology"
+      },
+      "frames": [
+        "bastion",
+        "viper",
+        "citadel",
+        "mirage"
+      ]
+    },
+    "frame-damage-overlays": {
+      "expectedCount": 16,
+      "perFrame": {
+        "count": 4,
+        "slots": [
+          "worn",
+          "damaged",
+          "critical",
+          "internal-breach"
+        ]
+      },
+      "frames": [
+        "bastion",
+        "viper",
+        "citadel",
+        "mirage"
+      ]
+    },
+    "universal-combat-fx": {
+      "expectedCount": 115,
+      "groups": [
+        {
+          "id": "impact",
+          "count": 24,
+          "members": [
+            [
+              "light-metal-impact",
+              6
+            ],
+            [
+              "heavy-metal-impact",
+              6
+            ],
+            [
+              "counter-impact",
+              4
+            ],
+            [
+              "critical-impact",
+              4
+            ],
+            [
+              "armour-breach-impact",
+              4
+            ]
+          ]
+        },
+        {
+          "id": "guard",
+          "count": 16,
+          "members": [
+            [
+              "block-impact",
+              6
+            ],
+            [
+              "instant-block",
+              4
+            ],
+            [
+              "guard-crush",
+              6
+            ]
+          ]
+        },
+        {
+          "id": "ground-movement",
+          "count": 20,
+          "members": [
+            [
+              "foot-plant",
+              4
+            ],
+            [
+              "dash-dust",
+              4
+            ],
+            [
+              "landing",
+              4
+            ],
+            [
+              "skid",
+              4
+            ],
+            [
+              "wall-contact",
+              4
+            ]
+          ]
+        },
+        {
+          "id": "damage-debris",
+          "count": 20,
+          "members": [
+            [
+              "armour-fragment",
+              6
+            ],
+            [
+              "metal-spark",
+              6
+            ],
+            [
+              "damage-smoke",
+              4
+            ],
+            [
+              "internal-breach",
+              4
+            ]
+          ]
+        },
+        {
+          "id": "system-state",
+          "count": 20,
+          "members": [
+            [
+              "core-spend",
+              4
+            ],
+            [
+              "low-core",
+              4
+            ],
+            [
+              "system-down",
+              4
+            ],
+            [
+              "reignition",
+              4
+            ],
+            [
+              "heat-vent",
+              4
+            ]
+          ]
+        },
+        {
+          "id": "broadcast-match",
+          "count": 15,
+          "members": [
+            [
+              "round-start",
+              3
+            ],
+            [
+              "ko",
+              4
+            ],
+            [
+              "victory",
+              2
+            ],
+            [
+              "super-freeze",
+              3
+            ],
+            [
+              "screen-transition",
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    "frame-specific-fx": {
+      "expectedCount": 160,
+      "perFrame": {
+        "bastion": {
+          "redline-bore": 10,
+          "anvil-lock": 10,
+          "blow-off": 10,
+          "kiln-verdict": 10
+        },
+        "viper": {
+          "switchback": 10,
+          "blue-sever": 10,
+          "backspark": 10,
+          "neon-autopsy": 10
+        },
+        "citadel": {
+          "fault-writ": 10,
+          "crown-wall": 10,
+          "deadbolt": 10,
+          "crown-engine": 10
+        },
+        "mirage": {
+          "false-entry": 10,
+          "null-needle": 10,
+          "slip-zero": 10,
+          "black-geometry": 10
+        }
+      }
+    },
+    "arena-layers": {
+      "expectedCount": 40,
+      "perArena": {
+        "count": 10,
+        "slots": [
+          "far-background",
+          "far-ambient-loop",
+          "midground",
+          "mid-machinery-loop",
+          "fight-plane",
+          "cage-containment",
+          "foreground-occlusion",
+          "stage-light-mask",
+          "hazard-damage-state",
+          "selection-broadcast-card"
+        ]
+      },
+      "arenas": [
+        "foundry-nine",
+        "reactor-spine",
+        "orbital-dock",
+        "ash-citadel"
+      ]
+    },
+    "service-bay-crew-upgrades": {
+      "expectedCount": 102,
+      "sharedEnvironment": [
+        "far-bay",
+        "service-cradle",
+        "access-gantry",
+        "umbilical-attached",
+        "umbilical-released",
+        "maintenance-arm",
+        "diagnostic-console",
+        "crew-elevator",
+        "armour-lock-sequence",
+        "technician-scale-set",
+        "floor-service-debris",
+        "emergency-lighting-state"
+      ],
+      "crewRoles": {
+        "crew-chief": [
+          "ready-portrait",
+          "full-body-idle",
+          "working",
+          "signal",
+          "injured",
+          "unavailable"
+        ],
+        "reactor-engineer": [
+          "ready-portrait",
+          "full-body-idle",
+          "working",
+          "signal",
+          "injured",
+          "unavailable"
+        ],
+        "weapons-officer": [
+          "ready-portrait",
+          "full-body-idle",
+          "working",
+          "signal",
+          "injured",
+          "unavailable"
+        ],
+        "systems-engineer": [
+          "ready-portrait",
+          "full-body-idle",
+          "working",
+          "signal",
+          "injured",
+          "unavailable"
+        ],
+        "damage-control": [
+          "ready-portrait",
+          "full-body-idle",
+          "working",
+          "signal",
+          "injured",
+          "unavailable"
+        ],
+        "sensor-operator": [
+          "ready-portrait",
+          "full-body-idle",
+          "working",
+          "signal",
+          "injured",
+          "unavailable"
+        ],
+        "arena-technician": [
+          "ready-portrait",
+          "full-body-idle",
+          "working",
+          "signal",
+          "injured",
+          "unavailable"
+        ]
+      },
+      "universalUpgradeIcons": {
+        "legs": [
+          "legs-1",
+          "legs-2",
+          "legs-3",
+          "legs-4"
+        ],
+        "arms": [
+          "arms-1",
+          "arms-2",
+          "arms-3",
+          "arms-4"
+        ],
+        "shoulders": [
+          "shoulders-1",
+          "shoulders-2",
+          "shoulders-3",
+          "shoulders-4"
+        ],
+        "core": [
+          "core-1",
+          "core-2",
+          "core-3",
+          "core-4"
+        ],
+        "cockpit": [
+          "cockpit-1",
+          "cockpit-2",
+          "cockpit-3",
+          "cockpit-4"
+        ],
+        "crew-support": [
+          "crew-support-1",
+          "crew-support-2",
+          "crew-support-3",
+          "crew-support-4"
+        ]
+      },
+      "frameSpecificCardsPerFrame": [
+        "weapon-module-a",
+        "weapon-module-b",
+        "mobility-module",
+        "cooling-module",
+        "defensive-module",
+        "signature-subsystem"
+      ]
+    },
+    "pilot-service-animation": {
+      "expectedCount": 72,
+      "perPilot": {
+        "count": 18,
+        "slots": [
+          "service-idle-a",
+          "service-idle-b",
+          "service-turn",
+          "service-signal",
+          "link-collar",
+          "harness-lock",
+          "cockpit-seat",
+          "capsule-seal",
+          "cockpit-neutral",
+          "cockpit-warning",
+          "cockpit-overdrive-call",
+          "cockpit-impact",
+          "launch-ready",
+          "umbilical-release-reaction",
+          "first-step-reaction",
+          "arena-focus",
+          "victory-comms",
+          "defeat-comms"
+        ]
+      },
+      "pilots": [
+        "branka-kovac",
+        "miho-tagawa",
+        "esi-quartey",
+        "parvaneh-razi"
+      ]
+    }
+  }
+}

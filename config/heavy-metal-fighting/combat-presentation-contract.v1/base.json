@@ -1,0 +1,405 @@
+{
+  "schema": "evavo.heavy-metal-fighting-combat-presentation-contract.v1",
+  "protocolVersion": "2026-08-12.1",
+  "project": {
+    "id": "heavy-metal-fighting",
+    "publicTitle": "HEAVY METAL FIGHTING",
+    "subtitle": "WAR CIRCUIT // 2089",
+    "technicalRepositoryId": "steel-dominion",
+    "logicalCanvas": {
+      "width": 640,
+      "height": 360
+    },
+    "nativeFrameCell": {
+      "width": 128,
+      "height": 128
+    },
+    "pilotPortraitMaster": {
+      "width": 256,
+      "height": 256
+    },
+    "pilotCutInCel": {
+      "width": 320,
+      "height": 112
+    },
+    "screenArt": {
+      "width": 640,
+      "height": 360
+    },
+    "stylePreset": "arcade-mech-fighter-1996"
+  },
+  "authority": {
+    "gameRepositoryOwnsCombatTiming": true,
+    "gameRepositoryOwnsHitboxesDamageAndInputs": true,
+    "gameRepositoryOwnsRuntimeSlotManifest": true,
+    "artStudioOwnsProductionPlanningAndReviewEvidence": true,
+    "providerMayDefineCanon": false,
+    "providerMayApproveArt": false,
+    "providerMayGeneratePackedRuntimeAtlas": false,
+    "automaticPromotionForbidden": true,
+    "namedHumanApprovalRequired": true,
+    "targetRepositoryMutationForbidden": true,
+    "gitMutationForbidden": true
+  },
+  "style": {
+    "northStar": "An original 1994-1997 arcade and DOS giant-Frame fighter with disciplined held-cel animation, mechanically coherent machines, expressive cel-painted Pilots, hard industrial broadcast UI, and readable spectacle.",
+    "productionLessons": [
+      "silhouette-first arcade readability",
+      "three-part move staging: anticipation, contact, recovery",
+      "limited local material ramps and deliberate pixel clusters",
+      "pilot personality and Frame identity treated as equal selection layers",
+      "industrial machinery must expose service, cooling, load and recoil logic",
+      "super presentation uses short portrait cut-ins, palette events and separate effects rather than long modern cinematics"
+    ],
+    "forbidden": [
+      "copying any commercial character, logo, stage, move animation or screen composition",
+      "generic chrome heavy-metal album branding",
+      "random skulls, flames, chains, wings or unreadable spikes",
+      "modern PBR gloss or baked bloom",
+      "random glowing seams or crawling micro-panel noise",
+      "floating weapons or armour without declared attachments",
+      "phase effects replacing the physical body",
+      "smooth tweened anatomy used instead of authored key poses",
+      "provider-generated final contact sheets or packed atlases"
+    ],
+    "pixelRules": {
+      "nearestFiltering": true,
+      "subpixelPlacement": false,
+      "bakedAntialiasing": false,
+      "bakedMotionBlur": false,
+      "nativeScaleReviewRequired": true,
+      "thumbnailReview": {
+        "width": 320,
+        "height": 180
+      }
+    }
+  },
+  "sharedStateLibrary": [
+    {
+      "id": "idle-a",
+      "status": "implemented",
+      "source": "neutral-and-throws:0",
+      "purpose": "primary load-bearing stance"
+    },
+    {
+      "id": "idle-b",
+      "status": "implemented",
+      "source": "neutral-and-throws:1",
+      "purpose": "secondary mechanical settle without human breathing"
+    },
+    {
+      "id": "walk-contact-left",
+      "status": "implemented",
+      "source": "neutral-and-throws:2",
+      "purpose": "first planted contact"
+    },
+    {
+      "id": "walk-contact-right",
+      "status": "implemented",
+      "source": "neutral-and-throws:3",
+      "purpose": "opposing planted contact"
+    },
+    {
+      "id": "ready",
+      "status": "implemented",
+      "source": "neutral-and-throws:4",
+      "purpose": "clearest single identity pose"
+    },
+    {
+      "id": "crouch",
+      "status": "implemented",
+      "source": "neutral-and-throws:5",
+      "purpose": "mechanically coherent compression"
+    },
+    {
+      "id": "guard",
+      "status": "implemented",
+      "source": "neutral-and-throws:6",
+      "purpose": "primary brace silhouette"
+    },
+    {
+      "id": "jump-shared",
+      "status": "implemented",
+      "source": "neutral-and-throws:7",
+      "purpose": "current shared airborne pose"
+    },
+    {
+      "id": "dash-shared",
+      "status": "implemented",
+      "source": "neutral-and-throws:8",
+      "purpose": "current launch/travel body pose"
+    },
+    {
+      "id": "hit-shared",
+      "status": "implemented",
+      "source": "neutral-and-throws:9",
+      "purpose": "current shared light hit, guard crush and KO stagger body pose"
+    },
+    {
+      "id": "knockdown-held",
+      "status": "implemented",
+      "source": "neutral-and-throws:10",
+      "purpose": "current grounded collapse hold"
+    },
+    {
+      "id": "wakeup",
+      "status": "implemented",
+      "source": "neutral-and-throws:11",
+      "purpose": "mechanical recovery to standing"
+    },
+    {
+      "id": "throw-start",
+      "status": "implemented",
+      "source": "neutral-and-throws:12",
+      "purpose": "throw initiation"
+    },
+    {
+      "id": "thrown-receiver",
+      "status": "implemented",
+      "source": "neutral-and-throws:13",
+      "purpose": "generic receiver pose"
+    },
+    {
+      "id": "throw-break",
+      "status": "implemented",
+      "source": "neutral-and-throws:14",
+      "purpose": "separation and counter-force"
+    },
+    {
+      "id": "throw-recoil",
+      "status": "implemented",
+      "source": "neutral-and-throws:15",
+      "purpose": "initiator follow-through"
+    },
+    {
+      "id": "walk-passing-left",
+      "status": "planned-atlas-v2",
+      "source": "utility-v2-planned:0",
+      "plannedSlot": 34,
+      "purpose": "left passing key"
+    },
+    {
+      "id": "walk-passing-right",
+      "status": "planned-atlas-v2",
+      "source": "utility-v2-planned:1",
+      "plannedSlot": 35,
+      "purpose": "right passing key"
+    },
+    {
+      "id": "block-impact",
+      "status": "planned-atlas-v2",
+      "source": "utility-v2-planned:2",
+      "plannedSlot": 54,
+      "purpose": "guard compression distinct from neutral guard"
+    },
+    {
+      "id": "guard-crush",
+      "status": "planned-atlas-v2",
+      "source": "utility-v2-planned:3",
+      "plannedSlot": 55,
+      "purpose": "guard geometry visibly opened"
+    },
+    {
+      "id": "jump-apex-fall",
+      "status": "planned-atlas-v2",
+      "source": "utility-v2-planned:4",
+      "plannedSlot": 74,
+      "purpose": "distinct apex or descent pose"
+    },
+    {
+      "id": "landing-compression",
+      "status": "planned-atlas-v2",
+      "source": "utility-v2-planned:5",
+      "plannedSlot": 75,
+      "purpose": "distinct landing key"
+    },
+    {
+      "id": "heavy-counter-stagger",
+      "status": "planned-atlas-v2",
+      "source": "utility-v2-planned:6",
+      "plannedSlot": 94,
+      "purpose": "heavy/counter reaction distinct from light hit"
+    },
+    {
+      "id": "wall-air-impact",
+      "status": "planned-atlas-v2",
+      "source": "utility-v2-planned:7",
+      "plannedSlot": 95,
+      "purpose": "wall or airborne reaction"
+    },
+    {
+      "id": "system-down",
+      "status": "planned-atlas-v2-and-gameplay",
+      "source": "utility-v2-planned:8",
+      "plannedSlot": 105,
+      "purpose": "CORE empty shutdown pose"
+    },
+    {
+      "id": "reignition",
+      "status": "planned-atlas-v2-and-gameplay",
+      "source": "utility-v2-planned:9",
+      "plannedSlot": 106,
+      "purpose": "CORE restart pose"
+    },
+    {
+      "id": "heat-vent",
+      "status": "planned-atlas-v2-and-gameplay",
+      "source": "utility-v2-planned:10",
+      "plannedSlot": 107,
+      "purpose": "emergency cooling pose"
+    },
+    {
+      "id": "entrance-taunt",
+      "status": "planned-atlas-v2",
+      "source": "utility-v2-planned:11",
+      "plannedSlot": 117,
+      "purpose": "deployment lock or restrained taunt"
+    },
+    {
+      "id": "victory",
+      "status": "implemented",
+      "source": "victory-defeat:0",
+      "plannedSlot": 118,
+      "purpose": "held victory result"
+    },
+    {
+      "id": "defeat",
+      "status": "implemented",
+      "source": "victory-defeat:1",
+      "plannedSlot": 119,
+      "purpose": "held defeat result"
+    }
+  ],
+  "superPresentationStandard": {
+    "name": "Overdrive portrait-cut-in standard",
+    "goal": "Deliver a high-value 1990s arcade punctuation without turning the match into a long modern cinematic.",
+    "pilotCelsPerPilot": [
+      "super-charge",
+      "super-call",
+      "super-resolve"
+    ],
+    "cutInCelSize": {
+      "width": 320,
+      "height": 112
+    },
+    "maximumPortraitStripHeight": 120,
+    "universalSequence": [
+      {
+        "step": 1,
+        "name": "confirm",
+        "visual": "two-tick input confirmation; no asset changes combat timing"
+      },
+      {
+        "step": 2,
+        "name": "palette-hit",
+        "visual": "one hard palette flash and controlled stage darkening"
+      },
+      {
+        "step": 3,
+        "name": "pilot-charge",
+        "visual": "first portrait cel enters on a hard rail"
+      },
+      {
+        "step": 4,
+        "name": "pilot-call",
+        "visual": "second portrait cel plus separately authored bitmap move name"
+      },
+      {
+        "step": 5,
+        "name": "pilot-resolve",
+        "visual": "third portrait cel and Frame-specific screen field lock"
+      },
+      {
+        "step": 6,
+        "name": "body-release",
+        "visual": "portrait clears before the real hero-contact body cel"
+      },
+      {
+        "step": 7,
+        "name": "impact",
+        "visual": "body contact, hitstop, Frame FX and brief camera response"
+      },
+      {
+        "step": 8,
+        "name": "return",
+        "visual": "stage palette and HUD restore immediately after the effect contract ends"
+      }
+    ],
+    "rules": [
+      "pilot cut-in may animate eyes and mouth across three held cels",
+      "cut-in is a framed strip or command card, not a full video",
+      "the opponent cannot be obscured for the whole active sequence",
+      "the physical Frame remains readable at the hero contact",
+      "all move names are separately authored bitmap text",
+      "all Frame effects are separate from body cells",
+      "runtime super freeze, hitstop and damage remain game-authoritative"
+    ],
+    "presentationBudget": {
+      "maximumPortraitOccupancyTicks": 20,
+      "entryTicks": 6,
+      "callTicks": 6,
+      "resolveTicks": 5,
+      "clearTicks": 3,
+      "rule": "Presentation ticks may occupy existing game-authoritative super-freeze windows but may never change combat startup, active, recovery, damage or hitstop."
+    },
+    "layerOrder": [
+      "controlled-stage-darken",
+      "Frame-specific-screen-field",
+      "industrial-cut-in-rail",
+      "Pilot-portrait-cel",
+      "separately-authored-move-name",
+      "small-CORE-or-contract-mark",
+      "hard-clear-before-body-contact"
+    ]
+  },
+  "postLaunchMoveBacklog": {
+    "status": "design-backlog-not-in-launch-120-cell-contract",
+    "purpose": "Record desirable fighter depth without pretending it is implemented or allocating final launch cels.",
+    "sharedCandidates": [
+      {
+        "id": "command-normal-a",
+        "description": "one Frame-specific forward normal that reinforces silhouette and spacing"
+      },
+      {
+        "id": "command-normal-b",
+        "description": "one Frame-specific low or overhead utility normal"
+      },
+      {
+        "id": "air-throw",
+        "description": "only if paired receiver choreography remains readable at 128x128"
+      },
+      {
+        "id": "second-overdrive",
+        "description": "only after first Overdrive, reversal and CORE presentation are proven"
+      }
+    ],
+    "gate": "requires a separately versioned move, hitbox, source-cell and runtime-atlas contract"
+  },
+  "sourceReview": {
+    "lastReviewedGameRevision": "22db456b660cf1ccee2d0f1278491f96b2dea36e",
+    "reviewedAt": "2026-08-12",
+    "files": [
+      {
+        "path": "scripts/combat/chassis_move_catalog.gd",
+        "blobSha": "bff8ff31433125ddd186b82e6e188d1516378044",
+        "authority": "Frame-specific normal and reversal IDs, timing and hit levels"
+      },
+      {
+        "path": "scripts/combat/move_catalog.gd",
+        "blobSha": "a4592e8d4d54e2c18150e4d086d0a98ac844bc2b",
+        "authority": "implemented primary specials and Overdrives"
+      },
+      {
+        "path": "scripts/presentation/fighter_animation_library.gd",
+        "blobSha": "fec65d425752252c16c0121c4f7a3748d3f5c7f0",
+        "authority": "current animation-bank and runtime-slot reuse"
+      },
+      {
+        "path": "docs/animation/HEAVY_METAL_FIGHTING_FRAME_ANIMATION_BIBLE.md",
+        "blobSha": "live-revision-bound",
+        "authority": "public move naming and production choreography"
+      }
+    ],
+    "rule": "Any different game revision or live slot-manifest hash requires a fresh source review before final promotion; newer revisions are not assumed compatible."
+  }
+}

@@ -1,0 +1,394 @@
+{
+  "pilots": [
+    {
+      "id": "branka-kovac",
+      "name": "BRANKA KOVAC",
+      "handle": "GRAVEBELL",
+      "affiliation": "DANUBE WORKS",
+      "defaultFrameId": "bastion",
+      "ageBand": "early-forties",
+      "background": "Former load marshal and emergency-rig operator whose structural-accident compensation claim was converted into a War Circuit Pilot contract.",
+      "dramaticFunction": "The human cost of industrial corporate ownership; protective of every crew member inside her Frame.",
+      "bodySilhouette": [
+        "broad-shouldered-working-build",
+        "stable-square-stance",
+        "hands-read-as-tools-not-fashion-poses"
+      ],
+      "faceLocks": [
+        "square-face",
+        "broken-nose",
+        "pale-jaw-scar",
+        "heavy-straight-brows",
+        "deep-set-dark-eyes"
+      ],
+      "hairLocks": [
+        "short-dark-hair",
+        "single-practical-grey-streak",
+        "no-long-loose-hair-inside-link-collar"
+      ],
+      "serviceClothing": [
+        "tan-grey-load-marshal-jacket",
+        "oxide-red-load-rating-tabs",
+        "black-padded-link-suit-visible-at-collar-and-cuffs",
+        "broad-service-gloves",
+        "heavy-work-boots"
+      ],
+      "linkSuit": [
+        "matte-black-pressure-managed-under-suit",
+        "bone-grey-impact-collar",
+        "oxide-red-emergency-release-tabs",
+        "compact-life-support-pack"
+      ],
+      "paletteRamps": [
+        "warm-workwear-tan",
+        "bone-grey",
+        "oxide-red",
+        "near-black",
+        "muted-skin-warmth"
+      ],
+      "expressionRules": [
+        "anger-is-held-in-jaw-and-brow-not-open-mouth-rage",
+        "ready-expression-is-direct-and-protective",
+        "pain-remains-controlled-until-internal-breach",
+        "victory-is-relief-and-crew-check-not-celebrity-triumph"
+      ],
+      "portraitSlots": [
+        "identity-front",
+        "identity-three-quarter",
+        "select-idle",
+        "select-focus",
+        "versus",
+        "hud-small",
+        "comms-neutral",
+        "comms-warning",
+        "comms-pain",
+        "super-charge",
+        "super-call",
+        "super-resolve",
+        "victory",
+        "defeat",
+        "dossier-ending"
+      ],
+      "superCutIn": {
+        "charge": "Branka lowers her chin as the collar lamps step from amber to red; mouth closed.",
+        "call": "She gives the move name in one compressed command cel with eyes locked forward.",
+        "resolve": "Jaw set, one sharp exhale, furnace light on the lower face; no screaming pose.",
+        "entryDirection": "left-to-right-heavy-warning-rail"
+      },
+      "selectPresentation": {
+        "idle": "three-quarter bust, shoulders square, eyes on opponent data",
+        "focus": "small forward head turn and one harder brow line",
+        "cardCopyPriority": [
+          "name",
+          "handle",
+          "contract-affiliation",
+          "load-tolerance",
+          "crew-command"
+        ]
+      },
+      "forbidden": [
+        "generic-young-action-hero",
+        "ornamental-cybernetic-eye",
+        "cleavage-armour",
+        "random-tactical-pouches",
+        "smiling-sponsor-pose"
+      ]
+    },
+    {
+      "id": "miho-tagawa",
+      "name": "MIHO TAGAWA",
+      "handle": "CUTGLASS",
+      "affiliation": "KANSAI ARC",
+      "defaultFrameId": "viper",
+      "ageBand": "late-twenties",
+      "background": "Expressway systems runner and illegal maintenance-road racer whose charges were erased in exchange for circuit ownership.",
+      "dramaticFunction": "A gifted route reader who treats surveillance, traffic and attack lanes as one moving map.",
+      "bodySilhouette": [
+        "compact-athletic-build",
+        "forward-ready-posture",
+        "quick-asymmetric-hand-language"
+      ],
+      "faceLocks": [
+        "compact-triangular-face",
+        "high-cheek-line",
+        "alert-dark-eyes",
+        "small-crooked-smile-only-in-safe-moments"
+      ],
+      "hairLocks": [
+        "short-asymmetric-black-hair",
+        "clean-left-temple-shape",
+        "no-generic-long-anime-fringe-over-both-eyes"
+      ],
+      "serviceClothing": [
+        "graphite-racing-service-jacket",
+        "blue-green-ceramic-shoulder-blocks",
+        "single-acid-lime-route-stripe",
+        "amber-service-visor-worn-up",
+        "fingerless-maintenance-gloves",
+        "scuffed-road-boots"
+      ],
+      "linkSuit": [
+        "charcoal-flex-link-suit",
+        "blue-green-rib-protection",
+        "acid-lime-route-index-at-left-collar",
+        "low-profile-neck-seal"
+      ],
+      "paletteRamps": [
+        "graphite",
+        "blue-green",
+        "acid-lime",
+        "amber-visor",
+        "cool-skin-shadow"
+      ],
+      "expressionRules": [
+        "danger-reads-as-concentration-before-amusement",
+        "focus-is-a-narrow-eye-line-not-manic-grin",
+        "pain-is-a-sharp-interrupted-breath",
+        "victory-is-an-instant-stop-and-small-disbelieving-smile"
+      ],
+      "portraitSlots": [
+        "identity-front",
+        "identity-three-quarter",
+        "select-idle",
+        "select-focus",
+        "versus",
+        "hud-small",
+        "comms-neutral",
+        "comms-warning",
+        "comms-pain",
+        "super-charge",
+        "super-call",
+        "super-resolve",
+        "victory",
+        "defeat",
+        "dossier-ending"
+      ],
+      "superCutIn": {
+        "charge": "Miho tracks three route vectors with eyes only while visor data reflects across one cheek.",
+        "call": "She snaps the move name on the hard brake cel; mouth shape compact and graphic.",
+        "resolve": "The smile disappears, eyes lock to the final line, and the portrait cuts before contact.",
+        "entryDirection": "fast-diagonal-rightward-route-cut"
+      },
+      "selectPresentation": {
+        "idle": "side-biased three-quarter bust with visor raised",
+        "focus": "visor catches one amber line while the head turns two or three degrees",
+        "cardCopyPriority": [
+          "name",
+          "handle",
+          "contract-affiliation",
+          "route-reading",
+          "single-pilot-load"
+        ]
+      },
+      "forbidden": [
+        "generic-manic-hacker",
+        "neon-accessories-everywhere",
+        "catlike-costume-cues",
+        "random-sponsor-logos",
+        "permanent-glowing-eye"
+      ]
+    },
+    {
+      "id": "esi-quartey",
+      "name": "ESI QUARTEY",
+      "handle": "NINTH GATE",
+      "affiliation": "ACCRA YARD",
+      "defaultFrameId": "citadel",
+      "ageBand": "late-thirties",
+      "background": "Structural-systems engineer and former emergency-yard commander fighting to keep a public infrastructure division out of a defence acquisition.",
+      "dramaticFunction": "A Pilot whose authority comes from responsibility for a ten-person crew rather than military theatre.",
+      "bodySilhouette": [
+        "tall-composed-build",
+        "upright-contained-posture",
+        "hands-used-for-measurement-and-command-signals"
+      ],
+      "faceLocks": [
+        "long-oval-face",
+        "strong-cheek-and-jaw-line",
+        "steady-dark-eyes",
+        "measured-mouth-shapes"
+      ],
+      "hairLocks": [
+        "close-braided-crown",
+        "clear-link-collar-silhouette",
+        "no-loose-decorative-strands"
+      ],
+      "serviceClothing": [
+        "deep-indigo-structural-work-coat",
+        "warm-ochre-edge-binding",
+        "rigid-high-collar",
+        "compact-hearing-protection",
+        "survey-tablet",
+        "structural-chalk-holder"
+      ],
+      "linkSuit": [
+        "indigo-black-command-link-suit",
+        "ochre-role-tabs",
+        "reinforced-shoulder-harness",
+        "crew-status-wrist-panel"
+      ],
+      "paletteRamps": [
+        "deep-indigo",
+        "warm-ochre",
+        "survey-white",
+        "near-black",
+        "warm-neutral-skin-ramp"
+      ],
+      "expressionRules": [
+        "anger-is-expressed-through-stillness",
+        "focus-is-open-eyed-and-analytical",
+        "pain-first-checks-crew-status",
+        "victory-is-a-contained-command-release"
+      ],
+      "portraitSlots": [
+        "identity-front",
+        "identity-three-quarter",
+        "select-idle",
+        "select-focus",
+        "versus",
+        "hud-small",
+        "comms-neutral",
+        "comms-warning",
+        "comms-pain",
+        "super-charge",
+        "super-call",
+        "super-resolve",
+        "victory",
+        "defeat",
+        "dossier-ending"
+      ],
+      "superCutIn": {
+        "charge": "Esi reads the containment state with one hand held in a crew-command signal.",
+        "call": "She issues the move name as an order; no shout distortion or exaggerated mouth.",
+        "resolve": "Eyes move from crew rail to opponent and the portrait locks to the timer axis.",
+        "entryDirection": "vertical-centre-command-card"
+      },
+      "selectPresentation": {
+        "idle": "front-biased bust with high collar and survey tablet edge",
+        "focus": "one small chin lift and direct eye contact",
+        "cardCopyPriority": [
+          "name",
+          "handle",
+          "contract-affiliation",
+          "containment-control",
+          "crew-command"
+        ]
+      },
+      "forbidden": [
+        "generic-military-officer",
+        "medal-covered-uniform",
+        "random-gun-belts",
+        "exaggerated-authoritarian-sneer",
+        "unrelated-tribal-pattern-filler"
+      ]
+    },
+    {
+      "id": "parvaneh-razi",
+      "name": "PARVANEH RAZI",
+      "handle": "FALSE SUN",
+      "affiliation": "CASPIAN SIGNAL",
+      "defaultFrameId": "mirage",
+      "ageBand": "mid-thirties",
+      "background": "Optical-field systems physicist forced to validate dangerous displacement hardware with the neurological profile she used to design it.",
+      "dramaticFunction": "The person most aware that the technology is failing and the only one able to interpret those failures quickly enough to survive.",
+      "bodySilhouette": [
+        "narrow-deliberate-build",
+        "controlled-low-motion-posture",
+        "hands-make-calibration-not-mystic-gestures"
+      ],
+      "faceLocks": [
+        "narrow-rectangular-face",
+        "tired-dark-eyes",
+        "precise-straight-nose",
+        "restrained-mouth-shapes"
+      ],
+      "hairLocks": [
+        "blunt-dark-hair",
+        "single-naturally-pale-temple",
+        "clean-collar-clearance",
+        "no-floating-hair-in-cockpit"
+      ],
+      "serviceClothing": [
+        "dark-plum-signal-suit",
+        "short-pale-calibration-coat",
+        "amber-optical-test-lens-clipped-at-collar",
+      "small-calibration-marks-at-cuffs-and-collar"
+      ],
+      "linkSuit": [
+        "plum-black-signal-link-suit",
+        "pale-ceramic-neck-seal",
+        "amber-diagnostic-tabs",
+        "no-decorative-body-armour"
+      ],
+      "paletteRamps": [
+        "dark-plum",
+        "pale-ceramic",
+        "amber",
+        "magenta-signal-accent",
+        "cool-neutral-skin-shadow"
+      ],
+      "expressionRules": [
+        "watchfulness-precedes-mystery",
+        "anxiety-is-visible-but-controlled",
+        "pain-reads-as-sensor-overload-not-supernatural-possession",
+        "victory-is-exhausted-recalibration"
+      ],
+      "portraitSlots": [
+        "identity-front",
+        "identity-three-quarter",
+        "select-idle",
+        "select-focus",
+        "versus",
+        "hud-small",
+        "comms-neutral",
+        "comms-warning",
+        "comms-pain",
+        "super-charge",
+        "super-call",
+        "super-resolve",
+        "victory",
+        "defeat",
+        "dossier-ending"
+      ],
+      "superCutIn": {
+        "charge": "Parvaneh watches a calibration line split across the amber lens reflection.",
+        "call": "The move name is spoken precisely while the three portrait strips misalign by one controlled step.",
+        "resolve": "The strips re-align on her real eye line and clear before the physical lance contact.",
+        "entryDirection": "three-part-offset-calibration-strip"
+      },
+      "selectPresentation": {
+        "idle": "quiet three-quarter bust with clipped lens visible at collar",
+        "focus": "one amber reflection and a small eye movement toward the viewer",
+        "cardCopyPriority": [
+          "name",
+          "handle",
+          "contract-affiliation",
+          "field-interpretation",
+          "crew-synchronisation"
+      ]
+      },
+      "forbidden": [
+        "generic-silver-haired-assassin",
+        "glowing-tattoos",
+        "mystic-hand-signs",
+        "floating-jewellery",
+        "emotionless-robot-woman"
+      ]
+    }
+  ],
+  "universalPortraitRules": [
+    "draw for native 256x256 master and verify the 48x48 HUD derivative",
+    "two major cel-shadow bands plus controlled accent highlight",
+    "face silhouette, hair mass, collar and light direction remain locked across all fifteen portrait slots",
+    "mouth animation uses held graphic shapes rather than smooth lip-sync",
+    "all names and move text are separately authored bitmap typography",
+    "no provider may infer a new costume, scar, hairstyle, emblem or cybernetic component between states"
+  ],
+  "selectionRules": [
+    "Pilot selection occurs before Frame selection",
+    "select-idle and select-focus are separate cels, not a smooth tween",
+    "the large portrait must retain the complete head silhouette and meaningful clothing anchors",
+    "contract affiliation is visible but does not imply loyalty",
+    "Pilot personality is communicated through pose and expression rather than decorative text volume"
+  ]
+}

@@ -1,0 +1,299 @@
+{
+  "id": "bastion",
+  "code": "BX-09",
+  "epithet": "GRAVEBELL",
+  "pilotId": "branka-kovac",
+  "motionIdentity": "hydraulic-weight",
+  "specialBanks": {
+    "special-a": "redline-bore",
+    "special-b": "anvil-lock",
+    "high-output-a": "kiln-verdict",
+    "high-output-b": "blow-off"
+  },
+  "moves": [
+    {
+      "id": "rivet-driver",
+      "publicName": "RIVET DRIVER",
+      "runtimeMoveId": "bastion_piston_jab",
+      "implementationStatus": "implemented",
+      "category": "standing-normal",
+      "inputNotation": "L",
+      "sourceBank": "standing-light",
+      "currentRuntimeBank": "standing-light",
+      "plannedProductionBank": "standing-light",
+      "hitLevel": "mid",
+      "resourceClass": "none",
+      "choreography": {
+        "startupIntent": "Retract the right wrist piston while the feet and core remain planted.",
+        "heroContact": "Short square piston punch with the shoulder block behind the wrist; the contact silhouette must read without sparks.",
+        "activeOvershoot": "Preserve the contact line for one held cel, then show a physically coherent overshoot.",
+        "recoveryIntent": "Expose the piston rod and visibly re-pressurise before the forearm returns.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["light-metal-impact", "piston-exhaust"],
+      "bodyNotes": [
+        "No boxing extension beyond the declared piston travel.",
+        "The left forearm remains a pressure-control guard."
+      ],
+      "productionGates": [],
+      "currentRuntimeTiming": {"startup": 7, "active": 4, "recovery": 15, "damage": 7}
+    },
+    {
+      "id": "gravebell",
+      "publicName": "GRAVEBELL",
+      "runtimeMoveId": "bastion_siege_hammer",
+      "implementationStatus": "implemented",
+      "category": "standing-normal",
+      "inputNotation": "H",
+      "sourceBank": "standing-heavy",
+      "currentRuntimeBank": "standing-heavy",
+      "plannedProductionBank": "standing-heavy",
+      "hitLevel": "mid",
+      "resourceClass": "none",
+      "choreography": {
+        "startupIntent": "Load across the rear anchor, raise the heavy forearm and close the shoulder brace.",
+        "heroContact": "Broad descending hammer line with the entire shoulder and torso mass committed.",
+        "activeOvershoot": "Piston and shoulder continue a few pixels past contact before the heel anchors absorb the load.",
+        "recoveryIntent": "Leave the forearm low and the torso pitched forward long enough to read as punishable.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["heavy-metal-impact", "floor-shock", "armour-fragment"],
+      "bodyNotes": [
+        "The forearm remains attached to its declared wrist mount.",
+        "Do not turn the pose into a human haymaker."
+      ],
+      "productionGates": [],
+      "currentRuntimeTiming": {"startup": 15, "active": 5, "recovery": 25, "damage": 16, "knockdown": true}
+    },
+    {
+      "id": "ankle-vise",
+      "publicName": "ANKLE VISE",
+      "runtimeMoveId": "bastion_toe_ram",
+      "implementationStatus": "implemented",
+      "category": "crouching-normal",
+      "inputNotation": "2L",
+      "sourceBank": "crouch-light",
+      "currentRuntimeBank": "crouch-light",
+      "plannedProductionBank": "crouch-light",
+      "hitLevel": "low",
+      "resourceClass": "none",
+      "choreography": {
+        "startupIntent": "Compress over both feet and expose the front heel ram.",
+        "heroContact": "Compact low toe/heel strike; reach comes from declared foot hardware, not leg stretching.",
+        "activeOvershoot": "Preserve the contact line for one held cel, then show a physically coherent overshoot.",
+        "recoveryIntent": "Retract the ram before the pelvis rises.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["light-metal-impact", "ground-scrape"],
+      "bodyNotes": [],
+      "productionGates": [],
+      "currentRuntimeTiming": {"startup": 6, "active": 4, "recovery": 13, "damage": 6}
+    },
+    {
+      "id": "slag-rake",
+      "publicName": "SLAG RAKE",
+      "runtimeMoveId": "bastion_foundry_sweep",
+      "implementationStatus": "implemented",
+      "category": "crouching-normal",
+      "inputNotation": "2H",
+      "sourceBank": "crouch-heavy",
+      "currentRuntimeBank": "crouch-heavy",
+      "plannedProductionBank": "crouch-heavy",
+      "hitLevel": "low",
+      "resourceClass": "none",
+      "choreography": {
+        "startupIntent": "Lower one forearm and rotate the hips as a single load-bearing unit.",
+        "heroContact": "Wide low forearm sweep with a clear horizontal lane and anchored opposite foot.",
+        "activeOvershoot": "Preserve the contact line for one held cel, then show a physically coherent overshoot.",
+        "recoveryIntent": "The sweeping arm drags low before hydraulic recovery restores the torso.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["heavy-metal-impact", "ground-sparks", "floor-shock"],
+      "bodyNotes": [],
+      "productionGates": [],
+      "currentRuntimeTiming": {"startup": 13, "active": 6, "recovery": 24, "damage": 14, "knockdown": true}
+    },
+    {
+      "id": "falling-rivet",
+      "publicName": "FALLING RIVET",
+      "runtimeMoveId": "bastion_drop_jab",
+      "implementationStatus": "implemented",
+      "category": "air-normal",
+      "inputNotation": "j.L",
+      "sourceBank": "jump-light",
+      "currentRuntimeBank": "jump-light",
+      "plannedProductionBank": "jump-light",
+      "hitLevel": "overhead",
+      "resourceClass": "none",
+      "choreography": {
+        "startupIntent": "Tuck the knees enough to keep the piston line visible.",
+        "heroContact": "Short downward piston contact beneath the torso.",
+        "activeOvershoot": "Preserve the contact line for one held cel, then show a physically coherent overshoot.",
+        "recoveryIntent": "Retract the wrist and prepare both feet for landing.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["light-metal-impact", "air-pressure"],
+      "bodyNotes": [],
+      "productionGates": [],
+      "currentRuntimeTiming": {"startup": 6, "active": 5, "recovery": 13, "damage": 8}
+    },
+    {
+      "id": "deadweight",
+      "publicName": "DEADWEIGHT",
+      "runtimeMoveId": "bastion_crater_press",
+      "implementationStatus": "implemented",
+      "category": "air-normal",
+      "inputNotation": "j.H",
+      "sourceBank": "jump-heavy",
+      "currentRuntimeBank": "jump-heavy",
+      "plannedProductionBank": "jump-heavy",
+      "hitLevel": "overhead",
+      "resourceClass": "none",
+      "choreography": {
+        "startupIntent": "Fold the lower body beneath the core and turn the broad underside toward the target.",
+        "heroContact": "Wide compact descending press using the whole lower chassis.",
+        "activeOvershoot": "Preserve the contact line for one held cel, then show a physically coherent overshoot.",
+        "recoveryIntent": "Land in deep compression, then force the anchors back into line.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["heavy-metal-impact", "landing-dust", "floor-shock"],
+      "bodyNotes": [],
+      "productionGates": [],
+      "currentRuntimeTiming": {"startup": 10, "active": 7, "recovery": 20, "damage": 17, "knockdown": true}
+    },
+    {
+      "id": "redline-bore",
+      "publicName": "REDLINE BORE",
+      "runtimeMoveId": "forge_ram",
+      "implementationStatus": "implemented",
+      "category": "special",
+      "inputNotation": "236H",
+      "sourceBank": "special-a",
+      "currentRuntimeBank": "special-a",
+      "plannedProductionBank": "special-a",
+      "hitLevel": "mid",
+      "resourceClass": "core-low",
+      "choreography": {
+        "startupIntent": "Lock the forearm tool, close the shoulder brace and pre-load the rear heel anchor.",
+        "heroContact": "Straight armoured drive with the bore line, shoulder and rear leg forming one force path.",
+        "activeOvershoot": "Preserve the contact line for one held cel, then show a physically coherent overshoot.",
+        "recoveryIntent": "Piston travel recoils visibly through the shoulder and torso before the anchors release.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["bastion-redline-bore", "heavy-metal-impact", "piston-exhaust"],
+      "bodyNotes": [],
+      "productionGates": [],
+      "currentRuntimeTiming": {"startup": 10, "active": 7, "recovery": 20, "damage": 17, "knockdown": true}
+    },
+    {
+      "id": "anvil-lock",
+      "publicName": "ANVIL LOCK",
+      "runtimeMoveId": null,
+      "implementationStatus": "planned-runtime-not-implemented",
+      "category": "special",
+      "inputNotation": "63214H",
+      "sourceBank": "special-b",
+      "currentRuntimeBank": "special-b",
+      "plannedProductionBank": "special-b",
+      "hitLevel": "throw",
+      "resourceClass": "core-medium",
+      "choreography": {
+        "startupIntent": "Open both forearm clamps and lower the centre of mass without advancing the feet.",
+        "heroContact": "Secure the opponent between the declared forearm tools, rotate through the hips and force a short industrial wrench.",
+        "activeOvershoot": "Preserve the contact line for one held cel, then show a physically coherent overshoot.",
+        "recoveryIntent": "Release cleanly, vent both clamps and restore the front guard.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["bastion-anvil-lock", "mag-lock-sparks", "floor-shock"],
+      "bodyNotes": [
+        "This is a mechanical clamp, not an invisible telekinetic grab.",
+        "Receiver choreography must be paired and size-safe."
+      ],
+      "productionGates": ["blocked-until-game-move-contract", "blocked-until-atlas-v2-special-b-authority"]
+    },
+    {
+      "id": "blow-off",
+      "publicName": "BLOW-OFF",
+      "runtimeMoveId": "bastion_pressure_vent",
+      "implementationStatus": "implemented-art-bank-shared",
+      "category": "reversal",
+      "inputNotation": "623L+H",
+      "sourceBank": "high-output-b",
+      "currentRuntimeBank": "high-output-a",
+      "plannedProductionBank": "high-output-b",
+      "hitLevel": "mid",
+      "resourceClass": "core-medium",
+      "choreography": {
+        "startupIntent": "Compact the torso and close all nonessential shutters.",
+        "heroContact": "Emergency pressure discharge around a short defensive body snap.",
+        "activeOvershoot": "Preserve the contact line for one held cel, then show a physically coherent overshoot.",
+        "recoveryIntent": "The Frame remains visibly vent-open and vulnerable while pressure rebuilds.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["bastion-blow-off", "pressure-crown", "heavy-metal-impact"],
+      "bodyNotes": [],
+      "productionGates": ["final-distinct-cels-blocked-until-atlas-v2"],
+      "currentRuntimeTiming": {"startup": 5, "active": 5, "recovery": 24, "damage": 14, "knockdown": true}
+    },
+    {
+      "id": "kiln-verdict",
+      "publicName": "KILN VERDICT",
+      "runtimeMoveId": "furnace_breaker",
+      "implementationStatus": "implemented",
+      "category": "overdrive",
+      "inputNotation": "236236H",
+      "sourceBank": "high-output-a",
+      "currentRuntimeBank": "high-output-a",
+      "plannedProductionBank": "high-output-a",
+      "hitLevel": "mid",
+      "resourceClass": "overdrive-full",
+      "choreography": {
+        "startupIntent": "Heel anchors lock, dorsal shutters open and furnace light rises through the sternum.",
+        "heroContact": "An enormous piston verdict with the forearm, shoulder, core and rear anchor aligned.",
+        "activeOvershoot": "The forearm drive continues through contact into a controlled structural stop.",
+        "recoveryIntent": "Bastion remains low and venting while the piston returns under visible load.",
+        "phaseKeys": ["startup-0", "startup-1", "startup-2", "active-entry", "hero-impact", "active-overshoot", "recoil", "vulnerable-recovery", "return-bridge"]
+      },
+      "effects": ["bastion-kiln-verdict", "super-freeze", "furnace-flare", "floor-shock"],
+      "bodyNotes": [],
+      "productionGates": [],
+      "currentRuntimeTiming": {"startup": 7, "active": 12, "recovery": 28, "damage": 31, "knockdown": true},
+      "pilotCutIn": {
+        "pilotStates": ["super-charge", "super-call", "super-resolve"],
+        "colourScript": "bone-grey / oxide-red / furnace-orange",
+        "call": "KILN VERDICT"
+      }
+    },
+    {
+      "id": "load-transfer",
+      "publicName": "LOAD TRANSFER",
+      "runtimeMoveId": null,
+      "implementationStatus": "implemented-universal-throw-system",
+      "category": "throw",
+      "inputNotation": "L+H",
+      "sourceBank": "neutral-and-throws",
+      "currentRuntimeBank": "neutral-and-throws",
+      "plannedProductionBank": "neutral-and-throws",
+      "hitLevel": "throw",
+      "resourceClass": "none",
+      "choreography": {
+        "startupIntent": "Clamp at the shoulder and waist with both forearms.",
+        "heroContact": "Pivot on the rear heel anchor and drive the receiver to the floor in front.",
+        "recoveryIntent": "Maintain one bracing hand until the receiver clears, then reset."
+      },
+      "effects": ["throw-impact", "floor-shock"],
+      "bodyNotes": [],
+      "productionGates": ["receiver-pairing-review-required"]
+    }
+  ],
+  "superPresentation": {
+    "moveId": "kiln-verdict",
+    "pilotId": "branka-kovac",
+    "portraitCels": ["super-charge", "super-call", "super-resolve"],
+    "screenField": "furnace-black-red",
+    "entry": "horizontal left cut-in behind a heavy warning rail",
+    "bodyPriority": "Bastion remains fully readable; flame and pressure layers sit behind and beyond the contact arm.",
+    "impactFreezeCue": "bone-white two-frame flash, oxide-red silhouette hold, furnace-orange aftershock",
+    "audioCue": "breaker lock, hydraulic chamber, Branka call, structural impact"
+  }
+}
