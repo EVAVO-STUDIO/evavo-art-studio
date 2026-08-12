@@ -15,9 +15,9 @@ const freeze = (value) => {
 export async function verifyHmfProductionWorkOrders() {
   const [first, body, receiptTemplate, repair, resume] = await Promise.all([
     buildHmfProductionWorkOrderBatch("hmf-b0001"),
-    heavyMetalFightingProductionWorkOrder("hmf.frame-animation.bastion.slot-001"),
-    heavyMetalFightingProductionReceiptTemplate("hmf.frame-animation.bastion.slot-001"),
-    heavyMetalFightingProductionRepairTemplate("hmf.frame-animation.bastion.slot-001", {
+    heavyMetalFightingProductionWorkOrder("hmf.frame-animation.bastion.slot-002"),
+    heavyMetalFightingProductionReceiptTemplate("hmf.frame-animation.bastion.slot-002"),
+    heavyMetalFightingProductionRepairTemplate("hmf.frame-animation.bastion.slot-002", {
       candidateSha256: "a".repeat(64),
       failureCodes: ["random-greebles", "pivot-drift"],
       attempt: 1,
