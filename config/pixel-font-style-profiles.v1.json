@@ -1,0 +1,86 @@
+{
+  "schema": "evavo.pixel-font-style-profile-catalog.v1",
+  "engineVersion": "3.0.0",
+  "purpose": "Open deterministic style profiles for binary, indexed, RGBA, layered and component-composed pixel-font sources.",
+  "sourceSchemas": [
+    "evavo.pixel-font-face-master.v2",
+    "evavo.pixel-font-universal-face.v1"
+  ],
+  "pixelModes": [
+    "binary",
+    "indexed",
+    "rgba",
+    "layered",
+    "component-composed"
+  ],
+  "spacingModes": [
+    "preserve",
+    "proportional",
+    "monospace",
+    "duospace",
+    "fixed-cell"
+  ],
+  "atlasStrategies": [
+    "maxrects",
+    "shelf",
+    "fixed-grid"
+  ],
+  "builtInOperations": [
+    "recolour",
+    "palette-map",
+    "gradient",
+    "outline",
+    "shadow",
+    "highlight",
+    "inline",
+    "dilate",
+    "erode",
+    "shear",
+    "mirror",
+    "rotate90",
+    "mask",
+    "translate",
+    "scale"
+  ],
+  "extensionPolicy": {
+    "reviewedPythonOperationRegistry": true,
+    "cliArbitraryCodeExecution": false,
+    "mcpArbitraryCodeExecution": false,
+    "sourceMasterMutation": false,
+    "transactionalCreateOnlyBuilds": true
+  },
+  "outputs": [
+    "multi-page RGBA PNG",
+    "AngelCode text BMFont",
+    "EVAVO universal atlas JSON",
+    "fixed-cell review PNG and JSON",
+    "BDF 2.1 alpha-mask projection",
+    "optional deterministic TrueType alpha-mask derivative",
+    "Godot FontVariation resource",
+    "normalised source, style profile and SHA-256 manifest"
+  ],
+  "canonicalRuntime": "AngelCode BMFont text plus matching RGBA PNG pages",
+  "trueTypePolicy": {
+    "canonicalRuntime": false,
+    "colourPreservation": false,
+    "dependency": "fonttools==4.63.0",
+    "embeddingFsType": 0,
+    "deterministicTimestamps": true
+  },
+  "positioningAndComposition": {
+    "arbitraryGlyphRectangles": true,
+    "signedOffsets": true,
+    "zeroAdvanceCombiningMarks": true,
+    "anchorAttachedComponents": true,
+    "componentPaletteRemapping": true,
+    "mixedCaseLegacyFaceIds": true,
+    "emptySoftHyphenCompatibility": true
+  },
+  "runtimeBoundary": {
+    "unicodeScalarAndPrivateUseGlyphs": true,
+    "contextualShapingProvidedByCompiler": false,
+    "bidirectionalLayoutProvidedByCompiler": false,
+    "verticalLayoutProvidedByCompiler": false,
+    "reason": "BMFont/PNG is a glyph runtime; shaping and layout remain target-engine responsibilities."
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "atlas": {
+    "allowMultiPage": true,
+    "columns": 16,
+    "maximumEdge": 2048,
+    "padding": 1,
+    "powerOfTwo": true,
+    "strategy": "maxrects"
+  },
+  "background": "#00000000",
+  "description": "Deterministic arcade-outline starter profile.",
+  "displayName": "Arcade Outline",
+  "ink": "#ffffffff",
+  "operations": [
+    {
+      "colour": "#1a0b12ff",
+      "connectivity": 8,
+      "op": "outline",
+      "radius": 1
+    }
+  ],
+  "output": {
+    "atlasJson": true,
+    "bdf": true,
+    "bmfont": true,
+    "godotResource": true,
+    "godotResourceBasePath": "assets/fonts",
+    "gridSheet": true,
+    "includeNormalisedFace": true,
+    "ttf": false
+  },
+  "padding": 1,
+  "profileId": "arcade-outline",
+  "schema": "evavo.pixel-font-style-profile.v1",
+  "spacing": {
+    "mode": "preserve",
+    "tracking": 0
+  },
+  "strikes": [
+    1
+  ],
+  "version": "1.0.0"
+}

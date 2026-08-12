@@ -1,0 +1,33 @@
+{
+  "schema": "evavo.pixel-font-universal-face.v1",
+  "familyId": "universal-example",
+  "faceId": "universal-example-indexed",
+  "displayName": "Universal Indexed Arcade Example",
+  "version": "1.0.0",
+  "kind": "author-defined-multicolour-arcade-display",
+  "styleTags": ["indexed", "multicolour", "arcade", "display"],
+  "designIntent": "Named-palette example showing that multicolour glyph pixels remain canonical in BMFont/PNG output.",
+  "pixelMode": "indexed",
+  "palette": {
+    "A": "#f4d58dff",
+    "B": "#8b5e34ff",
+    "C": "#e63946ff"
+  },
+  "metrics": {
+    "baseline": 7,
+    "ascent": 7,
+    "descent": 2,
+    "lineHeight": 10,
+    "capHeight": 7,
+    "xHeight": 5,
+    "spaceAdvance": 4
+  },
+  "coverage": {"requiredCodepoints": [32, 65, 66, 65533]},
+  "glyphs": [
+    {"codepoint": 32, "width": 3, "height": 1, "xOffset": 0, "yOffset": 0, "xAdvance": 4, "bitmap": ["..."]},
+    {"codepoint": 65, "width": 5, "height": 7, "xOffset": 0, "yOffset": 0, "xAdvance": 6, "bitmap": [".AAA.", "A...A", "A.B.A", "AAAAA", "A...A", "A.C.A", "A...A"]},
+    {"codepoint": 66, "width": 5, "height": 7, "xOffset": 0, "yOffset": 0, "xAdvance": 6, "bitmap": ["BBBB.", "B...B", "B.C.B", "BBBB.", "B.A.B", "B...B", "BBBB."]},
+    {"codepoint": 65533, "width": 5, "height": 7, "xOffset": 0, "yOffset": 0, "xAdvance": 6, "bitmap": ["CCCCC", "C...C", "...C.", "..C..", ".....", "..C..", "CCCCC"]}
+  ],
+  "kerning": []
+}

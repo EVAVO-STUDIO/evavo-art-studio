@@ -1,0 +1,15 @@
+{
+  "schema": "evavo.pixel-font-style-profile.v1",
+  "profileId": "colour-rune",
+  "displayName": "Colour Rune",
+  "version": "1.0.0",
+  "description": "Retains indexed colour, then adds a dark pixel outline and exact integer strikes.",
+  "ink": "#ffffffff",
+  "background": "#00000000",
+  "padding": 2,
+  "spacing": {"mode": "preserve", "tracking": 1, "cellAdvance": 8, "wideAdvance": 16, "fixedCellWidth": 16, "fixedCellHeight": 16},
+  "operations": [{"op": "outline", "radius": 1, "connectivity": 8, "colour": "#1a0b12ff"}],
+  "atlas": {"strategy": "maxrects", "maximumEdge": 256, "padding": 2, "powerOfTwo": true, "allowMultiPage": true, "columns": 16, "cellWidth": 16, "cellHeight": 16},
+  "output": {"bmfont": true, "atlasJson": true, "gridSheet": true, "bdf": true, "ttf": true, "godotResource": true, "includeNormalisedFace": true, "godotResourceBasePath": "assets/fonts", "ttfPixelUnits": 64},
+  "strikes": [1, 2, 4]
+}
