@@ -1,0 +1,74 @@
+{
+  "authority": {
+    "creativeApproval": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "targetRepositoryMutation": false
+  },
+  "engineVersion": "1.0.0",
+  "fontInput": "AngelCode BMFont text plus matching RGBA PNG page(s)",
+  "motions": [
+    "blink",
+    "jitter",
+    "palette-cycle",
+    "shine",
+    "sparkle",
+    "type-on",
+    "wave"
+  ],
+  "operations": [
+    "bands",
+    "bevel",
+    "dilate",
+    "erode",
+    "extrude",
+    "gradient",
+    "highlight",
+    "inline",
+    "mask",
+    "mirror",
+    "outline",
+    "palette-map",
+    "plate",
+    "recolour",
+    "rotate90",
+    "scale",
+    "shadow",
+    "shear",
+    "taper",
+    "translate"
+  ],
+  "outputs": [
+    "RGBA PNG frame(s)",
+    "horizontal sprite sheet",
+    "SHA-256 manifest",
+    "web CSS/JavaScript",
+    "optional Godot SpriteFrames .tres"
+  ],
+  "presets": [
+    "arcade-chrome-title",
+    "blue-command-badge",
+    "brass-plaque-label",
+    "cga-menu",
+    "dos-brass-title",
+    "fantasy-fire-title",
+    "gothic-violet-title",
+    "hologram-cyan-title",
+    "ice-rune-title",
+    "stone-carved-title",
+    "strategy-ui-emboss",
+    "toxic-tech-title",
+    "warning-red-title",
+    "website-pixel-neon"
+  ],
+  "purpose": "Pixel-perfect text, headings, logos and animated title treatments built from canonical bitmap-font output without mutating font masters.",
+  "renderingPolicy": {
+    "antialiasing": false,
+    "fontMasterMutation": false,
+    "integerCoordinates": true,
+    "nearestOnly": true,
+    "vectorResampling": false
+  },
+  "schema": "evavo.pixel-text-catalog.v1"
+}

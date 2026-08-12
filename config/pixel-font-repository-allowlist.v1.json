@@ -1,0 +1,26 @@
+{
+  "schema": "evavo.pixel-font-repository-allowlist.v1",
+  "version": 1,
+  "repositories": [
+    {
+      "repository": "EVAVO-STUDIO/battle-chess",
+      "branches": ["main"],
+      "destinationRoots": ["assets/fonts"],
+      "publishModes": ["install-only", "branch", "direct-main"]
+    },
+    {
+      "repositoryPattern": "EVAVO-STUDIO/*",
+      "branches": ["main"],
+      "destinationRoots": [
+        "addons/fonts",
+        "assets/fonts",
+        "game/assets/fonts",
+        "packages/fonts",
+        "public/fonts",
+        "resources/fonts",
+        "src/assets/fonts"
+      ],
+      "publishModes": ["install-only", "branch"]
+    }
+  ]
+}

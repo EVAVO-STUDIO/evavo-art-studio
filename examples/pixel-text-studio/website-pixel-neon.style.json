@@ -1,0 +1,81 @@
+{
+  "animation": {
+    "fps": 6,
+    "frames": 6,
+    "loop": true,
+    "motions": [
+      {
+        "op": "blink",
+        "pattern": [
+          255,
+          255,
+          220,
+          255,
+          200,
+          255
+        ]
+      }
+    ]
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic website-pixel-neon pixel text/title starter treatment.",
+  "displayName": "Website Pixel Neon",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "vertical",
+      "bandHeight": 0,
+      "colours": [
+        "#86fff8ff",
+        "#2ed3f0ff",
+        "#d078ffff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "colour": "#090613ff",
+      "connectivity": 8,
+      "op": "outline",
+      "radius": 1
+    },
+    {
+      "colours": [
+        "#4b1678ff",
+        "#19104cff"
+      ],
+      "depth": 2,
+      "dx": 1,
+      "dy": 1,
+      "op": "extrude"
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "website-pixel-neon"
+}

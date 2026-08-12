@@ -1,0 +1,85 @@
+{
+  "animation": {
+    "fps": 10,
+    "frames": 6,
+    "loop": true,
+    "motions": [
+      {
+        "colours": [
+          "#d7ff6aff",
+          "#6ce83eff",
+          "#30c86fff"
+        ],
+        "op": "palette-cycle",
+        "step": 1
+      }
+    ]
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic toxic-tech-title pixel text/title starter treatment.",
+  "displayName": "Toxic Tech Title",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "horizontal",
+      "bandHeight": 2,
+      "colours": [
+        "#d7ff6aff",
+        "#6ce83eff",
+        "#1c7e45ff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "colour": "#07120cff",
+      "connectivity": 4,
+      "op": "outline",
+      "radius": 1
+    },
+    {
+      "colours": [
+        "#184a31ff",
+        "#071a14ff"
+      ],
+      "depth": 2,
+      "dx": 1,
+      "dy": 1,
+      "op": "extrude"
+    },
+    {
+      "alpha": 210,
+      "op": "mask",
+      "pattern": "scanline",
+      "phase": 0
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "toxic-tech-title"
+}
