@@ -29,7 +29,6 @@ const MAX_EVIDENCE_BYTES = 2 * 1024 * 1024 * 1024;
 const MAX_EVENTS = 50_000;
 const MAX_STRING = 4096;
 const MAX_LEASE_SECONDS = 24 * 60 * 60;
-const EVENT_RETRY_LIMIT = 64;
 const ALLOWED_STEP_KINDS = new Set([
   'external-ingest',
   'workspace-operation',
@@ -319,6 +318,7 @@ export function jobCapabilities() {
     exactOutputEvidence: true,
     crashResumable: true,
     staleLeaseRecovery: true,
+    optimisticConcurrency: true,
     imageBytesThroughMcp: false,
     authority: authorityBoundary(),
   };
@@ -403,6 +403,7 @@ export async function compileWorkspaceJob({ workspaceRoot, request, requestBytes
       appendOnlyEvents: true,
       createOnlyPlan: true,
       staleLeaseRecovery: true,
+      compareAndAppendEvents: true,
       exactInputRevalidationBeforeStart: true,
       exactOutputEvidenceOnSuccess: true,
     },
@@ -654,30 +655,39 @@ async function verifyInputFingerprints(root, step) {
   return drift;
 }
 
-async function appendEvent(root, plan, eventsRoot, rawEvent) {
+async function appendEvent(root, plan, eventsRoot, rawEvent, expectedPreviousEventSha256) {
   const canonicalAt = requireIsoTimestamp(rawEvent.at, 'event.at');
-  const eventInput = { ...rawEvent, at: canonicalAt };
-  for (let attempt = 0; attempt < EVENT_RETRY_LIMIT; attempt += 1) {
-    const events = await readEvents(eventsRoot, plan.jobId);
-    const sequence = events.length + 1;
-    const event = withDocumentHash({
-      schema: JOB_EVENT_SCHEMA,
-      version: 1,
-      jobId: plan.jobId,
-      sequence,
-      previousEventSha256: events.at(-1).documentSha256,
-      ...eventInput,
-    });
-    const target = path.join(eventsRoot, eventFilename(sequence));
-    try {
-      await writeJsonCreateOnly(target, event);
-      return event;
-    } catch (error) {
-      if (error?.code === 'ARTIST_WORKSPACE_JOB_COLLISION') continue;
-      throw error;
-    }
+  if (!/^[a-f0-9]{64}$/.test(expectedPreviousEventSha256 ?? '')) {
+    fail('ARTIST_WORKSPACE_JOB_CONCURRENCY', 'Append requires the exact previously inspected event SHA-256.');
   }
-  fail('ARTIST_WORKSPACE_JOB_CONCURRENCY', 'Could not append job event after bounded concurrent retries.');
+  const events = await readEvents(eventsRoot, plan.jobId);
+  const currentPreviousEventSha256 = events.at(-1).documentSha256;
+  if (currentPreviousEventSha256 !== expectedPreviousEventSha256) {
+    fail('ARTIST_WORKSPACE_JOB_CONCURRENCY', 'Job state changed after precondition verification; inspect current state before retrying.', {
+      expectedPreviousEventSha256,
+      currentPreviousEventSha256,
+    });
+  }
+  const sequence = events.length + 1;
+  const event = withDocumentHash({
+    schema: JOB_EVENT_SCHEMA,
+    version: 1,
+    jobId: plan.jobId,
+    sequence,
+    previousEventSha256: currentPreviousEventSha256,
+    ...rawEvent,
+    at: canonicalAt,
+  });
+  const target = path.join(eventsRoot, eventFilename(sequence));
+  try {
+    await writeJsonCreateOnly(target, event);
+  } catch (error) {
+    if (error?.code === 'ARTIST_WORKSPACE_JOB_COLLISION') {
+      fail('ARTIST_WORKSPACE_JOB_CONCURRENCY', 'Another checkpoint won the append race; inspect current state before retrying.');
+    }
+    throw error;
+  }
+  return event;
 }
 
 function requireActor(actor) {
@@ -702,7 +712,7 @@ export async function claimWorkspaceJob({ workspaceRoot, jobId, actor, leaseSeco
   const nowMs = Date.parse(now);
   if (!Number.isFinite(nowMs)) fail('ARTIST_WORKSPACE_JOB_INVALID', 'now must be an ISO timestamp.');
   const expiresAt = new Date(nowMs + leaseSeconds * 1000).toISOString();
-  await appendEvent(root, plan, eventsRoot, { type: 'claimed', at: now, actor: safeActor, details: { expiresAt, leaseSeconds } });
+  await appendEvent(root, plan, eventsRoot, { type: 'claimed', at: now, actor: safeActor, details: { expiresAt, leaseSeconds } }, state.lastEventSha256);
   return inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
 }
 
@@ -712,7 +722,7 @@ export async function releaseWorkspaceJob({ workspaceRoot, jobId, actor, now = n
   const { plan, eventsRoot } = await readPlanFromRoot(root, safeId(jobId, 'jobId'));
   const state = await inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
   requireLease(state, safeActor);
-  await appendEvent(root, plan, eventsRoot, { type: 'released', at: now, actor: safeActor, details: {} });
+  await appendEvent(root, plan, eventsRoot, { type: 'released', at: now, actor: safeActor, details: {} }, state.lastEventSha256);
   return inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
 }
 
@@ -731,7 +741,7 @@ export async function startWorkspaceJobStep({ workspaceRoot, jobId, actor, stepI
   if (stepState.status === 'in-progress') return state;
   const inputDrift = await verifyInputFingerprints(root, planStep);
   if (inputDrift.length > 0) fail('ARTIST_WORKSPACE_JOB_INPUT_DRIFT', `Step ${safeStepId} inputs changed since compilation.`, inputDrift);
-  await appendEvent(root, plan, eventsRoot, { type: 'step-started', at: now, actor: safeActor, stepId: safeStepId, details: { attempt: stepState.attempts + 1 } });
+  await appendEvent(root, plan, eventsRoot, { type: 'step-started', at: now, actor: safeActor, stepId: safeStepId, details: { attempt: stepState.attempts + 1 } }, state.lastEventSha256);
   return inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
 }
 
@@ -749,7 +759,7 @@ export async function completeWorkspaceJobStep({ workspaceRoot, jobId, actor, st
   if (stepState.status !== 'in-progress') fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Step ${safeStepId} must be in-progress before completion.`);
   const evidence = [];
   for (const output of planStep.outputs) evidence.push(await snapshotFile(root, output, `step ${safeStepId} output`));
-  await appendEvent(root, plan, eventsRoot, { type: 'step-succeeded', at: now, actor: safeActor, stepId: safeStepId, details: { evidence } });
+  await appendEvent(root, plan, eventsRoot, { type: 'step-succeeded', at: now, actor: safeActor, stepId: safeStepId, details: { evidence } }, state.lastEventSha256);
   return inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
 }
 
@@ -764,7 +774,7 @@ export async function failWorkspaceJobStep({ workspaceRoot, jobId, actor, stepId
   if (state.paused || state.cancelled) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Cannot fail a step while job status is ${state.status}.`);
   const stepState = state.steps.find((step) => step.id === safeStepId)?.state;
   if (!stepState || stepState.status !== 'in-progress') fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Step ${safeStepId} must be in-progress before failure can be recorded.`);
-  await appendEvent(root, plan, eventsRoot, { type: 'step-failed', at: now, actor: safeActor, stepId: safeStepId, details: { message: safeMessage } });
+  await appendEvent(root, plan, eventsRoot, { type: 'step-failed', at: now, actor: safeActor, stepId: safeStepId, details: { message: safeMessage } }, state.lastEventSha256);
   return inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
 }
 
@@ -775,7 +785,7 @@ export async function pauseWorkspaceJob({ workspaceRoot, jobId, actor, now = new
   const state = await inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
   requireLease(state, safeActor);
   if (state.paused) return state;
-  await appendEvent(root, plan, eventsRoot, { type: 'paused', at: now, actor: safeActor, details: {} });
+  await appendEvent(root, plan, eventsRoot, { type: 'paused', at: now, actor: safeActor, details: {} }, state.lastEventSha256);
   return inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
 }
 
@@ -786,7 +796,7 @@ export async function resumeWorkspaceJob({ workspaceRoot, jobId, actor, now = ne
   const state = await inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
   requireLease(state, safeActor);
   if (!state.paused) return state;
-  await appendEvent(root, plan, eventsRoot, { type: 'resumed', at: now, actor: safeActor, details: {} });
+  await appendEvent(root, plan, eventsRoot, { type: 'resumed', at: now, actor: safeActor, details: {} }, state.lastEventSha256);
   return inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
 }
 
@@ -798,6 +808,6 @@ export async function cancelWorkspaceJob({ workspaceRoot, jobId, actor, reason, 
   const state = await inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
   requireLease(state, safeActor);
   if (state.status === 'completed') fail('ARTIST_WORKSPACE_JOB_TERMINAL', 'Completed jobs cannot be cancelled.');
-  await appendEvent(root, plan, eventsRoot, { type: 'cancelled', at: now, actor: safeActor, details: { reason: safeReason } });
+  await appendEvent(root, plan, eventsRoot, { type: 'cancelled', at: now, actor: safeActor, details: { reason: safeReason } }, state.lastEventSha256);
   return inspectWorkspaceJob({ workspaceRoot: root, jobId: plan.jobId, now });
 }

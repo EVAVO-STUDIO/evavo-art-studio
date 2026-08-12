@@ -64,6 +64,7 @@ try {
   assert.equal(plan.steps.length, 3);
   assert.equal(plan.steps[0].inputFingerprints[0].path, 'sources/source.txt');
   assert.equal(plan.steps[0].inputFingerprints[0].bytes, 10);
+  assert.equal(plan.execution.compareAndAppendEvents, true);
 
   let state = await createWorkspaceJob({ workspaceRoot: root, plan });
   assert.equal(state.status, 'ready');
@@ -159,6 +160,35 @@ try {
   assert.equal(state.nextStepId, 'prepare');
   assert.equal(state.steps.find((step) => step.id === 'prepare').state.status, 'failed');
 
+  // Concurrent checkpoint intents are compare-and-append: only one competing actor may win each observed state.
+  // Repeat the race enough times to exercise both precondition and exclusive-create collision paths.
+  for (let index = 0; index < 16; index += 1) {
+    const concurrentRequest = structuredClone(request);
+    concurrentRequest.jobId = `job-concurrent-${String(index).padStart(2, '0')}`;
+    const concurrentPlan = await compileWorkspaceJob({
+      workspaceRoot: root,
+      request: concurrentRequest,
+      compiledAt: `2026-08-12T04:${String(20 + index).padStart(2, '0')}:00.000Z`,
+    });
+    await createWorkspaceJob({ workspaceRoot: root, plan: concurrentPlan });
+    const competingClaims = await Promise.allSettled([
+      claimWorkspaceJob({ workspaceRoot: root, jobId: concurrentPlan.jobId, actor: `race-a-${index}`, leaseSeconds: 300, now: '2026-08-12T05:00:00.000Z' }),
+      claimWorkspaceJob({ workspaceRoot: root, jobId: concurrentPlan.jobId, actor: `race-b-${index}`, leaseSeconds: 300, now: '2026-08-12T05:00:00.000Z' }),
+    ]);
+    const fulfilled = competingClaims.filter((entry) => entry.status === 'fulfilled');
+    const rejected = competingClaims.filter((entry) => entry.status === 'rejected');
+    assert.equal(fulfilled.length, 1, `exactly one concurrent claim must win for ${concurrentPlan.jobId}`);
+    assert.equal(rejected.length, 1, `exactly one concurrent claim must be rejected for ${concurrentPlan.jobId}`);
+    assert.equal(
+      ['ARTIST_WORKSPACE_JOB_CONCURRENCY', 'ARTIST_WORKSPACE_JOB_ALREADY_CLAIMED'].includes(rejected[0].reason?.code),
+      true,
+      `unexpected concurrent-claim rejection for ${concurrentPlan.jobId}: ${rejected[0].reason?.code}`,
+    );
+    const concurrentState = await inspectWorkspaceJob({ workspaceRoot: root, jobId: concurrentPlan.jobId, now: '2026-08-12T05:00:01.000Z' });
+    assert.equal(concurrentState.eventCount, 2, `stale competing claim must not become a second durable event for ${concurrentPlan.jobId}`);
+    assert.ok(concurrentState.activeLease?.actor.startsWith('race-'));
+  }
+
   // Dependency cycles are rejected at compilation time.
   const cycle = {
     schema: JOB_REQUEST_SCHEMA,
@@ -194,6 +224,7 @@ try {
   console.log('Persistent Artist Workspace job regressions passed.');
   console.log('- append-only hash-chained checkpoints survive actor interruption');
   console.log('- stale leases allow bounded takeover without guessing the next step');
+  console.log('- competing checkpoint intents use compare-and-append semantics and cannot serialize stale state');
   console.log('- exact compiled inputs are revalidated before execution');
   console.log('- exact succeeded outputs remain drift-verifiable after completion');
   console.log('- failed steps remain resumable and dependency cycles are rejected');

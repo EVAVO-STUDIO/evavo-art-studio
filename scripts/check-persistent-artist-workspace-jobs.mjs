@@ -52,8 +52,11 @@ for (const token of [
   "commitFile: 'job-commit.json'",
   'appendOnlyEvents: true',
   'staleLeaseRecovery: true',
+  'optimisticConcurrency: true',
+  'compareAndAppendEvents: true',
   'exactInputRevalidationBeforeStart: true',
   'exactOutputEvidenceOnSuccess: true',
+  'ARTIST_WORKSPACE_JOB_CONCURRENCY',
   'ARTIST_WORKSPACE_JOB_INPUT_DRIFT',
   'ARTIST_WORKSPACE_JOB_EVIDENCE_DRIFT',
   "path.join(root, 'journals', 'jobs'",
@@ -117,8 +120,9 @@ for (const script of ['scripts/test-persistent-artist-workspace-jobs.mjs', 'scri
 
 console.log('Persistent Artist Workspace job guard passed.');
 console.log('- job plans are create-only and exact-input bound');
-console.log('- checkpoints are append-only, self-hashed and hash-chained');
+console.log('- checkpoints are append-only, self-hashed, hash-chained and compare-and-append serialized');
 console.log('- stale claims recover without mutable lock state');
+console.log('- competing stale checkpoint intents fail closed instead of becoming later authoritative events');
 console.log('- failed steps remain resumable while dependency cycles are rejected');
 console.log('- succeeded output evidence is drift-verified before later work continues');
 console.log('- MCP remains path-only and grants no provider, Storage, repository or Git authority');
