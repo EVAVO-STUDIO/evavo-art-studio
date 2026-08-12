@@ -10,6 +10,10 @@ import {
   validateHmfFrameAtlasV3MasterRoot,
   verifyHmfFrameAtlasV3Delivery,
 } from "./frame-atlas-v3-delivery.mjs";
+import {
+  buildHmfFrameMoveBodyChoreography,
+  verifyHmfFrameMoveBodyChoreography,
+} from "./frame-move-body-choreography.mjs";
 
 const FRAMES = ["bastion", "viper", "citadel", "mirage"];
 const MOTION_IDENTITIES = {
@@ -88,6 +92,66 @@ test("frame atlas-v3 delivery verification locks geometry, role grammar, target 
   assert.equal(verification.authority.workspaceExportWrite, true);
   assert.equal(verification.authority.targetRepositoryMutation, false);
   assert.equal(verification.authority.publication, false);
+});
+
+test("named Frame moves bind to production body banks and exact role choreography without claiming game timing authority", async () => {
+  const [verification, ...frames] = await Promise.all([
+    verifyHmfFrameMoveBodyChoreography(),
+    ...FRAMES.map((frameId) => buildHmfFrameMoveBodyChoreography(frameId)),
+  ]);
+  assert.equal(verification.status, "passed");
+  assert.equal(verification.frameCount, 4);
+  assert.equal(verification.moveCount, 44);
+  assert.ok(verification.runtimeImplementedCount > 0);
+  assert.ok(verification.plannedCount > 0);
+  assert.ok(verification.checks.every((check) => check.passed));
+
+  for (const frame of frames) {
+    assert.equal(frame.moves.length, 11);
+    assert.equal(frame.byCategory.normals.length, 6);
+    assert.equal(frame.byCategory.specials.length, 2);
+    assert.ok(frame.byCategory.reversal);
+    assert.ok(frame.byCategory.overdrive);
+    assert.ok(frame.byCategory.throw);
+    assert.ok(Object.values(frame.namedHighOutput).every(Boolean));
+    assert.equal(frame.authority.simulationTiming, false);
+    assert.equal(frame.authority.hitboxesDamageAndInputs, false);
+    assert.equal(frame.authority.workOrderMutation, false);
+    assert.equal(frame.authority.targetRepositoryMutation, false);
+
+    const specialA = frame.moves.find((move) => move.productionBodyBank === "special-a");
+    const specialB = frame.moves.find((move) => move.productionBodyBank === "special-b");
+    const reversal = frame.moves.find((move) => move.productionBodyBank === "reversal");
+    const overdrive = frame.moves.find((move) => move.productionBodyBank === "overdrive");
+    const standingHeavy = frame.moves.find((move) => move.productionBodyBank === "standing-heavy");
+    const throwMove = frame.moves.find((move) => move.category === "throw");
+
+    assert.deepEqual(specialA.productionBodySlotRange, { start: 150, end: 159, count: 10 });
+    assert.deepEqual(specialB.productionBodySlotRange, { start: 160, end: 169, count: 10 });
+    assert.deepEqual(reversal.productionBodySlotRange, { start: 170, end: 177, count: 8 });
+    assert.deepEqual(overdrive.productionBodySlotRange, { start: 178, end: 191, count: 14 });
+    assert.equal(standingHeavy.heroBodyRole.slot, 121);
+    assert.equal(standingHeavy.heroBodyRole.semanticId, "standing-heavy:hero-impact");
+    assert.equal(overdrive.heroBodyRole.slot, 184);
+    assert.equal(overdrive.heroBodyRole.semanticId, "overdrive:super-primary-impact");
+    assert.equal(throwMove.productionBodyBank, "throw-attacker");
+    assert.equal(throwMove.pairedReceiverBank, "throw-receiver");
+    assert.equal(throwMove.pairedReceiverRoles.length, 6);
+    assert.equal(Array.isArray(overdrive.separateEffects), true);
+    assert.equal(typeof overdrive.choreography.startupIntent, "string");
+    assert.equal(typeof overdrive.choreography.heroContact, "string");
+    if (specialB.implementationStatus === "planned-runtime-not-implemented") {
+      assert.equal(specialB.runtimeImplemented, false);
+      assert.ok(specialB.productionGates.length > 0);
+    }
+  }
+
+  const bastion = frames.find((frame) => frame.frameId === "bastion");
+  assert.equal(bastion.namedHighOutput.specialA, "redline-bore");
+  assert.equal(bastion.namedHighOutput.specialB, "anvil-lock");
+  assert.equal(bastion.namedHighOutput.reversal, "blow-off");
+  assert.equal(bastion.namedHighOutput.overdrive, "kiln-verdict");
+  assert.equal(bastion.moves.find((move) => move.moveId === "gravebell")?.publicName, "GRAVEBELL");
 });
 
 test("final atlas plan compilation refuses to proceed before the governed style proof is complete", async () => {
