@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "evavo-project-art-workspace-ingest": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_ingest_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ART_WORKSPACE_INGEST_ROOTS": "D:\\EVAVO-Art-Workspaces;D:\\EVAVO-Evidence",
+        "EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS": "C:\\Users\\Greg\\Downloads;D:\\EVAVO-Incoming-Art;C:\\GitRepos",
+        "EVAVO_ART_WORKSPACE_INGEST_MCP_ALLOW_WRITE": "true"
+      }
+    }
+  }
+}
