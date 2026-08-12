@@ -1,0 +1,69 @@
+name: Persistent Artist Workspace catalog
+
+on:
+  pull_request:
+    paths:
+      - "scripts/project-art/persistent-workspace-catalog.mjs"
+      - "scripts/project-art/common.mjs"
+      - "scripts/project-art/persistent-workspace.mjs"
+      - "scripts/project-art/persistent-workspace-ingest.mjs"
+      - "package.json"
+      - "scripts/persistent-artist-workspace-catalog.mjs"
+      - "scripts/check-persistent-artist-workspace-catalog.mjs"
+      - "scripts/test-persistent-artist-workspace-catalog.mjs"
+      - "scripts/test-project-art-workspace-catalog-mcp.mjs"
+      - "tools/project_art_workspace_catalog_mcp.mjs"
+      - "docs/PERSISTENT_ARTIST_WORKSPACE_CATALOG.md"
+      - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
+      - ".github/workflows/persistent-artist-workspace-catalog.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/project-art/persistent-workspace-catalog.mjs"
+      - "scripts/project-art/common.mjs"
+      - "scripts/project-art/persistent-workspace.mjs"
+      - "scripts/project-art/persistent-workspace-ingest.mjs"
+      - "package.json"
+      - "scripts/persistent-artist-workspace-catalog.mjs"
+      - "scripts/check-persistent-artist-workspace-catalog.mjs"
+      - "scripts/test-persistent-artist-workspace-catalog.mjs"
+      - "scripts/test-project-art-workspace-catalog-mcp.mjs"
+      - "tools/project_art_workspace_catalog_mcp.mjs"
+      - "docs/PERSISTENT_ARTIST_WORKSPACE_CATALOG.md"
+      - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
+      - ".github/workflows/persistent-artist-workspace-catalog.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistent-artist-workspace-catalog-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Run exact catalog contract and adversarial regressions
+        run: node scripts/check-persistent-artist-workspace-catalog.mjs
+
+      - name: Prove exact source remains clean
+        if: always()
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
