@@ -69,7 +69,7 @@ jobs:
           node --check scripts/heavy-metal-fighting-art-studio.test.mjs
           node --check scripts/heavy-metal-fighting-production-design.test.mjs
           node --check scripts/game-art-campaign-heavy-metal-fighting.test.mjs
-      - name: Run governed campaign, mechanical and production-design tests
+      - name: Run governed campaign, mechanical, sprite-census and production-design tests
         run: |
           node --test \
             scripts/game-art-campaign-heavy-metal-fighting.test.mjs \
@@ -82,6 +82,8 @@ jobs:
           node scripts/heavy-metal-fighting-art-studio.mjs summary > "$RUNNER_TEMP/heavy-metal-fighting-summary.json"
           node scripts/heavy-metal-fighting-art-studio.mjs contract > "$RUNNER_TEMP/heavy-metal-fighting-mechanical-contract.json"
           node scripts/heavy-metal-fighting-art-studio.mjs presentation-contract > "$RUNNER_TEMP/heavy-metal-fighting-combat-presentation.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs sprite-census > "$RUNNER_TEMP/heavy-metal-fighting-sprite-census.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs sprite-bank overdrive > "$RUNNER_TEMP/heavy-metal-fighting-overdrive-bank.json"
           node scripts/heavy-metal-fighting-art-studio.mjs pilot branka-kovac > "$RUNNER_TEMP/heavy-metal-fighting-branka-pilot.json"
           node scripts/heavy-metal-fighting-art-studio.mjs moves bastion > "$RUNNER_TEMP/heavy-metal-fighting-bastion-moves.json"
           node scripts/heavy-metal-fighting-art-studio.mjs move bastion blow-off > "$RUNNER_TEMP/heavy-metal-fighting-bastion-blow-off.json"
@@ -111,6 +113,8 @@ jobs:
             ${{ runner.temp }}/heavy-metal-fighting-summary.json
             ${{ runner.temp }}/heavy-metal-fighting-mechanical-contract.json
             ${{ runner.temp }}/heavy-metal-fighting-combat-presentation.json
+            ${{ runner.temp }}/heavy-metal-fighting-sprite-census.json
+            ${{ runner.temp }}/heavy-metal-fighting-overdrive-bank.json
             ${{ runner.temp }}/heavy-metal-fighting-branka-pilot.json
             ${{ runner.temp }}/heavy-metal-fighting-bastion-moves.json
             ${{ runner.temp }}/heavy-metal-fighting-bastion-blow-off.json
