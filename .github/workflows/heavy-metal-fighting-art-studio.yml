@@ -19,7 +19,9 @@ on:
       - "package.json"
       - ".github/workflows/heavy-metal-fighting-art-studio.yml"
   push:
-    branches: [main]
+    branches:
+      - main
+      - "codex/hmf-*"
     paths:
       - "config/game-art-campaign.heavy-metal-fighting.v1.json"
       - "config/game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-*"
