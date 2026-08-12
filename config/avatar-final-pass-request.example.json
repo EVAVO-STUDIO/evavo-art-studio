@@ -1,0 +1,97 @@
+{
+  "schema": "evavo.project-art-avatar-final-pass-request.v1",
+  "sessionId": "eva-final-pass-v1",
+  "characterId": "eva-female",
+  "sourceCommit": "1111111111111111111111111111111111111111",
+  "materializationManifestPath": "manifest.json",
+  "materializationManifestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "assignmentMode": "owner-declared-only",
+  "semanticInferencePerformed": false,
+  "timestampOrderingUsedAsSemantics": false,
+  "generationOrderingUsedAsSemantics": false,
+  "canvas": {
+    "width": 1024,
+    "height": 1024
+  },
+  "frames": [
+    {
+      "frameId": "idle-a",
+      "materializedPath": "frames/ChatGPT Image Aug 9, 2026, 01_50_47 PM (1).png",
+      "expectedSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "targetPath": "assets/eva-female/reviewed/idle-a.png",
+      "disposition": "accept",
+      "issues": [],
+      "repairOperations": [],
+      "reviewNotes": "Approved identity and neutral idle anchor."
+    },
+    {
+      "frameId": "idle-b",
+      "materializedPath": "frames/ChatGPT Image Aug 9, 2026, 01_50_47 PM (2).png",
+      "expectedSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "targetPath": "assets/eva-female/reviewed/idle-b.png",
+      "disposition": "deterministic-repair",
+      "issues": ["edge-halo"],
+      "repairOperations": ["edge-decontaminate", "defringe"],
+      "reviewNotes": "Preserve the pose and identity; clean only the transparent edge."
+    }
+  ],
+  "inbetweens": [
+    {
+      "frameId": "idle-mid",
+      "beforeFrameId": "idle-a",
+      "afterFrameId": "idle-b",
+      "targetPath": "assets/eva-female/reviewed/idle-mid.png",
+      "method": "provider-generated",
+      "durationMs": 80,
+      "constraints": ["hands", "fingers", "anatomy", "face-identity", "style"]
+    }
+  ],
+  "sequences": [
+    {
+      "id": "idle-main",
+      "kind": "idle",
+      "loopMode": "loop",
+      "frames": [
+        { "frameId": "idle-a", "durationMs": 120 },
+        { "frameId": "idle-mid", "durationMs": 80 },
+        { "frameId": "idle-b", "durationMs": 120 },
+        { "frameId": "idle-mid", "durationMs": 80 }
+      ],
+      "neutralFrameId": "idle-a",
+      "emotion": null,
+      "loopThresholds": {
+        "maximumChangedFraction": 0.2,
+        "maximumMeanChannelDelta": 24,
+        "maximumAlphaChangedFraction": 0.1,
+        "maximumCentroidShiftPixels": 8
+      }
+    }
+  ],
+  "qualityGates": {
+    "maximumCentroidShiftPixels": 20,
+    "maximumChangedFraction": 0.5,
+    "maximumMeanChannelDelta": 64,
+    "maximumAlphaChangedFraction": 0.25,
+    "minimumFrameDurationMs": 40,
+    "maximumFrameDurationMs": 500,
+    "requireHandsReview": true,
+    "requireFaceIdentityReview": true,
+    "requireLoopClosureForLoops": true
+  },
+  "authority": {
+    "semanticAssignment": false,
+    "sourceMutation": false,
+    "sourceDeletion": false,
+    "imageEditing": false,
+    "providerExecution": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "repositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "deployment": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "forcePush": false
+  }
+}
