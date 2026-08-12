@@ -1,0 +1,18 @@
+{
+  "schema": "evavo.heavy-metal-fighting-combat-presentation-bundle.v1",
+  "protocolVersion": "2026-08-12.1",
+  "contractSchema": "evavo.heavy-metal-fighting-combat-presentation-contract.v1",
+  "components": {
+    "base": "combat-presentation-contract.v1/base.json",
+    "frames": [
+      "combat-presentation-contract.v1/frames/bastion.json",
+      "combat-presentation-contract.v1/frames/viper.json",
+      "combat-presentation-contract.v1/frames/citadel.json",
+      "combat-presentation-contract.v1/frames/mirage.json"
+    ],
+    "screens": "combat-presentation-contract.v1/screens.json",
+    "assetAllocation": "combat-presentation-contract.v1/asset-allocation.json",
+    "intro": "combat-presentation-contract.v1/intro.json",
+    "pilots": "combat-presentation-contract.v1/pilots.json"
+  }
+}
