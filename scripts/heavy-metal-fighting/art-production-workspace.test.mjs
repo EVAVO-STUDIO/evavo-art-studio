@@ -11,6 +11,12 @@ import {
   materializeHmfArtProductionWorkspace,
   verifyHmfArtProductionWorkspace,
 } from "./art-production-workspace.mjs";
+import {
+  buildHmfProductionBatchRegistry,
+  heavyMetalFightingProductionRegistryBatch,
+  heavyMetalFightingProductionRegistrySummary,
+  verifyHmfProductionBatchRegistry,
+} from "./batch-registry.mjs";
 
 const ROOTS = ["sources","working","versions","masks","scratch","review","masters","exports","manifests","journals"];
 
@@ -101,4 +107,58 @@ test("workspace verification binds the 1573-image census to the style and batch 
   assert.ok(verification.checks.every((check) => check.passed));
   assert.equal(verification.batchSummary.bodyAnimationBatches, 104);
   assert.equal(verification.batchSummary.minimumGovernedBatches, 179);
+});
+
+test("production registry compiles exactly 179 gapless batches and 1573 unique workspace outputs", async () => {
+  const registry = await buildHmfProductionBatchRegistry();
+  assert.equal(registry.schema, "evavo.heavy-metal-fighting-production-batch-registry.v1");
+  assert.equal(registry.totals.batches, 179);
+  assert.equal(registry.totals.sourceImages, 1573);
+  assert.equal(registry.totals.bodyAnimationBatches, 104);
+  assert.equal(registry.totals.bodyAnimationImages, 896);
+  assert.equal(registry.totals.supportingBatches, 75);
+  assert.equal(registry.totals.supportingImages, 677);
+  assert.match(registry.registrySha256, /^[a-f0-9]{64}$/);
+  const units = registry.batches.flatMap((batch) => batch.units);
+  assert.equal(new Set(units.map((unit) => unit.id)).size, 1573);
+  assert.equal(new Set(units.map((unit) => unit.workspaceOutputPath)).size, 1573);
+  assert.ok(units.every((unit) => unit.workspaceOutputPath.startsWith("working/")));
+  assert.ok(registry.batches.every((batch, index) => batch.id === `hmf-b${String(index + 1).padStart(4, "0")}`));
+  assert.ok(registry.batches.every((batch) => batch.requiredImages >= 1 && batch.requiredImages <= 10));
+});
+
+test("production registry covers body slots 0-223 once per Frame and contains the bounded style-proof wave", async () => {
+  const registry = await buildHmfProductionBatchRegistry();
+  for (const frameId of ["bastion","viper","citadel","mirage"]) {
+    const slots = registry.batches
+      .flatMap((batch) => batch.units)
+      .filter((unit) => unit.kind === "frame-body-cel" && unit.subjectId === frameId)
+      .map((unit) => unit.bodySlot)
+      .sort((a, b) => a - b);
+    assert.equal(slots.length, 224);
+    assert.deepEqual(slots, Array.from({length:224}, (_, index) => index));
+  }
+  const proof = registry.batches.filter((batch) => batch.styleProofCritical);
+  assert.ok(proof.some((batch) => batch.familyId === "pilot-portraits" && batch.subjectId === "branka-kovac"));
+  assert.ok(proof.some((batch) => batch.familyId === "frame-construction" && batch.subjectId === "bastion"));
+  assert.ok(proof.some((batch) => batch.familyId === "arena-layers" && batch.subjectId === "foundry-nine"));
+  assert.ok(proof.some((batch) => batch.familyId === "frame-animation" && batch.subjectId === "bastion"));
+  assert.ok(registry.batches
+    .filter((batch) => batch.familyId === "frame-animation" && !batch.styleProofCritical)
+    .every((batch) => batch.approvalPrerequisites.includes("style-proof-approved")));
+});
+
+test("production registry inspection and verification are deterministic governance surfaces", async () => {
+  const [summary, batch1, verification] = await Promise.all([
+    heavyMetalFightingProductionRegistrySummary(),
+    heavyMetalFightingProductionRegistryBatch("1"),
+    verifyHmfProductionBatchRegistry(),
+  ]);
+  assert.equal(verification.status, "passed");
+  assert.ok(verification.checks.every((check) => check.passed));
+  assert.equal(summary.totals.batches, 179);
+  assert.equal(batch1.batch.id, "hmf-b0001");
+  assert.equal(batch1.batch.productionWave, "style-proof");
+  assert.equal(batch1.batch.authority.providerExecution, false);
+  assert.equal(batch1.batch.authority.namedHumanApprovalRequired, true);
 });
