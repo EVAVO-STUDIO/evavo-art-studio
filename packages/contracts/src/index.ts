@@ -17,4 +17,5 @@ export * from "./constants.js";
 export * from "./models.js";
 export * from "./sprite-models.js";
 export * from "./validation-common.js";
+export * from "./web-pbr-texture-set.js";
 export { validateArtBrief, assertArtBrief } from "./validation.js";
