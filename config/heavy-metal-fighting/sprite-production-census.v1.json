@@ -1,0 +1,212 @@
+{
+  "schema": "evavo.heavy-metal-fighting-sprite-production-census.v1",
+  "protocolVersion": "2026-08-12.1",
+  "project": {
+    "id": "heavy-metal-fighting",
+    "publicTitle": "HEAVY METAL FIGHTING",
+    "technicalRepositoryId": "steel-dominion",
+    "logicalCanvas": { "width": 640, "height": 360 },
+    "authoringCanvas": { "width": 640, "height": 640 },
+    "pixelMasterMethod": "author-large-for-structure-then-hand-master-native-pixels",
+    "finalFiltering": "nearest-only"
+  },
+  "compatibilityAtlas": {
+    "status": "implemented-prototype-and-fallback",
+    "cell": { "width": 128, "height": 128 },
+    "pivot": { "x": 64, "y": 128 },
+    "slotsPerFrame": 120,
+    "uniqueCurrentRuntimeSlots": 104,
+    "reservedCurrentRuntimeSlots": 16,
+    "sharedBoundarySlots": [24, 44, 64, 84],
+    "purpose": "retain current game compatibility and fallback validation while production-master-v3 is migrated"
+  },
+  "productionMasterV3": {
+    "status": "planned-production-target-not-yet-game-authoritative",
+    "migrationRequiredBeforeFinalPromotion": true,
+    "cell": { "width": 160, "height": 160 },
+    "pivot": { "x": 80, "y": 152 },
+    "groundLineY": 152,
+    "minimumTransparentSafetyPx": 4,
+    "columns": 16,
+    "rows": 16,
+    "slotsPerFrame": 256,
+    "usedBodySlotsPerFrame": 224,
+    "reservedSlotsPerFrame": 32,
+    "atlas": { "width": 2560, "height": 2560 },
+    "launchFrames": 4,
+    "launchBodyCels": 896,
+    "generationGate": "construction-concepts-pilots-ui-and-style-proof-may-begin-now; final-body-cel-promotion-requires-game-atlas-v3-migration",
+    "reason": "A 160-pixel native cell gives the giant Frames enough screen presence, silhouette room and attack extension at 640x360 without baking effects into the body. A 256-slot atlas keeps the runtime regular while retaining 32 future/reserved slots."
+  },
+  "productionTotals": {
+    "legacyCampaignSourceImages": 1157,
+    "legacyFrameBodyCels": 480,
+    "productionMasterFrameBodyCels": 896,
+    "additionalFrameBodyCels": 416,
+    "productionMasterSourceImages": 1573
+  },
+  "bodyCelBanks": [
+    { "id": "ready", "start": 0, "count": 1, "end": 0, "purpose": "single clearest fighting identity pose" },
+    { "id": "idle", "start": 1, "count": 4, "end": 4, "purpose": "held mechanical settle loop; no human breathing bounce" },
+    { "id": "walk-forward", "start": 5, "count": 6, "end": 10, "purpose": "three-contact mechanical gait with passing poses" },
+    { "id": "walk-back", "start": 11, "count": 6, "end": 16, "purpose": "authored retreat gait; never reverse-play the forward walk" },
+    { "id": "crouch-transition", "start": 17, "count": 2, "end": 18, "purpose": "mechanical compression into crouch" },
+    { "id": "crouch-hold", "start": 19, "count": 1, "end": 19, "purpose": "stable low fighting pose" },
+    { "id": "dash-forward", "start": 20, "count": 4, "end": 23, "purpose": "launch, travel, brake and footing recovery" },
+    { "id": "dash-back", "start": 24, "count": 4, "end": 27, "purpose": "distinct retreat burst and brake" },
+    { "id": "jump-launch", "start": 28, "count": 3, "end": 30, "purpose": "compression, powered release and first rise" },
+    { "id": "jump-rise", "start": 31, "count": 2, "end": 32, "purpose": "rising body keys driven by game physics" },
+    { "id": "jump-apex", "start": 33, "count": 1, "end": 33, "purpose": "single strongest apex silhouette" },
+    { "id": "jump-fall", "start": 34, "count": 2, "end": 35, "purpose": "descent preparation and landing readiness" },
+    { "id": "landing", "start": 36, "count": 3, "end": 38, "purpose": "impact compression, settle and recovery" },
+
+    { "id": "guard-standing", "start": 39, "count": 2, "end": 40, "purpose": "held high guard and mechanical settle" },
+    { "id": "guard-crouching", "start": 41, "count": 2, "end": 42, "purpose": "held low guard and mechanical settle" },
+    { "id": "block-high", "start": 43, "count": 3, "end": 45, "purpose": "contact compression, recoil and guard return" },
+    { "id": "block-low", "start": 46, "count": 3, "end": 48, "purpose": "low contact compression, recoil and guard return" },
+    { "id": "instant-block", "start": 49, "count": 3, "end": 51, "purpose": "fast brace, contact lock and return" },
+    { "id": "guard-crush", "start": 52, "count": 5, "end": 56, "purpose": "guard geometry opens and Frame becomes visibly vulnerable" },
+    { "id": "hit-light", "start": 57, "count": 4, "end": 60, "purpose": "small armour displacement without full-body collapse" },
+    { "id": "hit-heavy", "start": 61, "count": 5, "end": 65, "purpose": "large upper-mass recoil with coherent planted footing where appropriate" },
+    { "id": "counter-stagger", "start": 66, "count": 5, "end": 70, "purpose": "distinct punish/counter reaction" },
+    { "id": "air-hit", "start": 71, "count": 4, "end": 74, "purpose": "airborne recoil with one coherent chassis" },
+    { "id": "wall-impact", "start": 75, "count": 4, "end": 78, "purpose": "contact-side compression and recovery start" },
+    { "id": "knockdown-fall", "start": 79, "count": 7, "end": 85, "purpose": "balance failure, rotation, first floor hit and settle" },
+    { "id": "grounded-hold", "start": 86, "count": 1, "end": 86, "purpose": "stable grounded state" },
+    { "id": "wakeup", "start": 87, "count": 4, "end": 90, "purpose": "mechanical leverage back to ready" },
+
+    { "id": "grab-whiff", "start": 91, "count": 3, "end": 93, "purpose": "throw attempt, miss and recovery" },
+    { "id": "throw-attacker", "start": 94, "count": 8, "end": 101, "purpose": "secure contact, load, rotate/reposition, release/slam and recoil" },
+    { "id": "throw-receiver", "start": 102, "count": 6, "end": 107, "purpose": "generic receiver choreography compatible with all launch Frames" },
+    { "id": "throw-break", "start": 108, "count": 4, "end": 111, "purpose": "counter-force, separation and footing recovery" },
+
+    { "id": "standing-light", "start": 112, "count": 5, "end": 116, "purpose": "fast authored normal: intent, contact and recovery without filler" },
+    { "id": "standing-heavy", "start": 117, "count": 8, "end": 124, "purpose": "large anticipation, hero contact, overshoot and punishable recovery" },
+    { "id": "crouching-light", "start": 125, "count": 5, "end": 129, "purpose": "fast low normal" },
+    { "id": "crouching-heavy", "start": 130, "count": 8, "end": 137, "purpose": "committed low heavy or sweep" },
+    { "id": "jumping-light", "start": 138, "count": 5, "end": 142, "purpose": "compact air normal keyed to physics phase" },
+    { "id": "jumping-heavy", "start": 143, "count": 7, "end": 149, "purpose": "committed air normal with landing/readability allowance" },
+
+    { "id": "special-a", "start": 150, "count": 10, "end": 159, "purpose": "signature special A with readable startup, contact and dedicated recovery" },
+    { "id": "special-b", "start": 160, "count": 10, "end": 169, "purpose": "signature special B with distinct body language" },
+    { "id": "reversal", "start": 170, "count": 8, "end": 177, "purpose": "fast invulnerable/defensive response with its own body bank" },
+    { "id": "overdrive", "start": 178, "count": 14, "end": 191, "purpose": "premium body animation for the super after the separate Pilot cut-in" },
+
+    { "id": "system-down", "start": 192, "count": 5, "end": 196, "purpose": "CORE depletion collapse/lock with readable safe-state transition" },
+    { "id": "reignition", "start": 197, "count": 5, "end": 201, "purpose": "reactor restart, systems relight and return to control" },
+    { "id": "heat-vent", "start": 202, "count": 4, "end": 205, "purpose": "emergency cooling body response with separate steam FX" },
+    { "id": "entrance", "start": 206, "count": 6, "end": 211, "purpose": "service-cradle release/arena-ready body sequence" },
+    { "id": "victory", "start": 212, "count": 6, "end": 217, "purpose": "restrained characterful victory held in classic arcade style" },
+    { "id": "defeat", "start": 218, "count": 6, "end": 223, "purpose": "mechanically coherent shutdown/defeat without generic explosion" }
+  ],
+  "reservedSlots": {
+    "start": 224,
+    "end": 255,
+    "count": 32,
+    "policy": "reserved for later game-authoritative movement, system, throw, boss, upgrade-clearance or additional reaction states; never fill merely to use space"
+  },
+  "frameVisualEnvelopes": {
+    "bastion": {
+      "neutralBodyHeightPx": 136,
+      "neutralBodyWidthPx": 108,
+      "maximumBodyHeightPx": 142,
+      "maximumBodyWidthPx": 150,
+      "groundFootprintPx": 92,
+      "motionCadence": "heavy-held",
+      "screenRead": "wide pressure silhouette with large piston forearms"
+    },
+    "viper": {
+      "neutralBodyHeightPx": 114,
+      "neutralBodyWidthPx": 76,
+      "maximumBodyHeightPx": 124,
+      "maximumBodyWidthPx": 144,
+      "groundFootprintPx": 58,
+      "motionCadence": "fast-snap",
+      "screenRead": "low forward razor silhouette with digitigrade legs"
+    },
+    "citadel": {
+      "neutralBodyHeightPx": 146,
+      "neutralBodyWidthPx": 120,
+      "maximumBodyHeightPx": 148,
+      "maximumBodyWidthPx": 152,
+      "groundFootprintPx": 98,
+      "motionCadence": "measured-brace",
+      "screenRead": "tall fortress silhouette with dominant containment side"
+    },
+    "mirage": {
+      "neutralBodyHeightPx": 124,
+      "neutralBodyWidthPx": 84,
+      "maximumBodyHeightPx": 134,
+      "maximumBodyWidthPx": 146,
+      "groundFootprintPx": 64,
+      "motionCadence": "precise-drift",
+      "screenRead": "narrow physical chassis with separate optical false-vector FX"
+    }
+  },
+  "recommendedHoldLanguage": {
+    "simulationHz": 60,
+    "principle": "unique-cel count and simulation ticks are different; most drawings are held for 2-6 ticks, with deliberate longer holds on impact, recovery and mechanical settle",
+    "profiles": {
+      "heavy-held": {
+        "idleLoopTicks": 60,
+        "walkCycleTargetTicks": 30,
+        "lightNormalTargetTicks": 12,
+        "heavyNormalTargetTicks": 24,
+        "note": "Bastion prioritises readable load and long recovery rather than extra in-betweens"
+      },
+      "fast-snap": {
+        "idleLoopTicks": 48,
+        "walkCycleTargetTicks": 18,
+        "lightNormalTargetTicks": 8,
+        "heavyNormalTargetTicks": 18,
+        "note": "Viper changes drawings quickly but still holds hero contact and brake poses"
+      },
+      "measured-brace": {
+        "idleLoopTicks": 66,
+        "walkCycleTargetTicks": 34,
+        "lightNormalTargetTicks": 14,
+        "heavyNormalTargetTicks": 26,
+        "note": "Citadel uses longer setup and containment holds rather than smooth motion"
+      },
+      "precise-drift": {
+        "idleLoopTicks": 54,
+        "walkCycleTargetTicks": 24,
+        "lightNormalTargetTicks": 10,
+        "heavyNormalTargetTicks": 20,
+        "note": "Mirage keeps body timing exact while optical echoes are timed independently"
+      }
+    }
+  },
+  "supportingNativeDimensions": {
+    "pilotPortraitMaster": { "width": 256, "height": 256, "countPerPilot": 15 },
+    "pilotHudPortrait": { "width": 56, "height": 56, "derivativeFrom": "pilotPortraitMaster" },
+    "pilotOverdriveCutIn": { "width": 320, "height": 112, "countPerPilot": 3 },
+    "pilotServiceStanding": { "width": 192, "height": 256 },
+    "pilotCockpitCel": { "width": 320, "height": 180 },
+    "frameConstructionMaster": { "width": 320, "height": 320, "countPerFrame": 10 },
+    "frameHeroCard": { "width": 320, "height": 240 },
+    "frameDamageOverlay": { "width": 160, "height": 160, "countPerFrame": 4 },
+    "universalFxSmall": { "width": 64, "height": 64 },
+    "universalFxMedium": { "width": 96, "height": 96 },
+    "frameSpecificFx": { "width": 160, "height": 160, "countPerFrame": 40 },
+    "arenaLayer": { "width": 640, "height": 360 },
+    "introCel": { "width": 640, "height": 360, "count": 30 },
+    "titleAndMenuComposition": { "width": 640, "height": 360 }
+  },
+  "productionRules": [
+    "one unique body cel per work unit; never ask a provider for a final packed atlas",
+    "final native body art is hand-mastered at 160x160 with real alpha and no baked antialiasing",
+    "the 640x640 authoring canvas is a structural working surface, not a direct automatic downscale target",
+    "body animation must remain readable without FX in one-colour silhouette",
+    "combat FX, muzzle/energy arcs, phase echoes, steam, sparks and screen fields remain separate",
+    "all grounded cels use the same 80,152 pivot and declared ground contacts",
+    "no body pixel may cross the four-pixel transparent safety boundary",
+    "walk-forward and walk-back are independently authored because mechanical load transfer is directional",
+    "standing and crouching guards have separate body states",
+    "high block, low block, instant block, guard crush, light hit, heavy hit and counter stagger are not interchangeable",
+    "reversal owns its own body bank in production-master-v3",
+    "Overdrive Pilot cut-ins do not replace the fourteen-cel Frame body sequence",
+    "reserved slots remain empty until a game-authoritative requirement exists",
+    "final promotion is blocked until steel-dominion adopts the production-master-v3 atlas contract and exports a matching live manifest"
+  ]
+}
