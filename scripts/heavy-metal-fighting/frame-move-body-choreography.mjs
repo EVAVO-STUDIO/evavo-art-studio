@@ -11,6 +11,16 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "../..");
 const PRESENTATION_CONTRACT_PATH = path.join(ROOT, "config", "heavy-metal-fighting", "combat-presentation-contract.v1.json");
 const FRAME_IDS = Object.freeze(["bastion", "viper", "citadel", "mirage"]);
+const COMPATIBILITY_TO_PRODUCTION_BODY_BANK = Object.freeze({
+  "standing-light": "standing-light",
+  "standing-heavy": "standing-heavy",
+  "crouch-light": "crouching-light",
+  "crouch-heavy": "crouching-heavy",
+  "jump-light": "jumping-light",
+  "jump-heavy": "jumping-heavy",
+  "special-a": "special-a",
+  "special-b": "special-b",
+});
 
 function fail(message) {
   throw new Error(`HEAVY_METAL_FIGHTING_FRAME_MOVE_BODY_CHOREOGRAPHY_INVALID: ${message}`);
@@ -27,7 +37,9 @@ function productionBankForMove(move) {
   if (move.category === "reversal") return "reversal";
   if (move.category === "overdrive") return "overdrive";
   if (move.category === "throw") return "throw-attacker";
-  return move.plannedProductionBank;
+  const productionBank = COMPATIBILITY_TO_PRODUCTION_BODY_BANK[move.plannedProductionBank];
+  assert(productionBank, `${move.id} has unsupported compatibility production bank ${move.plannedProductionBank}.`);
+  return productionBank;
 }
 function pairedReceiverBank(move) {
   return move.category === "throw" ? "throw-receiver" : null;
@@ -84,6 +96,7 @@ function compileMove(frame, move, roleMap) {
     resourceClass: move.resourceClass,
     compatibilitySourceBank: move.sourceBank,
     compatibilityRuntimeBank: move.currentRuntimeBank,
+    compatibilityPlannedProductionBank: move.plannedProductionBank,
     productionBodyBank,
     productionBodySlotRange: freeze({ start: bodyRoles[0].slot, end: bodyRoles.at(-1).slot, count: bodyRoles.length }),
     heroBodyRole: heroRole,
@@ -182,6 +195,8 @@ export async function verifyHmfFrameMoveBodyChoreography() {
     check("six-normals-per-frame", frames.every((frame) => frame.byCategory.normals.length === 6)),
     check("two-specials-per-frame", frames.every((frame) => frame.byCategory.specials.length === 2)),
     check("named-high-output-per-frame", frames.every((frame) => Object.values(frame.namedHighOutput).every(Boolean))),
+    check("crouch-bank-aliases", frames.every((frame) => frame.moves.filter((move) => move.category === "crouching-normal").every((move) => move.productionBodyBank.startsWith("crouching-")))),
+    check("jump-bank-aliases", frames.every((frame) => frame.moves.filter((move) => move.category === "air-normal").every((move) => move.productionBodyBank.startsWith("jumping-")))),
     check("standing-heavy-hero-slot", frames.every((frame) => frame.moves.find((move) => move.productionBodyBank === "standing-heavy")?.heroBodyRole.slot === 121)),
     check("reversal-bank", frames.every((frame) => frame.moves.find((move) => move.category === "reversal")?.productionBodyBank === "reversal")),
     check("overdrive-bank", frames.every((frame) => frame.moves.find((move) => move.category === "overdrive")?.productionBodyBank === "overdrive")),
