@@ -1,0 +1,84 @@
+{
+  "schema": "evavo.heavy-metal-fighting-batch-production-policy.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "maximumImagesPerBatch": 10,
+  "allowPartialFinalBatch": true,
+  "paddingForbidden": true,
+  "oneAssetPerOutput": true,
+  "contactSheetsForbidden": true,
+  "providerPackedAtlasesForbidden": true,
+  "familyContainmentRequired": true,
+  "identityContainmentRequiredFor": ["pilot-portraits", "frame-construction", "frame-animation", "frame-damage-overlays", "frame-specific-fx", "pilot-service-animation"],
+  "frameAnimationProductionGroups": [
+    {"id": "neutral-locomotion", "celsPerFrame": 39, "batchesPerFrame": 4},
+    {"id": "defence-reactions", "celsPerFrame": 52, "batchesPerFrame": 6},
+    {"id": "throws", "celsPerFrame": 21, "batchesPerFrame": 3},
+    {"id": "normals", "celsPerFrame": 38, "batchesPerFrame": 4},
+    {"id": "specials-overdrive", "celsPerFrame": 42, "batchesPerFrame": 5},
+    {"id": "core-entrance-result", "celsPerFrame": 32, "batchesPerFrame": 4}
+  ],
+  "supportingFamilyPacking": [
+    {"family": "title-and-shell", "sourceImages": 42, "scope": "project", "minimumBatches": 5},
+    {"family": "pilot-portraits", "sourceImages": 60, "scope": "per-pilot-15", "minimumBatches": 8},
+    {"family": "frame-construction", "sourceImages": 40, "scope": "per-frame-10", "minimumBatches": 4},
+    {"family": "frame-damage-overlays", "sourceImages": 16, "scope": "per-frame-4", "minimumBatches": 4},
+    {"family": "universal-combat-fx", "sourceImages": 115, "scope": "thematic", "minimumBatches": 12},
+    {"family": "frame-specific-fx", "sourceImages": 160, "scope": "per-frame-40", "minimumBatches": 16},
+    {"family": "arena-layers", "sourceImages": 40, "scope": "per-arena-10", "minimumBatches": 4},
+    {"family": "service-bay-crew-upgrades", "sourceImages": 102, "scope": "thematic-and-frame-aware", "minimumBatches": 11},
+    {"family": "pilot-service-animation", "sourceImages": 72, "scope": "per-pilot-18", "minimumBatches": 8},
+    {"family": "opening-intro", "sourceImages": 30, "scope": "chronological", "minimumBatches": 3}
+  ],
+  "batchStateMachine": [
+    "planned",
+    "references-locked",
+    "generation-authorized",
+    "candidates-admitted",
+    "deterministic-qa-passed",
+    "creative-review-passed",
+    "selected-or-repair-requested",
+    "mastered",
+    "named-human-approved",
+    "delivery-ready"
+  ],
+  "workOrderMustBind": [
+    "exact-project-and-contract-hashes",
+    "family-subject-and-production-group",
+    "exact-output-path-and-native-dimensions",
+    "style-authenticity-contract",
+    "canonical-identity-references",
+    "mechanical-landmarks-or-pilot-identity-landmarks",
+    "previous-and-next-approved-cels-when-animation",
+    "alpha-and-pivot-contract",
+    "anti-generic-failure-codes",
+    "provider-authority-boundary"
+  ],
+  "candidatePolicy": [
+    "candidate files live in scratch/provider until admitted",
+    "a failed cel triggers the smallest bounded repair rather than sibling regeneration",
+    "passing siblings are never regenerated merely because one candidate failed",
+    "selected candidates move to working and receive append-only workspace versions",
+    "masters require named-human approval and deterministic technical checks",
+    "final atlases are deterministic derivatives of approved individual masters"
+  ],
+  "promptAssemblyOrder": [
+    "project north-star",
+    "family style grammar",
+    "subject identity lock",
+    "exact work-unit pose or composition intent",
+    "previous-and-next continuity references",
+    "mechanical or facial landmark constraints",
+    "palette-material-lighting constraints",
+    "anti-generic prohibitions",
+    "exact output dimensions-alpha-pivot",
+    "one-separate-image output rule"
+  ],
+  "authority": {
+    "providerExecution": false,
+    "providerApproval": false,
+    "automaticPromotion": false,
+    "targetRepositoryMutation": false,
+    "namedHumanApprovalRequired": true
+  }
+}
