@@ -16,14 +16,20 @@ on:
       - "scripts/layered-godot-handoff-gate.mjs"
       - "scripts/check-layered-godot-handoff-gate.mjs"
       - "scripts/test-layered-godot-handoff-gate.mjs"
+      - "scripts/layered-godot-repository-review.mjs"
+      - "scripts/layered-godot-repository-review/**"
+      - "scripts/check-layered-godot-repository-review.mjs"
+      - "scripts/test-layered-godot-repository-review.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
       - "config/layered-production-godot-workspace-auditor.v1.json"
       - "config/layered-production-godot-runtime-validator.v1.json"
       - "config/layered-production-godot-handoff-gate.v1.json"
+      - "config/layered-production-godot-repository-review.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
       - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
       - "docs/LAYERED_GODOT_RUNTIME_VALIDATOR.md"
       - "docs/LAYERED_GODOT_HANDOFF_GATE.md"
+      - "docs/LAYERED_GODOT_REPOSITORY_REVIEW.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   push:
     branches:
@@ -42,14 +48,20 @@ on:
       - "scripts/layered-godot-handoff-gate.mjs"
       - "scripts/check-layered-godot-handoff-gate.mjs"
       - "scripts/test-layered-godot-handoff-gate.mjs"
+      - "scripts/layered-godot-repository-review.mjs"
+      - "scripts/layered-godot-repository-review/**"
+      - "scripts/check-layered-godot-repository-review.mjs"
+      - "scripts/test-layered-godot-repository-review.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
       - "config/layered-production-godot-workspace-auditor.v1.json"
       - "config/layered-production-godot-runtime-validator.v1.json"
       - "config/layered-production-godot-handoff-gate.v1.json"
+      - "config/layered-production-godot-repository-review.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
       - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
       - "docs/LAYERED_GODOT_RUNTIME_VALIDATOR.md"
       - "docs/LAYERED_GODOT_HANDOFF_GATE.md"
+      - "docs/LAYERED_GODOT_REPOSITORY_REVIEW.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   workflow_dispatch:
 
@@ -88,6 +100,9 @@ jobs:
 
       - name: Run read-only Godot handoff promotion gate regressions
         run: node scripts/check-layered-godot-handoff-gate.mjs
+
+      - name: Run read-only Git repository review regressions
+        run: node scripts/check-layered-godot-repository-review.mjs
 
       - name: Prove exact source remains clean
         if: always()

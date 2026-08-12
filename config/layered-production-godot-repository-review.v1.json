@@ -1,0 +1,47 @@
+{
+  "schema": "evavo.layered-production.godot-repository-review.v1",
+  "version": 1,
+  "protocolVersion": "2026-08-12.1",
+  "description": "Read-only Git repository review after an approved Godot handoff gate and before any staging, commit or push authority exists.",
+  "entrypoint": "scripts/layered-godot-repository-review.mjs",
+  "requirements": {
+    "requiresCurrentHandoffReAdmissionBeforeAndAfterReview": true,
+    "requiresExactGitRepositoryRoot": true,
+    "requiresNamedBranch": true,
+    "requiresOriginRepositoryMatch": true,
+    "requiresEmptyGitIndex": true,
+    "requiresNoUnrelatedTrackedChanges": true,
+    "requiresNoUnrelatedUntrackedFiles": true,
+    "requiresNoDeleteConflictOrTypeChange": true,
+    "requiresExpectedPathsVisibleToGit": true,
+    "requiresNoActiveFilterWorkingTreeEncodingOrIdentTransform": true,
+    "requiresCanonicalLfResourceContent": true,
+    "requiresRepeatedStableGitSnapshot": true,
+    "gitOptionalLocksDisabled": true,
+    "gitFsMonitorDisabled": true,
+    "externalDiffDisabled": true,
+    "textConvDisabled": true,
+    "maximumGitOutputBytes": 2097152,
+    "defaultGitTimeoutMs": 30000
+  },
+  "readiness": {
+    "repositoryReviewPassed": true,
+    "commitCandidateReadyWhenChangesExist": true,
+    "alreadyIntegratedWhenNoChangesExist": true,
+    "gitCommitAuthorized": false,
+    "gitPushAuthorized": false,
+    "requiresExplicitGitOperator": true
+  },
+  "authority": {
+    "targetRepositoryRead": true,
+    "targetRepositoryWrite": false,
+    "gitRead": true,
+    "gitStage": false,
+    "gitHookExecution": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "deployment": false,
+    "publication": false,
+    "forcePush": false
+  }
+}
