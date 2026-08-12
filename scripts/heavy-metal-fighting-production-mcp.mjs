@@ -14,6 +14,10 @@ import {
   verifyHmfFrameAtlasV3Delivery,
 } from "./heavy-metal-fighting/frame-atlas-v3-delivery.mjs";
 import {
+  buildHmfFrameMoveBodyChoreography,
+  verifyHmfFrameMoveBodyChoreography,
+} from "./heavy-metal-fighting/frame-move-body-choreography.mjs";
+import {
   buildHmfStyleProofExecutionPlan,
   heavyMetalFightingStyleProofExecutionStatus,
   verifyHmfStyleProofExecutionPlan,
@@ -28,12 +32,13 @@ import {
 import { verifyHmfProductionWorkOrders } from "./heavy-metal-fighting/work-order-verification.mjs";
 
 export const SERVER_NAME = "evavo-heavy-metal-fighting-production";
-export const SERVER_VERSION = "1.2.0";
+export const SERVER_VERSION = "1.3.0";
 
 export const REGISTRY_SUMMARY_TOOL = "evavo_hmf_production_registry_summary";
 export const REGISTRY_BATCH_TOOL = "evavo_hmf_production_registry_batch";
 export const STYLE_PROOF_EXECUTION_TOOL = "evavo_hmf_production_style_proof_execution";
 export const FRAME_ATLAS_V3_TOOL = "evavo_hmf_production_frame_atlas_v3";
+export const FRAME_MOVE_CHOREOGRAPHY_TOOL = "evavo_hmf_production_frame_move_choreography";
 export const WORK_ORDER_BATCH_TOOL = "evavo_hmf_production_work_order_batch";
 export const WORK_ORDER_TOOL = "evavo_hmf_production_work_order";
 export const RECEIPT_TEMPLATE_TOOL = "evavo_hmf_production_receipt_template";
@@ -90,7 +95,12 @@ export function toolDefinitions() {
     },
     {
       name: FRAME_ATLAS_V3_TOOL,
-      description: "Return the deterministic 224-authored-cel / 32-transparent-reserve atlas-v3 layout for one Frame, including all 26 governed body batches, exact master paths and the steel-dominion final-v3 target path. This does not read image bytes, build an atlas or mutate either repository.",
+      description: "Return the deterministic 224-authored-cel / 32-transparent-reserve atlas-v3 layout for one Frame, including semantic body roles, motion realization, all 26 governed body batches, exact master paths and the steel-dominion final-v3 target path. This does not read image bytes, build an atlas or mutate either repository.",
+      inputSchema: objectSchema({ frameId: FRAME_ID_SCHEMA }, ["frameId"]),
+    },
+    {
+      name: FRAME_MOVE_CHOREOGRAPHY_TOOL,
+      description: "Return the exact 11-move named production body choreography for one Frame: six normals, two specials, reversal, Overdrive and throw, mapped to production-master-v3 role slots while preserving runtime implementation/timing as read-only external authority.",
       inputSchema: objectSchema({ frameId: FRAME_ID_SCHEMA }, ["frameId"]),
     },
     {
@@ -128,7 +138,7 @@ export function toolDefinitions() {
     },
     {
       name: VERIFY_TOOL,
-      description: "Verify the exact HMF registry, style-proof execution, frame-atlas-v3 layout and work-order governance layers without provider execution, approval, promotion, filesystem writes or repository mutation.",
+      description: "Verify the exact HMF registry, style-proof execution, frame-atlas-v3 layout, named move/body choreography and work-order governance layers without provider execution, approval, promotion, filesystem writes or repository mutation.",
       inputSchema: objectSchema(),
     },
   ]);
@@ -159,6 +169,7 @@ export async function callTool(name, input = {}) {
     });
   }
   if (name === FRAME_ATLAS_V3_TOOL) return buildHmfFrameAtlasV3Layout(String(input.frameId ?? ""));
+  if (name === FRAME_MOVE_CHOREOGRAPHY_TOOL) return buildHmfFrameMoveBodyChoreography(String(input.frameId ?? ""));
   if (name === WORK_ORDER_BATCH_TOOL) return buildHmfProductionWorkOrderBatch(normalizeBatch(input.batch));
   if (name === WORK_ORDER_TOOL) return heavyMetalFightingProductionWorkOrder(input.unitId);
   if (name === RECEIPT_TEMPLATE_TOOL) return heavyMetalFightingProductionReceiptTemplate(input.unitId);
@@ -169,18 +180,20 @@ export async function callTool(name, input = {}) {
   });
   if (name === RESUME_BATCH_TOOL) return heavyMetalFightingProductionBatchResumePlan(normalizeBatch(input.batch), input.receipts ?? []);
   if (name === VERIFY_TOOL) {
-    const [registry, styleProofExecution, frameAtlasV3, workOrders] = await Promise.all([
+    const [registry, styleProofExecution, frameAtlasV3, frameMoveChoreography, workOrders] = await Promise.all([
       verifyHmfProductionBatchRegistry(),
       verifyHmfStyleProofExecutionPlan(),
       verifyHmfFrameAtlasV3Delivery(),
+      verifyHmfFrameMoveBodyChoreography(),
       verifyHmfProductionWorkOrders(),
     ]);
     return Object.freeze({
-      schema: "evavo.heavy-metal-fighting-production-agent-verification.v3",
-      status: registry.status === "passed" && styleProofExecution.status === "passed" && frameAtlasV3.status === "passed" && workOrders.status === "passed" ? "passed" : "failed",
+      schema: "evavo.heavy-metal-fighting-production-agent-verification.v4",
+      status: registry.status === "passed" && styleProofExecution.status === "passed" && frameAtlasV3.status === "passed" && frameMoveChoreography.status === "passed" && workOrders.status === "passed" ? "passed" : "failed",
       registry,
       styleProofExecution,
       frameAtlasV3,
+      frameMoveChoreography,
       workOrders,
       authority: Object.freeze({
         providerExecution: false,
@@ -208,7 +221,7 @@ export async function handleRequest(request) {
       protocolVersion: request.params?.protocolVersion ?? "2024-11-05",
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-      instructions: "Read-only HEAVY METAL FIGHTING final-art production surface. It exposes the 1,573-image / 179-batch registry, the four-phase Branka/Bastion/Foundry Nine style-proof controller, the deterministic 224-cel Frame atlas-v3 handoff layout, immutable one-image work orders, receipt requirements, bounded repair templates and deterministic resume planning. It does not generate images, build delivery atlases, persist receipts or approvals, approve art, promote masters, mutate the game repository, commit, push, deploy or publish.",
+      instructions: "Read-only HEAVY METAL FIGHTING final-art production surface. It exposes the 1,573-image / 179-batch registry, the four-phase Branka/Bastion/Foundry Nine style-proof controller, the deterministic 224-cel Frame atlas-v3 handoff layout, exact 44-move named body choreography, immutable one-image work orders, receipt requirements, bounded repair templates and deterministic resume planning. It does not generate images, build delivery atlases, persist receipts or approvals, change combat timing, approve art, promote masters, mutate the game repository, commit, push, deploy or publish.",
     });
   }
   if (request.method === "ping") return response(request.id, {});

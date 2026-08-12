@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   FRAME_ATLAS_V3_TOOL,
+  FRAME_MOVE_CHOREOGRAPHY_TOOL,
   REGISTRY_BATCH_TOOL,
   REGISTRY_SUMMARY_TOOL,
   RECEIPT_TEMPLATE_TOOL,
@@ -24,6 +25,7 @@ const EXPECTED_TOOLS = [
   REGISTRY_BATCH_TOOL,
   STYLE_PROOF_EXECUTION_TOOL,
   FRAME_ATLAS_V3_TOOL,
+  FRAME_MOVE_CHOREOGRAPHY_TOOL,
   WORK_ORDER_BATCH_TOOL,
   WORK_ORDER_TOOL,
   RECEIPT_TEMPLATE_TOOL,
@@ -36,7 +38,7 @@ test("production MCP exposes only bounded read-only planning and review tools", 
   const tools = toolDefinitions();
   assert.deepEqual(tools.map((tool) => tool.name), EXPECTED_TOOLS);
   const names = tools.map((tool) => tool.name).join(" ");
-  for (const prohibited of ["generate", "approve", "promote", "publish", "commit", "push", "write", "deploy"] ) {
+  for (const prohibited of ["generate", "approve", "promote", "publish", "commit", "push", "write", "deploy"]) {
     assert.equal(names.includes(prohibited), false, `production MCP gained prohibited ${prohibited} tool`);
   }
 });
@@ -101,7 +103,7 @@ test("style-proof execution accepts only explicit named-human evidence", async (
   );
 });
 
-test("frame atlas-v3 MCP tool exposes deterministic 224-cel handoff without building or promoting it", async () => {
+test("frame atlas-v3 MCP tool exposes deterministic 224-cel semantic handoff without building or promoting it", async () => {
   const layout = await callTool(FRAME_ATLAS_V3_TOOL, { frameId: "bastion" });
   assert.equal(layout.frameId, "bastion");
   assert.equal(layout.slots.length, 224);
@@ -112,9 +114,37 @@ test("frame atlas-v3 MCP tool exposes deterministic 224-cel handoff without buil
   assert.equal(layout.reservedSlots.at(-1), 255);
   assert.deepEqual(layout.productionMaster.cell, { width: 160, height: 160 });
   assert.deepEqual(layout.productionMaster.pivot, { x: 80, y: 152 });
+  assert.match(layout.roleGrammarSha256, /^[0-9a-f]{64}$/);
+  assert.match(layout.roleMapSha256, /^[0-9a-f]{64}$/);
+  assert.equal(layout.frameMotionRealization.motionIdentity, "hydraulic-weight");
+  assert.equal(layout.slots[121].bodyRole.semanticId, "standing-heavy:hero-impact");
+  assert.equal(layout.slots[184].bodyRole.semanticId, "overdrive:super-primary-impact");
   assert.equal(layout.gameTargetPath, "res://assets/fighters/final-v3/bastion.png");
   assert.equal(layout.authority.targetRepositoryMutation, false);
   assert.equal(layout.authority.gitMutation, false);
+});
+
+test("frame move choreography MCP tool exposes exact named moves without claiming game timing authority", async () => {
+  const frame = await callTool(FRAME_MOVE_CHOREOGRAPHY_TOOL, { frameId: "bastion" });
+  assert.equal(frame.frameId, "bastion");
+  assert.equal(frame.moves.length, 11);
+  assert.equal(frame.byCategory.normals.length, 6);
+  assert.equal(frame.byCategory.specials.length, 2);
+  assert.equal(frame.namedHighOutput.specialA, "redline-bore");
+  assert.equal(frame.namedHighOutput.specialB, "anvil-lock");
+  assert.equal(frame.namedHighOutput.reversal, "blow-off");
+  assert.equal(frame.namedHighOutput.overdrive, "kiln-verdict");
+  const heavy = frame.moves.find((move) => move.moveId === "gravebell");
+  assert.equal(heavy.publicName, "GRAVEBELL");
+  assert.deepEqual(heavy.productionBodySlotRange, { start: 117, end: 124, count: 8 });
+  assert.equal(heavy.heroBodyRole.semanticId, "standing-heavy:hero-impact");
+  const overdrive = frame.moves.find((move) => move.moveId === "kiln-verdict");
+  assert.deepEqual(overdrive.productionBodySlotRange, { start: 178, end: 191, count: 14 });
+  assert.equal(overdrive.heroBodyRole.slot, 184);
+  assert.equal(overdrive.authority.simulationTiming, false);
+  assert.equal(overdrive.authority.hitboxesDamageAndInputs, false);
+  assert.equal(frame.authority.workOrderMutation, false);
+  assert.equal(frame.authority.targetRepositoryMutation, false);
 });
 
 test("one final Frame body work order remains native, identity-bound and one-image-only", async () => {
@@ -155,12 +185,14 @@ test("receipt, repair and resume tools stay human-gated and non-executing", asyn
   assert.ok(resume.unitStates.every((state) => state.nextAction === "lock-references"));
 });
 
-test("production MCP verification composes registry, style-proof, atlas-v3 and work-order evidence", async () => {
+test("production MCP verification composes registry, style-proof, atlas-v3, move choreography and work-order evidence", async () => {
   const verification = await callTool(VERIFY_TOOL);
   assert.equal(verification.status, "passed");
   assert.equal(verification.registry.status, "passed");
   assert.equal(verification.styleProofExecution.status, "passed");
   assert.equal(verification.frameAtlasV3.status, "passed");
+  assert.equal(verification.frameMoveChoreography.status, "passed");
+  assert.equal(verification.frameMoveChoreography.moveCount, 44);
   assert.equal(verification.workOrders.status, "passed");
   assert.equal(verification.authority.providerExecution, false);
   assert.equal(verification.authority.receiptPersistence, false);
@@ -173,8 +205,9 @@ test("JSON-RPC surface rejects undeclared production mutation tools", async () =
   assert.deepEqual(listed.result.tools.map((tool) => tool.name), EXPECTED_TOOLS);
   const initialized = await handleRequest({ jsonrpc: "2.0", id: 2, method: "initialize", params: {} });
   assert.equal(initialized.result.serverInfo.name, "evavo-heavy-metal-fighting-production");
-  assert.equal(initialized.result.serverInfo.version, "1.2.0");
+  assert.equal(initialized.result.serverInfo.version, "1.3.0");
   assert.match(initialized.result.instructions, /does not generate images/i);
   assert.match(initialized.result.instructions, /style-proof controller/i);
   assert.match(initialized.result.instructions, /atlas-v3 handoff layout/i);
+  assert.match(initialized.result.instructions, /44-move named body choreography/i);
 });
