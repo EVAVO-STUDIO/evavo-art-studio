@@ -1,0 +1,210 @@
+name: Temporary publish persistent workspace catalog v2
+
+on:
+  push:
+    branches:
+      - automation/publish-persistent-workspace-catalog-20260812
+    paths:
+      - ".github/workflows/publish-persistent-workspace-catalog-v2.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-persistent-workspace-catalog-v2-20260812
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      REVIEWED_BASE_SHA: 71e563788083e12f354f27500374956a3c5d66cf
+      EXPECTED_BUNDLE_SHA256: cb3f0c0e122cdbe7eaa3cd22549d4ad43a38dd517933e213c045e4bddc67b14f
+      PRODUCT_BRANCH: agent/persistent-workspace-catalog-20260812
+    steps:
+      - name: Check out exact repaired carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Bind current production base and prove path compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "automation/publish-persistent-workspace-catalog-20260812"
+          git fetch --no-tags origin main
+          current_main="$(git rev-parse origin/main)"
+          git merge-base --is-ancestor "${REVIEWED_BASE_SHA}" "${current_main}"
+          while IFS= read -r product_path; do
+            git diff --quiet "${REVIEWED_BASE_SHA}" "${current_main}" -- "${product_path}" || {
+              echo "Concurrent production change overlaps catalog path: ${product_path}" >&2
+              exit 1
+            }
+          done <<'EOF'
+          .github/workflows/artist-workspace-agent-suite.yml
+          .github/workflows/persistent-artist-workspace-catalog.yml
+          config/artist-workspace-agent-suite.v1.json
+          config/mcp.persistent-artist-workspace-catalog.windows.example.json
+          config/mcp.project-art-workspace.windows.example.json
+          docs/ARTIST_WORKSPACE_AGENT_SUITE.md
+          docs/PERSISTENT_ARTIST_WORKSPACE_CATALOG.md
+          scripts/check-artist-workspace-agent-suite.mjs
+          scripts/check-persistent-artist-workspace-catalog.mjs
+          scripts/persistent-artist-workspace-catalog.mjs
+          scripts/project-art/persistent-workspace-catalog.mjs
+          scripts/test-persistent-artist-workspace-catalog.mjs
+          scripts/test-project-art-workspace-catalog-mcp.mjs
+          tools/project_art_workspace_catalog_mcp.mjs
+          EOF
+          if git ls-remote --exit-code --heads origin "refs/heads/${PRODUCT_BRANCH}" >/dev/null 2>&1; then
+            echo "Product branch already exists: ${PRODUCT_BRANCH}" >&2
+            exit 1
+          fi
+          echo "CURRENT_MAIN_SHA=${current_main}" >> "${GITHUB_ENV}"
+
+      - name: Verify exact carrier and reconstruct release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/catalog-carrier.sha256 <<'EOF'
+          36f965a37bcb04316656388ab70409cae7f61ac8ff86eba89226ed1d34aa3115  .evavo-transfer/persistent-workspace-catalog/part-00.b64
+          8be7358a0dbe7f5068c05b786050132f2b322bf6ea6e4bc681a3218b293e7118  .evavo-transfer/persistent-workspace-catalog/part-01.b64
+          3dd705a3c4ecf81df6fb989752eae7e8a42a5f8b512090e61f4b11a48c274cc6  .evavo-transfer/persistent-workspace-catalog/part-02.b64
+          d693839f3e7bd2fb3a0a0fb9473396a88790f4e593ebd7872aab547e633e6f78  .evavo-transfer/persistent-workspace-catalog/part-03.b64
+          ea101e9584a6709d2e820478f35925037a7910d5ed4521c7a6958c4128cb6f74  .evavo-transfer/persistent-workspace-catalog/part-04.b64
+          EOF
+          sha256sum --check /tmp/catalog-carrier.sha256
+          cat .evavo-transfer/persistent-workspace-catalog/part-*.b64 > /tmp/catalog-release.b64
+          base64 --decode /tmp/catalog-release.b64 > /tmp/catalog-release.tar.gz
+          test "$(sha256sum /tmp/catalog-release.tar.gz | awk '{print $1}')" = "${EXPECTED_BUNDLE_SHA256}"
+          mkdir -p /tmp/catalog-release
+          tar --extract --gzip --file /tmp/catalog-release.tar.gz --directory /tmp/catalog-release --no-same-owner
+
+      - name: Verify exact release manifest and file identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const crypto = require('node:crypto');
+          const root = '/tmp/catalog-release/payload';
+          const manifest = JSON.parse(fs.readFileSync(path.join(root, 'release-manifest.json'), 'utf8'));
+          if (manifest.schema !== 'evavo.art-studio-release-bundle.v1') throw new Error('Unexpected release schema.');
+          if (manifest.releaseId !== 'persistent-artist-workspace-catalog-20260812') throw new Error('Unexpected release ID.');
+          if (manifest.baseSha !== process.env.REVIEWED_BASE_SHA) throw new Error('Reviewed release base SHA mismatch.');
+          if (manifest.commitMessage !== 'feat(project-art): add persistent workspace catalog') throw new Error('Commit message mismatch.');
+          if (!Array.isArray(manifest.files) || manifest.files.length !== 14) throw new Error('Unexpected release file count.');
+          const expected = [
+            '.github/workflows/artist-workspace-agent-suite.yml',
+            '.github/workflows/persistent-artist-workspace-catalog.yml',
+            'config/artist-workspace-agent-suite.v1.json',
+            'config/mcp.persistent-artist-workspace-catalog.windows.example.json',
+            'config/mcp.project-art-workspace.windows.example.json',
+            'docs/ARTIST_WORKSPACE_AGENT_SUITE.md',
+            'docs/PERSISTENT_ARTIST_WORKSPACE_CATALOG.md',
+            'scripts/check-artist-workspace-agent-suite.mjs',
+            'scripts/check-persistent-artist-workspace-catalog.mjs',
+            'scripts/persistent-artist-workspace-catalog.mjs',
+            'scripts/project-art/persistent-workspace-catalog.mjs',
+            'scripts/test-persistent-artist-workspace-catalog.mjs',
+            'scripts/test-project-art-workspace-catalog-mcp.mjs',
+            'tools/project_art_workspace_catalog_mcp.mjs',
+          ].sort();
+          const seen = new Set();
+          for (const entry of manifest.files) {
+            if (!entry || typeof entry.path !== 'string' || !/^[A-Za-z0-9._/-]+$/.test(entry.path)) throw new Error('Unsafe release path.');
+            if (entry.path.startsWith('/') || entry.path.includes('..') || seen.has(entry.path)) throw new Error(`Invalid release path: ${entry.path}`);
+            seen.add(entry.path);
+            const absolute = path.join(root, entry.path);
+            const stat = fs.lstatSync(absolute);
+            if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Invalid release file: ${entry.path}`);
+            const bytes = fs.readFileSync(absolute);
+            const digest = crypto.createHash('sha256').update(bytes).digest('hex');
+            if (stat.size !== entry.bytes || digest !== entry.sha256) throw new Error(`Release identity mismatch: ${entry.path}`);
+          }
+          const actual = [...seen].sort();
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('Release path inventory mismatch.');
+          NODE
+
+      - name: Build and validate exact product branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch --create "${PRODUCT_BRANCH}" "${CURRENT_MAIN_SHA}"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const manifest = JSON.parse(fs.readFileSync('/tmp/catalog-release/payload/release-manifest.json', 'utf8'));
+          for (const entry of manifest.files) {
+            const source = path.join('/tmp/catalog-release/payload', entry.path);
+            const destination = path.join(process.cwd(), entry.path);
+            fs.mkdirSync(path.dirname(destination), { recursive: true });
+            fs.copyFileSync(source, destination);
+            fs.chmodSync(destination, fs.statSync(source).mode & 0o777);
+          }
+          NODE
+          node --check scripts/project-art/persistent-workspace-catalog.mjs
+          node --check scripts/persistent-artist-workspace-catalog.mjs
+          node --check tools/project_art_workspace_catalog_mcp.mjs
+          node --check scripts/check-persistent-artist-workspace-catalog.mjs
+          node --check scripts/test-persistent-artist-workspace-catalog.mjs
+          node --check scripts/test-project-art-workspace-catalog-mcp.mjs
+          node --check scripts/check-artist-workspace-agent-suite.mjs
+          node scripts/check-persistent-artist-workspace-catalog.mjs
+          node scripts/check-artist-workspace-agent-suite.mjs
+          git diff --check
+          test ! -e .evavo-transfer
+          test ! -e .github/workflows/publish-persistent-workspace-catalog.yml
+          test ! -e .github/workflows/publish-persistent-workspace-catalog-v2.yml
+          node <<'NODE'
+          const cp = require('node:child_process');
+          const expected = [
+            '.github/workflows/artist-workspace-agent-suite.yml',
+            '.github/workflows/persistent-artist-workspace-catalog.yml',
+            'config/artist-workspace-agent-suite.v1.json',
+            'config/mcp.persistent-artist-workspace-catalog.windows.example.json',
+            'config/mcp.project-art-workspace.windows.example.json',
+            'docs/ARTIST_WORKSPACE_AGENT_SUITE.md',
+            'docs/PERSISTENT_ARTIST_WORKSPACE_CATALOG.md',
+            'scripts/check-artist-workspace-agent-suite.mjs',
+            'scripts/check-persistent-artist-workspace-catalog.mjs',
+            'scripts/persistent-artist-workspace-catalog.mjs',
+            'scripts/project-art/persistent-workspace-catalog.mjs',
+            'scripts/test-persistent-artist-workspace-catalog.mjs',
+            'scripts/test-project-art-workspace-catalog-mcp.mjs',
+            'tools/project_art_workspace_catalog_mcp.mjs',
+          ].sort();
+          const actual = cp.execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', process.env.CURRENT_MAIN_SHA, '--'], { encoding: 'utf8' }).trim().split(/\r?\n/u).filter(Boolean).sort();
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`Unexpected product scope:\n${actual.join('\n')}`);
+          if (actual.includes('pnpm-lock.yaml')) throw new Error('Lockfile must remain unchanged.');
+          NODE
+
+      - name: Commit and push reviewed product branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name EVAVO-STUDIO
+          git config user.email evavo.studio@gmail.com
+          git add -- \
+            .github/workflows/artist-workspace-agent-suite.yml \
+            .github/workflows/persistent-artist-workspace-catalog.yml \
+            config/artist-workspace-agent-suite.v1.json \
+            config/mcp.persistent-artist-workspace-catalog.windows.example.json \
+            config/mcp.project-art-workspace.windows.example.json \
+            docs/ARTIST_WORKSPACE_AGENT_SUITE.md \
+            docs/PERSISTENT_ARTIST_WORKSPACE_CATALOG.md \
+            scripts/check-artist-workspace-agent-suite.mjs \
+            scripts/check-persistent-artist-workspace-catalog.mjs \
+            scripts/persistent-artist-workspace-catalog.mjs \
+            scripts/project-art/persistent-workspace-catalog.mjs \
+            scripts/test-persistent-artist-workspace-catalog.mjs \
+            scripts/test-project-art-workspace-catalog-mcp.mjs \
+            tools/project_art_workspace_catalog_mcp.mjs
+          git diff --cached --check
+          git commit -m "feat(project-art): add persistent workspace catalog"
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "${CURRENT_MAIN_SHA}"
+          git push --set-upstream origin "${PRODUCT_BRANCH}"
