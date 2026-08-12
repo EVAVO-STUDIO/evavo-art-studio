@@ -623,7 +623,7 @@ export async function assertTransactionDirectoryEntries(
 export async function removeTransactionDirectory(transaction) {
   await assertTransactionDirectoryEntries(transaction);
   for (const entry of await readdir(transaction.path, { withFileTypes: true })) {
-    const entryPath = path.join(transactionPath, entry.name);
+    const entryPath = path.join(transaction.path, entry.name);
     const stats = await lstat(entryPath, { bigint: true });
     assertSafeRegular(stats, `transaction cleanup ${entry.name}`);
     await unlink(entryPath);
