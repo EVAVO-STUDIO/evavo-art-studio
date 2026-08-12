@@ -1,0 +1,75 @@
+name: Temporary repair persistent workspace catalog carrier
+
+on:
+  push:
+    branches:
+      - automation/publish-persistent-workspace-catalog-20260812
+    paths:
+      - ".evavo-transfer/persistent-workspace-catalog/repair-part01-*.txt"
+      - ".github/workflows/repair-persistent-workspace-catalog-carrier.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-persistent-workspace-catalog-carrier-20260812
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_MAIN_SHA: 71e563788083e12f354f27500374956a3c5d66cf
+      EXPECTED_PART00_SHA256: 36f965a37bcb04316656388ab70409cae7f61ac8ff86eba89226ed1d34aa3115
+      EXPECTED_PART01_SHA256: 8be7358a0dbe7f5068c05b786050132f2b322bf6ea6e4bc681a3218b293e7118
+      EXPECTED_PART01_GIT_BLOB: 8d1e7dc68ce4f5f9ba9db98843eea0d9406f435a
+    steps:
+      - name: Check out exact repair source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Rebuild and verify exact carrier chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "automation/publish-persistent-workspace-catalog-20260812"
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "${EXPECTED_MAIN_SHA}"
+          cat > /tmp/repair-parts.sha256 <<'EOF'
+          0b4b48ff992f2b0863a43af8eeb0f12011113b629cf8cba44d136bfc80ac9120  .evavo-transfer/persistent-workspace-catalog/repair-part01-00.txt
+          2cbcc87a926c02495e0212065c815c0118e451a0e24e8c6966a3ad214fe33bbd  .evavo-transfer/persistent-workspace-catalog/repair-part01-01.txt
+          e56a0b57dccc1c7b9e9c22b688cd0cdc5af37c7f9f8430a41fb3ebfb82b24350  .evavo-transfer/persistent-workspace-catalog/repair-part01-02.txt
+          04e3f68ee5b14cccfcc563b8962a679d044d1e422fa25bbc2cfcfc7920e6fef8  .evavo-transfer/persistent-workspace-catalog/repair-part01-03.txt
+          5b50c3a62991429a11fc34a64d0cc09066ef6b11052543ee3e9e62a19c7c525a  .evavo-transfer/persistent-workspace-catalog/repair-part01-04.txt
+          cef3ed548172990f850cf58e2066364e41f2e8f879d2be2c09630d1d48dac113  .evavo-transfer/persistent-workspace-catalog/repair-part01-05.txt
+          32a7cf118a461d8ad6921ebce1bcaa5b9b210aaaa0e8f863d1bfba2d7583575d  .evavo-transfer/persistent-workspace-catalog/repair-part01-06.txt
+          4571d671a8d1e1426d84c1f77feec361821606c0cb8dd02c58acb57609fc8dd1  .evavo-transfer/persistent-workspace-catalog/repair-part01-07.txt
+          8c7cbb6064b0a18d66a19a0a002a46ea5482cdddac3f4cf1553c4db64e0b29a4  .evavo-transfer/persistent-workspace-catalog/repair-part01-08.txt
+          EOF
+          sha256sum --check /tmp/repair-parts.sha256
+          cat .evavo-transfer/persistent-workspace-catalog/repair-part01-*.txt > /tmp/part-01.b64
+          test "$(wc -c < /tmp/part-01.b64)" = "9000"
+          test "$(sha256sum /tmp/part-01.b64 | awk '{print $1}')" = "${EXPECTED_PART01_SHA256}"
+          test "$(git hash-object /tmp/part-01.b64)" = "${EXPECTED_PART01_GIT_BLOB}"
+          test "$(sha256sum .evavo-transfer/persistent-workspace-catalog/part-00.b64 | awk '{print $1}')" = "${EXPECTED_PART00_SHA256}"
+
+      - name: Publish repaired temporary carrier
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/part-01.b64 .evavo-transfer/persistent-workspace-catalog/part-01.b64
+          rm -f .evavo-transfer/persistent-workspace-catalog/repair-part01-*.txt
+          rm -f .github/workflows/repair-persistent-workspace-catalog-carrier.yml
+          test "$(sha256sum .evavo-transfer/persistent-workspace-catalog/part-00.b64 | awk '{print $1}')" = "${EXPECTED_PART00_SHA256}"
+          test "$(sha256sum .evavo-transfer/persistent-workspace-catalog/part-01.b64 | awk '{print $1}')" = "${EXPECTED_PART01_SHA256}"
+          git config user.name EVAVO-STUDIO
+          git config user.email evavo.studio@gmail.com
+          git add -A -- .evavo-transfer/persistent-workspace-catalog .github/workflows/repair-persistent-workspace-catalog-carrier.yml
+          git diff --cached --check
+          git commit -m "fix(release): restore exact catalog carrier chunks"
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "${EXPECTED_MAIN_SHA}"
+          git push origin HEAD:automation/publish-persistent-workspace-catalog-20260812
