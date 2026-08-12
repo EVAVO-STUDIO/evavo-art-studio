@@ -1,0 +1,82 @@
+name: Temporary assemble avatar sequence bundle writer
+
+on:
+  push:
+    branches:
+      - agent/avatar-sequence-bundle-writer
+    paths:
+      - ".agent/avatar-sequence-bundle/**"
+      - ".github/workflows/temporary-assemble-avatar-sequence-bundle.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-avatar-sequence-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Reconstruct and verify reviewed source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .agent/avatar-sequence-bundle/chunk-* > /tmp/avatar-sequence-bundle.tar.xz.b64
+          base64 --decode /tmp/avatar-sequence-bundle.tar.xz.b64 > /tmp/avatar-sequence-bundle.tar.xz
+          echo "d03a1ef8bcb870af788c6ec56a0cc35fcfacddd7eb511a70bfa7b9c55f9d09ba  /tmp/avatar-sequence-bundle.tar.xz" | sha256sum --check --strict
+          tar -tJf /tmp/avatar-sequence-bundle.tar.xz | sed 's#^\./##' | sort > /tmp/archive-paths.txt
+          cat > /tmp/expected-paths.txt <<'EOF'
+          scripts/check-project-art-avatar-sequence-bundle.mjs
+          scripts/test-project-art-avatar-sequence-bundle-mcp.mjs
+          scripts/test-project-art-avatar-sequence-bundle.mjs
+          scripts/write-project-art-avatar-sequence-bundle.mjs
+          tools/project_art_avatar_sequence_bundle_mcp.mjs
+          EOF
+          sort -o /tmp/expected-paths.txt /tmp/expected-paths.txt
+          diff -u /tmp/expected-paths.txt /tmp/archive-paths.txt
+          tar -xJf /tmp/avatar-sequence-bundle.tar.xz
+
+      - name: Validate assembled implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/project-art/avatar-sequence-bundle-common.mjs
+          node --check scripts/project-art/avatar-sequence-bundle-fixture.mjs
+          node --check scripts/write-project-art-avatar-sequence-bundle.mjs
+          node --check scripts/check-project-art-avatar-sequence-bundle.mjs
+          node --check scripts/test-project-art-avatar-sequence-bundle.mjs
+          node --check scripts/test-project-art-avatar-sequence-bundle-mcp.mjs
+          node --check tools/project_art_avatar_sequence_bundle_mcp.mjs
+          node scripts/check-project-art-avatar-sequence-bundle.mjs
+          node --test scripts/test-project-art-avatar-sequence-bundle.mjs
+          node scripts/test-project-art-avatar-sequence-bundle-mcp.mjs
+          node scripts/check-project-art-avatar-sequence.mjs
+          git diff --check
+
+      - name: Commit exact assembled scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .agent/avatar-sequence-bundle
+          rm .github/workflows/temporary-assemble-avatar-sequence-bundle.yml
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(project-art): add atomic avatar sequence bundle writer"
+          git push origin HEAD:agent/avatar-sequence-bundle-writer
