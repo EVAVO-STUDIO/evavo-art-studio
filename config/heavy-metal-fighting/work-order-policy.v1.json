@@ -1,0 +1,64 @@
+{
+  "schema": "evavo.heavy-metal-fighting-work-order-policy.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "candidatePolicy": {
+    "singleCandidatePerExecution": true,
+    "candidateFanout": 1,
+    "maximumRepairAttempts": 3,
+    "candidateRoot": "scratch/provider",
+    "reviewRoot": "review/batches",
+    "versionRoot": "versions/heavy-metal-fighting",
+    "receiptRoot": "manifests/receipts",
+    "journalRoot": "journals/batches",
+    "passingSiblingRegenerationForbidden": true,
+    "candidateAdmissionRequiresSha256": true
+  },
+  "receiptStateMachine": [
+    {"id":"planned","rank":0,"implicit":true,"requiresEvidence":false,"requiresCandidate":false,"requiresHuman":false},
+    {"id":"references-locked","rank":1,"requiresEvidence":true,"requiresCandidate":false,"requiresHuman":false},
+    {"id":"generation-authorized","rank":2,"requiresEvidence":true,"requiresCandidate":false,"requiresHuman":true},
+    {"id":"candidates-admitted","rank":3,"requiresEvidence":true,"requiresCandidate":true,"requiresHuman":false},
+    {"id":"deterministic-qa-passed","rank":4,"requiresEvidence":true,"requiresCandidate":true,"requiresHuman":false},
+    {"id":"creative-review-passed","rank":5,"requiresEvidence":true,"requiresCandidate":true,"requiresHuman":false},
+    {"id":"selected-or-repair-requested","rank":6,"requiresEvidence":true,"requiresCandidate":true,"requiresHuman":true,"outcomes":["selected","repair-requested"]},
+    {"id":"mastered","rank":7,"requiresEvidence":true,"requiresCandidate":true,"requiresHuman":false},
+    {"id":"named-human-approved","rank":8,"requiresEvidence":true,"requiresCandidate":true,"requiresHuman":true},
+    {"id":"delivery-ready","rank":9,"requiresEvidence":true,"requiresCandidate":true,"requiresHuman":false,"terminal":true}
+  ],
+  "technicalFailureCodes": [
+    "wrong-native-dimensions",
+    "wrong-authoring-canvas",
+    "alpha-contamination",
+    "matte-or-checkerboard",
+    "crop-risk",
+    "pivot-drift",
+    "ground-contact-drift",
+    "unsafe-transparent-rgb",
+    "duplicate-candidate",
+    "continuity-break",
+    "palette-contract-drift",
+    "runtime-mirror-failure"
+  ],
+  "receiptRules": [
+    "the first explicit receipt for a unit is references-locked",
+    "a normal attempt advances one state at a time",
+    "generation authorization and selection decisions require a human actor",
+    "named-human-approved always requires a human actor",
+    "repair-requested ends the current attempt and the next linked receipt starts a new attempt at generation-authorized",
+    "a repair attempt may change only the failing unit; passing siblings remain frozen",
+    "candidate SHA-256 remains stable through QA, review, selection, mastering and approval within one attempt",
+    "delivery-ready cannot exist without the linked named-human-approved receipt"
+  ],
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "automaticNamedHumanApproval": false,
+    "automaticPromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
