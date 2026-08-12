@@ -19,6 +19,11 @@ import {
   verifyHmfProviderExecutionEnvelopes,
 } from "./heavy-metal-fighting/frame-body-provider-execution-envelope.mjs";
 import {
+  buildHmfProviderSubmissionManifestBatch,
+  heavyMetalFightingProviderSubmissionManifest,
+  verifyHmfProviderSubmissionManifests,
+} from "./heavy-metal-fighting/frame-body-provider-submission-manifest.mjs";
+import {
   buildHmfFrameAtlasV3Layout,
   verifyHmfFrameAtlasV3Delivery,
 } from "./heavy-metal-fighting/frame-atlas-v3-delivery.mjs";
@@ -41,7 +46,7 @@ import {
 import { verifyHmfProductionWorkOrders } from "./heavy-metal-fighting/work-order-verification.mjs";
 
 export const SERVER_NAME = "evavo-heavy-metal-fighting-production";
-export const SERVER_VERSION = "1.5.0";
+export const SERVER_VERSION = "1.6.0";
 
 export const REGISTRY_SUMMARY_TOOL = "evavo_hmf_production_registry_summary";
 export const REGISTRY_BATCH_TOOL = "evavo_hmf_production_registry_batch";
@@ -51,6 +56,8 @@ export const FRAME_MOVE_CHOREOGRAPHY_TOOL = "evavo_hmf_production_frame_move_cho
 export const BODY_CHOREOGRAPHY_OVERLAY_TOOL = "evavo_hmf_production_body_choreography_overlay";
 export const PROVIDER_EXECUTION_ENVELOPE_TOOL = "evavo_hmf_production_provider_execution_envelope";
 export const PROVIDER_EXECUTION_ENVELOPE_BATCH_TOOL = "evavo_hmf_production_provider_execution_envelope_batch";
+export const PROVIDER_SUBMISSION_MANIFEST_TOOL = "evavo_hmf_production_provider_submission_manifest";
+export const PROVIDER_SUBMISSION_MANIFEST_BATCH_TOOL = "evavo_hmf_production_provider_submission_manifest_batch";
 export const WORK_ORDER_BATCH_TOOL = "evavo_hmf_production_work_order_batch";
 export const WORK_ORDER_TOOL = "evavo_hmf_production_work_order";
 export const RECEIPT_TEMPLATE_TOOL = "evavo_hmf_production_receipt_template";
@@ -100,6 +107,7 @@ const BATCH_ARTIFACT_BINDING_SCHEMA = objectSchema(
   ARTIFACT_BINDING_PROPERTIES,
   ["unitId", "bindingKey", "sourcePath", "artifactId", "evidenceSha256", "actorClass", "actorId", "occurredAt"],
 );
+const SUBMISSION_AUTHORIZATION_SCHEMA = { type: "object" };
 
 export function toolDefinitions() {
   return Object.freeze([
@@ -155,6 +163,26 @@ export function toolDefinitions() {
       }, ["batch"]),
     },
     {
+      name: PROVIDER_SUBMISSION_MANIFEST_TOOL,
+      description: "Validate the second named-human provider-submission gate for one submit-ready Frame body envelope and compile an exact one-call/one-candidate runtime submission instruction. The instruction still requires a separate explicit write-enabled runtime call and this tool never enqueues or executes it.",
+      inputSchema: objectSchema({
+        unitId: { type: "string", minLength: 1 },
+        receipts: { type: "array", items: { type: "object" }, default: [] },
+        artifactBindings: { type: "array", items: SINGLE_ARTIFACT_BINDING_SCHEMA, maxItems: 16, default: [] },
+        submissionAuthorization: SUBMISSION_AUTHORIZATION_SCHEMA,
+      }, ["unitId"]),
+    },
+    {
+      name: PROVIDER_SUBMISSION_MANIFEST_BATCH_TOOL,
+      description: "Compile submission manifests for the exact 1-10 units in one Frame-animation batch. Human authorizations are bound per unit; the tool reports authorized, awaiting and blocked units without runtime enqueue, provider execution or candidate approval.",
+      inputSchema: objectSchema({
+        batch: BATCH_ID_SCHEMA,
+        receipts: { type: "array", items: { type: "object" }, default: [] },
+        artifactBindings: { type: "array", items: BATCH_ARTIFACT_BINDING_SCHEMA, maxItems: 160, default: [] },
+        submissionAuthorizations: { type: "array", items: SUBMISSION_AUTHORIZATION_SCHEMA, maxItems: 10, default: [] },
+      }, ["batch"]),
+    },
+    {
       name: WORK_ORDER_BATCH_TOOL,
       description: "Compile the immutable one-image Art Studio work orders for one numbered HMF batch. This only compiles instructions; it does not call a provider.",
       inputSchema: objectSchema({ batch: BATCH_ID_SCHEMA }, ["batch"]),
@@ -189,7 +217,7 @@ export function toolDefinitions() {
     },
     {
       name: VERIFY_TOOL,
-      description: "Verify the exact HMF registry, style-proof execution, frame-atlas-v3 layout, named move/body choreography, supplemental overlays, provider execution envelopes and work-order governance without provider execution, approval, promotion, filesystem writes or repository mutation.",
+      description: "Verify the exact HMF registry, style proof, atlas-v3 layout, named move/body choreography, supplemental overlays, provider execution envelopes, second-gate submission manifests and work-order governance without provider execution, runtime enqueue, approval, promotion, filesystem writes or repository mutation.",
       inputSchema: objectSchema(),
     },
   ]);
@@ -230,6 +258,16 @@ export async function callTool(name, input = {}) {
     receipts: input.receipts ?? [],
     artifactBindings: input.artifactBindings ?? [],
   });
+  if (name === PROVIDER_SUBMISSION_MANIFEST_TOOL) return heavyMetalFightingProviderSubmissionManifest(input.unitId, {
+    receipts: input.receipts ?? [],
+    artifactBindings: input.artifactBindings ?? [],
+    submissionAuthorization: input.submissionAuthorization ?? null,
+  });
+  if (name === PROVIDER_SUBMISSION_MANIFEST_BATCH_TOOL) return buildHmfProviderSubmissionManifestBatch(normalizeBatch(input.batch), {
+    receipts: input.receipts ?? [],
+    artifactBindings: input.artifactBindings ?? [],
+    submissionAuthorizations: input.submissionAuthorizations ?? [],
+  });
   if (name === WORK_ORDER_BATCH_TOOL) return buildHmfProductionWorkOrderBatch(normalizeBatch(input.batch));
   if (name === WORK_ORDER_TOOL) return heavyMetalFightingProductionWorkOrder(input.unitId);
   if (name === RECEIPT_TEMPLATE_TOOL) return heavyMetalFightingProductionReceiptTemplate(input.unitId);
@@ -247,6 +285,7 @@ export async function callTool(name, input = {}) {
       frameMoveChoreography,
       bodyChoreographyOverlays,
       providerExecutionEnvelopes,
+      providerSubmissionManifests,
       workOrders,
     ] = await Promise.all([
       verifyHmfProductionBatchRegistry(),
@@ -255,16 +294,18 @@ export async function callTool(name, input = {}) {
       verifyHmfFrameMoveBodyChoreography(),
       verifyHmfBodyChoreographyOverlays(),
       verifyHmfProviderExecutionEnvelopes(),
+      verifyHmfProviderSubmissionManifests(),
       verifyHmfProductionWorkOrders(),
     ]);
     return Object.freeze({
-      schema: "evavo.heavy-metal-fighting-production-agent-verification.v6",
+      schema: "evavo.heavy-metal-fighting-production-agent-verification.v7",
       status: registry.status === "passed"
         && styleProofExecution.status === "passed"
         && frameAtlasV3.status === "passed"
         && frameMoveChoreography.status === "passed"
         && bodyChoreographyOverlays.status === "passed"
         && providerExecutionEnvelopes.status === "passed"
+        && providerSubmissionManifests.status === "passed"
         && workOrders.status === "passed"
         ? "passed"
         : "failed",
@@ -274,9 +315,11 @@ export async function callTool(name, input = {}) {
       frameMoveChoreography,
       bodyChoreographyOverlays,
       providerExecutionEnvelopes,
+      providerSubmissionManifests,
       workOrders,
       authority: Object.freeze({
         providerExecution: false,
+        runtimeEnqueue: false,
         referenceArtifactAdmission: false,
         receiptPersistence: false,
         automaticApproval: false,
@@ -302,7 +345,7 @@ export async function handleRequest(request) {
       protocolVersion: request.params?.protocolVersion ?? "2024-11-05",
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-      instructions: "Read-only HEAVY METAL FIGHTING final-art production surface. It exposes the 1,573-image / 179-batch registry, four-phase style-proof controller, deterministic 224-cel atlas-v3 layout, exact 44-move body choreography, hash-bound choreography overlays, human-gated provider execution envelopes, immutable one-image work orders, receipt requirements, bounded repair templates and deterministic resume planning. A submit-ready envelope still requires a separate explicit write-enabled runtime call. This server does not generate images, execute providers, admit reference artifacts, persist receipts or approvals, mutate base work orders or receipt chains, change combat timing, approve art, promote masters, mutate the game repository, commit, push, deploy or publish.",
+      instructions: "Read-only HEAVY METAL FIGHTING final-art production surface. It exposes the 1,573-image / 179-batch registry, four-phase style-proof controller, deterministic 224-cel atlas-v3 layout, exact 44-move body choreography, hash-bound choreography overlays, human-gated provider execution envelopes, second-gate provider submission manifests, immutable one-image work orders, receipt requirements, bounded repair templates and deterministic resume planning. An authorized submission manifest still requires a separate explicit write-enabled runtime call and canonical provider-contract validation. This server does not generate images, enqueue runtime jobs, execute providers, admit reference artifacts, persist receipts or approvals, mutate base work orders or receipt chains, change combat timing, approve art, promote masters, mutate the game repository, commit, push, deploy or publish.",
     });
   }
   if (request.method === "ping") return response(request.id, {});
