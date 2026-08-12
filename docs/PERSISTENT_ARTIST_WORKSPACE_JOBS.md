@@ -102,6 +102,16 @@ Immediately before a step begins, those fingerprints are revalidated. If an inpu
 
 This prevents a resumed agent from executing a plan against different source art merely because the path still has the same name.
 
+## Strict plan admission
+
+A self-hash proves that a plan is internally self-consistent; it does not make arbitrary plan bytes trusted authority. `create` and every later persisted-plan read therefore re-admit the complete plan structure even when a caller has correctly recomputed `documentSha256`.
+
+Admission checks the bounded top-level schema, version and identities; canonical timestamp and request digest; unique step identities; supported step kinds; dependency graph; canonical input and output paths; exact one-to-one input fingerprints; bounded byte lengths and SHA-256 values; optional tool names; fixed journal publication metadata; required execution-safety flags; and the complete false-only authority boundary.
+
+A correctly rehashed plan is rejected with `ARTIST_WORKSPACE_JOB_PLAN_INVALID` if it removes an input fingerprint, substitutes a fingerprint path, introduces path traversal or a dependency cycle, changes journal publication metadata, disables an execution guard, removes an authority denial, or adds unsupported plan fields. This makes the compiler the convenient construction path, not a security boundary that can be skipped by manufacturing a new self-hash.
+
+Historical v1 plans remain readable when they predate the optional `revalidateJournalPathChainOnReadAndAppend` evidence flag; if that flag is present it must be `true`. Runtime path-chain revalidation itself remains mandatory regardless of whether the older plan recorded that later evidence field.
+
 ## Claims and stale-lease recovery
 
 A mutating agent first claims the job for a bounded lease of 30 seconds to 24 hours.
