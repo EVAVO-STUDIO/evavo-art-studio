@@ -24,18 +24,24 @@ on:
       - "scripts/layered-godot-git-operator/**"
       - "scripts/check-layered-godot-git-operator.mjs"
       - "scripts/test-layered-godot-git-operator.mjs"
+      - "scripts/layered-godot-git-push-operator.mjs"
+      - "scripts/layered-godot-git-push-operator/**"
+      - "scripts/check-layered-godot-git-push-operator.mjs"
+      - "scripts/test-layered-godot-git-push-operator.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
       - "config/layered-production-godot-workspace-auditor.v1.json"
       - "config/layered-production-godot-runtime-validator.v1.json"
       - "config/layered-production-godot-handoff-gate.v1.json"
       - "config/layered-production-godot-repository-review.v1.json"
       - "config/layered-production-godot-git-operator.v1.json"
+      - "config/layered-production-godot-git-push-operator.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
       - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
       - "docs/LAYERED_GODOT_RUNTIME_VALIDATOR.md"
       - "docs/LAYERED_GODOT_HANDOFF_GATE.md"
       - "docs/LAYERED_GODOT_REPOSITORY_REVIEW.md"
       - "docs/LAYERED_GODOT_GIT_OPERATOR.md"
+      - "docs/LAYERED_GODOT_GIT_PUSH_OPERATOR.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   push:
     branches:
@@ -62,18 +68,24 @@ on:
       - "scripts/layered-godot-git-operator/**"
       - "scripts/check-layered-godot-git-operator.mjs"
       - "scripts/test-layered-godot-git-operator.mjs"
+      - "scripts/layered-godot-git-push-operator.mjs"
+      - "scripts/layered-godot-git-push-operator/**"
+      - "scripts/check-layered-godot-git-push-operator.mjs"
+      - "scripts/test-layered-godot-git-push-operator.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
       - "config/layered-production-godot-workspace-auditor.v1.json"
       - "config/layered-production-godot-runtime-validator.v1.json"
       - "config/layered-production-godot-handoff-gate.v1.json"
       - "config/layered-production-godot-repository-review.v1.json"
       - "config/layered-production-godot-git-operator.v1.json"
+      - "config/layered-production-godot-git-push-operator.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
       - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
       - "docs/LAYERED_GODOT_RUNTIME_VALIDATOR.md"
       - "docs/LAYERED_GODOT_HANDOFF_GATE.md"
       - "docs/LAYERED_GODOT_REPOSITORY_REVIEW.md"
       - "docs/LAYERED_GODOT_GIT_OPERATOR.md"
+      - "docs/LAYERED_GODOT_GIT_PUSH_OPERATOR.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   workflow_dispatch:
 
@@ -118,6 +130,9 @@ jobs:
 
       - name: Run explicit Git commit operator regressions
         run: node scripts/check-layered-godot-git-operator.mjs
+
+      - name: Run explicit plain fast-forward Git push operator regressions
+        run: node scripts/check-layered-godot-git-push-operator.mjs
 
       - name: Prove exact source remains clean
         if: always()

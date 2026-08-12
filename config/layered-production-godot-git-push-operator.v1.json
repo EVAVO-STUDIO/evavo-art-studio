@@ -1,0 +1,48 @@
+{
+  "schema": "evavo.layered-production.godot-git-push-operator.v1",
+  "version": 1,
+  "protocolVersion": "2026-08-13.1",
+  "description": "Explicit plain fast-forward Git push boundary after one exact layered Godot commit receipt.",
+  "entrypoint": "scripts/layered-godot-git-push-operator.mjs",
+  "requirements": {
+    "requiresExactCommitReceipt": true,
+    "requiresCommittedOutcome": true,
+    "requiresImmutableInputSnapshot": true,
+    "requiresExactRepositoryRoot": true,
+    "requiresExactLocalHeadBranchParentTreeMessageAndBytes": true,
+    "requiresCompletelyCleanRepository": true,
+    "requiresExactHttpsGithubOrigin": true,
+    "rejectsPushUrl": true,
+    "rejectsCustomReceivePack": true,
+    "rejectsMirrorRemote": true,
+    "rejectsUrlRewriteRules": true,
+    "requiresRemoteBranchAlreadyExists": true,
+    "requiresRemoteHeadEqualCommitParent": true,
+    "requiresRepeatedLocalAndRemotePreflight": true,
+    "plainFastForwardPushOnly": true,
+    "prePushHooksDisabled": true,
+    "tagPushDisabled": true,
+    "forcePushDisabled": true,
+    "requiresExactRemoteReadback": true,
+    "idempotentWhenAlreadyPushed": true,
+    "boundedGitOutputBytes": 2097152,
+    "boundedNetworkTimeoutMs": 120000
+  },
+  "outcomes": {
+    "pushed": "The plain push command succeeded and remote readback equals the exact commit.",
+    "already-pushed": "Remote already equals the exact commit; no push command ran.",
+    "remote-confirmed-after-client-error": "The client returned non-zero but exact remote readback proves the commit is present."
+  },
+  "authority": {
+    "targetRepositoryRead": true,
+    "targetRepositoryWorkingTreeWrite": false,
+    "gitRead": true,
+    "gitNetworkRead": true,
+    "gitCommit": false,
+    "gitPush": true,
+    "gitTagPush": false,
+    "forcePush": false,
+    "deployment": false,
+    "releasePublication": false
+  }
+}
