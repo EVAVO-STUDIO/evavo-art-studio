@@ -23,6 +23,16 @@
         "EVAVO_ART_WORKSPACE_INGEST_MCP_ALLOW_WRITE": "false",
         "EVAVO_ART_WORKSPACE_INGEST_MCP_TIMEOUT_MS": "600000"
       }
+    },
+    "evavo-project-art-workspace-catalog": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_catalog_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_PERSISTENT_CATALOG_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
+        "EVAVO_PERSISTENT_CATALOG_MCP_ALLOW_WRITE": "false"
+      }
     }
   }
 }

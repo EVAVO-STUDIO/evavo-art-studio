@@ -1,0 +1,96 @@
+{
+  "screens": [
+    {
+      "id": "title-attract",
+      "status": "launch-required",
+      "purpose": "Establish HEAVY METAL FIGHTING as a corporate broadcast and show Frame scale before the player enters the menus.",
+      "layout": {"logoZone":{"x":48,"y":34,"width":544,"height":150},"background":"live service bay with selected Frame in cradle","prompt":"PRESS FIRE TO ENTER","lowerRail":"WAR CIRCUIT // 2089, version, EVAVO"},
+      "requiredAssets": ["primary-title-master","subtitle-lockup","press-fire-prompt","menu-far-city","menu-bay-opening","menu-service-cradle","menu-technicians","menu-foreground-console","menu-rain-overlay","menu-diagnostic-overlay","attract-demo-window"],
+      "motion": ["warning lamps alternate on held cels","one maintenance arm traverses on a low-rate loop","two technician loops establish scale","Frame sensor and cooling shutters idle without human breathing","attract mode cuts to short governed demo-fight excerpts after inactivity"],
+      "antiGeneric": ["no generic skyline-only background","no band-logo flames or skulls","no smooth cinematic fog hiding the title"]
+    },
+    {
+      "id":"main-menu","status":"launch-required","purpose":"Fast arcade navigation over the same living service-bay world.",
+      "options":["EXHIBITION","DOMINION CIRCUIT","VERSUS","TRAINING","SERVICE BAY","RECORDS","OPTIONS"],
+      "layout":{"menuRail":{"x":66,"y":188,"width":248,"height":136},"descriptionPanel":{"x":334,"y":206,"width":238,"height":86},"helpRail":{"x":64,"y":326,"width":512,"height":18}},
+      "requiredAssets":["main-menu-frame","main-menu-cursor","main-menu-item-inactive","main-menu-item-active","main-menu-description-panel","main-menu-help-rail","main-menu-save-status","front-end-transition-shutter"],
+      "motion":["cursor snaps on a two-cel mechanical latch","selection change triggers one short diagnostic wipe"],
+      "antiGeneric":["no glassmorphism","no tiny illegible telemetry","no excessive menu depth"]
+    },
+    {
+      "id":"pilot-select","status":"launch-required","purpose":"Choose the human identity before the machine; portrait character is as important as Frame statistics.",
+      "layout":{"portraitPanel":{"x":24,"y":48,"width":228,"height":252},"pilotGrid":{"x":272,"y":64,"width":160,"height":144,"arrangement":"2x2"},"identityRail":{"x":256,"y":220,"width":360,"height":80},"promptRail":{"x":24,"y":316,"width":592,"height":22}},
+      "portraitStates":["select-idle","select-focus"],
+      "displayFields":["pilot name","handle","contract affiliation","neural traits","current record"],
+      "requiredAssets":["pilot-select-frame","pilot-grid-cell","pilot-focus-plate","pilot-stat-rail"],
+      "motion":["selected portrait changes from select-idle to select-focus","name and affiliation arrive on separate hard wipes","no free-floating full-body animation behind the UI"],
+      "antiGeneric":["no generic anime roster grid","no portrait cropping that removes face silhouette","no modern card carousel"]
+    },
+    {
+      "id":"frame-select","status":"launch-required","purpose":"Choose a Frame independently from the Pilot and communicate size, crew, CORE and doctrine immediately.",
+      "layout":{"heroViewport":{"x":16,"y":42,"width":330,"height":250},"frameGrid":{"x":368,"y":54,"width":248,"height":138,"arrangement":"2x2"},"statRail":{"x":356,"y":202,"width":260,"height":90},"selectedPilotBadge":{"x":24,"y":300,"width":160,"height":42}},
+      "displayFields":["Frame code","epithet","class","crew requirement","CORE type","combat doctrine","Pilot compatibility"],
+      "requiredAssets":["frame-select-frame","frame-card-shell","frame-silhouette-viewport","frame-stat-bar-set","crew-core-badge-set","pilot-frame-compatibility-indicator"],
+      "motion":["hero Frame uses ready/idle held cels or a service-cradle turntable study","stat bars step rather than smoothly tween","Pilot compatibility changes as a hard status latch, not a percentage animation"],
+      "antiGeneric":["no rotating modern 3D showroom","no interchangeable generic mech thumbnails","no hidden crew requirement"]
+    },
+    {
+      "id":"service-bay-loadout","status":"launch-required-campaign","purpose":"Show the Frame as maintained machinery and allow upgrades without destroying chassis identity.",
+      "layout":{"frameBay":{"x":8,"y":28,"width":390,"height":294},"hardpointRail":{"x":410,"y":46,"width":218,"height":186},"crewStatus":{"x":410,"y":240,"width":218,"height":82}},
+      "requiredAssets":["shared service-bay environment","crew role sets","universal upgrade icons","frame-specific upgrade cards","frame construction and hardpoint diagrams"],
+      "motion":["technicians work on held loops","one selected hardpoint flashes with a service lamp","armour plates change only when the equipped module declares a visible variant"],
+      "antiGeneric":["no freeform cosmetic kitbash","no unexplained attachment floating off the chassis","no upgrade that invalidates animation clearance"]
+    },
+    {
+      "id":"versus","status":"launch-required","purpose":"Show Pilot and Frame as equal identities and establish the arena before loading.",
+      "layout":{"left":{"x":0,"y":0,"width":302,"height":360},"right":{"x":338,"y":0,"width":302,"height":360},"centre":{"x":292,"y":36,"width":56,"height":286}},
+      "displayFields":["Pilot","handle","Frame code","Frame epithet","crew","CORE","arena","rules"],
+      "requiredAssets":["versus-split-frame","arena-rules-plate","pilot versus portraits","Frame hero cards"],
+      "motion":["portrait and Frame silhouette arrive on different shutters","centre arena card locks last","one rivalry line may type on a two-step bitmap reveal"],
+      "antiGeneric":["no long loading tips","no oversized VS glyph covering faces","no random sponsor clutter"]
+    },
+    {
+      "id":"pre-fight-launch","status":"launch-required","purpose":"Deliver the signature service-cradle, crew check, armour lock and umbilical release ritual.",
+      "sequence":["Frame dormant against service cradle","crew and Pilot status lamps close in order","armour access seals lock","external CORE line transfers load","umbilical unlocks and retracts","sensor line ignites","Frame takes first step","cut to arena tunnel ready pose"],
+      "requiredAssets":["service bay environment","Pilot service animation","Frame construction/service pose","umbilical and launch effects"],
+      "antiGeneric":["no magical instantaneous spawn","no unserviceable cables passing through armour","no identical launch ritual for every Frame"]
+    },
+    {
+      "id":"match-hud","status":"launch-required","purpose":"Prioritise competitive information and communicate CORE as high-output reserve without modern UI clutter.",
+      "layout":{"p1Structure":{"x":18,"y":12,"width":250,"height":18},"p2Structure":{"x":372,"y":12,"width":250,"height":18},"p1Guard":{"x":18,"y":33,"width":188,"height":7},"p2Guard":{"x":434,"y":33,"width":188,"height":7},"timer":{"x":286,"y":8,"width":68,"height":34},"p1Core":{"x":18,"y":44,"width":172,"height":10},"p2Core":{"x":450,"y":44,"width":172,"height":10},"pilotPortraits":"48x48 at outer ends of structure bars"},
+      "hierarchy":["Structure","timer and rounds","guard","CORE","Overdrive/system state","Pilot/Frame identity"],
+      "requiredAssets":["hud-left-frame","hud-right-frame","timer-round-housing","core-segment-rail","guard-integrity-rail","pilot hud portraits"],
+      "states":["normal","low-core","system-down","reignition","heat-warning","internal-breach","overdrive-ready"],
+      "antiGeneric":["crew health is not a permanent second health bar","no translucent panel stack","no smooth gradient meter"]
+    },
+    {
+      "id":"super-cut-in","status":"launch-required","purpose":"Provide a short 90s arcade Overdrive punctuation with animated Pilot identity and no long modern cinematic interruption.",
+      "timeline":[{"ticks":"0-1","event":"input-confirmed; game timing remains authoritative"},{"ticks":"2-3","event":"one hard palette flash and stage luminance drop"},{"ticks":"4-9","event":"pilot super-charge cel enters in framed strip"},{"ticks":"10-15","event":"pilot super-call cel and move name rail"},{"ticks":"16-20","event":"pilot super-resolve cel; frame-specific screen field locks"},{"ticks":"21+","event":"cut-in clears before the real body hero-contact cel; normal simulation presentation resumes"}],
+      "requiredAssets":["super-cut-in-frame","pilot super-charge/call/resolve portraits","three universal super-freeze FX","Frame-specific Overdrive FX"],
+      "rules":["portrait strip occupies no more than one third of screen height","cut-in never covers the opponent for the entire active sequence","body animation and hitbox truth remain visible at contact","move name is separately authored bitmap text, never model-generated text"]
+    },
+    {
+      "id":"round-result","status":"launch-required","purpose":"Return immediately to the people and machine consequences after the final contact.",
+      "displayFields":["winner","Pilot","Frame","integrity","CORE","crew report in campaign","score or credits"],
+      "requiredAssets":["round-result-plate","pilot victory/defeat portraits","Frame victory/defeat cels"],
+      "antiGeneric":["no instant confetti over a crew casualty report","no modern social-media style card"]
+    },
+    {
+      "id":"ending-credits","status":"launch-required-campaign","purpose":"Resolve the Pilot contract and corporation consequence using cel portraits, broadcast plates and limited full-screen art.",
+      "requiredAssets":["ending-credits-rail","pilot dossier-ending portraits","intro-style full-screen cels where required"],
+      "antiGeneric":["no generic scrolling lore dump","no unrelated concept-art slideshow"]
+    }
+  ],
+  "interfaceDesign": {
+    "titleIdentity":{"lineOne":"HEAVY METAL","lineTwo":"FIGHTING","subtitle":"WAR CIRCUIT // 2089","tagline":"PILOT THE FRAME. SURVIVE THE CIRCUIT.","construction":["two-line-condensed-industrial-masthead","bone-grey-upper-line","hazard-red-lower-line","shared-black-steel-housing","hard-chamfers-and-load-bearing-rails","one-colour-and-four-colour-reduction-safe"],"letterLocks":["wide-stable-H-and-M","octagonal-counter-language-without-copying-an-existing-logo","short-middle-bars-on-E","heavy-terminal-G","no-distorted-or-missing-letters"],"forbidden":["music-festival-logo","chrome-album-cover","skulls-flames-wings-chains","generic-slanted-esports-wordmark","soft-glow-dependent-legibility"]},
+    "grid":{"logicalCanvas":[640,360],"baseModule":4,"safeMargin":16,"lineWeights":[1,2,4],"nearestFiltering":true,"integerPlacement":true},
+    "typography":{"title":"custom hand-pixelled display master","sectionHeaderLogicalHeight":16,"cardHeaderLogicalHeight":12,"bodyLogicalHeight":8,"numericLogicalHeight":12,"rules":["uppercase for broadcast and Frame billing","mixed-case reserved for longer dossier copy","all move names separately authored","no model-generated text inside images","no antialiased browser font captured as final art"]},
+    "palette":{"shell":["#030509","#0B111A","#343D49","#66717D","#E2D8BD","#D43A2F","#E7A72B"],"roleRules":["black and steel own most screen area","bone ivory owns primary identity text","hazard red owns destructive or selected states","warning amber owns system state","Pilot and Frame accent colours are local and bounded"]},
+    "motionGrammar":{"transitionTicks":[2,4,6,8],"cursorCels":2,"allowed":["hard-broadcast-shutter","diagnostic-wipe","palette-hit","mechanical-latch","stepped-stat-change","held-portrait-swap"],"forbidden":["spring-easing","inertial-card-carousel","soft-crossfade","blurred-zoom","continuous-floating-panels"]},
+    "selectionFlow":{"steps":["Pilot select","Frame select","campaign loadout and crew confirmation when applicable","versus and arena billing"],"defaultPairingIsVisible":true,"defaultPairingIsHardLocked":false,"rules":["Pilot and Frame are equal identity layers","crew requirement and CORE are never hidden","compatibility is status information not a deceptive cosmetic score","same-Frame match retains Pilot and palette readability"]},
+    "pilotCard":{"master":[256,256],"largePanel":[228,252],"hudDerivative":[48,48],"fields":["name","handle","affiliation","neural traits","record"],"states":["select-idle","select-focus"],"rules":["preserve complete head silhouette","retain meaningful collar and clothing anchors","two held states are enough when acting is strong"]},
+    "frameCard":{"heroViewport":[330,250],"fields":["Frame code","epithet","class","crew requirement","CORE type","combat doctrine","Pilot compatibility"],"artBindings":["hero-frame-card","one-colour-silhouette","ready-or-service-cradle-cel","construction-authority"],"rules":["no modern rotating 3D showroom","no interchangeable mech thumbnail template","Frame proportions must match gameplay identity master"]},
+    "hudHierarchy":["Structure","timer and rounds","guard","CORE","Overdrive and system state","Pilot and Frame identity"],
+    "superCutIn":{"portraitCels":3,"maximumScreenHeight":120,"maximumOccupancyTicks":20,"layerOrder":["stage darken","Frame screen field","industrial rail","Pilot portrait","bitmap move name","small CORE mark","hard clear"],"rule":"The cut-in is punctuation inside a game-authoritative freeze, not a separate cinematic that changes move timing."}
+  }
+}

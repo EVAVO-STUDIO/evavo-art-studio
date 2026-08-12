@@ -14,13 +14,14 @@ on:
       - "scripts/heavy-metal-fighting-art-studio-mcp.mjs"
       - "scripts/heavy-metal-fighting-art-studio-core.test.mjs"
       - "scripts/heavy-metal-fighting-art-studio.test.mjs"
-      - "docs/HEAVY_METAL_FIGHTING_CAMPAIGN_ADAPTER.md"
-      - "docs/HEAVY_METAL_FIGHTING_ART_STUDIO_*.md"
+      - "scripts/heavy-metal-fighting-production-design.test.mjs"
+      - "docs/HEAVY_METAL_FIGHTING_*.md"
       - "package.json"
       - ".github/workflows/heavy-metal-fighting-art-studio.yml"
   push:
     branches:
       - main
+      - "codex/hmf-*"
     paths:
       - "config/game-art-campaign.heavy-metal-fighting.v1.json"
       - "config/game-art-campaign.heavy-metal-fighting.v1.payload.b64.part-*"
@@ -33,15 +34,14 @@ on:
       - "scripts/heavy-metal-fighting-art-studio-mcp.mjs"
       - "scripts/heavy-metal-fighting-art-studio-core.test.mjs"
       - "scripts/heavy-metal-fighting-art-studio.test.mjs"
-      - "docs/HEAVY_METAL_FIGHTING_CAMPAIGN_ADAPTER.md"
-      - "docs/HEAVY_METAL_FIGHTING_ART_STUDIO_*.md"
+      - "scripts/heavy-metal-fighting-production-design.test.mjs"
+      - "docs/HEAVY_METAL_FIGHTING_*.md"
       - "package.json"
       - ".github/workflows/heavy-metal-fighting-art-studio.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
-
 concurrency:
   group: heavy-metal-fighting-art-studio-${{ github.ref }}
   cancel-in-progress: true
@@ -49,19 +49,17 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out exact source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-
       - name: Set up Node.js 22.14.0
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: "22.14.0"
           package-manager-cache: false
-
       - name: Check adapter syntax
         run: |
           find scripts/heavy-metal-fighting -name '*.mjs' -print0 | xargs -0 -n1 node --check
@@ -69,27 +67,39 @@ jobs:
           node --check scripts/heavy-metal-fighting-art-studio-mcp.mjs
           node --check scripts/heavy-metal-fighting-art-studio-core.test.mjs
           node --check scripts/heavy-metal-fighting-art-studio.test.mjs
+          node --check scripts/heavy-metal-fighting-production-design.test.mjs
           node --check scripts/game-art-campaign-heavy-metal-fighting.test.mjs
-
-      - name: Run governed campaign and mechanical adapter tests
+      - name: Run governed campaign, mechanical and production-design tests
         run: |
           node --test \
             scripts/game-art-campaign-heavy-metal-fighting.test.mjs \
             scripts/heavy-metal-fighting-art-studio-core.test.mjs \
+            scripts/heavy-metal-fighting-production-design.test.mjs \
             scripts/heavy-metal-fighting-art-studio.test.mjs
-
-      - name: Compile verification evidence
+      - name: Compile exact production evidence
         run: |
           node scripts/heavy-metal-fighting-art-studio.mjs verify > "$RUNNER_TEMP/heavy-metal-fighting-verification.json"
           node scripts/heavy-metal-fighting-art-studio.mjs summary > "$RUNNER_TEMP/heavy-metal-fighting-summary.json"
           node scripts/heavy-metal-fighting-art-studio.mjs contract > "$RUNNER_TEMP/heavy-metal-fighting-mechanical-contract.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs presentation-contract > "$RUNNER_TEMP/heavy-metal-fighting-combat-presentation.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs pilot branka-kovac > "$RUNNER_TEMP/heavy-metal-fighting-branka-pilot.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs moves bastion > "$RUNNER_TEMP/heavy-metal-fighting-bastion-moves.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs move bastion blow-off > "$RUNNER_TEMP/heavy-metal-fighting-bastion-blow-off.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs move bastion anvil-lock > "$RUNNER_TEMP/heavy-metal-fighting-bastion-anvil-lock.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs cel bastion 97 > "$RUNNER_TEMP/heavy-metal-fighting-bastion-reversal-cel.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs screen pilot-select > "$RUNNER_TEMP/heavy-metal-fighting-pilot-select.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs screen frame-select > "$RUNNER_TEMP/heavy-metal-fighting-frame-select.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs screen match-hud > "$RUNNER_TEMP/heavy-metal-fighting-match-hud.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs super bastion > "$RUNNER_TEMP/heavy-metal-fighting-bastion-super.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs intro > "$RUNNER_TEMP/heavy-metal-fighting-intro.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs attract > "$RUNNER_TEMP/heavy-metal-fighting-attract.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs readiness > "$RUNNER_TEMP/heavy-metal-fighting-readiness.json"
+          node scripts/heavy-metal-fighting-art-studio.mjs assets > "$RUNNER_TEMP/heavy-metal-fighting-assets.json"
           node scripts/heavy-metal-fighting-art-studio.mjs style-proof > "$RUNNER_TEMP/heavy-metal-fighting-style-proof.json"
-
       - name: Prove source tree remains clean
         run: |
           git diff --exit-code
           test -z "$(git status --porcelain)"
-
       - name: Upload exact Art Studio evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -100,4 +110,18 @@ jobs:
             ${{ runner.temp }}/heavy-metal-fighting-verification.json
             ${{ runner.temp }}/heavy-metal-fighting-summary.json
             ${{ runner.temp }}/heavy-metal-fighting-mechanical-contract.json
+            ${{ runner.temp }}/heavy-metal-fighting-combat-presentation.json
+            ${{ runner.temp }}/heavy-metal-fighting-branka-pilot.json
+            ${{ runner.temp }}/heavy-metal-fighting-bastion-moves.json
+            ${{ runner.temp }}/heavy-metal-fighting-bastion-blow-off.json
+            ${{ runner.temp }}/heavy-metal-fighting-bastion-anvil-lock.json
+            ${{ runner.temp }}/heavy-metal-fighting-bastion-reversal-cel.json
+            ${{ runner.temp }}/heavy-metal-fighting-pilot-select.json
+            ${{ runner.temp }}/heavy-metal-fighting-frame-select.json
+            ${{ runner.temp }}/heavy-metal-fighting-match-hud.json
+            ${{ runner.temp }}/heavy-metal-fighting-bastion-super.json
+            ${{ runner.temp }}/heavy-metal-fighting-intro.json
+            ${{ runner.temp }}/heavy-metal-fighting-attract.json
+            ${{ runner.temp }}/heavy-metal-fighting-readiness.json
+            ${{ runner.temp }}/heavy-metal-fighting-assets.json
             ${{ runner.temp }}/heavy-metal-fighting-style-proof.json

@@ -1,0 +1,57 @@
+name: Layered Godot workspace writer
+
+on:
+  pull_request:
+    paths:
+      - "scripts/layered-godot-workspace-writer.mjs"
+      - "scripts/layered-godot-workspace-writer/**"
+      - "scripts/check-layered-godot-workspace-writer.mjs"
+      - "scripts/test-layered-godot-workspace-writer.mjs"
+      - "config/layered-production-godot-workspace-writer.v1.json"
+      - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
+      - ".github/workflows/layered-godot-workspace-writer.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/layered-godot-workspace-writer.mjs"
+      - "scripts/layered-godot-workspace-writer/**"
+      - "scripts/check-layered-godot-workspace-writer.mjs"
+      - "scripts/test-layered-godot-workspace-writer.mjs"
+      - "config/layered-production-godot-workspace-writer.v1.json"
+      - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
+      - ".github/workflows/layered-godot-workspace-writer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layered-godot-workspace-writer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Run bounded contract and adversarial regressions
+        run: node scripts/check-layered-godot-workspace-writer.mjs
+
+      - name: Prove exact source remains clean
+        if: always()
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
