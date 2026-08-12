@@ -189,8 +189,9 @@ jobs:
             'scripts/test-project-art-workspace-catalog-mcp.mjs',
             'tools/project_art_workspace_catalog_mcp.mjs',
           ].sort();
-          const lines = cp.execFileSync('git', ['status', '--porcelain=v1', '--untracked-files=all'], { encoding: 'utf8' }).trim().split(/\r?\n/u).filter(Boolean);
-          const actual = lines.map((line) => line.slice(3)).sort();
+          const tracked = cp.execFileSync('git', ['diff', '--name-only', process.env.CURRENT_MAIN_SHA, '--'], { encoding: 'utf8' }).trim().split(/\r?\n/u).filter(Boolean);
+          const untracked = cp.execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { encoding: 'utf8' }).trim().split(/\r?\n/u).filter(Boolean);
+          const actual = [...new Set([...tracked, ...untracked])].sort();
           if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`Unexpected product scope:\n${actual.join('\n')}`);
           if (actual.includes('pnpm-lock.yaml')) throw new Error('Lockfile must remain unchanged.');
           NODE
