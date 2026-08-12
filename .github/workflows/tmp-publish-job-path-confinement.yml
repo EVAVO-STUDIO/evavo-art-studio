@@ -1,0 +1,330 @@
+name: Temporary publish workspace job path confinement
+
+on:
+  push:
+    branches:
+      - agent/project-art-job-path-confinement-20260812
+    paths:
+      - ".github/workflows/tmp-publish-job-path-confinement.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out exact feature source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Apply exact path-confinement hardening
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly 1 match, found {count}")
+              return text.replace(old, new, 1)
+
+          def replace_exact_count(text, old, new, expected, label):
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f"{label}: expected exactly {expected} matches, found {count}")
+              return text.replace(old, new)
+
+          core_path = Path('scripts/project-art/persistent-workspace-jobs.mjs')
+          core = core_path.read_text(encoding='utf-8')
+
+          core = replace_once(
+              core,
+              "  return current;\n}\n\nasync function snapshotFile(root, relative, label = 'file') {",
+              """  return current;
+}
+
+async function resolveJobPath(root, relative, label, { allowMissingLeaf = false, requireDirectory = false } = {}) {
+  let absolute;
+  try {
+    absolute = await rejectSymbolicChain(root, relative, { allowMissingLeaf });
+  } catch (error) {
+    if (typeof error?.code === 'string' && error.code.startsWith('ARTIST_WORKSPACE_JOB_')) throw error;
+    fail('ARTIST_WORKSPACE_JOB_PATH_INVALID', `${label} cannot be resolved safely: ${error.message}`);
+  }
+  if (requireDirectory) {
+    const metadata = await lstat(absolute).catch((error) => {
+      fail('ARTIST_WORKSPACE_JOB_PATH_INVALID', `${label} cannot be inspected: ${error.message}`);
+    });
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+      fail('ARTIST_WORKSPACE_JOB_PATH_INVALID', `${label} must be a non-symbolic directory.`);
+    }
+    const resolved = await realpath(absolute).catch((error) => {
+      fail('ARTIST_WORKSPACE_JOB_PATH_INVALID', `${label} cannot be resolved: ${error.message}`);
+    });
+    if (!insideRoot(root, resolved)) fail('ARTIST_WORKSPACE_JOB_PATH_INVALID', `${label} escaped workspaceRoot.`);
+    absolute = resolved;
+  }
+  return absolute;
+}
+
+async function snapshotFile(root, relative, label = 'file') {""",
+              'insert resolveJobPath helper',
+          )
+
+          core = replace_once(
+              core,
+              "    optimisticConcurrency: true,\n    imageBytesThroughMcp: false,",
+              "    optimisticConcurrency: true,\n    postCreationPathChainRevalidation: true,\n    imageBytesThroughMcp: false,",
+              'capability flag',
+          )
+
+          core = replace_once(
+              core,
+              "      compareAndAppendEvents: true,\n      exactInputRevalidationBeforeStart: true,",
+              "      compareAndAppendEvents: true,\n      revalidateJournalPathChainOnReadAndAppend: true,\n      exactInputRevalidationBeforeStart: true,",
+              'plan execution flag',
+          )
+
+          old_read_plan = """async function readPlanFromRoot(root, jobId) {
+  const paths = jobPaths(root, jobId);
+  const { value: commit } = await readStableJsonFile(paths.commitPath, 'job commit marker');
+  if (!isRecord(commit) || commit.schema !== JOB_COMMIT_SCHEMA || commit.jobId !== jobId) {
+    fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', 'Job commit marker is missing or invalid.');
+  }
+  verifyDocumentHash(commit, 'job commit marker');
+  const { value } = await readStableJsonFile(paths.planPath, 'job plan');
+  validatePlan(value);
+  if (value.workspaceRoot !== root) fail('ARTIST_WORKSPACE_JOB_PLAN_INVALID', 'Job plan workspaceRoot does not match the inspected root.');
+  if (value.jobId !== jobId) fail('ARTIST_WORKSPACE_JOB_PLAN_INVALID', 'Job plan jobId does not match its directory.');
+  if (commit.planSha256 !== value.documentSha256) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', 'Job commit marker does not bind the current plan.');
+  const { value: initialEvent } = await readStableJsonFile(path.join(paths.eventsRoot, eventFilename(1)), 'initial job event');
+  if (initialEvent.documentSha256 !== commit.initialEventSha256) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', 'Job commit marker does not bind the initial event.');
+  return { plan: value, commit, ...paths };
+}
+"""
+          new_read_plan = """async function readPlanFromRoot(root, jobId) {
+  const safeJobId = safeId(jobId, 'jobId');
+  const relativeRoot = `journals/jobs/${safeJobId}`;
+  const jobRoot = await resolveJobPath(root, relativeRoot, 'job root', { requireDirectory: true });
+  const planPath = await resolveJobPath(root, `${relativeRoot}/job-plan.json`, 'job plan path');
+  const eventsRoot = await resolveJobPath(root, `${relativeRoot}/events`, 'job events directory', { requireDirectory: true });
+  const commitPath = await resolveJobPath(root, `${relativeRoot}/job-commit.json`, 'job commit marker path');
+  const { value: commit } = await readStableJsonFile(commitPath, 'job commit marker');
+  if (!isRecord(commit) || commit.schema !== JOB_COMMIT_SCHEMA || commit.jobId !== safeJobId) {
+    fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', 'Job commit marker is missing or invalid.');
+  }
+  verifyDocumentHash(commit, 'job commit marker');
+  const { value } = await readStableJsonFile(planPath, 'job plan');
+  validatePlan(value);
+  if (value.workspaceRoot !== root) fail('ARTIST_WORKSPACE_JOB_PLAN_INVALID', 'Job plan workspaceRoot does not match the inspected root.');
+  if (value.jobId !== safeJobId) fail('ARTIST_WORKSPACE_JOB_PLAN_INVALID', 'Job plan jobId does not match its directory.');
+  if (commit.planSha256 !== value.documentSha256) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', 'Job commit marker does not bind the current plan.');
+  const initialEventPath = await resolveJobPath(root, `${relativeRoot}/events/${eventFilename(1)}`, 'initial job event path');
+  const { value: initialEvent } = await readStableJsonFile(initialEventPath, 'initial job event');
+  if (initialEvent.documentSha256 !== commit.initialEventSha256) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', 'Job commit marker does not bind the initial event.');
+  return { plan: value, commit, jobRoot, planPath, eventsRoot, commitPath };
+}
+"""
+          core = replace_once(core, old_read_plan, new_read_plan, 'readPlanFromRoot hardening')
+
+          old_read_events = """async function readEvents(eventsRoot, jobId) {
+  const metadata = await lstat(eventsRoot).catch((error) => fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Events directory cannot be inspected: ${error.message}`));
+  if (metadata.isSymbolicLink() || !metadata.isDirectory()) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', 'Events path must be a non-symbolic directory.');
+  const names = (await readdir(eventsRoot)).filter((name) => /^\\d{6}\\.json$/.test(name)).sort();
+  if (names.length < 1 || names.length > MAX_EVENTS) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Job event count must be 1-${MAX_EVENTS}.`);
+  const events = [];
+  let previous = null;
+  for (let index = 0; index < names.length; index += 1) {
+    const expectedName = eventFilename(index + 1);
+    if (names[index] !== expectedName) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Job event sequence is not contiguous at ${expectedName}.`);
+    const { value } = await readStableJsonFile(path.join(eventsRoot, names[index]), `job event ${expectedName}`);
+    if (!isRecord(value) || value.schema !== JOB_EVENT_SCHEMA || value.jobId !== jobId || value.sequence !== index + 1) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Job event ${expectedName} has invalid identity.`);
+    verifyDocumentHash(value, `job event ${expectedName}`);
+    const expectedPrevious = previous?.documentSha256 ?? null;
+    if (value.previousEventSha256 !== expectedPrevious) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Job event ${expectedName} broke the hash chain.`);
+    events.push(value);
+    previous = value;
+  }
+  return events;
+}
+"""
+          new_read_events = """async function readEvents(root, jobId) {
+  const safeJobId = safeId(jobId, 'jobId');
+  const relativeEventsRoot = `journals/jobs/${safeJobId}/events`;
+  const eventsRoot = await resolveJobPath(root, relativeEventsRoot, 'job events directory', { requireDirectory: true });
+  const names = (await readdir(eventsRoot)).filter((name) => /^\\d{6}\\.json$/.test(name)).sort();
+  if (names.length < 1 || names.length > MAX_EVENTS) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Job event count must be 1-${MAX_EVENTS}.`);
+  const events = [];
+  let previous = null;
+  for (let index = 0; index < names.length; index += 1) {
+    const expectedName = eventFilename(index + 1);
+    if (names[index] !== expectedName) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Job event sequence is not contiguous at ${expectedName}.`);
+    const eventPath = await resolveJobPath(root, `${relativeEventsRoot}/${names[index]}`, `job event ${expectedName} path`);
+    const { value } = await readStableJsonFile(eventPath, `job event ${expectedName}`);
+    if (!isRecord(value) || value.schema !== JOB_EVENT_SCHEMA || value.jobId !== safeJobId || value.sequence !== index + 1) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Job event ${expectedName} has invalid identity.`);
+    verifyDocumentHash(value, `job event ${expectedName}`);
+    const expectedPrevious = previous?.documentSha256 ?? null;
+    if (value.previousEventSha256 !== expectedPrevious) fail('ARTIST_WORKSPACE_JOB_STATE_INVALID', `Job event ${expectedName} broke the hash chain.`);
+    events.push(value);
+    previous = value;
+  }
+  return events;
+}
+"""
+          core = replace_once(core, old_read_events, new_read_events, 'readEvents hardening')
+
+          core = replace_exact_count(
+              core,
+              'const events = await readEvents(eventsRoot, plan.jobId);',
+              'const events = await readEvents(root, plan.jobId);',
+              2,
+              'readEvents call sites',
+          )
+
+          core = replace_once(
+              core,
+              '  const target = path.join(eventsRoot, eventFilename(sequence));',
+              """  const target = await resolveJobPath(
+    root,
+    `journals/jobs/${plan.jobId}/events/${eventFilename(sequence)}`,
+    'next job event path',
+    { allowMissingLeaf: true },
+  );""",
+              'append target confinement',
+          )
+          core_path.write_text(core, encoding='utf-8', newline='\n')
+
+          test_path = Path('scripts/test-persistent-artist-workspace-jobs.mjs')
+          test = test_path.read_text(encoding='utf-8')
+          test = replace_once(
+              test,
+              "import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';",
+              "import { mkdtemp, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';",
+              'test rename import',
+          )
+          path_chain_test = """
+  // Job journals are not trusted forever after creation: a later parent-directory symlink substitution fails closed.
+  const pathChainRequest = structuredClone(request);
+  pathChainRequest.jobId = 'job-path-chain';
+  const pathChainPlan = await compileWorkspaceJob({ workspaceRoot: root, request: pathChainRequest, compiledAt: '2026-08-12T05:10:00.000Z' });
+  await createWorkspaceJob({ workspaceRoot: root, plan: pathChainPlan });
+  const pathChainJobRoot = path.join(root, 'journals', 'jobs', pathChainPlan.jobId);
+  const relocatedParent = path.join(root, 'scratch-job-journal');
+  await mkdir(relocatedParent, { recursive: true });
+  const relocatedJobRoot = path.join(relocatedParent, pathChainPlan.jobId);
+  await rename(pathChainJobRoot, relocatedJobRoot);
+  await symlink(relocatedJobRoot, pathChainJobRoot, 'dir');
+  await assert.rejects(
+    inspectWorkspaceJob({ workspaceRoot: root, jobId: pathChainPlan.jobId, now: '2026-08-12T05:10:01.000Z' }),
+    (error) => error?.code === 'ARTIST_WORKSPACE_JOB_PATH_INVALID',
+  );
+  await assert.rejects(
+    claimWorkspaceJob({ workspaceRoot: root, jobId: pathChainPlan.jobId, actor: 'path-race-agent', leaseSeconds: 300, now: '2026-08-12T05:10:02.000Z' }),
+    (error) => error?.code === 'ARTIST_WORKSPACE_JOB_PATH_INVALID',
+  );
+
+"""
+          test = replace_once(
+              test,
+              '  // Dependency cycles are rejected at compilation time.\n',
+              path_chain_test + '  // Dependency cycles are rejected at compilation time.\n',
+              'path-chain regression insertion',
+          )
+          test = replace_once(
+              test,
+              "  console.log('- symbolic inputs and tampered events are rejected');",
+              "  console.log('- symbolic inputs, post-creation journal path substitution and tampered events are rejected');",
+              'test summary',
+          )
+          test_path.write_text(test, encoding='utf-8', newline='\n')
+
+          guard_path = Path('scripts/check-persistent-artist-workspace-jobs.mjs')
+          guard = guard_path.read_text(encoding='utf-8')
+          guard = replace_once(
+              guard,
+              "  'optimisticConcurrency: true',\n  'compareAndAppendEvents: true',",
+              "  'optimisticConcurrency: true',\n  'postCreationPathChainRevalidation: true',\n  'compareAndAppendEvents: true',\n  'revalidateJournalPathChainOnReadAndAppend: true',",
+              'static path-chain tokens',
+          )
+          guard = replace_once(
+              guard,
+              "for (const token of ['ChatGPT', 'Claude', 'crash-resumable', 'stale-lease recovery', 'exact input', 'output evidence', 'append-only', 'force push']) {",
+              "for (const token of ['ChatGPT', 'Claude', 'crash-resumable', 'stale-lease recovery', 'exact input', 'output evidence', 'append-only', 'post-creation path confinement', 'force push']) {",
+              'docs guard token',
+          )
+          guard = replace_once(
+              guard,
+              "console.log('- competing stale checkpoint intents fail closed instead of becoming later authoritative events');\nconsole.log('- failed steps remain resumable while dependency cycles are rejected');",
+              "console.log('- competing stale checkpoint intents fail closed instead of becoming later authoritative events');\nconsole.log('- post-creation journal paths are revalidated through the workspace root before reads and appends');\nconsole.log('- failed steps remain resumable while dependency cycles are rejected');",
+              'guard summary',
+          )
+          guard_path.write_text(guard, encoding='utf-8', newline='\n')
+
+          docs_path = Path('docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md')
+          docs = docs_path.read_text(encoding='utf-8')
+          docs_section = """There is no mutable `current.json` pointer. Current state is derived from immutable evidence each time the job is inspected.
+
+## Post-creation path confinement
+
+Creation-time checks are not treated as permanent trust. Every later inspection re-walks the complete `journals/jobs/<job-id>/...` chain under the exact workspace root before reading the plan, commit marker, events directory, or an individual event. Every new checkpoint also revalidates the events directory and its create-only target before append.
+
+If a job directory or later path component is replaced with a symbolic link or junction after job creation, inspection and mutation fail closed with `ARTIST_WORKSPACE_JOB_PATH_INVALID`. A stale path cannot redirect the resumable-job journal outside the configured workspace root.
+
+## Job request
+"""
+          docs = replace_once(
+              docs,
+              "There is no mutable `current.json` pointer. Current state is derived from immutable evidence each time the job is inspected.\n\n## Job request\n",
+              docs_section,
+              'documentation path-confinement section',
+          )
+          docs_path.write_text(docs, encoding='utf-8', newline='\n')
+          PY
+
+      - name: Validate focused resumable-job surface
+        run: |
+          node --check scripts/project-art/persistent-workspace-jobs.mjs
+          node scripts/check-persistent-artist-workspace-jobs.mjs
+          git diff --check
+
+      - name: Commit clean product scope
+        shell: bash
+        run: |
+          rm .github/workflows/tmp-publish-job-path-confinement.yml
+          git diff --check
+          git status --short
+          python3 - <<'PY'
+          import subprocess
+          expected = {
+              'docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md',
+              'scripts/check-persistent-artist-workspace-jobs.mjs',
+              'scripts/project-art/persistent-workspace-jobs.mjs',
+              'scripts/test-persistent-artist-workspace-jobs.mjs',
+              '.github/workflows/tmp-publish-job-path-confinement.yml',
+          }
+          actual = set(subprocess.check_output(['git', 'status', '--porcelain=v1'], text=True).splitlines())
+          paths = {line[3:] for line in actual}
+          if paths != expected:
+              raise SystemExit(f'unexpected publisher scope: {sorted(paths)}')
+          PY
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md \
+            scripts/check-persistent-artist-workspace-jobs.mjs \
+            scripts/project-art/persistent-workspace-jobs.mjs \
+            scripts/test-persistent-artist-workspace-jobs.mjs \
+            .github/workflows/tmp-publish-job-path-confinement.yml
+          git commit -m "fix(project-art): revalidate workspace job path chains"
+          git push origin HEAD:agent/project-art-job-path-confinement-20260812
