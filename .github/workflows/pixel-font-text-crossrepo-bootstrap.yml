@@ -1,0 +1,264 @@
+name: Finalize Pixel Text Studio and cross-repository delivery
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/pixel-font-text-crossrepo-bootstrap.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pixel-font-text-crossrepo-bootstrap
+  cancel-in-progress: false
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONHASHSEED: "0"
+  PYTHONDONTWRITEBYTECODE: "1"
+  SOURCE_DATE_EPOCH: "1577836800"
+  CARRIER_PIXEL_SHA256: "7fa2f53a6b9c70bcc9293d11df2d8addb344069ea59b2704b4deab3360836ced"
+  OVERLAY_SHA256: "aa4f16425d3c1d33e2c1c87b328c07df2d9e2da3b5f4f126aadc974d4d6a3159"
+  CARRIER_URL: "https://media.canva.com/v2/image-resize/format:PNG/height:200/quality:100/uri:ifs%3A%2F%2FM%2Fb30ccea0-ec9e-4103-a791-e07f572ab3bf/watermark:F/width:200?csig=AAAAAAAAAAAAAAAAAAAAAMzdKeSSCsU0tX0GfMfWPmY4srHaqFxFwXL24iqsLsVu&exp=1786548968&osig=AAAAAAAAAAAAAAAAAAAAAH1gtbAyoDBjdJIREsWX0qWTmahqjNxL_DvrqieUEroL&signer=media-rpc&x-canva-quality=thumbnail"
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact bootstrap commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: pip
+          cache-dependency-path: requirements/pixel-font-universal.txt
+
+      - name: Require unchanged main before publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Download and decode checksum-protected carrier
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-all-errors --proto '=https' --tlsv1.2 \
+            "$CARRIER_URL" --output "$RUNNER_TEMP/pixel-font-text-crossrepo-carrier.png"
+          python -m pip install --disable-pip-version-check --no-cache-dir "Pillow==11.3.0"
+          python - <<'PY'
+          from __future__ import annotations
+          import hashlib
+          import io
+          import os
+          import struct
+          import zipfile
+          from pathlib import Path
+          from PIL import Image
+
+          carrier = Path(os.environ["RUNNER_TEMP"]) / "pixel-font-text-crossrepo-carrier.png"
+          with Image.open(carrier) as source:
+              if source.size != (200, 200):
+                  raise SystemExit(f"unexpected carrier dimensions: {source.size}")
+              pixels = source.convert("RGB").tobytes()
+          observed_pixel_sha = hashlib.sha256(pixels).hexdigest()
+          if observed_pixel_sha != os.environ["CARRIER_PIXEL_SHA256"]:
+              raise SystemExit(f"carrier pixel SHA mismatch: {observed_pixel_sha}")
+          if pixels[:8] != b"EVPTX001":
+              raise SystemExit("carrier magic mismatch")
+          payload_length = struct.unpack(">Q", pixels[8:16])[0]
+          embedded_sha = pixels[16:48]
+          payload = pixels[48:48 + payload_length]
+          observed_payload_sha = hashlib.sha256(payload).digest()
+          if len(payload) != payload_length:
+              raise SystemExit("carrier payload is truncated")
+          if observed_payload_sha != embedded_sha:
+              raise SystemExit("embedded payload SHA mismatch")
+          if observed_payload_sha.hex() != os.environ["OVERLAY_SHA256"]:
+              raise SystemExit(f"overlay SHA mismatch: {observed_payload_sha.hex()}")
+          expected = sorted([
+              ".github/workflows/pixel-font-repository-delivery-contract.yml",
+              ".github/workflows/pixel-font-repository-publish.yml",
+              "config/mcp.pixel-font-automation.windows.example.json",
+              "config/pixel-font-automation-suite.v1.json",
+              "config/pixel-font-repository-allowlist.v1.json",
+              "config/pixel-text-studio.v1.json",
+              "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md",
+              "docs/PIXEL_TEXT_STUDIO.md",
+              "examples/pixel-font-repository-delivery/universal-godot-family.job.json",
+              "examples/pixel-text-studio/README.md",
+              "examples/pixel-text-studio/arcade-chrome-title.style.json",
+              "examples/pixel-text-studio/blue-command-badge.style.json",
+              "examples/pixel-text-studio/brass-plaque-label.style.json",
+              "examples/pixel-text-studio/cga-menu.style.json",
+              "examples/pixel-text-studio/dos-brass-title.style.json",
+              "examples/pixel-text-studio/fantasy-fire-title.style.json",
+              "examples/pixel-text-studio/gothic-violet-title.style.json",
+              "examples/pixel-text-studio/hologram-cyan-title.style.json",
+              "examples/pixel-text-studio/ice-rune-title.style.json",
+              "examples/pixel-text-studio/stone-carved-title.style.json",
+              "examples/pixel-text-studio/strategy-ui-emboss.style.json",
+              "examples/pixel-text-studio/toxic-tech-title.style.json",
+              "examples/pixel-text-studio/warning-red-title.style.json",
+              "examples/pixel-text-studio/website-pixel-neon.style.json",
+              "scripts/check-pixel-font-automation-suite.mjs",
+              "scripts/check-pixel-font-repository-delivery.mjs",
+              "scripts/check-pixel-text-studio-mcp.mjs",
+              "scripts/pixel-font-repository-delivery-mcp.mjs",
+              "scripts/pixel-font-repository-delivery.mjs",
+              "scripts/pixel-font-repository-delivery/common.mjs",
+              "scripts/pixel-font-repository-delivery/compiler.mjs",
+              "scripts/pixel-font-repository-delivery/installer.mjs",
+              "scripts/pixel-font-repository-delivery/planner.mjs",
+              "scripts/pixel-font-repository-delivery/schema.mjs",
+              "scripts/pixel-text-studio-mcp.mjs",
+              "tools/check_pixel_text_studio.py",
+              "tools/pixel_text_studio.py",
+              "tools/pixel_text_studio_engine.py",
+          ])
+          with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+              if archive.testzip() is not None:
+                  raise SystemExit("overlay ZIP integrity check failed")
+              observed = sorted(archive.namelist())
+              if observed != expected:
+                  raise SystemExit(f"overlay inventory mismatch: {observed}")
+              archive.extractall(Path.cwd())
+          print(f"verified carrier pixels={observed_pixel_sha} overlay={observed_payload_sha.hex()} files={len(expected)}")
+          PY
+
+      - name: Install exact scalable-font convenience backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-universal.txt
+          python - <<'PY'
+          import fontTools
+          assert fontTools.__version__ == "4.63.0", fontTools.__version__
+          PY
+
+      - name: Run complete Pixel Text and delivery gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/pixel-font-repository-delivery.mjs
+          node --check scripts/pixel-font-repository-delivery-mcp.mjs
+          for source in scripts/pixel-font-repository-delivery/*.mjs; do node --check "$source"; done
+          node --check scripts/check-pixel-font-repository-delivery.mjs
+          node --check scripts/check-pixel-font-automation-suite.mjs
+          node --check scripts/pixel-text-studio-mcp.mjs
+          node --check scripts/check-pixel-text-studio-mcp.mjs
+          python -m py_compile tools/pixel_text_studio.py tools/pixel_text_studio_engine.py tools/check_pixel_text_studio.py
+          python tools/check_pixel_text_studio.py
+          node scripts/check-pixel-text-studio-mcp.mjs
+          node scripts/check-pixel-font-repository-delivery.mjs
+          node scripts/check-pixel-font-automation-suite.mjs
+          workspace="$RUNNER_TEMP/pixel-font-crossrepo-smoke"
+          mkdir -p "$workspace"
+          node scripts/pixel-font-repository-delivery.mjs plan \
+            --job examples/pixel-font-repository-delivery/universal-godot-family.job.json \
+            --workspace "$workspace" \
+            --expected-head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            --output "$workspace/delivery-plan.json"
+          test -s "$workspace/delivery-plan.json"
+          git diff --check
+
+      - name: Commit readable source and remove bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/pixel-font-text-crossrepo-bootstrap.yml
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add --all
+          git diff --cached --check
+          python - <<'PY'
+          import subprocess
+          expected = sorted([
+              ".github/workflows/pixel-font-repository-delivery-contract.yml",
+              ".github/workflows/pixel-font-repository-publish.yml",
+              ".github/workflows/pixel-font-text-crossrepo-bootstrap.yml",
+              "config/mcp.pixel-font-automation.windows.example.json",
+              "config/pixel-font-automation-suite.v1.json",
+              "config/pixel-font-repository-allowlist.v1.json",
+              "config/pixel-text-studio.v1.json",
+              "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md",
+              "docs/PIXEL_TEXT_STUDIO.md",
+              "examples/pixel-font-repository-delivery/universal-godot-family.job.json",
+              "examples/pixel-text-studio/README.md",
+              "examples/pixel-text-studio/arcade-chrome-title.style.json",
+              "examples/pixel-text-studio/blue-command-badge.style.json",
+              "examples/pixel-text-studio/brass-plaque-label.style.json",
+              "examples/pixel-text-studio/cga-menu.style.json",
+              "examples/pixel-text-studio/dos-brass-title.style.json",
+              "examples/pixel-text-studio/fantasy-fire-title.style.json",
+              "examples/pixel-text-studio/gothic-violet-title.style.json",
+              "examples/pixel-text-studio/hologram-cyan-title.style.json",
+              "examples/pixel-text-studio/ice-rune-title.style.json",
+              "examples/pixel-text-studio/stone-carved-title.style.json",
+              "examples/pixel-text-studio/strategy-ui-emboss.style.json",
+              "examples/pixel-text-studio/toxic-tech-title.style.json",
+              "examples/pixel-text-studio/warning-red-title.style.json",
+              "examples/pixel-text-studio/website-pixel-neon.style.json",
+              "scripts/check-pixel-font-automation-suite.mjs",
+              "scripts/check-pixel-font-repository-delivery.mjs",
+              "scripts/check-pixel-text-studio-mcp.mjs",
+              "scripts/pixel-font-repository-delivery-mcp.mjs",
+              "scripts/pixel-font-repository-delivery.mjs",
+              "scripts/pixel-font-repository-delivery/common.mjs",
+              "scripts/pixel-font-repository-delivery/compiler.mjs",
+              "scripts/pixel-font-repository-delivery/installer.mjs",
+              "scripts/pixel-font-repository-delivery/planner.mjs",
+              "scripts/pixel-font-repository-delivery/schema.mjs",
+              "scripts/pixel-text-studio-mcp.mjs",
+              "tools/check_pixel_text_studio.py",
+              "tools/pixel_text_studio.py",
+              "tools/pixel_text_studio_engine.py",
+          ])
+          observed = sorted(line for line in subprocess.check_output(["git", "diff", "--cached", "--name-only"], text=True).splitlines() if line)
+          if observed != expected:
+              raise SystemExit(f"staged scope mismatch: {observed}")
+          PY
+          git commit -m "feat(pixel-text): automate titles and repository delivery" -m "Add deterministic Pixel Text Studio title/UI rendering for games and websites, including animated 90s-style treatments, plus guarded cross-repository font installation, naming, Godot 4.6.2 setup, optional web/TTF/BDF/source delivery, ChatGPT/Claude MCP surfaces, allowlisted publication modes and exact target-head ownership checks."
+
+      - name: Fast-forward current main only
+        shell: bash
+        run: |
+          set -euo pipefail
+          published="$(git rev-parse HEAD)"
+          parent="$(git rev-parse HEAD^)"
+          test "$parent" = "$GITHUB_SHA"
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
+          git push origin HEAD:main
+          remote="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "$remote" = "$published"
+          printf '{"status":"published","commit":"%s","parent":"%s","tree":"%s","overlaySha256":"%s"}\n' \
+            "$published" "$parent" "$(git rev-parse HEAD^{tree})" "$OVERLAY_SHA256" \
+            | tee "$RUNNER_TEMP/pixel-text-crossrepo-publication.json"
+
+      - name: Retain publication receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pixel-text-crossrepo-publication-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/pixel-text-crossrepo-publication.json
