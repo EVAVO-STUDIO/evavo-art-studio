@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  FRAME_ATLAS_V3_TOOL,
   REGISTRY_BATCH_TOOL,
   REGISTRY_SUMMARY_TOOL,
   RECEIPT_TEMPLATE_TOOL,
@@ -22,6 +23,7 @@ const EXPECTED_TOOLS = [
   REGISTRY_SUMMARY_TOOL,
   REGISTRY_BATCH_TOOL,
   STYLE_PROOF_EXECUTION_TOOL,
+  FRAME_ATLAS_V3_TOOL,
   WORK_ORDER_BATCH_TOOL,
   WORK_ORDER_TOOL,
   RECEIPT_TEMPLATE_TOOL,
@@ -99,6 +101,22 @@ test("style-proof execution accepts only explicit named-human evidence", async (
   );
 });
 
+test("frame atlas-v3 MCP tool exposes deterministic 224-cel handoff without building or promoting it", async () => {
+  const layout = await callTool(FRAME_ATLAS_V3_TOOL, { frameId: "bastion" });
+  assert.equal(layout.frameId, "bastion");
+  assert.equal(layout.slots.length, 224);
+  assert.equal(layout.bodyBatchIds.length, 26);
+  assert.equal(layout.productionMaster.slotsPerFrame, 256);
+  assert.equal(layout.reservedSlots.length, 32);
+  assert.equal(layout.reservedSlots[0], 224);
+  assert.equal(layout.reservedSlots.at(-1), 255);
+  assert.deepEqual(layout.productionMaster.cell, { width: 160, height: 160 });
+  assert.deepEqual(layout.productionMaster.pivot, { x: 80, y: 152 });
+  assert.equal(layout.gameTargetPath, "res://assets/fighters/final-v3/bastion.png");
+  assert.equal(layout.authority.targetRepositoryMutation, false);
+  assert.equal(layout.authority.gitMutation, false);
+});
+
 test("one final Frame body work order remains native, identity-bound and one-image-only", async () => {
   const order = await callTool(WORK_ORDER_TOOL, { unitId: "hmf.frame-animation.bastion.slot-002" });
   assert.equal(order.assetContract.nativeDimensions.width, 160);
@@ -137,11 +155,12 @@ test("receipt, repair and resume tools stay human-gated and non-executing", asyn
   assert.ok(resume.unitStates.every((state) => state.nextAction === "lock-references"));
 });
 
-test("production MCP verification composes registry, style-proof and work-order evidence", async () => {
+test("production MCP verification composes registry, style-proof, atlas-v3 and work-order evidence", async () => {
   const verification = await callTool(VERIFY_TOOL);
   assert.equal(verification.status, "passed");
   assert.equal(verification.registry.status, "passed");
   assert.equal(verification.styleProofExecution.status, "passed");
+  assert.equal(verification.frameAtlasV3.status, "passed");
   assert.equal(verification.workOrders.status, "passed");
   assert.equal(verification.authority.providerExecution, false);
   assert.equal(verification.authority.receiptPersistence, false);
@@ -154,7 +173,8 @@ test("JSON-RPC surface rejects undeclared production mutation tools", async () =
   assert.deepEqual(listed.result.tools.map((tool) => tool.name), EXPECTED_TOOLS);
   const initialized = await handleRequest({ jsonrpc: "2.0", id: 2, method: "initialize", params: {} });
   assert.equal(initialized.result.serverInfo.name, "evavo-heavy-metal-fighting-production");
-  assert.equal(initialized.result.serverInfo.version, "1.1.0");
+  assert.equal(initialized.result.serverInfo.version, "1.2.0");
   assert.match(initialized.result.instructions, /does not generate images/i);
   assert.match(initialized.result.instructions, /style-proof controller/i);
+  assert.match(initialized.result.instructions, /atlas-v3 handoff layout/i);
 });

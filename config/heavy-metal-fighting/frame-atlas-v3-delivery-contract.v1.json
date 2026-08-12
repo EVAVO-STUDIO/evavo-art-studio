@@ -1,0 +1,68 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-atlas-v3-delivery-contract.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "publicTitle": "HEAVY METAL FIGHTING",
+  "frames": ["bastion", "viper", "citadel", "mirage"],
+  "productionMaster": {
+    "contractId": "production_master_v3",
+    "cell": {"width": 160, "height": 160},
+    "authoringCell": {"width": 640, "height": 640},
+    "pivot": {"x": 80, "y": 152},
+    "columns": 16,
+    "rows": 16,
+    "atlas": {"width": 2560, "height": 2560},
+    "slotsPerFrame": 256,
+    "authoredSlotsPerFrame": 224,
+    "reservedSlots": {"start": 224, "end": 255, "count": 32, "requiredAlpha": "fully-transparent"},
+    "canonicalFormat": "png",
+    "resampling": "none",
+    "runtimeFiltering": "nearest-neighbour"
+  },
+  "sourcePolicy": {
+    "masterRootTemplate": "masters/frames/{frame}/sprites",
+    "requiresAllAuthoredSlots": true,
+    "requiresDeliveryReadyReceiptChains": true,
+    "requiresCompleteStyleProof": true,
+    "requiresRgbaSource": true,
+    "requiresTransparentCorners": true,
+    "sourceMutation": false,
+    "slotReordering": false,
+    "trimming": false,
+    "rotation": false,
+    "extrusion": false,
+    "padding": false,
+    "scaling": false
+  },
+  "exportPolicy": {
+    "workspaceRootTemplate": "exports/runtime/frames/{frame}",
+    "createOnlyDeliveryDirectory": true,
+    "atomicPublicationInsideWorkspace": true,
+    "imageNameTemplate": "{frame}.png",
+    "manifestNameTemplate": "{frame}.atlas-v3.json",
+    "receiptNameTemplate": "{frame}.atlas-v3.receipt.json"
+  },
+  "gameTarget": {
+    "repository": "EVAVO-STUDIO/steel-dominion",
+    "technicalId": "steel-dominion",
+    "root": "res://assets/fighters/final-v3",
+    "imagePathTemplate": "res://assets/fighters/final-v3/{frame}.png",
+    "contractId": "production_master_v3",
+    "activationRequiresFocusedGodotValidation": true,
+    "activationRequiresRuntimeCutover": true,
+    "artStudioMayWriteTargetRepository": false
+  },
+  "authority": {
+    "sourceRead": true,
+    "workspaceExportWrite": true,
+    "sourceMutation": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "forcePush": false,
+    "namedHumanApprovalRequired": true
+  }
+}
