@@ -10,6 +10,9 @@ on:
       - "scripts/check-persistent-artist-workspace-ingest.mjs"
       - "tools/project_art_workspace_mcp.mjs"
       - "tools/project_art_workspace_ingest_mcp.mjs"
+      - "tools/project_art_workspace_catalog_mcp.mjs"
+      - "scripts/check-persistent-artist-workspace-catalog.mjs"
+      - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
       - ".github/workflows/artist-workspace-agent-suite.yml"
   push:
     branches:
@@ -22,6 +25,9 @@ on:
       - "scripts/check-persistent-artist-workspace-ingest.mjs"
       - "tools/project_art_workspace_mcp.mjs"
       - "tools/project_art_workspace_ingest_mcp.mjs"
+      - "tools/project_art_workspace_catalog_mcp.mjs"
+      - "scripts/check-persistent-artist-workspace-catalog.mjs"
+      - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
       - ".github/workflows/artist-workspace-agent-suite.yml"
   workflow_dispatch:
 
@@ -35,7 +41,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - name: Check out exact source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

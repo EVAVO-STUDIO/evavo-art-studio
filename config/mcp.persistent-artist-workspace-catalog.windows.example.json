@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "evavo-project-art-workspace-catalog": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_catalog_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_PERSISTENT_CATALOG_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Requests",
+        "EVAVO_PERSISTENT_CATALOG_MCP_ALLOW_WRITE": "false"
+      }
+    }
+  }
+}
