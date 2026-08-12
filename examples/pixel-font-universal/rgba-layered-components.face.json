@@ -1,0 +1,310 @@
+{
+  "schema": "evavo.pixel-font-universal-face.v1",
+  "familyId": "universal-example",
+  "faceId": "universal-example-rgba-components",
+  "displayName": "Universal RGBA Components Example",
+  "version": "1.0.0",
+  "kind": "author-defined-rgba-icon-and-ornamental-face",
+  "styleTags": [
+    "rgba",
+    "icons",
+    "ornamental",
+    "components",
+    "anchors"
+  ],
+  "designIntent": "Direct RGBA, layered and component-composed glyph source in one face.",
+  "pixelMode": "rgba",
+  "metrics": {
+    "baseline": 7,
+    "ascent": 7,
+    "descent": 2,
+    "lineHeight": 10,
+    "capHeight": 7,
+    "xHeight": 5,
+    "spaceAdvance": 4
+  },
+  "coverage": {
+    "requiredCodepoints": [
+      32,
+      65,
+      769,
+      193,
+      9733,
+      9822,
+      65533
+    ]
+  },
+  "glyphs": [
+    {
+      "codepoint": 32,
+      "width": 3,
+      "height": 1,
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 4,
+      "pixels": [
+        [
+          null,
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "codepoint": 65,
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 6,
+      "anchors": {
+        "top": [
+          2,
+          0
+        ]
+      },
+      "pixels": [
+        [
+          null,
+          "#f4d58dff",
+          "#f4d58dff",
+          "#f4d58dff",
+          null
+        ],
+        [
+          "#f4d58dff",
+          null,
+          null,
+          null,
+          "#f4d58dff"
+        ],
+        [
+          "#f4d58dff",
+          null,
+          null,
+          null,
+          "#f4d58dff"
+        ],
+        [
+          "#f4d58dff",
+          "#f4d58dff",
+          "#f4d58dff",
+          "#f4d58dff",
+          "#f4d58dff"
+        ],
+        [
+          "#f4d58dff",
+          null,
+          null,
+          null,
+          "#f4d58dff"
+        ],
+        [
+          "#f4d58dff",
+          null,
+          null,
+          null,
+          "#f4d58dff"
+        ],
+        [
+          "#f4d58dff",
+          null,
+          null,
+          null,
+          "#f4d58dff"
+        ]
+      ]
+    },
+    {
+      "codepoint": 769,
+      "width": 3,
+      "height": 2,
+      "xOffset": 0,
+      "yOffset": -2,
+      "xAdvance": 0,
+      "anchors": {
+        "bottom": [
+          1,
+          1
+        ]
+      },
+      "layers": [
+        {
+          "colour": "#ffffffff",
+          "bitmap": [
+            "..#",
+            ".#."
+          ]
+        }
+      ]
+    },
+    {
+      "codepoint": 193,
+      "width": 5,
+      "height": 9,
+      "xOffset": 0,
+      "yOffset": -2,
+      "xAdvance": 6,
+      "anchors": {
+        "top": [
+          2,
+          2
+        ]
+      },
+      "components": [
+        {
+          "codepoint": 65
+        },
+        {
+          "codepoint": 769,
+          "sourceAnchor": "bottom",
+          "targetAnchor": "top"
+        }
+      ]
+    },
+    {
+      "codepoint": 9733,
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "pixels": [
+        [
+          null,
+          null,
+          "#ffffffff",
+          null,
+          null
+        ],
+        [
+          "#ff8800ff",
+          null,
+          "#ffdd00ff",
+          null,
+          "#ff8800ff"
+        ],
+        [
+          null,
+          "#ffdd00ff",
+          "#ffffffff",
+          "#ffdd00ff",
+          null
+        ],
+        [
+          null,
+          "#ff3300ff",
+          null,
+          "#ff3300ff",
+          null
+        ],
+        [
+          "#ff3300ff",
+          null,
+          null,
+          null,
+          "#ff3300ff"
+        ]
+      ]
+    },
+    {
+      "codepoint": 9822,
+      "width": 5,
+      "height": 5,
+      "xOffset": 0,
+      "yOffset": 1,
+      "xAdvance": 6,
+      "pixels": [
+        [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "layers": [
+        {
+          "colour": "#f2d59aff",
+          "bitmap": [
+            "..#..",
+            ".###.",
+            "#####",
+            ".###.",
+            "..#.."
+          ]
+        },
+        {
+          "colour": "#e63946ff",
+          "bitmap": [
+            ".....",
+            "..#..",
+            ".....",
+            ".....",
+            "....."
+          ]
+        }
+      ]
+    },
+    {
+      "codepoint": 65533,
+      "width": 5,
+      "height": 7,
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 6,
+      "pixels": [
+        [
+          "#ffffffff",
+          "#ffffffff",
+          "#ffffffff",
+          "#ffffffff",
+          "#ffffffff"
+        ],
+        [
+          "#ffffffff",
+          null,
+          null,
+          null,
+          "#ffffffff"
+        ],
+        [
+          null,
+          null,
+          null,
+          "#ffffffff",
+          null
+        ],
+        [
+          null,
+          null,
+          "#ffffffff",
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          "#ffffffff",
+          null,
+          null
+        ],
+        [
+          "#ffffffff",
+          "#ffffffff",
+          "#ffffffff",
+          "#ffffffff",
+          "#ffffffff"
+        ]
+      ]
+    }
+  ],
+  "kerning": []
+}

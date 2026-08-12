@@ -1,0 +1,15 @@
+{
+  "schema": "evavo.pixel-font-style-profile.v1",
+  "profileId": "duospace-cjk-ready",
+  "displayName": "Duospace CJK Ready",
+  "version": "1.0.0",
+  "description": "Preserves narrow cells while assigning East Asian wide/full-width scalars a double cell.",
+  "ink": "#ffffffff",
+  "background": "#00000000",
+  "padding": 1,
+  "spacing": {"mode": "duospace", "tracking": 0, "cellAdvance": 8, "wideAdvance": 16, "fixedCellWidth": 16, "fixedCellHeight": 16},
+  "operations": [],
+  "atlas": {"strategy": "fixed-grid", "maximumEdge": 1024, "padding": 1, "powerOfTwo": true, "allowMultiPage": true, "columns": 16, "cellWidth": 18, "cellHeight": 18},
+  "output": {"bmfont": true, "atlasJson": true, "gridSheet": true, "bdf": true, "ttf": false, "godotResource": true, "includeNormalisedFace": true, "godotResourceBasePath": "assets/fonts", "ttfPixelUnits": 64},
+  "strikes": [1, 2]
+}

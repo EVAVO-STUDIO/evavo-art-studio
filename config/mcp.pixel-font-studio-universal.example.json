@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "evavo-pixel-font-universal": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\scripts\\pixel-font-studio-universal-mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_PIXEL_FONT_UNIVERSAL_PYTHON": "python",
+        "EVAVO_PIXEL_FONT_UNIVERSAL_ALLOWED_ROOTS": "C:\\GitRepos\\evavo-art-studio\\config\\pixel-font-families;C:\\EVAVO\\pixel-font-builds",
+        "EVAVO_PIXEL_FONT_UNIVERSAL_MODE": "read-only",
+        "EVAVO_PIXEL_FONT_UNIVERSAL_ALLOW_WRITES": "false"
+      }
+    }
+  }
+}

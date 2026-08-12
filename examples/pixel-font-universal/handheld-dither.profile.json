@@ -1,0 +1,43 @@
+{
+  "atlas": {
+    "allowMultiPage": true,
+    "columns": 16,
+    "maximumEdge": 2048,
+    "padding": 1,
+    "powerOfTwo": true,
+    "strategy": "maxrects"
+  },
+  "background": "#00000000",
+  "description": "Deterministic handheld-dither starter profile.",
+  "displayName": "Handheld Dither",
+  "ink": "#ffffffff",
+  "operations": [
+    {
+      "alpha": 80,
+      "op": "mask",
+      "pattern": "bayer4",
+      "phase": 9
+    }
+  ],
+  "output": {
+    "atlasJson": true,
+    "bdf": true,
+    "bmfont": true,
+    "godotResource": true,
+    "godotResourceBasePath": "assets/fonts",
+    "gridSheet": true,
+    "includeNormalisedFace": true,
+    "ttf": false
+  },
+  "padding": 1,
+  "profileId": "handheld-dither",
+  "schema": "evavo.pixel-font-style-profile.v1",
+  "spacing": {
+    "mode": "preserve",
+    "tracking": 0
+  },
+  "strikes": [
+    1
+  ],
+  "version": "1.0.0"
+}
