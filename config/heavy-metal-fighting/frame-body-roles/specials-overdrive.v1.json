@@ -1,0 +1,15 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-role-group.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "groupId": "specials-overdrive",
+  "start": 150,
+  "end": 191,
+  "count": 42,
+  "banks": {
+    "special-a": {"roles": [["special-a-tell","startup"],["special-a-load-a","startup"],["special-a-load-b","startup"],["special-a-release","startup"],["special-a-active-entry","active"],["special-a-hero-impact","active"],["special-a-continuation","active"],["special-a-overshoot","active"],["special-a-vulnerable-recovery","recovery"],["special-a-return-bridge","recovery"]], "hero": 5, "contacts": [4,5,6,7], "hold": {"5":"hero","8":"long"}},
+    "special-b": {"roles": [["special-b-tell","startup"],["special-b-load-a","startup"],["special-b-load-b","startup"],["special-b-release","startup"],["special-b-active-entry","active"],["special-b-hero-impact","active"],["special-b-continuation","active"],["special-b-overshoot","active"],["special-b-vulnerable-recovery","recovery"],["special-b-return-bridge","recovery"]], "hero": 5, "contacts": [4,5,6,7], "hold": {"5":"hero","8":"long"}},
+    "reversal": {"roles": [["reversal-threat-read","startup"],["reversal-compression","startup"],["reversal-release","startup"],["reversal-active-entry","active"],["reversal-hero-contact","active"],["reversal-escape-or-overshoot","active"],["reversal-recoil","recovery"],["reversal-ready-bridge","recovery"]], "hero": 4, "contacts": [3,4,5], "hold": {"4":"hero"}},
+    "overdrive": {"roles": [["super-ready","startup"],["super-charge-a","startup"],["super-charge-b","startup"],["super-load","startup"],["super-release","startup"],["super-active-entry","active"],["super-primary-impact","active"],["super-continuation-a","active"],["super-continuation-b","active"],["super-secondary-impact","active"],["super-overshoot","active"],["super-recoil","recovery"],["super-vulnerable-recovery","recovery"],["super-ready-bridge","recovery"]], "hero": 6, "contacts": [5,6,7,8,9,10], "hold": {"6":"hero","9":"hero","12":"long"}}
+  }
+}

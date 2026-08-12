@@ -1,0 +1,17 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-role-group.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "groupId": "normals",
+  "start": 112,
+  "end": 149,
+  "count": 38,
+  "banks": {
+    "standing-light": {"roles": [["intent","startup"],["quick-load","startup"],["active-entry","active"],["hero-contact","active"],["quick-recovery","recovery"]], "hero": 3, "contacts": [2,3], "hold": {"3":"hero"}},
+    "standing-heavy": {"roles": [["anticipation","startup"],["deep-load","startup"],["release-commit","startup"],["active-entry","active"],["hero-impact","active"],["overshoot","active"],["recoil","recovery"],["vulnerable-recovery","recovery"]], "hero": 4, "contacts": [3,4,5], "hold": {"4":"hero","7":"long"}},
+    "crouching-light": {"roles": [["low-intent","startup"],["low-load","startup"],["low-active-entry","active"],["low-hero-contact","active"],["low-recovery","recovery"]], "hero": 3, "contacts": [2,3], "hold": {"3":"hero"}},
+    "crouching-heavy": {"roles": [["low-anticipation","startup"],["deep-low-load","startup"],["sweep-release","startup"],["low-active-entry","active"],["low-hero-impact","active"],["low-overshoot","active"],["low-recoil","recovery"],["low-vulnerable-recovery","recovery"]], "hero": 4, "contacts": [3,4,5], "hold": {"4":"hero","7":"long"}},
+    "jumping-light": {"roles": [["air-intent","startup"],["air-load","startup"],["air-active-entry","active"],["air-hero-contact","active"],["air-retract","recovery"]], "hero": 3, "contacts": [2,3], "hold": {"3":"hero"}},
+    "jumping-heavy": {"roles": [["air-anticipation","startup"],["air-commit","startup"],["air-active-entry","active"],["air-hero-impact","active"],["air-overshoot","active"],["air-retract","recovery"],["landing-ready","recovery"]], "hero": 3, "contacts": [2,3,4], "hold": {"3":"hero"}}
+  }
+}

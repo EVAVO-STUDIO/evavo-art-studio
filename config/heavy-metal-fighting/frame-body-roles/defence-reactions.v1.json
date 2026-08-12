@@ -1,0 +1,25 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-role-group.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "groupId": "defence-reactions",
+  "start": 39,
+  "end": 90,
+  "count": 52,
+  "banks": {
+    "guard-standing": {"roles": [["high-guard-lock","guard"],["high-guard-settle","guard"]], "hero": 0},
+    "guard-crouching": {"roles": [["low-guard-lock","guard"],["low-guard-settle","guard"]], "hero": 0},
+    "block-high": {"roles": [["high-contact-compression","contact"],["high-block-recoil","reaction"],["high-guard-return","recovery"]], "hero": 0, "contacts": [0], "hold": {"0":"hero"}},
+    "block-low": {"roles": [["low-contact-compression","contact"],["low-block-recoil","reaction"],["low-guard-return","recovery"]], "hero": 0, "contacts": [0], "hold": {"0":"hero"}},
+    "instant-block": {"roles": [["instant-brace","startup"],["instant-contact-lock","contact"],["instant-return","recovery"]], "hero": 1, "contacts": [1], "hold": {"1":"hero"}},
+    "guard-crush": {"roles": [["guard-failure-contact","contact"],["geometry-open","reaction"],["mass-recoil","reaction"],["vulnerable-stagger","recovery"],["unguarded-recovery","recovery"]], "hero": 1, "contacts": [0], "hold": {"1":"hero","3":"long"}},
+    "hit-light": {"roles": [["contact-nudge","contact"],["light-recoil","reaction"],["recoil-apex","reaction"],["light-recovery","recovery"]], "hero": 0, "contacts": [0], "hold": {"0":"hero"}},
+    "hit-heavy": {"roles": [["heavy-contact","contact"],["upper-mass-recoil","reaction"],["recoil-apex","reaction"],["balance-catch","reaction"],["heavy-recovery","recovery"]], "hero": 0, "contacts": [0], "hold": {"0":"hero","2":"medium"}},
+    "counter-stagger": {"roles": [["counter-contact","contact"],["punish-recoil","reaction"],["stagger-apex","reaction"],["balance-search","reaction"],["counter-recovery","recovery"]], "hero": 0, "contacts": [0], "hold": {"0":"hero","2":"medium"}},
+    "air-hit": {"roles": [["air-contact","contact"],["air-recoil","reaction"],["air-recoil-apex","reaction"],["air-recovery-set","recovery"]], "hero": 0, "contacts": [0], "hold": {"0":"hero"}},
+    "wall-impact": {"roles": [["wall-contact","contact"],["wall-compression","reaction"],["wall-rebound","reaction"],["wall-recovery-start","recovery"]], "hero": 0, "contacts": [0], "hold": {"0":"hero","1":"medium"}},
+    "knockdown-fall": {"roles": [["balance-break","reaction"],["fall-commit","reaction"],["rotation","reaction"],["floor-approach","reaction"],["first-floor-contact","contact"],["floor-rebound","reaction"],["floor-settle","recovery"]], "hero": 4, "contacts": [4], "hold": {"4":"hero","6":"long"}},
+    "grounded-hold": {"roles": [["grounded-stable-hold","hold"]], "hero": 0, "hold": {"0":"long"}},
+    "wakeup": {"roles": [["leverage-start","recovery"],["mass-lift","recovery"],["footing-reacquire","recovery"],["ready-return","recovery"]], "hero": 2, "hold": {"3":"medium"}}
+  }
+}

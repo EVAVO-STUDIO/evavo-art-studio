@@ -1,0 +1,17 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-role-group.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "groupId": "core-entrance-result",
+  "start": 192,
+  "end": 223,
+  "count": 32,
+  "banks": {
+    "system-down": {"roles": [["core-zero-warning","system"],["drive-loss","system"],["system-lock","system"],["deadweight-settle","system"],["system-down-hold","system"]], "hero": 2, "hold": {"4":"long"}},
+    "reignition": {"roles": [["restart-trigger","system"],["power-return","system"],["actuator-reengage","system"],["balance-reacquire","system"],["control-restored","system"]], "hero": 3},
+    "heat-vent": {"roles": [["vent-brace","system"],["vent-open","system"],["peak-cooling","system"],["vent-recover","system"]], "hero": 2, "hold": {"2":"medium"}},
+    "entrance": {"roles": [["cradle-lock","entrance"],["umbilical-release","entrance"],["weight-transfer","entrance"],["first-step","entrance"],["arena-square","entrance"],["fight-ready","entrance"]], "hero": 5, "hold": {"0":"medium","5":"long"}},
+    "victory": {"roles": [["victory-recognition","result"],["victory-shift","result"],["signature-victory","result"],["victory-settle","result"],["victory-hold","result"],["victory-loop-bridge","result"]], "hero": 2, "hold": {"2":"hero","4":"long"}},
+    "defeat": {"roles": [["defeat-failure","result"],["defeat-collapse","result"],["defeat-primary-settle","result"],["defeat-secondary-settle","result"],["defeat-hold","result"],["defeat-loop-bridge","result"]], "hero": 2, "hold": {"2":"hero","4":"long"}}
+  }
+}

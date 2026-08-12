@@ -1,0 +1,64 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-motion-realization.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "frames": {
+    "bastion": {
+      "motionIdentity": "hydraulic-weight",
+      "cadence": "heavy-held",
+      "bodyRules": [
+        "hips commit before the shoulder mass fully catches up",
+        "piston rods and forearm mass visibly finish force transfer",
+        "heels and anchor feet release late and settle last",
+        "hero impact reads as accumulated mass rather than a fast human punch"
+      ],
+      "recoveryRule": "pressure and linkage recoil are readable before the ready silhouette is recovered",
+      "fxSeparation": "pressure vent, piston exhaust, bore trails and furnace flare are separate FX"
+    },
+    "viper": {
+      "motionIdentity": "razor-snap",
+      "cadence": "fast-snap",
+      "bodyRules": [
+        "digitigrade legs preload and release like mechanical springs",
+        "contact is abrupt with deliberate overshoot rather than smooth interpolation",
+        "braking poses are as important as launch poses",
+        "low body mass stays coherent even when blades or afterimages extend the attack read"
+      ],
+      "recoveryRule": "hard brake and footing reacquisition must read before neutral is restored",
+      "fxSeparation": "blade arcs, electrical discharge, afterimages and brake sparks are separate FX"
+    },
+    "citadel": {
+      "motionIdentity": "containment-brace",
+      "cadence": "measured-brace",
+      "bodyRules": [
+        "setup is measured and visibly anchored",
+        "the containment side remains asymmetrically dominant",
+        "ground anchors and broad support geometry communicate force management",
+        "active poses hold structural authority instead of becoming loose human martial-arts silhouettes"
+      ],
+      "recoveryRule": "anchors, shield mass and torso alignment reset deliberately before ready",
+      "fxSeparation": "field rings, anchor shock, containment walls and pulse effects are separate FX"
+    },
+    "mirage": {
+      "motionIdentity": "phase-drift",
+      "cadence": "precise-drift",
+      "bodyRules": [
+        "the physical body remains one coherent chassis in every cel",
+        "false positions never replace the canonical physical body drawing",
+        "narrow body geometry changes direction precisely rather than smearing",
+        "integrated lance and prism vanes preserve mechanically plausible hinges through all phases"
+      ],
+      "recoveryRule": "the physical chassis resolves first; optical false-vector collapse is separate FX",
+      "fxSeparation": "optical echoes, null lines, phase seams and false-vector collapse are separate FX"
+    }
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticApproval": false,
+    "automaticPromotion": false,
+    "workOrderMutation": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "publication": false
+  }
+}

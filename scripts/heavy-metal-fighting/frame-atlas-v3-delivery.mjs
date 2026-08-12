@@ -6,6 +6,10 @@ import { fileURLToPath } from "node:url";
 import { secureFile, sha256File, validateTimestamp } from "../project-art/atlas-contract.mjs";
 import { buildHmfProductionBatchRegistry } from "./batch-registry.mjs";
 import { loadHmfArtProductionWorkspace } from "./art-production-workspace.mjs";
+import {
+  buildHmfFrameBodyRoleMap,
+  verifyHmfFrameBodyRoleGrammar,
+} from "./frame-body-role-grammar.mjs";
 import { heavyMetalFightingStyleProofExecutionStatus } from "./style-proof-plan.mjs";
 import {
   buildHmfProductionWorkOrderBatch,
@@ -107,10 +111,34 @@ function bodyBatchesForFrame(registry, frameId) {
     .filter((batch) => batch.familyId === "frame-animation" && batch.subjectId === frameId)
     .sort((left, right) => left.sequence - right.sequence);
 }
+function compactBodyRole(role) {
+  return freeze({
+    semanticId: role.semanticId,
+    roleId: role.roleId,
+    phase: role.phase,
+    hero: role.hero,
+    contactRole: role.contactRole,
+    holdPriority: role.holdPriority,
+  });
+}
+function frameMotionRealization(roleMap) {
+  const first = roleMap.slots[0];
+  assert(first, `${roleMap.frameId} role map has no slot zero.`);
+  return freeze({
+    motionIdentity: first.motionIdentity,
+    motionCadence: first.motionCadence,
+    bodyRules: first.bodyRules,
+    recoveryRule: first.recoveryRule,
+    fxSeparation: first.fxSeparation,
+  });
+}
 
 export async function buildHmfFrameAtlasV3Layout(frameIdInput) {
   const loaded = await loadContractAndAuthorities();
   const frameId = safeFrameId(frameIdInput, loaded.contract);
+  const roleMap = await buildHmfFrameBodyRoleMap(frameId);
+  assert(roleMap.frameId === frameId, `${frameId} body-role map resolved the wrong Frame.`);
+  assert(roleMap.slots.length === 224, `${frameId} body-role map must contain 224 authored roles.`);
   const batches = bodyBatchesForFrame(loaded.registry, frameId);
   assert(batches.length === 26, `${frameId} must resolve exactly 26 governed body-animation batches; found ${batches.length}.`);
   const units = batches.flatMap((batch) => batch.units.map((unit) => ({ batch, unit })));
@@ -124,6 +152,9 @@ export async function buildHmfFrameAtlasV3Layout(frameIdInput) {
     assert(unit.nativeDimensions?.width === 160 && unit.nativeDimensions?.height === 160, `${unit.id} lost 160x160 native dimensions.`);
     assert(unit.pivot?.x === 80 && unit.pivot?.y === 152, `${unit.id} lost pivot 80,152.`);
     assert(unit.masterOutputPath === `masters/frames/${frameId}/sprites/${path.posix.basename(unit.masterOutputPath)}`, `${unit.id} master path escaped the canonical Frame master root.`);
+    const bodyRole = roleMap.slots[unit.bodySlot];
+    assert(bodyRole?.slot === unit.bodySlot, `${unit.id} has no exact body-role binding.`);
+    assert(bodyRole.bankId === unit.bodyBankId, `${unit.id} bank ${unit.bodyBankId} disagrees with role bank ${bodyRole.bankId}.`);
     return freeze({
       slot: unit.bodySlot,
       row: Math.floor(unit.bodySlot / 16),
@@ -134,6 +165,7 @@ export async function buildHmfFrameAtlasV3Layout(frameIdInput) {
       height: 160,
       bankId: unit.bodyBankId,
       productionGroup: unit.productionGroup,
+      bodyRole: compactBodyRole(bodyRole),
       unitId: unit.id,
       batchId: batch.id,
       masterRelativePath: unit.masterOutputPath,
@@ -148,6 +180,9 @@ export async function buildHmfFrameAtlasV3Layout(frameIdInput) {
     frameId,
     registrySha256: loaded.registry.registrySha256,
     deliveryContractSha256: sha256Value(loaded.contract),
+    roleGrammarSha256: roleMap.grammarSha256,
+    roleMapSha256: roleMap.roleMapSha256,
+    frameMotionRealization: frameMotionRealization(roleMap),
     productionMaster: loaded.contract.productionMaster,
     bodyBatchIds: batches.map((batch) => batch.id),
     slots,
@@ -304,7 +339,10 @@ export async function compileHmfFrameAtlasV3DeliveryPlanFile(input, outputPath) 
 }
 
 export async function verifyHmfFrameAtlasV3Delivery() {
-  const loaded = await loadContractAndAuthorities();
+  const [loaded, bodyRoleVerification] = await Promise.all([
+    loadContractAndAuthorities(),
+    verifyHmfFrameBodyRoleGrammar(),
+  ]);
   const layouts = await Promise.all(loaded.contract.frames.map((frameId) => buildHmfFrameAtlasV3Layout(frameId)));
   const checks = [
     ["four-frames", layouts.length === 4],
@@ -316,6 +354,10 @@ export async function verifyHmfFrameAtlasV3Delivery() {
     ["pivot", layouts.every((layout) => layout.productionMaster.pivot.x === 80 && layout.productionMaster.pivot.y === 152)],
     ["26-body-batches", layouts.every((layout) => layout.bodyBatchIds.length === 26)],
     ["contiguous-slots", layouts.every((layout) => layout.slots.every((slot, index) => slot.slot === index))],
+    ["body-role-grammar", bodyRoleVerification.status === "passed" && bodyRoleVerification.roleBindings === 896],
+    ["body-role-bindings", layouts.every((layout) => layout.slots.every((slot) => typeof slot.bodyRole?.semanticId === "string" && slot.bodyRole.semanticId.length > 0))],
+    ["standing-heavy-hero-impact", layouts.every((layout) => layout.slots[121].bodyRole.semanticId === "standing-heavy:hero-impact" && layout.slots[121].bodyRole.hero === true)],
+    ["frame-motion-realization", layouts.every((layout) => typeof layout.frameMotionRealization?.motionIdentity === "string" && layout.frameMotionRealization.bodyRules?.length >= 4)],
     ["final-v3-target", layouts.every((layout) => layout.gameTargetPath === `res://assets/fighters/final-v3/${layout.frameId}.png`)],
     ["no-target-write", loaded.contract.authority.targetRepositoryMutation === false && loaded.contract.gameTarget.artStudioMayWriteTargetRepository === false],
     ["human-and-style-proof-gated", loaded.contract.authority.namedHumanApprovalRequired === true && loaded.contract.sourcePolicy.requiresCompleteStyleProof === true && loaded.contract.sourcePolicy.requiresDeliveryReadyReceiptChains === true],
@@ -324,7 +366,17 @@ export async function verifyHmfFrameAtlasV3Delivery() {
     schema: "evavo.heavy-metal-fighting-frame-atlas-v3-verification.v1",
     status: checks.every((check) => check.passed) ? "passed" : "failed",
     deliveryContractSha256: sha256Value(loaded.contract),
-    layouts: freeze(layouts.map((layout) => freeze({ frameId: layout.frameId, layoutSha256: layout.layoutSha256, bodyBatchCount: layout.bodyBatchIds.length, authoredSlots: layout.slots.length, gameTargetPath: layout.gameTargetPath }))),
+    bodyRoleVerification,
+    layouts: freeze(layouts.map((layout) => freeze({
+      frameId: layout.frameId,
+      layoutSha256: layout.layoutSha256,
+      roleGrammarSha256: layout.roleGrammarSha256,
+      roleMapSha256: layout.roleMapSha256,
+      motionIdentity: layout.frameMotionRealization.motionIdentity,
+      bodyBatchCount: layout.bodyBatchIds.length,
+      authoredSlots: layout.slots.length,
+      gameTargetPath: layout.gameTargetPath,
+    }))),
     checks,
     failed: checks.filter((check) => !check.passed),
     authority: loaded.contract.authority,

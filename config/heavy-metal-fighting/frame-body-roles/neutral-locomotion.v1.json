@@ -1,0 +1,24 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-role-group.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "groupId": "neutral-locomotion",
+  "start": 0,
+  "end": 38,
+  "count": 39,
+  "banks": {
+    "ready": {"roles": [["combat-ready-identity","hold"]], "hero": 0},
+    "idle": {"roles": [["settle-load","loop"],["micro-compression","loop"],["micro-release","loop"],["settle-return","loop"]], "hero": 0, "hold": {"0":"long","3":"long"}},
+    "walk-forward": {"roles": [["rear-contact","locomotion"],["forward-passing","locomotion"],["front-contact","locomotion"],["weight-transfer","locomotion"],["return-passing","locomotion"],["cycle-close","locomotion"]], "hero": 2, "hold": {"0":"medium","2":"medium"}},
+    "walk-back": {"roles": [["retreat-contact","locomotion"],["retreat-passing","locomotion"],["rearward-contact","locomotion"],["weight-check","locomotion"],["return-passing","locomotion"],["retreat-cycle-close","locomotion"]], "hero": 2, "hold": {"0":"medium","2":"medium"}},
+    "crouch-transition": {"roles": [["compression-entry","transition"],["low-lock","transition"]], "hero": 1},
+    "crouch-hold": {"roles": [["low-ready-hold","hold"]], "hero": 0},
+    "dash-forward": {"roles": [["burst-launch","locomotion"],["burst-travel","locomotion"],["hard-brake","locomotion"],["footing-recovery","locomotion"]], "hero": 1, "hold": {"1":"short","2":"medium"}},
+    "dash-back": {"roles": [["retreat-launch","locomotion"],["retreat-travel","locomotion"],["retreat-brake","locomotion"],["retreat-footing-recovery","locomotion"]], "hero": 1, "hold": {"1":"short","2":"medium"}},
+    "jump-launch": {"roles": [["launch-compression","transition"],["powered-release","transition"],["first-rise","air"]], "hero": 1},
+    "jump-rise": {"roles": [["rising-drive","air"],["rising-stabilise","air"]], "hero": 0},
+    "jump-apex": {"roles": [["apex-silhouette","air"]], "hero": 0, "hold": {"0":"medium"}},
+    "jump-fall": {"roles": [["descent-set","air"],["landing-prepare","air"]], "hero": 1},
+    "landing": {"roles": [["impact-compression","reaction"],["landing-settle","transition"],["landing-recovery","transition"]], "hero": 0, "hold": {"0":"medium"}}
+  }
+}

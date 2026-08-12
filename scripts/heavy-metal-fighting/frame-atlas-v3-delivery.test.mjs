@@ -12,6 +12,12 @@ import {
 } from "./frame-atlas-v3-delivery.mjs";
 
 const FRAMES = ["bastion", "viper", "citadel", "mirage"];
+const MOTION_IDENTITIES = {
+  bastion: "hydraulic-weight",
+  viper: "razor-snap",
+  citadel: "containment-brace",
+  mirage: "phase-drift",
+};
 
 test("frame atlas-v3 delivery covers all four 224-cel production masters without repacking semantics", async () => {
   const layouts = await Promise.all(FRAMES.map((frameId) => buildHmfFrameAtlasV3Layout(frameId)));
@@ -29,6 +35,12 @@ test("frame atlas-v3 delivery covers all four 224-cel production masters without
     assert.equal(layout.productionMaster.authoredSlotsPerFrame, 224);
     assert.equal(layout.slots.length, 224);
     assert.equal(layout.bodyBatchIds.length, 26);
+    assert.match(layout.roleGrammarSha256, /^[0-9a-f]{64}$/);
+    assert.match(layout.roleMapSha256, /^[0-9a-f]{64}$/);
+    assert.equal(layout.frameMotionRealization.motionIdentity, MOTION_IDENTITIES[layout.frameId]);
+    assert.ok(layout.frameMotionRealization.bodyRules.length >= 4);
+    assert.equal(typeof layout.frameMotionRealization.recoveryRule, "string");
+    assert.equal(typeof layout.frameMotionRealization.fxSeparation, "string");
     assert.deepEqual(layout.reservedSlots, Array.from({ length: 32 }, (_, index) => 224 + index));
     assert.equal(layout.gameTargetPath, `res://assets/fighters/final-v3/${layout.frameId}.png`);
     assert.equal(layout.authority.targetRepositoryMutation, false);
@@ -41,20 +53,38 @@ test("frame atlas-v3 delivery covers all four 224-cel production masters without
       assert.equal(slot.y, Math.floor(index / 16) * 160);
       assert.equal(slot.width, 160);
       assert.equal(slot.height, 160);
+      assert.equal(typeof slot.bodyRole.semanticId, "string");
+      assert.equal(typeof slot.bodyRole.roleId, "string");
+      assert.equal(typeof slot.bodyRole.phase, "string");
+      assert.equal(typeof slot.bodyRole.hero, "boolean");
+      assert.equal(typeof slot.bodyRole.contactRole, "boolean");
+      assert.equal(typeof slot.bodyRole.holdPriority, "string");
       assert.match(slot.masterRelativePath, new RegExp(`^masters/frames/${layout.frameId}/sprites/${layout.frameId}-`));
       assert.equal(allUnits.has(slot.unitId), false, `duplicate body unit ${slot.unitId}`);
       allUnits.add(slot.unitId);
     }
+    assert.equal(layout.slots[121].bodyRole.semanticId, "standing-heavy:hero-impact");
+    assert.equal(layout.slots[121].bodyRole.hero, true);
+    assert.equal(layout.slots[121].bodyRole.contactRole, true);
+    assert.equal(layout.slots[184].bodyRole.semanticId, "overdrive:super-primary-impact");
+    assert.equal(layout.slots[184].bodyRole.holdPriority, "hero");
+    assert.equal(layout.slots[192].bodyRole.semanticId, "system-down:core-zero-warning");
+    assert.equal(layout.slots[212].bodyRole.semanticId, "victory:victory-recognition");
+    assert.equal(layout.slots[223].bodyRole.semanticId, "defeat:defeat-loop-bridge");
   }
   assert.equal(allUnits.size, 896);
 });
 
-test("frame atlas-v3 delivery verification locks geometry, target path and authority boundary", async () => {
+test("frame atlas-v3 delivery verification locks geometry, role grammar, target path and authority boundary", async () => {
   const verification = await verifyHmfFrameAtlasV3Delivery();
   assert.equal(verification.status, "passed");
   assert.equal(verification.layouts.length, 4);
   assert.ok(verification.checks.every((check) => check.passed));
   assert.equal(verification.failed.length, 0);
+  assert.equal(verification.bodyRoleVerification.status, "passed");
+  assert.equal(verification.bodyRoleVerification.roleBindings, 896);
+  assert.equal(verification.layouts.find((layout) => layout.frameId === "bastion")?.motionIdentity, "hydraulic-weight");
+  assert.equal(verification.layouts.find((layout) => layout.frameId === "mirage")?.motionIdentity, "phase-drift");
   assert.equal(verification.authority.workspaceExportWrite, true);
   assert.equal(verification.authority.targetRepositoryMutation, false);
   assert.equal(verification.authority.publication, false);

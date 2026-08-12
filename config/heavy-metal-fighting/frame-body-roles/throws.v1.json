@@ -1,0 +1,15 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-role-group.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "groupId": "throws",
+  "start": 91,
+  "end": 111,
+  "count": 21,
+  "banks": {
+    "grab-whiff": {"roles": [["grab-intent","startup"],["miss-extension","active"],["whiff-recovery","recovery"]], "hero": 1},
+    "throw-attacker": {"roles": [["grab-intent","startup"],["secure-contact","contact"],["load-opponent","active"],["reposition","active"],["throw-commit","active"],["hero-release-or-slam","contact"],["throw-overshoot","recovery"],["throw-recoil","recovery"]], "hero": 5, "contacts": [1,5], "hold": {"1":"medium","5":"hero"}},
+    "throw-receiver": {"roles": [["receiver-contact","contact"],["receiver-loaded","reaction"],["receiver-displaced","reaction"],["receiver-release","reaction"],["receiver-impact","contact"],["receiver-recovery-start","recovery"]], "hero": 4, "contacts": [0,4], "hold": {"4":"hero"}},
+    "throw-break": {"roles": [["break-contact","contact"],["counter-force","active"],["separation","recovery"],["footing-recovery","recovery"]], "hero": 1, "contacts": [0], "hold": {"1":"hero"}}
+  }
+}
