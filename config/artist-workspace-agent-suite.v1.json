@@ -1,7 +1,7 @@
 {
   "schema": "evavo.artist-workspace-agent-suite.v1",
   "version": 1,
-  "description": "Canonical path-only MCP deployment for persistent project-art workspaces, exact external asset ingest and content-addressed workspace discovery.",
+  "description": "Canonical path-only MCP deployment for persistent project-art workspaces, exact external asset ingest, content-addressed workspace discovery and crash-resumable production checkpoints.",
   "configuration": "config/mcp.project-art-workspace.windows.example.json",
   "servers": [
     {
@@ -47,6 +47,21 @@
         "exact-duplicate-detection",
         "workspace-drift-verification"
       ]
+    },
+    {
+      "id": "evavo-project-art-workspace-jobs",
+      "entrypoint": "tools/project_art_workspace_jobs_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_WORKSPACE_JOB_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "workspace-job-capabilities",
+        "exact-job-plan-compilation",
+        "append-only-job-publication",
+        "lease-bounded-agent-claim",
+        "hash-chained-checkpoints",
+        "crash-resume-and-drift-verification"
+      ]
     }
   ],
   "flows": [
@@ -68,6 +83,19 @@
         "evavo_art_run_workspace_catalog",
         "evavo_art_query_workspace_catalog",
         "evavo_art_verify_workspace_catalog"
+      ]
+    },
+    {
+      "id": "resumable-persistent-workspace-production",
+      "steps": [
+        "evavo_art_workspace_job_capabilities",
+        "evavo_art_compile_workspace_job",
+        "evavo_art_create_workspace_job",
+        "evavo_art_inspect_workspace_job",
+        "evavo_art_checkpoint_workspace_job",
+        "bounded-existing-art-tool-from-ready-job-step",
+        "evavo_art_checkpoint_workspace_job",
+        "evavo_art_inspect_workspace_job"
       ]
     },
     {
