@@ -191,3 +191,7 @@ After externally authorised candidate production and review evidence exists, a l
 HEAVY METAL FIGHTING has a long art campaign. The risk is not only bad single images; it is gradual drift across hundreds of separate outputs.
 
 This surface makes every agent interaction resolve back to the same hashes, Frame/Pilot identity, 1990s style contract, batch boundaries, work-order paths and receipt history. Bastion's later attack cel therefore remains tied to the same construction and material logic as his first style-proof pose, and a repaired image cannot silently force regeneration of nine passing siblings.
+
+## Repository hygiene
+
+The production surface is represented only by governed source, configuration, documentation, tests and CI evidence. Temporary staging markers, provider candidates, generated review artifacts and receipt journals do not belong in the repository tree. Runtime production state stays in the persistent Artist Workspace and evidence channels defined by the work-order contract; Git remains source authority rather than a scratch filesystem.
