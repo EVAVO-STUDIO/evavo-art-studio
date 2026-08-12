@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 export const LAYERED_GODOT_REPOSITORY_REVIEW_PROTOCOL_VERSION = "2026-08-12.1";
 export const LAYERED_GODOT_REPOSITORY_REVIEW_RECEIPT_KIND =
   "evavo.layered-production.godot-repository-review-receipt";
-export const EXPECTED_HANDOFF_GATE_PROTOCOL_VERSION = "2026-08-12.1";
+export const EXPECTED_HANDOFF_GATE_PROTOCOL_VERSION = "2026-08-13.1";
 export const EXPECTED_HANDOFF_GATE_RECEIPT_KIND =
   "evavo.layered-production.godot-handoff-gate-receipt";
 export const MAXIMUM_REVIEW_INPUT_BYTES = 32 * 1024 * 1024;
