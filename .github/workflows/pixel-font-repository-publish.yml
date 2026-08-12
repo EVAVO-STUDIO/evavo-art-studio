@@ -1,0 +1,181 @@
+name: Publish pixel fonts to an EVAVO repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_path:
+        description: Reviewed Art Studio repository-delivery job path
+        required: true
+        type: string
+      target_repository:
+        description: Target owner/repository
+        required: true
+        type: string
+      target_branch:
+        description: Exact target base branch
+        required: true
+        default: main
+        type: string
+      expected_target_head:
+        description: Exact 40-character target branch SHA
+        required: true
+        type: string
+      publish_mode:
+        description: Safe branch publication or explicitly allowlisted direct main
+        required: true
+        default: branch
+        type: choice
+        options:
+          - branch
+          - direct-main
+      publish_branch:
+        description: Branch name when publish_mode is branch
+        required: false
+        type: string
+      confirmation:
+        description: Type PUBLISH to authorize target checkout mutation and normal push
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      job_path:
+        required: true
+        type: string
+      target_repository:
+        required: true
+        type: string
+      target_branch:
+        required: true
+        type: string
+      expected_target_head:
+        required: true
+        type: string
+      publish_mode:
+        required: true
+        type: string
+      publish_branch:
+        required: false
+        type: string
+      confirmation:
+        required: true
+        type: string
+    secrets:
+      repository_token:
+        required: false
+      EVAVO_PIXEL_FONT_REPOSITORY_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pixel-font-publish-${{ inputs.target_repository }}-${{ inputs.target_branch }}
+  cancel-in-progress: false
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONHASHSEED: "0"
+  PYTHONDONTWRITEBYTECODE: "1"
+  SOURCE_DATE_EPOCH: "1577836800"
+  TARGET_TOKEN: ${{ secrets.repository_token || secrets.EVAVO_PIXEL_FONT_REPOSITORY_TOKEN }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Require explicit publication confirmation and token
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.confirmation }}" = "PUBLISH"
+          test -n "$TARGET_TOKEN"
+          [[ "${{ inputs.expected_target_head }}" =~ ^[0-9a-f]{40}$ ]]
+          test "${{ inputs.publish_mode }}" = "branch" -o "${{ inputs.publish_mode }}" = "direct-main"
+          target_slug="${{ inputs.target_repository }}"
+          echo "target_slug=${target_slug//\//-}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact Art Studio automation source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          path: art-studio
+          persist-credentials: false
+
+      - name: Check out exact target repository head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ inputs.target_repository }}
+          ref: ${{ inputs.expected_target_head }}
+          token: ${{ secrets.repository_token || secrets.EVAVO_PIXEL_FONT_REPOSITORY_TOKEN }}
+          path: target
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: "pip"
+          cache-dependency-path: art-studio/requirements/pixel-font-universal.txt
+
+      - name: Install exact font compiler dependency
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r art-studio/requirements/pixel-font-universal.txt
+          python - <<'PY'
+          import fontTools
+          assert fontTools.__version__ == "4.63.0", fontTools.__version__
+          PY
+
+      - name: Verify target identity and configure commit author
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C target rev-parse HEAD)" = "${{ inputs.expected_target_head }}"
+          test -z "$(git -C target status --porcelain=v1 --untracked-files=all)"
+          git -C target config user.name "EVAVO Pixel Font Delivery"
+          git -C target config user.email "evavo.studio@gmail.com"
+
+      - name: Compile, install, validate, commit and normally push
+        shell: bash
+        run: |
+          set -euo pipefail
+          job="$GITHUB_WORKSPACE/art-studio/${{ inputs.job_path }}"
+          art_root="$GITHUB_WORKSPACE/art-studio"
+          case "$(realpath "$job")" in
+            "$art_root"/*) ;;
+            *) echo "job_path escapes Art Studio" >&2; exit 2 ;;
+          esac
+          args=(
+            run
+            --job "$job"
+            --target-root "$GITHUB_WORKSPACE/target"
+            --allowlist "$art_root/config/pixel-font-repository-allowlist.v1.json"
+            --expected-head "${{ inputs.expected_target_head }}"
+            --repository "${{ inputs.target_repository }}"
+            --branch "${{ inputs.target_branch }}"
+            --publish-mode "${{ inputs.publish_mode }}"
+            --confirm-publish
+          )
+          if test -n "${{ inputs.publish_branch }}"; then
+            args+=(--publish-branch "${{ inputs.publish_branch }}")
+          fi
+          node "$art_root/scripts/pixel-font-repository-delivery.mjs" "${args[@]}" \
+            | tee "$RUNNER_TEMP/pixel-font-repository-publication.json"
+          test -z "$(git -C target status --porcelain=v1 --untracked-files=all)"
+
+      - name: Retain exact publication receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pixel-font-publication-${{ steps.guard.outputs.target_slug }}-${{ inputs.expected_target_head }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: ${{ runner.temp }}/pixel-font-repository-publication.json
