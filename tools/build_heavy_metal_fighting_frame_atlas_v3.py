@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -23,6 +24,7 @@ COLUMNS = 16
 AUTHORED_SLOTS = 224
 TOTAL_SLOTS = 256
 RESERVED_START = 224
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 def fail(message: str) -> None:
@@ -55,7 +57,7 @@ def write_json(path: Path, value: dict[str, Any]) -> None:
 
 def require_regular_file(path: Path, label: str) -> Path:
     try:
-        info = path.lstat()
+        path.lstat()
     except FileNotFoundError:
         fail(f"{label} does not exist: {path}")
     if path.is_symlink() or not path.is_file():
@@ -84,7 +86,7 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
     if plan.get("schema") != PLAN_SCHEMA:
         fail(f"plan schema must be {PLAN_SCHEMA}")
     supplied_hash = plan.get("planSha256")
-    if not isinstance(supplied_hash, str) or len(supplied_hash) != 64:
+    if not isinstance(supplied_hash, str) or not SHA256_PATTERN.fullmatch(supplied_hash):
         fail("planSha256 is missing or malformed")
     body = dict(plan)
     body.pop("planSha256", None)
@@ -124,6 +126,12 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
             fail(f"slot {index} pixel placement drifted")
         if source.get("width") != CELL[0] or source.get("height") != CELL[1]:
             fail(f"slot {index} dimensions drifted")
+        if not SHA256_PATTERN.fullmatch(str(source.get("headReceiptSha256") or "")):
+            fail(f"slot {index} is missing a valid delivery-ready receipt-chain head")
+        if not SHA256_PATTERN.fullmatch(str(source.get("workOrderSha256") or "")):
+            fail(f"slot {index} is missing a valid work-order SHA-256")
+        if not SHA256_PATTERN.fullmatch(str(source.get("sourceSha256") or "")):
+            fail(f"slot {index} is missing a valid source SHA-256")
     if plan.get("reservedSlots") != list(range(RESERVED_START, TOTAL_SLOTS)):
         fail("plan reserved slots must be exactly 224-255")
     game_target = plan.get("gameTarget") or {}
@@ -228,13 +236,7 @@ def execute(plan: dict[str, Any], output_root: Path) -> dict[str, Any]:
                 "batchId": source["batchId"],
                 "workOrderSha256": source["workOrderSha256"],
                 "sourceSha256": source["sourceSha256"],
-                "headReceiptSha256": next(
-                    evidence["headReceiptSha256"][i]
-                    for evidence in plan["batchEvidence"]
-                    if evidence["batchId"] == source["batchId"]
-                    for i, item in enumerate([s for s in plan["sources"] if s["batchId"] == source["batchId"]])
-                    if item["unitId"] == source["unitId"]
-                ),
+                "headReceiptSha256": source["headReceiptSha256"],
             })
         if not reserved_region_is_transparent(atlas):
             fail("reserved slots 224-255 are not fully transparent before encoding")

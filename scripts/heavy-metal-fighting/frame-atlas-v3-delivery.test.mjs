@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -7,6 +7,7 @@ import test from "node:test";
 import {
   buildHmfFrameAtlasV3Layout,
   compileHmfFrameAtlasV3DeliveryPlan,
+  validateHmfFrameAtlasV3MasterRoot,
   verifyHmfFrameAtlasV3Delivery,
 } from "./frame-atlas-v3-delivery.mjs";
 
@@ -61,7 +62,9 @@ test("frame atlas-v3 delivery verification locks geometry, target path and autho
 
 test("final atlas plan compilation refuses to proceed before the governed style proof is complete", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "hmf-atlas-v3-incomplete-style-proof-"));
+  const masterRoot = path.join(root, "masters", "frames", "bastion", "sprites");
   try {
+    await mkdir(masterRoot, { recursive: true });
     await assert.rejects(
       compileHmfFrameAtlasV3DeliveryPlan({
         frameId: "bastion",
@@ -78,13 +81,32 @@ test("final atlas plan compilation refuses to proceed before the governed style 
   }
 });
 
-test("fixed-grid Python builder keeps 224 authored cells, transparent reserve and no game mutation authority", async () => {
+test("Frame master root must be a real directory inside the persistent workspace", { skip: process.platform === "win32" }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "hmf-atlas-v3-master-root-"));
+  const external = await mkdtemp(path.join(os.tmpdir(), "hmf-atlas-v3-external-master-"));
+  const frameParent = path.join(root, "masters", "frames", "bastion");
+  try {
+    await mkdir(frameParent, { recursive: true });
+    await symlink(external, path.join(frameParent, "sprites"), "dir");
+    await assert.rejects(
+      validateHmfFrameAtlasV3MasterRoot(root, "bastion"),
+      /non-symlink directory/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(external, { recursive: true, force: true });
+  }
+});
+
+test("fixed-grid Python builder keeps 224 authored cells, direct receipt evidence, transparent reserve and no game mutation authority", async () => {
   const source = await readFile(new URL("../../tools/build_heavy_metal_fighting_frame_atlas_v3.py", import.meta.url), "utf8");
   assert.match(source, /AUTHORED_SLOTS = 224/);
   assert.match(source, /TOTAL_SLOTS = 256/);
   assert.match(source, /RESERVED_START = 224/);
   assert.match(source, /ATLAS = \(2560, 2560\)/);
   assert.match(source, /CELL = \(160, 160\)/);
+  assert.match(source, /headReceiptSha256/);
+  assert.match(source, /source\["headReceiptSha256"\]/);
   assert.match(source, /image\.mode != "RGBA"/);
   assert.match(source, /transparent cell corners/);
   assert.match(source, /reserved_region_is_transparent/);

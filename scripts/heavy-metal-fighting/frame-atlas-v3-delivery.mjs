@@ -20,6 +20,7 @@ export const HMF_FRAME_ATLAS_V3_PROTOCOL_VERSION = "2026-08-12.1";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "../..");
 const CONTRACT_PATH = path.join(ROOT, "config", "heavy-metal-fighting", "frame-atlas-v3-delivery-contract.v1.json");
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 function fail(message) {
   throw new Error(`HEAVY_METAL_FIGHTING_FRAME_ATLAS_V3_INVALID: ${message}`);
@@ -49,6 +50,10 @@ function safeFrameId(value, contract) {
   const frameId = String(value ?? "").trim().toLowerCase();
   assert(contract.frames.includes(frameId), `frameId must be one of ${contract.frames.join(", ")}.`);
   return frameId;
+}
+function pathIsWithin(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 async function readStableJson(filePath, label) {
   const before = await lstat(filePath);
@@ -161,6 +166,18 @@ async function validatedWorkspaceRoot(workspaceRoot) {
   return realpath(root);
 }
 
+export async function validateHmfFrameAtlasV3MasterRoot(workspaceRoot, frameIdInput) {
+  const loaded = await loadContractAndAuthorities();
+  const frameId = safeFrameId(frameIdInput, loaded.contract);
+  const workspaceReal = await validatedWorkspaceRoot(workspaceRoot);
+  const candidate = path.join(workspaceReal, "masters", "frames", frameId, "sprites");
+  const info = await lstat(candidate).catch(() => null);
+  assert(info?.isDirectory() && !info.isSymbolicLink(), `canonical master directory must be an existing non-symlink directory for ${frameId}.`);
+  const masterRoot = await realpath(candidate);
+  assert(pathIsWithin(workspaceReal, masterRoot), `canonical master directory escaped the persistent Artist Workspace for ${frameId}.`);
+  return freeze({ frameId, workspaceRoot: workspaceReal, masterRoot });
+}
+
 export async function compileHmfFrameAtlasV3DeliveryPlan({
   frameId,
   workspaceRoot,
@@ -172,16 +189,18 @@ export async function compileHmfFrameAtlasV3DeliveryPlan({
   assert(Array.isArray(frameReceipts), "frameReceipts must be an array.");
   assert(Array.isArray(styleProofApprovalRecords), "styleProofApprovalRecords must be an array.");
   assert(Array.isArray(styleProofReceipts), "styleProofReceipts must be an array.");
-  const [layout, loaded, styleProofStatus, workspaceReal] = await Promise.all([
+  const [layout, loaded, styleProofStatus, masterRootStatus] = await Promise.all([
     buildHmfFrameAtlasV3Layout(frameId),
     loadContractAndAuthorities(),
     heavyMetalFightingStyleProofExecutionStatus({ approvalRecords: styleProofApprovalRecords, receipts: styleProofReceipts }),
-    validatedWorkspaceRoot(workspaceRoot),
+    validateHmfFrameAtlasV3MasterRoot(workspaceRoot, frameId),
   ]);
   assert(styleProofStatus.status === "complete" && styleProofStatus.activePhaseId === null, `style proof must be complete before final Frame atlas assembly; current status ${styleProofStatus.status}.`);
+  assert(masterRootStatus.frameId === layout.frameId, "validated master-root Frame id drifted from atlas layout.");
 
   const batchEvidence = [];
   const workOrderMap = new Map();
+  const receiptHeadByUnitId = new Map();
   for (const batchId of layout.bodyBatchIds) {
     const receipts = frameReceipts.filter((receipt) => receipt.batchId === batchId);
     const [resume, bundle] = await Promise.all([
@@ -189,24 +208,32 @@ export async function compileHmfFrameAtlasV3DeliveryPlan({
       buildHmfProductionWorkOrderBatch(batchId),
     ]);
     assert(resume.status === "delivery-ready" && resume.completedUnits === resume.totalUnits, `${batchId} is not delivery-ready.`);
+    const unitReceiptHeads = resume.unitStates.map((state) => {
+      assert(state.complete === true && SHA256_PATTERN.test(String(state.headReceiptSha256 ?? "")), `${state.unitId} is missing a valid delivery-ready receipt-chain head.`);
+      assert(!receiptHeadByUnitId.has(state.unitId), `${state.unitId} receipt-chain head is duplicated across body batches.`);
+      receiptHeadByUnitId.set(state.unitId, state.headReceiptSha256);
+      return freeze({ unitId: state.unitId, headReceiptSha256: state.headReceiptSha256 });
+    });
     batchEvidence.push(freeze({
       batchId,
       workOrderBatchSha256: bundle.workOrderBatchSha256,
       completedUnits: resume.completedUnits,
-      headReceiptSha256: resume.unitStates.map((state) => state.headReceiptSha256),
+      unitReceiptHeads: freeze(unitReceiptHeads),
     }));
     for (const order of bundle.workOrders) workOrderMap.set(order.unitId, order);
   }
   assert(workOrderMap.size === 224, `expected 224 work orders for ${layout.frameId}; found ${workOrderMap.size}.`);
+  assert(receiptHeadByUnitId.size === 224, `expected 224 receipt-chain heads for ${layout.frameId}; found ${receiptHeadByUnitId.size}.`);
 
   const sources = [];
-  const allowedMasterRoot = await realpath(path.join(workspaceReal, "masters", "frames", layout.frameId, "sprites")).catch(() => null);
-  assert(allowedMasterRoot, `canonical master directory does not exist for ${layout.frameId}.`);
+  const allowedMasterRoot = masterRootStatus.masterRoot;
   for (const slot of layout.slots) {
     const order = workOrderMap.get(slot.unitId);
     assert(order, `missing work order for ${slot.unitId}.`);
     assert(order.assetContract.masterOutputPath === slot.masterRelativePath, `${slot.unitId} layout/master work-order path drifted.`);
-    const absoluteSource = path.resolve(workspaceReal, ...slot.masterRelativePath.split("/"));
+    const headReceiptSha256 = receiptHeadByUnitId.get(slot.unitId);
+    assert(SHA256_PATTERN.test(String(headReceiptSha256 ?? "")), `${slot.unitId} has no bound receipt-chain head.`);
+    const absoluteSource = path.resolve(masterRootStatus.workspaceRoot, ...slot.masterRelativePath.split("/"));
     const verified = await secureFile(absoluteSource, [allowedMasterRoot], `${slot.unitId}.master`);
     sources.push(freeze({
       slot: slot.slot,
@@ -221,6 +248,7 @@ export async function compileHmfFrameAtlasV3DeliveryPlan({
       unitId: slot.unitId,
       batchId: slot.batchId,
       workOrderSha256: order.workOrderSha256,
+      headReceiptSha256,
       masterRelativePath: slot.masterRelativePath,
       sourcePath: verified.resolved,
       sourceBytes: verified.size,
@@ -242,7 +270,7 @@ export async function compileHmfFrameAtlasV3DeliveryPlan({
     deliveryContractSha256: layout.deliveryContractSha256,
     styleProofExecutionSha256: styleProofStatus.styleProofExecutionSha256,
     styleProofApproval: finalApproval,
-    workspaceRoot: workspaceReal,
+    workspaceRoot: masterRootStatus.workspaceRoot,
     allowedSourceRoot: allowedMasterRoot,
     productionMaster: loaded.contract.productionMaster,
     sources: freeze(sources),

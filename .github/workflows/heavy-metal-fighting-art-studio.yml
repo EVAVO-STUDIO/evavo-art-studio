@@ -85,7 +85,7 @@ jobs:
           node --check scripts/heavy-metal-fighting-art-studio.test.mjs
           node --check scripts/heavy-metal-fighting-production-design.test.mjs
           node --check scripts/game-art-campaign-heavy-metal-fighting.test.mjs
-          python3 -m py_compile tools/build_heavy_metal_fighting_frame_atlas_v3.py
+          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/python-bytecode" python3 -m py_compile tools/build_heavy_metal_fighting_frame_atlas_v3.py
       - name: Run governed HMF campaign, mechanical, sprite, design, workspace, work-order, atlas and MCP tests
         run: |
           node --test \
@@ -138,7 +138,11 @@ jobs:
       - name: Prove source tree remains clean
         run: |
           git diff --exit-code
-          test -z "$(git status --porcelain)"
+          STATUS="$(git status --porcelain=v1)"
+          if [ -n "$STATUS" ]; then
+            printf 'Unexpected validation byproducts:\n%s\n' "$STATUS" >&2
+            exit 1
+          fi
       - name: Upload exact Art Studio evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
