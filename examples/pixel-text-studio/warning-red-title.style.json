@@ -1,0 +1,80 @@
+{
+  "animation": {
+    "fps": 8,
+    "frames": 4,
+    "loop": true,
+    "motions": [
+      {
+        "op": "blink",
+        "pattern": [
+          255,
+          205,
+          255,
+          235
+        ]
+      }
+    ]
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic warning-red-title pixel text/title starter treatment.",
+  "displayName": "Warning Red Title",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "vertical",
+      "bandHeight": 0,
+      "colours": [
+        "#ffd08dff",
+        "#ff6c45ff",
+        "#b51e2fff",
+        "#671525ff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "colour": "#17080dff",
+      "connectivity": 8,
+      "op": "outline",
+      "radius": 1
+    },
+    {
+      "colours": [
+        "#69151fff",
+        "#2c0b13ff"
+      ],
+      "depth": 2,
+      "dx": 1,
+      "dy": 1,
+      "op": "extrude"
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "warning-red-title"
+}

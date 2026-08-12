@@ -1,0 +1,57 @@
+{
+  "animation": {
+    "fps": 8,
+    "frames": 1,
+    "loop": true,
+    "motions": []
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic strategy-ui-emboss pixel text/title starter treatment.",
+  "displayName": "Strategy Ui Emboss",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "colour": "#08050dcc",
+      "dx": 1,
+      "dy": 1,
+      "op": "shadow"
+    },
+    {
+      "colour": "#d7c49aff",
+      "op": "recolour"
+    },
+    {
+      "colour": "#fff0c7ff",
+      "dx": -1,
+      "dy": -1,
+      "op": "highlight"
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "strategy-ui-emboss"
+}

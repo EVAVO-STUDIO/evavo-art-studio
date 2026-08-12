@@ -1,0 +1,59 @@
+{
+  "animation": {
+    "fps": 8,
+    "frames": 1,
+    "loop": true,
+    "motions": []
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic cga-menu pixel text/title starter treatment.",
+  "displayName": "Cga Menu",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "horizontal",
+      "bandHeight": 2,
+      "colours": [
+        "#55ffffff",
+        "#ff55ffff",
+        "#ffffffff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "colour": "#000000ff",
+      "connectivity": 4,
+      "op": "outline",
+      "radius": 1
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "cga-menu"
+}

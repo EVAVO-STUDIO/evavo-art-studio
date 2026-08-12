@@ -1,0 +1,73 @@
+{
+  "animation": {
+    "fps": 8,
+    "frames": 1,
+    "loop": true,
+    "motions": []
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic stone-carved-title pixel text/title starter treatment.",
+  "displayName": "Stone Carved Title",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "vertical",
+      "bandHeight": 0,
+      "colours": [
+        "#d8cfb4ff",
+        "#a99b7cff",
+        "#716650ff",
+        "#9d8c70ff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "dx": -1,
+      "dy": -1,
+      "highlight": "#eee4c9ff",
+      "op": "bevel",
+      "shadow": "#403a31ff"
+    },
+    {
+      "colour": "#201d19ff",
+      "connectivity": 8,
+      "op": "outline",
+      "radius": 1
+    },
+    {
+      "colour": "#0d0b09cc",
+      "dx": 2,
+      "dy": 2,
+      "op": "shadow"
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "stone-carved-title"
+}

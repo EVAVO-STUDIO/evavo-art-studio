@@ -1,0 +1,79 @@
+{
+  "animation": {
+    "fps": 8,
+    "frames": 1,
+    "loop": true,
+    "motions": []
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic arcade-chrome-title pixel text/title starter treatment.",
+  "displayName": "Arcade Chrome Title",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "vertical",
+      "bandHeight": 0,
+      "colours": [
+        "#dceeffff",
+        "#7aa2c8ff",
+        "#f8fbffff",
+        "#3f678fff",
+        "#bcd2e6ff",
+        "#263c59ff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "dx": -1,
+      "dy": -1,
+      "highlight": "#ffffffff",
+      "op": "bevel",
+      "shadow": "#10243cff"
+    },
+    {
+      "colour": "#05070cff",
+      "connectivity": 8,
+      "op": "outline",
+      "radius": 1
+    },
+    {
+      "colours": [
+        "#29466aff",
+        "#09101cff"
+      ],
+      "depth": 2,
+      "dx": 1,
+      "dy": 1,
+      "op": "extrude"
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "arcade-chrome-title"
+}

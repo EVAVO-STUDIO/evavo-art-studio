@@ -1,0 +1,74 @@
+{
+  "animation": {
+    "fps": 8,
+    "frames": 8,
+    "loop": true,
+    "motions": [
+      {
+        "alpha": 235,
+        "colour": "#ffffffff",
+        "op": "shine",
+        "slope": -1,
+        "width": 1
+      }
+    ]
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic ice-rune-title pixel text/title starter treatment.",
+  "displayName": "Ice Rune Title",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "vertical",
+      "bandHeight": 0,
+      "colours": [
+        "#ffffffff",
+        "#c6f4ffff",
+        "#6fc7e9ff",
+        "#3976a8ff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "colour": "#102743ff",
+      "connectivity": 8,
+      "op": "outline",
+      "radius": 1
+    },
+    {
+      "colour": "#071426cc",
+      "dx": 2,
+      "dy": 2,
+      "op": "shadow"
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "ice-rune-title"
+}

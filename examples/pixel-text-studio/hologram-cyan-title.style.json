@@ -1,0 +1,79 @@
+{
+  "animation": {
+    "fps": 12,
+    "frames": 8,
+    "loop": true,
+    "motions": [
+      {
+        "op": "jitter",
+        "seed": "hologram-cyan",
+        "x": 1,
+        "y": 0
+      },
+      {
+        "alpha": 180,
+        "colour": "#ffffffff",
+        "op": "shine",
+        "slope": 1,
+        "width": 1
+      }
+    ]
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic hologram-cyan-title pixel text/title starter treatment.",
+  "displayName": "Hologram Cyan Title",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "vertical",
+      "bandHeight": 0,
+      "colours": [
+        "#d9ffffff",
+        "#5ee9ffff",
+        "#2a9fcdff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "colour": "#061821ff",
+      "connectivity": 8,
+      "op": "outline",
+      "radius": 1
+    },
+    {
+      "alpha": 200,
+      "op": "mask",
+      "pattern": "scanline",
+      "phase": 0
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "hologram-cyan-title"
+}

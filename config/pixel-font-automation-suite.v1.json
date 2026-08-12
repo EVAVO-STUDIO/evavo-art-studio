@@ -1,0 +1,109 @@
+{
+  "schema": "evavo.pixel-font-automation-suite.v1",
+  "version": 1,
+  "description": "Canonical path-only ChatGPT and Claude deployment for style-neutral pixel-font creation, 1990s-ready pixel text/title rendering, deterministic multi-format builds, transactional target-repository installation and separately gated normal Git publication.",
+  "configuration": "config/mcp.pixel-font-automation.windows.example.json",
+  "servers": [
+    {
+      "id": "evavo-pixel-font-universal",
+      "entrypoint": "scripts/pixel-font-studio-universal-mcp.mjs",
+      "sourceRootsEnvironment": "EVAVO_PIXEL_FONT_UNIVERSAL_ALLOWED_ROOTS",
+      "writeGateEnvironment": "EVAVO_PIXEL_FONT_UNIVERSAL_ALLOW_WRITES",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "style-and-format-catalogue",
+        "face-and-profile-validation",
+        "starter-profile-generation",
+        "create-only-multi-format-compilation",
+        "output-validation",
+        "deterministic-build-comparison"
+      ]
+    },
+    {
+      "id": "evavo-pixel-text-studio",
+      "entrypoint": "scripts/pixel-text-studio-mcp.mjs",
+      "sourceRootsEnvironment": "EVAVO_PIXEL_TEXT_STUDIO_ALLOWED_ROOTS",
+      "writeGateEnvironment": "EVAVO_PIXEL_TEXT_STUDIO_ALLOW_WRITES",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "text-style-catalogue",
+        "style-validation",
+        "starter-title-treatments",
+        "create-only-static-and-animated-rendering",
+        "output-validation",
+        "deterministic-build-comparison"
+      ]
+    },
+    {
+      "id": "evavo-pixel-font-repository-delivery",
+      "entrypoint": "scripts/pixel-font-repository-delivery-mcp.mjs",
+      "sourceRootsEnvironment": "EVAVO_PIXEL_FONT_DELIVERY_SOURCE_ROOTS",
+      "targetRootsEnvironment": "EVAVO_PIXEL_FONT_DELIVERY_TARGET_ROOTS",
+      "allowlistEnvironment": "EVAVO_PIXEL_FONT_DELIVERY_ALLOWLIST",
+      "writeGateEnvironment": "EVAVO_PIXEL_FONT_DELIVERY_ALLOW_WRITES",
+      "gitPublishGateEnvironment": "EVAVO_PIXEL_FONT_DELIVERY_ALLOW_GIT_PUBLISH",
+      "defaultWriteEnabled": false,
+      "defaultGitPublishEnabled": false,
+      "toolGroups": [
+        "repository-delivery-catalogue",
+        "delivery-job-validation",
+        "create-only-delivery-planning",
+        "transactional-owned-file-installation",
+        "installation-verification",
+        "exact-normal-git-publication"
+      ]
+    }
+  ],
+  "supportedBuildInputs": [
+    "Universal v3 compile from reviewed face and profile",
+    "existing exact Universal v3 build",
+    "Pixel Font Studio v2 family with exact pixel-font-family.json SHA-256",
+    "Pixel Text Studio render from an installed or compiled BMFont strike plus reviewed title style",
+    "existing exact Pixel Text Studio static or animated build"
+  ],
+  "flows": [
+    {
+      "id": "reviewed-source-to-target-repository",
+      "steps": [
+        "evavo_pixel_font_universal_catalog",
+        "evavo_pixel_font_validate_face",
+        "evavo_pixel_font_validate_profile",
+        "evavo_pixel_font_compile_style",
+        "evavo_pixel_font_validate_output",
+        "separate-native-resolution-font-review",
+        "evavo_pixel_text_catalog",
+        "evavo_pixel_text_validate_style",
+        "evavo_pixel_text_render",
+        "evavo_pixel_text_validate_output",
+        "separate-native-resolution-title-review",
+        "evavo_pixel_font_validate_repository_job",
+        "evavo_pixel_font_plan_repository_delivery",
+        "separate-explicit-publication-authorization",
+        "evavo_pixel_font_run_repository_delivery",
+        "exact-remote-readback-and-receipt"
+      ]
+    }
+  ],
+  "publication": {
+    "enabledByDefault": false,
+    "manualOrReusableWorkflowOnly": true,
+    "allowlistRequired": true,
+    "cleanCheckoutRequired": true,
+    "exactTargetHeadRequired": true,
+    "exactRemoteRequired": true,
+    "perCallConfirmationRequired": true,
+    "normalPushOnly": true,
+    "forcePush": false
+  },
+  "authority": {
+    "bytesFlowThroughMcp": false,
+    "arbitraryShell": false,
+    "callerSelectedExecutable": false,
+    "callerSelectedAllowlist": false,
+    "sourceMutation": false,
+    "creativeApproval": false,
+    "repositoryMutation": false,
+    "gitPublication": false,
+    "forcePush": false
+  }
+}

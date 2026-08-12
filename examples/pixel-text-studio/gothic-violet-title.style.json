@@ -1,0 +1,78 @@
+{
+  "animation": {
+    "fps": 8,
+    "frames": 1,
+    "loop": true,
+    "motions": []
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic gothic-violet-title pixel text/title starter treatment.",
+  "displayName": "Gothic Violet Title",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "vertical",
+      "bandHeight": 0,
+      "colours": [
+        "#f1d8ffff",
+        "#b982d9ff",
+        "#70418fff",
+        "#35234fff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "dx": -1,
+      "dy": -1,
+      "highlight": "#fff3ffff",
+      "op": "bevel",
+      "shadow": "#25152fff"
+    },
+    {
+      "colour": "#0b0712ff",
+      "connectivity": 8,
+      "op": "outline",
+      "radius": 1
+    },
+    {
+      "colours": [
+        "#4a2863ff",
+        "#20132fff",
+        "#0e0917ff"
+      ],
+      "depth": 3,
+      "dx": 1,
+      "dy": 1,
+      "op": "extrude"
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "gothic-violet-title"
+}

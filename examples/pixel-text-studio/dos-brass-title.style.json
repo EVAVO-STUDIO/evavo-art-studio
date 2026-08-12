@@ -1,0 +1,78 @@
+{
+  "animation": {
+    "fps": 8,
+    "frames": 1,
+    "loop": true,
+    "motions": []
+  },
+  "background": "#00000000",
+  "canvas": {
+    "anchor": "center",
+    "height": 0,
+    "width": 0
+  },
+  "description": "Deterministic dos-brass-title pixel text/title starter treatment.",
+  "displayName": "Dos Brass Title",
+  "engineVersion": "1.0.0",
+  "layout": {
+    "align": "center",
+    "lineGap": 1,
+    "missingGlyph": "error",
+    "replacementCodepoint": 65533,
+    "tabSpaces": 4,
+    "tracking": 0
+  },
+  "operations": [
+    {
+      "axis": "vertical",
+      "bandHeight": 0,
+      "colours": [
+        "#fff0b0ff",
+        "#d8a85cff",
+        "#8e592fff",
+        "#e5bd6aff",
+        "#7a3f29ff"
+      ],
+      "op": "bands",
+      "phase": 0,
+      "phasePerFrame": 0
+    },
+    {
+      "dx": -1,
+      "dy": -1,
+      "highlight": "#fff8d7ff",
+      "op": "bevel",
+      "shadow": "#5d2d22ff"
+    },
+    {
+      "colour": "#160b12ff",
+      "connectivity": 8,
+      "op": "outline",
+      "radius": 1
+    },
+    {
+      "colours": [
+        "#6e4930ff",
+        "#2d1420ff"
+      ],
+      "depth": 2,
+      "dx": 1,
+      "dy": 1,
+      "op": "extrude"
+    }
+  ],
+  "output": {
+    "godotResourceRoot": "",
+    "individualFrames": true,
+    "sheet": true,
+    "webBundle": true
+  },
+  "padding": {
+    "bottom": 4,
+    "left": 4,
+    "right": 4,
+    "top": 4
+  },
+  "schema": "evavo.pixel-text-style.v1",
+  "styleId": "dos-brass-title"
+}

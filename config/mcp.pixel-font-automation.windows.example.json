@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "evavo-pixel-font-universal": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\scripts\\pixel-font-studio-universal-mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_PIXEL_FONT_UNIVERSAL_PYTHON": "python",
+        "EVAVO_PIXEL_FONT_UNIVERSAL_ALLOWED_ROOTS": "C:\\GitRepos\\evavo-art-studio\\config\\pixel-font-families;C:\\GitRepos\\evavo-art-studio\\examples\\pixel-font-universal;C:\\EVAVO\\pixel-font-builds",
+        "EVAVO_PIXEL_FONT_UNIVERSAL_MODE": "read-only",
+        "EVAVO_PIXEL_FONT_UNIVERSAL_ALLOW_WRITES": "false"
+      }
+    },
+    "evavo-pixel-text-studio": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\scripts\\pixel-text-studio-mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_PIXEL_TEXT_STUDIO_PYTHON": "python",
+        "EVAVO_PIXEL_TEXT_STUDIO_ALLOWED_ROOTS": "C:\\GitRepos\\evavo-art-studio;C:\\EVAVO\\pixel-font-builds;C:\\EVAVO\\pixel-text-builds",
+        "EVAVO_PIXEL_TEXT_STUDIO_MODE": "read-only",
+        "EVAVO_PIXEL_TEXT_STUDIO_ALLOW_WRITES": "false"
+      }
+    },
+    "evavo-pixel-font-repository-delivery": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\scripts\\pixel-font-repository-delivery-mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_PIXEL_FONT_DELIVERY_MODE": "read-only",
+        "EVAVO_PIXEL_FONT_DELIVERY_ALLOW_WRITES": "false",
+        "EVAVO_PIXEL_FONT_DELIVERY_ALLOW_GIT_PUBLISH": "false",
+        "EVAVO_PIXEL_FONT_DELIVERY_SOURCE_ROOTS": "C:\\GitRepos\\evavo-art-studio;C:\\EVAVO\\pixel-font-builds;C:\\EVAVO\\pixel-font-delivery-plans",
+        "EVAVO_PIXEL_FONT_DELIVERY_TARGET_ROOTS": "C:\\GitRepos",
+        "EVAVO_PIXEL_FONT_DELIVERY_ALLOWLIST": "C:\\GitRepos\\evavo-art-studio\\config\\pixel-font-repository-allowlist.v1.json",
+        "EVAVO_PIXEL_FONT_DELIVERY_COMPILER": "C:\\GitRepos\\evavo-art-studio\\tools\\pixel_font_universal.py",
+        "EVAVO_PIXEL_FONT_DELIVERY_PYTHON": "python",
+        "EVAVO_PIXEL_FONT_DELIVERY_TIMEOUT_MS": "900000",
+        "EVAVO_PIXEL_FONT_DELIVERY_TEXT_COMPILER": "C:\\GitRepos\\evavo-art-studio\\tools\\pixel_text_studio.py"
+      }
+    }
+  }
+}

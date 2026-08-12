@@ -1,0 +1,144 @@
+{
+  "schema": "evavo.pixel-font-repository-automation-job.v1",
+  "jobId": "universal-example-godot-delivery",
+  "family": {
+    "familyId": "universal-example",
+    "displayName": "Universal Pixel Font Example",
+    "version": "1.0.0",
+    "namespace": "UniversalExamplePixelFonts"
+  },
+  "builds": [
+    {
+      "buildId": "ui",
+      "mode": "compile",
+      "facePath": "../pixel-font-universal/binary-proportional.face.json",
+      "profilePath": "../pixel-font-universal/dos-mono.profile.json",
+      "strike": 1,
+      "targetStem": "Universal_UI",
+      "displayName": "Universal UI",
+      "roles": [
+        "body",
+        "button",
+        "hud",
+        "menu"
+      ],
+      "include": {
+        "runtime": true,
+        "atlasJson": true,
+        "ttf": true,
+        "bdf": true,
+        "source": true,
+        "profile": true,
+        "review": true,
+        "godot": true
+      }
+    },
+    {
+      "buildId": "display",
+      "mode": "compile",
+      "facePath": "../pixel-font-universal/indexed-arcade.face.json",
+      "profilePath": "../pixel-font-universal/arcade-outline.profile.json",
+      "strike": 1,
+      "targetStem": "Universal_Display",
+      "displayName": "Universal Display",
+      "roles": [
+        "result",
+        "title",
+        "victory"
+      ],
+      "include": {
+        "runtime": true,
+        "atlasJson": true,
+        "ttf": true,
+        "bdf": true,
+        "source": true,
+        "profile": true,
+        "review": true,
+        "godot": true
+      }
+    },
+    {
+      "buildId": "ornament",
+      "mode": "compile",
+      "facePath": "../pixel-font-universal/rgba-layered-components.face.json",
+      "profilePath": "../pixel-font-universal/fantasy-herald.profile.json",
+      "strike": 1,
+      "targetStem": "Universal_Ornament",
+      "displayName": "Universal Ornament",
+      "roles": [
+        "icon",
+        "ornament"
+      ],
+      "include": {
+        "runtime": true,
+        "atlasJson": true,
+        "ttf": true,
+        "bdf": true,
+        "source": true,
+        "profile": true,
+        "review": true,
+        "godot": true
+      }
+    }
+  ],
+  "target": {
+    "repository": "EVAVO-STUDIO/example-game",
+    "branch": "main",
+    "adapter": "godot-4.6.2",
+    "destinationRoot": "assets/fonts/universal_example",
+    "filenameCase": "pascal",
+    "installationMode": "replace-owned",
+    "installationManifestPath": "assets/fonts/universal_example/pixel-font-installation.json",
+    "receiptPath": "assets/fonts/universal_example/pixel-font-delivery-receipt.json",
+    "readmePath": "assets/fonts/universal_example/README.md",
+    "godot": {
+      "resourceRoot": "assets/fonts/universal_example",
+      "loaderClass": "UniversalExamplePixelFonts",
+      "loaderPath": "assets/fonts/universal_example/godot/UniversalExamplePixelFonts.gd",
+      "roleMapPath": "metadata/role-map.json",
+      "roleResourceRoot": "godot/roles",
+      "systemFallback": false,
+      "subpixelPositioning": false,
+      "mipmaps": false,
+      "integerScaleOnly": true,
+      "nearestFiltering": true
+    }
+  },
+  "publish": {
+    "mode": "branch",
+    "remote": "origin",
+    "branchName": "agent/pixel-font/universal-example",
+    "allowDirectMain": false,
+    "commitMessage": "feat(fonts): install Universal Example pixel family",
+    "push": true
+  },
+  "policy": {
+    "requireClean": true,
+    "requireExactHead": true,
+    "requireExactRemote": true,
+    "removeStaleOwnedFiles": true,
+    "retainSourceEvidence": true
+  },
+  "titles": [
+    {
+      "titleId": "game-title",
+      "mode": "render",
+      "fontBuildId": "display",
+      "text": "AB",
+      "stylePath": "../pixel-text-studio/fantasy-fire-title.style.json",
+      "targetStem": "Universal_Game_Title",
+      "displayName": "Universal Game Title",
+      "roles": [
+        "game-title-logo"
+      ],
+      "include": {
+        "frames": true,
+        "sheet": true,
+        "web": true,
+        "godot": true,
+        "source": true,
+        "manifest": true
+      }
+    }
+  ]
+}
