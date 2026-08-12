@@ -10,6 +10,7 @@ on:
       - "tools/raw_art_folder_mcp.mjs"
       - "docs/RAW_ART_FOLDER_WORKBENCH.md"
       - "config/mcp.raw-art-folder.windows.example.json"
+      - "package.json"
       - ".github/workflows/raw-art-folder-workbench.yml"
   push:
     branches:
@@ -22,6 +23,7 @@ on:
       - "tools/raw_art_folder_mcp.mjs"
       - "docs/RAW_ART_FOLDER_WORKBENCH.md"
       - "config/mcp.raw-art-folder.windows.example.json"
+      - "package.json"
       - ".github/workflows/raw-art-folder-workbench.yml"
   workflow_dispatch:
 
@@ -60,8 +62,12 @@ jobs:
           node --check scripts/test-raw-art-folder-workbench.mjs
           node --check tools/raw_art_folder_mcp.mjs
 
+      - name: Verify root command wiring
+        run: |
+          node -e 'const p=require("./package.json"); const s=p.scripts||{}; for (const k of ["raw-art:folder:scan","raw-art:folder:plan","raw-art:folder:materialize","raw-art:folder:verify","raw-art:folder:mcp","raw-art:folder:test","raw-art:folder:check"]) { if (!s[k]) throw new Error(`Missing ${k}`); } if (!s.check.includes("pnpm run raw-art:folder:check")) throw new Error("Root check does not include RAW_ART folder validation");'
+
       - name: Run exact contract and adversarial tests
-        run: node scripts/check-raw-art-folder-workbench.mjs
+        run: pnpm run raw-art:folder:check
 
       - name: Prove source remains clean
         if: always()
