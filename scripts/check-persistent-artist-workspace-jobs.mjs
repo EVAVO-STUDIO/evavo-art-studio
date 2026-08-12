@@ -53,7 +53,9 @@ for (const token of [
   'appendOnlyEvents: true',
   'staleLeaseRecovery: true',
   'optimisticConcurrency: true',
+  'postCreationPathChainRevalidation: true',
   'compareAndAppendEvents: true',
+  'revalidateJournalPathChainOnReadAndAppend: true',
   'exactInputRevalidationBeforeStart: true',
   'exactOutputEvidenceOnSuccess: true',
   'ARTIST_WORKSPACE_JOB_CONCURRENCY',
@@ -97,7 +99,7 @@ assert.equal(server.env.EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE, 'false');
 assert.ok(server.env.EVAVO_ART_WORKSPACE_JOB_ROOTS.includes('ArtWorkspaces'));
 
 const docs = content.get('docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md');
-for (const token of ['ChatGPT', 'Claude', 'crash-resumable', 'stale-lease recovery', 'exact input', 'output evidence', 'append-only', 'force push']) {
+for (const token of ['ChatGPT', 'Claude', 'crash-resumable', 'stale-lease recovery', 'exact input', 'output evidence', 'append-only', 'post-creation path confinement', 'force push']) {
   assert.equal(docs.toLowerCase().includes(token.toLowerCase()), true, `Job documentation is missing ${token}`);
 }
 
@@ -123,6 +125,7 @@ console.log('- job plans are create-only and exact-input bound');
 console.log('- checkpoints are append-only, self-hashed, hash-chained and compare-and-append serialized');
 console.log('- stale claims recover without mutable lock state');
 console.log('- competing stale checkpoint intents fail closed instead of becoming later authoritative events');
+console.log('- post-creation journal paths are revalidated through the workspace root before reads and appends');
 console.log('- failed steps remain resumable while dependency cycles are rejected');
 console.log('- succeeded output evidence is drift-verified before later work continues');
 console.log('- MCP remains path-only and grants no provider, Storage, repository or Git authority');
