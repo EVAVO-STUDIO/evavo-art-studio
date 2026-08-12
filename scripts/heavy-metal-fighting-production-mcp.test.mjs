@@ -5,6 +5,8 @@ import {
   BODY_CHOREOGRAPHY_OVERLAY_TOOL,
   FRAME_ATLAS_V3_TOOL,
   FRAME_MOVE_CHOREOGRAPHY_TOOL,
+  PROVIDER_EXECUTION_ENVELOPE_BATCH_TOOL,
+  PROVIDER_EXECUTION_ENVELOPE_TOOL,
   REGISTRY_BATCH_TOOL,
   REGISTRY_SUMMARY_TOOL,
   RECEIPT_TEMPLATE_TOOL,
@@ -20,7 +22,6 @@ import {
 } from "./heavy-metal-fighting-production-mcp.mjs";
 
 const CANDIDATE = "a".repeat(64);
-
 const EXPECTED_TOOLS = [
   REGISTRY_SUMMARY_TOOL,
   REGISTRY_BATCH_TOOL,
@@ -28,6 +29,8 @@ const EXPECTED_TOOLS = [
   FRAME_ATLAS_V3_TOOL,
   FRAME_MOVE_CHOREOGRAPHY_TOOL,
   BODY_CHOREOGRAPHY_OVERLAY_TOOL,
+  PROVIDER_EXECUTION_ENVELOPE_TOOL,
+  PROVIDER_EXECUTION_ENVELOPE_BATCH_TOOL,
   WORK_ORDER_BATCH_TOOL,
   WORK_ORDER_TOOL,
   RECEIPT_TEMPLATE_TOOL,
@@ -177,6 +180,34 @@ test("body choreography overlay binds exact pose intent to the immutable work or
   assert.match(overlay.supplementalProviderPrompt, /one-image work-unit boundary/);
 });
 
+test("provider execution envelope MCP tools report blockers and exact batch cardinality without executing providers", async () => {
+  const unitId = "hmf.frame-animation.bastion.slot-121";
+  const [order, envelope] = await Promise.all([
+    callTool(WORK_ORDER_TOOL, { unitId }),
+    callTool(PROVIDER_EXECUTION_ENVELOPE_TOOL, { unitId }),
+  ]);
+  assert.equal(envelope.unitId, unitId);
+  assert.equal(envelope.baseWorkOrderSha256, order.workOrderSha256);
+  assert.equal(envelope.status, "blocked");
+  assert.equal(envelope.submissionReady, false);
+  assert.equal(envelope.authorization.nextLegalAction, "lock-references");
+  assert.ok(envelope.missingReferenceBindingKeys.length > 0);
+  assert.equal(envelope.providerRequestInput, null);
+  assert.match(envelope.executionEnvelopeSha256, /^[0-9a-f]{64}$/);
+  assert.equal(envelope.authority.providerExecution, false);
+  assert.equal(envelope.authority.referenceArtifactAdmission, false);
+  assert.equal(envelope.authority.explicitWriteEnabledRuntimeCallRequired, true);
+
+  const batch = await callTool(PROVIDER_EXECUTION_ENVELOPE_BATCH_TOOL, { batch: order.batchId });
+  assert.equal(batch.batchId, order.batchId);
+  assert.equal(batch.frameId, "bastion");
+  assert.ok(batch.envelopeCount >= 1 && batch.envelopeCount <= 10);
+  assert.equal(batch.envelopeCount, batch.envelopes.length);
+  assert.equal(batch.readyEnvelopeCount, 0);
+  assert.equal(batch.blockedEnvelopeCount, batch.envelopeCount);
+  assert.equal(batch.authority.providerExecution, false);
+});
+
 test("one final Frame body work order remains native, identity-bound and one-image-only", async () => {
   const order = await callTool(WORK_ORDER_TOOL, { unitId: "hmf.frame-animation.bastion.slot-002" });
   assert.equal(order.assetContract.nativeDimensions.width, 160);
@@ -215,7 +246,7 @@ test("receipt, repair and resume tools stay human-gated and non-executing", asyn
   assert.ok(resume.unitStates.every((state) => state.nextAction === "lock-references"));
 });
 
-test("production MCP verification composes registry, style-proof, atlas-v3, move choreography, overlays and work-order evidence", async () => {
+test("production MCP verification composes registry, style-proof, atlas-v3, choreography, envelopes and work-order evidence", async () => {
   const verification = await callTool(VERIFY_TOOL);
   assert.equal(verification.status, "passed");
   assert.equal(verification.registry.status, "passed");
@@ -224,8 +255,10 @@ test("production MCP verification composes registry, style-proof, atlas-v3, move
   assert.equal(verification.frameMoveChoreography.status, "passed");
   assert.equal(verification.frameMoveChoreography.moveCount, 44);
   assert.equal(verification.bodyChoreographyOverlays.status, "passed");
+  assert.equal(verification.providerExecutionEnvelopes.status, "passed");
   assert.equal(verification.workOrders.status, "passed");
   assert.equal(verification.authority.providerExecution, false);
+  assert.equal(verification.authority.referenceArtifactAdmission, false);
   assert.equal(verification.authority.receiptPersistence, false);
   assert.equal(verification.authority.gitMutation, false);
 });
@@ -236,11 +269,12 @@ test("JSON-RPC surface rejects undeclared production mutation tools", async () =
   assert.deepEqual(listed.result.tools.map((tool) => tool.name), EXPECTED_TOOLS);
   const initialized = await handleRequest({ jsonrpc: "2.0", id: 2, method: "initialize", params: {} });
   assert.equal(initialized.result.serverInfo.name, "evavo-heavy-metal-fighting-production");
-  assert.equal(initialized.result.serverInfo.version, "1.4.0");
+  assert.equal(initialized.result.serverInfo.version, "1.5.0");
   assert.match(initialized.result.instructions, /does not generate images/i);
   assert.match(initialized.result.instructions, /style-proof controller/i);
-  assert.match(initialized.result.instructions, /atlas-v3 handoff layout/i);
-  assert.match(initialized.result.instructions, /44-move named body choreography/i);
-  assert.match(initialized.result.instructions, /supplemental body choreography overlays/i);
-  assert.match(initialized.result.instructions, /mutate base work orders or receipt chains/i);
+  assert.match(initialized.result.instructions, /atlas-v3 layout/i);
+  assert.match(initialized.result.instructions, /44-move body choreography/i);
+  assert.match(initialized.result.instructions, /provider execution envelopes/i);
+  assert.match(initialized.result.instructions, /separate explicit write-enabled runtime call/i);
+  assert.match(initialized.result.instructions, /does not.*execute providers/i);
 });

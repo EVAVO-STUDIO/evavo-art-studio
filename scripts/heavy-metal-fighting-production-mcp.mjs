@@ -14,6 +14,11 @@ import {
   verifyHmfBodyChoreographyOverlays,
 } from "./heavy-metal-fighting/frame-body-choreography-overlay.mjs";
 import {
+  buildHmfProviderExecutionEnvelopeBatch,
+  heavyMetalFightingProviderExecutionEnvelope,
+  verifyHmfProviderExecutionEnvelopes,
+} from "./heavy-metal-fighting/frame-body-provider-execution-envelope.mjs";
+import {
   buildHmfFrameAtlasV3Layout,
   verifyHmfFrameAtlasV3Delivery,
 } from "./heavy-metal-fighting/frame-atlas-v3-delivery.mjs";
@@ -36,7 +41,7 @@ import {
 import { verifyHmfProductionWorkOrders } from "./heavy-metal-fighting/work-order-verification.mjs";
 
 export const SERVER_NAME = "evavo-heavy-metal-fighting-production";
-export const SERVER_VERSION = "1.4.0";
+export const SERVER_VERSION = "1.5.0";
 
 export const REGISTRY_SUMMARY_TOOL = "evavo_hmf_production_registry_summary";
 export const REGISTRY_BATCH_TOOL = "evavo_hmf_production_registry_batch";
@@ -44,6 +49,8 @@ export const STYLE_PROOF_EXECUTION_TOOL = "evavo_hmf_production_style_proof_exec
 export const FRAME_ATLAS_V3_TOOL = "evavo_hmf_production_frame_atlas_v3";
 export const FRAME_MOVE_CHOREOGRAPHY_TOOL = "evavo_hmf_production_frame_move_choreography";
 export const BODY_CHOREOGRAPHY_OVERLAY_TOOL = "evavo_hmf_production_body_choreography_overlay";
+export const PROVIDER_EXECUTION_ENVELOPE_TOOL = "evavo_hmf_production_provider_execution_envelope";
+export const PROVIDER_EXECUTION_ENVELOPE_BATCH_TOOL = "evavo_hmf_production_provider_execution_envelope_batch";
 export const WORK_ORDER_BATCH_TOOL = "evavo_hmf_production_work_order_batch";
 export const WORK_ORDER_TOOL = "evavo_hmf_production_work_order";
 export const RECEIPT_TEMPLATE_TOOL = "evavo_hmf_production_receipt_template";
@@ -64,12 +71,10 @@ const BATCH_ID_SCHEMA = {
     { type: "string", pattern: "^hmf-b(?:0[0-9]{3}|01[0-7][0-9]|0179)$" },
   ],
 };
-
 const FRAME_ID_SCHEMA = {
   type: "string",
   enum: ["bastion", "viper", "citadel", "mirage"],
 };
-
 const APPROVAL_RECORD_SCHEMA = objectSchema({
   id: { type: "string", minLength: 1 },
   actorClass: { const: "human" },
@@ -77,6 +82,24 @@ const APPROVAL_RECORD_SCHEMA = objectSchema({
   occurredAt: { type: "string", minLength: 1 },
   evidenceSha256: { type: "string", pattern: "^[0-9a-f]{64}$" },
 }, ["id", "actorClass", "actorId", "occurredAt", "evidenceSha256"]);
+const ARTIFACT_BINDING_PROPERTIES = {
+  unitId: { type: "string", minLength: 1 },
+  bindingKey: { type: "string", minLength: 1 },
+  sourcePath: { type: "string", minLength: 1 },
+  artifactId: { type: "string", pattern: "^artifact_[0-9a-f]{64}$" },
+  evidenceSha256: { type: "string", pattern: "^[0-9a-f]{64}$" },
+  actorClass: { const: "human" },
+  actorId: { type: "string", minLength: 1 },
+  occurredAt: { type: "string", minLength: 1 },
+};
+const SINGLE_ARTIFACT_BINDING_SCHEMA = objectSchema(
+  ARTIFACT_BINDING_PROPERTIES,
+  ["bindingKey", "sourcePath", "artifactId", "evidenceSha256", "actorClass", "actorId", "occurredAt"],
+);
+const BATCH_ARTIFACT_BINDING_SCHEMA = objectSchema(
+  ARTIFACT_BINDING_PROPERTIES,
+  ["unitId", "bindingKey", "sourcePath", "artifactId", "evidenceSha256", "actorClass", "actorId", "occurredAt"],
+);
 
 export function toolDefinitions() {
   return Object.freeze([
@@ -105,13 +128,31 @@ export function toolDefinitions() {
     },
     {
       name: FRAME_MOVE_CHOREOGRAPHY_TOOL,
-      description: "Return the exact 11-move named production body choreography for one Frame: six normals, two specials, reversal, Overdrive and throw, mapped to production-master-v3 role slots while preserving runtime implementation/timing as read-only external authority.",
+      description: "Return the exact 11-move named production body choreography for one Frame: six normals, two specials, reversal, Overdrive and throw, mapped to production-master-v3 role slots while preserving runtime implementation and timing as read-only external authority.",
       inputSchema: objectSchema({ frameId: FRAME_ID_SCHEMA }, ["frameId"]),
     },
     {
       name: BODY_CHOREOGRAPHY_OVERLAY_TOOL,
       description: "Compile a hash-bound supplemental choreography overlay for one existing Frame body-cel work order. It adds exact body-role, motion and optional named-move context without mutating the base workOrderSha256 or receipt chain and without executing a provider.",
       inputSchema: objectSchema({ unitId: { type: "string", minLength: 1 } }, ["unitId"]),
+    },
+    {
+      name: PROVIDER_EXECUTION_ENVELOPE_TOOL,
+      description: "Compose one immutable Frame body work order and its choreography overlay into a hash-bound provider execution envelope. Optional external receipts and human-admitted reference artifacts can make it submit-ready, but this tool never executes the provider, admits artifacts, persists receipts or approves the candidate.",
+      inputSchema: objectSchema({
+        unitId: { type: "string", minLength: 1 },
+        receipts: { type: "array", items: { type: "object" }, default: [] },
+        artifactBindings: { type: "array", items: SINGLE_ARTIFACT_BINDING_SCHEMA, maxItems: 16, default: [] },
+      }, ["unitId"]),
+    },
+    {
+      name: PROVIDER_EXECUTION_ENVELOPE_BATCH_TOOL,
+      description: "Compile the existing 1-10 work units in one Frame-animation batch into provider execution envelopes. Every reference artifact binding must identify its exact unit. This remains compilation-only and performs no provider call or state mutation.",
+      inputSchema: objectSchema({
+        batch: BATCH_ID_SCHEMA,
+        receipts: { type: "array", items: { type: "object" }, default: [] },
+        artifactBindings: { type: "array", items: BATCH_ARTIFACT_BINDING_SCHEMA, maxItems: 160, default: [] },
+      }, ["batch"]),
     },
     {
       name: WORK_ORDER_BATCH_TOOL,
@@ -148,7 +189,7 @@ export function toolDefinitions() {
     },
     {
       name: VERIFY_TOOL,
-      description: "Verify the exact HMF registry, style-proof execution, frame-atlas-v3 layout, named move/body choreography, supplemental choreography overlays and work-order governance layers without provider execution, approval, promotion, filesystem writes or repository mutation.",
+      description: "Verify the exact HMF registry, style-proof execution, frame-atlas-v3 layout, named move/body choreography, supplemental overlays, provider execution envelopes and work-order governance without provider execution, approval, promotion, filesystem writes or repository mutation.",
       inputSchema: objectSchema(),
     },
   ]);
@@ -181,6 +222,14 @@ export async function callTool(name, input = {}) {
   if (name === FRAME_ATLAS_V3_TOOL) return buildHmfFrameAtlasV3Layout(String(input.frameId ?? ""));
   if (name === FRAME_MOVE_CHOREOGRAPHY_TOOL) return buildHmfFrameMoveBodyChoreography(String(input.frameId ?? ""));
   if (name === BODY_CHOREOGRAPHY_OVERLAY_TOOL) return heavyMetalFightingBodyChoreographyOverlay(input.unitId);
+  if (name === PROVIDER_EXECUTION_ENVELOPE_TOOL) return heavyMetalFightingProviderExecutionEnvelope(input.unitId, {
+    receipts: input.receipts ?? [],
+    artifactBindings: input.artifactBindings ?? [],
+  });
+  if (name === PROVIDER_EXECUTION_ENVELOPE_BATCH_TOOL) return buildHmfProviderExecutionEnvelopeBatch(normalizeBatch(input.batch), {
+    receipts: input.receipts ?? [],
+    artifactBindings: input.artifactBindings ?? [],
+  });
   if (name === WORK_ORDER_BATCH_TOOL) return buildHmfProductionWorkOrderBatch(normalizeBatch(input.batch));
   if (name === WORK_ORDER_TOOL) return heavyMetalFightingProductionWorkOrder(input.unitId);
   if (name === RECEIPT_TEMPLATE_TOOL) return heavyMetalFightingProductionReceiptTemplate(input.unitId);
@@ -191,25 +240,44 @@ export async function callTool(name, input = {}) {
   });
   if (name === RESUME_BATCH_TOOL) return heavyMetalFightingProductionBatchResumePlan(normalizeBatch(input.batch), input.receipts ?? []);
   if (name === VERIFY_TOOL) {
-    const [registry, styleProofExecution, frameAtlasV3, frameMoveChoreography, bodyChoreographyOverlays, workOrders] = await Promise.all([
-      verifyHmfProductionBatchRegistry(),
-      verifyHmfStyleProofExecutionPlan(),
-      verifyHmfFrameAtlasV3Delivery(),
-      verifyHmfFrameMoveBodyChoreography(),
-      verifyHmfBodyChoreographyOverlays(),
-      verifyHmfProductionWorkOrders(),
-    ]);
-    return Object.freeze({
-      schema: "evavo.heavy-metal-fighting-production-agent-verification.v5",
-      status: registry.status === "passed" && styleProofExecution.status === "passed" && frameAtlasV3.status === "passed" && frameMoveChoreography.status === "passed" && bodyChoreographyOverlays.status === "passed" && workOrders.status === "passed" ? "passed" : "failed",
+    const [
       registry,
       styleProofExecution,
       frameAtlasV3,
       frameMoveChoreography,
       bodyChoreographyOverlays,
+      providerExecutionEnvelopes,
+      workOrders,
+    ] = await Promise.all([
+      verifyHmfProductionBatchRegistry(),
+      verifyHmfStyleProofExecutionPlan(),
+      verifyHmfFrameAtlasV3Delivery(),
+      verifyHmfFrameMoveBodyChoreography(),
+      verifyHmfBodyChoreographyOverlays(),
+      verifyHmfProviderExecutionEnvelopes(),
+      verifyHmfProductionWorkOrders(),
+    ]);
+    return Object.freeze({
+      schema: "evavo.heavy-metal-fighting-production-agent-verification.v6",
+      status: registry.status === "passed"
+        && styleProofExecution.status === "passed"
+        && frameAtlasV3.status === "passed"
+        && frameMoveChoreography.status === "passed"
+        && bodyChoreographyOverlays.status === "passed"
+        && providerExecutionEnvelopes.status === "passed"
+        && workOrders.status === "passed"
+        ? "passed"
+        : "failed",
+      registry,
+      styleProofExecution,
+      frameAtlasV3,
+      frameMoveChoreography,
+      bodyChoreographyOverlays,
+      providerExecutionEnvelopes,
       workOrders,
       authority: Object.freeze({
         providerExecution: false,
+        referenceArtifactAdmission: false,
         receiptPersistence: false,
         automaticApproval: false,
         automaticPromotion: false,
@@ -234,7 +302,7 @@ export async function handleRequest(request) {
       protocolVersion: request.params?.protocolVersion ?? "2024-11-05",
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-      instructions: "Read-only HEAVY METAL FIGHTING final-art production surface. It exposes the 1,573-image / 179-batch registry, the four-phase Branka/Bastion/Foundry Nine style-proof controller, the deterministic 224-cel Frame atlas-v3 handoff layout, exact 44-move named body choreography, hash-bound supplemental body choreography overlays, immutable one-image work orders, receipt requirements, bounded repair templates and deterministic resume planning. It does not generate images, build delivery atlases, mutate base work orders or receipt chains, persist receipts or approvals, change combat timing, approve art, promote masters, mutate the game repository, commit, push, deploy or publish.",
+      instructions: "Read-only HEAVY METAL FIGHTING final-art production surface. It exposes the 1,573-image / 179-batch registry, four-phase style-proof controller, deterministic 224-cel atlas-v3 layout, exact 44-move body choreography, hash-bound choreography overlays, human-gated provider execution envelopes, immutable one-image work orders, receipt requirements, bounded repair templates and deterministic resume planning. A submit-ready envelope still requires a separate explicit write-enabled runtime call. This server does not generate images, execute providers, admit reference artifacts, persist receipts or approvals, mutate base work orders or receipt chains, change combat timing, approve art, promote masters, mutate the game repository, commit, push, deploy or publish.",
     });
   }
   if (request.method === "ping") return response(request.id, {});
