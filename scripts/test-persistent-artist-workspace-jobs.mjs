@@ -14,6 +14,7 @@ import {
   inspectWorkspaceJob,
   releaseWorkspaceJob,
   startWorkspaceJobStep,
+  withDocumentHash,
 } from './project-art/persistent-workspace-jobs.mjs';
 
 const root = await mkdtemp(path.join(os.tmpdir(), 'evavo-art-job-test-'));
@@ -65,6 +66,43 @@ try {
   assert.equal(plan.steps[0].inputFingerprints[0].path, 'sources/source.txt');
   assert.equal(plan.steps[0].inputFingerprints[0].bytes, 10);
   assert.equal(plan.execution.compareAndAppendEvents, true);
+
+  const rehashPlan = (mutate) => {
+    const candidate = structuredClone(plan);
+    delete candidate.documentSha256;
+    mutate(candidate);
+    return withDocumentHash(candidate);
+  };
+
+  // A document hash is not plan authority. Correctly rehashed malformed plans must be fully re-admitted.
+  const rehashedPlanAttacks = [
+    ['missing input fingerprint', (candidate) => { candidate.steps[0].inputFingerprints = []; }],
+    ['substituted input fingerprint path', (candidate) => { candidate.steps[0].inputFingerprints[0].path = 'sources/other.txt'; }],
+    ['output traversal', (candidate) => { candidate.steps[0].outputs[0] = '../escape.txt'; }],
+    ['dependency cycle', (candidate) => { candidate.steps[0].requires = ['export']; }],
+    ['publication redirect', (candidate) => { candidate.publication.relativeRoot = 'journals/jobs/other-job'; }],
+    ['disabled execution guard', (candidate) => { candidate.execution.exactInputRevalidationBeforeStart = false; }],
+    ['missing authority denial', (candidate) => { delete candidate.authority.storageWrite; }],
+    ['unsupported top-level field', (candidate) => { candidate.unexpectedAuthority = false; }],
+  ];
+  for (const [label, mutate] of rehashedPlanAttacks) {
+    await assert.rejects(
+      createWorkspaceJob({ workspaceRoot: root, plan: rehashPlan(mutate) }),
+      (error) => error?.code === 'ARTIST_WORKSPACE_JOB_PLAN_INVALID',
+      label,
+    );
+  }
+
+  // Historical v1 plans without the later optional path-chain evidence flag remain readable and executable.
+  const legacyPlan = rehashPlan((candidate) => {
+    candidate.jobId = 'job-legacy-v1';
+    candidate.publication.relativeRoot = `journals/jobs/${candidate.jobId}`;
+    delete candidate.execution.revalidateJournalPathChainOnReadAndAppend;
+  });
+  let legacyState = await createWorkspaceJob({ workspaceRoot: root, plan: legacyPlan });
+  assert.equal(legacyState.status, 'ready');
+  legacyState = await inspectWorkspaceJob({ workspaceRoot: root, jobId: legacyPlan.jobId });
+  assert.equal(legacyState.planSha256, legacyPlan.documentSha256);
 
   let state = await createWorkspaceJob({ workspaceRoot: root, plan });
   assert.equal(state.status, 'ready');
@@ -189,7 +227,6 @@ try {
     assert.ok(concurrentState.activeLease?.actor.startsWith('race-'));
   }
 
-
   // Job journals are not trusted forever after creation: a later parent-directory symlink substitution fails closed.
   const pathChainRequest = structuredClone(request);
   pathChainRequest.jobId = 'job-path-chain';
@@ -244,6 +281,8 @@ try {
 
   console.log('Persistent Artist Workspace job regressions passed.');
   console.log('- append-only hash-chained checkpoints survive actor interruption');
+  console.log('- correctly rehashed malformed plans are fully re-admitted and rejected before publication');
+  console.log('- historical v1 plans without the later optional path-chain evidence flag remain compatible');
   console.log('- stale leases allow bounded takeover without guessing the next step');
   console.log('- competing checkpoint intents use compare-and-append semantics and cannot serialize stale state');
   console.log('- exact compiled inputs are revalidated before execution');

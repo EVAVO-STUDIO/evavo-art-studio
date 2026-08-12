@@ -54,10 +54,12 @@ for (const token of [
   'staleLeaseRecovery: true',
   'optimisticConcurrency: true',
   'postCreationPathChainRevalidation: true',
+  'strictRehashedPlanAdmission: true',
   'compareAndAppendEvents: true',
   'revalidateJournalPathChainOnReadAndAppend: true',
   'exactInputRevalidationBeforeStart: true',
   'exactOutputEvidenceOnSuccess: true',
+  'ARTIST_WORKSPACE_JOB_PLAN_INVALID',
   'ARTIST_WORKSPACE_JOB_CONCURRENCY',
   'ARTIST_WORKSPACE_JOB_INPUT_DRIFT',
   'ARTIST_WORKSPACE_JOB_EVIDENCE_DRIFT',
@@ -99,7 +101,7 @@ assert.equal(server.env.EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE, 'false');
 assert.ok(server.env.EVAVO_ART_WORKSPACE_JOB_ROOTS.includes('ArtWorkspaces'));
 
 const docs = content.get('docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md');
-for (const token of ['ChatGPT', 'Claude', 'crash-resumable', 'stale-lease recovery', 'exact input', 'output evidence', 'append-only', 'post-creation path confinement', 'force push']) {
+for (const token of ['ChatGPT', 'Claude', 'crash-resumable', 'stale-lease recovery', 'exact input', 'output evidence', 'append-only', 'post-creation path confinement', 'correctly rehashed plan', 'force push']) {
   assert.equal(docs.toLowerCase().includes(token.toLowerCase()), true, `Job documentation is missing ${token}`);
 }
 
@@ -122,6 +124,7 @@ for (const script of ['scripts/test-persistent-artist-workspace-jobs.mjs', 'scri
 
 console.log('Persistent Artist Workspace job guard passed.');
 console.log('- job plans are create-only and exact-input bound');
+console.log('- correctly rehashed plans are fully re-admitted before durable publication');
 console.log('- checkpoints are append-only, self-hashed, hash-chained and compare-and-append serialized');
 console.log('- stale claims recover without mutable lock state');
 console.log('- competing stale checkpoint intents fail closed instead of becoming later authoritative events');
