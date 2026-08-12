@@ -45,6 +45,12 @@ journals/
 
 There is no mutable `current.json` pointer. Current state is derived from immutable evidence each time the job is inspected.
 
+## Post-creation path confinement
+
+Creation-time checks are not treated as permanent trust. Every later inspection re-walks the complete `journals/jobs/<job-id>/...` chain under the exact workspace root before reading the plan, commit marker, events directory, or an individual event. Every new checkpoint also revalidates the events directory and its create-only target before append.
+
+If a job directory or later path component is replaced with a symbolic link or junction after job creation, inspection and mutation fail closed with `ARTIST_WORKSPACE_JOB_PATH_INVALID`. A stale path cannot redirect the resumable-job journal outside the configured workspace root.
+
 ## Job request
 
 Schema:

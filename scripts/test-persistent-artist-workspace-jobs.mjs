@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -189,6 +189,27 @@ try {
     assert.ok(concurrentState.activeLease?.actor.startsWith('race-'));
   }
 
+
+  // Job journals are not trusted forever after creation: a later parent-directory symlink substitution fails closed.
+  const pathChainRequest = structuredClone(request);
+  pathChainRequest.jobId = 'job-path-chain';
+  const pathChainPlan = await compileWorkspaceJob({ workspaceRoot: root, request: pathChainRequest, compiledAt: '2026-08-12T05:10:00.000Z' });
+  await createWorkspaceJob({ workspaceRoot: root, plan: pathChainPlan });
+  const pathChainJobRoot = path.join(root, 'journals', 'jobs', pathChainPlan.jobId);
+  const relocatedParent = path.join(root, 'scratch-job-journal');
+  await mkdir(relocatedParent, { recursive: true });
+  const relocatedJobRoot = path.join(relocatedParent, pathChainPlan.jobId);
+  await rename(pathChainJobRoot, relocatedJobRoot);
+  await symlink(relocatedJobRoot, pathChainJobRoot, 'dir');
+  await assert.rejects(
+    inspectWorkspaceJob({ workspaceRoot: root, jobId: pathChainPlan.jobId, now: '2026-08-12T05:10:01.000Z' }),
+    (error) => error?.code === 'ARTIST_WORKSPACE_JOB_PATH_INVALID',
+  );
+  await assert.rejects(
+    claimWorkspaceJob({ workspaceRoot: root, jobId: pathChainPlan.jobId, actor: 'path-race-agent', leaseSeconds: 300, now: '2026-08-12T05:10:02.000Z' }),
+    (error) => error?.code === 'ARTIST_WORKSPACE_JOB_PATH_INVALID',
+  );
+
   // Dependency cycles are rejected at compilation time.
   const cycle = {
     schema: JOB_REQUEST_SCHEMA,
@@ -228,7 +249,7 @@ try {
   console.log('- exact compiled inputs are revalidated before execution');
   console.log('- exact succeeded outputs remain drift-verifiable after completion');
   console.log('- failed steps remain resumable and dependency cycles are rejected');
-  console.log('- symbolic inputs and tampered events are rejected');
+  console.log('- symbolic inputs, post-creation journal path substitution and tampered events are rejected');
 } finally {
   await rm(root, { recursive: true, force: true });
 }
