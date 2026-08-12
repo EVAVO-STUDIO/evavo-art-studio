@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  BODY_CHOREOGRAPHY_OVERLAY_TOOL,
   FRAME_ATLAS_V3_TOOL,
   FRAME_MOVE_CHOREOGRAPHY_TOOL,
   REGISTRY_BATCH_TOOL,
@@ -26,6 +27,7 @@ const EXPECTED_TOOLS = [
   STYLE_PROOF_EXECUTION_TOOL,
   FRAME_ATLAS_V3_TOOL,
   FRAME_MOVE_CHOREOGRAPHY_TOOL,
+  BODY_CHOREOGRAPHY_OVERLAY_TOOL,
   WORK_ORDER_BATCH_TOOL,
   WORK_ORDER_TOOL,
   RECEIPT_TEMPLATE_TOOL,
@@ -147,6 +149,34 @@ test("frame move choreography MCP tool exposes exact named moves without claimin
   assert.equal(frame.authority.targetRepositoryMutation, false);
 });
 
+test("body choreography overlay binds exact pose intent to the immutable work order without mutating its hash", async () => {
+  const unitId = "hmf.frame-animation.bastion.slot-121";
+  const [order, overlay] = await Promise.all([
+    callTool(WORK_ORDER_TOOL, { unitId }),
+    callTool(BODY_CHOREOGRAPHY_OVERLAY_TOOL, { unitId }),
+  ]);
+  assert.equal(overlay.unitId, unitId);
+  assert.equal(overlay.baseWorkOrderSha256, order.workOrderSha256);
+  assert.match(overlay.overlaySha256, /^[0-9a-f]{64}$/);
+  assert.equal(overlay.frameId, "bastion");
+  assert.equal(overlay.bodySlot, 121);
+  assert.equal(overlay.bodyBankId, "standing-heavy");
+  assert.equal(overlay.bodyRole.semanticId, "standing-heavy:hero-impact");
+  assert.equal(overlay.bodyRole.hero, true);
+  assert.equal(overlay.moveBinding.publicName, "GRAVEBELL");
+  assert.equal(overlay.moveBinding.actorRole, "primary-body");
+  assert.equal(overlay.frameMotionRealization.motionIdentity, "hydraulic-weight");
+  assert.equal(overlay.authority.supplementalPromptUse, true);
+  assert.equal(overlay.authority.baseWorkOrderMutation, false);
+  assert.equal(overlay.authority.receiptChainMutation, false);
+  assert.equal(overlay.authority.simulationTiming, false);
+  assert.equal(overlay.authority.targetRepositoryMutation, false);
+  assert.match(overlay.supplementalProviderPrompt, /immutable base work order/i);
+  assert.match(overlay.supplementalProviderPrompt, /ART SEMANTICS ONLY/);
+  assert.match(overlay.supplementalProviderPrompt, /BODY ONLY/);
+  assert.match(overlay.supplementalProviderPrompt, /one-image work-unit boundary/);
+});
+
 test("one final Frame body work order remains native, identity-bound and one-image-only", async () => {
   const order = await callTool(WORK_ORDER_TOOL, { unitId: "hmf.frame-animation.bastion.slot-002" });
   assert.equal(order.assetContract.nativeDimensions.width, 160);
@@ -185,7 +215,7 @@ test("receipt, repair and resume tools stay human-gated and non-executing", asyn
   assert.ok(resume.unitStates.every((state) => state.nextAction === "lock-references"));
 });
 
-test("production MCP verification composes registry, style-proof, atlas-v3, move choreography and work-order evidence", async () => {
+test("production MCP verification composes registry, style-proof, atlas-v3, move choreography, overlays and work-order evidence", async () => {
   const verification = await callTool(VERIFY_TOOL);
   assert.equal(verification.status, "passed");
   assert.equal(verification.registry.status, "passed");
@@ -193,6 +223,7 @@ test("production MCP verification composes registry, style-proof, atlas-v3, move
   assert.equal(verification.frameAtlasV3.status, "passed");
   assert.equal(verification.frameMoveChoreography.status, "passed");
   assert.equal(verification.frameMoveChoreography.moveCount, 44);
+  assert.equal(verification.bodyChoreographyOverlays.status, "passed");
   assert.equal(verification.workOrders.status, "passed");
   assert.equal(verification.authority.providerExecution, false);
   assert.equal(verification.authority.receiptPersistence, false);
@@ -205,9 +236,11 @@ test("JSON-RPC surface rejects undeclared production mutation tools", async () =
   assert.deepEqual(listed.result.tools.map((tool) => tool.name), EXPECTED_TOOLS);
   const initialized = await handleRequest({ jsonrpc: "2.0", id: 2, method: "initialize", params: {} });
   assert.equal(initialized.result.serverInfo.name, "evavo-heavy-metal-fighting-production");
-  assert.equal(initialized.result.serverInfo.version, "1.3.0");
+  assert.equal(initialized.result.serverInfo.version, "1.4.0");
   assert.match(initialized.result.instructions, /does not generate images/i);
   assert.match(initialized.result.instructions, /style-proof controller/i);
   assert.match(initialized.result.instructions, /atlas-v3 handoff layout/i);
   assert.match(initialized.result.instructions, /44-move named body choreography/i);
+  assert.match(initialized.result.instructions, /supplemental body choreography overlays/i);
+  assert.match(initialized.result.instructions, /mutate base work orders or receipt chains/i);
 });
