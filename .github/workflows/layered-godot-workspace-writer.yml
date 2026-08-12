@@ -7,8 +7,13 @@ on:
       - "scripts/layered-godot-workspace-writer/**"
       - "scripts/check-layered-godot-workspace-writer.mjs"
       - "scripts/test-layered-godot-workspace-writer.mjs"
+      - "scripts/layered-godot-workspace-auditor.mjs"
+      - "scripts/check-layered-godot-workspace-auditor.mjs"
+      - "scripts/test-layered-godot-workspace-auditor.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
+      - "config/layered-production-godot-workspace-auditor.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
+      - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   push:
     branches:
@@ -18,8 +23,13 @@ on:
       - "scripts/layered-godot-workspace-writer/**"
       - "scripts/check-layered-godot-workspace-writer.mjs"
       - "scripts/test-layered-godot-workspace-writer.mjs"
+      - "scripts/layered-godot-workspace-auditor.mjs"
+      - "scripts/check-layered-godot-workspace-auditor.mjs"
+      - "scripts/test-layered-godot-workspace-auditor.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
+      - "config/layered-production-godot-workspace-auditor.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
+      - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   workflow_dispatch:
 
@@ -47,8 +57,11 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Run bounded contract and adversarial regressions
+      - name: Run bounded writer contract and adversarial regressions
         run: node scripts/check-layered-godot-workspace-writer.mjs
+
+      - name: Run read-only post-write auditor regressions
+        run: node scripts/check-layered-godot-workspace-auditor.mjs
 
       - name: Prove exact source remains clean
         if: always()

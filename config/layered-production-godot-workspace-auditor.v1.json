@@ -1,0 +1,35 @@
+{
+  "schema": "evavo.layered-production.godot-workspace-auditor.v1",
+  "version": 1,
+  "protocolVersion": "2026-08-12.1",
+  "description": "Read-only, receipt-bound verification of the seven exact Godot 4.6.2 workspace resources after a governed layered-production write.",
+  "entrypoint": "scripts/layered-godot-workspace-auditor.mjs",
+  "command": "node scripts/layered-godot-workspace-auditor.mjs audit --plan <plan.json> --receipt <write-receipt.json> --workspace <absolute-directory> --repository <owner/repository>",
+  "requirements": {
+    "exactResourceCount": 7,
+    "requiresIntegrationPlanSelfHash": true,
+    "requiresWriteReceiptSelfHash": true,
+    "requiresReconstructedRequestIdentity": true,
+    "requiresExplicitRepositoryMatch": true,
+    "requiresExactWorkspaceMatch": true,
+    "requiresExactTargetBytes": true,
+    "requiresStableRegularTargets": true,
+    "symbolicParentsRejected": true,
+    "multiplyLinkedTargetsRejected": true,
+    "stageAndBackupResidueRejected": true,
+    "cleanupWarningsRejected": true,
+    "selfHashedAuditReceipt": true
+  },
+  "authority": {
+    "fileRead": true,
+    "fileWrite": false,
+    "targetRepositoryMutation": false,
+    "godotExecution": false,
+    "runtimeActivation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "deployment": false,
+    "publication": false,
+    "forcePush": false
+  }
+}
