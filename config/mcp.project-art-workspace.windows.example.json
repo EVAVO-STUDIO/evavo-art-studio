@@ -6,10 +6,22 @@
         "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_mcp.mjs"
       ],
       "env": {
-        "EVAVO_ART_WORKSPACE_ROOTS": "C:\\GitRepos;C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Incoming Art",
+        "EVAVO_ART_WORKSPACE_ROOTS": "C:\\GitRepos;C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Incoming Art;C:\\EVAVO\\Evidence",
         "EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE": "false",
         "EVAVO_ART_WORKSPACE_PYTHON": "py",
         "EVAVO_ART_WORKSPACE_MCP_TIMEOUT_MS": "600000"
+      }
+    },
+    "evavo-project-art-workspace-ingest": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_ingest_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ART_WORKSPACE_INGEST_ROOTS": "C:\\GitRepos;C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
+        "EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS": "C:\\Users\\Greg\\Downloads;C:\\EVAVO\\Incoming Art;C:\\GitRepos",
+        "EVAVO_ART_WORKSPACE_INGEST_MCP_ALLOW_WRITE": "false",
+        "EVAVO_ART_WORKSPACE_INGEST_MCP_TIMEOUT_MS": "600000"
       }
     }
   }
