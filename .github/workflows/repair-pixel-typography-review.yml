@@ -1,0 +1,313 @@
+name: Ensure Pixel Typography native review publication
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/repair-pixel-typography-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-pixel-typography-review
+  cancel-in-progress: false
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONHASHSEED: "0"
+  PYTHONDONTWRITEBYTECODE: "1"
+  SOURCE_DATE_EPOCH: "1577836800"
+
+jobs:
+  ensure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: "pip"
+          cache-dependency-path: requirements/pixel-font-universal.txt
+
+      - name: Require exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Reconcile exact reviewed native-review source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import urllib.request
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          blobs = {
+              ".github/workflows/pixel-font-repository-delivery-contract.yml": "ac67e9274c4e612c7db11773e3c21330797140f0",
+              "config/mcp.pixel-font-automation.windows.example.json": "58ce08f365f7c06fa55da8d2e6ca966edbd3ddce",
+              "config/pixel-font-automation-suite.v1.json": "708b6cc0104ade1ac75eb9921303908657c7aaa9",
+              "config/pixel-typography-review.v1.json": "07f52678542ca022eafb559bb2c13530e6530856",
+              "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md": "7e15ec9bfb2b73f5b1fcf95855349cedf01800a9",
+              "docs/PIXEL_TYPOGRAPHY_REVIEW.md": "ce64a5ed1a0575313b55a1442d0395718de11f9f",
+              "examples/pixel-typography-review/vga-dos-320x200.review.json": "cb7506b2310d215a29cfa770c12bc7eb5c03e512",
+              "scripts/check-pixel-font-automation-suite.mjs": "85b96ad45aef7b2a10b0249b9bb85ec20cbdc8be",
+              "scripts/check-pixel-typography-cli.mjs": "30e4cdc396498ab7ac497b4d05da2278ad12edc3",
+              "scripts/check-pixel-typography-review-mcp.mjs": "2919a7d403222ab6dd893689b1f481324cfaecbc",
+              "scripts/pixel-typography-review-mcp.mjs": "f31c4afb3d7d2a5a41f52e1a9fa9863c34fd53ae",
+              "scripts/pixel-typography.mjs": "2f1cbea380e1e8d06683b2de03e71c26aa263b10",
+              "tools/check_pixel_typography_review.py": "ae5ee6a9786cf6ec090e25df7a38020893baa8cb",
+              "tools/pixel_typography_review.py": "0a0a6abb65d7cd6f651511c35dd170bfea941e07",
+          }
+          accepted_existing = {
+              ".github/workflows/pixel-font-repository-delivery-contract.yml": {
+                  "f74393b1e2c249ce1da8ba1807a9f4e7ef97a315",
+                  "ac67e9274c4e612c7db11773e3c21330797140f0",
+              },
+              "config/mcp.pixel-font-automation.windows.example.json": {
+                  "0d7304610a2262698bef59e8b133c8362f25ba31",
+                  "58ce08f365f7c06fa55da8d2e6ca966edbd3ddce",
+              },
+              "config/pixel-font-automation-suite.v1.json": {
+                  "b0d136a349509a815e9c453f537521c139a598de",
+                  "708b6cc0104ade1ac75eb9921303908657c7aaa9",
+              },
+              "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md": {
+                  "fe59e9c2639465ef1e8fe0d04d98afed7c04f27b",
+                  "7e15ec9bfb2b73f5b1fcf95855349cedf01800a9",
+              },
+              "scripts/check-pixel-font-automation-suite.mjs": {
+                  "5a5c3d22bd41b57c29fe2eb7406e47423162665c",
+                  "85b96ad45aef7b2a10b0249b9bb85ec20cbdc8be",
+              },
+              "scripts/check-pixel-typography-cli.mjs": {
+                  "f94871079ea8003ef945684bd5bc6cba3cc7aa82",
+                  "30e4cdc396498ab7ac497b4d05da2278ad12edc3",
+              },
+              "scripts/pixel-typography.mjs": {
+                  "f96046351c3c163cfe57bbf055d7ab20a7bb1b43",
+                  "2f1cbea380e1e8d06683b2de03e71c26aa263b10",
+              },
+          }
+          for relative, accepted in accepted_existing.items():
+              path = Path(relative)
+              if not path.is_file() or path.is_symlink():
+                  raise SystemExit(f"governed existing file missing or symbolic: {relative}")
+              observed = subprocess.check_output(["git", "hash-object", relative], text=True).strip()
+              if observed not in accepted:
+                  raise SystemExit(f"unreviewed concurrent change at {relative}: {observed}")
+
+          for relative, blob in blobs.items():
+              path = Path(relative)
+              if path.is_file() and not path.is_symlink():
+                  observed = subprocess.check_output(["git", "hash-object", relative], text=True).strip()
+                  if observed == blob:
+                      continue
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/{repository}/git/blobs/{blob}",
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "User-Agent": "evavo-pixel-typography-review-reconciler",
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  payload = json.load(response)
+              data = base64.b64decode(payload["content"].replace("\n", ""), validate=True)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(data)
+              observed = subprocess.check_output(["git", "hash-object", relative], text=True).strip()
+              if observed != blob:
+                  raise SystemExit(f"blob materialization mismatch for {relative}: {observed}")
+
+          engine_path = Path("tools/pixel_typography_review_engine.py")
+          if not engine_path.is_file() or engine_path.is_symlink():
+              raise SystemExit("native review engine is missing")
+          engine = engine_path.read_text("utf-8")
+          if '        "engineVersion",\n        "profileId",' not in engine:
+              engine = engine.replace(
+                  '        "schema",\n        "profileId",',
+                  '        "schema",\n        "engineVersion",\n        "profileId",',
+                  1,
+              )
+          if 'value.get("engineVersion", ENGINE_VERSION)' not in engine:
+              engine = engine.replace(
+                  '    profile_id = safe_id(value.get("profileId"), f"{label}.profileId")',
+                  '    if value.get("engineVersion", ENGINE_VERSION) != ENGINE_VERSION:\n'
+                  '        fail(f"{label}.engineVersion must be {ENGINE_VERSION}")\n'
+                  '    profile_id = safe_id(value.get("profileId"), f"{label}.profileId")',
+                  1,
+              )
+          engine = engine.replace(
+              '            has_text = "text" in raw_sample\n            has_preset = "textPreset" in raw_sample',
+              '            has_text = raw_sample.get("text") is not None\n'
+              '            has_preset = raw_sample.get("textPreset") is not None',
+          )
+          engine_path.write_text(engine, "utf-8")
+
+          check_path = Path("tools/check_pixel_typography_review.py")
+          check = check_path.read_text("utf-8")
+          check = check.replace("integration-160x120", "integration-320x200")
+          check = check.replace("Integration 160x120", "Integration 320x200")
+          check = check.replace('{"width": 160, "height": 120}', '{"width": 320, "height": 200}')
+          check_path.write_text(check, "utf-8")
+          PY
+
+      - name: Install dependencies and validate complete production contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-universal.txt
+          python - <<'PY'
+          import fontTools
+          assert fontTools.__version__ == "4.63.0", fontTools.__version__
+          PY
+          node --check scripts/pixel-typography.mjs
+          node --check scripts/check-pixel-typography-cli.mjs
+          node --check scripts/pixel-typography-review-mcp.mjs
+          node --check scripts/check-pixel-typography-review-mcp.mjs
+          node --check scripts/check-pixel-font-automation-suite.mjs
+          python -m py_compile \
+            tools/pixel_typography_review.py \
+            tools/pixel_typography_review_engine.py \
+            tools/check_pixel_typography_review.py
+          node scripts/check-pixel-typography-cli.mjs
+          node scripts/pixel-typography.mjs check
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          paths = {
+              "universal-pixel-font-check-report.json": ("evavo.pixel-font-universal-check.v1", "3.0.0"),
+              "pixel-typography-review-check-report.json": ("evavo.pixel-typography-review-check.v1", "1.0.0"),
+          }
+          for relative, (schema, version) in paths.items():
+              path = Path(relative)
+              report = json.loads(path.read_text("utf-8"))
+              assert report["schema"] == schema
+              assert report["engineVersion"] == version
+              assert report["status"] == "passed"
+              path.unlink()
+          PY
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+          git diff --check
+
+      - name: Publish only the governed reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/finalize-pixel-typography-review.yml
+          rm -f .github/workflows/repair-pixel-typography-review.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          python - <<'PY'
+          import subprocess
+
+          allowed = {
+              ".github/workflows/finalize-pixel-typography-review.yml",
+              ".github/workflows/repair-pixel-typography-review.yml",
+              ".github/workflows/pixel-font-repository-delivery-contract.yml",
+              "config/mcp.pixel-font-automation.windows.example.json",
+              "config/pixel-font-automation-suite.v1.json",
+              "config/pixel-typography-review.v1.json",
+              "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md",
+              "docs/PIXEL_TYPOGRAPHY_REVIEW.md",
+              "examples/pixel-typography-review/vga-dos-320x200.review.json",
+              "scripts/check-pixel-font-automation-suite.mjs",
+              "scripts/check-pixel-typography-cli.mjs",
+              "scripts/check-pixel-typography-review-mcp.mjs",
+              "scripts/pixel-typography-review-mcp.mjs",
+              "scripts/pixel-typography.mjs",
+              "tools/check_pixel_typography_review.py",
+              "tools/pixel_typography_review.py",
+              "tools/pixel_typography_review_engine.py",
+          }
+          observed = {
+              line for line in subprocess.check_output(
+                  ["git", "diff", "--cached", "--name-only"], text=True
+              ).splitlines() if line
+          }
+          unexpected = sorted(observed - allowed)
+          if unexpected:
+              raise SystemExit(f"unexpected staged paths: {unexpected}")
+          if ".github/workflows/repair-pixel-typography-review.yml" not in observed:
+              raise SystemExit("recovery workflow deletion is not staged")
+          PY
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No reconciliation changes remained." >&2
+            exit 1
+          fi
+          if git diff --cached --name-only | grep -q '^config/pixel-typography-review.v1.json$'; then
+            message="feat(pixel-typography): add native-resolution review kits"
+          else
+            message="chore(pixel-typography): remove review publication recovery"
+          fi
+          git commit -m "$message" \
+            -m "Publish or verify deterministic fixed-resolution specimen pages, animation grids, visible-palette budget checks, exact integer-scale preview evidence, guarded CLI/MCP surfaces and path-filtered CI without force push or creative self-approval."
+          git fetch origin main
+          git rebase origin/main
+          python -m py_compile \
+            tools/pixel_typography_review.py \
+            tools/pixel_typography_review_engine.py \
+            tools/check_pixel_typography_review.py
+          node scripts/check-pixel-typography-cli.mjs
+          node scripts/check-pixel-typography-review-mcp.mjs
+          python tools/check_pixel_typography_review.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("pixel-typography-review-check-report.json")
+          report = json.loads(path.read_text("utf-8"))
+          assert report["status"] == "passed"
+          path.unlink()
+          PY
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git push origin HEAD:main
+          published="$(git rev-parse HEAD)"
+          remote="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "$remote" = "$published"
+          printf '{"status":"published","commit":"%s","tree":"%s","parent":"%s"}\n' \
+            "$published" "$(git rev-parse HEAD^{tree})" "$(git rev-parse HEAD^)" \
+            | tee "$RUNNER_TEMP/pixel-typography-review-reconciliation.json"
+
+      - name: Retain reconciliation receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pixel-typography-review-reconciliation-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/pixel-typography-review-reconciliation.json
