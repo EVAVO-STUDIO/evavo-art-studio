@@ -1,0 +1,217 @@
+{
+  "id": "mirage",
+  "code": "MX-04",
+  "epithet": "FALSE SUN",
+  "class": "PHASE FRAME",
+  "pilot": {
+    "id": "parvaneh-razi",
+    "name": "PARVANEH RAZI",
+    "handle": "FALSE SUN",
+    "affiliation": "CASPIAN SIGNAL"
+  },
+  "crewRequirement": 3,
+  "targetHeightMeters": 10.6,
+  "core": "NULL PRISM",
+  "motionIdentity": "phase-drift",
+  "silhouetteLocks": [
+    "narrow-central-body",
+    "long-forearms",
+    "mechanically-hinged-prism-vanes",
+    "compact-precise-feet",
+    "integrated-lance-emitter",
+    "limited-declared-asymmetry"
+  ],
+  "materialRamps": [
+    "pale-ceramic-plate",
+    "dark-plum-structural-shell",
+    "black-joint-cavities",
+    "amber-calibration-light",
+    "magenta-signal-accent"
+  ],
+  "landmarks": [
+    {
+      "id": "sensor-centre",
+      "side": "centre",
+      "attachment": "head",
+      "stability": "rigid"
+    },
+    {
+      "id": "core-centre",
+      "side": "centre",
+      "attachment": "central-body",
+      "stability": "rigid"
+    },
+    {
+      "id": "pilot-capsule-centre",
+      "side": "centre",
+      "attachment": "central-body",
+      "stability": "rigid"
+    },
+    {
+      "id": "left-shoulder",
+      "side": "left",
+      "attachment": "torso",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-shoulder",
+      "side": "right",
+      "attachment": "torso",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-elbow",
+      "side": "left",
+      "attachment": "left-arm",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-elbow",
+      "side": "right",
+      "attachment": "right-arm",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-wrist-mount",
+      "side": "left",
+      "attachment": "left-hand",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-wrist-mount",
+      "side": "right",
+      "attachment": "lance-emitter",
+      "stability": "telescoping-declared"
+    },
+    {
+      "id": "left-hip",
+      "side": "left",
+      "attachment": "pelvis",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-hip",
+      "side": "right",
+      "attachment": "pelvis",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-knee",
+      "side": "left",
+      "attachment": "left-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-knee",
+      "side": "right",
+      "attachment": "right-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-ankle",
+      "side": "left",
+      "attachment": "left-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-ankle",
+      "side": "right",
+      "attachment": "right-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-foot-contact",
+      "side": "left",
+      "attachment": "left-foot",
+      "stability": "ground-contract"
+    },
+    {
+      "id": "right-foot-contact",
+      "side": "right",
+      "attachment": "right-foot",
+      "stability": "ground-contract"
+    },
+    {
+      "id": "primary-cooling-centre",
+      "side": "centre",
+      "attachment": "prism-spine-root",
+      "stability": "hinged-declared"
+    }
+  ],
+  "hardpoints": [
+    {
+      "id": "right-lance-emitter",
+      "side": "right",
+      "attachment": "right-wrist-mount",
+      "clearance": "attack-lane"
+    },
+    {
+      "id": "prism-spine",
+      "side": "centre",
+      "attachment": "primary-cooling-centre",
+      "clearance": "silhouette"
+    },
+    {
+      "id": "left-phase-vane",
+      "side": "left",
+      "attachment": "prism-spine",
+      "clearance": "silhouette"
+    },
+    {
+      "id": "right-phase-vane",
+      "side": "right",
+      "attachment": "prism-spine",
+      "clearance": "silhouette"
+    },
+    {
+      "id": "null-field-projector",
+      "side": "centre",
+      "attachment": "core-centre",
+      "clearance": "effect-origin"
+    }
+  ],
+  "asymmetry": [
+    {
+      "id": "lance-emitter",
+      "side": "right",
+      "mirrorTreatment": "runtime-facing-mirror-is-allowed-but-weapon-mount-must-remain-on-the-rendered-arm"
+    }
+  ],
+  "mirrorPolicy": {
+    "mode": "runtime-mirror-with-weapon-side-review",
+    "requiredReview": true,
+    "rules": [
+      "physical-body-remains-one-coherent-chassis",
+      "lance-remains-on-the-rendered-declared-arm",
+      "false-bodies-are-effect-layers-only",
+      "prism-vanes-remain-attached-to-the-spine"
+    ]
+  },
+  "bodyEffectBoundary": {
+    "bodyOwned": [
+      "lance-emitter",
+      "prism-spine",
+      "hinged-prism-vanes",
+      "compact-feet",
+      "physical-body-silhouette"
+    ],
+    "effectOwned": [
+      "optical-echo",
+      "null-line",
+      "phase-seam",
+      "false-vector",
+      "displacement-collapse"
+    ],
+    "forbidden": [
+      "false-body-baked-into-physical-body-cel",
+      "detached-prism-shards",
+      "phase-effect-hiding-real-body-position"
+    ]
+  },
+  "motionRules": [
+    "precise-physical-key-before-visual-echo",
+    "false-vectors-never-own-the-hitbox-truth",
+    "controlled-return-after-displacement",
+    "idle-feet-remain-perfectly-planted"
+  ]
+}

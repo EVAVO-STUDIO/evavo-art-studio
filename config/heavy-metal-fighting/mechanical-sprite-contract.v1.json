@@ -1,0 +1,16 @@
+{
+  "schema": "evavo.mechanical-sprite-contract-bundle.v1",
+  "protocolVersion": "2026-08-12.1",
+  "contractSchema": "evavo.mechanical-sprite-contract.v1",
+  "components": {
+    "base": "mechanical-sprite-contract.v1/base.json",
+    "frames": [
+      "mechanical-sprite-contract.v1/frames/bastion.json",
+      "mechanical-sprite-contract.v1/frames/viper.json",
+      "mechanical-sprite-contract.v1/frames/citadel.json",
+      "mechanical-sprite-contract.v1/frames/mirage.json"
+    ],
+    "topology": "mechanical-sprite-contract.v1/topology.json",
+    "styleProof": "mechanical-sprite-contract.v1/style-proof.json"
+  }
+}

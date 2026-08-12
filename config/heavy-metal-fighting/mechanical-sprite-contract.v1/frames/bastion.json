@@ -1,0 +1,209 @@
+{
+  "id": "bastion",
+  "code": "BX-09",
+  "epithet": "GRAVEBELL",
+  "class": "SIEGE FRAME",
+  "pilot": {
+    "id": "branka-kovac",
+    "name": "BRANKA KOVAC",
+    "handle": "GRAVEBELL",
+    "affiliation": "DANUBE WORKS"
+  },
+  "crewRequirement": 7,
+  "targetHeightMeters": 12.4,
+  "core": "HYDRAULIC CORE",
+  "motionIdentity": "hydraulic-weight",
+  "silhouetteLocks": [
+    "slab-shoulders-wider-than-hips",
+    "enormous-piston-forearms",
+    "broad-two-part-feet-with-heel-anchors",
+    "compact-sensor-brow-buried-between-shoulders",
+    "dorsal-cooling-shutters"
+  ],
+  "materialRamps": [
+    "bone-grey-load-bearing-plate",
+    "oxide-red-load-tabs",
+    "black-joint-cavities",
+    "warm-hydraulic-steel",
+    "furnace-orange-system-light"
+  ],
+  "landmarks": [
+    {
+      "id": "sensor-centre",
+      "side": "centre",
+      "attachment": "head",
+      "stability": "rigid"
+    },
+    {
+      "id": "core-centre",
+      "side": "centre",
+      "attachment": "torso",
+      "stability": "rigid"
+    },
+    {
+      "id": "pilot-capsule-centre",
+      "side": "centre",
+      "attachment": "upper-sternum",
+      "stability": "rigid"
+    },
+    {
+      "id": "left-shoulder",
+      "side": "left",
+      "attachment": "torso",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-shoulder",
+      "side": "right",
+      "attachment": "torso",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-elbow",
+      "side": "left",
+      "attachment": "left-arm",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-elbow",
+      "side": "right",
+      "attachment": "right-arm",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-wrist-mount",
+      "side": "left",
+      "attachment": "left-forearm-piston",
+      "stability": "telescoping-declared"
+    },
+    {
+      "id": "right-wrist-mount",
+      "side": "right",
+      "attachment": "right-forearm-piston",
+      "stability": "telescoping-declared"
+    },
+    {
+      "id": "left-hip",
+      "side": "left",
+      "attachment": "pelvis",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-hip",
+      "side": "right",
+      "attachment": "pelvis",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-knee",
+      "side": "left",
+      "attachment": "left-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-knee",
+      "side": "right",
+      "attachment": "right-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-ankle",
+      "side": "left",
+      "attachment": "left-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-ankle",
+      "side": "right",
+      "attachment": "right-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-foot-contact",
+      "side": "left",
+      "attachment": "left-foot",
+      "stability": "ground-contract"
+    },
+    {
+      "id": "right-foot-contact",
+      "side": "right",
+      "attachment": "right-foot",
+      "stability": "ground-contract"
+    },
+    {
+      "id": "primary-cooling-centre",
+      "side": "centre",
+      "attachment": "dorsal-shutters",
+      "stability": "hinged-declared"
+    }
+  ],
+  "hardpoints": [
+    {
+      "id": "left-forearm-tool",
+      "side": "left",
+      "attachment": "left-wrist-mount",
+      "clearance": "attack-lane"
+    },
+    {
+      "id": "right-forearm-tool",
+      "side": "right",
+      "attachment": "right-wrist-mount",
+      "clearance": "attack-lane"
+    },
+    {
+      "id": "dorsal-cooling",
+      "side": "centre",
+      "attachment": "primary-cooling-centre",
+      "clearance": "silhouette"
+    },
+    {
+      "id": "left-heel-anchor",
+      "side": "left",
+      "attachment": "left-foot-contact",
+      "clearance": "ground"
+    },
+    {
+      "id": "right-heel-anchor",
+      "side": "right",
+      "attachment": "right-foot-contact",
+      "clearance": "ground"
+    }
+  ],
+  "asymmetry": [],
+  "mirrorPolicy": {
+    "mode": "runtime-mirror-safe",
+    "requiredReview": true,
+    "rules": [
+      "piston-tools-remain-declared-per-side",
+      "load-tabs-may-mirror-because-they-are-not-text",
+      "no-readable-markings-baked-into-body-cels"
+    ]
+  },
+  "bodyEffectBoundary": {
+    "bodyOwned": [
+      "piston-rods",
+      "forearm-tool-housings",
+      "heel-anchors",
+      "dorsal-shutters",
+      "system-lamps"
+    ],
+    "effectOwned": [
+      "pressure-vent",
+      "piston-exhaust",
+      "bore-trail",
+      "furnace-flare",
+      "floor-shock"
+    ],
+    "forbidden": [
+      "baked-motion-blur",
+      "detached-piston-components",
+      "effect-cloud-hiding-contact-pose"
+    ]
+  },
+  "motionRules": [
+    "heels-release-late",
+    "shoulders-lag-hips-by-one-held-cel",
+    "heavy-recovery-remains-visibly-punishable",
+    "idle-never-imitates-human-breathing"
+  ]
+}

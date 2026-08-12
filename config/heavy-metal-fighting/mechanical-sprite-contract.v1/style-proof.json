@@ -1,0 +1,257 @@
+{
+  "styleProof": {
+    "id": "branka-bastion-foundry-nine",
+    "approvalRequiredBeforeExpansion": true,
+    "pilotId": "branka-kovac",
+    "frameId": "bastion",
+    "arenaId": "foundry-nine",
+    "environmentId": "danube-works-service-cradle",
+    "titleId": "heavy-metal-fighting",
+    "pilotStates": [
+      "neutral",
+      "ready",
+      "system-warning",
+      "overdrive"
+    ],
+    "frameRequirements": [
+      {
+        "semantic": "idle-a",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 0,
+        "currentSlots": [
+          0
+        ],
+        "plannedSlots": [
+          0
+        ]
+      },
+      {
+        "semantic": "idle-b",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 1,
+        "currentSlots": [
+          1
+        ],
+        "plannedSlots": [
+          1
+        ]
+      },
+      {
+        "semantic": "ready",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 4,
+        "currentSlots": [
+          4
+        ],
+        "plannedSlots": [
+          4
+        ]
+      },
+      {
+        "semantic": "walk-contact-left",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 2,
+        "currentSlots": [
+          2
+        ],
+        "plannedSlots": [
+          2
+        ]
+      },
+      {
+        "semantic": "walk-passing-left",
+        "sourceClipOrdinal": 11,
+        "sourceFrameIndex": 0,
+        "currentSlots": [],
+        "plannedSlots": [
+          34
+        ]
+      },
+      {
+        "semantic": "walk-contact-right",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 3,
+        "currentSlots": [
+          3
+        ],
+        "plannedSlots": [
+          3
+        ]
+      },
+      {
+        "semantic": "walk-passing-right",
+        "sourceClipOrdinal": 11,
+        "sourceFrameIndex": 1,
+        "currentSlots": [],
+        "plannedSlots": [
+          35
+        ]
+      },
+      {
+        "semantic": "crouch",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 5,
+        "currentSlots": [
+          5
+        ],
+        "plannedSlots": [
+          5
+        ]
+      },
+      {
+        "semantic": "guard",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 6,
+        "currentSlots": [
+          6
+        ],
+        "plannedSlots": [
+          6
+        ]
+      },
+      {
+        "semantic": "jump-launch",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 7,
+        "currentSlots": [
+          7
+        ],
+        "plannedSlots": [
+          7
+        ]
+      },
+      {
+        "semantic": "jump-apex",
+        "sourceClipOrdinal": 11,
+        "sourceFrameIndex": 4,
+        "currentSlots": [],
+        "plannedSlots": [
+          74
+        ]
+      },
+      {
+        "semantic": "rivet-driver-startup",
+        "sourceClipOrdinal": 1,
+        "sourceFrameIndex": 0,
+        "currentSlots": [
+          16
+        ],
+        "plannedSlots": [
+          16
+        ]
+      },
+      {
+        "semantic": "rivet-driver-contact",
+        "sourceClipOrdinal": 1,
+        "sourceFrameIndex": 4,
+        "currentSlots": [
+          20
+        ],
+        "plannedSlots": [
+          20
+        ]
+      },
+      {
+        "semantic": "rivet-driver-recovery",
+        "sourceClipOrdinal": 1,
+        "sourceFrameIndex": 8,
+        "currentSlots": [
+          24
+        ],
+        "plannedSlots": [
+          24
+        ]
+      },
+      {
+        "semantic": "gravebell-startup",
+        "sourceClipOrdinal": 2,
+        "sourceFrameIndex": 0,
+        "currentSlots": [
+          24
+        ],
+        "plannedSlots": [
+          25
+        ]
+      },
+      {
+        "semantic": "gravebell-contact",
+        "sourceClipOrdinal": 2,
+        "sourceFrameIndex": 4,
+        "currentSlots": [
+          28
+        ],
+        "plannedSlots": [
+          29
+        ]
+      },
+      {
+        "semantic": "gravebell-recovery",
+        "sourceClipOrdinal": 2,
+        "sourceFrameIndex": 8,
+        "currentSlots": [
+          32
+        ],
+        "plannedSlots": [
+          33
+        ]
+      },
+      {
+        "semantic": "hit",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 9,
+        "currentSlots": [
+          9
+        ],
+        "plannedSlots": [
+          9
+        ]
+      },
+      {
+        "semantic": "knockdown",
+        "sourceClipOrdinal": 0,
+        "sourceFrameIndex": 10,
+        "currentSlots": [
+          10
+        ],
+        "plannedSlots": [
+          10
+        ]
+      },
+      {
+        "semantic": "victory",
+        "sourceClipOrdinal": 12,
+        "sourceFrameIndex": 0,
+        "currentSlots": [
+          118
+        ],
+        "plannedSlots": [
+          118
+        ]
+      },
+      {
+        "semantic": "defeat",
+        "sourceClipOrdinal": 12,
+        "sourceFrameIndex": 1,
+        "currentSlots": [
+          119
+        ],
+        "plannedSlots": [
+          119
+        ]
+      }
+    ],
+    "reviewContexts": [
+      "native-cell",
+      "640x360-match",
+      "320x180-thumbnail",
+      "grayscale",
+      "silhouette-only",
+      "runtime-mirror",
+      "foundry-nine",
+      "reactor-spine",
+      "orbital-dock",
+      "ash-citadel",
+      "title-and-selection"
+    ]
+  }
+}

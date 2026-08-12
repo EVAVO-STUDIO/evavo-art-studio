@@ -1,0 +1,216 @@
+{
+  "id": "citadel",
+  "code": "CX-88",
+  "epithet": "NINTH GATE",
+  "class": "CONTROL FRAME",
+  "pilot": {
+    "id": "esi-quartey",
+    "name": "ESI QUARTEY",
+    "handle": "NINTH GATE",
+    "affiliation": "ACCRA YARD"
+  },
+  "crewRequirement": 10,
+  "targetHeightMeters": 13.8,
+  "core": "SEISMIC HEART",
+  "motionIdentity": "containment-brace",
+  "silhouetteLocks": [
+    "tall-rectangular-torso",
+    "dominant-asymmetric-guard-assembly",
+    "wide-pelvis-and-stable-lower-legs",
+    "visible-ground-anchors",
+    "sensor-head-recessed-behind-upper-chest",
+    "field-rings-attached-to-real-housings"
+  ],
+  "materialRamps": [
+    "deep-indigo-structural-steel",
+    "warm-ochre-guard-hardware",
+    "black-joint-cavities",
+    "survey-white-calibration-marks",
+    "amber-field-system-light"
+  ],
+  "landmarks": [
+    {
+      "id": "sensor-centre",
+      "side": "centre",
+      "attachment": "recessed-head",
+      "stability": "rigid"
+    },
+    {
+      "id": "core-centre",
+      "side": "centre",
+      "attachment": "torso",
+      "stability": "rigid"
+    },
+    {
+      "id": "pilot-capsule-centre",
+      "side": "centre",
+      "attachment": "upper-torso",
+      "stability": "rigid"
+    },
+    {
+      "id": "left-shoulder",
+      "side": "left",
+      "attachment": "guard-root",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-shoulder",
+      "side": "right",
+      "attachment": "torso",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-elbow",
+      "side": "left",
+      "attachment": "guard-arm",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-elbow",
+      "side": "right",
+      "attachment": "free-arm",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-wrist-mount",
+      "side": "left",
+      "attachment": "guard-assembly",
+      "stability": "rigid-attached"
+    },
+    {
+      "id": "right-wrist-mount",
+      "side": "right",
+      "attachment": "free-hand",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-hip",
+      "side": "left",
+      "attachment": "pelvis",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-hip",
+      "side": "right",
+      "attachment": "pelvis",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-knee",
+      "side": "left",
+      "attachment": "left-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-knee",
+      "side": "right",
+      "attachment": "right-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-ankle",
+      "side": "left",
+      "attachment": "left-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-ankle",
+      "side": "right",
+      "attachment": "right-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-foot-contact",
+      "side": "left",
+      "attachment": "left-anchor-foot",
+      "stability": "ground-contract"
+    },
+    {
+      "id": "right-foot-contact",
+      "side": "right",
+      "attachment": "right-anchor-foot",
+      "stability": "ground-contract"
+    },
+    {
+      "id": "primary-cooling-centre",
+      "side": "centre",
+      "attachment": "rear-torso-vent",
+      "stability": "hinged-declared"
+    }
+  ],
+  "hardpoints": [
+    {
+      "id": "left-containment-guard",
+      "side": "left",
+      "attachment": "left-wrist-mount",
+      "clearance": "guard-and-attack-lane"
+    },
+    {
+      "id": "field-emitter-ring",
+      "side": "left",
+      "attachment": "left-containment-guard",
+      "clearance": "silhouette"
+    },
+    {
+      "id": "left-ground-anchor",
+      "side": "left",
+      "attachment": "left-foot-contact",
+      "clearance": "ground"
+    },
+    {
+      "id": "right-ground-anchor",
+      "side": "right",
+      "attachment": "right-foot-contact",
+      "clearance": "ground"
+    },
+    {
+      "id": "rear-cooling-loop",
+      "side": "centre",
+      "attachment": "primary-cooling-centre",
+      "clearance": "silhouette"
+    }
+  ],
+  "asymmetry": [
+    {
+      "id": "containment-guard",
+      "side": "left",
+      "mirrorTreatment": "runtime-facing-mirror-is-allowed-but-semantic-guard-side-must-be-reviewed"
+    }
+  ],
+  "mirrorPolicy": {
+    "mode": "runtime-mirror-with-semantic-side-review",
+    "requiredReview": true,
+    "rules": [
+      "guard-remains-attached-to-declared-arm",
+      "field-rings-never-float-or-swap-independently",
+      "ground-anchors-match-the-rendered-foot-contact"
+    ]
+  },
+  "bodyEffectBoundary": {
+    "bodyOwned": [
+      "containment-guard",
+      "field-emitter-housings",
+      "ground-anchors",
+      "recessed-sensor-head",
+      "rear-cooling-loop"
+    ],
+    "effectOwned": [
+      "field-ring",
+      "anchor-shock",
+      "containment-wall",
+      "pulse-geometry",
+      "shield-contact-flash"
+    ],
+    "forbidden": [
+      "floating-field-hardware",
+      "field-effect-hiding-guard-pose",
+      "symmetric-redesign-of-asymmetric-guard"
+    ]
+  },
+  "motionRules": [
+    "measured-setup-before-space-control",
+    "broad-controlled-active-cel",
+    "slow-structural-reset",
+    "shield-mass-is-always-counterbalanced"
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "schema": "evavo.mechanical-sprite-contract.v1",
+  "protocolVersion": "2026-08-12.1",
+  "project": {
+    "id": "heavy-metal-fighting",
+    "publicTitle": "HEAVY METAL FIGHTING",
+    "subtitle": "WAR CIRCUIT // 2089",
+    "technicalRepositoryId": "steel-dominion",
+    "logicalCanvas": {
+      "width": 640,
+      "height": 360
+    },
+    "nativeCell": {
+      "width": 128,
+      "height": 128
+    },
+    "origin": {
+      "x": 64,
+      "y": 128
+    },
+    "authoredFacing": "right",
+    "runtimeMirror": true,
+    "stylePreset": "arcade-mech-fighter-1996"
+  },
+  "authority": {
+    "gameRepositoryOwnsCombatTiming": true,
+    "gameRepositoryOwnsHitboxesAndDamage": true,
+    "gameRepositoryOwnsRuntimeSlotManifest": true,
+    "artStudioOwnsCandidateProductionAndReview": true,
+    "providerMayDefineCanon": false,
+    "providerMayGeneratePackedRuntimeAtlas": false,
+    "automaticPromotionForbidden": true,
+    "namedHumanApprovalRequired": true,
+    "targetRepositoryMutationForbidden": true,
+    "gitMutationForbidden": true
+  },
+  "inventory": {
+    "families": 11,
+    "sourceImages": 1157,
+    "batches": 119,
+    "frameAnimationImages": 480,
+    "frameAnimationImagesPerFrame": 120,
+    "openingIntroImages": 30
+  },
+  "atlas": {
+    "status": "implemented",
+    "width": 1024,
+    "height": 1920,
+    "cellWidth": 128,
+    "cellHeight": 128,
+    "columns": 8,
+    "rows": 15,
+    "slots": 120,
+    "origin": {
+      "x": 64,
+      "y": 128
+    },
+    "sharedBoundarySlots": [
+      24,
+      44,
+      64,
+      84
+    ],
+    "victorySlot": 118,
+    "defeatSlot": 119,
+    "facingPolicy": "one-authored-facing-runtime-mirror",
+    "sourceOfTruth": "live-fighter-atlas-slot-export"
+  },
+  "plannedAtlasV2": {
+    "status": "planned-not-authoritative",
+    "requiresGameRepositoryMigration": true,
+    "utilitySlots": {
+      "34": "walk-contact-b",
+      "35": "walk-passing-b",
+      "54": "block-impact",
+      "55": "guard-crush",
+      "74": "jump-apex-or-fall",
+      "75": "landing-compression",
+      "94": "heavy-or-counter-stagger",
+      "95": "wall-or-air-impact",
+      "105": "core-system-down",
+      "106": "core-reignition",
+      "107": "heat-vent",
+      "117": "entrance-or-taunt"
+    }
+  },
+  "phaseGrammar": {
+    "bankFrameCount": 9,
+    "startupFrameIndexes": [
+      0,
+      1,
+      2
+    ],
+    "activeFrameIndexes": [
+      3,
+      4,
+      5
+    ],
+    "heroImpactFrameIndex": 4,
+    "recoveryFrameIndexes": [
+      6,
+      7,
+      8
+    ],
+    "rule": "effects-reinforce-the-body-and-never-replace-a-readable-contact-pose"
+  },
+  "requiredLandmarkIds": [
+    "sensor-centre",
+    "core-centre",
+    "pilot-capsule-centre",
+    "left-shoulder",
+    "right-shoulder",
+    "left-elbow",
+    "right-elbow",
+    "left-wrist-mount",
+    "right-wrist-mount",
+    "left-hip",
+    "right-hip",
+    "left-knee",
+    "right-knee",
+    "left-ankle",
+    "right-ankle",
+    "left-foot-contact",
+    "right-foot-contact",
+    "primary-cooling-centre"
+  ],
+  "universalReviewGates": [
+    "native-128x128-readability",
+    "one-colour-silhouette-identity",
+    "mechanical-landmark-continuity",
+    "declared-hardpoint-continuity",
+    "palette-and-material-ramp-continuity",
+    "origin-and-ground-contact",
+    "transparent-safe-bounds",
+    "startup-contact-recovery-readability",
+    "mirror-safety",
+    "body-effect-separation",
+    "grayscale-stage-separation",
+    "all-four-arena-palette-review",
+    "godot-render-lab-evidence",
+    "live-slot-manifest-audit",
+    "named-human-style-approval"
+  ]
+}

@@ -1,0 +1,348 @@
+{
+  "clipBindings": [
+    {
+      "sourceClipOrdinal": 0,
+      "semantic": "neutral-and-throws",
+      "expectedFrames": 16,
+      "currentRuntimeSlots": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "plannedRuntimeSlots": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "sourceClipOrdinal": 1,
+      "semantic": "standing-light",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24
+      ],
+      "plannedRuntimeSlots": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24
+      ]
+    },
+    {
+      "sourceClipOrdinal": 2,
+      "semantic": "standing-heavy",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32
+      ],
+      "plannedRuntimeSlots": [
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33
+      ]
+    },
+    {
+      "sourceClipOrdinal": 3,
+      "semantic": "crouch-light",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "plannedRuntimeSlots": [
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ]
+    },
+    {
+      "sourceClipOrdinal": 4,
+      "semantic": "crouch-heavy",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52
+      ],
+      "plannedRuntimeSlots": [
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53
+      ]
+    },
+    {
+      "sourceClipOrdinal": 5,
+      "semantic": "jump-light",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64
+      ],
+      "plannedRuntimeSlots": [
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64
+      ]
+    },
+    {
+      "sourceClipOrdinal": 6,
+      "semantic": "jump-heavy",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72
+      ],
+      "plannedRuntimeSlots": [
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73
+      ]
+    },
+    {
+      "sourceClipOrdinal": 7,
+      "semantic": "special-a",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84
+      ],
+      "plannedRuntimeSlots": [
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84
+      ]
+    },
+    {
+      "sourceClipOrdinal": 8,
+      "semantic": "special-b",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92
+      ],
+      "plannedRuntimeSlots": [
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93
+      ]
+    },
+    {
+      "sourceClipOrdinal": 9,
+      "semantic": "high-output-a",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104
+      ],
+      "plannedRuntimeSlots": [
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104
+      ]
+    },
+    {
+      "sourceClipOrdinal": 10,
+      "semantic": "high-output-b",
+      "expectedFrames": 9,
+      "currentRuntimeSlots": [
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116
+      ],
+      "plannedRuntimeSlots": [
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116
+      ]
+    },
+    {
+      "sourceClipOrdinal": 11,
+      "semantic": "utility-v2-planned",
+      "expectedFrames": 12,
+      "currentRuntimeSlots": [],
+      "plannedRuntimeSlots": [
+        34,
+        35,
+        54,
+        55,
+        74,
+        75,
+        94,
+        95,
+        105,
+        106,
+        107,
+        117
+      ]
+    },
+    {
+      "sourceClipOrdinal": 12,
+      "semantic": "victory-defeat",
+      "expectedFrames": 2,
+      "currentRuntimeSlots": [
+        118,
+        119
+      ],
+      "plannedRuntimeSlots": [
+        118,
+        119
+      ]
+    }
+  ]
+}

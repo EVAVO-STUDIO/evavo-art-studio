@@ -1,0 +1,216 @@
+{
+  "id": "viper",
+  "code": "VX-27",
+  "epithet": "CUTGLASS",
+  "class": "RAZOR FRAME",
+  "pilot": {
+    "id": "miho-tagawa",
+    "name": "MIHO TAGAWA",
+    "handle": "CUTGLASS",
+    "affiliation": "KANSAI ARC"
+  },
+  "crewRequirement": 1,
+  "targetHeightMeters": 9.7,
+  "core": "ARC DRIVE",
+  "motionIdentity": "razor-snap",
+  "silhouetteLocks": [
+    "low-forward-sensor-brow",
+    "compact-torso-and-narrow-shoulder-roots",
+    "large-hip-drive-housings",
+    "digitigrade-legs-with-pronounced-heels",
+    "forearm-blade-cassettes",
+    "single-attached-dorsal-counterbalance-vane"
+  ],
+  "materialRamps": [
+    "graphite-structural-shell",
+    "blue-green-ceramic-plate",
+    "black-joint-cavities",
+    "acid-lime-diagnostics",
+    "arc-blue-system-light"
+  ],
+  "landmarks": [
+    {
+      "id": "sensor-centre",
+      "side": "centre",
+      "attachment": "head",
+      "stability": "rigid"
+    },
+    {
+      "id": "core-centre",
+      "side": "centre",
+      "attachment": "torso",
+      "stability": "rigid"
+    },
+    {
+      "id": "pilot-capsule-centre",
+      "side": "centre",
+      "attachment": "chest-capsule",
+      "stability": "rigid"
+    },
+    {
+      "id": "left-shoulder",
+      "side": "left",
+      "attachment": "torso",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-shoulder",
+      "side": "right",
+      "attachment": "torso",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-elbow",
+      "side": "left",
+      "attachment": "left-arm",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-elbow",
+      "side": "right",
+      "attachment": "right-arm",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-wrist-mount",
+      "side": "left",
+      "attachment": "left-blade-cassette",
+      "stability": "telescoping-declared"
+    },
+    {
+      "id": "right-wrist-mount",
+      "side": "right",
+      "attachment": "right-blade-cassette",
+      "stability": "telescoping-declared"
+    },
+    {
+      "id": "left-hip",
+      "side": "left",
+      "attachment": "left-hip-drive",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-hip",
+      "side": "right",
+      "attachment": "right-hip-drive",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-knee",
+      "side": "left",
+      "attachment": "left-digitigrade-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-knee",
+      "side": "right",
+      "attachment": "right-digitigrade-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-ankle",
+      "side": "left",
+      "attachment": "left-digitigrade-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "right-ankle",
+      "side": "right",
+      "attachment": "right-digitigrade-leg",
+      "stability": "articulated"
+    },
+    {
+      "id": "left-foot-contact",
+      "side": "left",
+      "attachment": "left-foot",
+      "stability": "ground-contract"
+    },
+    {
+      "id": "right-foot-contact",
+      "side": "right",
+      "attachment": "right-foot",
+      "stability": "ground-contract"
+    },
+    {
+      "id": "primary-cooling-centre",
+      "side": "centre",
+      "attachment": "dorsal-vane-root",
+      "stability": "hinged-declared"
+    }
+  ],
+  "hardpoints": [
+    {
+      "id": "left-blade-cassette",
+      "side": "left",
+      "attachment": "left-wrist-mount",
+      "clearance": "attack-lane"
+    },
+    {
+      "id": "right-blade-cassette",
+      "side": "right",
+      "attachment": "right-wrist-mount",
+      "clearance": "attack-lane"
+    },
+    {
+      "id": "dorsal-counterbalance-vane",
+      "side": "centre",
+      "attachment": "primary-cooling-centre",
+      "clearance": "silhouette"
+    },
+    {
+      "id": "left-heel-drive",
+      "side": "left",
+      "attachment": "left-foot-contact",
+      "clearance": "ground"
+    },
+    {
+      "id": "right-heel-drive",
+      "side": "right",
+      "attachment": "right-foot-contact",
+      "clearance": "ground"
+    }
+  ],
+  "asymmetry": [
+    {
+      "id": "route-sensor-mark",
+      "side": "left",
+      "mirrorTreatment": "omit-from-body-cel-and-author-as-separate-overlay"
+    }
+  ],
+  "mirrorPolicy": {
+    "mode": "runtime-mirror-with-overlay-repair",
+    "requiredReview": true,
+    "rules": [
+      "blade-cassettes-remain-physically-attached",
+      "route-sensor-mark-is-not-baked-into-body-cels",
+      "dorsal-vane-remains-one-continuous-attached-component"
+    ]
+  },
+  "bodyEffectBoundary": {
+    "bodyOwned": [
+      "blade-cassettes",
+      "hip-drive-housings",
+      "digitigrade-heels",
+      "dorsal-counterbalance-vane",
+      "sensor-brow"
+    ],
+    "effectOwned": [
+      "blade-arc",
+      "arc-discharge",
+      "route-afterimage",
+      "electrical-brake",
+      "landing-spark"
+    ],
+    "forbidden": [
+      "baked-afterimage",
+      "detached-blade-cassettes",
+      "animal-tail-or-claw-redesign"
+    ]
+  },
+  "motionRules": [
+    "fast-compression-before-contact",
+    "abrupt-readable-active-cel",
+    "elastic-mechanical-brake",
+    "minimal-idle-vertical-bounce"
+  ]
+}
