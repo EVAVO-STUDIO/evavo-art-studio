@@ -297,15 +297,156 @@ function validateRequest(request) {
   return { workspaceId, projectId, title, steps };
 }
 
+function planInvalid(message, data) {
+  fail('ARTIST_WORKSPACE_JOB_PLAN_INVALID', message, data);
+}
+
+function planValue(label, callback) {
+  try {
+    return callback();
+  } catch (error) {
+    if (error?.code === 'ARTIST_WORKSPACE_JOB_PLAN_INVALID') throw error;
+    planInvalid(`${label} is invalid: ${error.message}`, { causeCode: error?.code ?? null });
+  }
+}
+
+function requirePlanKeys(value, requiredKeys, optionalKeys, label) {
+  if (!isRecord(value)) planInvalid(`${label} must be an object.`);
+  const required = new Set(requiredKeys);
+  const allowed = new Set([...requiredKeys, ...optionalKeys]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) planInvalid(`${label} contains unsupported key: ${key}.`);
+  }
+  for (const key of required) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) planInvalid(`${label} is missing required key: ${key}.`);
+  }
+}
+
+function requirePlanUniqueArray(value, maximum, label) {
+  if (!Array.isArray(value) || value.length > maximum) planInvalid(`${label} must be an array with at most ${maximum} entries.`);
+  if (new Set(value).size !== value.length) planInvalid(`${label} must not contain duplicate entries.`);
+  return value;
+}
+
+function canonicalPlanPath(value, label) {
+  const canonical = planValue(label, () => canonicalRelativePath(value, label));
+  if (canonical !== value) planInvalid(`${label} must already use canonical workspace-relative path syntax.`);
+  return canonical;
+}
+
 function validatePlan(plan) {
-  if (!isRecord(plan) || plan.schema !== JOB_PLAN_SCHEMA) fail('ARTIST_WORKSPACE_JOB_PLAN_INVALID', `Plan must use ${JOB_PLAN_SCHEMA}.`);
+  if (!isRecord(plan) || plan.schema !== JOB_PLAN_SCHEMA) planInvalid(`Plan must use ${JOB_PLAN_SCHEMA}.`);
   verifyDocumentHash(plan, 'job plan');
-  safeId(plan.jobId, 'jobId');
-  safeId(plan.workspaceId, 'workspaceId');
-  safeId(plan.projectId, 'projectId');
-  if (!Array.isArray(plan.steps) || plan.steps.length < 1 || plan.steps.length > MAX_STEPS) fail('ARTIST_WORKSPACE_JOB_PLAN_INVALID', 'Plan steps are invalid.');
-  if (!isRecord(plan.authority)) fail('ARTIST_WORKSPACE_JOB_PLAN_INVALID', 'Plan authority is missing.');
-  for (const value of Object.values(plan.authority)) if (value !== false) fail('ARTIST_WORKSPACE_JOB_PLAN_INVALID', 'Job plan cannot grant external authority.');
+  requirePlanKeys(
+    plan,
+    ['schema', 'version', 'jobId', 'workspaceId', 'projectId', 'title', 'workspaceRoot', 'compiledAt', 'requestSha256', 'steps', 'publication', 'execution', 'authority', 'documentSha256'],
+    [],
+    'job plan',
+  );
+  if (plan.version !== 1) planInvalid('Job plan version must be 1.');
+  const jobId = planValue('jobId', () => safeId(plan.jobId, 'jobId'));
+  planValue('workspaceId', () => safeId(plan.workspaceId, 'workspaceId'));
+  planValue('projectId', () => safeId(plan.projectId, 'projectId'));
+  planValue('title', () => boundedString(plan.title, 'title', { max: 240 }));
+  if (typeof plan.workspaceRoot !== 'string' || plan.workspaceRoot.length < 1 || plan.workspaceRoot.length > 8192 || plan.workspaceRoot.includes('\0')) {
+    planInvalid('workspaceRoot must be a bounded absolute path string.');
+  }
+  if (!path.isAbsolute(plan.workspaceRoot) || path.resolve(plan.workspaceRoot) !== plan.workspaceRoot) {
+    planInvalid('workspaceRoot must already be an absolute normalized path.');
+  }
+  const canonicalCompiledAt = planValue('compiledAt', () => requireIsoTimestamp(plan.compiledAt, 'compiledAt'));
+  if (canonicalCompiledAt !== plan.compiledAt) planInvalid('compiledAt must already be canonical ISO-8601 text.');
+  if (!/^[a-f0-9]{64}$/.test(plan.requestSha256 ?? '')) planInvalid('requestSha256 must be a lowercase SHA-256 digest.');
+  if (!Array.isArray(plan.steps) || plan.steps.length < 1 || plan.steps.length > MAX_STEPS) planInvalid(`Plan steps must contain 1-${MAX_STEPS} entries.`);
+
+  const seen = new Set();
+  const validatedSteps = plan.steps.map((raw, index) => {
+    const label = `plan.steps[${index}]`;
+    requirePlanKeys(raw, ['id', 'kind', 'description', 'requires', 'inputs', 'outputs', 'inputFingerprints'], ['tool'], label);
+    const id = planValue(`${label}.id`, () => safeId(raw.id, `${label}.id`));
+    if (seen.has(id)) planInvalid(`Duplicate plan step id: ${id}.`);
+    seen.add(id);
+    const kind = planValue(`${label}.kind`, () => boundedString(raw.kind, `${label}.kind`, { max: 80 }));
+    if (!ALLOWED_STEP_KINDS.has(kind)) planInvalid(`Unsupported plan step kind: ${kind}.`);
+    planValue(`${label}.description`, () => boundedString(raw.description, `${label}.description`, { max: 1000 }));
+
+    const requires = requirePlanUniqueArray(raw.requires, MAX_DEPENDENCIES, `${label}.requires`)
+      .map((value, depIndex) => planValue(`${label}.requires[${depIndex}]`, () => safeId(value, `${label}.requires[${depIndex}]`)));
+    const inputs = requirePlanUniqueArray(raw.inputs, MAX_INPUTS, `${label}.inputs`)
+      .map((value, inputIndex) => canonicalPlanPath(value, `${label}.inputs[${inputIndex}]`));
+    const outputs = requirePlanUniqueArray(raw.outputs, MAX_OUTPUTS, `${label}.outputs`)
+      .map((value, outputIndex) => canonicalPlanPath(value, `${label}.outputs[${outputIndex}]`));
+
+    if (raw.tool !== undefined) {
+      const tool = planValue(`${label}.tool`, () => boundedString(raw.tool, `${label}.tool`, { max: 180 }));
+      if (!/^evavo_art_[a-z0-9_]+$/.test(tool)) planInvalid(`${label}.tool must name an existing evavo_art_* tool.`);
+    }
+
+    if (!Array.isArray(raw.inputFingerprints) || raw.inputFingerprints.length !== inputs.length) {
+      planInvalid(`${label}.inputFingerprints must contain exactly one fingerprint for each declared input.`);
+    }
+    raw.inputFingerprints.forEach((fingerprint, fingerprintIndex) => {
+      const fingerprintLabel = `${label}.inputFingerprints[${fingerprintIndex}]`;
+      requirePlanKeys(fingerprint, ['path', 'bytes', 'sha256'], [], fingerprintLabel);
+      const fingerprintPath = canonicalPlanPath(fingerprint.path, `${fingerprintLabel}.path`);
+      if (fingerprintPath !== inputs[fingerprintIndex]) {
+        planInvalid(`${fingerprintLabel}.path must bind the corresponding declared input path.`);
+      }
+      if (!Number.isSafeInteger(fingerprint.bytes) || fingerprint.bytes < 0 || fingerprint.bytes > MAX_EVIDENCE_BYTES) {
+        planInvalid(`${fingerprintLabel}.bytes is outside the bounded evidence size.`);
+      }
+      if (!/^[a-f0-9]{64}$/.test(fingerprint.sha256 ?? '')) planInvalid(`${fingerprintLabel}.sha256 must be a lowercase SHA-256 digest.`);
+    });
+
+    return { id, requires, inputs, outputs };
+  });
+
+  const byId = new Map(validatedSteps.map((step) => [step.id, step]));
+  for (const step of validatedSteps) {
+    for (const dependency of step.requires) {
+      if (!seen.has(dependency)) planInvalid(`${step.id} depends on unknown step ${dependency}.`);
+      if (dependency === step.id) planInvalid(`${step.id} cannot depend on itself.`);
+    }
+  }
+  const visiting = new Set();
+  const visited = new Set();
+  function visit(id) {
+    if (visited.has(id)) return;
+    if (visiting.has(id)) planInvalid(`Dependency cycle detected at ${id}.`);
+    visiting.add(id);
+    for (const dependency of byId.get(id).requires) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+  }
+  for (const step of validatedSteps) visit(step.id);
+
+  requirePlanKeys(plan.publication, ['relativeRoot', 'planFile', 'eventsDirectory', 'commitFile'], [], 'plan.publication');
+  if (plan.publication.relativeRoot !== `journals/jobs/${jobId}`) planInvalid('plan.publication.relativeRoot does not match the job identity.');
+  if (plan.publication.planFile !== 'job-plan.json') planInvalid('plan.publication.planFile must remain job-plan.json.');
+  if (plan.publication.eventsDirectory !== 'events') planInvalid('plan.publication.eventsDirectory must remain events.');
+  if (plan.publication.commitFile !== 'job-commit.json') planInvalid('plan.publication.commitFile must remain job-commit.json.');
+
+  const requiredExecutionFlags = [
+    'appendOnlyEvents',
+    'createOnlyPlan',
+    'staleLeaseRecovery',
+    'compareAndAppendEvents',
+    'exactInputRevalidationBeforeStart',
+    'exactOutputEvidenceOnSuccess',
+  ];
+  requirePlanKeys(plan.execution, requiredExecutionFlags, ['revalidateJournalPathChainOnReadAndAppend'], 'plan.execution');
+  for (const key of requiredExecutionFlags) {
+    if (plan.execution[key] !== true) planInvalid(`plan.execution.${key} must remain true.`);
+  }
+  if (Object.prototype.hasOwnProperty.call(plan.execution, 'revalidateJournalPathChainOnReadAndAppend') && plan.execution.revalidateJournalPathChainOnReadAndAppend !== true) {
+    planInvalid('plan.execution.revalidateJournalPathChainOnReadAndAppend must be true when present.');
+  }
+
+  const authority = authorityBoundary();
+  requirePlanKeys(plan.authority, Object.keys(authority), [], 'plan.authority');
+  for (const key of Object.keys(authority)) {
+    if (plan.authority[key] !== false) planInvalid(`plan.authority.${key} must remain false.`);
+  }
   return plan;
 }
 
@@ -344,6 +485,7 @@ export function jobCapabilities() {
     staleLeaseRecovery: true,
     optimisticConcurrency: true,
     postCreationPathChainRevalidation: true,
+    strictRehashedPlanAdmission: true,
     imageBytesThroughMcp: false,
     authority: authorityBoundary(),
   };
