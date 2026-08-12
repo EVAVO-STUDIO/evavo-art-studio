@@ -270,9 +270,12 @@ export function validateWebPbrTextureSet(document: unknown): WebPbrTextureSetVal
     if (typeof review.previewArtifactSha256 !== "string" || !SHA256.test(review.previewArtifactSha256)) {
       issues.push(issue("ART_WEB_PBR_PREVIEW_HASH_INVALID", "$.review.previewArtifactSha256"));
     }
-    if (!Array.isArray(review.checks) || review.checks.length < requiredReviewChecks.length || review.checks.length > 32) {
+    if (!Array.isArray(review.checks)) {
       issues.push(issue("ART_WEB_PBR_REVIEW_CHECKS_INVALID", "$.review.checks"));
     } else {
+      if (review.checks.length < requiredReviewChecks.length || review.checks.length > 32) {
+        issues.push(issue("ART_WEB_PBR_REVIEW_CHECKS_INVALID", "$.review.checks"));
+      }
       const ids = new Set<string>();
       review.checks.forEach((rawCheck, index) => {
         const check = record(rawCheck);
