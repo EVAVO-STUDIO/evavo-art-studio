@@ -1,0 +1,112 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  REGISTRY_BATCH_TOOL,
+  REGISTRY_SUMMARY_TOOL,
+  RECEIPT_TEMPLATE_TOOL,
+  REPAIR_TEMPLATE_TOOL,
+  RESUME_BATCH_TOOL,
+  VERIFY_TOOL,
+  WORK_ORDER_BATCH_TOOL,
+  WORK_ORDER_TOOL,
+  callTool,
+  handleRequest,
+  toolDefinitions,
+} from "./heavy-metal-fighting-production-mcp.mjs";
+
+const CANDIDATE = "a".repeat(64);
+
+const EXPECTED_TOOLS = [
+  REGISTRY_SUMMARY_TOOL,
+  REGISTRY_BATCH_TOOL,
+  WORK_ORDER_BATCH_TOOL,
+  WORK_ORDER_TOOL,
+  RECEIPT_TEMPLATE_TOOL,
+  REPAIR_TEMPLATE_TOOL,
+  RESUME_BATCH_TOOL,
+  VERIFY_TOOL,
+];
+
+test("production MCP exposes only bounded read-only planning and review tools", () => {
+  const tools = toolDefinitions();
+  assert.deepEqual(tools.map((tool) => tool.name), EXPECTED_TOOLS);
+  const names = tools.map((tool) => tool.name).join(" ");
+  for (const prohibited of ["generate", "approve", "promote", "publish", "commit", "push", "write", "deploy"] ) {
+    assert.equal(names.includes(prohibited), false, `production MCP gained prohibited ${prohibited} tool`);
+  }
+});
+
+test("registry and work-order tools expose the exact final production queue", async () => {
+  const summary = await callTool(REGISTRY_SUMMARY_TOOL);
+  assert.equal(summary.totals.batches, 179);
+  assert.equal(summary.totals.sourceImages, 1573);
+  assert.equal(summary.totals.bodyAnimationImages, 896);
+
+  const registryBatch = await callTool(REGISTRY_BATCH_TOOL, { batch: 1 });
+  assert.equal(registryBatch.batch.id, "hmf-b0001");
+  assert.ok(registryBatch.batch.requiredImages >= 1 && registryBatch.batch.requiredImages <= 10);
+
+  const workOrderBatch = await callTool(WORK_ORDER_BATCH_TOOL, { batch: "hmf-b0001" });
+  assert.equal(workOrderBatch.batchId, "hmf-b0001");
+  assert.equal(workOrderBatch.requiredImages, workOrderBatch.workOrders.length);
+  assert.ok(workOrderBatch.workOrders.every((order) => order.candidatePolicy.candidateFanout === 1));
+  assert.ok(workOrderBatch.workOrders.every((order) => order.authority.providerExecution === false));
+});
+
+test("one final Frame body work order remains native, identity-bound and one-image-only", async () => {
+  const order = await callTool(WORK_ORDER_TOOL, { unitId: "hmf.frame-animation.bastion.slot-002" });
+  assert.equal(order.assetContract.nativeDimensions.width, 160);
+  assert.equal(order.assetContract.nativeDimensions.height, 160);
+  assert.deepEqual(order.assetContract.pivot, { x: 80, y: 152 });
+  assert.equal(order.subjectContract.type, "frame");
+  assert.equal(order.subjectContract.id, "bastion");
+  assert.equal(order.subjectContract.motionIdentity, "hydraulic-weight");
+  assert.ok(order.referenceBindings.previousCel.startsWith("working/frames/bastion/sprites/"));
+  assert.ok(order.referenceBindings.nextCel.startsWith("working/frames/bastion/sprites/"));
+  assert.ok(order.providerPrompt.includes("OUTPUT EXACTLY ONE SEPARATE IMAGE"));
+  assert.equal(order.authority.automaticApproval, false);
+  assert.equal(order.authority.targetRepositoryMutation, false);
+});
+
+test("receipt, repair and resume tools stay human-gated and non-executing", async () => {
+  const unitId = "hmf.frame-animation.bastion.slot-002";
+  const receipt = await callTool(RECEIPT_TEMPLATE_TOOL, { unitId });
+  assert.equal(receipt.states.find((state) => state.id === "generation-authorized")?.requiresHuman, true);
+  assert.equal(receipt.states.find((state) => state.id === "named-human-approved")?.requiresHuman, true);
+
+  const repair = await callTool(REPAIR_TEMPLATE_TOOL, {
+    unitId,
+    candidateSha256: CANDIDATE,
+    failureCodes: ["random-greebles", "pivot-drift"],
+    attempt: 1,
+  });
+  assert.equal(repair.preservePassingSiblings, true);
+  assert.equal(repair.authority.providerExecution, false);
+  assert.equal(repair.authority.siblingRegeneration, false);
+  assert.ok(repair.siblingUnitIdsForbiddenFromRegeneration.length > 0);
+
+  const resume = await callTool(RESUME_BATCH_TOOL, { batch: "hmf-b0001", receipts: [] });
+  assert.equal(resume.status, "not-started");
+  assert.equal(resume.authority.providerExecution, false);
+  assert.ok(resume.unitStates.every((state) => state.nextAction === "lock-references"));
+});
+
+test("production MCP verification composes registry and work-order evidence", async () => {
+  const verification = await callTool(VERIFY_TOOL);
+  assert.equal(verification.status, "passed");
+  assert.equal(verification.registry.status, "passed");
+  assert.equal(verification.workOrders.status, "passed");
+  assert.equal(verification.authority.providerExecution, false);
+  assert.equal(verification.authority.receiptPersistence, false);
+  assert.equal(verification.authority.gitMutation, false);
+});
+
+test("JSON-RPC surface rejects undeclared production mutation tools", async () => {
+  await assert.rejects(callTool("evavo_hmf_production_generate", {}), /Unknown or prohibited/);
+  const listed = await handleRequest({ jsonrpc: "2.0", id: 1, method: "tools/list" });
+  assert.deepEqual(listed.result.tools.map((tool) => tool.name), EXPECTED_TOOLS);
+  const initialized = await handleRequest({ jsonrpc: "2.0", id: 2, method: "initialize", params: {} });
+  assert.equal(initialized.result.serverInfo.name, "evavo-heavy-metal-fighting-production");
+  assert.match(initialized.result.instructions, /does not generate images/i);
+});
