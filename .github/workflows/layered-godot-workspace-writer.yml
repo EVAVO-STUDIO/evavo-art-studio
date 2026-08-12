@@ -10,10 +10,15 @@ on:
       - "scripts/layered-godot-workspace-auditor.mjs"
       - "scripts/check-layered-godot-workspace-auditor.mjs"
       - "scripts/test-layered-godot-workspace-auditor.mjs"
+      - "scripts/layered-godot-runtime-validator.mjs"
+      - "scripts/check-layered-godot-runtime-validator.mjs"
+      - "scripts/test-layered-godot-runtime-validator.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
       - "config/layered-production-godot-workspace-auditor.v1.json"
+      - "config/layered-production-godot-runtime-validator.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
       - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
+      - "docs/LAYERED_GODOT_RUNTIME_VALIDATOR.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   push:
     branches:
@@ -26,10 +31,15 @@ on:
       - "scripts/layered-godot-workspace-auditor.mjs"
       - "scripts/check-layered-godot-workspace-auditor.mjs"
       - "scripts/test-layered-godot-workspace-auditor.mjs"
+      - "scripts/layered-godot-runtime-validator.mjs"
+      - "scripts/check-layered-godot-runtime-validator.mjs"
+      - "scripts/test-layered-godot-runtime-validator.mjs"
       - "config/layered-production-godot-workspace-writer.v1.json"
       - "config/layered-production-godot-workspace-auditor.v1.json"
+      - "config/layered-production-godot-runtime-validator.v1.json"
       - "docs/LAYERED_GODOT_WORKSPACE_WRITER.md"
       - "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md"
+      - "docs/LAYERED_GODOT_RUNTIME_VALIDATOR.md"
       - ".github/workflows/layered-godot-workspace-writer.yml"
   workflow_dispatch:
 
@@ -62,6 +72,9 @@ jobs:
 
       - name: Run read-only post-write auditor regressions
         run: node scripts/check-layered-godot-workspace-auditor.mjs
+
+      - name: Run sandboxed Godot runtime-validator contract regressions
+        run: node scripts/check-layered-godot-runtime-validator.mjs
 
       - name: Prove exact source remains clean
         if: always()

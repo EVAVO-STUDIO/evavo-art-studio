@@ -1,0 +1,65 @@
+{
+  "schema": "evavo.layered-production.godot-runtime-validator.v1",
+  "version": 1,
+  "protocolVersion": "2026-08-12.1",
+  "description": "Receipt-bound, sandboxed Godot 4.6.2 scene loading and instantiation validation for an already-written and audited layered-production handoff.",
+  "entrypoint": "scripts/layered-godot-runtime-validator.mjs",
+  "command": "node scripts/layered-godot-runtime-validator.mjs validate --plan <plan.json> --receipt <write-receipt.json> --audit-receipt <audit-receipt.json> --workspace <absolute-directory> --repository <owner/repository> --godot <absolute-godot-4.6.2-executable> [--timeout-ms 60000]",
+  "requirements": {
+    "requiredEngine": "Godot",
+    "requiredEngineVersion": "4.6.2",
+    "exactResourceCount": 7,
+    "requiresWriteReceipt": true,
+    "requiresCurrentAuditReceipt": true,
+    "requiresNoOutstandingWorkspaceTransaction": true,
+    "requiresSelfContainedSceneDraft": true,
+    "externalSceneResourcesRejected": true,
+    "sceneScriptsRejected": true,
+    "explicitAbsoluteExecutable": true,
+    "symbolicExecutableRejected": true,
+    "multiplyLinkedExecutableRejected": true,
+    "executableSha256Bound": true
+  },
+  "sandbox": {
+    "strategy": "ephemeral-exact-resource-copy",
+    "targetWorkspaceMounted": false,
+    "isolatedUserDirectories": true,
+    "cleanupRequired": true,
+    "sceneTreeActivation": false
+  },
+  "execution": {
+    "shell": false,
+    "headless": true,
+    "versionProbe": "--version",
+    "runtimeArguments": ["--headless", "--path", "<sandbox>", "--script", "<validator-script>", "--", "res://<scene>"],
+    "defaultTimeoutMs": 60000,
+    "maximumTimeoutMs": 300000,
+    "versionOutputBytes": 65536,
+    "runtimeOutputBytes": 524288,
+    "requiredEvidenceEvent": "evavo_layered_godot_runtime_validated"
+  },
+  "integrity": {
+    "preExecutionAuditRequired": true,
+    "postExecutionAuditRequired": true,
+    "postExecutionAuditRunsAfterEngineFailure": true,
+    "targetDriftFailsClosed": true,
+    "targetDriftOutranksEngineFailure": true,
+    "selfHashedValidationReceipt": true
+  },
+  "ci": {
+    "realEngineDownloadOnOrdinaryPush": false,
+    "deterministicContractTestsOnOrdinaryPush": true,
+    "reason": "Avoid repeated heavyweight engine downloads on the free GitHub Actions budget; real 4.6.2 execution is explicit through the CLI/runtime API when a validated executable is supplied."
+  },
+  "authority": {
+    "targetRepositoryRead": true,
+    "targetRepositoryWrite": false,
+    "godotExecutionInSandbox": true,
+    "targetRuntimeActivation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "deployment": false,
+    "publication": false,
+    "forcePush": false
+  }
+}
