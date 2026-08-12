@@ -1,0 +1,50 @@
+{
+  "schema": "evavo.layered-production.godot-workspace-writer.v1",
+  "version": 1,
+  "protocolVersion": "2026-08-12.1",
+  "description": "Explicit, bounded and rollback-safe application of approved layered-production Godot 4.6.2 integration plans to one selected repository workspace.",
+  "entrypoint": "scripts/layered-godot-workspace-writer.mjs",
+  "input": {
+    "kind": "evavo.layered-production.godot-integration-plan",
+    "protocolVersion": "2026-08-11.1",
+    "requiredResources": 7,
+    "requiredAssemblyScope": "runtime-candidate",
+    "requiresHandoffReady": true,
+    "requiresBlockerFree": true,
+    "requiresExplicitRepositoryMatch": true
+  },
+  "commands": {
+    "verify": "node scripts/layered-godot-workspace-writer.mjs verify --plan <plan.json> --workspace <absolute-directory> --repository <owner/repository>",
+    "apply": "node scripts/layered-godot-workspace-writer.mjs apply --plan <plan.json> --workspace <absolute-directory> --repository <owner/repository>"
+  },
+  "limits": {
+    "maximumPlanBytes": 33554432,
+    "maximumResourceBytes": 8388608,
+    "maximumTotalResourceBytes": 33554432,
+    "exactResourceCount": 7
+  },
+  "filesystemSafety": {
+    "portableRelativePathsOnly": true,
+    "repositoryControlPathsRejected": true,
+    "symbolicRootsRejected": true,
+    "symbolicParentsRejected": true,
+    "symbolicTargetsRejected": true,
+    "multiplyLinkedTargetsRejected": true,
+    "exclusiveStages": true,
+    "staleTargetDetection": true,
+    "atomicLinkInstallation": true,
+    "rollbackOnFailure": true,
+    "idempotentReplay": true,
+    "selfHashedReceipt": true
+  },
+  "authority": {
+    "exactWorkspaceFileWrite": true,
+    "godotExecution": false,
+    "runtimeActivation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "deployment": false,
+    "publication": false,
+    "forcePush": false
+  }
+}
