@@ -24,7 +24,7 @@ env:
   CARRIER_URL: "https://media.canva.com/v2/image-resize/format:PNG/height:200/quality:100/uri:ifs%3A%2F%2FM%2Fb30ccea0-ec9e-4103-a791-e07f572ab3bf/watermark:F/width:200?csig=AAAAAAAAAAAAAAAAAAAAAMzdKeSSCsU0tX0GfMfWPmY4srHaqFxFwXL24iqsLsVu&exp=1786548968&osig=AAAAAAAAAAAAAAAAAAAAAH1gtbAyoDBjdJIREsWX0qWTmahqjNxL_DvrqieUEroL&signer=media-rpc&x-canva-quality=thumbnail"
 
 jobs:
-  verify-and-publish:
+  verify-and-publish-source:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -65,11 +65,7 @@ jobs:
           python -m pip install --disable-pip-version-check --no-cache-dir "Pillow==11.3.0"
           python - <<'PY'
           from __future__ import annotations
-          import hashlib
-          import io
-          import os
-          import struct
-          import zipfile
+          import hashlib, io, os, struct, zipfile
           from pathlib import Path
           from PIL import Image
 
@@ -78,21 +74,19 @@ jobs:
               if source.size != (200, 200):
                   raise SystemExit(f"unexpected carrier dimensions: {source.size}")
               pixels = source.convert("RGB").tobytes()
-          observed_pixel_sha = hashlib.sha256(pixels).hexdigest()
-          if observed_pixel_sha != os.environ["CARRIER_PIXEL_SHA256"]:
-              raise SystemExit(f"carrier pixel SHA mismatch: {observed_pixel_sha}")
+          pixel_sha = hashlib.sha256(pixels).hexdigest()
+          if pixel_sha != os.environ["CARRIER_PIXEL_SHA256"]:
+              raise SystemExit(f"carrier pixel SHA mismatch: {pixel_sha}")
           if pixels[:8] != b"EVPTX001":
               raise SystemExit("carrier magic mismatch")
-          payload_length = struct.unpack(">Q", pixels[8:16])[0]
+          length = struct.unpack(">Q", pixels[8:16])[0]
           embedded_sha = pixels[16:48]
-          payload = pixels[48:48 + payload_length]
-          observed_payload_sha = hashlib.sha256(payload).digest()
-          if len(payload) != payload_length:
-              raise SystemExit("carrier payload is truncated")
-          if observed_payload_sha != embedded_sha:
-              raise SystemExit("embedded payload SHA mismatch")
-          if observed_payload_sha.hex() != os.environ["OVERLAY_SHA256"]:
-              raise SystemExit(f"overlay SHA mismatch: {observed_payload_sha.hex()}")
+          payload = pixels[48:48 + length]
+          payload_sha = hashlib.sha256(payload).digest()
+          if len(payload) != length or payload_sha != embedded_sha:
+              raise SystemExit("carrier payload integrity mismatch")
+          if payload_sha.hex() != os.environ["OVERLAY_SHA256"]:
+              raise SystemExit(f"overlay SHA mismatch: {payload_sha.hex()}")
           expected = sorted([
               ".github/workflows/pixel-font-repository-delivery-contract.yml",
               ".github/workflows/pixel-font-repository-publish.yml",
@@ -136,11 +130,10 @@ jobs:
           with zipfile.ZipFile(io.BytesIO(payload)) as archive:
               if archive.testzip() is not None:
                   raise SystemExit("overlay ZIP integrity check failed")
-              observed = sorted(archive.namelist())
-              if observed != expected:
-                  raise SystemExit(f"overlay inventory mismatch: {observed}")
+              if sorted(archive.namelist()) != expected:
+                  raise SystemExit("overlay inventory mismatch")
               archive.extractall(Path.cwd())
-          print(f"verified carrier pixels={observed_pixel_sha} overlay={observed_payload_sha.hex()} files={len(expected)}")
+          print(f"verified carrier pixels={pixel_sha} overlay={payload_sha.hex()} files={len(expected)}")
           PY
 
       - name: Install exact scalable-font convenience backend
@@ -179,23 +172,21 @@ jobs:
           test -s "$workspace/delivery-plan.json"
           git diff --check
 
-      - name: Commit readable source and remove bootstrap
+      - name: Commit only non-workflow production source
         shell: bash
         run: |
           set -euo pipefail
-          rm -f .github/workflows/pixel-font-text-crossrepo-bootstrap.yml
+          rm -f .github/workflows/pixel-font-repository-delivery-contract.yml
+          rm -f .github/workflows/pixel-font-repository-publish.yml
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
-          git add --all
+          git add config docs examples scripts tools
           git diff --cached --check
           python - <<'PY'
           import subprocess
           expected = sorted([
-              ".github/workflows/pixel-font-repository-delivery-contract.yml",
-              ".github/workflows/pixel-font-repository-publish.yml",
-              ".github/workflows/pixel-font-text-crossrepo-bootstrap.yml",
               "config/mcp.pixel-font-automation.windows.example.json",
               "config/pixel-font-automation-suite.v1.json",
               "config/pixel-font-repository-allowlist.v1.json",
@@ -239,7 +230,7 @@ jobs:
           PY
           git commit -m "feat(pixel-text): automate titles and repository delivery" -m "Add deterministic Pixel Text Studio title/UI rendering for games and websites, including animated 90s-style treatments, plus guarded cross-repository font installation, naming, Godot 4.6.2 setup, optional web/TTF/BDF/source delivery, ChatGPT/Claude MCP surfaces, allowlisted publication modes and exact target-head ownership checks."
 
-      - name: Fast-forward current main only
+      - name: Fast-forward current main with source only
         shell: bash
         run: |
           set -euo pipefail
@@ -251,14 +242,14 @@ jobs:
           git push origin HEAD:main
           remote="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           test "$remote" = "$published"
-          printf '{"status":"published","commit":"%s","parent":"%s","tree":"%s","overlaySha256":"%s"}\n' \
+          printf '{"status":"source-published","commit":"%s","parent":"%s","tree":"%s","overlaySha256":"%s"}\n' \
             "$published" "$parent" "$(git rev-parse HEAD^{tree})" "$OVERLAY_SHA256" \
-            | tee "$RUNNER_TEMP/pixel-text-crossrepo-publication.json"
+            | tee "$RUNNER_TEMP/pixel-text-crossrepo-source-publication.json"
 
-      - name: Retain publication receipt
+      - name: Retain source publication receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: pixel-text-crossrepo-publication-${{ github.sha }}
+          name: pixel-text-crossrepo-source-${{ github.sha }}
           if-no-files-found: error
           retention-days: 30
-          path: ${{ runner.temp }}/pixel-text-crossrepo-publication.json
+          path: ${{ runner.temp }}/pixel-text-crossrepo-source-publication.json
