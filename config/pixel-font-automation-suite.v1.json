@@ -3,6 +3,16 @@
   "version": 1,
   "description": "Canonical path-only ChatGPT and Claude deployment for style-neutral pixel-font creation, 1990s-ready pixel text/title rendering, deterministic multi-format builds, transactional target-repository installation and separately gated normal Git publication.",
   "configuration": "config/mcp.pixel-font-automation.windows.example.json",
+  "unifiedCli": {
+    "entrypoint": "scripts/pixel-typography.mjs",
+    "catalogCommand": "node scripts/pixel-typography.mjs catalog",
+    "checkCommand": "node scripts/pixel-typography.mjs check",
+    "delegates": {
+      "font": "tools/pixel_font_universal.py",
+      "text": "tools/pixel_text_studio.py",
+      "delivery": "scripts/pixel-font-repository-delivery.mjs"
+    }
+  },
   "servers": [
     {
       "id": "evavo-pixel-font-universal",

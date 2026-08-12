@@ -1,8 +1,17 @@
-name: Pixel Font Repository Delivery contract
+name: Pixel Typography and Repository Delivery contract
 
 on:
   pull_request:
     paths:
+      - "scripts/pixel-typography.mjs"
+      - "scripts/check-pixel-typography-cli.mjs"
+      - "tools/pixel_font_universal.py"
+      - "tools/pixel_font_universal_engine.py"
+      - "tools/pixel_font_universal/**"
+      - "tools/check_pixel_font_universal.py"
+      - "requirements/pixel-font-universal.txt"
+      - "examples/pixel-font-universal/**"
+      - "scripts/pixel-font-studio-universal-mcp.mjs"
       - "scripts/pixel-font-repository-delivery.mjs"
       - "scripts/pixel-font-repository-delivery-mcp.mjs"
       - "scripts/pixel-font-repository-delivery/**"
@@ -16,6 +25,7 @@ on:
       - "config/pixel-text-studio.v1.json"
       - "examples/pixel-text-studio/**"
       - "docs/PIXEL_TEXT_STUDIO.md"
+      - "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md"
       - "config/pixel-font-repository-allowlist.v1.json"
       - "config/mcp.pixel-font-automation.windows.example.json"
       - "config/pixel-font-automation-suite.v1.json"
@@ -26,6 +36,15 @@ on:
   push:
     branches: [main]
     paths:
+      - "scripts/pixel-typography.mjs"
+      - "scripts/check-pixel-typography-cli.mjs"
+      - "tools/pixel_font_universal.py"
+      - "tools/pixel_font_universal_engine.py"
+      - "tools/pixel_font_universal/**"
+      - "tools/check_pixel_font_universal.py"
+      - "requirements/pixel-font-universal.txt"
+      - "examples/pixel-font-universal/**"
+      - "scripts/pixel-font-studio-universal-mcp.mjs"
       - "scripts/pixel-font-repository-delivery.mjs"
       - "scripts/pixel-font-repository-delivery-mcp.mjs"
       - "scripts/pixel-font-repository-delivery/**"
@@ -39,6 +58,7 @@ on:
       - "config/pixel-text-studio.v1.json"
       - "examples/pixel-text-studio/**"
       - "docs/PIXEL_TEXT_STUDIO.md"
+      - "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md"
       - "config/pixel-font-repository-allowlist.v1.json"
       - "config/mcp.pixel-font-automation.windows.example.json"
       - "config/pixel-font-automation-suite.v1.json"
@@ -52,7 +72,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pixel-font-repository-delivery-${{ github.ref }}
+  group: pixel-typography-contract-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -96,26 +116,47 @@ jobs:
       - name: Check source syntax
         run: |
           set -euo pipefail
+          node --check scripts/pixel-typography.mjs
+          node --check scripts/check-pixel-typography-cli.mjs
+          node --check scripts/pixel-font-studio-universal-mcp.mjs
           node --check scripts/pixel-font-repository-delivery.mjs
           node --check scripts/pixel-font-repository-delivery-mcp.mjs
           for source in scripts/pixel-font-repository-delivery/*.mjs; do
             node --check "$source"
           done
           node --check scripts/check-pixel-font-repository-delivery.mjs
+          node --check scripts/check-pixel-font-automation-suite.mjs
           node --check scripts/pixel-text-studio-mcp.mjs
           node --check scripts/check-pixel-text-studio-mcp.mjs
-          python -m py_compile tools/pixel_text_studio.py tools/pixel_text_studio_engine.py tools/check_pixel_text_studio.py
+          python -m py_compile \
+            tools/pixel_font_universal.py \
+            tools/check_pixel_font_universal.py \
+            tools/pixel_font_universal/*.py \
+            tools/pixel_text_studio.py \
+            tools/pixel_text_studio_engine.py \
+            tools/check_pixel_text_studio.py
 
-      - name: Run Pixel Text Studio deterministic and MCP checks
+      - name: Run canonical Pixel Typography stack
         run: |
-          python tools/check_pixel_text_studio.py
-          node scripts/check-pixel-text-studio-mcp.mjs
+          set -euo pipefail
+          node scripts/check-pixel-typography-cli.mjs
+          node scripts/pixel-typography.mjs check
 
-      - name: Run transactional and Git publication adversarial checks
-        run: node scripts/check-pixel-font-repository-delivery.mjs
+      - name: Validate Universal check evidence
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
 
-      - name: Validate canonical ChatGPT and Claude pixel-font automation suite
-        run: node scripts/check-pixel-font-automation-suite.mjs
+          report_path = Path("universal-pixel-font-check-report.json")
+          report = json.loads(report_path.read_text("utf-8"))
+          assert report["schema"] == "evavo.pixel-font-universal-check.v1"
+          assert report["engineVersion"] == "3.0.0"
+          assert report["status"] == "passed"
+          assert report["operationCount"] == 15
+          report_path.unlink()
+          PY
 
       - name: Exercise real Universal compiler integration
         run: |
@@ -135,4 +176,8 @@ jobs:
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
           git diff --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          status="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -n "$status" ]]; then
+            printf '%s\n' "Unexpected retained files after Pixel Typography validation:" "$status" >&2
+            exit 1
+          fi
