@@ -142,6 +142,22 @@ jobs:
           node scripts/check-pixel-typography-cli.mjs
           node scripts/pixel-typography.mjs check
 
+      - name: Validate Universal check evidence
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report_path = Path("universal-pixel-font-check-report.json")
+          report = json.loads(report_path.read_text("utf-8"))
+          assert report["schema"] == "evavo.pixel-font-universal-check.v1"
+          assert report["engineVersion"] == "3.0.0"
+          assert report["status"] == "passed"
+          assert report["operationCount"] == 15
+          report_path.unlink()
+          PY
+
       - name: Exercise real Universal compiler integration
         run: |
           set -euo pipefail
