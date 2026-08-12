@@ -1,0 +1,107 @@
+{
+  "schema": "evavo.heavy-metal-fighting-style-authenticity-contract.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "northStar": "An original premium 1994-1997 arcade and DOS giant-machine fighter: strong held-cel posing, mechanically coherent Frames, expressive 1990s cel-illustrated Pilots, severe corporate-industrial stages and hard readable broadcast UI.",
+  "historicalReferenceLessons": [
+    "learn pilot-plus-machine identity and tournament consequence from 1990s PC robot fighters without copying any commercial robot or screen",
+    "learn silhouette, anticipation, hero-contact, recovery, portrait hierarchy and super readability from top 1990s Japanese arcade fighters without reproducing their characters, poses or layouts",
+    "learn industrial serviceability, access panels, load paths and believable machine scale from 1990s grounded mecha design",
+    "learn corporate infrastructure, rain, telecommunications and human vulnerability from 1990s cyberpunk animation",
+    "learn decisive contact weight and intimidation from 1990s 3D fighting presentation while keeping final gameplay fully authored 2D sprites"
+  ],
+  "pixelGrammar": {
+    "finalFrameCell": {"width": 160, "height": 160},
+    "pivot": {"x": 80, "y": 152},
+    "authoringCanvas": {"width": 640, "height": 640},
+    "finalFilter": "nearest-only",
+    "alpha": "real-transparent-alpha",
+    "clusterRule": "deliberate connected pixel clusters at native size; no resampled fuzz",
+    "outlineRule": "selective dark contour clusters and joint cavities; avoid uniform comic outlines on every internal edge",
+    "antiAliasRule": "no global antialiasing; only intentional hand-placed transition pixels where the approved native style requires them",
+    "materialRule": "major metal families use shadow, base, light, hard highlight and restrained specular accents rather than smooth PBR gradients",
+    "lightingRule": "stable upper-front gameplay key light; arena colour may influence selected highlights but may not redraw material identity",
+    "nativeReview": ["160x160", "640x360-match", "320x180-thumbnail", "one-colour-silhouette", "grayscale"]
+  },
+  "frameDesignGrammar": [
+    "every Frame must answer cockpit, crew, power, recoil, cooling and service-access logic before decoration",
+    "head, shoulder, forearm, torso, pelvis, lower-leg and foot silhouettes must remain independently recognisable",
+    "hardpoints and moving panels must attach to declared mechanical landmarks",
+    "signature asymmetry must be documented before animation and explicitly reviewed after runtime mirroring",
+    "weapon reach must come from declared mechanisms rather than arbitrary limb stretching",
+    "effects never replace a readable physical body pose"
+  ],
+  "pilotDesignGrammar": [
+    "Pilots use strong 1990s cel-animation face shapes, two dominant shadow bands and decisive expression changes",
+    "clothing begins with occupation, corporation and cockpit function rather than generic tactical decoration",
+    "hair mass, face proportions, scars, collars and signature accessories are identity landmarks and cannot drift between portraits",
+    "super cut-ins are three held cels, not miniature modern cinematics",
+    "all generated typography is prohibited; names and move text are separately authored bitmap assets"
+  ],
+  "animationGrammar": {
+    "principle": "few excellent drawings held deliberately are preferred to smooth filler",
+    "mustRead": ["anticipation", "commitment", "hero-contact", "overshoot", "vulnerable-recovery"],
+    "frameCadence": {
+      "bastion": "heavy-held hydraulic load and late recovery",
+      "viper": "fast-snap compression and hard mechanical brake",
+      "citadel": "measured-brace setup and structural reset",
+      "mirage": "precise physical body with independently timed false-vector effects"
+    },
+    "forbidden": [
+      "smooth skeletal tweening used as final character animation",
+      "micro-inbetweens that weaken hero poses",
+      "foot sliding during grounded holds",
+      "crawling panel detail from cel to cel",
+      "effect clouds used to hide weak attack silhouettes"
+    ]
+  },
+  "uiGrammar": [
+    "640x360-first hard pixel composition with hierarchy before decoration",
+    "health, timer, rounds, guard and CORE read before ornamental telemetry",
+    "menus use hard latches, stepped wipes and restrained low-rate animation rather than spring easing or glass panels",
+    "Pilot select prioritises portrait personality; Frame select prioritises silhouette, crew, CORE and combat doctrine",
+    "title and move typography are hand-authored assets, never provider text"
+  ],
+  "environmentGrammar": [
+    "every arena has a clean horizontal fight plane and clear far, mid, play-plane and foreground value separation",
+    "service ladders, cranes, vents, cable routes and containment infrastructure must have believable purpose",
+    "ambient loops stay low-rate and may not compete with fighter silhouettes",
+    "rain, steam, sparks and smoke are sparse stepped cels or separate effects, not low-alpha particle soup"
+  ],
+  "antiGenericFailureCodes": [
+    "random-greebles",
+    "random-glowing-seams",
+    "unexplained-floating-components",
+    "identical-frame-proportions",
+    "weapon-side-drift",
+    "joint-length-drift",
+    "pilot-face-drift",
+    "costume-drift",
+    "microdetail-crawl",
+    "generated-or-malformed-text",
+    "generic-cyan-magenta-cyberpunk-soup",
+    "modern-pbr-gloss",
+    "soft-airbrushed-gradients",
+    "over-smoothed-animation",
+    "effect-hides-unreadable-body",
+    "modern-glassmorphism-ui",
+    "skull-flame-chain-metal-cliche",
+    "provider-contact-sheet",
+    "provider-packed-final-atlas"
+  ],
+  "approvalGates": [
+    "style-north-star-approved",
+    "pilot-identity-approved",
+    "frame-construction-approved",
+    "key-pose-approved",
+    "animation-bank-approved",
+    "native-scale-and-stage-composite-approved",
+    "master-and-delivery-approved"
+  ],
+  "authority": {
+    "providerMayDefineStyle": false,
+    "providerMayChangeCanon": false,
+    "providerMayApprove": false,
+    "namedHumanApprovalRequired": true
+  }
+}
