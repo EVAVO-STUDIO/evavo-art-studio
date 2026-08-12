@@ -1,0 +1,36 @@
+{
+  "schema": "evavo.layered-production.godot-handoff-gate.v1",
+  "version": 1,
+  "protocolVersion": "2026-08-12.1",
+  "description": "Read-only promotion gate that re-admits a Godot 4.6.2 runtime-validation receipt against the current audited target before repository review.",
+  "entrypoint": "scripts/layered-godot-handoff-gate.mjs",
+  "requirements": {
+    "exactRuntimeReceiptKind": "evavo.layered-production.godot-runtime-validation-receipt",
+    "requiresCurrentAudit": true,
+    "requiresNoOutstandingTransaction": true,
+    "requiresExactGodotVersion": "4.6.2",
+    "requiresSandboxRemoved": true,
+    "requiresTargetWorkspaceUnmountedFromGodot": true,
+    "requiresSceneInstantiationEvidence": true,
+    "requiresTargetUnchangedSinceInputAudit": true,
+    "requiresRuntimeReceiptGitAuthorityFalse": true
+  },
+  "readiness": {
+    "repositoryReviewReady": true,
+    "gitCommitAuthorized": false,
+    "gitPushAuthorized": false,
+    "requiresExplicitRepositoryReview": true,
+    "requiresExplicitGitOperator": true
+  },
+  "authority": {
+    "targetRepositoryRead": true,
+    "targetRepositoryWrite": false,
+    "godotExecution": false,
+    "runtimeActivation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "deployment": false,
+    "publication": false,
+    "forcePush": false
+  }
+}
