@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "evavo-heavy-metal-fighting-production": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\scripts\\heavy-metal-fighting-production-mcp.mjs"
+      ]
+    }
+  }
+}
