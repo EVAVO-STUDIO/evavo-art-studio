@@ -4,7 +4,17 @@ The runtime validator proves that the exact layered-production scene can be load
 
 The handoff gate is the separate read-only promotion boundary between runtime validation and repository review. It re-admits the runtime-validation receipt against the selected target workspace before anything may describe the handoff as ready for repository review.
 
-It rejects unresolved `.evavo-godot-transactions` transactions, target drift since runtime validation, malformed or rehashed runtime evidence, repository mismatch, wrong engine evidence, incomplete sandbox cleanup, missing scene-instantiation proof, and any receipt claiming target mutation, activation, Git, deployment, publication, or force-push authority.
+It rejects unresolved `.evavo-godot-transactions` transactions, target drift since runtime validation, malformed or rehashed runtime evidence, repository mismatch, wrong engine evidence, incomplete sandbox cleanup, missing scene-instantiation proof, hostile input objects, and any receipt claiming target mutation, activation, Git, deployment, publication, or force-push authority.
+
+## Immutable input capture
+
+The exported handoff function accepts objects as well as the CLI's parsed JSON. Before the first asynchronous boundary, it now captures the complete request as one bounded immutable JSON snapshot.
+
+Only plain JSON data is admitted. The snapshot rejects accessor properties without invoking them, symbolic keys, exotic object prototypes, sparse or extended arrays, cyclic object graphs, non-finite numbers, revoked proxies, and proxies whose inspection traps throw. The top-level request also has one exact closed field set.
+
+Every later audit, receipt check, target comparison, and output hash uses that retained snapshot. A caller may mutate its original objects after invoking the gate, but post-call mutation cannot alter the handoff identity that is being reviewed.
+
+This closes the gap where a self-hashed payload could be read once for hashing and then expose different nested values during later semantic checks.
 
 ## Strict receipt admission
 
@@ -42,6 +52,7 @@ requiresExplicitGitOperator: true
 It also records:
 
 ```text
+immutableInputSnapshot: true
 exactAuditReceiptContract: true
 exactRuntimeReceiptContract: true
 unsupportedReceiptFieldsRejected: true
@@ -70,6 +81,7 @@ approved art
 → exact workspace write
 → read-only workspace audit
 → sandboxed Godot 4.6.2 runtime validation
+→ bounded immutable handoff snapshot
 → exact receipt re-admission
 → second fresh audit
 → read-only handoff promotion gate

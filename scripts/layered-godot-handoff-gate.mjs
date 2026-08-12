@@ -14,49 +14,78 @@ import {
   readStableRegularFile,
 } from "./layered-godot-workspace-writer/filesystem.mjs";
 import { assertNoOutstandingTransactions } from "./layered-godot-workspace-writer/journal.mjs";
-import { MAXIMUM_INPUT_BYTES, gateFail } from "./layered-godot-workspace-writer/handoff-gate/common.mjs";
+import {
+  MAXIMUM_INPUT_BYTES,
+  exactObject,
+  gateFail,
+  snapshotJsonValue,
+} from "./layered-godot-workspace-writer/handoff-gate/common.mjs";
 import { assertCurrentAudit } from "./layered-godot-workspace-writer/handoff-gate/audit-contract.mjs";
 import { validateRuntimeReceipt } from "./layered-godot-workspace-writer/handoff-gate/runtime-contract.mjs";
 
-export const LAYERED_GODOT_HANDOFF_GATE_PROTOCOL_VERSION = "2026-08-12.2";
+export const LAYERED_GODOT_HANDOFF_GATE_PROTOCOL_VERSION = "2026-08-13.1";
 export const LAYERED_GODOT_HANDOFF_GATE_RECEIPT_KIND =
   "evavo.layered-production.godot-handoff-gate-receipt";
 
-export async function gateLayeredGodotHandoff(
-  {
-    integrationPlan,
-    writeReceipt,
-    auditReceipt,
-    runtimeValidationReceipt,
-    workspaceRoot,
-    expectedRepository,
-  },
-  dependencies = {},
-) {
-  const auditWorkspace = dependencies.auditWorkspace ?? auditLayeredGodotWorkspace;
-  const selectedRepository = repositoryName(expectedRepository, "expectedRepository");
-  const root = await inspectWorkspaceRoot(path.resolve(workspaceRoot));
+const HANDOFF_INPUT_KEYS = [
+  "integrationPlan",
+  "writeReceipt",
+  "auditReceipt",
+  "runtimeValidationReceipt",
+  "workspaceRoot",
+  "expectedRepository",
+];
+
+export async function gateLayeredGodotHandoff(input, dependencies = {}) {
+  const request = exactObject(
+    snapshotJsonValue(input, "handoffInput"),
+    HANDOFF_INPUT_KEYS,
+    "handoffInput",
+    "INPUT_INVALID",
+  );
+  if (typeof request.workspaceRoot !== "string") {
+    gateFail("INPUT_INVALID", "handoffInput.workspaceRoot must be a string.");
+  }
+
+  const auditWorkspace =
+    dependencies.auditWorkspace ?? auditLayeredGodotWorkspace;
+  if (typeof auditWorkspace !== "function") {
+    gateFail("INPUT_INVALID", "dependencies.auditWorkspace must be a function.");
+  }
+
+  const selectedRepository = repositoryName(
+    request.expectedRepository,
+    "expectedRepository",
+  );
+  const root = await inspectWorkspaceRoot(path.resolve(request.workspaceRoot));
 
   await assertNoOutstandingTransactions(root);
   const admissionAudit = await auditWorkspace({
-    integrationPlan,
-    writeReceipt,
+    integrationPlan: request.integrationPlan,
+    writeReceipt: request.writeReceipt,
     workspaceRoot: root.path,
     expectedRepository: selectedRepository,
   });
-  const admittedAudit = assertCurrentAudit(auditReceipt, admissionAudit, "admissionAudit");
-  const runtimeReceipt = validateRuntimeReceipt(runtimeValidationReceipt, {
-    currentAudit: admittedAudit,
-    auditReceipt,
-    repository: selectedRepository,
-    root,
-    integrationPlan,
-  });
+  const admittedAudit = assertCurrentAudit(
+    request.auditReceipt,
+    admissionAudit,
+    "admissionAudit",
+  );
+  const runtimeReceipt = validateRuntimeReceipt(
+    request.runtimeValidationReceipt,
+    {
+      currentAudit: admittedAudit,
+      auditReceipt: request.auditReceipt,
+      repository: selectedRepository,
+      root,
+      integrationPlan: request.integrationPlan,
+    },
+  );
 
   await assertNoOutstandingTransactions(root);
   const finalAudit = await auditWorkspace({
-    integrationPlan,
-    writeReceipt,
+    integrationPlan: request.integrationPlan,
+    writeReceipt: request.writeReceipt,
     workspaceRoot: root.path,
     expectedRepository: selectedRepository,
   });
@@ -65,7 +94,11 @@ export async function gateLayeredGodotHandoff(
     finalAudit,
     "finalAudit",
   );
-  assertCurrentAudit(auditReceipt, admittedFinalAudit, "finalAudit");
+  assertCurrentAudit(
+    request.auditReceipt,
+    admittedFinalAudit,
+    "finalAudit",
+  );
   await assertNoOutstandingTransactions(root);
 
   const payload = {
@@ -75,7 +108,7 @@ export async function gateLayeredGodotHandoff(
     requestSha256: admittedFinalAudit.requestSha256,
     integrationSha256: admittedFinalAudit.integrationSha256,
     writeReceiptSha256: admittedFinalAudit.writeReceiptSha256,
-    auditReceiptSha256: auditReceipt.auditSha256,
+    auditReceiptSha256: request.auditReceipt.auditSha256,
     runtimeValidationSha256: runtimeReceipt.validationSha256,
     admissionAuditSha256: admittedAudit.auditSha256,
     currentAuditSha256: admittedFinalAudit.auditSha256,
@@ -84,6 +117,7 @@ export async function gateLayeredGodotHandoff(
       workspaceRoot: root.realPath,
     },
     admission: {
+      immutableInputSnapshot: true,
       exactAuditReceiptContract: true,
       exactRuntimeReceiptContract: true,
       unsupportedReceiptFieldsRejected: true,
