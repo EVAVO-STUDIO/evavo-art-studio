@@ -7,23 +7,25 @@ import {
   heavyMetalFightingHandoffTemplate, heavyMetalFightingIntroPlan, heavyMetalFightingMechanicalContract,
   heavyMetalFightingMovePlan, heavyMetalFightingPilotPlan, heavyMetalFightingProductionReadiness,
   heavyMetalFightingRuntimeSlot, heavyMetalFightingScreenPlan, heavyMetalFightingSourceCel,
+  heavyMetalFightingSpriteBank, heavyMetalFightingSpriteCensus,
   heavyMetalFightingStyleProof, heavyMetalFightingSummary, heavyMetalFightingSuperPlan,
   verifyHeavyMetalFightingStudio,
 } from "./heavy-metal-fighting/studio-runtime.mjs";
 import {
   ASSET_TOOL, ATTRACT_TOOL, BATCH_TOOL, CONTRACT_TOOL, FRAME_MOVES_TOOL, FRAME_TOOL,
   HANDOFF_TOOL, INTRO_TOOL, MOVE_TOOL, PILOT_TOOL, PRESENTATION_CONTRACT_TOOL, READINESS_TOOL,
-  RUNTIME_SLOT_TOOL, SCREEN_TOOL, SOURCE_CEL_TOOL, STYLE_PROOF_TOOL, SUMMARY_TOOL, SUPER_TOOL,
-  VERIFY_TOOL, callTool, toolDefinitions,
+  RUNTIME_SLOT_TOOL, SCREEN_TOOL, SOURCE_CEL_TOOL, SPRITE_BANK_TOOL, SPRITE_CENSUS_TOOL,
+  STYLE_PROOF_TOOL, SUMMARY_TOOL, SUPER_TOOL, VERIFY_TOOL, callTool, toolDefinitions,
 } from "./heavy-metal-fighting-art-studio-mcp.mjs";
 
 const FRAME_IDS = ["bastion", "viper", "citadel", "mirage"];
 const SHARED_BOUNDARIES = [24, 44, 64, 84];
 
-test("the retained campaign compiles through mechanical and combat-presentation authorities", async () => {
-  const [summary, mechanical, presentation, verification] = await Promise.all([
+test("the retained campaign compiles through mechanical, presentation and sprite-production authorities", async () => {
+  const [summary, mechanical, presentation, spriteCensus, verification] = await Promise.all([
     heavyMetalFightingSummary(), heavyMetalFightingMechanicalContract(),
-    heavyMetalFightingCombatPresentationContract(), verifyHeavyMetalFightingStudio(),
+    heavyMetalFightingCombatPresentationContract(), heavyMetalFightingSpriteCensus(),
+    verifyHeavyMetalFightingStudio(),
   ]);
   assert.equal(summary.campaignId, "heavy-metal-fighting-launch-four");
   assert.equal(summary.project.publicTitle, "HEAVY METAL FIGHTING");
@@ -32,6 +34,8 @@ test("the retained campaign compiles through mechanical and combat-presentation 
   assert.equal(summary.inventory.observedSourceImages, 1157);
   assert.equal(summary.inventory.observedBatches, 119);
   assert.equal(summary.productionDesign.sourceImages, 1157);
+  assert.equal(summary.spriteProduction.productionTotals.productionMasterSourceImages, 1573);
+  assert.equal(summary.spriteProduction.productionMasterV3.usedBodySlotsPerFrame, 224);
   assert.deepEqual(summary.frames.map((frame) => frame.id), FRAME_IDS);
   assert.ok(summary.frames.every((frame) => frame.authoredSourceCels === 120));
   assert.equal(mechanical.clipBindings.length, 13);
@@ -40,11 +44,34 @@ test("the retained campaign compiles through mechanical and combat-presentation 
   assert.equal(presentation.pilots.length, 4);
   assert.equal(presentation.screens.length, 11);
   assert.equal(summary.productionDesign.pilots.length, 4);
+  assert.equal(spriteCensus.productionMasterV3.slotsPerFrame, 256);
+  assert.equal(spriteCensus.productionMasterV3.launchBodyCels, 896);
   assert.equal(verification.status, "passed");
   assert.ok(verification.checks.every((check) => check.passed));
 });
 
-test("every Frame plan exposes source topology and current/planned runtime maps", async () => {
+test("production-master sprite census expands final body animation without pretending the current game already migrated", async () => {
+  const census = await heavyMetalFightingSpriteCensus();
+  assert.deepEqual(census.productionMasterV3.cell, { width: 160, height: 160 });
+  assert.deepEqual(census.productionMasterV3.pivot, { x: 80, y: 152 });
+  assert.equal(census.productionMasterV3.slotsPerFrame, 256);
+  assert.equal(census.productionMasterV3.usedBodySlotsPerFrame, 224);
+  assert.equal(census.productionMasterV3.reservedSlotsPerFrame, 32);
+  assert.equal(census.productionMasterV3.migrationRequiredBeforeFinalPromotion, true);
+  assert.equal(census.productionTotals.legacyFrameBodyCels, 480);
+  assert.equal(census.productionTotals.productionMasterFrameBodyCels, 896);
+  assert.equal(census.productionTotals.productionMasterSourceImages, 1573);
+  assert.equal(census.banks.reduce((sum, bank) => sum + bank.count, 0), 224);
+  const heavy = await heavyMetalFightingSpriteBank("standing-heavy");
+  const overdrive = await heavyMetalFightingSpriteBank("overdrive");
+  const result = await heavyMetalFightingSpriteBank("victory");
+  assert.deepEqual(heavy.bank, { id:"standing-heavy", start:117, count:8, end:124, purpose:heavy.bank.purpose });
+  assert.deepEqual(overdrive.bank, { id:"overdrive", start:178, count:14, end:191, purpose:overdrive.bank.purpose });
+  assert.equal(result.bank.count, 6);
+  assert.equal(heavy.finalPromotionBlockedUntilGameAtlasV3, true);
+});
+
+test("every compatibility Frame plan exposes source topology and current/planned runtime maps", async () => {
   for (const frameId of FRAME_IDS) {
     const frame = await heavyMetalFightingFramePlan(frameId);
     assert.equal(frame.id, frameId);
@@ -79,7 +106,7 @@ test("named move rosters expose implemented timings and blocked future banks", a
   assert.ok(planned.blockers.includes("blocked-until-game-move-contract"));
 });
 
-test("Pilot identity and source-cel production enrichment are directly inspectable", async () => {
+test("Pilot identity and compatibility source-cel production enrichment are directly inspectable", async () => {
   const pilot = await heavyMetalFightingPilotPlan("parvaneh-razi");
   assert.equal(pilot.pilot.name, "PARVANEH RAZI");
   assert.equal(pilot.defaultFrame.id, "mirage");
@@ -94,7 +121,7 @@ test("Pilot identity and source-cel production enrichment are directly inspectab
   assert.ok(reversal.productionDesign.blockers.includes("final-distinct-cels-blocked-until-atlas-v2"));
 });
 
-test("the governed style proof retains exact source cels and the current slot-24 conflict", async () => {
+test("the governed style proof retains exact compatibility source cels and the current slot-24 conflict", async () => {
   const proof = await heavyMetalFightingStyleProof();
   assert.equal(proof.id, "branka-bastion-foundry-nine");
   assert.equal(proof.pilotId, "branka-kovac");
@@ -109,7 +136,7 @@ test("the governed style proof retains exact source cels and the current slot-24
   assert.ok(proof.supportingUnits.serviceBay.length > 0);
 });
 
-test("batch retrieval remains family-locked and one-image-per-work-unit", async () => {
+test("compatibility batch retrieval remains family-locked and one-image-per-work-unit", async () => {
   for (const batchNumber of [1, 5, 20, 60, 100, 119]) {
     const batch = await heavyMetalFightingBatch(batchNumber);
     assert.equal(batch.gameId, "heavy-metal-fighting");
@@ -119,10 +146,14 @@ test("batch retrieval remains family-locked and one-image-per-work-unit", async 
     assert.ok(batch.units.every((unit) => unit.prompt.includes("Deliver only this one asset/frame as one separate image.")));
     assert.equal(new Set(batch.units.map((unit) => unit.targetPath)).size, batch.units.length);
     assert.ok(batch.units.every((unit) => unit.productionDesign));
+    for (const unit of batch.units.filter((unit) => unit.familyId === "frame-animation")) {
+      assert.equal(unit.productionDesign.compatibilityOnly, true);
+      assert.equal(unit.productionDesign.productionMasterV3RequiredForFinalBodyArt, true);
+    }
   }
 });
 
-test("source-cel and runtime-slot inspection stay bounded", async () => {
+test("compatibility source-cel and runtime-slot inspection stay bounded", async () => {
   const sourceCel = await heavyMetalFightingSourceCel("bastion", 25);
   assert.equal(sourceCel.cell.sourceClipOrdinal, 2);
   assert.deepEqual(sourceCel.cell.currentRuntimeSlots, [24]);
@@ -164,10 +195,12 @@ test("title, selection, HUD, super, intro and assets are directly inspectable", 
   assert.equal(assets.totalSourceImages, 1157);
 });
 
-test("the dedicated MCP exposes the complete read-only production surface", async () => {
-  assert.deepEqual(toolDefinitions().map((tool) => tool.name), [SUMMARY_TOOL,CONTRACT_TOOL,PRESENTATION_CONTRACT_TOOL,PILOT_TOOL,FRAME_TOOL,FRAME_MOVES_TOOL,MOVE_TOOL,SOURCE_CEL_TOOL,RUNTIME_SLOT_TOOL,SCREEN_TOOL,SUPER_TOOL,INTRO_TOOL,ATTRACT_TOOL,READINESS_TOOL,ASSET_TOOL,BATCH_TOOL,STYLE_PROOF_TOOL,VERIFY_TOOL,HANDOFF_TOOL]);
+test("the dedicated MCP exposes compatibility and production-master sprite planning without write authority", async () => {
+  assert.deepEqual(toolDefinitions().map((tool) => tool.name), [SUMMARY_TOOL,CONTRACT_TOOL,PRESENTATION_CONTRACT_TOOL,SPRITE_CENSUS_TOOL,SPRITE_BANK_TOOL,PILOT_TOOL,FRAME_TOOL,FRAME_MOVES_TOOL,MOVE_TOOL,SOURCE_CEL_TOOL,RUNTIME_SLOT_TOOL,SCREEN_TOOL,SUPER_TOOL,INTRO_TOOL,ATTRACT_TOOL,READINESS_TOOL,ASSET_TOOL,BATCH_TOOL,STYLE_PROOF_TOOL,VERIFY_TOOL,HANDOFF_TOOL]);
   const summary = await callTool(SUMMARY_TOOL);
   const presentation = await callTool(PRESENTATION_CONTRACT_TOOL);
+  const spriteCensus = await callTool(SPRITE_CENSUS_TOOL);
+  const spriteBank = await callTool(SPRITE_BANK_TOOL, { bankId: "overdrive" });
   const pilot = await callTool(PILOT_TOOL, { pilotId: "miho-tagawa" });
   const roster = await callTool(FRAME_MOVES_TOOL, { frameId: "mirage" });
   const move = await callTool(MOVE_TOOL, { frameId: "mirage", moveId: "black-geometry" });
@@ -179,7 +212,10 @@ test("the dedicated MCP exposes the complete read-only production surface", asyn
   const assets = await callTool(ASSET_TOOL, { familyId: "pilot-portraits" });
   const verification = await callTool(VERIFY_TOOL);
   assert.equal(summary.inventory.observedSourceImages, 1157);
+  assert.equal(summary.spriteProduction.productionTotals.productionMasterSourceImages, 1573);
   assert.equal(presentation.frames.length, 4);
+  assert.equal(spriteCensus.productionMasterV3.usedBodySlotsPerFrame, 224);
+  assert.equal(spriteBank.bank.count, 14);
   assert.equal(pilot.pilot.name, "MIHO TAGAWA");
   assert.equal(roster.moves.length, 11);
   assert.equal(move.move.publicName, "BLACK GEOMETRY");
@@ -193,13 +229,17 @@ test("the dedicated MCP exposes the complete read-only production surface", asyn
   await assert.rejects(callTool("evavo_heavy_metal_fighting_generate", {}), /Unknown or prohibited/);
 });
 
-test("handoff templates bind game, slot and combat-presentation revisions without mutation authority", async () => {
+test("handoff templates bind game, slot, presentation and sprite-census revisions without mutation authority", async () => {
   const handoff = await heavyMetalFightingHandoffTemplate({gameRevisionSha:"c".repeat(40),liveSlotManifestSha256:"d".repeat(64)});
   assert.equal(handoff.requiredAuthoredSourceCelsPerFrame, 120);
   assert.equal(handoff.currentMappedRuntimeSlotsPerFrame, 104);
   assert.equal(handoff.plannedMappedRuntimeSlotsPerFrame, 120);
   assert.deepEqual(handoff.currentSharedBoundarySlots, SHARED_BOUNDARIES);
   assert.match(handoff.combatPresentationContractSha256, /^[0-9a-f]{64}$/);
+  assert.match(handoff.spriteProductionCensusSha256, /^[0-9a-f]{64}$/);
+  assert.equal(handoff.productionMasterBodyCelsPerFrame, 224);
+  assert.equal(handoff.productionMasterAtlasSlotsPerFrame, 256);
+  assert.equal(handoff.productionMasterFinalPromotionBlocked, true);
   assert.match(handoff.combinedHandoffSha256, /^[0-9a-f]{64}$/);
   assert.equal(handoff.gameRevisionReviewStatus, "requires-fresh-live-game-source-review");
   assert.equal(handoff.authority.candidatePromotion, false);
