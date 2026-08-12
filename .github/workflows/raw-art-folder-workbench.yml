@@ -67,7 +67,7 @@ jobs:
           node -e 'const p=require("./package.json"); const s=p.scripts||{}; for (const k of ["raw-art:folder:scan","raw-art:folder:plan","raw-art:folder:materialize","raw-art:folder:verify","raw-art:folder:mcp","raw-art:folder:test","raw-art:folder:check"]) { if (!s[k]) throw new Error(`Missing ${k}`); } if (!s.check.includes("pnpm run raw-art:folder:check")) throw new Error("Root check does not include RAW_ART folder validation");'
 
       - name: Run exact contract and adversarial tests
-        run: pnpm run raw-art:folder:check
+        run: node scripts/check-raw-art-folder-workbench.mjs
 
       - name: Prove source remains clean
         if: always()
