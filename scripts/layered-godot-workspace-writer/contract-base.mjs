@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 
 export const LAYERED_GODOT_WORKSPACE_WRITER_PROTOCOL_VERSION =
-  "2026-08-12.1";
+  "2026-08-12.2";
 export const LAYERED_GODOT_INTEGRATION_PROTOCOL_VERSION = "2026-08-11.1";
 export const LAYERED_GODOT_INTEGRATION_PLAN_KIND =
   "evavo.layered-production.godot-integration-plan";
@@ -10,6 +10,9 @@ export const LAYERED_GODOT_WORKSPACE_WRITE_REQUEST_KIND =
   "evavo.layered-production.godot-workspace-write-request";
 export const LAYERED_GODOT_WORKSPACE_WRITE_RECEIPT_KIND =
   "evavo.layered-production.godot-workspace-write-receipt";
+export const LAYERED_GODOT_WORKSPACE_RECOVERY_RECEIPT_KIND =
+  "evavo.layered-production.godot-workspace-recovery-receipt";
+export const LAYERED_GODOT_TRANSACTION_ROOT = ".evavo-godot-transactions";
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -30,6 +33,7 @@ const REPOSITORY_CONTROL_SEGMENTS = new Set([
   ".svn",
   ".art-studio",
   ".godot",
+  ".evavo-godot-transactions",
   "node_modules",
 ]);
 export const EXPECTED_RESOURCE_KINDS = new Set([
@@ -44,6 +48,7 @@ export const EXPECTED_RESOURCE_KINDS = new Set([
 export const MAXIMUM_PLAN_BYTES = 32 * 1024 * 1024;
 export const MAXIMUM_RESOURCE_BYTES = 8 * 1024 * 1024;
 export const MAXIMUM_TOTAL_BYTES = 32 * 1024 * 1024;
+export const MAXIMUM_JOURNAL_BYTES = 4 * 1024 * 1024;
 
 export class LayeredGodotWorkspaceWriterError extends Error {
   constructor(code, message, details = undefined) {
@@ -129,12 +134,18 @@ function canonicalize(value, seen = new Set()) {
   }
   if (typeof value === "number") {
     if (!Number.isFinite(value)) {
-      fail("LAYERED_GODOT_WRITE_INPUT_INVALID", "Canonical payload contains a non-finite number.");
+      fail(
+        "LAYERED_GODOT_WRITE_INPUT_INVALID",
+        "Canonical payload contains a non-finite number.",
+      );
     }
     return value;
   }
   if (typeof value !== "object" || value === undefined) {
-    fail("LAYERED_GODOT_WRITE_INPUT_INVALID", "Canonical payload contains a non-JSON value.");
+    fail(
+      "LAYERED_GODOT_WRITE_INPUT_INVALID",
+      "Canonical payload contains a non-JSON value.",
+    );
   }
   if (seen.has(value)) {
     fail("LAYERED_GODOT_WRITE_INPUT_INVALID", "Canonical payload contains a cycle.");
@@ -146,7 +157,10 @@ function canonicalize(value, seen = new Set()) {
   } else {
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== Object.prototype && prototype !== null) {
-      fail("LAYERED_GODOT_WRITE_INPUT_INVALID", "Canonical payload contains a non-plain object.");
+      fail(
+        "LAYERED_GODOT_WRITE_INPUT_INVALID",
+        "Canonical payload contains a non-plain object.",
+      );
     }
     output = Object.fromEntries(
       Object.keys(value)

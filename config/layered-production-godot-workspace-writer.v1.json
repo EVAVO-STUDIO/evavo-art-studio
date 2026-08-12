@@ -1,8 +1,8 @@
 {
   "schema": "evavo.layered-production.godot-workspace-writer.v1",
   "version": 1,
-  "protocolVersion": "2026-08-12.1",
-  "description": "Explicit, bounded and rollback-safe application of approved layered-production Godot 4.6.2 integration plans to one selected repository workspace.",
+  "protocolVersion": "2026-08-12.2",
+  "description": "Explicit, bounded, rollback-safe and crash-recoverable application of approved layered-production Godot 4.6.2 integration plans to one selected repository workspace.",
   "entrypoint": "scripts/layered-godot-workspace-writer.mjs",
   "input": {
     "kind": "evavo.layered-production.godot-integration-plan",
@@ -15,12 +15,14 @@
   },
   "commands": {
     "verify": "node scripts/layered-godot-workspace-writer.mjs verify --plan <plan.json> --workspace <absolute-directory> --repository <owner/repository>",
-    "apply": "node scripts/layered-godot-workspace-writer.mjs apply --plan <plan.json> --workspace <absolute-directory> --repository <owner/repository>"
+    "apply": "node scripts/layered-godot-workspace-writer.mjs apply --plan <plan.json> --workspace <absolute-directory> --repository <owner/repository>",
+    "recover": "node scripts/layered-godot-workspace-writer.mjs recover --workspace <absolute-directory> --repository <owner/repository>"
   },
   "limits": {
     "maximumPlanBytes": 33554432,
     "maximumResourceBytes": 8388608,
     "maximumTotalResourceBytes": 33554432,
+    "maximumJournalRecordBytes": 4194304,
     "exactResourceCount": 7
   },
   "filesystemSafety": {
@@ -30,15 +32,25 @@
     "symbolicParentsRejected": true,
     "symbolicTargetsRejected": true,
     "multiplyLinkedTargetsRejected": true,
-    "exclusiveStages": true,
     "staleTargetDetection": true,
-    "atomicLinkInstallation": true,
+    "atomicHardLinkInstallation": true,
     "rollbackOnFailure": true,
     "idempotentReplay": true,
-    "selfHashedReceipt": true
+    "selfHashedReceipt": true,
+    "durableTransactionJournal": true,
+    "transactionRoot": ".evavo-godot-transactions",
+    "immutableIntentRecord": true,
+    "immutablePreparedRecord": true,
+    "immutableFinalizingRecord": true,
+    "crashRecovery": true,
+    "recoveryWithoutOriginalPlanFile": true,
+    "rollbackBeforeFinalizing": true,
+    "forwardCompletionAfterFinalizing": true,
+    "outstandingTransactionBlocksNewWrites": true
   },
   "authority": {
     "exactWorkspaceFileWrite": true,
+    "exactWorkspaceRecovery": true,
     "godotExecution": false,
     "runtimeActivation": false,
     "gitCommit": false,

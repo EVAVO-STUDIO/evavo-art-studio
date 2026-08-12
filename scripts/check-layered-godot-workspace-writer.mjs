@@ -12,6 +12,9 @@ const files = [
   "scripts/layered-godot-workspace-writer/contract-base.mjs",
   "scripts/layered-godot-workspace-writer/contract.mjs",
   "scripts/layered-godot-workspace-writer/filesystem.mjs",
+  "scripts/layered-godot-workspace-writer/journal.mjs",
+  "scripts/layered-godot-workspace-writer/recovery.mjs",
+  "scripts/layered-godot-workspace-writer/recovery.test.mjs",
   "scripts/layered-godot-workspace-writer/runtime.mjs",
   "scripts/check-layered-godot-workspace-writer.mjs",
   "scripts/test-layered-godot-workspace-writer.mjs",
@@ -48,6 +51,8 @@ const implementation = [
   source.get("scripts/layered-godot-workspace-writer/contract-base.mjs"),
   source.get("scripts/layered-godot-workspace-writer/contract.mjs"),
   source.get("scripts/layered-godot-workspace-writer/filesystem.mjs"),
+  source.get("scripts/layered-godot-workspace-writer/journal.mjs"),
+  source.get("scripts/layered-godot-workspace-writer/recovery.mjs"),
   source.get("scripts/layered-godot-workspace-writer/runtime.mjs"),
 ].join("\n");
 
@@ -55,23 +60,22 @@ for (const token of [
   "evavo.layered-production.godot-integration-plan",
   "evavo.layered-production.godot-workspace-write-request",
   "evavo.layered-production.godot-workspace-write-receipt",
+  "evavo.layered-production.godot-workspace-recovery-receipt",
   '"2026-08-11.1"',
-  '"2026-08-12.1"',
-  'assembly.scope !== "runtime-candidate"',
-  "assembly.candidateOnly !== false",
-  "readiness.handoffReady !== true",
-  "readiness.blockers.length !== 0",
-  "expectedRepository !== expectedRepository",
-  "portableRelativePath",
-  "readStableRegularFile",
-  "O_NOFOLLOW",
-  "nlink",
-  "createExactStage",
-  "link(operation.stage.path, operation.target)",
-  "LAYERED_GODOT_WRITE_TARGET_RACE",
-  "rollbackTransaction",
-  "LAYERED_GODOT_WRITE_ROLLED_BACK",
-  "receiptSha256",
+  '"2026-08-12.2"',
+  '".evavo-godot-transactions"',
+  "JOURNAL_INTENT_KIND",
+  "JOURNAL_PREPARED_KIND",
+  "JOURNAL_FINALIZING_KIND",
+  "writeImmutableRecord",
+  "writePreparedJournal",
+  "writeFinalizingJournal",
+  "recoverLayeredGodotWorkspace",
+  "rollbackPreparedTransaction",
+  "completeFinalizingTransaction",
+  "RECOVERY_REQUIRED",
+  "recoveryReceiptSha256",
+  "transactionId",
   "gitCommitCreated: false",
   "gitPushPerformed: false",
   "runtimeActivationPerformed: false",
@@ -100,27 +104,27 @@ const configuration = JSON.parse(
   source.get("config/layered-production-godot-workspace-writer.v1.json"),
 );
 assert.equal(configuration.schema, "evavo.layered-production.godot-workspace-writer.v1");
-assert.equal(configuration.protocolVersion, "2026-08-12.1");
+assert.equal(configuration.protocolVersion, "2026-08-12.2");
 assert.equal(configuration.input.requiredResources, 7);
-assert.equal(configuration.input.requiredAssemblyScope, "runtime-candidate");
-assert.equal(configuration.filesystemSafety.rollbackOnFailure, true);
-assert.equal(configuration.filesystemSafety.idempotentReplay, true);
+assert.equal(configuration.filesystemSafety.durableTransactionJournal, true);
+assert.equal(configuration.filesystemSafety.crashRecovery, true);
+assert.equal(configuration.filesystemSafety.forwardCompletionAfterFinalizing, true);
 assert.equal(configuration.authority.exactWorkspaceFileWrite, true);
 assert.equal(configuration.authority.gitCommit, false);
 assert.equal(configuration.authority.gitPush, false);
 assert.equal(configuration.authority.forcePush, false);
+assert.ok(configuration.commands.recover.includes(" recover "));
 
 const documentation = source.get("docs/LAYERED_GODOT_WORKSPACE_WRITER.md");
 for (const token of [
   "Godot 4.6.2",
-  "exactly seven declared resources",
-  "runtime-candidate",
-  "Verify without writing",
-  "Apply the exact drafts",
-  "symbolic targets",
-  "multiply linked targets",
-  "exclusive hard-link operation",
-  "rolled back in reverse order",
+  "2026-08-12.2",
+  "Durable transaction journal",
+  ".evavo-godot-transactions",
+  "recover",
+  "prepared",
+  "finalizing",
+  "process interruption",
   "does not:",
   "create a Git commit",
   "push Git history",
@@ -135,6 +139,7 @@ for (const token of [
   "persist-credentials: false",
   "package-manager-cache: false",
   "node scripts/check-layered-godot-workspace-writer.mjs",
+  "node scripts/check-layered-godot-workspace-auditor.mjs",
   "git diff --exit-code",
   "cancel-in-progress: true",
 ]) {
@@ -146,7 +151,11 @@ for (const forbidden of ["pnpm install", "npm install", "yarn install", "fetch-d
 
 const tests = spawnSync(
   process.execPath,
-  ["--test", path.join(root, "scripts/test-layered-godot-workspace-writer.mjs")],
+  [
+    "--test",
+    path.join(root, "scripts/test-layered-godot-workspace-writer.mjs"),
+    path.join(root, "scripts/layered-godot-workspace-writer/recovery.test.mjs"),
+  ],
   {
     cwd: root,
     encoding: "utf8",
@@ -159,8 +168,9 @@ if (tests.stderr) process.stderr.write(tests.stderr);
 assert.equal(tests.status, 0, "layered Godot workspace writer tests failed");
 
 console.log("Layered Godot workspace writer contract passed.");
-console.log("- seven exact Godot 4.6.2 drafts are plan-hash and repository bound");
-console.log("- portable paths, symlink boundaries and hard-link targets fail closed");
-console.log("- exclusive staging, stale detection and reverse rollback are covered");
-console.log("- replay is idempotent and receipts are self-hashed");
+console.log("- seven exact Godot 4.6.2 drafts remain plan-hash and repository bound");
+console.log("- protocol 2026-08-12.2 journals intent, prepared and finalizing boundaries");
+console.log("- interrupted preparation and mutation can be recovered without the original plan file");
+console.log("- pre-finalizing recovery rolls back; post-finalizing recovery completes forward");
+console.log("- new writes fail closed until outstanding transactions are recovered");
 console.log("- Git, activation, deployment and publication authority remain separate");

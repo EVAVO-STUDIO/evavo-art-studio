@@ -1,18 +1,10 @@
 # Layered Godot workspace writer
 
-The layered-production compiler already produces a deterministic Godot 4.6.2 integration plan containing seven exact resource drafts:
+The layered-production compiler produces a deterministic Godot 4.6.2 integration plan containing exactly seven resource drafts. The workspace writer is the separate explicit boundary that may apply those exact drafts to one selected repository working tree.
 
-1. the `.tscn` scene draft
-2. the route graph
-3. the placement resource
-4. the animation resource
-5. the camera resource
-6. the pixel-import policy
-7. the integration manifest
+Protocol `2026-08-12.2` keeps the original exact-byte, repository-bound writer contract and adds durable recovery for process interruption or machine termination.
 
-Those plans intentionally have no repository-write authority. This writer is the separate explicit boundary that can apply one approved, blocker-free `runtime-candidate` plan to one selected repository working tree.
-
-## What it accepts
+## Accepted handoff
 
 The writer accepts only:
 
@@ -27,11 +19,11 @@ reviewOnly=false
 zero readiness blockers
 ```
 
-The plan must retain its exact canonical self-hash. Every resource must retain its declared UTF-8 bytes, byte count and SHA-256 identity. Every write intent must be an exact copy of one declared resource and must name the repository selected at invocation time.
+The integration plan retains its canonical self-hash. Every resource retains its UTF-8 byte count and SHA-256 identity. Every write intent must be an exact copy of one declared resource and must name the repository selected at invocation time.
 
-The output paths are checked against the plan's declared outputs. JSON drafts must remain valid JSON, the scene draft must remain a `.tscn` text resource, and non-scene runtime resources must stay under the declared runtime root.
+## Commands
 
-## Verify without writing
+Verify without writing:
 
 ```powershell
 node scripts/layered-godot-workspace-writer.mjs verify `
@@ -40,9 +32,7 @@ node scripts/layered-godot-workspace-writer.mjs verify `
   --repository EVAVO-STUDIO/GodotGameFoundationKit
 ```
 
-Verification emits the bound request hash, integration hash, repository, workspace, resource count and total bytes. It performs no file write.
-
-## Apply the exact drafts
+Apply the exact drafts:
 
 ```powershell
 node scripts/layered-godot-workspace-writer.mjs apply `
@@ -53,37 +43,116 @@ node scripts/layered-godot-workspace-writer.mjs apply `
   --revision 1.0.0
 ```
 
-Application produces a self-hashed receipt with one outcome per resource:
+Recover an interrupted transaction without the original plan file:
 
-```text
-created
-replaced
-unchanged
+```powershell
+node scripts/layered-godot-workspace-writer.mjs recover `
+  --workspace C:\GitRepos\GodotGameFoundationKit `
+  --repository EVAVO-STUDIO/GodotGameFoundationKit
 ```
 
-An identical replay is read-only and reports seven `unchanged` outcomes.
+A new apply fails closed with `LAYERED_GODOT_WRITE_RECOVERY_REQUIRED` while any outstanding transaction remains.
+
+## Durable transaction journal
+
+Before the writer creates a resource stage or changes an output target, it creates one repository-local transaction beneath:
+
+```text
+.evavo-godot-transactions/<transaction-id>.active/
+```
+
+That internal root is reserved and cannot be selected by an integration-plan output path.
+
+The writer publishes three immutable, self-hashed journal boundaries with atomic record installation:
+
+1. **intent**: exact request SHA-256, integration SHA-256, repository, canonical workspace, seven resource identities, and the pre-write parent-directory baseline;
+2. **prepared**: exact per-resource outcome, stage identity, prior target identity when present, and deterministic backup name;
+3. **finalizing**: an explicit durable commit boundary bound to the exact intent and prepared journal hashes.
+
+Resource stages and replacement backups remain inside the transaction directory. They are not scattered across the game asset folders.
+
+### Why the finalizing boundary matters
+
+Before `finalizing.json` exists, recovery returns the selected repository to the state that existed before writer-owned target mutation. Writer-created targets are removed only when ownership is proven through the retained stage inode. Replaced originals are restored only from the exact identity-bound backup.
+
+After `finalizing.json` exists, the transaction is committed. Recovery does not roll it backwards. It verifies all seven committed resource SHA-256 values and byte counts, removes only the exact retained stages and backups, re-proves singly linked final targets, and completes the transaction forward.
+
+This means process interruption cannot leave the writer guessing whether it should roll back or finish.
+
+## Process interruption cases
+
+The adversarial suite covers interruption:
+
+```text
+after durable intent
+after durable prepared state
+after replacement backup movement
+after atomic target linking
+after durable finalizing
+```
+
+It also verifies that:
+
+- a new write is blocked until recovery completes;
+- repository mismatch cannot recover another repository's transaction;
+- an external file that appears before a writer-owned create is preserved rather than deleted;
+- an external change that occurs before a replacement starts is preserved while earlier writer-owned mutations are rolled back;
+- writer-owned targets are removed only when the retained transaction stage proves inode ownership;
+- post-finalizing recovery completes the approved resources forward rather than reverting them.
 
 ## Filesystem protections
 
-The writer fails closed for:
+The writer and recovery path fail closed for:
 
-- absolute, traversing, non-portable or repository-control output paths
-- Windows-reserved path components
-- symbolic workspace roots, symbolic parent directories and symbolic targets
-- non-regular targets and multiply linked targets
-- plan, resource, byte-count or SHA-256 drift
-- target repository mismatch
-- stale target changes between preflight and commit
-- targets that appear during an exclusive installation
-- parent-directory replacement during the transaction
+- absolute, traversing, non-portable or repository-control output paths;
+- the reserved `.evavo-godot-transactions` internal root;
+- Windows-reserved path components;
+- symbolic workspace roots, symbolic parent directories and symbolic targets;
+- non-regular targets and multiply linked ordinary targets;
+- plan, resource, byte-count or SHA-256 drift;
+- target repository mismatch;
+- stale target changes between preflight and mutation;
+- targets that appear during atomic installation;
+- altered journal records, stages or backups;
+- unexpected transaction-directory entries.
 
-Changed resources are first written to exclusive same-directory stage files. Existing targets are moved to unique backups only after preflight is complete. A stage is installed through an exclusive hard-link operation, then its staging name is removed. The writer re-reads every final target before transaction finalisation.
+Journal records are written through an exclusive temporary file, flushed, atomically hard-linked into their final immutable record name, and directory-synced before the writer proceeds.
 
-If any resource cannot be installed safely, every earlier writer-owned replacement is rolled back in reverse order. Externally changed files are never overwritten merely to complete rollback. Hidden stage and backup files are identity checked before cleanup.
+Changed resources are staged in the transaction directory and installed through a hard link into the target path. Replacement originals are moved into the same transaction directory before installation. The retained stage is intentionally kept until the durable finalizing boundary so pre-finalizing recovery can prove ownership of an installed target.
+
+## Receipts
+
+A successful apply emits a self-hashed write receipt containing:
+
+```text
+requestSha256
+integrationSha256
+transactionId
+recoveryState=clean
+seven resource outcomes
+prior identities for non-created targets
+repository and canonical workspace
+appliedAt
+authority boundary
+receiptSha256
+```
+
+Recovery emits its own self-hashed receipt describing each recovered transaction and whether it was:
+
+```text
+discarded-incomplete-preparation
+rolled-back
+rolled-back-external-preserved
+completed-forward
+```
+
+Neither receipt claims that Godot has run or that the written resources were activated.
 
 ## Authority boundary
 
-The writer may change the selected repository working tree only. It does not:
+The writer may modify the selected repository working tree and may restore or complete its own durably journaled transaction.
+
+It does not:
 
 ```text
 run Godot
@@ -97,14 +166,14 @@ publish
 force push
 ```
 
-Repository review, Godot import, scene loading, runtime testing, visual approval, Git commit and Git push remain separate explicit steps.
+Godot import, scene loading, runtime validation, repository review, Git commit, Git push and deployment remain separate explicit steps.
 
 ## Validation
 
-Run the complete focused contract and adversarial suite with:
+Run:
 
 ```powershell
 node scripts/check-layered-godot-workspace-writer.mjs
 ```
 
-The suite proves exact first-write behavior, idempotent replay, stale-file replacement, plan tamper rejection, review-only rejection, repository binding, traversal rejection, symbolic-parent rejection, hard-link rejection and reverse-order rollback after a late target change.
+The focused suite verifies ordinary application, replay and replacement plus durable interruption/recovery boundaries, repository binding, reserved paths, symbolic paths, hard-link rejection, late external changes and current authority limits.
