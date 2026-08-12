@@ -28,7 +28,7 @@ test("numbered production batches compile into immutable one-image work orders",
 });
 
 test("production-v3 body work orders bind native dimensions, Frame identity, within-bank continuity and anti-generic gates", async () => {
-  const order = await heavyMetalFightingProductionWorkOrder("hmf.frame-animation.bastion.slot-001");
+  const order = await heavyMetalFightingProductionWorkOrder("hmf.frame-animation.bastion.slot-002");
   assert.equal(order.assetContract.nativeDimensions.width, 160);
   assert.equal(order.assetContract.nativeDimensions.height, 160);
   assert.deepEqual(order.assetContract.pivot, {x:80,y:152});
