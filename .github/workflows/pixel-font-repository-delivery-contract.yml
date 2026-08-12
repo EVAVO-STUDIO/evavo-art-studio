@@ -1,0 +1,138 @@
+name: Pixel Font Repository Delivery contract
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pixel-font-repository-delivery.mjs"
+      - "scripts/pixel-font-repository-delivery-mcp.mjs"
+      - "scripts/pixel-font-repository-delivery/**"
+      - "scripts/check-pixel-font-repository-delivery.mjs"
+      - "scripts/check-pixel-font-automation-suite.mjs"
+      - "tools/pixel_text_studio.py"
+      - "tools/pixel_text_studio_engine.py"
+      - "tools/check_pixel_text_studio.py"
+      - "scripts/pixel-text-studio-mcp.mjs"
+      - "scripts/check-pixel-text-studio-mcp.mjs"
+      - "config/pixel-text-studio.v1.json"
+      - "examples/pixel-text-studio/**"
+      - "docs/PIXEL_TEXT_STUDIO.md"
+      - "config/pixel-font-repository-allowlist.v1.json"
+      - "config/mcp.pixel-font-automation.windows.example.json"
+      - "config/pixel-font-automation-suite.v1.json"
+      - "examples/pixel-font-repository-delivery/**"
+      - "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md"
+      - ".github/workflows/pixel-font-repository-delivery-contract.yml"
+      - ".github/workflows/pixel-font-repository-publish.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/pixel-font-repository-delivery.mjs"
+      - "scripts/pixel-font-repository-delivery-mcp.mjs"
+      - "scripts/pixel-font-repository-delivery/**"
+      - "scripts/check-pixel-font-repository-delivery.mjs"
+      - "scripts/check-pixel-font-automation-suite.mjs"
+      - "tools/pixel_text_studio.py"
+      - "tools/pixel_text_studio_engine.py"
+      - "tools/check_pixel_text_studio.py"
+      - "scripts/pixel-text-studio-mcp.mjs"
+      - "scripts/check-pixel-text-studio-mcp.mjs"
+      - "config/pixel-text-studio.v1.json"
+      - "examples/pixel-text-studio/**"
+      - "docs/PIXEL_TEXT_STUDIO.md"
+      - "config/pixel-font-repository-allowlist.v1.json"
+      - "config/mcp.pixel-font-automation.windows.example.json"
+      - "config/pixel-font-automation-suite.v1.json"
+      - "examples/pixel-font-repository-delivery/**"
+      - "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md"
+      - ".github/workflows/pixel-font-repository-delivery-contract.yml"
+      - ".github/workflows/pixel-font-repository-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pixel-font-repository-delivery-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONHASHSEED: "0"
+  PYTHONDONTWRITEBYTECODE: "1"
+  SOURCE_DATE_EPOCH: "1577836800"
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13.5"
+          cache: "pip"
+          cache-dependency-path: requirements/pixel-font-universal.txt
+
+      - name: Install exact scalable-font convenience backend
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements/pixel-font-universal.txt
+          python - <<'PY'
+          import fontTools
+          assert fontTools.__version__ == "4.63.0", fontTools.__version__
+          PY
+
+      - name: Check source syntax
+        run: |
+          set -euo pipefail
+          node --check scripts/pixel-font-repository-delivery.mjs
+          node --check scripts/pixel-font-repository-delivery-mcp.mjs
+          for source in scripts/pixel-font-repository-delivery/*.mjs; do
+            node --check "$source"
+          done
+          node --check scripts/check-pixel-font-repository-delivery.mjs
+          node --check scripts/pixel-text-studio-mcp.mjs
+          node --check scripts/check-pixel-text-studio-mcp.mjs
+          python -m py_compile tools/pixel_text_studio.py tools/pixel_text_studio_engine.py tools/check_pixel_text_studio.py
+
+      - name: Run Pixel Text Studio deterministic and MCP checks
+        run: |
+          python tools/check_pixel_text_studio.py
+          node scripts/check-pixel-text-studio-mcp.mjs
+
+      - name: Run transactional and Git publication adversarial checks
+        run: node scripts/check-pixel-font-repository-delivery.mjs
+
+      - name: Validate canonical ChatGPT and Claude pixel-font automation suite
+        run: node scripts/check-pixel-font-automation-suite.mjs
+
+      - name: Exercise real Universal compiler integration
+        run: |
+          set -euo pipefail
+          workspace="$RUNNER_TEMP/universal-delivery"
+          mkdir -p "$workspace"
+          node scripts/pixel-font-repository-delivery.mjs plan \
+            --job examples/pixel-font-repository-delivery/universal-godot-family.job.json \
+            --workspace "$workspace" \
+            --expected-head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            --output "$workspace/delivery-plan.json"
+          test -s "$workspace/delivery-plan.json"
+
+      - name: Prove source tree remains clean
+        run: |
+          set -euo pipefail
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
