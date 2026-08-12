@@ -17,6 +17,11 @@ import {
   verifyHmfProductionBatchRegistry,
 } from "./heavy-metal-fighting/batch-registry.mjs";
 import {
+  buildHmfStyleProofExecutionPlan,
+  heavyMetalFightingStyleProofExecutionStatus,
+  verifyHmfStyleProofExecutionPlan,
+} from "./heavy-metal-fighting/style-proof-plan.mjs";
+import {
   buildHmfProductionWorkOrderBatch,
   heavyMetalFightingProductionBatchResumePlan,
   heavyMetalFightingProductionReceiptTemplate,
@@ -43,6 +48,9 @@ function usage() {
     "  node scripts/heavy-metal-fighting-production-workspace.mjs registry",
     "  node scripts/heavy-metal-fighting-production-workspace.mjs registry-batch <1-179|hmf-b0001>",
     "  node scripts/heavy-metal-fighting-production-workspace.mjs registry-unit <unit-id>",
+    "  node scripts/heavy-metal-fighting-production-workspace.mjs style-proof-verify",
+    "  node scripts/heavy-metal-fighting-production-workspace.mjs style-proof-plan",
+    "  node scripts/heavy-metal-fighting-production-workspace.mjs style-proof-status [--approvals-json <path>] [--receipts-json <path>]",
     "  node scripts/heavy-metal-fighting-production-workspace.mjs work-order-verify",
     "  node scripts/heavy-metal-fighting-production-workspace.mjs work-order-batch <1-179|hmf-b0001>",
     "  node scripts/heavy-metal-fighting-production-workspace.mjs work-order <unit-id>",
@@ -52,14 +60,15 @@ function usage() {
     "  node scripts/heavy-metal-fighting-production-workspace.mjs materialize --workspace-root <persistent-artist-workspace>",
     "",
     "The registry deterministically compiles the exact 1,573-image production campaign into 179 governed batches from existing HMF authorities.",
+    "The style-proof layer groups every style-proof-critical batch into four ordered Branka/Bastion/Foundry Nine phases and accepts only externally recorded named-human approval evidence. It never creates approvals.",
     "The work-order layer compiles immutable one-image jobs, receipt templates, bounded repairs and resume plans. It never calls a provider or approves/promotes art.",
     "materialize only creates governed subdirectories inside an already-created persistent Artist Workspace. It does not call providers, approve art, touch the game repository, commit, push or publish.",
   ].join("\n");
 }
-async function receiptsFromFile(filePath) {
+async function jsonArrayFromFile(filePath, optionName) {
   if (!filePath) return [];
   const parsed = JSON.parse(await readFile(filePath, "utf8"));
-  if (!Array.isArray(parsed)) throw new Error("--receipts-json must contain a JSON array of production receipts.");
+  if (!Array.isArray(parsed)) throw new Error(`${optionName} must contain a JSON array.`);
   return parsed;
 }
 async function run(argv = process.argv.slice(2)) {
@@ -78,6 +87,13 @@ async function run(argv = process.argv.slice(2)) {
   if (command === "registry-unit") {
     if (argv.length !== 2) throw new Error(`registry-unit requires one exact unit id.\n\n${usage()}`);
     return heavyMetalFightingProductionRegistryUnit(argv[1]);
+  }
+  if (command === "style-proof-verify") return verifyHmfStyleProofExecutionPlan();
+  if (command === "style-proof-plan") return buildHmfStyleProofExecutionPlan();
+  if (command === "style-proof-status") {
+    const approvalRecords = await jsonArrayFromFile(option(argv.slice(1), "--approvals-json"), "--approvals-json");
+    const receipts = await jsonArrayFromFile(option(argv.slice(1), "--receipts-json"), "--receipts-json");
+    return heavyMetalFightingStyleProofExecutionStatus({ approvalRecords, receipts });
   }
   if (command === "work-order-verify") return verifyHmfProductionWorkOrders();
   if (command === "work-order-batch") {
@@ -103,7 +119,7 @@ async function run(argv = process.argv.slice(2)) {
   if (command === "resume-batch") {
     const batchId = argv[1];
     if (!batchId) throw new Error(`resume-batch requires one batch id or sequence.\n\n${usage()}`);
-    const receipts = await receiptsFromFile(option(argv.slice(2), "--receipts-json"));
+    const receipts = await jsonArrayFromFile(option(argv.slice(2), "--receipts-json"), "--receipts-json");
     return heavyMetalFightingProductionBatchResumePlan(batchId, receipts);
   }
   if (command === "materialize") {

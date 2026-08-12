@@ -10,6 +10,11 @@ import {
   verifyHmfProductionBatchRegistry,
 } from "./heavy-metal-fighting/batch-registry.mjs";
 import {
+  buildHmfStyleProofExecutionPlan,
+  heavyMetalFightingStyleProofExecutionStatus,
+  verifyHmfStyleProofExecutionPlan,
+} from "./heavy-metal-fighting/style-proof-plan.mjs";
+import {
   buildHmfProductionWorkOrderBatch,
   heavyMetalFightingProductionBatchResumePlan,
   heavyMetalFightingProductionReceiptTemplate,
@@ -19,10 +24,11 @@ import {
 import { verifyHmfProductionWorkOrders } from "./heavy-metal-fighting/work-order-verification.mjs";
 
 export const SERVER_NAME = "evavo-heavy-metal-fighting-production";
-export const SERVER_VERSION = "1.0.0";
+export const SERVER_VERSION = "1.1.0";
 
 export const REGISTRY_SUMMARY_TOOL = "evavo_hmf_production_registry_summary";
 export const REGISTRY_BATCH_TOOL = "evavo_hmf_production_registry_batch";
+export const STYLE_PROOF_EXECUTION_TOOL = "evavo_hmf_production_style_proof_execution";
 export const WORK_ORDER_BATCH_TOOL = "evavo_hmf_production_work_order_batch";
 export const WORK_ORDER_TOOL = "evavo_hmf_production_work_order";
 export const RECEIPT_TEMPLATE_TOOL = "evavo_hmf_production_receipt_template";
@@ -44,6 +50,14 @@ const BATCH_ID_SCHEMA = {
   ],
 };
 
+const APPROVAL_RECORD_SCHEMA = objectSchema({
+  id: { type: "string", minLength: 1 },
+  actorClass: { const: "human" },
+  actorId: { type: "string", minLength: 1 },
+  occurredAt: { type: "string", minLength: 1 },
+  evidenceSha256: { type: "string", pattern: "^[0-9a-f]{64}$" },
+}, ["id", "actorClass", "actorId", "occurredAt", "evidenceSha256"]);
+
 export function toolDefinitions() {
   return Object.freeze([
     {
@@ -55,6 +69,14 @@ export function toolDefinitions() {
       name: REGISTRY_BATCH_TOOL,
       description: "Inspect one exact numbered HMF production batch with up to ten separate source-art units, dependencies, approval prerequisites and output paths.",
       inputSchema: objectSchema({ batch: BATCH_ID_SCHEMA }, ["batch"]),
+    },
+    {
+      name: STYLE_PROOF_EXECUTION_TOOL,
+      description: "Compile the exact four-phase Branka/Bastion/Foundry Nine style-proof execution plan and optionally derive cross-batch readiness from externally recorded human approval evidence and production receipts. This never generates, approves or persists anything.",
+      inputSchema: objectSchema({
+        approvalRecords: { type: "array", items: APPROVAL_RECORD_SCHEMA, default: [] },
+        receipts: { type: "array", items: { type: "object" }, default: [] },
+      }),
     },
     {
       name: WORK_ORDER_BATCH_TOOL,
@@ -91,7 +113,7 @@ export function toolDefinitions() {
     },
     {
       name: VERIFY_TOOL,
-      description: "Verify the exact HMF registry and work-order governance layers without provider execution, approval, promotion, filesystem writes or repository mutation.",
+      description: "Verify the exact HMF registry, style-proof execution and work-order governance layers without provider execution, approval, promotion, filesystem writes or repository mutation.",
       inputSchema: objectSchema(),
     },
   ]);
@@ -107,6 +129,20 @@ export async function callTool(name, input = {}) {
   }
   if (name === REGISTRY_SUMMARY_TOOL) return heavyMetalFightingProductionRegistrySummary();
   if (name === REGISTRY_BATCH_TOOL) return heavyMetalFightingProductionRegistryBatch(normalizeBatch(input.batch));
+  if (name === STYLE_PROOF_EXECUTION_TOOL) {
+    const [plan, status] = await Promise.all([
+      buildHmfStyleProofExecutionPlan(),
+      heavyMetalFightingStyleProofExecutionStatus({
+        approvalRecords: input.approvalRecords ?? [],
+        receipts: input.receipts ?? [],
+      }),
+    ]);
+    return Object.freeze({
+      schema: "evavo.heavy-metal-fighting-production-style-proof-agent-view.v1",
+      plan,
+      status,
+    });
+  }
   if (name === WORK_ORDER_BATCH_TOOL) return buildHmfProductionWorkOrderBatch(normalizeBatch(input.batch));
   if (name === WORK_ORDER_TOOL) return heavyMetalFightingProductionWorkOrder(input.unitId);
   if (name === RECEIPT_TEMPLATE_TOOL) return heavyMetalFightingProductionReceiptTemplate(input.unitId);
@@ -117,14 +153,16 @@ export async function callTool(name, input = {}) {
   });
   if (name === RESUME_BATCH_TOOL) return heavyMetalFightingProductionBatchResumePlan(normalizeBatch(input.batch), input.receipts ?? []);
   if (name === VERIFY_TOOL) {
-    const [registry, workOrders] = await Promise.all([
+    const [registry, styleProofExecution, workOrders] = await Promise.all([
       verifyHmfProductionBatchRegistry(),
+      verifyHmfStyleProofExecutionPlan(),
       verifyHmfProductionWorkOrders(),
     ]);
     return Object.freeze({
-      schema: "evavo.heavy-metal-fighting-production-agent-verification.v1",
-      status: registry.status === "passed" && workOrders.status === "passed" ? "passed" : "failed",
+      schema: "evavo.heavy-metal-fighting-production-agent-verification.v2",
+      status: registry.status === "passed" && styleProofExecution.status === "passed" && workOrders.status === "passed" ? "passed" : "failed",
       registry,
+      styleProofExecution,
       workOrders,
       authority: Object.freeze({
         providerExecution: false,
@@ -152,7 +190,7 @@ export async function handleRequest(request) {
       protocolVersion: request.params?.protocolVersion ?? "2024-11-05",
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-      instructions: "Read-only HEAVY METAL FIGHTING final-art production surface. It exposes the 1,573-image / 179-batch registry, immutable one-image work orders, receipt requirements, bounded repair templates and deterministic resume planning. It does not generate images, persist receipts, approve art, promote masters, mutate the game repository, commit, push, deploy or publish.",
+      instructions: "Read-only HEAVY METAL FIGHTING final-art production surface. It exposes the 1,573-image / 179-batch registry, the four-phase Branka/Bastion/Foundry Nine style-proof controller, immutable one-image work orders, receipt requirements, bounded repair templates and deterministic resume planning. It does not generate images, persist receipts or approvals, approve art, promote masters, mutate the game repository, commit, push, deploy or publish.",
     });
   }
   if (request.method === "ping") return response(request.id, {});

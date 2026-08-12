@@ -7,6 +7,7 @@ import {
   RECEIPT_TEMPLATE_TOOL,
   REPAIR_TEMPLATE_TOOL,
   RESUME_BATCH_TOOL,
+  STYLE_PROOF_EXECUTION_TOOL,
   VERIFY_TOOL,
   WORK_ORDER_BATCH_TOOL,
   WORK_ORDER_TOOL,
@@ -20,6 +21,7 @@ const CANDIDATE = "a".repeat(64);
 const EXPECTED_TOOLS = [
   REGISTRY_SUMMARY_TOOL,
   REGISTRY_BATCH_TOOL,
+  STYLE_PROOF_EXECUTION_TOOL,
   WORK_ORDER_BATCH_TOOL,
   WORK_ORDER_TOOL,
   RECEIPT_TEMPLATE_TOOL,
@@ -52,6 +54,49 @@ test("registry and work-order tools expose the exact final production queue", as
   assert.equal(workOrderBatch.requiredImages, workOrderBatch.workOrders.length);
   assert.ok(workOrderBatch.workOrders.every((order) => order.candidatePolicy.candidateFanout === 1));
   assert.ok(workOrderBatch.workOrders.every((order) => order.authority.providerExecution === false));
+});
+
+test("style-proof execution tool covers every critical batch in four human-gated phases", async () => {
+  const [summary, view] = await Promise.all([
+    callTool(REGISTRY_SUMMARY_TOOL),
+    callTool(STYLE_PROOF_EXECUTION_TOOL),
+  ]);
+  assert.equal(view.plan.phases.length, 4);
+  assert.equal(view.plan.totals.batches, summary.totals.styleProofBatches);
+  assert.equal(new Set(view.plan.phases.flatMap((phase) => phase.batchIds)).size, view.plan.totals.batches);
+  assert.equal(view.plan.phases[0].id, "brand-shell");
+  assert.equal(view.plan.phases.at(-1).completionApprovalId, "style-proof-approved");
+  assert.equal(view.plan.proofSubjects.pilotId, "branka-kovac");
+  assert.equal(view.plan.proofSubjects.frameId, "bastion");
+  assert.equal(view.plan.proofSubjects.arenaId, "foundry-nine");
+  assert.equal(view.plan.runtimePromotion.productionMasterCell.width, 160);
+  assert.equal(view.plan.runtimePromotion.productionMasterCell.height, 160);
+  assert.deepEqual(view.plan.runtimePromotion.productionMasterPivot, { x: 80, y: 152 });
+  assert.equal(view.plan.runtimePromotion.finalFrameBodyPromotionRequiresGameAtlasV3Migration, true);
+  assert.equal(view.plan.runtimePromotion.artProductionMayProceedBeforeMigration, true);
+  assert.equal(view.status.phaseStatuses[0].status, "blocked-by-approval");
+  assert.ok(view.status.phaseStatuses[0].missingApprovalIds.includes("style-north-star-approved"));
+  assert.equal(view.status.authority.providerExecution, false);
+  assert.equal(view.status.authority.automaticApproval, false);
+});
+
+test("style-proof execution accepts only explicit named-human evidence", async () => {
+  const approval = {
+    id: "style-north-star-approved",
+    actorClass: "human",
+    actorId: "named-human-reviewer",
+    occurredAt: "2026-08-12T08:00:00Z",
+    evidenceSha256: "b".repeat(64),
+  };
+  const view = await callTool(STYLE_PROOF_EXECUTION_TOOL, { approvalRecords: [approval] });
+  assert.equal(view.status.status, "ready-to-start");
+  assert.equal(view.status.phaseStatuses[0].status, "ready-to-start");
+  assert.equal(view.status.phaseStatuses[0].missingApprovalIds.length, 0);
+  assert.equal(view.status.phaseStatuses[1].status, "blocked-by-prior-phase");
+  await assert.rejects(
+    callTool(STYLE_PROOF_EXECUTION_TOOL, { approvalRecords: [{ ...approval, actorClass: "agent" }] }),
+    /must be recorded by a human actor/,
+  );
 });
 
 test("one final Frame body work order remains native, identity-bound and one-image-only", async () => {
@@ -92,10 +137,11 @@ test("receipt, repair and resume tools stay human-gated and non-executing", asyn
   assert.ok(resume.unitStates.every((state) => state.nextAction === "lock-references"));
 });
 
-test("production MCP verification composes registry and work-order evidence", async () => {
+test("production MCP verification composes registry, style-proof and work-order evidence", async () => {
   const verification = await callTool(VERIFY_TOOL);
   assert.equal(verification.status, "passed");
   assert.equal(verification.registry.status, "passed");
+  assert.equal(verification.styleProofExecution.status, "passed");
   assert.equal(verification.workOrders.status, "passed");
   assert.equal(verification.authority.providerExecution, false);
   assert.equal(verification.authority.receiptPersistence, false);
@@ -108,5 +154,7 @@ test("JSON-RPC surface rejects undeclared production mutation tools", async () =
   assert.deepEqual(listed.result.tools.map((tool) => tool.name), EXPECTED_TOOLS);
   const initialized = await handleRequest({ jsonrpc: "2.0", id: 2, method: "initialize", params: {} });
   assert.equal(initialized.result.serverInfo.name, "evavo-heavy-metal-fighting-production");
+  assert.equal(initialized.result.serverInfo.version, "1.1.0");
   assert.match(initialized.result.instructions, /does not generate images/i);
+  assert.match(initialized.result.instructions, /style-proof controller/i);
 });

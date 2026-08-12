@@ -1,0 +1,66 @@
+{
+  "schema": "evavo.heavy-metal-fighting-style-proof-execution-policy.v1",
+  "protocolVersion": "2026-08-12.1",
+  "projectId": "heavy-metal-fighting",
+  "styleProofId": "branka-bastion-foundry-nine",
+  "batchAtomicity": "all units in a style-proof-critical production batch remain together; no provider contact sheet or packed atlas is permitted",
+  "approvalRecord": {
+    "actorClass": "human",
+    "evidenceSha256Required": true,
+    "occurredAtRequired": true,
+    "persistenceAuthority": false
+  },
+  "phases": [
+    {
+      "id": "brand-shell",
+      "order": 1,
+      "label": "Brand and broadcast shell",
+      "families": ["title-and-shell"],
+      "requiredApprovalIds": ["style-north-star-approved"],
+      "completionApprovalId": "style-proof-brand-shell-approved",
+      "reviewIntent": "Lock title hierarchy, broadcast-era UI density, palette discipline, typography placement zones and the non-generic 1990s arcade presentation language before character identity work expands."
+    },
+    {
+      "id": "pilot-frame-identity",
+      "order": 2,
+      "label": "Branka and Bastion identity lock",
+      "families": ["pilot-portraits", "frame-construction"],
+      "requiredApprovalIds": ["style-north-star-approved", "style-proof-brand-shell-approved"],
+      "completionApprovalId": "frame-construction-approved",
+      "reviewIntent": "Lock Branka Kovac and Bastion as reusable visual authorities: face, clothing, silhouette, construction logic, joints, hardpoints, materials, scale and the hydraulic-weight motion identity."
+    },
+    {
+      "id": "industrial-context",
+      "order": 3,
+      "label": "Foundry and service-world lock",
+      "families": ["service-bay-crew-upgrades", "pilot-service-animation", "arena-layers"],
+      "requiredApprovalIds": ["style-north-star-approved", "frame-construction-approved"],
+      "completionApprovalId": "style-proof-world-context-approved",
+      "reviewIntent": "Prove technicians, service cradle, crew scale, industrial maintenance culture and Foundry Nine read as one coherent world around the approved Pilot and Frame identities."
+    },
+    {
+      "id": "combat-readability",
+      "order": 4,
+      "label": "Combat material and motion proof",
+      "families": ["universal-combat-fx", "frame-animation", "frame-specific-fx"],
+      "requiredApprovalIds": ["style-north-star-approved", "frame-construction-approved", "style-proof-world-context-approved"],
+      "completionApprovalId": "style-proof-approved",
+      "reviewIntent": "Prove native-pixel silhouette, hydraulic load, hit readability, separate effects, CORE/heat language and arena contrast before the remaining three Frames and full 896-cel body campaign expand."
+    }
+  ],
+  "runtimePromotion": {
+    "artProductionMayProceedBeforeMigration": true,
+    "finalFrameBodyPromotionRequiresGameAtlasV3Migration": true,
+    "reason": "The production-master-v3 art contract is 160x160 with a 256-slot atlas, while the live game remains on the compatibility atlas until a separately tested steel-dominion migration lands."
+  },
+  "authority": {
+    "providerExecution": false,
+    "receiptPersistence": false,
+    "automaticApproval": false,
+    "automaticPromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
