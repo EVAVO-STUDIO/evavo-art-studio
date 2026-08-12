@@ -281,7 +281,7 @@ export function validateWebPbrTextureSet(document: unknown): WebPbrTextureSetVal
           issues.push(issue("ART_WEB_PBR_REVIEW_CHECK_INVALID", prefix));
           return;
         }
-        exactKeys(check, ["id", "status", "detail"], prefix, issues);
+        exactKeys(check, check.detail === undefined ? ["id", "status"] : ["id", "status", "detail"], prefix, issues);
         if (typeof check.id !== "string" || check.id.length < 1 || check.id.length > 100 || ids.has(check.id)) {
           issues.push(issue("ART_WEB_PBR_REVIEW_CHECK_ID_INVALID", `${prefix}.id`));
         } else {
