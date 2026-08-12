@@ -16,9 +16,11 @@ on:
       - "scripts/heavy-metal-fighting-production-mcp.mjs"
       - "scripts/heavy-metal-fighting-production-mcp.test.mjs"
       - "scripts/heavy-metal-fighting-production-workspace.mjs"
+      - "scripts/heavy-metal-fighting-frame-atlas-v3.mjs"
       - "scripts/heavy-metal-fighting-art-studio-core.test.mjs"
       - "scripts/heavy-metal-fighting-art-studio.test.mjs"
       - "scripts/heavy-metal-fighting-production-design.test.mjs"
+      - "tools/build_heavy_metal_fighting_frame_atlas_v3.py"
       - "docs/HEAVY_METAL_FIGHTING_*.md"
       - "package.json"
       - ".github/workflows/heavy-metal-fighting-art-studio.yml"
@@ -40,9 +42,11 @@ on:
       - "scripts/heavy-metal-fighting-production-mcp.mjs"
       - "scripts/heavy-metal-fighting-production-mcp.test.mjs"
       - "scripts/heavy-metal-fighting-production-workspace.mjs"
+      - "scripts/heavy-metal-fighting-frame-atlas-v3.mjs"
       - "scripts/heavy-metal-fighting-art-studio-core.test.mjs"
       - "scripts/heavy-metal-fighting-art-studio.test.mjs"
       - "scripts/heavy-metal-fighting-production-design.test.mjs"
+      - "tools/build_heavy_metal_fighting_frame_atlas_v3.py"
       - "docs/HEAVY_METAL_FIGHTING_*.md"
       - "package.json"
       - ".github/workflows/heavy-metal-fighting-art-studio.yml"
@@ -76,11 +80,13 @@ jobs:
           node --check scripts/heavy-metal-fighting-production-mcp.mjs
           node --check scripts/heavy-metal-fighting-production-mcp.test.mjs
           node --check scripts/heavy-metal-fighting-production-workspace.mjs
+          node --check scripts/heavy-metal-fighting-frame-atlas-v3.mjs
           node --check scripts/heavy-metal-fighting-art-studio-core.test.mjs
           node --check scripts/heavy-metal-fighting-art-studio.test.mjs
           node --check scripts/heavy-metal-fighting-production-design.test.mjs
           node --check scripts/game-art-campaign-heavy-metal-fighting.test.mjs
-      - name: Run governed HMF campaign, mechanical, sprite, design, workspace, work-order and MCP tests
+          python3 -m py_compile tools/build_heavy_metal_fighting_frame_atlas_v3.py
+      - name: Run governed HMF campaign, mechanical, sprite, design, workspace, work-order, atlas and MCP tests
         run: |
           node --test \
             scripts/game-art-campaign-heavy-metal-fighting.test.mjs \
@@ -88,6 +94,7 @@ jobs:
             scripts/heavy-metal-fighting-production-design.test.mjs \
             scripts/heavy-metal-fighting/art-production-workspace.test.mjs \
             scripts/heavy-metal-fighting/work-orders.test.mjs \
+            scripts/heavy-metal-fighting/frame-atlas-v3-delivery.test.mjs \
             scripts/heavy-metal-fighting-production-mcp.test.mjs \
             scripts/heavy-metal-fighting-art-studio.test.mjs
       - name: Compile exact production evidence
@@ -118,11 +125,15 @@ jobs:
           node scripts/heavy-metal-fighting-production-workspace.mjs batch-policy > "$RUNNER_TEMP/heavy-metal-fighting-batch-policy.json"
           node scripts/heavy-metal-fighting-production-workspace.mjs registry-verify > "$RUNNER_TEMP/heavy-metal-fighting-registry-verification.json"
           node scripts/heavy-metal-fighting-production-workspace.mjs registry-summary > "$RUNNER_TEMP/heavy-metal-fighting-registry-summary.json"
+          node scripts/heavy-metal-fighting-production-workspace.mjs style-proof-verify > "$RUNNER_TEMP/heavy-metal-fighting-style-proof-execution-verification.json"
+          node scripts/heavy-metal-fighting-production-workspace.mjs style-proof-plan > "$RUNNER_TEMP/heavy-metal-fighting-style-proof-execution-plan.json"
           node scripts/heavy-metal-fighting-production-workspace.mjs work-order-verify > "$RUNNER_TEMP/heavy-metal-fighting-work-order-verification.json"
           node scripts/heavy-metal-fighting-production-workspace.mjs work-order-batch hmf-b0001 > "$RUNNER_TEMP/heavy-metal-fighting-work-order-batch-0001.json"
           node scripts/heavy-metal-fighting-production-workspace.mjs receipt-template hmf.frame-animation.bastion.slot-000 > "$RUNNER_TEMP/heavy-metal-fighting-receipt-template.json"
           node scripts/heavy-metal-fighting-production-workspace.mjs repair-template hmf.frame-animation.bastion.slot-000 --candidate-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --failure-codes random-greebles,pivot-drift --attempt 1 > "$RUNNER_TEMP/heavy-metal-fighting-repair-template.json"
           node scripts/heavy-metal-fighting-production-workspace.mjs resume-batch hmf-b0001 > "$RUNNER_TEMP/heavy-metal-fighting-resume-batch-0001.json"
+          node scripts/heavy-metal-fighting-frame-atlas-v3.mjs verify > "$RUNNER_TEMP/heavy-metal-fighting-frame-atlas-v3-verification.json"
+          node scripts/heavy-metal-fighting-frame-atlas-v3.mjs layout bastion > "$RUNNER_TEMP/heavy-metal-fighting-bastion-atlas-v3-layout.json"
           node --input-type=module -e 'import { callTool, VERIFY_TOOL } from "./scripts/heavy-metal-fighting-production-mcp.mjs"; console.log(JSON.stringify(await callTool(VERIFY_TOOL), null, 2));' > "$RUNNER_TEMP/heavy-metal-fighting-production-mcp-verification.json"
       - name: Prove source tree remains clean
         run: |
@@ -161,9 +172,13 @@ jobs:
             ${{ runner.temp }}/heavy-metal-fighting-batch-policy.json
             ${{ runner.temp }}/heavy-metal-fighting-registry-verification.json
             ${{ runner.temp }}/heavy-metal-fighting-registry-summary.json
+            ${{ runner.temp }}/heavy-metal-fighting-style-proof-execution-verification.json
+            ${{ runner.temp }}/heavy-metal-fighting-style-proof-execution-plan.json
             ${{ runner.temp }}/heavy-metal-fighting-work-order-verification.json
             ${{ runner.temp }}/heavy-metal-fighting-work-order-batch-0001.json
             ${{ runner.temp }}/heavy-metal-fighting-receipt-template.json
             ${{ runner.temp }}/heavy-metal-fighting-repair-template.json
             ${{ runner.temp }}/heavy-metal-fighting-resume-batch-0001.json
+            ${{ runner.temp }}/heavy-metal-fighting-frame-atlas-v3-verification.json
+            ${{ runner.temp }}/heavy-metal-fighting-bastion-atlas-v3-layout.json
             ${{ runner.temp }}/heavy-metal-fighting-production-mcp-verification.json
