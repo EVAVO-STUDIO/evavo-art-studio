@@ -13,6 +13,14 @@ const config = JSON.parse(await readFile(path.join(root, configPath), "utf8"));
 assert.equal(manifest.schema, "evavo.pixel-font-automation-suite.v1");
 assert.equal(manifest.version, 1);
 assert.equal(manifest.configuration, configPath);
+assert.equal(manifest.unifiedCli.entrypoint, "scripts/pixel-typography.mjs");
+assert.equal(manifest.unifiedCli.catalogCommand, "node scripts/pixel-typography.mjs catalog");
+assert.equal(manifest.unifiedCli.checkCommand, "node scripts/pixel-typography.mjs check");
+assert.deepEqual(manifest.unifiedCli.delegates, {
+  font: "tools/pixel_font_universal.py",
+  text: "tools/pixel_text_studio.py",
+  delivery: "scripts/pixel-font-repository-delivery.mjs",
+});
 assert.deepEqual(manifest.servers.map((entry) => entry.id), [
   "evavo-pixel-font-universal",
   "evavo-pixel-text-studio",
@@ -47,6 +55,11 @@ assert.ok(delivery.env.EVAVO_PIXEL_FONT_DELIVERY_TEXT_COMPILER.endsWith("pixel_t
 for (const relative of [
   manifestPath,
   configPath,
+  "scripts/pixel-typography.mjs",
+  "scripts/check-pixel-typography-cli.mjs",
+  "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md",
+  "tools/pixel_font_universal.py",
+  "tools/check_pixel_font_universal.py",
   "scripts/pixel-font-studio-universal-mcp.mjs",
   "scripts/pixel-text-studio-mcp.mjs",
   "scripts/check-pixel-text-studio-mcp.mjs",
