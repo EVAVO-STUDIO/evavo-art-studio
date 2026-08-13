@@ -1,0 +1,278 @@
+name: Bootstrap avatar provider candidate source transfer
+
+on:
+  push:
+    branches:
+      - agent/avatar-provider-candidate-materialization-v1
+    paths:
+      - .github/workflows/bootstrap-avatar-provider-candidate-transfer.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+
+concurrency:
+  group: bootstrap-avatar-provider-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  transfer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact transfer branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Rebuild and verify hash-locked source tranche
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import hashlib
+          import io
+          import json
+          import os
+          from pathlib import Path, PurePosixPath
+          import re
+          import shutil
+          import stat
+          import tarfile
+          import urllib.request
+
+          REPOSITORY = "EVAVO-STUDIO/evavo-art-studio"
+          ISSUE_NUMBER = 246
+          CHUNK_COUNT = 3
+          ARCHIVE_SHA256 = "fad2a2218cfecf83e72fe8ff75a224d0580bd3e35521e4b5677a27268f7bdc15"
+          WORKFLOW_PATH = Path(".github/workflows/bootstrap-avatar-provider-candidate-transfer.yml")
+          EXPECTED_PATHS = {
+              ".github/workflows/artist-workspace-agent-suite.yml",
+              "config/artist-workspace-agent-suite.v4.json",
+              "config/mcp.project-art-avatar-final-pass-provider-candidate.windows.example.json",
+              "config/mcp.project-art-workspace.windows.example.json",
+              "docs/ARTIST_WORKSPACE_AGENT_SUITE.md",
+              "docs/PROJECT_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE.md",
+              "scripts/avatar-final-pass-provider-candidate-cli.mjs",
+              "scripts/check-artist-workspace-agent-suite.mjs",
+              "scripts/check-artist-workspace-avatar-provider-candidate-integration.mjs",
+              "scripts/check-project-art-avatar-final-pass-provider-candidate-suite.mjs",
+              "scripts/check-project-art-avatar-final-pass-provider-candidate.mjs",
+              "scripts/project-art/avatar-final-pass-provider-candidate-common.mjs",
+              "scripts/project-art/avatar-final-pass-provider-candidate-constants.mjs",
+              "scripts/project-art/avatar-final-pass-provider-candidate-fixture.mjs",
+              "scripts/project-art/avatar-final-pass-provider-candidate-materialize.mjs",
+              "scripts/project-art/avatar-final-pass-provider-candidate-png.mjs",
+              "scripts/project-art/avatar-final-pass-provider-candidate-source.mjs",
+              "scripts/project-art/avatar-final-pass-provider-candidate.mjs",
+              "scripts/test-project-art-avatar-final-pass-provider-candidate-mcp.mjs",
+              "scripts/test-project-art-avatar-final-pass-provider-candidate.mjs",
+              "tools/project_art_avatar_final_pass_provider_candidate_mcp.mjs",
+          }
+
+          token = os.environ.get("GH_TOKEN", "")
+          if not token:
+              raise SystemExit("GH_TOKEN is required")
+          request = urllib.request.Request(
+              f"https://api.github.com/repos/{REPOSITORY}/issues/{ISSUE_NUMBER}/comments?per_page=100",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {token}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "evavo-avatar-provider-candidate-bootstrap/1",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              comments = json.load(response)
+
+          pattern = re.compile(r"^EVAVO_TRANSFER_CHUNK ([1-3])/3\n([A-Za-z0-9+/=]+)$")
+          chunks: dict[int, str] = {}
+          for comment in comments:
+              body = comment.get("body")
+              if not isinstance(body, str):
+                  continue
+              match = pattern.fullmatch(body)
+              if match is None:
+                  continue
+              index = int(match.group(1))
+              if index in chunks:
+                  raise SystemExit(f"duplicate transfer chunk {index}")
+              chunks[index] = match.group(2)
+          if set(chunks) != set(range(1, CHUNK_COUNT + 1)):
+              raise SystemExit(f"expected chunks 1..{CHUNK_COUNT}, found {sorted(chunks)}")
+
+          try:
+              archive = base64.b64decode("".join(chunks[index] for index in range(1, CHUNK_COUNT + 1)), validate=True)
+          except Exception as error:
+              raise SystemExit(f"transfer base64 is invalid: {error}") from error
+          actual_archive_sha256 = hashlib.sha256(archive).hexdigest()
+          if actual_archive_sha256 != ARCHIVE_SHA256:
+              raise SystemExit(
+                  f"transfer archive SHA-256 mismatch: expected {ARCHIVE_SHA256}, got {actual_archive_sha256}"
+              )
+
+          root = Path.cwd().resolve()
+          payloads: dict[str, bytes] = {}
+          with tarfile.open(fileobj=io.BytesIO(archive), mode="r:xz") as bundle:
+              seen_members: set[str] = set()
+              for member in bundle.getmembers():
+                  raw_name = member.name
+                  name = raw_name[2:] if raw_name.startswith("./") else raw_name
+                  if name in {"", "."}:
+                      if not member.isdir():
+                          raise SystemExit("archive root must be a directory")
+                      continue
+                  posix = PurePosixPath(name)
+                  if posix.is_absolute() or ".." in posix.parts or "\\" in name or "\x00" in name:
+                      raise SystemExit(f"unsafe archive member: {raw_name!r}")
+                  if name in seen_members:
+                      raise SystemExit(f"duplicate archive member: {name}")
+                  seen_members.add(name)
+                  if member.isdir():
+                      continue
+                  if not member.isfile() or member.issym() or member.islnk() or member.isdev():
+                      raise SystemExit(f"archive member is not an ordinary file: {name}")
+                  if stat.S_IMODE(member.mode) & 0o022:
+                      raise SystemExit(f"archive member is group/world writable: {name}")
+                  extracted = bundle.extractfile(member)
+                  if extracted is None:
+                      raise SystemExit(f"archive member could not be read: {name}")
+                  payloads[name] = extracted.read()
+
+          manifest_bytes = payloads.pop(".evavo-transfer-manifest.json", None)
+          if manifest_bytes is None:
+              raise SystemExit("transfer manifest is missing")
+          manifest = json.loads(manifest_bytes.decode("utf-8"))
+          if manifest.get("schema") != "evavo.avatar-provider-candidate-transfer.v1":
+              raise SystemExit("transfer manifest schema is invalid")
+          manifest_files = manifest.get("files")
+          if not isinstance(manifest_files, dict) or set(manifest_files) != EXPECTED_PATHS:
+              raise SystemExit("transfer manifest path set is invalid")
+          if set(payloads) != EXPECTED_PATHS:
+              raise SystemExit("archive payload path set is invalid")
+
+          for relative in sorted(EXPECTED_PATHS):
+              data = payloads[relative]
+              expected = manifest_files[relative]
+              if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+                  raise SystemExit(f"manifest hash is invalid for {relative}")
+              actual = hashlib.sha256(data).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"payload hash mismatch for {relative}")
+
+              target = root.joinpath(*PurePosixPath(relative).parts)
+              if not target.resolve(strict=False).is_relative_to(root):
+                  raise SystemExit(f"target path escapes repository: {relative}")
+              cursor = root
+              for part in PurePosixPath(relative).parts[:-1]:
+                  cursor = cursor / part
+                  if cursor.is_symlink():
+                      raise SystemExit(f"target parent is symbolic: {cursor}")
+              if target.is_symlink():
+                  raise SystemExit(f"target is symbolic: {relative}")
+              target.parent.mkdir(parents=True, exist_ok=True)
+              temporary = target.with_name(f".{target.name}.evavo-transfer")
+              if temporary.exists() or temporary.is_symlink():
+                  raise SystemExit(f"temporary target already exists: {temporary}")
+              temporary.write_bytes(data)
+              os.chmod(temporary, 0o644)
+              os.replace(temporary, target)
+              if hashlib.sha256(target.read_bytes()).hexdigest() != expected:
+                  raise SystemExit(f"post-write hash mismatch for {relative}")
+
+          if not WORKFLOW_PATH.is_file() or WORKFLOW_PATH.is_symlink():
+              raise SystemExit("bootstrap workflow source is missing or symbolic")
+          WORKFLOW_PATH.unlink()
+          Path("/tmp/evavo-avatar-provider-candidate-paths.txt").write_text(
+              "\n".join(sorted(EXPECTED_PATHS)) + "\n",
+              encoding="utf-8",
+          )
+          print(f"Verified and materialized {len(EXPECTED_PATHS)} exact source files.")
+          PY
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Validate exact candidate-materialization source
+        run: |
+          while IFS= read -r file; do
+            case "$file" in
+              *.mjs) node --check "$file" ;;
+              *.json) node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$file" ;;
+            esac
+          done < /tmp/evavo-avatar-provider-candidate-paths.txt
+          node scripts/check-project-art-avatar-final-pass-provider-candidate-suite.mjs
+          node scripts/check-artist-workspace-avatar-provider-candidate-integration.mjs
+          node scripts/check-artist-workspace-agent-suite.mjs
+          git diff --check
+
+      - name: Commit exact source and remove bootstrap carrier
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected = set(Path('/tmp/evavo-avatar-provider-candidate-paths.txt').read_text().splitlines())
+          workflow = '.github/workflows/bootstrap-avatar-provider-candidate-transfer.yml'
+          expected.add(workflow)
+          status = subprocess.run(
+              ['git', 'status', '--porcelain=v1', '--untracked-files=all'],
+              check=True,
+              capture_output=True,
+              text=True,
+          ).stdout.splitlines()
+          observed = {line[3:] for line in status if line}
+          if observed != expected:
+              raise SystemExit(f'unexpected working-tree scope: expected {sorted(expected)}, got {sorted(observed)}')
+          PY
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git add -A -- .github/workflows/artist-workspace-agent-suite.yml \
+            .github/workflows/bootstrap-avatar-provider-candidate-transfer.yml \
+            config/artist-workspace-agent-suite.v4.json \
+            config/mcp.project-art-avatar-final-pass-provider-candidate.windows.example.json \
+            config/mcp.project-art-workspace.windows.example.json \
+            docs/ARTIST_WORKSPACE_AGENT_SUITE.md \
+            docs/PROJECT_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE.md \
+            scripts/avatar-final-pass-provider-candidate-cli.mjs \
+            scripts/check-artist-workspace-agent-suite.mjs \
+            scripts/check-artist-workspace-avatar-provider-candidate-integration.mjs \
+            scripts/check-project-art-avatar-final-pass-provider-candidate-suite.mjs \
+            scripts/check-project-art-avatar-final-pass-provider-candidate.mjs \
+            scripts/project-art/avatar-final-pass-provider-candidate-common.mjs \
+            scripts/project-art/avatar-final-pass-provider-candidate-constants.mjs \
+            scripts/project-art/avatar-final-pass-provider-candidate-fixture.mjs \
+            scripts/project-art/avatar-final-pass-provider-candidate-materialize.mjs \
+            scripts/project-art/avatar-final-pass-provider-candidate-png.mjs \
+            scripts/project-art/avatar-final-pass-provider-candidate-source.mjs \
+            scripts/project-art/avatar-final-pass-provider-candidate.mjs \
+            scripts/test-project-art-avatar-final-pass-provider-candidate-mcp.mjs \
+            scripts/test-project-art-avatar-final-pass-provider-candidate.mjs \
+            tools/project_art_avatar_final_pass_provider_candidate_mcp.mjs
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected = set(Path('/tmp/evavo-avatar-provider-candidate-paths.txt').read_text().splitlines())
+          expected.add('.github/workflows/bootstrap-avatar-provider-candidate-transfer.yml')
+          staged = set(
+              subprocess.run(
+                  ['git', 'diff', '--cached', '--name-only'],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              ).stdout.splitlines()
+          )
+          if staged != expected:
+              raise SystemExit(f'unexpected staged scope: expected {sorted(expected)}, got {sorted(staged)}')
+          PY
+          git commit -m "feat(avatar): materialize verified provider candidates"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
