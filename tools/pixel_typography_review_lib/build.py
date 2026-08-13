@@ -12,6 +12,7 @@ from pixel_font_universal.formats import png_rgba
 from pixel_text_studio_engine import decode_rgba_png, load_bitmap_font, normalise_style, render_build, validate_build
 
 from .common import BUILD_SCHEMA, ENGINE_VERSION, MAP_SCHEMA, fail, load_json, normalise_profile
+from .display import display_metadata, nearest_resize_png
 from .raster import animation_grid, blit, integer_scale_png, palette, palette_png
 
 
@@ -121,14 +122,45 @@ def build_review(font_path: Path, style_path: Path, profile_value: Any, output_r
                 preview_data = integer_scale_png(page_png, scale, preview_path)
                 files[preview_path] = preview_data
                 previews.append({"scale": scale, "path": preview_path, "width": native_width * scale, "height": native_height * scale, "sha256": sha256_bytes(preview_data)})
-            page_records.append({"pageId": page["id"], "align": page["align"], "path": page_path, "width": native_width, "height": native_height, "sha256": sha256_bytes(page_png), "samples": rectangles, "previews": previews})
+            display_record = None
+            display_profile = profile["displayPreview"]
+            if display_profile is not None:
+                display_path = f"display/{page['id']}.png"
+                display_data = nearest_resize_png(
+                    page_png,
+                    display_profile["width"],
+                    display_profile["height"],
+                    display_path,
+                )
+                files[display_path] = display_data
+                display_previews: list[dict[str, Any]] = []
+                for scale in display_profile["integerScales"]:
+                    preview_path = f"display-previews/{page['id']}-{scale}x.png"
+                    preview_data = integer_scale_png(display_data, scale, preview_path)
+                    files[preview_path] = preview_data
+                    display_previews.append({
+                        "scale": scale,
+                        "path": preview_path,
+                        "width": display_profile["width"] * scale,
+                        "height": display_profile["height"] * scale,
+                        "sha256": sha256_bytes(preview_data),
+                    })
+                display_record = {
+                    "path": display_path,
+                    "width": display_profile["width"],
+                    "height": display_profile["height"],
+                    "sha256": sha256_bytes(display_data),
+                    **display_metadata(native_width, native_height, display_profile["width"], display_profile["height"]),
+                    "previews": display_previews,
+                }
+            page_records.append({"pageId": page["id"], "align": page["align"], "path": page_path, "width": native_width, "height": native_height, "sha256": sha256_bytes(page_png), "samples": rectangles, "previews": previews, "displayPreview": display_record})
 
         colours = palette(page_pngs)
         if profile["paletteBudget"] and len(colours) > profile["paletteBudget"]:
             fail(f"native review uses {len(colours)} visible RGBA colours, exceeding paletteBudget {profile['paletteBudget']}")
         palette_path = "palette/palette.png"
         files[palette_path] = palette_png(colours)
-        review_map = {"schema": MAP_SCHEMA, "profileId": profile["profileId"], "nativeResolution": profile["nativeResolution"], "pages": page_records, "samples": sample_records}
+        review_map = {"schema": MAP_SCHEMA, "profileId": profile["profileId"], "nativeResolution": profile["nativeResolution"], "displayPreview": profile["displayPreview"], "pages": page_records, "samples": sample_records}
         files["review-map.json"] = pretty_json(review_map)
         files["source/review-profile.json"] = pretty_json(profile)
         files["source/pixel-text-style.json"] = pretty_json(style)
@@ -139,6 +171,7 @@ def build_review(font_path: Path, style_path: Path, profile_value: Any, output_r
             "profileId": profile["profileId"],
             "eraProfile": profile["eraProfile"],
             "nativeResolution": profile["nativeResolution"],
+            "displayPreview": profile["displayPreview"],
             "font": {"descriptorName": font.path.name, "descriptorSha256": font.descriptor_sha256, "pages": [{"name": page.name, "sha256": digest} for page, digest in zip(font.page_paths, font.page_sha256)]},
             "styleId": style["styleId"],
             "styleSha256": sha256_bytes(canonical_json(style)),

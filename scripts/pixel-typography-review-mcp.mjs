@@ -7,7 +7,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 export const SERVER_NAME = "evavo-pixel-typography-review";
-export const SERVER_VERSION = "1.0.0";
+export const SERVER_VERSION = "1.1.0";
 export const TOOLS = Object.freeze({
   catalog: "evavo_pixel_typography_review_catalog",
   validateProfile: "evavo_pixel_typography_review_validate_profile",
@@ -86,7 +86,7 @@ const objectSchema = (properties, required = []) => ({ type: "object", additiona
 const filePath = { type: "string", minLength: 1, maxLength: 4096 };
 export function toolDefinitions(current = policy()) {
   const definitions = [
-    { name: TOOLS.catalog, description: "List native-resolution review profiles, roles, outputs and authority boundaries.", inputSchema: objectSchema({}) },
+    { name: TOOLS.catalog, description: "List native-resolution and display-aspect review profiles, roles, outputs and authority boundaries.", inputSchema: objectSchema({}) },
     { name: TOOLS.validateProfile, description: "Validate one native-resolution review profile without writing files.", inputSchema: objectSchema({ profilePath: filePath }, ["profilePath"]) },
     { name: TOOLS.profileExample, description: "Return one original starter review profile without writing files.", inputSchema: objectSchema({ preset: { type: "string", minLength: 1, maxLength: 128 }, profileId: { type: "string", minLength: 1, maxLength: 128 } }, ["preset"]) },
     { name: TOOLS.validateOutput, description: "Verify a retained review kit, PNGs, palettes, integer previews and hashes.", inputSchema: objectSchema({ outputRoot: filePath }, ["outputRoot"]) },

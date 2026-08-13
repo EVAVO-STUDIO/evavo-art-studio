@@ -60,7 +60,7 @@ async function catalog() {
       check: { mode: "read-only", description: "canonical deterministic validation stack" },
     },
     mcp: automation.servers.map(({ id, entrypoint, defaultWriteEnabled, defaultGitPublishEnabled }) => ({ id, entrypoint, defaultWriteEnabled, ...(defaultGitPublishEnabled === undefined ? {} : { defaultGitPublishEnabled }) })),
-    review: { nativeResolutionPages: true, paletteBudgetValidation: true, integerScaleProof: true, animationGridEvidence: true, independentPngRevalidation: true },
+    review: { nativeResolutionPages: true, displayAspectCorrection: true, pixelAspectEvidence: true, paletteBudgetValidation: true, integerScaleProof: true, animationGridEvidence: true, independentPngRevalidation: true },
     policy: {
       arbitraryShell: false,
       callerSelectedExecutable: false,

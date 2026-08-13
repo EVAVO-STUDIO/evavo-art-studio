@@ -15,7 +15,7 @@ from pixel_font_universal.common import (
     text as bounded_text,
 )
 
-ENGINE_VERSION = "1.0.0"
+ENGINE_VERSION = "1.1.0"
 PROFILE_SCHEMA = "evavo.pixel-typography-review-profile.v1"
 BUILD_SCHEMA = "evavo.pixel-typography-review-build.v1"
 VALIDATION_SCHEMA = "evavo.pixel-typography-review-validation.v1"
@@ -91,11 +91,11 @@ def _sample(sample_id: str, role: str, *, value: str | None = None, preset: str 
     if preset is not None:
         result["textPreset"] = preset
     if render_mode == "animation-grid":
-        result.update({"frameColumns": 4, "frameGap": 1})
+        result.update({"frameColumns": 2, "frameGap": 1})
     return result
 
 
-def _profile(profile_id: str, display_name: str, description: str, era_profile: str, width: int, height: int, background: str, palette_budget: int, scales: list[int]) -> dict[str, Any]:
+def _profile(profile_id: str, display_name: str, description: str, era_profile: str, width: int, height: int, background: str, palette_budget: int, scales: list[int], display_preview: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
         "schema": PROFILE_SCHEMA,
         "profileId": profile_id,
@@ -103,6 +103,7 @@ def _profile(profile_id: str, display_name: str, description: str, era_profile: 
         "description": description,
         "eraProfile": era_profile,
         "nativeResolution": {"width": width, "height": height},
+        "displayPreview": display_preview,
         "background": background,
         "padding": 8,
         "gap": 5,
@@ -129,7 +130,7 @@ def _profile(profile_id: str, display_name: str, description: str, era_profile: 
 
 
 BUILTIN_PROFILES: dict[str, dict[str, Any]] = {
-    "vga-dos-320x200": _profile("vga-dos-320x200", "VGA DOS 320x200", "Native 320x200 review pages for a restrained early-1990s DOS treatment.", "vga-dos-era", 320, 200, "#090611ff", 16, [2, 3]),
+    "vga-dos-320x200": _profile("vga-dos-320x200", "VGA DOS 320x200", "Native 320x200 review pages plus a 320x240 display-aspect preview for a restrained early-1990s DOS treatment.", "vga-dos-era", 320, 200, "#090611ff", 16, [2, 3], {"width": 320, "height": 240, "integerScales": [2, 3]}),
     "arcade-320x240": _profile("arcade-320x240", "1990s Arcade 320x240", "Native 320x240 review pages for an original 1990s arcade treatment.", "nineteen-nineties-arcade-era", 320, 240, "#05050aff", 32, [2, 3]),
     "web-pixel-640x360": _profile("web-pixel-640x360", "Web Pixel 640x360", "A 640x360 raster review target for game sites and web presentation.", "modern-pixel-era", 640, 360, "#090611ff", 64, [2]),
 }
@@ -150,10 +151,13 @@ def catalog() -> dict[str, Any]:
             "native-resolution RGBA review pages",
             "retained static specimens and animation grids",
             "exact integer-scale nearest-neighbour previews",
+            "optional display-aspect-corrected previews with source/display/pixel ratio evidence",
             "observed palette swatches",
             "review rectangle map",
             "SHA-256 manifest and source evidence",
         ],
+        "displayAspectCorrection": True,
+        "pixelAspectEvidence": True,
         "policy": {
             "createOnly": True,
             "transactional": True,
@@ -182,7 +186,7 @@ def profile_from_preset(preset: str, profile_id: str | None = None) -> dict[str,
 def normalise_profile(value: Any, *, label: str = "review profile") -> dict[str, Any]:
     if not isinstance(value, dict) or value.get("schema") != PROFILE_SCHEMA:
         fail(f"{label}.schema must be {PROFILE_SCHEMA}")
-    allowed = {"schema", "engineVersion", "profileId", "displayName", "description", "eraProfile", "nativeResolution", "background", "padding", "gap", "paletteBudget", "integerScales", "pages"}
+    allowed = {"schema", "engineVersion", "profileId", "displayName", "description", "eraProfile", "nativeResolution", "displayPreview", "background", "padding", "gap", "paletteBudget", "integerScales", "pages"}
     unknown = sorted(set(value) - allowed)
     if unknown:
         fail(f"{label} contains unsupported fields: {', '.join(unknown)}")
@@ -206,6 +210,23 @@ def normalise_profile(value: Any, *, label: str = "review profile") -> dict[str,
     if not isinstance(scales_raw, list) or not 1 <= len(scales_raw) <= MAX_SCALES:
         fail(f"{label}.integerScales must contain 1..{MAX_SCALES} values")
     scales = sorted({bounded_int(item, f"{label}.integerScales", 1, 8) for item in scales_raw})
+
+    display_raw = value.get("displayPreview")
+    if display_raw is None:
+        display_preview = None
+    else:
+        if not isinstance(display_raw, dict) or set(display_raw) != {"width", "height", "integerScales"}:
+            fail(f"{label}.displayPreview must contain exactly width, height and integerScales")
+        display_width = bounded_int(display_raw["width"], f"{label}.displayPreview.width", 1, MAX_CANVAS_EDGE)
+        display_height = bounded_int(display_raw["height"], f"{label}.displayPreview.height", 1, MAX_CANVAS_EDGE)
+        if display_width * display_height > MAX_PIXELS:
+            fail(f"{label}.displayPreview exceeds the pixel budget")
+        display_scales_raw = display_raw["integerScales"]
+        if not isinstance(display_scales_raw, list) or not 1 <= len(display_scales_raw) <= MAX_SCALES:
+            fail(f"{label}.displayPreview.integerScales must contain 1..{MAX_SCALES} values")
+        display_scales = sorted({bounded_int(item, f"{label}.displayPreview.integerScales", 1, 8) for item in display_scales_raw})
+        display_preview = {"width": display_width, "height": display_height, "integerScales": display_scales}
+
     pages_raw = value.get("pages")
     if not isinstance(pages_raw, list) or not 1 <= len(pages_raw) <= MAX_PAGES:
         fail(f"{label}.pages must contain 1..{MAX_PAGES} pages")
@@ -278,6 +299,7 @@ def normalise_profile(value: Any, *, label: str = "review profile") -> dict[str,
         "description": bounded_text(value.get("description", "Deterministic native-resolution pixel typography review."), f"{label}.description", 4096),
         "eraProfile": era_profile,
         "nativeResolution": {"width": width, "height": height},
+        "displayPreview": display_preview,
         "background": colour_hex(parse_colour(value.get("background", "#000000ff"), f"{label}.background")),
         "padding": bounded_int(value.get("padding", 8), f"{label}.padding", 0, 512),
         "gap": bounded_int(value.get("gap", 4), f"{label}.gap", 0, 256),

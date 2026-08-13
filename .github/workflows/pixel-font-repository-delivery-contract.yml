@@ -182,11 +182,13 @@ jobs:
           review_path = Path("pixel-typography-review-check-report.json")
           review = json.loads(review_path.read_text("utf-8"))
           assert review["schema"] == "evavo.pixel-typography-review-check.v1"
-          assert review["engineVersion"] == "1.0.0"
+          assert review["engineVersion"] == "1.1.0"
           assert review["status"] == "passed"
           assert review["profilePresetCount"] >= 3
           assert review["pageCount"] == 2
           assert review["sampleCount"] == 4
+          assert review["displayCorrectedPageCount"] == 2
+          assert review["pixelWidthToHeightRatio"] == {"numerator": 5, "denominator": 6}
           review_path.unlink()
           PY
 

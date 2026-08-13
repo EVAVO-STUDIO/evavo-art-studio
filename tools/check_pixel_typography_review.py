@@ -95,11 +95,12 @@ def style() -> dict:
 def profile() -> dict:
     return {
         "schema": PROFILE_SCHEMA,
-        "profileId": "integration-160x120",
-        "displayName": "Integration 160x120",
-        "description": "Exercises static, animated, palette and integer-scale review evidence.",
+        "profileId": "integration-160x100",
+        "displayName": "Integration 160x100",
+        "description": "Exercises native, display-aspect, animated, palette and integer-scale review evidence.",
         "eraProfile": "vga-dos-era",
-        "nativeResolution": {"width": 160, "height": 120},
+        "nativeResolution": {"width": 160, "height": 100},
+        "displayPreview": {"width": 160, "height": 120, "integerScales": [2]},
         "background": "#090611ff",
         "padding": 6,
         "gap": 4,
@@ -138,7 +139,8 @@ def main() -> int:
     try:
         assert len(BUILTIN_PROFILES) >= 3
         normalised = normalise_profile(profile())
-        assert normalised["nativeResolution"] == {"width": 160, "height": 120}
+        assert normalised["nativeResolution"] == {"width": 160, "height": 100}
+        assert normalised["displayPreview"] == {"width": 160, "height": 120, "integerScales": [2]}
         assert normalised["eraProfile"] == "vga-dos-era"
         assert normalised["integerScales"] == [2, 3]
 
@@ -169,6 +171,10 @@ def main() -> int:
         assert (first / "pages" / "alphabet.png").is_file()
         assert (first / "pages" / "motion.png").is_file()
         assert (first / "previews" / "alphabet-3x.png").is_file()
+        assert (first / "display" / "alphabet.png").is_file()
+        assert (first / "display-previews" / "alphabet-2x.png").is_file()
+        assert first_validation["displayPreview"] == {"width": 160, "height": 120, "integerScales": [2]}
+        assert first_validation["displayCorrectedPageCount"] == 2
         assert (first / "palette" / "palette.png").is_file()
         assert (first / "review-map.json").is_file()
         comparison = compare_reviews(first, second)
@@ -186,18 +192,20 @@ def main() -> int:
 
         tampered = temporary / "tampered"
         shutil.copytree(first, tampered)
-        preview = tampered / "previews" / "alphabet-2x.png"
+        preview = tampered / "display-previews" / "alphabet-2x.png"
         preview.write_bytes(preview.read_bytes() + b"tamper")
         expect_error(lambda: validate_review(tampered), "identity mismatch")
 
         report = {
             "schema": "evavo.pixel-typography-review-check.v1",
-            "engineVersion": "1.0.0",
+            "engineVersion": "1.1.0",
             "status": "passed",
             "profilePresetCount": len(BUILTIN_PROFILES),
             "pageCount": first_validation["pageCount"],
             "sampleCount": first_validation["sampleCount"],
             "paletteCount": first_validation["paletteCount"],
+            "displayCorrectedPageCount": first_validation["displayCorrectedPageCount"],
+            "pixelWidthToHeightRatio": first_manifest["pages"][0]["displayPreview"]["pixelWidthToHeightRatio"],
             "buildSha256": first_manifest["buildSha256"],
             "deterministicTreeSha256": comparison["treeSha256"],
         }

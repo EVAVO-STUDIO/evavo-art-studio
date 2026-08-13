@@ -9,6 +9,7 @@ from pixel_font_universal.formats import png_rgba
 from pixel_text_studio_engine import decode_rgba_png
 
 from .common import MAX_CANVAS_EDGE, fail
+from .display import display_metadata, nearest_resize_png
 from .raster import animation_grid, blit, integer_scale_png
 
 
@@ -125,6 +126,60 @@ def validate_pages(output_root: Path, manifest: Mapping[str, Any], profile: Mapp
                 fail(f"integer-scale preview dimensions drifted: {preview_value}")
         if sorted(observed_scales) != profile["integerScales"]:
             fail(f"integer-scale preview inventory mismatch: {page['pageId']}")
+
+        display_profile = profile["displayPreview"]
+        display_record = page.get("displayPreview")
+        if display_profile is None:
+            if display_record is not None:
+                fail(f"unexpected display-aspect preview: {page['pageId']}")
+        else:
+            if not isinstance(display_record, dict):
+                fail(f"display-aspect preview record is missing: {page['pageId']}")
+            display_width = display_profile["width"]
+            display_height = display_profile["height"]
+            display_path_value = display_record.get("path")
+            if not isinstance(display_path_value, str):
+                fail("display-aspect preview path is invalid")
+            display_path = output_root / display_path_value
+            expected_display = nearest_resize_png(data, display_width, display_height, display_path_value)
+            if (
+                not display_path.is_file()
+                or display_path.is_symlink()
+                or display_path.read_bytes() != expected_display
+                or sha256_file(display_path) != display_record.get("sha256")
+            ):
+                fail(f"display-aspect preview validation failed: {display_path_value}")
+            if display_record.get("width") != display_width or display_record.get("height") != display_height:
+                fail(f"display-aspect preview dimensions drifted: {display_path_value}")
+            metadata = display_metadata(native_width, native_height, display_width, display_height)
+            for key, expected_value in metadata.items():
+                if display_record.get(key) != expected_value:
+                    fail(f"display-aspect metadata drifted for {page['pageId']}: {key}")
+            display_previews = display_record.get("previews")
+            if not isinstance(display_previews, list):
+                fail(f"display-aspect preview inventory is invalid: {page['pageId']}")
+            observed_display_scales = []
+            for preview in display_previews:
+                if not isinstance(preview, dict):
+                    fail("display preview record must be an object")
+                scale = bounded_int(preview.get("scale"), "display preview scale", 1, 8)
+                observed_display_scales.append(scale)
+                preview_value = preview.get("path")
+                if not isinstance(preview_value, str):
+                    fail("display preview path is invalid")
+                preview_path = output_root / preview_value
+                expected = integer_scale_png(expected_display, scale, preview_value)
+                if (
+                    not preview_path.is_file()
+                    or preview_path.is_symlink()
+                    or preview_path.read_bytes() != expected
+                    or sha256_file(preview_path) != preview.get("sha256")
+                ):
+                    fail(f"display integer-scale preview validation failed: {preview_value}")
+                if preview.get("width") != display_width * scale or preview.get("height") != display_height * scale:
+                    fail(f"display integer-scale preview dimensions drifted: {preview_value}")
+            if sorted(observed_display_scales) != display_profile["integerScales"]:
+                fail(f"display preview inventory mismatch: {page['pageId']}")
         page_data.append(data)
 
     if seen_samples != set(sample_by_id):

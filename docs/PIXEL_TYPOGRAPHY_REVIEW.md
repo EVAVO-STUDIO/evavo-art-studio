@@ -94,3 +94,22 @@ Writes require read-write mode, an allowed output root and `confirmWrite=true`. 
 - Independent validation reopens all PNGs, reconstructs pages and animation grids, and recomputes palettes and previews.
 - A passed technical review is evidence, not automatic creative approval.
 - Repository delivery remains a separate ownership-safe transaction.
+
+## Display-aspect correction
+
+A native pixel grid and the physical display shape are not always the same. The optional `displayPreview` contract keeps the authoritative native page unchanged, then emits a second deterministic nearest-neighbour resample at the reviewed display dimensions.
+
+For the supplied VGA/DOS profile this means:
+
+```json
+"nativeResolution": {"width": 320, "height": 200},
+"displayPreview": {
+  "width": 320,
+  "height": 240,
+  "integerScales": [2, 3]
+}
+```
+
+The review kit retains `display/<page-id>.png` and exact integer enlargements under `display-previews/`. Each page record includes reduced native, display and pixel width-to-height ratios. The independent validator reconstructs the display image from the native page and rejects changed resampling, ratio metadata, dimensions, hashes or scale previews.
+
+This display proof is separate from optional CRT styling. Scanlines, bloom, phosphor masks and curvature can be useful presentation treatments, but they do not replace the unfiltered native page or the deterministic aspect-corrected geometry evidence.

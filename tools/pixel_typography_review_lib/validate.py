@@ -33,7 +33,7 @@ def validate_review(output_root: Path) -> dict[str, Any]:
     review_map = load_json(output_root / "review-map.json", "review map")
     if not isinstance(review_map, dict) or review_map.get("schema") != MAP_SCHEMA:
         fail("review-map.json schema mismatch")
-    if review_map.get("profileId") != profile["profileId"] or review_map.get("nativeResolution") != native:
+    if review_map.get("profileId") != profile["profileId"] or review_map.get("nativeResolution") != native or review_map.get("displayPreview") != profile["displayPreview"]:
         fail("review map profile identity mismatch")
     if review_map.get("pages") != pages or review_map.get("samples") != samples:
         fail("review map does not match manifest geometry")
@@ -47,6 +47,8 @@ def validate_review(output_root: Path) -> dict[str, Any]:
         "paletteCount": len(colours),
         "fileCount": len(expected_files) + 1,
         "nativeResolution": native,
+        "displayPreview": profile["displayPreview"],
+        "displayCorrectedPageCount": len(pages) if profile["displayPreview"] is not None else 0,
     }
 
 

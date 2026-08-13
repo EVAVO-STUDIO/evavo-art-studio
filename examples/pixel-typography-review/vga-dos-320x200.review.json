@@ -12,7 +12,10 @@
   "padding": 8,
   "gap": 5,
   "paletteBudget": 16,
-  "integerScales": [2, 3],
+  "integerScales": [
+    2,
+    3
+  ],
   "pages": [
     {
       "id": "title",
@@ -29,7 +32,7 @@
           "role": "animation-strip",
           "text": "BATTLE CHESS",
           "renderMode": "animation-grid",
-          "frameColumns": 4,
+          "frameColumns": 2,
           "frameGap": 1
         }
       ]
@@ -38,20 +41,56 @@
       "id": "alphabet",
       "align": "left",
       "samples": [
-        {"id": "uppercase", "role": "alphabet-uppercase", "textPreset": "uppercase"},
-        {"id": "lowercase", "role": "alphabet-lowercase", "textPreset": "lowercase"},
-        {"id": "digits", "role": "numerals", "textPreset": "digits"},
-        {"id": "punctuation", "role": "punctuation", "textPreset": "punctuation"}
+        {
+          "id": "uppercase",
+          "role": "alphabet-uppercase",
+          "textPreset": "uppercase"
+        },
+        {
+          "id": "lowercase",
+          "role": "alphabet-lowercase",
+          "textPreset": "lowercase"
+        },
+        {
+          "id": "digits",
+          "role": "numerals",
+          "textPreset": "digits"
+        },
+        {
+          "id": "punctuation",
+          "role": "punctuation",
+          "textPreset": "punctuation"
+        }
       ]
     },
     {
       "id": "ui",
       "align": "left",
       "samples": [
-        {"id": "menu", "role": "menu-label", "textPreset": "menu"},
-        {"id": "hud", "role": "hud-label", "textPreset": "hud"},
-        {"id": "status", "role": "status-text", "textPreset": "status"}
+        {
+          "id": "menu",
+          "role": "menu-label",
+          "textPreset": "menu"
+        },
+        {
+          "id": "hud",
+          "role": "hud-label",
+          "textPreset": "hud"
+        },
+        {
+          "id": "status",
+          "role": "status-text",
+          "textPreset": "status"
+        }
       ]
     }
-  ]
+  ],
+  "displayPreview": {
+    "width": 320,
+    "height": 240,
+    "integerScales": [
+      2,
+      3
+    ]
+  }
 }
