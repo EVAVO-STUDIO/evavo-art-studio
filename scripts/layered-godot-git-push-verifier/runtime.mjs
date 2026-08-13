@@ -14,10 +14,16 @@ import {
   inspectLocalRepository,
   makeOwnedGitRunner,
 } from "./git-readonly.mjs";
+import { validateCommitReceipt } from "./commit-receipt-contract.mjs";
 import { validatePushReceipt } from "./receipt-contract.mjs";
 import { makeVerificationReceipt } from "./verification-receipt.mjs";
 
-const INPUT_KEYS = ["pushReceipt", "workspaceRoot", "expectedRepository"];
+const INPUT_KEYS = [
+  "commitReceipt",
+  "pushReceipt",
+  "workspaceRoot",
+  "expectedRepository",
+];
 
 export async function verifyLayeredGodotPushReceipt(input, dependencies = {}) {
   const request = exactObject(
@@ -43,11 +49,18 @@ export async function verifyLayeredGodotPushReceipt(input, dependencies = {}) {
   const root = captureWorkspaceRoot(
     await guardedDeps.inspectWorkspaceRoot(path.resolve(request.workspaceRoot)),
   );
+  const commitReceipt = validateCommitReceipt(
+    request.commitReceipt,
+    repository,
+    root,
+    sameFilesystemPath,
+  );
   const receipt = validatePushReceipt(
     request.pushReceipt,
     repository,
     root,
     sameFilesystemPath,
+    commitReceipt,
   );
   const ownedRunGit = makeOwnedGitRunner(root, guardedDeps);
 
@@ -111,6 +124,7 @@ export async function verifyLayeredGodotPushReceipt(input, dependencies = {}) {
   return makeVerificationReceipt({
     repository,
     root,
+    commitReceipt,
     receipt,
     local: localAfter,
     origin: originAfter,
