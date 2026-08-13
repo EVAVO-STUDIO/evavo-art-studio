@@ -1,0 +1,195 @@
+name: Retry avatar provider frame finisher source transfer
+
+on:
+  push:
+    branches:
+      - agent/avatar-provider-frame-finisher-v1-transfer
+    paths:
+      - .github/workflows/bootstrap-avatar-provider-frame-finisher-transfer-retry.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: retry-avatar-provider-frame-finisher-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  transfer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact transfer branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Rebuild exact verified source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, hashlib, io, json, os, re, stat, subprocess, tarfile, urllib.request
+          from pathlib import Path, PurePosixPath
+
+          REPO = 'EVAVO-STUDIO/evavo-art-studio'
+          BASE = 'e77aba8a7f78c5345b234e9803872723bad8ae43'
+          BLOB = '1e26a35a062e951ae3610ec5696c5e43bb35d031'
+          ARCHIVE_SHA = '846998d14a455dc52d675f11a49a019465ca5ff6dcce9e6ac091bd8303578587'
+          CARRIERS = {
+              '.github/workflows/bootstrap-avatar-provider-frame-finisher-transfer.yml',
+              '.github/workflows/bootstrap-avatar-provider-frame-finisher-transfer-retry.yml',
+          }
+          EXPECTED = {
+              '.github/workflows/artist-workspace-agent-suite.yml',
+              'config/artist-workspace-agent-suite.v5.json',
+              'config/mcp.project-art-avatar-final-pass-provider-frame-finisher.windows.example.json',
+              'config/mcp.project-art-workspace.windows.example.json',
+              'docs/ARTIST_WORKSPACE_AGENT_SUITE.md',
+              'docs/PROJECT_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER.md',
+              'scripts/avatar-final-pass-provider-frame-finisher-cli.mjs',
+              'scripts/check-artist-workspace-agent-suite.mjs',
+              'scripts/check-artist-workspace-avatar-provider-frame-finisher-integration.mjs',
+              'scripts/check-project-art-avatar-final-pass-provider-frame-finisher-suite.mjs',
+              'scripts/check-project-art-avatar-final-pass-provider-frame-finisher.mjs',
+              'scripts/project-art/avatar-final-pass-provider-frame-finisher-common.mjs',
+              'scripts/project-art/avatar-final-pass-provider-frame-finisher-constants.mjs',
+              'scripts/project-art/avatar-final-pass-provider-frame-finisher-execute.mjs',
+              'scripts/project-art/avatar-final-pass-provider-frame-finisher-fixture.mjs',
+              'scripts/project-art/avatar-final-pass-provider-frame-finisher-png.mjs',
+              'scripts/project-art/avatar-final-pass-provider-frame-finisher-review.mjs',
+              'scripts/project-art/avatar-final-pass-provider-frame-finisher-source.mjs',
+              'scripts/project-art/avatar-final-pass-provider-frame-finisher.mjs',
+              'scripts/test-project-art-avatar-final-pass-provider-frame-finisher-mcp.mjs',
+              'scripts/test-project-art-avatar-final-pass-provider-frame-finisher.mjs',
+              'tools/project_art_avatar_final_pass_provider_frame_finisher_mcp.mjs',
+          }
+
+          if subprocess.run(['git', 'merge-base', '--is-ancestor', BASE, 'HEAD']).returncode:
+              raise SystemExit('transfer branch base mismatch')
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', f'{BASE}..HEAD'], text=True
+          ).splitlines())
+          if changed != CARRIERS:
+              raise SystemExit(f'unexpected carrier scope: {sorted(changed)}')
+
+          request = urllib.request.Request(
+              f'https://api.github.com/repos/{REPO}/git/blobs/{BLOB}',
+              headers={
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'evavo-frame-finisher-transfer/2',
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              record = json.load(response)
+          if record.get('sha') != BLOB or record.get('encoding') != 'base64':
+              raise SystemExit('blob identity mismatch')
+          archive = base64.b64decode(record['content'])
+          if hashlib.sha256(archive).hexdigest() != ARCHIVE_SHA:
+              raise SystemExit('archive hash mismatch')
+
+          payloads = {}
+          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:xz') as bundle:
+              for member in bundle.getmembers():
+                  name = member.name[2:] if member.name.startswith('./') else member.name
+                  if name in ('', '.'):
+                      if not member.isdir(): raise SystemExit('invalid archive root')
+                      continue
+                  posix = PurePosixPath(name)
+                  if posix.is_absolute() or '..' in posix.parts or '\\' in name or '\0' in name:
+                      raise SystemExit(f'unsafe member {name}')
+                  if member.isdir(): continue
+                  if name in payloads or not member.isfile() or member.issym() or member.islnk() or member.isdev():
+                      raise SystemExit(f'invalid member {name}')
+                  if stat.S_IMODE(member.mode) & 0o022:
+                      raise SystemExit(f'unsafe mode {name}')
+                  stream = bundle.extractfile(member)
+                  if stream is None: raise SystemExit(f'unreadable member {name}')
+                  payloads[name] = stream.read()
+
+          manifest_bytes = payloads.pop('.evavo-transfer-manifest.json', None)
+          if manifest_bytes is None: raise SystemExit('missing manifest')
+          manifest = json.loads(manifest_bytes.decode('utf-8'))
+          files = manifest.get('files')
+          if (
+              manifest.get('schema') != 'evavo.avatar-provider-frame-finisher-transfer.v1'
+              or manifest.get('baseCommit') != BASE
+              or not isinstance(files, dict)
+              or set(files) != EXPECTED
+              or set(payloads) != EXPECTED
+          ):
+              raise SystemExit('manifest contract mismatch')
+
+          root = Path.cwd().resolve()
+          for relative in sorted(EXPECTED):
+              data = payloads[relative]
+              expected_hash = files[relative]
+              if not re.fullmatch(r'[0-9a-f]{64}', expected_hash) or hashlib.sha256(data).hexdigest() != expected_hash:
+                  raise SystemExit(f'payload hash mismatch {relative}')
+              target = root.joinpath(*PurePosixPath(relative).parts)
+              if not target.resolve(strict=False).is_relative_to(root):
+                  raise SystemExit(f'path escape {relative}')
+              cursor = root
+              for part in PurePosixPath(relative).parts[:-1]:
+                  cursor /= part
+                  if cursor.is_symlink(): raise SystemExit(f'symbolic parent {relative}')
+              if target.exists():
+                  metadata = target.lstat()
+                  if target.is_symlink() or not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                      raise SystemExit(f'unsafe target {relative}')
+              target.parent.mkdir(parents=True, exist_ok=True)
+              temporary = target.with_name('.' + target.name + '.evavo-transfer')
+              if temporary.exists() or temporary.is_symlink(): raise SystemExit(f'temp collision {relative}')
+              temporary.write_bytes(data)
+              os.chmod(temporary, 0o644)
+              os.replace(temporary, target)
+              if hashlib.sha256(target.read_bytes()).hexdigest() != expected_hash:
+                  raise SystemExit(f'post-write mismatch {relative}')
+
+          Path('/tmp/frame-finisher-paths.txt').write_text(
+              '\n'.join(sorted(EXPECTED)) + '\n', encoding='utf-8'
+          )
+          print(f'Verified and materialized {len(EXPECTED)} exact files.')
+          PY
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: '22.14.0'
+          package-manager-cache: false
+
+      - name: Validate exact source
+        run: |
+          while IFS= read -r file; do
+            case "$file" in
+              *.mjs) node --check "$file" ;;
+              *.json) node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$file" ;;
+            esac
+          done < /tmp/frame-finisher-paths.txt
+          node scripts/check-project-art-avatar-final-pass-provider-frame-finisher-suite.mjs
+          node scripts/check-artist-workspace-avatar-provider-candidate-integration.mjs
+          node scripts/check-artist-workspace-avatar-provider-frame-finisher-integration.mjs
+          node scripts/check-artist-workspace-agent-suite.mjs
+          git diff --check
+
+      - name: Commit non-workflow source
+        run: |
+          git restore -- .github/workflows/artist-workspace-agent-suite.yml
+          grep -v '^\.github/workflows/artist-workspace-agent-suite\.yml$' \
+            /tmp/frame-finisher-paths.txt > /tmp/frame-finisher-nonworkflow.txt
+          git config user.name 'EVAVO-STUDIO'
+          git config user.email 'evavo.studio@gmail.com'
+          while IFS= read -r file; do git add -- "$file"; done < /tmp/frame-finisher-nonworkflow.txt
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          expected = set(Path('/tmp/frame-finisher-nonworkflow.txt').read_text().splitlines())
+          staged = set(subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines())
+          if staged != expected: raise SystemExit(f'unexpected staged scope: {sorted(staged)}')
+          PY
+          git commit -m 'feat(avatar): finish and admit reviewed provider frames'
+          git push origin "HEAD:$GITHUB_REF_NAME"
