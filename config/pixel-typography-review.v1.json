@@ -1,6 +1,6 @@
 {
   "schema": "evavo.pixel-typography-review-catalog.v1",
-  "engineVersion": "1.0.0",
+  "engineVersion": "1.1.0",
   "purpose": "Deterministic native-resolution review packages for pixel-font and Pixel Text Studio output.",
   "profileSchema": "evavo.pixel-typography-review-profile.v1",
   "buildSchema": "evavo.pixel-typography-review-build.v1",
@@ -39,6 +39,7 @@
     "native-resolution RGBA review pages",
     "retained static specimens and animation grids",
     "exact integer-scale nearest-neighbour previews",
+    "display-aspect-corrected nearest-neighbour previews and ratio evidence",
     "observed palette swatches",
     "review rectangle map",
     "SHA-256 manifest and source evidence"
@@ -55,5 +56,7 @@
     "gitCommit": false,
     "gitPush": false,
     "publication": false
-  }
+  },
+  "displayAspectCorrection": true,
+  "pixelAspectEvidence": true
 }

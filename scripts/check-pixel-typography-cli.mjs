@@ -29,6 +29,8 @@ assert.equal(catalog.version, 2);
 assert.deepEqual(Object.keys(catalog.commands), ["catalog", "font", "text", "review", "delivery", "check"]);
 assert.deepEqual(catalog.mcp.map((entry) => entry.id), ["evavo-pixel-font-universal", "evavo-pixel-text-studio", "evavo-pixel-typography-review", "evavo-pixel-font-repository-delivery"]);
 assert.equal(catalog.review.nativeResolutionPages, true);
+assert.equal(catalog.review.displayAspectCorrection, true);
+assert.equal(catalog.review.pixelAspectEvidence, true);
 assert.equal(catalog.review.paletteBudgetValidation, true);
 assert.equal(catalog.review.integerScaleProof, true);
 assert.equal(catalog.policy.arbitraryShell, false);

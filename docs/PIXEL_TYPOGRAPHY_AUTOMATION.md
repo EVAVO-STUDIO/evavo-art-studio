@@ -69,3 +69,7 @@ evavo-pixel-font-repository-delivery
 ```
 
 Writes remain disabled by default. Review output is create-only. Repository installation and Git publication are separately gated. No service exposes arbitrary shell execution or force push.
+
+### Display-correct review evidence
+
+Review profiles may declare a `displayPreview` alongside the native resolution. The native page remains the source-of-truth pixel grid; the display preview models the reviewed presentation dimensions and records native, display and pixel aspect ratios. Exact integer enlargements of the corrected display are retained separately, so agents cannot confuse native pixels, display geometry and zoomed inspection.
