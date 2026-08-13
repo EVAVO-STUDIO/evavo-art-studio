@@ -66,7 +66,30 @@ That contract re-admits the actual source commit and push receipts, recomputes t
 
 Correctly rehashed unsupported fields, invented lineage, source-receipt substitution, missing contract-admission evidence or authority escalation fail closed. The emitted receipt records `verificationReceiptContractAdmitted: true` only after the runtime has passed that same contract.
 
+## Portable delivery evidence bundle
+
+A closed verification receipt still depends on the actual commit and push receipts during downstream admission. Passing three separately paired JSON files is fragile: files can be separated, substituted, or handed to a consumer without an explicit target.
+
+The verifier package therefore exposes `createDeliveryEvidenceBundle` and `validateDeliveryEvidenceBundle`. The bundle is one immutable, self-contained JSON envelope that embeds:
+
+- the actual admitted commit receipt;
+- the actual admitted push receipt;
+- the actual admitted verification receipt;
+- each source receipt's exact self-hash;
+- request, integration, write, handoff and repository-review lineage;
+- commit, parent, tree, branch, remote-current and push-outcome identity;
+- the explicitly selected repository and workspace; and
+- a complete false-only Git, deployment, release and artifact-publication authority map.
+
+Bundle creation captures the complete input before reading it, re-admits all three source receipts through their current closed contracts, binds their hashes and lineage, computes one canonical bundle self-hash, and then re-admits the generated bundle through its own exact contract before returning it. The returned evidence records `deliveryEvidenceContractAdmitted: true` only after that final admission succeeds.
+
+Bundle validation is an **offline re-admission** step. It performs no target-repository read, Git command, network read, Git mutation, deployment, release publication or artifact publication. It proves that the embedded receipts and their delivery identity were already admitted by the live verifier; it does not claim that time has stopped or replace a fresh live verification when current-state evidence is required.
+
+Correctly rehashed unknown bundle fields, source-receipt substitution, invented lineage, source-hash disagreement, authority escalation, accessors and Proxy input fail closed.
+
 ## CLI
+
+Live verification:
 
 ```powershell
 node scripts/layered-godot-git-push-verifier.mjs verify `
@@ -76,7 +99,28 @@ node scripts/layered-godot-git-push-verifier.mjs verify `
   --repository EVAVO-STUDIO/GodotGameFoundationKit
 ```
 
-The command emits a self-hashed, closed-contract verification receipt containing the exact commit and push receipt hashes, upstream request/write/handoff/review lineage, current local commit identity, current remote ref, two-phase stability evidence and the read-only authority actually exercised.
+Create one portable delivery evidence bundle after live verification:
+
+```powershell
+node scripts/layered-godot-git-push-verifier.mjs bundle `
+  --commit-receipt D:\EVAVO-Evidence\layered-district.commit-receipt.json `
+  --push-receipt D:\EVAVO-Evidence\layered-district.push-receipt.json `
+  --verification-receipt D:\EVAVO-Evidence\layered-district.verification-receipt.json `
+  --workspace C:\GitRepos\GodotGameFoundationKit `
+  --repository EVAVO-STUDIO/GodotGameFoundationKit `
+  > D:\EVAVO-Evidence\layered-district.delivery-evidence.json
+```
+
+Re-admit an existing bundle without repository or network access:
+
+```powershell
+node scripts/layered-godot-git-push-verifier.mjs validate-bundle `
+  --bundle D:\EVAVO-Evidence\layered-district.delivery-evidence.json `
+  --workspace C:\GitRepos\GodotGameFoundationKit `
+  --repository EVAVO-STUDIO/GodotGameFoundationKit
+```
+
+The `verify` command emits a self-hashed, closed-contract verification receipt containing the exact commit and push receipt hashes, upstream request/write/handoff/review lineage, current local commit identity, current remote ref, two-phase stability evidence and the read-only authority actually exercised. The `bundle` and `validate-bundle` commands write JSON to standard output only; callers choose whether and where to persist it.
 
 ## Complete governed chain
 
@@ -92,6 +136,7 @@ approved layered art
 → explicit plain fast-forward Git push operator
 → independent read-only push receipt and commit-lineage verifier
 → closed-contract verification receipt
+→ self-contained offline delivery evidence bundle
 ```
 
-A successful verification is evidence that the admitted commit receipt, bound push receipt, exact local commit and remote branch remain one current delivery chain. It is not deployment or release publication, and it does not authorize another Git mutation.
+A successful verification is evidence that the admitted commit receipt, bound push receipt, exact local commit and remote branch remain one current delivery chain. A successful bundle validation proves the embedded evidence is internally complete and contract-current. Neither is deployment or release publication, and neither authorizes another Git mutation.
