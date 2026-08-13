@@ -1,0 +1,77 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-deterministic-qa-policy.v1",
+  "protocolVersion": "2026-08-13.1",
+  "projectId": "heavy-metal-fighting",
+  "assetKind": "frame-body-cel",
+  "candidate": {
+    "maximumBytes": 16777216,
+    "width": 160,
+    "height": 160,
+    "bitDepth": 8,
+    "colorType": 6,
+    "compression": 0,
+    "filter": 0,
+    "interlace": 0
+  },
+  "alpha": {
+    "binaryOnly": true,
+    "transparentRgbMustBeZero": true,
+    "minimumOpaquePixels": 128,
+    "maximumCoverageRatio": 0.72,
+    "transparentCornersRequired": true
+  },
+  "geometry": {
+    "pivot": {"x": 80, "y": 152},
+    "groundLineY": 152,
+    "minimumTopMargin": 1,
+    "minimumLeftMargin": 1,
+    "minimumRightMargin": 1,
+    "maximumPivotGap": 24,
+    "groundedBottomTolerance": 4
+  },
+  "cluster": {
+    "minimumLargestComponentRatio": 0.6,
+    "tinyComponentMaximumPixels": 3,
+    "maximumTinyComponents": 8
+  },
+  "palette": {
+    "maximumOpaqueRgbColors": 96
+  },
+  "duplicateScope": {
+    "sameBatch": true,
+    "crossBatchComparisonsOptional": true
+  },
+  "automatedFailureCodes": [
+    "wrong-native-dimensions",
+    "wrong-authoring-canvas",
+    "alpha-contamination",
+    "matte-or-checkerboard",
+    "crop-risk",
+    "pivot-drift",
+    "ground-contact-drift",
+    "unsafe-transparent-rgb",
+    "duplicate-candidate",
+    "palette-contract-drift",
+    "random-greebles"
+  ],
+  "deferredFailureCodes": [
+    "continuity-break",
+    "runtime-mirror-failure",
+    "weapon-side-drift",
+    "joint-length-drift",
+    "microdetail-crawl",
+    "effect-hides-unreadable-body"
+  ],
+  "authority": {
+    "providerExecution": false,
+    "providerRetry": false,
+    "creativeReview": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanRepairAuthorizationRequired": true
+  }
+}
