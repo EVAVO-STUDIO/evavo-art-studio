@@ -19,5 +19,7 @@ console.log("- exact source commit and push receipts are re-admitted through clo
 console.log("- generated verification receipts are re-admitted through their own exact closed contract");
 console.log("- inherited hashes and commit, parent, tree and branch identity must agree across receipts");
 console.log("- local and remote identities are proved twice across the verification window");
+console.log("- portable delivery evidence embeds and re-admits all three source receipts offline");
+console.log("- delivery bundles bind source hashes, lineage, Git identity and false-only authority");
 console.log("- the Git command surface is closed and read-only");
-console.log("- commit, push, deployment and release authority remain false");
+console.log("- commit, push, deployment, release and artifact-publication authority remain false");
