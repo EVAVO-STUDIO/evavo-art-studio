@@ -16,6 +16,7 @@ export { canonicalSha256 } from "./layered-godot-git-push-verifier/canonical.mjs
 export { snapshotJsonValue } from "./layered-godot-git-push-verifier/snapshot.mjs";
 export { validateCommitReceipt } from "./layered-godot-git-push-verifier/commit-receipt-contract.mjs";
 export { validatePushReceipt } from "./layered-godot-git-push-verifier/receipt-contract.mjs";
+export { validateVerificationReceipt } from "./layered-godot-git-push-verifier/verification-receipt-contract.mjs";
 export { verifyLayeredGodotPushReceipt } from "./layered-godot-git-push-verifier/runtime.mjs";
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

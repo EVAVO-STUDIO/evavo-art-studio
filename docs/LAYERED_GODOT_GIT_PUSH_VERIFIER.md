@@ -6,7 +6,7 @@ The verifier does not push, create a commit, update a ref, mutate the worktree, 
 
 ## Source-receipt admission
 
-The verifier now requires both the actual source commit receipt and the push receipt. A bare `commitReceiptSha256` string is not accepted as proof of upstream authority.
+The verifier requires both the actual source commit receipt and the push receipt. A bare `commitReceiptSha256` string is not accepted as proof of upstream authority.
 
 The complete input is captured as one immutable snapshot before repository or network inspection. The source commit receipt is then re-admitted through the current closed commit-operator contract, including its schema, protocol, self-hash, target, reviewed Git state, staged-resource evidence, commit identity and false-only downstream authority boundary.
 
@@ -51,6 +51,21 @@ The two fresh local inspections must agree, the repository must remain clean, an
 
 All Git execution passes through a closed read-only Git command set. Only the exact `rev-parse`, `branch`, `show`, `status`, origin-configuration reads and `ls-remote` forms required for verification are admitted. Injected runners receive the same output and timeout bounds as the built-in runner.
 
+## Verification-receipt admission
+
+The verifier does not return its generated receipt merely because the receipt can hash itself. Before return, the complete generated receipt is re-admitted through the exported `validateVerificationReceipt` closed verification-receipt contract.
+
+That contract re-admits the actual source commit and push receipts, recomputes the verification receipt self-hash, closes every nested object boundary, and proves exact parity for:
+
+- source receipt hashes and upstream request, integration, write, handoff and review lineage;
+- repository and workspace identity;
+- local commit, parent, tree and branch parity, plus a recomputed fresh clean-state snapshot hash;
+- exact HTTPS GitHub origin and current remote branch identity;
+- push outcome and two-phase stability claims; and
+- the complete read-only, false-mutation authority map.
+
+Correctly rehashed unsupported fields, invented lineage, source-receipt substitution, missing contract-admission evidence or authority escalation fail closed. The emitted receipt records `verificationReceiptContractAdmitted: true` only after the runtime has passed that same contract.
+
 ## CLI
 
 ```powershell
@@ -61,7 +76,7 @@ node scripts/layered-godot-git-push-verifier.mjs verify `
   --repository EVAVO-STUDIO/GodotGameFoundationKit
 ```
 
-The command emits a self-hashed verification receipt containing the exact commit and push receipt hashes, upstream request/write/handoff/review lineage, current local commit identity, current remote ref, two-phase stability evidence and the read-only authority actually exercised.
+The command emits a self-hashed, closed-contract verification receipt containing the exact commit and push receipt hashes, upstream request/write/handoff/review lineage, current local commit identity, current remote ref, two-phase stability evidence and the read-only authority actually exercised.
 
 ## Complete governed chain
 
@@ -76,6 +91,7 @@ approved layered art
 → explicit commit-only Git operator
 → explicit plain fast-forward Git push operator
 → independent read-only push receipt and commit-lineage verifier
+→ closed-contract verification receipt
 ```
 
 A successful verification is evidence that the admitted commit receipt, bound push receipt, exact local commit and remote branch remain one current delivery chain. It is not deployment or release publication, and it does not authorize another Git mutation.

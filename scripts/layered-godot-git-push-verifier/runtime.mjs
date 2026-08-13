@@ -17,6 +17,7 @@ import {
 import { validateCommitReceipt } from "./commit-receipt-contract.mjs";
 import { validatePushReceipt } from "./receipt-contract.mjs";
 import { makeVerificationReceipt } from "./verification-receipt.mjs";
+import { validateVerificationReceipt } from "./verification-receipt-contract.mjs";
 
 const INPUT_KEYS = [
   "commitReceipt",
@@ -121,7 +122,7 @@ export async function verifyLayeredGodotPushReceipt(input, dependencies = {}) {
     "dependencies.now result",
     "TIME_INVALID",
   );
-  return makeVerificationReceipt({
+  const verificationReceipt = makeVerificationReceipt({
     repository,
     root,
     commitReceipt,
@@ -131,4 +132,12 @@ export async function verifyLayeredGodotPushReceipt(input, dependencies = {}) {
     remote: remoteAfter,
     verifiedAt,
   });
+  return validateVerificationReceipt(
+    verificationReceipt,
+    repository,
+    root.realPath,
+    sameFilesystemPath,
+    commitReceipt,
+    receipt,
+  );
 }

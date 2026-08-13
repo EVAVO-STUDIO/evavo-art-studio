@@ -20,7 +20,9 @@ const files = [
   "scripts/layered-godot-git-push-verifier/receipt-outcome.mjs",
   "scripts/layered-godot-git-push-verifier/runtime.mjs",
   "scripts/layered-godot-git-push-verifier/verification-receipt.mjs",
+  "scripts/layered-godot-git-push-verifier/verification-receipt-contract.mjs",
   "scripts/layered-godot-git-push-verifier/cli.mjs",
+  "scripts/layered-godot-git-push-verifier/test-verification-receipt.mjs",
   "scripts/test-layered-godot-git-push-verifier.mjs",
   "scripts/check-layered-godot-git-push-verifier.mjs",
   "config/layered-production-godot-git-push-verifier.v1.json",
@@ -63,11 +65,13 @@ test("push verifier source, lineage and authority contract remain exact", async 
     .map((entry) => source.get(entry))
     .join("\n");
   for (const token of [
-    "validateCommitReceipt", "validatePushReceipt", "snapshotJsonValue", "utilTypes.isProxy",
+    "validateCommitReceipt", "validatePushReceipt", "validateVerificationReceipt",
+    "snapshotJsonValue", "utilTypes.isProxy",
     "captureDependencies", "captureWorkspaceRoot", "captureOrigin",
     "captureGitResult", "copyStableBuffer", "SharedArrayBuffer",
     "assertReadOnlyGitArguments", "commitReceiptAdmitted: true",
     "lineageBindingsCurrent: true", "crossReceiptBindingsVerified: true",
+    "verificationReceiptContractAdmitted: true",
     "stableAcrossVerification: true", "gitPushAttempted: false",
     "gitPushPerformed: false", "gitRefUpdated: false",
     "forcePushPerformed: false", "deploymentPerformed: false",
@@ -82,7 +86,7 @@ test("push verifier source, lineage and authority contract remain exact", async 
 
   const config = JSON.parse(source.get("config/layered-production-godot-git-push-verifier.v1.json"));
   assert.equal(config.schema, "evavo.layered-production.godot-git-push-verifier.v1");
-  assert.equal(config.protocolVersion, "2026-08-13.2");
+  assert.equal(config.protocolVersion, "2026-08-13.3");
   for (const key of [
     "requiresExactCurrentCommitReceipt", "requiresClosedCommitReceiptContract",
     "requiresCommitReceiptSelfHash", "requiresCommitAndPushReceiptLineageParity",
@@ -95,6 +99,9 @@ test("push verifier source, lineage and authority contract remain exact", async 
     "requiresExactHttpsGithubOrigin", "requiresTwoPhaseLocalAndRemoteVerification",
     "requiresRemoteRefEqualReceiptCommit", "requiresClosedReadOnlyGitCommandSet",
     "requiresOwnedGitOutputBuffers", "rejectsSharedGitOutputBuffers",
+    "requiresClosedVerificationReceiptContract",
+    "requiresGeneratedVerificationReceiptReadmission",
+    "requiresVerificationReceiptSourceLineageParity",
   ]) assert.equal(config.requirements[key], true, `config missing ${key}`);
   for (const key of ["gitPush", "gitRefUpdate", "forcePush", "deployment", "releasePublication"]) {
     assert.equal(config.authority[key], false, `authority ${key} must remain false`);
@@ -105,7 +112,8 @@ test("push verifier source, lineage and authority contract remain exact", async 
     "read-only post-push boundary", "self-hash is integrity, not independent authority",
     "actual source commit receipt", "cross-receipt lineage",
     "two fresh local inspections", "both remote reads",
-    "closed read-only Git command set", "does not push",
+    "closed read-only Git command set", "closed verification-receipt contract",
+    "verificationReceiptContractAdmitted: true", "does not push",
     "not deployment or release publication",
   ]) assert.ok(docs.includes(token), `push verifier docs missing ${token}`);
 });

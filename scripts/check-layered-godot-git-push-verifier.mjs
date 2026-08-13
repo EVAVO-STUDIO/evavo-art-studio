@@ -16,6 +16,7 @@ if (tests.stderr) process.stderr.write(tests.stderr);
 assert.equal(tests.status, 0, "push verifier tests failed");
 console.log("Layered Godot Git push verifier contract passed.");
 console.log("- exact source commit and push receipts are re-admitted through closed contracts");
+console.log("- generated verification receipts are re-admitted through their own exact closed contract");
 console.log("- inherited hashes and commit, parent, tree and branch identity must agree across receipts");
 console.log("- local and remote identities are proved twice across the verification window");
 console.log("- the Git command surface is closed and read-only");
