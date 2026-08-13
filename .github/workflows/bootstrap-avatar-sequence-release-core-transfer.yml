@@ -1,0 +1,141 @@
+name: Bootstrap avatar sequence release core transfer
+
+on:
+  push:
+    branches:
+      - agent/avatar-sequence-release-core-transfer-20260813
+    paths:
+      - .github/workflows/bootstrap-avatar-sequence-release-core-transfer.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-avatar-sequence-release-core-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  transfer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact transfer branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Rebuild and verify hash-locked source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, hashlib, io, json, os, re, stat, tarfile, urllib.request
+          from pathlib import Path, PurePosixPath
+
+          REPOSITORY = 'EVAVO-STUDIO/evavo-art-studio'
+          BLOB_SHA = 'f1eaf6a528f3eecb7e9fc25f0f2c5c2a8f1e9119'
+          ARCHIVE_SHA256 = 'd6cdeac66d35056a163d07c59a240f07f9298a0532e8b0b7397859580cf7c430'
+          EXPECTED = {
+              'scripts/project-art/avatar-sequence-release.mjs': '7bc7263a08551d99777976de9e64f39c1447514028138d0d09dab5d81fc4b82a',
+              'tools/project_art_avatar_sequence_release_mcp.mjs': '4bd386b1bb1f71de581086538c04452f9a7192b7cd8b66902c5f7ff082df2128',
+          }
+
+          request = urllib.request.Request(
+              f'https://api.github.com/repos/{REPOSITORY}/git/blobs/{BLOB_SHA}',
+              headers={
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'evavo-avatar-sequence-release-bootstrap/1',
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              record = json.load(response)
+          if record.get('sha') != BLOB_SHA or record.get('encoding') != 'base64' or record.get('truncated') is True:
+              raise SystemExit('Git blob identity is incomplete or mismatched')
+          archive = base64.b64decode(record['content'], validate=False)
+          actual_archive_sha = hashlib.sha256(archive).hexdigest()
+          if actual_archive_sha != ARCHIVE_SHA256:
+              raise SystemExit(f'archive SHA-256 mismatch: {actual_archive_sha}')
+
+          payloads = {}
+          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:xz') as bundle:
+              for member in bundle.getmembers():
+                  name = member.name[2:] if member.name.startswith('./') else member.name
+                  if name in ('', '.'):
+                      if not member.isdir():
+                          raise SystemExit('archive root must be a directory')
+                      continue
+                  posix = PurePosixPath(name)
+                  if posix.is_absolute() or '..' in posix.parts or '\\' in name or '\x00' in name:
+                      raise SystemExit(f'unsafe archive member: {name}')
+                  if member.isdir():
+                      continue
+                  if name in payloads or not member.isfile() or member.issym() or member.islnk() or member.isdev():
+                      raise SystemExit(f'invalid archive member: {name}')
+                  if stat.S_IMODE(member.mode) & 0o022:
+                      raise SystemExit(f'unsafe archive mode: {name}')
+                  stream = bundle.extractfile(member)
+                  if stream is None:
+                      raise SystemExit(f'unreadable archive member: {name}')
+                  payloads[name] = stream.read()
+
+          manifest_bytes = payloads.pop('.evavo-transfer-manifest.json', None)
+          if manifest_bytes is None:
+              raise SystemExit('transfer manifest is missing')
+          manifest = json.loads(manifest_bytes.decode('utf-8'))
+          if manifest.get('schema') != 'evavo.avatar-sequence-release-core-transfer.v1':
+              raise SystemExit('transfer manifest schema is invalid')
+          if manifest.get('files') != EXPECTED or set(payloads) != set(EXPECTED):
+              raise SystemExit('transfer manifest path or hash set is invalid')
+
+          root = Path.cwd().resolve()
+          for relative, expected_sha in sorted(EXPECTED.items()):
+              data = payloads[relative]
+              if hashlib.sha256(data).hexdigest() != expected_sha:
+                  raise SystemExit(f'payload hash mismatch: {relative}')
+              target = root.joinpath(*PurePosixPath(relative).parts)
+              if not target.resolve(strict=False).is_relative_to(root):
+                  raise SystemExit(f'target escapes repository: {relative}')
+              cursor = root
+              for part in PurePosixPath(relative).parts[:-1]:
+                  cursor /= part
+                  if cursor.is_symlink():
+                      raise SystemExit(f'symbolic target parent: {relative}')
+              if target.exists() or target.is_symlink():
+                  raise SystemExit(f'create-only target already exists: {relative}')
+              target.parent.mkdir(parents=True, exist_ok=True)
+              temporary = target.with_name(f'.{target.name}.evavo-transfer')
+              temporary.write_bytes(data)
+              os.chmod(temporary, 0o644)
+              os.replace(temporary, target)
+              if hashlib.sha256(target.read_bytes()).hexdigest() != expected_sha:
+                  raise SystemExit(f'post-write hash mismatch: {relative}')
+
+          Path('/tmp/avatar-sequence-release-core-paths.txt').write_text(
+              '\n'.join(sorted(EXPECTED)) + '\n', encoding='utf-8'
+          )
+          print('Verified and materialized exact sequence-release core files.')
+          PY
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: '22.14.0'
+          package-manager-cache: false
+
+      - name: Validate and commit exact source
+        run: |
+          while IFS= read -r file; do
+            node --check "$file"
+          done < /tmp/avatar-sequence-release-core-paths.txt
+          git diff --check
+          git config user.name 'EVAVO-STUDIO'
+          git config user.email 'evavo.studio@gmail.com'
+          while IFS= read -r file; do
+            git add -- "$file"
+          done < /tmp/avatar-sequence-release-core-paths.txt
+          git commit -m 'chore(avatar): materialize exact sequence release core'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
