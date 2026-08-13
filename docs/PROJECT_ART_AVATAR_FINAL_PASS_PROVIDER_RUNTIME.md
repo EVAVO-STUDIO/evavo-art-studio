@@ -12,7 +12,7 @@ evavo.project-art-avatar-final-pass-provider-batch.v1
 → governed candidate materialization or failure record
 ```
 
-The bridge does not execute a provider. It does not enqueue a runtime job, materialize image bytes, approve or promote a candidate, write the reviewed target, mutate a repository, push Git, deploy, publish or activate the avatar runtime.
+The bridge does not execute a provider. It does not enqueue a runtime job, materialize image bytes, approve or promote a candidate, write the reviewed target, mutate a repository, push Git, deploy, publish or activate the avatar runtime. It does not approve or promote a candidate.
 
 ## Why this is separate
 
@@ -59,8 +59,8 @@ kind                 art.candidate.edit | art.candidate.generate
 maximum attempts     3 runtime retries of the same idempotent request
 lease                300000 ms
 timeout              1800000 ms
-provider calls       one creative submission
-candidate count      one
+provider calls       one provider call
+candidate count      one candidate
 fallback             disabled
 ```
 
@@ -125,6 +125,12 @@ node C:\GitRepos\evavo-art-studio\scripts\avatar-final-pass-provider-runtime-cli
   --output C:\EVAVO\Evidence\eva\talk-a.normalized-outcome.json
 ```
 
+The exact successful normalized state is:
+
+```text
+candidate-materialization-required
+```
+
 The normalized record prepares a create-only materialization request for the governed scratch path. It does not write the artifact. It requires the following next steps:
 
 ```text
@@ -149,7 +155,13 @@ bounded failure code and message
 classification: transient | permanent | incompatible | cancelled
 ```
 
-The normalized failure record keeps the original provider batch immutable. Any retry requires a fresh named-human run-once authorization and a new candidate output path. It cannot silently retry as a new creative variation or fall through to another provider.
+The exact normalized failure state is:
+
+```text
+provider-failure-record-required
+```
+
+The normalized failure record keeps the original provider batch immutable. Any retry requires fresh named-human authorization, a new run-once receipt, and a new candidate output path. It cannot silently retry as a new creative variation or fall through to another provider.
 
 ## MCP
 
@@ -186,7 +198,7 @@ canonical frame review
 → separately authorized durable runtime enqueue and execution
 → runtime outcome normalization
 → create-only candidate materialization
-→ rerun frame finisher and registration checks
+→ rerun the avatar frame finisher and registration checks
 → independent hands, anatomy, identity and continuity review
 → generate dependent in-betweens only from final endpoint hashes
 → rerun loop closure
@@ -227,5 +239,3 @@ force push
 ```
 
 A valid runtime outcome is evidence about one provider call. It is not evidence that the frame is visually correct, that hands or anatomy are approved, that animation timing is final or that the avatar is production-ready.
-
-It does not approve or promote a candidate.
