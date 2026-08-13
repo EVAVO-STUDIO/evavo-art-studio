@@ -8,6 +8,8 @@ export {
   EXPECTED_GIT_COMMIT_RECEIPT_KIND,
   EXPECTED_GIT_PUSH_OPERATOR_PROTOCOL_VERSION,
   EXPECTED_GIT_PUSH_RECEIPT_KIND,
+  LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_KIND,
+  LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_PROTOCOL_VERSION,
   LAYERED_GODOT_GIT_PUSH_VERIFICATION_RECEIPT_KIND,
   LAYERED_GODOT_GIT_PUSH_VERIFIER_PROTOCOL_VERSION,
   LayeredGodotGitPushVerifierError,
@@ -17,6 +19,11 @@ export { snapshotJsonValue } from "./layered-godot-git-push-verifier/snapshot.mj
 export { validateCommitReceipt } from "./layered-godot-git-push-verifier/commit-receipt-contract.mjs";
 export { validatePushReceipt } from "./layered-godot-git-push-verifier/receipt-contract.mjs";
 export { validateVerificationReceipt } from "./layered-godot-git-push-verifier/verification-receipt-contract.mjs";
+export {
+  admitDeliverySourceEvidence,
+  validateDeliveryEvidenceBundle,
+} from "./layered-godot-git-push-verifier/delivery-evidence-contract.mjs";
+export { createDeliveryEvidenceBundle } from "./layered-godot-git-push-verifier/delivery-evidence.mjs";
 export { verifyLayeredGodotPushReceipt } from "./layered-godot-git-push-verifier/runtime.mjs";
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
