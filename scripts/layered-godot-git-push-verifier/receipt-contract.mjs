@@ -21,7 +21,59 @@ const KEYS = [
   "receiptSha256",
 ];
 
-export function validatePushReceipt(value, repository, root, sameFilesystemPath) {
+function validateLineage(receipt, commitReceipt, sameFilesystemPath) {
+  if (commitReceipt === null || typeof commitReceipt !== "object") {
+    verifierFail(
+      "COMMIT_RECEIPT_INVALID",
+      "An admitted source commit receipt is required before push receipt verification.",
+    );
+  }
+  if (
+    receipt.commitReceiptSha256 !== commitReceipt.receiptSha256 ||
+    receipt.requestSha256 !== commitReceipt.requestSha256 ||
+    receipt.integrationSha256 !== commitReceipt.integrationSha256 ||
+    receipt.repositoryReviewSha256 !== commitReceipt.repositoryReviewSha256
+  ) {
+    verifierFail(
+      "PUSH_RECEIPT_INVALID",
+      "Push receipt inherited hashes do not match the admitted commit receipt.",
+    );
+  }
+
+  if (
+    receipt.target.expectedRepository.toLowerCase() !==
+      commitReceipt.target.expectedRepository.toLowerCase() ||
+    !sameFilesystemPath(
+      receipt.target.workspaceRoot,
+      commitReceipt.target.workspaceRoot,
+    )
+  ) {
+    verifierFail(
+      "PUSH_RECEIPT_INVALID",
+      "Push and commit receipt targets do not identify the same repository workspace.",
+    );
+  }
+
+  if (
+    receipt.local.commit !== commitReceipt.commit.commit ||
+    receipt.local.parent !== commitReceipt.commit.parent ||
+    receipt.local.tree !== commitReceipt.commit.tree ||
+    receipt.local.branch !== commitReceipt.commit.branch
+  ) {
+    verifierFail(
+      "PUSH_RECEIPT_INVALID",
+      "Push receipt Git identity does not match the admitted commit receipt.",
+    );
+  }
+}
+
+export function validatePushReceipt(
+  value,
+  repository,
+  root,
+  sameFilesystemPath,
+  commitReceipt,
+) {
   const receipt = exactObject(value, KEYS, "pushReceipt", "PUSH_RECEIPT_INVALID");
   if (
     receipt.schemaVersion !== "1.0" ||
@@ -87,6 +139,7 @@ export function validatePushReceipt(value, repository, root, sameFilesystemPath)
   gitOid(remote.after, "pushReceipt.remote.after");
   if (remote.after !== local.commit) verifierFail("PUSH_RECEIPT_INVALID", "Push receipt remote result does not equal the exact local commit.");
 
+  validateLineage(receipt, commitReceipt, sameFilesystemPath);
   validatePushOutcome(receipt, local, remote);
   return receipt;
 }
