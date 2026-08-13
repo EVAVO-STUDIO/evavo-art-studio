@@ -139,4 +139,4 @@ approved layered art
 → self-contained offline delivery evidence bundle
 ```
 
-A successful verification is evidence that the admitted commit receipt, bound push receipt, exact local commit and remote branch remain one current delivery chain. A successful bundle validation proves the embedded evidence is internally complete and contract-current. Neither is deployment or release publication, and neither authorizes another Git mutation.
+A successful verification is evidence that the admitted commit receipt, bound push receipt, exact local commit and remote branch remain one current delivery chain. A successful bundle validation proves the embedded evidence is internally complete and contract-current. A successful verification or bundle validation is not deployment or release publication, and neither authorizes another Git mutation.
