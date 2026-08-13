@@ -1,0 +1,35 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-selection-decision-policy.v1",
+  "protocolVersion": "2026-08-13.1",
+  "projectId": "heavy-metal-fighting",
+  "assetKind": "frame-body-cel",
+  "decisionRules": {
+    "receiptState": "selected-or-repair-requested",
+    "allowedOutcomes": [
+      "selected",
+      "repair-requested"
+    ],
+    "outcomeMustMatchCreativeRecommendation": true,
+    "selectedRequiresZeroFailureCodes": true,
+    "repairRequiresAtLeastOneFailureCode": true,
+    "selectedNextAction": "master-selected-candidate",
+    "repairRequestedNextAction": "authorize-bounded-repair",
+    "namedHumanDecisionRequired": true,
+    "minimumRationaleCharacters": 20,
+    "maximumRationaleCharacters": 1600
+  },
+  "authority": {
+    "providerExecution": false,
+    "providerRetry": false,
+    "candidateMutation": false,
+    "automaticSelection": false,
+    "automaticRepairAuthorization": false,
+    "mastering": false,
+    "candidatePromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanDecisionRequired": true
+  }
+}
