@@ -95,7 +95,8 @@ approved layered art
 → read-only handoff gate
 → read-only Git repository review
 → explicit commit-only Git operator
-→ explicit plain fast-forward push operator
+→ explicit plain fast-forward Git push operator
+→ independent read-only push receipt verifier
 ```
 
-The push receipt is self-hashed and records the exact commit receipt, local commit and tree, remote branch before and after, bounded command-output hashes and the authority actually exercised. A successful Git push is not deployment or release publication.
+The push receipt is self-hashed and records the exact commit receipt, local commit and tree, remote branch before and after, bounded command-output hashes and the authority actually exercised. It may then enter the independent read-only push receipt verifier, which re-admits the receipt and proves the local and remote refs are still current without performing another mutation. A successful Git push is not deployment or release publication.

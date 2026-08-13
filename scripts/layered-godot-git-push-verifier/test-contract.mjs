@@ -1,0 +1,99 @@
+import assert from "node:assert/strict";
+import { lstatSync, readFileSync } from "node:fs";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const files = [
+  "scripts/layered-godot-git-push-verifier.mjs",
+  "scripts/layered-godot-git-push-verifier/protocol.mjs",
+  "scripts/layered-godot-git-push-verifier/canonical.mjs",
+  "scripts/layered-godot-git-push-verifier/snapshot.mjs",
+  "scripts/layered-godot-git-push-verifier/validation.mjs",
+  "scripts/layered-godot-git-push-verifier/dependencies.mjs",
+  "scripts/layered-godot-git-push-verifier/buffers.mjs",
+  "scripts/layered-godot-git-push-verifier/git-options.mjs",
+  "scripts/layered-godot-git-push-verifier/git-readonly.mjs",
+  "scripts/layered-godot-git-push-verifier/receipt-contract.mjs",
+  "scripts/layered-godot-git-push-verifier/receipt-outcome.mjs",
+  "scripts/layered-godot-git-push-verifier/runtime.mjs",
+  "scripts/layered-godot-git-push-verifier/verification-receipt.mjs",
+  "scripts/layered-godot-git-push-verifier/cli.mjs",
+  "scripts/test-layered-godot-git-push-verifier.mjs",
+  "scripts/check-layered-godot-git-push-verifier.mjs",
+  "config/layered-production-godot-git-push-verifier.v1.json",
+  "docs/LAYERED_GODOT_GIT_PUSH_VERIFIER.md",
+];
+
+function sourceMap() {
+  const source = new Map();
+  for (const relative of files) {
+    const absolute = path.join(root, relative);
+    const metadata = lstatSync(absolute);
+    assert.equal(metadata.isFile(), true, `${relative} must be a regular file`);
+    assert.equal(metadata.isSymbolicLink(), false, `${relative} must not be symbolic`);
+    assert.ok(metadata.size > 0 && metadata.size < 2_000_000, `${relative} has invalid size`);
+    const content = readFileSync(absolute, "utf8");
+    assert.equal(content.startsWith("\uFEFF"), false, `${relative} must not have BOM`);
+    assert.equal(content.includes("\r"), false, `${relative} must use LF line endings`);
+    source.set(relative, content);
+  }
+  return source;
+}
+
+test("push verifier source and authority contract remain exact", async () => {
+  const source = sourceMap();
+  const verifier = await import("../layered-godot-git-push-verifier.mjs");
+  const push = await import("../layered-godot-git-push-operator.mjs");
+  assert.equal(
+    verifier.EXPECTED_GIT_PUSH_OPERATOR_PROTOCOL_VERSION,
+    push.LAYERED_GODOT_GIT_PUSH_OPERATOR_PROTOCOL_VERSION,
+  );
+  assert.equal(verifier.EXPECTED_GIT_PUSH_RECEIPT_KIND, push.LAYERED_GODOT_GIT_PUSH_RECEIPT_KIND);
+
+  const implementation = files
+    .filter((entry) => entry.includes("git-push-verifier/") || entry.endsWith("git-push-verifier.mjs"))
+    .map((entry) => source.get(entry))
+    .join("\n");
+  for (const token of [
+    "validatePushReceipt", "snapshotJsonValue", "utilTypes.isProxy",
+    "captureDependencies", "captureWorkspaceRoot", "captureOrigin",
+    "captureGitResult", "copyStableBuffer", "SharedArrayBuffer",
+    "assertReadOnlyGitArguments", "stableAcrossVerification: true",
+    "gitPushAttempted: false", "gitPushPerformed: false", "gitRefUpdated: false",
+    "forcePushPerformed: false", "deploymentPerformed: false",
+    "releasePublicationPerformed: false",
+  ]) assert.ok(implementation.includes(token), `push verifier missing ${token}`);
+  const gitSurface = source.get("scripts/layered-godot-git-push-verifier/git-readonly.mjs");
+  for (const forbidden of [
+    '["push"', '["update-index"', '["commit"', '["fetch"', '["pull"',
+    '["merge"', '["rebase"', '["reset"', '["checkout"', '["restore"',
+    "--force-with-lease", "shell: true",
+  ]) assert.equal(gitSurface.includes(forbidden), false, `push verifier Git surface contains ${forbidden}`);
+
+  const config = JSON.parse(source.get("config/layered-production-godot-git-push-verifier.v1.json"));
+  assert.equal(config.schema, "evavo.layered-production.godot-git-push-verifier.v1");
+  assert.equal(config.protocolVersion, "2026-08-13.1");
+  for (const key of [
+    "requiresExactCurrentPushReceipt", "requiresClosedPushReceiptContract",
+    "requiresPushReceiptSelfHash", "requiresOutcomeCommandAuthorityParity",
+    "requiresImmutableInputSnapshot", "requiresSynchronousDependencyCaptureBeforeAsyncBoundary",
+    "rejectsProxyInputsDependenciesAndResults", "requiresExactRepositoryRoot",
+    "requiresCleanLocalRepository", "requiresExactLocalHeadParentTreeAndBranch",
+    "requiresExactHttpsGithubOrigin", "requiresTwoPhaseLocalAndRemoteVerification",
+    "requiresRemoteRefEqualReceiptCommit", "requiresClosedReadOnlyGitCommandSet",
+    "requiresOwnedGitOutputBuffers", "rejectsSharedGitOutputBuffers",
+  ]) assert.equal(config.requirements[key], true, `config missing ${key}`);
+  for (const key of ["gitPush", "gitRefUpdate", "forcePush", "deployment", "releasePublication"]) {
+    assert.equal(config.authority[key], false, `authority ${key} must remain false`);
+  }
+
+  const docs = source.get("docs/LAYERED_GODOT_GIT_PUSH_VERIFIER.md");
+  for (const token of [
+    "read-only post-push boundary", "self-hash is integrity, not independent authority",
+    "two fresh local inspections", "both remote reads",
+    "closed read-only Git command set", "does not push",
+    "not deployment or release publication",
+  ]) assert.ok(docs.includes(token), `push verifier docs missing ${token}`);
+});
