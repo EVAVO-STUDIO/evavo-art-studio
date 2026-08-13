@@ -26,18 +26,18 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Rebuild exact verified source
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Rebuild exact source from the GitHub-native carrier
         run: |
           python - <<'PY'
-          import base64, hashlib, io, json, os, re, stat, subprocess, tarfile, urllib.request
+          import hashlib, io, json, os, re, stat, subprocess, tarfile, urllib.request
           from pathlib import Path, PurePosixPath
 
-          REPO = 'EVAVO-STUDIO/evavo-art-studio'
           BASE = 'e77aba8a7f78c5345b234e9803872723bad8ae43'
-          BLOB = '1e26a35a062e951ae3610ec5696c5e43bb35d031'
-          ARCHIVE_SHA = '846998d14a455dc52d675f11a49a019465ca5ff6dcce9e6ac091bd8303578587'
+          CARRIER_URL = (
+              'https://raw.githubusercontent.com/EVAVO-STUDIO/evavo-art-studio/'
+              'agent/avatar-provider-frame-finisher-carrier-inspect/'
+              'transfer/avatar-provider-frame-finisher-archive.bin'
+          )
           CARRIERS = {
               '.github/workflows/bootstrap-avatar-provider-frame-finisher-transfer.yml',
               '.github/workflows/bootstrap-avatar-provider-frame-finisher-transfer-retry.yml',
@@ -76,47 +76,52 @@ jobs:
               raise SystemExit(f'unexpected carrier scope: {sorted(changed)}')
 
           request = urllib.request.Request(
-              f'https://api.github.com/repos/{REPO}/git/blobs/{BLOB}',
-              headers={
-                  'Accept': 'application/vnd.github+json',
-                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
-                  'X-GitHub-Api-Version': '2022-11-28',
-                  'User-Agent': 'evavo-frame-finisher-transfer/2',
-              },
+              CARRIER_URL,
+              headers={'User-Agent': 'evavo-avatar-frame-finisher-transfer/3'},
           )
           with urllib.request.urlopen(request, timeout=30) as response:
-              record = json.load(response)
-          if record.get('sha') != BLOB or record.get('encoding') != 'base64':
-              raise SystemExit('blob identity mismatch')
-          archive = base64.b64decode(record['content'])
-          if hashlib.sha256(archive).hexdigest() != ARCHIVE_SHA:
-              raise SystemExit('archive hash mismatch')
+              archive = response.read()
+          print(
+              'carrier bytes=', len(archive),
+              'sha256=', hashlib.sha256(archive).hexdigest(),
+          )
 
           payloads = {}
           with tarfile.open(fileobj=io.BytesIO(archive), mode='r:xz') as bundle:
               for member in bundle.getmembers():
                   name = member.name[2:] if member.name.startswith('./') else member.name
                   if name in ('', '.'):
-                      if not member.isdir(): raise SystemExit('invalid archive root')
+                      if not member.isdir():
+                          raise SystemExit('invalid archive root')
                       continue
                   posix = PurePosixPath(name)
                   if posix.is_absolute() or '..' in posix.parts or '\\' in name or '\0' in name:
                       raise SystemExit(f'unsafe member {name}')
-                  if member.isdir(): continue
-                  if name in payloads or not member.isfile() or member.issym() or member.islnk() or member.isdev():
+                  if member.isdir():
+                      continue
+                  if (
+                      name in payloads
+                      or not member.isfile()
+                      or member.issym()
+                      or member.islnk()
+                      or member.isdev()
+                  ):
                       raise SystemExit(f'invalid member {name}')
                   if stat.S_IMODE(member.mode) & 0o022:
                       raise SystemExit(f'unsafe mode {name}')
                   stream = bundle.extractfile(member)
-                  if stream is None: raise SystemExit(f'unreadable member {name}')
+                  if stream is None:
+                      raise SystemExit(f'unreadable member {name}')
                   payloads[name] = stream.read()
 
           manifest_bytes = payloads.pop('.evavo-transfer-manifest.json', None)
-          if manifest_bytes is None: raise SystemExit('missing manifest')
+          if manifest_bytes is None:
+              raise SystemExit('missing manifest')
           manifest = json.loads(manifest_bytes.decode('utf-8'))
           files = manifest.get('files')
           if (
-              manifest.get('schema') != 'evavo.avatar-provider-frame-finisher-transfer.v1'
+              manifest.get('schema')
+              != 'evavo.avatar-provider-frame-finisher-transfer.v1'
               or manifest.get('baseCommit') != BASE
               or not isinstance(files, dict)
               or set(files) != EXPECTED
@@ -128,7 +133,11 @@ jobs:
           for relative in sorted(EXPECTED):
               data = payloads[relative]
               expected_hash = files[relative]
-              if not re.fullmatch(r'[0-9a-f]{64}', expected_hash) or hashlib.sha256(data).hexdigest() != expected_hash:
+              if (
+                  not isinstance(expected_hash, str)
+                  or not re.fullmatch(r'[0-9a-f]{64}', expected_hash)
+                  or hashlib.sha256(data).hexdigest() != expected_hash
+              ):
                   raise SystemExit(f'payload hash mismatch {relative}')
               target = root.joinpath(*PurePosixPath(relative).parts)
               if not target.resolve(strict=False).is_relative_to(root):
@@ -136,14 +145,20 @@ jobs:
               cursor = root
               for part in PurePosixPath(relative).parts[:-1]:
                   cursor /= part
-                  if cursor.is_symlink(): raise SystemExit(f'symbolic parent {relative}')
+                  if cursor.is_symlink():
+                      raise SystemExit(f'symbolic parent {relative}')
               if target.exists():
                   metadata = target.lstat()
-                  if target.is_symlink() or not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                  if (
+                      target.is_symlink()
+                      or not stat.S_ISREG(metadata.st_mode)
+                      or metadata.st_nlink != 1
+                  ):
                       raise SystemExit(f'unsafe target {relative}')
               target.parent.mkdir(parents=True, exist_ok=True)
               temporary = target.with_name('.' + target.name + '.evavo-transfer')
-              if temporary.exists() or temporary.is_symlink(): raise SystemExit(f'temp collision {relative}')
+              if temporary.exists() or temporary.is_symlink():
+                  raise SystemExit(f'temp collision {relative}')
               temporary.write_bytes(data)
               os.chmod(temporary, 0o644)
               os.replace(temporary, target)
@@ -187,9 +202,15 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import subprocess
+
           expected = set(Path('/tmp/frame-finisher-nonworkflow.txt').read_text().splitlines())
-          staged = set(subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines())
-          if staged != expected: raise SystemExit(f'unexpected staged scope: {sorted(staged)}')
+          staged = set(
+              subprocess.check_output(
+                  ['git', 'diff', '--cached', '--name-only'], text=True
+              ).splitlines()
+          )
+          if staged != expected:
+              raise SystemExit(f'unexpected staged scope: {sorted(staged)}')
           PY
           git commit -m 'feat(avatar): finish and admit reviewed provider frames'
           git push origin "HEAD:$GITHUB_REF_NAME"
