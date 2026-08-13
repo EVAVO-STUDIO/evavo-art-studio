@@ -10,6 +10,8 @@ export {
   EXPECTED_GIT_PUSH_RECEIPT_KIND,
   LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_KIND,
   LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_PROTOCOL_VERSION,
+  LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_PUBLICATION_KIND,
+  LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_PUBLICATION_PROTOCOL_VERSION,
   LAYERED_GODOT_GIT_PUSH_VERIFICATION_RECEIPT_KIND,
   LAYERED_GODOT_GIT_PUSH_VERIFIER_PROTOCOL_VERSION,
   LayeredGodotGitPushVerifierError,
@@ -24,6 +26,10 @@ export {
   validateDeliveryEvidenceBundle,
 } from "./layered-godot-git-push-verifier/delivery-evidence-contract.mjs";
 export { createDeliveryEvidenceBundle } from "./layered-godot-git-push-verifier/delivery-evidence.mjs";
+export {
+  publishDeliveryEvidenceBundle,
+  validateDeliveryEvidencePublicationReceipt,
+} from "./layered-godot-git-push-verifier/delivery-evidence-publication.mjs";
 export { verifyLayeredGodotPushReceipt } from "./layered-godot-git-push-verifier/runtime.mjs";
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
