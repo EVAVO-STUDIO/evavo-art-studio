@@ -10,6 +10,7 @@ import type {
   LayeredProviderReferenceRole,
 } from "./layered-production-types.js";
 import { freeze } from "./layered-production-internal.js";
+import { projectSourceArtCalibration } from "./jonez-source-art-calibration.js";
 
 function alphaInstruction(alpha: LayeredProductionAlphaPolicy): string {
   if (alpha === "opaque") return "Fill the complete canvas deliberately. No alpha holes and no accidental transparency.";
@@ -77,6 +78,7 @@ export function providerPrompt(
   allLayerRoles: readonly LayeredProductionLayerRole[],
 ): Readonly<{ prompt: string; negativePrompt: string }> {
   const otherRoles = allLayerRoles.filter((role) => role !== layer.role);
+  const calibration = projectSourceArtCalibration(request, unit.id);
   const frameText = unit.frame
     ? `Animation: ${unit.frame.clipId}, frame ${unit.frame.frameNumber} of ${unit.frame.frameCount}, ${unit.frame.framesPerSecond} FPS, ${unit.frame.loop ? "looping" : "one-shot"}; exact pose: ${unit.frame.pose}.`
     : "Static source unit; do not invent additional states or frames.";
@@ -93,6 +95,12 @@ export function providerPrompt(
     `Lighting lock: fixed key ${request.style.lighting.keyDirectionDegrees} degrees at elevation ${request.style.lighting.keyElevationDegrees}; shadow direction ${request.style.lighting.shadowDirectionDegrees}; no frame-to-frame variation.`,
     `Palette: ${request.style.palette.mode}, maximum ${request.style.palette.maximumLocalColours} local colours and ${request.style.palette.maximumSceneColours} scene colours; preserve palette indices.`,
     `Pixel grammar: deliberate clusters, fixed pixel density, antialias none, subpixel motion forbidden, gradients ${request.style.pixelGrammar.gradientPolicy}, texture noise forbidden, dithering ${request.style.pixelGrammar.dithering}, outline ${request.style.pixelGrammar.outline}.`,
+    ...(calibration
+      ? [
+          `Project-specific calibration identity: ${calibration.calibrationSha256}.`,
+          calibration.provider.promptAddendum,
+        ]
+      : []),
     `Distinctive motifs: ${request.style.distinctiveMotifs.join("; ")}.`,
     `Materials: ${request.style.materialVocabulary.join("; ")}.`,
     `Line rules: ${request.style.lineRules.join("; ")}.`,
@@ -127,6 +135,7 @@ export function providerPrompt(
     "inconsistent pixel density",
     "anti-aliased contours",
     "subpixel detail",
+    ...(calibration?.provider.negativeTerms ?? []),
     ...request.style.forbiddenModernTraits,
     ...request.style.forbiddenGenericTraits,
     ...layer.exclude,
@@ -167,4 +176,3 @@ export function reviewPlan(unit: LayeredProductionUnitInput, layer: LayeredProdu
     candidateOnly: true as const,
   });
 }
-

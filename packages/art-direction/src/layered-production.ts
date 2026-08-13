@@ -4,6 +4,7 @@ export * from "./layered-production-assembly-types.js";
 export * from "./layered-production-assembly.js";
 export * from "./layered-production-godot-types.js";
 export * from "./layered-production-godot.js";
+export * from "./jonez-source-art-calibration.js";
 export { validateLayeredProductionRequest } from "./layered-production-validation.js";
 export {
   compileLayeredProductionPlan,
