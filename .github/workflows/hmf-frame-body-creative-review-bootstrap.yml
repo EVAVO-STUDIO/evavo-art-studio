@@ -1,0 +1,123 @@
+name: Apply HMF Frame body creative-review boundary
+
+on:
+  push:
+    branches:
+      - "work/hmf-frame-body-creative-review-v1"
+    paths:
+      - ".hmf-creative-review-bootstrap/source.zip"
+      - ".github/workflows/hmf-frame-body-creative-review-bootstrap.yml"
+permissions:
+  contents: write
+
+concurrency:
+  group: hmf-frame-body-creative-review-bootstrap
+  cancel-in-progress: false
+
+env:
+  SOURCE_ARCHIVE_SHA256: "88a6fdb1bc4057893d30b59639c41e97bf8ade4b3a825e57cd6f6b917734b58b"
+
+jobs:
+  apply-validate-publish-branch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact branch source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Verify and unpack exact reviewed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=".hmf-creative-review-bootstrap/source.zip"
+          printf '%s  %s\n' "$SOURCE_ARCHIVE_SHA256" "$archive" | sha256sum --check --strict
+          package="$RUNNER_TEMP/hmf-frame-body-creative-review"
+          rm -rf "$package"
+          mkdir -p "$package"
+          unzip -q "$archive" -d "$package"
+          (cd "$package" && sha256sum --check --strict MANIFEST.sha256)
+
+      - name: Apply exact production files
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="$RUNNER_TEMP/hmf-frame-body-creative-review"
+          cp -R "$package/config/." config/
+          cp -R "$package/docs/." docs/
+          cp -R "$package/scripts/." scripts/
+
+      - name: Validate focused and integrated HMF contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for source in scripts/heavy-metal-fighting/frame-body-creative-review*.mjs; do
+            node --check "$source"
+          done
+          node scripts/heavy-metal-fighting/frame-body-creative-review-cli.mjs verify > "$RUNNER_TEMP/hmf-creative-review-verification.json"
+          node --test scripts/heavy-metal-fighting/frame-body-creative-review.test.mjs
+          node --test scripts/heavy-metal-fighting-art-studio-core.test.mjs
+
+      - name: Verify exact reviewed scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add \
+            config/heavy-metal-fighting/frame-body-creative-review-policy.v1.json \
+            docs/HEAVY_METAL_FIGHTING_FRAME_BODY_CREATIVE_REVIEW.md \
+            scripts/heavy-metal-fighting/frame-body-creative-review-cli.mjs \
+            scripts/heavy-metal-fighting/frame-body-creative-review-common.mjs \
+            scripts/heavy-metal-fighting/frame-body-creative-review-evidence.mjs \
+            scripts/heavy-metal-fighting/frame-body-creative-review-persistence.mjs \
+            scripts/heavy-metal-fighting/frame-body-creative-review-plan.mjs \
+            scripts/heavy-metal-fighting/frame-body-creative-review-submission.mjs \
+            scripts/heavy-metal-fighting/frame-body-creative-review-verification.mjs \
+            scripts/heavy-metal-fighting/frame-body-creative-review.mjs \
+            scripts/heavy-metal-fighting/frame-body-creative-review.test.mjs \
+            scripts/heavy-metal-fighting-art-studio-core.test.mjs
+          git diff --cached --check
+          git diff --cached --name-only | LC_ALL=C sort > "$RUNNER_TEMP/actual-scope.txt"
+          cat > "$RUNNER_TEMP/expected-scope.txt" <<'SCOPE'
+          config/heavy-metal-fighting/frame-body-creative-review-policy.v1.json
+          docs/HEAVY_METAL_FIGHTING_FRAME_BODY_CREATIVE_REVIEW.md
+          scripts/heavy-metal-fighting-art-studio-core.test.mjs
+          scripts/heavy-metal-fighting/frame-body-creative-review-cli.mjs
+          scripts/heavy-metal-fighting/frame-body-creative-review-common.mjs
+          scripts/heavy-metal-fighting/frame-body-creative-review-evidence.mjs
+          scripts/heavy-metal-fighting/frame-body-creative-review-persistence.mjs
+          scripts/heavy-metal-fighting/frame-body-creative-review-plan.mjs
+          scripts/heavy-metal-fighting/frame-body-creative-review-submission.mjs
+          scripts/heavy-metal-fighting/frame-body-creative-review-verification.mjs
+          scripts/heavy-metal-fighting/frame-body-creative-review.mjs
+          scripts/heavy-metal-fighting/frame-body-creative-review.test.mjs
+          SCOPE
+          LC_ALL=C sort -o "$RUNNER_TEMP/expected-scope.txt" "$RUNNER_TEMP/expected-scope.txt"
+          diff -u "$RUNNER_TEMP/expected-scope.txt" "$RUNNER_TEMP/actual-scope.txt"
+          test -z "$(git diff --name-only)"
+          test -z "$(git ls-files --others --exclude-standard)"
+
+      - name: Commit and normally push reviewed branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EVAVO-STUDIO"
+          git config user.email "evavo.studio@gmail.com"
+          git commit \
+            -m "feat(hmf): admit named-human Frame cel creative review" \
+            -m "Bind deterministic-QA-passed Frame body candidates to exact native bytes, six governed review contexts, twelve required human criteria and a canonical reviewer attestation. Recompile report and plan semantics before materialization, append creative-review-passed only after a complete human pass, retain failed reviews without advancing receipts, and keep selection, approval, promotion, repair authorization, provider execution, game-repository mutation, Git, deployment and publication authority false."
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          printf '{"status":"published","branch":"%s","commit":"%s","tree":"%s","parent":"%s"}\n' \
+            "$GITHUB_REF_NAME" \
+            "$(git rev-parse HEAD)" \
+            "$(git rev-parse 'HEAD^{tree}')" \
+            "$(git rev-parse 'HEAD^')" \
+            | tee "$RUNNER_TEMP/hmf-frame-body-creative-review-publication.json"
