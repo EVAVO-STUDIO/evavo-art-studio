@@ -11,8 +11,8 @@ function run(relative, label) {
     encoding: 'utf8',
     shell: false,
     windowsHide: true,
-    timeout: 240_000,
-    maxBuffer: 24 * 1024 * 1024,
+    timeout: 300_000,
+    maxBuffer: 32 * 1024 * 1024,
   });
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
@@ -27,10 +27,15 @@ run(
 );
 run(
   'scripts/check-artist-workspace-avatar-provider-integration.mjs',
-  'Artist Workspace avatar provider integration guard',
+  'Artist Workspace avatar provider v2 integration guard',
+);
+run(
+  'scripts/check-artist-workspace-avatar-provider-runtime-integration.mjs',
+  'Artist Workspace avatar provider runtime v3 integration guard',
 );
 
 console.log('Artist Workspace agent suite combined guard passed.');
 console.log('- v1 workspace, ingest, catalog and resumable-job contracts remain compatible');
-console.log('- v2 adds the governed avatar final-pass provider compiler without replacing v1');
-console.log('- one existing consolidated workflow validates both contracts');
+console.log('- v2 retains the governed avatar final-pass provider compiler');
+console.log('- v3 adds exact durable runtime dispatch, binding and outcome normalization');
+console.log('- one existing consolidated workflow validates all three contracts');

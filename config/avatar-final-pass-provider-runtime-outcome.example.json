@@ -1,0 +1,51 @@
+{
+  "kind": "candidate-run-result",
+  "submissionIdempotencyKey": "avatar-provider-submit:1111111111111111111111111111111111111111",
+  "providerCallCount": 1,
+  "completedAt": "2026-08-13T03:00:00.000Z",
+  "result": {
+    "schemaVersion": "1.0",
+    "protocolVersion": "2026-08-07.3",
+    "requestId": "provider_2222222222222222222222222222222222222222",
+    "requestSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "compiledPromptSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "routingInspection": {
+      "schemaVersion": "1.0",
+      "protocolVersion": "2026-08-07.3",
+      "requestId": "provider_2222222222222222222222222222222222222222",
+      "requestSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "requiredCapabilities": [
+        "edit",
+        "reference-images",
+        "identity-reference",
+        "native-alpha",
+        "custom-size",
+        "candidate-count"
+      ],
+      "adapters": [],
+      "eligibleAdapterIds": [
+        "approved-adapter"
+      ],
+      "firstEligibleAdapterId": "approved-adapter",
+      "outcome": "eligible",
+      "fallbackAllowed": false,
+      "providerCallPerformedByInspection": false
+    },
+    "adapterId": "approved-adapter",
+    "model": "approved-model",
+    "candidateArtifacts": [
+      "artifact_5555555555555555555555555555555555555555555555555555555555555555"
+    ],
+    "evidenceArtifact": "artifact_6666666666666666666666666666666666666666666666666666666666666666",
+    "attempts": [
+      {
+        "adapterId": "approved-adapter",
+        "model": "approved-model",
+        "startedAt": "2026-08-13T03:00:00.000Z",
+        "completedAt": "2026-08-13T03:00:00.000Z",
+        "outcome": "succeeded"
+      }
+    ],
+    "requiresAlphaExtraction": false
+  }
+}
