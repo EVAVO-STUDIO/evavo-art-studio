@@ -16,4 +16,5 @@ export {
   getLayeredProductionUnit,
   layeredProductionProtocolSummary,
   verifyLayeredProductionPlan,
+  verifyLayeredProductionPlanAgainstRequest,
 } from "./layered-production-compiler.js";

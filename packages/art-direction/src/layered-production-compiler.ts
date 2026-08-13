@@ -2,6 +2,7 @@ export {
   compileLayeredProductionPlan,
   getLayeredProductionUnit,
   verifyLayeredProductionPlan,
+  verifyLayeredProductionPlanAgainstRequest,
 } from "./layered-production-plan.js";
 export {
   compileLayeredProviderCandidateRequest,
