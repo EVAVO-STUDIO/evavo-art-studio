@@ -10,6 +10,8 @@ config/mcp.project-art-workspace.windows.example.json
 
 That one configuration registers six deliberately separate path-only servers:
 
+The v2 compatibility contract registered five deliberately separate path-only servers; v3 retains all five and adds the provider-runtime bridge as the sixth.
+
 ```text
 evavo-project-art-workspace
 evavo-project-art-workspace-ingest
