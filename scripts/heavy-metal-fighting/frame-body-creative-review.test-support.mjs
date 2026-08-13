@@ -149,7 +149,7 @@ export async function fixture() {
       bankId: "standing-heavy",
       roleId: "hero-impact",
       semanticId: "standing-heavy:hero-impact",
-      phase: "contact",
+      phase: "active",
       hero: true,
       contactRole: true,
       holdPriority: "hero"
