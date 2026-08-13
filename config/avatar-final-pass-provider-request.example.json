@@ -1,0 +1,37 @@
+{
+  "schema": "evavo.project-art-avatar-final-pass-provider-request.v1",
+  "requestId": "eva-provider-run-001",
+  "planSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "jobs": [
+    {
+      "jobId": "redraw:talk-a",
+      "identityFrameId": "idle-a",
+      "candidateOutputPath": "scratch/avatar-final-pass/eva-final-pass-v1/talk-a/candidate-01.png",
+      "selection": {
+        "preferredAdapterId": null,
+        "preferredModel": null,
+        "allowedAdapterIds": [],
+        "allowFallback": false,
+        "requireSeed": false,
+        "seed": null
+      },
+      "authorization": null,
+      "artifactBindings": [],
+      "notes": "Repair only the declared hand and finger defects while preserving pose, face identity, clothing, style and registration."
+    }
+  ],
+  "authority": {
+    "sourceMutation": false,
+    "automaticGenerationAuthorization": false,
+    "providerExecution": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "repositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "deployment": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "forcePush": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "evavo-project-art-avatar-final-pass-provider": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ROOTS": "C:\\EVAVO\\workspaces",
+        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_MCP_ALLOW_WRITE": "true"
+      }
+    }
+  }
+}
