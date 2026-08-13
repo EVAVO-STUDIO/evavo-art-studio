@@ -12,11 +12,6 @@ on:
       - "requirements/pixel-font-universal.txt"
       - "examples/pixel-font-universal/**"
       - "scripts/pixel-font-studio-universal-mcp.mjs"
-      - "scripts/pixel-font-repository-delivery.mjs"
-      - "scripts/pixel-font-repository-delivery-mcp.mjs"
-      - "scripts/pixel-font-repository-delivery/**"
-      - "scripts/check-pixel-font-repository-delivery.mjs"
-      - "scripts/check-pixel-font-automation-suite.mjs"
       - "tools/pixel_text_studio.py"
       - "tools/pixel_text_studio_engine.py"
       - "tools/check_pixel_text_studio.py"
@@ -25,11 +20,25 @@ on:
       - "config/pixel-text-studio.v1.json"
       - "examples/pixel-text-studio/**"
       - "docs/PIXEL_TEXT_STUDIO.md"
-      - "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md"
+      - "tools/pixel_typography_review.py"
+      - "tools/pixel_typography_review_engine.py"
+      - "tools/pixel_typography_review_lib/**"
+      - "tools/check_pixel_typography_review.py"
+      - "scripts/pixel-typography-review-mcp.mjs"
+      - "scripts/check-pixel-typography-review-mcp.mjs"
+      - "config/pixel-typography-review.v1.json"
+      - "examples/pixel-typography-review/**"
+      - "docs/PIXEL_TYPOGRAPHY_REVIEW.md"
+      - "scripts/pixel-font-repository-delivery.mjs"
+      - "scripts/pixel-font-repository-delivery-mcp.mjs"
+      - "scripts/pixel-font-repository-delivery/**"
+      - "scripts/check-pixel-font-repository-delivery.mjs"
+      - "scripts/check-pixel-font-automation-suite.mjs"
       - "config/pixel-font-repository-allowlist.v1.json"
       - "config/mcp.pixel-font-automation.windows.example.json"
       - "config/pixel-font-automation-suite.v1.json"
       - "examples/pixel-font-repository-delivery/**"
+      - "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md"
       - "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md"
       - ".github/workflows/pixel-font-repository-delivery-contract.yml"
       - ".github/workflows/pixel-font-repository-publish.yml"
@@ -45,11 +54,6 @@ on:
       - "requirements/pixel-font-universal.txt"
       - "examples/pixel-font-universal/**"
       - "scripts/pixel-font-studio-universal-mcp.mjs"
-      - "scripts/pixel-font-repository-delivery.mjs"
-      - "scripts/pixel-font-repository-delivery-mcp.mjs"
-      - "scripts/pixel-font-repository-delivery/**"
-      - "scripts/check-pixel-font-repository-delivery.mjs"
-      - "scripts/check-pixel-font-automation-suite.mjs"
       - "tools/pixel_text_studio.py"
       - "tools/pixel_text_studio_engine.py"
       - "tools/check_pixel_text_studio.py"
@@ -58,11 +62,25 @@ on:
       - "config/pixel-text-studio.v1.json"
       - "examples/pixel-text-studio/**"
       - "docs/PIXEL_TEXT_STUDIO.md"
-      - "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md"
+      - "tools/pixel_typography_review.py"
+      - "tools/pixel_typography_review_engine.py"
+      - "tools/pixel_typography_review_lib/**"
+      - "tools/check_pixel_typography_review.py"
+      - "scripts/pixel-typography-review-mcp.mjs"
+      - "scripts/check-pixel-typography-review-mcp.mjs"
+      - "config/pixel-typography-review.v1.json"
+      - "examples/pixel-typography-review/**"
+      - "docs/PIXEL_TYPOGRAPHY_REVIEW.md"
+      - "scripts/pixel-font-repository-delivery.mjs"
+      - "scripts/pixel-font-repository-delivery-mcp.mjs"
+      - "scripts/pixel-font-repository-delivery/**"
+      - "scripts/check-pixel-font-repository-delivery.mjs"
+      - "scripts/check-pixel-font-automation-suite.mjs"
       - "config/pixel-font-repository-allowlist.v1.json"
       - "config/mcp.pixel-font-automation.windows.example.json"
       - "config/pixel-font-automation-suite.v1.json"
       - "examples/pixel-font-repository-delivery/**"
+      - "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md"
       - "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md"
       - ".github/workflows/pixel-font-repository-delivery-contract.yml"
       - ".github/workflows/pixel-font-repository-publish.yml"
@@ -84,7 +102,7 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Check out exact source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -119,22 +137,26 @@ jobs:
           node --check scripts/pixel-typography.mjs
           node --check scripts/check-pixel-typography-cli.mjs
           node --check scripts/pixel-font-studio-universal-mcp.mjs
-          node --check scripts/pixel-font-repository-delivery.mjs
-          node --check scripts/pixel-font-repository-delivery-mcp.mjs
-          for source in scripts/pixel-font-repository-delivery/*.mjs; do
-            node --check "$source"
-          done
-          node --check scripts/check-pixel-font-repository-delivery.mjs
-          node --check scripts/check-pixel-font-automation-suite.mjs
           node --check scripts/pixel-text-studio-mcp.mjs
           node --check scripts/check-pixel-text-studio-mcp.mjs
+          node --check scripts/pixel-typography-review-mcp.mjs
+          node --check scripts/check-pixel-typography-review-mcp.mjs
+          node --check scripts/pixel-font-repository-delivery.mjs
+          node --check scripts/pixel-font-repository-delivery-mcp.mjs
+          for source in scripts/pixel-font-repository-delivery/*.mjs; do node --check "$source"; done
+          node --check scripts/check-pixel-font-repository-delivery.mjs
+          node --check scripts/check-pixel-font-automation-suite.mjs
           python -m py_compile \
             tools/pixel_font_universal.py \
             tools/check_pixel_font_universal.py \
             tools/pixel_font_universal/*.py \
             tools/pixel_text_studio.py \
             tools/pixel_text_studio_engine.py \
-            tools/check_pixel_text_studio.py
+            tools/check_pixel_text_studio.py \
+            tools/pixel_typography_review.py \
+            tools/pixel_typography_review_engine.py \
+            tools/pixel_typography_review_lib/*.py \
+            tools/check_pixel_typography_review.py
 
       - name: Run canonical Pixel Typography stack
         run: |
@@ -142,20 +164,30 @@ jobs:
           node scripts/check-pixel-typography-cli.mjs
           node scripts/pixel-typography.mjs check
 
-      - name: Validate Universal check evidence
+      - name: Validate retained check evidence
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
 
-          report_path = Path("universal-pixel-font-check-report.json")
-          report = json.loads(report_path.read_text("utf-8"))
-          assert report["schema"] == "evavo.pixel-font-universal-check.v1"
-          assert report["engineVersion"] == "3.0.0"
-          assert report["status"] == "passed"
-          assert report["operationCount"] == 15
-          report_path.unlink()
+          universal_path = Path("universal-pixel-font-check-report.json")
+          universal = json.loads(universal_path.read_text("utf-8"))
+          assert universal["schema"] == "evavo.pixel-font-universal-check.v1"
+          assert universal["engineVersion"] == "3.0.0"
+          assert universal["status"] == "passed"
+          assert universal["operationCount"] == 15
+          universal_path.unlink()
+
+          review_path = Path("pixel-typography-review-check-report.json")
+          review = json.loads(review_path.read_text("utf-8"))
+          assert review["schema"] == "evavo.pixel-typography-review-check.v1"
+          assert review["engineVersion"] == "1.0.0"
+          assert review["status"] == "passed"
+          assert review["profilePresetCount"] >= 3
+          assert review["pageCount"] == 2
+          assert review["sampleCount"] == 4
+          review_path.unlink()
           PY
 
       - name: Exercise real Universal compiler integration

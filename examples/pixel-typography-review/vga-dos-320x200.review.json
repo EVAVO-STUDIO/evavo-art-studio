@@ -1,0 +1,57 @@
+{
+  "schema": "evavo.pixel-typography-review-profile.v1",
+  "profileId": "vga-dos-320x200",
+  "displayName": "VGA DOS 320x200",
+  "description": "Native 320x200 review pages for a restrained early-1990s DOS game font or title treatment.",
+  "eraProfile": "vga-dos-era",
+  "nativeResolution": {
+    "width": 320,
+    "height": 200
+  },
+  "background": "#090611ff",
+  "padding": 8,
+  "gap": 5,
+  "paletteBudget": 16,
+  "integerScales": [2, 3],
+  "pages": [
+    {
+      "id": "title",
+      "align": "center",
+      "samples": [
+        {
+          "id": "title-static",
+          "role": "title",
+          "text": "CHESS LORD",
+          "renderMode": "static"
+        },
+        {
+          "id": "title-motion",
+          "role": "animation-strip",
+          "text": "BATTLE CHESS",
+          "renderMode": "animation-grid",
+          "frameColumns": 4,
+          "frameGap": 1
+        }
+      ]
+    },
+    {
+      "id": "alphabet",
+      "align": "left",
+      "samples": [
+        {"id": "uppercase", "role": "alphabet-uppercase", "textPreset": "uppercase"},
+        {"id": "lowercase", "role": "alphabet-lowercase", "textPreset": "lowercase"},
+        {"id": "digits", "role": "numerals", "textPreset": "digits"},
+        {"id": "punctuation", "role": "punctuation", "textPreset": "punctuation"}
+      ]
+    },
+    {
+      "id": "ui",
+      "align": "left",
+      "samples": [
+        {"id": "menu", "role": "menu-label", "textPreset": "menu"},
+        {"id": "hud", "role": "hud-label", "textPreset": "hud"},
+        {"id": "status", "role": "status-text", "textPreset": "status"}
+      ]
+    }
+  ]
+}

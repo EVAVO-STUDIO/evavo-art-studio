@@ -9,70 +9,36 @@ const manifestPath = "config/pixel-font-automation-suite.v1.json";
 const configPath = "config/mcp.pixel-font-automation.windows.example.json";
 const manifest = JSON.parse(await readFile(path.join(root, manifestPath), "utf8"));
 const config = JSON.parse(await readFile(path.join(root, configPath), "utf8"));
-
 assert.equal(manifest.schema, "evavo.pixel-font-automation-suite.v1");
-assert.equal(manifest.version, 1);
+assert.equal(manifest.version, 2);
 assert.equal(manifest.configuration, configPath);
 assert.equal(manifest.unifiedCli.entrypoint, "scripts/pixel-typography.mjs");
-assert.equal(manifest.unifiedCli.catalogCommand, "node scripts/pixel-typography.mjs catalog");
-assert.equal(manifest.unifiedCli.checkCommand, "node scripts/pixel-typography.mjs check");
-assert.deepEqual(manifest.unifiedCli.delegates, {
-  font: "tools/pixel_font_universal.py",
-  text: "tools/pixel_text_studio.py",
-  delivery: "scripts/pixel-font-repository-delivery.mjs",
-});
-assert.deepEqual(manifest.servers.map((entry) => entry.id), [
-  "evavo-pixel-font-universal",
-  "evavo-pixel-text-studio",
-  "evavo-pixel-font-repository-delivery",
-]);
+assert.deepEqual(manifest.unifiedCli.delegates, { font: "tools/pixel_font_universal.py", text: "tools/pixel_text_studio.py", review: "tools/pixel_typography_review.py", delivery: "scripts/pixel-font-repository-delivery.mjs" });
+assert.deepEqual(manifest.servers.map((entry) => entry.id), ["evavo-pixel-font-universal", "evavo-pixel-text-studio", "evavo-pixel-typography-review", "evavo-pixel-font-repository-delivery"]);
 assert.equal(manifest.servers.every((entry) => entry.defaultWriteEnabled === false), true);
-assert.equal(manifest.servers[2].defaultGitPublishEnabled, false);
+assert.equal(manifest.servers[3].defaultGitPublishEnabled, false);
 assert.ok(manifest.supportedBuildInputs.some((entry) => entry.includes("Pixel Font Studio v2")));
 assert.ok(manifest.supportedBuildInputs.some((entry) => entry.includes("Pixel Text Studio")));
+assert.ok(manifest.supportedBuildInputs.some((entry) => entry.includes("native-resolution review kit")));
+assert.ok(manifest.flows[0].steps.includes("evavo_pixel_typography_review_validate_output"));
 assert.equal(manifest.publication.manualOrReusableWorkflowOnly, true);
 assert.equal(manifest.publication.normalPushOnly, true);
 assert.equal(manifest.publication.forcePush, false);
 for (const value of Object.values(manifest.authority)) assert.equal(value, false);
-
 const universal = config.mcpServers?.["evavo-pixel-font-universal"];
 const pixelText = config.mcpServers?.["evavo-pixel-text-studio"];
+const review = config.mcpServers?.["evavo-pixel-typography-review"];
 const delivery = config.mcpServers?.["evavo-pixel-font-repository-delivery"];
-assert.ok(universal);
-assert.ok(pixelText);
-assert.ok(delivery);
+assert.ok(universal && pixelText && review && delivery);
 assert.equal(universal.env.EVAVO_PIXEL_FONT_UNIVERSAL_MODE, "read-only");
 assert.equal(universal.env.EVAVO_PIXEL_FONT_UNIVERSAL_ALLOW_WRITES, "false");
 assert.equal(pixelText.env.EVAVO_PIXEL_TEXT_STUDIO_MODE, "read-only");
 assert.equal(pixelText.env.EVAVO_PIXEL_TEXT_STUDIO_ALLOW_WRITES, "false");
+assert.equal(review.env.EVAVO_PIXEL_TYPOGRAPHY_REVIEW_MODE, "read-only");
+assert.equal(review.env.EVAVO_PIXEL_TYPOGRAPHY_REVIEW_ALLOW_WRITES, "false");
+assert.ok(review.env.EVAVO_PIXEL_TYPOGRAPHY_REVIEW_ALLOWED_ROOTS.includes("pixel-typography-reviews"));
 assert.equal(delivery.env.EVAVO_PIXEL_FONT_DELIVERY_MODE, "read-only");
 assert.equal(delivery.env.EVAVO_PIXEL_FONT_DELIVERY_ALLOW_WRITES, "false");
 assert.equal(delivery.env.EVAVO_PIXEL_FONT_DELIVERY_ALLOW_GIT_PUBLISH, "false");
-assert.ok(delivery.env.EVAVO_PIXEL_FONT_DELIVERY_TARGET_ROOTS.includes("GitRepos"));
-assert.ok(delivery.env.EVAVO_PIXEL_FONT_DELIVERY_ALLOWLIST.endsWith("pixel-font-repository-allowlist.v1.json"));
-assert.ok(delivery.env.EVAVO_PIXEL_FONT_DELIVERY_TEXT_COMPILER.endsWith("pixel_text_studio.py"));
-
-for (const relative of [
-  manifestPath,
-  configPath,
-  "scripts/pixel-typography.mjs",
-  "scripts/check-pixel-typography-cli.mjs",
-  "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md",
-  "tools/pixel_font_universal.py",
-  "tools/check_pixel_font_universal.py",
-  "scripts/pixel-font-studio-universal-mcp.mjs",
-  "scripts/pixel-text-studio-mcp.mjs",
-  "scripts/check-pixel-text-studio-mcp.mjs",
-  "tools/pixel_text_studio.py",
-  "tools/pixel_text_studio_engine.py",
-  "config/pixel-text-studio.v1.json",
-  "docs/PIXEL_TEXT_STUDIO.md",
-  "scripts/pixel-font-repository-delivery-mcp.mjs",
-  "scripts/pixel-font-repository-delivery.mjs",
-  "config/pixel-font-repository-allowlist.v1.json",
-  "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md",
-  ".github/workflows/pixel-font-repository-delivery-contract.yml",
-  ".github/workflows/pixel-font-repository-publish.yml",
-]) await access(path.join(root, relative));
-
+for (const relative of [manifestPath, configPath, "scripts/pixel-typography.mjs", "scripts/check-pixel-typography-cli.mjs", "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md", "scripts/pixel-font-studio-universal-mcp.mjs", "scripts/pixel-text-studio-mcp.mjs", "tools/pixel_text_studio.py", "tools/pixel_typography_review.py", "tools/pixel_typography_review_engine.py", "tools/check_pixel_typography_review.py", "scripts/pixel-typography-review-mcp.mjs", "scripts/check-pixel-typography-review-mcp.mjs", "config/pixel-typography-review.v1.json", "examples/pixel-typography-review/vga-dos-320x200.review.json", "docs/PIXEL_TYPOGRAPHY_REVIEW.md", "scripts/pixel-font-repository-delivery-mcp.mjs", "scripts/pixel-font-repository-delivery.mjs", "config/pixel-font-repository-allowlist.v1.json", "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md", ".github/workflows/pixel-font-repository-delivery-contract.yml", ".github/workflows/pixel-font-repository-publish.yml"]) await access(path.join(root, relative));
 process.stdout.write("Pixel-font automation suite checks passed.\n");

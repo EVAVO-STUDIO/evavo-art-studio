@@ -1,7 +1,7 @@
 {
   "schema": "evavo.pixel-font-automation-suite.v1",
-  "version": 1,
-  "description": "Canonical path-only ChatGPT and Claude deployment for style-neutral pixel-font creation, 1990s-ready pixel text/title rendering, deterministic multi-format builds, transactional target-repository installation and separately gated normal Git publication.",
+  "version": 2,
+  "description": "Canonical path-only ChatGPT and Claude deployment for style-neutral pixel-font creation, 1990s-ready pixel text/title rendering, deterministic native-resolution review, multi-format builds, transactional target-repository installation and separately gated normal Git publication.",
   "configuration": "config/mcp.pixel-font-automation.windows.example.json",
   "unifiedCli": {
     "entrypoint": "scripts/pixel-typography.mjs",
@@ -10,6 +10,7 @@
     "delegates": {
       "font": "tools/pixel_font_universal.py",
       "text": "tools/pixel_text_studio.py",
+      "review": "tools/pixel_typography_review.py",
       "delivery": "scripts/pixel-font-repository-delivery.mjs"
     }
   },
@@ -45,6 +46,21 @@
       ]
     },
     {
+      "id": "evavo-pixel-typography-review",
+      "entrypoint": "scripts/pixel-typography-review-mcp.mjs",
+      "sourceRootsEnvironment": "EVAVO_PIXEL_TYPOGRAPHY_REVIEW_ALLOWED_ROOTS",
+      "writeGateEnvironment": "EVAVO_PIXEL_TYPOGRAPHY_REVIEW_ALLOW_WRITES",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "native-review-catalogue",
+        "review-profile-validation",
+        "starter-review-profile-generation",
+        "create-only-native-resolution-review-building",
+        "palette-and-integer-scale-verification",
+        "deterministic-review-comparison"
+      ]
+    },
+    {
       "id": "evavo-pixel-font-repository-delivery",
       "entrypoint": "scripts/pixel-font-repository-delivery-mcp.mjs",
       "sourceRootsEnvironment": "EVAVO_PIXEL_FONT_DELIVERY_SOURCE_ROOTS",
@@ -69,7 +85,8 @@
     "existing exact Universal v3 build",
     "Pixel Font Studio v2 family with exact pixel-font-family.json SHA-256",
     "Pixel Text Studio render from an installed or compiled BMFont strike plus reviewed title style",
-    "existing exact Pixel Text Studio static or animated build"
+    "existing exact Pixel Text Studio static or animated build",
+    "native-resolution review kit from a canonical BMFont, Pixel Text style and reviewed era/display profile"
   ],
   "flows": [
     {
@@ -85,7 +102,11 @@
         "evavo_pixel_text_validate_style",
         "evavo_pixel_text_render",
         "evavo_pixel_text_validate_output",
-        "separate-native-resolution-title-review",
+        "evavo_pixel_typography_review_catalog",
+        "evavo_pixel_typography_review_validate_profile",
+        "evavo_pixel_typography_review_build",
+        "evavo_pixel_typography_review_validate_output",
+        "separate-creative-approval",
         "evavo_pixel_font_validate_repository_job",
         "evavo_pixel_font_plan_repository_delivery",
         "separate-explicit-publication-authorization",

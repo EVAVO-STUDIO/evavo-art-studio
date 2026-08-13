@@ -1,0 +1,59 @@
+{
+  "schema": "evavo.pixel-typography-review-catalog.v1",
+  "engineVersion": "1.0.0",
+  "purpose": "Deterministic native-resolution review packages for pixel-font and Pixel Text Studio output.",
+  "profileSchema": "evavo.pixel-typography-review-profile.v1",
+  "buildSchema": "evavo.pixel-typography-review-build.v1",
+  "eraProfiles": [
+    "era-neutral",
+    "cga-era",
+    "ega-era",
+    "vga-dos-era",
+    "amiga-era",
+    "sixteen-bit-console-era",
+    "nineteen-nineties-arcade-era",
+    "modern-pixel-era"
+  ],
+  "usageRoles": [
+    "title",
+    "logo",
+    "heading",
+    "alphabet-uppercase",
+    "alphabet-lowercase",
+    "numerals",
+    "punctuation",
+    "menu-label",
+    "button-label",
+    "hud-label",
+    "status-text",
+    "badge",
+    "animation-strip",
+    "decorative-text"
+  ],
+  "profilePresets": [
+    "vga-dos-320x200",
+    "arcade-320x240",
+    "web-pixel-640x360"
+  ],
+  "outputs": [
+    "native-resolution RGBA review pages",
+    "retained static specimens and animation grids",
+    "exact integer-scale nearest-neighbour previews",
+    "observed palette swatches",
+    "review rectangle map",
+    "SHA-256 manifest and source evidence"
+  ],
+  "policy": {
+    "createOnly": true,
+    "transactional": true,
+    "nearestOnly": true,
+    "integerCoordinates": true,
+    "antialiasing": false,
+    "fontMasterMutation": false,
+    "creativeApproval": false,
+    "targetRepositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false
+  }
+}

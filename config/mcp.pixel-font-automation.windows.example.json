@@ -24,6 +24,18 @@
         "EVAVO_PIXEL_TEXT_STUDIO_ALLOW_WRITES": "false"
       }
     },
+    "evavo-pixel-typography-review": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\scripts\\pixel-typography-review-mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_PIXEL_TYPOGRAPHY_REVIEW_PYTHON": "python",
+        "EVAVO_PIXEL_TYPOGRAPHY_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos\\evavo-art-studio;C:\\EVAVO\\pixel-font-builds;C:\\EVAVO\\pixel-text-builds;C:\\EVAVO\\pixel-typography-reviews",
+        "EVAVO_PIXEL_TYPOGRAPHY_REVIEW_MODE": "read-only",
+        "EVAVO_PIXEL_TYPOGRAPHY_REVIEW_ALLOW_WRITES": "false"
+      }
+    },
     "evavo-pixel-font-repository-delivery": {
       "command": "node",
       "args": [
