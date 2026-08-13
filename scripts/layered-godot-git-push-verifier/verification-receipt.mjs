@@ -54,6 +54,7 @@ export function makeVerificationReceipt({
       lineageBindingsCurrent: true,
       localRepositoryCurrent: true,
       remoteRefCurrent: true,
+      verificationReceiptContractAdmitted: true,
       outcome: receipt.outcome,
     },
     verifiedAt,

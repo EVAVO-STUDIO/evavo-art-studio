@@ -5,7 +5,7 @@ import {
   LAYERED_GODOT_GIT_PUSH_RECEIPT_KIND,
 } from "../layered-godot-git-push-operator/contract.mjs";
 
-export const LAYERED_GODOT_GIT_PUSH_VERIFIER_PROTOCOL_VERSION = "2026-08-13.2";
+export const LAYERED_GODOT_GIT_PUSH_VERIFIER_PROTOCOL_VERSION = "2026-08-13.3";
 export const LAYERED_GODOT_GIT_PUSH_VERIFICATION_RECEIPT_KIND =
   "evavo.layered-production.godot-git-push-verification-receipt";
 export const EXPECTED_GIT_PUSH_OPERATOR_PROTOCOL_VERSION =

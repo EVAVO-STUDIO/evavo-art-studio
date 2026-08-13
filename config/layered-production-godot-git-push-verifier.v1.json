@@ -1,8 +1,8 @@
 {
   "schema": "evavo.layered-production.godot-git-push-verifier.v1",
   "version": 1,
-  "protocolVersion": "2026-08-13.2",
-  "description": "Read-only independent verification boundary for one exact layered Godot commit receipt, its bound push receipt and their current local and remote refs.",
+  "protocolVersion": "2026-08-13.3",
+  "description": "Read-only independent verification boundary for one exact layered Godot commit receipt, its bound push receipt, their current local and remote refs, and one closed-contract verification receipt.",
   "entrypoint": "scripts/layered-godot-git-push-verifier.mjs",
   "requirements": {
     "requiresExactCurrentCommitReceipt": true,
@@ -33,7 +33,10 @@
     "maximumGitOutputBytes": 2097152,
     "maximumLocalGitTimeoutMs": 30000,
     "maximumNetworkGitTimeoutMs": 120000,
-    "emitsSelfHashedVerificationReceipt": true
+    "emitsSelfHashedVerificationReceipt": true,
+    "requiresClosedVerificationReceiptContract": true,
+    "requiresGeneratedVerificationReceiptReadmission": true,
+    "requiresVerificationReceiptSourceLineageParity": true
   },
   "authority": {
     "targetRepositoryRead": true,
