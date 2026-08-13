@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SOURCE_ARCHIVE_SHA256: "88a6fdb1bc4057893d30b59639c41e97bf8ade4b3a825e57cd6f6b917734b58b"
+  SOURCE_BLOB_SHA: "1b6e75bf33849bf2e923396d6a6f971519574180"
 
 jobs:
   apply-validate-publish-branch:
@@ -39,7 +39,9 @@ jobs:
         run: |
           set -euo pipefail
           archive=".hmf-creative-review-bootstrap/source.zip"
-          printf '%s  %s\n' "$SOURCE_ARCHIVE_SHA256" "$archive" | sha256sum --check --strict
+          observed="$(git hash-object "$archive")"
+          test "$observed" = "$SOURCE_BLOB_SHA"
+          unzip -tq "$archive"
           package="$RUNNER_TEMP/hmf-frame-body-creative-review"
           rm -rf "$package"
           mkdir -p "$package"
