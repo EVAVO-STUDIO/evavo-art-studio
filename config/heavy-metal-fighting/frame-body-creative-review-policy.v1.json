@@ -1,0 +1,160 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-creative-review-policy.v1",
+  "protocolVersion": "2026-08-13.1",
+  "projectId": "heavy-metal-fighting",
+  "assetKind": "frame-body-cel",
+  "reviewModes": [
+    {
+      "id": "native-160x160",
+      "label": "Native 160 × 160",
+      "purpose": "Judge real pixel clusters, silhouette, material grouping and readability without resampling."
+    },
+    {
+      "id": "nearest-neighbour-4x",
+      "label": "Nearest-neighbour 4×",
+      "purpose": "Inspect authored cluster decisions, joint edges and stray or crawling pixels."
+    },
+    {
+      "id": "match-640x360",
+      "label": "640 × 360 match composite",
+      "purpose": "Judge gameplay scale, pose readability and physical-body separation from effects."
+    },
+    {
+      "id": "thumbnail-320x180",
+      "label": "320 × 180 thumbnail",
+      "purpose": "Confirm the held pose and Frame identity remain readable at reduced presentation scale."
+    },
+    {
+      "id": "one-colour-silhouette",
+      "label": "One-colour silhouette",
+      "purpose": "Confirm Frame identity, action direction, weight and limb separation without surface detail."
+    },
+    {
+      "id": "grayscale",
+      "label": "Grayscale",
+      "purpose": "Confirm value hierarchy, material separation and contact readability without hue."
+    }
+  ],
+  "criteria": [
+    {
+      "id": "frame-identity-silhouette",
+      "label": "Frame identity and silhouette",
+      "instruction": "The exact Frame must remain recognisable through head, shoulder, forearm, torso, pelvis, lower-leg and foot masses. The pose must not collapse into generic giant-machine proportions.",
+      "failureCodes": [
+        "random-greebles",
+        "unexplained-floating-components",
+        "identical-frame-proportions"
+      ]
+    },
+    {
+      "id": "mechanical-construction-landmarks",
+      "label": "Mechanical construction and landmarks",
+      "instruction": "Cockpit, load paths, joints, declared hardpoints, service logic and signature asymmetry must remain mechanically coherent and attached to the approved construction landmarks.",
+      "failureCodes": [
+        "random-greebles",
+        "unexplained-floating-components",
+        "weapon-side-drift",
+        "joint-length-drift"
+      ]
+    },
+    {
+      "id": "body-role-choreography",
+      "label": "Body-role choreography",
+      "instruction": "The cel must clearly perform its exact bank, semantic role, phase, hero/contact responsibility and hold priority rather than merely depicting a plausible generic pose.",
+      "failureCodes": [
+        "continuity-break",
+        "ground-contact-drift",
+        "effect-hides-unreadable-body",
+        "over-smoothed-animation"
+      ]
+    },
+    {
+      "id": "motion-identity-cadence",
+      "label": "Motion identity and cadence",
+      "instruction": "The held drawing must express the Frame-specific motion identity and cadence, including anticipation, commitment, contact or recovery emphasis appropriate to this slot.",
+      "failureCodes": [
+        "continuity-break",
+        "joint-length-drift",
+        "microdetail-crawl",
+        "over-smoothed-animation"
+      ]
+    },
+    {
+      "id": "material-palette-lighting",
+      "label": "Material, palette and lighting",
+      "instruction": "Approved material ramps, selective contour clusters and stable upper-front gameplay light must survive without PBR gloss, airbrushed gradients, cyan-magenta soup or decorative glowing seams.",
+      "failureCodes": [
+        "palette-contract-drift",
+        "random-glowing-seams",
+        "generic-cyan-magenta-cyberpunk-soup",
+        "modern-pbr-gloss",
+        "soft-airbrushed-gradients"
+      ]
+    },
+    {
+      "id": "pixel-authenticity-readability",
+      "label": "1990s pixel authenticity and readability",
+      "instruction": "Native-scale clusters must look deliberately authored for a premium 1994–1997 arcade/DOS fighter, with no resampled fuzz, filler detail, contact-sheet residue or provider-packed output behaviour.",
+      "failureCodes": [
+        "random-greebles",
+        "microdetail-crawl",
+        "modern-pbr-gloss",
+        "soft-airbrushed-gradients",
+        "provider-contact-sheet",
+        "provider-packed-final-atlas"
+      ]
+    },
+    {
+      "id": "physical-body-effect-separation",
+      "label": "Physical body and effect separation",
+      "instruction": "The physical Frame body must remain fully readable on its own. Energy, smoke, impact or false-vector effects may not replace anatomy, hide weak posing or become fused into the body cel.",
+      "failureCodes": [
+        "effect-hides-unreadable-body",
+        "unexplained-floating-components",
+        "random-glowing-seams"
+      ]
+    },
+    {
+      "id": "continuity-hardpoint-mirror-intent",
+      "label": "Continuity, hardpoint and mirror intent",
+      "instruction": "Against the exact reference-manifest lineage, previous/next cel intent and declared mirror policy, joint lengths, hardpoints, weapon side, silhouette landmarks and panel detail must remain stable.",
+      "failureCodes": [
+        "continuity-break",
+        "runtime-mirror-failure",
+        "weapon-side-drift",
+        "joint-length-drift",
+        "microdetail-crawl"
+      ]
+    }
+  ],
+  "decisionRules": {
+    "reviewCompletionReceiptState": "creative-review-passed",
+    "criterionStatuses": [
+      "pass",
+      "fail"
+    ],
+    "allCriteriaRequired": true,
+    "allReviewModesRequired": true,
+    "namedHumanReviewerRequired": true,
+    "recommendedOutcomeWhenAllPass": "selected",
+    "recommendedOutcomeWhenAnyFail": "repair-requested",
+    "selectionRemainsSeparate": true,
+    "minimumObservationCharacters": 20,
+    "maximumObservationCharacters": 1200,
+    "maximumSummaryCharacters": 2400
+  },
+  "authority": {
+    "providerExecution": false,
+    "providerRetry": false,
+    "candidateMutation": false,
+    "automaticCreativeApproval": false,
+    "selection": false,
+    "repairAuthorization": false,
+    "candidatePromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanReviewerRequired": true
+  }
+}
