@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: write
-  issues: read
 
 concurrency:
   group: bootstrap-avatar-provider-frame-finisher-v2-${{ github.ref }}
@@ -28,8 +27,6 @@ jobs:
           persist-credentials: true
 
       - name: Rebuild and verify hash-locked source tranche
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           python - <<'PY'
           from __future__ import annotations
@@ -44,13 +41,15 @@ jobs:
           import stat
           import subprocess
           import tarfile
-          import urllib.request
 
-          REPOSITORY = "EVAVO-STUDIO/evavo-art-studio"
-          ISSUE_NUMBER = 248
           BASE_COMMIT = "dad75aa7463a55853a91a8ab0db04a07de930a82"
           ARCHIVE_SHA256 = "67133778e445aa7754788c22783916430f023f8c869391894168aad519c356ea"
-          PREFIX = "EVAVO_FRAME_FINISHER_TRANSFER_V2 1/1\n"
+          WORKFLOW_PATH = ".github/workflows/bootstrap-avatar-provider-frame-finisher-v2.yml"
+          CHUNK_PATHS = [
+              f"transfer/avatar-provider-frame-finisher/chunk-{index:02d}.txt"
+              for index in range(1, 5)
+          ]
+          EXPECTED_CARRIER_PATHS = {WORKFLOW_PATH, *CHUNK_PATHS}
           EXPECTED_PATHS = {
               "config/artist-workspace-agent-suite.v5.json",
               "config/mcp.project-art-avatar-final-pass-provider-frame-finisher.windows.example.json",
@@ -67,41 +66,38 @@ jobs:
               "tools/project_art_avatar_final_pass_provider_frame_finisher_mcp.mjs",
           }
 
-          parent = subprocess.check_output(
-              ["git", "rev-parse", "HEAD^"], text=True
-          ).strip()
-          if parent != BASE_COMMIT:
+          if subprocess.run(
+              ["git", "merge-base", "--is-ancestor", BASE_COMMIT, "HEAD"]
+          ).returncode:
+              raise SystemExit("transfer branch is not descended from the sealed base commit")
+          carrier_scope = set(
+              subprocess.check_output(
+                  ["git", "diff", "--name-only", f"{BASE_COMMIT}..HEAD"],
+                  text=True,
+              ).splitlines()
+          )
+          if carrier_scope != EXPECTED_CARRIER_PATHS:
               raise SystemExit(
-                  f"transfer parent mismatch: expected {BASE_COMMIT}, got {parent}"
+                  f"unexpected carrier scope: expected {sorted(EXPECTED_CARRIER_PATHS)}, got {sorted(carrier_scope)}"
               )
 
-          token = os.environ.get("GH_TOKEN", "")
-          if not token:
-              raise SystemExit("GH_TOKEN is required")
-          request = urllib.request.Request(
-              f"https://api.github.com/repos/{REPOSITORY}/issues/{ISSUE_NUMBER}/comments?per_page=100",
-              headers={
-                  "Accept": "application/vnd.github+json",
-                  "Authorization": f"Bearer {token}",
-                  "X-GitHub-Api-Version": "2022-11-28",
-                  "User-Agent": "evavo-avatar-frame-finisher-bootstrap/2",
-              },
-          )
-          with urllib.request.urlopen(request, timeout=30) as response:
-              comments = json.load(response)
-          carriers = [
-              comment.get("body")
-              for comment in comments
-              if isinstance(comment.get("body"), str)
-              and comment["body"].startswith(PREFIX)
-          ]
-          if len(carriers) != 1:
-              raise SystemExit(
-                  f"expected one exact transfer carrier, found {len(carriers)}"
-              )
-          encoded = carriers[0][len(PREFIX):]
-          if not re.fullmatch(r"[A-Za-z0-9+/=]+", encoded):
-              raise SystemExit("transfer base64 contains unsupported characters")
+          encoded_parts = []
+          for chunk_path in CHUNK_PATHS:
+              chunk = Path(chunk_path)
+              metadata = chunk.lstat()
+              if (
+                  not chunk.is_file()
+                  or chunk.is_symlink()
+                  or metadata.st_nlink != 1
+                  or metadata.st_size < 1
+                  or metadata.st_size > 8_000
+              ):
+                  raise SystemExit(f"invalid transfer chunk: {chunk_path}")
+              text = chunk.read_text(encoding="ascii").strip()
+              if not re.fullmatch(r"[A-Za-z0-9+/=]+", text):
+                  raise SystemExit(f"invalid base64 in transfer chunk: {chunk_path}")
+              encoded_parts.append(text)
+          encoded = "".join(encoded_parts)
           archive = base64.b64decode(encoded, validate=True)
           actual_archive_sha256 = hashlib.sha256(archive).hexdigest()
           if actual_archive_sha256 != ARCHIVE_SHA256:
@@ -138,13 +134,9 @@ jobs:
                       or member.islnk()
                       or member.isdev()
                   ):
-                      raise SystemExit(
-                          f"archive member is not an ordinary file: {name}"
-                      )
+                      raise SystemExit(f"archive member is not an ordinary file: {name}")
                   if stat.S_IMODE(member.mode) & 0o022:
-                      raise SystemExit(
-                          f"archive member is group/world writable: {name}"
-                      )
+                      raise SystemExit(f"archive member is group/world writable: {name}")
                   extracted = bundle.extractfile(member)
                   if extracted is None:
                       raise SystemExit(f"archive member could not be read: {name}")
@@ -156,8 +148,7 @@ jobs:
           manifest = json.loads(manifest_bytes.decode("utf-8"))
           manifest_files = manifest.get("files")
           if (
-              manifest.get("schema")
-              != "evavo.avatar-provider-frame-finisher-transfer.v2"
+              manifest.get("schema") != "evavo.avatar-provider-frame-finisher-transfer.v2"
               or manifest.get("baseCommit") != BASE_COMMIT
               or not isinstance(manifest_files, dict)
               or set(manifest_files) != EXPECTED_PATHS
@@ -190,9 +181,7 @@ jobs:
                       or not stat.S_ISREG(metadata.st_mode)
                       or metadata.st_nlink != 1
                   ):
-                      raise SystemExit(
-                          f"existing target is not a single-link regular file: {relative}"
-                      )
+                      raise SystemExit(f"unsafe existing target: {relative}")
               target.parent.mkdir(parents=True, exist_ok=True)
               temporary = target.with_name(f".{target.name}.evavo-transfer")
               if temporary.exists() or temporary.is_symlink():
@@ -207,7 +196,9 @@ jobs:
               "\n".join(sorted(EXPECTED_PATHS)) + "\n",
               encoding="utf-8",
           )
-          print(f"Verified and materialized {len(EXPECTED_PATHS)} exact source files.")
+          print(
+              f"Verified {len(archive)} archive bytes and materialized {len(EXPECTED_PATHS)} exact source files."
+          )
           PY
 
       - name: Set up Node.js 22.14.0
