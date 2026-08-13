@@ -229,4 +229,4 @@ jobs:
               raise SystemExit(f'unexpected staged scope: expected {sorted(expected)}, got {sorted(staged)}')
           PY
           git commit -m 'feat(avatar): finish and admit reviewed provider frames'
-          git push origin "HEAD:${{ GITHUB_REF_NAME }}"
+          git push origin "HEAD:$GITHUB_REF_NAME"
