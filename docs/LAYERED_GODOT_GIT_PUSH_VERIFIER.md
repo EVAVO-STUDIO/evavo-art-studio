@@ -87,6 +87,28 @@ Bundle validation is an **offline re-admission** step. It performs no target-rep
 
 Correctly rehashed unknown bundle fields, source-receipt substitution, invented lineage, source-hash disagreement, authority escalation, accessors and Proxy input fail closed.
 
+## Governed create-only file publication
+
+A correct in-memory bundle can still be damaged by an unsafe handoff. Shell redirection may truncate an existing destination before the verifier starts, follow a symbolic link, use shell-dependent text encoding, or leave a partial file after interruption.
+
+`publishDeliveryEvidenceBundle` closes that final local boundary. The `bundle` CLI requires `--output` and publishes the exact pretty-printed UTF-8 bundle bytes through one governed create-only transaction:
+
+1. the complete publication input and bundle are immutably captured and re-admitted;
+2. the selected output filename must be one portable `.json` filename;
+3. the existing output parent is proved to be a stable real directory rather than a symbolic path;
+4. an exclusive mode-`0600` stage file is created in that same directory;
+5. the exact UTF-8 bytes are written, file-synced and read back;
+6. an atomic no-replace hard link publishes the same inode at the final destination;
+7. an existing or racing destination fails closed rather than being replaced;
+8. the stage link is removed, the directory sync is attempted, and the final one-link file is read back again; and
+9. a self-hashed publication receipt is re-admitted before return.
+
+The output directory must already exist. The output file must not exist. Symbolic output parents and symbolic or regular existing destinations are rejected. A failed transaction removes only files whose exact filesystem identity still belongs to that transaction; changed paths are left untouched and the failure is reported.
+
+The publication receipt binds the selected repository, workspace and absolute output path to the bundle self-hash, exact byte count and exact file SHA-256. It records `publicationReceiptContractAdmitted: true`, local delivery-evidence file creation, and false existing-file replacement, Git mutation, push, deployment, release and remote artifact-publication authority.
+
+This is local evidence-file creation, not deployment or release publication.
+
 ## CLI
 
 Live verification:
@@ -99,7 +121,7 @@ node scripts/layered-godot-git-push-verifier.mjs verify `
   --repository EVAVO-STUDIO/GodotGameFoundationKit
 ```
 
-Create one portable delivery evidence bundle after live verification:
+Create and safely publish one portable delivery evidence bundle after live verification:
 
 ```powershell
 node scripts/layered-godot-git-push-verifier.mjs bundle `
@@ -108,7 +130,7 @@ node scripts/layered-godot-git-push-verifier.mjs bundle `
   --verification-receipt D:\EVAVO-Evidence\layered-district.verification-receipt.json `
   --workspace C:\GitRepos\GodotGameFoundationKit `
   --repository EVAVO-STUDIO/GodotGameFoundationKit `
-  > D:\EVAVO-Evidence\layered-district.delivery-evidence.json
+  --output D:\EVAVO-Evidence\layered-district.delivery-evidence.json
 ```
 
 Re-admit an existing bundle without repository or network access:
@@ -120,7 +142,9 @@ node scripts/layered-godot-git-push-verifier.mjs validate-bundle `
   --repository EVAVO-STUDIO/GodotGameFoundationKit
 ```
 
-The `verify` command emits a self-hashed, closed-contract verification receipt containing the exact commit and push receipt hashes, upstream request/write/handoff/review lineage, current local commit identity, current remote ref, two-phase stability evidence and the read-only authority actually exercised. The `bundle` and `validate-bundle` commands write JSON to standard output only; callers choose whether and where to persist it.
+The `verify` command emits a self-hashed, closed-contract verification receipt containing the exact commit and push receipt hashes, upstream request/write/handoff/review lineage, current local commit identity, current remote ref, two-phase stability evidence and the read-only authority actually exercised.
+
+The `bundle` command writes the bundle only through the governed `--output` boundary and writes its smaller self-hashed publication receipt to standard output. It refuses to overwrite or truncate an existing destination. The `validate-bundle` command writes the re-admitted bundle to standard output and performs no file mutation.
 
 ## Complete governed chain
 
@@ -137,6 +161,7 @@ approved layered art
 → independent read-only push receipt and commit-lineage verifier
 → closed-contract verification receipt
 → self-contained offline delivery evidence bundle
+→ governed create-only exact-byte evidence-file publication
 ```
 
-A successful verification is evidence that the admitted commit receipt, bound push receipt, exact local commit and remote branch remain one current delivery chain. A successful bundle validation proves the embedded evidence is internally complete and contract-current. A successful verification or bundle validation is not deployment or release publication, and neither authorizes another Git mutation.
+A successful verification is evidence that the admitted commit receipt, bound push receipt, exact local commit and remote branch remain one current delivery chain. A successful bundle validation proves the embedded evidence is internally complete and contract-current. A successful local publication proves that exact admitted bundle was written once to the selected non-symbolic destination without replacement. None of verification, bundle validation or local evidence publication authorizes another Git mutation, deployment or release publication.

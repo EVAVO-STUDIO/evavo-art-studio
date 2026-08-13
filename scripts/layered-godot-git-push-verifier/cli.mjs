@@ -7,6 +7,7 @@ import {
 import { captureStableFileRead } from "./buffers.mjs";
 import { createDeliveryEvidenceBundle } from "./delivery-evidence.mjs";
 import { validateDeliveryEvidenceBundle } from "./delivery-evidence-contract.mjs";
+import { publishDeliveryEvidenceBundle } from "./delivery-evidence-publication.mjs";
 import { verifyLayeredGodotPushReceipt } from "./runtime.mjs";
 
 const COMMAND_FLAGS = Object.freeze({
@@ -22,6 +23,7 @@ const COMMAND_FLAGS = Object.freeze({
     "--verification-receipt",
     "--workspace",
     "--repository",
+    "--output",
   ],
   "validate-bundle": [
     "--bundle",
@@ -123,13 +125,20 @@ export async function runCli(argv = process.argv.slice(2)) {
       "verification receipt",
       filesystem.readStableRegularFile,
     );
-    console.log(JSON.stringify(createDeliveryEvidenceBundle({
+    const bundle = createDeliveryEvidenceBundle({
       commitReceipt,
       pushReceipt,
       verificationReceipt,
       workspaceRoot,
       expectedRepository: repository,
-    }), null, 2));
+    });
+    const publicationReceipt = await publishDeliveryEvidenceBundle({
+      bundle,
+      workspaceRoot,
+      expectedRepository: repository,
+      outputPath: path.resolve(values.get("--output")),
+    });
+    console.log(JSON.stringify(publicationReceipt, null, 2));
   } catch (error) {
     console.error(JSON.stringify({
       code: error instanceof LayeredGodotGitPushVerifierError

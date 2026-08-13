@@ -23,9 +23,11 @@ const files = [
   "scripts/layered-godot-git-push-verifier/verification-receipt-contract.mjs",
   "scripts/layered-godot-git-push-verifier/delivery-evidence.mjs",
   "scripts/layered-godot-git-push-verifier/delivery-evidence-contract.mjs",
+  "scripts/layered-godot-git-push-verifier/delivery-evidence-publication.mjs",
   "scripts/layered-godot-git-push-verifier/cli.mjs",
   "scripts/layered-godot-git-push-verifier/test-verification-receipt.mjs",
   "scripts/layered-godot-git-push-verifier/test-delivery-evidence.mjs",
+  "scripts/layered-godot-git-push-verifier/test-delivery-evidence-publication.mjs",
   "scripts/test-layered-godot-git-push-verifier.mjs",
   "scripts/check-layered-godot-git-push-verifier.mjs",
   "config/layered-production-godot-git-push-verifier.v1.json",
@@ -67,8 +69,18 @@ test("push verifier source, lineage, delivery evidence and authority contracts r
     verifier.LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_KIND,
     "evavo.layered-production.godot-git-delivery-evidence-bundle",
   );
+  assert.equal(
+    verifier.LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_PUBLICATION_PROTOCOL_VERSION,
+    "2026-08-13.1",
+  );
+  assert.equal(
+    verifier.LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_PUBLICATION_KIND,
+    "evavo.layered-production.godot-git-delivery-evidence-publication-receipt",
+  );
   assert.equal(typeof verifier.createDeliveryEvidenceBundle, "function");
   assert.equal(typeof verifier.validateDeliveryEvidenceBundle, "function");
+  assert.equal(typeof verifier.publishDeliveryEvidenceBundle, "function");
+  assert.equal(typeof verifier.validateDeliveryEvidencePublicationReceipt, "function");
 
   const implementation = files
     .filter((entry) => entry.includes("git-push-verifier/") || entry.endsWith("git-push-verifier.mjs"))
@@ -86,6 +98,11 @@ test("push verifier source, lineage, delivery evidence and authority contracts r
     "sourceReceipts", "sourceReceiptHashesBound: true",
     "sourceLineageBound: true", "deliveryEvidenceContractAdmitted: true",
     "deliveryEvidencePackagingPerformed: true",
+    "publishDeliveryEvidenceBundle", "validateDeliveryEvidencePublicationReceipt",
+    "createExactStage", "atomicNoReplacePublicationPerformed: true",
+    "createOnlyDestinationEnforced: true", "finalReadbackVerified: true",
+    "deliveryEvidenceFileCreationPerformed: true",
+    "existingDeliveryEvidenceReplacementPerformed: false",
     "stableAcrossVerification: true", "gitPushAttempted: false",
     "gitPushPerformed: false", "gitRefUpdated: false",
     "forcePushPerformed: false", "deploymentPerformed: false",
@@ -156,6 +173,42 @@ test("push verifier source, lineage, delivery evidence and authority contracts r
     );
   }
 
+  assert.equal(config.deliveryEvidence.publication.protocolVersion, "2026-08-13.1");
+  assert.equal(
+    config.deliveryEvidence.publication.kind,
+    "evavo.layered-production.godot-git-delivery-evidence-publication-receipt",
+  );
+  for (const key of [
+    "requiresExplicitOutputPath",
+    "requiresExistingNonSymbolicOutputParent",
+    "requiresCreateOnlyDestination",
+    "requiresExactUtf8StageSync",
+    "requiresAtomicNoReplaceHardLink",
+    "requiresExactPostWriteReadback",
+    "emitsSelfHashedPublicationReceipt",
+    "requiresGeneratedPublicationReceiptReadmission",
+  ]) {
+    assert.equal(
+      config.deliveryEvidence.publication.requirements[key],
+      true,
+      `delivery evidence publication config missing ${key}`,
+    );
+  }
+  assert.equal(
+    config.deliveryEvidence.publication.authority.deliveryEvidenceFileCreation,
+    true,
+  );
+  for (const key of [
+    "existingFileReplacement", "targetRepositoryMutation", "gitCommit", "gitRefUpdate",
+    "gitPush", "forcePush", "deployment", "releasePublication", "artifactPublication",
+  ]) {
+    assert.equal(
+      config.deliveryEvidence.publication.authority[key],
+      false,
+      `delivery evidence publication authority ${key} must remain false`,
+    );
+  }
+
   const docs = source.get("docs/LAYERED_GODOT_GIT_PUSH_VERIFIER.md");
   for (const token of [
     "read-only post-push boundary", "self-hash is integrity, not independent authority",
@@ -165,6 +218,8 @@ test("push verifier source, lineage, delivery evidence and authority contracts r
     "verificationReceiptContractAdmitted: true", "does not push",
     "Portable delivery evidence bundle", "three separately paired JSON files",
     "deliveryEvidenceContractAdmitted: true", "offline re-admission",
+    "Governed create-only file publication", "atomic no-replace hard link",
+    "publicationReceiptContractAdmitted: true", "--output",
     "not deployment or release publication",
   ]) assert.ok(docs.includes(token), `push verifier docs missing ${token}`);
 });

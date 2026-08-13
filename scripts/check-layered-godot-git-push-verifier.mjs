@@ -21,5 +21,7 @@ console.log("- inherited hashes and commit, parent, tree and branch identity mus
 console.log("- local and remote identities are proved twice across the verification window");
 console.log("- portable delivery evidence embeds and re-admits all three source receipts offline");
 console.log("- delivery bundles bind source hashes, lineage, Git identity and false-only authority");
+console.log("- delivery evidence file output is create-only, exact UTF-8 and atomically no-replace");
+console.log("- publication receipts bind the output path, bundle hash, exact bytes and false-only authority");
 console.log("- the Git command surface is closed and read-only");
 console.log("- commit, push, deployment, release and artifact-publication authority remain false");
