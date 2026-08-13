@@ -1,5 +1,5 @@
 {
-  "schema": "evavo.layered-production-godot-git-push-operator.v1",
+  "schema": "evavo.layered-production.godot-git-push-operator.v1",
   "version": 1,
   "protocolVersion": "2026-08-13.1",
   "description": "Explicit plain fast-forward Git push boundary with owned dependency, origin and subprocess evidence after one exact layered Godot commit receipt.",
