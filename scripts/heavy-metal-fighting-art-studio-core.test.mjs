@@ -7,4 +7,5 @@ import "./heavy-metal-fighting/frame-body-provider-runtime-dispatch.test.mjs";
 import "./heavy-metal-fighting/frame-body-candidate-admission.test.mjs";
 import "./heavy-metal-fighting/frame-body-deterministic-qa.test.mjs";
 import "./heavy-metal-fighting/frame-body-creative-review.test.mjs";
+import "./heavy-metal-fighting/frame-body-selection-decision.test.mjs";
 import "./heavy-metal-fighting/studio-core.test.mjs";
