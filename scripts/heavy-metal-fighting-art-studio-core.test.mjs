@@ -5,4 +5,5 @@ import "./heavy-metal-fighting/frame-body-provider-execution-envelope.test.mjs";
 import "./heavy-metal-fighting/frame-body-provider-submission-manifest.test.mjs";
 import "./heavy-metal-fighting/frame-body-provider-runtime-dispatch.test.mjs";
 import "./heavy-metal-fighting/frame-body-candidate-admission.test.mjs";
+import "./heavy-metal-fighting/frame-body-deterministic-qa.test.mjs";
 import "./heavy-metal-fighting/studio-core.test.mjs";
