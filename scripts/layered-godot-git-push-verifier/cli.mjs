@@ -5,7 +5,30 @@ import {
   verifierFail,
 } from "./protocol.mjs";
 import { captureStableFileRead } from "./buffers.mjs";
+import { createDeliveryEvidenceBundle } from "./delivery-evidence.mjs";
+import { validateDeliveryEvidenceBundle } from "./delivery-evidence-contract.mjs";
 import { verifyLayeredGodotPushReceipt } from "./runtime.mjs";
+
+const COMMAND_FLAGS = Object.freeze({
+  verify: [
+    "--commit-receipt",
+    "--push-receipt",
+    "--workspace",
+    "--repository",
+  ],
+  bundle: [
+    "--commit-receipt",
+    "--push-receipt",
+    "--verification-receipt",
+    "--workspace",
+    "--repository",
+  ],
+  "validate-bundle": [
+    "--bundle",
+    "--workspace",
+    "--repository",
+  ],
+});
 
 async function readJson(filePath, label, readStableRegularFile) {
   const inspected = captureStableFileRead(
@@ -24,13 +47,16 @@ async function readJson(filePath, label, readStableRegularFile) {
 
 function parseCli(argv) {
   const [command, ...rest] = argv;
-  if (command !== "verify") {
+  const allowed = Object.hasOwn(COMMAND_FLAGS, command) ? COMMAND_FLAGS[command] : null;
+  if (!allowed) {
     verifierFail(
       "CLI_INVALID",
-      "Usage: layered-godot-git-push-verifier.mjs verify --commit-receipt FILE --push-receipt FILE --workspace DIR --repository OWNER/REPO",
+      "Usage: layered-godot-git-push-verifier.mjs <verify|bundle|validate-bundle> with exact command flags.",
     );
   }
-  if (rest.length % 2 !== 0) verifierFail("CLI_INVALID", "CLI flags must be --flag value pairs.");
+  if (rest.length % 2 !== 0) {
+    verifierFail("CLI_INVALID", "CLI flags must be --flag value pairs.");
+  }
   const values = new Map();
   for (let index = 0; index < rest.length; index += 2) {
     const flag = rest[index];
@@ -41,21 +67,36 @@ function parseCli(argv) {
     if (values.has(flag)) verifierFail("CLI_INVALID", `Duplicate CLI argument ${flag}.`);
     values.set(flag, value);
   }
-  const allowed = [
-    "--commit-receipt",
-    "--push-receipt",
-    "--workspace",
-    "--repository",
-  ];
-  for (const key of allowed) if (!values.has(key)) verifierFail("CLI_INVALID", `Missing ${key}.`);
-  for (const key of values.keys()) if (!allowed.includes(key)) verifierFail("CLI_INVALID", `Unknown CLI argument ${key}.`);
-  return values;
+  for (const key of allowed) {
+    if (!values.has(key)) verifierFail("CLI_INVALID", `Missing ${key}.`);
+  }
+  for (const key of values.keys()) {
+    if (!allowed.includes(key)) verifierFail("CLI_INVALID", `Unknown CLI argument ${key}.`);
+  }
+  return Object.freeze({ command, values });
 }
 
 export async function runCli(argv = process.argv.slice(2)) {
   try {
-    const values = parseCli(argv);
+    const { command, values } = parseCli(argv);
     const filesystem = await import("../layered-godot-workspace-writer/filesystem.mjs");
+    const repository = values.get("--repository");
+    const workspaceRoot = path.resolve(values.get("--workspace"));
+
+    if (command === "validate-bundle") {
+      const bundle = await readJson(
+        values.get("--bundle"),
+        "delivery evidence bundle",
+        filesystem.readStableRegularFile,
+      );
+      console.log(JSON.stringify(
+        validateDeliveryEvidenceBundle(bundle, repository, workspaceRoot),
+        null,
+        2,
+      ));
+      return;
+    }
+
     const commitReceipt = await readJson(
       values.get("--commit-receipt"),
       "commit receipt",
@@ -66,11 +107,28 @@ export async function runCli(argv = process.argv.slice(2)) {
       "push receipt",
       filesystem.readStableRegularFile,
     );
-    console.log(JSON.stringify(await verifyLayeredGodotPushReceipt({
+
+    if (command === "verify") {
+      console.log(JSON.stringify(await verifyLayeredGodotPushReceipt({
+        commitReceipt,
+        pushReceipt,
+        workspaceRoot,
+        expectedRepository: repository,
+      }), null, 2));
+      return;
+    }
+
+    const verificationReceipt = await readJson(
+      values.get("--verification-receipt"),
+      "verification receipt",
+      filesystem.readStableRegularFile,
+    );
+    console.log(JSON.stringify(createDeliveryEvidenceBundle({
       commitReceipt,
       pushReceipt,
-      workspaceRoot: path.resolve(values.get("--workspace")),
-      expectedRepository: values.get("--repository"),
+      verificationReceipt,
+      workspaceRoot,
+      expectedRepository: repository,
     }), null, 2));
   } catch (error) {
     console.error(JSON.stringify({

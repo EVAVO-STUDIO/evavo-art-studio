@@ -21,8 +21,11 @@ const files = [
   "scripts/layered-godot-git-push-verifier/runtime.mjs",
   "scripts/layered-godot-git-push-verifier/verification-receipt.mjs",
   "scripts/layered-godot-git-push-verifier/verification-receipt-contract.mjs",
+  "scripts/layered-godot-git-push-verifier/delivery-evidence.mjs",
+  "scripts/layered-godot-git-push-verifier/delivery-evidence-contract.mjs",
   "scripts/layered-godot-git-push-verifier/cli.mjs",
   "scripts/layered-godot-git-push-verifier/test-verification-receipt.mjs",
+  "scripts/layered-godot-git-push-verifier/test-delivery-evidence.mjs",
   "scripts/test-layered-godot-git-push-verifier.mjs",
   "scripts/check-layered-godot-git-push-verifier.mjs",
   "config/layered-production-godot-git-push-verifier.v1.json",
@@ -45,7 +48,7 @@ function sourceMap() {
   return source;
 }
 
-test("push verifier source, lineage and authority contract remain exact", async () => {
+test("push verifier source, lineage, delivery evidence and authority contracts remain exact", async () => {
   const source = sourceMap();
   const verifier = await import("../layered-godot-git-push-verifier.mjs");
   const push = await import("../layered-godot-git-push-operator/contract.mjs");
@@ -59,6 +62,13 @@ test("push verifier source, lineage and authority contract remain exact", async 
     push.LAYERED_GODOT_GIT_PUSH_OPERATOR_PROTOCOL_VERSION,
   );
   assert.equal(verifier.EXPECTED_GIT_PUSH_RECEIPT_KIND, push.LAYERED_GODOT_GIT_PUSH_RECEIPT_KIND);
+  assert.equal(verifier.LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_PROTOCOL_VERSION, "2026-08-13.1");
+  assert.equal(
+    verifier.LAYERED_GODOT_GIT_DELIVERY_EVIDENCE_KIND,
+    "evavo.layered-production.godot-git-delivery-evidence-bundle",
+  );
+  assert.equal(typeof verifier.createDeliveryEvidenceBundle, "function");
+  assert.equal(typeof verifier.validateDeliveryEvidenceBundle, "function");
 
   const implementation = files
     .filter((entry) => entry.includes("git-push-verifier/") || entry.endsWith("git-push-verifier.mjs"))
@@ -72,10 +82,14 @@ test("push verifier source, lineage and authority contract remain exact", async 
     "assertReadOnlyGitArguments", "commitReceiptAdmitted: true",
     "lineageBindingsCurrent: true", "crossReceiptBindingsVerified: true",
     "verificationReceiptContractAdmitted: true",
+    "createDeliveryEvidenceBundle", "validateDeliveryEvidenceBundle",
+    "sourceReceipts", "sourceReceiptHashesBound: true",
+    "sourceLineageBound: true", "deliveryEvidenceContractAdmitted: true",
+    "deliveryEvidencePackagingPerformed: true",
     "stableAcrossVerification: true", "gitPushAttempted: false",
     "gitPushPerformed: false", "gitRefUpdated: false",
     "forcePushPerformed: false", "deploymentPerformed: false",
-    "releasePublicationPerformed: false",
+    "releasePublicationPerformed: false", "artifactPublicationPerformed: false",
   ]) assert.ok(implementation.includes(token), `push verifier missing ${token}`);
   const gitSurface = source.get("scripts/layered-godot-git-push-verifier/git-readonly.mjs");
   for (const forbidden of [
@@ -107,6 +121,41 @@ test("push verifier source, lineage and authority contract remain exact", async 
     assert.equal(config.authority[key], false, `authority ${key} must remain false`);
   }
 
+  assert.equal(config.deliveryEvidence.protocolVersion, "2026-08-13.1");
+  assert.equal(
+    config.deliveryEvidence.kind,
+    "evavo.layered-production.godot-git-delivery-evidence-bundle",
+  );
+  for (const key of [
+    "embedsActualCommitPushAndVerificationReceipts",
+    "requiresClosedCommitPushAndVerificationReceiptAdmission",
+    "requiresExactSourceReceiptHashParity",
+    "requiresExactSourceLineageAndGitIdentityParity",
+    "requiresExplicitRepositoryAndWorkspaceTarget",
+    "requiresImmutableInputSnapshot",
+    "rejectsUnsupportedFieldsAtEveryBundleBoundary",
+    "emitsSelfHashedDeliveryEvidenceBundle",
+    "requiresGeneratedDeliveryEvidenceBundleReadmission",
+    "operatesWithoutTargetRepositoryOrNetworkAccess",
+  ]) {
+    assert.equal(
+      config.deliveryEvidence.requirements[key],
+      true,
+      `delivery evidence config missing ${key}`,
+    );
+  }
+  for (const key of [
+    "targetRepositoryRead", "targetRepositoryMutation", "gitRead", "gitNetworkRead",
+    "gitCommit", "gitRefUpdate", "gitPush", "deployment", "releasePublication",
+    "artifactPublication",
+  ]) {
+    assert.equal(
+      config.deliveryEvidence.authority[key],
+      false,
+      `delivery evidence authority ${key} must remain false`,
+    );
+  }
+
   const docs = source.get("docs/LAYERED_GODOT_GIT_PUSH_VERIFIER.md");
   for (const token of [
     "read-only post-push boundary", "self-hash is integrity, not independent authority",
@@ -114,6 +163,8 @@ test("push verifier source, lineage and authority contract remain exact", async 
     "two fresh local inspections", "both remote reads",
     "closed read-only Git command set", "closed verification-receipt contract",
     "verificationReceiptContractAdmitted: true", "does not push",
+    "Portable delivery evidence bundle", "three separately paired JSON files",
+    "deliveryEvidenceContractAdmitted: true", "offline re-admission",
     "not deployment or release publication",
   ]) assert.ok(docs.includes(token), `push verifier docs missing ${token}`);
 });
