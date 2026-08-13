@@ -122,6 +122,26 @@ test("rejects correctly rehashed invented verification lineage", async (t) => {
   );
 });
 
+test("rejects a correctly rehashed invented fresh local snapshot", async (t) => {
+  const { fx, receipt, verificationReceipt } = await verifiedFixture(t);
+  const tampered = rehashVerificationReceipt(
+    verificationReceipt,
+    (copy) => {
+      copy.local.snapshotSha256 = "f".repeat(64);
+    },
+  );
+  expectInvalid(() =>
+    validateVerificationReceipt(
+      tampered,
+      REPOSITORY,
+      fx.root,
+      sameFilesystemPath,
+      fx.receipt,
+      receipt,
+    ),
+  );
+});
+
 test("requires explicit generated-receipt contract admission evidence", async (t) => {
   const { fx, receipt, verificationReceipt } = await verifiedFixture(t);
   const tampered = JSON.parse(JSON.stringify(verificationReceipt));

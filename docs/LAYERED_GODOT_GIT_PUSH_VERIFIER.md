@@ -59,7 +59,7 @@ That contract re-admits the actual source commit and push receipts, recomputes t
 
 - source receipt hashes and upstream request, integration, write, handoff and review lineage;
 - repository and workspace identity;
-- local commit, parent, tree, branch, cleanliness and snapshot identity;
+- local commit, parent, tree and branch parity, plus a recomputed fresh clean-state snapshot hash;
 - exact HTTPS GitHub origin and current remote branch identity;
 - push outcome and two-phase stability claims; and
 - the complete read-only, false-mutation authority map.

@@ -310,6 +310,13 @@ export function validateVerificationReceipt(
     "verificationReceipt.local.snapshotSha256",
     "VERIFICATION_RECEIPT_INVALID",
   );
+  const expectedLocalSnapshotSha256 = canonicalSha256({
+    head: local.commit,
+    parent: local.parent,
+    tree: local.tree,
+    branch: local.branch,
+    clean: true,
+  });
   if (
     local.commit !== commitReceipt.commit.commit ||
     local.parent !== commitReceipt.commit.parent ||
@@ -319,7 +326,7 @@ export function validateVerificationReceipt(
     local.parent !== pushReceipt.local.parent ||
     local.tree !== pushReceipt.local.tree ||
     local.branch !== pushReceipt.local.branch ||
-    local.snapshotSha256 !== pushReceipt.local.snapshotSha256 ||
+    local.snapshotSha256 !== expectedLocalSnapshotSha256 ||
     local.clean !== true
   ) {
     verifierFail(
