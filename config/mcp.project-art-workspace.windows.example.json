@@ -43,6 +43,16 @@
         "EVAVO_ART_WORKSPACE_JOB_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
         "EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE": "false"
       }
+    },
+    "evavo-project-art-avatar-final-pass-provider": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
+        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_MCP_ALLOW_WRITE": "false"
+      }
     }
   }
 }
