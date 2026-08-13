@@ -23,6 +23,7 @@ export const VERIFIED_AT = "2026-08-13T02:00:00.000Z";
 
 export function verifierInput(fx, pushReceipt, overrides = {}) {
   return {
+    commitReceipt: fx.receipt,
     pushReceipt,
     workspaceRoot: fx.root,
     expectedRepository: REPOSITORY,
@@ -45,11 +46,19 @@ export async function expectCode(promise, code) {
   );
 }
 
-export function rehashPushReceipt(receipt, mutate) {
+function rehashReceipt(receipt, mutate) {
   const copy = JSON.parse(JSON.stringify(receipt));
   mutate(copy);
   delete copy.receiptSha256;
   return { ...copy, receiptSha256: pushCanonicalSha256(copy) };
+}
+
+export function rehashPushReceipt(receipt, mutate) {
+  return rehashReceipt(receipt, mutate);
+}
+
+export function rehashCommitReceipt(receipt, mutate) {
+  return rehashReceipt(receipt, mutate);
 }
 
 export async function pushedFixture(t, outcome = "pushed") {

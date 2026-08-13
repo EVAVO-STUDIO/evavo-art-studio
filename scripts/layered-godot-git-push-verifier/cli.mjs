@@ -27,7 +27,7 @@ function parseCli(argv) {
   if (command !== "verify") {
     verifierFail(
       "CLI_INVALID",
-      "Usage: layered-godot-git-push-verifier.mjs verify --push-receipt FILE --workspace DIR --repository OWNER/REPO",
+      "Usage: layered-godot-git-push-verifier.mjs verify --commit-receipt FILE --push-receipt FILE --workspace DIR --repository OWNER/REPO",
     );
   }
   if (rest.length % 2 !== 0) verifierFail("CLI_INVALID", "CLI flags must be --flag value pairs.");
@@ -41,7 +41,12 @@ function parseCli(argv) {
     if (values.has(flag)) verifierFail("CLI_INVALID", `Duplicate CLI argument ${flag}.`);
     values.set(flag, value);
   }
-  const allowed = ["--push-receipt", "--workspace", "--repository"];
+  const allowed = [
+    "--commit-receipt",
+    "--push-receipt",
+    "--workspace",
+    "--repository",
+  ];
   for (const key of allowed) if (!values.has(key)) verifierFail("CLI_INVALID", `Missing ${key}.`);
   for (const key of values.keys()) if (!allowed.includes(key)) verifierFail("CLI_INVALID", `Unknown CLI argument ${key}.`);
   return values;
@@ -51,12 +56,18 @@ export async function runCli(argv = process.argv.slice(2)) {
   try {
     const values = parseCli(argv);
     const filesystem = await import("../layered-godot-workspace-writer/filesystem.mjs");
+    const commitReceipt = await readJson(
+      values.get("--commit-receipt"),
+      "commit receipt",
+      filesystem.readStableRegularFile,
+    );
     const pushReceipt = await readJson(
       values.get("--push-receipt"),
       "push receipt",
       filesystem.readStableRegularFile,
     );
     console.log(JSON.stringify(await verifyLayeredGodotPushReceipt({
+      commitReceipt,
       pushReceipt,
       workspaceRoot: path.resolve(values.get("--workspace")),
       expectedRepository: values.get("--repository"),
