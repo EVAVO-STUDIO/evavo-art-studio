@@ -1,0 +1,218 @@
+{
+  "schema": "evavo.artist-workspace-agent-suite.v1",
+  "version": 5,
+  "description": "Canonical path-only MCP deployment for persistent project-art workspaces, exact external asset ingest, content-addressed discovery, crash-resumable checkpoints, governed avatar provider execution, strict candidate materialization, deterministic pixel finishing, and named-human admission of exact final frame hashes.",
+  "configuration": "config/mcp.project-art-workspace.windows.example.json",
+  "servers": [
+    {
+      "id": "evavo-project-art-workspace",
+      "entrypoint": "tools/project_art_workspace_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_WORKSPACE_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "project-intelligence",
+        "deterministic-sandbox",
+        "reference-planning",
+        "temporary-intake",
+        "sprite-atlas",
+        "persistent-workspace-create",
+        "persistent-workspace-snapshot",
+        "evavo-storage-handoff"
+      ]
+    },
+    {
+      "id": "evavo-project-art-workspace-ingest",
+      "entrypoint": "tools/project_art_workspace_ingest_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_WORKSPACE_INGEST_ROOTS",
+      "sourceRootsEnvironment": "EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_WORKSPACE_INGEST_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "external-source-capabilities",
+        "external-source-plan-compilation",
+        "atomic-persistent-workspace-ingest"
+      ]
+    },
+    {
+      "id": "evavo-project-art-workspace-catalog",
+      "entrypoint": "tools/project_art_workspace_catalog_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_PERSISTENT_CATALOG_ROOTS",
+      "writeGateEnvironment": "EVAVO_PERSISTENT_CATALOG_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "workspace-catalog-capabilities",
+        "content-addressed-workspace-inventory",
+        "bounded-workspace-query",
+        "exact-duplicate-detection",
+        "workspace-drift-verification"
+      ]
+    },
+    {
+      "id": "evavo-project-art-workspace-jobs",
+      "entrypoint": "tools/project_art_workspace_jobs_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_WORKSPACE_JOB_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "workspace-job-capabilities",
+        "exact-job-plan-compilation",
+        "append-only-job-publication",
+        "lease-bounded-agent-claim",
+        "hash-chained-checkpoints",
+        "crash-resume-and-drift-verification"
+      ]
+    },
+    {
+      "id": "evavo-project-art-avatar-final-pass-provider",
+      "entrypoint": "tools/project_art_avatar_final_pass_provider_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "avatar-final-pass-provider-capabilities",
+        "sealed-final-pass-provider-compilation",
+        "one-candidate-redraw-envelopes",
+        "anatomy-safe-inbetween-envelopes",
+        "final-endpoint-hash-gating"
+      ]
+    },
+    {
+      "id": "evavo-project-art-avatar-final-pass-provider-runtime",
+      "entrypoint": "tools/project_art_avatar_final_pass_provider_runtime_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "avatar-provider-runtime-capabilities",
+        "exact-ready-job-dispatch",
+        "generic-runtime-contract-binding",
+        "candidate-or-failure-outcome-normalization",
+        "create-only-candidate-materialization-planning"
+      ]
+    },
+    {
+      "id": "evavo-project-art-avatar-final-pass-provider-candidate",
+      "entrypoint": "tools/project_art_avatar_final_pass_provider_candidate_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_ROOTS",
+      "artifactRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ARTIFACT_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "immutable-provider-artifact-verification",
+        "strict-rgba-png-admission",
+        "create-only-workspace-candidate-materialization",
+        "hash-bound-frame-finisher-handoff",
+        "restart-safe-materialization-readback"
+      ]
+    },
+    {
+      "id": "evavo-project-art-avatar-final-pass-provider-frame-finisher",
+      "entrypoint": "tools/project_art_avatar_final_pass_provider_frame_finisher_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": [
+        "exact-candidate-finisher-chain-validation",
+        "strict-rgba-png-decoding-and-canonical-reencoding",
+        "hidden-transparent-rgb-cleanup",
+        "named-human-frame-review",
+        "final-frame-hash-admission"
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "chat-or-claude-image-to-persistent-workspace",
+      "steps": [
+        "evavo_art_workspace_ingest_capabilities",
+        "evavo_art_compile_workspace_ingest",
+        "evavo_art_run_workspace_ingest",
+        "evavo_art_compile_workspace_snapshot",
+        "evavo_art_run_workspace_snapshot"
+      ]
+    },
+    {
+      "id": "persistent-workspace-discovery-and-drift",
+      "steps": [
+        "evavo_art_workspace_catalog_capabilities",
+        "evavo_art_compile_workspace_catalog",
+        "evavo_art_run_workspace_catalog",
+        "evavo_art_query_workspace_catalog",
+        "evavo_art_verify_workspace_catalog"
+      ]
+    },
+    {
+      "id": "resumable-persistent-workspace-production",
+      "steps": [
+        "evavo_art_workspace_job_capabilities",
+        "evavo_art_compile_workspace_job",
+        "evavo_art_create_workspace_job",
+        "evavo_art_inspect_workspace_job",
+        "evavo_art_checkpoint_workspace_job",
+        "bounded-existing-art-tool-from-ready-job-step",
+        "evavo_art_checkpoint_workspace_job",
+        "evavo_art_inspect_workspace_job"
+      ]
+    },
+    {
+      "id": "avatar-final-pass-redraw-and-inbetween-submission",
+      "steps": [
+        "review-sealed-avatar-final-pass-plan",
+        "admit-canonical-identity-and-endpoint-artifacts",
+        "record-named-human-run-once-authorization",
+        "evavo_art_avatar_final_pass_provider_capabilities",
+        "evavo_art_compile_avatar_final_pass_provider_batch",
+        "evavo_art_avatar_final_pass_provider_runtime_capabilities",
+        "evavo_art_compile_avatar_final_pass_provider_runtime_dispatch",
+        "separate-generic-provider-runtime-contract-compilation",
+        "evavo_art_bind_avatar_final_pass_provider_runtime_contract",
+        "separately-authorized-runtime-enqueue-and-provider-execution",
+        "evavo_art_compile_avatar_final_pass_provider_runtime_outcome",
+        "evavo_art_avatar_final_pass_provider_candidate_capabilities",
+        "evavo_art_materialize_avatar_final_pass_provider_candidate",
+        "evavo_art_avatar_final_pass_provider_frame_finisher_capabilities",
+        "evavo_art_finish_avatar_final_pass_provider_candidate",
+        "record-named-human-art-anatomy-identity-continuity-decision",
+        "evavo_art_review_avatar_final_pass_provider_frame",
+        "rerun-avatar-sequence-timing-and-final-to-first-loop-closure",
+        "seal-final-frame-sha-before-dependent-inbetween-or-sequence"
+      ]
+    },
+    {
+      "id": "persistent-workspace-to-evavo-storage",
+      "steps": [
+        "evavo_art_prepare_storage_handoff",
+        "independently-authorized-evavo-storage-ingest"
+      ]
+    },
+    {
+      "id": "persistent-workspace-art-production",
+      "steps": [
+        "evavo_art_compile_sandbox",
+        "evavo_art_run_sandbox",
+        "evavo_art_compile_atlas",
+        "evavo_art_run_atlas",
+        "separate-visual-review-and-promotion"
+      ]
+    }
+  ],
+  "authority": {
+    "bytesFlowThroughMcp": false,
+    "arbitraryShell": false,
+    "sourceMutation": false,
+    "sourceDeletion": false,
+    "runtimeEnqueue": false,
+    "providerExecution": false,
+    "candidateMaterialization": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "storageWrite": false,
+    "repositoryMutation": false,
+    "gitPublication": false,
+    "deployment": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "forcePush": false
+  }
+}

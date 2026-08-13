@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "evavo-project-art-avatar-final-pass-provider-frame-finisher": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_frame_finisher_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
+        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_MCP_ALLOW_WRITE": "false"
+      }
+    }
+  }
+}
