@@ -124,7 +124,8 @@ jobs:
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
           git diff --check
-          git diff --name-only | LC_ALL=C sort > "$RUNNER_TEMP/actual-scope.txt"
+          git add --all
+          git diff --cached --name-only | LC_ALL=C sort > "$RUNNER_TEMP/actual-scope.txt"
           cat > "$RUNNER_TEMP/expected-scope.txt" <<'EOF'
           .github/workflows/pixel-display-aspect-bootstrap.yml
           .github/workflows/pixel-font-repository-delivery-contract.yml
@@ -155,7 +156,6 @@ jobs:
           set -euo pipefail
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
-          git add --all
           git diff --cached --check
           git commit -m "feat(pixel-typography): add display-aspect review evidence" -m "Preserve exact native pages while adding deterministic aspect-corrected display previews, reduced native/display/pixel ratio evidence, exact integer-scale enlargements, independent reconstruction, guarded MCP discovery, updated examples and path-filtered CI. Creative approval, repository mutation, Git publication and force push remain outside the review engine."
           git push origin "HEAD:${GITHUB_REF_NAME}"
