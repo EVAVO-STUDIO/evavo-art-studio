@@ -15,6 +15,7 @@ const files = [
   "scripts/layered-godot-git-push-verifier/buffers.mjs",
   "scripts/layered-godot-git-push-verifier/git-options.mjs",
   "scripts/layered-godot-git-push-verifier/git-readonly.mjs",
+  "scripts/layered-godot-git-push-verifier/commit-receipt-contract.mjs",
   "scripts/layered-godot-git-push-verifier/receipt-contract.mjs",
   "scripts/layered-godot-git-push-verifier/receipt-outcome.mjs",
   "scripts/layered-godot-git-push-verifier/runtime.mjs",
@@ -42,10 +43,15 @@ function sourceMap() {
   return source;
 }
 
-test("push verifier source and authority contract remain exact", async () => {
+test("push verifier source, lineage and authority contract remain exact", async () => {
   const source = sourceMap();
   const verifier = await import("../layered-godot-git-push-verifier.mjs");
-  const push = await import("../layered-godot-git-push-operator.mjs");
+  const push = await import("../layered-godot-git-push-operator/contract.mjs");
+  assert.equal(
+    verifier.EXPECTED_GIT_COMMIT_OPERATOR_PROTOCOL_VERSION,
+    push.EXPECTED_GIT_COMMIT_OPERATOR_PROTOCOL_VERSION,
+  );
+  assert.equal(verifier.EXPECTED_GIT_COMMIT_RECEIPT_KIND, push.EXPECTED_GIT_COMMIT_RECEIPT_KIND);
   assert.equal(
     verifier.EXPECTED_GIT_PUSH_OPERATOR_PROTOCOL_VERSION,
     push.LAYERED_GODOT_GIT_PUSH_OPERATOR_PROTOCOL_VERSION,
@@ -57,11 +63,13 @@ test("push verifier source and authority contract remain exact", async () => {
     .map((entry) => source.get(entry))
     .join("\n");
   for (const token of [
-    "validatePushReceipt", "snapshotJsonValue", "utilTypes.isProxy",
+    "validateCommitReceipt", "validatePushReceipt", "snapshotJsonValue", "utilTypes.isProxy",
     "captureDependencies", "captureWorkspaceRoot", "captureOrigin",
     "captureGitResult", "copyStableBuffer", "SharedArrayBuffer",
-    "assertReadOnlyGitArguments", "stableAcrossVerification: true",
-    "gitPushAttempted: false", "gitPushPerformed: false", "gitRefUpdated: false",
+    "assertReadOnlyGitArguments", "commitReceiptAdmitted: true",
+    "lineageBindingsCurrent: true", "crossReceiptBindingsVerified: true",
+    "stableAcrossVerification: true", "gitPushAttempted: false",
+    "gitPushPerformed: false", "gitRefUpdated: false",
     "forcePushPerformed: false", "deploymentPerformed: false",
     "releasePublicationPerformed: false",
   ]) assert.ok(implementation.includes(token), `push verifier missing ${token}`);
@@ -74,11 +82,14 @@ test("push verifier source and authority contract remain exact", async () => {
 
   const config = JSON.parse(source.get("config/layered-production-godot-git-push-verifier.v1.json"));
   assert.equal(config.schema, "evavo.layered-production.godot-git-push-verifier.v1");
-  assert.equal(config.protocolVersion, "2026-08-13.1");
+  assert.equal(config.protocolVersion, "2026-08-13.2");
   for (const key of [
-    "requiresExactCurrentPushReceipt", "requiresClosedPushReceiptContract",
-    "requiresPushReceiptSelfHash", "requiresOutcomeCommandAuthorityParity",
-    "requiresImmutableInputSnapshot", "requiresSynchronousDependencyCaptureBeforeAsyncBoundary",
+    "requiresExactCurrentCommitReceipt", "requiresClosedCommitReceiptContract",
+    "requiresCommitReceiptSelfHash", "requiresCommitAndPushReceiptLineageParity",
+    "requiresCommitAndPushGitIdentityParity", "requiresExactCurrentPushReceipt",
+    "requiresClosedPushReceiptContract", "requiresPushReceiptSelfHash",
+    "requiresOutcomeCommandAuthorityParity", "requiresImmutableInputSnapshot",
+    "requiresSynchronousDependencyCaptureBeforeAsyncBoundary",
     "rejectsProxyInputsDependenciesAndResults", "requiresExactRepositoryRoot",
     "requiresCleanLocalRepository", "requiresExactLocalHeadParentTreeAndBranch",
     "requiresExactHttpsGithubOrigin", "requiresTwoPhaseLocalAndRemoteVerification",
@@ -92,6 +103,7 @@ test("push verifier source and authority contract remain exact", async () => {
   const docs = source.get("docs/LAYERED_GODOT_GIT_PUSH_VERIFIER.md");
   for (const token of [
     "read-only post-push boundary", "self-hash is integrity, not independent authority",
+    "actual source commit receipt", "cross-receipt lineage",
     "two fresh local inspections", "both remote reads",
     "closed read-only Git command set", "does not push",
     "not deployment or release publication",
