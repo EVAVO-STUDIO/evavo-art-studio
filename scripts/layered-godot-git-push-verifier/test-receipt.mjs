@@ -9,8 +9,26 @@ import {
   verifyLayeredGodotPushReceipt,
 } from "./test-fixture.mjs";
 
+const INPUT_INVALID = "LAYERED_GODOT_GIT_PUSH_VERIFIER_INPUT_INVALID";
 const INVALID = "LAYERED_GODOT_GIT_PUSH_VERIFIER_PUSH_RECEIPT_INVALID";
 const COMMIT_INVALID = "LAYERED_GODOT_GIT_PUSH_VERIFIER_COMMIT_RECEIPT_INVALID";
+
+test("requires actual source commit receipt evidence", async (t) => {
+  const { fx, receipt } = await pushedFixture(t);
+  const missing = verifierInput(fx, receipt);
+  delete missing.commitReceipt;
+  await expectCode(
+    verifyLayeredGodotPushReceipt(missing, verifierDependencies(fx)),
+    INPUT_INVALID,
+  );
+  await expectCode(
+    verifyLayeredGodotPushReceipt(
+      verifierInput(fx, receipt, { commitReceipt: null }),
+      verifierDependencies(fx),
+    ),
+    COMMIT_INVALID,
+  );
+});
 
 test("rejects correctly rehashed unsupported commit receipt fields", async (t) => {
   const { fx, receipt } = await pushedFixture(t);
