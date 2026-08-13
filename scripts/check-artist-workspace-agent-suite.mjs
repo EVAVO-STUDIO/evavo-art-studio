@@ -33,9 +33,14 @@ run(
   'scripts/check-artist-workspace-avatar-provider-runtime-integration.mjs',
   'Artist Workspace avatar provider runtime v3 integration guard',
 );
+run(
+  'scripts/check-artist-workspace-avatar-provider-candidate-integration.mjs',
+  'Artist Workspace avatar provider candidate v4 integration guard',
+);
 
 console.log('Artist Workspace agent suite combined guard passed.');
 console.log('- v1 workspace, ingest, catalog and resumable-job contracts remain compatible');
 console.log('- v2 retains the governed avatar final-pass provider compiler');
-console.log('- v3 adds exact durable runtime dispatch, binding and outcome normalization');
-console.log('- one existing consolidated workflow validates all three contracts');
+console.log('- v3 retains exact durable runtime dispatch, binding and outcome normalization');
+console.log('- v4 adds strict create-only provider candidate materialization and frame-finisher handoff');
+console.log('- one existing consolidated workflow validates all four contracts');

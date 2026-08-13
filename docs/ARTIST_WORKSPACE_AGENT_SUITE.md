@@ -8,9 +8,11 @@ Use:
 config/mcp.project-art-workspace.windows.example.json
 ```
 
-That one configuration registers six deliberately separate path-only servers:
+That one configuration now registers seven deliberately separate path-only servers.
 
-The v2 compatibility contract registered five deliberately separate path-only servers; v3 retains all five and adds the provider-runtime bridge as the sixth. The v2 compatibility example keeps all five write gates set to `false`.
+The v2 compatibility contract registered five deliberately separate path-only servers; v3 retained all five and added the provider-runtime bridge as the sixth. The v3 compatibility contract therefore registered six deliberately separate path-only servers. V4 retains all six and adds strict provider-candidate materialization as the seventh.
+
+The v2 compatibility example keeps all five write gates set to `false`. The v3 compatibility example keeps all six write gates set to `false`. The current canonical example keeps all seven write gates set to `false`.
 
 ```text
 evavo-project-art-workspace
@@ -19,9 +21,10 @@ evavo-project-art-workspace-catalog
 evavo-project-art-workspace-jobs
 evavo-project-art-avatar-final-pass-provider
 evavo-project-art-avatar-final-pass-provider-runtime
+evavo-project-art-avatar-final-pass-provider-candidate
 ```
 
-The primary server owns project inspection, deterministic image operations, sprite and atlas work, persistent workspace creation, append-only snapshots and EVAVO Storage handoff preparation. The ingest server owns exact placement of mounted chat attachments, generated images and approved local files into an existing workspace. The catalog server gives agents a content-addressed, queryable view of what the workspace actually contains and whether it has drifted. The jobs server adds append-only, crash-resumable checkpoints. The avatar final-pass provider server compiles explicitly selected hand, finger, anatomy, identity and continuity redraws plus generated in-betweens into one-candidate requests. The provider-runtime bridge binds one ready request to the canonical `@evavo/art-providers` durable runtime contract and validates the eventual candidate result or provider failure without itself enqueueing, executing, materializing, approving or publishing anything.
+The primary server owns project inspection, deterministic image operations, sprite and atlas work, persistent workspace creation, append-only snapshots and EVAVO Storage handoff preparation. The ingest server owns exact placement of mounted chat attachments, generated images and approved local files into an existing workspace. The catalog server gives agents a content-addressed, queryable view of what the workspace actually contains and whether it has drifted. The jobs server adds append-only, crash-resumable checkpoints. The avatar final-pass provider server compiles explicitly selected hand, finger, anatomy, identity and continuity redraws plus generated in-betweens into one-candidate requests. The provider-runtime bridge binds one ready request to the canonical `@evavo/art-providers` durable runtime contract and validates one successful candidate result or one explicit provider failure. The provider-candidate materializer then admits one exact successful unapproved PNG from the immutable artifact store into its governed scratch path and emits a hash-bound frame-finisher handoff.
 
 ## End-to-end flow
 
@@ -45,7 +48,10 @@ ChatGPT / Claude attachment, repository image or generated candidate
 → canonical generic runtime-contract compilation and binding
 → separately authorised runtime enqueue and one provider call
 → candidate-result or provider-failure normalization
-→ create-only candidate materialization
+→ immutable candidate and evidence artifact verification
+→ strict non-animated RGBA PNG and exact-canvas admission
+→ create-only unapproved candidate materialization
+→ hash-bound frame-finisher request
 → rerun frame finishing, registration and loop closure
 → independent art, anatomy, identity and continuity review
 → final reviewed SHA-256 before dependent in-betweens or sequences
@@ -152,32 +158,98 @@ candidateCount 1
 
 Durable retries must retain the same deterministic provider request and cannot become creative fallback variations. The binding step independently validates the normalized request, prompt hash, capability profile, queue, job kind, idempotency key, retry policy, lease and timeout. The outcome step accepts only one successful candidate result or one explicit provider failure.
 
-A successful result produces a create-only materialization plan for the governed scratch path. It still requires the avatar frame finisher, native-scale inspection, art/anatomy/identity/continuity review, and a final reviewed SHA-256 before any dependent in-between or sequence can use it. A failure records zero candidates and requires fresh named-human generation and submission authorization before another attempt.
+A successful result produces `candidate-materialization-required`. A failure produces `provider-failure-record-required` and requires fresh named-human authorization before another provider attempt. The runtime bridge does not approve or promote a candidate.
 
 Write gate: `EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_MCP_ALLOW_WRITE=true`
 
 The gate permits private create-only JSON dispatch, binding and outcome records inside configured roots. It does not compile the generic package, enqueue a runtime job, call a provider, materialize image bytes, approve a candidate or activate the avatar.
 
+### `evavo-project-art-avatar-final-pass-provider-candidate`
+
+Entrypoint: `tools/project_art_avatar_final_pass_provider_candidate_mcp.mjs`
+
+Canonical tools:
+
+```text
+evavo_art_avatar_final_pass_provider_candidate_capabilities
+evavo_art_materialize_avatar_final_pass_provider_candidate
+```
+
+This server starts from a successful `candidate-materialization-required` outcome. It independently revalidates the dispatch, binding and outcome hashes, then verifies the immutable candidate and provider evidence artifacts through `LocalArtifactStore`.
+
+The candidate must remain one unapproved `image/png` intermediate artifact with exact provider request, prompt, candidate-family, asset and continuity identities. The evidence must bind the same candidate, one successful provider attempt, the same adapter and model, fallback disabled, and native alpha.
+
+Before publication the server validates:
+
+```text
+PNG CRC for every chunk
+one IHDR / consecutive IDAT / one terminal IEND
+no APNG chunks
+8-bit RGBA
+non-interlaced
+exact expected canvas
+at least one visible pixel
+at least one transparent pixel
+```
+
+It publishes these three files create-only as one rollback-safe bundle:
+
+```text
+candidate-01.png
+candidate-01.materialization.json
+candidate-01.finisher-request.json
+```
+
+The receipt records exact artifact, evidence, output, alpha and SHA-256 identities. The finisher request preserves the required next path:
+
+```text
+avatar frame finisher
+→ native-scale and contact-sheet inspection
+→ hands and anatomy review
+→ face identity review
+→ continuity and loop-closure review
+→ final reviewed SHA-256
+```
+
+The server permits no creative approval, candidate promotion, repository mutation, deployment, publication or runtime activation.
+
+Independent allowlists:
+
+```text
+EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_ROOTS
+EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ARTIFACT_ROOTS
+```
+
+Write gate:
+
+```text
+EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_MCP_ALLOW_WRITE=true
+```
+
 ## Safe deployment defaults
 
-The canonical example keeps all six write gates set to `false`. Enable only the server needed for the current operation and only on the trusted local workstation.
+The canonical example keeps all seven write gates set to `false`. Enable only the server needed for the current operation and only on the trusted local workstation.
 
-Workspace roots control plans, evidence, catalogs, journals and workspaces. Ingest source roots separately control external reads. Provider roots separately control sealed plans and batches. Runtime roots separately control dispatch, compiled-contract evidence and outcome records. Keep allowlists explicit rather than granting broad drive access.
+Workspace roots control plans, evidence, catalogs, journals, workspaces and candidate scratch outputs. Ingest source roots separately control external reads. Provider roots separately control sealed plans and batches. Runtime roots separately control dispatch, compiled-contract evidence and outcome records. Candidate artifact roots separately control immutable artifact reads. Keep allowlists explicit rather than granting broad drive access.
 
 Image bytes remain in local files and the artifact store. MCP carries bounded paths, hashes, dimensions, identifiers, plans, state and receipts; it does not transport image payloads through the language-model context.
 
 ## EVAVO Storage
 
-`evavo_art_prepare_storage_handoff` creates an exact self-hashed request for selected workspace files. It does not perform the Storage write. Provider compilation, runtime binding, candidate outcome normalization, workspace processing or job completion is not Storage admission.
+`evavo_art_prepare_storage_handoff` creates an exact self-hashed request for selected workspace files. It does not perform the Storage write. Provider compilation, runtime binding, outcome normalization, candidate materialization, workspace processing or job completion is not Storage admission.
 
 ## Creative and publication authority
 
-Technical processing, catalog verification, job completion, provider-request compilation, runtime-contract binding and outcome normalization do not grant creative approval. The suite performs no automatic:
+Technical processing, catalog verification, job completion, provider-request compilation, runtime-contract binding, outcome normalization and unapproved candidate materialization do not grant creative approval.
+
+The default suite performs no automatic:
 
 ```text
 runtime enqueue
 provider execution
-candidate materialization
+alpha extraction
+deterministic QA completion
+creative review
 candidate approval
 candidate promotion
 EVAVO Storage write
@@ -189,4 +261,6 @@ runtime activation
 force push
 ```
 
-Those actions retain separate authority, evidence and confirmation boundaries.
+A write-enabled candidate materializer may create only the exact unapproved scratch candidate, materialization receipt and frame-finisher request. It cannot turn that technical write into approval or production readiness.
+
+Those later actions retain separate authority, evidence and confirmation boundaries.
