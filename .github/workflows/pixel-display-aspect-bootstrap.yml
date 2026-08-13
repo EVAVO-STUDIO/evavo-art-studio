@@ -5,7 +5,6 @@ on:
     branches:
       - "work/pixel-typography-display-aspect-v1"
     paths:
-      - ".pixel-display-bootstrap/**"
       - ".github/workflows/pixel-display-aspect-bootstrap.yml"
 
 permissions:
@@ -115,20 +114,18 @@ jobs:
               universal_path.unlink()
           PY
 
-      - name: Remove one-time transport and verify exact reviewed scope
+      - name: Remove transport and verify exact source scope
         shell: bash
         run: |
           set -euo pipefail
           rm -rf .pixel-display-bootstrap
-          rm -f .github/workflows/pixel-display-aspect-bootstrap.yml
+          git restore --source="$GITHUB_SHA" -- .github/workflows/pixel-font-repository-delivery-contract.yml
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
           git diff --check
           git add --all
           git diff --cached --name-only | LC_ALL=C sort > "$RUNNER_TEMP/actual-scope.txt"
           cat > "$RUNNER_TEMP/expected-scope.txt" <<'EOF'
-          .github/workflows/pixel-display-aspect-bootstrap.yml
-          .github/workflows/pixel-font-repository-delivery-contract.yml
           .pixel-display-bootstrap/part-000.txt
           .pixel-display-bootstrap/part-001.txt
           .pixel-display-bootstrap/part-002.txt
@@ -150,14 +147,14 @@ jobs:
           LC_ALL=C sort -o "$RUNNER_TEMP/expected-scope.txt" "$RUNNER_TEMP/expected-scope.txt"
           diff -u "$RUNNER_TEMP/expected-scope.txt" "$RUNNER_TEMP/actual-scope.txt"
 
-      - name: Commit and normally push reviewed branch
+      - name: Commit and normally push reviewed source branch
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
           git diff --cached --check
-          git commit -m "feat(pixel-typography): add display-aspect review evidence" -m "Preserve exact native pages while adding deterministic aspect-corrected display previews, reduced native/display/pixel ratio evidence, exact integer-scale enlargements, independent reconstruction, guarded MCP discovery, updated examples and path-filtered CI. Creative approval, repository mutation, Git publication and force push remain outside the review engine."
+          git commit -m "feat(pixel-typography): add display-aspect review evidence" -m "Preserve exact native pages while adding deterministic aspect-corrected display previews, reduced native/display/pixel ratio evidence, exact integer-scale enlargements, independent reconstruction, guarded MCP discovery and updated examples. Creative approval, repository mutation, Git publication and force push remain outside the review engine."
           git push origin "HEAD:${GITHUB_REF_NAME}"
           printf '{"status":"published","branch":"%s","commit":"%s","tree":"%s","parent":"%s"}\n' \
             "$GITHUB_REF_NAME" \
