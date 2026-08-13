@@ -4,6 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export {
+  EXPECTED_GIT_COMMIT_OPERATOR_PROTOCOL_VERSION,
+  EXPECTED_GIT_COMMIT_RECEIPT_KIND,
   EXPECTED_GIT_PUSH_OPERATOR_PROTOCOL_VERSION,
   EXPECTED_GIT_PUSH_RECEIPT_KIND,
   LAYERED_GODOT_GIT_PUSH_VERIFICATION_RECEIPT_KIND,
@@ -12,6 +14,7 @@ export {
 } from "./layered-godot-git-push-verifier/protocol.mjs";
 export { canonicalSha256 } from "./layered-godot-git-push-verifier/canonical.mjs";
 export { snapshotJsonValue } from "./layered-godot-git-push-verifier/snapshot.mjs";
+export { validateCommitReceipt } from "./layered-godot-git-push-verifier/commit-receipt-contract.mjs";
 export { validatePushReceipt } from "./layered-godot-git-push-verifier/receipt-contract.mjs";
 export { verifyLayeredGodotPushReceipt } from "./layered-godot-git-push-verifier/runtime.mjs";
 
