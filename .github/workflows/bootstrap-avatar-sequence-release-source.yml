@@ -1,0 +1,165 @@
+name: Bootstrap reviewed avatar sequence release source
+
+on:
+  push:
+    branches:
+      - agent/avatar-sequence-release-v1
+    paths:
+      - .github/workflows/bootstrap-avatar-sequence-release-source.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-avatar-sequence-release-source-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Materialize the exact hash-locked non-workflow tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          from pathlib import Path, PurePosixPath
+          import stat
+          import urllib.request
+
+          REPOSITORY = 'EVAVO-STUDIO/evavo-art-studio'
+          TREE_SHA = 'f3ed7f2bad46476628e2b1938138806b16f801e4'
+          EXPECTED = {
+              'config/artist-workspace-agent-suite.v6.json',
+              'config/mcp.project-art-avatar-sequence-release.windows.example.json',
+              'config/mcp.project-art-workspace.windows.example.json',
+              'docs/ARTIST_WORKSPACE_AGENT_SUITE.md',
+              'docs/PROJECT_ART_AVATAR_SEQUENCE_RELEASE.md',
+              'scripts/avatar-sequence-release-cli.mjs',
+              'scripts/check-artist-workspace-agent-suite.mjs',
+              'scripts/check-artist-workspace-avatar-sequence-release-integration.mjs',
+              'scripts/check-project-art-avatar-sequence-release-suite.mjs',
+              'scripts/check-project-art-avatar-sequence-release.mjs',
+              'scripts/project-art/avatar-sequence-release-fixture.mjs',
+              'scripts/project-art/avatar-sequence-release.mjs',
+              'scripts/test-project-art-avatar-sequence-release-mcp.mjs',
+              'scripts/test-project-art-avatar-sequence-release.mjs',
+              'tools/project_art_avatar_sequence_release_mcp.mjs',
+          }
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'evavo-avatar-sequence-release-source/1',
+          }
+          request = urllib.request.Request(
+              f'https://api.github.com/repos/{REPOSITORY}/git/trees/{TREE_SHA}?recursive=1',
+              headers=headers,
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              tree = json.load(response)
+          if tree.get('sha') != TREE_SHA or tree.get('truncated') is True:
+              raise SystemExit('source tree identity is incomplete or mismatched')
+          entries = {
+              entry.get('path'): entry
+              for entry in tree.get('tree', [])
+              if entry.get('path') in EXPECTED
+          }
+          if set(entries) != EXPECTED:
+              raise SystemExit(f'exact source path set is incomplete: {sorted(set(EXPECTED) - set(entries))}')
+
+          root = Path.cwd().resolve()
+          manifest = {}
+          for relative in sorted(EXPECTED):
+              entry = entries[relative]
+              if entry.get('type') != 'blob' or entry.get('mode') != '100644':
+                  raise SystemExit(f'invalid tree entry for {relative}')
+              blob_request = urllib.request.Request(entry['url'], headers=headers)
+              with urllib.request.urlopen(blob_request, timeout=30) as response:
+                  blob = json.load(response)
+              if blob.get('sha') != entry.get('sha') or blob.get('encoding') != 'base64' or blob.get('truncated') is True:
+                  raise SystemExit(f'blob identity is incomplete for {relative}')
+              data = base64.b64decode(blob['content'], validate=False)
+              git_sha = hashlib.sha1(f'blob {len(data)}'.encode() + b'\x00' + data).hexdigest()
+              if git_sha != entry['sha']:
+                  raise SystemExit(f'Git blob verification failed for {relative}')
+              posix = PurePosixPath(relative)
+              if posix.is_absolute() or '..' in posix.parts or '\\' in relative or '\x00' in relative:
+                  raise SystemExit(f'unsafe target path: {relative}')
+              target = root.joinpath(*posix.parts)
+              if not target.resolve(strict=False).is_relative_to(root):
+                  raise SystemExit(f'target escapes repository: {relative}')
+              cursor = root
+              for part in posix.parts[:-1]:
+                  cursor /= part
+                  if cursor.is_symlink():
+                      raise SystemExit(f'symbolic target parent: {relative}')
+              if target.exists():
+                  metadata = target.lstat()
+                  if target.is_symlink() or not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                      raise SystemExit(f'unsafe existing target: {relative}')
+              target.parent.mkdir(parents=True, exist_ok=True)
+              temporary = target.with_name(f'.{target.name}.evavo-source')
+              if temporary.exists() or temporary.is_symlink():
+                  raise SystemExit(f'temporary target collision: {relative}')
+              temporary.write_bytes(data)
+              os.chmod(temporary, 0o644)
+              os.replace(temporary, target)
+              if hashlib.sha1(f'blob {target.stat().st_size}'.encode() + b'\x00' + target.read_bytes()).hexdigest() != entry['sha']:
+                  raise SystemExit(f'post-write Git blob verification failed for {relative}')
+              manifest[relative] = entry['sha']
+
+          Path('/tmp/avatar-sequence-release-source-paths.txt').write_text(
+              '\n'.join(sorted(EXPECTED)) + '\n', encoding='utf-8'
+          )
+          Path('/tmp/avatar-sequence-release-source-manifest.json').write_text(
+              json.dumps(manifest, sort_keys=True, indent=2) + '\n', encoding='utf-8'
+          )
+          print(f'Verified and materialized {len(EXPECTED)} exact non-workflow source files.')
+          PY
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: '22.14.0'
+          package-manager-cache: false
+
+      - name: Validate exact source and push the branch
+        run: |
+          while IFS= read -r file; do
+            case "$file" in
+              *.mjs) node --check "$file" ;;
+              *.json) node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$file" ;;
+            esac
+          done < /tmp/avatar-sequence-release-source-paths.txt
+          node scripts/check-project-art-avatar-sequence-release-suite.mjs
+          node scripts/check-artist-workspace-avatar-sequence-release-integration.mjs
+          node scripts/check-artist-workspace-agent-suite.mjs
+          git diff --check
+          git config user.name 'EVAVO-STUDIO'
+          git config user.email 'evavo.studio@gmail.com'
+          while IFS= read -r file; do
+            git add -- "$file"
+          done < /tmp/avatar-sequence-release-source-paths.txt
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          expected = set(Path('/tmp/avatar-sequence-release-source-paths.txt').read_text().splitlines())
+          staged = set(subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines())
+          if staged != expected:
+              raise SystemExit(f'unexpected staged scope: expected {sorted(expected)}, got {sorted(staged)}')
+          PY
+          git commit -m 'feat(avatar): add reviewed sequence release source'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
