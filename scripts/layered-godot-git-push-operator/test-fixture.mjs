@@ -18,6 +18,7 @@ import {
 } from "./contract.mjs";
 
 const REPOSITORY = "EVAVO-STUDIO/TestGame";
+const SAFE_ORIGIN = `https://github.com/${REPOSITORY}.git`;
 const MESSAGE = "feat(art): integrate approved district resources";
 const RESOURCE_PATHS = [
   "game/generated/district.tscn",
@@ -168,13 +169,21 @@ async function fixture() {
   return fx;
 }
 
+function mappedArgs(fx, args) {
+  return args.map((entry) => entry === SAFE_ORIGIN ? fx.remote : entry);
+}
+
+async function runFixtureGit(fx, root, args, settings) {
+  return runGit(root, mappedArgs(fx, args), settings);
+}
+
 function dependencies(fx, options = {}) {
   return {
     complete: true,
     inspectWorkspaceRoot: async () => ({ path: fx.root, realPath: fx.realRoot }),
     sameFilesystemPath: (a, b) => path.resolve(a) === path.resolve(b),
-    resolveOrigin: async () => ({ url: fx.remote, repository: REPOSITORY }),
-    runGit: options.runGit ?? ((root, args, settings) => runGit(root, args, settings)),
+    resolveOrigin: async () => ({ url: SAFE_ORIGIN, repository: REPOSITORY }),
+    runGit: options.runGit ?? ((root, args, settings) => runFixtureGit(fx, root, args, settings)),
   };
 }
 
@@ -219,11 +228,10 @@ function competingRemoteCommit(fx) {
   return commit;
 }
 
-
 export {
   assert, access, chmod, path, writeFile,
   canonicalSha256, inspectOrigin, pushLayeredGodotCommit, runGit,
-  REPOSITORY, MESSAGE, RESOURCE_PATHS,
-  git, bareGit, fixture, dependencies, input, cleanup, expectCode,
-  competingRemoteCommit, makeCommitReceipt,
+  REPOSITORY, SAFE_ORIGIN, MESSAGE, RESOURCE_PATHS,
+  sha, git, bareGit, fixture, dependencies, input, cleanup, expectCode,
+  competingRemoteCommit, makeCommitReceipt, runFixtureGit,
 };

@@ -4,11 +4,30 @@ The commit-only Git operator creates and independently verifies one exact local 
 
 The push operator is the next and final Git mutation boundary. It accepts only the exact self-hashed `committed` receipt, re-verifies the local commit and repository from Git itself, verifies the remote branch still equals the reviewed parent, and performs one explicit **plain fast-forward branch push**. It never uses force, force-with-lease, tags, mirror mode, branch creation, ref deletion, deployment or release publication.
 
+## Owned admission boundary
+
+The public entrypoint captures both the JSON request and every dependency override before the first asynchronous boundary. Dependencies must be one plain non-Proxy object containing only the documented fields. Accessors are rejected without being invoked, symbolic and unsupported fields are rejected, and every callable dependency must be a non-Proxy function.
+
+Results that can influence the network mutation are converted into private owned values before the retained push runtime receives them:
+
+- workspace `path` and `realPath` are copied from a plain result object;
+- every resolved origin is revalidated as the exact selected `https://github.com/OWNER/REPOSITORY` identity and copied into a frozen value;
+- injected origin metadata cannot claim one repository while naming another URL;
+- every Git result is required to contain only integer `exitCode`, bounded `signal`, `stdout` and `stderr`;
+- combined Git output is rejected above the same 2 MiB limit enforced by the built-in runner;
+- Git output buffers are copied twice while being captured and must remain stable;
+- Proxy and shared-memory output buffers are rejected;
+- the push command status and output bytes are privately owned before any post-push remote readback or local reinspection occurs; and
+- CLI stable-file reads are copied and cross-checked against their byte count and SHA-256 before JSON parsing.
+
+The validated v1 push runtime remains behind this admission wrapper. The receipt protocol stays `2026-08-13.1` because the remote operation, outcomes and receipt schema are unchanged; the hardening removes caller-owned mutable evidence from the mutation boundary.
+
 ## Admission rules
 
 Before any network mutation, the operator proves:
 
 - the complete request was captured as one bounded immutable JSON snapshot;
+- dependency overrides and their mutation-relevant results were captured as owned non-Proxy values;
 - the commit receipt uses the exact current commit-operator protocol and authority boundary;
 - local `HEAD`, branch, parent, tree, message, author, committer and timestamp equal the receipt;
 - the commit changes exactly the receipt-bound resource paths;
@@ -45,7 +64,7 @@ remote-confirmed-after-client-error
   the client returned non-zero, but remote readback proves the exact commit is present
 ```
 
-The third outcome avoids falsely reporting failure when the server accepted the update but the client lost confirmation. Its receipt records that a push was attempted while not claiming that the client command succeeded.
+The third outcome avoids falsely reporting failure when the server accepted the update but the client lost confirmation. Its receipt records that a push was attempted while not claiming that the client command succeeded. Because the command result is privately copied before readback, a caller cannot rewrite that status or its evidence buffers while verification is in progress.
 
 ## CLI
 

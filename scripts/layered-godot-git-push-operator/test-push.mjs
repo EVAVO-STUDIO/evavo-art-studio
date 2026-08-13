@@ -1,10 +1,10 @@
 import test from "node:test";
 
 import {
-  assert, access, chmod, path, writeFile, canonicalSha256, inspectOrigin,
-  pushLayeredGodotCommit, runGit, REPOSITORY, git, bareGit, fixture,
+  assert, access, chmod, path, writeFile,
+  pushLayeredGodotCommit, REPOSITORY, git, bareGit, fixture,
   dependencies, input, cleanup, expectCode, competingRemoteCommit,
-  makeCommitReceipt,
+  runFixtureGit,
 } from "./test-fixture.mjs";
 
 test("pushes exactly one reviewed branch commit without hooks, tags or force", async (t) => {
@@ -84,7 +84,7 @@ test("plain push rejects a remote race that occurs after preflight", async (t) =
       raced = true;
       competingRemoteCommit(fx);
     }
-    return runGit(root, args, settings);
+    return runFixtureGit(fx, root, args, settings);
   };
   await expectCode(
     pushLayeredGodotCommit(input(fx), dependencies(fx, { runGit: wrapped })),
@@ -98,7 +98,7 @@ test("accepts remote readback when the client reports a synthetic error after su
   const fx = await fixture();
   await cleanup(t, fx);
   const wrapped = async (root, args, settings) => {
-    const result = await runGit(root, args, settings);
+    const result = await runFixtureGit(fx, root, args, settings);
     if (args.includes("push")) return { ...result, exitCode: 1 };
     return result;
   };
@@ -108,4 +108,3 @@ test("accepts remote readback when the client reports a synthetic error after su
   assert.equal(result.authority.gitPushPerformed, false);
   assert.equal(result.authority.gitRemoteRefUpdatedToCommit, true);
 });
-

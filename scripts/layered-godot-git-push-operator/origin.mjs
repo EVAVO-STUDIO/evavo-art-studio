@@ -1,5 +1,5 @@
-import { pushFail } from "./contract.mjs";
-import { gitText, networkOptions } from "./git-exec.mjs";
+import { pushFail, repositoryName } from "./contract.mjs";
+import { networkOptions } from "./git-exec.mjs";
 
 const HTTPS_GITHUB_ORIGIN = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/u;
 
@@ -7,6 +7,26 @@ function parseOriginRepository(originUrl) {
   const match = HTTPS_GITHUB_ORIGIN.exec(originUrl);
   if (!match) pushFail("ORIGIN_UNSAFE", "The push boundary requires one exact HTTPS github.com origin URL.");
   return `${match[1]}/${match[2]}`;
+}
+
+export function validateOriginIdentity(originUrl, repository) {
+  if (
+    typeof originUrl !== "string" ||
+    originUrl.length < 1 ||
+    originUrl.length > 2048 ||
+    originUrl.includes("\0")
+  ) {
+    pushFail("ORIGIN_UNSAFE", "The push boundary requires one bounded HTTPS github.com origin URL.");
+  }
+  const expectedRepository = repositoryName(repository, "expectedRepository");
+  const originRepository = parseOriginRepository(originUrl);
+  if (originRepository.toLowerCase() !== expectedRepository.toLowerCase()) {
+    pushFail("ORIGIN_MISMATCH", "Current origin does not match the explicitly selected GitHub repository.", {
+      expectedRepository,
+      originUrl,
+    });
+  }
+  return Object.freeze({ url: originUrl, repository: originRepository });
 }
 
 function parseNullConfig(buffer) {
@@ -31,16 +51,12 @@ async function optionalConfig(root, args, deps) {
 }
 
 export async function inspectOrigin(root, repository, deps) {
-  const originUrl = await gitText(root.path, ["config", "--local", "--get", "remote.origin.url"], {
-    errorCode: "ORIGIN_INSPECTION_FAILED",
-  });
-  const originRepository = parseOriginRepository(originUrl);
-  if (originRepository.toLowerCase() !== repository.toLowerCase()) {
-    pushFail("ORIGIN_MISMATCH", "Current origin does not match the explicitly selected GitHub repository.", {
-      expectedRepository: repository,
-      originUrl,
-    });
-  }
+  const originUrl = (await deps.runGit(
+    root.path,
+    ["config", "--local", "--get", "remote.origin.url"],
+    { errorCode: "ORIGIN_INSPECTION_FAILED" },
+  )).stdout.toString("utf8").trim();
+  const identity = validateOriginIdentity(originUrl, repository);
 
   const pushUrls = (await optionalConfig(root, ["config", "--local", "--get-all", "remote.origin.pushurl"], deps))
     .toString("utf8").split("\n").map((entry) => entry.trim()).filter(Boolean);
@@ -67,7 +83,7 @@ export async function inspectOrigin(root, repository, deps) {
     });
   }
 
-  return Object.freeze({ url: originUrl, repository: originRepository });
+  return identity;
 }
 
 function parseRemoteHead(buffer, branch) {
