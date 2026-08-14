@@ -65,6 +65,14 @@ def read_json_private(path:Path,label:str,root:Path)->tuple[dict[str,Any],bytes]
     data=stable_bytes(path,label,root,MAX,private=True)
     try: return json.loads(data.decode("utf-8")),data
     except (UnicodeDecodeError,json.JSONDecodeError) as e: fail(f"{label} invalid JSON: {e}")
+
+def expected_manifest_body(p:dict[str,Any],image_data:bytes)->dict[str,Any]:
+    slots=[{k:s[k] for k in ("slot","row","column","x","y","width","height","bankId","unitId","batchId","workOrderSha256","sourceSha256","headReceiptSha256")} for s in p["sources"]]
+    return {"schema":MANIFEST_SCHEMA,"projectId":p["projectId"],"frameId":p["frameId"],"contractId":"production_master_v3","planSha256":p["planSha256"],"image":p["outputs"]["image"],"imageSha256":digest(image_data),"size":{"width":2560,"height":2560},"cell":{"width":160,"height":160},"pivot":{"x":80,"y":152},"columns":16,"rows":16,"authoredSlots":224,"reservedSlots":list(range(224,256)),"reservedSlotsFullyTransparent":True,"slots":slots,"gameTarget":p["gameTarget"],"repositoryMutation":False,"publication":False}
+
+def expected_receipt_body(p:dict[str,Any],image_data:bytes,manifest_data:bytes)->dict[str,Any]:
+    return {"schema":RECEIPT_SCHEMA,"projectId":p["projectId"],"frameId":p["frameId"],"contractId":"production_master_v3","planSha256":p["planSha256"],"styleProofExecutionSha256":p["styleProofExecutionSha256"],"styleProofApproval":p["styleProofApproval"],"sourceCount":224,"reservedSlotCount":32,"outputs":{"image":{"path":p["outputs"]["image"],"sha256":digest(image_data),"bytes":len(image_data)},"manifest":{"path":p["outputs"]["manifest"],"sha256":digest(manifest_data),"bytes":len(manifest_data)}},"gameTarget":p["gameTarget"],"gameActivationReady":False,"gameActivationBlockers":p["gameTarget"]["activationBlockers"],"authority":p["authority"],"createOnlyOutput":True,"atomicWorkspacePublication":True,"sourceMutation":False,"targetRepositoryMutation":False,"gitMutation":False,"publication":False}
+
 def verify_output(plan_input:Any,root_input:Path,verify_pixels:bool=True)->dict[str,Any]:
     p=admit_plan(plan_input); workspace=directory(Path(p["workspaceRoot"]),"workspaceRoot")
     parent=directory(workspace/PurePosixPath(p["outputs"]["recommendedWorkspaceParent"]),"export parent",workspace)
@@ -76,14 +84,13 @@ def verify_output(plan_input:Any,root_input:Path,verify_pixels:bool=True)->dict[
     manifest,mdata=read_json_private(root/p["outputs"]["manifest"],"manifest",root)
     receipt,rdata=read_json_private(root/p["outputs"]["receipt"],"receipt",root)
     exact(manifest,{"schema","projectId","frameId","contractId","planSha256","image","imageSha256","size","cell","pivot","columns","rows","authoredSlots","reservedSlots","reservedSlotsFullyTransparent","slots","gameTarget","repositoryMutation","publication","manifestSha256"},"manifest")
-    if manifest["schema"]!=MANIFEST_SCHEMA or manifest["manifestSha256"]!=bodyhash(manifest,"manifestSha256") or manifest["planSha256"]!=p["planSha256"] or manifest["imageSha256"]!=digest(image_data): fail("manifest evidence mismatch")
-    if manifest["slots"]!=[{k:s[k] for k in ("slot","row","column","x","y","width","height","bankId","unitId","batchId","workOrderSha256","sourceSha256","headReceiptSha256")} for s in p["sources"]]: fail("manifest source bindings drifted")
-    false(manifest["repositoryMutation"],"manifest.repositoryMutation"); false(manifest["publication"],"manifest.publication")
+    if manifest["manifestSha256"]!=bodyhash(manifest,"manifestSha256"): fail("manifest self-hash mismatch")
+    manifest_body=dict(manifest);manifest_body.pop("manifestSha256")
+    if manifest_body!=expected_manifest_body(p,image_data): fail("manifest semantics drifted from admitted plan")
     exact(receipt,{"schema","projectId","frameId","contractId","planSha256","styleProofExecutionSha256","styleProofApproval","sourceCount","reservedSlotCount","outputs","gameTarget","gameActivationReady","gameActivationBlockers","authority","createOnlyOutput","atomicWorkspacePublication","sourceMutation","targetRepositoryMutation","gitMutation","publication","receiptSha256"},"receipt")
-    if receipt["schema"]!=RECEIPT_SCHEMA or receipt["receiptSha256"]!=bodyhash(receipt,"receiptSha256") or receipt["planSha256"]!=p["planSha256"]: fail("receipt evidence mismatch")
-    if receipt["outputs"]!={"image":{"path":p["outputs"]["image"],"sha256":digest(image_data),"bytes":len(image_data)},"manifest":{"path":p["outputs"]["manifest"],"sha256":digest(mdata),"bytes":len(mdata)}}: fail("receipt output evidence drifted")
-    false(receipt["gameActivationReady"],"receipt.gameActivationReady")
-    for key in ("sourceMutation","targetRepositoryMutation","gitMutation","publication"): false(receipt[key],f"receipt.{key}")
+    if receipt["receiptSha256"]!=bodyhash(receipt,"receiptSha256"): fail("receipt self-hash mismatch")
+    receipt_body=dict(receipt);receipt_body.pop("receiptSha256")
+    if receipt_body!=expected_receipt_body(p,image_data,mdata): fail("receipt semantics drifted from admitted plan")
     try: from PIL import Image,ImageChops
     except ImportError as e: fail(f"Pillow required: {e}")
     atlas=Image.open(io.BytesIO(image_data)); atlas.load()
