@@ -19,7 +19,7 @@ test("atlas-v3 builder retains closed plan admission, exact source bytes and no-
  ]);
  assert.match(builder,/admit_plan\(plan_input\)/);assert.match(builder,/stable_bytes\(Path\(s\["sourcePath"\]\)/);assert.match(builder,/verify_output\(plan,stage,True\)/);assert.match(builder,/rename_noreplace\(stage,output\)/);assert.match(builder,/published directory identity changed/);assert.doesNotMatch(builder,/os\.replace\(/);assert.doesNotMatch(builder,/\.resize\(/);assert.doesNotMatch(builder,/\.rotate\(/);
  assert.match(common,/MoveFileExW/);assert.match(common,/renameat2/);assert.match(common,/renamex_np/);assert.match(common,/O_NOFOLLOW/);assert.match(common,/st_nlink!=1/);
- assert.match(contract,/plan requires 224 sources/);assert.match(contract,/plan requires 26 batch evidence records/);assert.match(contract,/path substitution/);assert.match(contract,/source receipt evidence disagrees/);assert.match(contract,/atlas cell .* differs from source/);assert.match(contract,/targetRepositoryMutation/);assert.match(verifier,/skip-source-pixel-recheck/);
+ assert.match(contract,/plan requires 224 sources/);assert.match(contract,/plan requires 26 batch evidence records/);assert.match(contract,/path substitution/);assert.match(contract,/source receipt evidence disagrees/);assert.match(contract,/manifest semantics drifted/);assert.match(contract,/receipt semantics drifted/);assert.match(contract,/atlas cell .* differs from source/);assert.match(contract,/targetRepositoryMutation/);assert.match(verifier,/skip-source-pixel-recheck/);
 });
 
 test("atlas-v3 Python contract imports without the optional image runtime",()=>{
@@ -29,5 +29,5 @@ test("atlas-v3 Python contract imports without the optional image runtime",()=>{
 
 test("atlas-v3 Python build boundary regressions pass",()=>{
  const r=spawnSync(PYTHON,["scripts/heavy-metal-fighting/frame_atlas_v3_build_contract_test.py"],{cwd:ROOT,encoding:"utf8",env:PYTHON_ENV});
- assert.equal(r.status,0,`stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);assert.match(`${r.stdout}\n${r.stderr}`,/Ran 7 tests/);assert.match(`${r.stdout}\n${r.stderr}`,/OK/);
+ assert.equal(r.status,0,`stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);assert.match(`${r.stdout}\n${r.stderr}`,/Ran 9 tests/);assert.match(`${r.stdout}\n${r.stderr}`,/OK/);
 });
