@@ -20,10 +20,15 @@ import {
   normalizeHmfFrameBodyNamedHumanApproval,
   validateHmfFrameBodyCompletedMasteringPlan,
 } from "./frame-body-named-human-approval-validation.mjs";
+import {
+  assertExactApprovalKeys,
+  snapshotApprovalCompileRequest,
+  snapshotApprovalDocumentRequest,
+} from "./frame-body-named-human-approval-snapshot.mjs";
 import { validatedHmfFrameBodyNamedHumanApprovalWorkspace } from "./frame-body-named-human-approval-workspace.mjs";
 
 function validateMasterDescriptor(master, mastering, order, policy) {
-  assert(master && typeof master === "object" && !Array.isArray(master), "master must be an object.");
+  assertExactApprovalKeys(master, ["path", "sha256", "bytes"], "named-human approval master");
   const masterPath = safeRelativePath(master.path, "named-human approval master path");
   assert(SHA256.test(String(master.sha256 ?? "")), "named-human approval master SHA-256 is invalid.");
   assert(Number.isInteger(master.bytes) && master.bytes >= 1, "named-human approval master byte count is invalid.");
@@ -46,13 +51,15 @@ function validateMasterDescriptor(master, mastering, order, policy) {
   return freeze({ path: masterPath, sha256: master.sha256, bytes: master.bytes });
 }
 
-export async function compileHmfFrameBodyNamedHumanApprovalPlanDocument({
-  masteringPlan: masteringInput,
-  previousReceipts,
-  workspaceRoot,
-  master: masterInput,
-  humanApproval,
-} = {}) {
+export async function compileHmfFrameBodyNamedHumanApprovalPlanDocument(input = {}) {
+  const captured = snapshotApprovalDocumentRequest(input);
+  const {
+    masteringPlan: masteringInput,
+    previousReceipts,
+    workspaceRoot,
+    master: masterInput,
+    humanApproval,
+  } = captured;
   const mastering = await validateHmfFrameBodyCompletedMasteringPlan(masteringInput);
   const [policy, order] = await Promise.all([
     loadApprovalPolicy(),
@@ -198,13 +205,10 @@ export async function compileHmfFrameBodyNamedHumanApprovalPlanDocument({
   return freeze({ ...body, approvalPlanSha256: hashValue(body) });
 }
 
-export async function compileHmfFrameBodyNamedHumanApprovalPlan({
-  masteringPlan,
-  workspaceRoot,
-  humanApproval,
-} = {}) {
-  const inputs = await validatedHmfFrameBodyNamedHumanApprovalWorkspace(masteringPlan);
-  const requestedRoot = workspaceRoot ?? inputs.root;
+export async function compileHmfFrameBodyNamedHumanApprovalPlan(input = {}) {
+  const captured = snapshotApprovalCompileRequest(input);
+  const inputs = await validatedHmfFrameBodyNamedHumanApprovalWorkspace(captured.masteringPlan);
+  const requestedRoot = captured.workspaceRoot ?? inputs.root;
   assert(requestedRoot === inputs.root, "named-human approval workspace root drifted from mastering.");
   assert(
     inputs.master.sha256 === inputs.mastering.masteringRecord.master.sha256
@@ -220,6 +224,6 @@ export async function compileHmfFrameBodyNamedHumanApprovalPlan({
       sha256: inputs.master.sha256,
       bytes: inputs.master.size,
     },
-    humanApproval,
+    humanApproval: captured.humanApproval,
   });
 }

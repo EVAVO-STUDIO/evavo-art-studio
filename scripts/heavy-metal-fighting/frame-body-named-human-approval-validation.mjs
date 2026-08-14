@@ -14,6 +14,10 @@ import {
   safeActorId,
   selfHashed,
 } from "./frame-body-named-human-approval-common.mjs";
+import {
+  snapshotCompletedMasteringPlan,
+  snapshotHumanApproval,
+} from "./frame-body-named-human-approval-snapshot.mjs";
 
 function assertMasteringPlanAuthority(plan) {
   const authority = plan.authority ?? {};
@@ -62,8 +66,9 @@ function assertMasteringRecordAuthority(record) {
 }
 
 export async function validateHmfFrameBodyCompletedMasteringPlan(input) {
+  const captured = snapshotCompletedMasteringPlan(input);
   const plan = selfHashed(
-    input,
+    captured,
     "masteringPlanSha256",
     "completed selected-candidate mastering plan",
   );
@@ -144,24 +149,24 @@ export async function validateHmfFrameBodyCompletedMasteringPlan(input) {
 }
 
 export function normalizeHmfFrameBodyNamedHumanApproval(mastering, raw, policy) {
-  assert(raw && typeof raw === "object" && !Array.isArray(raw), "humanApproval must be an object.");
-  const actorId = safeActorId(raw.actorId, "humanApproval.actorId");
-  const occurredAt = canonicalTimestamp(raw.occurredAt, "humanApproval.occurredAt");
+  const captured = snapshotHumanApproval(raw);
+  const actorId = safeActorId(captured.actorId, "humanApproval.actorId");
+  const occurredAt = canonicalTimestamp(captured.occurredAt, "humanApproval.occurredAt");
   assert(
     Date.parse(occurredAt) >= Date.parse(mastering.receipt.occurredAt),
     "named-human approval may not occur before mastering completed.",
   );
   assert(
-    raw.decision === policy.approvalRules.requiredDecision,
+    captured.decision === policy.approvalRules.requiredDecision,
     "humanApproval.decision must be approved.",
   );
   const rationale = boundedString(
-    raw.rationale,
+    captured.rationale,
     "humanApproval.rationale",
     policy.approvalRules.minimumRationaleCharacters,
     policy.approvalRules.maximumRationaleCharacters,
   );
-  const attestations = raw.attestations ?? {};
+  const attestations = captured.attestations;
   assert(attestations.candidateSha256 === mastering.candidate.sha256, "approval attestation candidate SHA drifted.");
   assert(attestations.masterSha256 === mastering.masteringRecord.master.sha256, "approval attestation master SHA drifted.");
   assert(attestations.masteringPlanSha256 === mastering.masteringPlanSha256, "approval attestation mastering-plan SHA drifted.");
@@ -179,7 +184,7 @@ export function normalizeHmfFrameBodyNamedHumanApproval(mastering, raw, policy) 
     actorClass: "human",
     actorId,
     occurredAt,
-    decision: raw.decision,
+    decision: captured.decision,
     rationale,
     attestations: freeze({
       candidateSha256: attestations.candidateSha256,
