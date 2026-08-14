@@ -12,9 +12,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate rally art profile, program and 2D-to-3D handoff
+    name: Validate rally art profile, program, Falcon jobs and 2D-to-3D handoff
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - name: Check out exact commit
         uses: actions/checkout@v4
@@ -38,13 +38,14 @@ jobs:
           grep -F '"projectId": "isometric-rally-1990s"' \
             /tmp/game-art-profile-verification.json
 
-      - name: Run Rally 2.5D handoff and program tests
+      - name: Run Rally 2.5D handoff, program and Falcon job tests
         shell: bash
         run: |
           set -euo pipefail
           node --test \
             scripts/game-art-production/rally-25d-handoff.test.mjs \
             scripts/game-art-production/rally-25d-program.test.mjs \
+            scripts/game-art-production/rally-25d-falcon-jobs.test.mjs \
             | tee /tmp/rally-25d-art-tests.log
 
       - name: Compile representative vehicle handoff
@@ -69,6 +70,28 @@ jobs:
             /tmp/falcon-rally-art-handoff.json
           grep -F '"automaticPromotion": false' \
             /tmp/falcon-rally-art-handoff.json
+
+      - name: Compile and verify Falcon one-image provider session
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/game-art-production/rally-25d-falcon-jobs.mjs compile \
+            config/game-art-production/vehicles/falcon-rally-production-v1.json \
+            --output /tmp/falcon-rally.provider-session.json \
+            > /tmp/falcon-rally.provider-session.stdout.json
+          node scripts/game-art-production/rally-25d-falcon-jobs.mjs verify \
+            /tmp/falcon-rally.provider-session.json \
+            | tee /tmp/falcon-rally.provider-session.verify.json
+          grep -F '"schema": "evavo.rally-falcon-provider-job-session.v1"' \
+            /tmp/falcon-rally.provider-session.json
+          grep -F '"jobs": 12' \
+            /tmp/falcon-rally.provider-session.json
+          grep -F '"images": 12' \
+            /tmp/falcon-rally.provider-session.json
+          grep -F '"providerExecution": false' \
+            /tmp/falcon-rally.provider-session.json
+          grep -F '"downstream3DReady": false' \
+            /tmp/falcon-rally.provider-session.json
 
       - name: Compile and verify playable vertical-slice program
         shell: bash
@@ -108,7 +131,9 @@ jobs:
             /tmp/game-art-profile-verification.json
             /tmp/rally-25d-art-tests.log
             /tmp/falcon-rally-art-handoff.json
+            /tmp/falcon-rally.provider-session.json
+            /tmp/falcon-rally.provider-session.verify.json
             /tmp/rally-vertical-slice.art-program.json
             /tmp/rally-vertical-slice.art-program.verify.json
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7

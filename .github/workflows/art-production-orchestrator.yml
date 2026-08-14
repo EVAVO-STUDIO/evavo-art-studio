@@ -11,6 +11,7 @@ on:
       - "docs/ART_PRODUCTION_ORCHESTRATOR.md"
       - "docs/ART_PRODUCTION_PACKAGING_VERIFICATION.md"
       - "docs/ART_PRODUCTION_RUNTIME_ASSEMBLY_HANDOFF.md"
+      - "docs/ART_PRODUCTION_SOURCE_ADMISSION.md"
       - ".github/workflows/art-production-orchestrator.yml"
   workflow_dispatch:
 
@@ -87,6 +88,7 @@ jobs:
               "art-direction-build-and-tests",
               "candidate-bound-human-approval-receipts",
               "approval-bound-runtime-assembly-handoff",
+              "caller-supplied-source-png-byte-admission",
               "mcp-planning-only-contract",
               "clean-source-proof",
             ],
