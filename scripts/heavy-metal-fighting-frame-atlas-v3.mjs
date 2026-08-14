@@ -8,6 +8,9 @@ import {
   compileHmfFrameAtlasV3DeliveryPlanFile,
   verifyHmfFrameAtlasV3Delivery,
 } from "./heavy-metal-fighting/frame-atlas-v3-delivery.mjs";
+import {
+  admitHmfAtlasV3GameValidationReceipt,
+} from "./heavy-metal-fighting/frame-atlas-v3-game-validation-admission.mjs";
 
 function option(argv, name) {
   const index = argv.indexOf(name);
@@ -21,11 +24,14 @@ function usage() {
     "  node scripts/heavy-metal-fighting-frame-atlas-v3.mjs verify",
     "  node scripts/heavy-metal-fighting-frame-atlas-v3.mjs layout <bastion|viper|citadel|mirage>",
     "  node scripts/heavy-metal-fighting-frame-atlas-v3.mjs compile <frame> --workspace-root <root> --frame-receipts-json <file> --style-proof-approvals-json <file> --style-proof-receipts-json <file> --output <plan.json> [--compiled-at <UTC>]",
+    "  node scripts/heavy-metal-fighting-frame-atlas-v3.mjs admit-game-validation --validation-receipt <steel-dominion-validation.json> --expected-game-head <40-char-sha>",
     "",
     "Build the compiled plan with:",
     "  python tools/build_heavy_metal_fighting_frame_atlas_v3.py --plan <plan.json> --output-root <new-create-only-delivery-directory>",
     "",
-    "The compiler snapshots all caller input before asynchronous work. --output must be a new .json file inside the governed persistent Artist Workspace; it is staged, synchronised, atomically linked without replacement and read back byte-for-byte. Neither command writes to steel-dominion, commits, pushes, deploys or publishes.",
+    "The compiler snapshots all caller input before asynchronous work. --output must be a new .json file inside the governed persistent Artist Workspace; it is staged, synchronised, atomically linked without replacement and read back byte-for-byte.",
+    "",
+    "admit-game-validation reads one completed steel-dominion local Godot validation receipt, binds its exact bytes and six-suite semantics to the explicitly expected game commit, and emits read-only self-hashed Art Studio evidence. It does not read or mutate steel-dominion, activate its runtime, commit, push, deploy or publish.",
   ].join("\n");
 }
 async function jsonArray(filePath, label) {
@@ -58,6 +64,15 @@ async function run(argv = process.argv.slice(2)) {
       styleProofReceipts,
       ...(compiledAt ? { compiledAt } : {}),
     }, output);
+  }
+  if (command === "admit-game-validation") {
+    const validationReceipt = option(argv.slice(1), "--validation-receipt");
+    const expectedGameHead = option(argv.slice(1), "--expected-game-head");
+    if (!validationReceipt || !expectedGameHead) {
+      throw new Error(`admit-game-validation requires --validation-receipt and --expected-game-head.\n\n${usage()}`);
+    }
+    const receiptBytes = await readFile(path.resolve(validationReceipt));
+    return admitHmfAtlasV3GameValidationReceipt({ receiptBytes, expectedGameHead });
   }
   throw new Error(`Unknown command ${command}.\n\n${usage()}`);
 }
