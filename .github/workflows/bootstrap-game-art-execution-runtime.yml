@@ -72,16 +72,19 @@ jobs:
             '8216420dcf8d5bfdfde1b41984d7786208d140b3b0e188ef3611b2de2353071e' \
             "$archive" | sha256sum -c -
 
-      - name: Validate archive members and extract without links
+      - name: Validate archive members and atomically materialize exact bytes
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path, PurePosixPath
+          import hashlib
           import os
+          import stat
           import tarfile
+          import tempfile
 
-          root = Path.cwd().resolve()
+          root = Path.cwd().absolute()
           archive = Path(os.environ["RUNNER_TEMP"]) / "game-art-execution-runtime-payload.tar.gz"
           allowed = {
               ".github/workflows/game-art-production-profiles.yml",
@@ -103,7 +106,8 @@ jobs:
               "scripts",
               "scripts/game-art-production",
           }
-          observed = set()
+          payloads = {}
+          modes = {}
           with tarfile.open(archive, "r:gz") as bundle:
               for member in bundle.getmembers():
                   raw_name = member.name
@@ -127,21 +131,81 @@ jobs:
                       raise SystemExit(f"non-regular archive member rejected: {raw_name!r}")
                   if name not in allowed:
                       raise SystemExit(f"unexpected archive member: {raw_name!r}")
-                  destination = (root / Path(*posix.parts)).resolve()
-                  if destination != root and root not in destination.parents:
-                      raise SystemExit(f"archive member escaped repository: {raw_name!r}")
-                  destination.parent.mkdir(parents=True, exist_ok=True)
                   source = bundle.extractfile(member)
                   if source is None:
                       raise SystemExit(f"archive member has no bytes: {raw_name!r}")
-                  with destination.open("wb") as output:
-                      output.write(source.read())
-                  destination.chmod(member.mode & 0o777)
-                  observed.add(name)
-          if observed != allowed:
-              missing = sorted(allowed - observed)
-              extra = sorted(observed - allowed)
+                  if name in payloads:
+                      raise SystemExit(f"duplicate archive member: {raw_name!r}")
+                  payloads[name] = source.read()
+                  modes[name] = member.mode & 0o777
+
+          if set(payloads) != allowed:
+              missing = sorted(allowed - set(payloads))
+              extra = sorted(set(payloads) - allowed)
               raise SystemExit(f"archive member set drifted; missing={missing}, extra={extra}")
+
+          manifest = {}
+          for line in payloads[".runtime-payload.sha256"].decode("utf-8").splitlines():
+              digest, separator, name = line.partition("  ")
+              if separator != "  " or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+                  raise SystemExit(f"invalid payload manifest line: {line!r}")
+              if name in manifest:
+                  raise SystemExit(f"duplicate payload manifest path: {name!r}")
+              manifest[name] = digest
+          target_names = allowed - {".runtime-payload.sha256"}
+          if set(manifest) != target_names:
+              raise SystemExit(f"payload manifest member set drifted; expected={sorted(target_names)}, observed={sorted(manifest)}")
+
+          def ensure_real_directory(directory: Path) -> None:
+              relative = directory.relative_to(root)
+              current = root
+              for part in relative.parts:
+                  current = current / part
+                  try:
+                      metadata = current.lstat()
+                  except FileNotFoundError:
+                      current.mkdir()
+                      metadata = current.lstat()
+                  if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+                      raise SystemExit(f"archive destination ancestor is not a real directory: {current}")
+
+          for name in sorted(allowed):
+              data = payloads[name]
+              if name != ".runtime-payload.sha256":
+                  observed_digest = hashlib.sha256(data).hexdigest()
+                  if observed_digest != manifest[name]:
+                      raise SystemExit(f"archive source bytes drifted for {name}: expected={manifest[name]}, observed={observed_digest}")
+              posix = PurePosixPath(name)
+              destination = root.joinpath(*posix.parts)
+              if destination == root or root not in destination.parents:
+                  raise SystemExit(f"archive member escaped repository: {name!r}")
+              ensure_real_directory(destination.parent)
+              try:
+                  existing = destination.lstat()
+              except FileNotFoundError:
+                  existing = None
+              if existing is not None and (stat.S_ISLNK(existing.st_mode) or not stat.S_ISREG(existing.st_mode)):
+                  raise SystemExit(f"archive destination is not a regular file: {destination}")
+
+              descriptor, temporary_name = tempfile.mkstemp(prefix=".game-art-runtime-", dir=destination.parent)
+              temporary = Path(temporary_name)
+              try:
+                  with os.fdopen(descriptor, "wb") as output:
+                      output.write(data)
+                      output.flush()
+                      os.fsync(output.fileno())
+                  temporary.chmod(modes[name])
+                  os.replace(temporary, destination)
+              finally:
+                  temporary.unlink(missing_ok=True)
+
+              read_back = destination.read_bytes()
+              if read_back != data:
+                  raise SystemExit(f"materialized bytes differ from archive source for {name}")
+              if name != ".runtime-payload.sha256":
+                  actual_digest = hashlib.sha256(read_back).hexdigest()
+                  if actual_digest != manifest[name]:
+                      raise SystemExit(f"materialized hash drifted for {name}: expected={manifest[name]}, observed={actual_digest}")
           PY
 
       - name: Verify exact target file hashes
