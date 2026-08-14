@@ -14,16 +14,11 @@ import {
   ART_PRODUCTION_LOOP_KIND,
   ART_PRODUCTION_ORCHESTRATOR_PROTOCOL_VERSION,
 } from "./art-production-contract.js";
+import type {
+  ArtProductionCandidateAdmissionReceipt,
+  ArtProductionCandidateEvidence,
+} from "./art-production-candidate-admission-types.js";
 import type { CompiledArtProductionProfile } from "./art-production-profile-types.js";
-
-export interface ArtProductionCandidateEvidence {
-  readonly artifactId: string;
-  readonly sha256: string;
-  readonly bytes: number;
-  readonly width: number;
-  readonly height: number;
-  readonly alphaPolicy: LayeredProductionAlphaPolicy;
-}
 
 export interface ArtProductionMetricEvidence {
   readonly metricId: ArtProductionMetricId;
@@ -45,7 +40,7 @@ export interface ArtProductionAttemptInput {
   readonly unitId: string;
   readonly evaluator: string;
   readonly evaluatedAt: string;
-  readonly candidate: ArtProductionCandidateEvidence;
+  readonly candidateAdmissionReceipt: ArtProductionCandidateAdmissionReceipt;
   readonly metrics: readonly ArtProductionMetricEvidence[];
   readonly detections: readonly ArtProductionDetectionEvidence[];
 }
@@ -59,6 +54,7 @@ export interface ArtProductionAttemptRecord {
   readonly unitId: string;
   readonly evaluator: string;
   readonly evaluatedAt: string;
+  readonly candidateAdmissionReceipt: ArtProductionCandidateAdmissionReceipt;
   readonly candidate: ArtProductionCandidateEvidence;
   readonly metrics: readonly ArtProductionMetricEvidence[];
   readonly requiredMetricIds: readonly ArtProductionMetricId[];
@@ -70,6 +66,7 @@ export interface ArtProductionAttemptRecord {
   readonly retryPrompt?: string;
   readonly authority: Readonly<{
     readonly providerExecution: false;
+    readonly candidateAdmission: false;
     readonly creativeApproval: false;
     readonly imageMutation: false;
     readonly targetRepositoryMutation: false;
@@ -82,6 +79,12 @@ export interface ArtProductionAttemptRecord {
 
 export interface ArtProductionAcceptedCandidate
   extends ArtProductionCandidateEvidence {
+  readonly admissionReceiptSha256: string;
+  readonly scheduledBatchSha256: string;
+  readonly scheduledJobSha256: string;
+  readonly providerRequestSha256: string;
+  readonly providerResponseSha256: string;
+  readonly inspectionEvidenceSha256: string;
   readonly attemptSha256: string;
   readonly weightedScore: number;
 }
