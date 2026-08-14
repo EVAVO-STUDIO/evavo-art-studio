@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -12,12 +11,10 @@ import {
   assert,
   attempt,
   approvedPlan,
+  humanApprovals,
   productionRequest,
   profile,
 } from "./art-production-fixtures.mjs";
-
-const digest = (value) =>
-  createHash("sha256").update(value).digest("hex");
 
 test("retains approved individual PNGs and deterministically plans strips, grids and non-rotating atlases", () => {
   const complete = productionRequest();
@@ -38,20 +35,18 @@ test("retains approved individual PNGs and deterministically plans strips, grids
       );
     }
   }
-  const approvals = loop.unitStates.map((state) => {
-    assert.ok(state.acceptedCandidate);
-    return {
-      unitId: state.unitId,
-      sourceArtifactId: state.acceptedCandidate.artifactId,
-      sourceSha256: state.acceptedCandidate.sha256,
-      sourceBytes: state.acceptedCandidate.bytes,
-      reviewer: "Greg Parker",
-      reviewedAt: "2026-08-14T02:00:00.000Z",
-      approvalReceiptSha256: digest(`approval:${state.unitId}`),
-    };
-  });
+  const approvals = humanApprovals(plan, loop);
   const packaging = compileArtProductionPackagingPlan(plan, loop, approvals);
   assert.equal(packaging.individualSources.length, plan.totals.units);
+  assert.ok(
+    packaging.individualSources.every(
+      (source) =>
+        source.technicalReviewAttemptSha256.length === 64 &&
+        source.approvalRequestSha256.length === 64 &&
+        source.approvalBasisSha256.length === 64 &&
+        source.approvalReceiptSha256.length === 64,
+    ),
+  );
   assert.equal(packaging.animationSheets.length, 6);
   assert.ok(packaging.atlasPages.length >= 1);
   assert.ok(packaging.atlasPages.every((page) => page.rotation === false));

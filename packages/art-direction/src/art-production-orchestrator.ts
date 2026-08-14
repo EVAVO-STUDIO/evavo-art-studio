@@ -13,6 +13,11 @@ export {
   verifyArtProductionLoopAgainstProfile,
 } from "./art-production-loop.js";
 export { compileNextArtProductionBatch } from "./art-production-scheduler.js";
+export {
+  compileArtProductionHumanApprovalReceipt,
+  verifyArtProductionHumanApprovalReceipt,
+  verifyArtProductionHumanApprovalReceiptAgainstRequest,
+} from "./art-production-human-approval.js";
 export { compileArtProductionPackagingPlan } from "./art-production-packaging.js";
 export { verifyArtProductionPackagingPlan } from "./art-production-packaging-verification.js";
 
@@ -21,7 +26,7 @@ export function artProductionOrchestratorProtocolSummary() {
     schemaVersion: "1.0" as const,
     protocolVersion: ART_PRODUCTION_ORCHESTRATOR_PROTOCOL_VERSION,
     purpose:
-      "Coordinate profile-bound 1990s game-art generation, deterministic technical review, bounded repair, animation continuity and source-preserving packaging without granting provider execution or creative approval authority.",
+      "Coordinate profile-bound 1990s game-art generation, deterministic technical review, bounded repair, explicit named-human approval receipts, animation continuity and source-preserving packaging without granting provider execution or creative-decision authority.",
     cameraFamilies: [
       "isometric-life-sim-90s",
       "top-down-sports-90s",
@@ -37,12 +42,13 @@ export function artProductionOrchestratorProtocolSummary() {
       "score native pixel, camera, era, identity and runtime quality",
       "compile bounded repair instructions and retry prompts",
       "block after the configured retry budget rather than weakening review",
-      "require named-human approval before packaging",
+      "compile caller-supplied named-human decisions into exact candidate-bound evidence receipts",
       "retain individual PNGs while planning strips, grids and non-rotating atlases",
     ] as const,
     boundaries: freeze({
       providerExecution: false as const,
       automaticCreativeApproval: false as const,
+      creativeDecision: false as const,
       imageMutation: false as const,
       packagingExecution: false as const,
       targetRepositoryMutation: false as const,

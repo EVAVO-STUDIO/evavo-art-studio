@@ -56,7 +56,7 @@ jobs:
           set -euo pipefail
           git diff --exit-code
           STATUS="$(git status --porcelain=v1 --untracked-files=all)"
-          if [[ -n "${STATUS}" ]]; then
+          if [ -n "${STATUS}" ]; then
             printf 'Unexpected validation byproducts:\n%s\n' "${STATUS}" >&2
             exit 1
           fi
@@ -84,14 +84,15 @@ jobs:
             checks: [
               "frozen-dependency-install",
               "art-direction-build-and-tests",
+              "candidate-bound-human-approval-receipts",
               "mcp-planning-only-contract",
               "clean-source-proof",
             ],
             authority: {
               providerExecution: false,
               imageMutation: false,
+              creativeDecision: false,
               packagingExecution: false,
-              creativeApproval: false,
               targetRepositoryMutation: false,
               gitCommit: false,
               gitPush: false,

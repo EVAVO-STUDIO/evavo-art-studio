@@ -12,16 +12,16 @@ layered production plan
   -> deterministic technical evaluation
   -> bounded repair and retry
   -> technical pass
-  -> named-human creative approval
+  -> explicit named-human decision
+  -> candidate-bound human-approval receipt
   -> individual source PNG retention
   -> strip, grid and atlas metadata
   -> separate packaging execution and Godot integration
 ```
 
-
 ## Reusable game-type profile foundation
 
-The orchestrator complements the generic `scripts/game-art-production` profile engine rather than replacing it. The reusable profile engine resolves game-type asset contracts and one-asset work orders; this orchestrator coordinates many work orders through dependency, review, repair and packaging state.
+The orchestrator complements the generic `scripts/game-art-production` profile engine rather than replacing it. The reusable profile engine resolves game-type asset contracts and one-asset work orders; this orchestrator coordinates many work orders through dependency, review, repair, approval provenance and packaging state.
 
 The JONEZ fixture is now split across:
 
@@ -117,6 +117,24 @@ The loop is self-hashed, but verification does not trust that hash alone. It rec
 
 A rehashed authority escalation or edited repair result therefore fails verification.
 
+## Named-human approval receipts
+
+A deterministic technical pass is not a creative approval. For each accepted candidate, a caller must supply an explicit named-human approval request and a distinct content-addressed decision-evidence artifact.
+
+`compileArtProductionHumanApprovalReceipt` binds that supplied decision to:
+
+- the exact layered-production plan and plan SHA-256;
+- the exact full-production loop and profile SHA-256;
+- one canonical source unit;
+- the exact accepted candidate artifact, byte count and SHA-256;
+- the exact technical-review attempt and derived weighted score;
+- the reviewer, canonical UTC review time and approved decision;
+- the external decision-evidence artifact and SHA-256.
+
+The receipt retains independent request, approval-basis and complete-receipt hashes. Verification first checks its submitted payload, then recompiles the canonical receipt from the exact plan, loop, candidate and request. A changed derived score, candidate, loop, authority field or source identity cannot be legitimised by recomputing the outer receipt hash.
+
+Receipt compilation records a caller-supplied decision. It does not authenticate a person's legal identity, inspect the external evidence bytes or make the creative decision. Those remain responsibilities of the governed human-review and artifact systems.
+
 ## Packaging plan
 
 Packaging is available only when:
@@ -124,10 +142,10 @@ Packaging is available only when:
 1. the style proof is approved;
 2. the loop covers full production;
 3. every unit has a deterministic technical pass;
-4. each exact accepted candidate has named-human approval evidence;
+4. every exact accepted candidate has a valid candidate-bound named-human approval receipt;
 5. every animation clip contains all declared frames in canonical order.
 
-The plan can retain individual PNGs and describe:
+The plan retains each individual source with its technical-review attempt, approval request, approval basis and approval receipt identities, and can describe:
 
 - horizontal animation strips;
 - fixed-column animation grids;
@@ -144,7 +162,10 @@ compile_art_production_loop
 evaluate_art_production_attempt
 compile_next_art_production_batch
 verify_art_production_loop
+compile_art_production_human_approval_receipt
 compile_art_production_packaging_plan
 ```
 
-These tools compile and verify contracts only. They do not call a provider, admit candidate bytes, make a creative decision, execute image repair, write sheets or atlases, mutate a game repository, commit, push, deploy or publish.
+These tools compile and verify contracts only. The human-approval tool records an explicit caller-supplied named-human decision and can verify a receipt against the exact retained request; it does not decide whether an image is creatively approved.
+
+The tools do not call a provider, admit candidate bytes, make a creative decision, execute image repair, write sheets or atlases, mutate a game repository, commit, push, deploy or publish.
