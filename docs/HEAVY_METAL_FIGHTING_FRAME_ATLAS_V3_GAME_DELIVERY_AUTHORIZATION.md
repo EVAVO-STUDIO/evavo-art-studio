@@ -6,7 +6,7 @@ Repository mutation: prohibited
 
 ## Purpose
 
-The Frame atlas-v3 chain now has three separate evidence layers before any game-repository writer is allowed to exist:
+The Frame atlas-v3 chain keeps evidence admission, human authorization and repository mutation as separate trust boundaries:
 
 ```text
 four exact workspace atlas builds
@@ -22,13 +22,11 @@ explicit named-human delivery authorization
 future separately authorised repository writer
 ```
 
-This boundary closes the compiler-side blocker named `explicit-game-repository-delivery-authorization`. It records one explicit named-human authorization for the exact validated game commit and the exact four Frame build evidence sets.
+This layer records an explicit named-human authorization for one exact validated game commit and one exact four-Frame atlas evidence set. It does not copy atlas bytes into `steel-dominion`, activate the runtime, commit or push Git, deploy or publish.
 
-It does **not** copy the atlases into `steel-dominion`, activate the runtime, commit Git, push a branch, deploy or publish.
+## Required game-validation evidence
 
-## Required game validation evidence
-
-The caller must provide all three of:
+The caller must provide the exact:
 
 ```text
 gameValidationAdmission
@@ -36,16 +34,16 @@ gameValidationReceiptBytes
 expectedGameHead
 ```
 
-The compiler calls `verifyHmfAtlasV3GameValidationAdmission` again. A standalone admission hash is not sufficient.
+The compiler invokes `verifyHmfAtlasV3GameValidationAdmission` again. A standalone admission hash is not accepted.
 
-The exact original local-validation bytes must therefore still prove:
+The original receipt bytes must therefore still prove:
 
 - schema `steel-dominion.hmf-atlas-v3-local-validation.v1`;
 - repository `EVAVO-STUDIO/steel-dominion`;
 - the exact expected 40-character game commit;
 - Godot 4.6.2;
-- all six required suites, in order, passed;
-- clean game source before and after validation;
+- all six required suites passed in canonical serial order;
+- a clean game source tree before and after validation;
 - no GitHub Actions dependency;
 - no image generation.
 
@@ -60,43 +58,42 @@ citadel
 mirage
 ```
 
-Each entry contains the Python atlas builder's exact self-hashed build receipt and the independent build-verification result.
+Each entry supplies the Python atlas builder's exact self-hashed build receipt and its independent build-verification result.
 
-The authorization compiler re-admits every build receipt and requires:
+Every build receipt is re-admitted through a closed contract and must retain:
 
-- build receipt schema `evavo.heavy-metal-fighting-frame-atlas-v3-build-receipt.v1`;
-- contract `production_master_v3`;
+- schema `evavo.heavy-metal-fighting-frame-atlas-v3-build-receipt.v1`;
+- `production_master_v3` identity;
 - 224 authored sources and 32 reserved slots;
-- named-human style-proof approval;
-- canonical image and manifest paths;
-- canonical `steel-dominion` final-v3 target path;
-- the three existing activation blockers;
+- one named-human style-proof approval with valid evidence identity and UTC time;
+- canonical image and manifest names;
+- canonical `res://assets/fighters/final-v3/<frame>.png` target;
+- the exact existing activation blockers;
 - create-only atomic workspace publication;
 - source/workspace read-write authority only;
 - no source mutation, target-repository mutation, Git mutation, deployment or publication;
 - a valid canonical `receiptSha256`.
 
-The matching verification must use schema:
+The corresponding build verification must use schema:
 
 ```text
 evavo.heavy-metal-fighting-frame-atlas-v3-build-verification.v1
 ```
 
-and must cross-bind the exact:
+and must cross-bind the exact `frameId`, `planSha256`, `receiptSha256` and atlas image SHA-256. It must also prove:
 
-- `frameId`;
-- `planSha256`;
-- `receiptSha256`;
-- atlas image SHA-256;
-- `exactSourcePixelsVerified = true`;
-- `targetRepositoryMutation = false`;
-- `gameActivationReady = false`.
+```text
+status = passed
+exactSourcePixelsVerified = true
+targetRepositoryMutation = false
+gameActivationReady = false
+```
 
-The authorization retains a SHA-256 identity of the complete submitted build-verification object so later verification is bound to the same exact evidence.
+The authorization retains a SHA-256 identity of the complete submitted build-verification object, binding later verification to that exact evidence.
 
 ## Named-human authorization
 
-The human authorization input is closed and must contain exactly:
+The human input is closed and contains exactly:
 
 ```text
 actorId
@@ -107,9 +104,7 @@ evidenceSha256
 attestations
 ```
 
-`decision` must be `authorized`.
-
-All attestations are mandatory and true:
+`decision` must be `authorized`. All attestations are mandatory and true:
 
 ```text
 exactGameValidationAdmissionReviewed
@@ -120,9 +115,9 @@ deliveryAuthorizationOnly
 noRepositoryMutationOrRuntimeActivationPerformed
 ```
 
-The resulting record therefore represents an explicit human decision to authorize **delivery of the exact evidence-bound atlas set to the exact validated game commit**. It is not an automatic release decision.
+The authorization timestamp must be **at or after both** the completed local game-validation window and the latest retained Frame style-proof approval. An authorization that predates evidence it claims to review fails closed.
 
-## Output
+## Output and verification
 
 A successful compilation emits:
 
@@ -130,48 +125,22 @@ A successful compilation emits:
 evavo.heavy-metal-fighting-atlas-v3-game-delivery-authorization.v1
 ```
 
-The self-hashed record binds:
+The self-hashed record binds the exact game-validation admission, validated `steel-dominion` commit, all four plan/receipt/verification/image/style-proof identities, canonical target paths, named-human decision and a closed authority map.
 
-- exact game-validation admission SHA-256;
-- exact validated `steel-dominion` commit;
-- all four plan SHA-256 values;
-- all four build-receipt SHA-256 values;
-- all four build-verification SHA-256 identities;
-- all four atlas image SHA-256 values;
-- all four canonical target paths;
-- all four style-proof execution identities;
-- named-human authorization evidence;
-- explicit pass checks;
-- a closed authority map.
+`verifyHmfAtlasV3GameDeliveryAuthorization` does not accept that record alone. It requires the submitted authorization plus all original game-validation bytes, game head, four build-evidence entries and human authorization, then recompiles the expected record and requires exact identity agreement.
 
-## Verification
-
-`verifyHmfAtlasV3GameDeliveryAuthorization` does not accept a standalone authorization record.
-
-It requires the submitted authorization plus the original:
-
-```text
-gameValidationAdmission
-gameValidationReceiptBytes
-expectedGameHead
-atlasBuildEvidence
-humanAuthorization
-```
-
-The verifier re-admits the submitted self-hashed authorization, recompiles the expected record from the exact original evidence, and requires the identities to match.
-
-An attacker therefore cannot alter the authorizer, game commit, atlas image, receipt, target path or authority flags, recompute `authorizationSha256`, and have the altered record verify against the unchanged source evidence.
+A caller therefore cannot alter the authorizer, game commit, atlas image, receipt, target path, evidence chronology or authority flags, recompute `authorizationSha256`, and have the altered record verify against unchanged source evidence.
 
 ## Authority boundary
 
 Positive capabilities:
 
 ```text
-evidenceAdmission                   true
-namedHumanDeliveryAuthorization      true
+evidenceAdmission                  true
+namedHumanDeliveryAuthorization    true
 ```
 
-The following remain false:
+These remain false:
 
 ```text
 gameRepositoryRead
@@ -183,4 +152,4 @@ publication
 forcePush
 ```
 
-This boundary is deliberately one step before any `steel-dominion` repository writer. A future writer must independently re-verify this authorization and the concrete bytes it intends to install before it may mutate the game repository.
+This is deliberately one step before any `steel-dominion` repository writer. A future writer must independently re-verify this authorization and the concrete atlas bytes it intends to install before it may mutate the game repository.
