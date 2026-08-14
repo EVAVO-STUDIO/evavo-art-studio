@@ -18,7 +18,7 @@ test("atlas-v3 builder retains closed plan admission, exact source bytes and no-
   source("scripts/heavy-metal-fighting/verify_frame_atlas_v3_build.py"),
  ]);
  assert.match(builder,/admit_plan\(plan_input\)/);assert.match(builder,/stable_bytes\(Path\(s\["sourcePath"\]\)/);assert.match(builder,/verify_output\(plan,stage,True\)/);assert.match(builder,/rename_noreplace\(stage,output\)/);assert.match(builder,/published directory identity changed/);assert.doesNotMatch(builder,/os\.replace\(/);assert.doesNotMatch(builder,/\.resize\(/);assert.doesNotMatch(builder,/\.rotate\(/);
- assert.match(common,/MoveFileExW/);assert.match(common,/renameat2/);assert.match(common,/renamex_np/);assert.match(common,/O_NOFOLLOW/);assert.match(common,/st_nlink!=1/);
+ assert.match(common,/WinDLL\("kernel32",use_last_error=True\)/);assert.match(common,/ctypes\.set_last_error\(0\)/);assert.match(common,/MoveFileExW/);assert.match(common,/renameat2/);assert.match(common,/renamex_np/);assert.match(common,/O_NOFOLLOW/);assert.match(common,/st_nlink!=1/);
  assert.match(contract,/plan requires 224 sources/);assert.match(contract,/plan requires 26 batch evidence records/);assert.match(contract,/path substitution/);assert.match(contract,/source receipt evidence disagrees/);assert.match(contract,/manifest semantics drifted/);assert.match(contract,/receipt semantics drifted/);assert.match(contract,/atlas cell .* differs from source/);assert.match(contract,/targetRepositoryMutation/);assert.match(verifier,/skip-source-pixel-recheck/);
 });
 
