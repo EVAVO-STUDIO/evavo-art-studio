@@ -125,8 +125,9 @@ function fail(message) {
   throw new Error(`HEAVY_METAL_FIGHTING_ATLAS_V3_GAME_VALIDATION_INVALID: ${message}`);
 }
 
-function assertOrdinaryInput(input) {
-  if (utilTypes.isProxy(input)) fail("admission input may not be a Proxy.");
+function inspectOrdinaryInput(input, expectedNames, label) {
+  assert(input && typeof input === "object" && !Array.isArray(input), `${label} must be an object.`);
+  if (utilTypes.isProxy(input)) fail(`${label} may not be a Proxy.`);
   let prototype;
   let keys;
   let descriptors;
@@ -135,37 +136,60 @@ function assertOrdinaryInput(input) {
     keys = Reflect.ownKeys(input);
     descriptors = Object.getOwnPropertyDescriptors(input);
   } catch (error) {
-    fail(`admission input could not be inspected safely: ${error instanceof Error ? error.message : String(error)}`);
+    fail(`${label} could not be inspected safely: ${error instanceof Error ? error.message : String(error)}`);
   }
-  assert(prototype === Object.prototype, "admission input must use the ordinary Object prototype.");
-  assert(keys.every((key) => typeof key === "string"), "admission input may not contain symbolic properties.");
+  assert(prototype === Object.prototype, `${label} must use the ordinary Object prototype.`);
+  assert(keys.every((key) => typeof key === "string"), `${label} may not contain symbolic properties.`);
   const names = keys.map(String).sort();
+  const expected = [...expectedNames].sort();
   assert(
-    names.length === 2 && names[0] === "expectedGameHead" && names[1] === "receiptBytes",
-    "admission input fields must be exactly: expectedGameHead, receiptBytes.",
+    names.length === expected.length && names.every((name, index) => name === expected[index]),
+    `${label} fields must be exactly: ${expected.join(", ")}.`,
   );
   for (const name of names) {
     const descriptor = descriptors[name];
-    assert(descriptor && "value" in descriptor, `admission input.${name} may not be an accessor.`);
-    assert(descriptor.enumerable === true, `admission input.${name} must be enumerable data.`);
+    assert(descriptor && "value" in descriptor, `${label}.${name} may not be an accessor.`);
+    assert(descriptor.enumerable === true, `${label}.${name} must be enumerable data.`);
   }
   return descriptors;
 }
 
-function captureInput(input) {
-  assert(input && typeof input === "object" && !Array.isArray(input), "admission input must be an object.");
-  const descriptors = assertOrdinaryInput(input);
-  const expectedGameHead = descriptors.expectedGameHead.value;
-  assert(typeof expectedGameHead === "string" && GIT_SHA.test(expectedGameHead), "expectedGameHead must be a 40-character lowercase Git commit SHA.");
-  const source = descriptors.receiptBytes.value;
+function copyReceiptBytes(source) {
   assert(Buffer.isBuffer(source) || source instanceof Uint8Array, "receiptBytes must be a Buffer or Uint8Array.");
   if (typeof SharedArrayBuffer !== "undefined") {
     assert(!(source.buffer instanceof SharedArrayBuffer), "receiptBytes may not use shared memory.");
   }
   assert(source.byteLength >= 1 && source.byteLength <= MAXIMUM_RECEIPT_BYTES, "receiptBytes exceeds the admitted byte bounds.");
+  return Buffer.from(source);
+}
+
+function captureInput(input) {
+  const descriptors = inspectOrdinaryInput(input, ["receiptBytes", "expectedGameHead"], "admission input");
+  const expectedGameHead = descriptors.expectedGameHead.value;
+  assert(typeof expectedGameHead === "string" && GIT_SHA.test(expectedGameHead), "expectedGameHead must be a 40-character lowercase Git commit SHA.");
   return Object.freeze({
     expectedGameHead,
-    receiptBytes: Buffer.from(source),
+    receiptBytes: copyReceiptBytes(descriptors.receiptBytes.value),
+  });
+}
+
+function captureVerificationInput(input) {
+  const descriptors = inspectOrdinaryInput(
+    input,
+    ["admission", "receiptBytes", "expectedGameHead"],
+    "game validation verifier input",
+  );
+  const expectedGameHead = descriptors.expectedGameHead.value;
+  assert(typeof expectedGameHead === "string" && GIT_SHA.test(expectedGameHead), "expectedGameHead must be a 40-character lowercase Git commit SHA.");
+  const admission = snapshotApprovalJson(
+    descriptors.admission.value,
+    "submitted HMF atlas-v3 game validation admission",
+    { maximumDepth: 16, maximumNodes: 4096, maximumBytes: MAXIMUM_RECEIPT_BYTES },
+  );
+  return Object.freeze({
+    admission,
+    expectedGameHead,
+    receiptBytes: copyReceiptBytes(descriptors.receiptBytes.value),
   });
 }
 
@@ -284,7 +308,7 @@ function admissionAuthority() {
   });
 }
 
-export function verifyHmfAtlasV3GameValidationAdmission(value, expectedGameHead = undefined) {
+function validateAdmissionShape(value, expectedGameHead = undefined) {
   const admission = snapshotApprovalJson(value, "HMF atlas-v3 game validation admission", {
     maximumDepth: 16,
     maximumNodes: 4096,
@@ -367,8 +391,22 @@ export function admitHmfAtlasV3GameValidationReceipt(input) {
     },
     authority: admissionAuthority(),
   };
-  return verifyHmfAtlasV3GameValidationAdmission(
+  return validateAdmissionShape(
     freeze({ ...body, admissionSha256: hashValue(body) }),
     captured.expectedGameHead,
   );
+}
+
+export function verifyHmfAtlasV3GameValidationAdmission(input) {
+  const captured = captureVerificationInput(input);
+  const submitted = validateAdmissionShape(captured.admission, captured.expectedGameHead);
+  const expected = admitHmfAtlasV3GameValidationReceipt({
+    receiptBytes: captured.receiptBytes,
+    expectedGameHead: captured.expectedGameHead,
+  });
+  assert(
+    hashValue(submitted) === hashValue(expected),
+    "submitted game validation admission does not match the exact source receipt bytes and expected game head.",
+  );
+  return submitted;
 }
