@@ -1,0 +1,76 @@
+{
+  "schema": "evavo.rally-road-sign-visual-development.v1",
+  "protocolVersion": "2026-08-15.4",
+  "assetId": "road-sign-production-v1",
+  "subjectId": "road-sign",
+  "title": "Forest Rally original roadside sign kit",
+  "variants": ["chevron", "hazard-diamond", "route-arrow"],
+  "style": {
+    "projectionFamily": "fixed-isometric-2-5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "propLanguage": "A compact original roadside rally sign family with bold geometric symbols, thick painted metal plates, simple square posts, restrained fasteners and silhouettes readable at speed from the fixed gameplay camera.",
+    "palette": ["#17191a", "#f0d54c", "#d94a32", "#f4efe0", "#4f5859", "#818989", "#2f3435", "#a18a64"],
+    "surfaceLanguage": [
+      "large geometric symbols without words",
+      "broad painted-metal value groups",
+      "restrained edge wear",
+      "readable square-post construction",
+      "damage silhouettes visible at gameplay scale",
+      "no baked directional lighting"
+    ],
+    "forbidden": [
+      "real road authority branding",
+      "real manufacturer branding",
+      "readable place names",
+      "generated text",
+      "tiny sponsor decals",
+      "photogrammetry noise",
+      "baked directional shadows",
+      "contact sheets",
+      "multi-panel image layouts",
+      "multiple unrelated prop families in one image"
+    ]
+  },
+  "cameraLocks": {
+    "heroYawDegrees": 35,
+    "heroPitchDegrees": 24,
+    "orthographicPitchDegrees": 0,
+    "focalLengthMm": 70,
+    "consistentPostHeight": true,
+    "consistentPlateThickness": true,
+    "consistentFastenerSpacing": true
+  },
+  "jobs": [
+    {"id":"road-sign-chevron-identity","role":"identity-master","variant":"chevron","view":"front-three-quarter","phase":"identity","width":2048,"height":2048,"transparent":true,"dependsOn":[],"include":["single original chevron sign","complete post and brace","bold non-text symbol","true transparent background"],"exclude":["road scene","multiple signs","readable text","damage","cast shadow"]},
+    {"id":"road-sign-hazard-identity","role":"variant-identity","variant":"hazard-diamond","view":"front-three-quarter","phase":"identity","width":2048,"height":2048,"transparent":true,"dependsOn":["road-sign-chevron-identity"],"include":["single original diamond hazard sign","same post and fastener family","bold non-text hazard symbol","true transparent background"],"exclude":["road scene","multiple signs","readable text","damage","cast shadow"]},
+    {"id":"road-sign-route-arrow-identity","role":"variant-identity","variant":"route-arrow","view":"front-three-quarter","phase":"identity","width":2048,"height":2048,"transparent":true,"dependsOn":["road-sign-chevron-identity"],"include":["single original route-arrow sign","same post and fastener family","large geometric arrow without text","true transparent background"],"exclude":["road scene","multiple signs","readable text","damage","cast shadow"]},
+    {"id":"road-sign-chevron-front","role":"modular-modeling-reference","variant":"chevron","view":"front","phase":"orthographic","width":2048,"height":2048,"transparent":true,"dependsOn":["road-sign-chevron-identity"],"include":["strict front orthographic","exact plate silhouette","fastener positions","unchanged symbol","true transparent background"],"exclude":["perspective convergence","labels","dimensions","post hidden","cast shadow"]},
+    {"id":"road-sign-hazard-front","role":"modular-modeling-reference","variant":"hazard-diamond","view":"front","phase":"orthographic","width":2048,"height":2048,"transparent":true,"dependsOn":["road-sign-hazard-identity"],"include":["strict front orthographic","exact diamond silhouette","fastener positions","unchanged symbol","true transparent background"],"exclude":["perspective convergence","labels","dimensions","post hidden","cast shadow"]},
+    {"id":"road-sign-route-arrow-front","role":"modular-modeling-reference","variant":"route-arrow","view":"front","phase":"orthographic","width":2048,"height":2048,"transparent":true,"dependsOn":["road-sign-route-arrow-identity"],"include":["strict front orthographic","exact arrow-plate silhouette","fastener positions","unchanged symbol","true transparent background"],"exclude":["perspective convergence","labels","dimensions","post hidden","cast shadow"]},
+    {"id":"road-sign-post-brace-side","role":"modular-modeling-reference","variant":"shared-construction","view":"left","phase":"construction","width":2048,"height":2048,"transparent":true,"dependsOn":["road-sign-chevron-front"],"include":["strict side orthographic","plate thickness","square post","rear brace","fasteners","true transparent background"],"exclude":["perspective convergence","labels","dimensions","road scene","multiple variants"]},
+    {"id":"road-sign-material-painted-metal","role":"runtime-shader-reference","variant":"shared-construction","view":"material-detail","phase":"materials","width":2048,"height":2048,"transparent":false,"dependsOn":["road-sign-chevron-identity","road-sign-hazard-identity","road-sign-route-arrow-identity"],"include":["painted plate","galvanized post","metal fastener","restrained edge wear","wetness response","mud splatter zone"],"exclude":["full second prop","text labels","photoreal scan","deep rust holes","baked shadow"]},
+    {"id":"road-sign-damage-bent","role":"breakable-damage-reference","variant":"chevron","view":"front-three-quarter","phase":"damage","width":2048,"height":2048,"transparent":true,"dependsOn":["road-sign-chevron-identity"],"include":["same exact sign","bent post","creased plate","loose brace","all parts still attached","true transparent background"],"exclude":["complete destruction","fire","vehicle","different symbol","gore"]},
+    {"id":"road-sign-detached-components","role":"breakable-damage-reference","variant":"shared-construction","view":"front-three-quarter","phase":"breakables","width":2048,"height":2048,"transparent":true,"dependsOn":["road-sign-damage-bent","road-sign-post-brace-side"],"include":["single sign construction","plate separated","post separated","brace separated","small fastener fragments","true transparent background"],"exclude":["explosion","motion blur","multiple complete signs","labels","contact sheet"]}
+  ],
+  "output": {
+    "workingRoot": "working/rally/props/road-sign/visual-development-v1",
+    "masterRoot": "masters/rally/props/road-sign/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
