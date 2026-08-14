@@ -266,6 +266,8 @@ test('compiles explicit final-art, repair, in-between, timing and release handof
     assert.equal(plan.productionReady, false);
     assert.equal(plan.runtimeActivationAllowed, false);
     assert.equal(plan.qualityJobs.length, 4);
+    assert.equal(plan.qualityJobs[0].automatedAssurance.minimumIndependentInspectors, 2);
+    assert.equal(plan.qualityJobs[0].automatedAssurance.uncertainDisposition, 'quarantine');
     assert.equal(plan.repairJobs.length, 2);
     assert.equal(plan.inbetweenJobs.length, 1);
     assert.equal(plan.sequenceTimeline.length, 2);
@@ -273,6 +275,7 @@ test('compiles explicit final-art, repair, in-between, timing and release handof
     assert.equal(plan.atlasRequestTemplate.wholeRunAtomicPublication, true);
     assert.ok(plan.blockers.includes('provider-redraw-review-required'));
     assert.ok(plan.blockers.includes('inbetween-review-required'));
+    assert.ok(plan.blockers.includes('automated-frame-assurance-required'));
     assert.match(plan.planSha256, /^[a-f0-9]{64}$/u);
     assert.ok(Object.values(plan.authority).every((value) => value === false));
     assert.equal(plan.materialization.sourceBytesEmbeddedInPlan, false);
