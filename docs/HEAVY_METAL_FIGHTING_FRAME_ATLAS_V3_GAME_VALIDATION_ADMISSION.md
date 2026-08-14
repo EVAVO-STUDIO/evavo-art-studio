@@ -147,7 +147,18 @@ node scripts\heavy-metal-fighting-frame-atlas-v3.mjs admit-game-validation `
   --expected-game-head <40-char-head-from-that-validation-receipt>
 ```
 
-The command opens `--validation-receipt` read-only, requires a regular file between 1 byte and 1 MiB before allocating or reading it, reads exactly the observed size, probes for growth, and rechecks the file size before admission. Empty files, directories, oversized files, truncation, and growth during the bounded read are rejected.
+The command treats `--validation-receipt` as an untrusted filesystem path before it treats the file contents as evidence. It:
+
+- walks every existing path component with `lstat` and rejects symbolic-link or junction components;
+- requires the endpoint to be one regular file with exactly one filesystem link;
+- enforces the 1-byte to 1-MiB bound before allocation;
+- uses a no-follow file open on supported non-Windows platforms;
+- requires the opened file identity and stable metadata to match the inspected endpoint;
+- rechecks every path component after opening;
+- reads exactly the captured byte count and probes for growth;
+- rechecks device, inode, size, modification time, link count, and the complete path chain after the read.
+
+Directories, symbolic paths, multiply linked files, oversized files, truncation, growth, endpoint replacement, and path-component replacement are rejected before the captured bytes can be admitted.
 
 The command prints the self-hashed admission JSON to stdout. It does not write either repository.
 
