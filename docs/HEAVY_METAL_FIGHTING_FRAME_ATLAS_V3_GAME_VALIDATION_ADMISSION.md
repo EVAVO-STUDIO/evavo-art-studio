@@ -116,6 +116,27 @@ The admission binds:
 
 The output is deterministic for the same exact receipt bytes and expected game HEAD.
 
+## Downstream verification
+
+A self-hash alone is not origin evidence. The exported verifier therefore does **not** accept a standalone admission object.
+
+It requires exactly:
+
+```text
+admission
+receiptBytes
+expectedGameHead
+```
+
+The verifier:
+
+1. immutably captures all three caller inputs;
+2. re-admits the submitted admission through its closed self-hashed contract;
+3. independently recompiles the expected admission from the exact receipt bytes and expected game HEAD;
+4. requires the submitted and recomputed admission identities to match exactly.
+
+A caller cannot alter an admission field, recompute `admissionSha256`, and have that new document verify against unchanged source bytes.
+
 ## CLI
 
 After running the game-side local validation gate, admit its receipt from Art Studio with:
