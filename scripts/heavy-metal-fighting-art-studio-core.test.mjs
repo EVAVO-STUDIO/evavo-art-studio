@@ -12,4 +12,5 @@ import "./heavy-metal-fighting/frame-body-selection-decision.test.mjs";
 import "./heavy-metal-fighting/frame-body-selected-candidate-mastering.test.mjs";
 import "./heavy-metal-fighting/frame-body-named-human-approval.test.mjs";
 import "./heavy-metal-fighting/frame-body-named-human-approval-input-hardening.test.mjs";
+import "./heavy-metal-fighting/frame-body-delivery-readiness.test.mjs";
 import "./heavy-metal-fighting/studio-core.test.mjs";
