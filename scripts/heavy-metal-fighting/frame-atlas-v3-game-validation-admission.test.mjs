@@ -7,7 +7,7 @@ import {
   REQUIRED_GAME_VALIDATION_SUITES,
   verifyHmfAtlasV3GameValidationAdmission,
 } from "./frame-atlas-v3-game-validation-admission.mjs";
-import { hashBytes } from "./frame-body-named-human-approval-common.mjs";
+import { hashBytes, hashValue } from "./frame-body-named-human-approval-common.mjs";
 
 const HEAD = "723b6b6954e67c08ed337fad62c5ef2e10536234";
 
@@ -59,6 +59,12 @@ function admit(value = receipt(), expectedGameHead = HEAD, bom = true) {
   });
 }
 
+function rehashAdmission(value) {
+  const body = structuredClone(value);
+  delete body.admissionSha256;
+  return { ...body, admissionSha256: hashValue(body) };
+}
+
 test("exact six-suite Godot 4.6.2 receipt becomes deterministic self-hashed read-only admission", () => {
   const source = bytes();
   const admission = admitHmfAtlasV3GameValidationReceipt({ receiptBytes: source, expectedGameHead: HEAD });
@@ -75,7 +81,10 @@ test("exact six-suite Godot 4.6.2 receipt becomes deterministic self-hashed read
   assert.equal(admission.authority.deployment, false);
   assert.equal(admission.authority.publication, false);
   assert.equal(admission.authority.forcePush, false);
-  assert.deepEqual(verifyHmfAtlasV3GameValidationAdmission(admission, HEAD), admission);
+  assert.deepEqual(
+    verifyHmfAtlasV3GameValidationAdmission({ admission, receiptBytes: source, expectedGameHead: HEAD }),
+    admission,
+  );
   assert.deepEqual(admitHmfAtlasV3GameValidationReceipt({ receiptBytes: source, expectedGameHead: HEAD }), admission);
 });
 
@@ -171,19 +180,51 @@ test("receipt bytes are privately owned and bounded", () => {
   );
 });
 
-test("self-hashed admission rejects retained-hash authority or head mutation", () => {
-  const admission = admit();
+test("verifier rejects retained-hash authority or head mutation", () => {
+  const source = bytes();
+  const admission = admitHmfAtlasV3GameValidationReceipt({ receiptBytes: source, expectedGameHead: HEAD });
   const authorityDrift = structuredClone(admission);
   authorityDrift.authority.gameRepositoryMutation = true;
   assert.throws(
-    () => verifyHmfAtlasV3GameValidationAdmission(authorityDrift, HEAD),
+    () => verifyHmfAtlasV3GameValidationAdmission({ admission: authorityDrift, receiptBytes: source, expectedGameHead: HEAD }),
     /admissionSha256 does not match canonical content/,
   );
 
   const headDrift = structuredClone(admission);
   headDrift.validatedGameHead = "319989713c671670b1ae997ffb4e8386bdeb7c7e";
   assert.throws(
-    () => verifyHmfAtlasV3GameValidationAdmission(headDrift, HEAD),
+    () => verifyHmfAtlasV3GameValidationAdmission({ admission: headDrift, receiptBytes: source, expectedGameHead: HEAD }),
     /admissionSha256 does not match canonical content/,
   );
+});
+
+test("verifier rejects correctly rehashed admission metadata not derived from the exact source receipt", () => {
+  const source = bytes();
+  const admission = admitHmfAtlasV3GameValidationReceipt({ receiptBytes: source, expectedGameHead: HEAD });
+  const fabricated = structuredClone(admission);
+  fabricated.branch = "codex/fabricated-validation-branch";
+  const rehashed = rehashAdmission(fabricated);
+  assert.throws(
+    () => verifyHmfAtlasV3GameValidationAdmission({ admission: rehashed, receiptBytes: source, expectedGameHead: HEAD }),
+    /does not match the exact source receipt bytes and expected game head/,
+  );
+});
+
+test("verifier input itself rejects accessors and proxies without invoking them", () => {
+  const source = bytes();
+  const admission = admitHmfAtlasV3GameValidationReceipt({ receiptBytes: source, expectedGameHead: HEAD });
+  let invoked = false;
+  const accessor = { admission, expectedGameHead: HEAD };
+  Object.defineProperty(accessor, "receiptBytes", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return source;
+    },
+  });
+  assert.throws(() => verifyHmfAtlasV3GameValidationAdmission(accessor), /may not be an accessor/);
+  assert.equal(invoked, false);
+
+  const proxy = new Proxy({ admission, receiptBytes: source, expectedGameHead: HEAD }, {});
+  assert.throws(() => verifyHmfAtlasV3GameValidationAdmission(proxy), /may not be a Proxy/);
 });
