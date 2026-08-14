@@ -1,0 +1,222 @@
+{
+  "schema": "evavo.rally-falcon-visual-development.v1",
+  "protocolVersion": "2026-08-15.1",
+  "assetId": "falcon-rally-production-v1",
+  "subjectId": "falcon-rally",
+  "title": "Falcon Rally canonical player vehicle",
+  "style": {
+    "projectionFamily": "fixed-isometric-2.5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "silhouette": "Compact wide-track three-door rally hatch with a short front overhang, upright glasshouse, muscular wheel arches and an unmistakable planted stance readable at gameplay scale.",
+    "bodyProportions": {
+      "lengthToWidth": 2.18,
+      "wheelbaseToLength": 0.61,
+      "trackToWidth": 0.82,
+      "wheelDiameterToHeight": 0.43
+    },
+    "palette": [
+      "#111318",
+      "#e44735",
+      "#f2d6a2",
+      "#f3efe5",
+      "#6f7e78",
+      "#262a30"
+    ],
+    "surfaceLanguage": [
+      "broad hand-painted value groups",
+      "restrained physically based response",
+      "clean panel breaks",
+      "readable rubber and glass separation",
+      "limited fine decals",
+      "damage masks that remain legible from the fixed camera"
+    ],
+    "forbidden": [
+      "real manufacturer branding",
+      "copyrighted race livery",
+      "photogrammetry noise",
+      "hyper-real clearcoat clutter",
+      "tiny unreadable sponsor text",
+      "baked directional shadows",
+      "contact sheets",
+      "multi-panel image layouts",
+      "multiple cars in one image"
+    ]
+  },
+  "cameraLocks": {
+    "heroYawDegrees": 35,
+    "heroPitchDegrees": 24,
+    "orthographicPitchDegrees": 0,
+    "focalLengthMm": 70,
+    "groundPlane": "neutral-matte",
+    "consistentScale": true,
+    "consistentWheelbase": true,
+    "consistentTrackWidth": true
+  },
+  "jobs": [
+    {
+      "id": "falcon-identity-front-three-quarter",
+      "role": "identity-master",
+      "view": "front-three-quarter",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": [],
+      "include": ["complete clean vehicle", "front fascia", "left side silhouette", "wheel stance", "neutral matte ground"],
+      "exclude": ["motion", "driver", "dust", "damage", "open panels"]
+    },
+    {
+      "id": "falcon-identity-rear-three-quarter",
+      "role": "identity-continuity",
+      "view": "rear-three-quarter",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["falcon-identity-front-three-quarter"],
+      "include": ["same exact vehicle identity", "rear fascia", "right side silhouette", "exhaust position", "neutral matte ground"],
+      "exclude": ["motion", "driver", "dust", "damage", "open panels"]
+    },
+    {
+      "id": "falcon-ortho-front",
+      "role": "modeling-reference",
+      "view": "front",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["falcon-identity-front-three-quarter"],
+      "include": ["strict front orthographic", "centered symmetry", "full tyre width", "unchanged vehicle identity"],
+      "exclude": ["perspective convergence", "cast shadow", "ground reflection", "labels", "dimensions"]
+    },
+    {
+      "id": "falcon-ortho-left",
+      "role": "modeling-reference",
+      "view": "left",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["falcon-identity-front-three-quarter"],
+      "include": ["strict left orthographic", "full side profile", "wheel centers level", "unchanged vehicle identity"],
+      "exclude": ["perspective convergence", "cast shadow", "ground reflection", "labels", "dimensions"]
+    },
+    {
+      "id": "falcon-ortho-rear",
+      "role": "modeling-reference",
+      "view": "rear",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["falcon-identity-rear-three-quarter"],
+      "include": ["strict rear orthographic", "centered symmetry", "rear glass and lamps", "unchanged vehicle identity"],
+      "exclude": ["perspective convergence", "cast shadow", "ground reflection", "labels", "dimensions"]
+    },
+    {
+      "id": "falcon-ortho-top",
+      "role": "modeling-reference",
+      "view": "top",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["falcon-identity-front-three-quarter", "falcon-identity-rear-three-quarter"],
+      "include": ["strict top orthographic", "roof and bonnet plan", "wheel arch width", "unchanged vehicle identity"],
+      "exclude": ["perspective convergence", "cast shadow", "ground reflection", "labels", "dimensions"]
+    },
+    {
+      "id": "falcon-material-painted-body",
+      "role": "uv-material-reference",
+      "view": "material-detail",
+      "phase": "materials",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["falcon-identity-front-three-quarter"],
+      "include": ["painted body close detail", "clean panel seams", "controlled roughness", "dirt mask zones", "damage mask zones"],
+      "exclude": ["full second vehicle", "text labels", "brand marks", "baked shadows", "photoreal micro-scratches"]
+    },
+    {
+      "id": "falcon-material-glass-rubber-metal",
+      "role": "uv-material-reference",
+      "view": "material-detail",
+      "phase": "materials",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["falcon-identity-front-three-quarter"],
+      "include": ["windscreen glass", "side glass", "tyre rubber", "wheel metal", "lamp lenses", "dark interior"],
+      "exclude": ["full second vehicle", "text labels", "brand marks", "baked shadows", "chromatic aberration"]
+    },
+    {
+      "id": "falcon-damage-scraped",
+      "role": "rig-damage-reference",
+      "view": "front-three-quarter",
+      "phase": "damage",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["falcon-identity-front-three-quarter"],
+      "include": ["same exact vehicle identity", "light rally scrapes", "minor denting", "broken lamp option", "all panels attached"],
+      "exclude": ["fire", "major crumple", "detached bonnet", "different livery", "second vehicle"]
+    },
+    {
+      "id": "falcon-damage-critical",
+      "role": "rig-damage-reference",
+      "view": "front-three-quarter",
+      "phase": "damage",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["falcon-damage-scraped"],
+      "include": ["same exact vehicle identity", "front crumple", "bonnet popped", "broken windscreen", "damaged bumper", "engine smoke anchor visibility"],
+      "exclude": ["complete incineration", "different livery", "second vehicle", "driver injury", "gore"]
+    },
+    {
+      "id": "falcon-mechanical-wheel-suspension",
+      "role": "rig-mechanical-reference",
+      "view": "left",
+      "phase": "rigging",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["falcon-ortho-left"],
+      "include": ["same exact vehicle profile", "wheel centers", "steering pivot", "suspension travel envelope", "body pitch and roll reference"],
+      "exclude": ["readable labels", "technical text", "perspective convergence", "second vehicle"]
+    },
+    {
+      "id": "falcon-detachable-parts",
+      "role": "rig-damage-reference",
+      "view": "front-three-quarter",
+      "phase": "rigging",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["falcon-damage-critical"],
+      "include": ["same exact vehicle identity", "bonnet open", "boot open", "front bumper separated", "windscreen separated", "exhaust visible"],
+      "exclude": ["explosion", "motion blur", "second vehicle", "text labels", "contact sheet"]
+    }
+  ],
+  "output": {
+    "workingRoot": "working/rally/vehicles/falcon-rally/visual-development-v1",
+    "masterRoot": "masters/rally/vehicles/falcon-rally/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
