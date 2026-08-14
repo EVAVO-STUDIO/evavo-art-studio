@@ -7,8 +7,8 @@ const read = (relativePath) =>
 
 test("MCP exposes iterative art planning without provider or approval shortcuts", async () => {
   const [tools, provider] = await Promise.all([
-    read("mcp/art-production-tools.ts"),
-    read("mcp/provider-tools.ts"),
+    read("src/art-production-tools.ts"),
+    read("src/provider-tools.ts"),
   ]);
   for (const token of [
     "art_production_orchestrator_protocol",
