@@ -1,17 +1,17 @@
 # HEAVY METAL FIGHTING — atlas-v3 game delivery authorization
 
-Status: named-human read-only delivery authorization boundary  
+Status: named-human, byte-verifying, read-only delivery authorization boundary  
 Game target: `EVAVO-STUDIO/steel-dominion`  
 Repository mutation: prohibited
 
 ## Purpose
 
-The Frame atlas-v3 chain keeps evidence admission, human authorization and repository mutation as separate trust boundaries:
+The Frame atlas-v3 chain keeps evidence admission, human authorization and repository mutation as separate transactions:
 
 ```text
 four exact workspace atlas builds
         ↓
-independent exact-pixel build verification
+Art Studio independently decodes each atlas and all 224 source PNGs
         ↓
 local steel-dominion Godot 4.6.2 six-suite validation
         ↓
@@ -22,11 +22,36 @@ explicit named-human delivery authorization
 future separately authorised repository writer
 ```
 
-This layer records an explicit named-human authorization for one exact validated game commit and one exact four-Frame atlas evidence set. It does not copy atlas bytes into `steel-dominion`, activate the runtime, commit or push Git, deploy or publish.
+This boundary closes the metadata authorization blocker named
+`explicit-game-repository-delivery-authorization`. It does not copy an atlas into
+`steel-dominion`, activate runtime content, mutate Git, deploy or publish.
 
-## Required game-validation evidence
+## Trust correction in protocol 2026-08-15.2
 
-The caller must provide the exact:
+Protocol `2026-08-15.1` accepted a caller-supplied build-verification summary whose
+fields included `exactSourcePixelsVerified = true`. The summary was structurally
+checked and hashed, but a caller could fabricate the summary and calculate all
+outer public hashes without executing the real source-pixel comparison.
+
+Protocol `2026-08-15.2` removes that input completely.
+
+`atlasBuildEvidence` now requires, for every canonical Frame:
+
+```text
+frameId
+plan
+receipt
+atlasPngBytes
+sourcePngBytes[224]
+```
+
+A standalone build-verification object is rejected as an unexpected field. Art
+Studio compiles the verification result internally from privately copied byte
+payloads.
+
+## Required game validation evidence
+
+The caller must provide:
 
 ```text
 gameValidationAdmission
@@ -34,66 +59,80 @@ gameValidationReceiptBytes
 expectedGameHead
 ```
 
-The compiler invokes `verifyHmfAtlasV3GameValidationAdmission` again. A standalone admission hash is not accepted.
+The compiler calls `verifyHmfAtlasV3GameValidationAdmission` again. The original
+local validation bytes must still prove the exact `steel-dominion` commit,
+Godot 4.6.2, all six serial validation suites, clean source before and after,
+no GitHub Actions dependency and no image generation.
 
-The original receipt bytes must therefore still prove:
+## Exact build-plan admission
 
-- schema `steel-dominion.hmf-atlas-v3-local-validation.v1`;
-- repository `EVAVO-STUDIO/steel-dominion`;
-- the exact expected 40-character game commit;
-- Godot 4.6.2;
-- all six required suites passed in canonical serial order;
-- a clean game source tree before and after validation;
-- no GitHub Actions dependency;
-- no image generation.
+Every supplied plan is re-admitted before any pixel work. The verifier requires:
 
-## Required atlas build evidence
+- schema `evavo.heavy-metal-fighting-frame-atlas-v3-plan.v1`;
+- protocol `2026-08-12.1`;
+- project and Frame identity;
+- canonical self-hash;
+- named-human style-proof approval;
+- exact `production_master_v3` geometry;
+- 224 ordered 160×160 sources;
+- exact slot, row, column and atlas coordinates;
+- source byte counts and SHA-256 identities;
+- safe source-relative paths under the declared Frame source root;
+- 26 non-empty batch-evidence records covering every source exactly once;
+- exact reserved slots 224–255;
+- canonical output names and `steel-dominion` target paths;
+- closed build authority;
+- create-only atomic workspace publication.
 
-`atlasBuildEvidence` must contain exactly four entries in canonical order:
+The build receipt is then re-admitted and cross-bound to the exact plan,
+style-proof execution, approval, image, target, blockers and authority.
 
-```text
-bastion
-viper
-citadel
-mirage
-```
+## Independent PNG and pixel verification
 
-Each entry supplies the Python atlas builder's exact self-hashed build receipt and its independent build-verification result.
+Art Studio privately copies every byte view before inspecting it. Proxy objects,
+accessors, shared memory, missing entries, extra entries and oversized payloads
+are rejected.
 
-Every build receipt is re-admitted through a closed contract and must retain:
+For the atlas and each source PNG it independently validates:
 
-- schema `evavo.heavy-metal-fighting-frame-atlas-v3-build-receipt.v1`;
-- `production_master_v3` identity;
-- 224 authored sources and 32 reserved slots;
-- one named-human style-proof approval with valid evidence identity and UTC time;
-- canonical image and manifest names;
-- canonical `res://assets/fighters/final-v3/<frame>.png` target;
-- the exact existing activation blockers;
-- create-only atomic workspace publication;
-- source/workspace read-write authority only;
-- no source mutation, target-repository mutation, Git mutation, deployment or publication;
-- a valid canonical `receiptSha256`.
+- the eight-byte PNG signature;
+- complete bounded chunk framing;
+- alphabetic chunk types;
+- CRC-32 for every chunk;
+- one leading 13-byte `IHDR`;
+- contiguous `IDAT` data;
+- one terminal zero-length `IEND`;
+- no trailing bytes;
+- no APNG chunks;
+- no unsupported critical chunks;
+- eight-bit RGBA colour type 6;
+- standard compression and filtering;
+- non-interlaced encoding;
+- exact 2560×2560 atlas dimensions;
+- exact 160×160 source dimensions;
+- bounded inflation;
+- scanline filters 0, 1, 2, 3 and 4.
 
-The corresponding build verification must use schema:
+It then requires:
+
+- the exact atlas byte count and SHA-256 from the build receipt;
+- every source byte count and SHA-256 from the plan;
+- pixel-for-pixel equality between all 224 decoded sources and their assigned
+  atlas cells;
+- fully transparent reserved slots 224–255.
+
+Only after those checks pass does Art Studio internally compile:
 
 ```text
 evavo.heavy-metal-fighting-frame-atlas-v3-build-verification.v1
 ```
 
-and must cross-bind the exact `frameId`, `planSha256`, `receiptSha256` and atlas image SHA-256. It must also prove:
-
-```text
-status = passed
-exactSourcePixelsVerified = true
-targetRepositoryMutation = false
-gameActivationReady = false
-```
-
-The authorization retains a SHA-256 identity of the complete submitted build-verification object, binding later verification to that exact evidence.
+The resulting `buildVerificationSha256` is therefore an identity of a
+verification Art Studio actually executed, not a caller assertion.
 
 ## Named-human authorization
 
-The human input is closed and contains exactly:
+The human input remains closed and requires exactly:
 
 ```text
 actorId
@@ -104,18 +143,10 @@ evidenceSha256
 attestations
 ```
 
-`decision` must be `authorized`. All attestations are mandatory and true:
-
-```text
-exactGameValidationAdmissionReviewed
-allFourAtlasBuildVerificationsReviewed
-exactBuildReceiptLineageAccepted
-canonicalTargetPathsAccepted
-deliveryAuthorizationOnly
-noRepositoryMutationOrRuntimeActivationPerformed
-```
-
-The authorization timestamp must be **at or after both** the completed local game-validation window and the latest retained Frame style-proof approval. An authorization that predates evidence it claims to review fails closed.
+`decision` must be `authorized`, the decision time must be at or after the
+validated game and style-proof evidence, and all six attestations must be true.
+The decision authorizes delivery evidence only. It does not authorize repository
+mutation or runtime activation.
 
 ## Output and verification
 
@@ -123,24 +154,32 @@ A successful compilation emits:
 
 ```text
 evavo.heavy-metal-fighting-atlas-v3-game-delivery-authorization.v1
+protocolVersion: 2026-08-15.2
 ```
 
-The self-hashed record binds the exact game-validation admission, validated `steel-dominion` commit, all four plan/receipt/verification/image/style-proof identities, canonical target paths, named-human decision and a closed authority map.
+The record binds the exact game commit, game-validation admission, four plans,
+four build receipts, four internally compiled pixel-verification identities,
+four atlas image identities, canonical target paths, style-proof executions and
+named-human authorization evidence.
 
-`verifyHmfAtlasV3GameDeliveryAuthorization` does not accept that record alone. It requires the submitted authorization plus all original game-validation bytes, game head, four build-evidence entries and human authorization, then recompiles the expected record and requires exact identity agreement.
-
-A caller therefore cannot alter the authorizer, game commit, atlas image, receipt, target path, evidence chronology or authority flags, recompute `authorizationSha256`, and have the altered record verify against unchanged source evidence.
+`verifyHmfAtlasV3GameDeliveryAuthorization` requires the submitted authorization
+and all original inputs. It repeats the game-validation admission, plan and
+receipt checks, PNG decoding and all 896 source-cell comparisons, recompiles the
+canonical authorization and requires exact identity agreement.
 
 ## Authority boundary
 
 Positive capabilities:
 
 ```text
-evidenceAdmission                  true
-namedHumanDeliveryAuthorization    true
+evidenceAdmission                    true
+callerSuppliedAtlasByteRead           true
+callerSuppliedSourceByteRead          true
+imageInspection                       true
+namedHumanDeliveryAuthorization       true
 ```
 
-These remain false:
+The following remain false:
 
 ```text
 gameRepositoryRead
@@ -152,4 +191,7 @@ publication
 forcePush
 ```
 
-This is deliberately one step before any `steel-dominion` repository writer. A future writer must independently re-verify this authorization and the concrete atlas bytes it intends to install before it may mutate the game repository.
+The byte reads are limited to buffers explicitly supplied by the caller. There
+is no autonomous filesystem discovery, provider execution, image mutation,
+packing execution or game-repository write. A future writer must independently
+re-verify this authorization and the concrete bytes it intends to install.
