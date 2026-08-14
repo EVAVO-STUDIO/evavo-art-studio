@@ -1,0 +1,194 @@
+{
+  "schema": "evavo.rally-timber-bridge-visual-development.v1",
+  "protocolVersion": "2026-08-15.3",
+  "assetId": "timber-bridge-production-v1",
+  "subjectId": "timber-bridge",
+  "title": "Forest Rally timber bridge",
+  "style": {
+    "projectionFamily": "fixed-isometric-2-5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "structureLanguage": "A compact weathered timber rally bridge spanning a shallow forest creek, with a broad single-lane deck, readable heavy beams, restrained metal fasteners, sacrificial railings and damage silhouettes legible from the fixed gameplay camera.",
+    "palette": [
+      "#211710",
+      "#4a2e1c",
+      "#755038",
+      "#a17c57",
+      "#c9ab7d",
+      "#3b4140",
+      "#68716d",
+      "#d7d0bd"
+    ],
+    "surfaceLanguage": [
+      "broad timber value groups",
+      "clear plank and beam hierarchy",
+      "wet and dry material separation",
+      "restrained metal fasteners",
+      "damage silhouettes readable at gameplay scale",
+      "no baked directional lighting"
+    ],
+    "forbidden": [
+      "modern concrete motorway bridge",
+      "real company branding",
+      "tiny unreadable warning text",
+      "photogrammetry noise",
+      "hyper-real splinter clutter",
+      "baked directional shadows",
+      "contact sheets",
+      "multi-panel image layouts",
+      "multiple unrelated bridges in one image"
+    ]
+  },
+  "cameraLocks": {
+    "heroYawDegrees": 35,
+    "heroPitchDegrees": 26,
+    "orthographicPitchDegrees": 0,
+    "topPlanPitchDegrees": 90,
+    "focalLengthMm": 70,
+    "consistentDeckWidth": true,
+    "consistentSpanLength": true,
+    "consistentSupportSpacing": true
+  },
+  "jobs": [
+    {
+      "id": "timber-bridge-identity-dry",
+      "role": "identity-master",
+      "view": "front-three-quarter",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": [],
+      "include": ["single complete bridge", "dry timber deck", "forest creek context", "both railings", "clear approach road"],
+      "exclude": ["vehicles", "people", "rain", "damage", "multiple bridges"]
+    },
+    {
+      "id": "timber-bridge-identity-wet",
+      "role": "identity-continuity",
+      "view": "rear-three-quarter",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["timber-bridge-identity-dry"],
+      "include": ["same exact bridge identity", "wet timber", "muddy approaches", "shallow creek", "subtle mist"],
+      "exclude": ["different span", "night", "vehicles", "collapsed structure", "flood"]
+    },
+    {
+      "id": "timber-bridge-ortho-front",
+      "role": "modular-modeling-reference",
+      "view": "front",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["timber-bridge-identity-dry"],
+      "include": ["strict front orthographic", "full deck width", "rail height", "support spacing", "true transparent background"],
+      "exclude": ["perspective convergence", "labels", "dimensions", "cast shadow", "creek context"]
+    },
+    {
+      "id": "timber-bridge-ortho-side",
+      "role": "modular-modeling-reference",
+      "view": "left",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["timber-bridge-identity-dry"],
+      "include": ["strict side orthographic", "full span", "deck thickness", "beam and support hierarchy", "true transparent background"],
+      "exclude": ["perspective convergence", "labels", "dimensions", "cast shadow", "trees"]
+    },
+    {
+      "id": "timber-bridge-ortho-top",
+      "role": "modular-modeling-reference",
+      "view": "top",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["timber-bridge-identity-dry"],
+      "include": ["strict top orthographic", "plank layout", "rail alignment", "approach width", "true transparent background"],
+      "exclude": ["perspective convergence", "labels", "dimensions", "cast shadow", "water"]
+    },
+    {
+      "id": "timber-bridge-underside-structure",
+      "role": "modular-modeling-reference",
+      "view": "underside-three-quarter",
+      "phase": "structure",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["timber-bridge-ortho-side", "timber-bridge-ortho-front"],
+      "include": ["same exact bridge", "longitudinal beams", "cross beams", "supports", "metal fasteners", "true transparent background"],
+      "exclude": ["different bridge", "vehicles", "labels", "cast shadow", "decorative context"]
+    },
+    {
+      "id": "timber-bridge-material-dry-wet",
+      "role": "runtime-shader-reference",
+      "view": "material-detail",
+      "phase": "materials",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["timber-bridge-identity-dry", "timber-bridge-identity-wet"],
+      "include": ["weathered dry timber", "wet timber", "mud staining", "metal bolt", "broad stylized material groups"],
+      "exclude": ["text labels", "full second bridge", "photoreal scan", "baked shadow", "moss overgrowth"]
+    },
+    {
+      "id": "timber-bridge-damage-stressed",
+      "role": "breakable-damage-reference",
+      "view": "front-three-quarter",
+      "phase": "damage",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["timber-bridge-identity-dry"],
+      "include": ["same exact bridge", "minor deck flex", "cracked plank", "loose railing", "all major supports intact"],
+      "exclude": ["complete collapse", "fire", "vehicle", "different creek", "gore"]
+    },
+    {
+      "id": "timber-bridge-damage-critical",
+      "role": "breakable-damage-reference",
+      "view": "front-three-quarter",
+      "phase": "damage",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["timber-bridge-damage-stressed"],
+      "include": ["same exact bridge", "broken railing section", "displaced deck planks", "splinter source zones", "critical but readable silhouette"],
+      "exclude": ["entire bridge absent", "fire", "vehicle", "different materials", "gore"]
+    },
+    {
+      "id": "timber-bridge-breakable-parts",
+      "role": "breakable-damage-reference",
+      "view": "front-three-quarter",
+      "phase": "breakables",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["timber-bridge-damage-critical", "timber-bridge-underside-structure"],
+      "include": ["same exact bridge", "separated left railing module", "separated right railing module", "four deck break sections", "detached timber fragments", "true transparent background"],
+      "exclude": ["explosion", "motion blur", "multiple bridges", "labels", "contact sheet"]
+    }
+  ],
+  "output": {
+    "workingRoot": "working/rally/structures/timber-bridge/visual-development-v1",
+    "masterRoot": "masters/rally/structures/timber-bridge/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
