@@ -1,0 +1,64 @@
+{
+  "schema": "evavo.game-art-production-project.v1",
+  "protocolVersion": "2026-08-14.2",
+  "projectId": "reference-3d-action",
+  "title": "REFERENCE 3D ACTION GAME",
+  "profileId": "high-definition-3d-action",
+  "targetRepository": "example/reference-3d-action",
+  "styleDirection": "An original high-definition third-person action game with practical industrial forms, readable combat silhouettes, coherent PBR material language and uncluttered mission interfaces.",
+  "subjectGroups": {
+    "characters": [
+      "sentinel",
+      "raider"
+    ],
+    "environments": [
+      "refinery",
+      "canyon"
+    ],
+    "props": [
+      "pulse-rifle",
+      "power-cell"
+    ],
+    "interfaces": [
+      "mission-hud"
+    ]
+  },
+  "assetTypeAliases": {
+    "hero-concept": "character-concept",
+    "weapon-concept": "prop-concept",
+    "base-color-texture": "material-base-color",
+    "normal-map": "material-normal-map",
+    "environment-key-art": "environment-key-art",
+    "hud-screen": "interface-screen"
+  },
+  "productionDefaults": {
+    "batchSize": 4,
+    "candidateFanout": 1,
+    "maximumRepairAttempts": 2
+  },
+  "assetTypeOverrides": {},
+  "referenceContract": {
+    "styleRoot": "working/style",
+    "subjectRootTemplates": {
+      "characters": "working/characters/{subjectId}",
+      "environments": "working/environments/{subjectId}",
+      "props": "working/props/{subjectId}",
+      "interfaces": "working/interface/{subjectId}"
+    },
+    "continuityAuthority": "approved character, prop, material, environment and interface authorities inside the same production family"
+  },
+  "metadata": {
+    "purpose": "A non-pixel reference binding proving rendering, filtering and authoring-scale policies are supplied by profiles rather than hardcoded in the generic engine."
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticApproval": false,
+    "automaticPromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}

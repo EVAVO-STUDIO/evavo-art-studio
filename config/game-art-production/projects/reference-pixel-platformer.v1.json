@@ -1,14 +1,22 @@
 {
   "schema": "evavo.game-art-production-project.v1",
-  "protocolVersion": "2026-08-14.1",
+  "protocolVersion": "2026-08-14.2",
   "projectId": "reference-pixel-platformer",
   "title": "REFERENCE PIXEL PLATFORMER",
   "profileId": "pixel-platformer",
   "targetRepository": "example/reference-pixel-platformer",
   "styleDirection": "A compact original pixel platformer with clear gameplay silhouettes, deliberate tile adjacency, restrained palettes and readable layered depth.",
   "subjectGroups": {
-    "characters": ["hero", "rival", "crawler"],
-    "worlds": ["forest", "factory", "summit"]
+    "characters": [
+      "hero",
+      "rival",
+      "crawler"
+    ],
+    "worlds": [
+      "forest",
+      "factory",
+      "summit"
+    ]
   },
   "assetTypeAliases": {
     "hero-cel": "character-body-cel",

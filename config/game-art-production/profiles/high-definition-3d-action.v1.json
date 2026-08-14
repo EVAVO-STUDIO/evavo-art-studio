@@ -1,0 +1,443 @@
+{
+  "schema": "evavo.game-art-production-profile.v1",
+  "protocolVersion": "2026-08-14.2",
+  "profileId": "high-definition-3d-action",
+  "label": "High-definition 3D action game",
+  "gameType": "3d-action",
+  "era": "modern",
+  "tags": [
+    "high-definition",
+    "3d-action",
+    "concept-art",
+    "pbr-textures",
+    "interface-design"
+  ],
+  "defaults": {
+    "batchSize": 6,
+    "candidateFanout": 1,
+    "maximumRepairAttempts": 3,
+    "imageFormat": "png",
+    "renderingModel": "high-definition-raster",
+    "textureFiltering": "linear",
+    "authoringScalePolicy": "uniform",
+    "oneAssetPerOutput": true,
+    "providerFallbackAllowed": false
+  },
+  "lifecycle": [
+    {
+      "id": "planned",
+      "rank": 0,
+      "implicit": true,
+      "requiresEvidence": false,
+      "requiresCandidate": false,
+      "requiresHuman": false,
+      "nextAction": "lock-references"
+    },
+    {
+      "id": "references-locked",
+      "rank": 1,
+      "requiresEvidence": true,
+      "requiresCandidate": false,
+      "requiresHuman": false,
+      "nextAction": "request-generation-authorization"
+    },
+    {
+      "id": "generation-authorized",
+      "rank": 2,
+      "requiresEvidence": true,
+      "requiresCandidate": false,
+      "requiresHuman": true,
+      "nextAction": "run-provider-once"
+    },
+    {
+      "id": "candidates-admitted",
+      "rank": 3,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "run-deterministic-qa"
+    },
+    {
+      "id": "deterministic-qa-passed",
+      "rank": 4,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "run-creative-review"
+    },
+    {
+      "id": "creative-review-passed",
+      "rank": 5,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "select-or-request-repair"
+    },
+    {
+      "id": "selected-or-repair-requested",
+      "rank": 6,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": true,
+      "outcomes": [
+        "selected",
+        "repair-requested"
+      ],
+      "nextAction": "branch-on-human-decision"
+    },
+    {
+      "id": "mastered",
+      "rank": 7,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "request-named-human-approval"
+    },
+    {
+      "id": "named-human-approved",
+      "rank": 8,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": true,
+      "nextAction": "compile-delivery-readiness"
+    },
+    {
+      "id": "delivery-ready",
+      "rank": 9,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "complete",
+      "terminal": true
+    }
+  ],
+  "reviewPresets": {
+    "character-concept-review": {
+      "humanRequired": true,
+      "modes": [
+        "native",
+        "fit-preview",
+        "thumbnail",
+        "silhouette",
+        "grayscale"
+      ],
+      "criteria": [
+        "identity",
+        "anatomy",
+        "costume-design",
+        "gameplay-role",
+        "material-language",
+        "production-usability"
+      ]
+    },
+    "prop-concept-review": {
+      "humanRequired": true,
+      "modes": [
+        "native",
+        "fit-preview",
+        "thumbnail",
+        "silhouette",
+        "grayscale"
+      ],
+      "criteria": [
+        "prop-role",
+        "scale-language",
+        "construction-logic",
+        "material-language",
+        "interaction-readability",
+        "production-usability"
+      ]
+    },
+    "material-texture-review": {
+      "humanRequired": true,
+      "modes": [
+        "native",
+        "tiled-preview",
+        "sphere-preview",
+        "grayscale",
+        "channel-inspection"
+      ],
+      "criteria": [
+        "seam-safety",
+        "value-range",
+        "material-response",
+        "channel-correctness",
+        "scale-consistency",
+        "production-usability"
+      ]
+    },
+    "environment-key-art-review": {
+      "humanRequired": true,
+      "modes": [
+        "native",
+        "fit-preview",
+        "gameplay-overlay",
+        "thumbnail",
+        "grayscale"
+      ],
+      "criteria": [
+        "composition",
+        "gameplay-space",
+        "scale-language",
+        "lighting",
+        "material-language",
+        "production-usability"
+      ]
+    },
+    "interface-screen-review": {
+      "humanRequired": true,
+      "modes": [
+        "native",
+        "fit-preview",
+        "runtime-overlay",
+        "accessibility-preview",
+        "grayscale"
+      ],
+      "criteria": [
+        "hierarchy",
+        "readability",
+        "interaction-clarity",
+        "safe-area",
+        "accessibility",
+        "visual-language"
+      ]
+    }
+  },
+  "assetTypes": {
+    "character-concept": {
+      "kind": "concept-art",
+      "nativeDimensions": {
+        "width": 2048,
+        "height": 2048
+      },
+      "authoringCanvas": {
+        "width": 4096,
+        "height": 4096
+      },
+      "alpha": "mixed",
+      "reviewPreset": "character-concept-review",
+      "pathTemplate": "working/characters/{subjectId}/concept/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/characters/{subjectId}/concept/{productionGroup}/{unitId}.png",
+      "qaChecks": [
+        "native-dimensions",
+        "alpha-policy",
+        "color-space",
+        "crop-margins",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "color-space-drift",
+        "crop-risk",
+        "identity-drift",
+        "anatomy-drift",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "one independently authored character concept",
+        "clear gameplay role and silhouette",
+        "coherent construction and material callouts",
+        "production-usable front-facing design evidence"
+      ]
+    },
+    "prop-concept": {
+      "kind": "concept-art",
+      "nativeDimensions": {
+        "width": 2048,
+        "height": 2048
+      },
+      "authoringCanvas": {
+        "width": 4096,
+        "height": 4096
+      },
+      "alpha": "mixed",
+      "reviewPreset": "prop-concept-review",
+      "pathTemplate": "working/props/{subjectId}/concept/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/props/{subjectId}/concept/{productionGroup}/{unitId}.png",
+      "qaChecks": [
+        "native-dimensions",
+        "alpha-policy",
+        "color-space",
+        "crop-margins",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "color-space-drift",
+        "crop-risk",
+        "scale-language-drift",
+        "construction-logic-failure",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "one independently authored prop concept",
+        "clear scale and interaction affordances",
+        "credible construction and material breakup",
+        "no generated labels or fake callout text"
+      ]
+    },
+    "material-base-color": {
+      "kind": "texture-map",
+      "nativeDimensions": {
+        "width": 2048,
+        "height": 2048
+      },
+      "authoringCanvas": {
+        "width": 2048,
+        "height": 2048
+      },
+      "alpha": "opaque",
+      "reviewPreset": "material-texture-review",
+      "pathTemplate": "working/materials/{subjectId}/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/materials/{subjectId}/{productionGroup}/{unitId}.png",
+      "qaChecks": [
+        "native-dimensions",
+        "opaque-contract",
+        "color-space",
+        "tile-seams",
+        "value-range",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "color-space-drift",
+        "edge-seam",
+        "value-range-drift",
+        "material-scale-drift",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "one seamless base-color texture map",
+        "no baked lighting or normal information",
+        "consistent real-world material scale",
+        "production-ready tiling edges"
+      ]
+    },
+    "material-normal-map": {
+      "kind": "texture-map",
+      "nativeDimensions": {
+        "width": 2048,
+        "height": 2048
+      },
+      "authoringCanvas": {
+        "width": 2048,
+        "height": 2048
+      },
+      "alpha": "opaque",
+      "reviewPreset": "material-texture-review",
+      "pathTemplate": "working/materials/{subjectId}/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/materials/{subjectId}/{productionGroup}/{unitId}.png",
+      "qaChecks": [
+        "native-dimensions",
+        "opaque-contract",
+        "normal-channel-contract",
+        "tile-seams",
+        "value-range",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "normal-channel-drift",
+        "edge-seam",
+        "value-range-drift",
+        "material-scale-drift",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "one tangent-space normal map",
+        "neutral normal baseline remains correct",
+        "no base-color or lighting contamination",
+        "production-ready tiling edges"
+      ]
+    },
+    "environment-key-art": {
+      "kind": "key-art",
+      "nativeDimensions": {
+        "width": 3840,
+        "height": 2160
+      },
+      "authoringCanvas": {
+        "width": 3840,
+        "height": 2160
+      },
+      "alpha": "opaque",
+      "reviewPreset": "environment-key-art-review",
+      "pathTemplate": "working/environments/{subjectId}/key-art/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/environments/{subjectId}/key-art/{productionGroup}/{unitId}.png",
+      "qaChecks": [
+        "native-dimensions",
+        "opaque-contract",
+        "color-space",
+        "safe-area",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "color-space-drift",
+        "safe-area-violation",
+        "gameplay-space-failure",
+        "scale-language-drift",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "one widescreen environment key-art frame",
+        "clear traversal and combat space",
+        "coherent architectural scale and lighting",
+        "no interface or generated typography"
+      ]
+    },
+    "interface-screen": {
+      "kind": "interface-screen",
+      "nativeDimensions": {
+        "width": 1920,
+        "height": 1080
+      },
+      "authoringCanvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "alpha": "mixed",
+      "reviewPreset": "interface-screen-review",
+      "pathTemplate": "working/interface/{subjectId}/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/interface/{subjectId}/{productionGroup}/{unitId}.png",
+      "qaChecks": [
+        "native-dimensions",
+        "alpha-policy",
+        "safe-area",
+        "contrast",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "safe-area-violation",
+        "contrast-failure",
+        "hierarchy-failure",
+        "generated-or-malformed-text",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "one complete interface screen composition",
+        "clear interaction and information hierarchy",
+        "accessible contrast and safe areas",
+        "text zones use governed copy rather than generated filler"
+      ]
+    }
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticApproval": false,
+    "automaticPromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}

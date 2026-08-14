@@ -25,7 +25,9 @@ test("a completely new game type resolves from in-memory profile and project dat
   assert.equal(project.gameType, "tactical-strategy");
   assert.equal(project.era, "modern");
   assert.deepEqual(order.assetContract.nativeDimensions, { width: 1024, height: 1024 });
-  assert.equal(order.assetContract.authoringScale, 1);
+  assert.equal(order.assetContract.authoringScale.policy, "uniform");
+  assert.equal(order.assetContract.authoringScale.x, 1);
+  assert.equal(order.renderingContract.textureFiltering, "linear");
   assert.equal(order.output.working, "working/units/ranger/base/ranger-base-concept.png");
   assert.equal(order.authority.providerExecution, false);
   assert.equal(JSON.stringify(inputs), before, "profile resolution must not mutate caller data");

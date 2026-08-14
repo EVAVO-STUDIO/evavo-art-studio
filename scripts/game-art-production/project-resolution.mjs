@@ -56,7 +56,7 @@ function validateAssetAliases(input, profile, label) {
   return freeze(normalized);
 }
 
-function mergeAssetType(base, override, reviewPresets, assetTypeId) {
+function mergeAssetType(base, override, reviewPresets, defaults, assetTypeId) {
   if (!override) return base;
   const raw = object(override, `project.assetTypeOverrides.${assetTypeId}`);
   assertKnownKeys(raw, ALLOWED_ASSET_OVERRIDE_KEYS, `project.assetTypeOverrides.${assetTypeId}`);
@@ -67,7 +67,7 @@ function mergeAssetType(base, override, reviewPresets, assetTypeId) {
   delete merged.id;
   delete merged.authoringScale;
   if (raw.promptFragments) merged.promptFragments = [...base.promptFragments, ...raw.promptFragments];
-  return validateAssetType(assetTypeId, merged, reviewPresets, `resolved.assetTypes.${assetTypeId}`);
+  return validateAssetType(assetTypeId, merged, reviewPresets, defaults, `resolved.assetTypes.${assetTypeId}`);
 }
 
 function validateProductionDefaults(input, profileDefaults) {
@@ -140,7 +140,7 @@ export function resolveGameArtProductionProject({ profile: profileInput, project
   const project = validateGameArtProductionProjectBinding(projectInput, profile);
   const assetTypes = Object.fromEntries(Object.entries(profile.assetTypes).map(([assetTypeId, assetType]) => [
     assetTypeId,
-    mergeAssetType(assetType, project.assetTypeOverrides[assetTypeId], profile.reviewPresets, assetTypeId),
+    mergeAssetType(assetType, project.assetTypeOverrides[assetTypeId], profile.reviewPresets, profile.defaults, assetTypeId),
   ]));
   const body = {
     schema: GAME_ART_PRODUCTION_RESOLVED_PROJECT_SCHEMA,

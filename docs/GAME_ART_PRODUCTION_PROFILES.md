@@ -34,10 +34,12 @@ The generic engine contains no HMF roster, path, target-repository or title know
 config/game-art-production/
 ├─ profiles/
 │  ├─ arcade-fighter-1990s.v1.json
-│  └─ pixel-platformer.v1.json
+│  ├─ pixel-platformer.v1.json
+│  └─ high-definition-3d-action.v1.json
 └─ projects/
    ├─ heavy-metal-fighting.v1.json
-   └─ reference-pixel-platformer.v1.json
+   ├─ reference-pixel-platformer.v1.json
+   └─ reference-3d-action.v1.json
 ```
 
 Adding another game type does not require editing the engine. Add a validated profile file and one or more project bindings.
@@ -62,7 +64,8 @@ It provides:
 - filesystem-safe profile and project discovery;
 - reusable lifecycle validation;
 - reusable asset-type contracts;
-- integer authoring-scale validation;
+- profile-controlled exact, integer-uniform, uniform or freeform authoring-scale validation;
+- profile-controlled rendering model, image format and texture-filtering policy;
 - data-driven QA and failure vocabularies;
 - data-driven human review modes and criteria;
 - bounded project specialization;
@@ -84,7 +87,8 @@ default batch and repair policy
 receipt lifecycle and human gates
 review presets
 asset-type contracts
-dimensions and authoring scale
+dimensions and authoring-scale policy
+rendering model, image format and texture filtering
 alpha, pivot and ground rules
 QA checks
 failure codes
@@ -130,6 +134,27 @@ The `pixel-platformer` profile proves that the same engine can resolve a differe
 
 It uses tile adjacency, repeated-tile, gameplay-composite and parallax review instead of fighting-game body and stage review.
 
+### High-definition 3D action
+
+The `high-definition-3d-action` profile proves that pixel assumptions are not embedded in the core. It resolves:
+
+```text
+2048 × 2048 character and prop concepts
+2048 × 2048 PBR base-colour and normal maps
+3840 × 2160 environment key art
+1920 × 1080 interface screens
+```
+
+This profile declares:
+
+```text
+rendering model        high-definition-raster
+texture filtering      linear
+authoring scale policy uniform
+```
+
+Its work orders use concept, material-channel, environment, accessibility and interface review rather than pixel-cluster, ground-contact or nearest-neighbour review. The generic compiler does not mention pixel art, nearest filtering or integer scale unless the selected profile requires them.
+
 ## Project bindings
 
 A project binding supplies only project identity and bounded specialization:
@@ -173,6 +198,7 @@ Projects may specialize these asset-type fields:
 ```text
 nativeDimensions
 authoringCanvas
+authoringScalePolicy
 alpha
 pivot
 groundLineY
@@ -231,7 +257,7 @@ const order = await compileGameArtProductionWorkOrder({
 });
 ```
 
-The same compiler accepts a platformer, strategy game, card game, isometric game, RPG, adventure game or another data-defined profile without adding project branches to the engine.
+The same compiler accepts a platformer, high-definition 3D action game, strategy game, card game, isometric game, RPG, adventure game or another data-defined profile without adding project branches to the engine. Rendering model, format, filtering and scale policy remain profile data.
 
 ## CLI
 
@@ -259,6 +285,16 @@ node scripts/game-art-production/profile-cli.mjs work-order `
   --intent "Standing heavy hero-impact body cel with effects kept separate." `
   --tokens-json body-slot-tokens.json
 ```
+
+## Budget-aware validation
+
+Generic profile changes use one focused workflow:
+
+```text
+.github/workflows/game-art-production-profiles.yml
+```
+
+It performs syntax checks, runs the profile discovery/parity/platformer/3D/extensibility suite, proves a clean source tree and uploads one compact verification artifact. The existing HMF workflow continues to validate HMF-specific production changes, while the repository-wide mainline workflow remains the final integration gate. This avoids adding a second full-repository job for every profile edit.
 
 ## Preserved lifecycle
 

@@ -1,6 +1,6 @@
 {
   "schema": "evavo.game-art-production-profile.v1",
-  "protocolVersion": "2026-08-14.1",
+  "protocolVersion": "2026-08-14.2",
   "profileId": "arcade-fighter-1990s",
   "label": "1990s arcade fighter",
   "gameType": "arcade-fighter",
@@ -17,124 +17,429 @@
     "candidateFanout": 1,
     "maximumRepairAttempts": 3,
     "imageFormat": "png",
+    "renderingModel": "pixel-raster",
     "textureFiltering": "nearest",
-    "integerScaleOnly": true,
+    "authoringScalePolicy": "integer-uniform",
     "oneAssetPerOutput": true,
     "providerFallbackAllowed": false
   },
   "lifecycle": [
-    {"id": "planned", "rank": 0, "implicit": true, "requiresEvidence": false, "requiresCandidate": false, "requiresHuman": false, "nextAction": "lock-references"},
-    {"id": "references-locked", "rank": 1, "requiresEvidence": true, "requiresCandidate": false, "requiresHuman": false, "nextAction": "request-generation-authorization"},
-    {"id": "generation-authorized", "rank": 2, "requiresEvidence": true, "requiresCandidate": false, "requiresHuman": true, "nextAction": "run-provider-once"},
-    {"id": "candidates-admitted", "rank": 3, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "run-deterministic-qa"},
-    {"id": "deterministic-qa-passed", "rank": 4, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "run-creative-review"},
-    {"id": "creative-review-passed", "rank": 5, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "select-or-request-repair"},
-    {"id": "selected-or-repair-requested", "rank": 6, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": true, "outcomes": ["selected", "repair-requested"], "nextAction": "branch-on-human-decision"},
-    {"id": "mastered", "rank": 7, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "request-named-human-approval"},
-    {"id": "named-human-approved", "rank": 8, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": true, "nextAction": "compile-delivery-readiness"},
-    {"id": "delivery-ready", "rank": 9, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "complete", "terminal": true}
+    {
+      "id": "planned",
+      "rank": 0,
+      "implicit": true,
+      "requiresEvidence": false,
+      "requiresCandidate": false,
+      "requiresHuman": false,
+      "nextAction": "lock-references"
+    },
+    {
+      "id": "references-locked",
+      "rank": 1,
+      "requiresEvidence": true,
+      "requiresCandidate": false,
+      "requiresHuman": false,
+      "nextAction": "request-generation-authorization"
+    },
+    {
+      "id": "generation-authorized",
+      "rank": 2,
+      "requiresEvidence": true,
+      "requiresCandidate": false,
+      "requiresHuman": true,
+      "nextAction": "run-provider-once"
+    },
+    {
+      "id": "candidates-admitted",
+      "rank": 3,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "run-deterministic-qa"
+    },
+    {
+      "id": "deterministic-qa-passed",
+      "rank": 4,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "run-creative-review"
+    },
+    {
+      "id": "creative-review-passed",
+      "rank": 5,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "select-or-request-repair"
+    },
+    {
+      "id": "selected-or-repair-requested",
+      "rank": 6,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": true,
+      "outcomes": [
+        "selected",
+        "repair-requested"
+      ],
+      "nextAction": "branch-on-human-decision"
+    },
+    {
+      "id": "mastered",
+      "rank": 7,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "request-named-human-approval"
+    },
+    {
+      "id": "named-human-approved",
+      "rank": 8,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": true,
+      "nextAction": "compile-delivery-readiness"
+    },
+    {
+      "id": "delivery-ready",
+      "rank": 9,
+      "requiresEvidence": true,
+      "requiresCandidate": true,
+      "requiresHuman": false,
+      "nextAction": "complete",
+      "terminal": true
+    }
   ],
   "reviewPresets": {
     "arcade-body-cel": {
       "humanRequired": true,
-      "modes": ["native", "nearest-neighbour-4x", "stage-composite", "thumbnail", "silhouette", "grayscale"],
-      "criteria": ["identity", "silhouette", "mechanical-construction", "pose-role", "motion-cadence", "palette-materials", "pixel-authenticity", "continuity", "mirror-intent"]
+      "modes": [
+        "native",
+        "nearest-neighbour-4x",
+        "stage-composite",
+        "thumbnail",
+        "silhouette",
+        "grayscale"
+      ],
+      "criteria": [
+        "identity",
+        "silhouette",
+        "mechanical-construction",
+        "pose-role",
+        "motion-cadence",
+        "palette-materials",
+        "pixel-authenticity",
+        "continuity",
+        "mirror-intent"
+      ]
     },
     "arcade-portrait": {
       "humanRequired": true,
-      "modes": ["native", "nearest-neighbour-2x", "thumbnail", "silhouette", "grayscale"],
-      "criteria": ["identity", "facial-landmarks", "costume-continuity", "palette-materials", "pixel-authenticity", "interface-readability"]
+      "modes": [
+        "native",
+        "nearest-neighbour-2x",
+        "thumbnail",
+        "silhouette",
+        "grayscale"
+      ],
+      "criteria": [
+        "identity",
+        "facial-landmarks",
+        "costume-continuity",
+        "palette-materials",
+        "pixel-authenticity",
+        "interface-readability"
+      ]
     },
     "arcade-effect-cel": {
       "humanRequired": true,
-      "modes": ["native", "nearest-neighbour-2x", "stage-composite", "grayscale"],
-      "criteria": ["effect-role", "timing-shape", "palette-contrast", "body-separation", "pixel-authenticity", "stage-readability"]
+      "modes": [
+        "native",
+        "nearest-neighbour-2x",
+        "stage-composite",
+        "grayscale"
+      ],
+      "criteria": [
+        "effect-role",
+        "timing-shape",
+        "palette-contrast",
+        "body-separation",
+        "pixel-authenticity",
+        "stage-readability"
+      ]
     },
     "arcade-arena-layer": {
       "humanRequired": true,
-      "modes": ["native", "fight-plane-composite", "thumbnail", "grayscale"],
-      "criteria": ["arena-identity", "fight-plane-clarity", "parallax-separation", "value-hierarchy", "pixel-authenticity", "fighter-readability"]
+      "modes": [
+        "native",
+        "fight-plane-composite",
+        "thumbnail",
+        "grayscale"
+      ],
+      "criteria": [
+        "arena-identity",
+        "fight-plane-clarity",
+        "parallax-separation",
+        "value-hierarchy",
+        "pixel-authenticity",
+        "fighter-readability"
+      ]
     },
     "arcade-interface": {
       "humanRequired": true,
-      "modes": ["native", "runtime-composite", "thumbnail", "grayscale"],
-      "criteria": ["hierarchy", "readability", "era-authenticity", "state-clarity", "safe-area", "pixel-authenticity"]
+      "modes": [
+        "native",
+        "runtime-composite",
+        "thumbnail",
+        "grayscale"
+      ],
+      "criteria": [
+        "hierarchy",
+        "readability",
+        "era-authenticity",
+        "state-clarity",
+        "safe-area",
+        "pixel-authenticity"
+      ]
     }
   },
   "assetTypes": {
     "character-body-cel": {
       "kind": "animation-frame",
-      "nativeDimensions": {"width": 160, "height": 160},
-      "authoringCanvas": {"width": 640, "height": 640},
+      "nativeDimensions": {
+        "width": 160,
+        "height": 160
+      },
+      "authoringCanvas": {
+        "width": 640,
+        "height": 640
+      },
       "alpha": "transparent",
-      "pivot": {"x": 80, "y": 152},
+      "pivot": {
+        "x": 80,
+        "y": 152
+      },
       "groundLineY": 152,
       "reviewPreset": "arcade-body-cel",
       "pathTemplate": "working/characters/{subjectId}/animation/{productionGroup}/{unitId}.png",
       "masterPathTemplate": "masters/characters/{subjectId}/animation/{productionGroup}/{unitId}.png",
-      "qaChecks": ["native-dimensions", "rgba-alpha", "transparent-rgb", "crop-margins", "pivot", "ground-contact", "palette-complexity", "connected-body", "duplicate-candidate"],
-      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "unsafe-transparent-rgb", "crop-risk", "pivot-drift", "ground-contact-drift", "palette-contract-drift", "random-greebles", "duplicate-candidate", "continuity-break", "mirror-intent-drift"],
-      "promptFragments": ["one physical character body cel", "effects authored separately", "strong readable silhouette", "era-authentic clustered pixel construction", "stable hardware and costume landmarks across the animation bank"]
+      "qaChecks": [
+        "native-dimensions",
+        "rgba-alpha",
+        "transparent-rgb",
+        "crop-margins",
+        "pivot",
+        "ground-contact",
+        "palette-complexity",
+        "connected-body",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "unsafe-transparent-rgb",
+        "crop-risk",
+        "pivot-drift",
+        "ground-contact-drift",
+        "palette-contract-drift",
+        "random-greebles",
+        "duplicate-candidate",
+        "continuity-break",
+        "mirror-intent-drift"
+      ],
+      "promptFragments": [
+        "one physical character body cel",
+        "effects authored separately",
+        "strong readable silhouette",
+        "era-authentic clustered pixel construction",
+        "stable hardware and costume landmarks across the animation bank"
+      ]
     },
     "character-portrait": {
       "kind": "portrait",
-      "nativeDimensions": {"width": 256, "height": 256},
-      "authoringCanvas": {"width": 1024, "height": 1024},
+      "nativeDimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "authoringCanvas": {
+        "width": 1024,
+        "height": 1024
+      },
       "alpha": "mixed",
       "reviewPreset": "arcade-portrait",
       "pathTemplate": "working/characters/{subjectId}/portraits/{unitId}.png",
       "masterPathTemplate": "masters/characters/{subjectId}/portraits/{unitId}.png",
-      "qaChecks": ["native-dimensions", "alpha-policy", "crop-margins", "palette-complexity", "duplicate-candidate"],
-      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "crop-risk", "palette-contract-drift", "identity-drift", "facial-landmark-drift", "duplicate-candidate"],
-      "promptFragments": ["recognisable character identity at gameplay UI size", "stable face and costume landmarks", "restrained era-authentic pixel clusters", "no generated typography"]
+      "qaChecks": [
+        "native-dimensions",
+        "alpha-policy",
+        "crop-margins",
+        "palette-complexity",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "crop-risk",
+        "palette-contract-drift",
+        "identity-drift",
+        "facial-landmark-drift",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "recognisable character identity at gameplay UI size",
+        "stable face and costume landmarks",
+        "restrained era-authentic pixel clusters",
+        "no generated typography"
+      ]
     },
     "effect-cel": {
       "kind": "effect-frame",
-      "nativeDimensions": {"width": 256, "height": 256},
-      "authoringCanvas": {"width": 1024, "height": 1024},
+      "nativeDimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "authoringCanvas": {
+        "width": 1024,
+        "height": 1024
+      },
       "alpha": "transparent",
       "reviewPreset": "arcade-effect-cel",
       "pathTemplate": "working/effects/{subjectId}/{productionGroup}/{unitId}.png",
       "masterPathTemplate": "masters/effects/{subjectId}/{productionGroup}/{unitId}.png",
-      "qaChecks": ["native-dimensions", "rgba-alpha", "transparent-rgb", "crop-margins", "palette-complexity", "duplicate-candidate"],
-      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "unsafe-transparent-rgb", "crop-risk", "palette-contract-drift", "effect-body-entanglement", "duplicate-candidate"],
-      "promptFragments": ["single isolated gameplay effect frame", "transparent background", "readable impact hierarchy", "no character-body substitution"]
+      "qaChecks": [
+        "native-dimensions",
+        "rgba-alpha",
+        "transparent-rgb",
+        "crop-margins",
+        "palette-complexity",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "unsafe-transparent-rgb",
+        "crop-risk",
+        "palette-contract-drift",
+        "effect-body-entanglement",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "single isolated gameplay effect frame",
+        "transparent background",
+        "readable impact hierarchy",
+        "no character-body substitution"
+      ]
     },
     "arena-layer": {
       "kind": "background-layer",
-      "nativeDimensions": {"width": 640, "height": 360},
-      "authoringCanvas": {"width": 1280, "height": 720},
+      "nativeDimensions": {
+        "width": 640,
+        "height": 360
+      },
+      "authoringCanvas": {
+        "width": 1280,
+        "height": 720
+      },
       "alpha": "mixed",
       "reviewPreset": "arcade-arena-layer",
       "pathTemplate": "working/arenas/{subjectId}/{productionGroup}/{unitId}.png",
       "masterPathTemplate": "masters/arenas/{subjectId}/{productionGroup}/{unitId}.png",
-      "qaChecks": ["native-dimensions", "alpha-policy", "edge-seams", "palette-complexity", "duplicate-candidate"],
-      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "edge-seam", "palette-contract-drift", "fight-plane-obstruction", "parallax-depth-drift", "duplicate-candidate"],
-      "promptFragments": ["clear horizontal fight plane", "layer remains independently composable", "fighters retain foreground contrast", "era-authentic pixel background construction"]
+      "qaChecks": [
+        "native-dimensions",
+        "alpha-policy",
+        "edge-seams",
+        "palette-complexity",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "edge-seam",
+        "palette-contract-drift",
+        "fight-plane-obstruction",
+        "parallax-depth-drift",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "clear horizontal fight plane",
+        "layer remains independently composable",
+        "fighters retain foreground contrast",
+        "era-authentic pixel background construction"
+      ]
     },
     "interface-element": {
       "kind": "interface-element",
-      "nativeDimensions": {"width": 320, "height": 180},
-      "authoringCanvas": {"width": 1280, "height": 720},
+      "nativeDimensions": {
+        "width": 320,
+        "height": 180
+      },
+      "authoringCanvas": {
+        "width": 1280,
+        "height": 720
+      },
       "alpha": "mixed",
       "reviewPreset": "arcade-interface",
       "pathTemplate": "working/interface/{productionGroup}/{unitId}.png",
       "masterPathTemplate": "masters/interface/{productionGroup}/{unitId}.png",
-      "qaChecks": ["native-dimensions", "alpha-policy", "safe-area", "palette-complexity", "duplicate-candidate"],
-      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "safe-area-violation", "palette-contract-drift", "hierarchy-failure", "generated-or-malformed-text", "duplicate-candidate"],
-      "promptFragments": ["clear arcade information hierarchy", "state-readable at runtime scale", "era-authentic interface framing", "text zones remain blank unless typography is separately authored"]
+      "qaChecks": [
+        "native-dimensions",
+        "alpha-policy",
+        "safe-area",
+        "palette-complexity",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "safe-area-violation",
+        "palette-contract-drift",
+        "hierarchy-failure",
+        "generated-or-malformed-text",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "clear arcade information hierarchy",
+        "state-readable at runtime scale",
+        "era-authentic interface framing",
+        "text zones remain blank unless typography is separately authored"
+      ]
     },
     "title-card": {
       "kind": "title-card",
-      "nativeDimensions": {"width": 640, "height": 360},
-      "authoringCanvas": {"width": 1280, "height": 720},
+      "nativeDimensions": {
+        "width": 640,
+        "height": 360
+      },
+      "authoringCanvas": {
+        "width": 1280,
+        "height": 720
+      },
       "alpha": "mixed",
       "reviewPreset": "arcade-interface",
       "pathTemplate": "working/title/{productionGroup}/{unitId}.png",
       "masterPathTemplate": "masters/title/{productionGroup}/{unitId}.png",
-      "qaChecks": ["native-dimensions", "alpha-policy", "safe-area", "palette-complexity", "duplicate-candidate"],
-      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "safe-area-violation", "palette-contract-drift", "generated-or-malformed-text", "duplicate-candidate"],
-      "promptFragments": ["bold arcade presentation", "logo and typography are separate governed assets", "clean title-safe composition", "era-authentic pixel and CRT-aware contrast"]
+      "qaChecks": [
+        "native-dimensions",
+        "alpha-policy",
+        "safe-area",
+        "palette-complexity",
+        "duplicate-candidate"
+      ],
+      "failureCodes": [
+        "wrong-native-dimensions",
+        "alpha-contamination",
+        "safe-area-violation",
+        "palette-contract-drift",
+        "generated-or-malformed-text",
+        "duplicate-candidate"
+      ],
+      "promptFragments": [
+        "bold arcade presentation",
+        "logo and typography are separate governed assets",
+        "clean title-safe composition",
+        "era-authentic pixel and CRT-aware contrast"
+      ]
     }
   },
   "authority": {

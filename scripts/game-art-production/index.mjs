@@ -1,4 +1,5 @@
 export {
+  AUTHORING_SCALE_POLICIES,
   GAME_ART_PRODUCTION_PROFILE_SCHEMA,
   GAME_ART_PRODUCTION_PROJECT_SCHEMA,
   GAME_ART_PRODUCTION_PROTOCOL_VERSION,
@@ -6,6 +7,7 @@ export {
   GAME_ART_PRODUCTION_WORK_ORDER_SCHEMA,
   canonicalJson,
   sha256,
+  validateAuthoringScale,
 } from "./common.mjs";
 export {
   validateAssetType,

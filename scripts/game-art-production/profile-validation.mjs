@@ -1,5 +1,6 @@
 import {
   ALPHA_MODES,
+  AUTHORING_SCALE_POLICIES,
   GAME_ART_PRODUCTION_PROFILE_SCHEMA,
   GAME_ART_PRODUCTION_PROTOCOL_VERSION,
   array,
@@ -14,7 +15,7 @@ import {
   string,
   uniqueStrings,
   validateAuthority,
-  validateIntegerScale,
+  validateAuthoringScale,
 } from "./common.mjs";
 
 function validateLifecycle(input, label) {
@@ -61,12 +62,14 @@ function validateReviewPresets(input, label) {
   return freeze(normalized);
 }
 
-export function validateAssetType(assetTypeId, input, reviewPresets, label) {
+export function validateAssetType(assetTypeId, input, reviewPresets, defaults, label) {
   id(assetTypeId, `${label}.id`);
   const value = object(input, label);
   const nativeDimensions = dimensions(value.nativeDimensions, `${label}.nativeDimensions`);
   const authoringCanvas = dimensions(value.authoringCanvas, `${label}.authoringCanvas`);
-  const authoringScale = validateIntegerScale(nativeDimensions, authoringCanvas, `${label}.authoringCanvas`);
+  const authoringScalePolicy = id(value.authoringScalePolicy ?? defaults.authoringScalePolicy, `${label}.authoringScalePolicy`);
+  assert(AUTHORING_SCALE_POLICIES.has(authoringScalePolicy), `${label}.authoringScalePolicy is unsupported.`);
+  const authoringScale = validateAuthoringScale(nativeDimensions, authoringCanvas, authoringScalePolicy, `${label}.authoringCanvas`);
   const alpha = string(value.alpha, `${label}.alpha`, 1, 32);
   assert(ALPHA_MODES.has(alpha), `${label}.alpha must be transparent, opaque, or mixed.`);
   const reviewPreset = id(value.reviewPreset, `${label}.reviewPreset`);
@@ -83,6 +86,7 @@ export function validateAssetType(assetTypeId, input, reviewPresets, label) {
     kind: id(value.kind, `${label}.kind`),
     nativeDimensions,
     authoringCanvas,
+    authoringScalePolicy,
     authoringScale,
     alpha,
     pivot,
@@ -103,8 +107,9 @@ function validateDefaults(input, label) {
     candidateFanout: integer(value.candidateFanout, `${label}.candidateFanout`, 1, 1),
     maximumRepairAttempts: integer(value.maximumRepairAttempts, `${label}.maximumRepairAttempts`, 1, 20),
     imageFormat: id(value.imageFormat, `${label}.imageFormat`),
+    renderingModel: id(value.renderingModel, `${label}.renderingModel`),
     textureFiltering: id(value.textureFiltering, `${label}.textureFiltering`),
-    integerScaleOnly: value.integerScaleOnly === true,
+    authoringScalePolicy: id(value.authoringScalePolicy, `${label}.authoringScalePolicy`),
     oneAssetPerOutput: value.oneAssetPerOutput === true,
     providerFallbackAllowed: value.providerFallbackAllowed === true,
   });
@@ -116,8 +121,7 @@ export function validateGameArtProductionProfile(input) {
   assert(raw.protocolVersion === GAME_ART_PRODUCTION_PROTOCOL_VERSION, "profile.protocolVersion drifted.");
   const profileId = id(raw.profileId, "profile.profileId");
   const defaults = validateDefaults(raw.defaults, "profile.defaults");
-  assert(defaults.textureFiltering === "nearest", "profile defaults must retain nearest texture filtering.");
-  assert(defaults.integerScaleOnly === true, "profile defaults must retain integer-only scaling.");
+  assert(AUTHORING_SCALE_POLICIES.has(defaults.authoringScalePolicy), "profile defaults use an unsupported authoring scale policy.");
   assert(defaults.oneAssetPerOutput === true, "profile defaults must retain one asset per output.");
   assert(defaults.providerFallbackAllowed === false, "profile defaults must disable provider fallback.");
   const lifecycle = validateLifecycle(raw.lifecycle, "profile.lifecycle");
@@ -126,7 +130,7 @@ export function validateGameArtProductionProfile(input) {
   assert(Object.keys(rawAssetTypes).length >= 1, "profile.assetTypes must contain at least one type.");
   const assetTypes = Object.fromEntries(Object.entries(rawAssetTypes).map(([assetTypeId, value]) => [
     assetTypeId,
-    validateAssetType(assetTypeId, value, reviewPresets, `profile.assetTypes.${assetTypeId}`),
+    validateAssetType(assetTypeId, value, reviewPresets, defaults, `profile.assetTypes.${assetTypeId}`),
   ]));
   const authority = validateAuthority(raw.authority, "profile.authority");
   const body = {

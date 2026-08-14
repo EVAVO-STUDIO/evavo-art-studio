@@ -7,7 +7,7 @@ export const GAME_ART_PRODUCTION_PROFILE_SCHEMA = "evavo.game-art-production-pro
 export const GAME_ART_PRODUCTION_PROJECT_SCHEMA = "evavo.game-art-production-project.v1";
 export const GAME_ART_PRODUCTION_RESOLVED_PROJECT_SCHEMA = "evavo.game-art-production-resolved-project.v1";
 export const GAME_ART_PRODUCTION_WORK_ORDER_SCHEMA = "evavo.game-art-production-work-order.v1";
-export const GAME_ART_PRODUCTION_PROTOCOL_VERSION = "2026-08-14.1";
+export const GAME_ART_PRODUCTION_PROTOCOL_VERSION = "2026-08-14.2";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(HERE, "../..");
@@ -17,6 +17,7 @@ export const PROJECT_ROOT = path.join(CONFIG_ROOT, "projects");
 export const ID_PATTERN = /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/u;
 export const PATH_TOKEN_PATTERN = /\{([A-Za-z][A-Za-z0-9]*)(?::(\d{2}))?\}/gu;
 export const ALPHA_MODES = new Set(["transparent", "opaque", "mixed"]);
+export const AUTHORING_SCALE_POLICIES = new Set(["exact", "integer-uniform", "uniform", "freeform"]);
 export const FORBIDDEN_AUTHORITY_KEYS = Object.freeze([
   "providerExecution",
   "automaticGenerationAuthorization",
@@ -30,6 +31,7 @@ export const FORBIDDEN_AUTHORITY_KEYS = Object.freeze([
 export const ALLOWED_ASSET_OVERRIDE_KEYS = new Set([
   "nativeDimensions",
   "authoringCanvas",
+  "authoringScalePolicy",
   "alpha",
   "pivot",
   "groundLineY",
@@ -99,13 +101,31 @@ export function dimensions(value, label) {
   });
 }
 
-export function validateIntegerScale(nativeDimensions, authoringCanvas, label) {
+export function validateAuthoringScale(nativeDimensions, authoringCanvas, policy, label) {
+  assert(AUTHORING_SCALE_POLICIES.has(policy), `${label} uses unsupported authoring scale policy ${policy}.`);
   assert(authoringCanvas.width >= nativeDimensions.width && authoringCanvas.height >= nativeDimensions.height, `${label} must not be smaller than native dimensions.`);
-  assert(authoringCanvas.width % nativeDimensions.width === 0 && authoringCanvas.height % nativeDimensions.height === 0, `${label} must be an integer multiple of native dimensions.`);
   const scaleX = authoringCanvas.width / nativeDimensions.width;
   const scaleY = authoringCanvas.height / nativeDimensions.height;
-  assert(scaleX === scaleY, `${label} must use one uniform integer scale.`);
-  return scaleX;
+  const uniform = authoringCanvas.width * nativeDimensions.height === authoringCanvas.height * nativeDimensions.width;
+  const integerScale = Number.isInteger(scaleX) && Number.isInteger(scaleY);
+  if (policy === "exact") {
+    assert(authoringCanvas.width === nativeDimensions.width && authoringCanvas.height === nativeDimensions.height, `${label} must exactly match native dimensions.`);
+  } else if (policy === "integer-uniform") {
+    assert(uniform && integerScale, `${label} must use one uniform integer scale.`);
+  } else if (policy === "uniform") {
+    assert(uniform, `${label} must use one uniform scale.`);
+  }
+  return freeze({
+    policy,
+    x: scaleX,
+    y: scaleY,
+    uniform,
+    integer: integerScale,
+  });
+}
+
+export function validateIntegerScale(nativeDimensions, authoringCanvas, label) {
+  return validateAuthoringScale(nativeDimensions, authoringCanvas, "integer-uniform", label).x;
 }
 
 function sorted(value) {

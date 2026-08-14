@@ -74,17 +74,25 @@ export function resolveGameArtAssetType(project, requestedAssetTypeId) {
   return freeze({ requestedAssetTypeId: requested, resolvedAssetTypeId, assetType });
 }
 
+function authoringScaleDescription(asset) {
+  const scale = asset.authoringScale;
+  if (scale.policy === "exact") return "exact native-size authoring";
+  if (scale.uniform) return `${scale.policy} ${scale.x}x authoring`;
+  return `${scale.policy} ${scale.x}x by ${scale.y}x authoring`;
+}
+
 function promptFor(project, asset, input, output) {
   const pivot = asset.pivot ? ` Pivot ${asset.pivot.x},${asset.pivot.y}.` : "";
   const ground = asset.groundLineY === null ? "" : ` Ground line ${asset.groundLineY}.`;
+  const format = project.defaults.imageFormat.toUpperCase();
   return [
     `ORIGINAL GOVERNED GAME ART FOR ${project.title}.`,
-    `PRODUCTION PROFILE: ${project.profileLabel} (${project.profileId}); game type ${project.gameType}; era ${project.era}.`,
+    `PRODUCTION PROFILE: ${project.profileLabel} (${project.profileId}); game type ${project.gameType}; era ${project.era}; rendering model ${project.defaults.renderingModel}.`,
     `STYLE DIRECTION: ${project.styleDirection}`,
     `ASSET: ${asset.id}; kind ${asset.kind}; subject ${input.subjectId}; production group ${input.productionGroup}; unit ${input.unitId}.`,
     `CREATIVE INTENT: ${input.creativeIntent}`,
     `PROFILE RULES: ${asset.promptFragments.join("; ")}.`,
-    `TECHNICAL LOCK: ${asset.nativeDimensions.width}x${asset.nativeDimensions.height} native PNG; ${asset.authoringCanvas.width}x${asset.authoringCanvas.height} authoring canvas; uniform ${asset.authoringScale}x integer authoring scale; alpha ${asset.alpha}; nearest-neighbour mastering.${pivot}${ground}`,
+    `TECHNICAL LOCK: ${asset.nativeDimensions.width}x${asset.nativeDimensions.height} native ${format}; ${asset.authoringCanvas.width}x${asset.authoringCanvas.height} authoring canvas; ${authoringScaleDescription(asset)}; alpha ${asset.alpha}; ${project.defaults.textureFiltering} texture filtering.${pivot}${ground}`,
     `OUTPUT TARGETS: candidate ${output.working}; master ${output.master}.`,
     `QA AND REVIEW: ${asset.qaChecks.join("; ")}. Review preset ${asset.reviewPreset}. Failure vocabulary: ${asset.failureCodes.join("; ")}.`,
     "OUTPUT EXACTLY ONE SEPARATE ASSET. No contact sheet, sprite sheet, storyboard panel, multi-panel composition, generated labels, extra variants, automatic approval, promotion, repository mutation or publication.",
@@ -153,6 +161,12 @@ export async function compileGameArtProductionWorkOrder({
     output,
     referenceBindings: normalizeReferences(referenceBindings),
     lifecycle: project.lifecycle,
+    renderingContract: freeze({
+      model: project.defaults.renderingModel,
+      imageFormat: project.defaults.imageFormat,
+      textureFiltering: project.defaults.textureFiltering,
+      authoringScalePolicy: resolved.assetType.authoringScalePolicy,
+    }),
     candidatePolicy: freeze({
       candidateFanout: project.defaults.candidateFanout,
       maximumRepairAttempts: project.defaults.maximumRepairAttempts,
@@ -183,8 +197,10 @@ export async function verifyGameArtProductionProfiles() {
   const profiles = await Promise.all(profileIds.map(loadGameArtProductionProfile));
   const projects = await Promise.all(projectIds.map(compileGameArtProductionProject));
   const checks = freeze([
-    freeze({ id: "multiple-game-types", passed: new Set(profiles.map((profile) => profile.gameType)).size >= 2 }),
-    freeze({ id: "multiple-project-bindings", passed: projects.length >= 2 }),
+    freeze({ id: "multiple-game-types", passed: new Set(profiles.map((profile) => profile.gameType)).size >= 3 }),
+    freeze({ id: "multiple-rendering-models", passed: new Set(profiles.map((profile) => profile.defaults.renderingModel)).size >= 2 }),
+    freeze({ id: "profile-controlled-filtering", passed: profiles.some((profile) => profile.defaults.textureFiltering === "nearest") && profiles.some((profile) => profile.defaults.textureFiltering === "linear") }),
+    freeze({ id: "multiple-project-bindings", passed: projects.length >= 3 }),
     freeze({ id: "all-projects-profile-bound", passed: projects.every((project) => profileIds.includes(project.profileId)) }),
     freeze({ id: "all-profiles-data-driven", passed: profiles.every((profile) => Object.keys(profile.assetTypes).length >= 4) }),
     freeze({ id: "single-candidate-default", passed: profiles.every((profile) => profile.defaults.candidateFanout === 1) }),
@@ -202,6 +218,9 @@ export async function verifyGameArtProductionProfiles() {
       profileId: profile.profileId,
       gameType: profile.gameType,
       era: profile.era,
+      renderingModel: profile.defaults.renderingModel,
+      textureFiltering: profile.defaults.textureFiltering,
+      authoringScalePolicy: profile.defaults.authoringScalePolicy,
       assetTypeCount: Object.keys(profile.assetTypes).length,
       profileSha256: profile.profileSha256,
     }))),

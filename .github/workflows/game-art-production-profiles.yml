@@ -1,0 +1,65 @@
+name: Game Art Production Profiles
+
+on:
+  pull_request:
+    paths:
+      - "config/game-art-production/**"
+      - "scripts/game-art-production/**"
+      - "docs/GAME_ART_PRODUCTION_PROFILES.md"
+      - ".github/workflows/game-art-production-profiles.yml"
+  push:
+    branches:
+      - main
+      - "codex/game-art-*"
+      - "codex/hmf-*"
+    paths:
+      - "config/game-art-production/**"
+      - "scripts/game-art-production/**"
+      - "docs/GAME_ART_PRODUCTION_PROFILES.md"
+      - ".github/workflows/game-art-production-profiles.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: game-art-production-profiles-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+      - name: Check generic profile syntax
+        run: |
+          find scripts/game-art-production -name '*.mjs' -print0 | xargs -0 -n1 node --check
+      - name: Run reusable profile, parity and extensibility tests
+        run: |
+          node --test scripts/game-art-production/profile-engine.test.mjs
+      - name: Compile bounded verification evidence
+        run: |
+          node scripts/game-art-production/profile-cli.mjs verify > "$RUNNER_TEMP/game-art-production-profile-verification.json"
+      - name: Prove source tree remains clean
+        run: |
+          git diff --exit-code
+          STATUS="$(git status --porcelain=v1)"
+          if [ -n "$STATUS" ]; then
+            printf 'Unexpected validation byproducts:\n%s\n' "$STATUS" >&2
+            exit 1
+          fi
+      - name: Upload compact profile evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: game-art-production-profiles-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/game-art-production-profile-verification.json

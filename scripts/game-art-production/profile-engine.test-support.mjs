@@ -30,7 +30,7 @@ export function authority() {
 export function customStrategyInputs() {
   const profile = {
     schema: "evavo.game-art-production-profile.v1",
-    protocolVersion: "2026-08-14.1",
+    protocolVersion: "2026-08-14.2",
     profileId: "isometric-tactical-strategy",
     label: "Isometric tactical strategy",
     gameType: "tactical-strategy",
@@ -41,8 +41,9 @@ export function customStrategyInputs() {
       candidateFanout: 1,
       maximumRepairAttempts: 2,
       imageFormat: "png",
-      textureFiltering: "nearest",
-      integerScaleOnly: true,
+      renderingModel: "concept-raster",
+      textureFiltering: "linear",
+      authoringScalePolicy: "uniform",
       oneAssetPerOutput: true,
       providerFallbackAllowed: false,
     },
@@ -72,7 +73,7 @@ export function customStrategyInputs() {
   };
   const project = {
     schema: "evavo.game-art-production-project.v1",
-    protocolVersion: "2026-08-14.1",
+    protocolVersion: "2026-08-14.2",
     projectId: "custom-strategy-fixture",
     title: "CUSTOM STRATEGY FIXTURE",
     profileId: "isometric-tactical-strategy",
