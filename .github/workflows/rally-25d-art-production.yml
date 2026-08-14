@@ -1,0 +1,81 @@
+name: Rally 2.5D Art Production Contract
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rally-25d-art-production-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate rally art profile and 2D-to-3D handoff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Use repository Node version
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+
+      - name: Verify all game-art production profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/game-art-production/profile-cli.mjs verify \
+            | tee /tmp/game-art-profile-verification.json
+          grep -F '"status": "passed"' \
+            /tmp/game-art-profile-verification.json
+          grep -F '"projectId": "isometric-rally-1990s"' \
+            /tmp/game-art-profile-verification.json
+
+      - name: Run Rally 2.5D handoff tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test \
+            scripts/game-art-production/rally-25d-handoff.test.mjs \
+            | tee /tmp/rally-25d-art-handoff.log
+
+      - name: Compile representative vehicle handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/game-art-production/rally-25d-handoff.mjs \
+            vehicle \
+            falcon-rally \
+            falcon-rally-production-v1 \
+            "Create the canonical player rally car with readable suspension, detachable damage parts and premium 1990s isometric arcade styling." \
+            > /tmp/falcon-rally-art-handoff.json
+          grep -F '"schema": "evavo.rally-art-handoff.v1"' \
+            /tmp/falcon-rally-art-handoff.json
+          grep -F '"sourceProductionProtocolVersion": "2026-08-14.2"' \
+            /tmp/falcon-rally-art-handoff.json
+          grep -F '"model": "high-definition-stylized-raster"' \
+            /tmp/falcon-rally-art-handoff.json
+          grep -F '"textureFiltering": "linear"' \
+            /tmp/falcon-rally-art-handoff.json
+          grep -F '"compilerProfile": "rally-vehicle-rig-v1"' \
+            /tmp/falcon-rally-art-handoff.json
+          grep -F '"automaticPromotion": false' \
+            /tmp/falcon-rally-art-handoff.json
+
+      - name: Upload validation receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rally-25d-art-production-${{ github.sha }}
+          path: |
+            /tmp/game-art-profile-verification.json
+            /tmp/rally-25d-art-handoff.log
+            /tmp/falcon-rally-art-handoff.json
+          if-no-files-found: warn
+          retention-days: 14
