@@ -1,12 +1,31 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import copy,json,os,shutil,stat,sys,tempfile,unittest
+import copy,json,os,shutil,stat,struct,sys,tempfile,unittest,zlib
 from pathlib import Path
 HERE=Path(__file__).resolve().parent; ROOT=HERE.parents[1]; sys.path.insert(0,str(ROOT/"tools"))
 from frame_atlas_v3_build_common import BuildError,rename_noreplace,canon,digest,selfhash
 from frame_atlas_v3_build_contract import admit_plan,read_plan,verify_output
 from build_heavy_metal_fighting_frame_atlas_v3 import execute
-from PIL import Image,ImageDraw
+try:
+ import PIL
+except ModuleNotFoundError:
+ PIL=None
+
+def png_bytes(slot:int)->bytes:
+ width=height=160
+ red=(slot*17)%256;green=(slot*31)%256;blue=(slot*47)%256
+ raw=bytearray()
+ for y in range(height):
+  raw.append(0)
+  row=bytearray(width*4)
+  if y==80:
+   offset=80*4;row[offset:offset+4]=bytes((red,green,blue,255))
+  raw.extend(row)
+ def chunk(kind:bytes,data:bytes)->bytes:
+  payload=kind+data
+  return struct.pack(">I",len(data))+payload+struct.pack(">I",zlib.crc32(payload)&0xffffffff)
+ ihdr=struct.pack(">IIBBBBB",width,height,8,6,0,0,0)
+ return b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",ihdr)+chunk(b"IDAT",zlib.compress(bytes(raw),9))+chunk(b"IEND",b"")
 
 class AtlasBuildBoundaryTest(unittest.TestCase):
  @classmethod
@@ -15,8 +34,7 @@ class AtlasBuildBoundaryTest(unittest.TestCase):
   cls.src.mkdir(parents=True);cls.parent.mkdir(parents=True)
   sources=[]
   for slot in range(224):
-   img=Image.new("RGBA",(160,160),(0,0,0,0)); ImageDraw.Draw(img).rectangle((8,8,151,151),fill=((slot*17)%256,(slot*31)%256,(slot*47)%256,255))
-   name=f"bastion-bank-{slot//16:02d}-c{slot:03d}.png"; path=cls.src/name;img.save(path,format="PNG",compress_level=9); data=path.read_bytes(); batch=slot//9 if slot<144 else 16+(slot-144)//8; bid=f"hmf-b{batch+1:04d}"
+   name=f"bastion-bank-{slot//16:02d}-c{slot:03d}.png"; path=cls.src/name;data=png_bytes(slot);path.write_bytes(data); batch=slot//9 if slot<144 else 16+(slot-144)//8; bid=f"hmf-b{batch+1:04d}"
    sources.append({"slot":slot,"row":slot//16,"column":slot%16,"x":slot%16*160,"y":slot//16*160,"width":160,"height":160,"bankId":f"bank-{slot//16:02d}","productionGroup":"frame-body","unitId":f"hmf.frame-animation.bastion.slot-{slot:03d}","batchId":bid,"workOrderSha256":digest(f"order-{slot}".encode()),"headReceiptSha256":digest(f"receipt-{slot}".encode()),"masterRelativePath":f"masters/frames/bastion/sprites/{name}","sourcePath":str(path.absolute()),"sourceBytes":len(data),"sourceSha256":digest(data)})
   batches=[]
   for i in range(26):
@@ -46,7 +64,7 @@ class AtlasBuildBoundaryTest(unittest.TestCase):
   s=self.tmp/"stage";d=self.tmp/"destination";s.mkdir();d.mkdir();(d/"marker").write_text("keep")
   with self.assertRaises(FileExistsError):rename_noreplace(s,d)
   self.assertTrue(s.is_dir());self.assertEqual((d/"marker").read_text(),"keep")
- @unittest.skipIf(not hasattr(Image,"new"),"Pillow unavailable")
+ @unittest.skipIf(PIL is None,"Pillow unavailable")
  def test_build_and_independent_pixel_verification(self):
   out=self.parent/"atlas-v3-001";r=execute(self.plan,out);self.assertEqual(r["sourceCount"],224);self.assertFalse(r["gameActivationReady"])
   v=verify_output(self.plan,out,True);self.assertEqual(v["status"],"passed");self.assertTrue(v["exactSourcePixelsVerified"])
