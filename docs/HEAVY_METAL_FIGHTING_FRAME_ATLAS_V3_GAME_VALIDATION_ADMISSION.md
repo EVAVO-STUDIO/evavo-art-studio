@@ -139,12 +139,12 @@ A caller cannot alter an admission field, recompute `admissionSha256`, and have 
 
 ## CLI
 
-After running the game-side local validation gate, admit its receipt from Art Studio with:
+After running the game-side local validation gate, admit its receipt from Art Studio with the exact game HEAD written by that same validation run:
 
 ```powershell
 node scripts\heavy-metal-fighting-frame-atlas-v3.mjs admit-game-validation `
   --validation-receipt C:\ValidationEvidence\hmf-atlas-v3.json `
-  --expected-game-head 723b6b6954e67c08ed337fad62c5ef2e10536234
+  --expected-game-head <40-char-head-from-that-validation-receipt>
 ```
 
 The command prints the self-hashed admission JSON to stdout. It does not write either repository.
