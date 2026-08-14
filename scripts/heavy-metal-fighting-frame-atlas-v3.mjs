@@ -25,7 +25,7 @@ function usage() {
     "Build the compiled plan with:",
     "  python tools/build_heavy_metal_fighting_frame_atlas_v3.py --plan <plan.json> --output-root <new-create-only-delivery-directory>",
     "",
-    "The compiler requires complete named-human-approved receipt chains and a complete four-phase style proof. The builder writes only to a new child directory beneath the governed persistent Artist Workspace export parent. Neither command writes to steel-dominion, commits, pushes, deploys or publishes.",
+    "The compiler snapshots all caller input before asynchronous work. --output must be a new .json file inside the governed persistent Artist Workspace; it is staged, synchronised, atomically linked without replacement and read back byte-for-byte. Neither command writes to steel-dominion, commits, pushes, deploys or publishes.",
   ].join("\n");
 }
 async function jsonArray(filePath, label) {
