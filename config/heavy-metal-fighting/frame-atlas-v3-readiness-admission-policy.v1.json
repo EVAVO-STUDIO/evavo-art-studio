@@ -1,0 +1,39 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-atlas-v3-readiness-admission-policy.v1",
+  "protocolVersion": "2026-08-14.1",
+  "projectId": "heavy-metal-fighting",
+  "assetKind": "frame-body-cel",
+  "planSchema": "evavo.heavy-metal-fighting-frame-atlas-v3-plan.v1",
+  "requirements": {
+    "authoredSourceCount": 224,
+    "deliveryReadyReceiptRequired": true,
+    "persistedReadinessRecordRequired": true,
+    "readinessRecordSelfHashRequired": true,
+    "receiptEvidenceMustEqualReadinessRecord": true,
+    "masterMustMatchReadinessRecord": true,
+    "masterMustMatchApprovedCandidate": true,
+    "workOrderMustMatchReadinessRecord": true,
+    "deliveryContractMustMatchWorkOrder": true,
+    "allRecordsMustBeUnique": true
+  },
+  "authority": {
+    "deliveryPlanRead": true,
+    "readinessRecordRead": true,
+    "workOrderRead": true,
+    "readinessAdmissionCompilation": true,
+    "workspaceMutation": false,
+    "sourceMutation": false,
+    "candidateMutation": false,
+    "masterMutation": false,
+    "automaticApproval": false,
+    "automaticDelivery": false,
+    "candidatePromotion": false,
+    "gameRepositoryPromotion": false,
+    "targetRepositoryMutation": false,
+    "finalAtlasCompilation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "forcePush": false
+  }
+}
