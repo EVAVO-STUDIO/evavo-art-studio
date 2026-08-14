@@ -103,7 +103,7 @@ function isRuntimeAssemblyInvalid(error) {
 const canonical = compileFixture();
 
 test("compiles and verifies an exact approval-bound runtime assembly handoff", () => {
-  assert.equal(canonical.handoff.protocolVersion, "2026-08-14.3");
+  assert.equal(canonical.handoff.protocolVersion, "2026-08-14.4");
   assert.equal(
     canonical.handoff.kind,
     "evavo.art-production.runtime-assembly-handoff",
