@@ -9,6 +9,7 @@ import {
   compileArtProductionHumanApprovalReceipt,
   compileArtProductionLoop,
   compileArtProductionPackagingPlan,
+  compileArtProductionRuntimeAssemblyHandoff,
   compileLayeredProductionPlan,
   compileLayeredProductionStyleProofApprovalReceipt,
   compileNextArtProductionBatch,
@@ -17,6 +18,7 @@ import {
   verifyArtProductionHumanApprovalReceiptAgainstRequest,
   verifyArtProductionLoopAgainstProfile,
   verifyArtProductionPackagingPlan,
+  verifyArtProductionRuntimeAssemblyHandoff,
 } from "@evavo/art-direction";
 import type {
   ArtProductionAttemptInput,
@@ -24,6 +26,7 @@ import type {
   ArtProductionHumanApprovalReceipt,
   ArtProductionLoop,
   ArtProductionPackagingPlan,
+  ArtProductionRuntimeAssemblyHandoff,
 } from "@evavo/art-direction";
 
 const textResult = (value: unknown) => ({
@@ -77,7 +80,7 @@ export function registerArtProductionTools(server: McpServer): void {
     "art_production_orchestrator_protocol",
     {
       description:
-        "Describe the profile-driven 1990s game-art production loop for fixed camera grammar, dependency-safe batches, exact scheduled-job candidate admission, deterministic candidate review, bounded repair, animation continuity, exact named-human approval receipts and source-preserving sprite-sheet or atlas planning. No provider, image inspection or creative decision is executed.",
+        "Describe the profile-driven 1990s game-art production loop for fixed camera grammar, dependency-safe batches, exact scheduled-job candidate admission, deterministic candidate review, bounded repair, animation continuity, exact named-human approval receipts, source-preserving packaging and approval-bound runtime assembly handoff. No provider, image inspection, creative decision, assembly or activation is executed.",
       inputSchema: z.object({}),
     },
     async () => textResult(artProductionOrchestratorProtocolSummary()),
@@ -422,6 +425,80 @@ export function registerArtProductionTools(server: McpServer): void {
             packagingPlan === undefined ? "compiled" : "verified",
           executionBoundary:
             "Metadata-only: individual PNGs remain authoritative; no sheet or atlas pixels are written, no creative decision is made, and no repository or Git authority is granted.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_art_production_runtime_assembly_handoff",
+    {
+      description:
+        "Compile or verify the exact metadata handoff from an admission-bound reviewed Art Production loop and candidate-bound approval receipts into one runtime-candidate layered assembly manifest. Every assembly source is cross-bound to the packaging plan, scheduled candidate admission, technical-review attempt and complete human-approval receipt. No assembly files are written and no runtime is activated.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        profile: z.unknown(),
+        loop: z.unknown(),
+        approvals: z.unknown(),
+        packagingPlan: z.unknown(),
+        assemblyRequest: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+        runtimeAssemblyHandoff: z.unknown().optional(),
+      }),
+    },
+    async ({
+      productionRequest,
+      profile,
+      loop,
+      approvals,
+      packagingPlan,
+      assemblyRequest,
+      styleProofApproval,
+      runtimeAssemblyHandoff,
+    }) => {
+      try {
+        const plan = compilePlan(
+          productionRequest,
+          styleProofApproval,
+        );
+        const productionLoop = loop as ArtProductionLoop;
+        const humanApprovals =
+          approvals as readonly ArtProductionHumanApprovalReceipt[];
+        const submittedPackagingPlan =
+          packagingPlan as ArtProductionPackagingPlan;
+        verifyArtProductionLoopAgainstProfile(
+          plan,
+          profile,
+          productionLoop,
+        );
+        const compiled = compileArtProductionRuntimeAssemblyHandoff(
+          plan,
+          productionLoop,
+          humanApprovals,
+          submittedPackagingPlan,
+          assemblyRequest,
+        );
+        if (runtimeAssemblyHandoff !== undefined) {
+          verifyArtProductionRuntimeAssemblyHandoff(
+            plan,
+            productionLoop,
+            humanApprovals,
+            submittedPackagingPlan,
+            assemblyRequest,
+            runtimeAssemblyHandoff as ArtProductionRuntimeAssemblyHandoff,
+          );
+        }
+        return textResult({
+          schemaVersion: "1.0",
+          runtimeAssemblyHandoff: compiled,
+          status:
+            runtimeAssemblyHandoff === undefined
+              ? "compiled"
+              : "verified",
+          executionBoundary:
+            "Handoff metadata only: no artifact bytes are read, no image or package pixels are changed, no assembly files are written, no runtime is activated, and no repository, Git, deployment or publication authority is granted.",
         });
       } catch (error: unknown) {
         return toolError(error);

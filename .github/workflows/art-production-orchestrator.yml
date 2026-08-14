@@ -11,6 +11,7 @@ on:
       - "docs/ART_PRODUCTION_ORCHESTRATOR.md"
       - "docs/ART_PRODUCTION_CANDIDATE_ADMISSION.md"
       - "docs/ART_PRODUCTION_PACKAGING_VERIFICATION.md"
+      - "docs/ART_PRODUCTION_RUNTIME_ASSEMBLY_HANDOFF.md"
       - ".github/workflows/art-production-orchestrator.yml"
   workflow_dispatch:
 
@@ -86,20 +87,27 @@ jobs:
               "frozen-dependency-install",
               "art-direction-build-and-tests",
               "scheduled-job-candidate-admission-receipts",
+              "candidate-bound-human-approval-receipts",
+              "approval-bound-runtime-assembly-handoff",
               "mcp-planning-only-contract",
               "clean-source-proof",
             ],
             authority: {
+              artifactRead: false,
               providerExecution: false,
               imageInspection: false,
               automaticCandidateAdmission: false,
               imageMutation: false,
+              creativeDecision: false,
               packagingExecution: false,
-              creativeApproval: false,
+              automaticAssembly: false,
               targetRepositoryMutation: false,
+              runtimeActivation: false,
               gitCommit: false,
               gitPush: false,
+              deployment: false,
               publication: false,
+              forcePush: false,
             },
           };
           const receiptSha256 = createHash("sha256")

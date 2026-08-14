@@ -63,6 +63,25 @@ This distinguishes two failure classes:
 
 A valid packaging plan must pass both checks.
 
+## Runtime assembly consumption
+
+A verified package is now an explicit input to `compileArtProductionRuntimeAssemblyHandoff`.
+
+The handoff does not trust a runtime assembly source merely because it carries a syntactically content-addressed approval hash. It requires each admitted source to match the exact package entry and complete human-approval receipt for:
+
+```text
+artifact ID
+source SHA-256
+source byte count
+native dimensions
+technical-review attempt
+approval request
+approval basis
+approval receipt
+```
+
+This allows a runtime assembly to select a deliberate package subset without losing source provenance. The handoff remains metadata-only and does not execute package pixels, assembly writes or runtime activation.
+
 ## Authority remains closed
 
 This hardening does not add approval or packaging execution. Human-approval receipts state:
@@ -91,7 +110,7 @@ gitPush: false
 publication: false
 ```
 
-Provider execution, candidate admission, named-human decision making, evidence storage, image-byte packing and target-repository publication remain separate governed transactions.
+Provider execution, candidate admission, named-human decision making, evidence storage, image-byte packing, runtime assembly, activation and target-repository publication remain separate governed transactions.
 
 ## Adversarial regression coverage
 
@@ -106,6 +125,8 @@ The package suite proves that:
 - exact request-bound verification distinguishes separate named-human decisions;
 - the exact deterministic packaging payload verifies;
 - an atlas-placement mutation retaining the canonical hash string is rejected;
-- packaging-execution authority escalation followed by attacker recomputation of the package hash is rejected by deterministic recompilation.
+- packaging-execution authority escalation followed by attacker recomputation of the package hash is rejected by deterministic recompilation;
+- a runtime assembly source with unrelated receipt identity is rejected by the Art Production handoff;
+- a handoff cannot be replayed against another assembly request.
 
-The public package and MCP imports receive the hardened approval and packaging verifiers automatically through the stable Art Production Orchestrator export surface.
+The public package and MCP imports receive the hardened approval, packaging and runtime-assembly handoff verifiers automatically through the stable Art Production Orchestrator export surface.

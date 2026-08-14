@@ -1,5 +1,5 @@
 export const ART_PRODUCTION_ORCHESTRATOR_PROTOCOL_VERSION =
-  "2026-08-14.3" as const;
+  "2026-08-14.4" as const;
 export const ART_PRODUCTION_PROFILE_KIND =
   "evavo.art-production.profile" as const;
 export const ART_PRODUCTION_LOOP_KIND =
@@ -18,6 +18,8 @@ export const ART_PRODUCTION_HUMAN_APPROVAL_RECEIPT_KIND =
   "evavo.art-production.human-approval.receipt" as const;
 export const ART_PRODUCTION_PACKAGING_PLAN_KIND =
   "evavo.art-production.packaging-plan" as const;
+export const ART_PRODUCTION_RUNTIME_ASSEMBLY_HANDOFF_KIND =
+  "evavo.art-production.runtime-assembly-handoff" as const;
 
 export const ART_PRODUCTION_CAMERA_FAMILIES = [
   "isometric-life-sim-90s",
