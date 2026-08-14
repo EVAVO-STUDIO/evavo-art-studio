@@ -1,4 +1,10 @@
-import { fail, freeze, idValue, record, sha256 } from "./layered-production-internal.js";
+import {
+  fail,
+  freeze,
+  idValue,
+  record,
+  sha256,
+} from "./layered-production-internal.js";
 import { verifyLayeredProductionPlan } from "./layered-production-plan.js";
 import type { CompiledLayeredProductionPlan } from "./layered-production-types.js";
 import {
@@ -17,7 +23,10 @@ import {
   verifyArtProductionProfile,
 } from "./art-production-profile.js";
 import { SHA256_PATTERN } from "./art-production-review-normalization.js";
-import { buildAttemptRecord, replayAttemptInput } from "./art-production-loop-attempt.js";
+import {
+  buildAttemptRecord,
+  replayAttemptInput,
+} from "./art-production-loop-attempt.js";
 import {
   initialUnitStates,
   loopPayload,
@@ -35,7 +44,6 @@ export function compileArtProductionLoop(
     loopPayload(plan, profile, initialUnitStates(plan, profile), []),
   );
 }
-
 
 function applyAttemptInternal(
   plan: CompiledLayeredProductionPlan,
@@ -68,11 +76,18 @@ function applyAttemptInternal(
       `Layered-production unit ${unitId} no longer exists.`,
     );
   }
-  const attempt = buildAttemptRecord(loop, state, unit, input);
+  const attempt = buildAttemptRecord(plan, loop, state, unit, input);
+  const admission = attempt.candidateAdmissionReceipt;
   const acceptedCandidate: ArtProductionAcceptedCandidate | undefined =
     attempt.decision === "review-passed"
       ? freeze({
           ...attempt.candidate,
+          admissionReceiptSha256: admission.admissionReceiptSha256,
+          scheduledBatchSha256: admission.scheduledJob.batchSha256,
+          scheduledJobSha256: admission.scheduledJob.jobSha256,
+          providerRequestSha256: admission.providerEvidence.requestSha256,
+          providerResponseSha256: admission.providerEvidence.responseSha256,
+          inspectionEvidenceSha256: admission.inspectionEvidenceSha256,
           attemptSha256: attempt.attemptSha256,
           weightedScore: attempt.weightedScore,
         })
@@ -89,7 +104,9 @@ function applyAttemptInternal(
       : entry,
   );
   const scope =
-    loop.scope === "style-proof" ? new Set(plan.styleProof.unitIds) : undefined;
+    loop.scope === "style-proof"
+      ? new Set(plan.styleProof.unitIds)
+      : undefined;
   const states = refreshStatuses(nextStates, scope);
   const attempts = freeze([...loop.attempts, attempt]);
   return withLoopHash(loopPayload(plan, loop.profile, states, attempts));
@@ -103,7 +120,6 @@ export function evaluateArtProductionAttempt(
   return applyAttemptInternal(plan, loop, input, true);
 }
 
-
 function compareAttempt(
   actual: ArtProductionAttemptRecord,
   expected: ArtProductionAttemptRecord,
@@ -111,7 +127,7 @@ function compareAttempt(
   if (actual.attemptSha256 !== expected.attemptSha256) {
     fail(
       "ART_PRODUCTION_LOOP_INVALID",
-      "Retained attempt is not the deterministic result of its evidence.",
+      "Retained attempt is not the deterministic result of its admitted candidate and measured review evidence.",
       {
         expectedAttemptSha256: expected.attemptSha256,
         actualAttemptSha256: actual.attemptSha256,
@@ -149,16 +165,23 @@ export function verifyArtProductionLoop(
     );
   }
   const { loopSha256, ...withoutHash } = loop;
-  if (!SHA256_PATTERN.test(loopSha256) || sha256(withoutHash) !== loopSha256) {
+  if (
+    !SHA256_PATTERN.test(loopSha256) ||
+    sha256(withoutHash) !== loopSha256
+  ) {
     fail(
       "ART_PRODUCTION_LOOP_INVALID",
       "Art-production loop SHA-256 does not match its canonical payload.",
     );
   }
-  let replayed = compileArtProductionLoop(plan, (() => {
-    const { profileSha256: _profileSha256, ...profileInput } = loop.profile;
-    return profileInput;
-  })());
+  let replayed = compileArtProductionLoop(
+    plan,
+    (() => {
+      const { profileSha256: _profileSha256, ...profileInput } =
+        loop.profile;
+      return profileInput;
+    })(),
+  );
   for (const retainedAttempt of loop.attempts) {
     if (retainedAttempt.priorLoopSha256 !== replayed.loopSha256) {
       fail(
@@ -185,7 +208,7 @@ export function verifyArtProductionLoop(
   if (replayed.loopSha256 !== loop.loopSha256) {
     fail(
       "ART_PRODUCTION_LOOP_INVALID",
-      "Art-production loop is not the deterministic replay of its attempt history.",
+      "Art-production loop is not the deterministic replay of its candidate admission and attempt history.",
       {
         expectedLoopSha256: replayed.loopSha256,
         actualLoopSha256: loop.loopSha256,

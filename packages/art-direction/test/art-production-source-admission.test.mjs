@@ -270,7 +270,7 @@ const canonicalReceipt = compileArtProductionSourceAdmissionReceipt(
 );
 
 test("admits exact caller-supplied PNG bytes against the governed runtime handoff", () => {
-  assert.equal(canonicalReceipt.protocolVersion, "2026-08-14.4");
+  assert.equal(canonicalReceipt.protocolVersion, "2026-08-15.1");
   assert.equal(
     canonicalReceipt.kind,
     "evavo.art-production.source-admission.receipt",

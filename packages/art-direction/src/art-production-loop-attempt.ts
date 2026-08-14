@@ -7,7 +7,10 @@ import {
   sha256,
   stringValue,
 } from "./layered-production-internal.js";
-import type { CompiledLayeredProductionUnit } from "./layered-production-types.js";
+import type {
+  CompiledLayeredProductionPlan,
+  CompiledLayeredProductionUnit,
+} from "./layered-production-types.js";
 import {
   ART_PRODUCTION_ATTEMPT_KIND,
   ART_PRODUCTION_ORCHESTRATOR_PROTOCOL_VERSION,
@@ -20,11 +23,13 @@ import type {
   ArtProductionUnitState,
 } from "./art-production-orchestrator-types.js";
 import {
+  verifyArtProductionCandidateAdmissionReceiptForVerifiedLoop,
+} from "./art-production-candidate-admission.js";
+import {
   REPAIR_BY_DETECTION,
   REPAIR_BY_METRIC,
 } from "./art-production-repair-rules.js";
 import {
-  normalizeCandidate,
   normalizeDetections,
   normalizeMetrics,
   requiredMetrics,
@@ -37,6 +42,7 @@ import {
 } from "./art-production-review-scoring.js";
 
 export function buildAttemptRecord(
+  plan: CompiledLayeredProductionPlan,
   loop: ArtProductionLoop,
   state: ArtProductionUnitState,
   unit: CompiledLayeredProductionUnit,
@@ -50,11 +56,14 @@ export function buildAttemptRecord(
     "unitId",
     "evaluator",
     "evaluatedAt",
-    "candidate",
+    "candidateAdmissionReceipt",
     "metrics",
     "detections",
   ]);
-  if (input.schemaVersion !== "1.0" || input.kind !== ART_PRODUCTION_ATTEMPT_KIND) {
+  if (
+    input.schemaVersion !== "1.0" ||
+    input.kind !== ART_PRODUCTION_ATTEMPT_KIND
+  ) {
     fail(
       "ART_PRODUCTION_ATTEMPT_INVALID",
       "Attempt schema or kind is invalid.",
@@ -73,8 +82,26 @@ export function buildAttemptRecord(
       "Attempt unit does not match the selected unit state.",
     );
   }
+
+  const candidateAdmissionReceipt =
+    verifyArtProductionCandidateAdmissionReceiptForVerifiedLoop(
+      plan,
+      loop,
+      input.candidateAdmissionReceipt,
+    );
+  if (
+    candidateAdmissionReceipt.unitId !== unitId ||
+    candidateAdmissionReceipt.scheduledJob.attemptNumber !==
+      state.attemptCount + 1
+  ) {
+    fail(
+      "ART_PRODUCTION_ATTEMPT_INVALID",
+      "Attempt candidate admission does not match the selected unit and attempt number.",
+    );
+  }
+
   const requiredMetricIds = requiredMetrics(unit);
-  const candidate = normalizeCandidate(input.candidate, unit);
+  const candidate = candidateAdmissionReceipt.candidate;
   const metrics = normalizeMetrics(input.metrics, requiredMetricIds);
   const detections = normalizeDetections(input.detections, loop.profile);
   const score = weightedScore(metrics, loop.profile);
@@ -110,7 +137,9 @@ export function buildAttemptRecord(
                 "Increase the weakest measured review areas until the weighted technical score reaches the configured pass threshold without weakening any style, camera or continuity lock.",
               ]
             : []),
-        ].filter((entry, index, values) => values.indexOf(entry) === index),
+        ].filter(
+          (entry, index, values) => values.indexOf(entry) === index,
+        ),
   );
   const partial = {
     schemaVersion: "1.0" as const,
@@ -121,6 +150,7 @@ export function buildAttemptRecord(
     unitId,
     evaluator: stringValue(input.evaluator, "attempt.evaluator", 300),
     evaluatedAt: strictUtc(input.evaluatedAt, "attempt.evaluatedAt"),
+    candidateAdmissionReceipt,
     candidate,
     metrics,
     requiredMetricIds,
@@ -134,6 +164,7 @@ export function buildAttemptRecord(
       : {}),
     authority: freeze({
       providerExecution: false as const,
+      candidateAdmission: false as const,
       creativeApproval: false as const,
       imageMutation: false as const,
       targetRepositoryMutation: false as const,
@@ -145,7 +176,6 @@ export function buildAttemptRecord(
   return freeze({ ...partial, attemptSha256: sha256(partial) });
 }
 
-
 export function replayAttemptInput(
   attempt: ArtProductionAttemptRecord,
 ): ArtProductionAttemptInput {
@@ -156,7 +186,7 @@ export function replayAttemptInput(
     unitId: attempt.unitId,
     evaluator: attempt.evaluator,
     evaluatedAt: attempt.evaluatedAt,
-    candidate: attempt.candidate,
+    candidateAdmissionReceipt: attempt.candidateAdmissionReceipt,
     metrics: attempt.metrics,
     detections: attempt.detections,
   };
