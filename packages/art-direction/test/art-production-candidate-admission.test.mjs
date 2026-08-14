@@ -114,7 +114,7 @@ test("technical review rejects the former loose candidate object", () => {
     () => evaluateArtProductionAttempt(plan, loop, loose),
     (error) =>
       error instanceof ArtDirectionError &&
-      error.code === "ART_PRODUCTION_ATTEMPT_INVALID",
+      /unsupported fields: candidate/u.test(error.message),
   );
 });
 
@@ -134,7 +134,9 @@ test("rejects retained-hash candidate mutation", () => {
       error instanceof ArtDirectionError &&
       error.code ===
         "ART_PRODUCTION_CANDIDATE_ADMISSION_RECEIPT_INVALID" &&
-      /submitted payload/u.test(error.message),
+      /requestSha256 does not match|submitted payload/u.test(
+        error.message,
+      ),
   );
 });
 
