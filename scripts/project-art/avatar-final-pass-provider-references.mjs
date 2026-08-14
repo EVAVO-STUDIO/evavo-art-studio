@@ -34,6 +34,22 @@ export function requiredReferences(entry, plan) {
   }
 
   if (entry.upstream.kind === 'provider-redraw') {
+    const defectMask = entry.artifactBindings.find(
+      (binding) => binding.bindingKey === 'defect-mask',
+    );
+    if (!defectMask) {
+      prerequisiteBlockers.push('defect-mask-artifact-required');
+    } else {
+      references.push(
+        reference(
+          'defect-mask',
+          'edit-mask',
+          defectMask.sourcePath,
+          defectMask.sourceSha256,
+          `Exact human-admitted defect mask for ${entry.upstream.frameId}.`,
+        ),
+      );
+    }
     references.push(
       reference(
         'base-image',
@@ -138,6 +154,7 @@ export function prompt(entry, plan) {
       `Edit the supplied base image; do not redesign or replace the pose.`,
       `Correct only these declared defects: ${entry.upstream.issues.join(', ')}.`,
       'Use a precise repair mask over only the declared defect region and the smallest necessary anatomical boundary.',
+      'The defect-mask reference is the only authorized edit region; do not infer, expand or replace it.',
       'Use the provider\'s highest supported input-fidelity mode. Pixels outside the repair mask must remain invariant.',
     );
   } else {

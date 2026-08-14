@@ -47,7 +47,13 @@ test('compiles one-candidate redraw and anatomy-safe in-between provider submiss
   assert.equal(redraw.providerRequestInput.operation, 'edit');
   assert.equal(redraw.providerRequestInput.candidateCount, 1);
   assert.equal(redraw.providerRequestInput.selection.allowFallback, false);
-  assert.equal(redraw.providerRequestInput.references.length, 2);
+  assert.equal(redraw.providerRequestInput.references.length, 3);
+  assert.equal(
+    redraw.providerRequestInput.references.find(
+      (reference) => reference.role === 'edit-mask',
+    )?.artifactId,
+    `artifact_${hash('6')}`,
+  );
   assert.match(redraw.composedPrompt, /Correct only these declared defects: hands, fingers/u);
   assert.equal(redraw.providerRequestInput.metadata.approvals.anatomy, false);
 
@@ -74,6 +80,11 @@ test('missing authorization and artifact admission remain blocked without a subm
     assert.ok(job.blockers.includes('human-provider-authorization-required'));
     assert.ok(job.blockers.some((blocker) => blocker.startsWith('reference-artifact-required:')));
   }
+  assert.ok(
+    batch.jobs
+      .find((job) => job.jobId === 'redraw:talk-a')
+      .blockers.includes('defect-mask-artifact-required'),
+  );
 });
 
 test('in-betweens wait for final endpoint hashes instead of using unfinished repaired key frames', () => {
@@ -177,6 +188,19 @@ test('artifact substitution, fallback and output-target collisions fail closed',
     () => compile(plan, target),
     (error) => error.code === 'AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_PATH_INVALID',
   );
+});
+
+test('redraws cannot become submit-ready without an exact human-admitted defect mask', () => {
+  const plan = sealPlan();
+  const input = request(plan);
+  input.jobs[0].artifactBindings = input.jobs[0].artifactBindings.filter(
+    (binding) => binding.bindingKey !== 'defect-mask',
+  );
+  const batch = compile(plan, input);
+  const redraw = batch.jobs.find((entry) => entry.jobId === 'redraw:talk-a');
+  assert.equal(redraw.status, 'blocked');
+  assert.ok(redraw.blockers.includes('defect-mask-artifact-required'));
+  assert.equal(redraw.providerRequestInput, null);
 });
 
 test('deterministic repairs and morph previews never become provider jobs', () => {

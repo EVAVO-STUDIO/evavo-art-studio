@@ -4,11 +4,19 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import {
+  compileAvatarFinalPassProviderRuntimeDispatch,
   bindAvatarFinalPassProviderRuntimeContractFile,
   compileAvatarFinalPassProviderRuntimeDispatchFile,
   compileAvatarFinalPassProviderRuntimeOutcomeFile,
   verifyAvatarFinalPassProviderRuntime,
 } from './project-art/avatar-final-pass-provider-runtime.mjs';
+import {
+  stableJsonFile,
+  writeJsonCreateOnly,
+} from './project-art/avatar-final-pass-provider-runtime-common.mjs';
+import {
+  parseProjectArtEvaSourceRepairProviderPackageForDispatch,
+} from './project-art/eva-source-repair-provider-package.mjs';
 
 function usage() {
   return [
@@ -17,6 +25,7 @@ function usage() {
     'Usage:',
     '  node scripts/avatar-final-pass-provider-runtime-cli.mjs verify',
     '  node scripts/avatar-final-pass-provider-runtime-cli.mjs dispatch --batch <provider-batch.json> --job-id <jobId> --output <dispatch.json> [--compiled-at <ISO>]',
+    '  node scripts/avatar-final-pass-provider-runtime-cli.mjs dispatch-package --package <eva-provider-package.json> --job-id <jobId> --output <dispatch.json> [--compiled-at <ISO>]',
     '  node scripts/avatar-final-pass-provider-runtime-cli.mjs bind --dispatch <dispatch.json> --compiled-runtime-contract <contract.json> --output <binding.json>',
     '  node scripts/avatar-final-pass-provider-runtime-cli.mjs outcome --dispatch <dispatch.json> --binding <binding.json> --runtime-outcome <outcome.json> --output <normalized-outcome.json>',
     '',
@@ -76,6 +85,44 @@ export function runAvatarFinalPassProviderRuntimeCli(
     return {
       status: 'passed',
       schema: dispatch.schema,
+      jobId: dispatch.jobId,
+      operation: dispatch.operation,
+      runtimeDispatchSha256: dispatch.runtimeDispatchSha256,
+      runtimeEnqueue: false,
+      providerExecution: false,
+      candidateApproval: false,
+      outputPath,
+    };
+  }
+  if (command === 'dispatch-package') {
+    const options = parseOptions(argv.slice(1), [
+      '--package',
+      '--job-id',
+      '--output',
+      '--compiled-at',
+    ]);
+    const dispatchedAt = options.get('--compiled-at') ?? new Date().toISOString();
+    const providerPackage =
+      parseProjectArtEvaSourceRepairProviderPackageForDispatch(
+        stableJsonFile(
+        required(options, '--package'),
+        'EVA source-repair provider package file',
+        ).value,
+        dispatchedAt,
+      );
+    const dispatch = compileAvatarFinalPassProviderRuntimeDispatch({
+      batch: providerPackage.providerBatch,
+      jobId: required(options, '--job-id'),
+      compiledAt: dispatchedAt,
+    });
+    const outputPath = writeJsonCreateOnly(
+      required(options, '--output'),
+      dispatch,
+    );
+    return {
+      status: 'passed',
+      schema: dispatch.schema,
+      sourcePackageSha256: providerPackage.packageSha256,
       jobId: dispatch.jobId,
       operation: dispatch.operation,
       runtimeDispatchSha256: dispatch.runtimeDispatchSha256,

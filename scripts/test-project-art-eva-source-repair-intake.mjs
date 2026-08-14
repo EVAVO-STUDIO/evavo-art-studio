@@ -26,6 +26,22 @@ import {
   EVA_SOURCE_REPAIR_TASK_CATALOGUE,
   EVA_SOURCE_REPAIR_TASK_CATALOGUE_SHA256,
 } from './project-art/eva-source-repair-catalogue.mjs';
+import {
+  EVA_SOURCE_REPAIR_PROVIDER_ADMISSIONS_SCHEMA,
+  EVA_SOURCE_REPAIR_PROVIDER_PACKAGE_SCHEMA,
+  compileProjectArtEvaSourceRepairProviderAdmissionsTemplate,
+  compileProjectArtEvaSourceRepairProviderAdmissionsTemplateFile,
+  compileProjectArtEvaSourceRepairProviderPackage,
+  compileProjectArtEvaSourceRepairProviderPackageFile,
+  parseProjectArtEvaSourceRepairProviderPackage,
+  parseProjectArtEvaSourceRepairProviderPackageForDispatch,
+} from './project-art/eva-source-repair-provider-package.mjs';
+import {
+  compileAvatarFinalPassProviderRuntimeDispatch,
+} from './project-art/avatar-final-pass-provider-runtime.mjs';
+import {
+  runAvatarFinalPassProviderRuntimeCli,
+} from './avatar-final-pass-provider-runtime-cli.mjs';
 
 const RUNTIME_COMMIT = '1'.repeat(40);
 const RUNTIME_TREE = '2'.repeat(40);
@@ -226,6 +242,63 @@ function compile() {
   });
 }
 
+function providerAdmissions(intake) {
+  const template =
+    compileProjectArtEvaSourceRepairProviderAdmissionsTemplate(intake);
+  const body = {
+    schema: EVA_SOURCE_REPAIR_PROVIDER_ADMISSIONS_SCHEMA,
+    intakeSha256: intake.intakeSha256,
+    requestId: template.requestId,
+    authorization: {
+      action: 'run-provider-once',
+      actorClass: 'human',
+      actorId: 'eva-production-owner',
+      occurredAt: '2026-08-15T11:02:00.000Z',
+      expiresAt: '2026-08-15T12:02:00.000Z',
+      evidenceSha256: sha256('provider-authorization-evidence'),
+      authorizedJobIds: template.jobs.map((job) => job.jobId),
+      maximumProviderCalls: 6,
+      candidateCountPerJob: 1,
+      allowFallback: false,
+    },
+    jobs: template.jobs.map((job) => ({
+      jobId: job.jobId,
+      selection: job.selection,
+      artifactBindings: job.artifactBindings.map((binding) => ({
+        ...binding,
+        sourceSha256:
+          binding.sourceSha256 ?? sha256(`mask:${job.jobId}`),
+        artifactId: `artifact_${sha256(
+          `artifact:${job.jobId}:${binding.bindingKey}`,
+        )}`,
+        evidenceSha256: sha256(
+          `admission:${job.jobId}:${binding.bindingKey}`,
+        ),
+        actorId: 'eva-artifact-admitter',
+        occurredAt: '2026-08-15T11:01:00.000Z',
+      })),
+    })),
+    authority: {
+      sourceMutation: false,
+      automaticGenerationAuthorization: false,
+      providerExecution: false,
+      candidateApproval: false,
+      candidatePromotion: false,
+      repositoryMutation: false,
+      gitCommit: false,
+      gitPush: false,
+      deployment: false,
+      publication: false,
+      runtimeActivation: false,
+      forcePush: false,
+    },
+  };
+  return {
+    ...body,
+    admissionsSha256: sha256ProjectArtEvaSourceRepairDocument(body),
+  };
+}
+
 test('exact six-task handoff compiles into the existing provider boundary', () => {
   const intake = compile();
   assert.equal(intake.schema, EVA_SOURCE_REPAIR_INTAKE_SCHEMA);
@@ -271,8 +344,196 @@ test('exact six-task handoff compiles into the existing provider boundary', () =
       job.blockers.includes('human-provider-authorization-required'),
     ),
   );
+  assert.ok(
+    batch.jobs
+      .filter((job) => job.kind === 'provider-redraw')
+      .every((job) => job.blockers.includes('defect-mask-artifact-required')),
+  );
   assert.equal(batch.providerExecution, false);
   assert.equal(batch.candidateApproval, false);
+});
+
+test('named authorization and exact mask admissions seal one six-job provider package', () => {
+  const intake = compile();
+  const template =
+    compileProjectArtEvaSourceRepairProviderAdmissionsTemplate(intake);
+  assert.equal(template.jobs.length, 6);
+  assert.equal(
+    template.jobs.filter((job) =>
+      job.artifactBindings.some(
+        (binding) => binding.bindingKey === 'defect-mask',
+      ),
+    ).length,
+    5,
+  );
+
+  const providerPackage = compileProjectArtEvaSourceRepairProviderPackage({
+    intake,
+    admissions: providerAdmissions(intake),
+    compiledAt: '2026-08-15T11:03:00.000Z',
+  });
+  assert.equal(providerPackage.schema, EVA_SOURCE_REPAIR_PROVIDER_PACKAGE_SCHEMA);
+  assert.deepEqual(providerPackage.counts, {
+    requested: 6,
+    ready: 6,
+    blocked: 0,
+    redraws: 5,
+    inbetweens: 1,
+  });
+  assert.equal(providerPackage.providerExecution, false);
+  assert.equal(providerPackage.candidateApproval, false);
+  assert.equal(providerPackage.runtimeActivationAllowed, false);
+  assert.equal(
+    parseProjectArtEvaSourceRepairProviderPackage(providerPackage).packageSha256,
+    providerPackage.packageSha256,
+  );
+
+  const redraw = providerPackage.providerBatch.jobs.find(
+    (job) => job.kind === 'provider-redraw',
+  );
+  assert.equal(
+    redraw.providerRequestInput.references.filter(
+      (reference) => reference.role === 'edit-mask',
+    ).length,
+    1,
+  );
+  const dispatch = compileAvatarFinalPassProviderRuntimeDispatch({
+    batch: providerPackage.providerBatch,
+    jobId: redraw.jobId,
+    compiledAt: '2026-08-15T11:04:00.000Z',
+  });
+  assert.ok(
+    dispatch.expectedRuntimeContract.requiredCapabilityProfile.includes(
+      'defect-mask',
+    ),
+  );
+  assert.ok(
+    dispatch.expectedRuntimeContract.requiredCapabilityProfile.includes(
+      'mask-guided-edit',
+    ),
+  );
+});
+
+test('expired authorization, missing masks and package tampering fail closed', () => {
+  const intake = compile();
+
+  const expired = providerAdmissions(intake);
+  expired.authorization.expiresAt = '2026-08-15T11:02:30.000Z';
+  const { admissionsSha256: ignoredExpiredHash, ...expiredBody } = expired;
+  expired.admissionsSha256 =
+    sha256ProjectArtEvaSourceRepairDocument(expiredBody);
+  assert.throws(
+    () =>
+      compileProjectArtEvaSourceRepairProviderPackage({
+        intake,
+        admissions: expired,
+        compiledAt: '2026-08-15T11:03:00.000Z',
+      }),
+    /EVA_SOURCE_REPAIR_PROVIDER_AUTHORIZATION_WINDOW_INVALID/u,
+  );
+
+  const missingMask = providerAdmissions(intake);
+  missingMask.jobs[0].artifactBindings =
+    missingMask.jobs[0].artifactBindings.filter(
+      (binding) => binding.bindingKey !== 'defect-mask',
+    );
+  const { admissionsSha256: ignoredMaskHash, ...missingMaskBody } = missingMask;
+  missingMask.admissionsSha256 =
+    sha256ProjectArtEvaSourceRepairDocument(missingMaskBody);
+  assert.throws(
+    () =>
+      compileProjectArtEvaSourceRepairProviderPackage({
+        intake,
+        admissions: missingMask,
+        compiledAt: '2026-08-15T11:03:00.000Z',
+      }),
+    (error) =>
+      error?.code === 'EVA_SOURCE_REPAIR_PROVIDER_DEFECT_MASK_INVALID',
+  );
+
+  const providerPackage = compileProjectArtEvaSourceRepairProviderPackage({
+    intake,
+    admissions: providerAdmissions(intake),
+    compiledAt: '2026-08-15T11:03:00.000Z',
+  });
+  assert.throws(
+    () =>
+      parseProjectArtEvaSourceRepairProviderPackageForDispatch(
+        providerPackage,
+        '2026-08-15T12:02:00.000Z',
+      ),
+    (error) =>
+      error?.code ===
+      'EVA_SOURCE_REPAIR_PROVIDER_DISPATCH_AUTHORIZATION_EXPIRED',
+  );
+  const tampered = structuredClone(providerPackage);
+  tampered.providerBatch.jobs[0].providerExecution = true;
+  assert.throws(
+    () => parseProjectArtEvaSourceRepairProviderPackage(tampered),
+    (error) =>
+      error?.code === 'EVA_SOURCE_REPAIR_PROVIDER_SELF_HASH_MISMATCH',
+  );
+});
+
+test('create-only files carry intake through admissions template, package and runtime dispatch', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'eva-provider-package-'));
+  try {
+    const intake = compile();
+    const admissions = providerAdmissions(intake);
+    const intakePath = path.join(root, 'intake.json');
+    const admissionsPath = path.join(root, 'admissions.json');
+    const templatePath = path.join(root, 'admissions-template.json');
+    const packagePath = path.join(root, 'provider-package.json');
+    const dispatchPath = path.join(root, 'runtime-dispatch.json');
+    writeFileSync(intakePath, `${JSON.stringify(intake, null, 2)}\n`);
+    writeFileSync(admissionsPath, `${JSON.stringify(admissions, null, 2)}\n`);
+
+    const templateResult =
+      compileProjectArtEvaSourceRepairProviderAdmissionsTemplateFile({
+        intakePath,
+        outputPath: templatePath,
+      });
+    assert.equal(templateResult.template.jobs.length, 6);
+
+    const packageResult = compileProjectArtEvaSourceRepairProviderPackageFile({
+      intakePath,
+      admissionsPath,
+      outputPath: packagePath,
+      compiledAt: '2026-08-15T11:03:00.000Z',
+    });
+    assert.equal(packageResult.providerPackage.counts.ready, 6);
+    const firstJob = packageResult.providerPackage.providerBatch.jobs[0].jobId;
+    const dispatchResult = runAvatarFinalPassProviderRuntimeCli([
+      'dispatch-package',
+      '--package',
+      packagePath,
+      '--job-id',
+      firstJob,
+      '--output',
+      dispatchPath,
+      '--compiled-at',
+      '2026-08-15T11:04:00.000Z',
+    ]);
+    assert.equal(dispatchResult.jobId, firstJob);
+    assert.equal(
+      dispatchResult.sourcePackageSha256,
+      packageResult.providerPackage.packageSha256,
+    );
+    assert.equal(JSON.parse(readFileSync(dispatchPath, 'utf8')).jobId, firstJob);
+
+    assert.throws(
+      () =>
+        compileProjectArtEvaSourceRepairProviderPackageFile({
+          intakePath,
+          admissionsPath,
+          outputPath: packagePath,
+          compiledAt: '2026-08-15T11:03:00.000Z',
+        }),
+      /EEXIST/u,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('Git-blob, plan, manifest and authority drift fail closed', () => {

@@ -34,7 +34,43 @@ The intake produces exactly:
 
 Every source-edit job carries the original Runtime policy: precise hands-only mask, face and pose preservation, wardrobe and canvas preservation, highest input fidelity, real RGBA alpha, checkerboard/matte/halo rejection and exact invariance outside the mask.
 
+The mask is a first-class admitted artifact, not prompt prose. Every redraw remains blocked on `defect-mask-artifact-required` until a named human admits one exact same-canvas mask at the deterministic per-job `defect-mask.png` path. That mask is emitted to providers with the `edit-mask` role, and the runtime capability profile explicitly requires `defect-mask`, `mask-guided-edit`, high input fidelity and non-target invariance. This follows the provider workflow supported by [ComfyUI inpainting](https://docs.comfy.org/tutorials/basic/inpaint) and its [GPT Image edit node](https://docs.comfy.org/tutorials/partner-nodes/openai/gpt-image-1): body-part repair is an inpainting task, and the image and mask must be the same size.
+
 The request template deliberately contains no artifact admissions and no provider authorization. Passing it through the existing provider compiler therefore produces six blocked jobs with complete prompts and reference requirements. A named human must separately admit each exact artifact and record one run-once provider authorization before any job becomes submit-ready. Fallback and multiple candidates remain forbidden.
+
+## Sealed provider package
+
+Generate a fillable admissions template from the exact intake:
+
+```text
+node scripts/compile-project-art-eva-source-repair-provider-package.mjs template \
+  --intake <create-only-intake.json> \
+  --output <create-only-admissions-template.json>
+```
+
+The completed admissions document binds the intake SHA-256, exact ordered six-job set, per-job provider selection, every admitted source/reference/mask artifact and a named-human authorization. Authorization is limited to six total provider calls, one candidate per job, no fallback and a maximum 24-hour validity window.
+
+After admissions are complete, compile one self-hashed provider package:
+
+```text
+node scripts/compile-project-art-eva-source-repair-provider-package.mjs compile \
+  --intake <create-only-intake.json> \
+  --admissions <sealed-admissions.json> \
+  --output <create-only-provider-package.json> \
+  --compiled-at <canonical-utc>
+```
+
+Compilation must produce exactly five ready redraws and one ready in-between with zero blockers. The package embeds the exact plan, finalized request and ready provider batch, but it still cannot execute a provider or approve, promote, publish or activate a candidate.
+
+Compile a runtime dispatch directly from the verified package, without manually extracting or copying nested JSON:
+
+```text
+node scripts/avatar-final-pass-provider-runtime-cli.mjs dispatch-package \
+  --package <create-only-provider-package.json> \
+  --job-id <exact-job-id> \
+  --output <create-only-runtime-dispatch.json> \
+  --compiled-at <canonical-utc>
+```
 
 ## Command
 

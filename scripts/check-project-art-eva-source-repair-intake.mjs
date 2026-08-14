@@ -9,6 +9,16 @@ const files = Object.freeze({
   catalogue: 'scripts/project-art/eva-source-repair-catalogue.mjs',
   intake: 'scripts/project-art/eva-source-repair-intake.mjs',
   cli: 'scripts/compile-project-art-eva-source-repair-intake.mjs',
+  providerPackage:
+    'scripts/project-art/eva-source-repair-provider-package.mjs',
+  providerPackageCli:
+    'scripts/compile-project-art-eva-source-repair-provider-package.mjs',
+  providerReferences:
+    'scripts/project-art/avatar-final-pass-provider-references.mjs',
+  providerRuntimeConstants:
+    'scripts/project-art/avatar-final-pass-provider-runtime-constants.mjs',
+  providerRuntimeCli:
+    'scripts/avatar-final-pass-provider-runtime-cli.mjs',
   tests: 'scripts/test-project-art-eva-source-repair-intake.mjs',
   finalPass: 'scripts/project-art/avatar-final-pass.mjs',
   docs: 'docs/PROJECT_ART_EVA_SOURCE_REPAIR_INTAKE.md',
@@ -65,6 +75,42 @@ includes('tests', [
   'Git-blob, plan, manifest and authority drift fail closed',
   'file compilation is bounded and create-only',
   'human-provider-authorization-required',
+  'named authorization and exact mask admissions seal one six-job provider package',
+  'expired authorization, missing masks and package tampering fail closed',
+]);
+includes('providerPackage', [
+  'evavo.project-art-eva-source-repair-provider-admissions-template.v1',
+  'evavo.project-art-eva-source-repair-provider-admissions.v1',
+  'evavo.project-art-eva-source-repair-provider-package.v1',
+  'defect-mask',
+  'MAXIMUM_AUTHORIZATION_WINDOW_MS',
+  'maximumProviderCalls !== EXPECTED_TOTAL_JOBS',
+  'EVA_SOURCE_REPAIR_PROVIDER_DISPATCH_AUTHORIZATION_EXPIRED',
+  'EVA_SOURCE_REPAIR_PROVIDER_ARTIFACT_IDENTITY_CONFLICT',
+  'compileProjectArtAvatarFinalPassProviderBatch',
+  'compile-one-runtime-dispatch-per-job',
+  "openSync(absolute, 'wx', 0o600)",
+]);
+includes('providerPackageCli', [
+  "command === 'template'",
+  "command === 'compile'",
+  '--admissions',
+  'explicitProviderSubmissionRequired: true',
+  'providerExecution: false',
+]);
+includes('providerReferences', [
+  "binding.bindingKey === 'defect-mask'",
+  "prerequisiteBlockers.push('defect-mask-artifact-required')",
+  "'edit-mask'",
+  'The defect-mask reference is the only authorized edit region',
+]);
+includes('providerRuntimeConstants', [
+  "'edit-mask': 'defect-mask'",
+]);
+includes('providerRuntimeCli', [
+  'dispatch-package',
+  'parseProjectArtEvaSourceRepairProviderPackageForDispatch',
+  'sourcePackageSha256',
 ]);
 includes('finalPass', [
   'evavo.avatar.art-materialization-manifest.v1',
@@ -84,6 +130,10 @@ const packageJson = JSON.parse(source.package);
 assert.equal(
   packageJson.scripts['project-art:eva-source-repair:check'],
   'node scripts/check-project-art-eva-source-repair-intake.mjs && node --test scripts/test-project-art-eva-source-repair-intake.mjs',
+);
+assert.equal(
+  packageJson.scripts['project-art:eva-source-repair:provider'],
+  'node scripts/compile-project-art-eva-source-repair-provider-package.mjs',
 );
 assert.ok(
   packageJson.scripts['project-art:check'].includes(

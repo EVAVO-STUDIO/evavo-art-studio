@@ -207,6 +207,12 @@ export function request(plan, { ready = true } = {}) {
                 '1',
               ),
               admission('base-image', 'frames/talk-a.png', hash('a'), '2'),
+              admission(
+                'defect-mask',
+                'masks/talk-a-hands.png',
+                hash('d'),
+                '6',
+              ),
             ]
           : [],
         notes: 'Repair only the malformed right hand and preserve the pose.',
@@ -258,4 +264,3 @@ export function compile(plan, input) {
     compiledAt: at,
   });
 }
-

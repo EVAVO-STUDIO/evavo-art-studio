@@ -42,6 +42,18 @@ node C:\GitRepos\evavo-art-studio\scripts\avatar-final-pass-provider-runtime-cli
   --compiled-at 2026-08-13T03:00:00.000Z
 ```
 
+For the sealed EVA source-repair flow, dispatch directly from its verified provider package:
+
+```powershell
+node C:\GitRepos\evavo-art-studio\scripts\avatar-final-pass-provider-runtime-cli.mjs dispatch-package `
+  --package C:\EVAVO\Evidence\eva\eva-source-repair.provider-package.json `
+  --job-id redraw:eva-20260809-153620-frame-05 `
+  --output C:\EVAVO\Evidence\eva\eva-153620-05.runtime-dispatch.json `
+  --compiled-at 2026-08-15T11:04:00.000Z
+```
+
+`dispatch-package` revalidates the package self-hash, recomputes the nested six-job batch from its exact plan and request, and then compiles the selected job. No manual JSON extraction is required.
+
 The dispatch binds:
 
 ```text
@@ -68,6 +80,7 @@ For an edit, the adapter capability profile additionally requires:
 
 ```text
 mask-guided-edit
+defect-mask
 high-input-fidelity
 non-target-invariance
 identity-reference-lock
