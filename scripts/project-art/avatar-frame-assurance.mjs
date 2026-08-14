@@ -54,7 +54,7 @@ function fingerprint(value) {
     .digest('hex');
 }
 
-function parseObservation(value, label) {
+function parseObservation(value) {
   const code = 'PROJECT_ART_AVATAR_FRAME_ASSURANCE_OBSERVATION_INVALID';
   exact(
     value,
@@ -88,7 +88,7 @@ function parseObservation(value, label) {
   if (value.applicability === 'not-visible' && value.verdict !== 'pass') {
     fail(code);
   }
-  return Object.freeze({ ...value, label });
+  return Object.freeze({ ...value });
 }
 
 function parseCheck(value, expectedCheck) {
