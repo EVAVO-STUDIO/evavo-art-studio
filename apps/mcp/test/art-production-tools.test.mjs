@@ -18,6 +18,7 @@ test("MCP exposes iterative art planning without provider or approval shortcuts"
     "verify_art_production_loop",
     "compile_art_production_human_approval_receipt",
     "compile_art_production_packaging_plan",
+    "compile_art_production_runtime_assembly_handoff",
     "registerArtProductionTools(server)",
     "compileArtProductionLoop",
     "evaluateArtProductionAttempt",
@@ -25,6 +26,8 @@ test("MCP exposes iterative art planning without provider or approval shortcuts"
     "compileArtProductionHumanApprovalReceipt",
     "verifyArtProductionHumanApprovalReceiptAgainstRequest",
     "compileArtProductionPackagingPlan",
+    "compileArtProductionRuntimeAssemblyHandoff",
+    "verifyArtProductionRuntimeAssemblyHandoff",
   ]) {
     assert.ok(`${tools}\n${provider}`.includes(token), `missing MCP invariant ${token}`);
   }
@@ -44,4 +47,6 @@ test("MCP exposes iterative art planning without provider or approval shortcuts"
   assert.match(tools, /caller supplied; no provider call/i);
   assert.match(tools, /does not make it/i);
   assert.match(tools, /no sheet or atlas pixels are written/i);
+  assert.match(tools, /no assembly files are written/i);
+  assert.match(tools, /no runtime is activated/i);
 });
