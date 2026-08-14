@@ -76,17 +76,15 @@ function topological(jobs) {
     }
   }
   const ready = jobs.filter((job) => indegree.get(job.id) === 0).map((job) => job.id);
-  ready.sort((a, b) => byId.get(a).index - byId.get(b).index || a.localeCompare(b));
+  const order = (a, b) => byId.get(a).index - byId.get(b).index || a.localeCompare(b);
+  ready.sort(order);
   const ordered = [];
   while (ready.length) {
     const current = ready.shift();
     ordered.push(byId.get(current).job);
     for (const consumer of consumers.get(current)) {
       indegree.set(consumer, indegree.get(consumer) - 1);
-      if (indegree.get(consumer) === 0) {
-        ready.push(consumer);
-        ready.sort((a, b) => byId.get(a).index - byId.get(b).index || a.localeCompare(b));
-      }
+      if (indegree.get(consumer) === 0) { ready.push(consumer); ready.sort(order); }
     }
   }
   if (ordered.length !== jobs.length) fail("job dependency graph contains a cycle.");
@@ -109,4 +107,106 @@ export function validateGuardrailSpec(input) {
 
   exact(source.cameraLocks, CAMERA_KEYS, "cameraLocks");
   finite(source.cameraLocks.heroYawDegrees, "cameraLocks.heroYawDegrees", -180, 180);
-  finite(source.cameraLocks.heroPitchDegrees, "cameraLocks.heroPitchDegrees", 0, 89)²È="24‰½¹Í¥ÍÑ•¹Ñ¹‘½¹¹•Ñ¥½¹Ì‰t¤¥˜€¡‰½½°¡Í½ÕÉ”¹…µ•É…1½­Ím­•åt°…µ•É…1½­Ì¸‘í­•åõ€¤€„ôôÑÉÕ”¤™…¥°¡…µ•É…1½­Ì¸‘í­•åôµÕÍÐÉ•µ…¥¸ÑÉÕ”¹€¤ì((€•á…Ð¡Í½ÕÉ”¹½ÕÑÁÕÐ°=UQAUQ}-eL°€‰½ÕÑÁÕÐˆ¤ìÍ…™•I½½Ð¡Í½ÕÉ”¹½ÕÑÁÕÐ¹Ý½É­¥¹I½½Ð°€‰½ÕÑÁÕÐ¹Ý½É­¥¹I½½Ðˆ¤ìÍ…™•I½½Ð¡Í½ÕÉ”¹½ÕÑÁÕÐ¹µ…ÍÑ•ÉI½½Ð°€‰½ÕÑÁÕÐ¹µ…ÍÑ•ÉI½½Ðˆ¤ì(€¥˜€¡Í½ÕÉ”¹½ÕÑÁÕÐ¹™½Éµ…Ð€„ôô€‰Á¹œˆñðÍ½ÕÉ”¹½ÕÑÁÕÐ¹½¹•%µ…•A•É)½ˆ€„ôôÑÉÕ”ñðÍ½ÕÉ”¹½ÕÑÁÕÐ¹É•Ñ…¥¹%¹‘¥Ù¥‘Õ…±M½ÕÉ•Ì€„ôôÑÉÕ”ñðÍ½ÕÉ”¹½ÕÑÁÕÐ¹…ÕÑ½µ…Ñ¥ÍÍ•µ‰±ä€„ôô™…±Í”¤™…¥° ‰½ÕÑÁÕÐ½¹ÑÉ…Ð‘É¥™Ñ•¸ˆ¤ì(€Ù…±¥‘…Ñ•ÕÑ¡½É¥Ñä¡Í½ÕÉ”¹…ÕÑ¡½É¥Ñä¤ì((€¥˜€ …ÉÉ…ä¹¥ÍÉÉ…ä¡Í½ÕÉ”¹©½‰Ì¤ñðÍ½ÕÉ”¹©½‰Ì¹±•¹Ñ €„ôô€ÄÈ¤™…¥° ‰©½‰ÌµÕÍÐ½¹Ñ…¥¸•á…Ñ±äÑÝ•±Ù”½¹”µ¥µ…”©½‰Ì¸ˆ¤ì(€½¹ÍÐ¥‘Ì€ô¹•ÜM•Ð ¤ì(€½¹ÍÐ©½‰Ì€ôÍ½ÕÉ”¹©½‰Ì¹µ…À ¡É…Ü°¥¹‘•à¤€ôøì(€€€•á…Ð¡É…Ü°)=	}-eL°©½‰Íl‘í¥¹‘•áõu€¤ì(€€€½¹ÍÐ©½‰%€ô¥¡É…Ü¹¥°©½‰Íl‘í¥¹‘•áõt¹¥‘€¤ì¥˜€¡¥‘Ì¹¡…Ì¡©½‰%¤¤™…¥°¡‘ÕÁ±¥…Ñ”©½ˆ¥€‘í©½‰%‘ô¹€¤ì¥‘Ì¹…‘¡©½‰%¤ì(€€€½¹ÍÐÉ½±”€ô¥¡É…Ü¹É½±”°©½‰Íl‘í¥¹‘•áõt¹É½±•€¤ì½¹ÍÐÙ…É¥…¹Ð€ô¥¡É…Ü¹Ù…É¥…¹Ð°©½‰Íl‘í¥¹‘•áõt¹Ù…É¥…¹Ñ€¤ì¥˜€ …)=	}YI%9QL¹¡…Ì¡Ù…É¥…¹Ð¤¤™…¥°¡©½‰Íl‘í¥¹‘•áõt¹Ù…É¥…¹Ð¥ÌÕ¹ÍÕÁÁ½ÉÑ•¹€¤ì(€€€¥¡É…Ü¹Ù¥•Ü°©½‰Íl‘í¥¹‘•áõt¹Ù¥•Ý€¤ì¥¡É…Ü¹Á¡…Í”°©½‰Íl‘í¥¹‘•áõt¹Á¡…Í•€¤ì(€€€¥˜€ …9Õµ‰•È¹¥Í%¹Ñ••È¡É…Ü¹Ý¥‘Ñ ¤ñðÉ…Ü¹Ý¥‘Ñ €„ôô€ÈÀÐàñð€…9Õµ‰•È¹¥Í%¹Ñ••È¡É…Ü¹¡•¥¡Ð¤ñðÉ…Ü¹¡•¥¡Ð€„ôô€ÈÀÐà¤™…¥°¡©½‰Íl‘í¥¹‘•áõtµÕÍÐ‰”€ÈÀÐáàÈÀÐà¹€¤ì(€€€‰½½°¡É…Ü¹ÑÉ…¹ÍÁ…É•¹Ð°©½‰Íl‘í¥¹‘•áõt¹ÑÉ…¹ÍÁ…É•¹Ñ€¤ì(€€€½¹ÍÐ‘•Á•¹‘Í=¸€ôÍÑÉ¥¹Ì¡É…Ü¹‘•Á•¹‘Í=¸°©½‰Íl‘í¥¹‘•áõt¹‘•Á•¹‘Í=¹€¤¹µ…À ¡•¹ÑÉä¤€ôø¥¡•¹ÑÉä°©½‰Íl‘í¥¹‘•áõt¹‘•Á•¹‘Í=¹€¤¤ì(€€€½¹ÍÐ¥¹±Õ‘”€ôÍÑÉ¥¹Ì¡É…Ü¹¥¹±Õ‘”°©½‰Íl‘í¥¹‘•áõt¹¥¹±Õ‘•€°€Ì°€ÈÐ¤ì½¹ÍÐ•á±Õ‘”€ôÍÑÉ¥¹Ì¡É…Ü¹•á±Õ‘”°©½‰Íl‘í¥¹‘•áõt¹•á±Õ‘•€°€Ì°€ÈÐ¤ì(€€€¥˜€¡l¸¸¹¥¹±Õ‘”°€¸¸¹•á±Õ‘•t¹Í½µ” ¡•¹ÑÉä¤€ôø€½½¹Ñ…ÑqÌ©Í¡••ÑñµÕ±Ñ¥l´uÁ…¹•±ñÉ¥½˜½¤¹Ñ•ÍÐ¡•¹ÑÉä¤¤€˜˜¥¹±Õ‘”¹Í½µ” ¡•¹ÑÉä¤€ôø€½½¹Ñ…ÑqÌ©Í¡••ÑñµÕ±Ñ¥l´uÁ…¹•±ñÉ¥½˜½¤¹Ñ•ÍÐ¡•¹ÑÉä¤¤¤™…¥°¡©½‰Íl‘í¥¹‘•áõtÉ•ÅÕ•ÍÑÌ„™½É‰¥‘‘•¸½µ‰¥¹•±…å½ÕÐ¹€¤ì(€€€É•ÑÕÉ¸ì€¸¸¹É…Ü°¥è©½‰%°É½±”°Ù…É¥…¹Ð°‘•Á•¹‘Í=¸°¥¹±Õ‘”°•á±Õ‘”ôì(€ô¤ì(€Ñ½Á½±½¥…°¡©½‰Ì¤ì(€½¹ÍÐÉ½±•Ì€ô¹•ÜM•Ð¡©½‰Ì¹µ…À ¡©½ˆ¤€ôø©½ˆ¹É½±”¤¤ì™½È€¡½¹ÍÐÉ½±”½˜IEU%I}I=1L¤¥˜€ …É½±•Ì¹¡…Ì¡É½±”¤¤™…¥°¡©½ˆÉ½±”±½ÍÕÉ”¥Ìµ¥ÍÍ¥¹œ€‘íÉ½±•ô¹€¤ì(€¥˜€¡©½‰Ì¹™¥±Ñ•È ¡©½ˆ¤€ôø©½ˆ¹É½±”€ôôô€‰µ½‘Õ±…Èµµ½‘•±¥¹œµÉ•™•É•¹”ˆ¤¹±•¹Ñ €„ôô€Ð¤™…¥° ‰Õ…É‘É…¥°É•ÅÕ¥É•Ì•á…Ñ±ä™½ÕÈµ½‘•±¥¹œÉ•™•É•¹•Ì¸ˆ¤ì(€¥˜€¡©½‰Ì¹™¥±Ñ•È ¡©½ˆ¤€ôø©½ˆ¹É½±”€ôôô€‰‰É•…­…‰±”µ‘…µ…”µÉ•™•É•¹”ˆ¤¹±•¹Ñ €„ôô€Ì¤™…¥° ‰Õ…É‘É…¥°É•ÅÕ¥É•Ì•á…Ñ±äÑ¡É•”‘…µ…”É•™•É•¹•Ì¸ˆ¤ì(€™½È€¡½¹ÍÐÙ…É¥…¹Ð½˜YI%9QL¤¥˜€ …©½‰Ì¹Í½µ” ¡©½ˆ¤€ôø©½ˆ¹Ù…É¥…¹Ð€ôôôÙ…É¥…¹Ð€˜˜l‰¥‘•¹Ñ¥Ñäµµ…ÍÑ•Èˆ°€‰Ù…É¥…¹Ðµ¥‘•¹Ñ¥Ñä‰t¹¥¹±Õ‘•Ì¡©½ˆ¹É½±”¤¤¤™…¥°¡¥‘•¹Ñ¥Ñä±½ÍÕÉ”¥Ìµ¥ÍÍ¥¹œ€‘íÙ…É¥…¹Ñô¹€¤ì(€É•ÑÕÉ¸Í½ÕÉ”ì)ô()™Õ¹Ñ¥½¸ÁÉ½µÁÐ¡ÍÁ•Œ°©½ˆ¤ì(€É•ÑÕÉ¸l(€€€É•…Ñ”•á…Ñ±ä½¹”¥µ…”™½È€‘íÍÁ•Œ¹Ñ¥Ñ±•ô¹€°(€€€ÍÍ•Ð¥‘•¹Ñ¥Ñäè€‘íÍÁ•Œ¹ÍÕ‰©•Ñ%‘ôìµ½‘Õ±”è€‘í©½ˆ¹Ù…É¥…¹Ñôì©½ˆè€‘í©½ˆ¹¥‘ôìÉ½±”è€‘í©½ˆ¹É½±•ôìÙ¥•Üè€‘í©½ˆ¹Ù¥•Ýô¹€°(€€€Y¥ÍÕ…°Ñ…É•Ðè€‘íÍÁ•Œ¹ÍÑå±”¹‘•Í¥¹É…ôì€‘íÍÁ•Œ¹ÍÑå±”¹É•¹‘•É¥¹ôì€‘íÍÁ•Œ¹ÍÑå±”¹ÁÉ½Á1…¹Õ…•õ€°(€€€AÉ½©•Ñ¥½¸è€‘íÍÁ•Œ¹ÍÑå±”¹ÁÉ½©•Ñ¥½¹…µ¥±åô¸AÉ•Í•ÉÙ”‰•…´¡•¥¡Ð°Á½ÍÐÍÁ…¥¹œ°µ½‘Õ±”±•¹Ñ °½¹¹•Ñ¥½¸•¹‘Ì°Á…±•ÑÑ”…¹½¹ÍÑÉÕÑ¥½¸¥‘•¹Ñ¥Ñä•ÍÑ…‰±¥Í¡•‰ä‘•Á•¹‘•¹¥•Ì¹€°(€€€%¹±Õ‘”è€‘í©½ˆ¹¥¹±Õ‘”¹©½¥¸ ˆì€ˆ¥ô¹€°(€€€Ù½¥è€‘íl¸¸¹ÍÁ•Œ¹ÍÑå±”¹™½É‰¥‘‘•¸°€¸¸¹©½ˆ¹•á±Õ‘•t¹©½¥¸ ˆì€ˆ¥ô¹€°(€€€=ÕÑÁÕÐ½¹”€‘í©½ˆ¹Ý¥‘Ñ¡õà‘í©½ˆ¹¡•¥¡ÑôA9‘í©½ˆ¹ÑÉ…¹ÍÁ…É•¹Ð€ü€ˆÝ¥Ñ ÑÉÕ”ÑÉ…¹ÍÁ…É•¹Ð‰…­É½Õ¹ˆ€è€ˆ…Ì½¹”½¡•É•¹Ðµ…Ñ•É¥…°Ù¥•Ü‰ô¸9¼±…‰•±Ì°½¹Ñ…ÐÍ¡••Ð°É¥½ÈÕ¹É•±…Ñ•Í•½¹ÁÉ½À¹€°(€t¹©½¥¸ ‰q¸ˆ¤ì)ô()•áÁ½ÉÐ™Õ¹Ñ¥½¸½µÁ¥±•Õ…É‘É…¥±M•ÍÍ¥½¸¡¥¹ÁÕÐ¤ì(€½¹ÍÐÍÁ•Œ€ôÙ…±¥‘…Ñ•Õ…É‘É…¥±MÁ•Œ¡¥¹ÁÕÐ¤ì½¹ÍÐÍÁ•M¡„ÈÔØ€ôÍ¡„ÈÔØ¡ÍÁ•Œ¤ì½¹ÍÐ½É‘•É•€ôÑ½Á½±½¥…°¡ÍÁ•Œ¹©½‰Ì¤ì(€½¹ÍÐ©½‰Ì€ô½É‘•É•¹µ…À ¡©½ˆ°Í•ÅÕ•¹”¤€ôøì(€€€½¹ÍÐ‰½‘ä€ôì(€€€€€Í¡•µ„è)=	}M!5°ÁÉ½Ñ½½±Y•ÉÍ¥½¸èAI=Q==1}YIM%=8°Í•ÅÕ•¹”°…ÍÍ•Ñ%èÍÁ•Œ¹…ÍÍ•Ñ%°ÍÕ‰©•Ñ%èÍÁ•Œ¹ÍÕ‰©•Ñ%°(€€€€€©½‰%è©½ˆ¹¥°Á¡…Í”è©½ˆ¹Á¡…Í”°É½±”è©½ˆ¹É½±”°Ù…É¥…¹Ðè©½ˆ¹Ù…É¥…¹Ð°Ù¥•Üè©½ˆ¹Ù¥•Ü°(€€€€€½Á•É…Ñ¥½¸è€‰•¹•É…Ñ”ˆ°¥µ…•Ìè€Ä°…¹‘¥‘…Ñ•½Õ¹Ðè€Ä°(€€€€€Ñ…É•ÐèìÝ¥‘Ñ è©½ˆ¹Ý¥‘Ñ °¡•¥¡Ðè©½ˆ¹¡•¥¡Ð°™½Éµ…Ðè€‰Á¹œˆ°ÑÉ…¹ÍÁ…É•¹Ñ	…­É½Õ¹è©½ˆ¹ÑÉ…¹ÍÁ…É•¹Ðô°(€€€€€‘•Á•¹‘•¹¥•Ìèl¸¸¹©½ˆ¹‘•Á•¹‘Í=¹t°ÁÉ½µÁÐèÁÉ½µÁÐ¡ÍÁ•Œ°©½ˆ¤°(€€€€€½ÕÑÁÕÐèìÝ½É­¥¹œè€‘íÍÁ•Œ¹½ÕÑÁÕÐ¹Ý½É­¥¹I½½Ñô¼‘í©½ˆ¹¥‘ô¹Á¹€°µ…ÍÑ•Èè€‘íÍÁ•Œ¹½ÕÑÁÕÐ¹µ…ÍÑ•ÉI½½Ñô¼‘í©½ˆ¹¥‘ô¹Á¹€ô°(€€€€€¥‘•µÁ½Ñ•¹å-•äèÍ¡„ÈÔØ¡ìÍÁ•M¡„ÈÔØ°©½‰%è©½ˆ¹¥°‘•Á•¹‘•¹¥•Ìè©½ˆ¹‘•Á•¹‘Í=¸ô¤°(€€€€€…ÕÑ¡½É¥ÑäèìÁÉ½Ù¥‘•Éá•ÕÑ¥½¸è™…±Í”°…ÕÑ½µ…Ñ¥ÁÁÉ½Ù…°è™…±Í”°¥µ…•5ÕÑ…Ñ¥½¸è™…±Í”°…ÕÑ½µ…Ñ¥ÍÍ•µ‰±äè™…±Í”°É•Á½Í¥Ñ½Éå5ÕÑ…Ñ¥½¸è™…±Í”°¥Ñ5ÕÑ…Ñ¥½¸è™…±Í”°‘•Á±½åµ•¹Ðè™…±Í”°ÁÕ‰±¥…Ñ¥½¸è™…±Í”°¹…µ•‘!Õµ…¹ÁÁÉ½Ù…±I•ÅÕ¥É•èÑÉÕ”ô°(€€€ôì(€€€É•ÑÕÉ¸ì€¸¸¹‰½‘ä°©½‰M¡„ÈÔØèÍ¡„ÈÔØ¡‰½‘ä¤ôì(€ô¤ì(€½¹ÍÐ‰½‘ä€ôì(€€€Í¡•µ„èMMM%=9}M!5°ÁÉ½Ñ½½±Y•ÉÍ¥½¸èAI=Q==1}YIM%=8°Í•ÍÍ¥½¹%è€‘íÍÁ•Œ¹…ÍÍ•Ñ%‘ôµÙ¥ÍÕ…°µ‘•Ù•±½Áµ•¹ÐµØÅ€°…ÍÍ•Ñ%èÍÁ•Œ¹…ÍÍ•Ñ%°ÍÕ‰©•Ñ%èÍÁ•Œ¹ÍÕ‰©•Ñ%°(€€€ÍÁ•M¡„ÈÔØ°ÍÁ•Œ°©½‰Ì°(€€€Ñ½Ñ…±Ìèì©½‰Ìè©½‰Ì¹±•¹Ñ °¥µ…•Ìè©½‰Ì¹±•¹Ñ °Ù…É¥…¹ÑÌèÍÁ•Œ¹Ù…É¥…¹ÑÌ¹±•¹Ñ °µ½‘•±¥¹)½‰Ìè©½‰Ì¹™¥±Ñ•È ¡©½ˆ¤€ôø©½ˆ¹É½±”€ôôô€‰µ½‘Õ±…Èµµ½‘•±¥¹œµÉ•™•É•¹”ˆ¤¹±•¹Ñ °‘…µ…•)½‰Ìè©½‰Ì¹™¥±Ñ•È ¡©½ˆ¤€ôø©½ˆ¹É½±”€ôôô€‰‰É•…­…‰±”µ‘…µ…”µÉ•™•É•¹”ˆ¤¹±•¹Ñ °ÑÉ…¹ÍÁ…É•¹Ñ)½‰Ìè©½‰Ì¹™¥±Ñ•È ¡©½ˆ¤€ôø©½ˆ¹Ñ…É•Ð¹ÑÉ…¹ÍÁ…É•¹Ñ	…­É½Õ¹¤¹±•¹Ñ ô°(€€€É•…‘¥¹•ÍÌèìÍÑ…ÑÕÌè€‰ÁÉ½Ù¥‘•Èµ©½‰Ìµ½µÁ¥±•ˆ°ÁÉ½Ù¥‘•Éá•ÕÑ¥½¹I•ÅÕ¥É•èÑÉÕ”°¹…µ•‘!Õµ…¹ÁÁÉ½Ù…±I•ÅÕ¥É•èÑÉÕ”°‘½Ý¹ÍÑÉ•…´ÍI•…‘äè™…±Í”ô°(€€€…ÕÑ¡½É¥ÑäèÍÑÉÕÑÕÉ•‘±½¹”¡ÍÁ•Œ¹…ÕÑ¡½É¥Ñä¤°(€ôì(€É•ÑÕÉ¸ì€¸¸¹‰½‘ä°Í•ÍÍ¥½¹M¡„ÈÔØèÍ¡„ÈÔØ¡‰½‘ä¤ôì)ô()•áÁ½ÉÐ™Õ¹Ñ¥½¸Ù•É¥™åÕ…É‘É…¥±M•ÍÍ¥½¸¡Í•ÍÍ¥½¸¤ì(€¥˜€ …¥Í=‰©•Ð¡Í•ÍÍ¥½¸¤ñðÍ•ÍÍ¥½¸¹Í¡•µ„€„ôôMMM%=9}M!5ñðÍ•ÍÍ¥½¸¹ÁÉ½Ñ½½±Y•ÉÍ¥½¸€„ôôAI=Q==1}YIM%=8¤™…¥° ‰Í•ÍÍ¥½¸¥‘•¹Ñ¥Ñä‘É¥™Ñ•¸ˆ¤ì(€¥˜€¡ÑåÁ•½˜Í•ÍÍ¥½¸¹Í•ÍÍ¥½¹M¡„ÈÔØ€„ôô€‰ÍÑÉ¥¹œˆñð€…M!¹Ñ•ÍÐ¡Í•ÍÍ¥½¸¹Í•ÍÍ¥½¹M¡„ÈÔØ¤¤™…¥° ‰Í•ÍÍ¥½¹M¡„ÈÔØ¥Ì¥¹Ù…±¥¸ˆ¤ì(€½¹ÍÐ‰½‘ä€ô=‰©•Ð¹™É½µ¹ÑÉ¥•Ì¡=‰©•Ð¹•¹ÑÉ¥•Ì¡Í•ÍÍ¥½¸¤¹™¥±Ñ•È ¡m­•åt¤€ôø­•ä€„ôô€‰Í•ÍÍ¥½¹M¡„ÈÔØˆ¤¤ì(€¥˜€¡Í¡„ÈÔØ¡‰½‘ä¤€„ôôÍ•ÍÍ¥½¸¹Í•ÍÍ¥½¹M¡„ÈÔØ¤™…¥° ‰Í•ÍÍ¥½¹M¡„ÈÔØ‘½•Ì¹½Ðµ…Ñ Ñ¡”ÍÕ‰µ¥ÑÑ•Á…å±½…¸ˆ¤ì(€½¹ÍÐ•áÁ•Ñ•€ô½µÁ¥±•Õ…É‘É…¥±M•ÍÍ¥½¸¡Í•ÍÍ¥½¸¹ÍÁ•Œ¤ì(€¥˜€¡…¹½¹¥…±)Í½¸¡•áÁ•Ñ•¤€„ôô…¹½¹¥…±)Í½¸¡Í•ÍÍ¥½¸¤¤™…¥° ‰Í•ÍÍ¥½¸¥Ì¹½ÐÑ¡”‘•Ñ•Éµ¥¹¥ÍÑ¥Œ½µÁ¥±…Ñ¥½¸½˜¥ÑÌÉ•Ñ…¥¹•ÍÁ•Œ¸ˆ¤ì(€É•ÑÕÉ¸ÑÉÕ”ì)ô()…Íå¹Œ™Õ¹Ñ¥½¸µ…¥¸ ¤ì(€½¹ÍÐm½µµ…¹°¥¹ÁÕÑA…Ñ °€¸¸¹É•ÍÑt€ôÁÉ½•ÍÌ¹…ÉØ¹Í±¥” È¤ì½¹ÍÐ½ÕÑÁÕÑ%¹‘•à€ôÉ•ÍÐ¹¥¹‘•á=˜ ˆ´µ½ÕÑÁÕÐˆ¤ì½¹ÍÐ½ÕÑÁÕÑA…Ñ €ô½ÕÑÁÕÑ%¹‘•à€øô€À€üÉ•ÍÑm½ÕÑÁÕÑ%¹‘•à€¬€Åt€èÕ¹‘•™¥¹•ì(€¥˜€ …l‰½µÁ¥±”ˆ°€‰Ù•É¥™ä‰t¹¥¹±Õ‘•Ì¡½µµ…¹¤ñð€…¥¹ÁÕÑA…Ñ ¤™…¥° ‰UÍ…”èÉ…±±ä´ÈÕµÕ…É‘É…¥°µ©½‰Ì¹µ©Ì€ñ½µÁ¥±•ñÙ•É¥™äø€ñ¥¹ÁÕÐ¹©Í½¸øl´µ½ÕÑÁÕÐ½ÕÑÁÕÐ¹©Í½¹tˆ¤ì(€½¹ÍÐ¥¹ÁÕÐ€ô)M=8¹Á…ÉÍ”¡…Ý…¥ÐÉ•…‘¥±”¡¥¹ÁÕÑA…Ñ °€‰ÕÑ˜àˆ¤¤ì(€½¹ÍÐÉ•ÍÕ±Ð€ô½µµ…¹€ôôô€‰½µÁ¥±”ˆ€ü½µÁ¥±•Õ…É‘É…¥±M•ÍÍ¥½¸¡¥¹ÁÕÐ¤€èìÙ…±¥èÙ•É¥™åÕ…É‘É…¥±M•ÍÍ¥½¸¡¥¹ÁÕÐ¤°Í•ÍÍ¥½¹%è¥¹ÁÕÐ¹Í•ÍÍ¥½¹%°Í•ÍÍ¥½¹M¡„ÈÔØè¥¹ÁÕÐ¹Í•ÍÍ¥½¹M¡„ÈÔØ°©½‰Ìè¥¹ÁÕÐ¹Ñ½Ñ…±Ì¹©½‰Ì°¥µ…•Ìè¥¹ÁÕÐ¹Ñ½Ñ…±Ì¹¥µ…•Ì°Ù…É¥…¹ÑÌè¥¹ÁÕÐ¹Ñ½Ñ…±Ì¹Ù…É¥…¹ÑÌ°µ½‘•±¥¹)½‰Ìè¥¹ÁÕÐ¹Ñ½Ñ…±Ì¹µ½‘•±¥¹)½‰Ì°‘…µ…•)½‰Ìè¥¹ÁÕÐ¹Ñ½Ñ…±Ì¹‘…µ…•)½‰Ì°½¹•%µ…•A•É)½ˆè¥¹ÁÕÐ¹Ñ½Ñ…±Ì¹¥µ…•Ì€ôôô¥¹ÁÕÐ¹Ñ½Ñ…±Ì¹©½‰Ì°ÁÉ½Ù¥‘•Éá•ÕÑ¥½¸è™…±Í”ôì(€½¹ÍÐÉ•¹‘•É•€ô€‘í)M=8¹ÍÑÉ¥¹¥™ä¡É•ÍÕ±Ð°¹Õ±°°€È¥õq¹€ì¥˜€¡½ÕÑÁÕÑA…Ñ ¤…Ý…¥ÐÝÉ¥Ñ•¥±”¡½ÕÑÁÕÑA…Ñ °É•¹‘•É•°€‰ÕÑ˜àˆ¤ìÁÉ½•ÍÌ¹ÍÑ‘½ÕÐ¹ÝÉ¥Ñ”¡É•¹‘•É•¤ì)ô()¥˜€¡ÁÉ½•ÍÌ¹…ÉÙlÅt€˜˜Á…Ñ ¹É•Í½±Ù”¡ÁÉ½•ÍÌ¹…ÉÙlÅt¤€ôôô™¥±•UI1Q½A…Ñ ¡¥µÁ½ÉÐ¹µ•Ñ„¹ÕÉ°¤¤µ…¥¸ ¤¹…Ñ  ¡•ÉÉ½È¤€ôøìÁÉ½•ÍÌ¹ÍÑ‘•ÉÈ¹ÝÉ¥Ñ”¡€‘í•ÉÉ½È¥¹ÍÑ…¹•½˜ÉÉ½È€ü•ÉÉ½È¹µ•ÍÍ…”€èMÑÉ¥¹œ¡•ÉÉ½È¥õq¹€¤ìÁÉ½•ÍÌ¹•á¥Ñ½‘”€ô€Äìô¤ì(
+  finite(source.cameraLocks.heroPitchDegrees, "cameraLocks.heroPitchDegrees", 0, 89);
+  finite(source.cameraLocks.orthographicPitchDegrees, "cameraLocks.orthographicPitchDegrees", -89, 89);
+  finite(source.cameraLocks.topPlanPitchDegrees, "cameraLocks.topPlanPitchDegrees", 89, 90);
+  finite(source.cameraLocks.focalLengthMm, "cameraLocks.focalLengthMm", 20, 200);
+  for (const key of ["consistentBeamHeight", "consistentPostSpacing", "consistentModuleLength", "consistentEndConnections"]) {
+    if (bool(source.cameraLocks[key], `cameraLocks.${key}`) !== true) fail(`cameraLocks.${key} must remain true.`);
+  }
+
+  exact(source.output, OUTPUT_KEYS, "output");
+  safeRoot(source.output.workingRoot, "output.workingRoot"); safeRoot(source.output.masterRoot, "output.masterRoot");
+  if (source.output.format !== "png" || source.output.oneImagePerJob !== true || source.output.retainIndividualSources !== true || source.output.automaticAssembly !== false) fail("output contract drifted.");
+  validateAuthority(source.authority);
+
+  if (!Array.isArray(source.jobs) || source.jobs.length !== 12) fail("jobs must contain exactly twelve one-image jobs.");
+  const ids = new Set();
+  const jobs = source.jobs.map((raw, index) => {
+    exact(raw, JOB_KEYS, `jobs[${index}]`);
+    const jobId = id(raw.id, `jobs[${index}].id`); if (ids.has(jobId)) fail(`duplicate job id ${jobId}.`); ids.add(jobId);
+    const role = id(raw.role, `jobs[${index}].role`); if (!REQUIRED_ROLES.has(role)) fail(`jobs[${index}].role is unsupported.`);
+    const variant = id(raw.variant, `jobs[${index}].variant`); if (!JOB_VARIANTS.has(variant)) fail(`jobs[${index}].variant is unsupported.`);
+    const view = id(raw.view, `jobs[${index}].view`); const phase = id(raw.phase, `jobs[${index}].phase`);
+    if (!Number.isInteger(raw.width) || raw.width !== 2048 || !Number.isInteger(raw.height) || raw.height !== 2048) fail(`jobs[${index}] must be 2048x2048.`);
+    bool(raw.transparent, `jobs[${index}].transparent`);
+    const dependsOn = strings(raw.dependsOn, `jobs[${index}].dependsOn`).map((entry) => id(entry, `jobs[${index}].dependsOn`));
+    const include = strings(raw.include, `jobs[${index}].include`, 3, 24); const exclude = strings(raw.exclude, `jobs[${index}].exclude`, 3, 24);
+    if (include.some((entry) => /contact\s*sheet|multi[- ]panel|grid of|multiple alternatives/i.test(entry))) fail(`jobs[${index}] requests a forbidden combined layout.`);
+    return { ...raw, id: jobId, role, variant, view, phase, dependsOn, include, exclude };
+  });
+  topological(jobs);
+  const roles = new Set(jobs.map((job) => job.role)); for (const role of REQUIRED_ROLES) if (!roles.has(role)) fail(`job role closure is missing ${role}.`);
+  if (jobs.filter((job) => job.role === "identity-master").length !== 1) fail("guardrail requires exactly one identity master.");
+  if (jobs.filter((job) => job.role === "variant-identity").length !== 3) fail("guardrail requires exactly three variant identity references.");
+  if (jobs.filter((job) => job.role === "modular-modeling-reference").length !== 4) fail("guardrail requires exactly four modeling references.");
+  if (jobs.filter((job) => job.role === "breakable-damage-reference").length !== 3) fail("guardrail requires exactly three damage references.");
+  for (const variant of VARIANTS) if (!jobs.some((job) => job.variant === variant)) fail(`guardrail jobs do not cover ${variant}.`);
+  return source;
+}
+
+function prompt(spec, job) {
+  return [
+    `Create exactly one image for ${spec.title}.`,
+    `Asset identity: ${spec.subjectId}; variant: ${job.variant}; job: ${job.id}; role: ${job.role}; view: ${job.view}.`,
+    `Visual target: ${spec.style.designEra}; ${spec.style.rendering}; ${spec.style.propLanguage}`,
+    `Projection: ${spec.style.projectionFamily}. Hero camera ${spec.cameraLocks.heroYawDegrees} degrees yaw and ${spec.cameraLocks.heroPitchDegrees} degrees pitch; preserve beam height, post spacing, module length, end connections, palette and construction identity established by dependencies.`,
+    `Include: ${job.include.join("; ")}.`,
+    `Avoid: ${[...spec.style.forbidden, ...job.exclude].join("; ")}.`,
+    `Output one ${job.width}x${job.height} PNG${job.transparent ? " with true transparent background" : " as one coherent material reference"}. No labels, contact sheet, grid, duplicate complete module or unrelated prop family.`,
+  ].join("\n");
+}
+
+export function compileGuardrailSession(input) {
+  const spec = validateGuardrailSpec(input); const specSha256 = sha256(spec); const ordered = topological(spec.jobs);
+  const jobs = ordered.map((job, sequence) => {
+    const body = {
+      schema: JOB_SCHEMA, protocolVersion: PROTOCOL_VERSION, sequence, assetId: spec.assetId, subjectId: spec.subjectId,
+      jobId: job.id, phase: job.phase, role: job.role, variant: job.variant, view: job.view, operation: "generate", images: 1, candidateCount: 1,
+      target: { width: job.width, height: job.height, format: "png", transparentBackground: job.transparent },
+      dependencies: [...job.dependsOn], prompt: prompt(spec, job),
+      output: { working: `${spec.output.workingRoot}/${job.id}.png`, master: `${spec.output.masterRoot}/${job.id}.png` },
+      idempotencyKey: sha256({ specSha256, jobId: job.id, dependencies: job.dependsOn }),
+      authority: { providerExecution: false, automaticApproval: false, imageMutation: false, automaticAssembly: false, repositoryMutation: false, gitMutation: false, deployment: false, publication: false, namedHumanApprovalRequired: true },
+    };
+    return { ...body, jobSha256: sha256(body) };
+  });
+  const body = {
+    schema: SESSION_SCHEMA, protocolVersion: PROTOCOL_VERSION, sessionId: `${spec.assetId}-visual-development-v1`,
+    assetId: spec.assetId, subjectId: spec.subjectId, specSha256, spec, jobs,
+    totals: {
+      jobs: jobs.length, images: jobs.length, variants: spec.variants.length,
+      modelingJobs: jobs.filter((job) => job.role === "modular-modeling-reference").length,
+      damageJobs: jobs.filter((job) => job.role === "breakable-damage-reference").length,
+      transparentJobs: jobs.filter((job) => job.target.transparentBackground).length,
+    },
+    readiness: { status: "provider-jobs-compiled", providerExecutionRequired: true, namedHumanApprovalRequired: true, downstream3DReady: false },
+    authority: structuredClone(spec.authority),
+  };
+  return { ...body, sessionSha256: sha256(body) };
+}
+
+export function verifyGuardrailSession(session) {
+  if (!isObject(session) || session.schema !== SESSION_SCHEMA || session.protocolVersion !== PROTOCOL_VERSION) fail("session identity drifted.");
+  if (typeof session.sessionSha256 !== "string" || !SHA.test(session.sessionSha256)) fail("sessionSha256 is invalid.");
+  const body = Object.fromEntries(Object.entries(session).filter(([key]) => key !== "sessionSha256"));
+  if (sha256(body) !== session.sessionSha256) fail("sessionSha256 does not match the submitted payload.");
+  const expected = compileGuardrailSession(session.spec);
+  if (canonicalJson(expected) !== canonicalJson(session)) fail("session is not the deterministic compilation of its retained spec.");
+  return true;
+}
+
+async function main() {
+  const [command, inputPath, ...rest] = process.argv.slice(2); const outputIndex = rest.indexOf("--output"); const outputPath = outputIndex >= 0 ? rest[outputIndex + 1] : undefined;
+  if (!["compile", "verify"].includes(command) || !inputPath) fail("Usage: rally-25d-guardrail-jobs.mjs <compile|verify> <input.json> [--output output.json]");
+  const input = JSON.parse(await readFile(inputPath, "utf8"));
+  const result = command === "compile" ? compileGuardrailSession(input) : {
+    valid: verifyGuardrailSession(input), sessionId: input.sessionId, sessionSha256: input.sessionSha256,
+    jobs: input.totals.jobs, images: input.totals.images, variants: input.totals.variants,
+    modelingJobs: input.totals.modelingJobs, damageJobs: input.totals.damageJobs,
+    oneImagePerJob: input.totals.images === input.totals.jobs, providerExecution: false,
+  };
+  const rendered = `${JSON.stringify(result, null, 2)}\n`; if (outputPath) await writeFile(outputPath, rendered, "utf8"); process.stdout.write(rendered);
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((error) => { process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`); process.exitCode = 1; });
