@@ -4,12 +4,15 @@ import { readFile } from "node:fs/promises";
 
 import {
   ART_PRODUCTION_ATTEMPT_KIND,
+  ART_PRODUCTION_CANDIDATE_ADMISSION_REQUEST_KIND,
   ART_PRODUCTION_HUMAN_APPROVAL_REQUEST_KIND,
   ART_PRODUCTION_METRIC_IDS,
   applyLayeredProductionStyleProofApproval,
+  compileArtProductionCandidateAdmissionReceipt,
   compileArtProductionHumanApprovalReceipt,
   compileLayeredProductionPlan,
   compileLayeredProductionStyleProofApprovalReceipt,
+  compileNextArtProductionBatch,
 } from "../dist/index.js";
 
 const REQUEST_URL = new URL(
@@ -99,17 +102,93 @@ function unit(plan, unitId) {
   return result;
 }
 
+function candidateAdmissionRequest(
+  plan,
+  loop,
+  unitId,
+  options = {},
+) {
+  const state = loop.unitStates.find((entry) => entry.unitId === unitId);
+  assert.ok(state, `missing state ${unitId}`);
+  const source = unit(plan, unitId);
+  const batch = compileNextArtProductionBatch(plan, loop);
+  const job = batch.jobs.find((entry) => entry.unitId === unitId);
+  assert.ok(job, `unit ${unitId} is not in the exact current batch`);
+
+  const score = options.score ?? 100;
+  const attemptNumber = state.attemptCount + 1;
+  const candidateSha256 =
+    options.candidateSha256 ??
+    digest(
+      `${unitId}:${attemptNumber}:${score}:${options.candidateSalt ?? "candidate"}`,
+    );
+  const providerRequestSha256 =
+    options.providerRequestSha256 ??
+    digest(`provider-request:${job.jobSha256}`);
+  const providerResponseSha256 =
+    options.providerResponseSha256 ??
+    digest(`provider-response:${job.jobSha256}:${candidateSha256}`);
+  const inspectionEvidenceSha256 =
+    options.inspectionEvidenceSha256 ??
+    digest(`inspection:${job.jobSha256}:${candidateSha256}`);
+
+  return {
+    schemaVersion: "1.0",
+    kind: ART_PRODUCTION_CANDIDATE_ADMISSION_REQUEST_KIND,
+    planId: plan.planId,
+    planSha256: plan.planSha256,
+    loopSha256: loop.loopSha256,
+    profileSha256: loop.profileSha256,
+    batchSha256: batch.batchSha256,
+    jobSha256: job.jobSha256,
+    unitId,
+    attemptNumber,
+    providerEvidence: {
+      providerId: options.providerId ?? "fixture-provider",
+      model: options.model ?? "fixture-pixel-model-v1",
+      providerJobId:
+        options.providerJobId ??
+        `fixture-job-${job.jobSha256.slice(0, 24)}`,
+      requestArtifactId: `artifact_${providerRequestSha256}`,
+      requestSha256: providerRequestSha256,
+      responseArtifactId: `artifact_${providerResponseSha256}`,
+      responseSha256: providerResponseSha256,
+    },
+    candidate: {
+      artifactId: `artifact_${candidateSha256}`,
+      sha256: candidateSha256,
+      bytes: options.candidateBytes ?? 4096 + state.sequence,
+      width: options.width ?? source.dimensions.width,
+      height: options.height ?? source.dimensions.height,
+      alphaPolicy: options.alphaPolicy ?? source.alpha,
+    },
+    inspectionEvidenceArtifactId: `artifact_${inspectionEvidenceSha256}`,
+    inspectionEvidenceSha256,
+    admittedBy: options.admittedBy ?? "EVAVO candidate evidence operator",
+    admittedAt:
+      options.admittedAt ??
+      new Date(
+        Date.UTC(2026, 7, 14, 1, state.sequence, attemptNumber),
+      ).toISOString(),
+  };
+}
+
 function attempt(loop, plan, unitId, options = {}) {
   const state = loop.unitStates.find((entry) => entry.unitId === unitId);
   assert.ok(state, `missing state ${unitId}`);
   const source = unit(plan, unitId);
   const score = options.score ?? 100;
   const attemptNumber = state.attemptCount + 1;
-  const candidateSha256 = digest(`${unitId}:${attemptNumber}:${score}`);
   const requiredMetrics =
     source.kind === "animation-frame"
       ? ART_PRODUCTION_METRIC_IDS
       : ART_PRODUCTION_METRIC_IDS.slice(0, 9);
+  const admissionRequest = candidateAdmissionRequest(
+    plan,
+    loop,
+    unitId,
+    options,
+  );
   return {
     schemaVersion: "1.0",
     kind: ART_PRODUCTION_ATTEMPT_KIND,
@@ -117,24 +196,26 @@ function attempt(loop, plan, unitId, options = {}) {
     unitId,
     evaluator: "EVAVO deterministic pixel-art critic",
     evaluatedAt: new Date(
-      Date.UTC(2026, 7, 14, 1, state.sequence, attemptNumber),
+      Date.UTC(2026, 7, 14, 1, state.sequence, attemptNumber + 20),
     ).toISOString(),
-    candidate: {
-      artifactId: `artifact_${candidateSha256}`,
-      sha256: candidateSha256,
-      bytes: 4096 + state.sequence,
-      width: source.dimensions.width,
-      height: source.dimensions.height,
-      alphaPolicy: source.alpha,
-    },
+    candidateAdmissionReceipt:
+      compileArtProductionCandidateAdmissionReceipt(
+        plan,
+        loop,
+        admissionRequest,
+      ),
     metrics: requiredMetrics.map((metricId) => ({
       metricId,
       score,
-      evidenceSha256: digest(`${unitId}:${attemptNumber}:${metricId}:${score}`),
+      evidenceSha256: digest(
+        `${unitId}:${attemptNumber}:${metricId}:${score}`,
+      ),
     })),
     detections: (options.detections ?? []).map((detection) => ({
       detection,
-      evidenceSha256: digest(`${unitId}:${attemptNumber}:${detection}`),
+      evidenceSha256: digest(
+        `${unitId}:${attemptNumber}:${detection}`,
+      ),
     })),
   };
 }
@@ -160,7 +241,9 @@ function humanApprovalRequest(plan, loop, unitId, options = {}) {
     reviewer: options.reviewer ?? "Greg Parker",
     reviewedAt:
       options.reviewedAt ??
-      new Date(Date.UTC(2026, 7, 14, 2, state.sequence, 0)).toISOString(),
+      new Date(
+        Date.UTC(2026, 7, 14, 2, state.sequence, 0),
+      ).toISOString(),
     decision: "approved",
     decisionEvidenceArtifactId: `artifact_${decisionEvidenceSha256}`,
     decisionEvidenceSha256,
@@ -202,6 +285,7 @@ export {
   digest,
   canonicalSha256,
   approvedPlan,
+  candidateAdmissionRequest,
   attempt,
   humanApprovalRequest,
   humanApprovals,

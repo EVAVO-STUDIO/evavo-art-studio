@@ -1,6 +1,6 @@
 # Iterative 1990s Game Art Production Orchestrator
 
-The Art Production Orchestrator adds a deterministic review-and-repair control plane above the existing layered source-art contracts.
+The Art Production Orchestrator adds a deterministic admission, review-and-repair control plane above the existing layered source-art contracts.
 
 It is designed for DOS, VGA, top-down sports, side-on arcade, point-and-click, world-map and fixed-camera isometric games where camera accuracy, native pixel grammar and frame continuity matter more than one attractive concept image.
 
@@ -8,12 +8,13 @@ It is designed for DOS, VGA, top-down sports, side-on arcade, point-and-click, w
 layered production plan
   -> game, style and camera profile
   -> dependency-safe one-image batch
-  -> exact candidate evidence
+  -> external provider request and response evidence
+  -> retained candidate PNG and inspection evidence
+  -> exact scheduled-job candidate-admission receipt
   -> deterministic technical evaluation
   -> bounded repair and retry
   -> technical pass
-  -> explicit named-human decision
-  -> candidate-bound human-approval receipt
+  -> named-human creative approval receipt
   -> individual source PNG retention
   -> strip, grid and atlas metadata
   -> separate packaging execution and Godot integration
@@ -21,9 +22,9 @@ layered production plan
 
 ## Reusable game-type profile foundation
 
-The orchestrator complements the generic `scripts/game-art-production` profile engine rather than replacing it. The reusable profile engine resolves game-type asset contracts and one-asset work orders; this orchestrator coordinates many work orders through dependency, review, repair, approval provenance and packaging state.
+The orchestrator complements the generic `scripts/game-art-production` profile engine rather than replacing it. The reusable profile engine resolves game-type asset contracts and one-asset work orders; this orchestrator coordinates many work orders through dependency, admission, review, repair and packaging state.
 
-The JONEZ fixture is now split across:
+The JONEZ fixture is split across:
 
 ```text
 config/game-art-production/profiles/isometric-life-sim-1990s.v1.json
@@ -73,9 +74,40 @@ blocked
 
 The scheduler honours lower-layer dependencies, style-proof scope, continuity families, identity masters and previous animation frames. Repair work is scheduled before new work, and every job still requests exactly one source PNG.
 
+## Candidate admission
+
+Technical review accepts only a governed `evavo.art-production.candidate-admission.receipt`.
+
+The receipt compiler independently recompiles the exact current batch and refuses a request unless it identifies one current job by matching:
+
+```text
+batchSha256
+jobSha256
+unitId
+attemptNumber
+mode
+expected width and height
+expected alpha policy
+```
+
+The request must also provide four distinct content-addressed artifacts:
+
+- provider request evidence;
+- provider response evidence;
+- the retained candidate PNG;
+- a separate inspection-evidence report.
+
+The receipt retains the provider identity, model, provider job ID, candidate identity, admitting operator, admission time, a normalized request hash, a governed admission-basis hash and the complete receipt hash.
+
+This is an evidence-binding boundary, not an execution boundary. Art Studio does not claim to run the provider, fetch or decode the evidence, inspect the PNG bytes or decide that the candidate is technically acceptable.
+
+The former loose attempt-level `candidate` object is rejected. `ArtProductionAttemptInput` now carries the complete admission receipt, and semantic replay re-verifies that receipt against the exact prior loop before any score or state transition can be reproduced.
+
+See `docs/ART_PRODUCTION_CANDIDATE_ADMISSION.md`.
+
 ## Technical evaluation
 
-Candidate evidence is externally produced and content-addressed. The orchestrator does not claim to inspect image bytes by itself.
+Candidate and inspection evidence are externally produced and content-addressed. The orchestrator does not claim to inspect image bytes by itself.
 
 Static sources are scored for:
 
@@ -104,7 +136,8 @@ A failed attempt receives a bounded repair directive and a retry prompt that pre
 
 The loop is self-hashed, but verification does not trust that hash alone. It reconstructs the initial loop and replays every retained attempt in order, recomputing:
 
-- candidate admission identity;
+- scheduled candidate-admission identity;
+- candidate identity;
 - required metrics;
 - weighted score;
 - failed metrics;
@@ -115,25 +148,15 @@ The loop is self-hashed, but verification does not trust that hash alone. It rec
 - next unit states;
 - final loop identity.
 
-A rehashed authority escalation or edited repair result therefore fails verification.
+A rehashed scheduling substitution, authority escalation, edited repair result or changed candidate therefore fails verification.
 
 ## Named-human approval receipts
 
-A deterministic technical pass is not a creative approval. For each accepted candidate, a caller must supply an explicit named-human approval request and a distinct content-addressed decision-evidence artifact.
+A deterministic technical pass remains separate from creative approval.
 
-`compileArtProductionHumanApprovalReceipt` binds that supplied decision to:
+Before packaging, every exact accepted candidate requires an `evavo.art-production.human-approval.receipt` compiled from an explicit caller-supplied named-human decision. That receipt is bound to the exact plan, loop, profile, admitted candidate, technical-review attempt, reviewer, decision time and separate decision-evidence artifact.
 
-- the exact layered-production plan and plan SHA-256;
-- the exact full-production loop and profile SHA-256;
-- one canonical source unit;
-- the exact accepted candidate artifact, byte count and SHA-256;
-- the exact technical-review attempt and derived weighted score;
-- the reviewer, canonical UTC review time and approved decision;
-- the external decision-evidence artifact and SHA-256.
-
-The receipt retains independent request, approval-basis and complete-receipt hashes. Verification first checks its submitted payload, then recompiles the canonical receipt from the exact plan, loop, candidate and request. A changed derived score, candidate, loop, authority field or source identity cannot be legitimised by recomputing the outer receipt hash.
-
-Receipt compilation records a caller-supplied decision. It does not authenticate a person's legal identity, inspect the external evidence bytes or make the creative decision. Those remain responsibilities of the governed human-review and artifact systems.
+Receipt compilation records the decision; it does not make it or authenticate the reviewer’s legal identity.
 
 ## Packaging plan
 
@@ -141,11 +164,12 @@ Packaging is available only when:
 
 1. the style proof is approved;
 2. the loop covers full production;
-3. every unit has a deterministic technical pass;
-4. every exact accepted candidate has a valid candidate-bound named-human approval receipt;
-5. every animation clip contains all declared frames in canonical order.
+3. every source was admitted through its exact scheduled job;
+4. every unit has a deterministic technical pass;
+5. each exact accepted candidate has a named-human approval receipt;
+6. every animation clip contains all declared frames in canonical order.
 
-The plan retains each individual source with its technical-review attempt, approval request, approval basis and approval receipt identities, and can describe:
+The plan can retain individual PNGs and describe:
 
 - horizontal animation strips;
 - fixed-column animation grids;
@@ -159,13 +183,12 @@ Atlas rotation and trimming remain forbidden for pixel-art sources. Packaging me
 ```text
 art_production_orchestrator_protocol
 compile_art_production_loop
-evaluate_art_production_attempt
 compile_next_art_production_batch
+compile_art_production_candidate_admission_receipt
+evaluate_art_production_attempt
 verify_art_production_loop
 compile_art_production_human_approval_receipt
 compile_art_production_packaging_plan
 ```
 
-These tools compile and verify contracts only. The human-approval tool records an explicit caller-supplied named-human decision and can verify a receipt against the exact retained request; it does not decide whether an image is creatively approved.
-
-The tools do not call a provider, admit candidate bytes, make a creative decision, execute image repair, write sheets or atlases, mutate a game repository, commit, push, deploy or publish.
+These tools compile and verify contracts only. They do not call a provider, inspect image bytes, automatically admit a candidate, make a creative decision, execute image repair, write sheets or atlases, mutate a game repository, commit, push, deploy or publish.

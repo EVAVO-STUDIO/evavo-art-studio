@@ -5,6 +5,7 @@ import {
   ArtDirectionError,
   applyLayeredProductionStyleProofApproval,
   artProductionOrchestratorProtocolSummary,
+  compileArtProductionCandidateAdmissionReceipt,
   compileArtProductionHumanApprovalReceipt,
   compileArtProductionLoop,
   compileArtProductionPackagingPlan,
@@ -12,19 +13,23 @@ import {
   compileLayeredProductionStyleProofApprovalReceipt,
   compileNextArtProductionBatch,
   evaluateArtProductionAttempt,
+  verifyArtProductionCandidateAdmissionReceiptAgainstRequest,
   verifyArtProductionHumanApprovalReceiptAgainstRequest,
   verifyArtProductionLoopAgainstProfile,
   verifyArtProductionPackagingPlan,
 } from "@evavo/art-direction";
 import type {
   ArtProductionAttemptInput,
+  ArtProductionCandidateAdmissionReceipt,
   ArtProductionHumanApprovalReceipt,
   ArtProductionLoop,
   ArtProductionPackagingPlan,
 } from "@evavo/art-direction";
 
 const textResult = (value: unknown) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
+  content: [
+    { type: "text" as const, text: JSON.stringify(value, null, 2) },
+  ],
 });
 
 function toolError(error: unknown) {
@@ -39,8 +44,10 @@ function toolError(error: unknown) {
               error instanceof ArtDirectionError
                 ? error.code
                 : "ART_PRODUCTION_TOOL_REJECTED",
-            message: error instanceof Error ? error.message : String(error),
-            ...(error instanceof ArtDirectionError && error.details !== undefined
+            message:
+              error instanceof Error ? error.message : String(error),
+            ...(error instanceof ArtDirectionError &&
+            error.details !== undefined
               ? { details: error.details }
               : {}),
           },
@@ -70,7 +77,7 @@ export function registerArtProductionTools(server: McpServer): void {
     "art_production_orchestrator_protocol",
     {
       description:
-        "Describe the profile-driven 1990s game-art production loop for fixed camera grammar, dependency-safe batches, deterministic candidate review, bounded repair, animation continuity, exact named-human approval receipts and source-preserving sprite-sheet or atlas planning. No provider or creative decision is executed.",
+        "Describe the profile-driven 1990s game-art production loop for fixed camera grammar, dependency-safe batches, exact scheduled-job candidate admission, deterministic candidate review, bounded repair, animation continuity, exact named-human approval receipts and source-preserving sprite-sheet or atlas planning. No provider, image inspection or creative decision is executed.",
       inputSchema: z.object({}),
     },
     async () => textResult(artProductionOrchestratorProtocolSummary()),
@@ -89,46 +96,15 @@ export function registerArtProductionTools(server: McpServer): void {
     },
     async ({ productionRequest, profile, styleProofApproval }) => {
       try {
-        const plan = compilePlan(productionRequest, styleProofApproval);
+        const plan = compilePlan(
+          productionRequest,
+          styleProofApproval,
+        );
         return textResult({
           schemaVersion: "1.0",
           productionLoop: compileArtProductionLoop(plan, profile),
           executionBoundary:
-            "Plan-only: no provider call, candidate admission, image mutation, creative approval, packaging execution, target-repository mutation, Git, deployment or publication.",
-        });
-      } catch (error: unknown) {
-        return toolError(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    "evaluate_art_production_attempt",
-    {
-      description:
-        "Ingest exact candidate and measured QA evidence, replay the current loop, score pixel/camera/style/animation continuity, and produce either a technical pass, a bounded repair prompt, or a blocked state. This tool does not inspect or alter image bytes itself.",
-      inputSchema: z.object({
-        productionRequest: z.unknown(),
-        profile: z.unknown(),
-        loop: z.unknown(),
-        attempt: z.unknown(),
-        styleProofApproval: z.unknown().optional(),
-      }),
-    },
-    async ({ productionRequest, profile, loop, attempt, styleProofApproval }) => {
-      try {
-        const plan = compilePlan(productionRequest, styleProofApproval);
-        const productionLoop = loop as ArtProductionLoop;
-        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
-        return textResult({
-          schemaVersion: "1.0",
-          productionLoop: evaluateArtProductionAttempt(
-            plan,
-            productionLoop,
-            attempt as ArtProductionAttemptInput,
-          ),
-          executionBoundary:
-            "Evidence evaluation only: no provider call, image mutation, automatic creative approval, target-repository mutation, Git, deployment or publication.",
+            "Plan-only: no provider call, candidate admission, image inspection, image mutation, creative approval, packaging execution, target-repository mutation, Git, deployment or publication.",
         });
       } catch (error: unknown) {
         return toolError(error);
@@ -148,16 +124,139 @@ export function registerArtProductionTools(server: McpServer): void {
         styleProofApproval: z.unknown().optional(),
       }),
     },
-    async ({ productionRequest, profile, loop, styleProofApproval }) => {
+    async ({
+      productionRequest,
+      profile,
+      loop,
+      styleProofApproval,
+    }) => {
       try {
-        const plan = compilePlan(productionRequest, styleProofApproval);
+        const plan = compilePlan(
+          productionRequest,
+          styleProofApproval,
+        );
         const productionLoop = loop as ArtProductionLoop;
-        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
+        verifyArtProductionLoopAgainstProfile(
+          plan,
+          profile,
+          productionLoop,
+        );
         return textResult({
           schemaVersion: "1.0",
-          batch: compileNextArtProductionBatch(plan, productionLoop),
+          batch: compileNextArtProductionBatch(
+            plan,
+            productionLoop,
+          ),
           executionBoundary:
             "Batch compilation only: provider execution, candidate admission, creative approval and image mutation remain separate.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_art_production_candidate_admission_receipt",
+    {
+      description:
+        "Compile or verify a deterministic receipt that binds one externally produced PNG candidate to the exact current batch and job, provider request and response evidence, retained PNG identity, inspection evidence and admitting operator. This tool records caller-supplied evidence but does not call a provider or inspect image bytes.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        profile: z.unknown(),
+        loop: z.unknown(),
+        admissionRequest: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+        admissionReceipt: z.unknown().optional(),
+      }),
+    },
+    async ({
+      productionRequest,
+      profile,
+      loop,
+      admissionRequest,
+      styleProofApproval,
+      admissionReceipt,
+    }) => {
+      try {
+        const plan = compilePlan(
+          productionRequest,
+          styleProofApproval,
+        );
+        const productionLoop = loop as ArtProductionLoop;
+        verifyArtProductionLoopAgainstProfile(
+          plan,
+          profile,
+          productionLoop,
+        );
+        const compiled =
+          compileArtProductionCandidateAdmissionReceipt(
+            plan,
+            productionLoop,
+            admissionRequest,
+          );
+        if (admissionReceipt !== undefined) {
+          verifyArtProductionCandidateAdmissionReceiptAgainstRequest(
+            plan,
+            productionLoop,
+            admissionRequest,
+            admissionReceipt as ArtProductionCandidateAdmissionReceipt,
+          );
+        }
+        return textResult({
+          schemaVersion: "1.0",
+          candidateAdmissionReceipt: compiled,
+          status:
+            admissionReceipt === undefined ? "compiled" : "verified",
+          executionBoundary:
+            "Receipt-only: provider execution, request and response evidence, PNG bytes, inspection evidence and admitting identity are caller supplied; no provider call, image inspection, automatic candidate admission, image mutation, creative decision, repository mutation, Git, deployment or publication is performed.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "evaluate_art_production_attempt",
+    {
+      description:
+        "Verify an exact scheduled-job candidate admission receipt, ingest measured QA evidence, replay the current loop, score pixel/camera/style/animation continuity, and produce either a technical pass, a bounded repair prompt, or a blocked state. This tool does not inspect or alter image bytes itself.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        profile: z.unknown(),
+        loop: z.unknown(),
+        attempt: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+      }),
+    },
+    async ({
+      productionRequest,
+      profile,
+      loop,
+      attempt,
+      styleProofApproval,
+    }) => {
+      try {
+        const plan = compilePlan(
+          productionRequest,
+          styleProofApproval,
+        );
+        const productionLoop = loop as ArtProductionLoop;
+        verifyArtProductionLoopAgainstProfile(
+          plan,
+          profile,
+          productionLoop,
+        );
+        return textResult({
+          schemaVersion: "1.0",
+          productionLoop: evaluateArtProductionAttempt(
+            plan,
+            productionLoop,
+            attempt as ArtProductionAttemptInput,
+          ),
+          executionBoundary:
+            "Admission-bound evidence evaluation only: no provider call, image inspection, image mutation, automatic creative approval, target-repository mutation, Git, deployment or publication.",
         });
       } catch (error: unknown) {
         return toolError(error);
@@ -169,7 +268,7 @@ export function registerArtProductionTools(server: McpServer): void {
     "verify_art_production_loop",
     {
       description:
-        "Semantically replay and verify an iterative production loop against the exact layered-production request and game profile, including all retained review and repair transitions.",
+        "Semantically replay and verify an iterative production loop against the exact layered-production request and game profile, including every candidate-admission, review and repair transition.",
       inputSchema: z.object({
         productionRequest: z.unknown(),
         profile: z.unknown(),
@@ -177,17 +276,29 @@ export function registerArtProductionTools(server: McpServer): void {
         styleProofApproval: z.unknown().optional(),
       }),
     },
-    async ({ productionRequest, profile, loop, styleProofApproval }) => {
+    async ({
+      productionRequest,
+      profile,
+      loop,
+      styleProofApproval,
+    }) => {
       try {
-        const plan = compilePlan(productionRequest, styleProofApproval);
+        const plan = compilePlan(
+          productionRequest,
+          styleProofApproval,
+        );
         const productionLoop = loop as ArtProductionLoop;
-        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
+        verifyArtProductionLoopAgainstProfile(
+          plan,
+          profile,
+          productionLoop,
+        );
         return textResult({
           schemaVersion: "1.0",
           loopSha256: productionLoop.loopSha256,
           status: "passed",
           executionBoundary:
-            "Verification-only: no provider call, approval, image mutation, packaging execution, repository write, Git or publication.",
+            "Verification-only: no provider call, candidate admission, image inspection, approval, image mutation, packaging execution, repository write, Git or publication.",
         });
       } catch (error: unknown) {
         return toolError(error);
@@ -199,7 +310,7 @@ export function registerArtProductionTools(server: McpServer): void {
     "compile_art_production_human_approval_receipt",
     {
       description:
-        "Compile or verify a deterministic receipt for one explicit caller-supplied named-human approval decision. The receipt binds the exact plan, loop, profile, review-passed candidate, technical-review attempt and external decision-evidence identity. This tool records the decision but does not make it.",
+        "Compile or verify a deterministic receipt for one explicit caller-supplied named-human approval decision. The receipt binds the exact plan, loop, profile, admission-bound review-passed candidate, technical-review attempt and external decision-evidence identity. This tool records the decision but does not make it.",
       inputSchema: z.object({
         productionRequest: z.unknown(),
         profile: z.unknown(),
@@ -218,14 +329,22 @@ export function registerArtProductionTools(server: McpServer): void {
       approvalReceipt,
     }) => {
       try {
-        const plan = compilePlan(productionRequest, styleProofApproval);
-        const productionLoop = loop as ArtProductionLoop;
-        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
-        const compiled = compileArtProductionHumanApprovalReceipt(
-          plan,
-          productionLoop,
-          approvalRequest,
+        const plan = compilePlan(
+          productionRequest,
+          styleProofApproval,
         );
+        const productionLoop = loop as ArtProductionLoop;
+        verifyArtProductionLoopAgainstProfile(
+          plan,
+          profile,
+          productionLoop,
+        );
+        const compiled =
+          compileArtProductionHumanApprovalReceipt(
+            plan,
+            productionLoop,
+            approvalRequest,
+          );
         if (approvalReceipt !== undefined) {
           verifyArtProductionHumanApprovalReceiptAgainstRequest(
             plan,
@@ -237,9 +356,10 @@ export function registerArtProductionTools(server: McpServer): void {
         return textResult({
           schemaVersion: "1.0",
           approvalReceipt: compiled,
-          status: approvalReceipt === undefined ? "compiled" : "verified",
+          status:
+            approvalReceipt === undefined ? "compiled" : "verified",
           executionBoundary:
-            "Receipt-only: the named-human decision and decision evidence are caller supplied; no provider call, image mutation, creative decision, packaging execution, repository mutation, Git, deployment or publication is performed.",
+            "Receipt-only: the named-human decision and decision evidence are caller supplied; no provider call, image inspection, image mutation, creative decision, packaging execution, repository mutation, Git, deployment or publication is performed.",
         });
       } catch (error: unknown) {
         return toolError(error);
@@ -251,7 +371,7 @@ export function registerArtProductionTools(server: McpServer): void {
     "compile_art_production_packaging_plan",
     {
       description:
-        "After every source passes deterministic review and exact candidate-bound named-human approval receipts are supplied, compile individual-PNG retention plus animation strip, grid and non-rotating atlas layouts. It emits metadata only and does not pack image bytes.",
+        "After every admitted source passes deterministic review and exact candidate-bound named-human approval receipts are supplied, compile individual-PNG retention plus animation strip, grid and non-rotating atlas layouts. It emits metadata only and does not pack image bytes.",
       inputSchema: z.object({
         productionRequest: z.unknown(),
         profile: z.unknown(),
@@ -270,11 +390,18 @@ export function registerArtProductionTools(server: McpServer): void {
       packagingPlan,
     }) => {
       try {
-        const plan = compilePlan(productionRequest, styleProofApproval);
+        const plan = compilePlan(
+          productionRequest,
+          styleProofApproval,
+        );
         const productionLoop = loop as ArtProductionLoop;
         const humanApprovals =
           approvals as readonly ArtProductionHumanApprovalReceipt[];
-        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
+        verifyArtProductionLoopAgainstProfile(
+          plan,
+          profile,
+          productionLoop,
+        );
         const compiled = compileArtProductionPackagingPlan(
           plan,
           productionLoop,
@@ -291,7 +418,8 @@ export function registerArtProductionTools(server: McpServer): void {
         return textResult({
           schemaVersion: "1.0",
           packagingPlan: compiled,
-          status: packagingPlan === undefined ? "compiled" : "verified",
+          status:
+            packagingPlan === undefined ? "compiled" : "verified",
           executionBoundary:
             "Metadata-only: individual PNGs remain authoritative; no sheet or atlas pixels are written, no creative decision is made, and no repository or Git authority is granted.",
         });

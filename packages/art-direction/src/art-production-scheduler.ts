@@ -80,7 +80,9 @@ function compileJob(
     });
   });
   const mode =
-    state.status === "repair-required" ? ("repair" as const) : ("generate" as const);
+    state.status === "repair-required"
+      ? ("repair" as const)
+      : ("generate" as const);
   const prompt =
     mode === "repair"
       ? latestRetryPrompt(loop, state)
@@ -110,11 +112,10 @@ function compileJob(
   return freeze({ ...partial, jobSha256: sha256(partial) });
 }
 
-export function compileNextArtProductionBatch(
+export function compileNextArtProductionBatchFromVerifiedLoop(
   plan: CompiledLayeredProductionPlan,
   loop: ArtProductionLoop,
 ): ArtProductionBatch {
-  verifyArtProductionLoop(plan, loop);
   const eligible = loop.unitStates
     .filter(
       (state) =>
@@ -136,7 +137,8 @@ export function compileNextArtProductionBatch(
       ? "jobs-ready"
       : loop.totals.blocked > 0
         ? "blocked"
-        : loop.scope === "style-proof" && loop.totals.reviewPassed === plan.styleProof.unitIds.length
+        : loop.scope === "style-proof" &&
+            loop.totals.reviewPassed === plan.styleProof.unitIds.length
           ? "awaiting-style-proof-approval"
           : "awaiting-human-approval";
   const partial = {
@@ -155,4 +157,12 @@ export function compileNextArtProductionBatch(
     }),
   };
   return freeze({ ...partial, batchSha256: sha256(partial) });
+}
+
+export function compileNextArtProductionBatch(
+  plan: CompiledLayeredProductionPlan,
+  loop: ArtProductionLoop,
+): ArtProductionBatch {
+  verifyArtProductionLoop(plan, loop);
+  return compileNextArtProductionBatchFromVerifiedLoop(plan, loop);
 }

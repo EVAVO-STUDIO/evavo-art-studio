@@ -14,6 +14,11 @@ export {
 } from "./art-production-loop.js";
 export { compileNextArtProductionBatch } from "./art-production-scheduler.js";
 export {
+  compileArtProductionCandidateAdmissionReceipt,
+  verifyArtProductionCandidateAdmissionReceipt,
+  verifyArtProductionCandidateAdmissionReceiptAgainstRequest,
+} from "./art-production-candidate-admission.js";
+export {
   compileArtProductionHumanApprovalReceipt,
   verifyArtProductionHumanApprovalReceipt,
   verifyArtProductionHumanApprovalReceiptAgainstRequest,
@@ -26,7 +31,7 @@ export function artProductionOrchestratorProtocolSummary() {
     schemaVersion: "1.0" as const,
     protocolVersion: ART_PRODUCTION_ORCHESTRATOR_PROTOCOL_VERSION,
     purpose:
-      "Coordinate profile-bound 1990s game-art generation, deterministic technical review, bounded repair, explicit named-human approval receipts, animation continuity and source-preserving packaging without granting provider execution or creative-decision authority.",
+      "Coordinate profile-bound 1990s game-art generation, exact scheduled-job candidate admission, deterministic technical review, bounded repair, explicit named-human approval receipts, animation continuity and source-preserving packaging without granting provider execution or creative-decision authority.",
     cameraFamilies: [
       "isometric-life-sim-90s",
       "top-down-sports-90s",
@@ -38,7 +43,8 @@ export function artProductionOrchestratorProtocolSummary() {
     loop: [
       "compile exact game, style and camera profile",
       "schedule dependency-safe one-image jobs",
-      "ingest exact candidate and measured review evidence",
+      "bind external provider request, response, retained PNG and inspection evidence to the exact current job",
+      "admit the candidate through a self-hashed deterministic receipt before review",
       "score native pixel, camera, era, identity and runtime quality",
       "compile bounded repair instructions and retry prompts",
       "block after the configured retry budget rather than weakening review",
@@ -47,6 +53,8 @@ export function artProductionOrchestratorProtocolSummary() {
     ] as const,
     boundaries: freeze({
       providerExecution: false as const,
+      imageInspection: false as const,
+      automaticCandidateAdmission: false as const,
       automaticCreativeApproval: false as const,
       creativeDecision: false as const,
       imageMutation: false as const,
