@@ -13,10 +13,8 @@ export {
   verifyArtProductionLoopAgainstProfile,
 } from "./art-production-loop.js";
 export { compileNextArtProductionBatch } from "./art-production-scheduler.js";
-export {
-  compileArtProductionPackagingPlan,
-  verifyArtProductionPackagingPlan,
-} from "./art-production-packaging.js";
+export { compileArtProductionPackagingPlan } from "./art-production-packaging.js";
+export { verifyArtProductionPackagingPlan } from "./art-production-packaging-verification.js";
 
 export function artProductionOrchestratorProtocolSummary() {
   return freeze({
