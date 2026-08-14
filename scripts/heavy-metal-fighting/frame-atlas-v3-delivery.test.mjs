@@ -193,25 +193,31 @@ test("Frame master root must be a real directory inside the persistent workspace
 });
 
 test("fixed-grid Python builder keeps 224 authored cells, direct receipt evidence, transparent reserve and no game mutation authority", async () => {
-  const source = await readFile(new URL("../../tools/build_heavy_metal_fighting_frame_atlas_v3.py", import.meta.url), "utf8");
-  assert.match(source, /AUTHORED_SLOTS = 224/);
-  assert.match(source, /TOTAL_SLOTS = 256/);
-  assert.match(source, /RESERVED_START = 224/);
-  assert.match(source, /ATLAS = \(2560, 2560\)/);
-  assert.match(source, /CELL = \(160, 160\)/);
-  assert.match(source, /headReceiptSha256/);
-  assert.match(source, /source\["headReceiptSha256"\]/);
-  assert.match(source, /image\.mode != "RGBA"/);
-  assert.match(source, /transparent cell corners/);
-  assert.match(source, /reserved_region_is_transparent/);
-  assert.match(source, /atlas\.alpha_composite\(image, dest=/);
-  assert.match(source, /os\.replace\(temporary, output_root\)/);
-  assert.match(source, /"gameActivationReady": False/);
-  assert.match(source, /"targetRepositoryMutation": False/);
-  assert.doesNotMatch(source, /\.resize\(/);
-  assert.doesNotMatch(source, /\.rotate\(/);
-  assert.doesNotMatch(source, /subprocess/);
-  assert.doesNotMatch(source, /git push/);
+  const [builder, common, contract] = await Promise.all([
+    readFile(new URL("../../tools/build_heavy_metal_fighting_frame_atlas_v3.py", import.meta.url), "utf8"),
+    readFile(new URL("./frame_atlas_v3_build_common.py", import.meta.url), "utf8"),
+    readFile(new URL("./frame_atlas_v3_build_contract.py", import.meta.url), "utf8"),
+  ]);
+  assert.match(common, /CELL=\(160,160\)/);
+  assert.match(common, /ATLAS=\(2560,2560\)/);
+  assert.match(common, /AUTHORED=224/);
+  assert.match(common, /TOTAL=256/);
+  assert.match(contract, /reserved slots drifted/);
+  assert.match(contract, /plan requires 224 sources/);
+  assert.match(contract, /source receipt evidence disagrees/);
+  assert.match(builder, /headReceiptSha256/);
+  assert.match(builder, /stable_bytes\(Path\(s\["sourcePath"\]\)/);
+  assert.match(builder, /image\.mode!="RGBA"/);
+  assert.match(builder, /corners must be transparent/);
+  assert.match(builder, /atlas\.alpha_composite\(image,dest=/);
+  assert.match(builder, /rename_noreplace\(stage,output\)/);
+  assert.match(builder, /"gameActivationReady":False/);
+  assert.match(builder, /"targetRepositoryMutation":False/);
+  assert.doesNotMatch(builder, /os\.replace\(/);
+  assert.doesNotMatch(builder, /\.resize\(/);
+  assert.doesNotMatch(builder, /\.rotate\(/);
+  assert.doesNotMatch(builder, /subprocess/);
+  assert.doesNotMatch(builder, /git push/);
 });
 
 test("unknown Frames cannot acquire an atlas-v3 delivery layout", async () => {
