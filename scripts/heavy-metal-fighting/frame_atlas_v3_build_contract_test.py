@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy,json,os,shutil,stat,struct,sys,tempfile,unittest,zlib
 from pathlib import Path
 HERE=Path(__file__).resolve().parent; ROOT=HERE.parents[1]; sys.path.insert(0,str(ROOT/"tools"))
-from frame_atlas_v3_build_common import BuildError,rename_noreplace,canon,digest,selfhash
+from frame_atlas_v3_build_common import BuildError,MANIFEST_SCHEMA,RECEIPT_SCHEMA,rename_noreplace,canon,digest,selfhash
 from frame_atlas_v3_build_contract import admit_plan,read_plan,verify_output
 from build_heavy_metal_fighting_frame_atlas_v3 import execute
 try:
@@ -47,6 +47,15 @@ class AtlasBuildBoundaryTest(unittest.TestCase):
  def tearDownClass(cls): shutil.rmtree(cls.tmp,ignore_errors=True)
  def rehash(self,p):
   p=copy.deepcopy(p);p.pop("planSha256",None);return selfhash(p,"planSha256")
+ def write_fake_output(self):
+  out=Path(tempfile.mkdtemp(prefix="atlas-v3-evidence-",dir=self.parent));os.chmod(out,0o700)
+  image_data=png_bytes(0);ip=out/"bastion.png";ip.write_bytes(image_data);os.chmod(ip,0o600)
+  slots=[{k:s[k] for k in ("slot","row","column","x","y","width","height","bankId","unitId","batchId","workOrderSha256","sourceSha256","headReceiptSha256")} for s in self.plan["sources"]]
+  manifest=selfhash({"schema":MANIFEST_SCHEMA,"projectId":"heavy-metal-fighting","frameId":"bastion","contractId":"production_master_v3","planSha256":self.plan["planSha256"],"image":"bastion.png","imageSha256":digest(image_data),"size":{"width":2560,"height":2560},"cell":{"width":160,"height":160},"pivot":{"x":80,"y":152},"columns":16,"rows":16,"authoredSlots":224,"reservedSlots":list(range(224,256)),"reservedSlotsFullyTransparent":True,"slots":slots,"gameTarget":self.plan["gameTarget"],"repositoryMutation":False,"publication":False},"manifestSha256")
+  mdata=canon(manifest);mp=out/"bastion.atlas-v3.json";mp.write_bytes(mdata);os.chmod(mp,0o600)
+  receipt=selfhash({"schema":RECEIPT_SCHEMA,"projectId":"heavy-metal-fighting","frameId":"bastion","contractId":"production_master_v3","planSha256":self.plan["planSha256"],"styleProofExecutionSha256":self.plan["styleProofExecutionSha256"],"styleProofApproval":self.plan["styleProofApproval"],"sourceCount":224,"reservedSlotCount":32,"outputs":{"image":{"path":"bastion.png","sha256":digest(image_data),"bytes":len(image_data)},"manifest":{"path":"bastion.atlas-v3.json","sha256":digest(mdata),"bytes":len(mdata)}},"gameTarget":self.plan["gameTarget"],"gameActivationReady":False,"gameActivationBlockers":self.plan["gameTarget"]["activationBlockers"],"authority":self.plan["authority"],"createOnlyOutput":True,"atomicWorkspacePublication":True,"sourceMutation":False,"targetRepositoryMutation":False,"gitMutation":False,"publication":False},"receiptSha256")
+  rp=out/"bastion.atlas-v3.receipt.json";rp.write_bytes(canon(receipt));os.chmod(rp,0o600)
+  return out,manifest,receipt
  def test_exact_plan_admits(self): self.assertEqual(len(admit_plan(self.plan)["sources"]),224)
  def test_rehashed_unknown_plan_claim_fails(self):
   p=copy.deepcopy(self.plan);p["targetRepositoryWriteAuthorized"]=True
@@ -64,6 +73,20 @@ class AtlasBuildBoundaryTest(unittest.TestCase):
   s=self.tmp/"stage";d=self.tmp/"destination";s.mkdir();d.mkdir();(d/"marker").write_text("keep")
   with self.assertRaises(FileExistsError):rename_noreplace(s,d)
   self.assertTrue(s.is_dir());self.assertEqual((d/"marker").read_text(),"keep")
+ def test_rehashed_manifest_semantic_drift_fails_before_image_runtime(self):
+  out,manifest,receipt=self.write_fake_output()
+  try:
+   manifest=copy.deepcopy(manifest);manifest["gameTarget"]["repository"]="EVAVO-STUDIO/other-game";manifest.pop("manifestSha256");manifest=selfhash(manifest,"manifestSha256")
+   mp=out/"bastion.atlas-v3.json";mp.write_bytes(canon(manifest));os.chmod(mp,0o600)
+   with self.assertRaisesRegex(BuildError,"manifest semantics drifted"):verify_output(self.plan,out,False)
+  finally:shutil.rmtree(out,ignore_errors=True)
+ def test_rehashed_receipt_semantic_drift_fails_before_image_runtime(self):
+  out,manifest,receipt=self.write_fake_output()
+  try:
+   receipt=copy.deepcopy(receipt);receipt["sourceCount"]=223;receipt.pop("receiptSha256");receipt=selfhash(receipt,"receiptSha256")
+   rp=out/"bastion.atlas-v3.receipt.json";rp.write_bytes(canon(receipt));os.chmod(rp,0o600)
+   with self.assertRaisesRegex(BuildError,"receipt semantics drifted"):verify_output(self.plan,out,False)
+  finally:shutil.rmtree(out,ignore_errors=True)
  @unittest.skipIf(PIL is None,"Pillow unavailable")
  def test_build_and_independent_pixel_verification(self):
   out=self.parent/"atlas-v3-001";r=execute(self.plan,out);self.assertEqual(r["sourceCount"],224);self.assertFalse(r["gameActivationReady"])
@@ -74,6 +97,6 @@ class AtlasBuildBoundaryTest(unittest.TestCase):
   original=(out/"bastion.atlas-v3.receipt.json").read_bytes()
   with self.assertRaisesRegex(BuildError,"must not already exist"):execute(self.plan,out)
   self.assertEqual((out/"bastion.atlas-v3.receipt.json").read_bytes(),original)
-  receipt=json.loads(original);receipt["publication"]=True;receipt["receiptSha256"]=digest(canon({k:v for k,v in receipt.items() if k!="receiptSha256"}));rp=out/"bastion.atlas-v3.receipt.json";rp.write_bytes(canon(receipt));os.chmod(rp,0o600)
-  with self.assertRaisesRegex(BuildError,"publication must remain false"):verify_output(self.plan,out,False)
+  receipt=json.loads(original);receipt["publication"]=True;receipt.pop("receiptSha256");receipt=selfhash(receipt,"receiptSha256");rp=out/"bastion.atlas-v3.receipt.json";rp.write_bytes(canon(receipt));os.chmod(rp,0o600)
+  with self.assertRaisesRegex(BuildError,"receipt semantics drifted"):verify_output(self.plan,out,False)
 if __name__=="__main__":unittest.main()
