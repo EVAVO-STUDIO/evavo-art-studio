@@ -2,9 +2,7 @@
   "mcpServers": {
     "evavo-project-art-workspace": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_mcp.mjs"],
       "env": {
         "EVAVO_ART_WORKSPACE_ROOTS": "C:\\GitRepos;C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Incoming Art;C:\\EVAVO\\Evidence",
         "EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE": "false",
@@ -14,9 +12,7 @@
     },
     "evavo-project-art-workspace-ingest": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_ingest_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_ingest_mcp.mjs"],
       "env": {
         "EVAVO_ART_WORKSPACE_INGEST_ROOTS": "C:\\GitRepos;C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
         "EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS": "C:\\Users\\Greg\\Downloads;C:\\EVAVO\\Incoming Art;C:\\GitRepos",
@@ -26,9 +22,7 @@
     },
     "evavo-project-art-workspace-catalog": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_catalog_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_catalog_mcp.mjs"],
       "env": {
         "EVAVO_PERSISTENT_CATALOG_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
         "EVAVO_PERSISTENT_CATALOG_MCP_ALLOW_WRITE": "false"
@@ -36,9 +30,7 @@
     },
     "evavo-project-art-workspace-jobs": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_jobs_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_jobs_mcp.mjs"],
       "env": {
         "EVAVO_ART_WORKSPACE_JOB_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
         "EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE": "false"
@@ -46,9 +38,7 @@
     },
     "evavo-project-art-avatar-final-pass-provider": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_mcp.mjs"],
       "env": {
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_MCP_ALLOW_WRITE": "false"
@@ -56,9 +46,7 @@
     },
     "evavo-project-art-avatar-final-pass-provider-runtime": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_runtime_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_runtime_mcp.mjs"],
       "env": {
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_MCP_ALLOW_WRITE": "false"
@@ -66,9 +54,7 @@
     },
     "evavo-project-art-avatar-final-pass-provider-candidate": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_candidate_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_candidate_mcp.mjs"],
       "env": {
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ARTIFACT_ROOTS": "C:\\EVAVO\\ArtArtifacts",
@@ -77,12 +63,18 @@
     },
     "evavo-project-art-avatar-final-pass-provider-frame-finisher": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_frame_finisher_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_frame_finisher_mcp.mjs"],
       "env": {
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_MCP_ALLOW_WRITE": "false"
+      }
+    },
+    "evavo-project-art-avatar-sequence-release": {
+      "command": "node",
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_sequence_release_mcp.mjs"],
+      "env": {
+        "EVAVO_ART_AVATAR_SEQUENCE_RELEASE_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
+        "EVAVO_ART_AVATAR_SEQUENCE_RELEASE_MCP_ALLOW_WRITE": "false"
       }
     }
   }
