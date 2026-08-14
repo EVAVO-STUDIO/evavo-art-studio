@@ -1,0 +1,38 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-master-signoff-policy.v1",
+  "protocolVersion": "2026-08-14.1",
+  "projectId": "heavy-metal-fighting",
+  "assetKind": "frame-body-cel",
+  "signoffRules": {
+    "predecessorState": "mastered",
+    "receiptState": "named-human-approved",
+    "requiredActorClass": "human",
+    "requiredDecision": "approved",
+    "masterPathMustMatchWorkOrder": true,
+    "masterSha256MustMatchMasteringRecord": true,
+    "masterBytesMustMatchMasteringRecord": true,
+    "signoffRecordRequired": true,
+    "minimumRationaleCharacters": 20,
+    "maximumRationaleCharacters": 1600,
+    "nextLegalAction": "compile-delivery-readiness"
+  },
+  "authority": {
+    "masterRead": true,
+    "masteringRecordRead": true,
+    "namedReviewerSignoffDecision": true,
+    "signoffRecordPersistence": true,
+    "receiptPersistence": true,
+    "providerExecution": false,
+    "providerRetry": false,
+    "candidateMutation": false,
+    "masterMutation": false,
+    "imageTransformation": false,
+    "automaticSignoff": false,
+    "gameRepositoryPromotion": false,
+    "targetRepositoryMutation": false,
+    "finalAtlasCompilation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false
+  }
+}
