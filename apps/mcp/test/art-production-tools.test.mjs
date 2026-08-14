@@ -38,6 +38,8 @@ test("MCP exposes iterative art planning without provider or approval shortcuts"
     "promoteSelectedCandidate",
     "LocalArtifactStore",
     "RuntimeWorker",
+    "compileArtProductionSourceAdmissionReceipt",
+    "verifyArtProductionSourceAdmissionReceipt",
     "child_process",
     "shell: true",
   ]) {

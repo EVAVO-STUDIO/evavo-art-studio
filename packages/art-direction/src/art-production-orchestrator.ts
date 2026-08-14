@@ -24,13 +24,17 @@ export {
   compileArtProductionRuntimeAssemblyHandoff,
   verifyArtProductionRuntimeAssemblyHandoff,
 } from "./art-production-runtime-assembly.js";
+export {
+  compileArtProductionSourceAdmissionReceipt,
+  verifyArtProductionSourceAdmissionReceipt,
+} from "./art-production-source-admission.js";
 
 export function artProductionOrchestratorProtocolSummary() {
   return freeze({
     schemaVersion: "1.0" as const,
     protocolVersion: ART_PRODUCTION_ORCHESTRATOR_PROTOCOL_VERSION,
     purpose:
-      "Coordinate profile-bound 1990s game-art generation, deterministic technical review, bounded repair, explicit named-human approval receipts, animation continuity, source-preserving packaging and exact runtime-assembly handoff without granting provider execution, creative-decision, assembly or activation authority.",
+      "Coordinate profile-bound 1990s game-art generation, deterministic technical review, bounded repair, explicit named-human approval receipts, animation continuity, source-preserving packaging, exact runtime-assembly handoff and read-only caller-supplied PNG admission without granting provider execution, creative-decision, mutation, assembly or activation authority.",
     cameraFamilies: [
       "isometric-life-sim-90s",
       "top-down-sports-90s",
@@ -49,7 +53,16 @@ export function artProductionOrchestratorProtocolSummary() {
       "compile caller-supplied named-human decisions into exact candidate-bound evidence receipts",
       "retain individual PNGs while planning strips, grids and non-rotating atlases",
       "bind runtime assembly sources to exact packaging, technical-review and approval-receipt lineage",
+      "inspect exact caller-supplied PNG bytes and emit a deterministic read-only source-admission receipt",
     ] as const,
+    sourceByteAdmission: freeze({
+      callerSuppliedByteRead: true as const,
+      autonomousArtifactFetch: false as const,
+      artifactWrite: false as const,
+      exactPngStructure: true as const,
+      decodedRgbaEvidence: true as const,
+      sourceMutation: false as const,
+    }),
     boundaries: freeze({
       artifactRead: false as const,
       providerExecution: false as const,

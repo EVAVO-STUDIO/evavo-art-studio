@@ -105,7 +105,8 @@ function attempt(loop, plan, unitId, options = {}) {
   const source = unit(plan, unitId);
   const score = options.score ?? 100;
   const attemptNumber = state.attemptCount + 1;
-  const candidateSha256 = digest(`${unitId}:${attemptNumber}:${score}`);
+  const candidateSha256 =
+    options.candidateSha256 ?? digest(`${unitId}:${attemptNumber}:${score}`);
   const requiredMetrics =
     source.kind === "animation-frame"
       ? ART_PRODUCTION_METRIC_IDS
@@ -122,7 +123,7 @@ function attempt(loop, plan, unitId, options = {}) {
     candidate: {
       artifactId: `artifact_${candidateSha256}`,
       sha256: candidateSha256,
-      bytes: 4096 + state.sequence,
+      bytes: options.candidateBytes ?? 4096 + state.sequence,
       width: source.dimensions.width,
       height: source.dimensions.height,
       alphaPolicy: source.alpha,

@@ -17,12 +17,13 @@ layered production plan
   -> individual source PNG retention
   -> strip, grid and atlas metadata
   -> approval-bound runtime assembly handoff
+  -> exact caller-supplied source PNG byte admission
   -> separate assembly execution and Godot integration
 ```
 
 ## Reusable game-type profile foundation
 
-The orchestrator complements the generic `scripts/game-art-production` profile engine rather than replacing it. The reusable profile engine resolves game-type asset contracts and one-asset work orders; this orchestrator coordinates many work orders through dependency, review, repair, approval provenance, packaging state and runtime-assembly admission.
+The orchestrator complements the generic `scripts/game-art-production` profile engine rather than replacing it. The reusable profile engine resolves game-type asset contracts and one-asset work orders; this orchestrator coordinates many work orders through dependency, review, repair, approval provenance, packaging state, runtime-assembly admission and exact source-byte verification.
 
 The JONEZ fixture is now split across:
 
@@ -76,7 +77,7 @@ The scheduler honours lower-layer dependencies, style-proof scope, continuity fa
 
 ## Technical evaluation
 
-Candidate evidence is externally produced and content-addressed. The orchestrator does not claim to inspect image bytes by itself.
+Candidate evidence is externally produced and content-addressed. The technical-review loop does not claim to inspect image bytes by itself. Exact PNG byte inspection occurs later at the source-admission boundary after review, approval, packaging and runtime-handoff lineage are complete.
 
 Static sources are scored for:
 
@@ -165,6 +166,29 @@ The handoff embeds the verified runtime-ready assembly manifest and one lineage 
 
 The handoff is still metadata only. It does not read source bytes, pack pixels, write assembly files, run Godot, mutate a game repository or activate a runtime.
 
+## Source PNG byte admission
+
+`compileArtProductionSourceAdmissionReceipt` is the next read-only boundary. It first re-verifies the exact runtime handoff, then requires one caller-supplied `Uint8Array` for every source binding.
+
+For each PNG it independently verifies:
+
+- exact byte count, SHA-256 and `artifact_<sha256>` identity;
+- PNG signature, bounded chunk framing and every chunk CRC;
+- one leading IHDR, contiguous IDAT data and terminal IEND;
+- static eight-bit RGBA non-interlaced encoding;
+- exact native dimensions;
+- bounded zlib decoding and PNG filters 0 through 4;
+- alpha-policy compliance;
+- non-empty visible pixels;
+- zero hidden RGB values under fully transparent pixels;
+- decoded RGBA SHA-256 and pixel totals.
+
+The resulting receipt binds those byte and pixel facts to the plan, loop, package, assembly request, assembly manifest, handoff, technical-review attempt and human-approval lineage.
+
+`verifyArtProductionSourceAdmissionReceipt` validates the submitted receipt and then repeats the complete byte inspection to recompile the canonical receipt. Rehashed receipt mutation or replay against another handoff therefore fails.
+
+This API inspects only bytes explicitly supplied by the caller. It does not browse an artifact store, write files, mutate pixels, execute packaging, assemble a scene or activate a runtime.
+
 ## MCP surface
 
 ```text
@@ -181,5 +205,7 @@ compile_art_production_runtime_assembly_handoff
 These tools compile and verify contracts only. The human-approval tool records an explicit caller-supplied named-human decision and can verify a receipt against the exact retained request; it does not decide whether an image is creatively approved.
 
 The runtime-assembly handoff tool cross-binds approved package sources to the existing assembly manifest, but it does not read artifact bytes, execute assembly, write a scene, activate a runtime, mutate a repository, commit, push, deploy or publish.
+
+Source PNG byte admission is deliberately a direct `@evavo/art-direction` package API rather than an MCP tool. The MCP surface cannot fetch or ingest binary artifact payloads and remains planning-only.
 
 The tools do not call a provider, admit candidate bytes, make a creative decision, execute image repair, write sheets or atlases, mutate a game repository, commit, push, deploy or publish.
