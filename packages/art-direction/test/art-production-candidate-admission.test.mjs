@@ -5,11 +5,13 @@ import {
   compileArtProductionCandidateAdmissionReceipt,
   compileArtProductionLoop,
   compileLayeredProductionPlan,
+  compileNextArtProductionBatch,
   evaluateArtProductionAttempt,
   verifyArtProductionCandidateAdmissionReceipt,
   verifyArtProductionCandidateAdmissionReceiptAgainstRequest,
 } from "../dist/index.js";
 import {
+  approvedPlan,
   assert,
   attempt,
   candidateAdmissionRequest,
@@ -18,6 +20,10 @@ import {
   productionRequest,
   profile,
 } from "./art-production-fixtures.mjs";
+import {
+  addCompleteRuntimeAnimations,
+  productionRequest as runtimeProductionRequest,
+} from "./layered-assembly-fixtures.mjs";
 
 function requestFromReceipt(receipt) {
   return {
@@ -101,6 +107,61 @@ test("compiles and verifies an exact scheduled-job candidate admission receipt",
     ),
     true,
   );
+});
+
+test("applies untouched sibling receipts from one scheduled batch as the loop advances", () => {
+  const plan = approvedPlan(
+    addCompleteRuntimeAnimations(runtimeProductionRequest()),
+  );
+  let loop = compileArtProductionLoop(plan, profile());
+  let batch = compileNextArtProductionBatch(plan, loop);
+
+  for (let guard = 0; batch.jobs.length < 2 && guard < 100; guard += 1) {
+    assert.equal(batch.status, "jobs-ready");
+    assert.ok(batch.jobs.length > 0);
+    loop = evaluateArtProductionAttempt(
+      plan,
+      loop,
+      attempt(loop, plan, batch.jobs[0].unitId),
+    );
+    batch = compileNextArtProductionBatch(plan, loop);
+  }
+
+  assert.equal(batch.status, "jobs-ready");
+  assert.ok(batch.jobs.length >= 2);
+  const scheduledLoopSha256 = loop.loopSha256;
+  const scheduledBatchSha256 = batch.batchSha256;
+  const scheduledAttempts = batch.jobs
+    .slice(0, 2)
+    .map((job) => attempt(loop, plan, job.unitId));
+
+  assert.ok(
+    scheduledAttempts.every(
+      (entry) =>
+        entry.candidateAdmissionReceipt.loopSha256 ===
+          scheduledLoopSha256 &&
+        entry.candidateAdmissionReceipt.scheduledJob.batchSha256 ===
+          scheduledBatchSha256,
+    ),
+  );
+
+  loop = evaluateArtProductionAttempt(plan, loop, scheduledAttempts[0]);
+  loop = evaluateArtProductionAttempt(plan, loop, {
+    ...scheduledAttempts[1],
+    loopSha256: loop.loopSha256,
+  });
+
+  const secondUnitId = scheduledAttempts[1].unitId;
+  const secondState = loop.unitStates.find(
+    (entry) => entry.unitId === secondUnitId,
+  );
+  const retainedSecondAttempt = loop.attempts.at(-1);
+  assert.equal(secondState?.status, "review-passed");
+  assert.equal(
+    retainedSecondAttempt?.candidateAdmissionReceipt.loopSha256,
+    scheduledLoopSha256,
+  );
+  assert.notEqual(retainedSecondAttempt?.priorLoopSha256, scheduledLoopSha256);
 });
 
 test("technical review rejects the former loose candidate object", () => {

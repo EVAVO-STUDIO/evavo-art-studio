@@ -112,6 +112,24 @@ function compileJob(
   return freeze({ ...partial, jobSha256: sha256(partial) });
 }
 
+export function compileArtProductionJobForVerifiedLoop(
+  plan: CompiledLayeredProductionPlan,
+  loop: ArtProductionLoop,
+  unitId: string,
+): ArtProductionBatchJob {
+  const state = loop.unitStates.find((entry) => entry.unitId === unitId);
+  if (
+    !state ||
+    (state.status !== "queued" && state.status !== "repair-required")
+  ) {
+    fail(
+      "ART_PRODUCTION_UNIT_NOT_READY",
+      `Unit ${unitId} is not eligible for a generation or repair job in the current production loop.`,
+    );
+  }
+  return compileJob(plan, loop, state);
+}
+
 export function compileNextArtProductionBatchFromVerifiedLoop(
   plan: CompiledLayeredProductionPlan,
   loop: ArtProductionLoop,

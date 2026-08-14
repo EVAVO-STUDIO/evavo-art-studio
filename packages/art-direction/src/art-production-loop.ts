@@ -136,6 +136,62 @@ function compareAttempt(
   }
 }
 
+function profileInputFromLoop(loop: ArtProductionLoop): ArtProductionProfileInput {
+  const { profileSha256: _profileSha256, ...profileInput } = loop.profile;
+  return profileInput;
+}
+
+export function resolveArtProductionLoopRevisionFromVerifiedLoop(
+  plan: CompiledLayeredProductionPlan,
+  loop: ArtProductionLoop,
+  loopSha256: string,
+): ArtProductionLoop {
+  if (!SHA256_PATTERN.test(loopSha256)) {
+    fail(
+      "ART_PRODUCTION_LOOP_INVALID",
+      "Requested production-loop revision must be lowercase SHA-256.",
+    );
+  }
+  if (loop.loopSha256 === loopSha256) return loop;
+
+  let replayed = compileArtProductionLoop(plan, profileInputFromLoop(loop));
+  if (replayed.loopSha256 === loopSha256) return replayed;
+
+  for (const retainedAttempt of loop.attempts) {
+    if (retainedAttempt.priorLoopSha256 !== replayed.loopSha256) {
+      fail(
+        "ART_PRODUCTION_LOOP_INVALID",
+        "Retained attempt history is not contiguous while resolving a scheduled batch revision.",
+      );
+    }
+    const next = applyAttemptInternal(
+      plan,
+      replayed,
+      replayAttemptInput(retainedAttempt),
+      false,
+    );
+    const expectedAttempt = next.attempts.at(-1);
+    if (!expectedAttempt) {
+      fail(
+        "ART_PRODUCTION_LOOP_INVALID",
+        "Deterministic replay did not produce an attempt record while resolving a scheduled batch revision.",
+      );
+    }
+    compareAttempt(retainedAttempt, expectedAttempt);
+    replayed = next;
+    if (replayed.loopSha256 === loopSha256) return replayed;
+  }
+
+  fail(
+    "ART_PRODUCTION_LOOP_INVALID",
+    "Candidate admission is not bound to the current production loop or one of its deterministic ancestor revisions.",
+    {
+      requestedLoopSha256: loopSha256,
+      currentLoopSha256: loop.loopSha256,
+    },
+  );
+}
+
 export function verifyArtProductionLoop(
   plan: CompiledLayeredProductionPlan,
   loop: ArtProductionLoop,
@@ -174,14 +230,7 @@ export function verifyArtProductionLoop(
       "Art-production loop SHA-256 does not match its canonical payload.",
     );
   }
-  let replayed = compileArtProductionLoop(
-    plan,
-    (() => {
-      const { profileSha256: _profileSha256, ...profileInput } =
-        loop.profile;
-      return profileInput;
-    })(),
-  );
+  let replayed = compileArtProductionLoop(plan, profileInputFromLoop(loop));
   for (const retainedAttempt of loop.attempts) {
     if (retainedAttempt.priorLoopSha256 !== replayed.loopSha256) {
       fail(

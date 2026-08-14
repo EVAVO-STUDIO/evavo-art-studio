@@ -33,12 +33,14 @@ function compileFixture() {
     const batch = compileNextArtProductionBatch(plan, loop);
     assert.equal(batch.status, "jobs-ready");
     assert.ok(batch.jobs.length > 0);
-    for (const job of batch.jobs) {
-      loop = evaluateArtProductionAttempt(
-        plan,
-        loop,
-        attempt(loop, plan, job.unitId),
-      );
+    const scheduledAttempts = batch.jobs.map((job) =>
+      attempt(loop, plan, job.unitId),
+    );
+    for (const scheduledAttempt of scheduledAttempts) {
+      loop = evaluateArtProductionAttempt(plan, loop, {
+        ...scheduledAttempt,
+        loopSha256: loop.loopSha256,
+      });
     }
   }
 

@@ -26,6 +26,12 @@ import {
   verifyArtProductionCandidateAdmissionReceiptForVerifiedLoop,
 } from "./art-production-candidate-admission.js";
 import {
+  resolveArtProductionLoopRevisionFromVerifiedLoop,
+} from "./art-production-loop.js";
+import {
+  compileArtProductionJobForVerifiedLoop,
+} from "./art-production-scheduler.js";
+import {
   REPAIR_BY_DETECTION,
   REPAIR_BY_METRIC,
 } from "./art-production-repair-rules.js";
@@ -83,10 +89,27 @@ export function buildAttemptRecord(
     );
   }
 
+  const admissionEnvelope = record(
+    input.candidateAdmissionReceipt,
+    "attempt.candidateAdmissionReceipt",
+  );
+  const scheduledLoopSha256 = stringValue(
+    admissionEnvelope.loopSha256,
+    "attempt.candidateAdmissionReceipt.loopSha256",
+    64,
+  );
+  const scheduledLoop =
+    scheduledLoopSha256 === loop.loopSha256
+      ? loop
+      : resolveArtProductionLoopRevisionFromVerifiedLoop(
+          plan,
+          loop,
+          scheduledLoopSha256,
+        );
   const candidateAdmissionReceipt =
     verifyArtProductionCandidateAdmissionReceiptForVerifiedLoop(
       plan,
-      loop,
+      scheduledLoop,
       input.candidateAdmissionReceipt,
     );
   if (
@@ -97,6 +120,31 @@ export function buildAttemptRecord(
     fail(
       "ART_PRODUCTION_ATTEMPT_INVALID",
       "Attempt candidate admission does not match the selected unit and attempt number.",
+    );
+  }
+
+  const currentJob = compileArtProductionJobForVerifiedLoop(
+    plan,
+    loop,
+    unitId,
+  );
+  if (
+    currentJob.jobSha256 !==
+      candidateAdmissionReceipt.scheduledJob.jobSha256 ||
+    currentJob.attemptNumber !==
+      candidateAdmissionReceipt.scheduledJob.attemptNumber ||
+    currentJob.mode !== candidateAdmissionReceipt.scheduledJob.mode
+  ) {
+    fail(
+      "ART_PRODUCTION_ATTEMPT_INVALID",
+      "Attempt candidate admission no longer matches the untouched scheduled job in the current production loop.",
+      {
+        scheduledLoopSha256,
+        currentLoopSha256: loop.loopSha256,
+        scheduledJobSha256:
+          candidateAdmissionReceipt.scheduledJob.jobSha256,
+        currentJobSha256: currentJob.jobSha256,
+      },
     );
   }
 
