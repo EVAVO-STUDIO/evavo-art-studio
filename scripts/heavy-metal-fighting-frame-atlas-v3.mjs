@@ -33,7 +33,7 @@ function usage() {
     "",
     "The compiler snapshots all caller input before asynchronous work. --output must be a new .json file inside the governed persistent Artist Workspace; it is staged, synchronised, atomically linked without replacement and read back byte-for-byte.",
     "",
-    "admit-game-validation reads one completed steel-dominion local Godot validation receipt through a stable single-link regular-file boundary, rejects symbolic-link endpoints, binds its exact bytes and six-suite semantics to the explicitly expected game commit, and emits read-only self-hashed Art Studio evidence. It does not read or mutate steel-dominion, activate its runtime, commit, push, deploy or publish.",
+    "admit-game-validation reads one completed steel-dominion local Godot validation receipt through a stable single-link regular-file boundary, rejects symbolic-link or junction path components, binds its exact bytes and six-suite semantics to the explicitly expected game commit, and emits read-only self-hashed Art Studio evidence. It does not read or mutate steel-dominion, activate its runtime, commit, push, deploy or publish.",
   ].join("\n");
 }
 
@@ -50,11 +50,27 @@ function sameStableFile(left, right) {
   );
 }
 
-async function inspectRegularValidationReceiptPath(resolved) {
-  const initial = await lstat(resolved, { bigint: true });
-  if (initial.isSymbolicLink()) {
-    throw new Error("--validation-receipt may not be a symbolic link or junction.");
+async function inspectValidationReceiptPathChain(resolved) {
+  const parsed = path.parse(resolved);
+  const segments = path.relative(parsed.root, resolved).split(path.sep).filter(Boolean);
+  let current = parsed.root;
+  const entries = [];
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    const info = await lstat(current, { bigint: true });
+    if (info.isSymbolicLink()) {
+      throw new Error(`--validation-receipt path may not contain a symbolic link or junction: ${current}`);
+    }
+    const final = index === segments.length - 1;
+    if (!final && !info.isDirectory()) {
+      throw new Error(`--validation-receipt parent path must remain a directory: ${current}`);
+    }
+    entries.push(Object.freeze({ path: current, info }));
   }
+  if (entries.length === 0) {
+    throw new Error("--validation-receipt must name a file, not a filesystem root.");
+  }
+  const initial = entries.at(-1).info;
   if (!initial.isFile()) {
     throw new Error("--validation-receipt must resolve to a regular file.");
   }
@@ -69,12 +85,25 @@ async function inspectRegularValidationReceiptPath(resolved) {
       `--validation-receipt must be between 1 and ${HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES} bytes before reading.`,
     );
   }
-  return initial;
+  return Object.freeze(entries);
+}
+
+function assertPathChainUnchanged(before, after) {
+  if (before.length !== after.length) {
+    throw new Error("--validation-receipt path changed while being admitted.");
+  }
+  for (const [index, prior] of before.entries()) {
+    const current = after[index];
+    if (prior.path !== current.path || !sameFileIdentity(prior.info, current.info)) {
+      throw new Error(`--validation-receipt path component changed identity while being admitted: ${prior.path}`);
+    }
+  }
 }
 
 async function readBoundedGameValidationReceipt(filePath) {
   const resolved = path.resolve(filePath);
-  const initialPath = await inspectRegularValidationReceiptPath(resolved);
+  const initialChain = await inspectValidationReceiptPathChain(resolved);
+  const initialPath = initialChain.at(-1).info;
   const noFollow = process.platform === "win32" ? 0 : (constants.O_NOFOLLOW ?? 0);
   const handle = await open(resolved, constants.O_RDONLY | noFollow);
   try {
@@ -88,6 +117,8 @@ async function readBoundedGameValidationReceipt(filePath) {
     if (!sameStableFile(initialPath, opened)) {
       throw new Error("--validation-receipt changed identity or metadata before reading.");
     }
+    const openedChain = await inspectValidationReceiptPathChain(resolved);
+    assertPathChainUnchanged(initialChain, openedChain);
 
     const receiptBytes = Buffer.allocUnsafe(Number(opened.size));
     let offset = 0;
@@ -116,13 +147,9 @@ async function readBoundedGameValidationReceipt(filePath) {
       throw new Error("--validation-receipt changed while being read.");
     }
 
-    const finalPath = await lstat(resolved, { bigint: true });
-    if (
-      finalPath.isSymbolicLink() ||
-      !finalPath.isFile() ||
-      finalPath.nlink !== 1n ||
-      !sameStableFile(finalHandle, finalPath)
-    ) {
+    const finalChain = await inspectValidationReceiptPathChain(resolved);
+    assertPathChainUnchanged(openedChain, finalChain);
+    if (!sameStableFile(finalHandle, finalChain.at(-1).info)) {
       throw new Error("--validation-receipt path changed identity after reading.");
     }
     return receiptBytes;
