@@ -61,6 +61,14 @@ function capabilityProfile(request) {
     if (capability) values.add(capability);
   }
   if (request.target?.transparency === 'required') values.add('native-alpha');
+  if (request.operation === 'edit') {
+    values.add('mask-guided-edit');
+    values.add('high-input-fidelity');
+    values.add('non-target-invariance');
+  }
+  values.add('identity-reference-lock');
+  values.add('true-alpha-validation');
+  values.add('fake-transparency-rejection');
   values.add('custom-size');
   values.add('candidate-count');
   if (request.seed !== undefined) values.add('seed');

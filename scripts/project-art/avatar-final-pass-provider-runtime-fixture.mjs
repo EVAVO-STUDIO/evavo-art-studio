@@ -333,6 +333,14 @@ function expectedCapabilityProfile(input) {
     }
   }
   values.add('native-alpha');
+  if (input.operation === 'edit') {
+    values.add('mask-guided-edit');
+    values.add('high-input-fidelity');
+    values.add('non-target-invariance');
+  }
+  values.add('identity-reference-lock');
+  values.add('true-alpha-validation');
+  values.add('fake-transparency-rejection');
   values.add('custom-size');
   values.add('candidate-count');
   return Object.freeze([...values].sort());

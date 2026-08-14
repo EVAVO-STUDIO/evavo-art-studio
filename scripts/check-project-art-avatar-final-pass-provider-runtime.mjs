@@ -105,6 +105,12 @@ requireTokens('dispatchCore', [
   'leaseDurationMs: 300_000',
   'timeoutMs: 1_800_000',
   'candidateCount: 1',
+  "values.add('mask-guided-edit')",
+  "values.add('high-input-fidelity')",
+  "values.add('non-target-invariance')",
+  "values.add('identity-reference-lock')",
+  "values.add('true-alpha-validation')",
+  "values.add('fake-transparency-rejection')",
   'candidate-run-result',
   'provider-failure',
 ]);
