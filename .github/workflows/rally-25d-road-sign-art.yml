@@ -1,0 +1,36 @@
+name: Rally 2.5D Road Sign Art Contract
+on: { workflow_dispatch: {} }
+permissions: { contents: read }
+concurrency:
+  group: rally-25d-road-sign-art-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1, persist-credentials: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22.14.0 }
+      - name: Test deterministic road-sign jobs
+        run: node --test scripts/game-art-production/rally-25d-road-sign-jobs.test.mjs
+      - name: Compile and verify road-sign session
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/game-art-production/rally-25d-road-sign-jobs.mjs compile \
+            config/game-art-production/props/road-sign-production-v1.json \
+            --output "${RUNNER_TEMP}/road-sign.session.json" >/dev/null
+          node scripts/game-art-production/rally-25d-road-sign-jobs.mjs verify \
+            "${RUNNER_TEMP}/road-sign.session.json" | tee "${RUNNER_TEMP}/road-sign.verify.json"
+          grep -F '"jobs": 10' "${RUNNER_TEMP}/road-sign.session.json"
+          grep -F '"variants": 3' "${RUNNER_TEMP}/road-sign.session.json"
+          grep -F '"modelingJobs": 4' "${RUNNER_TEMP}/road-sign.session.json"
+          grep -F '"damageJobs": 2' "${RUNNER_TEMP}/road-sign.session.json"
+          grep -F '"providerExecution": false' "${RUNNER_TEMP}/road-sign.session.json"
+      - name: Prove source remains clean
+        shell: bash
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
