@@ -84,6 +84,16 @@
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
         "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_MCP_ALLOW_WRITE": "false"
       }
+    },
+    "evavo-project-art-avatar-sequence-release": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_sequence_release_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ART_AVATAR_SEQUENCE_RELEASE_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
+        "EVAVO_ART_AVATAR_SEQUENCE_RELEASE_MCP_ALLOW_WRITE": "false"
+      }
     }
   }
 }
