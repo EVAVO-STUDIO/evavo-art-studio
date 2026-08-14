@@ -1,0 +1,41 @@
+{
+  "schema": "evavo.heavy-metal-fighting-frame-body-delivery-readiness-policy.v1",
+  "protocolVersion": "2026-08-14.1",
+  "projectId": "heavy-metal-fighting",
+  "assetKind": "frame-body-cel",
+  "readinessRules": {
+    "predecessorState": "named-human-approved",
+    "receiptState": "delivery-ready",
+    "requiredActorClass": "system",
+    "terminalState": true,
+    "approvalRecordRequired": true,
+    "masterPathMustMatchWorkOrder": true,
+    "masterPathMustLiveUnderMasters": true,
+    "masterSha256MustMatchApprovedCandidate": true,
+    "masterBytesMustMatchApprovalRecord": true,
+    "deliveryDescriptorRequired": true,
+    "createOnlyOrExactReuse": true,
+    "exactPostWriteReadbackRequired": true,
+    "maximumMasterBytes": 16777216,
+    "nextLegalAction": "complete"
+  },
+  "authority": {
+    "masterRead": true,
+    "approvalRecordRead": true,
+    "deliveryReadinessRecordPersistence": true,
+    "receiptPersistence": true,
+    "providerExecution": false,
+    "providerRetry": false,
+    "candidateMutation": false,
+    "masterMutation": false,
+    "imageTransformation": false,
+    "automaticApproval": false,
+    "deliveryReadinessCompilation": true,
+    "gameRepositoryPromotion": false,
+    "targetRepositoryMutation": false,
+    "finalAtlasCompilation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false
+  }
+}
