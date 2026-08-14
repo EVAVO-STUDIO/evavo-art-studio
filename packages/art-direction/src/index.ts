@@ -9,3 +9,4 @@ export * from "./protocol.js";
 export { ART_DIRECTION_COMPILE_CAPABILITIES } from "./jobs.js";
 export { compileArtDirectionJob } from "./public-jobs.js";
 export * from "./layered-production.js";
+export * from "./art-production-orchestrator.js";

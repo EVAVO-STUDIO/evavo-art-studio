@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "evavo.art-production.profile",
+  "profileId": "jonez-1991-iterative-production",
+  "revision": "1.0.0",
+  "game": {
+    "gameId": "jonez",
+    "gameTitle": "JONEZ",
+    "productionProfileId": "isometric-life-sim-1990s",
+    "productionProjectId": "jonez",
+    "genre": "isometric social life simulation and crowd-search city board",
+    "targetEra": "1991-1993 DOS VGA",
+    "engine": "Godot",
+    "engineVersion": "4.6.2"
+  },
+  "bindings": {
+    "styleId": "jonez-1991-vga-story-city",
+    "cameraFamily": "isometric-life-sim-90s"
+  },
+  "camera": {
+    "family": "isometric-life-sim-90s",
+    "fixed": true,
+    "projection": "dimetric",
+    "yawDegrees": 45,
+    "pitchDegrees": 30,
+    "rollDegrees": 0,
+    "orthographicScale": 1,
+    "facingDirections": ["se", "sw", "nw", "ne"]
+  },
+  "iteration": {
+    "maximumAttemptsPerUnit": 4,
+    "maximumBatchSize": 4,
+    "technicalPassScore": 92,
+    "minimumMetricScore": 82,
+    "metricWeights": {
+      "alpha-quality": 10,
+      "layer-purity": 12,
+      "native-readability": 10,
+      "palette-discipline": 8,
+      "pixel-cluster-quality": 12,
+      "camera-accuracy": 12,
+      "era-authenticity": 8,
+      "non-generic-quality": 12,
+      "runtime-usability": 8,
+      "identity-consistency": 12,
+      "pivot-stability": 8,
+      "ground-contact-stability": 8,
+      "pose-progression": 8
+    },
+    "blockingDetections": [
+      "multiple-assets",
+      "layer-contamination",
+      "antialiasing",
+      "gradient-shading",
+      "bloom-or-soft-lighting",
+      "procedural-pixel-noise",
+      "generic-ai-styling",
+      "vector-like-rendering",
+      "generated-readable-text",
+      "matte-halo",
+      "unsafe-transparent-rgb",
+      "camera-drift",
+      "identity-drift",
+      "pivot-drift",
+      "ground-contact-drift",
+      "crop-risk",
+      "copyrighted-imitation"
+    ]
+  },
+  "animation": {
+    "anchorFirst": true,
+    "requireIdentityMaster": true,
+    "requirePreviousFrameContext": true,
+    "identityMetricMinimum": 92,
+    "pivotMetricMinimum": 94,
+    "groundContactMetricMinimum": 94
+  },
+  "packaging": {
+    "retainIndividualPngs": true,
+    "outputs": [
+      "individual-png",
+      "animation-strip",
+      "animation-grid",
+      "atlas"
+    ],
+    "gridColumns": 4,
+    "atlas": {
+      "maximumWidth": 1024,
+      "maximumHeight": 1024,
+      "padding": 2,
+      "rotation": false,
+      "trim": false
+    }
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "packagingExecution": false,
+    "targetRepositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false
+  }
+}

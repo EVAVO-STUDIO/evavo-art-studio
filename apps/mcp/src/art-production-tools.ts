@@ -1,0 +1,248 @@
+import { McpServer } from "@modelcontextprotocol/server";
+import * as z from "zod/v4";
+
+import {
+  ArtDirectionError,
+  applyLayeredProductionStyleProofApproval,
+  artProductionOrchestratorProtocolSummary,
+  compileArtProductionLoop,
+  compileArtProductionPackagingPlan,
+  compileLayeredProductionPlan,
+  compileLayeredProductionStyleProofApprovalReceipt,
+  compileNextArtProductionBatch,
+  evaluateArtProductionAttempt,
+  verifyArtProductionLoopAgainstProfile,
+  verifyArtProductionPackagingPlan,
+} from "@evavo/art-direction";
+import type {
+  ArtProductionAttemptInput,
+  ArtProductionHumanApprovalInput,
+  ArtProductionLoop,
+  ArtProductionPackagingPlan,
+} from "@evavo/art-direction";
+
+const textResult = (value: unknown) => ({
+  content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
+});
+
+function toolError(error: unknown) {
+  return {
+    isError: true,
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify(
+          {
+            code:
+              error instanceof ArtDirectionError
+                ? error.code
+                : "ART_PRODUCTION_TOOL_REJECTED",
+            message: error instanceof Error ? error.message : String(error),
+            ...(error instanceof ArtDirectionError && error.details !== undefined
+              ? { details: error.details }
+              : {}),
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
+}
+
+function compilePlan(
+  productionRequest: unknown,
+  styleProofApproval: unknown | undefined,
+) {
+  const pending = compileLayeredProductionPlan(productionRequest);
+  if (styleProofApproval === undefined) return pending;
+  const receipt = compileLayeredProductionStyleProofApprovalReceipt(
+    pending,
+    styleProofApproval,
+  );
+  return applyLayeredProductionStyleProofApproval(pending, receipt);
+}
+
+export function registerArtProductionTools(server: McpServer): void {
+  server.registerTool(
+    "art_production_orchestrator_protocol",
+    {
+      description:
+        "Describe the profile-driven 1990s game-art production loop for fixed camera grammar, dependency-safe batches, deterministic candidate review, bounded repair, animation continuity and source-preserving sprite-sheet or atlas planning. No provider or approval action is executed.",
+      inputSchema: z.object({}),
+    },
+    async () => textResult(artProductionOrchestratorProtocolSummary()),
+  );
+
+  server.registerTool(
+    "compile_art_production_loop",
+    {
+      description:
+        "Compile a self-hashed iterative production loop from an exact layered-production request and reusable game/style/camera profile. It schedules only eligible one-image source units and does not call a provider.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        profile: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+      }),
+    },
+    async ({ productionRequest, profile, styleProofApproval }) => {
+      try {
+        const plan = compilePlan(productionRequest, styleProofApproval);
+        return textResult({
+          schemaVersion: "1.0",
+          productionLoop: compileArtProductionLoop(plan, profile),
+          executionBoundary:
+            "Plan-only: no provider call, candidate admission, image mutation, creative approval, packaging execution, target-repository mutation, Git, deployment or publication.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "evaluate_art_production_attempt",
+    {
+      description:
+        "Ingest exact candidate and measured QA evidence, replay the current loop, score pixel/camera/style/animation continuity, and produce either a technical pass, a bounded repair prompt, or a blocked state. This tool does not inspect or alter image bytes itself.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        profile: z.unknown(),
+        loop: z.unknown(),
+        attempt: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+      }),
+    },
+    async ({ productionRequest, profile, loop, attempt, styleProofApproval }) => {
+      try {
+        const plan = compilePlan(productionRequest, styleProofApproval);
+        const productionLoop = loop as ArtProductionLoop;
+        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
+        return textResult({
+          schemaVersion: "1.0",
+          productionLoop: evaluateArtProductionAttempt(
+            plan,
+            productionLoop,
+            attempt as ArtProductionAttemptInput,
+          ),
+          executionBoundary:
+            "Evidence evaluation only: no provider call, image mutation, automatic creative approval, target-repository mutation, Git, deployment or publication.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_next_art_production_batch",
+    {
+      description:
+        "Compile the next dependency-safe batch, prioritising bounded repairs before new source units and binding review-passed identity or previous-frame references. Every job still requests exactly one PNG and remains unexecuted.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        profile: z.unknown(),
+        loop: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+      }),
+    },
+    async ({ productionRequest, profile, loop, styleProofApproval }) => {
+      try {
+        const plan = compilePlan(productionRequest, styleProofApproval);
+        const productionLoop = loop as ArtProductionLoop;
+        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
+        return textResult({
+          schemaVersion: "1.0",
+          batch: compileNextArtProductionBatch(plan, productionLoop),
+          executionBoundary:
+            "Batch compilation only: provider execution, candidate admission, creative approval and image mutation remain separate.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "verify_art_production_loop",
+    {
+      description:
+        "Semantically replay and verify an iterative production loop against the exact layered-production request and game profile, including all retained review and repair transitions.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        profile: z.unknown(),
+        loop: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+      }),
+    },
+    async ({ productionRequest, profile, loop, styleProofApproval }) => {
+      try {
+        const plan = compilePlan(productionRequest, styleProofApproval);
+        const productionLoop = loop as ArtProductionLoop;
+        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
+        return textResult({
+          schemaVersion: "1.0",
+          loopSha256: productionLoop.loopSha256,
+          status: "passed",
+          executionBoundary:
+            "Verification-only: no provider call, approval, image mutation, packaging execution, repository write, Git or publication.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_art_production_packaging_plan",
+    {
+      description:
+        "After every source passes deterministic review and exact named-human approval is supplied, compile individual-PNG retention plus animation strip, grid and non-rotating atlas layouts. It emits metadata only and does not pack image bytes.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        profile: z.unknown(),
+        loop: z.unknown(),
+        approvals: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+        packagingPlan: z.unknown().optional(),
+      }),
+    },
+    async ({
+      productionRequest,
+      profile,
+      loop,
+      approvals,
+      styleProofApproval,
+      packagingPlan,
+    }) => {
+      try {
+        const plan = compilePlan(productionRequest, styleProofApproval);
+        const productionLoop = loop as ArtProductionLoop;
+        const humanApprovals = approvals as readonly ArtProductionHumanApprovalInput[];
+        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
+        const compiled = compileArtProductionPackagingPlan(
+          plan,
+          productionLoop,
+          humanApprovals,
+        );
+        if (packagingPlan !== undefined) {
+          verifyArtProductionPackagingPlan(
+            plan,
+            productionLoop,
+            humanApprovals,
+            packagingPlan as ArtProductionPackagingPlan,
+          );
+        }
+        return textResult({
+          schemaVersion: "1.0",
+          packagingPlan: compiled,
+          status: packagingPlan === undefined ? "compiled" : "verified",
+          executionBoundary:
+            "Metadata-only: individual PNGs remain authoritative; no sheet or atlas pixels are written, no creative decision is made, and no repository or Git authority is granted.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+}

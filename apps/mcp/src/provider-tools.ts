@@ -9,6 +9,7 @@ import {
 } from "@evavo/art-providers";
 
 import { registerArtDirectionTools } from "./art-direction-tools.js";
+import { registerArtProductionTools } from "./art-production-tools.js";
 import { registerLayeredGodotTools } from "./layered-godot-tools.js";
 import { registerSelectionTools } from "./selection-tools.js";
 
@@ -40,6 +41,7 @@ function toolError(error: unknown) {
 
 export function registerProviderTools(server: McpServer): void {
   registerArtDirectionTools(server);
+  registerArtProductionTools(server);
   registerLayeredGodotTools(server);
   registerSelectionTools(server);
 
