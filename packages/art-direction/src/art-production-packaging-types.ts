@@ -4,16 +4,6 @@ import {
   ART_PRODUCTION_PACKAGING_PLAN_KIND,
 } from "./art-production-contract.js";
 
-export interface ArtProductionHumanApprovalInput {
-  readonly unitId: string;
-  readonly sourceArtifactId: string;
-  readonly sourceSha256: string;
-  readonly sourceBytes: number;
-  readonly reviewer: string;
-  readonly reviewedAt: string;
-  readonly approvalReceiptSha256: string;
-}
-
 export interface ArtProductionPackagingPlan {
   readonly schemaVersion: "1.0";
   readonly kind: typeof ART_PRODUCTION_PACKAGING_PLAN_KIND;
@@ -30,6 +20,9 @@ export interface ArtProductionPackagingPlan {
     readonly width: number;
     readonly height: number;
     readonly targetPath: string;
+    readonly technicalReviewAttemptSha256: string;
+    readonly approvalRequestSha256: string;
+    readonly approvalBasisSha256: string;
     readonly approvalReceiptSha256: string;
   }>[];
   readonly animationSheets: readonly Readonly<{

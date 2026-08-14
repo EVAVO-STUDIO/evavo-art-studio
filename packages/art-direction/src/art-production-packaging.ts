@@ -1,11 +1,7 @@
 import {
   fail,
   freeze,
-  idValue,
-  integerValue,
-  record,
   sha256,
-  stringValue,
 } from "./layered-production-internal.js";
 import type {
   CompiledLayeredProductionPlan,
@@ -16,142 +12,59 @@ import {
   ART_PRODUCTION_PACKAGING_PLAN_KIND,
 } from "./art-production-orchestrator-types.js";
 import type {
-  ArtProductionHumanApprovalInput,
+  ArtProductionHumanApprovalReceipt,
   ArtProductionLoop,
   ArtProductionPackagingPlan,
 } from "./art-production-orchestrator-types.js";
 import { verifyArtProductionLoop } from "./art-production-loop.js";
-
-const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
-const ARTIFACT_ID_PATTERN = /^artifact_[0-9a-f]{64}$/u;
-
-function sha256Value(value: unknown, label: string): string {
-  if (typeof value !== "string" || !SHA256_PATTERN.test(value)) {
-    fail("ART_PRODUCTION_PACKAGING_INVALID", `${label} must be lowercase SHA-256.`);
-  }
-  return value;
-}
-
-function canonicalUtc(value: unknown, label: string): string {
-  const output = stringValue(value, label, 64);
-  const parsed = new Date(output);
-  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString() !== output) {
-    fail(
-      "ART_PRODUCTION_PACKAGING_INVALID",
-      `${label} must be canonical UTC ISO-8601.`,
-    );
-  }
-  return output;
-}
+import {
+  verifyArtProductionHumanApprovalReceiptForVerifiedLoop,
+} from "./art-production-human-approval.js";
 
 function normalizeApprovals(
   plan: CompiledLayeredProductionPlan,
   loop: ArtProductionLoop,
   value: unknown,
-): readonly ArtProductionHumanApprovalInput[] {
+): readonly ArtProductionHumanApprovalReceipt[] {
   if (!Array.isArray(value) || value.length !== loop.unitStates.length) {
     fail(
       "ART_PRODUCTION_PACKAGING_INVALID",
-      "Human approvals must cover every full-production source unit exactly once.",
+      "Human approval receipts must cover every full-production source unit exactly once.",
     );
   }
   const seen = new Set<string>();
   const output = value.map((entryValue, index) => {
-    const entry = record(entryValue, `approvals[${index}]`);
-    const allowed = [
-      "unitId",
-      "sourceArtifactId",
-      "sourceSha256",
-      "sourceBytes",
-      "reviewer",
-      "reviewedAt",
-      "approvalReceiptSha256",
-    ];
-    const unknown = Object.keys(entry).filter((key) => !allowed.includes(key));
-    if (unknown.length > 0 || allowed.some((key) => !Object.hasOwn(entry, key))) {
-      fail(
-        "ART_PRODUCTION_PACKAGING_INVALID",
-        `approvals[${index}] fields are incomplete or unsupported.`,
-      );
-    }
-    const unitId = idValue(entry.unitId, `approvals[${index}].unitId`);
-    if (seen.has(unitId)) {
-      fail(
-        "ART_PRODUCTION_PACKAGING_INVALID",
-        `Human approval duplicates unit ${unitId}.`,
-      );
-    }
-    seen.add(unitId);
-    const state = loop.unitStates.find((candidate) => candidate.unitId === unitId);
-    const unit = plan.layers
-      .flatMap((layer) => layer.units)
-      .find((candidate) => candidate.id === unitId);
-    if (!state?.acceptedCandidate || state.status !== "review-passed" || !unit) {
-      fail(
-        "ART_PRODUCTION_PACKAGING_INVALID",
-        `Human approval references source unit ${unitId} without a technical review pass.`,
-      );
-    }
-    const sourceSha256 = sha256Value(
-      entry.sourceSha256,
-      `approvals[${index}].sourceSha256`,
+    verifyArtProductionHumanApprovalReceiptForVerifiedLoop(
+      plan,
+      loop,
+      entryValue,
     );
-    const sourceArtifactId = entry.sourceArtifactId;
-    if (
-      typeof sourceArtifactId !== "string" ||
-      !ARTIFACT_ID_PATTERN.test(sourceArtifactId) ||
-      sourceArtifactId !== `artifact_${sourceSha256}`
-    ) {
+    const receipt = entryValue as ArtProductionHumanApprovalReceipt;
+    if (seen.has(receipt.unitId)) {
       fail(
         "ART_PRODUCTION_PACKAGING_INVALID",
-        `approvals[${index}].sourceArtifactId is invalid.`,
+        `Human approval receipts duplicate unit ${receipt.unitId}.`,
       );
     }
-    if (
-      sourceArtifactId !== state.acceptedCandidate.artifactId ||
-      sourceSha256 !== state.acceptedCandidate.sha256 ||
-      entry.sourceBytes !== state.acceptedCandidate.bytes
-    ) {
-      fail(
-        "ART_PRODUCTION_PACKAGING_INVALID",
-        `Human approval for ${unitId} is not bound to the exact review-passed source candidate.`,
-      );
-    }
-    return freeze({
-      unitId,
-      sourceArtifactId,
-      sourceSha256,
-      sourceBytes: integerValue(
-        entry.sourceBytes,
-        `approvals[${index}].sourceBytes`,
-        1,
-        256 * 1024 * 1024,
-      ),
-      reviewer: stringValue(entry.reviewer, `approvals[${index}].reviewer`, 300),
-      reviewedAt: canonicalUtc(
-        entry.reviewedAt,
-        `approvals[${index}].reviewedAt`,
-      ),
-      approvalReceiptSha256: sha256Value(
-        entry.approvalReceiptSha256,
-        `approvals[${index}].approvalReceiptSha256`,
-      ),
-    });
+    seen.add(receipt.unitId);
+    return receipt;
   });
   for (const state of loop.unitStates) {
     if (!seen.has(state.unitId)) {
       fail(
         "ART_PRODUCTION_PACKAGING_INVALID",
-        `Human approvals are missing source unit ${state.unitId}.`,
+        `Human approval receipts are missing source unit ${state.unitId}.`,
       );
     }
   }
   return freeze(
     [...output].sort((left, right) => {
       const leftSequence =
-        loop.unitStates.find((state) => state.unitId === left.unitId)?.sequence ?? 0;
+        loop.unitStates.find((state) => state.unitId === left.unitId)?.sequence ??
+        0;
       const rightSequence =
-        loop.unitStates.find((state) => state.unitId === right.unitId)?.sequence ?? 0;
+        loop.unitStates.find((state) => state.unitId === right.unitId)
+          ?.sequence ?? 0;
       return leftSequence - rightSequence || left.unitId.localeCompare(right.unitId);
     }),
   );
@@ -368,7 +281,7 @@ function atlasPages(
 export function compileArtProductionPackagingPlan(
   plan: CompiledLayeredProductionPlan,
   loop: ArtProductionLoop,
-  approvalsInput: readonly ArtProductionHumanApprovalInput[] | unknown,
+  approvalsInput: readonly ArtProductionHumanApprovalReceipt[] | unknown,
 ): ArtProductionPackagingPlan {
   verifyArtProductionLoop(plan, loop);
   if (loop.scope !== "full-production") {
@@ -398,7 +311,7 @@ export function compileArtProductionPackagingPlan(
         if (!approval) {
           fail(
             "ART_PRODUCTION_PACKAGING_INVALID",
-            `Missing human approval for source unit ${unit.id}.`,
+            `Missing human approval receipt for source unit ${unit.id}.`,
           );
         }
         return freeze({
@@ -409,6 +322,10 @@ export function compileArtProductionPackagingPlan(
           width: unit.dimensions.width,
           height: unit.dimensions.height,
           targetPath: unit.targetPath,
+          technicalReviewAttemptSha256:
+            approval.technicalReview.attemptSha256,
+          approvalRequestSha256: approval.requestSha256,
+          approvalBasisSha256: approval.approvalBasisSha256,
           approvalReceiptSha256: approval.approvalReceiptSha256,
         });
       }),
@@ -456,14 +373,14 @@ export function compileArtProductionPackagingPlan(
 export function verifyArtProductionPackagingPlan(
   plan: CompiledLayeredProductionPlan,
   loop: ArtProductionLoop,
-  approvals: readonly ArtProductionHumanApprovalInput[] | unknown,
+  approvals: readonly ArtProductionHumanApprovalReceipt[] | unknown,
   packagingPlan: ArtProductionPackagingPlan,
 ): true {
   const expected = compileArtProductionPackagingPlan(plan, loop, approvals);
   if (expected.packagingSha256 !== packagingPlan.packagingSha256) {
     fail(
       "ART_PRODUCTION_PACKAGING_INVALID",
-      "Packaging plan is not the deterministic compilation of its plan, loop and human approvals.",
+      "Packaging plan is not the deterministic compilation of its plan, loop and human approval receipts.",
     );
   }
   return true;

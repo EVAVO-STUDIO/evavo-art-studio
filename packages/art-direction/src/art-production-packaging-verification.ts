@@ -1,7 +1,7 @@
 import { fail, sha256 } from "./layered-production-internal.js";
 import type { CompiledLayeredProductionPlan } from "./layered-production-types.js";
 import type {
-  ArtProductionHumanApprovalInput,
+  ArtProductionHumanApprovalReceipt,
   ArtProductionLoop,
   ArtProductionPackagingPlan,
 } from "./art-production-orchestrator-types.js";
@@ -19,7 +19,7 @@ function packagingPayload(
 export function verifyArtProductionPackagingPlan(
   plan: CompiledLayeredProductionPlan,
   loop: ArtProductionLoop,
-  approvals: readonly ArtProductionHumanApprovalInput[] | unknown,
+  approvals: readonly ArtProductionHumanApprovalReceipt[] | unknown,
   packagingPlan: ArtProductionPackagingPlan,
 ): true {
   if (

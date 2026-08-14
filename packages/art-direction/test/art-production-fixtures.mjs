@@ -4,8 +4,10 @@ import { readFile } from "node:fs/promises";
 
 import {
   ART_PRODUCTION_ATTEMPT_KIND,
+  ART_PRODUCTION_HUMAN_APPROVAL_REQUEST_KIND,
   ART_PRODUCTION_METRIC_IDS,
   applyLayeredProductionStyleProofApproval,
+  compileArtProductionHumanApprovalReceipt,
   compileLayeredProductionPlan,
   compileLayeredProductionStyleProofApprovalReceipt,
 } from "../dist/index.js";
@@ -137,6 +139,44 @@ function attempt(loop, plan, unitId, options = {}) {
   };
 }
 
+function humanApprovalRequest(plan, loop, unitId, options = {}) {
+  const state = loop.unitStates.find((entry) => entry.unitId === unitId);
+  assert.ok(state?.acceptedCandidate, `missing accepted candidate ${unitId}`);
+  const decisionEvidenceSha256 =
+    options.decisionEvidenceSha256 ??
+    digest(`human-approval-evidence:${loop.loopSha256}:${unitId}`);
+  return {
+    schemaVersion: "1.0",
+    kind: ART_PRODUCTION_HUMAN_APPROVAL_REQUEST_KIND,
+    planId: plan.planId,
+    planSha256: plan.planSha256,
+    loopSha256: loop.loopSha256,
+    profileSha256: loop.profileSha256,
+    unitId,
+    sourceArtifactId: state.acceptedCandidate.artifactId,
+    sourceSha256: state.acceptedCandidate.sha256,
+    sourceBytes: state.acceptedCandidate.bytes,
+    acceptedAttemptSha256: state.acceptedCandidate.attemptSha256,
+    reviewer: options.reviewer ?? "Greg Parker",
+    reviewedAt:
+      options.reviewedAt ??
+      new Date(Date.UTC(2026, 7, 14, 2, state.sequence, 0)).toISOString(),
+    decision: "approved",
+    decisionEvidenceArtifactId: `artifact_${decisionEvidenceSha256}`,
+    decisionEvidenceSha256,
+  };
+}
+
+function humanApprovals(plan, loop) {
+  return loop.unitStates.map((state) =>
+    compileArtProductionHumanApprovalReceipt(
+      plan,
+      loop,
+      humanApprovalRequest(plan, loop, state.unitId),
+    ),
+  );
+}
+
 function canonicalSort(value) {
   if (Array.isArray(value)) return value.map(canonicalSort);
   if (!value || typeof value !== "object") return value;
@@ -163,4 +203,6 @@ export {
   canonicalSha256,
   approvedPlan,
   attempt,
+  humanApprovalRequest,
+  humanApprovals,
 };

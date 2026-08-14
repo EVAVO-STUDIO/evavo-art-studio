@@ -5,18 +5,20 @@ import {
   ArtDirectionError,
   applyLayeredProductionStyleProofApproval,
   artProductionOrchestratorProtocolSummary,
+  compileArtProductionHumanApprovalReceipt,
   compileArtProductionLoop,
   compileArtProductionPackagingPlan,
   compileLayeredProductionPlan,
   compileLayeredProductionStyleProofApprovalReceipt,
   compileNextArtProductionBatch,
   evaluateArtProductionAttempt,
+  verifyArtProductionHumanApprovalReceiptAgainstRequest,
   verifyArtProductionLoopAgainstProfile,
   verifyArtProductionPackagingPlan,
 } from "@evavo/art-direction";
 import type {
   ArtProductionAttemptInput,
-  ArtProductionHumanApprovalInput,
+  ArtProductionHumanApprovalReceipt,
   ArtProductionLoop,
   ArtProductionPackagingPlan,
 } from "@evavo/art-direction";
@@ -68,7 +70,7 @@ export function registerArtProductionTools(server: McpServer): void {
     "art_production_orchestrator_protocol",
     {
       description:
-        "Describe the profile-driven 1990s game-art production loop for fixed camera grammar, dependency-safe batches, deterministic candidate review, bounded repair, animation continuity and source-preserving sprite-sheet or atlas planning. No provider or approval action is executed.",
+        "Describe the profile-driven 1990s game-art production loop for fixed camera grammar, dependency-safe batches, deterministic candidate review, bounded repair, animation continuity, exact named-human approval receipts and source-preserving sprite-sheet or atlas planning. No provider or creative decision is executed.",
       inputSchema: z.object({}),
     },
     async () => textResult(artProductionOrchestratorProtocolSummary()),
@@ -194,10 +196,62 @@ export function registerArtProductionTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "compile_art_production_human_approval_receipt",
+    {
+      description:
+        "Compile or verify a deterministic receipt for one explicit caller-supplied named-human approval decision. The receipt binds the exact plan, loop, profile, review-passed candidate, technical-review attempt and external decision-evidence identity. This tool records the decision but does not make it.",
+      inputSchema: z.object({
+        productionRequest: z.unknown(),
+        profile: z.unknown(),
+        loop: z.unknown(),
+        approvalRequest: z.unknown(),
+        styleProofApproval: z.unknown().optional(),
+        approvalReceipt: z.unknown().optional(),
+      }),
+    },
+    async ({
+      productionRequest,
+      profile,
+      loop,
+      approvalRequest,
+      styleProofApproval,
+      approvalReceipt,
+    }) => {
+      try {
+        const plan = compilePlan(productionRequest, styleProofApproval);
+        const productionLoop = loop as ArtProductionLoop;
+        verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
+        const compiled = compileArtProductionHumanApprovalReceipt(
+          plan,
+          productionLoop,
+          approvalRequest,
+        );
+        if (approvalReceipt !== undefined) {
+          verifyArtProductionHumanApprovalReceiptAgainstRequest(
+            plan,
+            productionLoop,
+            approvalRequest,
+            approvalReceipt,
+          );
+        }
+        return textResult({
+          schemaVersion: "1.0",
+          approvalReceipt: compiled,
+          status: approvalReceipt === undefined ? "compiled" : "verified",
+          executionBoundary:
+            "Receipt-only: the named-human decision and decision evidence are caller supplied; no provider call, image mutation, creative decision, packaging execution, repository mutation, Git, deployment or publication is performed.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     "compile_art_production_packaging_plan",
     {
       description:
-        "After every source passes deterministic review and exact named-human approval is supplied, compile individual-PNG retention plus animation strip, grid and non-rotating atlas layouts. It emits metadata only and does not pack image bytes.",
+        "After every source passes deterministic review and exact candidate-bound named-human approval receipts are supplied, compile individual-PNG retention plus animation strip, grid and non-rotating atlas layouts. It emits metadata only and does not pack image bytes.",
       inputSchema: z.object({
         productionRequest: z.unknown(),
         profile: z.unknown(),
@@ -218,7 +272,8 @@ export function registerArtProductionTools(server: McpServer): void {
       try {
         const plan = compilePlan(productionRequest, styleProofApproval);
         const productionLoop = loop as ArtProductionLoop;
-        const humanApprovals = approvals as readonly ArtProductionHumanApprovalInput[];
+        const humanApprovals =
+          approvals as readonly ArtProductionHumanApprovalReceipt[];
         verifyArtProductionLoopAgainstProfile(plan, profile, productionLoop);
         const compiled = compileArtProductionPackagingPlan(
           plan,

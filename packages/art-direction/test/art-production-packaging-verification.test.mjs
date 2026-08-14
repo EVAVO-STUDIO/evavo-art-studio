@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -13,28 +12,11 @@ import {
 import {
   attempt,
   approvedPlan,
+  canonicalSha256,
+  humanApprovals,
   productionRequest,
   profile,
 } from "./art-production-fixtures.mjs";
-
-const digest = (value) =>
-  createHash("sha256").update(value).digest("hex");
-
-function canonicalSort(value) {
-  if (Array.isArray(value)) return value.map(canonicalSort);
-  if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.keys(value)
-      .sort()
-      .map((key) => [key, canonicalSort(value[key])]),
-  );
-}
-
-function sha256(value) {
-  return createHash("sha256")
-    .update(JSON.stringify(canonicalSort(value)))
-    .digest("hex");
-}
 
 function compileFixture() {
   const complete = productionRequest();
@@ -55,18 +37,7 @@ function compileFixture() {
       );
     }
   }
-  const approvals = loop.unitStates.map((state) => {
-    assert.ok(state.acceptedCandidate);
-    return {
-      unitId: state.unitId,
-      sourceArtifactId: state.acceptedCandidate.artifactId,
-      sourceSha256: state.acceptedCandidate.sha256,
-      sourceBytes: state.acceptedCandidate.bytes,
-      reviewer: "Greg Parker",
-      reviewedAt: "2026-08-14T02:00:00.000Z",
-      approvalReceiptSha256: digest(`approval:${state.unitId}`),
-    };
-  });
+  const approvals = humanApprovals(plan, loop);
   return {
     plan,
     loop,
@@ -77,7 +48,7 @@ function compileFixture() {
 
 function rehashPackagingPlan(packagingPlan) {
   const { packagingSha256: _discarded, ...payload } = packagingPlan;
-  packagingPlan.packagingSha256 = sha256(payload);
+  packagingPlan.packagingSha256 = canonicalSha256(payload);
   return packagingPlan;
 }
 
