@@ -1,0 +1,115 @@
+name: Art Production Orchestrator
+
+on:
+  pull_request:
+    paths:
+      - "packages/art-direction/src/**"
+      - "packages/art-direction/test/**"
+      - "apps/mcp/src/art-production-tools.ts"
+      - "apps/mcp/src/provider-tools.ts"
+      - "apps/mcp/test/art-production-tools.test.mjs"
+      - "docs/ART_PRODUCTION_ORCHESTRATOR.md"
+      - "docs/ART_PRODUCTION_PACKAGING_VERIFICATION.md"
+      - ".github/workflows/art-production-orchestrator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: art-production-orchestrator-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and test Art Production contracts
+        run: pnpm --filter @evavo/art-direction test
+
+      - name: Verify MCP planning-only exposure
+        run: node --test apps/mcp/test/art-production-tools.test.mjs
+
+      - name: Prove exact source remains clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          STATUS="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -n "${STATUS}" ]]; then
+            printf 'Unexpected validation byproducts:\n%s\n' "${STATUS}" >&2
+            exit 1
+          fi
+
+      - name: Compile bounded validation receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' > "${RUNNER_TEMP}/art-production-orchestrator-validation.json"
+          import { createHash } from "node:crypto";
+
+          const canonicalSort = (value) => {
+            if (Array.isArray(value)) return value.map(canonicalSort);
+            if (!value || typeof value !== "object") return value;
+            return Object.fromEntries(
+              Object.keys(value)
+                .sort()
+                .map((key) => [key, canonicalSort(value[key])]),
+            );
+          };
+          const payload = {
+            schemaVersion: "1.0",
+            kind: "evavo.art-production-orchestrator-pr-validation.v1",
+            commitSha: process.env.GITHUB_SHA,
+            checks: [
+              "frozen-dependency-install",
+              "art-direction-build-and-tests",
+              "mcp-planning-only-contract",
+              "clean-source-proof",
+            ],
+            authority: {
+              providerExecution: false,
+              imageMutation: false,
+              packagingExecution: false,
+              creativeApproval: false,
+              targetRepositoryMutation: false,
+              gitCommit: false,
+              gitPush: false,
+              publication: false,
+            },
+          };
+          const receiptSha256 = createHash("sha256")
+            .update(JSON.stringify(canonicalSort(payload)))
+            .digest("hex");
+          process.stdout.write(
+            `${JSON.stringify({ ...payload, receiptSha256 }, null, 2)}\n`,
+          );
+          NODE
+
+      - name: Upload compact validation evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: art-production-orchestrator-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/art-production-orchestrator-validation.json
