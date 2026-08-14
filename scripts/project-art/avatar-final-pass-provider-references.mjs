@@ -137,6 +137,8 @@ export function prompt(entry, plan) {
     lines.push(
       `Edit the supplied base image; do not redesign or replace the pose.`,
       `Correct only these declared defects: ${entry.upstream.issues.join(', ')}.`,
+      'Use a precise repair mask over only the declared defect region and the smallest necessary anatomical boundary.',
+      'Use the provider\'s highest supported input-fidelity mode. Pixels outside the repair mask must remain invariant.',
     );
   } else {
     lines.push(
@@ -149,8 +151,8 @@ export function prompt(entry, plan) {
   lines.push(
     'Keep face, hair, clothing, proportions, palette, lighting, camera, outline treatment and canvas registration consistent.',
     'Hands, fingers, wrists, arms, anatomy, silhouette and transparent edges must be clean at native scale.',
+    'Return actual RGBA transparency. A baked checkerboard, matte, halo or opaque background is a failed candidate.',
     'Return one frame only: no contact sheet, no alternate, no text, no labels, no background and no second character.',
   );
   return lines.join('\n');
 }
-

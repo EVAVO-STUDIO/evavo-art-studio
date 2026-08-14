@@ -64,6 +64,19 @@ candidate count      one candidate
 fallback             disabled
 ```
 
+For an edit, the adapter capability profile additionally requires:
+
+```text
+mask-guided-edit
+high-input-fidelity
+non-target-invariance
+identity-reference-lock
+true-alpha-validation
+fake-transparency-rejection
+```
+
+This is deliberately stricter than prompt-only repair. The provider must confine the edit to the smallest declared defect region, preserve the rest of the frame, retain the admitted canonical identity reference, and return real alpha rather than a baked checkerboard or matte. An adapter that cannot prove these capabilities is incompatible and must fail closed; it cannot silently fall back to a general redraw model.
+
 The dispatch is still compilation-only. A write-enabled provider worker must separately call the generic compiler and separately enqueue the returned job.
 
 ## Generic runtime binding
@@ -89,6 +102,8 @@ The binding revalidates:
 - maximum attempts, lease and timeout;
 - required runtime capabilities;
 - required adapter capability profile;
+- mask-guided edit and high input fidelity for redraw jobs;
+- non-target invariance, identity lock and true-alpha validation;
 - one-candidate scope;
 - transparent PNG target;
 - disabled fallback;
