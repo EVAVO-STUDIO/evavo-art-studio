@@ -1,0 +1,61 @@
+{
+  "schema": "evavo.game-art-production-project.v1",
+  "protocolVersion": "2026-08-14.1",
+  "projectId": "reference-pixel-platformer",
+  "title": "REFERENCE PIXEL PLATFORMER",
+  "profileId": "pixel-platformer",
+  "targetRepository": "example/reference-pixel-platformer",
+  "styleDirection": "A compact original pixel platformer with clear gameplay silhouettes, deliberate tile adjacency, restrained palettes and readable layered depth.",
+  "subjectGroups": {
+    "characters": ["hero", "rival", "crawler"],
+    "worlds": ["forest", "factory", "summit"]
+  },
+  "assetTypeAliases": {
+    "hero-cel": "character-body-cel",
+    "world-tile": "environment-tile",
+    "background-layer": "parallax-layer",
+    "hud-icon": "interface-icon",
+    "pickup": "pickup-icon"
+  },
+  "productionDefaults": {
+    "batchSize": 8,
+    "candidateFanout": 1,
+    "maximumRepairAttempts": 2
+  },
+  "assetTypeOverrides": {
+    "character-body-cel": {
+      "pathTemplate": "working/actors/{subjectId}/{productionGroup}/frame-{frameIndex:03}.png",
+      "masterPathTemplate": "masters/actors/{subjectId}/{productionGroup}/frame-{frameIndex:03}.png"
+    },
+    "environment-tile": {
+      "pathTemplate": "working/worlds/{subjectId}/tiles/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/worlds/{subjectId}/tiles/{productionGroup}/{unitId}.png"
+    },
+    "parallax-layer": {
+      "pathTemplate": "working/worlds/{subjectId}/backgrounds/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/worlds/{subjectId}/backgrounds/{productionGroup}/{unitId}.png"
+    }
+  },
+  "referenceContract": {
+    "styleRoot": "working/style",
+    "subjectRootTemplates": {
+      "characters": "working/actors/{subjectId}",
+      "worlds": "working/worlds/{subjectId}"
+    },
+    "continuityAuthority": "approved neighbouring cels, tiles or layers in the same production group"
+  },
+  "metadata": {
+    "purpose": "A contrasting non-fighting profile fixture proving the engine is driven by game type and project data rather than HMF-specific code."
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticApproval": false,
+    "automaticPromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}

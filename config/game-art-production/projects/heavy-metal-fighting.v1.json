@@ -1,0 +1,81 @@
+{
+  "schema": "evavo.game-art-production-project.v1",
+  "protocolVersion": "2026-08-14.1",
+  "projectId": "heavy-metal-fighting",
+  "title": "HEAVY METAL FIGHTING",
+  "profileId": "arcade-fighter-1990s",
+  "targetRepository": "EVAVO-STUDIO/steel-dominion",
+  "styleDirection": "A high-impact original 1990s arcade fighting game with industrial Frame combat, disciplined pixel clusters, strong silhouettes, restrained material ramps and effects kept separate from physical bodies.",
+  "subjectGroups": {
+    "frames": ["bastion", "viper", "citadel", "mirage"],
+    "pilots": ["branka", "vale", "mara", "kael"],
+    "arenas": ["foundry-ring", "carrier-deck", "reactor-pit", "orbital-yard"]
+  },
+  "assetTypeAliases": {
+    "frame-body-cel": "character-body-cel",
+    "pilot-portrait": "character-portrait",
+    "frame-effect-cel": "effect-cel",
+    "arena-layer": "arena-layer",
+    "interface-element": "interface-element",
+    "title-card": "title-card"
+  },
+  "productionDefaults": {
+    "batchSize": 10,
+    "candidateFanout": 1,
+    "maximumRepairAttempts": 3
+  },
+  "assetTypeOverrides": {
+    "character-body-cel": {
+      "pathTemplate": "working/frames/{subjectId}/sprites/{productionGroup}/slot-{bodySlot:03}.png",
+      "masterPathTemplate": "masters/frames/{subjectId}/sprites/{productionGroup}/slot-{bodySlot:03}.png",
+      "promptFragments": ["preserve the project Frame construction, landmark, hardpoint and material references", "authored body faces right before runtime mirroring", "physical Frame body remains readable without effects"]
+    },
+    "character-portrait": {
+      "pathTemplate": "working/pilots/{subjectId}/portraits/{unitId}.png",
+      "masterPathTemplate": "masters/pilots/{subjectId}/portraits/{unitId}.png",
+      "promptFragments": ["preserve the approved pilot face, hair mass, clothing silhouette and permanent identity landmarks"]
+    },
+    "effect-cel": {
+      "pathTemplate": "working/frames/{subjectId}/effects/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/frames/{subjectId}/effects/{productionGroup}/{unitId}.png",
+      "promptFragments": ["effect remains independently composable over the separately approved Frame body"]
+    },
+    "arena-layer": {
+      "pathTemplate": "working/arenas/{subjectId}/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/arenas/{subjectId}/{productionGroup}/{unitId}.png",
+      "promptFragments": ["preserve the governed arena identity and unobstructed fight plane"]
+    },
+    "interface-element": {
+      "pathTemplate": "working/interface/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/interface/{productionGroup}/{unitId}.png"
+    },
+    "title-card": {
+      "pathTemplate": "working/title/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/title/{productionGroup}/{unitId}.png"
+    }
+  },
+  "referenceContract": {
+    "styleRoot": "working/style",
+    "subjectRootTemplates": {
+      "frames": "working/frames/{subjectId}",
+      "pilots": "working/pilots/{subjectId}",
+      "arenas": "working/arenas/{subjectId}"
+    },
+    "continuityAuthority": "approved neighbouring assets inside the same coherent animation or layer group"
+  },
+  "metadata": {
+    "legacyAdapter": "scripts/heavy-metal-fighting/work-orders.mjs",
+    "currentProductionBodyCelContract": "160x160 native, 640x640 authoring, pivot 80,152, ground line 152"
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticApproval": false,
+    "automaticPromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}

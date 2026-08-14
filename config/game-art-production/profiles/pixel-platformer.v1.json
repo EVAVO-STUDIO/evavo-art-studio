@@ -1,0 +1,134 @@
+{
+  "schema": "evavo.game-art-production-profile.v1",
+  "protocolVersion": "2026-08-14.1",
+  "profileId": "pixel-platformer",
+  "label": "Pixel platformer",
+  "gameType": "platformer",
+  "era": "flexible-pixel",
+  "tags": [
+    "pixel-art",
+    "platformer",
+    "tilemap",
+    "sprite-animation",
+    "parallax"
+  ],
+  "defaults": {
+    "batchSize": 10,
+    "candidateFanout": 1,
+    "maximumRepairAttempts": 3,
+    "imageFormat": "png",
+    "textureFiltering": "nearest",
+    "integerScaleOnly": true,
+    "oneAssetPerOutput": true,
+    "providerFallbackAllowed": false
+  },
+  "lifecycle": [
+    {"id": "planned", "rank": 0, "implicit": true, "requiresEvidence": false, "requiresCandidate": false, "requiresHuman": false, "nextAction": "lock-references"},
+    {"id": "references-locked", "rank": 1, "requiresEvidence": true, "requiresCandidate": false, "requiresHuman": false, "nextAction": "request-generation-authorization"},
+    {"id": "generation-authorized", "rank": 2, "requiresEvidence": true, "requiresCandidate": false, "requiresHuman": true, "nextAction": "run-provider-once"},
+    {"id": "candidates-admitted", "rank": 3, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "run-deterministic-qa"},
+    {"id": "deterministic-qa-passed", "rank": 4, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "run-creative-review"},
+    {"id": "creative-review-passed", "rank": 5, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "select-or-request-repair"},
+    {"id": "selected-or-repair-requested", "rank": 6, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": true, "outcomes": ["selected", "repair-requested"], "nextAction": "branch-on-human-decision"},
+    {"id": "mastered", "rank": 7, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "request-named-human-approval"},
+    {"id": "named-human-approved", "rank": 8, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": true, "nextAction": "compile-delivery-readiness"},
+    {"id": "delivery-ready", "rank": 9, "requiresEvidence": true, "requiresCandidate": true, "requiresHuman": false, "nextAction": "complete", "terminal": true}
+  ],
+  "reviewPresets": {
+    "platformer-character-cel": {
+      "humanRequired": true,
+      "modes": ["native", "nearest-neighbour-8x", "gameplay-composite", "silhouette", "grayscale"],
+      "criteria": ["character-identity", "pose-role", "ground-contact", "animation-continuity", "palette-readability", "pixel-authenticity"]
+    },
+    "platformer-tile": {
+      "humanRequired": true,
+      "modes": ["native", "nearest-neighbour-8x", "repeated-tile", "adjacency-composite", "grayscale"],
+      "criteria": ["seamlessness", "edge-language", "collision-readability", "palette-consistency", "pixel-authenticity"]
+    },
+    "platformer-background": {
+      "humanRequired": true,
+      "modes": ["native", "gameplay-composite", "parallax-stack", "thumbnail", "grayscale"],
+      "criteria": ["depth-role", "character-contrast", "seam-safety", "palette-hierarchy", "pixel-authenticity"]
+    },
+    "platformer-icon": {
+      "humanRequired": true,
+      "modes": ["native", "nearest-neighbour-8x", "runtime-composite", "grayscale"],
+      "criteria": ["semantic-readability", "silhouette", "palette-contrast", "pixel-authenticity"]
+    }
+  },
+  "assetTypes": {
+    "character-body-cel": {
+      "kind": "animation-frame",
+      "nativeDimensions": {"width": 32, "height": 32},
+      "authoringCanvas": {"width": 128, "height": 128},
+      "alpha": "transparent",
+      "pivot": {"x": 16, "y": 30},
+      "groundLineY": 30,
+      "reviewPreset": "platformer-character-cel",
+      "pathTemplate": "working/characters/{subjectId}/animation/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/characters/{subjectId}/animation/{productionGroup}/{unitId}.png",
+      "qaChecks": ["native-dimensions", "rgba-alpha", "transparent-rgb", "crop-margins", "pivot", "ground-contact", "palette-complexity", "duplicate-candidate"],
+      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "unsafe-transparent-rgb", "crop-risk", "pivot-drift", "ground-contact-drift", "palette-contract-drift", "continuity-break", "duplicate-candidate"],
+      "promptFragments": ["one separate character animation cel", "transparent background", "clear platforming silhouette", "stable proportions across the animation bank"]
+    },
+    "environment-tile": {
+      "kind": "tile",
+      "nativeDimensions": {"width": 16, "height": 16},
+      "authoringCanvas": {"width": 64, "height": 64},
+      "alpha": "opaque",
+      "reviewPreset": "platformer-tile",
+      "pathTemplate": "working/tiles/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/tiles/{productionGroup}/{unitId}.png",
+      "qaChecks": ["native-dimensions", "opaque-contract", "tile-seams", "palette-complexity", "duplicate-candidate"],
+      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "edge-seam", "palette-contract-drift", "collision-readability-failure", "duplicate-candidate"],
+      "promptFragments": ["one independently authored environment tile", "edge language supports governed adjacency", "no baked tile sheet", "clear gameplay collision reading"]
+    },
+    "parallax-layer": {
+      "kind": "background-layer",
+      "nativeDimensions": {"width": 320, "height": 180},
+      "authoringCanvas": {"width": 1280, "height": 720},
+      "alpha": "mixed",
+      "reviewPreset": "platformer-background",
+      "pathTemplate": "working/backgrounds/{subjectId}/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/backgrounds/{subjectId}/{productionGroup}/{unitId}.png",
+      "qaChecks": ["native-dimensions", "alpha-policy", "horizontal-seam", "palette-complexity", "duplicate-candidate"],
+      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "edge-seam", "palette-contract-drift", "character-contrast-failure", "parallax-depth-drift", "duplicate-candidate"],
+      "promptFragments": ["one independent parallax layer", "horizontal continuation remains safe", "gameplay character stays legible", "depth role is unambiguous"]
+    },
+    "interface-icon": {
+      "kind": "interface-icon",
+      "nativeDimensions": {"width": 16, "height": 16},
+      "authoringCanvas": {"width": 64, "height": 64},
+      "alpha": "transparent",
+      "reviewPreset": "platformer-icon",
+      "pathTemplate": "working/interface/icons/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/interface/icons/{productionGroup}/{unitId}.png",
+      "qaChecks": ["native-dimensions", "rgba-alpha", "transparent-rgb", "palette-complexity", "duplicate-candidate"],
+      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "unsafe-transparent-rgb", "palette-contract-drift", "semantic-readability-failure", "duplicate-candidate"],
+      "promptFragments": ["one compact gameplay icon", "readable at native size", "transparent background", "no generated typography"]
+    },
+    "pickup-icon": {
+      "kind": "pickup-icon",
+      "nativeDimensions": {"width": 16, "height": 16},
+      "authoringCanvas": {"width": 64, "height": 64},
+      "alpha": "transparent",
+      "reviewPreset": "platformer-icon",
+      "pathTemplate": "working/pickups/{productionGroup}/{unitId}.png",
+      "masterPathTemplate": "masters/pickups/{productionGroup}/{unitId}.png",
+      "qaChecks": ["native-dimensions", "rgba-alpha", "transparent-rgb", "palette-complexity", "duplicate-candidate"],
+      "failureCodes": ["wrong-native-dimensions", "alpha-contamination", "unsafe-transparent-rgb", "palette-contract-drift", "semantic-readability-failure", "duplicate-candidate"],
+      "promptFragments": ["one collectible gameplay pickup", "strong native-size silhouette", "transparent background", "clear contrast against level art"]
+    }
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticApproval": false,
+    "automaticPromotion": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}

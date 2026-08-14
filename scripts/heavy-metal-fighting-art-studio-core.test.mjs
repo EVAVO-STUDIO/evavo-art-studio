@@ -1,3 +1,4 @@
+import "./game-art-production/profile-engine.test.mjs";
 import "./heavy-metal-fighting/mechanical-contract.test.mjs";
 import "./heavy-metal-fighting/combat-presentation-contract.test.mjs";
 import "./heavy-metal-fighting/sprite-production-census.test.mjs";
