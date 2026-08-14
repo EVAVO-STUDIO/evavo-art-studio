@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 const ROOT=path.resolve(HERE,"../..");
 const source=(p)=>readFile(path.join(ROOT,p),"utf8");
+const PYTHON=process.platform==="win32"?"python":"python3";
+const PYTHON_ENV={...process.env,PYTHONDONTWRITEBYTECODE:"1",PYTHONPYCACHEPREFIX:path.join(process.env.RUNNER_TEMP??process.env.TMPDIR??"/tmp","hmf-atlas-v3-builder-bytecode")};
+const PILLOW_AVAILABLE=spawnSync(PYTHON,["-c","import PIL"],{cwd:ROOT,encoding:"utf8",env:PYTHON_ENV}).status===0;
+
 test("atlas-v3 builder retains closed plan admission, exact source bytes and no-replace publication",async()=>{
  const [builder,common,contract,verifier]=await Promise.all([
   source("tools/build_heavy_metal_fighting_frame_atlas_v3.py"),
@@ -18,8 +22,13 @@ test("atlas-v3 builder retains closed plan admission, exact source bytes and no-
  assert.match(common,/MoveFileExW/);assert.match(common,/renameat2/);assert.match(common,/renamex_np/);assert.match(common,/O_NOFOLLOW/);assert.match(common,/st_nlink!=1/);
  assert.match(contract,/plan requires 224 sources/);assert.match(contract,/plan requires 26 batch evidence records/);assert.match(contract,/path substitution/);assert.match(contract,/source receipt evidence disagrees/);assert.match(contract,/atlas cell .* differs from source/);assert.match(contract,/targetRepositoryMutation/);assert.match(verifier,/skip-source-pixel-recheck/);
 });
-test("atlas-v3 Python build boundary regressions pass",()=>{
- const py=process.platform==="win32"?"python":"python3";
- const r=spawnSync(py,["scripts/heavy-metal-fighting/frame_atlas_v3_build_contract_test.py"],{cwd:ROOT,encoding:"utf8",env:{...process.env,PYTHONDONTWRITEBYTECODE:"1",PYTHONPYCACHEPREFIX:path.join(process.env.RUNNER_TEMP??process.env.TMPDIR??"/tmp","hmf-atlas-v3-builder-bytecode")}});
+
+test("atlas-v3 Python contract imports without the optional image runtime",()=>{
+ const r=spawnSync(PYTHON,["-c","import sys; sys.path.insert(0, 'scripts/heavy-metal-fighting'); import frame_atlas_v3_build_common, frame_atlas_v3_build_contract"],{cwd:ROOT,encoding:"utf8",env:PYTHON_ENV});
+ assert.equal(r.status,0,`stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
+});
+
+test("atlas-v3 Python build boundary regressions pass with the image runtime",{skip:!PILLOW_AVAILABLE},()=>{
+ const r=spawnSync(PYTHON,["scripts/heavy-metal-fighting/frame_atlas_v3_build_contract_test.py"],{cwd:ROOT,encoding:"utf8",env:PYTHON_ENV});
  assert.equal(r.status,0,`stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);assert.match(`${r.stdout}\n${r.stderr}`,/Ran 7 tests/);assert.match(`${r.stdout}\n${r.stderr}`,/OK/);
 });
