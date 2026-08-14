@@ -60,14 +60,15 @@ def stable_bytes(path:Path,label:str,root:Path,max_bytes:int=MAX,private:bool=Fa
         if not stat.S_ISREG(before.st_mode) or before.st_nlink!=1: fail(f"{label} must be one regular file link")
         if before.st_size>max_bytes: fail(f"{label} exceeds byte limit")
         if private and os.name!="nt" and stat.S_IMODE(before.st_mode)&0o077: fail(f"{label} must be private")
-        data=b""
-        while len(data)<=max_bytes:
-            chunk=os.read(fd,min(1024*1024,max_bytes+1-len(data)))
+        parts=[];total=0
+        while total<=max_bytes:
+            chunk=os.read(fd,min(1024*1024,max_bytes+1-total))
             if not chunk: break
-            data+=chunk
+            parts.append(chunk);total+=len(chunk)
+        if total>max_bytes: fail(f"{label} exceeds byte limit")
         after=os.fstat(fd)
         if (before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns)!=(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns): fail(f"{label} changed while read")
-        return data
+        return b"".join(parts)
     finally: os.close(fd)
 def read_plan(path:Path)->dict[str,Any]:
     path=path.absolute(); data=stable_bytes(path,"plan",path.parent,MAX)
@@ -89,19 +90,27 @@ def fsync_dir(path:Path)->None:
     finally: os.close(fd)
 def rename_noreplace(src:Path,dst:Path)->None:
     if os.name=="nt":
-        move=ctypes.windll.kernel32.MoveFileExW; move.argtypes=[ctypes.c_wchar_p,ctypes.c_wchar_p,ctypes.c_uint32]; move.restype=ctypes.c_int
+        kernel32=ctypes.WinDLL("kernel32",use_last_error=True)
+        move=kernel32.MoveFileExW; move.argtypes=[ctypes.c_wchar_p,ctypes.c_wchar_p,ctypes.c_uint32]; move.restype=ctypes.c_int
+        ctypes.set_last_error(0)
         if move(str(src),str(dst),0): return
         code=ctypes.get_last_error()
         if code in {80,183}: raise FileExistsError(str(dst))
-        raise OSError(code,os.strerror(code),str(dst))
+        raise ctypes.WinError(code)
     if sys_platform()=="linux":
-        libc=ctypes.CDLL(None,use_errno=True); fn=libc.renameat2; fn.argtypes=[ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint]; fn.restype=ctypes.c_int
+        libc=ctypes.CDLL(None,use_errno=True)
+        try: fn=libc.renameat2
+        except AttributeError: fail("Linux libc lacks atomic no-replace renameat2")
+        fn.argtypes=[ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint]; fn.restype=ctypes.c_int
         if fn(-100,os.fsencode(src),-100,os.fsencode(dst),1)==0:return
         code=ctypes.get_errno()
         if code==errno.EEXIST: raise FileExistsError(str(dst))
         raise OSError(code,os.strerror(code),str(dst))
     if sys_platform()=="darwin":
-        libc=ctypes.CDLL(None,use_errno=True); fn=libc.renamex_np; fn.argtypes=[ctypes.c_char_p,ctypes.c_char_p,ctypes.c_uint]; fn.restype=ctypes.c_int
+        libc=ctypes.CDLL(None,use_errno=True)
+        try: fn=libc.renamex_np
+        except AttributeError: fail("Darwin libc lacks atomic no-replace renamex_np")
+        fn.argtypes=[ctypes.c_char_p,ctypes.c_char_p,ctypes.c_uint]; fn.restype=ctypes.c_int
         if fn(os.fsencode(src),os.fsencode(dst),4)==0:return
         code=ctypes.get_errno()
         if code==errno.EEXIST: raise FileExistsError(str(dst))
@@ -109,4 +118,3 @@ def rename_noreplace(src:Path,dst:Path)->None:
     fail("platform lacks atomic no-replace directory rename")
 def sys_platform()->str:
     import sys; return sys.platform
-
