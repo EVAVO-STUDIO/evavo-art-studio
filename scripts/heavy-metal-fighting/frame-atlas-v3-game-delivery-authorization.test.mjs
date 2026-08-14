@@ -201,6 +201,7 @@ test("exact four-atlas evidence and exact game validation compile one read-only 
   assert.deepEqual(authorization.atlasBuilds.map((entry) => entry.frameId), FRAMES);
   assert.ok(authorization.atlasBuilds.every((entry) => /^[0-9a-f]{64}$/u.test(entry.buildVerificationSha256)));
   assert.equal(authorization.humanAuthorization.actorClass, "human");
+  assert.equal(authorization.checks.authorizationAfterReviewedEvidence, true);
   assert.equal(authorization.authority.evidenceAdmission, true);
   assert.equal(authorization.authority.namedHumanDeliveryAuthorization, true);
   assert.equal(authorization.authority.gameRepositoryMutation, false);
@@ -283,6 +284,15 @@ test("delivery authorization requires an explicit named-human authorized decisio
   assert.throws(
     () => compileHmfAtlasV3GameDeliveryAuthorization(incomplete),
     /fields must be exactly/,
+  );
+});
+
+test("named-human authorization cannot predate the game validation or reviewed style proof evidence", () => {
+  const early = inputs();
+  early.humanAuthorization.occurredAt = "2026-08-15T00:10:00.000Z";
+  assert.throws(
+    () => compileHmfAtlasV3GameDeliveryAuthorization(early),
+    /must be at or after the reviewed game-validation and style-proof evidence/,
   );
 });
 
