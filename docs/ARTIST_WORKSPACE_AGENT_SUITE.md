@@ -10,7 +10,7 @@ config/mcp.project-art-workspace.windows.example.json
 
 That one configuration now registers nine deliberately separate path-only servers.
 
-The compatibility history remains additive. V2 registered five deliberately separate path-only servers. V3 retained all five and added the provider-runtime bridge as the sixth. V4 retained all six and added strict provider-candidate materialization as the seventh. V5 retained all seven and added deterministic frame finishing and final-frame admission as the eighth. V6 retains all eight and adds reviewed sequence release sealing as the ninth.
+The compatibility history remains additive. V2 registers five deliberately separate path-only servers. V3 registers six deliberately separate path-only servers. V4 registers seven deliberately separate path-only servers. V5 registers eight deliberately separate path-only servers. V6 registers nine deliberately separate path-only servers. Each version retains every earlier server and adds only its new governed boundary.
 
 The v2 compatibility example keeps all five write gates set to `false`. The v3 compatibility example keeps all six write gates set to `false`. The v4 compatibility example keeps all seven write gates set to `false`. The v5 compatibility example keeps all eight write gates set to `false`. The current v6 canonical example keeps all nine write gates set to `false`.
 
