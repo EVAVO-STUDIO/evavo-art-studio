@@ -79,7 +79,10 @@ export const AVATAR_FINAL_PASS_AUTHORITY_KEYS = Object.freeze([
 const IDENTIFIER_PATTERN = /^[a-z0-9][a-z0-9._-]{0,95}$/u;
 const SHA1_PATTERN = /^[a-f0-9]{40}$/u;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
-const MATERIALIZATION_SCHEMA = 'evavo.avatar.art-materialization-manifest.v1';
+const MATERIALIZATION_SCHEMAS = new Set([
+  'evavo.avatar.art-materialization-manifest.v1',
+  'evavo.avatar.art-materialization-manifest.v2',
+]);
 const MAXIMUM_REQUEST_BYTES = 2 * 1024 * 1024;
 const MAXIMUM_FRAMES = 512;
 const MAXIMUM_SEQUENCES = 128;
@@ -355,7 +358,7 @@ function parseQualityGates(value) {
 }
 
 function parseMaterializationManifest(value, expectedPath, expectedSha256, sourceCommit) {
-  if (!isRecord(value) || value.schema !== MATERIALIZATION_SCHEMA) {
+  if (!isRecord(value) || !MATERIALIZATION_SCHEMAS.has(value.schema)) {
     fail('PROJECT_ART_AVATAR_FINAL_PASS_MANIFEST_INVALID');
   }
   if (
