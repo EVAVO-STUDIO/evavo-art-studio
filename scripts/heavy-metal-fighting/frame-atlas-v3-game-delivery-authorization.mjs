@@ -31,6 +31,7 @@ const BUILD_VERIFICATION_SCHEMA =
   "evavo.heavy-metal-fighting-frame-atlas-v3-build-verification.v1";
 const GAME_REPOSITORY = "EVAVO-STUDIO/steel-dominion";
 const GIT_SHA = /^[0-9a-f]{40}$/u;
+const UTC_TIMESTAMP = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,7}))?Z$/u;
 const BLOCKERS = Object.freeze([
   "focused-godot-atlas-v3-validation",
   "runtime-cutover-validation",
@@ -47,76 +48,31 @@ const INPUT_FIELDS = Object.freeze([
 const VERIFY_INPUT_FIELDS = Object.freeze([...INPUT_FIELDS, "authorization"]);
 const BUILD_EVIDENCE_FIELDS = Object.freeze(["frameId", "verification", "receipt"]);
 const VERIFICATION_FIELDS = Object.freeze([
-  "schema",
-  "status",
-  "frameId",
-  "planSha256",
-  "receiptSha256",
-  "imageSha256",
-  "exactSourcePixelsVerified",
-  "targetRepositoryMutation",
-  "gameActivationReady",
+  "schema", "status", "frameId", "planSha256", "receiptSha256", "imageSha256",
+  "exactSourcePixelsVerified", "targetRepositoryMutation", "gameActivationReady",
 ]);
 const BUILD_RECEIPT_FIELDS = Object.freeze([
-  "schema",
-  "projectId",
-  "frameId",
-  "contractId",
-  "planSha256",
-  "styleProofExecutionSha256",
-  "styleProofApproval",
-  "sourceCount",
-  "reservedSlotCount",
-  "outputs",
-  "gameTarget",
-  "gameActivationReady",
-  "gameActivationBlockers",
-  "authority",
-  "createOnlyOutput",
-  "atomicWorkspacePublication",
-  "sourceMutation",
-  "targetRepositoryMutation",
-  "gitMutation",
-  "publication",
-  "receiptSha256",
+  "schema", "projectId", "frameId", "contractId", "planSha256",
+  "styleProofExecutionSha256", "styleProofApproval", "sourceCount", "reservedSlotCount",
+  "outputs", "gameTarget", "gameActivationReady", "gameActivationBlockers", "authority",
+  "createOnlyOutput", "atomicWorkspacePublication", "sourceMutation",
+  "targetRepositoryMutation", "gitMutation", "publication", "receiptSha256",
 ]);
 const STYLE_PROOF_FIELDS = Object.freeze([
-  "id",
-  "actorClass",
-  "actorId",
-  "occurredAt",
-  "evidenceSha256",
+  "id", "actorClass", "actorId", "occurredAt", "evidenceSha256",
 ]);
 const RECEIPT_OUTPUT_FIELDS = Object.freeze(["image", "manifest"]);
 const RECEIPT_FILE_FIELDS = Object.freeze(["path", "sha256", "bytes"]);
 const GAME_TARGET_FIELDS = Object.freeze([
-  "repository",
-  "technicalId",
-  "contractId",
-  "imagePath",
-  "activationReady",
-  "activationBlockers",
+  "repository", "technicalId", "contractId", "imagePath", "activationReady", "activationBlockers",
 ]);
 const BUILD_AUTHORITY_FIELDS = Object.freeze([
-  "sourceRead",
-  "workspaceExportWrite",
-  "sourceMutation",
-  "candidateApproval",
-  "candidatePromotion",
-  "targetRepositoryMutation",
-  "gitMutation",
-  "deployment",
-  "publication",
-  "forcePush",
+  "sourceRead", "workspaceExportWrite", "sourceMutation", "candidateApproval", "candidatePromotion",
+  "targetRepositoryMutation", "gitMutation", "deployment", "publication", "forcePush",
   "namedHumanApprovalRequired",
 ]);
 const HUMAN_AUTHORIZATION_FIELDS = Object.freeze([
-  "actorId",
-  "occurredAt",
-  "decision",
-  "rationale",
-  "evidenceSha256",
-  "attestations",
+  "actorId", "occurredAt", "decision", "rationale", "evidenceSha256", "attestations",
 ]);
 const HUMAN_ATTESTATION_FIELDS = Object.freeze([
   "exactGameValidationAdmissionReviewed",
@@ -127,35 +83,16 @@ const HUMAN_ATTESTATION_FIELDS = Object.freeze([
   "noRepositoryMutationOrRuntimeActivationPerformed",
 ]);
 const AUTHORIZATION_FIELDS = Object.freeze([
-  "schema",
-  "protocolVersion",
-  "projectId",
-  "publicTitle",
-  "gameRepository",
-  "gameHead",
-  "gameValidationAdmissionSha256",
-  "atlasBuilds",
-  "humanAuthorization",
-  "checks",
-  "authority",
+  "schema", "protocolVersion", "projectId", "publicTitle", "gameRepository", "gameHead",
+  "gameValidationAdmissionSha256", "atlasBuilds", "humanAuthorization", "checks", "authority",
   "authorizationSha256",
 ]);
 const AUTHORIZED_BUILD_FIELDS = Object.freeze([
-  "frameId",
-  "planSha256",
-  "buildReceiptSha256",
-  "buildVerificationSha256",
-  "imageSha256",
-  "targetImagePath",
-  "styleProofExecutionSha256",
+  "frameId", "planSha256", "buildReceiptSha256", "buildVerificationSha256", "imageSha256",
+  "targetImagePath", "styleProofExecutionSha256",
 ]);
 const AUTHORIZATION_HUMAN_FIELDS = Object.freeze([
-  "actorClass",
-  "actorId",
-  "occurredAt",
-  "decision",
-  "rationale",
-  "evidenceSha256",
+  "actorClass", "actorId", "occurredAt", "decision", "rationale", "evidenceSha256",
 ]);
 const CHECK_FIELDS = Object.freeze([
   "exactGameValidationAdmission",
@@ -166,17 +103,12 @@ const CHECK_FIELDS = Object.freeze([
   "allBuildEvidenceCrossBound",
   "canonicalGameTargetPaths",
   "namedHumanDeliveryAuthorization",
+  "authorizationAfterReviewedEvidence",
   "runtimeActivationRemainsSeparate",
 ]);
 const AUTHORITY_FIELDS = Object.freeze([
-  "evidenceAdmission",
-  "namedHumanDeliveryAuthorization",
-  "gameRepositoryRead",
-  "gameRepositoryMutation",
-  "runtimeActivation",
-  "gitMutation",
-  "deployment",
-  "publication",
+  "evidenceAdmission", "namedHumanDeliveryAuthorization", "gameRepositoryRead",
+  "gameRepositoryMutation", "runtimeActivation", "gitMutation", "deployment", "publication",
   "forcePush",
 ]);
 
@@ -243,27 +175,24 @@ function captureInput(input, includeAuthorization = false) {
     typeof expectedGameHead === "string" && GIT_SHA.test(expectedGameHead),
     "expectedGameHead must be a 40-character lowercase Git commit SHA.",
   );
-  const atlasBuildEvidence = snapshotApprovalJson(
-    descriptors.atlasBuildEvidence.value,
-    "atlasBuildEvidence",
-    { maximumDepth: 16, maximumNodes: 4096, maximumBytes: 1024 * 1024 },
-  );
-  const humanAuthorization = snapshotApprovalJson(
-    descriptors.humanAuthorization.value,
-    "humanAuthorization",
-    { maximumDepth: 8, maximumNodes: 128, maximumBytes: 32 * 1024 },
-  );
-  const gameValidationAdmission = snapshotApprovalJson(
-    descriptors.gameValidationAdmission.value,
-    "gameValidationAdmission",
-    { maximumDepth: 16, maximumNodes: 4096, maximumBytes: 1024 * 1024 },
-  );
   const captured = {
-    gameValidationAdmission,
+    gameValidationAdmission: snapshotApprovalJson(
+      descriptors.gameValidationAdmission.value,
+      "gameValidationAdmission",
+      { maximumDepth: 16, maximumNodes: 4096, maximumBytes: 1024 * 1024 },
+    ),
     gameValidationReceiptBytes: copyReceiptBytes(descriptors.gameValidationReceiptBytes.value),
     expectedGameHead,
-    atlasBuildEvidence,
-    humanAuthorization,
+    atlasBuildEvidence: snapshotApprovalJson(
+      descriptors.atlasBuildEvidence.value,
+      "atlasBuildEvidence",
+      { maximumDepth: 16, maximumNodes: 4096, maximumBytes: 1024 * 1024 },
+    ),
+    humanAuthorization: snapshotApprovalJson(
+      descriptors.humanAuthorization.value,
+      "humanAuthorization",
+      { maximumDepth: 8, maximumNodes: 128, maximumBytes: 32 * 1024 },
+    ),
   };
   if (includeAuthorization) {
     captured.authorization = snapshotApprovalJson(
@@ -273,6 +202,17 @@ function captureInput(input, includeAuthorization = false) {
     );
   }
   return Object.freeze(captured);
+}
+
+function timestampMilliseconds(value, label) {
+  assert(typeof value === "string", `${label} must be a UTC timestamp.`);
+  const match = UTC_TIMESTAMP.exec(value);
+  assert(match, `${label} must be a UTC timestamp.`);
+  const milliseconds = (match[2] ?? "0").padEnd(3, "0").slice(0, 3);
+  const normalized = `${match[1]}.${milliseconds}Z`;
+  const instant = Date.parse(normalized);
+  assert(Number.isFinite(instant), `${label} must be a valid UTC timestamp.`);
+  return instant;
 }
 
 function validateHumanAuthorization(value) {
@@ -330,6 +270,8 @@ function validateBuildReceipt(receipt, frameId) {
       SHA256.test(receipt.styleProofApproval.evidenceSha256),
     `atlas build receipt ${frameId} style proof approval drifted.`,
   );
+  const styleProofOccurredAt = receipt.styleProofApproval.occurredAt;
+  timestampMilliseconds(styleProofOccurredAt, `atlas build receipt ${frameId} styleProofApproval.occurredAt`);
   assert(receipt.sourceCount === 224 && receipt.reservedSlotCount === 32, `atlas build receipt ${frameId} source counts drifted.`);
   assertExactApprovalKeys(receipt.outputs, RECEIPT_OUTPUT_FIELDS, `atlas build receipt ${frameId} outputs`);
   validateReceiptFile(receipt.outputs.image, `${frameId}.png`, `atlas build receipt ${frameId} outputs.image`);
@@ -356,16 +298,15 @@ function validateBuildReceipt(receipt, frameId) {
     assert(receipt.authority[key] === false, `atlas build receipt ${frameId} gained forbidden authority: ${key}.`);
   }
   for (const key of [
-    "gameActivationReady",
-    "sourceMutation",
-    "targetRepositoryMutation",
-    "gitMutation",
-    "publication",
+    "gameActivationReady", "sourceMutation", "targetRepositoryMutation", "gitMutation", "publication",
   ]) {
     assert(receipt[key] === false, `atlas build receipt ${frameId}.${key} must remain false.`);
   }
-  assert(receipt.createOnlyOutput === true && receipt.atomicWorkspacePublication === true, `atlas build receipt ${frameId} publication contract drifted.`);
-  return receipt;
+  assert(
+    receipt.createOnlyOutput === true && receipt.atomicWorkspacePublication === true,
+    `atlas build receipt ${frameId} publication contract drifted.`,
+  );
+  return freeze({ receipt, styleProofOccurredAt });
 }
 
 function validateBuildVerification(verification, receipt, frameId) {
@@ -384,12 +325,21 @@ function validateBuildVerification(verification, receipt, frameId) {
 
 function validateBuildEvidence(value) {
   assert(Array.isArray(value) && value.length === FRAMES.length, "atlasBuildEvidence must contain exactly four Frame entries.");
-  return freeze(value.map((entry, index) => {
+  let latestStyleProofMilliseconds = Number.NEGATIVE_INFINITY;
+  const atlasBuilds = value.map((entry, index) => {
     const frameId = FRAMES[index];
     assertExactApprovalKeys(entry, BUILD_EVIDENCE_FIELDS, `atlasBuildEvidence[${index}]`);
     assert(entry.frameId === frameId, `atlasBuildEvidence[${index}] must be ${frameId}.`);
-    const receipt = validateBuildReceipt(entry.receipt, frameId);
+    const admittedReceipt = validateBuildReceipt(entry.receipt, frameId);
+    const receipt = admittedReceipt.receipt;
     const verification = validateBuildVerification(entry.verification, receipt, frameId);
+    latestStyleProofMilliseconds = Math.max(
+      latestStyleProofMilliseconds,
+      timestampMilliseconds(
+        admittedReceipt.styleProofOccurredAt,
+        `atlas build receipt ${frameId} styleProofApproval.occurredAt`,
+      ),
+    );
     return freeze({
       frameId,
       planSha256: receipt.planSha256,
@@ -399,7 +349,8 @@ function validateBuildEvidence(value) {
       targetImagePath: receipt.gameTarget.imagePath,
       styleProofExecutionSha256: receipt.styleProofExecutionSha256,
     });
-  }));
+  });
+  return freeze({ atlasBuilds: freeze(atlasBuilds), latestStyleProofMilliseconds });
 }
 
 function authorizationAuthority() {
@@ -426,19 +377,29 @@ function validateAuthorizationShape(value, expectedGameHead = undefined) {
   selfHashed(authorization, "authorizationSha256", "HMF atlas-v3 game delivery authorization");
   assert(authorization.schema === HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_SCHEMA, "delivery authorization schema drifted.");
   assert(authorization.protocolVersion === HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_PROTOCOL_VERSION, "delivery authorization protocol drifted.");
-  assert(authorization.projectId === "heavy-metal-fighting" && authorization.publicTitle === "HEAVY METAL FIGHTING", "delivery authorization project identity drifted.");
+  assert(
+    authorization.projectId === "heavy-metal-fighting" && authorization.publicTitle === "HEAVY METAL FIGHTING",
+    "delivery authorization project identity drifted.",
+  );
   assert(authorization.gameRepository === GAME_REPOSITORY, "delivery authorization repository drifted.");
   assert(GIT_SHA.test(authorization.gameHead), "delivery authorization gameHead must be a Git SHA.");
-  if (expectedGameHead !== undefined) assert(authorization.gameHead === expectedGameHead, "delivery authorization gameHead drifted from expected game head.");
+  if (expectedGameHead !== undefined) {
+    assert(authorization.gameHead === expectedGameHead, "delivery authorization gameHead drifted from expected game head.");
+  }
   assert(SHA256.test(authorization.gameValidationAdmissionSha256), "delivery authorization game validation hash is invalid.");
   assert(Array.isArray(authorization.atlasBuilds) && authorization.atlasBuilds.length === 4, "delivery authorization must retain four atlas builds.");
   authorization.atlasBuilds.forEach((entry, index) => {
     assertExactApprovalKeys(entry, AUTHORIZED_BUILD_FIELDS, `delivery authorization atlasBuilds[${index}]`);
     assert(entry.frameId === FRAMES[index], `delivery authorization atlasBuilds[${index}] frame drifted.`);
-    for (const key of ["planSha256", "buildReceiptSha256", "buildVerificationSha256", "imageSha256", "styleProofExecutionSha256"]) {
+    for (const key of [
+      "planSha256", "buildReceiptSha256", "buildVerificationSha256", "imageSha256", "styleProofExecutionSha256",
+    ]) {
       assert(SHA256.test(entry[key]), `delivery authorization atlasBuilds[${index}].${key} must be a SHA-256.`);
     }
-    assert(entry.targetImagePath === `res://assets/fighters/final-v3/${entry.frameId}.png`, `delivery authorization atlasBuilds[${index}] target path drifted.`);
+    assert(
+      entry.targetImagePath === `res://assets/fighters/final-v3/${entry.frameId}.png`,
+      `delivery authorization atlasBuilds[${index}] target path drifted.`,
+    );
   });
   assertExactApprovalKeys(authorization.humanAuthorization, AUTHORIZATION_HUMAN_FIELDS, "delivery authorization humanAuthorization");
   assert(authorization.humanAuthorization.actorClass === "human", "delivery authorization must retain a human authorizer.");
@@ -448,7 +409,9 @@ function validateAuthorizationShape(value, expectedGameHead = undefined) {
   boundedString(authorization.humanAuthorization.rationale, "delivery authorization humanAuthorization.rationale", 12, 2000);
   assert(SHA256.test(authorization.humanAuthorization.evidenceSha256), "delivery authorization human evidence hash is invalid.");
   assertExactApprovalKeys(authorization.checks, CHECK_FIELDS, "delivery authorization checks");
-  for (const key of CHECK_FIELDS) assert(authorization.checks[key] === true, `delivery authorization check ${key} must remain true.`);
+  for (const key of CHECK_FIELDS) {
+    assert(authorization.checks[key] === true, `delivery authorization check ${key} must remain true.`);
+  }
   assertExactApprovalKeys(authorization.authority, AUTHORITY_FIELDS, "delivery authorization authority");
   assert(
     authorization.authority.evidenceAdmission === true &&
@@ -468,8 +431,19 @@ export function compileHmfAtlasV3GameDeliveryAuthorization(input) {
     receiptBytes: captured.gameValidationReceiptBytes,
     expectedGameHead: captured.expectedGameHead,
   });
-  const atlasBuilds = validateBuildEvidence(captured.atlasBuildEvidence);
+  const validatedBuildEvidence = validateBuildEvidence(captured.atlasBuildEvidence);
   const humanAuthorization = validateHumanAuthorization(captured.humanAuthorization);
+  const evidenceCompletedAt = Math.max(
+    timestampMilliseconds(
+      gameValidationAdmission.validationWindow.completedAtUtc,
+      "game validation admission validationWindow.completedAtUtc",
+    ),
+    validatedBuildEvidence.latestStyleProofMilliseconds,
+  );
+  assert(
+    timestampMilliseconds(humanAuthorization.occurredAt, "humanAuthorization.occurredAt") >= evidenceCompletedAt,
+    "humanAuthorization.occurredAt must be at or after the reviewed game-validation and style-proof evidence.",
+  );
   const body = {
     schema: HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_SCHEMA,
     protocolVersion: HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_PROTOCOL_VERSION,
@@ -478,7 +452,7 @@ export function compileHmfAtlasV3GameDeliveryAuthorization(input) {
     gameRepository: GAME_REPOSITORY,
     gameHead: captured.expectedGameHead,
     gameValidationAdmissionSha256: gameValidationAdmission.admissionSha256,
-    atlasBuilds,
+    atlasBuilds: validatedBuildEvidence.atlasBuilds,
     humanAuthorization,
     checks: {
       exactGameValidationAdmission: true,
@@ -489,6 +463,7 @@ export function compileHmfAtlasV3GameDeliveryAuthorization(input) {
       allBuildEvidenceCrossBound: true,
       canonicalGameTargetPaths: true,
       namedHumanDeliveryAuthorization: true,
+      authorizationAfterReviewedEvidence: true,
       runtimeActivationRemainsSeparate: true,
     },
     authority: authorizationAuthority(),
