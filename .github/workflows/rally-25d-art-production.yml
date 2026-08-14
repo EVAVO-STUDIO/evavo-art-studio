@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate rally art profile and 2D-to-3D handoff
+    name: Validate rally art profile, program and 2D-to-3D handoff
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Use repository Node version
         uses: actions/setup-node@v4
@@ -37,13 +38,14 @@ jobs:
           grep -F '"projectId": "isometric-rally-1990s"' \
             /tmp/game-art-profile-verification.json
 
-      - name: Run Rally 2.5D handoff tests
+      - name: Run Rally 2.5D handoff and program tests
         shell: bash
         run: |
           set -euo pipefail
           node --test \
             scripts/game-art-production/rally-25d-handoff.test.mjs \
-            | tee /tmp/rally-25d-art-handoff.log
+            scripts/game-art-production/rally-25d-program.test.mjs \
+            | tee /tmp/rally-25d-art-tests.log
 
       - name: Compile representative vehicle handoff
         shell: bash
@@ -68,6 +70,35 @@ jobs:
           grep -F '"automaticPromotion": false' \
             /tmp/falcon-rally-art-handoff.json
 
+      - name: Compile and verify playable vertical-slice program
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/game-art-production/rally-25d-program.mjs compile \
+            config/game-art-production/programs/rally-vertical-slice.v1.json \
+            --output /tmp/rally-vertical-slice.art-program.json \
+            > /tmp/rally-vertical-slice.art-program.stdout.json
+          node scripts/game-art-production/rally-25d-program.mjs verify \
+            /tmp/rally-vertical-slice.art-program.json \
+            | tee /tmp/rally-vertical-slice.art-program.verify.json
+          grep -F '"schema": "evavo.rally-art-program.v1"' \
+            /tmp/rally-vertical-slice.art-program.json
+          grep -F '"assets": 13' \
+            /tmp/rally-vertical-slice.art-program.json
+          grep -F '"status": "awaiting-art-production"' \
+            /tmp/rally-vertical-slice.art-program.json
+          grep -F '"downstreamProductionReady": false' \
+            /tmp/rally-vertical-slice.art-program.json
+          grep -F '"providerExecution": false' \
+            /tmp/rally-vertical-slice.art-program.json
+
+      - name: Prove validation leaves source clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
       - name: Upload validation receipts
         if: always()
         uses: actions/upload-artifact@v4
@@ -75,7 +106,9 @@ jobs:
           name: rally-25d-art-production-${{ github.sha }}
           path: |
             /tmp/game-art-profile-verification.json
-            /tmp/rally-25d-art-handoff.log
+            /tmp/rally-25d-art-tests.log
             /tmp/falcon-rally-art-handoff.json
+            /tmp/rally-vertical-slice.art-program.json
+            /tmp/rally-vertical-slice.art-program.verify.json
           if-no-files-found: warn
           retention-days: 14
