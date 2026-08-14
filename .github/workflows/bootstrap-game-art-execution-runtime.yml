@@ -1,0 +1,197 @@
+name: Bootstrap Game Art Execution Runtime
+
+on:
+  push:
+    branches:
+      - codex/game-art-execution-runtime-20260814
+    paths:
+      - ".bootstrap/game-art-runtime/**"
+      - ".github/workflows/bootstrap-game-art-execution-runtime.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-game-art-execution-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact transport commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reconstruct and verify exact payload archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/game-art-execution-runtime-payload.tar.gz"
+          cat \
+            .bootstrap/game-art-runtime/chunk-000 \
+            .bootstrap/game-art-runtime/chunk-001 \
+            .bootstrap/game-art-runtime/chunk-002 \
+            .bootstrap/game-art-runtime/chunk-003-0 \
+            .bootstrap/game-art-runtime/chunk-003-1 \
+            .bootstrap/game-art-runtime/chunk-004 \
+            .bootstrap/game-art-runtime/chunk-005 \
+            .bootstrap/game-art-runtime/chunk-006 \
+            .bootstrap/game-art-runtime/chunk-007 \
+            .bootstrap/game-art-runtime/chunk-008 \
+            .bootstrap/game-art-runtime/chunk-009 \
+            .bootstrap/game-art-runtime/chunk-010 \
+            .bootstrap/game-art-runtime/chunk-011 \
+            .bootstrap/game-art-runtime/chunk-012 \
+            .bootstrap/game-art-runtime/chunk-013 \
+            .bootstrap/game-art-runtime/chunk-014 \
+            .bootstrap/game-art-runtime/chunk-015 \
+            .bootstrap/game-art-runtime/chunk-016 \
+            .bootstrap/game-art-runtime/chunk-017 \
+            .bootstrap/game-art-runtime/chunk-018 \
+            .bootstrap/game-art-runtime/chunk-019 \
+            .bootstrap/game-art-runtime/chunk-020 \
+            .bootstrap/game-art-runtime/chunk-021 \
+            .bootstrap/game-art-runtime/chunk-022 \
+            .bootstrap/game-art-runtime/chunk-023 \
+            .bootstrap/game-art-runtime/chunk-024 \
+            .bootstrap/game-art-runtime/chunk-025 \
+            .bootstrap/game-art-runtime/chunk-026 \
+            .bootstrap/game-art-runtime/chunk-027 \
+            .bootstrap/game-art-runtime/chunk-028 \
+            .bootstrap/game-art-runtime/chunk-029 \
+            .bootstrap/game-art-runtime/chunk-030 \
+            .bootstrap/game-art-runtime/chunk-031 \
+            .bootstrap/game-art-runtime/chunk-032 \
+            .bootstrap/game-art-runtime/chunk-033 \
+            > "$archive"
+          printf '%s  %s\n' \
+            '8216420dcf8d5bfdfde1b41984d7786208d140b3b0e188ef3611b2de2353071e' \
+            "$archive" | sha256sum -c -
+
+      - name: Validate archive members and extract without links
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          import os
+          import tarfile
+
+          root = Path.cwd().resolve()
+          archive = Path(os.environ["RUNNER_TEMP"]) / "game-art-execution-runtime-payload.tar.gz"
+          allowed = {
+              ".github/workflows/game-art-production-profiles.yml",
+              "docs/GAME_ART_PRODUCTION_EXECUTION_RUNTIME.md",
+              "scripts/game-art-production/candidate-admission.mjs",
+              "scripts/game-art-production/execution-cli.mjs",
+              "scripts/game-art-production/execution-verification.mjs",
+              "scripts/game-art-production/index.mjs",
+              "scripts/game-art-production/lifecycle.mjs",
+              "scripts/game-art-production/profile-engine-execution.test.mjs",
+              "scripts/game-art-production/profile-engine.test.mjs",
+              "scripts/game-art-production/provider-runtime.mjs",
+              ".runtime-payload.sha256",
+          }
+          allowed_directories = {
+              ".github",
+              ".github/workflows",
+              "docs",
+              "scripts",
+              "scripts/game-art-production",
+          }
+          observed = set()
+          with tarfile.open(archive, "r:gz") as bundle:
+              for member in bundle.getmembers():
+                  raw_name = member.name
+                  if "\\" in raw_name or raw_name.startswith("/"):
+                      raise SystemExit(f"unsafe archive path: {raw_name!r}")
+                  name = raw_name
+                  while name.startswith("./"):
+                      name = name[2:]
+                  if name in {"", "."}:
+                      if member.isdir():
+                          continue
+                      raise SystemExit(f"unsafe archive member: {raw_name!r}")
+                  posix = PurePosixPath(name)
+                  if posix.is_absolute() or posix.as_posix() != name or any(part in {"", ".", ".."} for part in posix.parts):
+                      raise SystemExit(f"unsafe archive path: {raw_name!r}")
+                  if member.isdir():
+                      if name not in allowed_directories:
+                          raise SystemExit(f"unexpected archive directory: {raw_name!r}")
+                      continue
+                  if not member.isfile():
+                      raise SystemExit(f"non-regular archive member rejected: {raw_name!r}")
+                  if name not in allowed:
+                      raise SystemExit(f"unexpected archive member: {raw_name!r}")
+                  destination = (root / Path(*posix.parts)).resolve()
+                  if destination != root and root not in destination.parents:
+                      raise SystemExit(f"archive member escaped repository: {raw_name!r}")
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  source = bundle.extractfile(member)
+                  if source is None:
+                      raise SystemExit(f"archive member has no bytes: {raw_name!r}")
+                  with destination.open("wb") as output:
+                      output.write(source.read())
+                  destination.chmod(member.mode & 0o777)
+                  observed.add(name)
+          if observed != allowed:
+              missing = sorted(allowed - observed)
+              extra = sorted(observed - allowed)
+              raise SystemExit(f"archive member set drifted; missing={missing}, extra={extra}")
+          PY
+
+      - name: Verify exact target file hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c .runtime-payload.sha256
+          rm -f .runtime-payload.sha256
+
+      - name: Run focused reusable execution validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/game-art-production/lifecycle.mjs
+          node --check scripts/game-art-production/provider-runtime.mjs
+          node --check scripts/game-art-production/candidate-admission.mjs
+          node --check scripts/game-art-production/execution-verification.mjs
+          node --check scripts/game-art-production/execution-cli.mjs
+          node --check scripts/game-art-production/index.mjs
+          node --check scripts/game-art-production/profile-engine-execution.test.mjs
+          node --check scripts/game-art-production/profile-engine.test.mjs
+          node --test scripts/game-art-production/profile-engine.test.mjs
+          node scripts/game-art-production/execution-cli.mjs verify
+          git diff --check
+
+      - name: Replace transport commit with exact feature files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .bootstrap/game-art-runtime
+          rmdir .bootstrap 2>/dev/null || true
+          rm -f .github/workflows/bootstrap-game-art-execution-runtime.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- \
+            .bootstrap \
+            .github/workflows/bootstrap-game-art-execution-runtime.yml \
+            .github/workflows/game-art-production-profiles.yml \
+            docs/GAME_ART_PRODUCTION_EXECUTION_RUNTIME.md \
+            scripts/game-art-production/candidate-admission.mjs \
+            scripts/game-art-production/execution-cli.mjs \
+            scripts/game-art-production/execution-verification.mjs \
+            scripts/game-art-production/index.mjs \
+            scripts/game-art-production/lifecycle.mjs \
+            scripts/game-art-production/profile-engine-execution.test.mjs \
+            scripts/game-art-production/profile-engine.test.mjs \
+            scripts/game-art-production/provider-runtime.mjs
+
+          git diff --cached --check
+          test -z "$(git status --porcelain=v1 --untracked-files=all | grep -v '^M  ' | grep -v '^A  ' | grep -v '^D  ' || true)"
+          git commit -m "feat(game-art): add reusable execution runtime" -m "Add profile-driven lifecycle receipts, provider submission authorization and dispatch, actual provider-runtime binding, candidate inspection, create-only scratch admission, bounded repair, and deterministic resume across fighter, platformer, rally and high-definition profiles." -m "Preserve one-candidate/no-fallback behavior, human gates, semantic revalidation and all no-execution/no-approval/no-promotion/no-target-repository/no-Git/no-deployment/no-publication authority boundaries."
+          git push origin "HEAD:${GITHUB_REF_NAME}"
