@@ -175,23 +175,25 @@ function compileFixture(options = {}) {
     const batch = compileNextArtProductionBatch(plan, loop);
     assert.equal(batch.status, "jobs-ready");
     assert.ok(batch.jobs.length > 0);
-    for (const job of batch.jobs) {
+    const scheduledAttempts = batch.jobs.map((job) => {
       const bytes = sourceBytesByUnit.get(job.unitId);
-      loop = evaluateArtProductionAttempt(
-        plan,
+      return attempt(
         loop,
-        attempt(
-          loop,
-          plan,
-          job.unitId,
-          bytes
-            ? {
-                candidateSha256: byteDigest(bytes),
-                candidateBytes: bytes.length,
-              }
-            : {},
-        ),
+        plan,
+        job.unitId,
+        bytes
+          ? {
+              candidateSha256: byteDigest(bytes),
+              candidateBytes: bytes.length,
+            }
+          : {},
       );
+    });
+    for (const scheduledAttempt of scheduledAttempts) {
+      loop = evaluateArtProductionAttempt(plan, loop, {
+        ...scheduledAttempt,
+        loopSha256: loop.loopSha256,
+      });
     }
   }
 
@@ -270,7 +272,7 @@ const canonicalReceipt = compileArtProductionSourceAdmissionReceipt(
 );
 
 test("admits exact caller-supplied PNG bytes against the governed runtime handoff", () => {
-  assert.equal(canonicalReceipt.protocolVersion, "2026-08-14.4");
+  assert.equal(canonicalReceipt.protocolVersion, "2026-08-15.1");
   assert.equal(
     canonicalReceipt.kind,
     "evavo.art-production.source-admission.receipt",

@@ -1,15 +1,27 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import process from "node:process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   admitHmfAtlasV3GameValidationReceipt,
   HMF_ATLAS_V3_GAME_VALIDATION_ADMISSION_SCHEMA,
+  HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES,
   REQUIRED_GAME_VALIDATION_SUITES,
   verifyHmfAtlasV3GameValidationAdmission,
 } from "./frame-atlas-v3-game-validation-admission.mjs";
 import { hashBytes, hashValue } from "./frame-body-named-human-approval-common.mjs";
 
 const HEAD = "723b6b6954e67c08ed337fad62c5ef2e10536234";
+const CLI_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "heavy-metal-fighting-frame-atlas-v3.mjs",
+);
 
 function timestamp(second) {
   return `2026-08-14T10:00:${String(second).padStart(2, "0")}.0000000Z`;
@@ -147,6 +159,15 @@ test("validation and suite timestamp windows are chronological and duration-boun
   escaped.suites[5].completed_at_utc = timestamp(13);
   escaped.suites[5].duration_seconds = 3;
   assert.throws(() => admit(escaped), /escaped the overall validation window/);
+
+  const overlapping = receipt();
+  overlapping.suites[1].started_at_utc = timestamp(0);
+  overlapping.suites[1].completed_at_utc = timestamp(1);
+  overlapping.suites[1].duration_seconds = 1;
+  assert.throws(
+    () => admit(overlapping),
+    /started before the previous required suite completed/,
+  );
 });
 
 test("admission input rejects accessors without invocation and rejects proxies", () => {
@@ -164,6 +185,16 @@ test("admission input rejects accessors without invocation and rejects proxies",
 
   const proxy = new Proxy({ receiptBytes: bytes(), expectedGameHead: HEAD }, {});
   assert.throws(() => admitHmfAtlasV3GameValidationReceipt(proxy), /may not be a Proxy/);
+
+  const proxiedBytes = new Proxy(new Uint8Array(bytes()), {});
+  assert.throws(
+    () =>
+      admitHmfAtlasV3GameValidationReceipt({
+        receiptBytes: proxiedBytes,
+        expectedGameHead: HEAD,
+      }),
+    /receiptBytes may not be a Proxy/,
+  );
 });
 
 test("receipt bytes are privately owned and bounded", () => {
@@ -173,11 +204,50 @@ test("receipt bytes are privately owned and bounded", () => {
   source.fill(0);
   assert.equal(admission.sourceReceipt.byteSha256, expectedDigest);
 
-  const oversized = Buffer.alloc(1024 * 1024 + 1, 0x20);
+  const oversized = Buffer.alloc(
+    HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES + 1,
+    0x20,
+  );
   assert.throws(
     () => admitHmfAtlasV3GameValidationReceipt({ receiptBytes: oversized, expectedGameHead: HEAD }),
     /exceeds the admitted byte bounds/,
   );
+});
+
+test("CLI rejects an oversized validation receipt before reading it into memory", () => {
+  const temporaryDirectory = mkdtempSync(
+    path.join(tmpdir(), "hmf-atlas-v3-validation-admission-"),
+  );
+  try {
+    const oversizedPath = path.join(temporaryDirectory, "oversized.json");
+    writeFileSync(
+      oversizedPath,
+      Buffer.alloc(
+        HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES + 1,
+        0x20,
+      ),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        CLI_PATH,
+        "admit-game-validation",
+        "--validation-receipt",
+        oversizedPath,
+        "--expected-game-head",
+        HEAD,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.match(
+      result.stderr,
+      /--validation-receipt must be between 1 and 1048576 bytes before reading/,
+    );
+  } finally {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
 });
 
 test("verifier rejects retained-hash authority or head mutation", () => {

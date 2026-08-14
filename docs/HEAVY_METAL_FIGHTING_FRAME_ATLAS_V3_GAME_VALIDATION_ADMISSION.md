@@ -78,7 +78,7 @@ handoff-tooling
   run_final_asset_handoff_tooling_tests.ps1
 ```
 
-Every suite must have status `passed`, no error, a chronological UTC window inside the overall validation window, and a duration matching that window.
+Every suite must have status `passed`, no error, a chronological UTC window inside the overall validation window, and a duration matching that window. Because the game-side gate executes the array serially, each suite must start at or after the preceding required suite completed; overlapping or time-reversed sibling records are rejected.
 
 ## Input hardening
 
@@ -89,7 +89,7 @@ receiptBytes
 expectedGameHead
 ```
 
-The input object may not be a Proxy, contain accessors, symbols, extra fields, shared-memory receipt bytes, or an oversized receipt. The receipt bytes are copied before parsing so later caller mutation cannot alter the admitted evidence.
+The input object may not be a Proxy, contain accessors, symbols, extra fields, shared-memory receipt bytes, proxied byte views, or an oversized receipt. The receipt bytes are copied before parsing so later caller mutation cannot alter the admitted evidence.
 
 The parsed receipt is also admitted through the existing bounded immutable JSON snapshot boundary before semantic validation.
 
@@ -146,6 +146,8 @@ node scripts\heavy-metal-fighting-frame-atlas-v3.mjs admit-game-validation `
   --validation-receipt C:\ValidationEvidence\hmf-atlas-v3.json `
   --expected-game-head <40-char-head-from-that-validation-receipt>
 ```
+
+The command opens `--validation-receipt` read-only, requires a regular file between 1 byte and 1 MiB before allocating or reading it, reads exactly the observed size, probes for growth, and rechecks the file size before admission. Empty files, directories, oversized files, truncation, and growth during the bounded read are rejected.
 
 The command prints the self-hashed admission JSON to stdout. It does not write either repository.
 

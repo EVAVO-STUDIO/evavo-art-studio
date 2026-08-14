@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-art-local-model-stack",
+  "storagePlanner": "EVAVO-STUDIO/evavo-local-storage#storage.ai_plan",
+  "image": {
+    "production": "FLUX.2-klein-4B",
+    "fineTune": "FLUX.2-klein-4B-Base",
+    "localVramClassGiB": 8,
+    "capabilities": ["text-to-image", "single-reference editing", "multi-reference editing", "LoRA/customisation"]
+  },
+  "styleProfiles": {
+    "cel-1990s-cyberpunk": {
+      "promptGrammar": "1990s hand-painted cyberpunk cel-animation grammar, hard ink linework, restrained cel shading, painted background, period colour design, analog composite texture",
+      "trainingData": "owned/licensed/public-domain only",
+      "consistency": ["character sheets", "multi-reference editing", "pose references", "palette locks", "seed/config manifests", "authorised character/style LoRA"]
+    },
+    "dos-vga-sprite": {
+      "postProcess": ["fixed canvas", "indexed palette", "nearest-neighbour", "no antialiasing", "pixel cluster validation", "sprite sheet validation"]
+    },
+    "arcade-1990s-fighter": {
+      "promptGrammar": "1990s arcade fighting-game pixel-art grammar, strong silhouette, hand-pixelled highlight clusters, constrained indexed palette",
+      "postProcess": ["fixed pose boxes", "palette lock", "pixel-grid quantisation", "frame anatomy consistency"]
+    }
+  },
+  "animation": {
+    "localPrimary": "keyframe generation + reference-controlled inbetweens + deterministic line/palette stabilisation + ffmpeg assembly",
+    "longVideo": "burst",
+    "burstCandidates": ["HunyuanVideo-1.5", "Wan2.2", "LTX-class"],
+    "reason": "current flagship video routes document VRAM above the 12 GiB local target"
+  },
+  "storage": {
+    "hotModels": "local-ai-cache",
+    "canonicalModels": "bee://primary/AI/Models/Art",
+    "datasets": "bee://primary/AI/Datasets/Art",
+    "outputs": "bee://primary/AI/Outputs/Art",
+    "fineTunes": "bee://primary/AI/FineTunes/Art",
+    "durableMilestones": "evavo-storage",
+    "coldHydration": "online-only-after-independent-remote-attestation"
+  },
+  "quality": ["exact source/reference hashes", "character consistency", "palette/style profile checks", "alpha/dimension checks", "human creative review before canonical promotion"]
+}

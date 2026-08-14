@@ -19,7 +19,8 @@ export const HMF_ATLAS_V3_GAME_VALIDATION_ADMISSION_SCHEMA =
   "evavo.heavy-metal-fighting-atlas-v3-game-validation-admission.v1";
 export const HMF_ATLAS_V3_GAME_VALIDATION_ADMISSION_PROTOCOL_VERSION = "2026-08-15.1";
 
-const MAXIMUM_RECEIPT_BYTES = 1024 * 1024;
+export const HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES =
+  1024 * 1024;
 const GIT_SHA = /^[0-9a-f]{40}$/u;
 const SAFE_BRANCH = /^(?:detached-head|[A-Za-z0-9][A-Za-z0-9._/-]{0,254})$/u;
 const GODOT_462 = /^4\.6\.2(?:[.+ -]|$)/u;
@@ -155,11 +156,18 @@ function inspectOrdinaryInput(input, expectedNames, label) {
 }
 
 function copyReceiptBytes(source) {
+  if (source && typeof source === "object" && utilTypes.isProxy(source)) {
+    fail("receiptBytes may not be a Proxy.");
+  }
   assert(Buffer.isBuffer(source) || source instanceof Uint8Array, "receiptBytes must be a Buffer or Uint8Array.");
   if (typeof SharedArrayBuffer !== "undefined") {
     assert(!(source.buffer instanceof SharedArrayBuffer), "receiptBytes may not use shared memory.");
   }
-  assert(source.byteLength >= 1 && source.byteLength <= MAXIMUM_RECEIPT_BYTES, "receiptBytes exceeds the admitted byte bounds.");
+  assert(
+    source.byteLength >= 1 &&
+      source.byteLength <= HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES,
+    "receiptBytes exceeds the admitted byte bounds.",
+  );
   return Buffer.from(source);
 }
 
@@ -184,7 +192,11 @@ function captureVerificationInput(input) {
   const admission = snapshotApprovalJson(
     descriptors.admission.value,
     "submitted HMF atlas-v3 game validation admission",
-    { maximumDepth: 16, maximumNodes: 4096, maximumBytes: MAXIMUM_RECEIPT_BYTES },
+    {
+      maximumDepth: 16,
+      maximumNodes: 4096,
+      maximumBytes: HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES,
+    },
   );
   return Object.freeze({
     admission,
@@ -212,7 +224,7 @@ function decodeReceipt(bytes) {
   return snapshotApprovalJson(parsed, "steel-dominion atlas-v3 local validation receipt", {
     maximumDepth: 16,
     maximumNodes: 4096,
-    maximumBytes: MAXIMUM_RECEIPT_BYTES,
+    maximumBytes: HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES,
   });
 }
 
@@ -259,6 +271,7 @@ function validateReceipt(receipt, expectedGameHead) {
   assert(receipt.completed_suite_count === REQUIRED_GAME_VALIDATION_SUITES.length, "validation receipt completed_suite_count must be six.");
   assert(Array.isArray(receipt.suites) && receipt.suites.length === REQUIRED_GAME_VALIDATION_SUITES.length, "validation receipt must contain exactly six suites.");
 
+  let previousSuiteCompleted = started;
   const admittedSuites = receipt.suites.map((suite, index) => {
     const expected = REQUIRED_GAME_VALIDATION_SUITES[index];
     assertExactApprovalKeys(suite, SUITE_FIELDS, `validation receipt suites[${index}]`);
@@ -268,8 +281,13 @@ function validateReceipt(receipt, expectedGameHead) {
     const suiteCompleted = timestampMilliseconds(suite.completed_at_utc, `validation receipt suite ${suite.id} completed_at_utc`);
     assert(suiteCompleted >= suiteStarted, `validation receipt suite ${suite.id} completed before it started.`);
     assert(suiteStarted >= started && suiteCompleted <= completed, `validation receipt suite ${suite.id} escaped the overall validation window.`);
+    assert(
+      suiteStarted >= previousSuiteCompleted,
+      `validation receipt suite ${suite.id} started before the previous required suite completed.`,
+    );
     const suiteDuration = durationSeconds(suite.duration_seconds, `validation receipt suite ${suite.id} duration_seconds`);
     assertDurationMatches(suiteStarted, suiteCompleted, suiteDuration, `validation receipt suite ${suite.id} duration_seconds`);
+    previousSuiteCompleted = suiteCompleted;
     return freeze({
       id: suite.id,
       runner: suite.runner,
@@ -312,7 +330,7 @@ function validateAdmissionShape(value, expectedGameHead = undefined) {
   const admission = snapshotApprovalJson(value, "HMF atlas-v3 game validation admission", {
     maximumDepth: 16,
     maximumNodes: 4096,
-    maximumBytes: MAXIMUM_RECEIPT_BYTES,
+    maximumBytes: HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES,
   });
   assertExactApprovalKeys(admission, ADMISSION_FIELDS, "HMF atlas-v3 game validation admission");
   selfHashed(admission, "admissionSha256", "HMF atlas-v3 game validation admission");
@@ -327,7 +345,13 @@ function validateAdmissionShape(value, expectedGameHead = undefined) {
 
   assertExactApprovalKeys(admission.sourceReceipt, SOURCE_RECEIPT_FIELDS, "game validation admission sourceReceipt");
   assert(admission.sourceReceipt.schema === STEEL_DOMINION_ATLAS_V3_LOCAL_VALIDATION_SCHEMA, "game validation admission source receipt schema drifted.");
-  assert(Number.isInteger(admission.sourceReceipt.bytes) && admission.sourceReceipt.bytes >= 1 && admission.sourceReceipt.bytes <= MAXIMUM_RECEIPT_BYTES, "game validation admission source receipt byte count drifted.");
+  assert(
+    Number.isInteger(admission.sourceReceipt.bytes) &&
+      admission.sourceReceipt.bytes >= 1 &&
+      admission.sourceReceipt.bytes <=
+        HMF_ATLAS_V3_GAME_VALIDATION_MAXIMUM_RECEIPT_BYTES,
+    "game validation admission source receipt byte count drifted.",
+  );
   assert(SHA256.test(admission.sourceReceipt.byteSha256) && SHA256.test(admission.sourceReceipt.canonicalSha256), "game validation admission source receipt hashes are invalid.");
 
   assertExactApprovalKeys(admission.validationWindow, VALIDATION_WINDOW_FIELDS, "game validation admission validationWindow");

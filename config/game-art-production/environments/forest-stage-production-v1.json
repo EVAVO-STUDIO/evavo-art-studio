@@ -1,0 +1,240 @@
+{
+  "schema": "evavo.rally-forest-visual-development.v1",
+  "protocolVersion": "2026-08-15.2",
+  "assetId": "forest-stage-production-v1",
+  "subjectId": "forest-stage",
+  "title": "Forest Rally canonical playable stage",
+  "style": {
+    "projectionFamily": "fixed-isometric-2-5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "environmentLanguage": "A fast, readable temperate forest rally stage with rolling terrain, broad dirt and gravel roads, deliberate corner silhouettes, wet-weather variants and strong foreground-to-background value separation.",
+    "palette": [
+      "#101711",
+      "#2f4a33",
+      "#607554",
+      "#84735a",
+      "#b09a73",
+      "#d6ccb8",
+      "#53666d",
+      "#272c2b"
+    ],
+    "surfaceLanguage": [
+      "broad hand-painted terrain value groups",
+      "readable road edges and shoulders",
+      "restrained physically based response",
+      "clear dry wet mud and water states",
+      "limited repeated texture noise",
+      "tree and rock silhouettes readable from the fixed camera"
+    ],
+    "forbidden": [
+      "photogrammetry noise",
+      "hyper-real forest clutter",
+      "tiny unreadable signage",
+      "modern motorway infrastructure",
+      "baked directional shadows",
+      "contact sheets",
+      "multi-panel image layouts",
+      "multiple unrelated locations in one image"
+    ]
+  },
+  "cameraLocks": {
+    "heroYawDegrees": 35,
+    "heroPitchDegrees": 28,
+    "topPlanPitchDegrees": 90,
+    "focalLengthMm": 70,
+    "consistentRoadWidth": true,
+    "consistentTerrainScale": true,
+    "consistentVegetationScale": true
+  },
+  "jobs": [
+    {
+      "id": "forest-stage-identity-dry",
+      "role": "identity-master",
+      "view": "isometric-wide",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": [],
+      "include": ["single coherent dry forest rally stage", "rolling terrain", "dirt and gravel road", "readable corners", "tree-line depth"],
+      "exclude": ["cars", "spectators", "rain", "night", "multiple locations"]
+    },
+    {
+      "id": "forest-stage-identity-wet",
+      "role": "identity-continuity",
+      "view": "isometric-wide",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["forest-stage-identity-dry"],
+      "include": ["same exact stage identity", "wet road", "mud patches", "light mist", "water sheen", "darker foliage"],
+      "exclude": ["different road layout", "night", "cars", "spectators", "storm destruction"]
+    },
+    {
+      "id": "forest-stage-road-plan",
+      "role": "world-composition",
+      "view": "top",
+      "phase": "layout",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["forest-stage-identity-dry"],
+      "include": ["single top-plan road route", "clear start and finish extents", "hairpin", "fast sweeper", "bridge approach", "consistent road width"],
+      "exclude": ["perspective convergence", "labels", "dimensions", "multiple route alternatives", "decorative border"]
+    },
+    {
+      "id": "forest-stage-road-cross-section",
+      "role": "terrain-modeling-reference",
+      "view": "side",
+      "phase": "layout",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["forest-stage-road-plan"],
+      "include": ["single road cross-section", "crown", "gravel shoulder", "ditch", "bank", "consistent scale"],
+      "exclude": ["readable labels", "multiple cross-sections", "perspective", "vehicles", "buildings"]
+    },
+    {
+      "id": "forest-stage-material-dirt-gravel",
+      "role": "terrain-material-reference",
+      "view": "material-detail",
+      "phase": "materials",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["forest-stage-identity-dry"],
+      "include": ["dry compacted dirt", "loose gravel shoulder", "wheel polish zones", "stone size hierarchy", "broad stylized color groups"],
+      "exclude": ["text labels", "photoreal scan", "baked shadows", "full landscape", "tyre tracks"]
+    },
+    {
+      "id": "forest-stage-material-mud-water",
+      "role": "terrain-material-reference",
+      "view": "material-detail",
+      "phase": "materials",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["forest-stage-identity-wet"],
+      "include": ["wet dirt", "mud", "shallow puddle", "water edge", "controlled reflections", "broad stylized color groups"],
+      "exclude": ["text labels", "photoreal scan", "deep ocean water", "full landscape", "vehicles"]
+    },
+    {
+      "id": "forest-stage-material-grass-ground",
+      "role": "terrain-material-reference",
+      "view": "material-detail",
+      "phase": "materials",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["forest-stage-identity-dry"],
+      "include": ["forest grass", "needle litter", "exposed soil", "moss patches", "readable tiling rhythm"],
+      "exclude": ["text labels", "photoreal scan", "dense flowers", "full landscape", "large rocks"]
+    },
+    {
+      "id": "forest-stage-material-rock-bank",
+      "role": "terrain-material-reference",
+      "view": "material-detail",
+      "phase": "materials",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["forest-stage-identity-dry"],
+      "include": ["weathered rock", "cut bank", "moss edge", "dirt transition", "broad stylized planes"],
+      "exclude": ["text labels", "photoreal scan", "crystal formations", "full mountain", "snow"]
+    },
+    {
+      "id": "forest-stage-tree-conifer",
+      "role": "foliage-modeling-reference",
+      "view": "front-three-quarter",
+      "phase": "foliage",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["forest-stage-identity-dry"],
+      "include": ["single stylized mature conifer", "clear trunk", "layered branch masses", "gameplay-scale silhouette", "true transparent background"],
+      "exclude": ["forest scene", "multiple trees", "labels", "cast shadow", "photoreal needles"]
+    },
+    {
+      "id": "forest-stage-tree-deciduous",
+      "role": "foliage-modeling-reference",
+      "view": "front-three-quarter",
+      "phase": "foliage",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["forest-stage-identity-dry"],
+      "include": ["single stylized mature deciduous tree", "clear trunk", "broad leaf masses", "gameplay-scale silhouette", "true transparent background"],
+      "exclude": ["forest scene", "multiple trees", "labels", "cast shadow", "photoreal leaves"]
+    },
+    {
+      "id": "forest-stage-shrub-fern",
+      "role": "foliage-modeling-reference",
+      "view": "front-three-quarter",
+      "phase": "foliage",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["forest-stage-material-grass-ground"],
+      "include": ["single clustered forest shrub and fern module", "clear ground contact", "broad leaf groups", "true transparent background"],
+      "exclude": ["full forest", "multiple separate modules", "labels", "cast shadow", "flowers"]
+    },
+    {
+      "id": "forest-stage-edge-module",
+      "role": "world-composition",
+      "view": "isometric-wide",
+      "phase": "assembly",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["forest-stage-tree-conifer", "forest-stage-tree-deciduous", "forest-stage-shrub-fern", "forest-stage-road-cross-section"],
+      "include": ["single reusable road-edge module", "bank", "ditch", "mixed tree line", "rocks", "clear road shoulder"],
+      "exclude": ["cars", "spectators", "buildings", "multiple modules", "night"]
+    },
+    {
+      "id": "forest-stage-creek-crossing",
+      "role": "world-composition",
+      "view": "isometric-wide",
+      "phase": "assembly",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["forest-stage-material-mud-water", "forest-stage-road-plan"],
+      "include": ["single shallow creek crossing", "approach road", "wet stones", "water edge", "clear collision silhouette"],
+      "exclude": ["large bridge", "boats", "people", "multiple crossings", "waterfall"]
+    },
+    {
+      "id": "forest-stage-weather-rain-fog",
+      "role": "runtime-shader-reference",
+      "view": "isometric-wide",
+      "phase": "weather",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": ["forest-stage-identity-wet", "forest-stage-edge-module", "forest-stage-creek-crossing"],
+      "include": ["same exact forest stage identity", "rain atmosphere", "low fog", "wet surfaces", "headlight-safe contrast", "readable road"],
+      "exclude": ["night", "lightning", "snow", "different route", "cars"]
+    }
+  ],
+  "output": {
+    "workingRoot": "working/rally/environments/forest-stage/visual-development-v1",
+    "masterRoot": "masters/rally/environments/forest-stage/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}

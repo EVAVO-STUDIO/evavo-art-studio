@@ -688,6 +688,14 @@ function createQualityJob(frame, qualityGates) {
       'frame-to-frame-jitter',
     ]),
     thresholds: qualityGates,
+    automatedAssurance: Object.freeze({
+      schema: 'evavo.project-art-avatar-frame-assurance.v1',
+      minimumIndependentInspectors: 2,
+      minimumConfidence: 0.9,
+      uncertainDisposition: 'quarantine',
+      sourceIdentityMustMatch: true,
+      candidateApproval: false,
+    }),
     manualReviewRequired: true,
     candidateApproval: false,
   });
@@ -903,6 +911,7 @@ export function compileProjectArtAvatarFinalPass({
   if (repairJobs.some((job) => job.mode === 'provider-redraw')) blockers.push('provider-redraw-review-required');
   if (inbetweenJobs.length > 0) blockers.push('inbetween-review-required');
   blockers.push('independent-art-review-required');
+  blockers.push('automated-frame-assurance-required');
   blockers.push('independent-animation-review-required');
   blockers.push('independent-runtime-review-required');
   blockers.push('loop-closure-evidence-required-for-loops');
