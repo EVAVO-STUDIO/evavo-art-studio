@@ -1,0 +1,29 @@
+name: EVA avatar provider capability probe
+
+on:
+  push:
+    branches:
+      - agent/eva-avatar-art-production-v2
+    paths:
+      - .github/workflows/eva-avatar-provider-capability-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Report bounded provider availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${OPENAI_API_KEY:-}" ]; then
+            echo "EVA_PROVIDER_AVAILABLE=true"
+          else
+            echo "EVA_PROVIDER_AVAILABLE=false"
+            exit 3
+          fi
