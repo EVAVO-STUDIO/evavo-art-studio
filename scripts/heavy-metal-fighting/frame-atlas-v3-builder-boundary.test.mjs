@@ -9,7 +9,6 @@ const ROOT=path.resolve(HERE,"../..");
 const source=(p)=>readFile(path.join(ROOT,p),"utf8");
 const PYTHON=process.platform==="win32"?"python":"python3";
 const PYTHON_ENV={...process.env,PYTHONDONTWRITEBYTECODE:"1",PYTHONPYCACHEPREFIX:path.join(process.env.RUNNER_TEMP??process.env.TMPDIR??"/tmp","hmf-atlas-v3-builder-bytecode")};
-const PILLOW_AVAILABLE=spawnSync(PYTHON,["-c","import PIL"],{cwd:ROOT,encoding:"utf8",env:PYTHON_ENV}).status===0;
 
 test("atlas-v3 builder retains closed plan admission, exact source bytes and no-replace publication",async()=>{
  const [builder,common,contract,verifier]=await Promise.all([
@@ -28,7 +27,7 @@ test("atlas-v3 Python contract imports without the optional image runtime",()=>{
  assert.equal(r.status,0,`stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
 });
 
-test("atlas-v3 Python build boundary regressions pass with the image runtime",{skip:!PILLOW_AVAILABLE},()=>{
+test("atlas-v3 Python build boundary regressions pass",()=>{
  const r=spawnSync(PYTHON,["scripts/heavy-metal-fighting/frame_atlas_v3_build_contract_test.py"],{cwd:ROOT,encoding:"utf8",env:PYTHON_ENV});
  assert.equal(r.status,0,`stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);assert.match(`${r.stdout}\n${r.stderr}`,/Ran 7 tests/);assert.match(`${r.stdout}\n${r.stderr}`,/OK/);
 });
