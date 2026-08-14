@@ -25,11 +25,13 @@ import {
   writeApprovalReceiptChain,
 } from "./frame-body-named-human-approval-io.mjs";
 import { compileHmfFrameBodyNamedHumanApprovalPlanDocument } from "./frame-body-named-human-approval-plan.mjs";
+import { snapshotApprovalPlan } from "./frame-body-named-human-approval-snapshot.mjs";
 import { validatedHmfFrameBodyNamedHumanApprovalWorkspace } from "./frame-body-named-human-approval-workspace.mjs";
 
 export async function materializeHmfFrameBodyNamedHumanApproval(planInput) {
+  const captured = snapshotApprovalPlan(planInput);
   const plan = selfHashed(
-    planInput,
+    captured,
     "approvalPlanSha256",
     "Frame body named-human approval plan",
   );
