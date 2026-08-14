@@ -1,0 +1,65 @@
+name: Rally 2.5D Gravel Spray Art Contract
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rally-25d-gravel-spray-art-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+      - name: Test deterministic gravel-spray jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/game-art-production/rally-25d-gravel-spray-jobs.test.mjs \
+            | tee "${RUNNER_TEMP}/gravel-spray-tests.log"
+      - name: Compile and verify provider session
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/game-art-production/rally-25d-gravel-spray-jobs.mjs compile \
+            config/game-art-production/vfx/gravel-spray-production-v1.json \
+            --output "${RUNNER_TEMP}/gravel-spray.session.json" \
+            > "${RUNNER_TEMP}/gravel-spray.stdout.json"
+          node scripts/game-art-production/rally-25d-gravel-spray-jobs.mjs verify \
+            "${RUNNER_TEMP}/gravel-spray.session.json" \
+            | tee "${RUNNER_TEMP}/gravel-spray.verify.json"
+          grep -F '"schema": "evavo.rally-gravel-spray-provider-job-session.v1"' "${RUNNER_TEMP}/gravel-spray.session.json"
+          grep -F '"jobs": 12' "${RUNNER_TEMP}/gravel-spray.session.json"
+          grep -F '"images": 12' "${RUNNER_TEMP}/gravel-spray.session.json"
+          grep -F '"responseJobs": 5' "${RUNNER_TEMP}/gravel-spray.session.json"
+          grep -F '"spriteJobs": 4' "${RUNNER_TEMP}/gravel-spray.session.json"
+          grep -F '"impactJobs": 2' "${RUNNER_TEMP}/gravel-spray.session.json"
+          grep -F '"providerExecution": false' "${RUNNER_TEMP}/gravel-spray.session.json"
+          grep -F '"downstream3DReady": false' "${RUNNER_TEMP}/gravel-spray.session.json"
+      - name: Prove source remains clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gravel-spray-art-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/gravel-spray-tests.log
+            ${{ runner.temp }}/gravel-spray.session.json
+            ${{ runner.temp }}/gravel-spray.verify.json
+          if-no-files-found: warn
+          retention-days: 7

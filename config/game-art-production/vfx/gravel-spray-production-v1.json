@@ -1,0 +1,354 @@
+{
+  "schema": "evavo.rally-gravel-spray-visual-development.v1",
+  "protocolVersion": "2026-08-15.6",
+  "assetId": "gravel-spray-production-v1",
+  "subjectId": "gravel-spray",
+  "title": "Forest Rally four-wheel gravel spray",
+  "style": {
+    "projectionFamily": "fixed-isometric-2-5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "effectLanguage": "A fast directional gravel roost built from readable pebble silhouettes, short ballistic arcs, a restrained warm dust support layer and clean wheel-contact origins that never obscure the vehicle silhouette.",
+    "palette": [
+      "#191815",
+      "#3a342c",
+      "#625746",
+      "#8a785d",
+      "#ae9a75",
+      "#cfbea0",
+      "#e1d7c3",
+      "#675f55"
+    ],
+    "surfaceLanguage": [
+      "discrete readable stones rather than uniform noise",
+      "short ballistic arcs with strong contact origin",
+      "larger fragments near the wheel and smaller fragments in decay",
+      "restrained warm dust support",
+      "clear alpha falloff without rectangular edges",
+      "high-speed readability from the fixed gameplay camera"
+    ],
+    "forbidden": [
+      "opaque smoke wall",
+      "giant rocks",
+      "muzzle-flash sparks",
+      "vehicle silhouette baked into the image",
+      "road background baked into the image",
+      "photoreal scan noise",
+      "hard rectangular alpha edge",
+      "contact sheets",
+      "multi-panel image layouts",
+      "multiple unrelated effects in one image"
+    ]
+  },
+  "continuity": {
+    "wheelContactOrigin": true,
+    "travelDirection": "vehicle-rearward",
+    "gravityReadable": true,
+    "windResponseReadable": true,
+    "consistentStoneScale": true,
+    "consistentDustTemperature": true
+  },
+  "jobs": [
+    {
+      "id": "gravel-spray-contact-burst",
+      "role": "effect-shape-master",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [],
+      "include": [
+        "single compact wheel-contact burst",
+        "clear ground origin",
+        "mixed small stones",
+        "short warm dust support",
+        "true transparent background"
+      ],
+      "exclude": [
+        "vehicle",
+        "road scene",
+        "multiple bursts",
+        "large boulders",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "gravel-spray-low-speed",
+      "role": "effect-response-reference",
+      "phase": "response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["gravel-spray-contact-burst"],
+      "include": [
+        "same exact gravel effect language",
+        "low-speed compact emission",
+        "few stones",
+        "minimal dust support",
+        "true transparent background"
+      ],
+      "exclude": [
+        "high roost",
+        "opaque cloud",
+        "vehicle",
+        "second effect",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "gravel-spray-high-speed",
+      "role": "effect-response-reference",
+      "phase": "response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["gravel-spray-contact-burst"],
+      "include": [
+        "same exact gravel effect language",
+        "high-speed elongated roost",
+        "readable ballistic arcs",
+        "bounded dust tail",
+        "true transparent background"
+      ],
+      "exclude": [
+        "screen-filling cloud",
+        "giant rocks",
+        "vehicle",
+        "second effect",
+        "motion-blur smear"
+      ]
+    },
+    {
+      "id": "gravel-spray-peak-slip",
+      "role": "effect-response-reference",
+      "phase": "response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["gravel-spray-high-speed"],
+      "include": [
+        "same exact gravel effect language",
+        "peak-slip lateral fan",
+        "dense near-wheel stones",
+        "controlled roost width",
+        "true transparent background"
+      ],
+      "exclude": [
+        "explosion",
+        "uniform cone",
+        "vehicle",
+        "road background",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "gravel-spray-crosswind-left",
+      "role": "effect-response-reference",
+      "phase": "wind",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["gravel-spray-high-speed"],
+      "include": [
+        "same high-speed gravel roost",
+        "left crosswind affecting only fine dust and light chips",
+        "heavy stones retain ballistic path",
+        "true transparent background"
+      ],
+      "exclude": [
+        "entire effect bent unnaturally",
+        "vehicle",
+        "road scene",
+        "second effect",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "gravel-spray-crosswind-right",
+      "role": "effect-response-reference",
+      "phase": "wind",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["gravel-spray-crosswind-left"],
+      "include": [
+        "same exact roost mirrored only by wind direction",
+        "right crosswind affecting fine dust and light chips",
+        "heavy stones retain ballistic path",
+        "true transparent background"
+      ],
+      "exclude": [
+        "new effect identity",
+        "vehicle",
+        "road scene",
+        "multiple winds",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "gravel-spray-pebble-small",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["gravel-spray-contact-burst"],
+      "include": [
+        "single small irregular gravel pebble",
+        "broad stylized planes",
+        "readable edge",
+        "neutral lighting",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple pebbles",
+        "ground",
+        "shadow",
+        "text",
+        "photoreal micro-noise"
+      ]
+    },
+    {
+      "id": "gravel-spray-pebble-medium",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["gravel-spray-pebble-small"],
+      "include": [
+        "single medium irregular gravel pebble",
+        "same material family",
+        "slightly heavier silhouette",
+        "neutral lighting",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple pebbles",
+        "ground",
+        "shadow",
+        "text",
+        "boulder scale"
+      ]
+    },
+    {
+      "id": "gravel-spray-chip",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["gravel-spray-pebble-small"],
+      "include": [
+        "single thin angular gravel chip",
+        "same material family",
+        "high-speed readable silhouette",
+        "neutral lighting",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple chips",
+        "ground",
+        "shadow",
+        "text",
+        "glass shard"
+      ]
+    },
+    {
+      "id": "gravel-spray-dust-support",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["gravel-spray-contact-burst"],
+      "include": [
+        "single soft warm dust support sprite",
+        "dense center",
+        "soft irregular alpha edge",
+        "ground-hugging shape",
+        "true transparent background"
+      ],
+      "exclude": [
+        "stone silhouettes",
+        "hard square edge",
+        "vehicle",
+        "road",
+        "opaque smoke"
+      ]
+    },
+    {
+      "id": "gravel-spray-impact-burst",
+      "role": "impact-reference",
+      "phase": "impact",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "gravel-spray-peak-slip",
+        "gravel-spray-pebble-medium",
+        "gravel-spray-chip"
+      ],
+      "include": [
+        "single tyre-to-gravel impact burst",
+        "bounded radial chips",
+        "rearward bias",
+        "short dust punctuation",
+        "true transparent background"
+      ],
+      "exclude": [
+        "explosion fire",
+        "vehicle",
+        "road scene",
+        "multiple impacts",
+        "screen-filling cloud"
+      ]
+    },
+    {
+      "id": "gravel-spray-late-decay",
+      "role": "impact-reference",
+      "phase": "decay",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "gravel-spray-impact-burst",
+        "gravel-spray-dust-support"
+      ],
+      "include": [
+        "single late-decay state",
+        "few falling pebbles",
+        "faint dispersed dust",
+        "clear empty space",
+        "true transparent background"
+      ],
+      "exclude": [
+        "fresh contact burst",
+        "dense cloud",
+        "vehicle",
+        "road scene",
+        "second effect"
+      ]
+    }
+  ],
+  "output": {
+    "workingRoot": "working/rally/vfx/gravel-spray/visual-development-v1",
+    "masterRoot": "masters/rally/vfx/gravel-spray/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
