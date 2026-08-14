@@ -15,4 +15,5 @@ import "./heavy-metal-fighting/frame-body-named-human-approval-input-hardening.t
 import "./heavy-metal-fighting/frame-body-delivery-readiness.test.mjs";
 import "./heavy-metal-fighting/frame-atlas-v3-delivery-boundary.test.mjs";
 import "./heavy-metal-fighting/frame-atlas-v3-builder-boundary.test.mjs";
+import "./heavy-metal-fighting/frame-atlas-v3-game-validation-admission.test.mjs";
 import "./heavy-metal-fighting/studio-core.test.mjs";
