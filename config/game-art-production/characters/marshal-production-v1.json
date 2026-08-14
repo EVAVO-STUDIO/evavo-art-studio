@@ -1,0 +1,435 @@
+{
+  "schema": "evavo.rally-marshal-visual-development.v1",
+  "protocolVersion": "2026-08-15.6",
+  "assetId": "marshal-production-v1",
+  "subjectId": "marshal",
+  "title": "Forest Rally marshal character",
+  "style": {
+    "projectionFamily": "fixed-isometric-2-5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "characterLanguage": "A friendly but alert rally marshal with a tall readable silhouette, era-appropriate orange safety vest, dark practical clothing, cap, gloves, sturdy boots and a large red flag. Proportions are simplified for a rigid-segment low-poly rig and remain clear at fixed-isometric crowd scale.",
+    "palette": [
+      "#17191a",
+      "#303638",
+      "#5b6464",
+      "#d5d0bf",
+      "#e56a22",
+      "#ff9b34",
+      "#9e1f24",
+      "#d93a34",
+      "#6b4b32",
+      "#d9a582"
+    ],
+    "surfaceLanguage": [
+      "broad painted-cloth value groups",
+      "clear safety-vest silhouette",
+      "restrained skin and face detail",
+      "large readable hands and boots",
+      "flag cloth distinct from clothing",
+      "no baked directional lighting"
+    ],
+    "forbidden": [
+      "real motorsport branding",
+      "real event logos",
+      "readable sponsor text",
+      "generated wording",
+      "photoreal pores",
+      "anatomically noisy fingers",
+      "tiny facial detail",
+      "baked directional shadows",
+      "contact sheets",
+      "multi-panel image layouts",
+      "multiple unrelated characters in one image"
+    ]
+  },
+  "bodyLocks": {
+    "heightMeters": 1.78,
+    "shoulderWidthMeters": 0.46,
+    "headRadiusMeters": 0.13,
+    "handLengthMeters": 0.18,
+    "bootLengthMeters": 0.28,
+    "flagPoleLengthMeters": 1.35,
+    "consistentBodyProportions": true,
+    "consistentClothing": true,
+    "consistentFlagIdentity": true,
+    "consistentHandScale": true
+  },
+  "animationClips": [
+    "idle",
+    "alert",
+    "flag-wave",
+    "react",
+    "flee"
+  ],
+  "jobs": [
+    {
+      "id": "marshal-identity-front",
+      "role": "identity-master",
+      "view": "front-three-quarter",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [],
+      "include": [
+        "single full-body rally marshal",
+        "orange safety vest",
+        "cap gloves sturdy boots and red flag",
+        "neutral ready stance",
+        "large readable hands",
+        "true transparent background"
+      ],
+      "exclude": [
+        "other people",
+        "vehicle",
+        "readable text",
+        "motion blur",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-identity-rear",
+      "role": "identity-continuity",
+      "view": "rear-three-quarter",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-identity-front"
+      ],
+      "include": [
+        "same exact marshal identity",
+        "same clothing colors and flag",
+        "rear vest and belt construction",
+        "clear boot and hand silhouette",
+        "true transparent background"
+      ],
+      "exclude": [
+        "different outfit",
+        "other people",
+        "vehicle",
+        "readable text",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-ortho-front",
+      "role": "modular-modeling-reference",
+      "view": "front",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-identity-front"
+      ],
+      "include": [
+        "strict full-body front orthographic",
+        "neutral A-pose",
+        "open readable hands",
+        "flag held vertically",
+        "true transparent background"
+      ],
+      "exclude": [
+        "perspective convergence",
+        "labels",
+        "dimensions",
+        "action pose",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-ortho-left",
+      "role": "modular-modeling-reference",
+      "view": "left",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-identity-front"
+      ],
+      "include": [
+        "strict full-body left orthographic",
+        "neutral A-pose",
+        "body depth and limb thickness",
+        "flag pole alignment",
+        "true transparent background"
+      ],
+      "exclude": [
+        "perspective convergence",
+        "labels",
+        "dimensions",
+        "action pose",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-ortho-back",
+      "role": "modular-modeling-reference",
+      "view": "back",
+      "phase": "orthographic",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-identity-rear"
+      ],
+      "include": [
+        "strict full-body rear orthographic",
+        "neutral A-pose",
+        "vest back panel and belt",
+        "boot and glove continuity",
+        "true transparent background"
+      ],
+      "exclude": [
+        "perspective convergence",
+        "labels",
+        "dimensions",
+        "action pose",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-rig-apose",
+      "role": "rigging-reference",
+      "view": "front-three-quarter",
+      "phase": "rigging",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-ortho-front",
+        "marshal-ortho-left",
+        "marshal-ortho-back"
+      ],
+      "include": [
+        "same exact marshal in relaxed A-pose",
+        "clear shoulder elbow wrist hip knee and ankle pivots",
+        "separated rigid limb segments",
+        "readable open hands",
+        "true transparent background"
+      ],
+      "exclude": [
+        "skeleton labels",
+        "multiple poses",
+        "contact sheet",
+        "extreme anatomy",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-materials",
+      "role": "runtime-shader-reference",
+      "view": "material-detail",
+      "phase": "materials",
+      "width": 2048,
+      "height": 2048,
+      "transparent": false,
+      "dependsOn": [
+        "marshal-identity-front",
+        "marshal-identity-rear"
+      ],
+      "include": [
+        "orange safety fabric",
+        "dark shirt and trousers",
+        "skin",
+        "gloves",
+        "boots",
+        "cap",
+        "painted red flag cloth",
+        "restrained wetness and dirt response"
+      ],
+      "exclude": [
+        "text labels",
+        "full second character",
+        "photoreal scan",
+        "brand patches",
+        "baked shadow"
+      ]
+    },
+    {
+      "id": "marshal-flag-prop",
+      "role": "prop-modeling-reference",
+      "view": "front-three-quarter",
+      "phase": "prop",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-identity-front"
+      ],
+      "include": [
+        "single marshal flag and pole",
+        "large red cloth silhouette",
+        "simple reinforced pole grip",
+        "same exact flag identity",
+        "true transparent background"
+      ],
+      "exclude": [
+        "character body",
+        "multiple flags",
+        "readable text",
+        "real logo",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-idle-pose",
+      "role": "animation-key-pose",
+      "view": "front-three-quarter",
+      "phase": "animation",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-rig-apose",
+        "marshal-flag-prop"
+      ],
+      "include": [
+        "same exact marshal",
+        "relaxed idle stance",
+        "flag lowered safely",
+        "balanced weight",
+        "readable hand grips",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple frames",
+        "contact sheet",
+        "running",
+        "panic",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-alert-pose",
+      "role": "animation-key-pose",
+      "view": "front-three-quarter",
+      "phase": "animation",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-idle-pose"
+      ],
+      "include": [
+        "same exact marshal",
+        "alert braced stance",
+        "head turned toward approaching car",
+        "flag raised",
+        "clear arm silhouette",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple frames",
+        "contact sheet",
+        "fleeing",
+        "fallen pose",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-flag-wave-pose",
+      "role": "animation-key-pose",
+      "view": "front-three-quarter",
+      "phase": "animation",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-alert-pose"
+      ],
+      "include": [
+        "same exact marshal",
+        "wide safe flag-wave key pose",
+        "clear shoulder elbow and wrist arc",
+        "cloth trailing from pole",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple frames",
+        "contact sheet",
+        "flag disconnected",
+        "motion blur",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-react-pose",
+      "role": "animation-key-pose",
+      "view": "front-three-quarter",
+      "phase": "animation",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-alert-pose"
+      ],
+      "include": [
+        "same exact marshal",
+        "short startled recoil pose",
+        "flag still controlled",
+        "clear backward weight shift",
+        "hands remain readable",
+        "true transparent background"
+      ],
+      "exclude": [
+        "gore",
+        "collision contact",
+        "multiple frames",
+        "fallen body",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "marshal-flee-pose",
+      "role": "animation-key-pose",
+      "view": "front-three-quarter",
+      "phase": "animation",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "marshal-react-pose"
+      ],
+      "include": [
+        "same exact marshal",
+        "urgent but readable running key pose",
+        "flag carried safely",
+        "opposed arm and leg action",
+        "clear foot placement",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple frames",
+        "contact sheet",
+        "vehicle",
+        "gore",
+        "cast shadow"
+      ]
+    }
+  ],
+  "output": {
+    "workingRoot": "working/rally/characters/marshal/visual-development-v1",
+    "masterRoot": "masters/rally/characters/marshal/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
