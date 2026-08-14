@@ -51,7 +51,10 @@ test("MCP exposes iterative art planning without provider or approval shortcuts"
     );
   }
   assert.match(tools, /no provider call/i);
-  assert.match(tools, /does not inspect image bytes/i);
+  assert.match(
+    tools,
+    /does not call a provider or inspect image bytes/i,
+  );
   assert.match(tools, /caller supplied; no provider call/i);
   assert.match(tools, /does not make it/i);
   assert.match(tools, /no sheet or atlas pixels are written/i);
