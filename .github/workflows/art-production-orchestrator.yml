@@ -10,6 +10,7 @@ on:
       - "apps/mcp/test/art-production-tools.test.mjs"
       - "docs/ART_PRODUCTION_ORCHESTRATOR.md"
       - "docs/ART_PRODUCTION_PACKAGING_VERIFICATION.md"
+      - "docs/ART_PRODUCTION_RUNTIME_ASSEMBLY_HANDOFF.md"
       - ".github/workflows/art-production-orchestrator.yml"
   workflow_dispatch:
 
@@ -85,18 +86,24 @@ jobs:
               "frozen-dependency-install",
               "art-direction-build-and-tests",
               "candidate-bound-human-approval-receipts",
+              "approval-bound-runtime-assembly-handoff",
               "mcp-planning-only-contract",
               "clean-source-proof",
             ],
             authority: {
+              artifactRead: false,
               providerExecution: false,
               imageMutation: false,
               creativeDecision: false,
               packagingExecution: false,
+              automaticAssembly: false,
               targetRepositoryMutation: false,
+              runtimeActivation: false,
               gitCommit: false,
               gitPush: false,
+              deployment: false,
               publication: false,
+              forcePush: false,
             },
           };
           const receiptSha256 = createHash("sha256")

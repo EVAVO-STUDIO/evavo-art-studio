@@ -16,12 +16,13 @@ layered production plan
   -> candidate-bound human-approval receipt
   -> individual source PNG retention
   -> strip, grid and atlas metadata
-  -> separate packaging execution and Godot integration
+  -> approval-bound runtime assembly handoff
+  -> separate assembly execution and Godot integration
 ```
 
 ## Reusable game-type profile foundation
 
-The orchestrator complements the generic `scripts/game-art-production` profile engine rather than replacing it. The reusable profile engine resolves game-type asset contracts and one-asset work orders; this orchestrator coordinates many work orders through dependency, review, repair, approval provenance and packaging state.
+The orchestrator complements the generic `scripts/game-art-production` profile engine rather than replacing it. The reusable profile engine resolves game-type asset contracts and one-asset work orders; this orchestrator coordinates many work orders through dependency, review, repair, approval provenance, packaging state and runtime-assembly admission.
 
 The JONEZ fixture is now split across:
 
@@ -154,6 +155,16 @@ The plan retains each individual source with its technical-review attempt, appro
 
 Atlas rotation and trimming remain forbidden for pixel-art sources. Packaging metadata does not mutate pixels or replace the authoritative individual PNGs.
 
+## Runtime assembly handoff
+
+The generic layered-assembly compiler remains reusable outside Art Production and therefore accepts content-addressed approval-receipt identities without receiving the full production loop and packaging contract.
+
+`compileArtProductionRuntimeAssemblyHandoff` is the stricter orchestrated bridge. It verifies the exact loop, every complete approval receipt and the deterministic packaging plan before compiling a `runtime-candidate` assembly manifest. Every admitted assembly source must match the same artifact ID, SHA-256, byte count, dimensions, technical-review attempt, approval request, approval basis and approval receipt retained by packaging.
+
+The handoff embeds the verified runtime-ready assembly manifest and one lineage record per admitted source. Verification first checks the submitted handoff and authority boundary, then recompiles the expected handoff from the exact plan, loop, receipts, package and assembly request. A handoff from another placement layout, source subset, package, receipt set or loop cannot be replayed.
+
+The handoff is still metadata only. It does not read source bytes, pack pixels, write assembly files, run Godot, mutate a game repository or activate a runtime.
+
 ## MCP surface
 
 ```text
@@ -164,8 +175,11 @@ compile_next_art_production_batch
 verify_art_production_loop
 compile_art_production_human_approval_receipt
 compile_art_production_packaging_plan
+compile_art_production_runtime_assembly_handoff
 ```
 
 These tools compile and verify contracts only. The human-approval tool records an explicit caller-supplied named-human decision and can verify a receipt against the exact retained request; it does not decide whether an image is creatively approved.
+
+The runtime-assembly handoff tool cross-binds approved package sources to the existing assembly manifest, but it does not read artifact bytes, execute assembly, write a scene, activate a runtime, mutate a repository, commit, push, deploy or publish.
 
 The tools do not call a provider, admit candidate bytes, make a creative decision, execute image repair, write sheets or atlases, mutate a game repository, commit, push, deploy or publish.
