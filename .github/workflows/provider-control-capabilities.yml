@@ -158,7 +158,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -F 'PROVIDER_PROTOCOL_VERSION = "2026-08-07.3"' packages/providers/src/types.ts
+          grep -F 'PROVIDER_PROTOCOL_VERSION = "2026-08-15.1"' packages/providers/src/types.ts
           grep -F 'ProviderRoutingInspection' packages/providers/src/types.ts
           grep -F 'freezeNormalizedProviderRequest' packages/providers/src/validation.ts
           grep -F 'providerCallPerformedByInspection: false' packages/providers/src/registry.ts
