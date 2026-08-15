@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   linkSync,
-  mkdirSync,
   mkdtempSync,
   rmSync,
   symlinkSync,
@@ -23,10 +22,10 @@ import {
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI_PATH = path.resolve(HERE, "..", "heavy-metal-fighting-frame-atlas-v3.mjs");
 
-function withTemp(prefix, callback) {
+async function withTemp(prefix, callback) {
   const root = mkdtempSync(path.join(tmpdir(), prefix));
   try {
-    return callback(root);
+    return await callback(root);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -86,8 +85,8 @@ test("stable authorization CLI reader rejects symbolic and multiply-linked evide
   });
 });
 
-test("plan path preflight confines all 224 source reads to the canonical Frame source root", () => {
-  withTemp("hmf-auth-cli-plan-", (root) => {
+test("plan path preflight confines all 224 source reads to the canonical Frame source root", async () => {
+  await withTemp("hmf-auth-cli-plan-", async (root) => {
     const plan = planFixture(root);
     const result = preflightHmfAtlasV3DeliveryAuthorizationPlanPaths(plan, "bastion");
     assert.equal(result.sourcePaths.length, 224);
@@ -103,8 +102,8 @@ test("plan path preflight confines all 224 source reads to the canonical Frame s
   });
 });
 
-test("real CLI routes authorize-game-delivery through the closed request manifest", () => {
-  withTemp("hmf-auth-cli-route-", (root) => {
+test("real CLI routes authorize-game-delivery through the closed request manifest", async () => {
+  await withTemp("hmf-auth-cli-route-", async (root) => {
     const requestPath = path.join(root, "request.json");
     writeFileSync(requestPath, `${JSON.stringify({
       schema: `${HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_CLI_REQUEST_SCHEMA}.drift`,
