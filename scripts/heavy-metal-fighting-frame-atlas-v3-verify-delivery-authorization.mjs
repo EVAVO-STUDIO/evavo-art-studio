@@ -39,10 +39,7 @@ function decodeJson(bytes, label) {
   }
 }
 
-export async function verifyHmfAtlasV3GameDeliveryAuthorizationFromFiles({
-  requestPath,
-  authorizationPath,
-}) {
+async function verifyFromFiles(requestPath, authorizationPath) {
   const authorizationBytes = await readHmfAtlasV3StableSingleLinkFile(authorizationPath, {
     label: "--authorization",
     maximumBytes: MAXIMUM_AUTHORIZATION_BYTES,
@@ -62,17 +59,12 @@ async function run(argv = process.argv.slice(2)) {
   ) {
     throw new Error(`verify delivery authorization requires exactly --request <request.json> --authorization <authorization.json>.\n\n${usage()}`);
   }
-  return verifyHmfAtlasV3GameDeliveryAuthorizationFromFiles({
-    requestPath: argv[1],
-    authorizationPath: argv[3],
-  });
+  return verifyFromFiles(argv[1], argv[3]);
 }
 
-if (process.argv[1]?.endsWith("heavy-metal-fighting-frame-atlas-v3-verify-delivery-authorization.mjs")) {
-  run().then((result) => {
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  }).catch((error) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exitCode = 1;
-  });
-}
+run().then((result) => {
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+}).catch((error) => {
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+});
