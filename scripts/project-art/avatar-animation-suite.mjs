@@ -13,6 +13,8 @@ export const AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1 =
   'evavo.project-art-avatar-animation-suite-request.v1';
 export const AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA =
   'evavo.project-art-avatar-animation-suite-request.v2';
+export const AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V1 =
+  'evavo.project-art-avatar-animation-suite-plan.v1';
 export const AVATAR_ANIMATION_SUITE_PLAN_SCHEMA =
   'evavo.project-art-avatar-animation-suite-plan.v2';
 export const AVATAR_ANIMATION_SUITE_CAPABILITIES_SCHEMA =
@@ -784,6 +786,10 @@ export function projectArtAvatarAnimationSuiteCapabilities() {
       AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA,
     ]),
     planSchema: AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
+    acceptedPlanSchemas: Object.freeze([
+      AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V1,
+      AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
+    ]),
     characters: Object.freeze(['eva-female', 'top-hat-man']),
     completeClipMatrix: true,
     multipleIdleVariants: 4,

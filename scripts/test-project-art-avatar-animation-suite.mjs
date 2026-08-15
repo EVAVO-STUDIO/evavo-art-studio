@@ -7,6 +7,7 @@ import test from 'node:test';
 
 import {
   AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
+  AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V1,
   AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA,
   AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1,
   ProjectArtAvatarAnimationSuiteError,
@@ -305,6 +306,10 @@ test('capabilities expose animation quality without claiming execution', () => {
   assert.deepEqual(capabilities.acceptedRequestSchemas, [
     AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1,
     AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA,
+  ]);
+  assert.deepEqual(capabilities.acceptedPlanSchemas, [
+    AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V1,
+    AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
   ]);
   assert.equal(capabilities.fakeTransparencyGridAllowed, false);
   assert.equal(capabilities.providerExecution, false);

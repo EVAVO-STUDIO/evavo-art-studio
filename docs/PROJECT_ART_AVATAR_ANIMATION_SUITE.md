@@ -47,7 +47,7 @@ pnpm run project-art:avatar-animation:compile -- \
 
 The output path must not already exist. The plan binds the normalized request and the full plan with SHA-256 hashes, retains lossless RGBA PNG masters and declares lossless WebP/PNG runtime delivery.
 
-Legacy Cloudinary-only v1 requests remain accepted for deterministic compatibility, but they do not claim a full-body animation-master reference. New Top Hat production handoffs must use v2.
+Legacy Cloudinary-only v1 requests and their v1 plan identifier remain permanently discoverable for deterministic compatibility, but they do not claim a full-body animation-master reference. New Top Hat production handoffs compile to v2.
 
 Trusted agents can expose the same compiler over stdio with `pnpm run project-art:avatar-animation:mcp`. File compilation remains root-confined and write-gated; the capabilities call is read-only.
 
