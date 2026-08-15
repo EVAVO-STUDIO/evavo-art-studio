@@ -1,0 +1,33 @@
+{
+  "contractVersion": "evavo_art_asset_fabricator_material_contracts_v1",
+  "protocolVersion": "2026-08-16.3",
+  "requestContract": "evavo_art_asset_fabricator_material_request_v1",
+  "handoffSchema": "evavo.art.asset-fabricator-material-handoff.v1",
+  "requiredOutputs": [
+    "base-color",
+    "height",
+    "normal",
+    "roughness",
+    "metalness",
+    "ao",
+    "curvature",
+    "thickness",
+    "wear-mask",
+    "dirt-mask",
+    "damage-mask"
+  ],
+  "normalConvention": "opengl",
+  "ormPacking": {"r": "ao", "g": "roughness", "b": "metalness"},
+  "authority": {
+    "providerExecution": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticTextureBake": false,
+    "automaticMaterialAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}

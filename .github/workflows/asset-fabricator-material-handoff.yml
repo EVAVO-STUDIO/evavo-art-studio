@@ -1,0 +1,40 @@
+name: Asset Fabricator material handoff
+
+on:
+  push:
+    paths:
+      - "contracts/asset-fabricator-material-handoff-v1.json"
+      - "docs/ASSET_FABRICATOR_MATERIAL_HANDOFF.md"
+      - "scripts/game-art-production/asset-fabricator-material-handoff.mjs"
+      - "tests/asset-fabricator-material-handoff.test.mjs"
+      - ".github/workflows/asset-fabricator-material-handoff.yml"
+  pull_request:
+    paths:
+      - "contracts/asset-fabricator-material-handoff-v1.json"
+      - "docs/ASSET_FABRICATOR_MATERIAL_HANDOFF.md"
+      - "scripts/game-art-production/asset-fabricator-material-handoff.mjs"
+      - "tests/asset-fabricator-material-handoff.test.mjs"
+      - ".github/workflows/asset-fabricator-material-handoff.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22.14.0"
+      - run: node --check scripts/game-art-production/asset-fabricator-material-handoff.mjs
+      - run: node --test tests/asset-fabricator-material-handoff.test.mjs
+      - run: node -e "JSON.parse(require('fs').readFileSync('contracts/asset-fabricator-material-handoff-v1.json','utf8'))"
+      - run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
