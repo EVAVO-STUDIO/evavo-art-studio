@@ -9,15 +9,20 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 
-export const AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA =
+export const AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1 =
   'evavo.project-art-avatar-animation-suite-request.v1';
+export const AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA =
+  'evavo.project-art-avatar-animation-suite-request.v2';
 export const AVATAR_ANIMATION_SUITE_PLAN_SCHEMA =
-  'evavo.project-art-avatar-animation-suite-plan.v1';
+  'evavo.project-art-avatar-animation-suite-plan.v2';
 export const AVATAR_ANIMATION_SUITE_CAPABILITIES_SCHEMA =
-  'evavo.project-art-avatar-animation-suite-capabilities.v1';
+  'evavo.project-art-avatar-animation-suite-capabilities.v2';
 
 const IDENTIFIER = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
 const ASSET_ID = /^[a-f0-9]{32}$/u;
+const GIT_OBJECT_ID = /^[a-f0-9]{40}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
+const AVATAR_RUNTIME_REPOSITORY = 'EVAVO-STUDIO/evavo-avatar-runtime';
 const AUTHORITY_KEYS = Object.freeze([
   'providerExecution',
   'candidateApproval',
@@ -224,6 +229,130 @@ function parseSource(value) {
   });
 }
 
+function repositoryAssetPath(value, characterId, suffix, label) {
+  if (
+    typeof value !== 'string' ||
+    value.length > 512 ||
+    value.includes('\\') ||
+    value.startsWith('/') ||
+    value.split('/').some((part) => part === '' || part === '.' || part === '..') ||
+    path.posix.normalize(value) !== value ||
+    !value.startsWith(`assets/${characterId}/candidates/`) ||
+    !value.endsWith(suffix)
+  ) {
+    fail('PROJECT_ART_AVATAR_ANIMATION_MASTER_PATH_INVALID', `${label} is invalid.`);
+  }
+  return value;
+}
+
+function parseAnimationIdentityMaster(value, characterId) {
+  if (value === null) return null;
+  exact(
+    value,
+    [
+      'provider',
+      'repository',
+      'commit',
+      'tree',
+      'asset',
+      'candidateManifest',
+      'lifecycle',
+    ],
+    'animationIdentityMaster',
+  );
+  if (
+    value.provider !== 'git-repository-asset' ||
+    value.repository !== AVATAR_RUNTIME_REPOSITORY ||
+    typeof value.commit !== 'string' ||
+    !GIT_OBJECT_ID.test(value.commit) ||
+    typeof value.tree !== 'string' ||
+    !GIT_OBJECT_ID.test(value.tree)
+  ) {
+    fail('PROJECT_ART_AVATAR_ANIMATION_MASTER_REVISION_INVALID');
+  }
+  exact(
+    value.asset,
+    ['path', 'mediaType', 'format', 'width', 'height', 'bytes', 'sha256', 'alpha'],
+    'animationIdentityMaster.asset',
+  );
+  if (
+    value.asset.mediaType !== 'image/png' ||
+    value.asset.format !== 'png' ||
+    typeof value.asset.sha256 !== 'string' ||
+    !SHA256.test(value.asset.sha256) ||
+    value.asset.alpha !== 'rgba8-straight'
+  ) {
+    fail('PROJECT_ART_AVATAR_ANIMATION_MASTER_ASSET_INVALID');
+  }
+  const asset = Object.freeze({
+    path: repositoryAssetPath(
+      value.asset.path,
+      characterId,
+      '.alpha.png',
+      'animationIdentityMaster.asset.path',
+    ),
+    mediaType: 'image/png',
+    format: 'png',
+    width: integer(value.asset.width, 'animationIdentityMaster.asset.width', 256, 4096),
+    height: integer(value.asset.height, 'animationIdentityMaster.asset.height', 256, 4096),
+    bytes: integer(
+      value.asset.bytes,
+      'animationIdentityMaster.asset.bytes',
+      1,
+      512_000_000,
+    ),
+    sha256: value.asset.sha256,
+    alpha: 'rgba8-straight',
+  });
+  exact(
+    value.candidateManifest,
+    ['path', 'sha256'],
+    'animationIdentityMaster.candidateManifest',
+  );
+  if (
+    typeof value.candidateManifest.sha256 !== 'string' ||
+    !SHA256.test(value.candidateManifest.sha256)
+  ) {
+    fail('PROJECT_ART_AVATAR_ANIMATION_MASTER_MANIFEST_INVALID');
+  }
+  const candidateManifest = Object.freeze({
+    path: repositoryAssetPath(
+      value.candidateManifest.path,
+      characterId,
+      '.candidate.json',
+      'animationIdentityMaster.candidateManifest.path',
+    ),
+    sha256: value.candidateManifest.sha256,
+  });
+  exact(
+    value.lifecycle,
+    [
+      'approvalState',
+      'productionReady',
+      'runtimeActivationEligible',
+      'maySeedAnimationGeneration',
+    ],
+    'animationIdentityMaster.lifecycle',
+  );
+  if (
+    value.lifecycle.approvalState !== 'unapproved' ||
+    value.lifecycle.productionReady !== false ||
+    value.lifecycle.runtimeActivationEligible !== false ||
+    value.lifecycle.maySeedAnimationGeneration !== true
+  ) {
+    fail('PROJECT_ART_AVATAR_ANIMATION_MASTER_LIFECYCLE_INVALID');
+  }
+  return Object.freeze({
+    provider: 'git-repository-asset',
+    repository: AVATAR_RUNTIME_REPOSITORY,
+    commit: value.commit,
+    tree: value.tree,
+    asset,
+    candidateManifest,
+    lifecycle: Object.freeze({ ...value.lifecycle }),
+  });
+}
+
 function parseRequirements(value) {
   const keys = [
     'multipleIdleVariants',
@@ -252,23 +381,39 @@ function parseRequirements(value) {
 }
 
 export function parseAvatarAnimationSuiteRequest(value) {
-  exact(
-    value,
-    [
-      'schema',
-      'sessionId',
-      'requestedAt',
-      'characterId',
-      'source',
-      'targetCanvas',
-      'requirements',
-      'authority',
-    ],
-    'request',
-  );
-  if (value.schema !== AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA) {
+  if (!isRecord(value)) {
+    fail('PROJECT_ART_AVATAR_ANIMATION_OBJECT_INVALID', 'request must be an object.');
+  }
+  const legacy = value.schema === AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1;
+  if (!legacy && value.schema !== AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA) {
     fail('PROJECT_ART_AVATAR_ANIMATION_SCHEMA_INVALID');
   }
+  exact(
+    value,
+    legacy
+      ? [
+          'schema',
+          'sessionId',
+          'requestedAt',
+          'characterId',
+          'source',
+          'targetCanvas',
+          'requirements',
+          'authority',
+        ]
+      : [
+          'schema',
+          'sessionId',
+          'requestedAt',
+          'characterId',
+          'source',
+          'animationIdentityMaster',
+          'targetCanvas',
+          'requirements',
+          'authority',
+        ],
+    'request',
+  );
   const characterId = id(value.characterId, 'characterId');
   if (!['eva-female', 'top-hat-man'].includes(characterId)) {
     fail('PROJECT_ART_AVATAR_ANIMATION_CHARACTER_INVALID');
@@ -281,12 +426,36 @@ export function parseAvatarAnimationSuiteRequest(value) {
   if (targetCanvas.width !== 1024 || targetCanvas.height !== 1536) {
     fail('PROJECT_ART_AVATAR_ANIMATION_CANVAS_INVALID');
   }
+  const animationIdentityMaster = legacy
+    ? null
+    : parseAnimationIdentityMaster(value.animationIdentityMaster, characterId);
+  if (
+    !legacy &&
+    characterId === 'top-hat-man' &&
+    animationIdentityMaster === null
+  ) {
+    fail(
+      'PROJECT_ART_AVATAR_ANIMATION_MASTER_REQUIRED',
+      'Top Hat v2 requests require a hash-bound full-body animation identity master.',
+    );
+  }
+  if (
+    animationIdentityMaster !== null &&
+    (animationIdentityMaster.asset.width !== targetCanvas.width ||
+      animationIdentityMaster.asset.height !== targetCanvas.height)
+  ) {
+    fail(
+      'PROJECT_ART_AVATAR_ANIMATION_MASTER_CANVAS_INVALID',
+      'The animation identity master must exactly match the target canvas.',
+    );
+  }
   return Object.freeze({
-    schema: AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA,
+    schema: value.schema,
     sessionId: id(value.sessionId, 'sessionId'),
     requestedAt: timestamp(value.requestedAt, 'requestedAt'),
     characterId,
     source: parseSource(value.source),
+    ...(legacy ? {} : { animationIdentityMaster }),
     targetCanvas,
     requirements: parseRequirements(value.requirements),
     authority: parseAuthority(value.authority),
@@ -320,7 +489,13 @@ function identityRequirements(characterId) {
       ]);
 }
 
-function compileFrameJobs(characterId, clips, identityLock) {
+function compileFrameJobs(
+  characterId,
+  clips,
+  identityLock,
+  identityReferenceSetSha256,
+  hasAnimationIdentityMaster,
+) {
   const jobs = [];
   for (const entry of clips) {
     for (let ordinal = 0; ordinal < entry.targetFrames; ordinal += 1) {
@@ -344,17 +519,21 @@ function compileFrameJobs(characterId, clips, identityLock) {
           ),
           referenceRoles: Object.freeze([
             'canonical-identity',
+            ...(hasAnimationIdentityMaster ? ['animation-identity-master'] : []),
             ...(ordinal > 0 ? ['previous-approved-frame'] : []),
             ...(entry.loopMode === 'loop' && ordinal === entry.targetFrames - 1
               ? ['loop-opening-frame']
               : []),
           ]),
+          identityReferenceSetSha256,
           identityLock,
           promptContract: Object.freeze({
             oneFrameOnly: true,
             contactSheetForbidden: true,
             spriteSheetInProviderOutputForbidden: true,
             preserveCanvasAndRegistration: true,
+            canonicalIdentityReferenceRequired: true,
+            animationIdentityMasterRequired: hasAnimationIdentityMaster,
             separatedMouthUnderlay: entry.kind.startsWith('talk-'),
             backgroundInstruction:
               'Use native file alpha when genuinely supported; otherwise use one declared flat high-chroma matte selected for low subject collision. Never draw a checkerboard, transparency grid, scenery, gradient, floor or shadow outside the character. Preserve subject lighting; add no matte spill, complementary rim, coloured outline, halo, glow or chromatic aberration. Keep safe matte clearance on every canvas side.',
@@ -383,7 +562,11 @@ function compileFrameJobs(characterId, clips, identityLock) {
   return Object.freeze(jobs);
 }
 
-function compilePoseJobs(characterId) {
+function compilePoseJobs(
+  characterId,
+  identityReferenceSetSha256,
+  hasAnimationIdentityMaster,
+) {
   const mouths = MOUTH_POSES.flatMap((pose) =>
     Array.from({ length: pose.variants }, (_, ordinal) =>
       Object.freeze({
@@ -391,6 +574,11 @@ function compilePoseJobs(characterId) {
         layer: 'mouth',
         pose: pose.id,
         energy: pose.variants === 1 ? 'neutral' : ordinal === 0 ? 'relaxed' : 'energetic',
+        referenceRoles: Object.freeze([
+          'canonical-identity',
+          ...(hasAnimationIdentityMaster ? ['animation-identity-master'] : []),
+        ]),
+        identityReferenceSetSha256,
         registration: 'full-canvas-pixel-exact',
         transparentRgbaRequired: true,
       }),
@@ -401,6 +589,11 @@ function compilePoseJobs(characterId) {
       jobId: `${characterId}-eyes-${pose}`,
       layer: 'eyes',
       pose,
+      referenceRoles: Object.freeze([
+        'canonical-identity',
+        ...(hasAnimationIdentityMaster ? ['animation-identity-master'] : []),
+      ]),
+      identityReferenceSetSha256,
       registration: 'full-canvas-pixel-exact',
       transparentRgbaRequired: true,
     }),
@@ -413,19 +606,52 @@ export function compileProjectArtAvatarAnimationSuite(value, options = {}) {
   const compiledAt = timestamp(options.compiledAt, 'compiledAt');
   const clips = Object.freeze([...CLIPS, signatureClip(request.characterId)]);
   const identityLock = identityRequirements(request.characterId);
-  const frameJobs = compileFrameJobs(request.characterId, clips, identityLock);
-  const poseJobs = compilePoseJobs(request.characterId);
+  const animationIdentityMaster = request.animationIdentityMaster ?? null;
+  const identityReferences = Object.freeze({
+    canonicalIdentity: request.source,
+    animationIdentityMaster,
+  });
+  const identityReferenceSetSha256 = sha256(
+    Buffer.from(`${canonicalAvatarAnimationSuiteJson(identityReferences)}\n`, 'utf8'),
+  );
+  const hasAnimationIdentityMaster = animationIdentityMaster !== null;
+  const frameJobs = compileFrameJobs(
+    request.characterId,
+    clips,
+    identityLock,
+    identityReferenceSetSha256,
+    hasAnimationIdentityMaster,
+  );
+  const poseJobs = compilePoseJobs(
+    request.characterId,
+    identityReferenceSetSha256,
+    hasAnimationIdentityMaster,
+  );
   const requestSha256 = sha256(
     Buffer.from(`${canonicalAvatarAnimationSuiteJson(request)}\n`, 'utf8'),
   );
   const body = Object.freeze({
     schema: AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
+    requestSchema: request.schema,
     sessionId: request.sessionId,
     characterId: request.characterId,
     requestedAt: request.requestedAt,
     compiledAt,
     requestSha256,
     source: request.source,
+    animationIdentityMaster,
+    identityReferences,
+    identityReferenceSetSha256,
+    identityReferencePolicy: Object.freeze({
+      canonicalIdentityRole: 'face-character-design-and-style-lock',
+      animationIdentityMasterRole: hasAnimationIdentityMaster
+        ? 'full-body-canvas-registration-silhouette-and-proportion-lock'
+        : 'not-provided',
+      allImageJobsHashBound: true,
+      unapprovedAnimationMasterMaySeedGenerationOnly: hasAnimationIdentityMaster,
+      animationMasterCannotGrantCandidateApproval: true,
+      animationMasterCannotGrantRuntimeActivation: true,
+    }),
     targetCanvas: request.targetCanvas,
     identityLock,
     clips,
@@ -553,6 +779,10 @@ export function projectArtAvatarAnimationSuiteCapabilities() {
   return Object.freeze({
     schema: AVATAR_ANIMATION_SUITE_CAPABILITIES_SCHEMA,
     requestSchema: AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA,
+    acceptedRequestSchemas: Object.freeze([
+      AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1,
+      AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA,
+    ]),
     planSchema: AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
     characters: Object.freeze(['eva-female', 'top-hat-man']),
     completeClipMatrix: true,
@@ -561,6 +791,9 @@ export function projectArtAvatarAnimationSuiteCapabilities() {
     separatedMouthAndEyeLayers: true,
     audioTimedVisemes: true,
     continuityLinkedFrameJobs: true,
+    hashBoundAnimationIdentityMaster: true,
+    allImageJobsIdentityReferenceBound: true,
+    legacyCloudinaryOnlyRequestCompatibility: true,
     smartBackgroundRecovery: true,
     fakeTransparencyGridAllowed: false,
     createOnlyPlanWrites: true,

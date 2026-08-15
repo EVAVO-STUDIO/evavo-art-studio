@@ -8,6 +8,7 @@ import test from 'node:test';
 import {
   AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
   AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA,
+  AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1,
   ProjectArtAvatarAnimationSuiteError,
   compileProjectArtAvatarAnimationSuite,
   compileProjectArtAvatarAnimationSuiteFile,
@@ -29,6 +30,39 @@ function authority() {
     runtimeActivation: false,
     deployment: false,
     forcePush: false,
+  };
+}
+
+function topHatAnimationIdentityMaster() {
+  return {
+    provider: 'git-repository-asset',
+    repository: 'EVAVO-STUDIO/evavo-avatar-runtime',
+    commit: 'd212eb42a98d1e4f860d9edf8e336dfa2fdf89fd',
+    tree: 'da576b10d9f1fea12a7fba84da50a8ca06ac9f70',
+    asset: {
+      path:
+        'assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png',
+      mediaType: 'image/png',
+      format: 'png',
+      width: 1024,
+      height: 1536,
+      bytes: 647297,
+      sha256:
+        '92cb290246a7629024dcb7768f4119f6a139d9c9f59e3d0545563e1f5b35575a',
+      alpha: 'rgba8-straight',
+    },
+    candidateManifest: {
+      path:
+        'assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.candidate.json',
+      sha256:
+        '9861873478898b54ec0f1413d9898fde9807351b21b1bc3105430213cfbae670',
+    },
+    lifecycle: {
+      approvalState: 'unapproved',
+      productionReady: false,
+      runtimeActivationEligible: false,
+      maySeedAnimationGeneration: true,
+    },
   };
 }
 
@@ -68,6 +102,7 @@ function request(characterId = 'top-hat-man') {
           secureUrl:
             'https://res.cloudinary.com/dntogqtey/image/upload/v1785146100/EVA_Fallback_mlk4.png',
         },
+    animationIdentityMaster: topHat ? topHatAnimationIdentityMaster() : null,
     targetCanvas: { width: 1024, height: 1536 },
     requirements: {
       multipleIdleVariants: 4,
@@ -99,6 +134,17 @@ test('compiler creates the complete professional Top Hat production plan', () =>
   assert.ok(
     plan.identityLock.some((line) => line.includes('top-hat crown height')),
   );
+  assert.equal(
+    plan.animationIdentityMaster.asset.sha256,
+    '92cb290246a7629024dcb7768f4119f6a139d9c9f59e3d0545563e1f5b35575a',
+  );
+  assert.equal(plan.identityReferences.canonicalIdentity.provider, 'cloudinary');
+  assert.equal(
+    plan.identityReferences.animationIdentityMaster.lifecycle.approvalState,
+    'unapproved',
+  );
+  assert.match(plan.identityReferenceSetSha256, /^[a-f0-9]{64}$/u);
+  assert.equal(plan.identityReferencePolicy.allImageJobsHashBound, true);
   assert.equal(plan.qualityGates.topHatGeometryDriftBlocking, true);
   assert.equal(plan.productionReady, false);
   assert.ok(Object.values(plan.authority).every((value) => value === false));
@@ -112,6 +158,8 @@ test('every frame job carries continuity, real-alpha and assurance controls', ()
     plan.frameJobs.every(
       (job) =>
         job.referenceRoles.includes('canonical-identity') &&
+        !job.referenceRoles.includes('animation-identity-master') &&
+        job.promptContract.animationIdentityMasterRequired === false &&
         job.alphaMastering.operation === 'media.background-recovery' &&
         job.alphaMastering.paintedGridNeverAcceptedAsAlpha &&
         job.alphaMastering.edgeColourUnmixingRequired &&
@@ -133,6 +181,40 @@ test('every frame job carries continuity, real-alpha and assurance controls', ()
   );
 });
 
+test('every Top Hat frame and registered pose is bound to the full-body alpha master', () => {
+  const plan = compileProjectArtAvatarAnimationSuite(request(), {
+    compiledAt: FIXED_TIME,
+  });
+  const jobs = [...plan.frameJobs, ...plan.poseJobs];
+  assert.equal(jobs.length, plan.counts.totalPlannedImages);
+  assert.ok(
+    jobs.every(
+      (job) =>
+        job.referenceRoles.includes('canonical-identity') &&
+        job.referenceRoles.includes('animation-identity-master') &&
+        job.identityReferenceSetSha256 === plan.identityReferenceSetSha256,
+    ),
+  );
+  assert.ok(
+    plan.frameJobs.every(
+      (job) => job.promptContract.animationIdentityMasterRequired === true,
+    ),
+  );
+});
+
+test('legacy v1 Cloudinary-only requests remain deterministic and non-activating', () => {
+  const value = request();
+  value.schema = AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1;
+  delete value.animationIdentityMaster;
+  const plan = compileProjectArtAvatarAnimationSuite(value, {
+    compiledAt: FIXED_TIME,
+  });
+  assert.equal(plan.requestSchema, AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1);
+  assert.equal(plan.animationIdentityMaster, null);
+  assert.equal(plan.identityReferencePolicy.allImageJobsHashBound, true);
+  assert.equal(plan.runtimeActivationAllowed, false);
+});
+
 test('fake transparency, authority escalation and incomplete animation coverage fail closed', () => {
   for (const mutate of [
     (value) => {
@@ -143,6 +225,37 @@ test('fake transparency, authority escalation and incomplete animation coverage 
     },
     (value) => {
       value.requirements.multipleTalkVariants = 1;
+    },
+  ]) {
+    const value = request();
+    mutate(value);
+    assert.throws(
+      () => compileProjectArtAvatarAnimationSuite(value, { compiledAt: FIXED_TIME }),
+      (error) => error instanceof ProjectArtAvatarAnimationSuiteError,
+    );
+  }
+});
+
+test('v2 Top Hat master substitution, path escape and readiness escalation fail closed', () => {
+  for (const mutate of [
+    (value) => {
+      value.animationIdentityMaster = null;
+    },
+    (value) => {
+      value.animationIdentityMaster.commit = '0'.repeat(39);
+    },
+    (value) => {
+      value.animationIdentityMaster.asset.path =
+        'assets/top-hat-man/candidates/../forged.alpha.png';
+    },
+    (value) => {
+      value.animationIdentityMaster.asset.sha256 = 'not-a-sha256';
+    },
+    (value) => {
+      value.animationIdentityMaster.lifecycle.productionReady = true;
+    },
+    (value) => {
+      value.animationIdentityMaster.asset.width = 1023;
     },
   ]) {
     const value = request();
@@ -188,6 +301,11 @@ test('capabilities expose animation quality without claiming execution', () => {
   assert.equal(capabilities.multipleIdleVariants, 4);
   assert.equal(capabilities.multipleTalkVariants, 6);
   assert.equal(capabilities.smartBackgroundRecovery, true);
+  assert.equal(capabilities.hashBoundAnimationIdentityMaster, true);
+  assert.deepEqual(capabilities.acceptedRequestSchemas, [
+    AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1,
+    AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA,
+  ]);
   assert.equal(capabilities.fakeTransparencyGridAllowed, false);
   assert.equal(capabilities.providerExecution, false);
 });

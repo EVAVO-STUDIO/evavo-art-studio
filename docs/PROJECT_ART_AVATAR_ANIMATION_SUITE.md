@@ -1,6 +1,6 @@
 # Project Art avatar animation suite
 
-The avatar animation suite turns one immutable Cloudinary identity source into a deterministic production plan for either `eva-female` or `top-hat-man`. It is a planning boundary: it never calls a provider, approves a candidate, mutates the source, activates the runtime or publishes files.
+The avatar animation suite turns immutable identity references into a deterministic production plan for either `eva-female` or `top-hat-man`. The canonical Cloudinary portrait remains the face, character-design and style lock. A v2 request can additionally bind a full-body RGBA animation master by repository, commit, tree, asset path, asset SHA-256, manifest path and manifest SHA-256. It is a planning boundary: it never calls a provider, approves a candidate, mutates a source, activates the runtime or publishes files.
 
 ## Production matrix
 
@@ -16,7 +16,9 @@ Talking body frames deliberately use a separated mouth underlay. Runtime visemes
 
 ## Transparency and continuity
 
-Each frame job is conditioned on the canonical identity and its previous approved frame. Loop endings also reference the opening frame. All jobs preserve the same canvas, pivot and baseline.
+Each frame job is conditioned on the canonical identity and its previous approved frame. When a full-body animation master is present, every one of the 315 frame jobs and 17 registered pose jobs also names the `animation-identity-master` role and carries the same SHA-256 identity-reference-set binding. Loop endings additionally reference the opening frame. All jobs preserve the same canvas, pivot and baseline.
+
+Top Hat v2 requests require the full-body master. The repository source is accepted only from `EVAVO-STUDIO/evavo-avatar-runtime`, only from the character's bounded candidate directory, only with full Git object IDs and SHA-256 values, and only when it exactly matches the `1024x1536` target canvas. Its lifecycle must remain `unapproved`, non-production and non-activatable while `maySeedAnimationGeneration` permits controlled key-pose work. The master cannot grant approval or runtime authority.
 
 Native provider alpha is preferred. If it is unavailable, the job declares one flat green, magenta or blue matte selected for low colour collision with the character. Mastering uses border-connected segmentation, edge-colour unmixing and hidden-RGB cleanup. Painted checkerboards, transparency grids, scenery, gradients and contact sheets are forbidden provider output and remain blocking even when they visually resemble transparency.
 
@@ -24,11 +26,12 @@ Frames require two independent inspectors at 0.95 confidence, adjacent-frame con
 
 ## Compile a create-only plan
 
-Prepare an exact `evavo.project-art-avatar-animation-suite-request.v1` JSON document with:
+Prepare an exact `evavo.project-art-avatar-animation-suite-request.v2` JSON document with:
 
 - a canonical request timestamp and safe session identifier;
 - character ID `eva-female` or `top-hat-man`;
 - an immutable Cloudinary source identity, dimensions and HTTPS delivery URL;
+- `animationIdentityMaster`: `null` for a character that does not yet have one, or a hash-bound repository alpha candidate. It is mandatory for Top Hat v2 requests;
 - target canvas `1024x1536`;
 - exactly four idles, six talks, separate mouth and eye layers, exact audio timing, genuine transparency, no fake grid and professional frame assurance;
 - every authority flag set to `false`.
@@ -43,6 +46,8 @@ pnpm run project-art:avatar-animation:compile -- \
 ```
 
 The output path must not already exist. The plan binds the normalized request and the full plan with SHA-256 hashes, retains lossless RGBA PNG masters and declares lossless WebP/PNG runtime delivery.
+
+Legacy Cloudinary-only v1 requests remain accepted for deterministic compatibility, but they do not claim a full-body animation-master reference. New Top Hat production handoffs must use v2.
 
 Trusted agents can expose the same compiler over stdio with `pnpm run project-art:avatar-animation:mcp`. File compilation remains root-confined and write-gated; the capabilities call is read-only.
 
