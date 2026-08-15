@@ -319,6 +319,30 @@ test("background recovery defeats a transparent-rim bypass around a visible pain
   assert.deepEqual(pixel(await rgba(result.png), 0, 64), [0, 0, 0, 0]);
 });
 
+test("background recovery defeats a partial-alpha painted grid inside a clear rim", async () => {
+  const width = 128;
+  const height = 128;
+  const candidate = await raster(width, height, 4, (x, y) => {
+    if (x >= 42 && x <= 85 && y >= 35 && y <= 92) {
+      return [208, 72, 48, 255];
+    }
+    const value =
+      (Math.floor(x / 16) + Math.floor(y / 16)) % 2 ? 176 : 224;
+    const alpha =
+      x === 0 || y === 0 || x === width - 1 || y === height - 1
+        ? 0
+        : 128;
+    return [value, value, value, alpha];
+  });
+  const result = await recoverBackgroundAlpha(candidate);
+  assert.equal(result.evidence.strategy, "checkerboard-recovery");
+  assert.equal(result.evidence.classification.checkerboard.detected, true);
+  assert.ok(
+    result.evidence.classification.checkerboard.visibleBorderFraction >= 0.7,
+  );
+  assert.deepEqual(pixel(await rgba(result.png), 1, 64), [0, 0, 0, 0]);
+});
+
 test("background recovery defeats a transparent-rim bypass around a declared solid matte", async () => {
   const candidate = await raster(96, 96, 4, (x, y) => {
     if (x === 0 || y === 0 || x === 95 || y === 95) {

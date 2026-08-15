@@ -122,6 +122,7 @@ export interface CheckerboardDetectionEvidence {
   readonly detected: boolean;
   readonly confidence: number;
   readonly sampledBorderPixels: number;
+  readonly visibleBorderFraction: number;
   readonly opaqueBorderFraction: number;
   readonly lowChromaBorderFraction: number;
   readonly tileSize: number | null;
@@ -399,6 +400,7 @@ function checkerSamples(source: Readonly<{
 }>): Readonly<{
   samples: readonly CheckerSample[];
   sampledPixels: number;
+  visibleFraction: number;
   opaqueFraction: number;
   lowChromaFraction: number;
 }> {
@@ -410,6 +412,7 @@ function checkerSamples(source: Readonly<{
   const stride = Math.max(1, Math.ceil(Math.sqrt(bandPixels / 40_000)));
   const samples: CheckerSample[] = [];
   let sampledPixels = 0;
+  let visible = 0;
   let opaque = 0;
   let lowChroma = 0;
   for (let y = 0; y < source.height; y += stride) {
@@ -430,8 +433,10 @@ function checkerSamples(source: Readonly<{
       // Fit only pixels whose grid would actually be visible. Hidden RGB
       // beneath genuine alpha must never turn a valid transparent PNG into a
       // checkerboard-recovery candidate.
-      if (source.data[offset + 3]! >= 254) {
-        opaque += 1;
+      const alpha = source.data[offset + 3]!;
+      if (alpha >= 32) {
+        visible += 1;
+        if (alpha >= 254) opaque += 1;
         if (Math.max(red, green, blue) - Math.min(red, green, blue) <= 32) {
           lowChroma += 1;
         }
@@ -442,8 +447,9 @@ function checkerSamples(source: Readonly<{
   return {
     samples,
     sampledPixels,
+    visibleFraction: sampledPixels ? visible / sampledPixels : 0,
     opaqueFraction: sampledPixels ? opaque / sampledPixels : 0,
-    lowChromaFraction: opaque ? lowChroma / opaque : 0,
+    lowChromaFraction: visible ? lowChroma / visible : 0,
   };
 }
 
@@ -606,7 +612,8 @@ export function detectPaintedTransparencyCheckerboard(
     best &&
       // A thin real-alpha rim or a few token-transparent pixels must not let
       // an otherwise visible painted grid bypass classification.
-      sampleSet.opaqueFraction >= 0.25 &&
+      (sampleSet.opaqueFraction >= 0.25 ||
+        sampleSet.visibleFraction >= 0.7) &&
       (neutralGrid || chromaticGrid),
   );
   const confidence = detected && best
@@ -621,6 +628,7 @@ export function detectPaintedTransparencyCheckerboard(
     detected,
     confidence: Number(confidence.toFixed(6)),
     sampledBorderPixels: sampleSet.sampledPixels,
+    visibleBorderFraction: Number(sampleSet.visibleFraction.toFixed(6)),
     opaqueBorderFraction: Number(sampleSet.opaqueFraction.toFixed(6)),
     lowChromaBorderFraction: Number(sampleSet.lowChromaFraction.toFixed(6)),
     tileSize: best ? best.tileSize : null,
@@ -1082,7 +1090,7 @@ async function recoverCheckerboard(
     const value = Math.min(firstDistance, secondDistance);
     const squared = Math.round(value * value);
     matteDistance[pixel] = squared;
-    if (source.data[offset + 3]! <= 1 || squared <= connectionSquared) {
+    if (source.data[offset + 3]! < 254 || squared <= connectionSquared) {
       eligible[pixel] = 1;
     }
   }

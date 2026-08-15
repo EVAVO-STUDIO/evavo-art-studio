@@ -109,6 +109,9 @@ export interface SpriteFakeTransparencyEvidence {
   readonly checkerboardConfidence: number;
   readonly checkerboardTileSize: number | null;
   readonly checkerboardColours: readonly RgbaColour[];
+  readonly checkerboardFitFraction: number | null;
+  readonly checkerboardCoverageFraction: number | null;
+  readonly checkerboardRmse: number | null;
 }
 
 export interface SpriteHaloEvidence {

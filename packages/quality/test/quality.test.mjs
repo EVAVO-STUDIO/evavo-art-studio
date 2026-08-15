@@ -107,6 +107,76 @@ test("rejects a large painted checkerboard even when a small patch has real alph
   assert.equal(report.fakeTransparency.checkerboardTileSize, 48);
 });
 
+test("rejects a subtle resampled checkerboard behind a dominant foreground", () => {
+  const width = 230;
+  const height = 253;
+  const decoded = frame(width, height, (x, y) => {
+    if (x >= 40 && x <= 190 && y >= 28 && y <= 238) {
+      return [72, 31, 18, 255];
+    }
+    const parity =
+      (Math.floor(x / 23.5) + Math.floor(y / 23.5)) % 2;
+    const noise = (x * 3 + y * 5) % 3;
+    const value = (parity ? 243 : 252) + noise;
+    return [value, value, value, 255];
+  }, false);
+  const report = analyseDecodedSpriteFrame(decoded, {
+    ...expectations,
+    frameId: "subtle-resampled-checkerboard",
+    expectedWidth: width,
+    expectedHeight: height,
+    safePadding: 0,
+  });
+  assert.equal(report.passed, false);
+  assert.equal(report.fakeTransparency.checkerboardDetected, true);
+  assert.ok([22, 23, 24].includes(report.fakeTransparency.checkerboardTileSize));
+  assert.ok(report.fakeTransparency.checkerboardCoverageFraction >= 0.5);
+  assert.ok(report.fakeTransparency.checkerboardFitFraction >= 0.82);
+});
+
+test("rejects a partial-alpha checkerboard hidden inside a transparent rim", () => {
+  const width = 128;
+  const height = 128;
+  const decoded = frame(width, height, (x, y) => {
+    if (x >= 42 && x <= 85 && y >= 35 && y <= 92) {
+      return [208, 72, 48, 255];
+    }
+    const value =
+      (Math.floor(x / 16) + Math.floor(y / 16)) % 2 ? 176 : 224;
+    const alpha =
+      x === 0 || y === 0 || x === width - 1 || y === height - 1
+        ? 0
+        : 128;
+    return [value, value, value, alpha];
+  });
+  const report = analyseDecodedSpriteFrame(decoded, {
+    ...expectations,
+    frameId: "partial-alpha-grid-bypass",
+    expectedWidth: width,
+    expectedHeight: height,
+    safePadding: 0,
+  });
+  assert.equal(report.fakeTransparency.checkerboardDetected, true);
+  assert.equal(report.passed, false);
+});
+
+test("does not label low-contrast neutral stripes as a checkerboard", () => {
+  const width = 230;
+  const height = 253;
+  const decoded = frame(width, height, (x) => {
+    const value = Math.floor(x / 23.5) % 2 ? 243 : 252;
+    return [value, value, value, 255];
+  }, false);
+  const report = analyseDecodedSpriteFrame(decoded, {
+    ...expectations,
+    frameId: "neutral-stripes",
+    expectedWidth: width,
+    expectedHeight: height,
+    safePadding: 0,
+  });
+  assert.equal(report.fakeTransparency.checkerboardDetected, false);
+});
+
 test("accepts intentional transparent edge bleed that agrees with the subject", () => {
   const decoded = frame(16, 16, (x, y) => {
     const subject = x >= 5 && x <= 10 && y >= 4 && y <= 11;

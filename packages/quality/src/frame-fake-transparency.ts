@@ -1,6 +1,5 @@
 import { clamp01, colourDistance, nearestColourDistance, quantizedColourKey } from "./math.js";
 import type { DecodedSpriteFrame, NormalizedSpriteFrameQualityExpectations, RgbaColour, SpriteAlphaEvidence, SpriteFakeTransparencyEvidence } from "./types.js";
-import { colourAt } from "./frame-shared.js";
 
 interface ColourBucket {
   count: number;
@@ -57,74 +56,226 @@ function borderIndices(width: number, height: number): number[] {
   return result;
 }
 
-function nearestOfTwo(colour: RgbaColour, colours: readonly RgbaColour[]): number {
-  const left = colourDistance(colour, colours[0]!);
-  const right = colourDistance(colour, colours[1]!);
-  return left <= right ? 0 : 1;
+interface CheckerSample extends RgbaColour {
+  readonly x: number;
+  readonly y: number;
 }
 
-function checkerboardEvidence(
-  frame: DecodedSpriteFrame,
-  topColours: readonly Readonly<{ colour: RgbaColour; fraction: number }>[],
-): Readonly<{
+interface CheckerFit {
+  readonly tileSize: number;
+  readonly colours: readonly [RgbaColour, RgbaColour];
+  readonly separation: number;
+  readonly fitFraction: number;
+  readonly coverageFraction: number;
+  readonly rmse: number;
+  readonly score: number;
+}
+
+const CHECKER_TILE_SIZES = Object.freeze([
+  2, 3, 4, 6, 8, 10, 12, 16, 20, 22, 23, 24, 26, 28, 32, 48, 64, 96, 128,
+]);
+
+function checkerSamples(frame: DecodedSpriteFrame): Readonly<{
+  samples: readonly CheckerSample[];
+  visibleFraction: number;
+  opaqueFraction: number;
+  lowChromaFraction: number;
+}> {
+  const band = Math.max(8, Math.floor(Math.min(frame.width, frame.height) * 0.16));
+  const bandPixels =
+    frame.width * frame.height -
+    Math.max(0, frame.width - band * 2) *
+      Math.max(0, frame.height - band * 2);
+  const stride = Math.max(1, Math.ceil(Math.sqrt(bandPixels / 40_000)));
+  const samples: CheckerSample[] = [];
+  let sampled = 0;
+  let visible = 0;
+  let opaque = 0;
+  let lowChroma = 0;
+  for (let y = 0; y < frame.height; y += stride) {
+    for (let x = 0; x < frame.width; x += stride) {
+      if (
+        x >= band &&
+        x < frame.width - band &&
+        y >= band &&
+        y < frame.height - band
+      ) {
+        continue;
+      }
+      sampled += 1;
+      const offset = (y * frame.width + x) * 4;
+      const alpha = frame.data[offset + 3]!;
+      if (alpha < 32) continue;
+      const red = frame.data[offset]!;
+      const green = frame.data[offset + 1]!;
+      const blue = frame.data[offset + 2]!;
+      visible += 1;
+      if (alpha >= 254) opaque += 1;
+      if (Math.max(red, green, blue) - Math.min(red, green, blue) <= 32) {
+        lowChroma += 1;
+      }
+      samples.push({ x, y, r: red, g: green, b: blue });
+    }
+  }
+  return {
+    samples,
+    visibleFraction: sampled ? visible / sampled : 0,
+    opaqueFraction: sampled ? opaque / sampled : 0,
+    lowChromaFraction: visible ? lowChroma / visible : 0,
+  };
+}
+
+function fitCheckerboard(
+  samples: readonly CheckerSample[],
+  tileSize: number,
+  phaseX: number,
+  phaseY: number,
+): CheckerFit | null {
+  const bins = [new Map<number, ColourBucket>(), new Map<number, ColourBucket>()];
+  for (const sample of samples) {
+    const parity =
+      (Math.floor((sample.x + phaseX) / tileSize) +
+        Math.floor((sample.y + phaseY) / tileSize)) &
+      1;
+    const key =
+      (Math.floor(sample.r / 8) << 10) |
+      (Math.floor(sample.g / 8) << 5) |
+      Math.floor(sample.b / 8);
+    const bucket = bins[parity]!.get(key) ?? {
+      count: 0,
+      red: 0,
+      green: 0,
+      blue: 0,
+    };
+    bucket.count += 1;
+    bucket.red += sample.r;
+    bucket.green += sample.g;
+    bucket.blue += sample.b;
+    bins[parity]!.set(key, bucket);
+  }
+  const dominant = bins.map((entries) => {
+    let best: ColourBucket | null = null;
+    for (const entry of entries.values()) {
+      if (!best || entry.count > best.count) best = entry;
+    }
+    return best;
+  });
+  if (!dominant[0] || !dominant[1] || dominant[0].count < 16 || dominant[1].count < 16) {
+    return null;
+  }
+  const colours = dominant.map((entry) => ({
+    r: entry!.red / entry!.count,
+    g: entry!.green / entry!.count,
+    b: entry!.blue / entry!.count,
+  })) as [RgbaColour, RgbaColour];
+  const separation = colourDistance(colours[0], colours[1]);
+  const fitDistance = Math.max(14, separation * 0.28);
+  let fitted = 0;
+  let eligible = 0;
+  let fittedSquaredError = 0;
+  for (const sample of samples) {
+    const parity =
+      (Math.floor((sample.x + phaseX) / tileSize) +
+        Math.floor((sample.y + phaseY) / tileSize)) &
+      1;
+    const expectedDistance = colourDistance(sample, colours[parity]!);
+    const alternateDistance = colourDistance(sample, colours[parity ^ 1]!);
+    if (Math.min(expectedDistance, alternateDistance) <= fitDistance) eligible += 1;
+    if (expectedDistance <= fitDistance && expectedDistance <= alternateDistance) {
+      fitted += 1;
+      fittedSquaredError += expectedDistance * expectedDistance;
+    }
+  }
+  const fitFraction = fitted / Math.max(1, eligible);
+  const coverageFraction = eligible / Math.max(1, samples.length);
+  const rmse = Math.sqrt(fittedSquaredError / Math.max(1, fitted));
+  return {
+    tileSize,
+    colours,
+    separation,
+    fitFraction,
+    coverageFraction,
+    rmse,
+    score:
+      (fitFraction * separation * Math.sqrt(coverageFraction)) /
+      Math.max(1, rmse),
+  };
+}
+
+function checkerboardEvidence(frame: DecodedSpriteFrame): Readonly<{
   detected: boolean;
   confidence: number;
   tileSize: number | null;
   colours: readonly RgbaColour[];
+  fitFraction: number | null;
+  coverageFraction: number | null;
+  rmse: number | null;
 }> {
-  if (topColours.length < 2) {
-    return { detected: false, confidence: 0, tileSize: null, colours: [] };
-  }
-  const colours = [topColours[0]!.colour, topColours[1]!.colour] as const;
-  const coverage = topColours[0]!.fraction + topColours[1]!.fraction;
-  if (coverage < 0.55 || colourDistance(colours[0], colours[1]) < 24) {
-    return { detected: false, confidence: 0, tileSize: null, colours };
-  }
-
-  const maximumTile = Math.max(2, Math.floor(Math.min(frame.width, frame.height) / 2));
-  const candidates = [2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128].filter(
-    (entry) => entry <= maximumTile,
-  );
-  const sampleStride = Math.max(1, Math.floor(Math.sqrt((frame.width * frame.height) / 4096)));
-  let bestConfidence = 0;
-  let bestTile: number | null = null;
-
-  for (const tile of candidates) {
+  const sampleSet = checkerSamples(frame);
+  let best: CheckerFit | null = null;
+  for (const tile of CHECKER_TILE_SIZES) {
+    if (frame.width / tile < 4 || frame.height / tile < 4) continue;
     const offsets = [...new Set([0, Math.floor(tile / 4), Math.floor(tile / 2), Math.floor((3 * tile) / 4)])];
     for (const offsetX of offsets) {
       for (const offsetY of offsets) {
-        let considered = 0;
-        let matchesNormal = 0;
-        let matchesFlipped = 0;
-        for (let y = 0; y < frame.height; y += sampleStride) {
-          for (let x = 0; x < frame.width; x += sampleStride) {
-            const colour = colourAt(frame, x, y);
-            const nearest = nearestOfTwo(colour, colours);
-            const nearestDistance = colourDistance(colour, colours[nearest]!);
-            if (nearestDistance > 56) continue;
-            const parity =
-              (Math.floor((x + offsetX) / tile) + Math.floor((y + offsetY) / tile)) % 2;
-            considered += 1;
-            if (nearest === parity) matchesNormal += 1;
-            if (nearest === 1 - parity) matchesFlipped += 1;
-          }
-        }
-        if (considered < 32) continue;
-        const pattern = Math.max(matchesNormal, matchesFlipped) / considered;
-        const confidence = pattern * (0.65 + 0.35 * coverage);
-        if (confidence > bestConfidence) {
-          bestConfidence = confidence;
-          bestTile = tile;
-        }
+        const fit = fitCheckerboard(sampleSet.samples, tile, offsetX, offsetY);
+        if (fit && (!best || fit.score > best.score)) best = fit;
       }
     }
   }
-
+  const neutralGrid = Boolean(
+    best &&
+      sampleSet.lowChromaFraction >= 0.78 &&
+      ((best.separation >= 18 &&
+        best.rmse <= 18 &&
+        best.fitFraction >= 0.88 &&
+        best.coverageFraction >= 0.3) ||
+        (best.separation >= 10 &&
+          best.rmse <= 4 &&
+          best.fitFraction >= 0.82 &&
+          best.coverageFraction >= 0.5 &&
+          frame.width / best.tileSize >= 8 &&
+          frame.height / best.tileSize >= 8)),
+  );
+  const chromaticGrid = Boolean(
+    best &&
+      best.separation >= 32 &&
+      best.rmse <= 12 &&
+      best.fitFraction >= 0.92 &&
+      best.coverageFraction >= 0.3,
+  );
+  const detected = Boolean(
+    best &&
+      (sampleSet.opaqueFraction >= 0.25 ||
+        sampleSet.visibleFraction >= 0.7) &&
+      (neutralGrid || chromaticGrid),
+  );
+  const confidence = detected && best
+    ? Math.max(
+        0.86,
+        Math.min(
+          1,
+          best.fitFraction *
+            Math.min(1, 8 / Math.max(1, best.rmse)) *
+            (0.9 + 0.1 * Math.sqrt(best.coverageFraction)),
+        ),
+      )
+    : 0;
   return {
-    detected: bestTile !== null,
-    confidence: Number(clamp01(bestConfidence).toFixed(6)),
-    tileSize: bestTile,
-    colours,
+    detected,
+    confidence: Number(clamp01(confidence).toFixed(6)),
+    tileSize: detected && best ? best.tileSize : null,
+    colours: detected && best
+      ? best.colours.map((colour) => ({
+          r: Math.round(colour.r),
+          g: Math.round(colour.g),
+          b: Math.round(colour.b),
+        }))
+      : [],
+    fitFraction: detected && best ? Number(best.fitFraction.toFixed(6)) : null,
+    coverageFraction:
+      detected && best ? Number(best.coverageFraction.toFixed(6)) : null,
+    rmse: detected && best ? Number(best.rmse.toFixed(4)) : null,
   };
 }
 
@@ -150,12 +301,18 @@ export function fakeTransparencyEvidence(
     dominant.fraction >= expectations.flatMatteBorderThreshold &&
     (nearestMatteDistance ?? Number.POSITIVE_INFINITY) <= 48;
 
-  const allIndices = Array.from({ length: frame.width * frame.height }, (_, index) => index);
-  const overallColours = dominantColours(frame, allIndices, 2);
   const checkerboard =
     expectations.transparency === "opaque" || !opaqueLike
-      ? { detected: false, confidence: 0, tileSize: null, colours: [] as readonly RgbaColour[] }
-      : checkerboardEvidence(frame, overallColours);
+      ? {
+          detected: false,
+          confidence: 0,
+          tileSize: null,
+          colours: [] as readonly RgbaColour[],
+          fitFraction: null,
+          coverageFraction: null,
+          rmse: null,
+        }
+      : checkerboardEvidence(frame);
 
   return {
     flatMatteDetected,
@@ -170,6 +327,8 @@ export function fakeTransparencyEvidence(
     checkerboardConfidence: checkerboard.confidence,
     checkerboardTileSize: checkerboard.tileSize,
     checkerboardColours: checkerboard.colours,
+    checkerboardFitFraction: checkerboard.fitFraction,
+    checkerboardCoverageFraction: checkerboard.coverageFraction,
+    checkerboardRmse: checkerboard.rmse,
   };
 }
-

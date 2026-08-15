@@ -164,6 +164,15 @@ export async function reviewArtBatchDirectory(
             checkerboardDetected: report.fakeTransparency.checkerboardDetected,
             checkerboardConfidence:
               report.fakeTransparency.checkerboardConfidence,
+            checkerboardTileSize:
+              report.fakeTransparency.checkerboardTileSize,
+            checkerboardFitFraction:
+              report.fakeTransparency.checkerboardFitFraction,
+            checkerboardCoverageFraction:
+              report.fakeTransparency.checkerboardCoverageFraction,
+            checkerboardRmse: report.fakeTransparency.checkerboardRmse,
+            checkerboardColours:
+              report.fakeTransparency.checkerboardColours,
           }),
           haloFraction: report.halo.haloFraction,
           unexpectedTransparentRgbFraction:
