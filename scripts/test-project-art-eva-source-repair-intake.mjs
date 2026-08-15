@@ -27,6 +27,9 @@ import {
   EVA_SOURCE_REPAIR_TASK_CATALOGUE_SHA256,
 } from './project-art/eva-source-repair-catalogue.mjs';
 import {
+  EVA_SOURCE_REPAIR_HAND_ENVELOPES,
+} from './project-art/eva-source-repair-candidate-assurance.mjs';
+import {
   EVA_SOURCE_REPAIR_PROVIDER_ADMISSIONS_SCHEMA,
   EVA_SOURCE_REPAIR_PROVIDER_PACKAGE_SCHEMA,
   compileProjectArtEvaSourceRepairProviderAdmissionsTemplate,
@@ -270,10 +273,8 @@ function providerAdmissions(intake) {
       candidateCountPerJob: 1,
       allowFallback: false,
     },
-    jobs: template.jobs.map((job) => ({
-      jobId: job.jobId,
-      selection: job.selection,
-      artifactBindings: job.artifactBindings.map((binding) => ({
+    jobs: template.jobs.map((job) => {
+      const artifactBindings = job.artifactBindings.map((binding) => ({
         ...binding,
         sourceSha256:
           binding.sourceSha256 ?? sha256(`mask:${job.jobId}`),
@@ -285,8 +286,109 @@ function providerAdmissions(intake) {
         ),
         actorId: 'eva-artifact-admitter',
         occurredAt: '2026-08-15T11:01:00.000Z',
-      })),
-    })),
+      }));
+      let maskAssurance = null;
+      if (job.jobId.startsWith('redraw:')) {
+        const frameId = job.jobId.replace(/^redraw:/u, '');
+        const repair = intake.providerPlan.repairJobs.find(
+          (entry) => entry.frameId === frameId,
+        );
+        const task = EVA_SOURCE_REPAIR_TASK_CATALOGUE.find(
+          (entry) => entry.frameId === frameId,
+        );
+        const maskBinding = artifactBindings.find(
+          (entry) => entry.bindingKey === 'defect-mask',
+        );
+        const envelopes = EVA_SOURCE_REPAIR_HAND_ENVELOPES[frameId];
+        const maskBody = {
+          schema: 'evavo.project-art-eva-source-repair-mask-assurance.v1',
+          phase: 'pre-dispatch-mask-admission',
+          frameId,
+          taskId: task.taskId,
+          inspectedAt: '2026-08-15T11:00:30.000Z',
+          intakeSha256: intake.intakeSha256,
+          canvas: { width: 1024, height: 1536 },
+          source: {
+            path: repair.sourcePath,
+            sha256: repair.sourceSha256,
+            gitBlobSha1: repair.sourceGitBlobSha1,
+            encoding: 'rgb8',
+            alphaChannelPresent: false,
+            identityAuthority: 'sealed-eva-source-repair-intake',
+          },
+          mask: {
+            path: maskBinding.sourcePath,
+            sha256: maskBinding.sourceSha256,
+            semantics: 'transparent-black-protected__opaque-white-editable',
+            connectivity: 4,
+            editablePixels: 3200,
+            protectedPixels: 1569664,
+            coverageRatio: 3200 / (1024 * 1536),
+            components: [
+              {
+                side: 'left',
+                pixelCount: 1600,
+                bounds: {
+                  minimumX: envelopes.left.minimumX + 10,
+                  minimumY: envelopes.left.minimumY + 10,
+                  maximumX: envelopes.left.minimumX + 49,
+                  maximumY: envelopes.left.minimumY + 49,
+                },
+                envelope: envelopes.left,
+              },
+              {
+                side: 'right',
+                pixelCount: 1600,
+                bounds: {
+                  minimumX: envelopes.right.minimumX + 10,
+                  minimumY: envelopes.right.minimumY + 10,
+                  maximumX: envelopes.right.minimumX + 49,
+                  maximumY: envelopes.right.minimumY + 49,
+                },
+                envelope: envelopes.right,
+              },
+            ],
+            touchesCanvasEdge: false,
+          },
+          gates: {
+            exactSourceIdentityPassed: true,
+            exactCanvasPassed: true,
+            canonicalBinaryMaskPassed: true,
+            bilateralHandEnvelopePassed: true,
+            faceTorsoWardrobeProtected: true,
+            providerDispatchMaskReady: true,
+            candidateApproval: false,
+            productionAlphaReady: false,
+            runtimeActivationAllowed: false,
+          },
+          authority: {
+            sourceMutation: false,
+            providerExecution: false,
+            candidateApproval: false,
+            candidatePromotion: false,
+            alphaMasteringApproval: false,
+            runtimeActivation: false,
+            publication: false,
+            repositoryMutation: false,
+            gitCommit: false,
+            gitPush: false,
+            forcePush: false,
+          },
+        };
+        maskAssurance = {
+          ...maskBody,
+          assuranceSha256:
+            sha256ProjectArtEvaSourceRepairDocument(maskBody),
+        };
+        maskBinding.evidenceSha256 = maskAssurance.assuranceSha256;
+      }
+      return {
+        jobId: job.jobId,
+        selection: job.selection,
+        artifactBindings,
+        maskAssurance,
+      };
+    }),
     authority: {
       sourceMutation: false,
       automaticGenerationAuthorization: false,
@@ -467,12 +569,43 @@ test('named authorization and exact mask admissions seal one six-job provider pa
   const redraw = providerPackage.providerBatch.jobs.find(
     (job) => job.kind === 'provider-redraw',
   );
+  const providerReferenceRoles = new Set([
+    'canonical-identity',
+    'direction-master',
+    'previous-key-pose',
+    'next-key-pose',
+    'base-image',
+    'mask',
+    'pose-control',
+    'edge-control',
+    'depth-control',
+    'palette-reference',
+    'line-reference',
+    'material-reference',
+    'layer-context',
+  ]);
   assert.equal(
     redraw.providerRequestInput.references.filter(
-      (reference) => reference.role === 'edit-mask',
+      (reference) => reference.role === 'mask',
     ).length,
     1,
   );
+  assert.ok(
+    redraw.providerRequestInput.references.every((reference) =>
+      providerReferenceRoles.has(reference.role),
+    ),
+  );
+  assert.equal(redraw.providerRequestInput.target.transparency, 'opaque');
+  assert.equal(redraw.providerRequestInput.background.strategy, 'opaque-source');
+  assert.match(
+    redraw.composedPrompt,
+    /production alpha mastering is a separate downstream gate/u,
+  );
+  const inbetween = providerPackage.providerBatch.jobs.find(
+    (job) => job.kind === 'provider-generated-inbetween',
+  );
+  assert.equal(inbetween.providerRequestInput.target.transparency, 'required');
+  assert.equal(inbetween.providerRequestInput.background.strategy, 'native-alpha');
   const dispatch = compileAvatarFinalPassProviderRuntimeDispatch({
     batch: providerPackage.providerBatch,
     jobId: redraw.jobId,
@@ -480,12 +613,17 @@ test('named authorization and exact mask admissions seal one six-job provider pa
   });
   assert.ok(
     dispatch.expectedRuntimeContract.requiredCapabilityProfile.includes(
-      'defect-mask',
+      'mask',
     ),
   );
   assert.ok(
     dispatch.expectedRuntimeContract.requiredCapabilityProfile.includes(
-      'mask-guided-edit',
+      'cancellation',
+    ),
+  );
+  assert.ok(
+    !dispatch.expectedRuntimeContract.requiredCapabilityProfile.includes(
+      'native-alpha',
     ),
   );
 });
@@ -525,6 +663,36 @@ test('expired authorization, missing masks and package tampering fail closed', (
       }),
     (error) =>
       error?.code === 'EVA_SOURCE_REPAIR_PROVIDER_DEFECT_MASK_INVALID',
+  );
+
+  const failedMaskAssurance = providerAdmissions(intake);
+  failedMaskAssurance.jobs[0].maskAssurance.gates.bilateralHandEnvelopePassed =
+    false;
+  const {
+    assuranceSha256: ignoredAssuranceSha256,
+    ...failedMaskAssuranceBody
+  } = failedMaskAssurance.jobs[0].maskAssurance;
+  failedMaskAssurance.jobs[0].maskAssurance.assuranceSha256 =
+    sha256ProjectArtEvaSourceRepairDocument(failedMaskAssuranceBody);
+  failedMaskAssurance.jobs[0].artifactBindings.find(
+    (binding) => binding.bindingKey === 'defect-mask',
+  ).evidenceSha256 =
+    failedMaskAssurance.jobs[0].maskAssurance.assuranceSha256;
+  const {
+    admissionsSha256: ignoredFailedMaskAdmissionsSha256,
+    ...failedMaskAdmissionsBody
+  } = failedMaskAssurance;
+  failedMaskAssurance.admissionsSha256 =
+    sha256ProjectArtEvaSourceRepairDocument(failedMaskAdmissionsBody);
+  assert.throws(
+    () =>
+      compileProjectArtEvaSourceRepairProviderPackage({
+        intake,
+        admissions: failedMaskAssurance,
+        compiledAt: '2026-08-15T11:03:00.000Z',
+      }),
+    (error) =>
+      error?.code === 'EVA_SOURCE_REPAIR_PROVIDER_MASK_ASSURANCE_INVALID',
   );
 
   const providerPackage = compileProjectArtEvaSourceRepairProviderPackage({

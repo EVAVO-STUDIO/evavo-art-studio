@@ -107,8 +107,9 @@ requireTokens('protocol', [
   "blockers.push('human-provider-authorization-required')",
   'reference-artifact-required:',
   'candidateCount: 1',
-  "transparency: 'required'",
-  "strategy: 'native-alpha'",
+  "transparency: sourceSpaceRepair ? 'opaque' : 'required'",
+  "strategy: sourceSpaceRepair ? 'opaque-source' : 'native-alpha'",
+  "admitted.role === 'edit-mask' ? 'mask'",
   'allowFallback: false',
   'providerRequestInput: requestInput',
   'providerExecution: false',
@@ -278,5 +279,5 @@ console.log('Project Art avatar final-pass provider guard passed.');
 console.log('- redraw and in-between jobs are selected explicitly from the sealed final-pass plan');
 console.log('- unfinished endpoint frames cannot feed provider-generated in-betweens');
 console.log('- named-human run-once authorization and exact admitted reference artifacts are required');
-console.log('- every ready request produces one transparent PNG candidate with provider fallback disabled');
+console.log('- every ready request produces one policy-matched RGBA PNG candidate with provider fallback disabled');
 console.log('- provider execution, approval, promotion, Git, publication and runtime authority remain false');

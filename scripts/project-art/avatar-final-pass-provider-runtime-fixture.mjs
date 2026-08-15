@@ -321,7 +321,7 @@ export function providerBatch() {
 }
 
 function expectedCapabilityProfile(input) {
-  const values = new Set([input.operation, 'reference-images']);
+  const values = new Set([input.operation, 'cancellation', 'reference-images']);
   if (input.references.length > 1) values.add('multiple-reference-images');
   for (const reference of input.references) {
     if (reference.role === 'canonical-identity') values.add('identity-reference');
@@ -332,17 +332,15 @@ function expectedCapabilityProfile(input) {
       values.add('temporal-reference');
     }
   }
-  values.add('native-alpha');
-  if (input.operation === 'edit') {
-    values.add('mask-guided-edit');
-    values.add('high-input-fidelity');
-    values.add('non-target-invariance');
+  if (input.references.some((reference) => reference.role === 'mask')) {
+    values.add('mask');
   }
-  values.add('identity-reference-lock');
-  values.add('true-alpha-validation');
-  values.add('fake-transparency-rejection');
-  values.add('custom-size');
-  values.add('candidate-count');
+  if (input.target.transparency === 'required') values.add('native-alpha');
+  if (input.sourceCanvas !== undefined) values.add('custom-size');
+  if (input.candidateCount > 1) values.add('candidate-count');
+  if (input.seed !== undefined || input.selection.requireSeed === true) {
+    values.add('seed');
+  }
   return Object.freeze([...values].sort());
 }
 

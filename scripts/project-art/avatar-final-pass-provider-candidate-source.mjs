@@ -140,6 +140,9 @@ function parseDispatch(input) {
     'AVATAR_PROVIDER_CANDIDATE_PROVIDER_COMPILER_INVALID',
   );
   const providerInput = dispatch.providerCompiler.input;
+  const sourceSpaceRepair =
+    dispatch.sessionId === 'eva-source-repair-v1' &&
+    dispatch.kind === 'provider-redraw';
   assert(
     sha256Document(providerInput) ===
       dispatch.providerRequestInputSha256,
@@ -151,8 +154,10 @@ function parseDispatch(input) {
       providerInput.continuityPhase === dispatch.continuityPhase &&
       providerInput.candidateCount === 1 &&
       providerInput.target?.outputFormat === 'png' &&
-      providerInput.target?.transparency === 'required' &&
-      providerInput.background?.strategy === 'native-alpha' &&
+      providerInput.target?.transparency ===
+        (sourceSpaceRepair ? 'opaque' : 'required') &&
+      providerInput.background?.strategy ===
+        (sourceSpaceRepair ? 'opaque-source' : 'native-alpha') &&
       providerInput.selection?.allowFallback === false &&
       providerInput.metadata?.schema ===
         AVATAR_FINAL_PASS_PROVIDER_METADATA_SCHEMA &&
@@ -267,6 +272,9 @@ function parseBinding(input, dispatch) {
 }
 
 function parseOutcome(input, dispatch, binding) {
+  const sourceSpaceRepair =
+    dispatch.sessionId === 'eva-source-repair-v1' &&
+    dispatch.kind === 'provider-redraw';
   const outcome = verifySelfHash(
     input,
     'runtimeOutcomeSha256',
@@ -305,7 +313,9 @@ function parseOutcome(input, dispatch, binding) {
       result.model.length > 0 &&
       result.requiresAlphaExtraction === false,
     'AVATAR_PROVIDER_CANDIDATE_OUTCOME_NOT_MATERIALIZABLE',
-    'Runtime outcome must contain one native-alpha candidate.',
+    sourceSpaceRepair
+      ? 'Runtime outcome must contain one source-space RGBA candidate.'
+      : 'Runtime outcome must contain one native-alpha candidate.',
   );
   const candidateArtifactId = artifactId(
     result.candidateArtifactId,

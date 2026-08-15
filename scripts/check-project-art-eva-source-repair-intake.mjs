@@ -15,13 +15,25 @@ const files = Object.freeze({
     'scripts/compile-project-art-eva-source-repair-provider-package.mjs',
   providerReferences:
     'scripts/project-art/avatar-final-pass-provider-references.mjs',
+  providerProtocol:
+    'scripts/project-art/avatar-final-pass-provider-protocol.mjs',
   providerRuntimeConstants:
     'scripts/project-art/avatar-final-pass-provider-runtime-constants.mjs',
   providerRuntimeCli:
     'scripts/avatar-final-pass-provider-runtime-cli.mjs',
+  candidateAssurance:
+    'scripts/project-art/eva-source-repair-candidate-assurance.mjs',
+  candidateAssuranceConstants:
+    'scripts/project-art/eva-source-repair-assurance-constants.mjs',
+  candidateAssuranceCli:
+    'scripts/compile-project-art-eva-source-repair-candidate-assurance.mjs',
+  candidateAssuranceTests:
+    'scripts/test-project-art-eva-source-repair-candidate-assurance.mjs',
   tests: 'scripts/test-project-art-eva-source-repair-intake.mjs',
   finalPass: 'scripts/project-art/avatar-final-pass.mjs',
   docs: 'docs/PROJECT_ART_EVA_SOURCE_REPAIR_INTAKE.md',
+  candidateAssuranceDocs:
+    'docs/PROJECT_ART_EVA_SOURCE_REPAIR_CANDIDATE_ASSURANCE.md',
   package: 'package.json',
 });
 
@@ -85,12 +97,17 @@ includes('tests', [
   'human-provider-authorization-required',
   'named authorization and exact mask admissions seal one six-job provider package',
   'expired authorization, missing masks and package tampering fail closed',
+  'bilateralHandEnvelopePassed',
+  'EVA_SOURCE_REPAIR_PROVIDER_MASK_ASSURANCE_INVALID',
 ]);
 includes('providerPackage', [
   'evavo.project-art-eva-source-repair-provider-admissions-template.v1',
   'evavo.project-art-eva-source-repair-provider-admissions.v1',
   'evavo.project-art-eva-source-repair-provider-package.v1',
   'defect-mask',
+  'maskAssurance',
+  'sealed-eva-source-repair-intake',
+  'EVA_SOURCE_REPAIR_PROVIDER_MASK_ASSURANCE_INVALID',
   'MAXIMUM_AUTHORIZATION_WINDOW_MS',
   'maximumProviderCalls !== EXPECTED_TOTAL_JOBS',
   'EVA_SOURCE_REPAIR_PROVIDER_DISPATCH_AUTHORIZATION_EXPIRED',
@@ -111,9 +128,17 @@ includes('providerReferences', [
   "prerequisiteBlockers.push('defect-mask-artifact-required')",
   "'edit-mask'",
   'The defect-mask reference is the only authorized edit region',
+  "plan.sessionId === 'eva-source-repair-v1'",
+  'production alpha mastering is a separate downstream gate',
+]);
+includes('providerProtocol', [
+  "admitted.role === 'edit-mask' ? 'mask'",
+  "transparency: sourceSpaceRepair ? 'opaque' : 'required'",
+  "strategy: sourceSpaceRepair ? 'opaque-source' : 'native-alpha'",
 ]);
 includes('providerRuntimeConstants', [
   "'edit-mask': 'defect-mask'",
+  "mask: 'mask'",
 ]);
 includes('providerRuntimeCli', [
   'dispatch-package',
@@ -132,19 +157,70 @@ includes('docs', [
   'one `provider-generated-inbetween` job',
   'mixed RGB and RGBA source encodings',
   'five known non-job dimension outliers',
-  'candidate outputs still require true 8-bit RGBA',
+  'true 8-bit RGBA source-space candidates',
+  "public `mask` role",
+  'zero changed RGBA pixels outside it',
   'two independent inspectors',
   'Top Hat Man production stays blocked',
+]);
+includes('candidateAssurance', [
+  'evavo.project-art-eva-source-repair-mask-assurance.v1',
+  'evavo.project-art-eva-source-repair-candidate-assurance.v1',
+  'EVA_SOURCE_REPAIR_HAND_ENVELOPES',
+  'transparent-black-protected__opaque-white-editable',
+  'EVA_SOURCE_REPAIR_ASSURANCE_MASK_COMPONENT_COUNT_INVALID',
+  'EVA_SOURCE_REPAIR_ASSURANCE_MASK_ENVELOPE_INVALID',
+  'EVA_SOURCE_REPAIR_ASSURANCE_PROTECTED_PIXEL_CHANGED',
+  'changedProtectedPixels',
+  'alphaMasteringRequired',
+  'productionAlphaReady',
+  'sealed-eva-source-repair-intake',
+  'inspectEvaSourceRepairCandidateUnboundFileForTesting',
+  "openSync(absolute, 'wx', 0o600)",
+]);
+includes('candidateAssuranceConstants', [
+  'EVA_SOURCE_REPAIR_HAND_ENVELOPES',
+  'eva-20260809-153620-frame-05',
+  'eva-20260809-154001-frame-05',
+  'eva-20260809-154325-frame-05',
+  'eva-20260809-154857-frame-04',
+  'eva-20260809-161524-frame-05',
+]);
+includes('candidateAssuranceCli', [
+  "['mask', 'candidate']",
+  '--intake',
+  '--mask-sha256',
+  '--candidate-sha256',
+  'candidateApproval: false',
+  'runtimeActivationAllowed: false',
+]);
+includes('candidateAssuranceTests', [
+  'one changed protected pixel fails closed',
+  'mask components outside the reviewed hand envelopes fail closed',
+  'partial-alpha, grey and hidden-RGB mask pixels fail closed',
+  'permission-restricted and create-only without dispatch authority',
+]);
+includes('candidateAssuranceDocs', [
+  '# Project Art EVA source-repair candidate assurance',
+  'exact invariance outside the mask',
+  '`target.transparency: opaque`',
+  '`background.strategy: opaque-source`',
+  'cannot substitute an arbitrary source',
+  'Agent-sized control surface',
 ]);
 
 const packageJson = JSON.parse(source.package);
 assert.equal(
   packageJson.scripts['project-art:eva-source-repair:check'],
-  'node scripts/check-project-art-eva-source-repair-intake.mjs && node --test scripts/test-project-art-eva-source-repair-intake.mjs',
+  'node scripts/check-project-art-eva-source-repair-intake.mjs && node --test scripts/test-project-art-eva-source-repair-intake.mjs scripts/test-project-art-eva-source-repair-candidate-assurance.mjs',
 );
 assert.equal(
   packageJson.scripts['project-art:eva-source-repair:provider'],
   'node scripts/compile-project-art-eva-source-repair-provider-package.mjs',
+);
+assert.equal(
+  packageJson.scripts['project-art:eva-source-repair:assurance'],
+  'node scripts/compile-project-art-eva-source-repair-candidate-assurance.mjs',
 );
 assert.ok(
   packageJson.scripts['project-art:check'].includes(

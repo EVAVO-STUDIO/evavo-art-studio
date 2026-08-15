@@ -46,12 +46,13 @@ test('binds one ready redraw to the generic provider runtime contract', () => {
   assert.equal(dispatch.expectedRuntimeContract.kind, 'art.candidate.edit');
   assert.equal(dispatch.expectedRuntimeContract.candidateCount, 1);
   for (const capability of [
-    'mask-guided-edit',
-    'high-input-fidelity',
-    'non-target-invariance',
-    'identity-reference-lock',
-    'true-alpha-validation',
-    'fake-transparency-rejection',
+    'edit',
+    'cancellation',
+    'reference-images',
+    'multiple-reference-images',
+    'identity-reference',
+    'native-alpha',
+    'custom-size',
   ]) {
     assert.ok(
       dispatch.expectedRuntimeContract.requiredCapabilityProfile.includes(
@@ -93,7 +94,7 @@ test('generated in-between dispatch retains temporal reference capabilities', ()
   );
   assert.ok(
     dispatch.expectedRuntimeContract.requiredCapabilityProfile.includes(
-      'identity-reference-lock',
+      'identity-reference',
     ),
   );
   assert.ok(

@@ -432,7 +432,8 @@ const expectedScripts = {
   'project-art:workspace:mcp:check': 'node scripts/test-project-art-workspace-mcp.mjs',
   'project-art:workspace:persistent': 'node scripts/persistent-artist-workspace.mjs',
   'project-art:workspace:persistent:check': 'node scripts/check-persistent-artist-workspace.mjs && node scripts/test-persistent-artist-workspace.mjs',
-  'project-art:eva-source-repair:check': 'node scripts/check-project-art-eva-source-repair-intake.mjs && node --test scripts/test-project-art-eva-source-repair-intake.mjs',
+  'project-art:eva-source-repair:check': 'node scripts/check-project-art-eva-source-repair-intake.mjs && node --test scripts/test-project-art-eva-source-repair-intake.mjs scripts/test-project-art-eva-source-repair-candidate-assurance.mjs',
+  'project-art:eva-source-repair:assurance': 'node scripts/compile-project-art-eva-source-repair-candidate-assurance.mjs',
   'project-art:mastering:check': 'node scripts/check-project-art-mastering-and-motion.mjs && node scripts/test-project-art-mastering-and-motion.mjs',
   'project-art:check': 'node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs && pnpm run project-art:avatar-assurance:check && pnpm run project-art:eva-source-repair:check && pnpm run project-art:mastering:check && pnpm run project-art:workspace:persistent:check && pnpm run project-art:loop:check && pnpm run project-art:workspace:mcp:check',
 };

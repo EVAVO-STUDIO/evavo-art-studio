@@ -104,4 +104,5 @@ export const REFERENCE_CAPABILITY_BY_ROLE = Object.freeze({
   'next-key-pose': 'temporal-reference',
   'base-image': null,
   'edit-mask': 'defect-mask',
+  mask: 'mask',
 });

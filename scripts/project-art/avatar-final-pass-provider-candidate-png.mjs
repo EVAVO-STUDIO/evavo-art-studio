@@ -101,7 +101,7 @@ function unfilterRows(inflated, width, height) {
   return output;
 }
 
-function alphaEvidence(pixels, width, height) {
+function alphaEvidence(pixels, width, height, requireTransparentPixels) {
   let transparentPixels = 0;
   let partialAlphaPixels = 0;
   let opaquePixels = 0;
@@ -147,11 +147,13 @@ function alphaEvidence(pixels, width, height) {
     'AVATAR_PROVIDER_CANDIDATE_PNG_EMPTY_ALPHA',
     'Candidate PNG is fully transparent.',
   );
-  assert(
-    transparentPixels > 0,
-    'AVATAR_PROVIDER_CANDIDATE_PNG_OPAQUE_BACKGROUND',
-    'Candidate PNG has no transparent pixels.',
-  );
+  if (requireTransparentPixels) {
+    assert(
+      transparentPixels > 0,
+      'AVATAR_PROVIDER_CANDIDATE_PNG_OPAQUE_BACKGROUND',
+      'Candidate PNG has no transparent pixels.',
+    );
+  }
 
   return Object.freeze({
     visiblePixels,
@@ -173,6 +175,7 @@ export function inspectAvatarProviderCandidatePng(
   input,
   expectedWidth,
   expectedHeight,
+  { requireTransparentPixels = true } = {},
 ) {
   const bytes = Buffer.from(input);
   assert(
@@ -341,7 +344,12 @@ export function inspectAvatarProviderCandidatePng(
     );
   }
   const pixels = unfilterRows(inflated, expectedWidth, expectedHeight);
-  const alpha = alphaEvidence(pixels, expectedWidth, expectedHeight);
+  const alpha = alphaEvidence(
+    pixels,
+    expectedWidth,
+    expectedHeight,
+    requireTransparentPixels,
+  );
 
   return deepFreeze({
     mediaType: 'image/png',

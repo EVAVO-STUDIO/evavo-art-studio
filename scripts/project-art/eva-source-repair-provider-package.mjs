@@ -29,6 +29,12 @@ import {
 import {
   EVA_SOURCE_REPAIR_INTAKE_SCHEMA,
 } from './eva-source-repair-intake.mjs';
+import {
+  EVA_SOURCE_REPAIR_TASK_CATALOGUE,
+} from './eva-source-repair-catalogue.mjs';
+import {
+  EVA_SOURCE_REPAIR_HAND_ENVELOPES,
+} from './eva-source-repair-assurance-constants.mjs';
 
 export const EVA_SOURCE_REPAIR_PROVIDER_ADMISSIONS_TEMPLATE_SCHEMA =
   'evavo.project-art-eva-source-repair-provider-admissions-template.v1';
@@ -225,6 +231,7 @@ export function compileProjectArtEvaSourceRepairProviderAdmissionsTemplate(
         ).selection,
       ),
       artifactBindings: requiredBindingTemplates(job),
+      maskAssurance: null,
     })),
     candidateCountPerJob: 1,
     allowFallback: false,
@@ -290,7 +297,13 @@ function parseAuthorization(value, expectedJobIds, compiledAt) {
   });
 }
 
-function validateDefectMask(job, requestJob) {
+function validateDefectMask(
+  job,
+  requestJob,
+  intakeSha256,
+  repairJob,
+  compiledAt,
+) {
   const maskBindings = requestJob.artifactBindings.filter(
     (binding) => binding.bindingKey === 'defect-mask',
   );
@@ -306,7 +319,200 @@ function validateDefectMask(job, requestJob) {
     ) {
       fail('EVA_SOURCE_REPAIR_PROVIDER_DEFECT_MASK_INVALID', job.jobId);
     }
-  } else if (maskBindings.length !== 0) {
+    const assurance = requestJob.maskAssurance;
+    exactKeys(
+      assurance,
+      [
+        'schema',
+        'phase',
+        'frameId',
+        'taskId',
+        'inspectedAt',
+        'intakeSha256',
+        'canvas',
+        'source',
+        'mask',
+        'gates',
+        'authority',
+        'assuranceSha256',
+      ],
+      `${job.jobId}.maskAssurance`,
+    );
+    verifySelfHash(
+      assurance,
+      'assuranceSha256',
+      `${job.jobId}.maskAssurance`,
+    );
+    timestamp(assurance.inspectedAt, `${job.jobId}.maskAssurance.inspectedAt`);
+    identifier(assurance.taskId, `${job.jobId}.maskAssurance.taskId`);
+    exactKeys(
+      assurance.source,
+      [
+        'path',
+        'sha256',
+        'gitBlobSha1',
+        'encoding',
+        'alphaChannelPresent',
+        'identityAuthority',
+      ],
+      `${job.jobId}.maskAssurance.source`,
+    );
+    exactKeys(
+      assurance.mask,
+      [
+        'path',
+        'sha256',
+        'semantics',
+        'connectivity',
+        'editablePixels',
+        'protectedPixels',
+        'coverageRatio',
+        'components',
+        'touchesCanvasEdge',
+      ],
+      `${job.jobId}.maskAssurance.mask`,
+    );
+    exactKeys(
+      assurance.gates,
+      [
+        'exactSourceIdentityPassed',
+        'exactCanvasPassed',
+        'canonicalBinaryMaskPassed',
+        'bilateralHandEnvelopePassed',
+        'faceTorsoWardrobeProtected',
+        'providerDispatchMaskReady',
+        'candidateApproval',
+        'productionAlphaReady',
+        'runtimeActivationAllowed',
+      ],
+      `${job.jobId}.maskAssurance.gates`,
+    );
+    exactKeys(
+      assurance.authority,
+      [
+        'sourceMutation',
+        'providerExecution',
+        'candidateApproval',
+        'candidatePromotion',
+        'alphaMasteringApproval',
+        'runtimeActivation',
+        'publication',
+        'repositoryMutation',
+        'gitCommit',
+        'gitPush',
+        'forcePush',
+      ],
+      `${job.jobId}.maskAssurance.authority`,
+    );
+    const baseReference = job.requiredReferences.find(
+      (reference) => reference.role === 'base-image',
+    );
+    const catalogueTask = EVA_SOURCE_REPAIR_TASK_CATALOGUE.find(
+      (task) => task.frameId === job.frameId,
+    );
+    const componentPixels = assurance.mask.components?.reduce(
+      (total, component) =>
+        total +
+        (Number.isSafeInteger(component?.pixelCount)
+          ? component.pixelCount
+          : Number.NaN),
+      0,
+    );
+    const componentsValid =
+      Array.isArray(assurance.mask.components) &&
+      assurance.mask.components.length === 2 &&
+      assurance.mask.components.every((component, index) => {
+        try {
+          exactKeys(
+            component,
+            ['side', 'pixelCount', 'bounds', 'envelope'],
+            `${job.jobId}.maskAssurance.mask.components[${index}]`,
+          );
+          exactKeys(
+            component.bounds,
+            ['minimumX', 'minimumY', 'maximumX', 'maximumY'],
+            `${job.jobId}.maskAssurance.mask.components[${index}].bounds`,
+          );
+          exactKeys(
+            component.envelope,
+            ['minimumX', 'minimumY', 'maximumX', 'maximumY'],
+            `${job.jobId}.maskAssurance.mask.components[${index}].envelope`,
+          );
+        } catch {
+          return false;
+        }
+        const values = [
+          component.pixelCount,
+          ...Object.values(component.bounds),
+          ...Object.values(component.envelope),
+        ];
+        const side = index === 0 ? 'left' : 'right';
+        const reviewedEnvelope =
+          EVA_SOURCE_REPAIR_HAND_ENVELOPES[job.frameId]?.[side];
+        return (
+          component.side === side &&
+          values.every(Number.isSafeInteger) &&
+          reviewedEnvelope &&
+          Object.entries(reviewedEnvelope).every(
+            ([key, value]) => component.envelope[key] === value,
+          ) &&
+          component.pixelCount >= 64 &&
+          component.bounds.minimumX >= component.envelope.minimumX &&
+          component.bounds.minimumY >= component.envelope.minimumY &&
+          component.bounds.maximumX <= component.envelope.maximumX &&
+          component.bounds.maximumY <= component.envelope.maximumY
+        );
+      });
+    if (
+      assurance.schema !==
+        'evavo.project-art-eva-source-repair-mask-assurance.v1' ||
+      assurance.phase !== 'pre-dispatch-mask-admission' ||
+      assurance.frameId !== job.frameId ||
+      assurance.taskId !== catalogueTask?.taskId ||
+      assurance.intakeSha256 !== intakeSha256 ||
+      Date.parse(assurance.inspectedAt) > Date.parse(compiledAt) ||
+      assurance.canvas?.width !== 1024 ||
+      assurance.canvas?.height !== 1536 ||
+      assurance.source.path !== baseReference?.sourcePath ||
+      assurance.source.sha256 !== baseReference?.sourceSha256 ||
+      assurance.source.gitBlobSha1 !== repairJob?.sourceGitBlobSha1 ||
+      assurance.source.encoding !== 'rgb8' ||
+      assurance.source.alphaChannelPresent !== false ||
+      assurance.source.identityAuthority !==
+        'sealed-eva-source-repair-intake' ||
+      assurance.mask.path !== maskBindings[0].sourcePath ||
+      assurance.mask.sha256 !== maskBindings[0].sourceSha256 ||
+      assurance.mask.semantics !==
+        'transparent-black-protected__opaque-white-editable' ||
+      assurance.mask.connectivity !== 4 ||
+      !Number.isSafeInteger(assurance.mask.editablePixels) ||
+      assurance.mask.editablePixels < Math.ceil(1024 * 1536 * 0.0005) ||
+      assurance.mask.editablePixels > Math.floor(1024 * 1536 * 0.15) ||
+      assurance.mask.protectedPixels !==
+        1024 * 1536 - assurance.mask.editablePixels ||
+      assurance.mask.coverageRatio !==
+        assurance.mask.editablePixels / (1024 * 1536) ||
+      componentPixels !== assurance.mask.editablePixels ||
+      assurance.mask.touchesCanvasEdge !== false ||
+      !componentsValid ||
+      assurance.gates.exactSourceIdentityPassed !== true ||
+      assurance.gates.exactCanvasPassed !== true ||
+      assurance.gates.canonicalBinaryMaskPassed !== true ||
+      assurance.gates.bilateralHandEnvelopePassed !== true ||
+      assurance.gates.faceTorsoWardrobeProtected !== true ||
+      assurance.gates.providerDispatchMaskReady !== true ||
+      assurance.gates.candidateApproval !== false ||
+      assurance.gates.productionAlphaReady !== false ||
+      assurance.gates.runtimeActivationAllowed !== false ||
+      Object.values(assurance.authority).some((value) => value !== false) ||
+      maskBindings[0].evidenceSha256 !== assurance.assuranceSha256
+    ) {
+      fail('EVA_SOURCE_REPAIR_PROVIDER_MASK_ASSURANCE_INVALID', job.jobId);
+    }
+  } else if (
+    maskBindings.length !== 0 ||
+    requestJob.maskAssurance !== null
+  ) {
     fail('EVA_SOURCE_REPAIR_PROVIDER_DEFECT_MASK_FORBIDDEN', job.jobId);
   }
 }
@@ -352,7 +558,7 @@ function validateAdmissions(input, intake, blockedBatch, compiledAt) {
   const jobs = input.jobs.map((job, index) => {
     exactKeys(
       job,
-      ['jobId', 'selection', 'artifactBindings'],
+      ['jobId', 'selection', 'artifactBindings', 'maskAssurance'],
       `admissions.jobs[${index}]`,
     );
     if (!Array.isArray(job.artifactBindings)) {
@@ -367,11 +573,20 @@ function validateAdmissions(input, intake, blockedBatch, compiledAt) {
         fail('EVA_SOURCE_REPAIR_PROVIDER_FUTURE_ADMISSION_INVALID');
       }
     }
-    validateDefectMask(blockedBatch.jobs[index], job);
+    validateDefectMask(
+      blockedBatch.jobs[index],
+      job,
+      intake.intakeSha256,
+      intake.providerPlan.repairJobs.find(
+        (entry) => entry.frameId === blockedBatch.jobs[index].frameId,
+      ),
+      compiledAt,
+    );
     return {
       jobId: job.jobId,
       selection: structuredClone(job.selection),
       artifactBindings: structuredClone(job.artifactBindings),
+      maskAssurance: structuredClone(job.maskAssurance),
     };
   });
   const artifacts = new Map();
@@ -555,11 +770,14 @@ export function compileProjectArtEvaSourceRepairProviderPackage({
     runtimeActivationAllowed: false,
     topHatProductionMayStart: false,
     nextRequiredActions: Object.freeze([
+      'validate-bilateral-source-space-mask-assurance-before-dispatch',
       'compile-one-runtime-dispatch-per-job',
       'bind-compatible-mask-guided-provider-runtime',
       'explicitly-submit-each-authorized-job-once',
-      'materialize-candidates-create-only',
-      'run-frame-finisher-and-dual-inspector-assurance',
+      'materialize-source-space-candidates-create-only',
+      'run-exact-protected-pixel-candidate-assurance',
+      'run-separate-alpha-mastering-with-non-target-evidence',
+      'run-frame-finisher-and-dual-inspector-assurance-after-alpha-mastering',
       'record-separate-creative-approval',
       'regenerate-atlas-and-sequence-release',
       'reverify-browser-playback-before-runtime-activation',

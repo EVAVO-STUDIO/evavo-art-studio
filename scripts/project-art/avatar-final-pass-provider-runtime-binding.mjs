@@ -86,6 +86,9 @@ export function validateAvatarFinalPassCompiledProviderRuntimeContract(
   );
   const request = compiled.request;
   assert(isRecord(request), 'AVATAR_PROVIDER_RUNTIME_COMPILED_REQUEST_INVALID');
+  const sourceSpaceRepair =
+    dispatch.sessionId === 'eva-source-repair-v1' &&
+    dispatch.kind === 'provider-redraw';
   assert(
     request.protocolVersion === GENERIC_PROVIDER_PROTOCOL_VERSION &&
       PROVIDER_REQUEST_ID_PATTERN.test(request.requestId) &&
@@ -93,9 +96,10 @@ export function validateAvatarFinalPassCompiledProviderRuntimeContract(
       request.assetKind === 'sprite-frame' &&
       request.continuityPhase === dispatch.continuityPhase &&
       request.candidateCount === 1 &&
-      request.target?.transparency === 'required' &&
+      request.target?.transparency === (sourceSpaceRepair ? 'opaque' : 'required') &&
       request.target?.outputFormat === 'png' &&
-      request.background?.strategy === 'native-alpha' &&
+      request.background?.strategy ===
+        (sourceSpaceRepair ? 'opaque-source' : 'native-alpha') &&
       request.selection?.allowFallback === false,
     'AVATAR_PROVIDER_RUNTIME_COMPILED_REQUEST_INVALID',
   );

@@ -173,8 +173,10 @@ function validateCandidateDescriptor(descriptor, source) {
       metadata.requiresBlockingQa === true &&
       metadata.requestSha256 === source.providerRequestSha256 &&
       metadata.compiledPromptSha256 === source.compiledPromptSha256 &&
-      metadata.backgroundStrategy === 'native-alpha' &&
-      metadata.transparencyTarget === 'required',
+      metadata.backgroundStrategy ===
+        source.dispatch.providerCompiler.input.background.strategy &&
+      metadata.transparencyTarget ===
+        source.dispatch.providerCompiler.input.target.transparency,
     'AVATAR_PROVIDER_CANDIDATE_ARTIFACT_BOUNDARY_INVALID',
     'Candidate artifact crossed or drifted from the unapproved provider boundary.',
   );
@@ -828,6 +830,11 @@ export async function materializeAvatarFinalPassProviderCandidate({
     candidateBytes,
     source.expectedWidth,
     source.expectedHeight,
+    {
+      requireTransparentPixels:
+        source.dispatch.providerCompiler.input.target.transparency ===
+        'required',
+    },
   );
   assert(
     png.sha256 === candidateDescriptor.contentSha256,

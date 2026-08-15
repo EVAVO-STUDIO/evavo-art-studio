@@ -50,7 +50,7 @@ test('compiles one-candidate redraw and anatomy-safe in-between provider submiss
   assert.equal(redraw.providerRequestInput.references.length, 3);
   assert.equal(
     redraw.providerRequestInput.references.find(
-      (reference) => reference.role === 'edit-mask',
+      (reference) => reference.role === 'mask',
     )?.artifactId,
     `artifact_${hash('6')}`,
   );

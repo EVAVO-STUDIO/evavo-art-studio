@@ -217,10 +217,13 @@ function parseProviderRequest(input, job, plan) {
   assert(isRecord(request.style), 'AVATAR_PROVIDER_RUNTIME_PROVIDER_REQUEST_INVALID');
   assert(isRecord(request.shot), 'AVATAR_PROVIDER_RUNTIME_PROVIDER_REQUEST_INVALID');
   exactKeys(request.target, ['width', 'height', 'transparency', 'outputFormat'], `${job.jobId}.providerRequestInput.target`);
+  const sourceSpaceRepair =
+    plan.sessionId === 'eva-source-repair-v1' &&
+    job.kind === 'provider-redraw';
   assert(
     request.target.width === plan.canvas.width &&
       request.target.height === plan.canvas.height &&
-      request.target.transparency === 'required' &&
+      request.target.transparency === (sourceSpaceRepair ? 'opaque' : 'required') &&
       request.target.outputFormat === 'png',
     'AVATAR_PROVIDER_RUNTIME_PROVIDER_TARGET_MISMATCH',
   );
@@ -232,7 +235,8 @@ function parseProviderRequest(input, job, plan) {
   );
   exactKeys(request.background, ['strategy'], `${job.jobId}.providerRequestInput.background`);
   assert(
-    request.background.strategy === 'native-alpha',
+    request.background.strategy ===
+      (sourceSpaceRepair ? 'opaque-source' : 'native-alpha'),
     'AVATAR_PROVIDER_RUNTIME_PROVIDER_BACKGROUND_INVALID',
   );
   assert(request.quality === 'high', 'AVATAR_PROVIDER_RUNTIME_PROVIDER_QUALITY_INVALID');
@@ -260,7 +264,10 @@ function parseProviderRequest(input, job, plan) {
     assert(
       job.kind === 'provider-redraw' &&
         job.continuityPhase === 'key-pose' &&
-        roles.includes('base-image'),
+        roles.includes('base-image') &&
+        (!sourceSpaceRepair ||
+          roles.includes('mask') ||
+          roles.includes('edit-mask')),
       'AVATAR_PROVIDER_RUNTIME_EDIT_REFERENCES_INVALID',
     );
   } else {

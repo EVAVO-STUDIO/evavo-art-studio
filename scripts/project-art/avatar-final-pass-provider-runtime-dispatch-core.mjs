@@ -52,7 +52,7 @@ const DISPATCH_KEYS = Object.freeze([
 ]);
 
 function capabilityProfile(request) {
-  const values = new Set([request.operation]);
+  const values = new Set([request.operation, 'cancellation']);
   const references = request.references ?? [];
   if (references.length > 0) values.add('reference-images');
   if (references.length > 1) values.add('multiple-reference-images');
@@ -61,17 +61,11 @@ function capabilityProfile(request) {
     if (capability) values.add(capability);
   }
   if (request.target?.transparency === 'required') values.add('native-alpha');
-  if (request.operation === 'edit') {
-    values.add('mask-guided-edit');
-    values.add('high-input-fidelity');
-    values.add('non-target-invariance');
+  if (request.sourceCanvas !== undefined) values.add('custom-size');
+  if (request.candidateCount > 1) values.add('candidate-count');
+  if (request.seed !== undefined || request.selection?.requireSeed === true) {
+    values.add('seed');
   }
-  values.add('identity-reference-lock');
-  values.add('true-alpha-validation');
-  values.add('fake-transparency-rejection');
-  values.add('custom-size');
-  values.add('candidate-count');
-  if (request.seed !== undefined) values.add('seed');
   return Object.freeze([...values].sort());
 }
 

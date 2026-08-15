@@ -144,9 +144,14 @@ export function admitBindings(entry, requirements) {
 }
 
 export function prompt(entry, plan) {
+  const sourceSpaceRepair =
+    plan.sessionId === 'eva-source-repair-v1' &&
+    entry.upstream.kind === 'provider-redraw';
   const lines = [
     `Create exactly one production candidate for ${plan.characterId} frame ${entry.upstream.frameId}.`,
-    `Target canvas: ${plan.canvas.width} x ${plan.canvas.height} RGBA PNG with true transparent alpha.`,
+    sourceSpaceRepair
+      ? `Target canvas: ${plan.canvas.width} x ${plan.canvas.height} 8-bit RGBA PNG preserving the supplied source background and alpha semantics exactly outside the mask.`
+      : `Target canvas: ${plan.canvas.width} x ${plan.canvas.height} RGBA PNG with true transparent alpha.`,
     `Preserve the exact canonical identity supplied as the canonical-identity reference.`,
   ];
   if (entry.upstream.kind === 'provider-redraw') {
@@ -168,8 +173,12 @@ export function prompt(entry, plan) {
   lines.push(
     'Keep face, hair, clothing, proportions, palette, lighting, camera, outline treatment and canvas registration consistent.',
     'Hands, fingers, wrists, arms, anatomy, silhouette and transparent edges must be clean at native scale.',
-    'Return actual RGBA transparency. A baked checkerboard, matte, halo or opaque background is a failed candidate.',
-    'Return one frame only: no contact sheet, no alternate, no text, no labels, no background and no second character.',
+    sourceSpaceRepair
+      ? 'Return an 8-bit RGBA source-space candidate. Do not remove, repaint, reinterpret or normalize the supplied opaque background outside the mask; production alpha mastering is a separate downstream gate.'
+      : 'Return actual RGBA transparency. A baked checkerboard, matte, halo or opaque background is a failed candidate.',
+    sourceSpaceRepair
+      ? 'Return one frame only: no contact sheet, no alternate, no text, no labels and no second character.'
+      : 'Return one frame only: no contact sheet, no alternate, no text, no labels, no background and no second character.',
   );
   return lines.join('\n');
 }

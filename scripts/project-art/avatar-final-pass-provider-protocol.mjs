@@ -10,6 +10,9 @@ import {
 } from './avatar-final-pass-provider-references.mjs';
 
 function providerRequest(entry, plan, admissions, composedPrompt) {
+  const sourceSpaceRepair =
+    plan.sessionId === 'eva-source-repair-v1' &&
+    entry.upstream.kind === 'provider-redraw';
   const mustAvoid = Object.freeze([
     'malformed hands or fingers',
     'broken wrists or duplicated limbs',
@@ -43,7 +46,9 @@ function providerRequest(entry, plan, admissions, composedPrompt) {
         'clean hands and fingers',
         'stable face identity',
         'stable anatomy and silhouette',
-        'native transparent alpha',
+        sourceSpaceRepair
+          ? 'exact source-space background and alpha preservation outside the mask'
+          : 'native transparent alpha',
         'exact canvas registration',
       ]),
       mustAvoid,
@@ -81,17 +86,21 @@ function providerRequest(entry, plan, admissions, composedPrompt) {
       exclude: mustAvoid,
       separateAssets: Object.freeze([]),
       framing: Object.freeze([
-        'One exact registered character frame on transparent alpha.',
+        sourceSpaceRepair
+          ? 'One exact registered source-space character frame.'
+          : 'One exact registered character frame on transparent alpha.',
       ]),
     }),
     target: Object.freeze({
       width: plan.canvas.width,
       height: plan.canvas.height,
-      transparency: 'required',
+      transparency: sourceSpaceRepair ? 'opaque' : 'required',
       outputFormat: 'png',
     }),
     sourceCanvas: plan.canvas,
-    background: Object.freeze({ strategy: 'native-alpha' }),
+    background: Object.freeze({
+      strategy: sourceSpaceRepair ? 'opaque-source' : 'native-alpha',
+    }),
     quality: 'high',
     candidateCount: 1,
     ...(entry.selection.seed === null ? {} : { seed: entry.selection.seed }),
@@ -99,7 +108,7 @@ function providerRequest(entry, plan, admissions, composedPrompt) {
       admissions.admitted.map((admitted) =>
         Object.freeze({
           artifactId: admitted.artifactId,
-          role: admitted.role,
+          role: admitted.role === 'edit-mask' ? 'mask' : admitted.role,
           strength: 1,
           required: true,
           note: admitted.note,
@@ -191,4 +200,3 @@ export function compileJob(entry, plan) {
     jobEnvelopeSha256: sha256AvatarFinalPassProviderDocument(body),
   });
 }
-
