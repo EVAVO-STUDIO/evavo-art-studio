@@ -15,8 +15,19 @@ import {
   loadHmfAtlasV3GameDeliveryAuthorizationCliInput,
   readHmfAtlasV3StableSingleLinkFile,
 } from "./frame-atlas-v3-game-delivery-authorization-cli.mjs";
-import { freeze, hashValue } from "./frame-body-named-human-approval-common.mjs";
-import { snapshotApprovalJson } from "./frame-body-named-human-approval-snapshot.mjs";
+import {
+  boundedString,
+  canonicalTimestamp,
+  freeze,
+  hashValue,
+  safeActorId,
+  selfHashed,
+  SHA256,
+} from "./frame-body-named-human-approval-common.mjs";
+import {
+  assertExactApprovalKeys,
+  snapshotApprovalJson,
+} from "./frame-body-named-human-approval-snapshot.mjs";
 
 export const HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_PUBLICATION_SCHEMA =
   "evavo.heavy-metal-fighting-atlas-v3-game-delivery-authorization-publication.v1";
@@ -25,10 +36,67 @@ export const HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_PUBLICATION_PROTOCOL_VERSI
 
 const GAME_REPOSITORY = "EVAVO-STUDIO/steel-dominion";
 const GIT_SHA = /^[0-9a-f]{40}$/u;
-const SHA256 = /^[0-9a-f]{64}$/u;
+const FRAMES = Object.freeze(["bastion", "viper", "citadel", "mirage"]);
 const PORTABLE_JSON = /^[A-Za-z0-9][A-Za-z0-9._-]{0,191}\.json$/u;
 const MAX_AUTHORIZATION_BYTES = 1024 * 1024;
 const PUBLICATION_INPUT_FIELDS = Object.freeze(["authorization", "outputPath"]);
+const AUTHORIZATION_FIELDS = Object.freeze([
+  "schema",
+  "protocolVersion",
+  "projectId",
+  "publicTitle",
+  "gameRepository",
+  "gameHead",
+  "gameValidationAdmissionSha256",
+  "atlasBuilds",
+  "humanAuthorization",
+  "checks",
+  "authority",
+  "authorizationSha256",
+]);
+const AUTHORIZED_BUILD_FIELDS = Object.freeze([
+  "frameId",
+  "planSha256",
+  "buildReceiptSha256",
+  "buildVerificationSha256",
+  "imageSha256",
+  "targetImagePath",
+  "styleProofExecutionSha256",
+]);
+const AUTHORIZATION_HUMAN_FIELDS = Object.freeze([
+  "actorClass",
+  "actorId",
+  "occurredAt",
+  "decision",
+  "rationale",
+  "evidenceSha256",
+]);
+const CHECK_FIELDS = Object.freeze([
+  "exactGameValidationAdmission",
+  "exactValidatedGameHead",
+  "allFourFrameBuildsPresent",
+  "allFourExactPixelVerificationsPassed",
+  "allBuildReceiptSelfHashesValid",
+  "allBuildEvidenceCrossBound",
+  "canonicalGameTargetPaths",
+  "namedHumanDeliveryAuthorization",
+  "authorizationAfterReviewedEvidence",
+  "runtimeActivationRemainsSeparate",
+]);
+const AUTHORITY_FIELDS = Object.freeze([
+  "evidenceAdmission",
+  "callerSuppliedAtlasByteRead",
+  "callerSuppliedSourceByteRead",
+  "imageInspection",
+  "namedHumanDeliveryAuthorization",
+  "gameRepositoryRead",
+  "gameRepositoryMutation",
+  "runtimeActivation",
+  "gitMutation",
+  "deployment",
+  "publication",
+  "forcePush",
+]);
 
 function fail(message) {
   throw new Error(`HEAVY_METAL_FIGHTING_ATLAS_V3_DELIVERY_AUTHORIZATION_PUBLICATION_INVALID: ${message}`);
@@ -144,10 +212,28 @@ function admitAuthorizationForLocalPublication(value) {
     "HMF atlas-v3 delivery authorization for publication",
     { maximumDepth: 16, maximumNodes: 4096, maximumBytes: MAX_AUTHORIZATION_BYTES },
   );
-  assert(authorization.schema === HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_SCHEMA, "authorization schema drifted.");
+  assertExactApprovalKeys(
+    authorization,
+    AUTHORIZATION_FIELDS,
+    "HMF atlas-v3 delivery authorization for publication",
+  );
+  selfHashed(
+    authorization,
+    "authorizationSha256",
+    "HMF atlas-v3 delivery authorization for publication",
+  );
+  assert(
+    authorization.schema === HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_SCHEMA,
+    "authorization schema drifted.",
+  );
   assert(
     authorization.protocolVersion === HMF_ATLAS_V3_GAME_DELIVERY_AUTHORIZATION_PROTOCOL_VERSION,
     "authorization protocol drifted.",
+  );
+  assert(
+    authorization.projectId === "heavy-metal-fighting" &&
+      authorization.publicTitle === "HEAVY METAL FIGHTING",
+    "authorization project identity drifted.",
   );
   assert(authorization.gameRepository === GAME_REPOSITORY, "authorization repository drifted.");
   assert(
@@ -155,15 +241,72 @@ function admitAuthorizationForLocalPublication(value) {
     "authorization gameHead must be a Git SHA.",
   );
   assert(
-    typeof authorization.authorizationSha256 === "string" && SHA256.test(authorization.authorizationSha256),
-    "authorizationSha256 must be SHA-256.",
+    SHA256.test(authorization.gameValidationAdmissionSha256),
+    "authorization game validation hash is invalid.",
   );
-  const body = structuredClone(authorization);
-  delete body.authorizationSha256;
   assert(
-    hashValue(body) === authorization.authorizationSha256,
-    "authorizationSha256 does not match canonical content.",
+    Array.isArray(authorization.atlasBuilds) && authorization.atlasBuilds.length === FRAMES.length,
+    "authorization must retain four canonical atlas builds.",
   );
+  authorization.atlasBuilds.forEach((entry, index) => {
+    assertExactApprovalKeys(entry, AUTHORIZED_BUILD_FIELDS, `authorization atlasBuilds[${index}]`);
+    assert(entry.frameId === FRAMES[index], `authorization atlasBuilds[${index}] frame drifted.`);
+    for (const key of [
+      "planSha256",
+      "buildReceiptSha256",
+      "buildVerificationSha256",
+      "imageSha256",
+      "styleProofExecutionSha256",
+    ]) {
+      assert(SHA256.test(entry[key]), `authorization atlasBuilds[${index}].${key} must be SHA-256.`);
+    }
+    assert(
+      entry.targetImagePath === `res://assets/fighters/final-v3/${entry.frameId}.png`,
+      `authorization atlasBuilds[${index}] target path drifted.`,
+    );
+  });
+  assertExactApprovalKeys(
+    authorization.humanAuthorization,
+    AUTHORIZATION_HUMAN_FIELDS,
+    "authorization humanAuthorization",
+  );
+  assert(
+    authorization.humanAuthorization.actorClass === "human",
+    "authorization must retain a human authorizer.",
+  );
+  safeActorId(
+    authorization.humanAuthorization.actorId,
+    "authorization humanAuthorization.actorId",
+  );
+  canonicalTimestamp(
+    authorization.humanAuthorization.occurredAt,
+    "authorization humanAuthorization.occurredAt",
+  );
+  assert(
+    authorization.humanAuthorization.decision === "authorized",
+    "authorization decision drifted.",
+  );
+  boundedString(
+    authorization.humanAuthorization.rationale,
+    "authorization humanAuthorization.rationale",
+    12,
+    2000,
+  );
+  assert(
+    SHA256.test(authorization.humanAuthorization.evidenceSha256),
+    "authorization human evidence hash is invalid.",
+  );
+  assertExactApprovalKeys(authorization.checks, CHECK_FIELDS, "authorization checks");
+  for (const key of CHECK_FIELDS) {
+    assert(authorization.checks[key] === true, `authorization check ${key} must remain true.`);
+  }
+  assertExactApprovalKeys(authorization.authority, AUTHORITY_FIELDS, "authorization authority");
+  for (const key of AUTHORITY_FIELDS.slice(0, 5)) {
+    assert(authorization.authority[key] === true, `authorization lost bounded authority: ${key}.`);
+  }
+  for (const key of AUTHORITY_FIELDS.slice(5)) {
+    assert(authorization.authority[key] === false, `authorization gained forbidden authority: ${key}.`);
+  }
   return authorization;
 }
 function authorizationBytes(authorization) {
@@ -189,7 +332,7 @@ function publicationReceipt(authorization, outputPath, bytes) {
       sha256: sha256Bytes(bytes),
     },
     checks: {
-      selfHashedAuthorizationAdmitted: true,
+      closedAuthorizationContract: true,
       createOnlyOutput: true,
       atomicNoReplacePublication: true,
       stableSingleLinkReadback: true,
@@ -232,7 +375,9 @@ export async function publishHmfAtlasV3GameDeliveryAuthorizationFile(input) {
       0o600,
     );
     try {
-      if (typeof handle.chmod === "function") await handle.chmod(0o600);
+      if (process.platform !== "win32" && typeof handle.chmod === "function") {
+        await handle.chmod(0o600);
+      }
       await handle.writeFile(bytes);
       await handle.sync();
       stageIdentity = await handle.stat({ bigint: true });
