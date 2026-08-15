@@ -1,15 +1,120 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "evavo-studio-ai-profile",
   "studio": "art-studio",
-  "minimumPlatform": {"evavo-local-storage":"0.23.0","evavo-model-lab":"0.5.0"},
-  "authorities": {"training":"evavo-model-lab","execution":"evavo-local-compute","storage":"evavo-local-storage","durable":"evavo-storage"},
-  "environments": ["visual","video"],
-  "modelSlots": ["image-base","image-edit","image-control","image-segmentation","image-lora","image-upscale","image-restoration","video-base","video-lora","video-interpolation"],
-  "localTraining": ["sdxl-dreambooth-lora"],
-  "largerGpuTraining": ["flux2-klein-lora","ltx2-lora","hunyuanvideo-1.5-lora"],
-  "specialistTraining": ["realesrgan-specialist"],
-  "qualityGates": ["exact-source-revision","dataset-rights","same-seed-base-vs-adapter-review","artifact-and-alpha-validation","studio-style-profile-review"],
-  "canonical": {"datasets":"bee://primary/EVAVO/AI/Datasets/Art","models":"bee://primary/EVAVO/AI/Models/Visual","videoModels":"bee://primary/EVAVO/AI/Models/Video","training":"bee://primary/EVAVO/AI/Training/Art","outputs":"bee://primary/EVAVO/AI/Outputs/Art"},
-  "policy": {"weightsInGit":false,"autoDownload":false,"aiOutputIsCandidateUntilStudioValidation":true}
+  "minimumPlatform": {
+    "evavo-local-storage": "0.27.0",
+    "evavo-local-compute": "0.8.0",
+    "evavo-model-lab": "0.9.0"
+  },
+  "authorities": {
+    "training": "evavo-model-lab",
+    "execution": "evavo-local-compute",
+    "storage": "evavo-local-storage",
+    "durable": "evavo-storage"
+  },
+  "environments": [
+    "visual",
+    "video"
+  ],
+  "modelSlots": [
+    "image-base",
+    "image-edit",
+    "image-control",
+    "image-segmentation",
+    "image-lora",
+    "image-upscale",
+    "image-restoration",
+    "video-base",
+    "video-image-to-video",
+    "video-first-last-frame",
+    "video-control",
+    "video-lora",
+    "video-interpolation"
+  ],
+  "videoGeneration": {
+    "styles": [
+      "realistic",
+      "cinematic",
+      "stylized",
+      "cel"
+    ],
+    "localRoutes": [
+      "wan2.2-ti2v-5b-comfy-offload",
+      "wan2.2-i2v-comfy-offload",
+      "wan-flf2v-comfy",
+      "wan-fun-control-comfy",
+      "ltx2-comfy",
+      "framepack"
+    ],
+    "referenceContract": {
+      "sourceDigestRequired": true,
+      "fullResolutionReviewRequired": true,
+      "defaultMotion": "restrained",
+      "preserveComposition": true,
+      "preserveCamera": true,
+      "preserveGeometry": true
+    },
+    "loopContract": {
+      "firstLastFrameConditioningPreferred": true,
+      "duplicateTerminalFrameForbidden": true,
+      "minimumPreviewCycles": 3,
+      "temporalQcRequired": true
+    }
+  },
+  "training": {
+    "local": [
+      "sdxl-dreambooth-lora"
+    ],
+    "sourceSpecificVideo": [
+      "ltx2-lora",
+      "ltx2-ic-lora",
+      "wan2.1-lora-videox-fun"
+    ],
+    "largerGpu": [
+      "flux2-klein-lora",
+      "hunyuanvideo-1.5-lora",
+      "wan2.2-lora-musubi-unofficial",
+      "framepack-lora-musubi-unofficial"
+    ],
+    "specialist": [
+      "realesrgan-specialist"
+    ],
+    "foundationTrainingFromScratchIsLocalLaptopWorkflow": false
+  },
+  "datasets": {
+    "kinds": [
+      "image-caption",
+      "video-caption",
+      "video-loop",
+      "cel-sequence"
+    ],
+    "semanticSplitLeakageCheckRequired": true,
+    "rightsManifestRequired": true
+  },
+  "qualityGates": [
+    "exact-source-revision",
+    "dataset-rights",
+    "same-seed-base-vs-adapter-review",
+    "reference-adherence",
+    "temporal-consistency",
+    "loop-seam-review",
+    "artifact-and-alpha-validation",
+    "studio-style-profile-review"
+  ],
+  "canonical": {
+    "datasets": "bee://primary/EVAVO/AI/Datasets/Art",
+    "models": "bee://primary/EVAVO/AI/Models/Visual",
+    "videoModels": "bee://primary/EVAVO/AI/Models/Video",
+    "training": "bee://primary/EVAVO/AI/Training/Art",
+    "outputs": "bee://primary/EVAVO/AI/Outputs/Art"
+  },
+  "policy": {
+    "rawArtImmutable": true,
+    "rawArtReferenceByReviewedDigestOnly": true,
+    "weightsInGit": false,
+    "autoDownload": false,
+    "generatedVideoIsFrameSequenceReplacement": false,
+    "aiOutputIsCandidateUntilStudioValidation": true
+  }
 }

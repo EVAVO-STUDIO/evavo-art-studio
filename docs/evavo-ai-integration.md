@@ -1,7 +1,21 @@
 # EVAVO AI integration
 
-Art Studio consumes the shared EVAVO creative-AI platform; it does not own a second ML stack. `evavo-model-lab` plans training/evaluation, `evavo-local-compute` executes bounded GPU work and `evavo-local-storage` owns model/dataset placement.
+Art Studio consumes the shared EVAVO creative-AI platform; it does not own a second ML stack. `evavo-model-lab` plans datasets, training and evaluation, `evavo-local-compute` executes bounded GPU work, and `evavo-local-storage` owns model, dataset and output placement.
 
-The practical local training lane is SDXL DreamBooth/LoRA with memory preflight. FLUX.2 Klein adapters are a higher-quality larger-GPU lane unless an upstream low-memory configuration is independently proven on the current machine. Local inference/post work may use reviewed image/edit/control/segmentation/upscale/restoration providers through the existing governed Art Studio workflow.
+## Local image and video lanes
 
-Use `evavo-model-lab studio-plan --studio art-studio --vram-gib 12` before choosing a trainer. A generated image, mask, control map, LoRA or video remains a candidate asset until the existing Art Studio style, transparency, composition and delivery QA passes. Model weights never belong in this repository.
+Use `evavo-model-lab studio-plan --studio art-studio --vram-gib 12` before choosing a trainer or model route. The governed local video lane supports realistic, cinematic, stylized and cel-oriented image-to-video work, plus first/last-frame and control-guided generation for loops. A 12 GB machine should use the platform's reviewed ComfyUI/offload routes where the direct upstream runtime requires more memory; a planner result is a capability and preflight decision, never a claim that weights are installed.
+
+Reference animation should normally use restrained motion: keep the camera, composition, silhouette, perspective and static geometry locked while animating only explicitly selected regions such as fog, rain, water, reflections, smoke, cloth or light. Every reference is identified by a reviewed content digest. RAW_ART remains immutable and is never silently replaced or rewritten by generated output.
+
+Seamless loops use first/last-frame conditioning when the selected source supports it. Reject a loop that merely duplicates its terminal frame. Review at least three repeated cycles and run boundary optical-flow, flicker, geometry-drift and reference-adherence checks before accepting it.
+
+## Training and fine-tuning
+
+The practical local still-image lane is SDXL DreamBooth/LoRA with memory preflight. Video fine-tuning is source-specific: LTX-2 LoRA/IC-LoRA and the documented VideoX-Fun Wan 2.1 LoRA route are supported planning lanes; Wan 2.2 and FramePack adapter routes through `musubi-tuner` remain explicitly unofficial until pinned and validated. Larger-GPU routes stay queued rather than being presented as safe laptop jobs. Foundation-model training from scratch is not a local-laptop workflow.
+
+Datasets must carry rights and provenance manifests, use semantic split-leakage checks, and remain in canonical storage. Model weights, datasets, checkpoints and generated media never belong in this repository, and source audit/provisioning does not silently download them.
+
+## Acceptance boundary
+
+A generated image, mask, control map, adapter or video remains a candidate asset until the existing Art Studio style, transparency, composition, temporal and delivery QA passes. AI video augments the governed asset workflow; it is not an independent frame-sequence replacement path and cannot bypass the existing RAW_ART workshop or human approval boundary.
