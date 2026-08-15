@@ -19,4 +19,5 @@ import "./heavy-metal-fighting/frame-atlas-v3-game-validation-admission.test.mjs
 import "./heavy-metal-fighting/frame-atlas-v3-game-validation-file-admission.test.mjs";
 import "./heavy-metal-fighting/frame-atlas-v3-game-delivery-authorization.test.mjs";
 import "./heavy-metal-fighting/frame-atlas-v3-game-delivery-authorization-cli.test.mjs";
+import "./heavy-metal-fighting/frame-atlas-v3-game-delivery-authorization-publication.test.mjs";
 import "./heavy-metal-fighting/studio-core.test.mjs";
