@@ -23,6 +23,10 @@ import {
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFklEQVR4nGNgoBo4YaPxHxkPhAKyAQDgPyKxKv0aXwAAAABJRU5ErkJggg==";
 const PNG = Buffer.from(PNG_BASE64, "base64");
+const OPAQUE_RGB_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqCA8RIyyCjRsWAAAADElEQVQI12P4//8/AAX+Av7czFnnAAAAAElFTkSuQmCC",
+  "base64",
+);
 
 function request(overrides = {}) {
   return {
@@ -544,6 +548,52 @@ test("fixture orchestration stores unapproved candidates and evidence with compl
   assert.deepEqual(evidenceBody.routingInspection, result.routingInspection);
   assert.equal(evidence.metadata.routingOutcome, "eligible");
   assert.equal(evidence.metadata.eligibleAdapterCount, 1);
+});
+
+test("native-alpha orchestration rejects opaque RGB before candidate storage or preview", async () => {
+  const fixture = await artifactFixture();
+  class OpaqueNativeAlphaAdapter extends FixtureImageProviderAdapter {
+    descriptor = Object.freeze({
+      ...FIXTURE_PROVIDER_DESCRIPTOR,
+      id: "opaque-native-alpha-provider",
+      priority: 1000,
+    });
+
+    async execute() {
+      return {
+        adapterId: this.descriptor.id,
+        model: this.descriptor.models[0],
+        outputs: Object.freeze([
+          Object.freeze({ mediaType: "image/png", bytes: OPAQUE_RGB_PNG }),
+          Object.freeze({ mediaType: "image/png", bytes: OPAQUE_RGB_PNG }),
+        ]),
+      };
+    }
+  }
+  await assert.rejects(
+    () =>
+      executeProviderCandidateRequest(
+        request({
+          requestId: "reject-painted-transparency",
+          references: [ref(fixture.canonical, "canonical-identity")],
+          background: { strategy: "native-alpha" },
+          selection: {
+            preferredAdapterId: "opaque-native-alpha-provider",
+            allowFallback: false,
+          },
+        }),
+        {
+          registry: new ProviderRegistry([new OpaqueNativeAlphaAdapter()]),
+          artifacts: fixture.store,
+          signal: new AbortController().signal,
+        },
+      ),
+    (error) =>
+      error instanceof ProviderError &&
+      error.code === "PROVIDER_NATIVE_ALPHA_MISSING" &&
+      error.classification === "incompatible" &&
+      /never stored or previewed/u.test(error.message),
+  );
 });
 
 test("fallback is bounded to explicitly allowed transient failures", async () => {

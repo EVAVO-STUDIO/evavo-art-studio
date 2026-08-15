@@ -184,6 +184,8 @@ pnpm art -- master-alpha `
 
 `--matte` is optional in automatic mode. Keep supplying it when the generation manifest declares a matte; the classifier can still recover if the provider returns real alpha, paints a checkerboard, or substitutes a different confidently flat high-chroma matte.
 
+For `native-alpha` provider requests, orchestration now inspects the encoded container before candidate storage. PNG colour types without alpha, JPEG output, and WebP output without an alpha feature/chunk fail with `PROVIDER_NATIVE_ALPHA_MISSING`. The opaque bytes are not stored as a candidate and are never shown in a review preview. If a provider cannot supply encoded alpha, route the request to an explicitly declared single-colour chroma-key job; never ask it to imitate transparency with a checkerboard.
+
 Optional controls:
 
 ```text

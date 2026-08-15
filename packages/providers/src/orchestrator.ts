@@ -32,6 +32,62 @@ const IMAGE_MEDIA_TYPES = new Set([
   "image/webp",
   "image/jpeg",
 ]);
+const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function bytesEqualAt(
+  bytes: Uint8Array,
+  expected: Uint8Array,
+  offset: number,
+): boolean {
+  return (
+    bytes.byteLength >= offset + expected.byteLength &&
+    expected.every((value, index) => bytes[offset + index] === value)
+  );
+}
+
+function pngHasEncodedAlpha(bytes: Uint8Array): boolean {
+  if (
+    bytes.byteLength < 33 ||
+    !bytesEqualAt(bytes, PNG_SIGNATURE, 0) ||
+    String.fromCharCode(...bytes.subarray(12, 16)) !== "IHDR"
+  ) {
+    return false;
+  }
+  const colourType = bytes[25];
+  return colourType === 4 || colourType === 6;
+}
+
+function webpHasEncodedAlpha(bytes: Uint8Array): boolean {
+  if (
+    bytes.byteLength < 20 ||
+    String.fromCharCode(...bytes.subarray(0, 4)) !== "RIFF" ||
+    String.fromCharCode(...bytes.subarray(8, 12)) !== "WEBP"
+  ) {
+    return false;
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 12;
+  while (offset + 8 <= bytes.byteLength) {
+    const kind = String.fromCharCode(...bytes.subarray(offset, offset + 4));
+    const size = view.getUint32(offset + 4, true);
+    if (kind === "ALPH") return true;
+    if (kind === "VP8X" && offset + 9 <= bytes.byteLength) {
+      return (view.getUint8(offset + 8) & 0x10) !== 0;
+    }
+    if (offset + 8 + size > bytes.byteLength) return false;
+    offset += 8 + size + (size & 1);
+  }
+  return false;
+}
+
+function outputHasEncodedAlpha(
+  mediaType: string,
+  bytes: Uint8Array,
+): boolean {
+  if (mediaType === "image/png") return pngHasEncodedAlpha(bytes);
+  if (mediaType === "image/webp") return webpHasEncodedAlpha(bytes);
+  return false;
+}
 
 function nowIso(now: () => Date): string {
   const value = now();
@@ -210,6 +266,17 @@ function validateAdapterResult(
         "PROVIDER_OUTPUT_SIZE_INVALID",
         `Candidate ${index + 1} must contain 1 to ${maximumOutputBytes} bytes.`,
         "permanent",
+      );
+    }
+    if (
+      request.target.transparency !== "opaque" &&
+      request.background.strategy === "native-alpha" &&
+      !outputHasEncodedAlpha(output.mediaType, output.bytes)
+    ) {
+      throw new ProviderError(
+        "PROVIDER_NATIVE_ALPHA_MISSING",
+        `Candidate ${index + 1} was requested as native alpha but returned an opaque container. RGB checkerboards and mattes are never stored or previewed as transparent candidates.`,
+        "incompatible",
       );
     }
   }
