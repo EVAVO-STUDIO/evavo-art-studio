@@ -73,7 +73,7 @@ Usage:
 
   evavo-art quality-frame --input frame.png --expectations frame-quality.json [--output report.json]
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
-  evavo-art master-alpha --input candidate.png --matte #00ff00 --output candidate.alpha.png [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json]
+  evavo-art master-alpha --input candidate.png --output candidate.alpha.png [--matte #00ff00] [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json]
   evavo-art atlas-build --manifest atlas.json --output-dir generated [--godot-project C:\\GitRepos\\game] [--godot-executable C:\\Path\\Godot_v4.6.2.exe]
 
   evavo-art provider-protocol [--output provider-protocol.json]
@@ -128,7 +128,7 @@ Legacy Book Art plan translation requires a canonical fingerprint-valid Docs-own
 Legacy Book Illustration plan translation additionally verifies exact style, page, layout and live-text protection evidence while leaving page layout and text authority in Docs Suite.
 Book Art provider commands require EVAVO_BOOK_ART_PROVIDER_ADAPTER_IDS; the input may not supply adapterPolicy. Compilation, submission, inspection and structural parity perform no provider call. Submission remains one-attempt and duplicate-safe. Inspection verifies immutable runtime evidence, while parity compares a fingerprinted Website observation without comparing pixels, writing artifacts or approving cutover.
 Docs Book release commands verify the complete ready_for_art_shadow receipt and sealed final brief before compiling or submitting the same one-candidate, one-attempt, no-fallback provider job. They perform no provider call, Book write, selection, promotion, binding, cutover or publication.
-Alpha mastering is deterministic and writes an unapproved PNG plus evidence. It exits with code 3 when blocking sprite QA fails.
+Alpha mastering classifies native alpha, painted checkerboards and safe high-chroma mattes, then writes a deterministic unapproved PNG plus evidence. It exits with code 3 when blocking sprite QA fails.
 Selection writes immutable ranking evidence. Promotion is a separate explicit compare-and-swap operation and cannot override blocking failures.
 Atlas and durable-runtime writes are explicit, local and root-scoped.
 `;

@@ -105,6 +105,55 @@ function resolved(maskBytes) {
   };
 }
 
+function nativeResolved(model) {
+  const normalized = validateProviderCandidateRequest({
+    schemaVersion: "1.0",
+    operation: "generate",
+    assetKind: "sprite-frame",
+    continuityPhase: "independent",
+    assetId: "hero-idle",
+    candidateFamilyId: "hero-idle-native-alpha",
+    frameId: "down-001",
+    creativeIntent: "Generate one isolated hero sprite.",
+    style: {
+      styleName: "Locked sprite",
+      intent: "Preserve the approved pixel treatment.",
+      mustHave: ["complete silhouette"],
+      mustAvoid: ["painted transparency preview"],
+    },
+    shot: {
+      subject: "One hero sprite.",
+      include: ["complete silhouette"],
+      exclude: ["background", "checkerboard"],
+      separateAssets: ["shadow"],
+    },
+    target: {
+      width: 128,
+      height: 128,
+      transparency: "required",
+      outputFormat: "png",
+    },
+    sourceCanvas: { width: 1024, height: 1024 },
+    background: { strategy: "native-alpha" },
+    quality: "high",
+    candidateCount: 1,
+    references: [],
+    selection: {
+      preferredModel: model,
+      allowedAdapterIds: ["openai-gpt-image"],
+      allowFallback: false,
+    },
+  });
+  const prompt = compileProviderCandidatePrompt(normalized);
+  return {
+    request: normalized,
+    requestSha256: providerRequestSha256(normalized),
+    compiledPrompt: prompt.text,
+    compiledPromptSha256: prompt.sha256,
+    references: [],
+  };
+}
+
 test("OpenAI inpaint records deterministic mask preflight before transport", async () => {
   let calls = 0;
   const adapter = new OpenAIImageProviderAdapter({
@@ -146,6 +195,57 @@ test("OpenAI inpaint rejects an alpha-less mask before any remote request", asyn
     (error) =>
       error instanceof ProviderError &&
       error.code === "OPENAI_INPAINT_MASK_ALPHA_REQUIRED",
+  );
+  assert.equal(calls, 0);
+});
+
+test("OpenAI sends API-level transparent background only to supported GPT Image models", async () => {
+  let requestBody;
+  const adapter = new OpenAIImageProviderAdapter({
+    apiKey: "test-key-abcdefghijklmnopqrstuvwxyz0123456789",
+    model: "gpt-image-1.5",
+    allowedModels: ["gpt-image-1.5"],
+    baseUrl: "https://example.test/v1",
+    fetch: async (_url, init) => {
+      requestBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({ data: [{ b64_json: OUTPUT }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  assert.ok(adapter.descriptor.capabilities.includes("native-alpha"));
+  const result = await adapter.execute(nativeResolved("gpt-image-1.5"), {
+    signal: new AbortController().signal,
+    requestedAt: new Date("2026-08-15T00:00:00Z"),
+  });
+  assert.equal(requestBody.background, "transparent");
+  assert.equal(requestBody.output_format, "png");
+  assert.equal(requestBody.size, "1024x1024");
+  assert.equal(result.outputs[0].metadata.background, "transparent");
+});
+
+test("OpenAI GPT Image 2 rejects native alpha before transport", async () => {
+  let calls = 0;
+  const adapter = new OpenAIImageProviderAdapter({
+    apiKey: "test-key-abcdefghijklmnopqrstuvwxyz0123456789",
+    model: "gpt-image-2",
+    allowedModels: ["gpt-image-2"],
+    fetch: async () => {
+      calls += 1;
+      throw new Error("transport must not run");
+    },
+  });
+  assert.equal(adapter.descriptor.capabilities.includes("native-alpha"), false);
+  await assert.rejects(
+    () =>
+      adapter.execute(nativeResolved("gpt-image-2"), {
+        signal: new AbortController().signal,
+        requestedAt: new Date("2026-08-15T00:00:00Z"),
+      }),
+    (error) =>
+      error instanceof ProviderError &&
+      error.code === "OPENAI_IMAGE_ALPHA_INCOMPATIBLE",
   );
   assert.equal(calls, 0);
 });

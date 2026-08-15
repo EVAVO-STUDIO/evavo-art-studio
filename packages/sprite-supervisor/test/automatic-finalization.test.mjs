@@ -86,6 +86,9 @@ test("auto background chooses a low-collision matte and blocks fake transparency
   assert.match(candidate.payloadTemplate.negativeIntent, /checkerboard/i);
   const mastering = masteringTasks(compiled)[0];
   assert.equal(mastering.payloadTemplate.backgroundMode, "chroma-key");
+  assert.ok(
+    mastering.requiredCapabilities.includes("media.background-recovery"),
+  );
   assert.equal(mastering.payloadTemplate.deliveryProfileId, "godot-sprite-lossless");
   assert.equal(mastering.payloadTemplate.requireFakeTransparencyRejection, true);
   assert.ok(

@@ -772,6 +772,8 @@ function pipelineForUnit(
           ...contract.style.mustAvoid,
           ...contract.provider.prohibitedChanges,
           "Do not create a sprite sheet, contact sheet, grid or multiple-panel image.",
+          "Never paint a checkerboard or transparency-preview grid; it is fake transparency and invalid output.",
+          `Every background pixel outside the subject must remain the exact flat ${request.provider.matteColour} extraction matte with no shadow, gradient, texture, scenery or colour variation.`,
           "Do not add scenery, UI, labels, watermarks, unrelated props or extra characters.",
         ].join(" "),
         style: styleEnvelope(contract),
@@ -866,6 +868,7 @@ function pipelineForUnit(
       requiredArtifactRoles: [candidateRole],
       payloadTemplate: normalizeJson({
         candidateArtifactId: { $artifact: candidateRole },
+        backgroundMode: "chroma-key",
         matteColour: request.provider.matteColour,
         frameId: unit.frameId ?? token(`direction-master-${unit.direction}`),
         targetWidth: contract.asset.dimensions.width,
@@ -881,6 +884,7 @@ function pipelineForUnit(
         },
       }),
       requiredCapabilities: [
+        "media.background-recovery",
         "media.chroma-extract",
         "media.raster",
         "quality.sprite-frame",

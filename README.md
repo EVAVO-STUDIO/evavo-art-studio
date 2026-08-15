@@ -17,11 +17,11 @@ This repository is intentionally broader than an image generator. It is the shar
 - provider-neutral generation, edit and inpaint contracts with immutable role-specific references;
 - deterministic provider prompt compilation for identity, style, shot, layer, target and alpha boundaries;
 - capability-matched provider selection with explicit allow-lists, bounded fallback and cancellation;
-- an OpenAI GPT Image 2 adapter using ordered references and masks, with chroma-key extraction required for transparent targets;
+- an OpenAI image adapter using ordered references and masks, model-aware native-alpha requests for supported GPT Image 1.x models, and declared chroma-key fallback for GPT Image 2;
 - governed ComfyUI workflow-profile adapters for local generation, editing, inpainting, matching assets and matching animation frames, bound to exact workflow, model, runtime, node and reference hashes;
 - decoded mask preflight that proves matching image format, dimensions, page count, alpha and editable coverage before remote inpaint;
 - unapproved provider candidates stored as immutable intermediate artifacts with complete attempt and provenance evidence;
-- high-chroma-only, border-connected segmentation with pre-extraction checkerboard rejection, opaque-source proof, matte colour unmixing, antialiased edge recovery and bounded transparent RGB bleed;
+- smart alpha classification that preserves genuine alpha, reconstructs conclusively detected painted checkerboards, and applies high-chroma-only border-connected declared or confidently inferred matte segmentation with opaque-source proof, colour unmixing, antialiased edge recovery and bounded transparent RGB bleed;
 - durable `art.candidate.master-alpha` work that emits only an unapproved alpha intermediate and immutable extraction or QA evidence;
 - deterministic candidate ranking using bounded alignment, silhouettes, symmetric edge distance, area, anchors, palette, luminance, edge orientation and overlapping colour;
 - optional model-assisted identity, costume, equipment, pose, style and perceptual evidence bound to exact candidate, reference, model and preprocessing hashes;
@@ -68,10 +68,9 @@ pnpm art -- provider-compile `
   --input .\examples\provider-candidate-request.json `
   --output .\provider-request.compiled.json
 
-# Deterministically turn one flat-matte candidate into an unapproved alpha master:
+# Deterministically preserve or recover native alpha, a painted checkerboard, or a flat matte:
 pnpm art -- master-alpha `
   --input .\candidate.png `
-  --matte "#00ff00" `
   --output .\candidate.alpha.png `
   --evidence .\candidate.alpha.evidence.json `
   --expectations .\frame-quality.json
@@ -185,11 +184,11 @@ $env:EVAVO_ART_COMFYUI_DEDICATED_INSTANCE = "true"
 
 Each catalog profile becomes one exact adapter ID such as `comfyui:sprite-match`. The worker does not accept arbitrary workflow JSON. It revalidates catalog, profile, workflow, model, runtime and node identities; verifies and uploads exact immutable reference bytes; preflights required node classes through ComfyUI; binds only declared mutable inputs; downloads bounded outputs; and records unapproved candidate provenance. Remote endpoints require explicit opt-in and HTTPS. Execution still requires the existing durable admission and short-lived RAW_ART execution authorisation. See [`docs/COMFYUI_PROVIDER_ADAPTER.md`](./docs/COMFYUI_PROVIDER_ADAPTER.md).
 
-GPT Image 2 does not currently support transparent backgrounds, so transparency-required requests use a declared flat high-chroma matte. Provider validation and provider-canvas preparation reject black, white and grey keys. The opaque chroma candidate remains an intermediate and must pass pre-extraction checkerboard detection, deterministic alpha mastering, edge cleanup and hostile-matte QA.
+GPT Image 2 does not currently support transparent backgrounds, so transparency-required requests use a declared flat high-chroma matte; provider validation and provider-canvas preparation reject black, white and grey keys. Models that explicitly advertise native alpha receive an API-level transparent-background request. Both paths remain intermediate and must pass smart background classification, deterministic alpha mastering, edge cleanup and hostile-matte QA. A painted transparency grid is repaired only when its periodic border model and recomposition proof are conclusive.
 
 ## Candidate alpha mastering
 
-Art Studio never removes every pixel matching a key colour. The extractor first rejects mixed-alpha inputs, low-chroma keys and periodic painted checkerboards. It then flood-fills only matte-like pixels connected to the image border, preserving enclosed matching colours in the subject. It estimates edge alpha against nearby confident foreground, removes matte contamination, writes bounded subject-colour bleed beneath nearby transparent pixels and runs the same decoded-pixel frame gates used elsewhere.
+Art Studio first distinguishes meaningful native alpha, an opaque painted checkerboard, a declared matte and a confidently inferred high-chroma matte. It never accepts checkerboard pixels as alpha, mixes native-alpha and chroma-key paths, or removes every pixel matching a key colour. Recovery flood-fills only background-like pixels connected to the image border, preserving enclosed matching colours in the subject. It then estimates edge alpha against nearby confident foreground, removes grid or matte contamination, writes bounded subject-colour bleed beneath nearby transparent pixels and runs the same decoded-pixel frame gates used elsewhere.
 
 The durable job kind is:
 
@@ -201,6 +200,7 @@ It requires:
 
 ```text
 media.chroma-extract
+media.background-recovery
 quality.sprite-frame
 evidence.bundle
 ```

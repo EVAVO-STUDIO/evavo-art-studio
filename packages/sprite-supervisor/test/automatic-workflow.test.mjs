@@ -90,7 +90,15 @@ test("automatic workflow compiles every authored frame into executable branches"
     assert.equal(task.payloadTemplate.targetWidth, 64);
     assert.equal(task.payloadTemplate.targetHeight, 64);
     assert.equal(task.payloadTemplate.resampling, "nearest");
+    assert.equal(task.payloadTemplate.backgroundMode, "chroma-key");
+    assert.ok(
+      task.requiredCapabilities.includes("media.background-recovery"),
+    );
     assert.ok(task.requiredCapabilities.includes("media.raster"));
+  }
+  for (const task of providerTasks) {
+    assert.match(task.payloadTemplate.negativeIntent, /transparency-preview grid/i);
+    assert.match(task.payloadTemplate.negativeIntent, /exact flat #[0-9a-f]{6}/i);
   }
   for (const task of selectionTasks) {
     assert.equal(task.payloadTemplate.policy.profile, "custom");

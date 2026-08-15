@@ -12,7 +12,7 @@ export function spriteFinalizerProtocolSummary() {
       "Repeat decoded-pixel QA after every repair pass and stop after a bounded maximum.",
     ],
     failClosedEscalation: [
-      "Missing alpha, painted checkerboards, baked mattes and crop failures require provider repair or named review.",
+      "Missing alpha, painted checkerboards and baked mattes route back through smart background recovery; ambiguous classification and crop failures require provider repair or named review.",
       "Dimension or output-format drift is an implementation-contract failure and blocks release.",
       "A deterministic repair that makes no further safe changes is escalated rather than looped indefinitely.",
       "No threshold is relaxed and no visible opaque pixel, alpha value, pivot, canvas or timing metadata is changed by the pixel repair kernel.",

@@ -6,13 +6,13 @@ Status: implemented deterministic foundation
 
 Provider image output is candidate material. A convincing green or magenta background is not transparency, and a provider-supplied alpha channel is not accepted without decoded-pixel evidence.
 
-Art Studio therefore separates candidate creation from alpha mastering:
+Art Studio therefore prevents fake alpha in the provider contract and classifies every candidate before alpha mastering:
 
 ```text
 provider candidate
   -> immutable unapproved artifact
-  -> mask or matte contract proof
-  -> deterministic alpha extraction
+  -> native-alpha / checkerboard / matte classification
+  -> native-alpha preservation or deterministic background recovery
   -> edge colour recovery
   -> transparent RGB bleed
   -> decoded-pixel sprite QA
@@ -44,6 +44,18 @@ OpenAI image-edit guidance is available at:
 - <https://developers.openai.com/api/docs/guides/image-generation>
 - <https://developers.openai.com/api/docs/models/gpt-image-2>
 
+## Smart background classification
+
+The recovery kernel uses evidence, not a global colour-delete guess:
+
+1. Preserve native alpha only when it has meaningful coverage and the complete canvas edge is transparent. Hidden RGB is canonicalized and only bounded subject-colour bleed is restored beside the silhouette.
+2. Detect a visible periodic two-colour checkerboard from the border, including neutral or strongly chromatic grids and grids wrapped in a token transparent rim. If confidence is high, model its tile size, phase and both colours, recover the foreground alpha, and verify every originally visible recovered pixel by compositing it back over the detected grid.
+3. Otherwise use the matte declared by the provider request.
+4. If the provider ignored that matte, infer a replacement only when one flat, highly saturated colour confidently owns the border. Black, white and grey are never inferred as destructive keys.
+5. Fail closed when none of those classifications is sufficiently supported.
+
+A checkerboard is never accepted as transparency merely because it looks familiar. It becomes eligible only after the painted RGB grid has been removed, real alpha exists, edge colours have been reconstructed, and the normal decoded-pixel QA no longer detects a grid or flat matte.
+
 ## Border-connected matte segmentation
 
 A global colour deletion is unsafe because the subject may legitimately contain the same green, blue or magenta selected for extraction.
@@ -74,11 +86,13 @@ The extractor estimates `a` by projecting `C-M` onto `F-M`, then recovers foregr
 
 ## Evidence
 
-The extraction evidence records:
+The recovery evidence records:
 
 - input and output SHA-256;
 - source format, dimensions, page count, alpha state and byte size;
-- declared matte RGB;
+- selected strategy (`native-alpha-preserved`, `checkerboard-recovery`, `declared-chroma-key` or `inferred-high-chroma-key`);
+- native-alpha coverage, transparent-edge fraction and checkerboard fit evidence;
+- declared or conservatively inferred matte RGB;
 - connection, foreground, edge-search and bleed thresholds;
 - border matte coverage;
 - border-connected background count;
@@ -88,6 +102,7 @@ The extraction evidence records:
 - transparent, partial and opaque output counts;
 - edge pixels decontaminated;
 - transparent RGB bleed pixels created.
+- checkerboard segmentation, edge recovery and recomposition error when a painted grid was repaired.
 
 The output is then passed to the existing frame-quality kernel, which proves:
 
@@ -112,6 +127,7 @@ Required capabilities:
 
 ```text
 media.chroma-extract
+media.background-recovery
 quality.sprite-frame
 evidence.bundle
 ```
@@ -155,11 +171,12 @@ For deliberate local inspection without the runtime queue:
 ```powershell
 pnpm art -- master-alpha `
   --input .\candidate.png `
-  --matte "#00ff00" `
   --output .\candidate.alpha.png `
   --evidence .\candidate.alpha.evidence.json `
   --expectations .\frame-quality.json
 ```
+
+`--matte` is optional in automatic mode. Keep supplying it when the generation manifest declares a matte; the classifier can still recover if the provider returns real alpha, paints a checkerboard, or substitutes a different confidently flat high-chroma matte.
 
 Optional controls:
 
@@ -186,6 +203,8 @@ Choose a matte that:
 Art Studio enforces high chroma at provider-request validation, provider-canvas preparation and ordinary alpha extraction. This prevents a caller or agent from quietly switching to black, white or grey and erasing EVA's clothing, pale highlights or other legitimate subject pixels. The separate delivery optimizer may opt into low-chroma removal only for an already-existing, explicitly declared legacy matte; its conservative border-connected thresholds and evidence remain mandatory. Provider generation never receives that override.
 
 Green is not universally correct. Magenta, blue or another controlled colour may be safer for a green character or vegetation effect. The matte colour is part of the compiled production contract and evidence.
+
+The generation prompt requires the exact matte in every pixel outside the subject, checks all four corners and the full edge, and explicitly forbids checkerboards, transparency-preview UI, texture, scenery, gradients and shadows. Native-alpha requests are sent only to adapters/models that advertise file-level alpha support; incompatible models use the matte path rather than pretending.
 
 ## Deliberate next gates
 

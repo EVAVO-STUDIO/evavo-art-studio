@@ -127,29 +127,36 @@ function backgroundSection(request: NormalizedProviderCandidateRequest): string[
   if (request.target.transparency === "opaque") {
     return [
       "BACKGROUND AND ALPHA CONTRACT",
-      "- Deliver an intentionally opaque candidate. Do not imitate transparency with a checkerboard.",
+      "- Deliver an intentionally opaque candidate. A transparency-preview checkerboard is forbidden image content.",
     ];
   }
   if (request.background.strategy === "native-alpha") {
     return [
       "BACKGROUND AND ALPHA CONTRACT",
-      "- Return genuine alpha transparency, not a checkerboard, white matte, black matte or coloured rectangle.",
+      "- Return genuine file-level alpha transparency. Every pixel outside the owned silhouette must have alpha zero in the encoded PNG/WebP.",
+      "- A grey-and-white transparency-preview grid is ordinary painted RGB, not alpha, and is forbidden anywhere in the returned pixels.",
+      "- Do not substitute a white, black, grey or coloured rectangle when alpha encoding is unavailable; report the request as incompatible instead.",
       "- Keep transparent margins clean and do not crop hair, limbs, equipment, shadows or effect trails.",
+      "- Before returning, verify the canvas edge is transparent and the result shows no grid or matte when composited over black, white, grey, green and magenta.",
     ];
   }
   if (request.background.strategy === "chroma-key") {
     return [
       "BACKGROUND AND ALPHA CONTRACT",
-      `- Render against one perfectly flat solid ${request.background.matteColour} chroma matte for deterministic extraction.`,
-      "- Do not render a checkerboard, gradient, horizon, vignette, texture, cast shadow on the matte or reflected matte-colour light.",
+      `- Render every pixel outside the owned silhouette as the exact solid ${request.background.matteColour} chroma matte for deterministic extraction.`,
+      "- A transparency-preview checkerboard/grid is forbidden; never paint or simulate transparency.",
+      "- The matte must be one colour from corner to corner: no gradient, horizon, vignette, texture, scenery, noise, cast shadow, glow, ambient variation or reflected matte-colour light.",
       "- Fill every background pixel to every canvas edge with that one exact colour; never draw grey/white transparency tiles, even if an editor normally displays transparency that way.",
       "- Keep the complete subject separated cleanly from the matte and inside the canvas with generous safe clearance.",
+      `- Before returning, inspect all four corners and the full canvas edge: they must still be exactly ${request.background.matteColour}.`,
       "- This is an intermediate extraction candidate; it is not the final transparent asset.",
     ];
   }
   return [
     "BACKGROUND AND ALPHA CONTRACT",
-    "- Keep the background simple and extraction-safe. Never imitate transparency with a checkerboard.",
+    "- Prefer genuine encoded alpha when the selected model supports it; otherwise use one uniform high-chroma extraction matte.",
+    "- Never draw or imitate transparency with a checkerboard/transparency-preview grid.",
+    "- Do not return a textured, scenic, shaded, gradient, black, white or grey fake-alpha background.",
     "- This candidate must still pass deterministic alpha extraction and hostile-matte QA before delivery.",
   ];
 }
@@ -230,7 +237,7 @@ export function compileProviderCandidatePrompt(
     "- Same approved identity and design, no unexplained drift.",
     "- Correct direction, pose, layer scope and occlusion.",
     "- No duplicated limbs, broken anatomy, malformed equipment, stray text or AI-like decorative filler.",
-    "- No crop, fake transparency, checkerboard or unintended baked background.",
+    "- No crop, fake transparency, checkerboard or unintended baked background; transparency is encoded as alpha or represented only by the exact declared extraction matte.",
     "- One bounded candidate image only.",
   ];
   const text = `${lines.filter((line, index, values) => {

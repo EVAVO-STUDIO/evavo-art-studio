@@ -61,6 +61,7 @@ test("mastering worker converts a chroma candidate into an unapproved QA-backed 
     },
     inputArtifacts: [candidate.artifactId],
     requiredCapabilities: [
+      "media.background-recovery",
       "media.chroma-extract",
       "media.raster",
       "quality.sprite-frame",
@@ -77,6 +78,7 @@ test("mastering worker converts a chroma candidate into an unapproved QA-backed 
       id: "alpha-mastering-fixture",
       queues: ["media"],
       capabilities: [
+        "media.background-recovery",
         "media.chroma-extract",
         "media.raster",
         "quality.sprite-frame",
@@ -145,6 +147,7 @@ test("mastering worker rejects candidates that are not declared as immutable inp
     },
     inputArtifacts: [],
     requiredCapabilities: [
+      "media.background-recovery",
       "media.chroma-extract",
       "media.raster",
       "quality.sprite-frame",
@@ -159,6 +162,7 @@ test("mastering worker rejects candidates that are not declared as immutable inp
       id: "alpha-lineage-fixture",
       queues: ["media"],
       capabilities: [
+        "media.background-recovery",
         "media.chroma-extract",
         "media.raster",
         "quality.sprite-frame",

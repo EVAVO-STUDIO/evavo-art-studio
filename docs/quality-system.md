@@ -13,6 +13,8 @@ Transparent output is accepted only when the decoded file contains an alpha chan
 
 Every transparent master is composited over black, white, middle grey, green and magenta test mattes. A contact sheet and numeric edge report are retained in the evidence bundle. Chroma-key generation may be used as an intermediate technique, but chroma removal, edge colour decontamination and alpha proof must complete before export.
 
+Before these blocking checks, the background-recovery kernel classifies the source. It preserves meaningful native alpha while canonicalizing hidden RGB, reconstructs confidently detected neutral or chromatic painted checkerboards into real alpha (including transparent-rim bypass attempts), removes a declared high-chroma matte, or conservatively infers a flat high-chroma border matte when a provider deviates. Checkerboard repair is accepted only when canvas-edge segmentation and recomposition proof succeed; ambiguous backgrounds remain rejected.
+
 ## Anti-generic art direction
 
 Negative prompts alone are not an art-direction system. Each project receives an explicit style envelope containing references, era, materials, palette, silhouette rules, camera rules, line treatment, composition, recurring motifs and prohibited motifs. Candidate selection compares against that envelope and across the asset family.

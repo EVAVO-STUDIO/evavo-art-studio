@@ -34,8 +34,6 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
       "master-alpha",
       "--input",
       input,
-      "--matte",
-      "#00ff00",
       "--output",
       output,
       "--evidence",
@@ -61,13 +59,14 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
   const proof = JSON.parse(await readFile(evidence, "utf8"));
   assert.equal(proof.approvalState, "unapproved");
   assert.equal(proof.promotionEligible, true);
+  assert.equal(proof.extraction.strategy, "inferred-high-chroma-key");
   assert.equal(proof.extraction.matte.hex, "#00ff00");
   assert.ok(proof.extraction.output.transparentPixels > 0);
   assert.ok(proof.extraction.output.partialPixels > 0);
   assert.equal(proof.quality.passed, true);
 });
 
-test("CLI fails closed when the declared matte is absent", async () => {
+test("CLI rejects an invalid declared matte before changing any pixels", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-master-cli-fail-"));
   const input = path.join(root, "candidate.png");
   const output = path.join(root, "candidate.alpha.png");
@@ -80,7 +79,7 @@ test("CLI fails closed when the declared matte is absent", async () => {
       "--input",
       input,
       "--matte",
-      "#0000ff",
+      "not-a-colour",
       "--output",
       output,
     ],
@@ -88,5 +87,5 @@ test("CLI fails closed when the declared matte is absent", async () => {
   );
   assert.equal(result.status, 1);
   const error = JSON.parse(result.stderr);
-  assert.equal(error.error.code, "CHROMA_KEY_BORDER_MATTE_INSUFFICIENT");
+  assert.equal(error.error.code, "BACKGROUND_RECOVERY_MATTE_INVALID");
 });

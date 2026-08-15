@@ -7,4 +7,5 @@ export * from "./timing.js";
 export * from "./build.js";
 export * from "./image-preflight.js";
 export * from "./chroma-key.js";
+export * from "./background-recovery.js";
 export { atomicWriteFile } from "./files.js";

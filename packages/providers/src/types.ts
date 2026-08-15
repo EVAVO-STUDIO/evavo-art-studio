@@ -5,7 +5,7 @@ import type {
   StoredArtifact,
 } from "@evavo/art-artifacts";
 
-export const PROVIDER_PROTOCOL_VERSION = "2026-08-07.3" as const;
+export const PROVIDER_PROTOCOL_VERSION = "2026-08-15.1" as const;
 
 export type ProviderOperation = "generate" | "edit" | "inpaint";
 export type ProviderAssetKind =

@@ -5,9 +5,12 @@ import sharp from "sharp";
 
 import {
   ChromaKeyExtractionError,
+  BackgroundAlphaRecoveryError,
   RasterPreflightError,
+  detectPaintedTransparencyCheckerboard,
   extractChromaKeyAlpha,
   preflightInpaintMask,
+  recoverBackgroundAlpha,
 } from "../dist/index.js";
 
 async function raster(width, height, channels, pixel) {
@@ -201,4 +204,159 @@ test("low-chroma extraction requires an explicit legacy-cleanup override", async
   });
   assert.ok(result.evidence.output.transparentPixels > 0);
   assert.ok(result.evidence.output.opaquePixels > 0);
+});
+
+test("background recovery converts a painted checkerboard to real alpha with clean edges", async () => {
+  const width = 128;
+  const height = 128;
+  const tile = 16;
+  const foreground = [218, 62, 38];
+  const matteAt = (x, y) =>
+    (Math.floor(x / tile) + Math.floor(y / tile)) % 2 ? 176 : 224;
+  const candidate = await raster(width, height, 4, (x, y) => {
+    const matte = matteAt(x, y);
+    if (x >= 43 && x <= 84 && y >= 36 && y <= 91) {
+      return [...foreground, 255];
+    }
+    if (
+      ((x === 42 || x === 85) && y >= 36 && y <= 91) ||
+      ((y === 35 || y === 92) && x >= 43 && x <= 84)
+    ) {
+      return [
+        ...foreground.map((channel) => Math.round(channel * 0.5 + matte * 0.5)),
+        255,
+      ];
+    }
+    return [matte, matte, matte, 255];
+  });
+  const source = await rgba(candidate);
+  const detection = detectPaintedTransparencyCheckerboard(
+    source.data,
+    width,
+    height,
+  );
+  assert.equal(detection.detected, true);
+  assert.equal(detection.tileSize, tile);
+
+  const result = await recoverBackgroundAlpha(candidate);
+  assert.equal(result.evidence.strategy, "checkerboard-recovery");
+  assert.equal(
+    result.evidence.guarantees.fakeCheckerboardAcceptedAsTransparency,
+    false,
+  );
+  assert.equal(result.evidence.guarantees.recompositionVerified, true);
+  assert.equal(result.evidence.checkerboardRecovery.compositeMismatchPixels, 0);
+  assert.ok(result.evidence.output.partialPixels > 0);
+  assert.ok(result.evidence.output.decontaminatedPixels > 0);
+
+  const decoded = await rgba(result.png);
+  assert.deepEqual(pixel(decoded, 0, 0), [0, 0, 0, 0]);
+  assert.deepEqual(pixel(decoded, 60, 60), [...foreground, 255]);
+  const edge = pixel(decoded, 60, 35);
+  assert.ok(edge[3] >= 124 && edge[3] <= 131);
+  for (let channel = 0; channel < 3; channel += 1) {
+    assert.ok(Math.abs(edge[channel] - foreground[channel]) <= 3);
+  }
+});
+
+test("background recovery removes a high-chroma painted checkerboard", async () => {
+  const candidate = await raster(96, 96, 4, (x, y) => {
+    if (x >= 31 && x <= 64 && y >= 24 && y <= 78) {
+      return [230, 150, 40, 255];
+    }
+    return (Math.floor(x / 12) + Math.floor(y / 12)) % 2
+      ? [0, 255, 0, 255]
+      : [255, 0, 255, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate);
+  assert.equal(result.evidence.strategy, "checkerboard-recovery");
+  assert.equal(result.evidence.classification.checkerboard.detected, true);
+  assert.equal(result.evidence.guarantees.recompositionVerified, true);
+  assert.deepEqual(pixel(await rgba(result.png), 0, 0), [0, 0, 0, 0]);
+});
+
+test("background recovery defeats a transparent-rim bypass around a visible painted grid", async () => {
+  const candidate = await raster(128, 128, 4, (x, y) => {
+    if (x === 0 || y === 0 || x === 127 || y === 127) {
+      return [0, 0, 0, 0];
+    }
+    if (x >= 40 && x <= 87 && y >= 22 && y <= 112) {
+      return [205, 75, 42, 255];
+    }
+    const value = (Math.floor(x / 16) + Math.floor(y / 16)) % 2 ? 176 : 224;
+    return [value, value, value, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate);
+  assert.equal(result.evidence.strategy, "checkerboard-recovery");
+  assert.equal(result.evidence.classification.checkerboard.detected, true);
+  assert.ok(
+    result.evidence.recomposition.checkedPixels < 128 * 128,
+    "pre-existing transparent pixels are not mistaken for matte-composition evidence",
+  );
+  assert.deepEqual(pixel(await rgba(result.png), 0, 64), [0, 0, 0, 0]);
+});
+
+test("background recovery preserves real alpha when checker colours exist only in hidden RGB", async () => {
+  const candidate = await raster(64, 64, 4, (x, y) => {
+    if (x >= 20 && x <= 43 && y >= 16 && y <= 47) {
+      return [35, 125, 225, x === 20 || x === 43 ? 128 : 255];
+    }
+    const value = (Math.floor(x / 8) + Math.floor(y / 8)) % 2 ? 176 : 224;
+    return [value, value, value, 0];
+  });
+  const result = await recoverBackgroundAlpha(candidate);
+  assert.equal(result.evidence.strategy, "native-alpha-preserved");
+  assert.equal(result.evidence.classification.checkerboard.detected, false);
+  assert.equal(result.evidence.guarantees.transparentCanvasEdge, true);
+  const decoded = await rgba(result.png);
+  assert.deepEqual(pixel(decoded, 0, 0), [0, 0, 0, 0]);
+  assert.deepEqual(
+    pixel(decoded, 19, 30),
+    [35, 125, 225, 0],
+    "only bounded subject-colour bleed remains beside the silhouette",
+  );
+});
+
+test("background recovery preserves meaningful native alpha before matte extraction", async () => {
+  const candidate = await raster(32, 32, 4, (x, y) => {
+    if (x >= 9 && x <= 22 && y >= 8 && y <= 23) {
+      return [50, 120, 230, x === 9 || x === 22 ? 128 : 255];
+    }
+    return [0, 0, 0, 0];
+  });
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.equal(result.evidence.strategy, "native-alpha-preserved");
+  assert.equal(result.evidence.classification.nativeAlphaMeaningful, true);
+  assert.equal(result.evidence.guarantees.transparentCanvasEdge, true);
+  assert.deepEqual(pixel(await rgba(result.png), 0, 0), [0, 0, 0, 0]);
+});
+
+test("background recovery infers only a confident high-chroma edge matte", async () => {
+  const candidate = await raster(48, 48, 4, (x, y) =>
+    x >= 15 && x <= 32 && y >= 12 && y <= 35
+      ? [230, 150, 40, 255]
+      : [255, 0, 255, 255],
+  );
+  const result = await recoverBackgroundAlpha(candidate);
+  assert.equal(result.evidence.strategy, "inferred-high-chroma-key");
+  assert.equal(result.evidence.classification.inferredMatte.hex, "#ff00ff");
+  assert.equal(result.evidence.guarantees.recompositionVerified, true);
+  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
+  assert.ok(result.evidence.output.transparentPixels > 0);
+
+  const substituted = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.equal(substituted.evidence.strategy, "inferred-high-chroma-key");
+  assert.equal(substituted.evidence.classification.inferredMatte.hex, "#ff00ff");
+
+  const neutral = await raster(32, 32, 4, () => [230, 230, 230, 255]);
+  await assert.rejects(
+    () => recoverBackgroundAlpha(neutral),
+    (error) =>
+      error instanceof BackgroundAlphaRecoveryError &&
+      error.code === "BACKGROUND_RECOVERY_UNRECOGNIZED",
+  );
 });

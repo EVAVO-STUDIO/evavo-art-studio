@@ -58,6 +58,12 @@ async function checkerboard() {
       data[offset + 1] = value;
       data[offset + 2] = value;
       data[offset + 3] = x === 0 && y === 0 ? 0 : 255;
+      if (x >= 11 && x <= 20 && y >= 9 && y <= 22) {
+        data[offset] = 225;
+        data[offset + 1] = 45;
+        data[offset + 2] = 25;
+        data[offset + 3] = 255;
+      }
     }
   }
   return sharp(data, { raw: { width, height, channels: 4 } })
@@ -108,6 +114,7 @@ async function execute(fx, payload) {
         },
         inputArtifacts: [fx.candidate.artifactId],
         requiredCapabilities: [
+          "media.background-recovery",
           "media.chroma-extract",
           "media.raster",
           "quality.sprite-frame",
@@ -155,7 +162,7 @@ test("green matte becomes real alpha and remains finalization-ready", async () =
   }
 });
 
-test("painted checkerboard transparency is rejected", async () => {
+test("painted checkerboard transparency is repaired into genuine alpha", async () => {
   const fx = await fixture(await checkerboard());
   try {
     const result = await execute(fx, {
@@ -163,14 +170,17 @@ test("painted checkerboard transparency is rejected", async () => {
       requireMeaningfulAlpha: true,
       quality: { safePadding: 0 },
     });
-    assert.equal(result.result.qualityPassed, false);
+    assert.equal(result.result.qualityPassed, true);
     const mastered = await fx.artifacts.get(result.outputArtifacts[0]);
-    assert.equal(mastered.labels.qualityState, "rejected");
+    assert.equal(mastered.labels.qualityState, "passed");
+    assert.equal(mastered.labels.backgroundRecoveryStrategy, "checkerboard-recovery");
     const evidence = JSON.parse(
       (await fx.artifacts.read(result.outputArtifacts[1])).toString("utf8"),
     );
-    assert.equal(evidence.quality.fakeTransparency.checkerboardDetected, true);
-    assert.equal(evidence.blockingProof.fakeTransparencyPassed, false);
+    assert.equal(evidence.background.extraction.strategy, "checkerboard-recovery");
+    assert.equal(evidence.background.extraction.guarantees.realAlpha, true);
+    assert.equal(evidence.quality.fakeTransparency.checkerboardDetected, false);
+    assert.equal(evidence.blockingProof.fakeTransparencyPassed, true);
   } finally {
     await rm(fx.root, { recursive: true, force: true });
   }

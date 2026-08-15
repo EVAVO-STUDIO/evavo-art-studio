@@ -43,6 +43,8 @@ const OPENAI_IMAGE_CAPABILITIES = Object.freeze([
   "cancellation",
 ] as const satisfies readonly ProviderCapability[]);
 
+const OPENAI_NATIVE_ALPHA_MODEL = /^gpt-image-1(?:\.5|-mini)?(?:$|-)/u;
+
 const REFERENCE_ROLE_ORDER = Object.freeze([
   "base-image",
   "canonical-identity",
@@ -201,6 +203,35 @@ export function openAIImageSourceSize(
     );
   }
   return `${width}x${height}`;
+}
+
+export function openAIImageSourceSizeForModel(
+  request: ResolvedProviderCandidateRequest["request"],
+  model: string,
+): string {
+  if (model === "gpt-image-2" || model.startsWith("gpt-image-2-")) {
+    return openAIImageSourceSize(request);
+  }
+  const allowed = new Set(["1024x1024", "1536x1024", "1024x1536"]);
+  if (request.sourceCanvas) {
+    const declared = `${request.sourceCanvas.width}x${request.sourceCanvas.height}`;
+    if (!allowed.has(declared)) {
+      throw new ProviderError(
+        "OPENAI_IMAGE_SIZE_INCOMPATIBLE",
+        `${model} sourceCanvas must be 1024x1024, 1536x1024 or 1024x1536.`,
+        "incompatible",
+      );
+    }
+    return declared;
+  }
+  const ratio = request.target.width / request.target.height;
+  if (ratio > 1.2) return "1536x1024";
+  if (ratio < 1 / 1.2) return "1024x1536";
+  return "1024x1024";
+}
+
+function supportsNativeAlpha(model: string): boolean {
+  return OPENAI_NATIVE_ALPHA_MODEL.test(model);
 }
 
 function quality(value: "draft" | "standard" | "high"): "low" | "medium" | "high" {
@@ -390,9 +421,14 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
       protocolVersion: PROVIDER_PROTOCOL_VERSION,
       id: "openai-gpt-image",
       label: "OpenAI GPT Image",
-      version: "1.0.0",
+      version: "1.1.0",
       priority: options.priority ?? 1_000,
-      capabilities: OPENAI_IMAGE_CAPABILITIES,
+      capabilities: Object.freeze([
+        ...OPENAI_IMAGE_CAPABILITIES,
+        ...(models.some(supportsNativeAlpha)
+          ? (["native-alpha"] as const)
+          : []),
+      ]),
       models: Object.freeze(models),
       maximumCandidates: 8,
       maximumReferenceImages: 16,
@@ -426,20 +462,37 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
         "incompatible",
       );
     }
-    if (request.background.strategy === "native-alpha") {
+    if (
+      request.background.strategy === "native-alpha" &&
+      !supportsNativeAlpha(model)
+    ) {
       throw new ProviderError(
         "OPENAI_IMAGE_ALPHA_INCOMPATIBLE",
-        "GPT Image 2 does not currently support transparent backgrounds.",
+        `${model} does not support transparent image backgrounds; use a declared high-chroma matte instead.`,
         "incompatible",
       );
     }
 
-    const size = openAIImageSourceSize(request);
+    const size = openAIImageSourceSizeForModel(request, model);
     const format = request.target.outputFormat;
+    if (
+      request.background.strategy === "native-alpha" &&
+      format === "jpeg"
+    ) {
+      throw new ProviderError(
+        "OPENAI_IMAGE_ALPHA_FORMAT_INCOMPATIBLE",
+        "Native-alpha OpenAI image requests must use PNG or WebP output.",
+        "incompatible",
+      );
+    }
     const useEditEndpoint =
       resolved.references.length > 0 || request.operation !== "generate";
     const background =
-      request.background.strategy === "provider-auto" ? "auto" : "opaque";
+      request.background.strategy === "native-alpha"
+        ? "transparent"
+        : request.background.strategy === "provider-auto"
+          ? "auto"
+          : "opaque";
     let body: BodyInit;
     const headers: Record<string, string> = {
       authorization: `Bearer ${this.#apiKey}`,

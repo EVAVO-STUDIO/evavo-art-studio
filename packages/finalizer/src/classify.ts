@@ -49,7 +49,7 @@ function actionFor(gate: SpriteQualityGateResult): SpriteFinalizationAction {
       gateIds: [gate.id],
       automatic: false,
       description:
-        "Use verified native alpha or an explicit border-connected matte extraction path. A painted transparency grid is not acceptable.",
+        "Use verified native alpha or smart border-connected background recovery. A painted transparency grid is removable source evidence, never acceptable delivered alpha.",
       preserve: ["identity", "pose", "camera", "palette", "framing"],
     };
   }
@@ -59,7 +59,7 @@ function actionFor(gate: SpriteQualityGateResult): SpriteFinalizationAction {
       gateIds: [gate.id],
       automatic: false,
       description:
-        "Reject the baked matte or checkerboard and regenerate on a declared matte that does not collide with the approved palette.",
+        "Route the immutable source back through smart background recovery. Reconstruct a confidently modelled painted checkerboard or declared matte; regenerate on a low-collision matte only when classification is ambiguous.",
       preserve: ["identity", "pose", "camera", "palette", "framing"],
     };
   }

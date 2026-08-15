@@ -11,8 +11,10 @@ import {
   type DeliveryProfileId,
 } from "@evavo/art-delivery-optimizer";
 import {
+  BackgroundAlphaRecoveryError,
   ChromaKeyExtractionError,
   extractChromaKeyAlpha,
+  recoverBackgroundAlpha,
   type ChromaKeyExtractionOptions,
 } from "@evavo/art-media";
 import {
@@ -315,21 +317,28 @@ async function prepareSource(
 }>> {
   const sourceDecoded = await decodeSpriteFrame(candidateBytes);
   if (mode === "native-alpha") {
-    if (!sourceDecoded.sourceHasAlpha || !hasNonOpaqueAlpha(sourceDecoded)) {
-      throw new PermanentRuntimeError(
-        "MASTERING_NATIVE_ALPHA_MISSING",
-        "Native-alpha mastering requires a decoded alpha channel with at least one non-opaque pixel.",
+    try {
+      const { matteColour: _ignoredMatte, ...automaticOptions } =
+        extractionOptions(payload, "#00ff00", false);
+      const recovery = await recoverBackgroundAlpha(
+        candidateBytes,
+        automaticOptions,
       );
+      return {
+        png: Buffer.from(recovery.png),
+        extraction: normalizeJson(recovery.evidence),
+        sourceDecoded,
+        blackEvidence: null,
+        ...(recovery.evidence.matte?.hex
+          ? { effectiveMatteColour: recovery.evidence.matte.hex }
+          : {}),
+      };
+    } catch (error: unknown) {
+      if (error instanceof BackgroundAlphaRecoveryError) {
+        throw new PermanentRuntimeError(error.code, error.message);
+      }
+      throw error;
     }
-    return {
-      png: await sharp(candidateBytes)
-        .rotate()
-        .png({ compressionLevel: 9, palette: false })
-        .toBuffer(),
-      extraction: null,
-      sourceDecoded,
-      blackEvidence: null,
-    };
   }
 
   if (mode === "opaque-preserve") {
@@ -364,19 +373,30 @@ async function prepareSource(
     );
   }
   try {
-    const extraction = await extractChromaKeyAlpha(
-      candidateBytes,
-      extractionOptions(payload, matteColour, mode === "black-additive"),
-    );
+    const extraction = mode === "black-additive"
+      ? await extractChromaKeyAlpha(
+          candidateBytes,
+          extractionOptions(payload, matteColour, true),
+        )
+      : await recoverBackgroundAlpha(
+          candidateBytes,
+          extractionOptions(payload, matteColour, false),
+        );
     return {
       png: Buffer.from(extraction.png),
       extraction: normalizeJson(extraction.evidence),
       sourceDecoded,
       blackEvidence,
-      effectiveMatteColour: matteColour,
+      effectiveMatteColour:
+        "strategy" in extraction.evidence
+          ? extraction.evidence.matte?.hex ?? matteColour
+          : matteColour,
     };
   } catch (error: unknown) {
-    if (error instanceof ChromaKeyExtractionError) {
+    if (
+      error instanceof ChromaKeyExtractionError ||
+      error instanceof BackgroundAlphaRecoveryError
+    ) {
       throw new PermanentRuntimeError(error.code, error.message);
     }
     throw error;
@@ -523,6 +543,17 @@ export function createCandidateMasteringHandlers(): Readonly<
         "Matte-backed mastering must require media.chroma-extract.",
       );
     }
+    if (
+      (mode === "native-alpha" || mode === "chroma-key") &&
+      !context.job.spec.requiredCapabilities.includes(
+        "media.background-recovery",
+      )
+    ) {
+      throw new PermanentRuntimeError(
+        "MASTERING_CAPABILITY_MISSING",
+        "Native-alpha and chroma-key mastering must require media.background-recovery.",
+      );
+    }
     if (!context.job.spec.requiredCapabilities.includes("media.raster")) {
       throw new PermanentRuntimeError(
         "MASTERING_CAPABILITY_MISSING",
@@ -607,6 +638,12 @@ export function createCandidateMasteringHandlers(): Readonly<
       (!quality.fakeTransparency.checkerboardDetected &&
         !quality.fakeTransparency.flatMatteDetected);
     const passed = quality.passed && meaningfulAlphaPassed && fakeTransparencyPassed;
+    const extractionEvidence = prepared.extraction;
+    const recoveryStrategy =
+      isRecord(extractionEvidence) &&
+      typeof extractionEvidence.strategy === "string"
+        ? extractionEvidence.strategy
+        : undefined;
 
     const stem = safeFileStem(
       candidate.fileName ?? candidate.labels.candidateFamilyId ?? candidate.artifactId,
@@ -623,6 +660,9 @@ export function createCandidateMasteringHandlers(): Readonly<
         finalDeliverable: "false",
         finalizationReady: passed ? "true" : "false",
         backgroundMode: mode,
+        ...(recoveryStrategy === undefined
+          ? {}
+          : { backgroundRecoveryStrategy: recoveryStrategy }),
         sourceCandidateArtifactId: candidateId,
         ...(candidate.labels.candidateFamilyId
           ? { candidateFamilyId: candidate.labels.candidateFamilyId }
@@ -743,6 +783,7 @@ export function createCandidateMasteringHandlers(): Readonly<
 
 export function candidateMasteringWorkerCapabilities(): readonly string[] {
   return [
+    "media.background-recovery",
     "media.chroma-extract",
     "media.raster",
     "quality.sprite-frame",

@@ -3,8 +3,8 @@ import path from "node:path";
 
 import {
   atomicWriteFile,
-  extractChromaKeyAlpha,
-  type ChromaKeyExtractionOptions,
+  recoverBackgroundAlpha,
+  type BackgroundAlphaRecoveryOptions,
 } from "@evavo/art-media";
 import {
   analyseDecodedSpriteFrame,
@@ -52,10 +52,10 @@ async function jsonFile(filePath: string): Promise<unknown> {
   return JSON.parse(await readFile(path.resolve(filePath), "utf8")) as unknown;
 }
 
-function extractionOptions(
+function recoveryOptions(
   values: MasteringCommandValues,
-  matteColour: string,
-): ChromaKeyExtractionOptions {
+  matteColour: string | undefined,
+): BackgroundAlphaRecoveryOptions {
   const connectionDistance = optionalNumber(
     values["connection-distance"],
     "--connection-distance",
@@ -74,7 +74,7 @@ function extractionOptions(
     "--minimum-border-matte-fraction",
   );
   return {
-    matteColour,
+    ...(matteColour === undefined ? {} : { matteColour }),
     ...(connectionDistance === undefined ? {} : { connectionDistance }),
     ...(opaqueSeedDistance === undefined ? {} : { opaqueSeedDistance }),
     ...(edgeSearchRadius === undefined ? {} : { edgeSearchRadius }),
@@ -92,7 +92,7 @@ export async function handleMasteringCommand(
   if (command !== "master-alpha") return { handled: false };
   const inputPath = path.resolve(required(values.input, "--input"));
   const outputPath = path.resolve(required(values.output, "--output"));
-  const matteColour = required(values.matte, "--matte");
+  const matteColour = values.matte?.trim() || undefined;
   const evidencePath = path.resolve(
     values.evidence?.trim() || `${outputPath}.evidence.json`,
   );
@@ -103,9 +103,9 @@ export async function handleMasteringCommand(
     throw new Error("--expectations must contain a JSON object.");
   }
 
-  const extraction = await extractChromaKeyAlpha(
+  const extraction = await recoverBackgroundAlpha(
     await readFile(inputPath),
-    extractionOptions(values, matteColour),
+    recoveryOptions(values, matteColour),
   );
   const decoded = await decodeSpriteFrame(extraction.png);
   const existingMattes = Array.isArray(suppliedExpectations.knownMatteColours)
@@ -131,7 +131,14 @@ export async function handleMasteringCommand(
       typeof suppliedExpectations.safePadding === "number"
         ? suppliedExpectations.safePadding
         : 1,
-    knownMatteColours: [matteColour, ...existingMattes],
+    knownMatteColours: [
+      ...(extraction.evidence.matte?.hex
+        ? [extraction.evidence.matte.hex]
+        : matteColour
+          ? [matteColour]
+          : []),
+      ...existingMattes,
+    ],
   });
   const evidence = {
     schemaVersion: "1.0",
@@ -157,6 +164,7 @@ export async function handleMasteringCommand(
       outputPath,
       evidencePath,
       outputSha256: extraction.evidence.outputSha256,
+      recoveryStrategy: extraction.evidence.strategy,
       qualityPassed: quality.passed,
       promotionEligible: quality.passed,
       approvalState: "unapproved",
