@@ -46,6 +46,7 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
       "8",
       "--bleed-radius",
       "2",
+      "--suppress-chroma-spill",
     ],
     { cwd, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
   );
@@ -54,6 +55,7 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
   assert.equal(summary.approvalState, "unapproved");
   assert.equal(summary.qualityPassed, true);
   assert.equal(summary.outputSha256.length, 64);
+  assert.equal(summary.chromaSpillSuppressed, true);
   await access(output);
   await access(evidence);
   const proof = JSON.parse(await readFile(evidence, "utf8"));
@@ -61,6 +63,7 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
   assert.equal(proof.promotionEligible, true);
   assert.equal(proof.extraction.strategy, "inferred-high-chroma-key");
   assert.equal(proof.extraction.matte.hex, "#00ff00");
+  assert.equal(proof.spillSuppression.matte.hex, "#00ff00");
   assert.ok(proof.extraction.output.transparentPixels > 0);
   assert.ok(proof.extraction.output.partialPixels > 0);
   assert.equal(proof.quality.passed, true);

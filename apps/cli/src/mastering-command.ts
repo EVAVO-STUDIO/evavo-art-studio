@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   atomicWriteFile,
   recoverBackgroundAlpha,
+  suppressChromaSpill,
   type BackgroundAlphaRecoveryOptions,
 } from "@evavo/art-media";
 import {
@@ -27,6 +28,7 @@ export interface MasteringCommandValues {
   readonly "checker-foreground-seed-distance"?: string;
   readonly "checker-minimum-border-fraction"?: string;
   readonly "checker-maximum-composite-channel-error"?: string;
+  readonly "suppress-chroma-spill"?: boolean;
 }
 
 export type MasteringCommandResult =
@@ -147,7 +149,16 @@ export async function handleMasteringCommand(
     await readFile(inputPath),
     recoveryOptions(values, matteColour),
   );
-  const decoded = await decodeSpriteFrame(extraction.png);
+  const spillSuppression = values["suppress-chroma-spill"]
+    ? await suppressChromaSpill(extraction.png, {
+        matteColour:
+          extraction.evidence.matte?.hex ??
+          extraction.evidence.classification.inferredMatte?.hex ??
+          required(matteColour, "--matte"),
+      })
+    : null;
+  const masteredPng = spillSuppression?.png ?? extraction.png;
+  const decoded = await decodeSpriteFrame(masteredPng);
   const existingMattes = Array.isArray(suppliedExpectations.knownMatteColours)
     ? suppliedExpectations.knownMatteColours
     : [];
@@ -202,12 +213,13 @@ export async function handleMasteringCommand(
     approvalState: "unapproved",
     promotionEligible: quality.passed,
     extraction: extraction.evidence,
+    spillSuppression: spillSuppression?.evidence ?? null,
     quality,
   };
 
   await mkdir(path.dirname(outputPath), { recursive: true });
   await mkdir(path.dirname(evidencePath), { recursive: true });
-  await atomicWriteFile(outputPath, extraction.png);
+  await atomicWriteFile(outputPath, masteredPng);
   await atomicWriteFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 
   return {
@@ -216,8 +228,11 @@ export async function handleMasteringCommand(
       schemaVersion: "1.0",
       outputPath,
       evidencePath,
-      outputSha256: extraction.evidence.outputSha256,
+      outputSha256:
+        spillSuppression?.evidence.outputSha256 ??
+        extraction.evidence.outputSha256,
       recoveryStrategy: extraction.evidence.strategy,
+      chromaSpillSuppressed: spillSuppression !== null,
       qualityPassed: quality.passed,
       promotionEligible: quality.passed,
       approvalState: "unapproved",

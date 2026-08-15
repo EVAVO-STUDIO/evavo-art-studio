@@ -24,6 +24,8 @@ Native provider alpha is preferred. If it is unavailable, the job declares one f
 
 Frames require two independent inspectors at 0.95 confidence, adjacent-frame continuity evidence and loop-closure evidence before they can enter an approved atlas. Top Hat frames additionally block any crown, brim, band, face, moustache or costume drift.
 
+Provider sheets rendered against a declared high-chroma matte must pass `master-alpha --suppress-chroma-spill` before frame extraction. This explicit post-recovery gate unmixes residual key colour, reduces contaminated edge alpha and records deterministic suppression evidence; it never treats a painted checkerboard as transparency. Rows that touch the provider canvas edge are excluded rather than promoted with cropped hats, hands or shoes.
+
 ## Compile a create-only plan
 
 Prepare an exact `evavo.project-art-avatar-animation-suite-request.v2` JSON document with:
