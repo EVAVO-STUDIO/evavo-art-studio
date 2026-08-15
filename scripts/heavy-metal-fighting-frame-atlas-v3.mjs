@@ -16,6 +16,9 @@ import {
 import {
   compileHmfAtlasV3GameDeliveryAuthorizationFromRequestFile,
 } from "./heavy-metal-fighting/frame-atlas-v3-game-delivery-authorization-cli.mjs";
+import {
+  compileVerifyAndPublishHmfAtlasV3GameDeliveryAuthorizationFromRequestFile,
+} from "./heavy-metal-fighting/frame-atlas-v3-game-delivery-authorization-publication.mjs";
 
 function option(argv, name) {
   const index = argv.indexOf(name);
@@ -31,6 +34,7 @@ function usage() {
     "  node scripts/heavy-metal-fighting-frame-atlas-v3.mjs compile <frame> --workspace-root <root> --frame-receipts-json <file> --style-proof-approvals-json <file> --style-proof-receipts-json <file> --output <plan.json> [--compiled-at <UTC>]",
     "  node scripts/heavy-metal-fighting-frame-atlas-v3.mjs admit-game-validation --validation-receipt <steel-dominion-validation.json> --expected-game-head <40-char-sha>",
     "  node scripts/heavy-metal-fighting-frame-atlas-v3.mjs authorize-game-delivery --request <delivery-authorization-request.json>",
+    "  node scripts/heavy-metal-fighting-frame-atlas-v3.mjs authorize-game-delivery --request <delivery-authorization-request.json> --output <new-authorization.json>",
     "",
     "Build the compiled plan with:",
     "  python tools/build_heavy_metal_fighting_frame_atlas_v3.py --plan <plan.json> --output-root <new-create-only-delivery-directory>",
@@ -39,7 +43,7 @@ function usage() {
     "",
     "admit-game-validation reads one completed steel-dominion local Godot validation receipt through a stable single-link regular-file boundary, rejects symbolic-link or junction path components, binds its exact bytes and six-suite semantics to the explicitly expected game commit, and emits read-only self-hashed Art Studio evidence. It does not read or mutate steel-dominion, activate its runtime, commit, push, deploy or publish.",
     "",
-    "authorize-game-delivery reads one closed request manifest plus the four exact workspace plans/builds and all 896 source PNGs through stable single-link file boundaries, recompiles the named-human delivery authorization from the exact bytes, and prints the self-hashed authorization to stdout. It does not write steel-dominion, activate runtime content, mutate Git, deploy or publish.",
+    "authorize-game-delivery reads one closed request manifest plus the four exact workspace plans/builds and all 896 source PNGs through stable single-link file boundaries and recompiles the named-human delivery authorization from the exact bytes. Without --output it prints the self-hashed authorization to stdout. With --output it recompiles and independently re-verifies the exact authorization, writes one new local authorization JSON through a create-only atomic no-replace transaction, verifies exact readback, and prints only the self-hashed local publication receipt. It never writes steel-dominion, activates runtime content, mutates Git, deploys or externally publishes.",
   ].join("\n");
 }
 
@@ -204,10 +208,24 @@ async function run(argv = process.argv.slice(2)) {
     return admitHmfAtlasV3GameValidationReceipt({ receiptBytes, expectedGameHead });
   }
   if (command === "authorize-game-delivery") {
-    if (argv.length !== 3 || argv[1] !== "--request" || !argv[2]) {
-      throw new Error(`authorize-game-delivery requires exactly --request <delivery-authorization-request.json>.\n\n${usage()}`);
+    const requestPath = option(argv.slice(1), "--request");
+    const outputPath = option(argv.slice(1), "--output");
+    const expectedLength = outputPath ? 5 : 3;
+    if (
+      argv.length !== expectedLength ||
+      argv[1] !== "--request" ||
+      !requestPath ||
+      (outputPath && (argv[3] !== "--output" || !argv[4]))
+    ) {
+      throw new Error(`authorize-game-delivery requires --request <delivery-authorization-request.json> and optionally --output <new-authorization.json>.\n\n${usage()}`);
     }
-    return compileHmfAtlasV3GameDeliveryAuthorizationFromRequestFile(argv[2]);
+    if (outputPath) {
+      return compileVerifyAndPublishHmfAtlasV3GameDeliveryAuthorizationFromRequestFile(
+        requestPath,
+        outputPath,
+      );
+    }
+    return compileHmfAtlasV3GameDeliveryAuthorizationFromRequestFile(requestPath);
   }
   throw new Error(`Unknown command ${command}.\n\n${usage()}`);
 }
