@@ -1,0 +1,55 @@
+name: Rally 2.5D Crash Debris Art Contract
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rally-crash-debris-art-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+      - name: Run focused deterministic tests
+        run: node --test scripts/game-art-production/rally-25d-crash-debris-jobs.test.mjs
+      - name: Compile and independently verify provider session
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/game-art-production/rally-25d-crash-debris-jobs.mjs compile \
+            config/game-art-production/vfx/crash-debris-production-v1.json \
+            --output "${RUNNER_TEMP}/crash-debris.session.json" \
+            > "${RUNNER_TEMP}/crash-debris.stdout.json"
+          node scripts/game-art-production/rally-25d-crash-debris-jobs.mjs verify \
+            "${RUNNER_TEMP}/crash-debris.session.json" \
+            | tee "${RUNNER_TEMP}/crash-debris.verify.json"
+          grep -F '"jobs": 12' "${RUNNER_TEMP}/crash-debris.verify.json"
+          grep -F '"responseJobs": 6' "${RUNNER_TEMP}/crash-debris.verify.json"
+          grep -F '"spriteJobs": 4' "${RUNNER_TEMP}/crash-debris.verify.json"
+          grep -F '"providerExecution": false' "${RUNNER_TEMP}/crash-debris.verify.json"
+          grep -F '"downstream3DReady": false' "${RUNNER_TEMP}/crash-debris.verify.json"
+      - name: Prove source remains clean
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crash-debris-art-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/crash-debris.session.json
+            ${{ runner.temp }}/crash-debris.verify.json
+          if-no-files-found: warn
+          retention-days: 7

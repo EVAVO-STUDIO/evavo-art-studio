@@ -1,0 +1,198 @@
+{
+  "schema": "evavo.rally-crash-debris-visual-development.v1",
+  "protocolVersion": "2026-08-15.10",
+  "assetId": "crash-debris-production-v1",
+  "subjectId": "crash-debris",
+  "title": "Rally vehicle crash debris",
+  "style": {
+    "projectionFamily": "fixed-isometric-2-5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "effectLanguage": "A readable one-shot vehicle impact family with paint chips, blunt metal shards, sparse body-panel fragments and restrained surface dust. Front, rear and side impacts share one visual identity while retaining distinct direction and silhouette.",
+    "palette": ["#61191f", "#9a2932", "#c64b54", "#2c3033", "#62696c", "#a18a6d", "#c7b69a", "#e0d4bf"],
+    "surfaceLanguage": [
+      "impact origin remains visible",
+      "small chips, medium shards and large panels remain distinct",
+      "large fragments are sparse and blunt",
+      "dust supports rather than hides the debris",
+      "gravity and travel direction remain readable",
+      "clean true transparency without rectangular edges"
+    ],
+    "forbidden": [
+      "blood or gore",
+      "glass fragments",
+      "fire or explosion",
+      "whole vehicle silhouette",
+      "whole road scene",
+      "knife-like fantasy shards",
+      "screen-filling debris wall",
+      "solid rectangular alpha",
+      "contact sheet",
+      "multi-panel layout",
+      "multiple unrelated impacts",
+      "text or labels"
+    ]
+  },
+  "continuity": {
+    "impactOriginReadable": true,
+    "vehicleZonesDistinct": true,
+    "fragmentFamiliesDistinct": true,
+    "gravityReadable": true,
+    "windResponseReadable": true,
+    "roadBackgroundExcluded": true
+  },
+  "jobs": [
+    {
+      "id": "crash-debris-shape-master",
+      "role": "effect-shape-master",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [],
+      "include": ["single compact crash-debris origin", "paint chips", "metal shards", "one sparse panel fragment", "restrained dust support"],
+      "exclude": ["vehicle", "road", "glass", "fire", "multiple impacts"]
+    },
+    {
+      "id": "crash-debris-front-impact",
+      "role": "effect-response-reference",
+      "phase": "impact-zone",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-shape-master"],
+      "include": ["same debris identity", "front impact direction", "forward bumper and bonnet fragments", "clear origin", "true transparency"],
+      "exclude": ["rearward-only travel", "vehicle", "glass", "fire", "road"]
+    },
+    {
+      "id": "crash-debris-rear-impact",
+      "role": "effect-response-reference",
+      "phase": "impact-zone",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-shape-master"],
+      "include": ["same debris identity", "rear impact direction", "boot and rear-bumper fragments", "clear origin", "true transparency"],
+      "exclude": ["front-only travel", "vehicle", "glass", "fire", "road"]
+    },
+    {
+      "id": "crash-debris-side-impact",
+      "role": "effect-response-reference",
+      "phase": "impact-zone",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-shape-master"],
+      "include": ["same debris identity", "side impact fan", "door-skin and trim fragments", "clear origin", "true transparency"],
+      "exclude": ["symmetrical radial explosion", "vehicle", "glass", "fire", "road"]
+    },
+    {
+      "id": "crash-debris-low-impulse",
+      "role": "effect-response-reference",
+      "phase": "impact-strength",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-front-impact"],
+      "include": ["same debris identity", "minor paint chips", "few small metal fragments", "no large panel", "minimal dust"],
+      "exclude": ["critical damage", "large fragment cloud", "vehicle", "glass", "fire"]
+    },
+    {
+      "id": "crash-debris-high-impulse",
+      "role": "effect-response-reference",
+      "phase": "impact-strength",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-low-impulse", "crash-debris-side-impact"],
+      "include": ["same debris identity", "critical bounded impact", "small and medium fragments", "one or two large panels", "readable dust support"],
+      "exclude": ["screen-filling explosion", "vehicle", "glass", "fireball", "gore"]
+    },
+    {
+      "id": "crash-debris-crosswind",
+      "role": "effect-response-reference",
+      "phase": "wind-response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-high-impulse"],
+      "include": ["same impact origin", "crosswind moves dust and paint chips", "heavy panels remain ballistic", "gravity remains readable", "true transparency"],
+      "exclude": ["uniformly sheared effect", "vehicle", "road", "fire", "second impact"]
+    },
+    {
+      "id": "crash-debris-paint-chip-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-low-impulse"],
+      "include": ["single small irregular paint flake", "painted face", "chipped metal edge", "blunt silhouette", "true transparency"],
+      "exclude": ["multiple flakes", "glass", "knife point", "shadow", "text"]
+    },
+    {
+      "id": "crash-debris-metal-shard-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-shape-master"],
+      "include": ["single folded metal shard", "blunt torn edge", "small thickness", "neutral steel", "true transparency"],
+      "exclude": ["multiple shards", "glass", "weapon-like point", "shadow", "text"]
+    },
+    {
+      "id": "crash-debris-panel-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-high-impulse"],
+      "include": ["single curved body-panel fragment", "painted exterior", "bare-metal reverse", "bent but blunt silhouette", "true transparency"],
+      "exclude": ["whole door", "whole bonnet", "glass", "shadow", "text"]
+    },
+    {
+      "id": "crash-debris-dust-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-shape-master"],
+      "include": ["single restrained impact-dust card", "low ground-attached shape", "soft feathered alpha", "warm neutral dust", "true transparency"],
+      "exclude": ["opaque cloud", "smoke plume", "multiple cards", "ground plane", "text"]
+    },
+    {
+      "id": "crash-debris-late-decay",
+      "role": "decay-reference",
+      "phase": "decay",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["crash-debris-crosswind", "crash-debris-dust-sprite"],
+      "include": ["single late debris state", "few falling chips", "one settling shard", "faint broken dust", "large empty space"],
+      "exclude": ["fresh impact", "vehicle", "road", "fire", "opaque cloud"]
+    }
+  ],
+  "output": {
+    "workingRoot": "working/rally/vfx/crash-debris/visual-development-v1",
+    "masterRoot": "masters/rally/vfx/crash-debris/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
