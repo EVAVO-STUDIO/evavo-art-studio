@@ -26,6 +26,7 @@ import { hashValue } from "./frame-body-named-human-approval-common.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI_PATH = path.resolve(HERE, "..", "heavy-metal-fighting-frame-atlas-v3.mjs");
 const HEAD = "319989713c671670b1ae997ffb4e8386bdeb7c7e";
+const FRAMES = ["bastion", "viper", "citadel", "mirage"];
 
 function withTemp(prefix, callback) {
   const root = mkdtempSync(path.join(tmpdir(), prefix));
@@ -41,12 +42,56 @@ function authorization() {
     publicTitle: "HEAVY METAL FIGHTING",
     gameRepository: "EVAVO-STUDIO/steel-dominion",
     gameHead: HEAD,
-    gameValidationAdmissionSha256: "1".repeat(64),
-    atlasBuilds: [],
-    humanAuthorization: {},
-    checks: {},
-    authority: {},
+    gameValidationAdmissionSha256: hashValue("game-validation-admission"),
+    atlasBuilds: FRAMES.map((frameId) => ({
+      frameId,
+      planSha256: hashValue(`plan-${frameId}`),
+      buildReceiptSha256: hashValue(`receipt-${frameId}`),
+      buildVerificationSha256: hashValue(`verification-${frameId}`),
+      imageSha256: hashValue(`image-${frameId}`),
+      targetImagePath: `res://assets/fighters/final-v3/${frameId}.png`,
+      styleProofExecutionSha256: hashValue(`style-proof-${frameId}`),
+    })),
+    humanAuthorization: {
+      actorClass: "human",
+      actorId: "greg-parker",
+      occurredAt: "2026-08-15T04:00:00.000Z",
+      decision: "authorized",
+      rationale: "Authorize exact reviewed atlas delivery evidence only.",
+      evidenceSha256: hashValue("publication-test-human-evidence"),
+    },
+    checks: {
+      exactGameValidationAdmission: true,
+      exactValidatedGameHead: true,
+      allFourFrameBuildsPresent: true,
+      allFourExactPixelVerificationsPassed: true,
+      allBuildReceiptSelfHashesValid: true,
+      allBuildEvidenceCrossBound: true,
+      canonicalGameTargetPaths: true,
+      namedHumanDeliveryAuthorization: true,
+      authorizationAfterReviewedEvidence: true,
+      runtimeActivationRemainsSeparate: true,
+    },
+    authority: {
+      evidenceAdmission: true,
+      callerSuppliedAtlasByteRead: true,
+      callerSuppliedSourceByteRead: true,
+      imageInspection: true,
+      namedHumanDeliveryAuthorization: true,
+      gameRepositoryRead: false,
+      gameRepositoryMutation: false,
+      runtimeActivation: false,
+      gitMutation: false,
+      deployment: false,
+      publication: false,
+      forcePush: false,
+    },
   };
+  return { ...body, authorizationSha256: hashValue(body) };
+}
+function rehashAuthorization(value) {
+  const body = structuredClone(value);
+  delete body.authorizationSha256;
   return { ...body, authorizationSha256: hashValue(body) };
 }
 
@@ -67,6 +112,7 @@ test("create-only publication writes exact self-hashed authorization bytes and r
     assert.equal(receipt.output.bytes, Buffer.byteLength(expected));
     assert.match(receipt.output.sha256, /^[0-9a-f]{64}$/u);
     assert.match(receipt.publicationReceiptSha256, /^[0-9a-f]{64}$/u);
+    assert.equal(receipt.checks.closedAuthorizationContract, true);
     assert.equal(receipt.authority.localAuthorizationEvidenceWrite, true);
     assert.equal(receipt.authority.gameRepositoryMutation, false);
     assert.equal(receipt.authority.runtimeActivation, false);
@@ -120,6 +166,31 @@ test("publication rejects authorization content whose retained self-hash was not
         outputPath: path.join(root, "delivery.authorization.json"),
       }),
       /authorizationSha256 does not match canonical content/,
+    );
+    assert.deepEqual(readdirSync(root), []);
+  });
+});
+
+test("publication rejects correctly rehashed extra claims and authority escalation", async () => {
+  await withTemp("hmf-auth-publication-closed-", async (root) => {
+    const extraClaim = authorization();
+    extraClaim.targetRepositoryWriteAuthorized = true;
+    await assert.rejects(
+      publishHmfAtlasV3GameDeliveryAuthorizationFile({
+        authorization: rehashAuthorization(extraClaim),
+        outputPath: path.join(root, "extra.authorization.json"),
+      }),
+      /fields must be exactly/,
+    );
+
+    const escalation = authorization();
+    escalation.authority.gameRepositoryMutation = true;
+    await assert.rejects(
+      publishHmfAtlasV3GameDeliveryAuthorizationFile({
+        authorization: rehashAuthorization(escalation),
+        outputPath: path.join(root, "escalated.authorization.json"),
+      }),
+      /gained forbidden authority: gameRepositoryMutation/,
     );
     assert.deepEqual(readdirSync(root), []);
   });
