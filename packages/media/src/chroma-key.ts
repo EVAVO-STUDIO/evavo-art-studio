@@ -8,6 +8,7 @@ const UNREACHED = 255;
 
 export interface ChromaKeyExtractionOptions {
   readonly matteColour: string;
+  readonly allowLowChromaMatte?: boolean;
   readonly connectionDistance?: number;
   readonly opaqueSeedDistance?: number;
   readonly edgeSearchRadius?: number;
@@ -76,6 +77,7 @@ export class ChromaKeyExtractionError extends Error {
 type Matte = Readonly<{ r: number; g: number; b: number; hex: string }>;
 type NormalizedOptions = Readonly<{
   matte: Matte;
+  allowLowChromaMatte: boolean;
   connectionDistance: number;
   opaqueSeedDistance: number;
   edgeSearchRadius: number;
@@ -123,7 +125,7 @@ function integer(
   return result;
 }
 
-function parseMatte(value: string): Matte {
+function parseMatte(value: string, allowLowChromaMatte: boolean): Matte {
   const normalized = value.trim().toLowerCase();
   if (!/^#[0-9a-f]{6}$/.test(normalized)) {
     throw new ChromaKeyExtractionError(
@@ -138,10 +140,10 @@ function parseMatte(value: string): Matte {
     hex: normalized,
   };
   const channels = [matte.r, matte.g, matte.b];
-  if (
-    Math.max(...channels) - Math.min(...channels) < 160 ||
-    (Math.max(...channels) < 240 && Math.min(...channels) > 15)
-  ) {
+  const highChroma =
+    Math.max(...channels) - Math.min(...channels) >= 160 &&
+    (Math.max(...channels) >= 240 || Math.min(...channels) <= 15);
+  if (!allowLowChromaMatte && !highChroma) {
     throw new ChromaKeyExtractionError(
       "CHROMA_KEY_MATTE_UNSAFE",
       "matteColour must be a declared high-chroma key; black, white and grey are unsafe for automatic extraction.",
@@ -255,6 +257,16 @@ function fakeCheckerboardAtBorder(
 }
 
 function normalize(options: ChromaKeyExtractionOptions): NormalizedOptions {
+  if (
+    options.allowLowChromaMatte !== undefined &&
+    typeof options.allowLowChromaMatte !== "boolean"
+  ) {
+    throw new ChromaKeyExtractionError(
+      "CHROMA_KEY_OPTIONS_INVALID",
+      "allowLowChromaMatte must be boolean when supplied.",
+    );
+  }
+  const allowLowChromaMatte = options.allowLowChromaMatte === true;
   const connectionDistance = finite(
     options.connectionDistance,
     140,
@@ -276,7 +288,8 @@ function normalize(options: ChromaKeyExtractionOptions): NormalizedOptions {
     );
   }
   return {
-    matte: parseMatte(options.matteColour),
+    matte: parseMatte(options.matteColour, allowLowChromaMatte),
+    allowLowChromaMatte,
     connectionDistance,
     opaqueSeedDistance,
     edgeSearchRadius: integer(

@@ -185,3 +185,20 @@ test("chroma extraction accepts only opaque sources and declared high-chroma key
       error.code === "CHROMA_KEY_SOURCE_ALPHA_INVALID",
   );
 });
+
+test("low-chroma extraction requires an explicit legacy-cleanup override", async () => {
+  const legacy = await raster(32, 32, 4, (x, y) =>
+    x >= 10 && x <= 21 && y >= 5 && y <= 27
+      ? [200, 200, 200, 255]
+      : [0, 0, 0, 255],
+  );
+  const result = await extractChromaKeyAlpha(legacy, {
+    matteColour: "#000000",
+    allowLowChromaMatte: true,
+    connectionDistance: 24,
+    opaqueSeedDistance: 64,
+    bleedRadius: 0,
+  });
+  assert.ok(result.evidence.output.transparentPixels > 0);
+  assert.ok(result.evidence.output.opaquePixels > 0);
+});

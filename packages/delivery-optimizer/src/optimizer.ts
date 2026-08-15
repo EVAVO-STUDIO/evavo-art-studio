@@ -46,6 +46,7 @@ function backgroundOptions(
   const blackMatte = background.matteColour.toLowerCase() === "#000000";
   return {
     matteColour: background.matteColour,
+    allowLowChromaMatte: true,
     connectionDistance:
       background.connectionDistance ?? (blackMatte ? 24 : 140),
     opaqueSeedDistance:

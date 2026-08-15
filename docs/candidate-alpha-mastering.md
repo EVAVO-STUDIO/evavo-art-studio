@@ -183,7 +183,7 @@ Choose a matte that:
 - does not share the subject's dominant luminance and hue;
 - remains stable across every frame in the family.
 
-Art Studio enforces high chroma at provider-request validation, provider-canvas preparation and alpha extraction. This prevents a caller or agent from quietly switching to black, white or grey and erasing EVA's clothing, pale highlights or other legitimate subject pixels.
+Art Studio enforces high chroma at provider-request validation, provider-canvas preparation and ordinary alpha extraction. This prevents a caller or agent from quietly switching to black, white or grey and erasing EVA's clothing, pale highlights or other legitimate subject pixels. The separate delivery optimizer may opt into low-chroma removal only for an already-existing, explicitly declared legacy matte; its conservative border-connected thresholds and evidence remain mandatory. Provider generation never receives that override.
 
 Green is not universally correct. Magenta, blue or another controlled colour may be safer for a green character or vegetation effect. The matte colour is part of the compiled production contract and evidence.
 
