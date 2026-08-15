@@ -209,6 +209,29 @@ test("black additive proves the black stage and extracts real alpha", async () =
   }
 });
 
+test("ordinary chroma-key mastering rejects a black matte", async () => {
+  const fx = await fixture(
+    await image(
+      { r: 0, g: 0, b: 0, alpha: 1 },
+      { r: 255, g: 90, b: 20, alpha: 1 },
+    ),
+  );
+  try {
+    await assert.rejects(
+      () =>
+        execute(fx, {
+          backgroundMode: "chroma-key",
+          matteColour: "#000000",
+          requireMeaningfulAlpha: true,
+          quality: { safePadding: 1 },
+        }),
+      (error) => error.code === "CHROMA_KEY_MATTE_UNSAFE",
+    );
+  } finally {
+    await rm(fx.root, { recursive: true, force: true });
+  }
+});
+
 test("opaque preserve accepts an opaque plate without flattening hidden alpha", async () => {
   const fx = await fixture(
     await image(

@@ -243,6 +243,7 @@ function extractionOptions(
   );
   return {
     matteColour,
+    allowLowChromaMatte: black,
     connectionDistance: connectionDistance ?? (black ? 24 : 140),
     opaqueSeedDistance: opaqueSeedDistance ?? (black ? 64 : 220),
     edgeSearchRadius: edgeSearchRadius ?? 12,
