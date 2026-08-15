@@ -218,7 +218,7 @@ function fakeCheckerboardAtBorder(
         const fitDistance = Math.max(14, separation * 0.28);
         let considered = 0;
         let fitted = 0;
-        let squaredError = 0;
+        let fittedSquaredError = 0;
         for (let y = 0; y < height; y += stride) {
           for (let x = 0; x < width; x += stride) {
             if (x >= band && x < width - band && y >= band && y < height - band) {
@@ -235,12 +235,18 @@ function fakeCheckerboardAtBorder(
               data[offset + 2]! - means[parity]![2]!,
             );
             considered += 1;
-            squaredError += distance * distance;
-            if (distance <= fitDistance) fitted += 1;
+            if (distance <= fitDistance) {
+              fitted += 1;
+              fittedSquaredError += distance * distance;
+            }
           }
         }
         const fit = fitted / considered;
-        const rmse = Math.sqrt(squaredError / considered);
+        // Foreground artwork is expected to interrupt a painted transparency
+        // grid. Measure colour regularity only across pixels assigned to the
+        // two grid colours; otherwise a legitimate foreground can suppress an
+        // otherwise exact checkerboard signature.
+        const rmse = Math.sqrt(fittedSquaredError / Math.max(1, fitted));
         const confidence = fit * Math.min(1, separation / 48) * Math.min(1, 18 / Math.max(1, rmse));
         if (confidence > bestConfidence) {
           bestConfidence = confidence;
