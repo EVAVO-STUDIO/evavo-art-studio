@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,11 +30,19 @@ const files = Object.freeze({
     'scripts/compile-project-art-eva-source-repair-candidate-assurance.mjs',
   candidateAssuranceTests:
     'scripts/test-project-art-eva-source-repair-candidate-assurance.mjs',
+  alphaMastering:
+    'scripts/project-art/eva-source-repair-alpha-mastering.mjs',
+  alphaMasteringCli:
+    'scripts/compile-project-art-eva-source-repair-alpha-mastering.mjs',
+  alphaMasteringTests:
+    'scripts/test-project-art-eva-source-repair-alpha-mastering.mjs',
   tests: 'scripts/test-project-art-eva-source-repair-intake.mjs',
   finalPass: 'scripts/project-art/avatar-final-pass.mjs',
   docs: 'docs/PROJECT_ART_EVA_SOURCE_REPAIR_INTAKE.md',
   candidateAssuranceDocs:
     'docs/PROJECT_ART_EVA_SOURCE_REPAIR_CANDIDATE_ASSURANCE.md',
+  alphaMasteringDocs:
+    'docs/PROJECT_ART_EVA_SOURCE_REPAIR_ALPHA_MASTERING.md',
   package: 'package.json',
 });
 
@@ -208,6 +217,44 @@ includes('candidateAssuranceDocs', [
   'cannot substitute an arbitrary source',
   'Agent-sized control surface',
 ]);
+includes('alphaMastering', [
+  'evavo.project-art-eva-source-repair-alpha-mastering.v1',
+  'source-space-to-production-alpha',
+  'apply-production-alpha-once',
+  'EVA_SOURCE_REPAIR_ALPHA_SOURCE_SPACE_CANDIDATE_INVALID',
+  'EVA_SOURCE_REPAIR_ALPHA_MATTE_RGB_INVALID',
+  'EVA_SOURCE_REPAIR_ALPHA_MATTE_PROFILE_INVALID',
+  'EVA_SOURCE_REPAIR_ALPHA_VISIBLE_RGB_DRIFT',
+  'visibleRgbMismatches',
+  'alphaPlaneMatchesMatte',
+  'transparentRgbCleanPassed',
+  'frameFinisherCompatibleHandoff',
+  'createOnlyTransactionalBundle',
+]);
+includes('alphaMasteringCli', [
+  '--candidate-assurance',
+  '--provider-materialization',
+  '--provider-finisher-request',
+  '--alpha-matte-sha256',
+  'apply-production-alpha-once',
+  'candidateApproval: false',
+  'sequenceReleaseAllowed: false',
+  'runtimeActivationAllowed: false',
+]);
+includes('alphaMasteringTests', [
+  'opaque source-space candidate becomes exact production alpha and a frame-finisher-compatible handoff',
+  'assurance drift, non-canonical matte RGB and canvas-edge foreground fail closed',
+  'file operator publishes one private create-only four-file bundle and refuses replacement',
+  'finishAvatarFinalPassProviderFrame',
+]);
+includes('alphaMasteringDocs', [
+  '# Project Art EVA source-repair alpha mastering',
+  'fully opaque RGBA source-space candidates',
+  'alpha 0:   RGB must be 0,0,0',
+  'alpha > 0: RGB must be 255,255,255',
+  'visible RGB mismatches',
+  'technical alpha readiness is not creative approval',
+]);
 
 const packageJson = JSON.parse(source.package);
 assert.equal(
@@ -239,8 +286,34 @@ for (const forbidden of [
 ]) {
   assert.ok(!source.intake.includes(forbidden), `intake contains ${forbidden}`);
 }
+for (const forbidden of [
+  'candidateApproval: true',
+  'candidatePromotion: true',
+  'sequenceReleaseAllowed: true',
+  'runtimeActivationAllowed: true',
+  'publicationAllowed: true',
+  'forcePush: true',
+  'git push',
+]) {
+  assert.ok(
+    !source.alphaMastering.includes(forbidden),
+    `alpha mastering contains ${forbidden}`,
+  );
+}
+
+const alphaTest = spawnSync(
+  process.execPath,
+  ['--test', path.join(root, files.alphaMasteringTests)],
+  { cwd: root, encoding: 'utf8' },
+);
+assert.equal(
+  alphaTest.status,
+  0,
+  `alpha mastering regressions failed\n${alphaTest.stdout}\n${alphaTest.stderr}`,
+);
 
 console.log('Project Art EVA source-repair intake guard passed.');
 console.log('- exact Runtime tasks bind both Git SHA-1 and materialized SHA-256 identities');
 console.log('- five masked edits and one endpoint-only in-between feed the existing provider chain');
+console.log('- source-space redraws now cross a deterministic named-human alpha-matte transaction before the existing frame finisher');
 console.log('- provider authorization, candidate review, publication and activation remain separate');
