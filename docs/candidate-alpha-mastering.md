@@ -48,7 +48,7 @@ OpenAI image-edit guidance is available at:
 
 The recovery kernel uses evidence, not a global colour-delete guess:
 
-1. Detect a visible periodic two-colour checkerboard from the border, including neutral or strongly chromatic grids and grids wrapped in a token transparent rim. If confidence is high, model its tile size, phase and both colours, recover the foreground alpha, and verify every originally visible recovered pixel by compositing it back over the detected grid.
+1. Detect a visible periodic two-colour checkerboard from the border, including neutral or strongly chromatic grids, low-contrast white/grey provider previews, nonstandard or resampled tile sizes, foreground-heavy canvases and grids wrapped in a token transparent rim. Robust parity colour modes prevent a large character from averaging the grid signal away. If confidence is high, model its tile size, phase and both colours, recover the foreground alpha, and verify every originally visible recovered pixel by compositing it back over the detected grid.
 2. Before trusting existing alpha, reject a token-alpha bypass when the declared matte—or a safely inferred high-chroma replacement—still dominates the visible border band. Composite the existing alpha over only that proven matte, re-extract it and retain recomposition evidence.
 3. Otherwise preserve native alpha only when it has meaningful coverage and the complete canvas edge is transparent. Hidden RGB is canonicalized and only bounded subject-colour bleed is restored beside the silhouette.
 4. Otherwise use the matte declared by the provider request.
@@ -70,20 +70,21 @@ Art Studio instead:
 5. Requires a configured fraction of border pixels to resemble that matte.
 6. Flood-fills only matte-like pixels connected to the canvas border.
 7. Preserves matching colours enclosed inside the subject.
-8. Builds bounded distance fields around the connected matte and confident foreground.
-9. Solves partial alpha against nearby foreground colour for antialiased edge pixels.
-10. Recovers foreground RGB using the compositing equation rather than leaving green or magenta contamination.
-11. Clears distant hidden matte colour.
-12. Propagates bounded subject-colour bleed beneath nearby alpha-zero pixels for safer texture filtering.
-13. Emits a deterministic lossless PNG and numeric evidence.
+8. Builds bounded distance fields around the connected matte and confident foreground. Foreground seeds are eroded farther inward on large plates, so a one-pixel generated fringe can never teach the solver that spill is subject colour.
+9. Solves partial alpha against nearby inset foreground colour and the nearest confident local matte sample, so bounded provider noise, shading and resampling do not become an outline.
+10. Recovers foreground RGB using the compositing equation, a physically valid alpha bound and a bounded nonlinear-raster allowance rather than leaving green, magenta or dark chroma contamination.
+11. Detects complementary provider-painted edge colours that disagree with the inset subject reference. Those pixels are replaced with audited subject-colour/spatial-alpha reconstruction instead of becoming a vivid outline; they are explicitly counted and excluded from exact source-plate recomposition proof.
+12. Clears distant hidden matte colour.
+13. Propagates bounded subject-colour bleed beneath nearby alpha-zero pixels for safer texture filtering.
+14. Emits a deterministic lossless PNG and numeric evidence.
 
-For observed colour `C`, matte `M`, foreground estimate `F` and alpha `a`:
+For observed colour `C`, local matte `M`, foreground estimate `F` and alpha `a`:
 
 ```text
 C = aF + (1-a)M
 ```
 
-The extractor estimates `a` by projecting `C-M` onto `F-M`, then recovers foreground colour from the same equation. Thresholds and evidence remain explicit; they are not silently lowered after a failure.
+The extractor estimates `a` by projecting `C-M` onto `F-M`, raises it to the minimum value that can reconstruct legal bounded RGB, then recovers foreground colour from the same equation. Every ordinary output pixel is recomposed against the same local matte field; any error beyond the declared allowance blocks the candidate. A provider-painted halo that is not a credible composite is repaired only inside the connected edge band, is counted separately, and retains its maximum source drift in evidence. Thresholds and evidence remain explicit; they are not silently lowered after a failure.
 
 ## Evidence
 
@@ -102,8 +103,11 @@ The recovery evidence records:
 - enclosed matte-like subject pixels preserved;
 - transparent, partial and opaque output counts;
 - edge pixels decontaminated;
-- transparent RGB bleed pixels created.
-- checkerboard segmentation, edge recovery and recomposition error when a painted grid was repaired.
+- transparent RGB bleed pixels created;
+- scale-aware foreground-seed inset;
+- provider-painted halo repairs and their maximum source-channel drift;
+- exact-recomposition pixel count, explicitly excluded halo-repair count, maximum observed error and maximum allowed error;
+- checkerboard segmentation, edge recovery and recomposition error when a painted grid was repaired;
 - visible border-band ownership and pre-existing non-opaque pixel counts when a solid-matte alpha-rim bypass was repaired.
 
 The output is then passed to the existing frame-quality kernel, which proves:
@@ -188,6 +192,11 @@ Optional controls:
 --edge-search-radius
 --bleed-radius
 --minimum-border-matte-fraction
+--maximum-composite-channel-error
+--checker-connection-distance
+--checker-foreground-seed-distance
+--checker-minimum-border-fraction
+--checker-maximum-composite-channel-error
 ```
 
 The CLI writes atomically, emits JSON on stdout and exits with code `3` when blocking sprite QA fails. The PNG and evidence remain available for diagnosis and are still marked unapproved.
@@ -206,7 +215,7 @@ Art Studio enforces high chroma at provider-request validation, provider-canvas 
 
 Green is not universally correct. Magenta, blue or another controlled colour may be safer for a green character or vegetation effect. The matte colour is part of the compiled production contract and evidence.
 
-The generation prompt requires the exact matte in every pixel outside the subject, checks all four corners and the full edge, and explicitly forbids checkerboards, transparency-preview UI, texture, scenery, gradients and shadows. Native-alpha requests are sent only to adapters/models that advertise file-level alpha support; incompatible models use the matte path rather than pretending.
+The generation prompt requires the exact matte in every pixel outside the subject, checks all four corners and the full edge, reserves transparent safety padding on every side, and explicitly forbids checkerboards, transparency-preview UI, texture, scenery, gradients, shadows, relighting, complementary rims, glow, chromatic aberration and key-colour spill. Native-alpha requests are sent only to adapters/models that advertise file-level alpha support; incompatible models use the matte path rather than pretending.
 
 ## Deliberate next gates
 

@@ -357,7 +357,7 @@ function compileFrameJobs(characterId, clips, identityLock) {
             preserveCanvasAndRegistration: true,
             separatedMouthUnderlay: entry.kind.startsWith('talk-'),
             backgroundInstruction:
-              'Use native file alpha when genuinely supported; otherwise use one declared flat high-chroma matte selected for low subject collision. Never draw a checkerboard, transparency grid, scenery, gradient, floor or shadow outside the character.',
+              'Use native file alpha when genuinely supported; otherwise use one declared flat high-chroma matte selected for low subject collision. Never draw a checkerboard, transparency grid, scenery, gradient, floor or shadow outside the character. Preserve subject lighting; add no matte spill, complementary rim, coloured outline, halo, glow or chromatic aberration. Keep safe matte clearance on every canvas side.',
           }),
           alphaMastering: Object.freeze({
             operation: 'media.background-recovery',

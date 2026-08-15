@@ -15,6 +15,7 @@ import {
   ChromaKeyExtractionError,
   extractChromaKeyAlpha,
   recoverBackgroundAlpha,
+  type BackgroundAlphaRecoveryOptions,
   type ChromaKeyExtractionOptions,
 } from "@evavo/art-media";
 import {
@@ -225,7 +226,7 @@ function extractionOptions(
   payload: Readonly<Record<string, JsonValue>>,
   matteColour: string,
   black: boolean,
-): ChromaKeyExtractionOptions {
+): ChromaKeyExtractionOptions & BackgroundAlphaRecoveryOptions {
   const connectionDistance = optionalNumber(
     payload.connectionDistance,
     "connectionDistance",
@@ -243,15 +244,50 @@ function extractionOptions(
     payload.minimumBorderMatteFraction,
     "minimumBorderMatteFraction",
   );
+  const maximumCompositeChannelError = optionalNumber(
+    payload.maximumCompositeChannelError,
+    "maximumCompositeChannelError",
+  );
+  const checkerConnectionDistance = optionalNumber(
+    payload.checkerConnectionDistance,
+    "checkerConnectionDistance",
+  );
+  const checkerForegroundSeedDistance = optionalNumber(
+    payload.checkerForegroundSeedDistance,
+    "checkerForegroundSeedDistance",
+  );
+  const checkerMinimumBorderFraction = optionalNumber(
+    payload.checkerMinimumBorderFraction,
+    "checkerMinimumBorderFraction",
+  );
+  const checkerMaximumCompositeChannelError = optionalNumber(
+    payload.checkerMaximumCompositeChannelError,
+    "checkerMaximumCompositeChannelError",
+  );
   return {
     matteColour,
     allowLowChromaMatte: black,
     connectionDistance: connectionDistance ?? (black ? 24 : 140),
-    opaqueSeedDistance: opaqueSeedDistance ?? (black ? 64 : 220),
+    opaqueSeedDistance: opaqueSeedDistance ?? (black ? 64 : 250),
     edgeSearchRadius: edgeSearchRadius ?? 12,
     bleedRadius: bleedRadius ?? 2,
     minimumBorderMatteFraction:
       minimumBorderMatteFraction ?? (black ? 0.85 : 0.65),
+    ...(maximumCompositeChannelError === undefined
+      ? {}
+      : { maximumCompositeChannelError }),
+    ...(checkerConnectionDistance === undefined
+      ? {}
+      : { checkerConnectionDistance }),
+    ...(checkerForegroundSeedDistance === undefined
+      ? {}
+      : { checkerForegroundSeedDistance }),
+    ...(checkerMinimumBorderFraction === undefined
+      ? {}
+      : { checkerMinimumBorderFraction }),
+    ...(checkerMaximumCompositeChannelError === undefined
+      ? {}
+      : { checkerMaximumCompositeChannelError }),
   };
 }
 

@@ -73,7 +73,7 @@ Usage:
 
   evavo-art quality-frame --input frame.png --expectations frame-quality.json [--output report.json]
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
-  evavo-art master-alpha --input candidate.png --output candidate.alpha.png [--matte #00ff00] [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json]
+  evavo-art master-alpha --input candidate.png --output candidate.alpha.png [--matte #00ff00] [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json] [--maximum-composite-channel-error 8]
   evavo-art atlas-build --manifest atlas.json --output-dir generated [--godot-project C:\\GitRepos\\game] [--godot-executable C:\\Path\\Godot_v4.6.2.exe]
 
   evavo-art provider-protocol [--output provider-protocol.json]
@@ -159,6 +159,11 @@ async function main(): Promise<void> {
       "edge-search-radius": { type: "string" },
       "bleed-radius": { type: "string" },
       "minimum-border-matte-fraction": { type: "string" },
+      "maximum-composite-channel-error": { type: "string" },
+      "checker-connection-distance": { type: "string" },
+      "checker-foreground-seed-distance": { type: "string" },
+      "checker-minimum-border-fraction": { type: "string" },
+      "checker-maximum-composite-channel-error": { type: "string" },
       manifest: { type: "string", short: "m" },
       descriptor: { type: "string", short: "d" },
       "output-dir": { type: "string" },

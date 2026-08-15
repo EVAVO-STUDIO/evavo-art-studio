@@ -5,6 +5,9 @@ import sharp, { type Metadata } from "sharp";
 const DEFAULT_MAXIMUM_INPUT_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAXIMUM_PIXELS = 8_294_400;
 const UNREACHED = 255;
+const RGB_RECONSTRUCTION_SLACK = 8;
+const FOREGROUND_SEED_MAXIMUM_INSET = 8;
+const PROVIDER_HALO_FOREGROUND_DISTANCE = 52;
 
 export interface ChromaKeyExtractionOptions {
   readonly matteColour: string;
@@ -14,6 +17,7 @@ export interface ChromaKeyExtractionOptions {
   readonly edgeSearchRadius?: number;
   readonly bleedRadius?: number;
   readonly minimumBorderMatteFraction?: number;
+  readonly maximumCompositeChannelError?: number;
   readonly maximumInputBytes?: number;
   readonly maximumPixels?: number;
 }
@@ -37,6 +41,9 @@ export interface ChromaKeyExtractionEvidence {
     edgeSearchRadius: number;
     bleedRadius: number;
     minimumBorderMatteFraction: number;
+    maximumCompositeChannelError: number;
+    foregroundSeedMinimumInset: number;
+    providerHaloForegroundDistance: number;
   }>;
   readonly border: Readonly<{
     pixels: number;
@@ -55,7 +62,20 @@ export interface ChromaKeyExtractionEvidence {
     partialPixels: number;
     opaquePixels: number;
     decontaminatedPixels: number;
+    providerHaloRepairPixels: number;
     transparentBleedPixels: number;
+  }>;
+  readonly recomposition: Readonly<{
+    checkedPixels: number;
+    excludedProviderHaloRepairPixels: number;
+    mismatchPixels: number;
+    maximumObservedChannelError: number;
+    maximumAllowedChannelError: number;
+  }>;
+  readonly providerHaloRepair: Readonly<{
+    pixels: number;
+    maximumSourceChannelDrift: number;
+    method: "inset-subject-colour-spatial-alpha";
   }>;
 }
 
@@ -83,6 +103,7 @@ type NormalizedOptions = Readonly<{
   edgeSearchRadius: number;
   bleedRadius: number;
   minimumBorderMatteFraction: number;
+  maximumCompositeChannelError: number;
   maximumInputBytes: number;
   maximumPixels: number;
 }>;
@@ -282,7 +303,7 @@ function normalize(options: ChromaKeyExtractionOptions): NormalizedOptions {
   );
   const opaqueSeedDistance = finite(
     options.opaqueSeedDistance,
-    220,
+    250,
     1,
     441,
     "opaqueSeedDistance",
@@ -312,6 +333,13 @@ function normalize(options: ChromaKeyExtractionOptions): NormalizedOptions {
       0.05,
       1,
       "minimumBorderMatteFraction",
+    ),
+    maximumCompositeChannelError: integer(
+      options.maximumCompositeChannelError,
+      RGB_RECONSTRUCTION_SLACK,
+      0,
+      32,
+      "maximumCompositeChannelError",
     ),
     maximumInputBytes: integer(
       options.maximumInputBytes,
@@ -395,9 +423,54 @@ function recoverColour(
   matteChannel: number,
   alpha: number,
   fallback: number,
+  maximumCompositeChannelError: number,
 ): number {
   if (alpha <= 0.025) return fallback;
-  return clampByte(matteChannel + (channel - matteChannel) / alpha);
+  const exact = matteChannel + (channel - matteChannel) / alpha;
+  // Reserve one channel level for alpha quantisation and RGB rounding so the
+  // emitted 8-bit PNG still satisfies the advertised recomposition bound.
+  const reconstructionSlack =
+    Math.max(0, maximumCompositeChannelError - 1) / alpha;
+  const minimum = Math.max(0, exact - reconstructionSlack);
+  const maximum = Math.min(255, exact + reconstructionSlack);
+  // Generated mattes are often nonlinear at dark fringes, so an exact
+  // inverse can create a saturated key-colour outline after RGB clamping.
+  // Within the declared recomposition proof bound, prefer the nearest
+  // confident subject colour. This neutralises spill without inventing an
+  // edge colour that cannot reproduce the source plate.
+  if (minimum <= maximum) {
+    return clampByte(Math.max(minimum, Math.min(maximum, fallback)));
+  }
+  return clampByte(exact);
+}
+
+function minimumPhysicalAlpha(
+  red: number,
+  green: number,
+  blue: number,
+  matte: Matte,
+): number {
+  let minimum = 0;
+  const sourceChannels = [red, green, blue];
+  const matteChannels = [matte.r, matte.g, matte.b];
+  for (let channel = 0; channel < 3; channel += 1) {
+    const source = sourceChannels[channel]!;
+    const background = matteChannels[channel]!;
+    const lower = -RGB_RECONSTRUCTION_SLACK;
+    const upper = 255 + RGB_RECONSTRUCTION_SLACK;
+    if (source < background && background > lower) {
+      minimum = Math.max(
+        minimum,
+        (background - source) / (background - lower),
+      );
+    } else if (source > background && background < upper) {
+      minimum = Math.max(
+        minimum,
+        (source - background) / (upper - background),
+      );
+    }
+  }
+  return Math.max(0, Math.min(1, minimum));
 }
 
 function decodeError(message: string): ChromaKeyExtractionError {
@@ -571,6 +644,35 @@ export async function extractChromaKeyAlpha(
     });
   }
 
+  const localMatteDistance = new Uint8Array(pixels);
+  localMatteDistance.fill(UNREACHED);
+  const nearestLocalMatte = new Int32Array(pixels);
+  nearestLocalMatte.fill(-1);
+  const coreMatteDistance = Math.min(48, settings.connectionDistance * 0.35);
+  const coreMatteSquared = coreMatteDistance * coreMatteDistance;
+  head = 0;
+  tail = 0;
+  for (let pixel = 0; pixel < pixels; pixel += 1) {
+    if (!connectedBackground[pixel] || matteDistance[pixel]! > coreMatteSquared) {
+      continue;
+    }
+    localMatteDistance[pixel] = 0;
+    nearestLocalMatte[pixel] = pixel;
+    queue[tail++] = pixel;
+  }
+  while (head < tail) {
+    const pixel = queue[head++]!;
+    const distance = localMatteDistance[pixel]!;
+    if (distance >= settings.edgeSearchRadius) continue;
+    const sourcePixel = nearestLocalMatte[pixel]!;
+    neighbours(pixel, width, height, (neighbour) => {
+      if (localMatteDistance[neighbour] !== UNREACHED) return;
+      localMatteDistance[neighbour] = distance + 1;
+      nearestLocalMatte[neighbour] = sourcePixel;
+      queue[tail++] = neighbour;
+    });
+  }
+
   const nearestForeground = new Int32Array(pixels);
   nearestForeground.fill(-1);
   const foregroundDistance = new Uint8Array(pixels);
@@ -578,11 +680,22 @@ export async function extractChromaKeyAlpha(
   head = 0;
   tail = 0;
   let confidentForegroundSeeds = 0;
+  // A fixed pixel inset is too weak for large generated plates and too harsh
+  // for small sprites. Scale the seed erosion with the canvas so coloured
+  // key fringes cannot teach the solver that spill is subject colour.
+  const foregroundSeedMinimumInset = Math.max(
+    2,
+    Math.min(
+      FOREGROUND_SEED_MAXIMUM_INSET,
+      Math.floor(Math.min(width, height) / 128),
+    ),
+  );
   for (let pixel = 0; pixel < pixels; pixel += 1) {
     if (
       !connectedBackground[pixel] &&
       sourceData[pixel * 4 + 3]! > 0 &&
-      matteDistance[pixel]! >= opaqueSquared
+      matteDistance[pixel]! >= opaqueSquared &&
+      backgroundDistance[pixel]! >= foregroundSeedMinimumInset
     ) {
       nearestForeground[pixel] = pixel;
       foregroundDistance[pixel] = 0;
@@ -614,9 +727,15 @@ export async function extractChromaKeyAlpha(
   let edgeBandPixels = 0;
   let preservedInteriorMatteLikePixels = 0;
   let decontaminatedPixels = 0;
+  let providerHaloRepairPixels = 0;
+  let maximumProviderHaloSourceChannelDrift = 0;
   let transparentPixels = 0;
   let partialPixels = 0;
   let opaquePixels = 0;
+  const maximumAllowedCompositeChannelError =
+    settings.maximumCompositeChannelError;
+  let compositeMismatchPixels = 0;
+  let maximumObservedCompositeChannelError = 0;
   for (let pixel = 0; pixel < pixels; pixel += 1) {
     const offset = pixel * 4;
     const sourceR = sourceData[offset]!;
@@ -624,6 +743,16 @@ export async function extractChromaKeyAlpha(
     const sourceB = sourceData[offset + 2]!;
     const sourceAlpha = sourceData[offset + 3]!;
     const background = connectedBackground[pixel] === 1;
+    const localMattePixel = nearestLocalMatte[pixel]!;
+    const localMatteOffset = localMattePixel * 4;
+    const localMatte = localMattePixel >= 0
+      ? {
+          r: sourceData[localMatteOffset]!,
+          g: sourceData[localMatteOffset + 1]!,
+          b: sourceData[localMatteOffset + 2]!,
+          hex: settings.matte.hex,
+        }
+      : settings.matte;
     const matteLike = matteDistance[pixel]! <= connectionSquared;
     const edgeCandidate =
       background ||
@@ -638,40 +767,86 @@ export async function extractChromaKeyAlpha(
     let red = sourceR;
     let green = sourceG;
     let blue = sourceB;
+    let providerHaloRepaired = false;
     if (edgeCandidate && nearForeground) {
       edgeBandPixels += 1;
       const seed = nearestForeground[pixel]! * 4;
-      const matteAlpha = projectionAlpha(
+      const projectedAlpha = projectionAlpha(
         sourceR,
         sourceG,
         sourceB,
         sourceData[seed]!,
         sourceData[seed + 1]!,
         sourceData[seed + 2]!,
-        settings.matte,
+        localMatte,
+      );
+      // Projection can underestimate alpha when a provider adds rim light,
+      // colour grading or nonlinear antialiasing. Enforce the smallest alpha
+      // that can reconstruct all three observed channels without clamping the
+      // recovered foreground outside the legal RGB cube. This removes green
+      // or magenta spill while retaining exact, physically possible edges.
+      const matteAlpha = Math.max(
+        projectedAlpha,
+        minimumPhysicalAlpha(sourceR, sourceG, sourceB, localMatte),
       );
       alpha = matteAlpha * (sourceAlpha / 255);
       if (alpha > 0 && alpha < 0.997) {
         red = recoverColour(
           sourceR,
-          settings.matte.r,
+          localMatte.r,
           matteAlpha,
           sourceData[seed]!,
+          maximumAllowedCompositeChannelError,
         );
         green = recoverColour(
           sourceG,
-          settings.matte.g,
+          localMatte.g,
           matteAlpha,
           sourceData[seed + 1]!,
+          maximumAllowedCompositeChannelError,
         );
         blue = recoverColour(
           sourceB,
-          settings.matte.b,
+          localMatte.b,
           matteAlpha,
           sourceData[seed + 2]!,
+          maximumAllowedCompositeChannelError,
         );
         if (red !== sourceR || green !== sourceG || blue !== sourceB) {
           decontaminatedPixels += 1;
+        }
+      }
+
+      if (!background) {
+        const seedR = sourceData[seed]!;
+        const seedG = sourceData[seed + 1]!;
+        const seedB = sourceData[seed + 2]!;
+        const recoveredForegroundDistance = Math.hypot(
+          red - seedR,
+          green - seedG,
+          blue - seedB,
+        );
+        if (
+          recoveredForegroundDistance >=
+            PROVIDER_HALO_FOREGROUND_DISTANCE
+        ) {
+          // Some image providers paint a complementary one-pixel outline
+          // which is not an alpha composite of either the proven matte or the
+          // nearby subject. Exact inversion turns that defect into a vivid
+          // magenta/cyan halo. Reject the outlier colour, reuse an inset
+          // subject reference and derive coverage from the connected spatial
+          // edge. This is explicitly counted and excluded from source-plate
+          // recomposition proof rather than silently pretending it was exact.
+          const spatialAlpha = Math.max(
+            0,
+            Math.min(1, (backgroundDistance[pixel]! - 0.25) / 1.5),
+          );
+          alpha = Math.max(projectedAlpha, spatialAlpha) * (sourceAlpha / 255);
+          red = seedR;
+          green = seedG;
+          blue = seedB;
+          providerHaloRepaired = true;
+          providerHaloRepairPixels += 1;
         }
       }
     }
@@ -693,12 +868,45 @@ export async function extractChromaKeyAlpha(
       if (finalAlpha === 255) opaquePixels += 1;
       else partialPixels += 1;
     }
+    const proofMatte = finalAlpha === 0
+      ? { r: sourceR, g: sourceG, b: sourceB }
+      : localMatte;
+    let pixelMismatch = false;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const matteChannel = [proofMatte.r, proofMatte.g, proofMatte.b][channel]!;
+      const recomposited = Math.round(
+        output[offset + channel]! * (finalAlpha / 255) +
+          matteChannel * (1 - finalAlpha / 255),
+      );
+      const error = Math.abs(recomposited - sourceData[offset + channel]!);
+      if (providerHaloRepaired) {
+        maximumProviderHaloSourceChannelDrift = Math.max(
+          maximumProviderHaloSourceChannelDrift,
+          error,
+        );
+      } else {
+        maximumObservedCompositeChannelError = Math.max(
+          maximumObservedCompositeChannelError,
+          error,
+        );
+        if (error > maximumAllowedCompositeChannelError) {
+          pixelMismatch = true;
+        }
+      }
+    }
+    if (pixelMismatch) compositeMismatchPixels += 1;
   }
 
   if (!opaquePixels && !partialPixels) {
     throw new ChromaKeyExtractionError(
       "CHROMA_KEY_OUTPUT_EMPTY",
       "Extraction removed every visible pixel.",
+    );
+  }
+  if (compositeMismatchPixels) {
+    throw new ChromaKeyExtractionError(
+      "CHROMA_KEY_COMPOSITE_DRIFT",
+      `${compositeMismatchPixels} extracted pixels exceeded the recomposition tolerance; maximum observed channel error was ${maximumObservedCompositeChannelError}.`,
     );
   }
 
@@ -772,6 +980,11 @@ export async function extractChromaKeyAlpha(
         edgeSearchRadius: settings.edgeSearchRadius,
         bleedRadius: settings.bleedRadius,
         minimumBorderMatteFraction: settings.minimumBorderMatteFraction,
+        maximumCompositeChannelError:
+          settings.maximumCompositeChannelError,
+        foregroundSeedMinimumInset,
+        providerHaloForegroundDistance:
+          PROVIDER_HALO_FOREGROUND_DISTANCE,
       },
       border: {
         pixels: borders.length,
@@ -790,7 +1003,21 @@ export async function extractChromaKeyAlpha(
         partialPixels,
         opaquePixels,
         decontaminatedPixels,
+        providerHaloRepairPixels,
         transparentBleedPixels,
+      },
+      recomposition: {
+        checkedPixels: pixels - providerHaloRepairPixels,
+        excludedProviderHaloRepairPixels: providerHaloRepairPixels,
+        mismatchPixels: compositeMismatchPixels,
+        maximumObservedChannelError: maximumObservedCompositeChannelError,
+        maximumAllowedChannelError: maximumAllowedCompositeChannelError,
+      },
+      providerHaloRepair: {
+        pixels: providerHaloRepairPixels,
+        maximumSourceChannelDrift:
+          maximumProviderHaloSourceChannelDrift,
+        method: "inset-subject-colour-spatial-alpha",
       },
     },
   };

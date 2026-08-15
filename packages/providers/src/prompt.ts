@@ -146,8 +146,9 @@ function backgroundSection(request: NormalizedProviderCandidateRequest): string[
       `- Render every pixel outside the owned silhouette as the exact solid ${request.background.matteColour} chroma matte for deterministic extraction.`,
       "- A transparency-preview checkerboard/grid is forbidden; never paint or simulate transparency.",
       "- The matte must be one colour from corner to corner: no gradient, horizon, vignette, texture, scenery, noise, cast shadow, glow, ambient variation or reflected matte-colour light.",
+      "- Preserve the subject's existing lighting. Do not add key-colour spill, complementary magenta/cyan rim light, outline, halo, chromatic aberration, edge glow or relighting at the silhouette.",
       "- Fill every background pixel to every canvas edge with that one exact colour; never draw grey/white transparency tiles, even if an editor normally displays transparency that way.",
-      "- Keep the complete subject separated cleanly from the matte and inside the canvas with generous safe clearance.",
+      "- Keep the complete subject separated cleanly from the matte and inside the canvas with generous safe clearance on all four sides; no visible subject pixel may touch the canvas edge.",
       `- Before returning, inspect all four corners and the full canvas edge: they must still be exactly ${request.background.matteColour}.`,
       "- This is an intermediate extraction candidate; it is not the final transparent asset.",
     ];

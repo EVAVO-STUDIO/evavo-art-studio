@@ -22,6 +22,11 @@ export interface MasteringCommandValues {
   readonly "edge-search-radius"?: string;
   readonly "bleed-radius"?: string;
   readonly "minimum-border-matte-fraction"?: string;
+  readonly "maximum-composite-channel-error"?: string;
+  readonly "checker-connection-distance"?: string;
+  readonly "checker-foreground-seed-distance"?: string;
+  readonly "checker-minimum-border-fraction"?: string;
+  readonly "checker-maximum-composite-channel-error"?: string;
 }
 
 export type MasteringCommandResult =
@@ -73,6 +78,26 @@ function recoveryOptions(
     values["minimum-border-matte-fraction"],
     "--minimum-border-matte-fraction",
   );
+  const maximumCompositeChannelError = optionalNumber(
+    values["maximum-composite-channel-error"],
+    "--maximum-composite-channel-error",
+  );
+  const checkerConnectionDistance = optionalNumber(
+    values["checker-connection-distance"],
+    "--checker-connection-distance",
+  );
+  const checkerForegroundSeedDistance = optionalNumber(
+    values["checker-foreground-seed-distance"],
+    "--checker-foreground-seed-distance",
+  );
+  const checkerMinimumBorderFraction = optionalNumber(
+    values["checker-minimum-border-fraction"],
+    "--checker-minimum-border-fraction",
+  );
+  const checkerMaximumCompositeChannelError = optionalNumber(
+    values["checker-maximum-composite-channel-error"],
+    "--checker-maximum-composite-channel-error",
+  );
   return {
     ...(matteColour === undefined ? {} : { matteColour }),
     ...(connectionDistance === undefined ? {} : { connectionDistance }),
@@ -82,6 +107,21 @@ function recoveryOptions(
     ...(minimumBorderMatteFraction === undefined
       ? {}
       : { minimumBorderMatteFraction }),
+    ...(maximumCompositeChannelError === undefined
+      ? {}
+      : { maximumCompositeChannelError }),
+    ...(checkerConnectionDistance === undefined
+      ? {}
+      : { checkerConnectionDistance }),
+    ...(checkerForegroundSeedDistance === undefined
+      ? {}
+      : { checkerForegroundSeedDistance }),
+    ...(checkerMinimumBorderFraction === undefined
+      ? {}
+      : { checkerMinimumBorderFraction }),
+    ...(checkerMaximumCompositeChannelError === undefined
+      ? {}
+      : { checkerMaximumCompositeChannelError }),
   };
 }
 
@@ -111,6 +151,26 @@ export async function handleMasteringCommand(
   const existingMattes = Array.isArray(suppliedExpectations.knownMatteColours)
     ? suppliedExpectations.knownMatteColours
     : [];
+  const checkerMattes = extraction.evidence.classification.checkerboard.detected
+    ? extraction.evidence.classification.checkerboard.colours.map(
+        (colour) =>
+          `#${[colour.r, colour.g, colour.b]
+            .map((channel) => channel.toString(16).padStart(2, "0"))
+            .join("")}`,
+      )
+    : [];
+  const knownMatteColours = [
+    ...(extraction.evidence.matte?.hex
+      ? [extraction.evidence.matte.hex]
+      : matteColour
+        ? [matteColour]
+        : []),
+    ...(extraction.evidence.classification.inferredMatte?.hex
+      ? [extraction.evidence.classification.inferredMatte.hex]
+      : []),
+    ...checkerMattes,
+    ...existingMattes,
+  ];
   const quality = analyseDecodedSpriteFrame(decoded, {
     ...suppliedExpectations,
     frameId:
@@ -131,14 +191,7 @@ export async function handleMasteringCommand(
       typeof suppliedExpectations.safePadding === "number"
         ? suppliedExpectations.safePadding
         : 1,
-    knownMatteColours: [
-      ...(extraction.evidence.matte?.hex
-        ? [extraction.evidence.matte.hex]
-        : matteColour
-          ? [matteColour]
-          : []),
-      ...existingMattes,
-    ],
+    ...(knownMatteColours.length ? { knownMatteColours } : {}),
   });
   const evidence = {
     schemaVersion: "1.0",

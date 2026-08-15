@@ -13,7 +13,7 @@ const DEFAULT_MAXIMUM_INPUT_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAXIMUM_PIXELS = 8_294_400;
 const UNREACHED = 255;
 const CHECKER_TILE_SIZES = Object.freeze([
-  2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128,
+  2, 3, 4, 6, 8, 10, 12, 16, 20, 22, 23, 24, 26, 28, 32, 48, 64, 96, 128,
 ]);
 
 type Colour = Readonly<{ r: number; g: number; b: number }>;
@@ -77,6 +77,7 @@ export interface BackgroundAlphaRecoveryEvidence {
     partialPixels: number;
     opaquePixels: number;
     decontaminatedPixels: number;
+    readonly providerHaloRepairPixels?: number;
     transparentBleedPixels: number;
   }>;
   readonly checkerboardRecovery?: Readonly<{
@@ -96,10 +97,12 @@ export interface BackgroundAlphaRecoveryEvidence {
   }>;
   readonly recomposition?: Readonly<{
     checkedPixels: number;
+    readonly excludedProviderHaloRepairPixels?: number;
     mismatchPixels: number;
     maximumObservedChannelError: number;
     maximumAllowedChannelError: number;
   }>;
+  readonly providerHaloRepair?: ChromaKeyExtractionEvidence["providerHaloRepair"];
   readonly guarantees: Readonly<{
     realAlpha: true;
     fakeCheckerboardAcceptedAsTransparency: false;
@@ -127,6 +130,7 @@ export interface CheckerboardDetectionEvidence {
   readonly colours: readonly Colour[];
   readonly colourSeparation: number | null;
   readonly fitFraction: number | null;
+  readonly coverageFraction: number | null;
   readonly rmse: number | null;
 }
 
@@ -161,6 +165,7 @@ interface CheckerFit {
   readonly colours: readonly [Colour, Colour];
   readonly separation: number;
   readonly fitFraction: number;
+  readonly coverageFraction: number;
   readonly rmse: number;
   readonly score: number;
 }
@@ -448,26 +453,41 @@ function fitCheckerboard(
   phaseX: number,
   phaseY: number,
 ): CheckerFit | null {
-  const sums = [
-    [0, 0, 0, 0],
-    [0, 0, 0, 0],
-  ];
+  const bins = [new Map<number, number[]>(), new Map<number, number[]>()];
   for (const sample of samples) {
     const parity =
       (Math.floor((sample.x + phaseX) / tileSize) +
         Math.floor((sample.y + phaseY) / tileSize)) &
       1;
-    const sum = sums[parity]!;
-    sum[0]! += sample.r;
-    sum[1]! += sample.g;
-    sum[2]! += sample.b;
-    sum[3]! += 1;
+    // Provider checkerboards are often lightly textured or compressed. Use a
+    // robust dominant colour per parity instead of averaging the foreground
+    // character into the grid model. Eight-level bins retain subtle neutral
+    // grid separation while absorbing one- or two-level provider noise.
+    const key =
+      (Math.floor(sample.r / 8) << 10) |
+      (Math.floor(sample.g / 8) << 5) |
+      Math.floor(sample.b / 8);
+    const bin = bins[parity]!.get(key) ?? [0, 0, 0, 0];
+    bin[0]! += sample.r;
+    bin[1]! += sample.g;
+    bin[2]! += sample.b;
+    bin[3]! += 1;
+    bins[parity]!.set(key, bin);
   }
-  if (sums[0]![3]! < 16 || sums[1]![3]! < 16) return null;
-  const colours = sums.map((sum) => ({
-    r: sum[0]! / sum[3]!,
-    g: sum[1]! / sum[3]!,
-    b: sum[2]! / sum[3]!,
+  const dominant = bins.map((values) => {
+    let best: number[] | null = null;
+    for (const value of values.values()) {
+      if (!best || value[3]! > best[3]!) best = value;
+    }
+    return best;
+  });
+  if (!dominant[0] || !dominant[1] || dominant[0][3]! < 16 || dominant[1][3]! < 16) {
+    return null;
+  }
+  const colours = dominant.map((sum) => ({
+    r: sum![0]! / sum![3]!,
+    g: sum![1]! / sum![3]!,
+    b: sum![2]! / sum![3]!,
   })) as [Colour, Colour];
   const separation = distance(
     colours[0].r,
@@ -477,23 +497,37 @@ function fitCheckerboard(
   );
   const fitDistance = Math.max(14, separation * 0.28);
   let fitted = 0;
+  let eligible = 0;
   let fittedSquaredError = 0;
   for (const sample of samples) {
     const parity =
       (Math.floor((sample.x + phaseX) / tileSize) +
         Math.floor((sample.y + phaseY) / tileSize)) &
       1;
-    const error = distance(sample.r, sample.g, sample.b, colours[parity]!);
-    if (error <= fitDistance) {
+    const expectedError = distance(
+      sample.r,
+      sample.g,
+      sample.b,
+      colours[parity]!,
+    );
+    const alternateError = distance(
+      sample.r,
+      sample.g,
+      sample.b,
+      colours[parity ^ 1]!,
+    );
+    if (Math.min(expectedError, alternateError) <= fitDistance) eligible += 1;
+    if (expectedError <= fitDistance && expectedError <= alternateError) {
       fitted += 1;
-      fittedSquaredError += error * error;
+      fittedSquaredError += expectedError * expectedError;
     }
   }
   // Foreground artwork can legitimately interrupt a painted transparency
   // grid near the edge. Measure regularity only across samples assigned to
   // either fitted grid colour so subject pixels cannot hide the grid signal.
   const rmse = Math.sqrt(fittedSquaredError / Math.max(1, fitted));
-  const fitFraction = fitted / samples.length;
+  const fitFraction = fitted / Math.max(1, eligible);
+  const coverageFraction = eligible / samples.length;
   return {
     tileSize,
     phaseX,
@@ -501,8 +535,11 @@ function fitCheckerboard(
     colours,
     separation,
     fitFraction,
+    coverageFraction,
     rmse,
-    score: (fitFraction * separation) / Math.max(1, rmse),
+    score:
+      (fitFraction * separation * Math.sqrt(coverageFraction)) /
+      Math.max(1, rmse),
   };
 }
 
@@ -544,15 +581,26 @@ export function detectPaintedTransparencyCheckerboard(
   const neutralGrid = Boolean(
     best &&
       sampleSet.lowChromaFraction >= 0.78 &&
-      best.separation >= 18 &&
-      best.rmse <= 18 &&
-      best.fitFraction >= 0.88,
+      ((best.separation >= 18 &&
+        best.rmse <= 18 &&
+        best.fitFraction >= 0.88 &&
+        best.coverageFraction >= 0.3) ||
+        // Image providers also paint low-contrast white/light-grey grids. A
+        // weak colour delta is still decisive when it repeats across many
+        // tiles, fits both parity classes tightly and owns most of the border.
+        (best.separation >= 10 &&
+          best.rmse <= 4 &&
+          best.fitFraction >= 0.82 &&
+          best.coverageFraction >= 0.5 &&
+          width / best.tileSize >= 8 &&
+          height / best.tileSize >= 8)),
   );
   const chromaticGrid = Boolean(
     best &&
       best.separation >= 32 &&
       best.rmse <= 12 &&
-      best.fitFraction >= 0.92,
+      best.fitFraction >= 0.92 &&
+      best.coverageFraction >= 0.3,
   );
   const detected = Boolean(
     best &&
@@ -575,20 +623,22 @@ export function detectPaintedTransparencyCheckerboard(
     sampledBorderPixels: sampleSet.sampledPixels,
     opaqueBorderFraction: Number(sampleSet.opaqueFraction.toFixed(6)),
     lowChromaBorderFraction: Number(sampleSet.lowChromaFraction.toFixed(6)),
-    tileSize: detected && best ? best.tileSize : null,
-    phaseX: detected && best ? best.phaseX : null,
-    phaseY: detected && best ? best.phaseY : null,
+    tileSize: best ? best.tileSize : null,
+    phaseX: best ? best.phaseX : null,
+    phaseY: best ? best.phaseY : null,
     colours:
-      detected && best
+      best
         ? best.colours.map((colour) => ({
             r: clampByte(colour.r),
             g: clampByte(colour.g),
             b: clampByte(colour.b),
           }))
         : [],
-    colourSeparation: detected && best ? Number(best.separation.toFixed(4)) : null,
-    fitFraction: detected && best ? Number(best.fitFraction.toFixed(6)) : null,
-    rmse: detected && best ? Number(best.rmse.toFixed(4)) : null,
+    colourSeparation: best ? Number(best.separation.toFixed(4)) : null,
+    fitFraction: best ? Number(best.fitFraction.toFixed(6)) : null,
+    coverageFraction:
+      best ? Number(best.coverageFraction.toFixed(6)) : null,
+    rmse: best ? Number(best.rmse.toFixed(4)) : null,
   };
 }
 
@@ -701,46 +751,6 @@ function outputStatistics(data: Buffer): Readonly<{
     else partialPixels += 1;
   }
   return { transparentPixels, partialPixels, opaquePixels };
-}
-
-function verifyRecomposition(
-  source: Buffer,
-  output: Buffer,
-  width: number,
-  height: number,
-  matteAt: (x: number, y: number) => Colour,
-  maximumAllowedChannelError: number,
-): NonNullable<BackgroundAlphaRecoveryEvidence["recomposition"]> {
-  let mismatchPixels = 0;
-  let maximumObservedChannelError = 0;
-  for (let pixel = 0; pixel < width * height; pixel += 1) {
-    const x = pixel % width;
-    const y = Math.floor(pixel / width);
-    const offset = pixel * 4;
-    const alpha = output[offset + 3]! / 255;
-    const matte = matteAt(x, y);
-    const matteChannels = [matte.r, matte.g, matte.b];
-    let mismatch = false;
-    for (let channel = 0; channel < 3; channel += 1) {
-      const recomposited = Math.round(
-        output[offset + channel]! * alpha +
-          matteChannels[channel]! * (1 - alpha),
-      );
-      const error = Math.abs(recomposited - source[offset + channel]!);
-      maximumObservedChannelError = Math.max(
-        maximumObservedChannelError,
-        error,
-      );
-      if (error > maximumAllowedChannelError) mismatch = true;
-    }
-    if (mismatch) mismatchPixels += 1;
-  }
-  return {
-    checkedPixels: width * height,
-    mismatchPixels,
-    maximumObservedChannelError,
-    maximumAllowedChannelError,
-  };
 }
 
 function edgeIsTransparent(data: Buffer, width: number, height: number): boolean {
@@ -1027,15 +1037,23 @@ async function recoverCheckerboard(
   );
   const maximumCompositeChannelError = boundedInteger(
     options.checkerMaximumCompositeChannelError,
-    6,
+    detection.colourSeparation !== null &&
+      detection.colourSeparation < 18 &&
+      detection.rmse !== null &&
+      detection.rmse <= 4 &&
+      detection.coverageFraction !== null &&
+      detection.coverageFraction >= 0.5
+      ? 24
+      : 12,
     0,
-    16,
+    32,
     "checkerMaximumCompositeChannelError",
   );
   const pixels = source.width * source.height;
   const connectionSquared = connectionDistance ** 2;
   const foregroundSquared = foregroundSeedDistance ** 2;
   const matteDistance = new Uint32Array(pixels);
+  const matteChoice = new Uint8Array(pixels);
   const eligible = new Uint8Array(pixels);
   const borders = borderIndices(source.width, source.height);
   let matchingBorderPixels = 0;
@@ -1043,13 +1061,25 @@ async function recoverCheckerboard(
     const x = pixel % source.width;
     const y = Math.floor(pixel / source.width);
     const offset = pixel * 4;
-    const matte = checkerMatte(detection, x, y);
-    const value = distance(
-      source.data[offset]!,
-      source.data[offset + 1]!,
-      source.data[offset + 2]!,
-      matte,
-    );
+    const red = source.data[offset]!;
+    const green = source.data[offset + 1]!;
+    const blue = source.data[offset + 2]!;
+    const modelledMatte = checkerMatte(detection, x, y);
+    const modelledChoice = detection.colours.indexOf(modelledMatte);
+    const firstDistance = distance(red, green, blue, detection.colours[0]!);
+    const secondDistance = distance(red, green, blue, detection.colours[1]!);
+    // Generated preview grids are commonly resampled to a provider-specific
+    // canvas, producing 23/24 px tile runs instead of one perfect integer
+    // lattice. Detection still proves the alternating grid; recovery chooses
+    // the locally matching one of its two proven colours so scaled phase drift
+    // cannot leave stripes, halos or false opaque islands behind.
+    const localChoice = firstDistance <= secondDistance ? 0 : 1;
+    const chosen =
+      Math.min(firstDistance, secondDistance) <= connectionDistance
+        ? localChoice
+        : modelledChoice;
+    matteChoice[pixel] = chosen < 0 ? localChoice : chosen;
+    const value = Math.min(firstDistance, secondDistance);
     const squared = Math.round(value * value);
     matteDistance[pixel] = squared;
     if (source.data[offset + 3]! <= 1 || squared <= connectionSquared) {
@@ -1094,6 +1124,8 @@ async function recoverCheckerboard(
 
   const backgroundDistance = new Uint8Array(pixels);
   backgroundDistance.fill(UNREACHED);
+  const nearestBackground = new Int32Array(pixels);
+  nearestBackground.fill(-1);
   head = 0;
   tail = 0;
   for (let pixel = 0; pixel < pixels; pixel += 1) {
@@ -1103,7 +1135,10 @@ async function recoverCheckerboard(
     neighbours(pixel, source.width, source.height, (next) => {
       if (!connected[next]) boundary = true;
     });
-    if (boundary) queue[tail++] = pixel;
+    if (boundary) {
+      nearestBackground[pixel] = pixel;
+      queue[tail++] = pixel;
+    }
   }
   while (head < tail) {
     const pixel = queue[head++]!;
@@ -1112,6 +1147,7 @@ async function recoverCheckerboard(
     neighbours(pixel, source.width, source.height, (next) => {
       if (backgroundDistance[next] !== UNREACHED) return;
       backgroundDistance[next] = currentDistance + 1;
+      nearestBackground[next] = nearestBackground[pixel]!;
       queue[tail++] = next;
     });
   }
@@ -1169,8 +1205,22 @@ async function recoverCheckerboard(
     const x = pixel % source.width;
     const y = Math.floor(pixel / source.width);
     const offset = pixel * 4;
-    const matte = checkerMatte(detection, x, y);
     const background = connected[pixel] === 1;
+    const localBackgroundPixel = nearestBackground[pixel]!;
+    const localBackgroundOffset = localBackgroundPixel * 4;
+    const matte = background
+      ? {
+          r: source.data[offset]!,
+          g: source.data[offset + 1]!,
+          b: source.data[offset + 2]!,
+        }
+      : localBackgroundPixel >= 0
+        ? {
+            r: source.data[localBackgroundOffset]!,
+            g: source.data[localBackgroundOffset + 1]!,
+            b: source.data[localBackgroundOffset + 2]!,
+          }
+        : detection.colours[matteChoice[pixel]!]!;
     const matteLike = matteDistance[pixel]! <= connectionSquared;
     const edgeCandidate =
       background ||
@@ -1243,7 +1293,7 @@ async function recoverCheckerboard(
   if (compositeMismatchPixels) {
     throw new BackgroundAlphaRecoveryError(
       "BACKGROUND_RECOVERY_CHECKERBOARD_COMPOSITE_DRIFT",
-      `${compositeMismatchPixels} recovered pixels exceeded the recomposition tolerance.`,
+      `${compositeMismatchPixels} recovered pixels exceeded the recomposition tolerance; maximum observed channel error was ${maximumObservedCompositeChannelError}.`,
     );
   }
   const transparentBleedPixels = applyTransparentBleed(
@@ -1336,6 +1386,12 @@ function chromaOptions(
         ? { minimumBorderMatteFraction: 0.75 }
         : {}
       : { minimumBorderMatteFraction: options.minimumBorderMatteFraction }),
+    ...(options.maximumCompositeChannelError === undefined
+      ? {}
+      : {
+          maximumCompositeChannelError:
+            options.maximumCompositeChannelError,
+        }),
     ...(options.maximumInputBytes === undefined
       ? {}
       : { maximumInputBytes: options.maximumInputBytes }),
@@ -1405,25 +1461,11 @@ async function recoverChroma(
       "Chroma extraction did not produce a fully transparent canvas edge.",
     );
   }
-  const maximumCompositeChannelError = boundedInteger(
-    options.maximumCompositeChannelError,
-    6,
-    0,
-    16,
-    "maximumCompositeChannelError",
-  );
-  const recomposition = verifyRecomposition(
-    compositeSource,
-    decoded.data,
-    source.width,
-    source.height,
-    () => matte,
-    maximumCompositeChannelError,
-  );
+  const recomposition = evidence.recomposition;
   if (recomposition.mismatchPixels) {
     throw new BackgroundAlphaRecoveryError(
       "BACKGROUND_RECOVERY_CHROMA_COMPOSITE_DRIFT",
-      `${recomposition.mismatchPixels} extracted pixels exceeded the recomposition tolerance.`,
+      `${recomposition.mismatchPixels} extracted pixels exceeded the recomposition tolerance; maximum observed channel error was ${recomposition.maximumObservedChannelError}.`,
     );
   }
   return {
@@ -1490,6 +1532,17 @@ export async function recoverBackgroundAlpha(
   const inferredMatteBand = inferredMatte
     ? fitVisibleMatteBand(source, inferredMatte.colour)
     : null;
+  const inferredPreferredToDeclared = Boolean(
+    declaredColour &&
+      inferredMatte &&
+      inferredMatteBand?.detected &&
+      distance(
+        declaredColour.r,
+        declaredColour.g,
+        declaredColour.b,
+        inferredMatte.colour,
+      ) >= 6,
+  );
   const sourceNonOpaquePixels = alpha.transparentPixels + alpha.partialPixels;
   const pixelCount = source.width * source.height;
   const minimumNativeTransparentFraction = boundedNumber(
@@ -1531,6 +1584,23 @@ export async function recoverBackgroundAlpha(
   // Do not let a token transparent rim cause a still-painted solid matte to
   // bypass extraction. The visible border band must prove dominant ownership
   // before existing alpha is composited over that matte and reconstructed.
+  if (
+    sourceNonOpaquePixels &&
+    inferredPreferredToDeclared &&
+    inferredMatte &&
+    inferredMatteBand?.detected
+  ) {
+    return recoverChroma(
+      source,
+      alpha,
+      checkerboard,
+      inferredMatte,
+      options,
+      inferredMatte.hex,
+      "inferred-high-chroma-key",
+      inferredMatteBand,
+    );
+  }
   if (sourceNonOpaquePixels && options.matteColour && declaredMatteBand?.detected) {
     return recoverChroma(
       source,
@@ -1566,6 +1636,17 @@ export async function recoverBackgroundAlpha(
   }
 
   let declaredFailure: ChromaKeyExtractionError | null = null;
+  if (inferredPreferredToDeclared && inferredMatte) {
+    return recoverChroma(
+      source,
+      alpha,
+      checkerboard,
+      inferredMatte,
+      options,
+      inferredMatte.hex,
+      "inferred-high-chroma-key",
+    );
+  }
   if (options.matteColour) {
     try {
       return await recoverChroma(

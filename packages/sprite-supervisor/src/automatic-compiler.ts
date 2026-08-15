@@ -774,6 +774,7 @@ function pipelineForUnit(
           "Do not create a sprite sheet, contact sheet, grid or multiple-panel image.",
           "Never paint a checkerboard or transparency-preview grid; it is fake transparency and invalid output.",
           `Every background pixel outside the subject must remain the exact flat ${request.provider.matteColour} extraction matte with no shadow, gradient, texture, scenery or colour variation.`,
+          "Do not relight the silhouette or add matte spill, a complementary rim, coloured outline, glow, halo or chromatic aberration. Keep safe matte clearance on every canvas side.",
           "Do not add scenery, UI, labels, watermarks, unrelated props or extra characters.",
         ].join(" "),
         style: styleEnvelope(contract),

@@ -275,6 +275,29 @@ test("background recovery removes a high-chroma painted checkerboard", async () 
   assert.deepEqual(pixel(await rgba(result.png), 0, 0), [0, 0, 0, 0]);
 });
 
+test("background recovery removes a subtle resampled provider checkerboard with a dominant foreground", async () => {
+  const width = 230;
+  const height = 253;
+  const candidate = await raster(width, height, 4, (x, y) => {
+    if (x >= 40 && x <= 190 && y >= 28 && y <= 238) {
+      return [72, 31, 18, 255];
+    }
+    const parity =
+      (Math.floor(x / 23.5) + Math.floor(y / 23.5)) % 2;
+    const noise = (x * 3 + y * 5) % 3;
+    const value = parity ? 243 + noise : 252 + noise;
+    return [value, value, value, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate);
+  assert.equal(result.evidence.strategy, "checkerboard-recovery");
+  assert.equal(result.evidence.classification.checkerboard.detected, true);
+  assert.ok(result.evidence.classification.checkerboard.coverageFraction >= 0.5);
+  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
+  const decoded = await rgba(result.png);
+  assert.deepEqual(pixel(decoded, 0, 0), [0, 0, 0, 0]);
+  assert.deepEqual(pixel(decoded, 100, 120), [72, 31, 18, 255]);
+});
+
 test("background recovery defeats a transparent-rim bypass around a visible painted grid", async () => {
   const candidate = await raster(128, 128, 4, (x, y) => {
     if (x === 0 || y === 0 || x === 127 || y === 127) {
@@ -413,5 +436,60 @@ test("background recovery infers only a confident high-chroma edge matte", async
     (error) =>
       error instanceof BackgroundAlphaRecoveryError &&
       error.code === "BACKGROUND_RECOVERY_UNRECOGNIZED",
+  );
+});
+
+test("variable chroma recovery removes dark matte spill without a green outline", async () => {
+  const candidate = await raster(96, 96, 4, (x, y) => {
+    if (x >= 18 && x <= 77 && y >= 15 && y <= 79) {
+      return [12, 9, 10, 255];
+    }
+    if (x >= 18 && x <= 77 && y === 80) {
+      return [1, 28, 0, 255];
+    }
+    return [18 + ((x + y) % 3), 247 + (x % 2), 15 + (y % 3), 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.equal(result.evidence.guarantees.realAlpha, true);
+  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
+  const decoded = await rgba(result.png);
+  assert.deepEqual(pixel(decoded, 0, 0), [0, 0, 0, 0]);
+  assert.deepEqual(pixel(decoded, 48, 40), [12, 9, 10, 255]);
+  const cleanedSpill = pixel(decoded, 48, 80);
+  assert.ok(cleanedSpill[3] < 255);
+  assert.ok(
+    cleanedSpill[3] === 0 ||
+      cleanedSpill[1] <= Math.max(cleanedSpill[0], cleanedSpill[2]) + 3,
+    `green spill remains: ${cleanedSpill}`,
+  );
+});
+
+test("provider halo repair rejects complementary edge paint instead of preserving an outline", async () => {
+  const candidate = await raster(96, 96, 4, (x, y) => {
+    if (x >= 20 && x <= 75 && y >= 20 && y <= 75) {
+      return [10, 9, 10, 255];
+    }
+    if (x >= 20 && x <= 75 && y === 19) {
+      return [174, 189, 157, 255];
+    }
+    return [12, 239, 24, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.ok(result.evidence.output.providerHaloRepairPixels > 0);
+  assert.equal(
+    result.evidence.recomposition.excludedProviderHaloRepairPixels,
+    result.evidence.output.providerHaloRepairPixels,
+  );
+  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
+  const decoded = await rgba(result.png);
+  const repaired = pixel(decoded, 48, 19);
+  assert.ok(repaired[3] > 0 && repaired[3] < 255);
+  assert.ok(
+    Math.max(repaired[0], repaired[1], repaired[2]) <= 20,
+    `provider halo colour remains: ${repaired}`,
   );
 });
