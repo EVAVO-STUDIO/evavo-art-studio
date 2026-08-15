@@ -47,7 +47,10 @@ assert.equal(mcpTests.status, 0, mcpTests.stderr || mcpTests.stdout);
 const combined = Object.values(source).join('\n');
 for (const token of [
   'evavo.raw-art-visual-catalog.v1',
+  'evavo.raw-art-visual-review-workbook.v1',
+  'evavo.raw-art-visual-context-inspection.v1',
   'evavo_raw_art_visual_build_catalog',
+  'evavo_raw_art_visual_inspect_context',
   'evavo_raw_art_visual_verify_catalog',
   'EVAVO_RAW_ART_VISUAL_MCP_ALLOW_WRITES',
   'confirmWrite=true',
@@ -55,6 +58,11 @@ for (const token of [
   'visualArtifactPathsReturned: true',
   'originalsReadOnly',
   'requiresOriginalInspectionBeforeSelectionOrEdit',
+  'likely-owner-desired-visual-direction',
+  'RAW_ART_REVIEW_WORKBOOK.json',
+  'GROUP_REVIEW_QUEUE.md',
+  'frameOrderAuthoritative',
+  'copyWorkbookBeforeRecordingDecisions',
   'sourceMutation": False',
   'gitPush: false',
 ]) assert.equal(combined.includes(token), true, `lost ${token}`);
@@ -71,5 +79,7 @@ for (const forbidden of [
 console.log('RAW_ART visual catalog contracts passed.');
 console.log('- every PNG is represented in a contact-sheet review packet');
 console.log('- selected originals require full-resolution inspection before edit or style use');
+console.log('- owner intent, style-family triage and frame-versus-variant evidence are explicit');
+console.log('- agents can hash-resolve any shortlisted item back to its full-resolution source path');
 console.log('- previews are create-only derivatives outside immutable RAW_ART');
 console.log('- source, approval, runtime, repository and publication authority remain false');

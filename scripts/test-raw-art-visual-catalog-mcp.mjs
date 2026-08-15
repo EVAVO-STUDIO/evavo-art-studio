@@ -50,9 +50,10 @@ test('visual catalog MCP is explicit, confined and returns inspectable artifact 
     const readWrite = { value: 'read-write', writesEnabled: true };
     assert.deepEqual(toolDefinitions(readOnly).map((tool) => tool.name), [
       'evavo_raw_art_visual_capabilities',
+      'evavo_raw_art_visual_inspect_context',
       'evavo_raw_art_visual_verify_catalog',
     ]);
-    assert.equal(toolDefinitions(readWrite).length, 3);
+    assert.equal(toolDefinitions(readWrite).length, 4);
     const outputRoot = path.join(evidence, 'catalog-001');
     const built = await callTool('evavo_raw_art_visual_build_catalog', {
       rawArtRoot: raw,
@@ -63,8 +64,21 @@ test('visual catalog MCP is explicit, confined and returns inspectable artifact 
     }, { mode: readWrite, roots, environment: process.env });
     assert.equal(built.summary.status, 'built');
     assert.equal(built.summary.contactSheetPaths.length, 1);
+    assert.equal(path.basename(built.summary.agentContextPath), 'AGENT_VISUAL_CONTEXT.md');
+    assert.equal(path.basename(built.summary.reviewWorkbookPath), 'RAW_ART_REVIEW_WORKBOOK.json');
     assert.equal(built.effects.visualCatalogWrite, true);
     assert.equal(built.effects.sourceMutation, false);
+    const context = await callTool('evavo_raw_art_visual_inspect_context', { outputRoot }, { mode: readOnly, roots, environment: process.env });
+    assert.equal(context.summary.status, 'inspectable');
+    assert.equal(context.summary.ownerIntentPrior.interpretation, 'likely-owner-desired-visual-direction');
+    assert.equal(path.basename(context.summary.paths.groupReviewQueue), 'GROUP_REVIEW_QUEUE.md');
+    const item = await callTool('evavo_raw_art_visual_inspect_context', {
+      outputRoot,
+      rawArtRoot: raw,
+      relativePath: 'fighter.png',
+    }, { mode: readOnly, roots, environment: process.env });
+    assert.equal(item.summary.item.sourceVerified, true);
+    assert.equal(item.summary.item.originalPath, path.join(raw, 'fighter.png'));
     const verified = await callTool('evavo_raw_art_visual_verify_catalog', { outputRoot, rawArtRoot: raw }, { mode: readOnly, roots, environment: process.env });
     assert.equal(verified.summary.status, 'passed');
     assert.equal(verified.summary.sourcesVerified, 1);

@@ -20,8 +20,8 @@ class RawArtVisualCatalogTests(unittest.TestCase):
     def fixture(self, root: Path) -> tuple[Path, dict[str, str]]:
         raw = root / "raw_Art"
         (raw / "fighters").mkdir(parents=True)
-        first = raw / "fighters" / "bastion-idle.png"
-        second = raw / "fighters" / "viper-idle.png"
+        first = raw / "fighters" / "bastion-idle-001.png"
+        second = raw / "fighters" / "bastion-idle-002.png"
         third = raw / "title.png"
         Image.new("RGBA", (48, 64), (190, 35, 24, 255)).save(first)
         transparent = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
@@ -52,10 +52,27 @@ class RawArtVisualCatalogTests(unittest.TestCase):
             self.assertEqual(len(manifest["reviewPackets"]), 1)
             self.assertTrue((output / "index.html").is_file())
             self.assertTrue((output / "contact-sheets" / "packet-0001.png").is_file())
+            self.assertTrue((output / "AGENT_VISUAL_CONTEXT.md").is_file())
+            self.assertTrue((output / "GROUP_REVIEW_QUEUE.md").is_file())
+            workbook = json.loads((output / "RAW_ART_REVIEW_WORKBOOK.json").read_text(encoding="utf-8"))
+            self.assertEqual(workbook["schema"], "evavo.raw-art-visual-review-workbook.v1")
+            self.assertEqual(workbook["policy"]["ownerIntentPrior"]["interpretation"], "likely-owner-desired-visual-direction")
+            self.assertTrue(workbook["policy"]["copyBeforeRecordingDecisions"])
+            self.assertEqual(len(workbook["items"]), 3)
+            self.assertEqual(workbook["sequenceAndVariantCandidates"][0]["candidateKind"], "probable-animation-frame-sequence")
             verified = self.command("verify", "--output-root", str(output), "--raw-art-root", str(raw))
             self.assertEqual(verified.returncode, 0, verified.stderr)
             verification = json.loads(verified.stdout)
             self.assertEqual(verification["sourcesVerified"], 3)
+            inspected = self.command(
+                "inspect", "--output-root", str(output), "--raw-art-root", str(raw),
+                "--relative-path", "fighters/bastion-idle-001.png",
+            )
+            self.assertEqual(inspected.returncode, 0, inspected.stderr)
+            context = json.loads(inspected.stdout)
+            self.assertEqual(context["schema"], "evavo.raw-art-visual-context-inspection.v1")
+            self.assertTrue(context["item"]["sourceVerified"])
+            self.assertEqual(Path(context["item"]["originalPath"]), (raw / "fighters" / "bastion-idle-001.png").resolve())
             after = {str(path.relative_to(raw)): digest(path) for path in raw.rglob("*.png")}
             self.assertEqual(before, after)
 

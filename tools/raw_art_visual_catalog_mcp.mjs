@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 export const SERVER_NAME = 'evavo-raw-art-visual-catalog';
-export const SERVER_VERSION = '1.0.0';
+export const SERVER_VERSION = '1.1.0';
 const runFile = promisify(execFile);
 const scriptPath = fileURLToPath(new URL('./raw_art_visual_catalog.py', import.meta.url));
 
@@ -91,8 +91,18 @@ export function toolDefinitions(current = policy()) {
   const tools = [
     {
       name: 'evavo_raw_art_visual_capabilities',
-      description: 'Describe safe PNG contact-sheet, HTML gallery, technical style evidence and agent review-packet capabilities.',
+      description: 'Describe safe PNG contact-sheet, owner-intent workbook, style-family triage, frame/variant review and full-resolution source-path capabilities.',
       inputSchema: object({}),
+    },
+    {
+      name: 'evavo_raw_art_visual_inspect_context',
+      description: 'Return verified paths to the complete visual context, review workbook, contact sheets and bounded style/frame candidate groups. With a relativePath and RAW_ART root, re-hash and return that full-resolution original for image viewing.',
+      inputSchema: object({
+        outputRoot: filePath,
+        rawArtRoot: filePath,
+        relativePath: { type: 'string', minLength: 1, maxLength: 32768 },
+        maximumGroups: { type: 'integer', minimum: 1, maximum: 100 },
+      }, ['outputRoot']),
     },
     {
       name: 'evavo_raw_art_visual_verify_catalog',
@@ -149,9 +159,18 @@ export async function callTool(name, input = {}, context = {}) {
     mode: current.value,
     writesEnabled: current.writesEnabled,
     allowedRootCount: allowed.length,
-    artifacts: ['manifest.json', 'index.html', 'AGENT_REVIEW_QUEUE.md', 'thumbnails/*.png', 'contact-sheets/*.png'],
-    workflow: ['open-contact-sheet', 'inspect-selected-original', 'record-creative-decision', 'create-working-copy', 'edit-or-generate-derivative', 'review-in-game'],
+    ownerIntentPrior: 'RAW_ART is strong evidence of the owner\'s desired visual direction, but not automatic style or production approval.',
+    artifacts: ['manifest.json', 'index.html', 'AGENT_REVIEW_QUEUE.md', 'AGENT_VISUAL_CONTEXT.md', 'RAW_ART_REVIEW_WORKBOOK.json', 'GROUP_REVIEW_QUEUE.md', 'thumbnails/*.png', 'contact-sheets/*.png'],
+    workflow: ['open-every-contact-sheet', 'name-coherent-visual-families', 'resolve-frames-versus-variants', 'inspect-selected-original-at-full-resolution', 'copy-workbook-and-record-decisions', 'create-source-bound-working-copy', 'edit-or-generate-derivative', 'compare-at-runtime-scale', 'review-in-game'],
   });
+  if (name === 'evavo_raw_art_visual_inspect_context') {
+    const outputRoot = confined(input.outputRoot, 'outputRoot', allowed);
+    const command = ['inspect', '--output-root', outputRoot];
+    if (input.relativePath) command.push('--relative-path', input.relativePath);
+    if (input.rawArtRoot) command.push('--raw-art-root', confined(input.rawArtRoot, 'rawArtRoot', allowed));
+    if (input.maximumGroups) command.push('--maximum-groups', String(input.maximumGroups));
+    return envelope(await python(command, context.environment));
+  }
   if (name === 'evavo_raw_art_visual_verify_catalog') {
     const outputRoot = confined(input.outputRoot, 'outputRoot', allowed);
     const command = ['verify', '--output-root', outputRoot];
@@ -181,7 +200,7 @@ export async function handleRequest(request, context = {}) {
     protocolVersion: request.params?.protocolVersion ?? '2025-03-26',
     capabilities: { tools: {} },
     serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-    instructions: 'Build visual artifacts outside RAW_ART, inspect every contact sheet, then inspect selected originals. Preview generation never grants creative, provenance, runtime or publication authority.',
+    instructions: 'Treat RAW_ART as strong owner-intent evidence. Build visual artifacts outside RAW_ART, inspect every contact sheet, classify coherent style families and frames versus variants, then hash-resolve and inspect selected originals at full resolution. Use only source-bound working copies. Preview generation never grants creative, style, provenance, runtime or publication authority.',
   });
   if (request.method === 'ping') return response(request.id, {});
   if (request.method === 'notifications/initialized') return null;
