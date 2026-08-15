@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-studio-ai-profile",
+  "studio": "art-studio",
+  "minimumPlatform": {"evavo-local-storage":"0.23.0","evavo-model-lab":"0.5.0"},
+  "authorities": {"training":"evavo-model-lab","execution":"evavo-local-compute","storage":"evavo-local-storage","durable":"evavo-storage"},
+  "environments": ["visual","video"],
+  "modelSlots": ["image-base","image-edit","image-control","image-segmentation","image-lora","image-upscale","image-restoration","video-base","video-lora","video-interpolation"],
+  "localTraining": ["sdxl-dreambooth-lora"],
+  "largerGpuTraining": ["flux2-klein-lora","ltx2-lora","hunyuanvideo-1.5-lora"],
+  "specialistTraining": ["realesrgan-specialist"],
+  "qualityGates": ["exact-source-revision","dataset-rights","same-seed-base-vs-adapter-review","artifact-and-alpha-validation","studio-style-profile-review"],
+  "canonical": {"datasets":"bee://primary/EVAVO/AI/Datasets/Art","models":"bee://primary/EVAVO/AI/Models/Visual","videoModels":"bee://primary/EVAVO/AI/Models/Video","training":"bee://primary/EVAVO/AI/Training/Art","outputs":"bee://primary/EVAVO/AI/Outputs/Art"},
+  "policy": {"weightsInGit":false,"autoDownload":false,"aiOutputIsCandidateUntilStudioValidation":true}
+}
