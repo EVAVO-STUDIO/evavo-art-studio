@@ -147,7 +147,9 @@ ChatGPT, Claude and trusted EVAVO agents can create a path-confined persistent w
 
 The Project Art sandbox includes the deterministic operation families needed for professional finishing: crop, pad, translate, pixel-safe and continuous-tone resize, arbitrary rotation, affine and perspective transforms, colour replacement, grayscale, inversion, posterisation, thresholding, gamma, hue, curves, channel mixing, multiple blur and edge filters, alpha morphology, feathering, defringing, halo and matte cleanup, ordered compositing, shadows and glows. `image-master` applies a release profile and emits a self-hashed mastering report. `motion-sequence` renders bounded keyframed layers to PNG frames, an exact manifest and an optional GIF preview.
 
-See [`docs/PERSISTENT_ARTIST_WORKSPACE.md`](./docs/PERSISTENT_ARTIST_WORKSPACE.md) and [`docs/PROJECT_ART_MASTERING_AND_MOTION.md`](./docs/PROJECT_ART_MASTERING_AND_MOTION.md).
+The avatar animation suite compiler expands one pinned EVA or Top Hat identity source into a governed 25-clip production plan: four anti-repeating idles, six talk performances, speech transitions, reactions and a character-specific greeting. It schedules 315 continuity-linked full-character frames plus 17 pixel-registered mouth and eye layers. Each frame requires genuine alpha or a declared low-collision chroma matte, border-connected background recovery, colour decontamination and independent frame assurance; a painted checkerboard is always blocking. The compiler plans work only and cannot approve, publish or activate art.
+
+See [`docs/PERSISTENT_ARTIST_WORKSPACE.md`](./docs/PERSISTENT_ARTIST_WORKSPACE.md), [`docs/PROJECT_ART_MASTERING_AND_MOTION.md`](./docs/PROJECT_ART_MASTERING_AND_MOTION.md) and [`docs/PROJECT_ART_AVATAR_ANIMATION_SUITE.md`](./docs/PROJECT_ART_AVATAR_ANIMATION_SUITE.md).
 
 ## Provider candidate execution
 

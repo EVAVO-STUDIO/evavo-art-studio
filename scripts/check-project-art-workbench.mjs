@@ -14,6 +14,7 @@ const relativeFiles = [
   'scripts/project-art/sandbox.mjs',
   'scripts/project-art/reference-derived.mjs',
   'scripts/project-art/persistent-workspace.mjs',
+  'scripts/project-art/avatar-animation-suite.mjs',
   'scripts/compile-project-art-intelligence.mjs',
   'scripts/compile-project-art-sandbox.mjs',
   'scripts/compile-reference-derived-image-plan.mjs',
@@ -29,14 +30,18 @@ const relativeFiles = [
   'scripts/test-persistent-artist-workspace.mjs',
   'scripts/check-project-art-mastering-and-motion.mjs',
   'scripts/test-project-art-mastering-and-motion.mjs',
+  'scripts/compile-project-art-avatar-animation-suite.mjs',
+  'scripts/test-project-art-avatar-animation-suite.mjs',
   'tools/run_project_art_sandbox.py',
   'tools/run_project_art_loop_closure.py',
   'tools/project_art_workspace_mcp.mjs',
+  'tools/project_art_avatar_animation_suite_mcp.mjs',
   'config/project-art-operations.v1.json',
   'config/mcp.project-art-workspace.windows.example.json',
   'docs/PROJECT_ART_WORKBENCH.md',
   'docs/PERSISTENT_ARTIST_WORKSPACE.md',
   'docs/PROJECT_ART_MASTERING_AND_MOTION.md',
+  'docs/PROJECT_ART_AVATAR_ANIMATION_SUITE.md',
   'docs/PROJECT_ART_LOOP_CLOSURE.md',
   'docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md',
   '.github/workflows/project-art-workbench.yml',
@@ -120,6 +125,17 @@ assert.deepEqual(registry.operations.map((operation) => operation.id), expectedO
 assert.deepEqual(registry.taskKinds, ['image', 'slice-sheet', 'assemble-sheet', 'sequence-review', 'image-composite', 'image-compare', 'image-master', 'motion-sequence']);
 
 const sourceAssertions = {
+  'scripts/project-art/avatar-animation-suite.mjs': [
+    'evavo.project-art-avatar-animation-suite-request.v1',
+    'evavo.project-art-avatar-animation-suite-plan.v1',
+    'paintedGridNeverAcceptedAsAlpha: true',
+    'borderConnectedSegmentationOnly: true',
+    'edgeColourUnmixingRequired: true',
+    'multipleIdleVariants: 4',
+    'multipleTalkVariants: 6',
+    'productionReady: false',
+    'runtimeActivationAllowed: false',
+  ],
   'scripts/project-art/intelligence.mjs': [
     'evavo.project-art-intelligence.v1',
     'evavo.project-art-queue-seed.v1',
@@ -394,6 +410,7 @@ for (const relative of [
   'scripts/project-art/sandbox.mjs',
   'scripts/project-art/reference-derived.mjs',
   'scripts/project-art/persistent-workspace.mjs',
+  'scripts/project-art/avatar-animation-suite.mjs',
   'scripts/compile-project-art-loop-closure.mjs',
 ]) {
   const source = contents.get(relative);
@@ -415,8 +432,13 @@ for (const relative of [
   assert.ok(!contents.get(relative).includes('git push'), `${relative} contains git push`);
   assert.ok(!contents.get(relative).includes('subprocess'), `${relative} contains subprocess`);
 }
-for (const forbidden of ['git push', 'candidateApproval: true', 'candidatePromotion: true', 'repositoryMutation: true', 'forcePush: true']) {
-  assert.ok(!contents.get('tools/project_art_workspace_mcp.mjs').includes(forbidden), `workspace MCP contains forbidden token: ${forbidden}`);
+for (const relative of [
+  'tools/project_art_workspace_mcp.mjs',
+  'tools/project_art_avatar_animation_suite_mcp.mjs',
+]) {
+  for (const forbidden of ['git push', 'candidateApproval: true', 'candidatePromotion: true', 'repositoryMutation: true', 'forcePush: true']) {
+    assert.ok(!contents.get(relative).includes(forbidden), `${relative} contains forbidden token: ${forbidden}`);
+  }
 }
 
 const packageJson = JSON.parse(contents.get('package.json'));
@@ -429,13 +451,16 @@ const expectedScripts = {
   'project-art:loop:compile': 'node scripts/compile-project-art-loop-closure.mjs',
   'project-art:loop:run': 'python tools/run_project_art_loop_closure.py',
   'project-art:loop:check': 'node scripts/check-project-art-loop-closure.mjs && node scripts/test-project-art-loop-closure.mjs',
+  'project-art:avatar-animation:compile': 'node scripts/compile-project-art-avatar-animation-suite.mjs',
+  'project-art:avatar-animation:mcp': 'node tools/project_art_avatar_animation_suite_mcp.mjs',
+  'project-art:avatar-animation:check': 'node --test scripts/test-project-art-avatar-animation-suite.mjs',
   'project-art:workspace:mcp:check': 'node scripts/test-project-art-workspace-mcp.mjs',
   'project-art:workspace:persistent': 'node scripts/persistent-artist-workspace.mjs',
   'project-art:workspace:persistent:check': 'node scripts/check-persistent-artist-workspace.mjs && node scripts/test-persistent-artist-workspace.mjs',
   'project-art:eva-source-repair:check': 'node scripts/check-project-art-eva-source-repair-intake.mjs && node --test scripts/test-project-art-eva-source-repair-intake.mjs scripts/test-project-art-eva-source-repair-candidate-assurance.mjs',
   'project-art:eva-source-repair:assurance': 'node scripts/compile-project-art-eva-source-repair-candidate-assurance.mjs',
   'project-art:mastering:check': 'node scripts/check-project-art-mastering-and-motion.mjs && node scripts/test-project-art-mastering-and-motion.mjs',
-  'project-art:check': 'node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs && pnpm run project-art:avatar-assurance:check && pnpm run project-art:eva-source-repair:check && pnpm run project-art:mastering:check && pnpm run project-art:workspace:persistent:check && pnpm run project-art:loop:check && pnpm run project-art:workspace:mcp:check',
+  'project-art:check': 'node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs && pnpm run project-art:avatar-assurance:check && pnpm run project-art:avatar-animation:check && pnpm run project-art:eva-source-repair:check && pnpm run project-art:mastering:check && pnpm run project-art:workspace:persistent:check && pnpm run project-art:loop:check && pnpm run project-art:workspace:mcp:check',
 };
 for (const [name, command] of Object.entries(expectedScripts)) {
   assert.equal(packageJson.scripts[name], command, `package script ${name} changed`);
@@ -443,6 +468,7 @@ for (const [name, command] of Object.entries(expectedScripts)) {
 const projectArtCheck = packageJson.scripts['project-art:check'];
 const orderedCommands = [
   'node scripts/test-project-art-workbench.mjs',
+  'pnpm run project-art:avatar-animation:check',
   'pnpm run project-art:eva-source-repair:check',
   'pnpm run project-art:mastering:check',
   'pnpm run project-art:workspace:persistent:check',
