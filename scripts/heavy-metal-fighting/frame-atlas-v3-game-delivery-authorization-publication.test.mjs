@@ -125,6 +125,40 @@ test("publication rejects authorization content whose retained self-hash was not
   });
 });
 
+test("publication input rejects accessors without invocation and rejects Proxy objects", async () => {
+  await withTemp("hmf-auth-publication-hostile-", async (root) => {
+    let invoked = false;
+    const accessor = {
+      authorization: authorization(),
+    };
+    Object.defineProperty(accessor, "outputPath", {
+      enumerable: true,
+      get() {
+        invoked = true;
+        return path.join(root, "accessor.authorization.json");
+      },
+    });
+    await assert.rejects(
+      publishHmfAtlasV3GameDeliveryAuthorizationFile(accessor),
+      /outputPath may not be an accessor/,
+    );
+    assert.equal(invoked, false);
+
+    const proxy = new Proxy(
+      {
+        authorization: authorization(),
+        outputPath: path.join(root, "proxy.authorization.json"),
+      },
+      {},
+    );
+    await assert.rejects(
+      publishHmfAtlasV3GameDeliveryAuthorizationFile(proxy),
+      /publication input may not be a Proxy/,
+    );
+    assert.deepEqual(readdirSync(root), []);
+  });
+});
+
 test("origin-bound publication wrapper recompiles and re-verifies the exact authorization before writing", () => {
   const source = readFileSync(
     path.join(HERE, "frame-atlas-v3-game-delivery-authorization-publication.mjs"),
@@ -133,7 +167,7 @@ test("origin-bound publication wrapper recompiles and re-verifies the exact auth
   assert.match(source, /loadHmfAtlasV3GameDeliveryAuthorizationCliInput\(requestPath\)/u);
   assert.match(source, /compileHmfAtlasV3GameDeliveryAuthorization\(input\)/u);
   assert.match(source, /verifyHmfAtlasV3GameDeliveryAuthorization\(\{ \.\.\.input, authorization \}\)/u);
-  assert.match(source, /publishHmfAtlasV3GameDeliveryAuthorizationFile\(\{ authorization: verified, outputPath \}\)/u);
+  assert.match(source, /publishHmfAtlasV3GameDeliveryAuthorizationFile\(\{\s*authorization: verified,\s*outputPath,/u);
 });
 
 test("stable CLI enters the create-only publication path only when explicit --output is supplied", () => {
