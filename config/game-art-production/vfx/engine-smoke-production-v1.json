@@ -1,0 +1,373 @@
+{
+  "schema": "evavo.rally-engine-smoke-visual-development.v1",
+  "protocolVersion": "2026-08-15.9",
+  "assetId": "engine-smoke-production-v1",
+  "subjectId": "engine-smoke",
+  "title": "Rally vehicle engine smoke",
+  "style": {
+    "projectionFamily": "fixed-isometric-2-5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "effectLanguage": "A readable damage-driven vehicle smoke family with a narrow source, soft rolling alpha, distinct clean, worn, damaged and critical densities, RPM cadence, crosswind breakup and no fire or generic opaque cloud.",
+    "palette": [
+      "#111315",
+      "#22272b",
+      "#363d42",
+      "#505a60",
+      "#727c80",
+      "#969e9e",
+      "#b9beb9",
+      "#d6d8d1"
+    ],
+    "surfaceLanguage": [
+      "narrow readable engine or exhaust origin",
+      "dense core and softer outer breakup remain separate",
+      "damage changes density and tint without changing the effect identity",
+      "RPM changes cadence and travel rather than simply scaling the image",
+      "wind bends soft wisps more than the dense core",
+      "clean transparent alpha without rectangular edges"
+    ],
+    "forbidden": [
+      "fire or flame",
+      "explosion",
+      "whole vehicle silhouette",
+      "whole road scene",
+      "solid black rectangle",
+      "contact sheet",
+      "multi-panel layout",
+      "multiple unrelated plumes",
+      "photographic stock compositing",
+      "text or labels inside the image"
+    ]
+  },
+  "continuity": {
+    "plumeOriginReadable": true,
+    "damageStatesDistinct": true,
+    "rpmResponseReadable": true,
+    "windResponseReadable": true,
+    "alphaEdgeClean": true,
+    "roadBackgroundExcluded": true
+  },
+  "jobs": [
+    {
+      "id": "engine-smoke-shape-master",
+      "role": "effect-shape-master",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [],
+      "include": [
+        "single compact vehicle smoke plume",
+        "readable narrow origin",
+        "soft rolling lobes",
+        "clean true transparent background",
+        "no vehicle silhouette"
+      ],
+      "exclude": [
+        "whole vehicle",
+        "road scene",
+        "fire",
+        "explosion",
+        "rectangular alpha edge"
+      ]
+    },
+    {
+      "id": "engine-smoke-clean-idle",
+      "role": "effect-response-reference",
+      "phase": "operating-state",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-shape-master"
+      ],
+      "include": [
+        "same exact plume language",
+        "very faint clean idle vapour",
+        "small soft wisps",
+        "large empty space",
+        "true transparent background"
+      ],
+      "exclude": [
+        "dense black smoke",
+        "fire",
+        "vehicle",
+        "road",
+        "multiple unrelated plumes"
+      ]
+    },
+    {
+      "id": "engine-smoke-clean-throttle",
+      "role": "effect-response-reference",
+      "phase": "operating-state",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-clean-idle"
+      ],
+      "include": [
+        "same exact plume language",
+        "clean throttle pulse",
+        "slightly longer warm-grey plume",
+        "clear source direction",
+        "true transparent background"
+      ],
+      "exclude": [
+        "critical damage smoke",
+        "fire",
+        "vehicle",
+        "road",
+        "opaque cloud"
+      ]
+    },
+    {
+      "id": "engine-smoke-damage-worn",
+      "role": "effect-response-reference",
+      "phase": "damage-state",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-shape-master"
+      ],
+      "include": [
+        "same plume identity",
+        "worn engine state",
+        "thin blue-grey wisps",
+        "moderate broken-up opacity",
+        "true transparent background"
+      ],
+      "exclude": [
+        "black wall of smoke",
+        "fire",
+        "vehicle",
+        "road",
+        "oil splash"
+      ]
+    },
+    {
+      "id": "engine-smoke-damage-medium",
+      "role": "effect-response-reference",
+      "phase": "damage-state",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-damage-worn"
+      ],
+      "include": [
+        "same plume identity",
+        "damaged engine state",
+        "layered grey smoke",
+        "readable core and soft edge",
+        "true transparent background"
+      ],
+      "exclude": [
+        "screen-filling cloud",
+        "fire",
+        "vehicle",
+        "road",
+        "metal debris"
+      ]
+    },
+    {
+      "id": "engine-smoke-damage-critical",
+      "role": "effect-response-reference",
+      "phase": "damage-state",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-damage-medium"
+      ],
+      "include": [
+        "same plume identity",
+        "critical but bounded dark smoke",
+        "dense core with soft breakup",
+        "visible buoyant rise",
+        "true transparent background"
+      ],
+      "exclude": [
+        "solid black rectangle",
+        "fireball",
+        "vehicle",
+        "road",
+        "gore"
+      ]
+    },
+    {
+      "id": "engine-smoke-low-rpm",
+      "role": "effect-response-reference",
+      "phase": "rpm-response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-damage-medium"
+      ],
+      "include": [
+        "same damaged smoke language",
+        "low RPM cadence",
+        "separated soft puffs",
+        "short travel",
+        "true transparent background"
+      ],
+      "exclude": [
+        "continuous jet",
+        "vehicle",
+        "road",
+        "fire",
+        "second plume source"
+      ]
+    },
+    {
+      "id": "engine-smoke-high-rpm",
+      "role": "effect-response-reference",
+      "phase": "rpm-response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-low-rpm"
+      ],
+      "include": [
+        "same damaged smoke language",
+        "high RPM cadence",
+        "longer connected plume",
+        "faster directional flow",
+        "true transparent background"
+      ],
+      "exclude": [
+        "rocket exhaust",
+        "fire",
+        "vehicle",
+        "road",
+        "motion-blur rectangle"
+      ]
+    },
+    {
+      "id": "engine-smoke-crosswind",
+      "role": "effect-response-reference",
+      "phase": "wind-response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-high-rpm",
+        "engine-smoke-damage-critical"
+      ],
+      "include": [
+        "same critical smoke identity",
+        "crosswind bends soft edges more than dense core",
+        "source remains readable",
+        "layered breakup",
+        "true transparent background"
+      ],
+      "exclude": [
+        "uniformly sheared flat ribbon",
+        "vehicle",
+        "road",
+        "fire",
+        "multiple sources"
+      ]
+    },
+    {
+      "id": "engine-smoke-core-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-damage-critical"
+      ],
+      "include": [
+        "single compact smoke-core card",
+        "soft irregular circular silhouette",
+        "dark grey centre",
+        "feathered alpha",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple cards",
+        "hard square",
+        "vehicle",
+        "ground shadow",
+        "text"
+      ]
+    },
+    {
+      "id": "engine-smoke-soft-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-shape-master"
+      ],
+      "include": [
+        "single broad soft smoke card",
+        "subtle internal noise",
+        "very clean feathered edge",
+        "neutral grey",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple cards",
+        "hard square",
+        "vehicle",
+        "ground shadow",
+        "text"
+      ]
+    },
+    {
+      "id": "engine-smoke-decay-tail",
+      "role": "decay-reference",
+      "phase": "decay",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "engine-smoke-crosswind",
+        "engine-smoke-soft-sprite"
+      ],
+      "include": [
+        "single late-decay smoke state",
+        "very low opacity",
+        "broken wisps",
+        "large empty space",
+        "true transparent background"
+      ],
+      "exclude": [
+        "fresh dense core",
+        "vehicle",
+        "road",
+        "fire",
+        "opaque cloud"
+      ]
+    }
+  ],
+  "output": {
+    "workingRoot": "working/rally/vfx/engine-smoke/visual-development-v1",
+    "masterRoot": "masters/rally/vfx/engine-smoke/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
