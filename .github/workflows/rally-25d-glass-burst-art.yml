@@ -1,0 +1,64 @@
+name: Rally 2.5D Glass Burst Art Contract
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rally-25d-glass-burst-art-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+      - name: Test deterministic Glass Burst jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/game-art-production/rally-25d-glass-burst-jobs.test.mjs \
+            | tee "${RUNNER_TEMP}/glass-burst-tests.log"
+      - name: Compile and verify provider session
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/game-art-production/rally-25d-glass-burst-jobs.mjs compile \
+            config/game-art-production/vfx/glass-burst-production-v1.json \
+            --output "${RUNNER_TEMP}/glass-burst.session.json" \
+            > "${RUNNER_TEMP}/glass-burst.stdout.json"
+          node scripts/game-art-production/rally-25d-glass-burst-jobs.mjs verify \
+            "${RUNNER_TEMP}/glass-burst.session.json" \
+            | tee "${RUNNER_TEMP}/glass-burst.verify.json"
+          grep -F '"schema": "evavo.rally-glass-burst-provider-job-session.v1"' "${RUNNER_TEMP}/glass-burst.session.json"
+          grep -F '"jobs": 12' "${RUNNER_TEMP}/glass-burst.session.json"
+          grep -F '"images": 12' "${RUNNER_TEMP}/glass-burst.session.json"
+          grep -F '"responseJobs": 6' "${RUNNER_TEMP}/glass-burst.session.json"
+          grep -F '"spriteJobs": 4' "${RUNNER_TEMP}/glass-burst.session.json"
+          grep -F '"providerExecution": false' "${RUNNER_TEMP}/glass-burst.session.json"
+          grep -F '"downstream3DReady": false' "${RUNNER_TEMP}/glass-burst.session.json"
+      - name: Prove source remains clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: glass-burst-art-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/glass-burst-tests.log
+            ${{ runner.temp }}/glass-burst.session.json
+            ${{ runner.temp }}/glass-burst.verify.json
+          if-no-files-found: warn
+          retention-days: 7
