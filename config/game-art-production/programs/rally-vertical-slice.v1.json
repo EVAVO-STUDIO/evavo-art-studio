@@ -145,7 +145,7 @@
       "subjectId": "glass-burst",
       "phase": "effects",
       "priority": 73,
-      "depenencies": [
+      "dependencies": [
         "falcon-rally-production-v1"
       ],
       "requiredForPlayable": true,
