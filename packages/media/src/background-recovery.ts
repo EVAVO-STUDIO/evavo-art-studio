@@ -63,6 +63,8 @@ export interface BackgroundAlphaRecoveryEvidence {
       colour: Colour;
       hex: string;
       matchingBorderFraction: number;
+      matchingVisibleBorderFraction: number;
+      visibleBorderFraction: number;
       borderRmse: number;
     }> | null;
   }>;
@@ -83,6 +85,14 @@ export interface BackgroundAlphaRecoveryEvidence {
     edgeBandPixels: number;
     compositeMismatchPixels: number;
     maximumCompositeChannelError: number;
+  }>;
+  readonly matteAlphaBypassRecovery?: Readonly<{
+    sourceNonOpaquePixels: number;
+    sampledBorderBandPixels: number;
+    visibleBorderBandPixels: number;
+    matchingBorderFraction: number;
+    matchingVisibleBorderFraction: number;
+    borderRmse: number;
   }>;
   readonly recomposition?: Readonly<{
     checkedPixels: number;
@@ -160,6 +170,17 @@ interface AlphaStatistics {
   readonly partialPixels: number;
   readonly opaquePixels: number;
   readonly transparentBorderFraction: number;
+}
+
+interface MatteBandFit {
+  readonly detected: boolean;
+  readonly sampledPixels: number;
+  readonly visiblePixels: number;
+  readonly matchingPixels: number;
+  readonly matchingBorderFraction: number;
+  readonly matchingVisibleBorderFraction: number;
+  readonly visibleBorderFraction: number;
+  readonly rmse: number;
 }
 
 function sha256(value: Uint8Array): string {
@@ -743,26 +764,116 @@ function sourceEvidence(source: DecodedSource): BackgroundAlphaRecoveryEvidence[
   };
 }
 
+function median(values: number[]): number {
+  values.sort((left, right) => left - right);
+  const middle = Math.floor(values.length / 2);
+  return values.length % 2
+    ? values[middle]!
+    : (values[middle - 1]! + values[middle]!) / 2;
+}
+
+function fitVisibleMatteBand(
+  source: DecodedSource,
+  colour: Colour,
+): MatteBandFit {
+  const sampleSet = checkerSamples(source);
+  let matchingPixels = 0;
+  let fittedSquaredError = 0;
+  for (const sample of sampleSet.samples) {
+    const error = distance(sample.r, sample.g, sample.b, colour);
+    if (error > 36) continue;
+    matchingPixels += 1;
+    fittedSquaredError += error * error;
+  }
+  const visiblePixels = sampleSet.samples.length;
+  const matchingBorderFraction = sampleSet.sampledPixels
+    ? matchingPixels / sampleSet.sampledPixels
+    : 0;
+  const matchingVisibleBorderFraction = visiblePixels
+    ? matchingPixels / visiblePixels
+    : 0;
+  const rmse = Math.sqrt(fittedSquaredError / Math.max(1, matchingPixels));
+  return {
+    detected:
+      matchingBorderFraction >= 0.7 &&
+      matchingVisibleBorderFraction >= 0.86 &&
+      rmse <= 28,
+    sampledPixels: sampleSet.sampledPixels,
+    visiblePixels,
+    matchingPixels,
+    matchingBorderFraction,
+    matchingVisibleBorderFraction,
+    visibleBorderFraction: sampleSet.opaqueFraction,
+    rmse,
+  };
+}
+
 function inferHighChromaMatte(source: DecodedSource): Readonly<{
   colour: Colour;
   hex: string;
   matchingBorderFraction: number;
+  matchingVisibleBorderFraction: number;
+  visibleBorderFraction: number;
   borderRmse: number;
 }> | null {
   const borders = borderIndices(source.width, source.height);
-  let red = 0;
-  let green = 0;
-  let blue = 0;
-  for (const pixel of borders) {
-    const offset = pixel * 4;
-    red += source.data[offset]!;
-    green += source.data[offset + 1]!;
-    blue += source.data[offset + 2]!;
+  if (borders.every((pixel) => source.data[pixel * 4 + 3]! >= 254)) {
+    let red = 0;
+    let green = 0;
+    let blue = 0;
+    for (const pixel of borders) {
+      const offset = pixel * 4;
+      red += source.data[offset]!;
+      green += source.data[offset + 1]!;
+      blue += source.data[offset + 2]!;
+    }
+    const edgeColour = {
+      r: clampByte(red / borders.length),
+      g: clampByte(green / borders.length),
+      b: clampByte(blue / borders.length),
+    };
+    const channels = [edgeColour.r, edgeColour.g, edgeColour.b];
+    if (
+      Math.max(...channels) - Math.min(...channels) >= 140 &&
+      Math.max(...channels) >= 210 &&
+      Math.min(...channels) <= 45
+    ) {
+      let matching = 0;
+      let squaredError = 0;
+      for (const pixel of borders) {
+        const offset = pixel * 4;
+        const error = distance(
+          source.data[offset]!,
+          source.data[offset + 1]!,
+          source.data[offset + 2]!,
+          edgeColour,
+        );
+        squaredError += error * error;
+        if (error <= 36) matching += 1;
+      }
+      const matchingFraction = matching / borders.length;
+      const edgeRmse = Math.sqrt(squaredError / borders.length);
+      if (matchingFraction >= 0.86 && edgeRmse <= 28) {
+        return {
+          colour: edgeColour,
+          hex: colourHex(edgeColour),
+          matchingBorderFraction: matchingFraction,
+          matchingVisibleBorderFraction: matchingFraction,
+          visibleBorderFraction: 1,
+          borderRmse: edgeRmse,
+        };
+      }
+    }
   }
+  const samples = checkerSamples(source).samples;
+  if (samples.length < 32) return null;
+  // A provider can add a token transparent rim around a still-painted matte.
+  // The component-wise median of only visible border-band pixels resists both
+  // that hidden RGB and bounded foreground interruptions.
   const colour = {
-    r: clampByte(red / borders.length),
-    g: clampByte(green / borders.length),
-    b: clampByte(blue / borders.length),
+    r: clampByte(median(samples.map((sample) => sample.r))),
+    g: clampByte(median(samples.map((sample) => sample.g))),
+    b: clampByte(median(samples.map((sample) => sample.b))),
   };
   const channels = [colour.r, colour.g, colour.b];
   if (
@@ -772,27 +883,15 @@ function inferHighChromaMatte(source: DecodedSource): Readonly<{
   ) {
     return null;
   }
-  let matching = 0;
-  let squaredError = 0;
-  for (const pixel of borders) {
-    const offset = pixel * 4;
-    const error = distance(
-      source.data[offset]!,
-      source.data[offset + 1]!,
-      source.data[offset + 2]!,
-      colour,
-    );
-    squaredError += error * error;
-    if (error <= 36) matching += 1;
-  }
-  const matchingBorderFraction = matching / borders.length;
-  const borderRmse = Math.sqrt(squaredError / borders.length);
-  if (matchingBorderFraction < 0.86 || borderRmse > 28) return null;
+  const fit = fitVisibleMatteBand(source, colour);
+  if (!fit.detected) return null;
   return {
     colour,
     hex: colourHex(colour),
-    matchingBorderFraction,
-    borderRmse,
+    matchingBorderFraction: fit.matchingBorderFraction,
+    matchingVisibleBorderFraction: fit.matchingVisibleBorderFraction,
+    visibleBorderFraction: fit.visibleBorderFraction,
+    borderRmse: fit.rmse,
   };
 }
 
@@ -1246,6 +1345,27 @@ function chromaOptions(
   };
 }
 
+function compositeExistingAlphaOverMatte(
+  source: DecodedSource,
+  matte: Colour,
+): Buffer {
+  const output = Buffer.allocUnsafe(source.data.byteLength);
+  for (let offset = 0; offset < source.data.byteLength; offset += 4) {
+    const alpha = source.data[offset + 3]! / 255;
+    output[offset] = clampByte(
+      source.data[offset]! * alpha + matte.r * (1 - alpha),
+    );
+    output[offset + 1] = clampByte(
+      source.data[offset + 1]! * alpha + matte.g * (1 - alpha),
+    );
+    output[offset + 2] = clampByte(
+      source.data[offset + 2]! * alpha + matte.b * (1 - alpha),
+    );
+    output[offset + 3] = 255;
+  }
+  return output;
+}
+
 async function recoverChroma(
   source: DecodedSource,
   alpha: AlphaStatistics,
@@ -1254,9 +1374,24 @@ async function recoverChroma(
   options: BackgroundAlphaRecoveryOptions,
   matteColour: string,
   strategy: "declared-chroma-key" | "inferred-high-chroma-key",
+  matteBandFit: MatteBandFit | null = null,
 ): Promise<BackgroundAlphaRecoveryResult> {
+  const matte = parseColour(matteColour);
+  const sourceNonOpaquePixels = alpha.transparentPixels + alpha.partialPixels;
+  if (sourceNonOpaquePixels && !matteBandFit?.detected) {
+    throw new BackgroundAlphaRecoveryError(
+      "BACKGROUND_RECOVERY_MATTE_ALPHA_BYPASS_UNPROVEN",
+      "Existing alpha may be flattened only after a dominant visible high-chroma matte is proven inside the transparent rim.",
+    );
+  }
+  const compositeSource = sourceNonOpaquePixels
+    ? compositeExistingAlphaOverMatte(source, matte)
+    : source.data;
+  const extractionInput = sourceNonOpaquePixels
+    ? await encodePng(compositeSource, source.width, source.height)
+    : source.encoded;
   const extraction = await extractChromaKeyAlpha(
-    source.encoded,
+    extractionInput,
     chromaOptions(options, matteColour, strategy === "inferred-high-chroma-key"),
   );
   const evidence = extraction.evidence;
@@ -1277,9 +1412,8 @@ async function recoverChroma(
     16,
     "maximumCompositeChannelError",
   );
-  const matte = parseColour(matteColour);
   const recomposition = verifyRecomposition(
-    source.data,
+    compositeSource,
     decoded.data,
     source.width,
     source.height,
@@ -1298,12 +1432,27 @@ async function recoverChroma(
       ...evidence,
       schemaVersion: "2.0",
       strategy,
+      inputSha256: sha256(source.encoded),
+      source: sourceEvidence(source),
       classification: classification(
         alpha,
         false,
         checkerboard,
         inferredMatte,
       ),
+      ...(sourceNonOpaquePixels && matteBandFit
+        ? {
+            matteAlphaBypassRecovery: {
+              sourceNonOpaquePixels,
+              sampledBorderBandPixels: matteBandFit.sampledPixels,
+              visibleBorderBandPixels: matteBandFit.visiblePixels,
+              matchingBorderFraction: matteBandFit.matchingBorderFraction,
+              matchingVisibleBorderFraction:
+                matteBandFit.matchingVisibleBorderFraction,
+              borderRmse: matteBandFit.rmse,
+            },
+          }
+        : {}),
       recomposition,
       guarantees: {
         realAlpha: true,
@@ -1332,6 +1481,16 @@ export async function recoverBackgroundAlpha(
     options.allowHighChromaInference === false
       ? null
       : inferHighChromaMatte(source);
+  const declaredColour = options.matteColour
+    ? parseColour(options.matteColour)
+    : null;
+  const declaredMatteBand = declaredColour
+    ? fitVisibleMatteBand(source, declaredColour)
+    : null;
+  const inferredMatteBand = inferredMatte
+    ? fitVisibleMatteBand(source, inferredMatte.colour)
+    : null;
+  const sourceNonOpaquePixels = alpha.transparentPixels + alpha.partialPixels;
   const pixelCount = source.width * source.height;
   const minimumNativeTransparentFraction = boundedNumber(
     options.minimumNativeTransparentFraction,
@@ -1353,8 +1512,14 @@ export async function recoverBackgroundAlpha(
     (alpha.transparentPixels + alpha.partialPixels) / pixelCount >=
       minimumNativeTransparentFraction &&
     alpha.transparentBorderFraction >= minimumNativeTransparentBorderFraction;
-  if (nativeAlphaMeaningful) {
-    return preserveNativeAlpha(
+  if (checkerboard.detected) {
+    if (options.allowCheckerboardRecovery === false) {
+      throw new BackgroundAlphaRecoveryError(
+        "BACKGROUND_RECOVERY_CHECKERBOARD_FORBIDDEN",
+        "A visible painted transparency checkerboard was detected and checkerboard recovery is disabled.",
+      );
+    }
+    return recoverCheckerboard(
       source,
       alpha,
       checkerboard,
@@ -1362,8 +1527,36 @@ export async function recoverBackgroundAlpha(
       options,
     );
   }
-  if (checkerboard.detected && options.allowCheckerboardRecovery !== false) {
-    return recoverCheckerboard(
+
+  // Do not let a token transparent rim cause a still-painted solid matte to
+  // bypass extraction. The visible border band must prove dominant ownership
+  // before existing alpha is composited over that matte and reconstructed.
+  if (sourceNonOpaquePixels && options.matteColour && declaredMatteBand?.detected) {
+    return recoverChroma(
+      source,
+      alpha,
+      checkerboard,
+      inferredMatte,
+      options,
+      options.matteColour,
+      "declared-chroma-key",
+      declaredMatteBand,
+    );
+  }
+  if (sourceNonOpaquePixels && inferredMatte && inferredMatteBand?.detected) {
+    return recoverChroma(
+      source,
+      alpha,
+      checkerboard,
+      inferredMatte,
+      options,
+      inferredMatte.hex,
+      "inferred-high-chroma-key",
+      inferredMatteBand,
+    );
+  }
+  if (nativeAlphaMeaningful) {
+    return preserveNativeAlpha(
       source,
       alpha,
       checkerboard,
@@ -1374,7 +1567,6 @@ export async function recoverBackgroundAlpha(
 
   let declaredFailure: ChromaKeyExtractionError | null = null;
   if (options.matteColour) {
-    parseColour(options.matteColour);
     try {
       return await recoverChroma(
         source,

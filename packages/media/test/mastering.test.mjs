@@ -296,6 +296,47 @@ test("background recovery defeats a transparent-rim bypass around a visible pain
   assert.deepEqual(pixel(await rgba(result.png), 0, 64), [0, 0, 0, 0]);
 });
 
+test("background recovery defeats a transparent-rim bypass around a declared solid matte", async () => {
+  const candidate = await raster(96, 96, 4, (x, y) => {
+    if (x === 0 || y === 0 || x === 95 || y === 95) {
+      return [0, 0, 0, 0];
+    }
+    if (x >= 31 && x <= 64 && y >= 20 && y <= 80) {
+      return [225, 95, 45, 255];
+    }
+    return [0, 255, 0, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.equal(result.evidence.strategy, "declared-chroma-key");
+  assert.ok(result.evidence.matteAlphaBypassRecovery);
+  assert.ok(result.evidence.matteAlphaBypassRecovery.sourceNonOpaquePixels > 0);
+  assert.equal(result.evidence.guarantees.recompositionVerified, true);
+  const decoded = await rgba(result.png);
+  assert.deepEqual(pixel(decoded, 0, 48), [0, 0, 0, 0]);
+  assert.deepEqual(pixel(decoded, 10, 48), [0, 0, 0, 0]);
+  assert.deepEqual(pixel(decoded, 48, 48), [225, 95, 45, 255]);
+});
+
+test("background recovery infers a substituted solid matte inside a transparent rim", async () => {
+  const candidate = await raster(96, 96, 4, (x, y) => {
+    if (x === 0 || y === 0 || x === 95 || y === 95) {
+      return [0, 0, 0, 0];
+    }
+    return x >= 31 && x <= 64 && y >= 20 && y <= 80
+      ? [225, 95, 45, 255]
+      : [255, 0, 255, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.equal(result.evidence.strategy, "inferred-high-chroma-key");
+  assert.equal(result.evidence.classification.inferredMatte.hex, "#ff00ff");
+  assert.ok(result.evidence.matteAlphaBypassRecovery);
+  assert.deepEqual(pixel(await rgba(result.png), 10, 48), [0, 0, 0, 0]);
+});
+
 test("background recovery preserves real alpha when checker colours exist only in hidden RGB", async () => {
   const candidate = await raster(64, 64, 4, (x, y) => {
     if (x >= 20 && x <= 43 && y >= 16 && y <= 47) {
@@ -330,6 +371,20 @@ test("background recovery preserves meaningful native alpha before matte extract
   assert.equal(result.evidence.strategy, "native-alpha-preserved");
   assert.equal(result.evidence.classification.nativeAlphaMeaningful, true);
   assert.equal(result.evidence.guarantees.transparentCanvasEdge, true);
+  assert.deepEqual(pixel(await rgba(result.png), 0, 0), [0, 0, 0, 0]);
+});
+
+test("background recovery does not mistake a green subject on real alpha for a matte", async () => {
+  const candidate = await raster(64, 64, 4, (x, y) =>
+    x >= 20 && x <= 43 && y >= 14 && y <= 49
+      ? [0, 245, 15, x === 20 || x === 43 ? 128 : 255]
+      : [0, 0, 0, 0],
+  );
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.equal(result.evidence.strategy, "native-alpha-preserved");
+  assert.equal(result.evidence.matteAlphaBypassRecovery, undefined);
   assert.deepEqual(pixel(await rgba(result.png), 0, 0), [0, 0, 0, 0]);
 });
 

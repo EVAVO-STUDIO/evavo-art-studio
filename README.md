@@ -21,7 +21,7 @@ This repository is intentionally broader than an image generator. It is the shar
 - governed ComfyUI workflow-profile adapters for local generation, editing, inpainting, matching assets and matching animation frames, bound to exact workflow, model, runtime, node and reference hashes;
 - decoded mask preflight that proves matching image format, dimensions, page count, alpha and editable coverage before remote inpaint;
 - unapproved provider candidates stored as immutable intermediate artifacts with complete attempt and provenance evidence;
-- smart alpha classification that preserves genuine alpha, reconstructs conclusively detected painted checkerboards, and applies high-chroma-only border-connected declared or confidently inferred matte segmentation with opaque-source proof, colour unmixing, antialiased edge recovery and bounded transparent RGB bleed;
+- smart alpha classification that preserves genuine alpha, reconstructs conclusively detected painted checkerboards, defeats token-alpha rims around proven solid mattes, and applies high-chroma-only border-connected declared or confidently inferred matte segmentation with opaque-intermediate proof, colour unmixing, antialiased edge recovery and bounded transparent RGB bleed;
 - durable `art.candidate.master-alpha` work that emits only an unapproved alpha intermediate and immutable extraction or QA evidence;
 - deterministic candidate ranking using bounded alignment, silhouettes, symmetric edge distance, area, anchors, palette, luminance, edge orientation and overlapping colour;
 - optional model-assisted identity, costume, equipment, pose, style and perceptual evidence bound to exact candidate, reference, model and preprocessing hashes;
@@ -188,7 +188,7 @@ GPT Image 2 does not currently support transparent backgrounds, so transparency-
 
 ## Candidate alpha mastering
 
-Art Studio first distinguishes meaningful native alpha, an opaque painted checkerboard, a declared matte and a confidently inferred high-chroma matte. It never accepts checkerboard pixels as alpha, mixes native-alpha and chroma-key paths, or removes every pixel matching a key colour. Recovery flood-fills only background-like pixels connected to the image border, preserving enclosed matching colours in the subject. It then estimates edge alpha against nearby confident foreground, removes grid or matte contamination, writes bounded subject-colour bleed beneath nearby transparent pixels and runs the same decoded-pixel frame gates used elsewhere.
+Art Studio first distinguishes meaningful native alpha, a visible painted checkerboard, a declared matte and a confidently inferred high-chroma matte. It never accepts checkerboard pixels as alpha or removes every pixel matching a key colour. A token transparent rim cannot disguise a painted interior: when a solid high-chroma matte still dominates the visible border band, recovery proves that ownership, composites existing alpha over only that matte, and re-extracts with recomposition evidence. Recovery flood-fills only background-like pixels connected to the image border, preserving enclosed matching colours in the subject. It then estimates edge alpha against nearby confident foreground, removes grid or matte contamination, writes bounded subject-colour bleed beneath nearby transparent pixels and runs the same decoded-pixel frame gates used elsewhere.
 
 The durable job kind is:
 

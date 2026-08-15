@@ -48,17 +48,18 @@ OpenAI image-edit guidance is available at:
 
 The recovery kernel uses evidence, not a global colour-delete guess:
 
-1. Preserve native alpha only when it has meaningful coverage and the complete canvas edge is transparent. Hidden RGB is canonicalized and only bounded subject-colour bleed is restored beside the silhouette.
-2. Detect a visible periodic two-colour checkerboard from the border, including neutral or strongly chromatic grids and grids wrapped in a token transparent rim. If confidence is high, model its tile size, phase and both colours, recover the foreground alpha, and verify every originally visible recovered pixel by compositing it back over the detected grid.
-3. Otherwise use the matte declared by the provider request.
-4. If the provider ignored that matte, infer a replacement only when one flat, highly saturated colour confidently owns the border. Black, white and grey are never inferred as destructive keys.
-5. Fail closed when none of those classifications is sufficiently supported.
+1. Detect a visible periodic two-colour checkerboard from the border, including neutral or strongly chromatic grids and grids wrapped in a token transparent rim. If confidence is high, model its tile size, phase and both colours, recover the foreground alpha, and verify every originally visible recovered pixel by compositing it back over the detected grid.
+2. Before trusting existing alpha, reject a token-alpha bypass when the declared matte—or a safely inferred high-chroma replacement—still dominates the visible border band. Composite the existing alpha over only that proven matte, re-extract it and retain recomposition evidence.
+3. Otherwise preserve native alpha only when it has meaningful coverage and the complete canvas edge is transparent. Hidden RGB is canonicalized and only bounded subject-colour bleed is restored beside the silhouette.
+4. Otherwise use the matte declared by the provider request.
+5. If the provider ignored that matte, infer a replacement only when one flat, highly saturated colour confidently owns the visible border band. Black, white and grey are never inferred as destructive keys.
+6. Fail closed when none of those classifications is sufficiently supported.
 
 A checkerboard is never accepted as transparency merely because it looks familiar. It becomes eligible only after the painted RGB grid has been removed, real alpha exists, edge colours have been reconstructed, and the normal decoded-pixel QA no longer detects a grid or flat matte.
 
 ## Border-connected matte segmentation
 
-A global colour deletion is unsafe because the subject may legitimately contain the same green, blue or magenta selected for extraction.
+A global colour deletion is unsafe because the subject may legitimately contain the same green, blue or magenta selected for extraction. The strict chroma primitive still accepts only an opaque intermediate. When the classifier proves a solid painted matte behind a token transparent rim, it first composites the source's existing alpha over that exact matte; this makes the bypass explicit and auditable without mixing unproved alpha into segmentation.
 
 Art Studio instead:
 
@@ -103,6 +104,7 @@ The recovery evidence records:
 - edge pixels decontaminated;
 - transparent RGB bleed pixels created.
 - checkerboard segmentation, edge recovery and recomposition error when a painted grid was repaired.
+- visible border-band ownership and pre-existing non-opaque pixel counts when a solid-matte alpha-rim bypass was repaired.
 
 The output is then passed to the existing frame-quality kernel, which proves:
 
