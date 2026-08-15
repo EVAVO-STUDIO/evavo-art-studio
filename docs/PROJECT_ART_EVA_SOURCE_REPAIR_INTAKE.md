@@ -17,7 +17,7 @@ The Runtime handoff binds:
 - the pinned Art Studio repository commit, tree and consumer schemas;
 - all-false source, provider, approval, repository, publication and activation authority.
 
-The required `evavo.avatar.art-materialization-manifest.v2` records both SHA-256 and the actual Git-blob SHA-1 calculated from each PNG's bytes. Art Studio verifies the manifest fingerprint, exact Runtime commit, 191-frame inventory, 1024 x 1536 alpha-capable PNG profile, source paths, Git identities and materialized byte identities before compiling any job.
+The required `evavo.avatar.art-materialization-manifest.v2` records both SHA-256 and the actual Git-blob SHA-1 calculated from each PNG's bytes. Art Studio verifies the manifest fingerprint, exact Runtime commit, 191-frame inventory, source paths, Git identities and materialized byte identities before compiling any job. Source validation matches the repository's real non-interlaced, 8-bit PNG bank: mixed RGB and RGBA source encodings are accepted only when PNG colour type and alpha metadata agree, and the five known non-job dimension outliers remain truthful inventory evidence instead of being mistaken for production frames. Every source, temporal reference and endpoint actually bound to a provider job must independently match the exact 1024 x 1536 production canvas. This source compatibility does not relax the repair boundary; candidate outputs still require true 8-bit RGBA with usable transparency.
 
 This closes a gap that SHA-256-only materialization could not close on its own: every admitted local PNG is now provably the exact Git blob named by the source-repair plan.
 

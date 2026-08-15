@@ -298,13 +298,24 @@ function parseMaterializedFrame(value, index) {
     `manifest.frames[${index}]`,
   );
   const media = record(value.media);
+  const sourceEncodingMatchesAlpha =
+    (media?.colourType === 2 && media.hasAlphaChannel === false) ||
+    (media?.colourType === 6 && media.hasAlphaChannel === true);
   if (
     !media ||
     media.format !== 'png' ||
-    media.width !== CANVAS.width ||
-    media.height !== CANVAS.height ||
-    media.hasAlphaChannel !== true ||
+    media.mimeType !== 'image/png' ||
+    !Number.isSafeInteger(media.width) ||
+    media.width < 1 ||
+    media.width > 32_768 ||
+    !Number.isSafeInteger(media.height) ||
+    media.height < 1 ||
+    media.height > 32_768 ||
+    media.bitDepth !== 8 ||
+    media.interlace !== 0 ||
+    !sourceEncodingMatchesAlpha ||
     media.animated !== false ||
+    (media.iendObserved !== true && media.iendObserved !== false) ||
     !Number.isSafeInteger(value.sizeBytes) ||
     value.sizeBytes < 33 ||
     value.sizeBytes > MAXIMUM_FRAME_BYTES ||
@@ -418,12 +429,21 @@ function providerPlanAndRequest(handoff, manifest, compiledAt) {
   for (const entries of byBlob.values()) {
     entries.sort((left, right) => left.sourcePath.localeCompare(right.sourcePath, 'en'));
   }
+  const productionFrame = (frame, label) => {
+    if (
+      frame.media.width !== CANVAS.width ||
+      frame.media.height !== CANVAS.height
+    ) {
+      fail('EVA_SOURCE_REPAIR_INTAKE_JOB_FRAME_PROFILE_INVALID', label);
+    }
+    return frame;
+  };
   const exactSource = (task) => {
     const frame = bySourcePath.get(task.sourcePath);
     if (!frame || frame.gitBlobSha1 !== task.sourceGitBlobSha1) {
       fail('EVA_SOURCE_REPAIR_INTAKE_SOURCE_IDENTITY_MISMATCH', task.taskId);
     }
-    return frame;
+    return productionFrame(frame, task.taskId);
   };
   const blobSource = (reference) => {
     const frame = byBlob.get(reference.referenceGitBlobSha1)?.[0];
@@ -433,7 +453,7 @@ function providerPlanAndRequest(handoff, manifest, compiledAt) {
         reference.referenceFrameId,
       );
     }
-    return frame;
+    return productionFrame(frame, reference.referenceFrameId);
   };
   const descriptors = new Map();
   const addDescriptor = (id, frame) => {

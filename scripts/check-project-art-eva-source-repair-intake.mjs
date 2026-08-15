@@ -55,6 +55,12 @@ includes('intake', [
   'evavo.project-art-eva-source-repair-intake.v1',
   'evavo.avatar.art-materialization-manifest.v2',
   'EXPECTED_FRAME_COUNT = 191',
+  'media?.colourType === 2 && media.hasAlphaChannel === false',
+  'media?.colourType === 6 && media.hasAlphaChannel === true',
+  "media.mimeType !== 'image/png'",
+  'media.bitDepth !== 8',
+  'media.interlace !== 0',
+  'EVA_SOURCE_REPAIR_INTAKE_JOB_FRAME_PROFILE_INVALID',
   'frame.gitBlobSha1 !== task.sourceGitBlobSha1',
   'human-provider-authorization-required',
   'admit-exact-reference-artifacts',
@@ -72,6 +78,8 @@ includes('cli', [
 ]);
 includes('tests', [
   'exact six-task handoff compiles into the existing provider boundary',
+  'mixed source encodings and non-job outliers compile while invalid job media fails closed',
+  '{ rgb: 152, rgba: 39 }',
   'Git-blob, plan, manifest and authority drift fail closed',
   'file compilation is bounded and create-only',
   'human-provider-authorization-required',
@@ -122,6 +130,9 @@ includes('docs', [
   'Git-blob SHA-1',
   'five `provider-redraw` jobs',
   'one `provider-generated-inbetween` job',
+  'mixed RGB and RGBA source encodings',
+  'five known non-job dimension outliers',
+  'candidate outputs still require true 8-bit RGBA',
   'two independent inspectors',
   'Top Hat Man production stays blocked',
 ]);

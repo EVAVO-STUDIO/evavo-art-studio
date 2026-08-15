@@ -142,6 +142,15 @@ function handoff() {
 }
 
 function frame({ sourcePath, gitBlobSha1, index }) {
+  const hasAlphaChannel = index > 152;
+  const outlierDimensions = new Map([
+    [187, [1254, 1254]],
+    [188, [1254, 1254]],
+    [189, [1254, 1254]],
+    [190, [1536, 1024]],
+    [191, [1619, 971]],
+  ]);
+  const [width, height] = outlierDimensions.get(index) ?? [1024, 1536];
   return {
     sourcePath,
     materializedPath: `frames/frame-${String(index).padStart(3, '0')}.png`,
@@ -151,12 +160,12 @@ function frame({ sourcePath, gitBlobSha1, index }) {
     media: {
       format: 'png',
       mimeType: 'image/png',
-      width: 1024,
-      height: 1536,
+      width,
+      height,
       bitDepth: 8,
-      colourType: 6,
+      colourType: hasAlphaChannel ? 6 : 2,
       interlace: 0,
-      hasAlphaChannel: true,
+      hasAlphaChannel,
       animated: false,
       iendObserved: true,
     },
@@ -351,6 +360,73 @@ test('exact six-task handoff compiles into the existing provider boundary', () =
   );
   assert.equal(batch.providerExecution, false);
   assert.equal(batch.candidateApproval, false);
+});
+
+test('mixed source encodings and non-job outliers compile while invalid job media fails closed', () => {
+  const mixedManifest = manifest();
+  assert.deepEqual(
+    mixedManifest.frames.reduce(
+      (counts, entry) => ({
+        rgb: counts.rgb + Number(entry.media.colourType === 2),
+        rgba: counts.rgba + Number(entry.media.colourType === 6),
+      }),
+      { rgb: 0, rgba: 0 },
+    ),
+    { rgb: 152, rgba: 39 },
+  );
+  assert.equal(
+    mixedManifest.frames.filter(
+      (entry) => entry.media.width !== 1024 || entry.media.height !== 1536,
+    ).length,
+    5,
+  );
+  const intake = compileProjectArtEvaSourceRepairIntake({
+    handoff: handoff(),
+    materializationManifest: mixedManifest,
+    compiledAt: COMPILED_AT,
+  });
+  assert.ok(
+    intake.providerPlan.repairJobs.every(
+      (job) => job.editPolicy.actualRgbaAlphaRequired === true,
+    ),
+  );
+
+  const inconsistent = structuredClone(mixedManifest);
+  inconsistent.frames[0].media.hasAlphaChannel = true;
+  const { manifestSha256: ignoredManifestSha256, ...inconsistentBody } =
+    inconsistent;
+  inconsistent.manifestSha256 =
+    sha256ProjectArtEvaSourceRepairDocument(inconsistentBody);
+  assert.throws(
+    () =>
+      compileProjectArtEvaSourceRepairIntake({
+        handoff: handoff(),
+        materializationManifest: inconsistent,
+        compiledAt: COMPILED_AT,
+      }),
+    /EVA_SOURCE_REPAIR_INTAKE_FRAME_INVALID/u,
+  );
+
+  const invalidJobMedia = structuredClone(mixedManifest);
+  const task = EVA_SOURCE_REPAIR_TASK_CATALOGUE[0];
+  const taskFrame = invalidJobMedia.frames.find(
+    (entry) => entry.sourcePath === task.sourcePath,
+  );
+  taskFrame.media.width = 1254;
+  taskFrame.media.height = 1254;
+  const { manifestSha256: ignoredJobMediaHash, ...invalidJobMediaBody } =
+    invalidJobMedia;
+  invalidJobMedia.manifestSha256 =
+    sha256ProjectArtEvaSourceRepairDocument(invalidJobMediaBody);
+  assert.throws(
+    () =>
+      compileProjectArtEvaSourceRepairIntake({
+        handoff: handoff(),
+        materializationManifest: invalidJobMedia,
+        compiledAt: COMPILED_AT,
+      }),
+    /EVA_SOURCE_REPAIR_INTAKE_JOB_FRAME_PROFILE_INVALID/u,
+  );
 });
 
 test('named authorization and exact mask admissions seal one six-job provider package', () => {
