@@ -24,6 +24,7 @@ import {
 import { hashValue } from "./frame-body-named-human-approval-common.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const CLI_PATH = path.resolve(HERE, "..", "heavy-metal-fighting-frame-atlas-v3.mjs");
 const HEAD = "319989713c671670b1ae997ffb4e8386bdeb7c7e";
 
 function withTemp(prefix, callback) {
@@ -133,4 +134,21 @@ test("origin-bound publication wrapper recompiles and re-verifies the exact auth
   assert.match(source, /compileHmfAtlasV3GameDeliveryAuthorization\(input\)/u);
   assert.match(source, /verifyHmfAtlasV3GameDeliveryAuthorization\(\{ \.\.\.input, authorization \}\)/u);
   assert.match(source, /publishHmfAtlasV3GameDeliveryAuthorizationFile\(\{ authorization: verified, outputPath \}\)/u);
+});
+
+test("stable CLI enters the create-only publication path only when explicit --output is supplied", () => {
+  const source = readFileSync(CLI_PATH, "utf8");
+  assert.match(
+    source,
+    /authorize-game-delivery --request <delivery-authorization-request\.json> --output <new-authorization\.json>/u,
+  );
+  assert.match(source, /const outputPath = option\(argv\.slice\(1\), "--output"\)/u);
+  assert.match(
+    source,
+    /if \(outputPath\) \{\s*return compileVerifyAndPublishHmfAtlasV3GameDeliveryAuthorizationFromRequestFile/u,
+  );
+  assert.match(
+    source,
+    /return compileHmfAtlasV3GameDeliveryAuthorizationFromRequestFile\(requestPath\);/u,
+  );
 });
