@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
   linkSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -36,6 +37,12 @@ function run(requestPath, authorizationPath) {
     { encoding: "utf8" },
   );
 }
+
+test("delivery authorization verifier CLI routes exact evidence into the recomputing verifier", () => {
+  const source = readFileSync(CLI_PATH, "utf8");
+  assert.match(source, /verifyHmfAtlasV3GameDeliveryAuthorization\(\{ \.\.\.input, authorization \}\)/);
+  assert.doesNotMatch(source, /compileHmfAtlasV3GameDeliveryAuthorization\(/);
+});
 
 test("delivery authorization verifier CLI requires exact request and authorization arguments", () => {
   const result = spawnSync(process.execPath, [CLI_PATH], { encoding: "utf8" });
