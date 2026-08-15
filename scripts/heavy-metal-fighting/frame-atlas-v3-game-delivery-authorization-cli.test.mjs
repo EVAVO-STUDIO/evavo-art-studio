@@ -128,11 +128,8 @@ test("real CLI routes authorize-game-delivery through the closed request manifes
   });
 });
 
-test("real CLI requires --request and accepts only the documented optional --output extension", () => {
+test("real CLI requires exactly one --request argument", () => {
   const result = spawnSync(process.execPath, [CLI_PATH, "authorize-game-delivery"], { encoding: "utf8" });
   assert.equal(result.status, 1);
-  assert.match(
-    result.stderr,
-    /requires --request <delivery-authorization-request\.json> and optionally --output <new-authorization\.json>/,
-  );
+  assert.match(result.stderr, /requires exactly --request/);
 });
