@@ -1,0 +1,322 @@
+{
+  "schema": "evavo.rally-skid-smoke-visual-development.v1",
+  "protocolVersion": "2026-08-15.7",
+  "assetId": "skid-smoke-production-v1",
+  "subjectId": "skid-smoke",
+  "title": "Forest Rally asphalt tyre skid smoke",
+  "style": {
+    "projectionFamily": "fixed-isometric-2-5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "effectLanguage": "A restrained white-grey tyre-smoke effect that begins at the rear wheel contact patches, stretches behind the moving car, separates into soft wisps and low haze, and remains readable without becoming an opaque screen-filling wall.",
+    "palette": [
+      "#151718",
+      "#34383a",
+      "#606668",
+      "#899092",
+      "#b4b9b8",
+      "#d7d9d5",
+      "#f0f0e9",
+      "#a6a19a"
+    ],
+    "surfaceLanguage": [
+      "compact wheel-contact core",
+      "soft directional wisps",
+      "low translucent trailing haze",
+      "cool white-grey smoke distinct from warm dirt dust",
+      "clean alpha falloff without rectangular edges",
+      "fixed-camera readability without hiding the vehicle silhouette"
+    ],
+    "forbidden": [
+      "opaque smoke wall",
+      "black engine smoke",
+      "warm dirt dust",
+      "fire or sparks",
+      "vehicle silhouette baked into the image",
+      "road background baked into the image",
+      "hard rectangular alpha edge",
+      "contact sheets",
+      "multi-panel image layouts",
+      "multiple unrelated effects in one image",
+      "photographic tyre smoke",
+      "text or branding"
+    ]
+  },
+  "continuity": {
+    "rearWheelContactOrigin": true,
+    "travelDirection": "vehicle-rearward",
+    "windResponseReadable": true,
+    "consistentSmokeTemperature": true,
+    "consistentOpacityHierarchy": true,
+    "roadBackgroundExcluded": true
+  },
+  "jobs": [
+    {
+      "id": "skid-smoke-contact-puff",
+      "role": "effect-shape-master",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [],
+      "include": [
+        "single compact rear-wheel contact puff",
+        "clear ground origin",
+        "cool white-grey smoke",
+        "dense core with soft edge",
+        "true transparent background"
+      ],
+      "exclude": [
+        "vehicle",
+        "road scene",
+        "multiple puffs",
+        "black smoke",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "skid-smoke-low-speed-slip",
+      "role": "effect-response-reference",
+      "phase": "response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "skid-smoke-contact-puff"
+      ],
+      "include": [
+        "same exact smoke language",
+        "low-speed light slip",
+        "small trailing wisp",
+        "high empty-space ratio",
+        "true transparent background"
+      ],
+      "exclude": [
+        "large cloud",
+        "warm dust",
+        "vehicle",
+        "road background",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "skid-smoke-high-speed-slip",
+      "role": "effect-response-reference",
+      "phase": "response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "skid-smoke-contact-puff"
+      ],
+      "include": [
+        "same exact smoke language",
+        "high-speed elongated rearward stream",
+        "clear core wisp and haze separation",
+        "bounded opacity",
+        "true transparent background"
+      ],
+      "exclude": [
+        "screen-filling cloud",
+        "engine smoke",
+        "vehicle",
+        "road background",
+        "motion-blur smear"
+      ]
+    },
+    {
+      "id": "skid-smoke-brake-lockup",
+      "role": "effect-response-reference",
+      "phase": "response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "skid-smoke-high-speed-slip"
+      ],
+      "include": [
+        "same exact smoke language",
+        "short intense brake-lockup burst",
+        "two rear contact origins implied without wheels",
+        "rapid rearward separation",
+        "true transparent background"
+      ],
+      "exclude": [
+        "four-wheel dust",
+        "fire",
+        "vehicle",
+        "road scene",
+        "opaque mass"
+      ]
+    },
+    {
+      "id": "skid-smoke-crosswind-left",
+      "role": "effect-response-reference",
+      "phase": "wind",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "skid-smoke-high-speed-slip"
+      ],
+      "include": [
+        "same high-speed smoke stream",
+        "left crosswind bends wisps and haze",
+        "dense contact core remains grounded",
+        "true transparent background"
+      ],
+      "exclude": [
+        "entire effect detached from ground",
+        "vehicle",
+        "road scene",
+        "second effect",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "skid-smoke-crosswind-right",
+      "role": "effect-response-reference",
+      "phase": "wind",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "skid-smoke-crosswind-left"
+      ],
+      "include": [
+        "same exact smoke stream mirrored only by wind direction",
+        "right crosswind bends wisps and haze",
+        "dense contact core remains grounded",
+        "true transparent background"
+      ],
+      "exclude": [
+        "new effect identity",
+        "vehicle",
+        "road scene",
+        "multiple winds",
+        "cast shadow"
+      ]
+    },
+    {
+      "id": "skid-smoke-core-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "skid-smoke-contact-puff"
+      ],
+      "include": [
+        "single compact soft smoke core sprite",
+        "dense centre",
+       "irregular feathered alpha",
+       "neutral lighting",
+       "true transparent background"
+      ],
+      "exclude": [
+        "multiple sprites",
+        "road",
+        "shadow",
+        "text",
+        "hard square edge"
+      ]
+    },
+    {
+      "id": "skid-smoke-wisp-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "skid-smoke-high-speed-slip"
+      ],
+      "include": [
+        "single elongated smoke wisp sprite",
+        "directional soft form",
+        "transparent gaps",
+       "cool white-grey tone",
+        "true transparent background"
+      ],
+      "exclude": [
+        "multiple wisps",
+        "road",
+        "shadow",
+        "warm dust",
+        "hard square edge"
+      ]
+    },
+    {
+      "id": "skid-smoke-haze-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "skid-smoke-low-speed-slip"
+      ],
+      "include": [
+        "single broad low-opacity haze sprite",
+        "very soft irregular alpha edge",
+        "subtle cool grey tone",
+        "large empty transparent margin",
+        "true transparent background"
+      ],
+      "exclude": [
+        "dense core",
+        "multiple sprites",
+        "road",
+        "black smoke",
+        "hard square edge"
+      ]
+    },
+    {
+      "id": "skid-smoke-late-decay",
+      "role": "decay-reference",
+      "phase": "decay",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [
+        "skid-smoke-wisp-sprite",
+        "skid-smoke-haze-sprite"
+      ],
+      "include": [
+        "single late-decay smoke state",
+        "broken wisps",
+        "faint dispersed haze",
+      "clear empty space",
+      "true transparent background"
+      ],
+      "exclude": [
+        "fresh contact core",
+        "dense cloud",
+      "vehicle",
+        "road scene",
+      "warm dust"
+      ]
+    }
+  ],
+  "output": {
+    "workingRoot": "working/rally/vfx/skid-smoke/visual-development-v1",
+    "masterRoot": "masters/rally/vfx/skid-smoke/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
