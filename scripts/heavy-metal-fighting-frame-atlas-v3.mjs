@@ -217,7 +217,7 @@ async function run(argv = process.argv.slice(2)) {
       !requestPath ||
       (outputPath && (argv[3] !== "--output" || !argv[4]))
     ) {
-      throw new Error(`authorize-game-delivery requires --request <delivery-authorization-request.json> and optionally --output <new-authorization.json>.\n\n${usage()}`);
+      throw new Error(`authorize-game-delivery requires exactly --request <delivery-authorization-request.json>, with optional --output <new-authorization.json>.\n\n${usage()}`);
     }
     if (outputPath) {
       return compileVerifyAndPublishHmfAtlasV3GameDeliveryAuthorizationFromRequestFile(
