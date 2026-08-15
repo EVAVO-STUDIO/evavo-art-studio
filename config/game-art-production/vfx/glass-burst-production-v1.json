@@ -1,0 +1,198 @@
+{
+  "schema": "evavo.rally-glass-burst-visual-development.v1",
+  "protocolVersion": "2026-08-15.8",
+  "assetId": "glass-burst-production-v1",
+  "subjectId": "glass-burst",
+  "title": "Rally vehicle glass burst",
+  "style": {
+    "projectionFamily": "fixed-isometric-2-5d",
+    "designEra": "original-1990s-arcade-rally",
+    "rendering": "high-definition-stylized-raster",
+    "effectLanguage": "A sharp readable vehicle-glass burst with a bright impact star, pale blue-white safety-glass fragments, distinct laminated windscreen flakes and tempered side-window cubes, short ballistic travel and restrained glitter that never becomes a generic explosion.",
+    "palette": ["#10181e", "#27414f", "#4e7081", "#7f9eaa", "#aec3ca", "#d6e1e2", "#f1f4ef", "#6d7779"],
+    "surfaceLanguage": [
+      "bright impact origin with controlled radial direction",
+      "laminated front-glass flakes remain flatter and more connected",
+      "tempered side and rear glass breaks into small blunt fragments",
+      "larger chunks remain close to the pane origin",
+      "fine glitter decays quickly and never forms an opaque cloud",
+      "clean transparent alpha without rectangular edges"
+    ],
+    "forbidden": [
+      "blood or gore",
+      "vehicle silhouette baked into the image",
+      "whole road scene",
+      "fire or explosion",
+      "metal debris",
+      "knife-like fantasy shards",
+      "opaque smoke cloud",
+      "hard rectangular alpha edge",
+      "contact sheets",
+      "multi-panel image layouts",
+      "multiple unrelated impacts",
+      "photographic stock compositing"
+    ]
+  },
+  "continuity": {
+    "impactOriginReadable": true,
+    "laminatedAndTemperedDistinct": true,
+    "gravityReadable": true,
+    "windResponseReadable": true,
+    "consistentFragmentScale": true,
+    "roadBackgroundExcluded": true
+  },
+  "jobs": [
+    {
+      "id": "glass-burst-impact-star",
+      "role": "effect-shape-master",
+      "phase": "identity",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": [],
+      "include": ["single compact glass impact star", "clear impact origin", "short radial fracture lines", "few pale fragments", "true transparent background"],
+      "exclude": ["vehicle", "road scene", "multiple impacts", "fire", "cast shadow"]
+    },
+    {
+      "id": "glass-burst-front-laminated",
+      "role": "effect-response-reference",
+      "phase": "pane-response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-impact-star"],
+      "include": ["same exact impact language", "laminated windscreen response", "flat connected flakes", "restrained outward travel", "true transparent background"],
+      "exclude": ["tempered cubes only", "whole windscreen frame", "vehicle", "road", "fire"]
+    },
+    {
+      "id": "glass-burst-side-tempered",
+      "role": "effect-response-reference",
+      "phase": "pane-response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-impact-star"],
+      "include": ["same exact impact language", "tempered side-window response", "small blunt fragments", "clear outward fan", "true transparent background"],
+      "exclude": ["laminated sheet", "door frame", "vehicle", "road", "knife-like shards"]
+    },
+    {
+      "id": "glass-burst-rear-tempered",
+      "role": "effect-response-reference",
+      "phase": "pane-response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-side-tempered"],
+      "include": ["same tempered fragment family", "rear-window burst", "wider shallow fan", "bounded fragment count", "true transparent background"],
+      "exclude": ["different glass colour", "vehicle", "road scene", "explosion", "cast shadow"]
+    },
+    {
+      "id": "glass-burst-low-impulse",
+      "role": "effect-response-reference",
+      "phase": "impact-response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-impact-star"],
+      "include": ["same exact effect language", "low impulse", "few close fragments", "small glitter punctuation", "true transparent background"],
+      "exclude": ["large fan", "dense cloud", "vehicle", "road", "fire"]
+    },
+    {
+      "id": "glass-burst-high-impulse",
+      "role": "effect-response-reference",
+      "phase": "impact-response",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-low-impulse", "glass-burst-side-tempered"],
+      "include": ["same exact effect language", "high but bounded impulse", "layered fragment speeds", "readable larger chunks", "true transparent background"],
+      "exclude": ["screen-filling explosion", "metal debris", "vehicle", "road", "gore"]
+    },
+    {
+      "id": "glass-burst-crosswind",
+      "role": "effect-response-reference",
+      "phase": "wind",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-high-impulse"],
+      "include": ["same high-impulse burst", "crosswind affects glitter and light shards", "heavy chunks retain ballistic path", "clear impact origin", "true transparent background"],
+      "exclude": ["all fragments bent uniformly", "vehicle", "road", "second impact", "cast shadow"]
+    },
+    {
+      "id": "glass-burst-glitter-sprite",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-impact-star"],
+      "include": ["single tiny glass glitter fleck", "bright edge", "simple readable silhouette", "neutral lighting", "true transparent background"],
+      "exclude": ["multiple flecks", "ground", "shadow", "text", "metal spark"]
+    },
+    {
+      "id": "glass-burst-shard-medium",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-side-tempered"],
+      "include": ["single medium safety-glass fragment", "blunt irregular shape", "pale blue-white edge", "neutral lighting", "true transparent background"],
+      "exclude": ["multiple shards", "knife point", "ground", "shadow", "text"]
+    },
+    {
+      "id": "glass-burst-chunk-large",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-high-impulse"],
+      "include": ["single larger safety-glass chunk", "broad readable planes", "thicker edge", "neutral lighting", "true transparent background"],
+      "exclude": ["multiple chunks", "boulder scale", "ground", "shadow", "text"]
+    },
+    {
+      "id": "glass-burst-laminate-flake",
+      "role": "particle-sprite-reference",
+      "phase": "sprites",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-front-laminated"],
+      "include": ["single flat laminated-glass flake", "thin connected-film edge", "subtle pale tint", "neutral lighting", "true transparent background"],
+      "exclude": ["tempered cube", "multiple flakes", "ground", "shadow", "text"]
+    },
+    {
+      "id": "glass-burst-late-decay",
+      "role": "decay-reference",
+      "phase": "decay",
+      "width": 2048,
+      "height": 2048,
+      "transparent": true,
+      "dependsOn": ["glass-burst-crosswind", "glass-burst-glitter-sprite", "glass-burst-shard-medium"],
+      "include": ["single late-decay state", "few falling fragments", "faint disappearing glitter", "large empty space", "true transparent background"],
+      "exclude": ["fresh impact star", "dense burst", "vehicle", "road", "smoke"]
+    }
+  ],
+  "output": {
+    "workingRoot": "working/rally/vfx/glass-burst/visual-development-v1",
+    "masterRoot": "masters/rally/vfx/glass-burst/visual-development-v1",
+    "format": "png",
+    "oneImagePerJob": true,
+    "retainIndividualSources": true,
+    "automaticAssembly": false
+  },
+  "authority": {
+    "providerExecution": false,
+    "automaticGenerationAuthorization": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automaticAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
