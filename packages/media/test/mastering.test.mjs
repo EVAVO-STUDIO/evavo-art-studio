@@ -517,3 +517,61 @@ test("provider halo repair rejects complementary edge paint instead of preservin
     `provider halo colour remains: ${repaired}`,
   );
 });
+
+test("provider halo repair catches a subtle matte-complement fringe below the generic colour-distance threshold", async () => {
+  const candidate = await raster(96, 96, 4, (x, y) => {
+    if (x >= 20 && x <= 75 && y >= 20 && y <= 75) {
+      return [10, 9, 10, 255];
+    }
+    if (x >= 20 && x <= 75 && y === 19) {
+      return [32, 8, 34, 255];
+    }
+    return [12, 239, 24, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.ok(
+    result.evidence.output.providerComplementHaloRepairPixels > 0,
+  );
+  assert.equal(result.evidence.output.providerDistanceHaloRepairPixels, 0);
+  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
+  const decoded = await rgba(result.png);
+  const repaired = pixel(decoded, 48, 19);
+  assert.ok(repaired[3] > 0 && repaired[3] < 255);
+  assert.ok(
+    Math.max(repaired[0], repaired[1], repaired[2]) <= 20,
+    `subtle provider halo colour remains: ${repaired}`,
+  );
+});
+
+test("provider halo repair cleans visible matte-connected antialias colour without eroding coverage", async () => {
+  const candidate = await raster(96, 96, 4, (x, y) => {
+    if (x >= 20 && x <= 75 && y >= 20 && y <= 75) {
+      return [0, 0, 0, 255];
+    }
+    if (x >= 20 && x <= 75 && y === 18) {
+      return [26, 221, 29, 255];
+    }
+    if (x >= 20 && x <= 75 && y === 19) {
+      return [66, 154, 68, 255];
+    }
+    return [0, 255, 0, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.ok(
+    result.evidence.output.providerConnectedMatteHaloRepairPixels > 0,
+  );
+  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
+  const decoded = await rgba(result.png);
+  const outer = pixel(decoded, 48, 18);
+  const inner = pixel(decoded, 48, 19);
+  assert.ok(outer[3] > 0 && outer[3] < inner[3]);
+  assert.ok(inner[3] > 0 && inner[3] < 255);
+  assert.ok(
+    Math.max(...outer.slice(0, 3), ...inner.slice(0, 3)) <= 20,
+    `matte-connected fringe remains: ${outer} / ${inner}`,
+  );
+});

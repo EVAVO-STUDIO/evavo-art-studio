@@ -78,6 +78,10 @@ export interface BackgroundAlphaRecoveryEvidence {
     opaquePixels: number;
     decontaminatedPixels: number;
     readonly providerHaloRepairPixels?: number;
+    readonly providerDistanceHaloRepairPixels?: number;
+    readonly providerComplementHaloRepairPixels?: number;
+    readonly providerConnectedMatteHaloRepairPixels?: number;
+    readonly providerForegroundHaloRepairPixels?: number;
     transparentBleedPixels: number;
   }>;
   readonly checkerboardRecovery?: Readonly<{

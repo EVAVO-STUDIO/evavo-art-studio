@@ -8,6 +8,10 @@ const UNREACHED = 255;
 const RGB_RECONSTRUCTION_SLACK = 8;
 const FOREGROUND_SEED_MAXIMUM_INSET = 8;
 const PROVIDER_HALO_FOREGROUND_DISTANCE = 52;
+const PROVIDER_COMPLEMENT_HALO_FOREGROUND_DISTANCE = 12;
+const PROVIDER_COMPLEMENT_HALO_MINIMUM_SCORE = 10;
+const PROVIDER_COMPLEMENT_HALO_MINIMUM_EXCESS = 8;
+const PROVIDER_COMPLEMENT_HALO_MINIMUM_EDGE_DEPTH = 3;
 
 export interface ChromaKeyExtractionOptions {
   readonly matteColour: string;
@@ -44,6 +48,10 @@ export interface ChromaKeyExtractionEvidence {
     maximumCompositeChannelError: number;
     foregroundSeedMinimumInset: number;
     providerHaloForegroundDistance: number;
+    providerComplementHaloForegroundDistance: number;
+    providerComplementHaloMinimumScore: number;
+    providerComplementHaloMinimumExcess: number;
+    providerComplementHaloMaximumEdgeDepth: number;
   }>;
   readonly border: Readonly<{
     pixels: number;
@@ -63,6 +71,10 @@ export interface ChromaKeyExtractionEvidence {
     opaquePixels: number;
     decontaminatedPixels: number;
     providerHaloRepairPixels: number;
+    providerDistanceHaloRepairPixels: number;
+    providerComplementHaloRepairPixels: number;
+    providerConnectedMatteHaloRepairPixels: number;
+    providerForegroundHaloRepairPixels: number;
     transparentBleedPixels: number;
   }>;
   readonly recomposition: Readonly<{
@@ -74,8 +86,12 @@ export interface ChromaKeyExtractionEvidence {
   }>;
   readonly providerHaloRepair: Readonly<{
     pixels: number;
+    distanceOutlierPixels: number;
+    matteComplementOutlierPixels: number;
+    connectedMatteEdgePixels: number;
+    foregroundEdgePixels: number;
     maximumSourceChannelDrift: number;
-    method: "inset-subject-colour-spatial-alpha";
+    method: "inset-subject-colour-spatial-alpha-with-matte-complement-rejection";
   }>;
 }
 
@@ -418,6 +434,31 @@ function projectionAlpha(
   return Math.max(0, Math.min(1, numerator / denominator));
 }
 
+function matteComplementScore(
+  red: number,
+  green: number,
+  blue: number,
+  matte: Matte,
+): number {
+  // Project chroma (colour with luminance removed) onto the direction
+  // opposite the local matte's chroma. The same evidence-backed detector then
+  // covers green->magenta, blue->yellow, magenta->green and custom high-
+  // chroma mattes without mistaking ordinary brightness changes for halos.
+  const matteMean = (matte.r + matte.g + matte.b) / 3;
+  const axisRed = matteMean - matte.r;
+  const axisGreen = matteMean - matte.g;
+  const axisBlue = matteMean - matte.b;
+  const axisMagnitude = Math.hypot(axisRed, axisGreen, axisBlue);
+  if (axisMagnitude <= 1) return 0;
+  const colourMean = (red + green + blue) / 3;
+  return (
+    ((red - colourMean) * axisRed +
+      (green - colourMean) * axisGreen +
+      (blue - colourMean) * axisBlue) /
+    axisMagnitude
+  );
+}
+
 function recoverColour(
   channel: number,
   matteChannel: number,
@@ -690,6 +731,10 @@ export async function extractChromaKeyAlpha(
       Math.floor(Math.min(width, height) / 128),
     ),
   );
+  const providerComplementHaloMaximumEdgeDepth = Math.max(
+    PROVIDER_COMPLEMENT_HALO_MINIMUM_EDGE_DEPTH,
+    foregroundSeedMinimumInset,
+  );
   for (let pixel = 0; pixel < pixels; pixel += 1) {
     if (
       !connectedBackground[pixel] &&
@@ -728,6 +773,10 @@ export async function extractChromaKeyAlpha(
   let preservedInteriorMatteLikePixels = 0;
   let decontaminatedPixels = 0;
   let providerHaloRepairPixels = 0;
+  let providerDistanceHaloRepairPixels = 0;
+  let providerComplementHaloRepairPixels = 0;
+  let providerConnectedMatteHaloRepairPixels = 0;
+  let providerForegroundHaloRepairPixels = 0;
   let maximumProviderHaloSourceChannelDrift = 0;
   let transparentPixels = 0;
   let partialPixels = 0;
@@ -817,7 +866,7 @@ export async function extractChromaKeyAlpha(
         }
       }
 
-      if (!background) {
+      if (alpha > 1 / 255) {
         const seedR = sourceData[seed]!;
         const seedG = sourceData[seed + 1]!;
         const seedB = sourceData[seed + 2]!;
@@ -826,27 +875,57 @@ export async function extractChromaKeyAlpha(
           green - seedG,
           blue - seedB,
         );
-        if (
+        const distanceHalo =
+          recoveredForegroundDistance >= PROVIDER_HALO_FOREGROUND_DISTANCE;
+        const recoveredComplementScore = matteComplementScore(
+          red,
+          green,
+          blue,
+          localMatte,
+        );
+        const foregroundComplementScore = matteComplementScore(
+          seedR,
+          seedG,
+          seedB,
+          localMatte,
+        );
+        const complementHalo =
+          !distanceHalo &&
+          backgroundDistance[pixel]! <=
+            providerComplementHaloMaximumEdgeDepth &&
           recoveredForegroundDistance >=
-            PROVIDER_HALO_FOREGROUND_DISTANCE
-        ) {
-          // Some image providers paint a complementary one-pixel outline
-          // which is not an alpha composite of either the proven matte or the
-          // nearby subject. Exact inversion turns that defect into a vivid
-          // magenta/cyan halo. Reject the outlier colour, reuse an inset
-          // subject reference and derive coverage from the connected spatial
-          // edge. This is explicitly counted and excluded from source-plate
-          // recomposition proof rather than silently pretending it was exact.
+            PROVIDER_COMPLEMENT_HALO_FOREGROUND_DISTANCE &&
+          recoveredComplementScore >=
+            PROVIDER_COMPLEMENT_HALO_MINIMUM_SCORE &&
+          recoveredComplementScore - foregroundComplementScore >=
+            PROVIDER_COMPLEMENT_HALO_MINIMUM_EXCESS;
+        if (distanceHalo || complementHalo) {
+          // Some image providers paint a complementary outline which is not
+          // an alpha composite of either the proven matte or nearby subject.
+          // Reject the outlier colour and reuse an inset subject reference.
+          // Foreground-classified outliers derive coverage from connected edge
+          // geometry; visible matte-connected antialias samples retain their
+          // physically bounded coverage so colour cleanup does not erode the
+          // silhouette. Both are separately audited and excluded from exact
+          // source-plate recomposition proof.
           const spatialAlpha = Math.max(
             0,
             Math.min(1, (backgroundDistance[pixel]! - 0.25) / 1.5),
           );
-          alpha = Math.max(projectedAlpha, spatialAlpha) * (sourceAlpha / 255);
+          if (!background) {
+            // The painted foreground outlier invalidates projection as an
+            // alpha estimate: a complementary fringe can project as opaque.
+            alpha = spatialAlpha * (sourceAlpha / 255);
+          }
           red = seedR;
           green = seedG;
           blue = seedB;
           providerHaloRepaired = true;
           providerHaloRepairPixels += 1;
+          if (distanceHalo) providerDistanceHaloRepairPixels += 1;
+          else providerComplementHaloRepairPixels += 1;
+          if (background) providerConnectedMatteHaloRepairPixels += 1;
+          else providerForegroundHaloRepairPixels += 1;
         }
       }
     }
@@ -985,6 +1064,14 @@ export async function extractChromaKeyAlpha(
         foregroundSeedMinimumInset,
         providerHaloForegroundDistance:
           PROVIDER_HALO_FOREGROUND_DISTANCE,
+        providerComplementHaloForegroundDistance:
+          PROVIDER_COMPLEMENT_HALO_FOREGROUND_DISTANCE,
+        providerComplementHaloMinimumScore:
+          PROVIDER_COMPLEMENT_HALO_MINIMUM_SCORE,
+        providerComplementHaloMinimumExcess:
+          PROVIDER_COMPLEMENT_HALO_MINIMUM_EXCESS,
+        providerComplementHaloMaximumEdgeDepth:
+          providerComplementHaloMaximumEdgeDepth,
       },
       border: {
         pixels: borders.length,
@@ -1004,6 +1091,10 @@ export async function extractChromaKeyAlpha(
         opaquePixels,
         decontaminatedPixels,
         providerHaloRepairPixels,
+        providerDistanceHaloRepairPixels,
+        providerComplementHaloRepairPixels,
+        providerConnectedMatteHaloRepairPixels,
+        providerForegroundHaloRepairPixels,
         transparentBleedPixels,
       },
       recomposition: {
@@ -1015,9 +1106,14 @@ export async function extractChromaKeyAlpha(
       },
       providerHaloRepair: {
         pixels: providerHaloRepairPixels,
+        distanceOutlierPixels: providerDistanceHaloRepairPixels,
+        matteComplementOutlierPixels: providerComplementHaloRepairPixels,
+        connectedMatteEdgePixels: providerConnectedMatteHaloRepairPixels,
+        foregroundEdgePixels: providerForegroundHaloRepairPixels,
         maximumSourceChannelDrift:
           maximumProviderHaloSourceChannelDrift,
-        method: "inset-subject-colour-spatial-alpha",
+        method:
+          "inset-subject-colour-spatial-alpha-with-matte-complement-rejection",
       },
     },
   };
