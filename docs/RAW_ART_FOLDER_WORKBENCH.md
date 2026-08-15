@@ -248,3 +248,10 @@ force push
 ```
 
 Those remain separate, explicit authorities with their own evidence and confirmations.
+
+
+## Visual catalog for actual image review
+
+The exact inventory intentionally does not place image bytes in MCP JSON. To let ChatGPT, Codex and other visual agents see the complete collection, follow the inventory with the create-only visual catalog documented in [RAW_ART_VISUAL_CATALOG.md](RAW_ART_VISUAL_CATALOG.md).
+
+The visual catalog creates contact sheets, individual thumbnails, a searchable local gallery, technical style evidence and an agent review queue outside RAW_ART. Every contact sheet must be inspected, and every shortlisted original must be opened at full resolution before selection, modification or style-bank admission.

@@ -10,6 +10,18 @@
         "EVAVO_RAW_ART_FOLDER_MCP_MODE": "read-write",
         "EVAVO_RAW_ART_FOLDER_MCP_ALLOW_WRITES": "true"
       }
+    },
+    "evavo-raw-art-visual-catalog": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\raw_art_visual_catalog_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_RAW_ART_VISUAL_ALLOWED_ROOTS": "C:\\GitRepos;D:\\EVAVO-Evidence;D:\\EVAVO-Art-Workspaces",
+        "EVAVO_RAW_ART_VISUAL_MCP_MODE": "read-write",
+        "EVAVO_RAW_ART_VISUAL_MCP_ALLOW_WRITES": "true",
+        "EVAVO_RAW_ART_VISUAL_PYTHON": "python"
+      }
     }
   }
 }
