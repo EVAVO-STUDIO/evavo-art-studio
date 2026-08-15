@@ -1,9 +1,11 @@
 import { FAMILIES, PROJECT_ID, PROTOCOL_VERSION, REQUEST_SCHEMA, assert, authority, bindings, exact, id, integer, object, text, uniqueIds } from "./rally-25d-program-common.mjs";
+import { assertCanonicalRallyVerticalSlice } from "./rally-25d-program-identity.mjs";
 
 export function validateRally25DArtProgramRequest(input) {
   const source = object(input, "request");
   exact(source, ["schema", "protocolVersion", "programId", "title", "project", "assets", "authority"], "request");
   assert(source.schema === REQUEST_SCHEMA && source.protocolVersion === PROTOCOL_VERSION, "request protocol identity drifted.");
+  const programId = id(source.programId, "request.programId");
   const project = object(source.project, "request.project");
   exact(project, ["projectId", "sourceRepository", "downstreamRepository", "runtimeRepository", "engine"], "request.project");
   assert(project.projectId === PROJECT_ID && project.sourceRepository === "EVAVO-STUDIO/evavo-art-studio" && project.downstreamRepository === "EVAVO-STUDIO/evavo-3d-studio" && project.runtimeRepository === "EVAVO-STUDIO/godot-462-isometric-rally" && project.engine === "Godot 4.6.2", "request project contract drifted.");
@@ -19,7 +21,8 @@ export function validateRally25DArtProgramRequest(input) {
     return { assetFamily, assetId, subjectId: id(asset.subjectId, `request.assets[${index}].subjectId`), creativeIntent: text(asset.creativeIntent, `request.assets[${index}].creativeIntent`, 10), phase: id(asset.phase, `request.assets[${index}].phase`), priority: integer(asset.priority, `request.assets[${index}].priority`, 0, 1000), dependencies, requiredForPlayable: asset.requiredForPlayable, referenceBindings: bindings(asset.referenceBindings, `request.assets[${index}].referenceBindings`) };
   });
   for (const asset of assets) for (const dependency of asset.dependencies) assert(seen.has(dependency), `asset ${asset.assetId} references unknown dependency ${dependency}.`);
-  return { schema: REQUEST_SCHEMA, protocolVersion: PROTOCOL_VERSION, programId: id(source.programId, "request.programId"), title: text(source.title, "request.title"), project: { ...project }, assets, authority: authority(source.authority, "request.authority") };
+  assertCanonicalRallyVerticalSlice(programId, assets);
+  return { schema: REQUEST_SCHEMA, protocolVersion: PROTOCOL_VERSION, programId, title: text(source.title, "request.title"), project: { ...project }, assets, authority: authority(source.authority, "request.authority") };
 }
 
 export function topologicalOrder(assets) {

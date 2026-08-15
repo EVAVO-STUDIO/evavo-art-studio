@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { compileRally25DArtProgram, sha256, verifyRally25DArtProgram } from "./rally-25d-program.mjs";
+import {
+  CANONICAL_RALLY_VERTICAL_SLICE_ASSETS,
+  LEGACY_RALLY_VERTICAL_SLICE_ASSET_IDS,
+} from "./rally-25d-program-identity.mjs";
 
 const request = JSON.parse(await readFile(new URL("../../config/game-art-production/programs/rally-vertical-slice.v1.json", import.meta.url), "utf8"));
 const roles = { vehicle: ["shape-language", "modeling-reference", "uv-material-reference", "rig-damage-reference"], environment: ["world-composition", "terrain-material-reference", "runtime-shader-reference"], structure: ["modular-modeling-reference", "runtime-shader-reference"], prop: ["prop-modeling-reference", "runtime-shader-reference"], character: ["character-rig-reference", "runtime-shader-reference"], fauna: ["fauna-rig-reference", "runtime-shader-reference"], vfx: ["effect-shape-timing", "runtime-shader-reference"] };
@@ -14,10 +18,30 @@ function handoff(input) {
 async function compile(value = request) { return compileRally25DArtProgram(value, { compileHandoff: async (input) => handoff(input) }); }
 function rehash(program) { const { programSha256: _discarded, ...payload } = program; program.programSha256 = sha256(payload); return program; }
 
-test("compiles and verifies the deterministic 13-asset playable slice without mutating input", async () => {
+test("compiles and verifies the canonical 13-asset playable slice without mutating input", async () => {
   const copy = structuredClone(request); const before = JSON.stringify(copy); const first = await compile(copy); const second = await compile(copy);
   assert.equal(JSON.stringify(copy), before); assert.deepEqual(first, second); assert.equal(first.totals.assets, 13); assert.equal(first.totals.playableRequiredAssets, 12); assert.equal(first.readiness.status, "awaiting-art-production"); assert.equal(verifyRally25DArtProgram(first), true);
+  assert.deepEqual(
+    first.assets.map(({ assetFamily, assetId, subjectId, phase, priority, dependencies, requiredForPlayable }) => ({ assetFamily, assetId, subjectId, phase, priority, dependencies, requiredForPlayable })),
+    CANONICAL_RALLY_VERTICAL_SLICE_ASSETS,
+  );
+  const crashDebris = first.assets.at(-1);
+  assert.equal(crashDebris.assetId, "crash-debris-production-v1");
+  assert.equal(crashDebris.subjectId, "crash-debris");
+  assert.deepEqual(crashDebris.dependencies, ["falcon-rally-production-v1"]);
+  assert.ok(!first.assets.some((asset) => Object.hasOwn(LEGACY_RALLY_VERTICAL_SLICE_ASSET_IDS, asset.assetId)));
   const order = new Map(first.assets.map((asset) => [asset.assetId, asset.sequence])); for (const asset of first.assets) for (const dependency of asset.dependencies) assert.ok(order.get(dependency) < asset.sequence);
+});
+
+test("rejects the legacy debris alias and canonical dependency drift", async () => {
+  const legacy = structuredClone(request);
+  legacy.assets.at(-1).assetId = "debris-burst-production-v1";
+  legacy.assets.at(-1).subjectId = "debris-burst";
+  await assert.rejects(() => compile(legacy), /legacy asset id debris-burst-production-v1/u);
+
+  const dependencyDrift = structuredClone(request);
+  dependencyDrift.assets.at(-1).dependencies.push("timber-bridge-production-v1");
+  await assert.rejects(() => compile(dependencyDrift), /canonical dependencies drifted/u);
 });
 
 test("rejects unknown dependencies and cycles", async () => {

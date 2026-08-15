@@ -15,143 +15,167 @@
       "assetFamily": "vehicle",
       "assetId": "falcon-rally-production-v1",
       "subjectId": "falcon-rally",
-      "creativeIntent": "Create the canonical player rally car with an unmistakable broad 1990s arcade silhouette, readable suspension travel, robust wheel clearance, separable panels, progressive damage, glass, smoke, oil and debris anchors, and premium fixed-isometric readability.",
       "phase": "core",
       "priority": 10,
       "dependencies": [],
       "requiredForPlayable": true,
+      "creativeIntent": "Create the canonical player rally car with an unmistakable broad 1990s arcade silhouette, readable suspension travel, robust wheel clearance, separable panels, progressive damage, glass, smoke, oil and debris anchors, and premium fixed-isometric readability.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "environment",
       "assetId": "forest-stage-production-v1",
       "subjectId": "forest-stage",
-      "creativeIntent": "Create the first playable forest rally stage with a clear isometric route, compact elevation changes, dirt and gravel shoulders, safe recovery space, readable hazards, modular terrain, controlled tree occlusion and strong 1990s arcade atmosphere.",
       "phase": "core",
       "priority": 20,
       "dependencies": [],
       "requiredForPlayable": true,
+      "creativeIntent": "Create the first playable forest rally stage with a clear isometric route, compact elevation changes, dirt and gravel shoulders, safe recovery space, readable hazards, modular terrain, controlled tree occlusion and strong 1990s arcade atmosphere.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "structure",
       "assetId": "timber-bridge-production-v1",
       "subjectId": "timber-bridge",
-      "creativeIntent": "Create a modular timber rally bridge for the forest stage with visible load-bearing construction, one-metre module logic, safe route clearance, breakable rails, collision masses, impact anchors and low-occlusion fixed-isometric readability.",
       "phase": "core",
       "priority": 30,
-      "dependencies": ["forest-stage-production-v1"],
+      "dependencies": [
+        "forest-stage-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create a modular timber rally bridge for the forest stage with visible load-bearing construction, one-metre module logic, safe route clearance, breakable rails, collision masses, impact anchors and low-occlusion fixed-isometric readability.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "prop",
       "assetId": "road-sign-production-v1",
       "subjectId": "road-sign",
-      "creativeIntent": "Create a compact original roadside rally sign set with strong silhouettes, simple pivots, convex collision, breakable posts and debris zones while avoiding real brands, generated readable text and fine detail that disappears from the gameplay camera.",
       "phase": "support",
       "priority": 40,
-      "dependencies": ["forest-stage-production-v1"],
+      "dependencies": [
+        "forest-stage-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create a compact original roadside rally sign set with strong silhouettes, simple pivots, convex collision, breakable posts and debris zones while avoiding real brands, generated readable text and fine detail that disappears from the gameplay camera.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "prop",
       "assetId": "guardrail-production-v1",
       "subjectId": "guardrail",
-      "creativeIntent": "Create modular rally guardrail pieces with straight, curved and end-cap construction, readable collision mass, deformation and detachable segments, restrained materials, impact sparks and debris anchors, and consistent one-metre pivots.",
       "phase": "support",
       "priority": 41,
-      "dependencies": ["forest-stage-production-v1"],
+      "dependencies": [
+        "forest-stage-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create modular rally guardrail pieces with straight, curved and end-cap construction, readable collision mass, deformation and detachable segments, restrained materials, impact sparks and debris anchors, and consistent one-metre pivots.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "character",
       "assetId": "marshal-production-v1",
       "subjectId": "marshal",
-      "creativeIntent": "Create the canonical rally marshal with a simple riggable silhouette, era-appropriate safety clothing, readable flag and reaction poses, restrained facial detail, fixed-isometric crowd scale and clear idle, alert, react and flee animation intent.",
       "phase": "support",
       "priority": 50,
-      "dependencies": ["forest-stage-production-v1"],
+      "dependencies": [
+        "forest-stage-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create the canonical rally marshal with a simple riggable silhouette, era-appropriate safety clothing, readable flag and reaction poses, restrained facial detail, fixed-isometric crowd scale and clear idle, alert, react and flee animation intent.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "fauna",
       "assetId": "bird-flock-production-v1",
       "subjectId": "bird-flock",
-      "creativeIntent": "Create a lightweight stylized bird-flock asset with readable grouped silhouettes, simple riggable or vertex-animation motion, calm, startled and flee behaviours, fixed-isometric scale and a strict runtime particle and draw-call budget.",
       "phase": "support",
       "priority": 60,
-      "dependencies": ["forest-stage-production-v1"],
+      "dependencies": [
+        "forest-stage-production-v1"
+      ],
       "requiredForPlayable": false,
+      "creativeIntent": "Create a lightweight stylized bird-flock asset with readable grouped silhouettes, simple riggable or vertex-animation motion, calm, startled and flee behaviours, fixed-isometric scale and a strict runtime particle and draw-call budget.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "vfx",
       "assetId": "dust-trail-production-v1",
       "subjectId": "dust-trail",
-      "creativeIntent": "Create layered dust-trail shape and timing references for four wheel contacts, with a compact initial burst, directional roost, broad low-opacity decay, ground contact, vehicle separation and deterministic scaling by speed and slip.",
       "phase": "effects",
       "priority": 70,
-      "dependencies": ["falcon-rally-production-v1", "forest-stage-production-v1"],
+      "dependencies": [
+        "falcon-rally-production-v1",
+        "forest-stage-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create layered dust-trail shape and timing references for four wheel contacts, with a compact initial burst, directional roost, broad low-opacity decay, ground contact, vehicle separation and deterministic scaling by speed and slip.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "vfx",
       "assetId": "gravel-spray-production-v1",
       "subjectId": "gravel-spray",
-      "creativeIntent": "Create gravel-spray references with directional wheel roost, discrete readable stones, short ballistic arcs, controlled dust support, collision fade and strict separation from the vehicle body for fixed-isometric gameplay.",
       "phase": "effects",
       "priority": 71,
-      "dependencies": ["falcon-rally-production-v1", "forest-stage-production-v1"],
+      "dependencies": [
+        "falcon-rally-production-v1",
+        "forest-stage-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create gravel-spray references with directional wheel roost, discrete readable stones, short ballistic arcs, controlled dust support, collision fade and strict separation from the vehicle body for fixed-isometric gameplay.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "vfx",
       "assetId": "skid-smoke-production-v1",
       "subjectId": "skid-smoke",
-      "creativeIntent": "Create restrained tyre-skid smoke with clear contact origin, speed-driven elongation, readable fade timing, asphalt-only response, no baked vehicle silhouette and compatibility with persistent skid-mark decals.",
       "phase": "effects",
       "priority": 72,
-      "dependencies": ["falcon-rally-production-v1"],
+      "dependencies": [
+        "falcon-rally-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create restrained tyre-skid-smoke with clear contact origin, speed-driven elongation, readable fade timing, asphalt-only response, no baked vehicle silhouette and compatibility with persistent skid-mark decals.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "vfx",
       "assetId": "glass-burst-production-v1",
       "subjectId": "glass-burst",
-      "creativeIntent": "Create an impact-driven glass-burst reference with a concise bright fracture flash, bounded shard count, outward directionality, short lifetime, ground collision response and safe visibility against both dark forest and bright road surfaces.",
       "phase": "effects",
       "priority": 73,
-      "dependencies": ["falcon-rally-production-v1"],
+      "depenencies": [
+        "falcon-rally-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create an impact-driven glass-burst reference with a concise bright fracture flash, bounded shard count, outward directionality, short lifetime, ground collision response and safe visibility against both dark forest and bright road surfaces.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "vfx",
       "assetId": "engine-smoke-production-v1",
       "subjectId": "engine-smoke",
-      "creativeIntent": "Create progressive engine-smoke references from light overheating haze through critical dark smoke, with bonnet anchoring, speed response, clean looping, controlled opacity and a distinct transition into fire without obscuring the car silhouette.",
       "phase": "effects",
       "priority": 74,
-      "dependencies": ["falcon-rally-production-v1"],
+      "dependencies": [
+        "falcon-rally-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create progressive engine-smoke references from light overheating haze through critical dark smoke, with bonnet anchoring, speed response, clean looping, controlled opacity and a distinct transition into fire without obscuring the car silhouette.",
       "referenceBindings": {}
     },
     {
       "assetFamily": "vfx",
-      "assetId": "debris-burst-production-v1",
-      "subjectId": "debris-burst",
-      "creativeIntent": "Create a bounded crash-debris reference for body fragments, timber chips and road particles with readable mass classes, directional impact response, short lifetimes, collision fade and no unbounded particle multiplication.",
+      "assetId": "crash-debris-production-v1",
+      "subjectId": "crash-debris",
       "phase": "effects",
       "priority": 75,
-      "dependencies": ["falcon-rally-production-v1", "timber-bridge-production-v1"],
+      "dependencies": [
+        "falcon-rally-production-v1"
+      ],
       "requiredForPlayable": true,
+      "creativeIntent": "Create bounded vehicle crash-debris references for paint chips, blunt metal shards, sparse body-panel fragments and restrained surface dust, with distinct front, rear and side impact direction, short lifetimes, strict particle budgets, no glass or fire, and clear fixed-isometric readability.",
       "referenceBindings": {}
     }
   ],
