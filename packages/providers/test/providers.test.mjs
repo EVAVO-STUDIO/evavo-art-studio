@@ -27,6 +27,18 @@ const OPAQUE_RGB_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqCA8RIyyCjRsWAAAADElEQVQI12P4//8/AAX+Av7czFnnAAAAAElFTkSuQmCC",
   "base64",
 );
+const OPAQUE_RGBA_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqCA8SNB3UliHjAAAAMUlEQVRYw+3OMQEAMAzDsKz8cYbGCqOPTMB6bX8Om8s5AAAAAAAAAAAAAAAAAABAkiyUcwPxNoPvewAAAABJRU5ErkJggg==",
+  "base64",
+);
+const TOKEN_ALPHA_CHECKERBOARD_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqCA8SORLxh0I/AAAB1UlEQVR42u3cUW3DMBRAUWcqg32XQ6EEz3jsazyGoxBCYBg6DHMqpcs95z95TnVlqbLkMUhbxhhj27bH7Avu9/uuBdxut13Pmz8/f13X5W3XdP49AcQJIE4AcQKIE0CcAOIEECeAOAHECSBOAHECiBNA3GWMfUeK5ePUM8y3A8QJIE4AcQKIE0CcAOIEECeAOAHECSBOAHECiBNAnADiBBB3GWPfmfLR59nm75tvB4gTQJwA4gQQJ4A4AcQJIO5y9AKe5fr1MfXcz+S898/voz/5KewAcQKIE0CcAOIEECeAOAHEneZ+gNn/83vX/SrfP8sOECeAOAHECSBOAHECiBNAnADiBBAngDgBxAkgTgBxAogTQNxp7ge4PvNX+cO6X+X7Z9kB4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHECSBOAHECiHM/wM51v8r3z7IDxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEELeMMca2bY/ZFxx9nm3+/Px1XRc7QJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHECSBOAHGnuR/A/Dl2gDgBxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIEwCU/QL6IG59mtGSnAAAAABJRU5ErkJggg==",
+  "base64",
+);
+const TOKEN_ALPHA_MATTE_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqCA8SOib7HuVJAAABCUlEQVR42u3dQRHCQBBFwR8KHyjAE9LiCQUoCTL6kNcGZrZe7Xm2UMe27dqlF7mlY8dD73B3BcAKgBUAKwBWAKwAWAGwAmAFwAqAFQArAFYArABYAbACYAXAnnL47/PW79+2vc4vm90PwAqAFQArAFYArABYAbACYAXACoAVACsAVgCsAFgBsAJgBcAKgBUAKwBWAKwAWAGwAmAFwAqAFQArAFYArABYAbACYAXACoAVACsAVgCsAFgBsAJgBcAKgBUAKwBWAKwAWAGwAmAFwAqAFQArAFYArABYAbACYAXACoAVACsA1j1hqXvCXgGwAmAFwAqAFQArAFYArABYAbACYAXACpB7+wPZMwe9cL+y5AAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 function request(overrides = {}) {
   return {
@@ -106,6 +118,27 @@ async function artifactFixture() {
 
 function ref(artifact, role, extra = {}) {
   return { artifactId: artifact.artifactId, role, ...extra };
+}
+
+function recordingArtifactStore(store) {
+  const puts = [];
+  return {
+    puts,
+    store: {
+      put: async (content, descriptor) => {
+        puts.push(descriptor);
+        return store.put(content, descriptor);
+      },
+      get: (artifactId) => store.get(artifactId),
+      read: (artifactId) => store.read(artifactId),
+      verify: (artifactId) => store.verify(artifactId),
+      updateReference: (namespace, name, artifactId, options) =>
+        store.updateReference(namespace, name, artifactId, options),
+      resolveReference: (namespace, name) =>
+        store.resolveReference(namespace, name),
+      listReferences: (namespace) => store.listReferences(namespace),
+    },
+  };
 }
 
 test("continuity-locked sprites require canonical identity and in-between neighbours", async () => {
@@ -593,6 +626,151 @@ test("native-alpha orchestration rejects opaque RGB before candidate storage or 
       error.code === "PROVIDER_NATIVE_ALPHA_MISSING" &&
       error.classification === "incompatible" &&
       /never stored or previewed/u.test(error.message),
+  );
+});
+
+for (const [name, bytes, expectedFailureToken] of [
+  [
+    "an RGBA container whose alpha plane is fully opaque",
+    OPAQUE_RGBA_PNG,
+    "BACKGROUND_RECOVERY_UNRECOGNIZED",
+  ],
+  [
+    "a painted checkerboard hidden behind a token transparent rim",
+    TOKEN_ALPHA_CHECKERBOARD_PNG,
+    "BACKGROUND_RECOVERY_CHECKERBOARD_FORBIDDEN",
+  ],
+  [
+    "a painted solid matte hidden behind a token transparent rim",
+    TOKEN_ALPHA_MATTE_PNG,
+    "inferred-high-chroma-key",
+  ],
+]) {
+  test(`native-alpha orchestration rejects ${name} before candidate storage or preview`, async () => {
+    const fixture = await artifactFixture();
+    const recording = recordingArtifactStore(fixture.store);
+    class FakeNativeAlphaAdapter extends FixtureImageProviderAdapter {
+      descriptor = Object.freeze({
+        ...FIXTURE_PROVIDER_DESCRIPTOR,
+        id: "fake-native-alpha-provider",
+        priority: 1000,
+      });
+
+      async execute() {
+        return {
+          adapterId: this.descriptor.id,
+          model: this.descriptor.models[0],
+          outputs: Object.freeze([
+            Object.freeze({ mediaType: "image/png", bytes }),
+            Object.freeze({ mediaType: "image/png", bytes }),
+          ]),
+        };
+      }
+    }
+
+    await assert.rejects(
+      () =>
+        executeProviderCandidateRequest(
+          request({
+            requestId: "reject-fake-native-alpha",
+            references: [ref(fixture.canonical, "canonical-identity")],
+            background: { strategy: "native-alpha" },
+            selection: {
+              preferredAdapterId: "fake-native-alpha-provider",
+              allowFallback: false,
+            },
+          }),
+          {
+            registry: new ProviderRegistry([new FakeNativeAlphaAdapter()]),
+            artifacts: recording.store,
+            signal: new AbortController().signal,
+          },
+        ),
+      (error) =>
+        error instanceof ProviderError &&
+        error.code === "PROVIDER_NATIVE_ALPHA_INVALID" &&
+        error.classification === "incompatible" &&
+        error.message.includes(expectedFailureToken) &&
+        /never .*stored/u.test(error.message),
+    );
+    assert.equal(
+      recording.puts.filter(
+        (descriptor) => descriptor.labels?.artifactRole === "provider-candidate",
+      ).length,
+      0,
+      "invalid provider bytes must not create candidate artifacts",
+    );
+    assert.equal(
+      recording.puts.filter(
+        (descriptor) =>
+          descriptor.labels?.artifactRole === "provider-candidate-evidence",
+      ).length,
+      1,
+      "the rejection must still leave auditable failure evidence",
+    );
+  });
+}
+
+test("native-alpha decoded rejection falls back without storing the invalid outputs", async () => {
+  const fixture = await artifactFixture();
+  const recording = recordingArtifactStore(fixture.store);
+  class FakeNativeAlphaAdapter extends FixtureImageProviderAdapter {
+    descriptor = Object.freeze({
+      ...FIXTURE_PROVIDER_DESCRIPTOR,
+      id: "fallback-fake-native-alpha-provider",
+      priority: 1000,
+    });
+
+    async execute() {
+      return {
+        adapterId: this.descriptor.id,
+        model: this.descriptor.models[0],
+        outputs: Object.freeze([
+          Object.freeze({ mediaType: "image/png", bytes: OPAQUE_RGBA_PNG }),
+          Object.freeze({ mediaType: "image/png", bytes: OPAQUE_RGBA_PNG }),
+        ]),
+      };
+    }
+  }
+
+  const result = await executeProviderCandidateRequest(
+    request({
+      requestId: "fallback-after-fake-native-alpha",
+      references: [ref(fixture.canonical, "canonical-identity")],
+      background: { strategy: "native-alpha" },
+      selection: {
+        preferredAdapterId: "fallback-fake-native-alpha-provider",
+        allowFallback: true,
+      },
+    }),
+    {
+      registry: new ProviderRegistry([
+        new FakeNativeAlphaAdapter(),
+        new FixtureImageProviderAdapter(),
+      ]),
+      artifacts: recording.store,
+      signal: new AbortController().signal,
+    },
+  );
+
+  assert.equal(result.adapterId, FIXTURE_PROVIDER_DESCRIPTOR.id);
+  assert.deepEqual(
+    result.attempts.map((attempt) => [attempt.outcome, attempt.code ?? null]),
+    [
+      ["failed", "PROVIDER_NATIVE_ALPHA_INVALID"],
+      ["succeeded", null],
+    ],
+  );
+  const candidatePuts = recording.puts.filter(
+    (descriptor) => descriptor.labels?.artifactRole === "provider-candidate",
+  );
+  assert.equal(candidatePuts.length, 2);
+  assert.ok(
+    candidatePuts.every(
+      (descriptor) =>
+        descriptor.labels?.providerAdapter === FIXTURE_PROVIDER_DESCRIPTOR.id,
+    ),
+    "only the verified fallback bytes may become candidate artifacts",
   );
 });
 

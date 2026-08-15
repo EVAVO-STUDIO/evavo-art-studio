@@ -5,6 +5,10 @@ import {
   type JsonValue,
   type StoredArtifact,
 } from "@evavo/art-artifacts";
+import {
+  BackgroundAlphaRecoveryError,
+  recoverBackgroundAlpha,
+} from "@evavo/art-media";
 
 import { compileProviderCandidatePrompt } from "./prompt.js";
 import { compileProviderExecutionRoutingPlan } from "./registry.js";
@@ -226,12 +230,59 @@ async function resolveReferences(
   return resolved;
 }
 
-function validateAdapterResult(
+async function validateNativeAlphaPixels(
+  index: number,
+  output: ProviderAdapterExecutionResult["outputs"][number],
+  request: NormalizedProviderCandidateRequest,
+  maximumOutputBytes: number,
+): Promise<void> {
+  let inspection: Awaited<ReturnType<typeof recoverBackgroundAlpha>>;
+  try {
+    inspection = await recoverBackgroundAlpha(output.bytes, {
+      allowCheckerboardRecovery: false,
+      allowHighChromaInference: true,
+      maximumInputBytes: Math.max(1_024, maximumOutputBytes),
+      maximumPixels: Math.max(
+        8_294_400,
+        request.target.width * request.target.height,
+      ),
+      minimumNativeTransparentFraction: 0.005,
+      minimumNativeTransparentBorderFraction: 1,
+    });
+  } catch (error: unknown) {
+    if (!(error instanceof BackgroundAlphaRecoveryError)) throw error;
+    throw new ProviderError(
+      "PROVIDER_NATIVE_ALPHA_INVALID",
+      `Candidate ${index + 1} was requested as native alpha but failed decoded-pixel validation (${error.code}). Fully opaque alpha planes, painted checkerboards, token-transparent rims and undecodable images are never stored or previewed as transparent candidates.`,
+      "incompatible",
+      { details: { backgroundRecoveryCode: error.code } },
+    );
+  }
+
+  if (inspection.evidence.strategy !== "native-alpha-preserved") {
+    throw new ProviderError(
+      "PROVIDER_NATIVE_ALPHA_INVALID",
+      `Candidate ${index + 1} was requested as native alpha but decoded as ${inspection.evidence.strategy}. Recovered mattes and painted checkerboards are never substituted for provider-native alpha or stored for review.`,
+      "incompatible",
+      {
+        details: {
+          backgroundRecoveryStrategy: inspection.evidence.strategy,
+          checkerboardDetected:
+            inspection.evidence.classification.checkerboard.detected,
+          nativeAlphaMeaningful:
+            inspection.evidence.classification.nativeAlphaMeaningful,
+        },
+      },
+    );
+  }
+}
+
+async function validateAdapterResult(
   adapter: ProviderAdapter,
   request: NormalizedProviderCandidateRequest,
   result: ProviderAdapterExecutionResult,
   maximumOutputBytes: number,
-): void {
+): Promise<void> {
   if (result.adapterId !== adapter.descriptor.id) {
     throw new ProviderError(
       "PROVIDER_ADAPTER_RESULT_INVALID",
@@ -270,13 +321,20 @@ function validateAdapterResult(
     }
     if (
       request.target.transparency !== "opaque" &&
-      request.background.strategy === "native-alpha" &&
-      !outputHasEncodedAlpha(output.mediaType, output.bytes)
+      request.background.strategy === "native-alpha"
     ) {
-      throw new ProviderError(
-        "PROVIDER_NATIVE_ALPHA_MISSING",
-        `Candidate ${index + 1} was requested as native alpha but returned an opaque container. RGB checkerboards and mattes are never stored or previewed as transparent candidates.`,
-        "incompatible",
+      if (!outputHasEncodedAlpha(output.mediaType, output.bytes)) {
+        throw new ProviderError(
+          "PROVIDER_NATIVE_ALPHA_MISSING",
+          `Candidate ${index + 1} was requested as native alpha but returned an opaque container. RGB checkerboards and mattes are never stored or previewed as transparent candidates.`,
+          "incompatible",
+        );
+      }
+      await validateNativeAlphaPixels(
+        index,
+        output,
+        request,
+        maximumOutputBytes,
       );
     }
   }
@@ -542,7 +600,7 @@ export async function executeProviderCandidateRequest(
         signal: options.signal,
         requestedAt: new Date(startedAt),
       });
-      validateAdapterResult(adapter, request, result, maximumOutputBytes);
+      await validateAdapterResult(adapter, request, result, maximumOutputBytes);
       const completedAt = nowIso(now);
       attempts.push({
         adapterId: adapter.descriptor.id,
