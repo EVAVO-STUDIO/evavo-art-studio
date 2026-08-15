@@ -50,17 +50,19 @@ A global colour deletion is unsafe because the subject may legitimately contain 
 
 Art Studio instead:
 
-1. Decodes the candidate into sRGB RGBA.
-2. Measures every pixel against the declared matte colour.
-3. Requires a configured fraction of border pixels to resemble that matte.
-4. Flood-fills only matte-like pixels connected to the canvas border.
-5. Preserves matching colours enclosed inside the subject.
-6. Builds bounded distance fields around the connected matte and confident foreground.
-7. Solves partial alpha against nearby foreground colour for antialiased edge pixels.
-8. Recovers foreground RGB using the compositing equation rather than leaving green or magenta contamination.
-9. Clears distant hidden matte colour.
-10. Propagates bounded subject-colour bleed beneath nearby alpha-zero pixels for safer texture filtering.
-11. Emits a deterministic lossless PNG and numeric evidence.
+1. Requires an explicitly declared high-chroma key; black, white and grey are rejected as unsafe destructive mattes.
+2. Decodes the candidate into sRGB RGBA and requires every source pixel to be opaque. A provider result that already mixes alpha must use native-alpha QA instead of combining two background-removal paths.
+3. Detects periodic painted checkerboards at the canvas border—including large tiles and chroma-coloured grids—before any pixel can be removed.
+4. Measures every pixel against the declared matte colour.
+5. Requires a configured fraction of border pixels to resemble that matte.
+6. Flood-fills only matte-like pixels connected to the canvas border.
+7. Preserves matching colours enclosed inside the subject.
+8. Builds bounded distance fields around the connected matte and confident foreground.
+9. Solves partial alpha against nearby foreground colour for antialiased edge pixels.
+10. Recovers foreground RGB using the compositing equation rather than leaving green or magenta contamination.
+11. Clears distant hidden matte colour.
+12. Propagates bounded subject-colour bleed beneath nearby alpha-zero pixels for safer texture filtering.
+13. Emits a deterministic lossless PNG and numeric evidence.
 
 For observed colour `C`, matte `M`, foreground estimate `F` and alpha `a`:
 
@@ -180,6 +182,8 @@ Choose a matte that:
 - has no texture, gradient, shadow, checkerboard or lighting variation;
 - does not share the subject's dominant luminance and hue;
 - remains stable across every frame in the family.
+
+Art Studio enforces high chroma at provider-request validation, provider-canvas preparation and alpha extraction. This prevents a caller or agent from quietly switching to black, white or grey and erasing EVA's clothing, pale highlights or other legitimate subject pixels.
 
 Green is not universally correct. Magenta, blue or another controlled colour may be safer for a green character or vegetation effect. The matte colour is part of the compiled production contract and evidence.
 

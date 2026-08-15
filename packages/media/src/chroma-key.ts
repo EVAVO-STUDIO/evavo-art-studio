@@ -131,11 +131,122 @@ function parseMatte(value: string): Matte {
       "matteColour must use #RRGGBB format.",
     );
   }
-  return {
+  const matte = {
     r: Number.parseInt(normalized.slice(1, 3), 16),
     g: Number.parseInt(normalized.slice(3, 5), 16),
     b: Number.parseInt(normalized.slice(5, 7), 16),
     hex: normalized,
+  };
+  const channels = [matte.r, matte.g, matte.b];
+  if (
+    Math.max(...channels) - Math.min(...channels) < 160 ||
+    (Math.max(...channels) < 240 && Math.min(...channels) > 15)
+  ) {
+    throw new ChromaKeyExtractionError(
+      "CHROMA_KEY_MATTE_UNSAFE",
+      "matteColour must be a declared high-chroma key; black, white and grey are unsafe for automatic extraction.",
+    );
+  }
+  return matte;
+}
+
+const CHECKERBOARD_TILE_SIZES = [
+  2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128,
+] as const;
+
+function fakeCheckerboardAtBorder(
+  data: Uint8Array,
+  width: number,
+  height: number,
+): Readonly<{ detected: boolean; tileSize: number | null; confidence: number }> {
+  const band = Math.max(12, Math.floor(Math.min(width, height) * 0.16));
+  const borderPixels =
+    width * height -
+    Math.max(0, width - band * 2) * Math.max(0, height - band * 2);
+  const stride = Math.max(1, Math.ceil(Math.sqrt(borderPixels / 40_000)));
+  let bestConfidence = 0;
+  let bestTile: number | null = null;
+
+  for (const tileSize of CHECKERBOARD_TILE_SIZES) {
+    if (width / tileSize < 4 || height / tileSize < 4) continue;
+    const phases = [
+      0,
+      Math.floor(tileSize / 4),
+      Math.floor(tileSize / 2),
+      Math.floor((tileSize * 3) / 4),
+    ];
+    for (const phaseX of phases) {
+      for (const phaseY of phases) {
+        const sums = [
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+        ];
+        for (let y = 0; y < height; y += stride) {
+          for (let x = 0; x < width; x += stride) {
+            if (x >= band && x < width - band && y >= band && y < height - band) {
+              continue;
+            }
+            const parity =
+              (Math.floor((x + phaseX) / tileSize) +
+                Math.floor((y + phaseY) / tileSize)) &
+              1;
+            const offset = (y * width + x) * 4;
+            sums[parity]![0] += data[offset]!;
+            sums[parity]![1] += data[offset + 1]!;
+            sums[parity]![2] += data[offset + 2]!;
+            sums[parity]![3] += 1;
+          }
+        }
+        if (sums[0]![3] < 32 || sums[1]![3] < 32) continue;
+        const means = sums.map((sum) => [
+          sum[0]! / sum[3]!,
+          sum[1]! / sum[3]!,
+          sum[2]! / sum[3]!,
+        ]);
+        const separation = Math.hypot(
+          means[0]![0]! - means[1]![0]!,
+          means[0]![1]! - means[1]![1]!,
+          means[0]![2]! - means[1]![2]!,
+        );
+        if (separation < 24) continue;
+        const fitDistance = Math.max(14, separation * 0.28);
+        let considered = 0;
+        let fitted = 0;
+        let squaredError = 0;
+        for (let y = 0; y < height; y += stride) {
+          for (let x = 0; x < width; x += stride) {
+            if (x >= band && x < width - band && y >= band && y < height - band) {
+              continue;
+            }
+            const parity =
+              (Math.floor((x + phaseX) / tileSize) +
+                Math.floor((y + phaseY) / tileSize)) &
+              1;
+            const offset = (y * width + x) * 4;
+            const distance = Math.hypot(
+              data[offset]! - means[parity]![0]!,
+              data[offset + 1]! - means[parity]![1]!,
+              data[offset + 2]! - means[parity]![2]!,
+            );
+            considered += 1;
+            squaredError += distance * distance;
+            if (distance <= fitDistance) fitted += 1;
+          }
+        }
+        const fit = fitted / considered;
+        const rmse = Math.sqrt(squaredError / considered);
+        const confidence = fit * Math.min(1, separation / 48) * Math.min(1, 18 / Math.max(1, rmse));
+        if (confidence > bestConfidence) {
+          bestConfidence = confidence;
+          bestTile = tileSize;
+        }
+      }
+    }
+  }
+  return {
+    detected: bestTile !== null && bestConfidence >= 0.88,
+    tileSize: bestTile,
+    confidence: Number(Math.min(1, bestConfidence).toFixed(6)),
   };
 }
 
@@ -337,6 +448,23 @@ export async function extractChromaKeyAlpha(
 
   const pixels = width * height;
   const sourceData = decoded.data;
+  let nonOpaqueSourcePixels = 0;
+  for (let offset = 3; offset < sourceData.byteLength; offset += 4) {
+    if (sourceData[offset] !== 255) nonOpaqueSourcePixels += 1;
+  }
+  if (nonOpaqueSourcePixels > 0) {
+    throw new ChromaKeyExtractionError(
+      "CHROMA_KEY_SOURCE_ALPHA_INVALID",
+      `Chroma-key extraction requires a fully opaque intermediate; ${nonOpaqueSourcePixels} pixels already contain alpha. Use native-alpha QA instead.`,
+    );
+  }
+  const checkerboard = fakeCheckerboardAtBorder(sourceData, width, height);
+  if (checkerboard.detected) {
+    throw new ChromaKeyExtractionError(
+      "CHROMA_KEY_FAKE_TRANSPARENCY_GRID",
+      `A periodic painted checkerboard was detected at the canvas border (tile ${checkerboard.tileSize}, confidence ${checkerboard.confidence}).`,
+    );
+  }
   const output = Buffer.alloc(sourceData.byteLength);
   const matteDistance = new Uint32Array(pixels);
   const connectedBackground = new Uint8Array(pixels);

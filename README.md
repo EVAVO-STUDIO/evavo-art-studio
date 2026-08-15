@@ -21,7 +21,7 @@ This repository is intentionally broader than an image generator. It is the shar
 - governed ComfyUI workflow-profile adapters for local generation, editing, inpainting, matching assets and matching animation frames, bound to exact workflow, model, runtime, node and reference hashes;
 - decoded mask preflight that proves matching image format, dimensions, page count, alpha and editable coverage before remote inpaint;
 - unapproved provider candidates stored as immutable intermediate artifacts with complete attempt and provenance evidence;
-- border-connected chroma segmentation, matte colour unmixing, antialiased edge recovery and bounded transparent RGB bleed;
+- high-chroma-only, border-connected segmentation with pre-extraction checkerboard rejection, opaque-source proof, matte colour unmixing, antialiased edge recovery and bounded transparent RGB bleed;
 - durable `art.candidate.master-alpha` work that emits only an unapproved alpha intermediate and immutable extraction or QA evidence;
 - deterministic candidate ranking using bounded alignment, silhouettes, symmetric edge distance, area, anchors, palette, luminance, edge orientation and overlapping colour;
 - optional model-assisted identity, costume, equipment, pose, style and perceptual evidence bound to exact candidate, reference, model and preprocessing hashes;
@@ -185,11 +185,11 @@ $env:EVAVO_ART_COMFYUI_DEDICATED_INSTANCE = "true"
 
 Each catalog profile becomes one exact adapter ID such as `comfyui:sprite-match`. The worker does not accept arbitrary workflow JSON. It revalidates catalog, profile, workflow, model, runtime and node identities; verifies and uploads exact immutable reference bytes; preflights required node classes through ComfyUI; binds only declared mutable inputs; downloads bounded outputs; and records unapproved candidate provenance. Remote endpoints require explicit opt-in and HTTPS. Execution still requires the existing durable admission and short-lived RAW_ART execution authorisation. See [`docs/COMFYUI_PROVIDER_ADAPTER.md`](./docs/COMFYUI_PROVIDER_ADAPTER.md).
 
-GPT Image 2 does not currently support transparent backgrounds, so transparency-required requests use a declared flat chroma matte. The chroma candidate remains an intermediate and must pass deterministic alpha mastering, edge cleanup and hostile-matte QA.
+GPT Image 2 does not currently support transparent backgrounds, so transparency-required requests use a declared flat high-chroma matte. Provider validation and provider-canvas preparation reject black, white and grey keys. The opaque chroma candidate remains an intermediate and must pass pre-extraction checkerboard detection, deterministic alpha mastering, edge cleanup and hostile-matte QA.
 
 ## Candidate alpha mastering
 
-Art Studio never removes every pixel matching a key colour. The extractor flood-fills only matte-like pixels connected to the image border, preserving enclosed matching colours in the subject. It then estimates edge alpha against nearby confident foreground, removes matte contamination, writes bounded subject-colour bleed beneath nearby transparent pixels and runs the same decoded-pixel frame gates used elsewhere.
+Art Studio never removes every pixel matching a key colour. The extractor first rejects mixed-alpha inputs, low-chroma keys and periodic painted checkerboards. It then flood-fills only matte-like pixels connected to the image border, preserving enclosed matching colours in the subject. It estimates edge alpha against nearby confident foreground, removes matte contamination, writes bounded subject-colour bleed beneath nearby transparent pixels and runs the same decoded-pixel frame gates used elsewhere.
 
 The durable job kind is:
 

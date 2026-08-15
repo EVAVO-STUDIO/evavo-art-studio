@@ -86,6 +86,27 @@ test("rejects a baked checkerboard transparency background", () => {
   assert.ok(report.fakeTransparency.checkerboardConfidence >= 0.86);
 });
 
+test("rejects a large painted checkerboard even when a small patch has real alpha", () => {
+  const decoded = frame(384, 384, (x, y) => {
+    if (x < 12 && y < 12) return [0, 0, 0, 0];
+    if (x >= 130 && x <= 253 && y >= 80 && y <= 330) {
+      return [200, 80, 50, 255];
+    }
+    const value = (Math.floor(x / 48) + Math.floor(y / 48)) % 2 ? 184 : 232;
+    return [value, value, value, 255];
+  });
+  const report = analyseDecodedSpriteFrame(decoded, {
+    ...expectations,
+    frameId: "checkerboard-with-alpha-bypass",
+    expectedWidth: 384,
+    expectedHeight: 384,
+    safePadding: 0,
+  });
+  assert.equal(report.passed, false);
+  assert.equal(report.fakeTransparency.checkerboardDetected, true);
+  assert.equal(report.fakeTransparency.checkerboardTileSize, 48);
+});
+
 test("accepts intentional transparent edge bleed that agrees with the subject", () => {
   const decoded = frame(16, 16, (x, y) => {
     const subject = x >= 5 && x <= 10 && y >= 4 && y <= 11;

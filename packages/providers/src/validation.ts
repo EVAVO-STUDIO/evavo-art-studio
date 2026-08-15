@@ -104,6 +104,18 @@ function fail(message: string): never {
   );
 }
 
+function highChromaMatte(value: string): boolean {
+  const channels = [
+    Number.parseInt(value.slice(1, 3), 16),
+    Number.parseInt(value.slice(3, 5), 16),
+    Number.parseInt(value.slice(5, 7), 16),
+  ];
+  return (
+    Math.max(...channels) - Math.min(...channels) >= 160 &&
+    (Math.max(...channels) >= 240 || Math.min(...channels) <= 15)
+  );
+}
+
 function requiredString(value: unknown, name: string, maximum = 32_000): string {
   if (typeof value !== "string") fail(`${name} must be a string.`);
   const normalized = value.trim();
@@ -388,6 +400,15 @@ export function validateProviderCandidateRequest(
   }
   if (strategy === "chroma-key" && !matteColour) {
     fail("Chroma-key candidates require an explicit matteColour.");
+  }
+  if (
+    strategy === "chroma-key" &&
+    matteColour !== undefined &&
+    !highChromaMatte(matteColour)
+  ) {
+    fail(
+      "Chroma-key candidates require a high-chroma matteColour; black, white and grey keys are unsafe.",
+    );
   }
   if (transparency === "required" && strategy === "opaque-source") {
     fail("A transparency-required target cannot use opaque-source strategy.");

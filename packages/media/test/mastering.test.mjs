@@ -145,3 +145,43 @@ test("chroma extraction fails closed when the declared matte is absent", async (
       error.code === "CHROMA_KEY_BORDER_MATTE_INSUFFICIENT",
   );
 });
+
+test("chroma extraction rejects painted checkerboards before any background removal", async () => {
+  const candidate = await raster(128, 128, 4, (x, y) => {
+    if (x >= 40 && x <= 87 && y >= 24 && y <= 111) {
+      return [210, 90, 55, 255];
+    }
+    const value = (Math.floor(x / 16) + Math.floor(y / 16)) % 2 ? 176 : 224;
+    return [value, value, value, 255];
+  });
+  await assert.rejects(
+    () => extractChromaKeyAlpha(candidate, { matteColour: "#00ff00" }),
+    (error) =>
+      error instanceof ChromaKeyExtractionError &&
+      error.code === "CHROMA_KEY_FAKE_TRANSPARENCY_GRID",
+  );
+});
+
+test("chroma extraction accepts only opaque sources and declared high-chroma keys", async () => {
+  const opaque = await raster(16, 16, 4, (x, y) =>
+    x >= 5 && x <= 10 && y >= 4 && y <= 11
+      ? [190, 80, 40, 255]
+      : [0, 255, 0, 255],
+  );
+  await assert.rejects(
+    () => extractChromaKeyAlpha(opaque, { matteColour: "#808080" }),
+    (error) =>
+      error instanceof ChromaKeyExtractionError &&
+      error.code === "CHROMA_KEY_MATTE_UNSAFE",
+  );
+
+  const mixedAlpha = await raster(16, 16, 4, (x, y) =>
+    x === 8 && y === 8 ? [190, 80, 40, 128] : [0, 255, 0, 255],
+  );
+  await assert.rejects(
+    () => extractChromaKeyAlpha(mixedAlpha, { matteColour: "#00ff00" }),
+    (error) =>
+      error instanceof ChromaKeyExtractionError &&
+      error.code === "CHROMA_KEY_SOURCE_ALPHA_INVALID",
+  );
+});

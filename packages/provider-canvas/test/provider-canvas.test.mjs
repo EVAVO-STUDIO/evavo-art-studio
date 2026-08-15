@@ -248,6 +248,17 @@ test("partial masks and invalid provider canvases fail closed", async () => {
       error instanceof ProviderCanvasError &&
       error.code === "PROVIDER_CANVAS_SIZE_INVALID",
   );
+  assert.throws(
+    () =>
+      normalizePixelArtProviderCanvasOptions({
+        matteColour: "#808080",
+        providerWidth: 1024,
+        providerHeight: 1024,
+      }),
+    (error) =>
+      error instanceof ProviderCanvasError &&
+      error.code === "PROVIDER_CANVAS_MATTE_UNSAFE",
+  );
 });
 
 test("restoration rejects source bytes that differ from the preparation manifest", async () => {

@@ -142,6 +142,7 @@ function backgroundSection(request: NormalizedProviderCandidateRequest): string[
       "BACKGROUND AND ALPHA CONTRACT",
       `- Render against one perfectly flat solid ${request.background.matteColour} chroma matte for deterministic extraction.`,
       "- Do not render a checkerboard, gradient, horizon, vignette, texture, cast shadow on the matte or reflected matte-colour light.",
+      "- Fill every background pixel to every canvas edge with that one exact colour; never draw grey/white transparency tiles, even if an editor normally displays transparency that way.",
       "- Keep the complete subject separated cleanly from the matte and inside the canvas with generous safe clearance.",
       "- This is an intermediate extraction candidate; it is not the final transparent asset.",
     ];

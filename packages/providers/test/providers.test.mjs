@@ -218,6 +218,7 @@ test("compiled prompt preserves shot and layer boundaries", async () => {
     "cast shadow",
     "held weapon",
     "perfectly flat solid #00ff00 chroma matte",
+    "never draw grey/white transparency tiles",
     "intermediate candidate artwork only",
     "No crop, fake transparency, checkerboard",
   ]) {
@@ -225,6 +226,22 @@ test("compiled prompt preserves shot and layer boundaries", async () => {
   }
   assert.equal(compiled.sha256.length, 64);
   assert.equal(providerRequestSha256(normalized).length, 64);
+});
+
+test("provider requests reject unsafe low-chroma extraction mattes", () => {
+  for (const matteColour of ["#000000", "#ffffff", "#808080"]) {
+    assert.throws(
+      () =>
+        validateProviderCandidateRequest(
+          request({
+            background: { strategy: "chroma-key", matteColour },
+          }),
+        ),
+      (error) =>
+        error instanceof ProviderError &&
+        /high-chroma matteColour/u.test(error.message),
+    );
+  }
 });
 
 test("governed Book candidate sets demand genuinely distinct non-template alternatives", () => {

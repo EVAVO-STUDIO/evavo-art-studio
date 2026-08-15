@@ -38,12 +38,23 @@ function matteColour(value: string): Readonly<{
       "matteColour must use #RRGGBB format.",
     );
   }
-  return {
+  const result = {
     r: Number.parseInt(normalized.slice(1, 3), 16),
     g: Number.parseInt(normalized.slice(3, 5), 16),
     b: Number.parseInt(normalized.slice(5, 7), 16),
     hex: normalized,
   };
+  const channels = [result.r, result.g, result.b];
+  if (
+    Math.max(...channels) - Math.min(...channels) < 160 ||
+    (Math.max(...channels) < 240 && Math.min(...channels) > 15)
+  ) {
+    throw new ProviderCanvasError(
+      "PROVIDER_CANVAS_MATTE_UNSAFE",
+      "matteColour must be a high-chroma key; black, white and grey are unsafe for provider restoration.",
+    );
+  }
+  return result;
 }
 
 function optionalProviderEdge(

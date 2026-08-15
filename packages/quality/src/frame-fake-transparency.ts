@@ -82,7 +82,7 @@ function checkerboardEvidence(
   }
 
   const maximumTile = Math.max(2, Math.floor(Math.min(frame.width, frame.height) / 2));
-  const candidates = [2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32].filter(
+  const candidates = [2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128].filter(
     (entry) => entry <= maximumTile,
   );
   const sampleStride = Math.max(1, Math.floor(Math.sqrt((frame.width * frame.height) / 4096)));
@@ -139,7 +139,7 @@ export function fakeTransparencyEvidence(
   const nearestMatteDistance = dominant
     ? nearestColourDistance(dominant.colour, expectations.knownMatteColours)
     : null;
-  const opaqueLike = alpha.opaqueFraction + alpha.partialFraction > 0.995;
+  const opaqueLike = alpha.transparentFraction < 0.2;
   const matteConfidence = dominant
     ? dominant.fraction * (nearestMatteDistance === null ? 0 : clamp01(1 - nearestMatteDistance / 96))
     : 0;

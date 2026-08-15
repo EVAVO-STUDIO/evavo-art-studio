@@ -22,7 +22,7 @@ A frame report records:
 
 ### Real transparency
 
-An alpha-required frame must contain source alpha and actual transparent or partially transparent pixels. A checkerboard rendered into opaque pixels is not transparency. A uniform green, magenta, white, black or grey border is treated as a likely baked matte when the border coverage and colour-distance evidence cross the declared threshold.
+An alpha-required frame must contain source alpha and actual transparent or partially transparent pixels. A checkerboard rendered into pixels is not transparency. Checker detection covers periodic tiles from 2 through 128 pixels and still runs when a suspicious candidate contains a small amount of real alpha, preventing a painted grid plus token-transparent-pixel bypass. A uniform green, magenta, white, black or grey border is treated as a likely baked matte when the border coverage and colour-distance evidence cross the declared threshold.
 
 ### Transparent RGB
 
