@@ -177,7 +177,10 @@ function fakeCheckerboardAtBorder(
     ];
     for (const phaseX of phases) {
       for (const phaseY of phases) {
-        const sums = [
+        const sums: [
+          [number, number, number, number],
+          [number, number, number, number],
+        ] = [
           [0, 0, 0, 0],
           [0, 0, 0, 0],
         ];
@@ -191,13 +194,14 @@ function fakeCheckerboardAtBorder(
                 Math.floor((y + phaseY) / tileSize)) &
               1;
             const offset = (y * width + x) * 4;
-            sums[parity]![0] += data[offset]!;
-            sums[parity]![1] += data[offset + 1]!;
-            sums[parity]![2] += data[offset + 2]!;
-            sums[parity]![3] += 1;
+            const sum = sums[parity as 0 | 1];
+            sum[0] += data[offset]!;
+            sum[1] += data[offset + 1]!;
+            sum[2] += data[offset + 2]!;
+            sum[3] += 1;
           }
         }
-        if (sums[0]![3] < 32 || sums[1]![3] < 32) continue;
+        if (sums[0][3] < 32 || sums[1][3] < 32) continue;
         const means = sums.map((sum) => [
           sum[0]! / sum[3]!,
           sum[1]! / sum[3]!,
