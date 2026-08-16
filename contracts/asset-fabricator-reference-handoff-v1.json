@@ -1,0 +1,54 @@
+{
+  "contractVersion": "evavo_art_asset_fabricator_reference_contracts_v1",
+  "protocolVersion": "2026-08-16.8",
+  "requestContract": "evavo_art_asset_fabricator_reference_request_v1",
+  "handoffSchema": "evavo.art.asset-fabricator-reference-handoff.v1",
+  "sourceFormats": ["png", "jpg", "jpeg", "webp"],
+  "assetClasses": [
+    "prop",
+    "hero-prop",
+    "character",
+    "creature",
+    "vehicle",
+    "architecture",
+    "environment-piece",
+    "environment-kit",
+    "terrain",
+    "abstract"
+  ],
+  "canonicalViews": {
+    "base": ["front", "back", "left", "right", "three-quarter"],
+    "vehicleAndEnvironment": ["front", "back", "left", "right", "three-quarter", "top"]
+  },
+  "materialContract": {
+    "normalConvention": "opengl",
+    "requiredRoles": ["base-color", "normal", "roughness", "metalness", "ao", "mask"],
+    "orm": {"r": "ao", "g": "roughness", "b": "metalness", "a": "mask"}
+  },
+  "retainedEvidence": [
+    "source program path, bytes, SHA-256 and contract version",
+    "every reference path, bytes, SHA-256, media type, view, role and rights",
+    "art, geometry, material, rigging and delivery intent",
+    "dimensions and named anchor positions",
+    "provenance and named-human review requirement"
+  ],
+  "targets": [
+    "multi-view 3D generation",
+    "3D asset production brief",
+    "Universal Asset",
+    "Asset Fabricator materials"
+  ],
+  "authority": {
+    "providerExecution": false,
+    "automaticCreativeApproval": false,
+    "imageMutation": false,
+    "automatic3dGeneration": false,
+    "automaticTextureBake": false,
+    "automaticMaterialAssembly": false,
+    "targetRepositoryMutation": false,
+    "gitMutation": false,
+    "deployment": false,
+    "publication": false,
+    "namedHumanApprovalRequired": true
+  }
+}
