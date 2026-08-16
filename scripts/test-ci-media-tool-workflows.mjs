@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOW_ROOT = path.join(ROOT, ".github/workflows");
 const SHARED_BOOTSTRAP = "bash scripts/bootstrap-ci-media-tools.sh";
+const PINNED_PYTHON_ACTION =
+  "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405";
+const PINNED_IMAGE_BACKEND =
+  "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt";
 const FORBIDDEN_PATTERNS = [
   /sudo\s+apt-get\s+update/,
   /apt-get\s+install[^\n]*\bffmpeg\b/,
@@ -76,5 +80,28 @@ test("critical media workflows use the shared bounded bootstrap", async () => {
     missing,
     [],
     `Critical workflows missing shared media bootstrap:\n${missing.join("\n")}`,
+  );
+});
+
+test("complete-validation workflows install the exact Python image backend", async () => {
+  const violations = [];
+  for (const workflow of await workflowSources()) {
+    const validationIndex = workflow.source.indexOf("pnpm check");
+    if (validationIndex < 0) continue;
+    const setupIndex = workflow.source.indexOf(PINNED_PYTHON_ACTION);
+    const installIndex = workflow.source.indexOf(PINNED_IMAGE_BACKEND);
+    if (
+      setupIndex < 0 ||
+      installIndex < 0 ||
+      setupIndex > validationIndex ||
+      installIndex > validationIndex
+    ) {
+      violations.push(workflow.path);
+    }
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    `Complete-validation workflows missing the exact Python image backend:\n${violations.join("\n")}`,
   );
 });
