@@ -598,6 +598,20 @@ try {
   const requirePillow = process.env.PROJECT_ART_REQUIRE_PILLOW === '1';
   if (requirePillow && !python) throw new Error('PROJECT_ART_REQUIRE_PILLOW=1 but no Python 3 executable was found.');
   if (requirePillow) {
+    const alphaAssociation = run(
+      python.command,
+      [
+        ...python.prefix,
+        '-m',
+        'unittest',
+        'scripts/test_project_art_alpha_association.py',
+      ],
+    );
+    assert.equal(
+      alphaAssociation.status,
+      0,
+      alphaAssociation.stderr || alphaAssociation.stdout,
+    );
     const generate = run(
       python.command,
       [

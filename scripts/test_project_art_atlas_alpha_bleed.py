@@ -151,12 +151,26 @@ class ProjectArtAtlasAlphaBleedTests(unittest.TestCase):
             self.assertTrue(summary["exactRgbaAtlasPaste"])
             self.assertGreater(summary["filledPixels"], 0)
 
+            alpha_encoding = receipt["alphaEncoding"]
+            self.assertEqual(alpha_encoding["association"], "straight")
+            self.assertFalse(alpha_encoding["premultiplied"])
+            self.assertEqual(alpha_encoding["colourSpace"], "srgb")
+            self.assertEqual(alpha_encoding["transparentRgbPolicy"], "bounded-visible-rgb-bleed")
+
             manifest = json.loads((output_root / "alpha-safe.atlas.json").read_text("utf-8"))
+            self.assertEqual(manifest["alphaEncoding"], alpha_encoding)
             frame = manifest["frames"]["hero/idle/01"]
             evidence = frame["transparentRgbBleed"]
             self.assertTrue(evidence["applied"])
             self.assertGreater(evidence["filledPixels"], 0)
             self.assertEqual(evidence["alphaThreshold"], 0)
+
+            texture_packer = json.loads(
+                (output_root / "alpha-safe.texturepacker.json").read_text("utf-8")
+            )
+            self.assertEqual(
+                texture_packer["meta"]["alphaEncoding"], alpha_encoding
+            )
 
             region = frame["frame"]
             atlas = Image.open(output_root / "alpha-safe.png").convert("RGBA")

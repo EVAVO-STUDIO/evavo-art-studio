@@ -668,6 +668,65 @@ def resized_canvas(
     return canvas
 
 
+def alpha_premultiply(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    """Convert straight RGBA to associated alpha with deterministic 8-bit rounding."""
+    mode = str(operation.get("mode", "nearest")).lower()
+    if mode != "nearest":
+        fail("alpha-premultiply.mode must be nearest")
+    rgba = image.convert("RGBA")
+    try:
+        source = rgba.tobytes()
+        output = bytearray(len(source))
+        for offset in range(0, len(source), 4):
+            alpha = source[offset + 3]
+            output[offset] = (source[offset] * alpha + 127) // 255
+            output[offset + 1] = (source[offset + 1] * alpha + 127) // 255
+            output[offset + 2] = (source[offset + 2] * alpha + 127) // 255
+            output[offset + 3] = alpha
+        return Image.frombytes("RGBA", rgba.size, bytes(output))
+    finally:
+        rgba.close()
+
+
+def alpha_unpremultiply(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    """Convert associated RGBA to straight alpha and fail closed on invalid pixels."""
+    mode = str(operation.get("mode", "strict")).lower()
+    if mode not in {"strict", "clamp"}:
+        fail("alpha-unpremultiply.mode must be strict or clamp")
+    rgba = image.convert("RGBA")
+    try:
+        source = rgba.tobytes()
+        output = bytearray(len(source))
+        for offset in range(0, len(source), 4):
+            red = source[offset]
+            green = source[offset + 1]
+            blue = source[offset + 2]
+            alpha = source[offset + 3]
+            if alpha == 0:
+                if mode == "strict" and (red or green or blue):
+                    fail(
+                        "alpha-unpremultiply strict mode rejected non-zero RGB at alpha zero"
+                    )
+                output[offset : offset + 4] = bytes((0, 0, 0, 0))
+                continue
+            if red > alpha or green > alpha or blue > alpha:
+                if mode == "strict":
+                    fail(
+                        "alpha-unpremultiply strict mode rejected a pixel that violates "
+                        "the premultiplied-alpha invariant"
+                    )
+                red = min(red, alpha)
+                green = min(green, alpha)
+                blue = min(blue, alpha)
+            output[offset] = min(255, (red * 255 + alpha // 2) // alpha)
+            output[offset + 1] = min(255, (green * 255 + alpha // 2) // alpha)
+            output[offset + 2] = min(255, (blue * 255 + alpha // 2) // alpha)
+            output[offset + 3] = alpha
+        return Image.frombytes("RGBA", rgba.size, bytes(output))
+    finally:
+        rgba.close()
+
+
 def connected_matte_to_alpha(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
     rgba = image.copy()
     width, height = rgba.size
@@ -1599,6 +1658,10 @@ def apply_operation(
         output.putalpha(alpha)
         alpha.close()
         return output
+    if op == "alpha-premultiply":
+        return alpha_premultiply(image, operation)
+    if op == "alpha-unpremultiply":
+        return alpha_unpremultiply(image, operation)
     if op == "alpha-feather":
         return _alpha_feather(image, float(operation.get("radius", 1)))
     if op == "connected-matte-to-alpha":

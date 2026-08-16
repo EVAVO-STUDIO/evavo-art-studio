@@ -44,6 +44,16 @@ def _transparent_rgb_summary(prepared: list[Any], options: dict[str, Any]) -> di
     }
 
 
+def _alpha_encoding_summary() -> dict[str, Any]:
+    return {
+        "schema": "evavo.project-art-alpha-encoding.v1",
+        "association": "straight",
+        "premultiplied": False,
+        "colourSpace": "srgb",
+        "transparentRgbPolicy": "bounded-visible-rgb-bleed",
+    }
+
+
 def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[str, Any]:
     validate_plan(plan)
     if output_root.exists() or output_root.is_symlink():
@@ -111,6 +121,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
         frames_hash = {item.frame.frame_id: frame_metadata(item) for item in ordered}
         image_name = paths["image"].name
         transparent_rgb = _transparent_rgb_summary(prepared, options)
+        alpha_encoding = _alpha_encoding_summary()
         common_meta = {
             "app": "EVAVO Art Studio",
             "version": "1.0",
@@ -125,6 +136,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
             "margin": int(options["margin"]),
             "extrude": extrude,
             "transparentRgbBleed": transparent_rgb,
+            "alphaEncoding": alpha_encoding,
         }
         texture_packer = {
             "frames": frames_hash,
@@ -160,6 +172,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
             "size": {"width": width, "height": height},
             "regions": godot_regions,
             "transparentRgbBleed": transparent_rgb,
+            "alphaEncoding": alpha_encoding,
             "planSha256": plan["planSha256"],
         }
         manifest_body = {
@@ -172,6 +185,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
             "frames": frames_hash,
             "options": {key: value for key, value in options.items() if key != "maximumDecodedPixelsPerFrame"},
             "transparentRgbBleed": transparent_rgb,
+            "alphaEncoding": alpha_encoding,
             "planSha256": plan["planSha256"],
             "sourceMutation": False,
             "repositoryMutation": False,
@@ -200,6 +214,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
             "frameCount": len(ordered),
             "size": {"width": width, "height": height},
             "transparentRgbBleed": transparent_rgb,
+            "alphaEncoding": alpha_encoding,
             "outputs": outputs,
             "authority": plan["authority"],
             "createOnlyOutput": True,
