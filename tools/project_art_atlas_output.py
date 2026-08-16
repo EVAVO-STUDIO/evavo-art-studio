@@ -9,6 +9,7 @@ from PIL import Image
 
 from project_art_atlas_models import Placement
 
+
 def paste_extruded(
     atlas: Image.Image,
     image: Image.Image,

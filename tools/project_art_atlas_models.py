@@ -12,6 +12,7 @@ from project_art_atlas_alpha_bleed import bleed_transparent_rgb
 from project_art_atlas_contract import fail, secure_source, sha256_file, validate_hash
 from transparency_guard import require_transparency
 
+
 @dataclass(frozen=True)
 class PreparedFrame:
     frame_id: str

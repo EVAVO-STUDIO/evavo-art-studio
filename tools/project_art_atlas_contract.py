@@ -11,6 +11,7 @@ RECEIPT_SCHEMA = "evavo.project-art-atlas-receipt.v1"
 SHA256 = set("0123456789abcdef")
 MAXIMUM_PLAN_BYTES = 32 * 1024 * 1024
 
+
 def fail(message: str) -> None:
     raise ValueError(message)
 
