@@ -6,6 +6,9 @@ on:
     paths:
       - "scripts/project-art/top-hat-pose-slot-production.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-package.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-foundation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-validation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-job.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
@@ -20,6 +23,9 @@ on:
     paths:
       - "scripts/project-art/top-hat-pose-slot-production.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-package.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-foundation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-validation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-job.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
