@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "evavo-web-assets": {
+      "command": "node",
+      "args": [
+        "C:\\GitRepos\\evavo-art-studio\\tools\\web_asset_pipeline_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_WEB_ASSET_ALLOWED_ROOTS": "C:\\EVAVO\\asset-intake;C:\\GitRepos",
+        "EVAVO_WEB_ASSET_ALLOW_WRITES": "true",
+        "EVAVO_WEB_ASSET_ALLOW_CLOUDINARY_WRITES": "false"
+      }
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "contract": "evavo_web_asset_pipeline_v1",
+  "schemaVersion": "1.0",
+  "batchId": "work-page-assets-2026-08-16",
+  "createdAt": "2026-08-16T00:00:00.000Z",
+  "assets": [
+    {
+      "id": "react-commerce-control-plane",
+      "source": {
+        "surface": "chatgpt-library",
+        "path": "incoming/react-commerce-control-plane.png",
+        "originalName": "React Commerce Control Plane.png",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "bytes": 123456,
+        "mediaType": "image/png",
+        "originRef": "library-item:replace-with-an-opaque-reference"
+      },
+      "naming": {
+        "fileStem": "react-commerce-control-plane-2026",
+        "publicId": "evavo/work/react-commerce/react-commerce-control-plane-2026",
+        "assetFolder": "evavo/work/react-commerce",
+        "displayName": "React Commerce Control Plane 2026"
+      },
+      "content": {
+        "alt": "React Commerce control plane with connected operations, content and deployment services.",
+        "accessibilityAlt": "Interface illustration representing the React Commerce operations and deployment control plane.",
+        "caption": "A unified control plane for commerce operations, content and deployment.",
+        "title": "React Commerce Control Plane",
+        "project": "React Commerce",
+        "assetRole": "active Work page support image",
+        "usage": "react_commerce_support_image",
+        "usageNote": "Use beside the platform architecture section; keep the complete interface visible.",
+        "siteArea": "work/react-commerce",
+        "reviewDate": "2026-08-16",
+        "reviewStatus": "review-required",
+        "reviewedBy": "pending"
+      },
+      "background": {
+        "mode": "recover-alpha",
+        "matteColour": "#00ff00",
+        "allowCheckerboardRecovery": true,
+        "allowHighChromaInference": true,
+        "suppressChromaSpill": true
+      },
+      "delivery": {
+        "objectFit": "contain",
+        "publishVariants": [
+          "master",
+          "web"
+        ]
+      },
+      "cloudinary": {
+        "tags": [
+          "portfolio",
+          "react-commerce",
+          "work-page"
+        ],
+        "context": {
+          "campaign": "portfolio-refresh"
+        },
+        "metadata": {},
+        "indexForVisualSearch": false
+      }
+    }
+  ]
+}

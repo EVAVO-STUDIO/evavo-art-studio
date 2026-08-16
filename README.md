@@ -153,6 +153,21 @@ The avatar animation suite compiler expands pinned EVA or Top Hat identity refer
 
 See [`docs/PERSISTENT_ARTIST_WORKSPACE.md`](./docs/PERSISTENT_ARTIST_WORKSPACE.md), [`docs/PROJECT_ART_MASTERING_AND_MOTION.md`](./docs/PROJECT_ART_MASTERING_AND_MOTION.md) and [`docs/PROJECT_ART_AVATAR_ANIMATION_SUITE.md`](./docs/PROJECT_ART_AVATAR_ANIMATION_SUITE.md).
 
+## Web asset finishing and Cloudinary
+
+Art Studio includes a governed raster bridge for assets resolved from chat attachments, ChatGPT Library, workspaces, EVAVO Storage or Cloudinary. It can search existing Cloudinary inventory first, stage exact source bytes without moving the original, recover genuine alpha when explicitly requested, emit a lossless PNG master plus optimized WebP derivative, and publish a self-hashed reviewed plan with deterministic public IDs and complete editorial metadata.
+
+The pipeline rejects SVG, keeps binaries out of MCP JSON, leaves originals immutable and separates local preparation from Cloudinary publication with independent write gates and per-call confirmation. Cloudinary credentials remain server-side in `CLOUDINARY_URL`.
+
+```powershell
+pnpm run build:domain
+pnpm run web-asset:pipeline -- capabilities
+pnpm run web-asset:mcp
+pnpm run web-asset:check
+```
+
+See [`docs/WEB_ASSET_FINISH_AND_CLOUDINARY.md`](./docs/WEB_ASSET_FINISH_AND_CLOUDINARY.md) and [`config/web-asset-pipeline.example.json`](./config/web-asset-pipeline.example.json).
+
 ## Provider candidate execution
 
 CLI, REST and MCP can validate and compile the same provider-neutral contract, but they do not call an image model. Execution occurs only after a durable job reaches a worker with the required provider capability.
