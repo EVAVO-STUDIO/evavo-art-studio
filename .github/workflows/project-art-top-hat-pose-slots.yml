@@ -1,0 +1,39 @@
+name: Project Art Top Hat Pose Slots
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/project-art/top-hat-pose-slot-production.mjs"
+      - "scripts/project-art/avatar-animation-suite.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
+      - ".github/workflows/project-art-top-hat-pose-slots.yml"
+  pull_request:
+    paths:
+      - "scripts/project-art/top-hat-pose-slot-production.mjs"
+      - "scripts/project-art/avatar-animation-suite.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
+      - ".github/workflows/project-art-top-hat-pose-slots.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-art-top-hat-pose-slots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Runtime 0.34 pose-slot contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Verify runner and pose-slot production map
+        run: |
+          node --version
+          node --test scripts/test-project-art-top-hat-pose-slot-production.mjs
