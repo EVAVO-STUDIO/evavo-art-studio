@@ -5,20 +5,36 @@ on:
     branches: [main]
     paths:
       - "scripts/project-art/top-hat-pose-slot-production.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-package.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-foundation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-validation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-job.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-writer.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-package.mjs"
+      - "scripts/write-project-art-top-hat-pose-slot-provider-package.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-package-writer.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_PACKAGE.md"
       - ".github/workflows/project-art-top-hat-pose-slots.yml"
   pull_request:
     paths:
       - "scripts/project-art/top-hat-pose-slot-production.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-package.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-foundation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-validation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-job.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-writer.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-package.mjs"
+      - "scripts/write-project-art-top-hat-pose-slot-provider-package.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-package-writer.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_PACKAGE.md"
       - ".github/workflows/project-art-top-hat-pose-slots.yml"
   workflow_dispatch:
 
@@ -31,33 +47,50 @@ concurrency:
 
 jobs:
   contract:
-    name: Runtime 0.34 pose-slot contract
+    name: Runtime 0.34 pose-slot provider contract
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Verify runner and pose-slot contracts
+      - name: Checkout exact revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - name: Use supported Node
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
+        with:
+          node-version: "22"
+      - name: Verify pose-slot production and provider contracts
         run: |
           node --version
           node --test scripts/test-project-art-top-hat-pose-slot-production.mjs
           node --test scripts/test-project-art-top-hat-pose-slot-writer.mjs
-      - name: Compile create-only production plan artifact
+          node --test scripts/test-project-art-top-hat-pose-slot-provider-package.mjs
+          node --test scripts/test-project-art-top-hat-pose-slot-provider-package-writer.mjs
+      - name: Compile create-only production and provider evidence
         env:
           PLAN_PATH: ${{ runner.temp }}/top-hat-pose-slot-production.json
-          RECEIPT_PATH: ${{ runner.temp }}/top-hat-pose-slot-production.receipt.json
+          PLAN_RECEIPT_PATH: ${{ runner.temp }}/top-hat-pose-slot-production.receipt.json
+          PROVIDER_PATH: ${{ runner.temp }}/top-hat-pose-slot-provider-package.json
+          PROVIDER_RECEIPT_PATH: ${{ runner.temp }}/top-hat-pose-slot-provider-package.receipt.json
         run: |
           node scripts/write-project-art-top-hat-pose-slot-production.mjs \
-            --output "$PLAN_PATH" > "$RECEIPT_PATH"
+            --output "$PLAN_PATH" > "$PLAN_RECEIPT_PATH"
+          node scripts/write-project-art-top-hat-pose-slot-provider-package.mjs \
+            --output "$PROVIDER_PATH" > "$PROVIDER_RECEIPT_PATH"
           node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) JSON.parse(fs.readFileSync(file,"utf8"));' \
-            "$PLAN_PATH" "$RECEIPT_PATH"
-          sha256sum "$PLAN_PATH" "$RECEIPT_PATH"
-      - name: Upload bounded production map evidence
-        uses: actions/upload-artifact@v4
+            "$PLAN_PATH" "$PLAN_RECEIPT_PATH" \
+            "$PROVIDER_PATH" "$PROVIDER_RECEIPT_PATH"
+          sha256sum \
+            "$PLAN_PATH" "$PLAN_RECEIPT_PATH" \
+            "$PROVIDER_PATH" "$PROVIDER_RECEIPT_PATH"
+      - name: Upload bounded production evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: top-hat-pose-slot-production-${{ github.sha }}
           path: |
             ${{ runner.temp }}/top-hat-pose-slot-production.json
             ${{ runner.temp }}/top-hat-pose-slot-production.receipt.json
+            ${{ runner.temp }}/top-hat-pose-slot-provider-package.json
+            ${{ runner.temp }}/top-hat-pose-slot-provider-package.receipt.json
           if-no-files-found: error
           retention-days: 14
