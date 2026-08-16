@@ -736,7 +736,17 @@ try {
           requireAlpha: true,
           consistencyProfile: 'identity-locked',
           thresholds: { maximumVisibleMeanColourDistance: 441.672956 },
-          preview: { contactSheet: true, animatedGif: true, onionSkins: true, columns: 2 },
+          preview: {
+            contactSheet: true,
+            animatedGif: true,
+            onionSkins: true,
+            columns: 2,
+            frameDurationMs: 120,
+            interpolation: 'crossfade',
+            easing: 'smoothstep',
+            presentationFps: 25,
+            loopTransition: true,
+          },
         },
       ],
       authority: { providerExecution: false, candidateApproval: false },
@@ -752,6 +762,20 @@ try {
     });
     assert.equal(fullPlan.tasks.find((task) => task.id === 'slice-walk').alphaPolicy, 'required');
     assert.equal(fullPlan.tasks.find((task) => task.id === 'assemble-walk').alphaPolicy, 'required');
+    assert.deepEqual(fullPlan.tasks.find((task) => task.id === 'review-walk').preview, {
+      contactSheet: true,
+      animatedGif: true,
+      onionSkins: true,
+      frameDurationMs: 120,
+      columns: 2,
+      interpolation: 'crossfade',
+      easing: 'smoothstep',
+      presentationFps: 25,
+      loopTransition: true,
+      samplesPerTransition: 3,
+      renderedFrameCount: 6,
+      outputFrameDurationMs: 40,
+    });
     const planPath = path.join(workspace, 'full-sandbox-plan.json');
     await writeJsonCreateOnly(planPath, fullPlan);
     const sourceBefore = sha256(await readFile(path.join(workspace, 'art', 'hero.png')));
@@ -817,6 +841,36 @@ try {
     assert.equal(sequenceManifest.status, 'passed');
     assert.equal(sequenceManifest.transitions[0].centroidAlignedAlphaIoU, 1);
     assert.equal(typeof sequenceManifest.transitions[0].visibleMeanColourDistance, 'number');
+    assert.deepEqual(sequenceManifest.animationPreview, {
+      enabled: true,
+      sourceFrameCount: 2,
+      renderedFrameCount: 6,
+      interpolation: 'crossfade',
+      interpolationApplied: true,
+      easing: 'smoothstep',
+      loopTransition: true,
+      presentationFps: 25,
+      samplesPerTransition: 3,
+      sourceFrameDurationMs: 120,
+      outputFrameDurationMs: 40,
+      dimensionsMatch: true,
+      reviewOnly: true,
+      sourceMastersModified: false,
+    });
+    const animationPreview = run(
+      python.command,
+      [
+        ...python.prefix,
+        '-c',
+        [
+          'from PIL import Image',
+          `image=Image.open(${JSON.stringify(path.join(outputRoot, 'review', 'animation-preview.gif'))})`,
+          'assert image.n_frames == 6',
+          'assert image.info["duration"] == 40',
+        ].join('\n'),
+      ],
+    );
+    assert.equal(animationPreview.status, 0, animationPreview.stderr || animationPreview.stdout);
     assert.equal(receipt.effects.sourceMutation, false);
     assert.equal(receipt.resourceUsage.externalSourceFiles, fullPlan.externalSources.length);
     assert.equal(

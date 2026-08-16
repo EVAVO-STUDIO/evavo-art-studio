@@ -514,6 +514,10 @@ This is intended for UI assembly, VFX overlays, sprite/accessory layers, control
     "animatedGif": true,
     "onionSkins": true,
     "frameDurationMs": 83,
+    "interpolation": "crossfade",
+    "easing": "smoothstep",
+    "presentationFps": 30,
+    "loopTransition": true,
     "columns": 6
   }
 }
@@ -530,8 +534,20 @@ The review task publishes:
 - centroid-aligned alpha intersection-over-union;
 - blank, duplicate, dimension, alpha, movement, and excessive-change findings;
 - an indexed contact sheet;
-- an animation preview GIF;
+- an animation preview GIF, optionally expanded from sparse authored poses into a governed, smooth crossfade presentation;
 - optional adjacent onion-skin images.
+
+`preview.interpolation="crossfade"` is a review-only presentation mode for
+subtle avatar and UI motion where the production compositor also blends
+adjacent authored poses. `presentationFps` controls preview sampling (up to the
+GIF-safe 50 fps boundary), `easing` is `linear` or `smoothstep`, and
+`loopTransition=true` includes the final-to-first seam. Art Studio records the
+source and rendered frame counts, cadence, easing and loop policy in
+`sequence-review.json`, caps the expanded preview at 600 frames and includes
+the complete decoded working set in the compiled resource budget. The added
+frames are preview derivatives only: they never replace, approve or promote
+the real-alpha source masters, and loop closure remains a separate blocking
+review.
 
 A blocked review remains useful evidence. It does not masquerade as creative approval, gameplay approval, historical approval, or runtime approval.
 

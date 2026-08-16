@@ -36,6 +36,7 @@ const MAXIMUM_TOTAL_OUTPUT_BYTES = 16 * 1024 * 1024 * 1024;
 const MAXIMUM_VIDEO_FRAME_TIMESTAMPS = 512;
 const MAXIMUM_VIDEO_TIMESTAMP_MS = 24 * 60 * 60 * 1_000;
 const MAXIMUM_NORMAL_MAP_PIXELS = 8_388_608;
+const MAXIMUM_SEQUENCE_PREVIEW_FRAMES = 600;
 const REVIEW_LABEL_HEIGHT = 18;
 
 const OUTPUT_EXTENSIONS = Object.freeze({
@@ -898,17 +899,78 @@ function normalizeReviewTask(task, taskIndex, registry, targetClaims) {
     task.expectedHeight === undefined
       ? null
       : boundedInteger(task.expectedHeight, `tasks[${taskIndex}].expectedHeight`, 1, 65_536);
+  const frameDurationMs = boundedInteger(
+    task.preview?.frameDurationMs ?? 100,
+    `tasks[${taskIndex}].preview.frameDurationMs`,
+    20,
+    10_000,
+  );
+  const interpolation = boundedString(
+    task.preview?.interpolation ?? 'none',
+    `tasks[${taskIndex}].preview.interpolation`,
+    32,
+  );
+  if (!['none', 'crossfade'].includes(interpolation)) {
+    fail(
+      'PROJECT_ART_SANDBOX_TASK_INVALID',
+      `tasks[${taskIndex}].preview.interpolation must be none or crossfade.`,
+    );
+  }
+  const easing = boundedString(
+    task.preview?.easing ?? 'smoothstep',
+    `tasks[${taskIndex}].preview.easing`,
+    32,
+  );
+  if (!['linear', 'smoothstep'].includes(easing)) {
+    fail(
+      'PROJECT_ART_SANDBOX_TASK_INVALID',
+      `tasks[${taskIndex}].preview.easing must be linear or smoothstep.`,
+    );
+  }
+  const presentationFps = boundedNumber(
+    task.preview?.presentationFps ?? 30,
+    `tasks[${taskIndex}].preview.presentationFps`,
+    1,
+    50,
+  );
+  const loopTransition = task.preview?.loopTransition === true;
+  const samplesPerTransition =
+    interpolation === 'crossfade'
+      ? Math.max(1, Math.round((frameDurationMs * presentationFps) / 1_000))
+      : 1;
+  const transitionCount =
+    sources.length < 2
+      ? 0
+      : loopTransition
+        ? sources.length
+        : sources.length - 1;
+  const renderedFrameCount =
+    interpolation === 'crossfade' && transitionCount > 0
+      ? transitionCount * samplesPerTransition + (loopTransition ? 0 : 1)
+      : sources.length;
+  if (renderedFrameCount > MAXIMUM_SEQUENCE_PREVIEW_FRAMES) {
+    fail(
+      'PROJECT_ART_SANDBOX_TASK_INVALID',
+      `tasks[${taskIndex}] smooth animation preview would render ${renderedFrameCount} frames; ` +
+        `the governed maximum is ${MAXIMUM_SEQUENCE_PREVIEW_FRAMES}.`,
+    );
+  }
   const preview = {
     contactSheet: task.preview?.contactSheet !== false,
     animatedGif: task.preview?.animatedGif !== false,
     onionSkins: task.preview?.onionSkins === true,
-    frameDurationMs: boundedInteger(
-      task.preview?.frameDurationMs ?? 100,
-      `tasks[${taskIndex}].preview.frameDurationMs`,
-      20,
-      10_000,
-    ),
+    frameDurationMs,
     columns: boundedInteger(task.preview?.columns ?? 8, `tasks[${taskIndex}].preview.columns`, 1, 100),
+    interpolation,
+    easing,
+    presentationFps,
+    loopTransition,
+    samplesPerTransition,
+    renderedFrameCount,
+    outputFrameDurationMs:
+      interpolation === 'crossfade'
+        ? Math.max(20, Math.round(frameDurationMs / samplesPerTransition))
+        : frameDurationMs,
   };
   if (expectedWidth !== null && expectedHeight !== null) {
     const framePixels = expectedWidth * expectedHeight;
@@ -937,6 +999,19 @@ function normalizeReviewTask(task, taskIndex, registry, targetClaims) {
       assertActiveDecodedPixelLimit(
         [sources.length * framePixels, sheetWidth * sheetHeight],
         `tasks[${taskIndex}] contact-sheet working set`,
+        registry.maximumDecodedPixels,
+      );
+    }
+    if (preview.animatedGif) {
+      assertActiveDecodedPixelLimit(
+        preview.interpolation === 'none'
+          ? [sources.length * framePixels, framePixels * 2]
+          : [
+              sources.length * framePixels,
+              preview.renderedFrameCount * framePixels,
+              framePixels,
+            ],
+        `tasks[${taskIndex}] animation-preview working set`,
         registry.maximumDecodedPixels,
       );
     }
@@ -1489,7 +1564,17 @@ function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
       assertActiveDecodedPixelLimit([sourceTotal, sheetWidth * sheetHeight * 2], `Task ${task.id} contact-sheet working set`, maximumDecodedPixels);
     }
     if (task.preview.animatedGif) {
-      assertActiveDecodedPixelLimit([sourceTotal, maximumFramePixels * 2], `Task ${task.id} animation-preview working set`, maximumDecodedPixels);
+      assertActiveDecodedPixelLimit(
+        task.preview.interpolation === 'none'
+          ? [sourceTotal, maximumFramePixels * 2]
+          : [
+              sourceTotal,
+              maximumFramePixels * task.preview.renderedFrameCount,
+              maximumFramePixels,
+            ],
+        `Task ${task.id} animation-preview working set`,
+        maximumDecodedPixels,
+      );
     }
     if (task.preview.onionSkins && dimensions.length > 1) {
       assertActiveDecodedPixelLimit([sourceTotal, maximumFramePixels * 5], `Task ${task.id} onion-skin working set`, maximumDecodedPixels);

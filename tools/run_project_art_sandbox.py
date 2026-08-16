@@ -51,6 +51,7 @@ MAXIMUM_MEDIA_TOOL_OUTPUT_BYTES = 1024 * 1024
 MEDIA_TOOL_TIMEOUT_SECONDS = 120
 MAXIMUM_VIDEO_FRAME_TIMESTAMPS = 512
 MAXIMUM_VIDEO_TIMESTAMP_MS = 86_400_000
+MAXIMUM_SEQUENCE_PREVIEW_FRAMES = 600
 REVIEW_LABEL_HEIGHT = 18
 SHA256_CHARS = set("0123456789abcdef")
 Image.MAX_IMAGE_PIXELS = MAXIMUM_PIXELS
@@ -1717,6 +1718,121 @@ def save_animation(
     context.register_output(target, f"animation output {target}")
 
 
+def sequence_animation_preview_evidence(
+    frames: list[Image.Image],
+    preview: dict[str, Any],
+) -> dict[str, Any]:
+    enabled = bool(preview.get("animatedGif", False))
+    interpolation = str(preview.get("interpolation", "none"))
+    easing = str(preview.get("easing", "smoothstep"))
+    if interpolation not in {"none", "crossfade"}:
+        fail("sequence-review animation preview interpolation is invalid")
+    if easing not in {"linear", "smoothstep"}:
+        fail("sequence-review animation preview easing is invalid")
+    loop_transition = bool(preview.get("loopTransition", False))
+    presentation_fps = governed_number(
+        preview.get("presentationFps", 30),
+        "sequence-review preview.presentationFps",
+        1,
+        50,
+    )
+    samples_per_transition = governed_integer(
+        preview.get("samplesPerTransition", 1),
+        "sequence-review preview.samplesPerTransition",
+        1,
+        MAXIMUM_SEQUENCE_PREVIEW_FRAMES,
+    )
+    source_frame_duration_ms = governed_integer(
+        preview.get("frameDurationMs", 100),
+        "sequence-review preview.frameDurationMs",
+        20,
+        10_000,
+    )
+    output_frame_duration_ms = governed_integer(
+        preview.get("outputFrameDurationMs", source_frame_duration_ms),
+        "sequence-review preview.outputFrameDurationMs",
+        20,
+        10_000,
+    )
+    dimensions_match = all(frame.size == frames[0].size for frame in frames[1:])
+    interpolation_applied = (
+        enabled
+        and interpolation == "crossfade"
+        and len(frames) > 1
+        and dimensions_match
+    )
+    rendered_frame_count = (
+        governed_integer(
+            preview.get("renderedFrameCount", len(frames)),
+            "sequence-review preview.renderedFrameCount",
+            1,
+            MAXIMUM_SEQUENCE_PREVIEW_FRAMES,
+        )
+        if interpolation_applied
+        else len(frames) if enabled else 0
+    )
+    if rendered_frame_count > MAXIMUM_SEQUENCE_PREVIEW_FRAMES:
+        fail(
+            "sequence-review animation preview exceeds the governed "
+            f"{MAXIMUM_SEQUENCE_PREVIEW_FRAMES}-frame boundary"
+        )
+    return {
+        "enabled": enabled,
+        "sourceFrameCount": len(frames),
+        "renderedFrameCount": rendered_frame_count,
+        "interpolation": interpolation,
+        "interpolationApplied": interpolation_applied,
+        "easing": easing,
+        "loopTransition": loop_transition,
+        "presentationFps": presentation_fps,
+        "samplesPerTransition": samples_per_transition,
+        "sourceFrameDurationMs": source_frame_duration_ms,
+        "outputFrameDurationMs": output_frame_duration_ms,
+        "dimensionsMatch": dimensions_match,
+        "reviewOnly": True,
+        "sourceMastersModified": False,
+    }
+
+
+def create_sequence_animation_preview_frames(
+    frames: list[Image.Image],
+    preview: dict[str, Any],
+    evidence: dict[str, Any],
+) -> tuple[list[Image.Image], bool]:
+    if not evidence["interpolationApplied"]:
+        return frames, False
+    samples = int(evidence["samplesPerTransition"])
+    loop_transition = bool(evidence["loopTransition"])
+    easing = str(evidence["easing"])
+    transition_count = len(frames) if loop_transition else len(frames) - 1
+    output: list[Image.Image] = []
+    try:
+        for index in range(transition_count):
+            current = frames[index]
+            following = frames[(index + 1) % len(frames)]
+            for sample in range(samples):
+                amount = sample / samples
+                if easing == "smoothstep":
+                    amount = amount * amount * (3 - 2 * amount)
+                output.append(
+                    current.copy()
+                    if amount == 0
+                    else Image.blend(current, following, amount)
+                )
+        if not loop_transition:
+            output.append(frames[-1].copy())
+        if len(output) != int(evidence["renderedFrameCount"]):
+            fail(
+                "sequence-review animation preview frame count disagrees with the "
+                "hash-bound plan"
+            )
+        return output, True
+    except Exception:
+        for frame in output:
+            frame.close()
+        raise
+
+
 def output_record(staging_root: Path, target: Path, image: Image.Image | None = None, *, role: str = "image") -> dict[str, Any]:
     digest, size = sha256_file(target)
     record: dict[str, Any] = {
@@ -2697,8 +2813,18 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
             context.maximum_decoded_pixels,
         )
     if preview["animatedGif"]:
+        rendered_frame_count = int(preview.get("renderedFrameCount", len(dimensions)))
+        interpolation = str(preview.get("interpolation", "none"))
         require_active_pixel_budget(
-            [source_pixels, maximum_frame_pixels * 2],
+            (
+                [source_pixels, maximum_frame_pixels * 2]
+                if interpolation == "none"
+                else [
+                    source_pixels,
+                    maximum_frame_pixels * rendered_frame_count,
+                    maximum_frame_pixels,
+                ]
+            ),
             f"sequence-review task {task['id']} animation-preview working set",
             context.maximum_decoded_pixels,
         )
@@ -2836,6 +2962,18 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                 issues.append({"code": "visible-colour-drift", **transition})
             if aligned_iou is not None and aligned_iou < float(thresholds["minimumCentroidAlignedAlphaIoU"]):
                 issues.append({"code": "centroid-aligned-silhouette-drift", **transition})
+        animation_preview = sequence_animation_preview_evidence(frames, preview)
+        if (
+            animation_preview["enabled"]
+            and animation_preview["interpolation"] == "crossfade"
+            and not animation_preview["dimensionsMatch"]
+        ):
+            issues.append(
+                {
+                    "code": "animation-preview-interpolation-dimension-mismatch",
+                    "message": "Crossfade preview requires equal frame dimensions.",
+                }
+            )
         manifest = {
             "schema": "evavo.project-art-sequence-review.v1",
             "taskId": task["id"],
@@ -2844,6 +2982,7 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
             "thresholds": thresholds,
             "frames": frame_records,
             "transitions": transitions,
+            "animationPreview": animation_preview,
             "issues": issues,
             "creativeApprovalPerformed": False,
             "runtimeApprovalPerformed": False,
@@ -2867,10 +3006,24 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                 sheet.close()
         if preview["animatedGif"]:
             value = target_directory / "animation-preview.gif"
-            duration = int(preview["frameDurationMs"])
-            save_animation(context, frames, value, duration)
-            outputs.append(output_record(context.staging, value, role="review-animation"))
-            output_paths.append(value)
+            animation_frames, owns_animation_frames = create_sequence_animation_preview_frames(
+                frames,
+                preview,
+                animation_preview,
+            )
+            try:
+                save_animation(
+                    context,
+                    animation_frames,
+                    value,
+                    int(animation_preview["outputFrameDurationMs"]),
+                )
+                outputs.append(output_record(context.staging, value, role="review-animation"))
+                output_paths.append(value)
+            finally:
+                if owns_animation_frames:
+                    for animation_frame in animation_frames:
+                        animation_frame.close()
         if preview["onionSkins"] and len(frames) > 1:
             onion_directory = target_directory / "onion-skins"
             onion_directory.mkdir(parents=True, exist_ok=False)
