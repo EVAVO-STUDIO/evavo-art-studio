@@ -109,10 +109,10 @@ Actor animation work additionally supplies the required `frameIndex` token throu
 The first binding is pinned to Godot Game Test Lab commit:
 
 ```text
-0b07c4834e798776c86687791e6e54ea6816ce98
+85cf19244454b1a98c94765fd0806827f661579d
 ```
 
-That Test Lab release adds the independent `classic-adventure-vga-art` checker and `godot-lab-classic-vga` command. The Adventure Studio proof workflow must use the same exact Test Lab SHA for both the source-art preflight and the reusable Linux sandbox call. Moving branch references are not release evidence.
+That Test Lab release adds the independent `classic-adventure-vga-art` checker and `scripts/classic_adventure_vga_qa.py` repository command. The Adventure Studio proof workflow must use the same exact Test Lab SHA for both the source-art preflight and the reusable Linux sandbox call. Moving branch references are not release evidence.
 
 The Linux sandbox remains responsible for:
 
