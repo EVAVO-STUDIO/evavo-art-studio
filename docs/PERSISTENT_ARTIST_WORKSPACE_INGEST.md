@@ -1,6 +1,6 @@
 # Persistent Artist Workspace external ingest
 
-The external-ingest boundary lets ChatGPT, Claude and trusted EVAVO agents take exact files from mounted chat attachments, generated-image folders, approved local art folders, RAW_ART review sessions or provider output folders and place them into an existing persistent Artist Workspace.
+The external-ingest boundary lets ChatGPT, Claude and trusted EVAVO agents take exact files from mounted chat attachments, generated-image folders, reference-video folders, approved local art folders, RAW_ART review sessions or provider output folders and place them into an existing persistent Artist Workspace.
 
 It closes the gap between **having a file available to the conversation** and **having a durable governed original plus an editable working copy**.
 
@@ -19,7 +19,7 @@ chat attachment / generated image / approved folder
 → commit marker written last
 ```
 
-The original external file is read-only. It is never renamed, deleted, overwritten or moved.
+The original external file is read-only. It is never renamed, deleted, overwritten or moved. Image dimensions are recorded when a format can be safely inspected; MP4/M4V, MOV, WebM, MKV and AVI reference clips retain their exact video media type and bytes for later governed `video-frame-extract` work.
 
 ## Relationship to RAW_ART folder review
 

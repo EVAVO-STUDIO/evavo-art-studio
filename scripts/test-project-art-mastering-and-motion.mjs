@@ -21,6 +21,7 @@ import {
 } from './project-art/common.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ATTACK_VIDEO_TIMESTAMP_MS = 86_400_001;
 
 function command(commandName, args, options = {}) {
   const result = spawnSync(commandName, args, {
@@ -60,6 +61,25 @@ function pythonCommand() {
   return null;
 }
 
+function mediaCommand(name, environmentNames) {
+  const configured = environmentNames
+    .map((environmentName) => process.env[environmentName])
+    .find((value) => typeof value === 'string' && value.trim());
+  const candidates = configured ? [configured.trim()] : [name];
+  for (const candidate of candidates) {
+    const result = spawnSync(candidate, ['-version'], {
+      encoding: 'utf8',
+      shell: false,
+      windowsHide: true,
+    });
+    if (result.status === 0) return candidate;
+  }
+  if (process.env.PROJECT_ART_REQUIRE_PILLOW === '1' || process.env.PROJECT_ART_REQUIRE_MEDIA_TOOLS === '1') {
+    throw new Error(`Project Art requires an executable ${name} for governed video-frame extraction regressions.`);
+  }
+  return null;
+}
+
 function rehash(document) {
   const result = structuredClone(document);
   delete result.documentSha256;
@@ -72,6 +92,8 @@ if (!python) {
   console.log('Project Art mastering and motion runtime regressions skipped: Pillow unavailable; the dedicated Project Art workflow requires the exact backend.');
   process.exit(0);
 }
+const ffmpeg = mediaCommand('ffmpeg', ['EVAVO_ART_FFMPEG_BIN', 'FFMPEG_BIN']);
+const ffprobe = mediaCommand('ffprobe', ['EVAVO_ART_FFPROBE_BIN', 'FFPROBE_BIN']);
 
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'evavo-project-art-mastering-motion-'));
 const workspace = path.join(temporary, 'workspace');
@@ -80,6 +102,7 @@ await mkdir(workspace, { recursive: true });
 try {
   const source = path.join(workspace, 'source.png');
   const mask = path.join(workspace, 'mask.png');
+  const videoFramePattern = path.join(workspace, 'video-frame-%04d.png');
   const fixture = `
 from PIL import Image, ImageDraw
 from pathlib import Path
@@ -95,6 +118,11 @@ matte = Image.new('RGBA', (48, 48), (0, 0, 0, 0))
 matte_draw = ImageDraw.Draw(matte)
 matte_draw.ellipse((5, 2, 42, 45), fill=(255, 255, 255, 255))
 matte.save(mask)
+for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
+    frame = Image.new('RGBA', (48, 32), (0, 0, 0, 0))
+    frame_draw = ImageDraw.Draw(frame)
+    frame_draw.rectangle((8 + index * 5, 6, 27 + index * 5, 25), fill=colour)
+    frame.save(Path(${JSON.stringify(workspace)}) / f'video-frame-{index:04d}.png')
 `;
   command(python.name, [...python.prefix, '-c', fixture]);
 
@@ -133,6 +161,7 @@ matte.save(mask)
           { op: 'defringe', radius: 1, maximumAlpha: 254, strength: 0.25 },
           { op: 'drop-shadow', offsetX: 2, offsetY: 2, radius: 1.5, opacity: 0.25, expandCanvas: false },
           { op: 'outer-glow', radius: 1, spread: 0, opacity: 0.1, colour: '#ffffff', expandCanvas: false },
+          { op: 'rim-light', width: 3, angleDegrees: 315, softness: 0.5, opacity: 0.65, colour: '#8fe8ff', blendMode: 'screen' },
         ],
         profile: {
           name: 'transparent-sprite-master',
@@ -149,6 +178,26 @@ matte.save(mask)
           minimumLuminanceSpan: 5,
           maximumEdgeMatteFraction: 1,
         },
+      },
+      {
+        id: 'normal-map',
+        kind: 'image',
+        source: 'source.png',
+        targetPath: 'textures/source-normal.png',
+        outputFormat: 'png',
+        operations: [
+          { op: 'normal-map-from-height', source: 'alpha', strength: 2.5, blurRadius: 0.5, preserveAlpha: true },
+        ],
+      },
+      {
+        id: 'rim-light-proof',
+        kind: 'image',
+        source: 'source.png',
+        targetPath: 'effects/source-rim-light.png',
+        outputFormat: 'png',
+        operations: [
+          { op: 'rim-light', width: 4, angleDegrees: 315, softness: 1, opacity: 1, colour: '#5de7ffff', blendMode: 'screen' },
+        ],
       },
       {
         id: 'motion-preview',
@@ -202,8 +251,8 @@ matte.save(mask)
   ]);
   const plan = JSON.parse(await readFile(planPath, 'utf8'));
   verifyDocumentHash(plan);
-  assert.deepEqual(plan.tasks.map((task) => task.kind), ['image-master', 'motion-sequence']);
-  assert.equal(plan.limits.plannedMaximumOutputFiles, 10);
+  assert.deepEqual(plan.tasks.map((task) => task.kind), ['image-master', 'image', 'image', 'motion-sequence']);
+  assert.equal(plan.limits.plannedMaximumOutputFiles, 12);
 
   command(python.name, [...python.prefix,
     'tools/run_project_art_sandbox.py',
@@ -215,7 +264,7 @@ matte.save(mask)
   const receipt = JSON.parse(await readFile(path.join(outputRoot, '_evavo', 'project-art-sandbox-receipt.json'), 'utf8'));
   verifyDocumentHash(receipt);
   assert.equal(receipt.status, 'passed');
-  assert.equal(receipt.tasks.length, 2);
+  assert.equal(receipt.tasks.length, 4);
 
   const masterReport = JSON.parse(await readFile(path.join(outputRoot, 'masters', 'source-master.mastering.json'), 'utf8'));
   verifyDocumentHash(masterReport);
@@ -224,6 +273,26 @@ matte.save(mask)
   assert.equal(masterReport.metrics.dimensions.width, 48);
   assert.ok(masterReport.operations.some((operation) => operation.op === 'defringe'));
   assert.ok(masterReport.operations.some((operation) => operation.op === 'outer-glow'));
+  assert.ok(masterReport.operations.some((operation) => operation.op === 'rim-light'));
+
+  const normalMapPath = path.join(outputRoot, 'textures', 'source-normal.png');
+  assert.equal((await lstat(normalMapPath)).isFile(), true);
+  command(python.name, [...python.prefix, '-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(normalMapPath)}).convert('RGBA')
+assert image.size == (48, 48)
+assert image.getpixel((24, 24))[2] > image.getpixel((24, 24))[0]
+assert image.getpixel((0, 0))[3] == 0
+`]);
+  const rimLightPath = path.join(outputRoot, 'effects', 'source-rim-light.png');
+  assert.equal((await lstat(rimLightPath)).isFile(), true);
+  command(python.name, [...python.prefix, '-c', `
+from PIL import Image
+source = Image.open(${JSON.stringify(source)}).convert('RGBA')
+rim = Image.open(${JSON.stringify(rimLightPath)}).convert('RGBA')
+assert source.getchannel('A').tobytes() == rim.getchannel('A').tobytes()
+assert source.tobytes() != rim.tobytes()
+`]);
 
   const motionRoot = path.join(outputRoot, 'motion', 'idle-preview');
   const motionManifest = JSON.parse(await readFile(path.join(motionRoot, 'motion-sequence.json'), 'utf8'));
@@ -235,6 +304,121 @@ matte.save(mask)
     assert.equal((await lstat(path.join(motionRoot, `frame-${index.toString().padStart(4, '0')}.png`))).isFile(), true);
   }
   assert.equal((await lstat(path.join(motionRoot, 'motion-preview.gif'))).isFile(), true);
+
+  if (ffmpeg && ffprobe) {
+    const videoPath = path.join(workspace, 'reference-motion.mkv');
+    command(ffmpeg, [
+      '-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
+      '-framerate', '2', '-start_number', '0', '-i', videoFramePattern,
+      '-frames:v', '2', '-c:v', 'ffv1', '-pix_fmt', 'bgra', videoPath,
+    ]);
+    const videoRequest = {
+      schema: 'evavo.project-art-sandbox-request.v1',
+      sandboxId: 'video-frame-extraction-regression-v1',
+      projectId: 'artist-workspace-regression',
+      purpose: 'Extract exact, attributable video reference frames without granting delivery admission.',
+      tasks: [
+        {
+          id: 'reference-frames',
+          kind: 'video-frame-extract',
+          source: 'reference-motion.mkv',
+          targetDirectory: 'references/video',
+          fileNamePattern: 'frame-{index}.png',
+          startIndex: 0,
+          timestampsMs: [0, 400],
+          expectedWidth: 48,
+          expectedHeight: 32,
+          preserveSourceAlpha: true,
+        },
+        {
+          id: 'prepare-reference-frame',
+          kind: 'image',
+          source: { taskId: 'reference-frames', outputIndex: 0 },
+          targetPath: 'references/prepared-frame.png',
+          outputFormat: 'png',
+          operations: [
+            { op: 'crop', x: 4, y: 2, width: 40, height: 28 },
+          ],
+        },
+      ],
+      authority: {
+        sourceMutation: false,
+        sourceDeletion: false,
+        providerExecution: false,
+        candidateApproval: false,
+        candidatePromotion: false,
+        targetRepositoryMutation: false,
+        publication: false,
+        deployment: false,
+        forcePush: false,
+      },
+    };
+    const videoRequestPath = path.join(workspace, 'video-request.json');
+    const videoPlanPath = path.join(workspace, 'video-plan.json');
+    const videoOutputRoot = path.join(workspace, 'video-output');
+    await writeFile(videoRequestPath, `${JSON.stringify(videoRequest, null, 2)}\n`);
+    command(process.execPath, [
+      'scripts/compile-project-art-sandbox.mjs',
+      '--workspace-root', workspace,
+      '--request', videoRequestPath,
+      '--output', videoPlanPath,
+      '--compiled-at', '2026-08-11T09:11:00.000Z',
+    ]);
+    const videoPlan = JSON.parse(await readFile(videoPlanPath, 'utf8'));
+    verifyDocumentHash(videoPlan);
+    assert.equal(videoPlan.execution.runtime, 'python-pillow-governed-ffmpeg');
+    assert.equal(videoPlan.externalSources[0].mediaKind, 'video');
+    assert.equal(videoPlan.limits.plannedMaximumOutputFiles, 5);
+    command(python.name, [...python.prefix,
+      'tools/run_project_art_sandbox.py',
+      '--workspace-root', workspace,
+      '--plan', videoPlanPath,
+      '--output-root', videoOutputRoot,
+    ]);
+    const videoManifest = JSON.parse(await readFile(path.join(videoOutputRoot, 'references', 'video', 'video-frames.json'), 'utf8'));
+    verifyDocumentHash(videoManifest);
+    assert.equal(videoManifest.schema, 'evavo.project-art-video-frame-extraction.v1');
+    assert.equal(videoManifest.frames.length, 2);
+    assert.equal(videoManifest.selection.mode, 'requested-timestamps-ms');
+    assert.equal(videoManifest.selection.frameSemantics, 'first-decodable-frame-at-or-after-requested-time');
+    assert.match(videoManifest.tools.ffmpeg.sha256, /^[0-9a-f]{64}$/u);
+    assert.match(videoManifest.tools.ffprobe.sha256, /^[0-9a-f]{64}$/u);
+    assert.equal(videoManifest.authority.deliveryAdmission, false);
+    assert.equal(videoManifest.frames.every((frame) => frame.deliveryAdmissionPerformed === false), true);
+    const extractedFrame0 = path.join(videoOutputRoot, 'references', 'video', 'frame-0000.png');
+    const extractedFrame1 = path.join(videoOutputRoot, 'references', 'video', 'frame-0001.png');
+    const preparedFrame = path.join(videoOutputRoot, 'references', 'prepared-frame.png');
+    assert.equal((await lstat(preparedFrame)).isFile(), true);
+    command(python.name, [...python.prefix, '-c', `
+from PIL import Image
+first = Image.open(${JSON.stringify(extractedFrame0)}).convert('RGBA')
+second = Image.open(${JSON.stringify(extractedFrame1)}).convert('RGBA')
+prepared = Image.open(${JSON.stringify(preparedFrame)}).convert('RGBA')
+assert first.size == second.size == (48, 32)
+assert first.getpixel((20, 10)) == (228, 54, 92, 255)
+assert second.getpixel((20, 10)) == (40, 190, 128, 255)
+assert first.getpixel((10, 10))[3] == 255
+assert second.getpixel((10, 10))[3] == 0
+assert prepared.size == (40, 28)
+assert prepared.getpixel((16, 8)) == first.getpixel((20, 10))
+`]);
+
+    const attackedVideoPlan = structuredClone(videoPlan);
+    attackedVideoPlan.tasks[0].timestampsMs = [0, ATTACK_VIDEO_TIMESTAMP_MS];
+    const attackedVideoPlanPath = path.join(workspace, 'attacked-video-plan.json');
+    const attackedVideoOutput = path.join(workspace, 'attacked-video-output');
+    await writeFile(attackedVideoPlanPath, `${JSON.stringify(rehash(attackedVideoPlan), null, 2)}\n`);
+    const attackedVideoResult = command(python.name, [...python.prefix,
+      'tools/run_project_art_sandbox.py',
+      '--workspace-root', workspace,
+      '--plan', attackedVideoPlanPath,
+      '--output-root', attackedVideoOutput,
+    ], { expectFailure: true });
+    assert.match(`${attackedVideoResult.stdout}\n${attackedVideoResult.stderr}`, /timestampsMs are invalid/u);
+    await assert.rejects(lstat(attackedVideoOutput));
+  } else {
+    console.log('Governed video-frame runtime regression skipped: FFmpeg or ffprobe unavailable outside the required Project Art CI lane.');
+  }
 
   const blockedRequest = structuredClone(request);
   blockedRequest.sandboxId = 'mastering-profile-block-v1';
@@ -261,7 +445,7 @@ ${blockedResult.stderr}`, /PROJECT_ART_MASTERING_PROFILE_FAILED/u);
   await assert.rejects(lstat(blockedOutputRoot));
 
   const tamperedPlan = structuredClone(plan);
-  tamperedPlan.tasks[1].frameCount = 20_001;
+  tamperedPlan.tasks[3].frameCount = 20_001;
   const tamperedPlanPath = path.join(workspace, 'tampered-plan.json');
   await writeFile(tamperedPlanPath, `${JSON.stringify(rehash(tamperedPlan), null, 2)}\n`);
   const tamperedOutputRoot = path.join(workspace, 'tampered-output');
@@ -272,6 +456,20 @@ ${blockedResult.stderr}`, /PROJECT_ART_MASTERING_PROFILE_FAILED/u);
     '--output-root', tamperedOutputRoot,
   ], { expectFailure: true });
   await assert.rejects(lstat(tamperedOutputRoot));
+
+  const operationTypeAttack = structuredClone(plan);
+  operationTypeAttack.tasks[0].operations.find((operation) => operation.op === 'rim-light').width = true;
+  const operationTypeAttackPath = path.join(workspace, 'operation-type-attack-plan.json');
+  const operationTypeAttackOutput = path.join(workspace, 'operation-type-attack-output');
+  await writeFile(operationTypeAttackPath, `${JSON.stringify(rehash(operationTypeAttack), null, 2)}\n`);
+  const operationTypeAttackResult = command(python.name, [...python.prefix,
+    'tools/run_project_art_sandbox.py',
+    '--workspace-root', workspace,
+    '--plan', operationTypeAttackPath,
+    '--output-root', operationTypeAttackOutput,
+  ], { expectFailure: true });
+  assert.match(`${operationTypeAttackResult.stdout}\n${operationTypeAttackResult.stderr}`, /rim-light\.width must be an integer/u);
+  await assert.rejects(lstat(operationTypeAttackOutput));
 
   const badCurve = structuredClone(request);
   badCurve.sandboxId = 'bad-curve-v1';
@@ -290,7 +488,8 @@ ${blockedResult.stderr}`, /PROJECT_ART_MASTERING_PROFILE_FAILED/u);
   console.log('- professional geometry, colour, filter, alpha and layer-effect operations execute deterministically');
   console.log('- image-master emits an exact self-hashed mastering report and enforces release profiles');
   console.log('- motion-sequence renders bounded keyframed PNG frames, manifest and GIF evidence');
-  console.log('- mastering blockers, malformed curves and correctly rehashed output-count attacks fail closed');
+  console.log('- governed video reference extraction fingerprints tools and never grants delivery admission');
+  console.log('- mastering blockers, malformed curves and correctly rehashed operation-type, output-count or video-bound attacks fail closed');
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }

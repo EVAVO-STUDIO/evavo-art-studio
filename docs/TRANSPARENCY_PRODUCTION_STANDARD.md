@@ -44,6 +44,35 @@ Use `pnpm art -- inspect-alpha --input .\candidate.png` for a read-only machine-
 
 Matte removal is border-connected. It does not globally delete every matching green, magenta or blue pixel, so enclosed subject colours survive. Partial edges are unmixed against local matte and foreground estimates, complementary provider halos are repaired, recomposition is checked, alpha-zero RGB is canonicalized and bounded subject-colour bleed is rebuilt for texture filtering.
 
+## Ambiguous natural-background recovery
+
+Deterministic recovery remains the first choice because it is explainable and can prove exact matte ownership. A photograph, painted scene, hair/fur edge, smoke, translucent material or background whose colours overlap the subject may be genuinely ambiguous. In that case Art Studio must not increase a colour-distance threshold until the source happens to pass.
+
+Use a governed semantic-mask lane instead:
+
+1. Preserve the exact source and classify deterministic alpha/matte evidence first.
+2. Run a pinned segmentation or high-resolution matting profile such as promptable SAM 2 or a reviewed BiRefNet profile through the shared `image-finishing` environment and its governed `image-segmentation` / `image-matting` slots. The exact reviewed-model manifest, workflow, checkpoint, runtime, preprocess settings and output mask must be hashed. Model weights are operator-installed; Art Studio does not silently download or float them.
+3. Treat the model result as a soft mask candidate, never as approved alpha.
+4. Combine it with known evidence: border-connected matte is definite background, an artist protect mask is definite foreground, an artist remove mask is definite background, and only the unresolved band may use model confidence.
+5. Refine edges with bounded alpha morphology, feathering, defringing and colour decontamination. Do not globally erase a colour that also appears inside the subject.
+6. Recompose against the original background where known, inspect the alpha mask, and proof the result over all hostile solid plates.
+7. Retain the source, raw model mask, artist masks, mastered alpha and evidence as separate workspace versions.
+
+The exact soft mask enters Project Art as an ordinary immutable image source. Apply it on a transparent `image-composite` canvas, then run `master-alpha` on that native-alpha working result with optional protect/remove masks. This keeps semantic inference separate from deterministic alpha cleanup and makes every mask replaceable without changing the original image.
+
+For video, propagate or track a mask only as reference evidence, then review temporal alpha stability frame by frame. One good mask on frame zero does not prove the silhouette on later frames. A semantic model may help locate the subject, but it cannot grant creative approval, delivery admission or atlas admission.
+
+This gives recovery several independent routes without confusing them:
+
+| Source condition | Primary route | Required fallback/control |
+|---|---|---|
+| proven native alpha | preserve and inspect | protect/remove masks only for a demonstrated defect |
+| declared low-collision flat matte | border-connected extraction and unmixing | artist masks for collisions or retained islands |
+| confidently inferred flat border matte | evidence-backed connected extraction | reject if confidence or recomposition proof is insufficient |
+| painted transparency checker | periodic-grid reconstruction only when conclusive | otherwise reject/regenerate; never accept the grid |
+| natural or overlapping background | pinned semantic soft mask | protect/remove masks, edge refinement and hostile proofs |
+| hair, fur, smoke, glass or glow | semantic/trimap candidate plus soft-alpha refinement | full-resolution artist review; never force binary alpha |
+
 ## Artist-guided correction
 
 Automatic evidence stays authoritative, but an artist can refine the recovered silhouette with two ordinary lossless masks:

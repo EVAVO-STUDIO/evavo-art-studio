@@ -296,6 +296,15 @@ export const IMAGE_EXTENSIONS = new Set([
   '.ktx2',
 ]);
 
+export const VIDEO_EXTENSIONS = new Set([
+  '.mp4',
+  '.m4v',
+  '.mov',
+  '.webm',
+  '.mkv',
+  '.avi',
+]);
+
 export const SOURCE_ART_EXTENSIONS = new Set([
   '.psd',
   '.psb',
@@ -378,6 +387,17 @@ export function mediaTypeFromPath(filePath) {
       return 'image/ktx';
     case '.ktx2':
       return 'image/ktx2';
+    case '.mp4':
+    case '.m4v':
+      return 'video/mp4';
+    case '.mov':
+      return 'video/quicktime';
+    case '.webm':
+      return 'video/webm';
+    case '.mkv':
+      return 'video/x-matroska';
+    case '.avi':
+      return 'video/x-msvideo';
     default:
       return 'application/octet-stream';
   }

@@ -252,7 +252,7 @@ The `separateAssets` list is authoritative. Common examples are cast shadows, he
 
 ## GPT Image 2 adapter
 
-The first remote adapter uses the OpenAI Image API directly through bounded server-side `fetch` calls. As of 29 July 2026, official OpenAI documentation states that GPT Image 2 supports generation, editing, multiple image inputs and mask editing; image inputs use high fidelity automatically. Its flexible image sizes must use multiples of 16, stay within 3840 pixels per edge and a 3:1 aspect ratio, and contain 655,360 to 8,294,400 pixels. GPT Image 2 does not currently support transparent backgrounds.
+The first remote adapter uses the OpenAI Image API directly through bounded server-side `fetch` calls. As of 16 August 2026, official OpenAI documentation states that GPT Image 2 supports generation, editing, multiple image inputs and mask editing. Input fidelity defaults to low and therefore has to be requested explicitly for continuity-sensitive edits. Its flexible image sizes must use multiples of 16, stay within 3840 pixels per edge and a 3:1 aspect ratio, and contain 655,360 to 8,294,400 pixels. GPT Image 2 does not currently support transparent backgrounds.
 
 Sources:
 
@@ -271,7 +271,7 @@ Generation without references uses `/v1/images/generations`. Any edit, inpaint o
 
 The Art Studio OpenAI adapter explicitly declares semantic image-reference capabilities for identity, direction, temporal neighbours, palette, line treatment, materials and layer context because those roles are preserved in its ordered inputs and compiled prompt. It deliberately does **not** declare `pose-control`, `edge-control` or `depth-control`: those are reserved for adapters that implement a genuine structural-control channel rather than treating a control map as an ordinary image reference. A request that marks one of those structural controls as required will therefore not route to the OpenAI adapter.
 
-The adapter deliberately omits an `input_fidelity` override because GPT Image 2 currently processes image inputs with high fidelity automatically.
+The adapter sends `input_fidelity=high` on every edit or reference-conditioned request. The API default is low, so relying on an implicit setting would weaken identity, feature and style retention across matching frames. Generation requests without image inputs omit the field because it has no input image to preserve.
 
 ### Transparency
 

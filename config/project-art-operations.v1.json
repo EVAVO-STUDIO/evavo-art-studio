@@ -328,6 +328,19 @@
       "deterministic": true
     },
     {
+      "id": "rim-light",
+      "kind": "pixel-effect",
+      "deterministic": true,
+      "required": [
+        "colour"
+      ]
+    },
+    {
+      "id": "normal-map-from-height",
+      "kind": "texture",
+      "deterministic": true
+    },
+    {
       "id": "convert",
       "kind": "encoding",
       "deterministic": true
@@ -340,6 +353,7 @@
   ],
   "taskKinds": [
     "image",
+    "video-frame-extract",
     "slice-sheet",
     "assemble-sheet",
     "sequence-review",

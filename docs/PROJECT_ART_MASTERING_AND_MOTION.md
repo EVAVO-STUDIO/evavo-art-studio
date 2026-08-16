@@ -80,6 +80,7 @@ hidden-rgb-rebuild
 outline
 drop-shadow
 outer-glow
+rim-light
 ```
 
 These operations support common generated-image cleanup problems:
@@ -92,6 +93,18 @@ These operations support common generated-image cleanup problems:
 - inconsistent outline, shadow or glow treatment.
 
 `defringe` combines bounded opaque-neighbour colour reconstruction with optional matte decontamination. It is intended for small edge corrections, not for inventing missing anatomy or replacing creative review.
+
+`rim-light` derives a directional inner edge from the existing alpha silhouette. Width, angle, softness, opacity, colour and `normal`, `screen` or `add` blending are explicit. The operation restores the exact source alpha after colouring, so a lighting pass cannot silently expand or erode the cut-out.
+
+### Texture and lighting preparation
+
+```text
+normal-map-from-height
+```
+
+`normal-map-from-height` derives a normalized RGB normal map from either luminance or alpha with bounded strength, blur, X/Y inversion and optional alpha preservation. It is useful for draft 2D-lighting maps and relief effects. It is not a substitute for a hand-authored normal map where facial planes, cloth folds, bevel direction or concavity matter.
+
+Use engine lighting for genuinely dynamic light. In Godot, pair the reviewed colour texture and normal texture through `CanvasTexture`, then light it with `PointLight2D` or `DirectionalLight2D` and explicit occluders. A baked `rim-light`, shadow or glow is appropriate only when the art direction requires that effect to remain fixed in the sprite.
 
 ## `image-master`
 
@@ -219,6 +232,39 @@ The renderer streams frame outputs, may retain frames only when an animated GIF 
 
 Motion rendering is useful for controlled UI transitions, VFX layers, parallax, camera-safe sprite previews, breathing/idle experiments and review composites. It is not a skeletal animation system and does not replace frame-by-frame creative animation where pose, anatomy or cloth must be redrawn.
 
+## Governed video reference frames
+
+`video-frame-extract` turns an exact local MP4, M4V, MOV, WebM, MKV or AVI source into a bounded set of timestamp-selected PNG reference frames. The task requires exact expected dimensions, one to 512 strictly increasing timestamps and a create-only target directory.
+
+```json
+{
+  "id": "walk-reference-frames",
+  "kind": "video-frame-extract",
+  "source": "sources/reference/walk-cycle.mov",
+  "targetDirectory": "scratch/reference/walk-cycle",
+  "fileNamePattern": "frame-{index}.png",
+  "timestampsMs": [0, 83, 167, 250],
+  "expectedWidth": 1920,
+  "expectedHeight": 1080,
+  "preserveSourceAlpha": true
+}
+```
+
+The runtime invokes only resolved FFmpeg and ffprobe executables through a fixed argument boundary with `shell=False`, bounded output, a timeout, local-file protocols, one selected video stream, disabled autorotation and no audio, subtitle or data streams. It records the exact executable version, bytes and SHA-256, video probe, requested timestamps and every output identity in `evavo.project-art-video-frame-extraction.v1`. Because video frames are discrete, selection is explicitly recorded as the first decodable frame at or after each requested timestamp rather than pretending every source contains a frame at the exact millisecond.
+
+Extracted frames are immutable reference evidence. They do not pass sprite delivery admission merely because they are PNGs, and the video manifest explicitly sets delivery admission and creative approval to false. Copy an exact frame into a working version, edit it, then run normal alpha mastering and review before any sprite or atlas use.
+
+## Sequence consistency profiles
+
+`sequence-review` can apply `off`, `motion-family` or `identity-locked` continuity profiles. In addition to ordinary changed-pixel and centroid checks, profiles measure:
+
+- alpha-bounds width and height drift;
+- relative alpha-mass drift;
+- visible mean-colour distance; and
+- centroid-aligned alpha intersection-over-union.
+
+The metrics catch size pumping, silhouette mutation, disappearing costume mass and palette/lighting jumps even when a moving subject would defeat a simple pixel difference. Thresholds remain explicit and may be tightened for a project. They are technical blockers, not permission to approve a character or animation automatically.
+
 ## Non-generic and consistent production
 
 The mastering and motion tools are deterministic production stages. They do not by themselves make provider output stylistically correct. Consistency comes from combining them with:
@@ -241,7 +287,7 @@ The compiler and runtime retain code-owned limits for task count, source count a
 
 A technical pass is not creative approval. Mastering evidence can prove dimensions, alpha, palette, tonal range and edge cleanliness, but final artistic quality and style correctness remain separately reviewed.
 
-No arbitrary shell is exposed. No image task can approve or promote a candidate, write EVAVO Storage, mutate a game repository, commit, push, deploy, publish or force-push.
+No arbitrary shell is exposed. The only external media execution is the fixed governed FFmpeg/ffprobe boundary for `video-frame-extract`; callers cannot supply a command or arguments outside the task contract. No image task can approve or promote a candidate, write EVAVO Storage, mutate a game repository, commit, push, deploy, publish or force-push.
 
 ## Mandatory validation
 
@@ -249,4 +295,4 @@ No arbitrary shell is exposed. No image task can approve or promote a candidate,
 pnpm run project-art:mastering:check
 ```
 
-The executable adversary covers the complete new operation surface, enforced and non-enforced mastering profiles, self-hashed mastering reports, keyframed frame rendering, masks, interpolation, motion blur, GIF evidence, malformed curve rejection and correctly rehashed output-count attacks.
+The executable adversary covers the complete operation surface, directional rim lighting, normal-map derivation, enforced and non-enforced mastering profiles, self-hashed mastering reports, keyframed frame rendering, masks, interpolation, motion blur, GIF evidence, exact video-frame extraction, binary fingerprints, malformed curve rejection and correctly rehashed output-count or video-bound attacks.

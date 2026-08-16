@@ -78,6 +78,25 @@ A normal workflow is:
 
 Image bytes do not flow through MCP. The tools exchange paths, bounded JSON requests, exact hashes, plans, summaries and receipts.
 
+## Multi-image, frame and video work
+
+The workspace is the shared visual context; chat history is not the asset database. Bring each required full-resolution image into `sources/`, retain exact extracted video frames under `scratch/` or `sources/`, and snapshot important working results into `versions/`. Do not rely on a low-resolution contact sheet, a previous chat thumbnail or an unrecorded provider response as the only reference.
+
+Use the deterministic sandbox to:
+
+- extract selected video timestamps with `video-frame-extract` and an exact FFmpeg/ffprobe receipt;
+- crop and paste exact regions between images with `image-composite.sourceRect`;
+- crop a separate selection/matte with `maskSourceRect`;
+- retain body, prop, face, effect and correction layers as separate lossless sources;
+- compare before/after images and adjacent frames;
+- build contact sheets, GIFs and onion skins for review only;
+- apply `motion-family` or `identity-locked` sequence consistency profiles; and
+- render bounded keyframed 2D composites without flattening the source package.
+
+For provider work, bind individual immutable references by semantic role—canonical identity, direction master, previous/next pose, palette, line, material, layer context—not one provider-made sheet. Keep the exact reference set and output together in the workspace. A generated animation frame is compared to its neighbours before another frame is requested; frames are not designed independently.
+
+Video extraction, AI segmentation and AI image edits remain unapproved reference or working material. They must pass the same alpha mastering, hostile-background proofs, continuity review and creative decision as any other candidate.
+
 ## Create a workspace
 
 ```json
@@ -175,7 +194,7 @@ The handoff does not perform the Storage write. `storageWrite` remains false unt
 
 ## Relationship to mastering, motion and review
 
-The persistent workspace is the durable filesystem and versioning layer. The deterministic sandbox supplies raster operations, masks, compositing, sprite sheets, atlases, image mastering and keyframed motion. The offline Review Studio supplies technical and creative review evidence.
+The persistent workspace is the durable filesystem and versioning layer. The deterministic sandbox supplies raster operations, exact region copy/paste, masks, compositing, video reference-frame extraction, sprite sheets, atlases, image mastering and keyframed motion. The offline Review Studio supplies technical and creative review evidence.
 
 A technical pass is not creative approval. Passing dimensions, transparency, palette or loop-continuity rules does not prove that a face, pose, costume, historical detail, material, silhouette or animation is creatively correct.
 

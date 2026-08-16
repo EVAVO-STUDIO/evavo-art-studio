@@ -31,7 +31,19 @@ Do not infer subject, canon, quality, sequence order, provenance or intended use
 - Keep every provider result as an immutable unapproved source. Master a working copy with `master-alpha`; never overwrite the source while diagnosing or repairing alpha.
 - Run transparency admission before slicing a sheet, assembling a sheet, packing an atlas or publishing a cut-out. Sprite and atlas inputs default to `alphaPolicy: required`. `opaque` is only for intentionally opaque art and never permits a painted grid.
 - If automatic recovery removes legitimate detail or retains background, use separate disjoint protect and remove masks. Review the result over black, white, grey, green and magenta solid plates plus the alpha-mask proof; never use a checkerboard proof because it can hide the exact failure being tested.
+- If a natural or overlapping background is ambiguous, do not widen colour thresholds until it passes. Use a pinned, hash-recorded semantic segmentation profile to create a soft-mask candidate, combine it with definite border/protect/remove evidence, then run deterministic edge cleanup and the same hostile proofs. A model mask is never approved alpha by itself.
 - Do not weaken thresholds to make an ambiguous candidate pass. Preserve the evidence, correct the source or masks, rerun mastering, and require admission again.
+
+## Multi-image and motion context
+
+- The persistent workspace is the visual memory. Bring every required full-resolution source, reference, mask and extracted frame into it; do not rely on chat thumbnails or an earlier contact sheet as the only copy.
+- Use individual immutable references with semantic roles. Keep canonical identity, direction master, previous pose, next pose, palette, line, material and layer context separate. Never send a provider-made sprite sheet or contact sheet as a substitute for the required originals.
+- OpenAI edit/reference jobs must retain the adapter's explicit `input_fidelity=high`. Do not remove that field or describe the API default as high.
+- Generate or repair one bounded frame or retained layer at a time. Compare it to its immediate neighbours before requesting the next frame; never design an animation as unrelated independent images.
+- Use `video-frame-extract` for exact timestamp-selected reference frames. The resulting PNGs and manifest are reference evidence, not admitted sprite assets.
+- Use `image-composite.sourceRect` and `maskSourceRect` for deterministic crop/copy/paste work between exact images. Preserve body, prop, face, VFX and correction layers separately until the reviewed export boundary.
+- Run `sequence-review` with `motion-family` or `identity-locked` thresholds where continuity matters, then run final-to-first loop closure for loops. Contact sheets, GIFs and onion skins are review views, not source masters.
+- Use `normal-map-from-height` only as a draft or intentionally derived normal. Use engine-side 2D lights and reviewed normal textures for dynamic lighting; use baked rim light, shadow or glow only when the effect is meant to remain fixed in the art.
 
 ## Style use
 

@@ -439,6 +439,12 @@ function mediaTypeFromPath(filePath) {
     case '.kra': return 'application/x-krita';
     case '.ase':
     case '.aseprite': return 'application/x-aseprite';
+    case '.mp4':
+    case '.m4v': return 'video/mp4';
+    case '.mov': return 'video/quicktime';
+    case '.webm': return 'video/webm';
+    case '.mkv': return 'video/x-matroska';
+    case '.avi': return 'video/x-msvideo';
     default: return 'application/octet-stream';
   }
 }

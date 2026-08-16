@@ -55,6 +55,8 @@ for (const token of [
   'PERSISTENT_ARTIST_WORKSPACE_INGEST_TARGET_EXISTS',
   'COPYFILE_EXCL',
   'O_NOFOLLOW',
+  'video/quicktime',
+  'video-frame-extract',
 ]) {
   assert.equal(combined.includes(token), true, `Missing permanent ingest contract token: ${token}`);
 }

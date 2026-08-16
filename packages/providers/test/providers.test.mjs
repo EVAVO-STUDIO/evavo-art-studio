@@ -896,12 +896,14 @@ test("OpenAI generation uses bounded JSON with candidate count and flexible sour
   assert.equal(body.n, 2);
   assert.equal(body.quality, "high");
   assert.equal(body.background, "opaque");
+  assert.equal(body.input_fidelity, undefined);
   const [width, height] = body.size.split("x").map(Number);
   assert.equal(width % 16, 0);
   assert.equal(height % 16, 0);
   assert.ok(width * height >= 655360);
   assert.equal(result.outputs.length, 2);
   assert.equal(result.externalId, "req_fixture");
+  assert.equal(result.metadata.inputFidelity, null);
 });
 
 test("OpenAI inpaint puts the editable base first, preserves reference order and sends one mask", async () => {
@@ -943,7 +945,7 @@ test("OpenAI inpaint puts the editable base first, preserves reference order and
       bytes: await fixture.store.read(reference.artifactId),
     });
   }
-  await adapter.execute(
+  const result = await adapter.execute(
     {
       request: normalized,
       requestSha256: providerRequestSha256(normalized),
@@ -965,7 +967,8 @@ test("OpenAI inpaint puts the editable base first, preserves reference order and
   const mask = captured.init.body.get("mask");
   assert.ok(mask instanceof Blob);
   assert.equal(mask.name, "mask.png");
-  assert.equal(captured.init.body.get("input_fidelity"), null);
+  assert.equal(captured.init.body.get("input_fidelity"), "high");
   assert.equal(captured.init.body.get("model"), "gpt-image-2");
   assert.equal(captured.init.body.get("n"), "2");
+  assert.equal(result.metadata.inputFidelity, "high-explicit");
 });

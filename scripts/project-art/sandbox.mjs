@@ -15,6 +15,7 @@ import {
   safeId,
   sha256,
   timestamp,
+  VIDEO_EXTENSIONS,
   verifyDocumentHash,
   withDocumentHash,
 } from './common.mjs';
@@ -32,6 +33,9 @@ const MAXIMUM_IMAGE_DIMENSION = 65_536;
 const MAXIMUM_OUTPUT_FILES = 20_000;
 const MAXIMUM_OUTPUT_BYTES = 2 * 1024 * 1024 * 1024;
 const MAXIMUM_TOTAL_OUTPUT_BYTES = 16 * 1024 * 1024 * 1024;
+const MAXIMUM_VIDEO_FRAME_TIMESTAMPS = 512;
+const MAXIMUM_VIDEO_TIMESTAMP_MS = 24 * 60 * 60 * 1_000;
+const MAXIMUM_NORMAL_MAP_PIXELS = 8_388_608;
 const REVIEW_LABEL_HEIGHT = 18;
 
 const OUTPUT_EXTENSIONS = Object.freeze({
@@ -200,6 +204,14 @@ function normalizedColour(value, label, fallback) {
   return boundedString(value ?? fallback, label, 64);
 }
 
+function normalizedBoolean(value, label, fallback, code = 'PROJECT_ART_SANDBOX_OPERATION_INVALID') {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'boolean') {
+    fail(code, `${label} must be boolean.`);
+  }
+  return value;
+}
+
 function normalizedDimensions(parameters, op, registry) {
   const width = parameters.width === undefined
     ? null
@@ -258,7 +270,7 @@ function operationWorkingSetMultiplier(operations) {
     if (['rotate', 'affine-transform', 'perspective-transform'].includes(operation.op)) multiplier = Math.max(multiplier, 5);
     if (['box-blur', 'median-filter', 'gaussian-blur', 'unsharp-mask', 'find-edges', 'emboss', 'edge-enhance'].includes(operation.op)) multiplier = Math.max(multiplier, 5);
     if (operation.op === 'motion-blur') multiplier = Math.max(multiplier, 6);
-    if (['drop-shadow', 'outer-glow', 'defringe', 'alpha-feather'].includes(operation.op)) multiplier = Math.max(multiplier, 8);
+    if (['drop-shadow', 'outer-glow', 'rim-light', 'normal-map-from-height', 'defringe', 'alpha-feather'].includes(operation.op)) multiplier = Math.max(multiplier, 8);
   }
   return multiplier;
 }
@@ -446,6 +458,28 @@ function normalizedOperation(value, index, registry) {
     parameters.colour = normalizedColour(parameters.colour, 'outer-glow.colour', '#ffffff');
     parameters.expandCanvas = parameters.expandCanvas === true;
   }
+  if (op === 'rim-light') {
+    parameters.width = boundedInteger(parameters.width ?? 2, 'rim-light.width', 1, 32);
+    parameters.angleDegrees = boundedNumber(parameters.angleDegrees ?? 315, 'rim-light.angleDegrees', -3600, 3600);
+    parameters.softness = boundedNumber(parameters.softness ?? 0, 'rim-light.softness', 0, 64);
+    parameters.opacity = boundedNumber(parameters.opacity ?? 0.5, 'rim-light.opacity', 0, 1);
+    parameters.colour = normalizedColour(parameters.colour, 'rim-light.colour', '#ffffff');
+    parameters.blendMode = parameters.blendMode ?? 'screen';
+    if (!['normal', 'screen', 'add'].includes(parameters.blendMode)) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'rim-light.blendMode must be normal, screen or add.');
+    }
+  }
+  if (op === 'normal-map-from-height') {
+    parameters.source = parameters.source ?? 'luminance';
+    if (!['luminance', 'alpha'].includes(parameters.source)) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'normal-map-from-height.source must be luminance or alpha.');
+    }
+    parameters.strength = boundedNumber(parameters.strength ?? 2, 'normal-map-from-height.strength', 0.01, 32);
+    parameters.blurRadius = boundedNumber(parameters.blurRadius ?? 0, 'normal-map-from-height.blurRadius', 0, 32);
+    parameters.invertX = normalizedBoolean(parameters.invertX, 'normal-map-from-height.invertX', false);
+    parameters.invertY = normalizedBoolean(parameters.invertY, 'normal-map-from-height.invertY', false);
+    parameters.preserveAlpha = normalizedBoolean(parameters.preserveAlpha, 'normal-map-from-height.preserveAlpha', true);
+  }
 
   return Object.freeze({ op, ...parameters });
 }
@@ -556,6 +590,98 @@ function normalizeSliceTask(task, taskIndex, registry, targetClaims) {
   };
 }
 
+function normalizeVideoFrameTask(task, taskIndex, registry, targetClaims) {
+  const source = normalizedSourceDescriptor(task.source, `tasks[${taskIndex}].source`);
+  if (source.kind !== 'external' || !VIDEO_EXTENSIONS.has(path.posix.extname(source.path).toLowerCase())) {
+    fail(
+      'PROJECT_ART_SANDBOX_SOURCE_INVALID',
+      `tasks[${taskIndex}].source must be an external MP4, M4V, MOV, WebM, MKV or AVI file.`,
+    );
+  }
+  const targetDirectory = normalizeTargetPath(
+    task.targetDirectory,
+    `tasks[${taskIndex}].targetDirectory`,
+    targetClaims,
+  );
+  const fileNamePattern = task.fileNamePattern ?? 'frame-{index}.png';
+  boundedString(fileNamePattern, `tasks[${taskIndex}].fileNamePattern`, 512);
+  if (
+    !fileNamePattern.includes('{index}') ||
+    fileNamePattern.includes('/') ||
+    fileNamePattern.includes('\\') ||
+    fileNamePattern.includes('\0') ||
+    !fileNamePattern.endsWith('.png')
+  ) {
+    fail(
+      'PROJECT_ART_SANDBOX_TASK_INVALID',
+      'video-frame-extract fileNamePattern must contain {index}, contain no slash, and end in .png.',
+    );
+  }
+  if (
+    !Array.isArray(task.timestampsMs) ||
+    task.timestampsMs.length < 1 ||
+    task.timestampsMs.length > MAXIMUM_VIDEO_FRAME_TIMESTAMPS
+  ) {
+    fail(
+      'PROJECT_ART_SANDBOX_TASK_INVALID',
+      `tasks[${taskIndex}].timestampsMs must contain 1-${MAXIMUM_VIDEO_FRAME_TIMESTAMPS} entries.`,
+    );
+  }
+  const timestampsMs = task.timestampsMs.map((value, index) =>
+    boundedInteger(
+      value,
+      `tasks[${taskIndex}].timestampsMs[${index}]`,
+      0,
+      MAXIMUM_VIDEO_TIMESTAMP_MS,
+    ));
+  if (timestampsMs.some((value, index) => index > 0 && value <= timestampsMs[index - 1])) {
+    fail(
+      'PROJECT_ART_SANDBOX_TASK_INVALID',
+      `tasks[${taskIndex}].timestampsMs must be strictly increasing.`,
+    );
+  }
+  const expectedWidth = boundedInteger(
+    task.expectedWidth,
+    `tasks[${taskIndex}].expectedWidth`,
+    1,
+    MAXIMUM_IMAGE_DIMENSION,
+  );
+  const expectedHeight = boundedInteger(
+    task.expectedHeight,
+    `tasks[${taskIndex}].expectedHeight`,
+    1,
+    MAXIMUM_IMAGE_DIMENSION,
+  );
+  assertDecodedPixelLimit(
+    expectedWidth,
+    expectedHeight,
+    `tasks[${taskIndex}] extracted video frame`,
+    registry.maximumDecodedPixels,
+  );
+  assertActiveDecodedPixelLimit(
+    [expectedWidth * expectedHeight * 2],
+    `tasks[${taskIndex}] video-frame extraction working set`,
+    registry.maximumDecodedPixels,
+  );
+  return {
+    id: safeId(task.id, `tasks[${taskIndex}].id`),
+    kind: 'video-frame-extract',
+    source,
+    targetDirectory,
+    fileNamePattern,
+    startIndex: boundedInteger(task.startIndex ?? 0, `tasks[${taskIndex}].startIndex`, 0, 1_000_000),
+    timestampsMs,
+    expectedWidth,
+    expectedHeight,
+    preserveSourceAlpha: normalizedBoolean(
+      task.preserveSourceAlpha,
+      `tasks[${taskIndex}].preserveSourceAlpha`,
+      true,
+      'PROJECT_ART_SANDBOX_TASK_INVALID',
+    ),
+  };
+}
+
 function normalizeSources(values, label) {
   if (!Array.isArray(values) || values.length < 1 || values.length > 10_000) {
     fail('PROJECT_ART_SANDBOX_SOURCE_INVALID', `${label} must contain 1-10,000 sources.`);
@@ -613,6 +739,21 @@ function normalizeAssembleTask(task, taskIndex, registry, targetClaims) {
 }
 
 
+function normalizedCompositeRect(value, label, registry) {
+  if (value === undefined) return null;
+  if (!isRecord(value)) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `${label} must be an object.`);
+  }
+  const rect = {
+    x: boundedInteger(value.x, `${label}.x`, 0, 65_535),
+    y: boundedInteger(value.y, `${label}.y`, 0, 65_535),
+    width: boundedInteger(value.width, `${label}.width`, 1, 65_536),
+    height: boundedInteger(value.height, `${label}.height`, 1, 65_536),
+  };
+  assertDecodedPixelLimit(rect.width, rect.height, label, registry.maximumDecodedPixels);
+  return rect;
+}
+
 function normalizeCompositeTask(task, taskIndex, targetClaims, registry) {
   const targetPath = normalizeTargetPath(task.targetPath, `tasks[${taskIndex}].targetPath`, targetClaims);
   const outputFormat = task.outputFormat || extensionFormat(targetPath);
@@ -632,6 +773,22 @@ function normalizeCompositeTask(task, taskIndex, targetClaims, registry) {
     const maskSourceIndex = layer.maskSourceIndex === undefined
       ? null
       : boundedInteger(layer.maskSourceIndex, `tasks[${taskIndex}].layers[${layerIndex}].maskSourceIndex`, 0, sources.length - 1);
+    const sourceRect = normalizedCompositeRect(
+      layer.sourceRect,
+      `tasks[${taskIndex}].layers[${layerIndex}].sourceRect`,
+      registry,
+    );
+    const maskSourceRect = normalizedCompositeRect(
+      layer.maskSourceRect,
+      `tasks[${taskIndex}].layers[${layerIndex}].maskSourceRect`,
+      registry,
+    );
+    if (maskSourceRect !== null && maskSourceIndex === null) {
+      fail(
+        'PROJECT_ART_SANDBOX_TASK_INVALID',
+        `tasks[${taskIndex}].layers[${layerIndex}].maskSourceRect requires maskSourceIndex.`,
+      );
+    }
     const width = layer.width === undefined ? null : boundedInteger(layer.width, `tasks[${taskIndex}].layers[${layerIndex}].width`, 1, 65_536);
     const height = layer.height === undefined ? null : boundedInteger(layer.height, `tasks[${taskIndex}].layers[${layerIndex}].height`, 1, 65_536);
     if ((width === null) !== (height === null)) {
@@ -654,7 +811,7 @@ function normalizeCompositeTask(task, taskIndex, targetClaims, registry) {
       fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported composite mask channel: ${maskChannel}.`);
     }
     const sampling = layer.sampling ?? 'nearest';
-    if (!['nearest', 'lanczos'].includes(sampling)) {
+    if (!['nearest', 'bicubic', 'lanczos'].includes(sampling)) {
       fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported composite sampling mode: ${sampling}.`);
     }
     return {
@@ -667,6 +824,8 @@ function normalizeCompositeTask(task, taskIndex, targetClaims, registry) {
       maskChannel,
       invertMask: layer.invertMask === true,
       sampling,
+      ...(sourceRect === null ? {} : { sourceRect }),
+      ...(maskSourceRect === null ? {} : { maskSourceRect }),
       ...(width === null ? {} : { width, height }),
     };
   });
@@ -696,6 +855,40 @@ function normalizeCompositeTask(task, taskIndex, targetClaims, registry) {
 function normalizeReviewTask(task, taskIndex, registry, targetClaims) {
   const targetDirectory = normalizeTargetPath(task.targetDirectory, `tasks[${taskIndex}].targetDirectory`, targetClaims);
   const thresholds = isRecord(task.thresholds) ? task.thresholds : {};
+  const consistencyProfile = boundedString(
+    task.consistencyProfile ?? 'off',
+    `tasks[${taskIndex}].consistencyProfile`,
+    32,
+  );
+  const consistencyDefaults = {
+    off: {
+      maximumCentroidShiftPixels: 1_000_000,
+      maximumAlphaBoundsWidthChangeFraction: 1_000,
+      maximumAlphaBoundsHeightChangeFraction: 1_000,
+      maximumVisibleMeanColourDistance: 441.672956,
+      maximumAlphaMassChangeFraction: 1_000,
+      minimumCentroidAlignedAlphaIoU: 0,
+    },
+    'motion-family': {
+      maximumCentroidShiftPixels: 96,
+      maximumAlphaBoundsWidthChangeFraction: 0.75,
+      maximumAlphaBoundsHeightChangeFraction: 0.75,
+      maximumVisibleMeanColourDistance: 64,
+      maximumAlphaMassChangeFraction: 1.25,
+      minimumCentroidAlignedAlphaIoU: 0.1,
+    },
+    'identity-locked': {
+      maximumCentroidShiftPixels: 48,
+      maximumAlphaBoundsWidthChangeFraction: 0.35,
+      maximumAlphaBoundsHeightChangeFraction: 0.35,
+      maximumVisibleMeanColourDistance: 36,
+      maximumAlphaMassChangeFraction: 0.55,
+      minimumCentroidAlignedAlphaIoU: 0.3,
+    },
+  }[consistencyProfile];
+  if (!consistencyDefaults) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `tasks[${taskIndex}].consistencyProfile must be off, motion-family or identity-locked.`);
+  }
   const sources = normalizeSources(task.sources, `tasks[${taskIndex}].sources`);
   const expectedWidth =
     task.expectedWidth === undefined
@@ -764,6 +957,7 @@ function normalizeReviewTask(task, taskIndex, registry, targetClaims) {
     ),
     rejectBlankFrames: task.rejectBlankFrames !== false,
     rejectIdenticalAdjacentFrames: task.rejectIdenticalAdjacentFrames !== false,
+    consistencyProfile,
     thresholds: {
       minimumChangedFraction: boundedNumber(
         thresholds.minimumChangedFraction ?? 0.0001,
@@ -778,10 +972,40 @@ function normalizeReviewTask(task, taskIndex, registry, targetClaims) {
         1,
       ),
       maximumCentroidShiftPixels: boundedNumber(
-        thresholds.maximumCentroidShiftPixels ?? 1_000_000,
+        thresholds.maximumCentroidShiftPixels ?? consistencyDefaults.maximumCentroidShiftPixels,
         `tasks[${taskIndex}].thresholds.maximumCentroidShiftPixels`,
         0,
         1_000_000,
+      ),
+      maximumAlphaBoundsWidthChangeFraction: boundedNumber(
+        thresholds.maximumAlphaBoundsWidthChangeFraction ?? consistencyDefaults.maximumAlphaBoundsWidthChangeFraction,
+        `tasks[${taskIndex}].thresholds.maximumAlphaBoundsWidthChangeFraction`,
+        0,
+        1_000,
+      ),
+      maximumAlphaBoundsHeightChangeFraction: boundedNumber(
+        thresholds.maximumAlphaBoundsHeightChangeFraction ?? consistencyDefaults.maximumAlphaBoundsHeightChangeFraction,
+        `tasks[${taskIndex}].thresholds.maximumAlphaBoundsHeightChangeFraction`,
+        0,
+        1_000,
+      ),
+      maximumVisibleMeanColourDistance: boundedNumber(
+        thresholds.maximumVisibleMeanColourDistance ?? consistencyDefaults.maximumVisibleMeanColourDistance,
+        `tasks[${taskIndex}].thresholds.maximumVisibleMeanColourDistance`,
+        0,
+        441.672956,
+      ),
+      maximumAlphaMassChangeFraction: boundedNumber(
+        thresholds.maximumAlphaMassChangeFraction ?? consistencyDefaults.maximumAlphaMassChangeFraction,
+        `tasks[${taskIndex}].thresholds.maximumAlphaMassChangeFraction`,
+        0,
+        1_000,
+      ),
+      minimumCentroidAlignedAlphaIoU: boundedNumber(
+        thresholds.minimumCentroidAlignedAlphaIoU ?? consistencyDefaults.minimumCentroidAlignedAlphaIoU,
+        `tasks[${taskIndex}].thresholds.minimumCentroidAlignedAlphaIoU`,
+        0,
+        1,
       ),
     },
     preview,
@@ -1024,10 +1248,14 @@ async function bindExternalSource(
   sourceMap,
   sourceByteTotal,
   registry,
+  expectedMediaKind = 'image',
 ) {
   if (descriptor.kind !== 'external') return descriptor;
   if (sourceMap.has(descriptor.path)) {
     const existing = sourceMap.get(descriptor.path);
+    if (existing.mediaKind !== expectedMediaKind) {
+      fail('PROJECT_ART_SANDBOX_SOURCE_INVALID', `Source media kind changed within the task graph: ${descriptor.path}.`);
+    }
     if (descriptor.expectedSha256 && descriptor.expectedSha256 !== existing.sha256) {
       fail('PROJECT_ART_SANDBOX_SOURCE_HASH_MISMATCH', `Expected SHA-256 changed for ${descriptor.path}.`);
     }
@@ -1062,23 +1290,31 @@ async function bindExternalSource(
   if (descriptor.expectedSha256 && descriptor.expectedSha256 !== identity.sha256) {
     fail('PROJECT_ART_SANDBOX_SOURCE_HASH_MISMATCH', `Source SHA-256 mismatch: ${descriptor.path}.`);
   }
-  const image = await inspectImageFile(resolved.absolutePath);
-  if (!image) {
-    fail('PROJECT_ART_SANDBOX_SOURCE_INVALID', `Sandbox sources must be supported images: ${descriptor.path}.`);
+  let image;
+  if (expectedMediaKind === 'video') {
+    if (!VIDEO_EXTENSIONS.has(path.posix.extname(descriptor.path).toLowerCase())) {
+      fail('PROJECT_ART_SANDBOX_SOURCE_INVALID', `Sandbox video source has an unsupported extension: ${descriptor.path}.`);
+    }
+  } else {
+    image = await inspectImageFile(resolved.absolutePath);
+    if (!image) {
+      fail('PROJECT_ART_SANDBOX_SOURCE_INVALID', `Sandbox sources must be supported images: ${descriptor.path}.`);
+    }
+    assertDecodedPixelLimit(
+      image.width,
+      image.height,
+      `Sandbox source ${descriptor.path}`,
+      registry.maximumDecodedPixels,
+    );
   }
-  assertDecodedPixelLimit(
-    image.width,
-    image.height,
-    `Sandbox source ${descriptor.path}`,
-    registry.maximumDecodedPixels,
-  );
   const source = {
     sourceId: `source_${sha256(`${descriptor.path}\0${identity.sha256}`).slice(0, 32)}`,
     path: descriptor.path,
     sha256: identity.sha256,
     bytes: identity.bytes,
     mediaType: mediaTypeFromPath(descriptor.path),
-    image,
+    mediaKind: expectedMediaKind,
+    ...(image === undefined ? {} : { image }),
   };
   sourceMap.set(descriptor.path, source);
   sourceByteTotal.value += identity.bytes;
@@ -1093,7 +1329,8 @@ function externalTaskDimensions(task, externalById) {
   if (descriptors.length === 0 || descriptors.some((source) => source.kind !== 'external')) {
     return null;
   }
-  return descriptors.map((source, index) => {
+  const dimensions = [];
+  for (const [index, source] of descriptors.entries()) {
     const external = externalById.get(source.sourceId);
     if (!external) {
       fail(
@@ -1101,12 +1338,14 @@ function externalTaskDimensions(task, externalById) {
         `tasks.${task.id}.sources[${index}] refers to an unknown external source.`,
       );
     }
-    return {
+    if (external.mediaKind !== 'image' || !external.image) return null;
+    dimensions.push({
       width: external.image.width,
       height: external.image.height,
       pixels: external.image.width * external.image.height,
-    };
-  });
+    });
+  }
+  return dimensions;
 }
 
 function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
@@ -1114,6 +1353,16 @@ function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
   if (!dimensions) return;
 
   if (task.kind === 'image' || task.kind === 'image-master') {
+    let operationInput = dimensions[0];
+    for (const operation of task.operations) {
+      if (operation.op === 'normal-map-from-height' && operationInput.pixels > MAXIMUM_NORMAL_MAP_PIXELS) {
+        fail(
+          'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
+          `Task ${task.id} normal-map-from-height exceeds its ${MAXIMUM_NORMAL_MAP_PIXELS}-pixel CPU boundary.`,
+        );
+      }
+      operationInput = imageOperationDimensions(operationInput, [operation]);
+    }
     const output = imageOperationDimensions(dimensions[0], task.operations);
     assertDecodedPixelLimit(output.width, output.height, `Task ${task.id} image output`, maximumDecodedPixels);
     assertActiveDecodedPixelLimit(
@@ -1170,13 +1419,34 @@ function assertBoundTaskPixelBudgets(task, externalById, maximumDecodedPixels) {
     const canvasPixels = task.canvas.width * task.canvas.height;
     for (const [index, layer] of task.layers.entries()) {
       const source = dimensions[layer.sourceIndex];
-      const layerWidth = layer.width ?? source.width;
-      const layerHeight = layer.height ?? source.height;
+      if (
+        layer.sourceRect &&
+        (layer.sourceRect.x + layer.sourceRect.width > source.width ||
+          layer.sourceRect.y + layer.sourceRect.height > source.height)
+      ) {
+        fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Task ${task.id} layer ${index} sourceRect escaped its source image.`);
+      }
+      const sourceWidth = layer.sourceRect?.width ?? source.width;
+      const sourceHeight = layer.sourceRect?.height ?? source.height;
+      const layerWidth = layer.width ?? sourceWidth;
+      const layerHeight = layer.height ?? sourceHeight;
       const mask = layer.maskSourceIndex === null ? null : dimensions[layer.maskSourceIndex];
+      if (
+        layer.maskSourceRect && mask &&
+        (layer.maskSourceRect.x + layer.maskSourceRect.width > mask.width ||
+          layer.maskSourceRect.y + layer.maskSourceRect.height > mask.height)
+      ) {
+        fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Task ${task.id} layer ${index} maskSourceRect escaped its mask image.`);
+      }
       const canvasMultiplier = layer.blendMode === 'normal' ? 3 : 9;
-      const layerMultiplier = mask ? 6 : 4;
+      const layerMultiplier = mask ? 8 : 6;
       assertActiveDecodedPixelLimit(
-        [canvasPixels * canvasMultiplier, layerWidth * layerHeight * layerMultiplier, mask?.pixels ?? 0],
+        [
+          canvasPixels * canvasMultiplier,
+          source.pixels,
+          layerWidth * layerHeight * (layerMultiplier - 1),
+          mask?.pixels ?? 0,
+        ],
         `Task ${task.id} layer ${index} working set`,
         maximumDecodedPixels,
       );
@@ -1267,6 +1537,7 @@ function maximumTaskOutputFiles(task, externalById, maximumDecodedPixels) {
     return 1 + (task.preview.difference ? 1 : 0) + (task.preview.overlay ? 1 : 0);
   }
   if (task.kind === 'image-master') return 2;
+  if (task.kind === 'video-frame-extract') return task.timestampsMs.length + 1;
   if (task.kind === 'motion-sequence') {
     return task.frameCount + 1 + (task.preview.animatedGif ? 1 : 0);
   }
@@ -1332,6 +1603,7 @@ export async function compileProjectArtSandbox({
     if (!registry.taskKinds.has(kind)) fail('PROJECT_ART_SANDBOX_TASK_INVALID', `Unsupported task kind: ${kind}.`);
     let normalized;
     if (kind === 'image') normalized = normalizeImageTask(task, index, registry, targetClaims);
+    else if (kind === 'video-frame-extract') normalized = normalizeVideoFrameTask(task, index, registry, targetClaims);
     else if (kind === 'slice-sheet') normalized = normalizeSliceTask(task, index, registry, targetClaims);
     else if (kind === 'assemble-sheet') normalized = normalizeAssembleTask(task, index, registry, targetClaims);
     else if (kind === 'sequence-review') normalized = normalizeReviewTask(task, index, registry, targetClaims);
@@ -1364,6 +1636,7 @@ export async function compileProjectArtSandbox({
           sourceMap,
           sourceByteTotal,
           registry,
+          task.kind === 'video-frame-extract' ? 'video' : 'image',
         ),
       });
     } else {
@@ -1376,6 +1649,7 @@ export async function compileProjectArtSandbox({
             sourceMap,
             sourceByteTotal,
             registry,
+            'image',
           ),
         );
       }
@@ -1422,7 +1696,9 @@ export async function compileProjectArtSandbox({
       plannedMaximumOutputFiles,
     },
     execution: {
-      runtime: 'python-pillow',
+      runtime: boundTasks.some((task) => task.kind === 'video-frame-extract')
+        ? 'python-pillow-governed-ffmpeg'
+        : 'python-pillow',
       entrypoint: 'tools/run_project_art_sandbox.py',
       outputRootMustNotExist: true,
       wholeRunAtomicPublication: true,

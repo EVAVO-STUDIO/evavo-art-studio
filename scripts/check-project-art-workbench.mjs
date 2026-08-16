@@ -44,6 +44,8 @@ const relativeFiles = [
   'docs/PROJECT_ART_AVATAR_ANIMATION_SUITE.md',
   'docs/PROJECT_ART_LOOP_CLOSURE.md',
   'docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md',
+  'docs/TRANSPARENCY_PRODUCTION_STANDARD.md',
+  'docs/ARTIST_AUTOMATION_CAPABILITY_MAP.md',
   '.github/workflows/project-art-workbench.yml',
   'package.json',
 ];
@@ -118,11 +120,13 @@ const expectedOperations = [
   'defringe',
   'drop-shadow',
   'outer-glow',
+  'rim-light',
+  'normal-map-from-height',
   'convert',
   'optimize',
 ];
 assert.deepEqual(registry.operations.map((operation) => operation.id), expectedOperations);
-assert.deepEqual(registry.taskKinds, ['image', 'slice-sheet', 'assemble-sheet', 'sequence-review', 'image-composite', 'image-compare', 'image-master', 'motion-sequence']);
+assert.deepEqual(registry.taskKinds, ['image', 'video-frame-extract', 'slice-sheet', 'assemble-sheet', 'sequence-review', 'image-composite', 'image-compare', 'image-master', 'motion-sequence']);
 
 const sourceAssertions = {
   'scripts/project-art/avatar-animation-suite.mjs': [
@@ -168,8 +172,10 @@ const sourceAssertions = {
     'MAXIMUM_IMAGE_DIMENSION',
     "kind: 'image-master'",
     "kind: 'motion-sequence'",
+    "kind: 'video-frame-extract'",
     'normalizeMasterTask',
     'normalizeMotionTask',
+    'normalizeVideoFrameTask',
     'operationWorkingSetMultiplier',
     'imageOperationDimensions',
     'maximumUniqueColours',
@@ -214,7 +220,7 @@ const sourceAssertions = {
   'scripts/test-project-art-mastering-and-motion.mjs': [
     'Project Art mastering and motion regressions passed.',
     'PROJECT_ART_MASTERING_PROFILE_FAILED',
-    'correctly rehashed output-count attacks fail closed',
+    'correctly rehashed operation-type, output-count or video-bound attacks fail closed',
   ],
   'scripts/project-art/reference-derived.mjs': [
     'evavo.reference-derived-image-request.v1',
@@ -301,6 +307,8 @@ const sourceAssertions = {
     'EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE',
     'EVAVO_ART_WORKSPACE_PYTHON',
     'EVAVO_ART_WORKSPACE_MCP_TIMEOUT_MS',
+    'EVAVO_ART_FFMPEG_BIN',
+    'EVAVO_ART_FFPROBE_BIN',
   ],
   'tools/run_project_art_sandbox.py': [
     'evavo.project-art-sandbox-receipt.v1',
@@ -333,6 +341,10 @@ const sourceAssertions = {
     'execute_motion_task',
     'drop-shadow target',
     'outer-glow target',
+    'VIDEO_FRAME_MANIFEST_SCHEMA = "evavo.project-art-video-frame-extraction.v1"',
+    'execute_video_frame_task',
+    'shell=False',
+    'timeout=timeout_seconds',
   ],
   'docs/PROJECT_ART_WORKBENCH.md': [
     'Project intelligence',
@@ -372,6 +384,22 @@ const sourceAssertions = {
     'technical pass is not creative approval',
     'EVAVO Storage',
     'No arbitrary shell',
+  ],
+  'docs/TRANSPARENCY_PRODUCTION_STANDARD.md': [
+    '# Transparency production standard',
+    'Ambiguous natural-background recovery',
+    'soft mask candidate',
+    'SAM 2',
+    'BiRefNet',
+    'hostile solid plates',
+  ],
+  'docs/ARTIST_AUTOMATION_CAPABILITY_MAP.md': [
+    '# Artist automation capability map',
+    'image-composite.sourceRect',
+    'video-frame-extract',
+    'evavo-3d-studio',
+    'TileSetAtlasSource',
+    'Fully automatic mechanical stages',
   ],
   'docs/PROJECT_ART_LOOP_CLOSURE.md': [
     '# Project Art loop-closure review',
@@ -430,8 +458,16 @@ for (const relative of [
   'tools/run_project_art_loop_closure.py',
 ]) {
   assert.ok(!contents.get(relative).includes('git push'), `${relative} contains git push`);
-  assert.ok(!contents.get(relative).includes('subprocess'), `${relative} contains subprocess`);
 }
+assert.equal(
+  contents.get('tools/run_project_art_sandbox.py').split('subprocess.run(').length - 1,
+  1,
+  'the sandbox runtime must have one controlled media subprocess boundary',
+);
+for (const forbidden of ['shell=True', 'os.system(', 'subprocess.Popen(', 'subprocess.call(', 'subprocess.check_output(']) {
+  assert.ok(!contents.get('tools/run_project_art_sandbox.py').includes(forbidden), `sandbox runtime contains unsafe process token: ${forbidden}`);
+}
+assert.ok(!contents.get('tools/run_project_art_loop_closure.py').includes('subprocess'), 'loop-closure runtime must not execute processes');
 for (const relative of [
   'tools/project_art_workspace_mcp.mjs',
   'tools/project_art_avatar_animation_suite_mcp.mjs',

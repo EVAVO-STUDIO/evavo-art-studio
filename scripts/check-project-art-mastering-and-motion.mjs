@@ -11,6 +11,8 @@ const files = {
   runtime: 'tools/run_project_art_sandbox.py',
   tests: 'scripts/test-project-art-mastering-and-motion.mjs',
   documentation: 'docs/PROJECT_ART_MASTERING_AND_MOTION.md',
+  capabilityDocumentation: 'docs/ARTIST_AUTOMATION_CAPABILITY_MAP.md',
+  transparencyDocumentation: 'docs/TRANSPARENCY_PRODUCTION_STANDARD.md',
   persistentDocumentation: 'docs/PERSISTENT_ARTIST_WORKSPACE.md',
   mcp: 'tools/project_art_workspace_mcp.mjs',
   package: 'package.json',
@@ -57,11 +59,14 @@ for (const operation of [
   'defringe',
   'drop-shadow',
   'outer-glow',
+  'rim-light',
+  'normal-map-from-height',
 ]) {
   assert.equal(operations.has(operation), true, `operation registry is missing ${operation}`);
 }
 assert.equal(registry.taskKinds.includes('image-master'), true);
 assert.equal(registry.taskKinds.includes('motion-sequence'), true);
+assert.equal(registry.taskKinds.includes('video-frame-extract'), true);
 assert.equal(registry.rules.wholeRunAtomicPublication, true);
 assert.equal(registry.rules.providerExecution, false);
 assert.equal(registry.rules.candidateApproval, false);
@@ -73,8 +78,10 @@ assert.equal(registry.rules.forcePush, false);
 requireTokens('compiler', contents.get('compiler'), [
   "kind: 'image-master'",
   "kind: 'motion-sequence'",
+  "kind: 'video-frame-extract'",
   'normalizeMasterTask',
   'normalizeMotionTask',
+  'normalizeVideoFrameTask',
   'operationWorkingSetMultiplier',
   'imageOperationDimensions',
   'maximumUniqueColours',
@@ -93,6 +100,12 @@ requireTokens('runtime', contents.get('runtime'), [
   'execute_motion_task',
   'drop-shadow target',
   'outer-glow target',
+  'VIDEO_FRAME_MANIFEST_SCHEMA = "evavo.project-art-video-frame-extraction.v1"',
+  'execute_video_frame_task',
+  'MAXIMUM_VIDEO_FRAME_TIMESTAMPS = 512',
+  'shell=False',
+  'timeout=timeout_seconds',
+  '"sha256": digest',
   'context.verify_sources()',
   'wholeRunAtomicPublication',
   'providerExecution": False',
@@ -110,7 +123,7 @@ requireTokens('tests', contents.get('tests'), [
   'evavo.project-art-mastering-report.v1',
   'evavo.project-art-motion-sequence.v1',
   'PROJECT_ART_MASTERING_PROFILE_FAILED',
-  'correctly rehashed output-count attacks fail closed',
+  'correctly rehashed operation-type, output-count or video-bound attacks fail closed',
 ]);
 requireTokens('documentation', contents.get('documentation'), [
   '# Project Art mastering and motion',
@@ -123,6 +136,22 @@ requireTokens('documentation', contents.get('documentation'), [
   'technical pass is not creative approval',
   'EVAVO Storage',
   'No arbitrary shell',
+]);
+requireTokens('capability documentation', contents.get('capabilityDocumentation'), [
+  '# Artist automation capability map',
+  'video-frame-extract',
+  'image-composite.sourceRect',
+  'evavo-3d-studio',
+  'TileSetAtlasSource',
+  'Fully automatic mechanical stages',
+]);
+requireTokens('transparency documentation', contents.get('transparencyDocumentation'), [
+  '# Transparency production standard',
+  'Ambiguous natural-background recovery',
+  'SAM 2',
+  'BiRefNet',
+  'soft mask candidate',
+  'never as approved alpha',
 ]);
 requireTokens('persistent documentation', contents.get('persistentDocumentation'), [
   '# Persistent Artist Workspace',
@@ -157,6 +186,8 @@ const workflowPaths = [
   'scripts/check-project-art-mastering-and-motion.mjs',
   'scripts/test-project-art-mastering-and-motion.mjs',
   'docs/PROJECT_ART_MASTERING_AND_MOTION.md',
+  'docs/ARTIST_AUTOMATION_CAPABILITY_MAP.md',
+  'docs/TRANSPARENCY_PRODUCTION_STANDARD.md',
 ];
 for (const workflowPath of workflowPaths) {
   assert.equal(count(contents.get('workflow'), `- "${workflowPath}"`), 2, `${workflowPath} must trigger PR and main validation`);
@@ -179,7 +210,11 @@ forbidTokens('compiler', contents.get('compiler'), [
 ]);
 forbidTokens('runtime', contents.get('runtime'), [
   'git push',
-  'subprocess',
+  'shell=True',
+  'os.system(',
+  'subprocess.Popen(',
+  'subprocess.call(',
+  'subprocess.check_output(',
   '"providerExecution": True',
   '"candidateApproval": True',
   '"candidatePromotion": True',
@@ -187,6 +222,7 @@ forbidTokens('runtime', contents.get('runtime'), [
   '"publication": True',
   '"forcePush": True',
 ]);
+assert.equal(count(contents.get('runtime'), 'subprocess.run('), 1, 'runtime media tools must use one controlled subprocess boundary');
 forbidTokens('MCP', contents.get('mcp'), [
   'git push',
   'candidateApproval: true',

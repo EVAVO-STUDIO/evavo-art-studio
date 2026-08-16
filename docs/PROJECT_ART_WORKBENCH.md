@@ -290,6 +290,29 @@ quantize
 autocontrast
 levels
 outline
+rotate
+affine-transform
+perspective-transform
+grayscale
+invert
+posterize
+threshold
+gamma
+hue-shift
+curves
+channel-mixer
+box-blur
+median-filter
+motion-blur
+emboss
+find-edges
+edge-enhance
+alpha-feather
+defringe
+drop-shadow
+outer-glow
+rim-light
+normal-map-from-height
 convert
 optimize
 ```
@@ -308,22 +331,45 @@ Important behavior:
 - `hidden-rgb-rebuild` propagates retained edge colour into transparent pixels to reduce sampling fringes in engines and atlases.
 - `palette-normalize` supports grayscale, monochrome, and explicit bounded palettes.
 - `outline` derives an outline from alpha without repainting the source file.
+- `rim-light` applies a directional inner highlight while restoring the exact source alpha silhouette.
+- `normal-map-from-height` creates a bounded draft 2D normal map from luminance or alpha, with strength, blur and channel-direction controls.
 - JPEG output is flattened and cannot be used as a transparency master.
 
 Every operation records before and after decoded-pixel identities in the execution receipt.
 
 ## 3. Sprite-sheet and animation work
 
-The sandbox has six task kinds:
+The sandbox has nine task kinds:
 
 ```text
 image
+video-frame-extract
 slice-sheet
 assemble-sheet
 sequence-review
 image-composite
 image-compare
+image-master
+motion-sequence
 ```
+
+### Extract exact video reference frames
+
+```json
+{
+  "id": "extract-turnaround",
+  "kind": "video-frame-extract",
+  "source": "sources/reference/turnaround.mov",
+  "targetDirectory": "scratch/turnaround-frames",
+  "fileNamePattern": "frame-{index}.png",
+  "timestampsMs": [0, 500, 1000, 1500],
+  "expectedWidth": 1920,
+  "expectedHeight": 1080,
+  "preserveSourceAlpha": true
+}
+```
+
+The compiler binds the exact video bytes and declared dimensions. Runtime selects only the first video stream through a fixed, no-shell FFmpeg/ffprobe boundary; disables autorotation; strips audio, subtitle and data streams; validates every decoded PNG; and records source, probe, requested timestamps, discrete-frame selection semantics and exact media-tool hashes in a self-hashed manifest. Frames are reference evidence only. They do not receive transparency or delivery admission automatically.
 
 ### Slice a sheet
 
@@ -389,7 +435,23 @@ The production registry currently permits at most 2,000 tasks, 10,000 exact exte
 
 ### Multi-layer compositing
 
-`image-composite` builds a new candidate from an ordered set of exact source images without mutating any source. Each layer can declare position, optional resize, nearest or Lanczos sampling, opacity, a blend mode, and an optional alpha/luminance mask sourced from another exact sandbox input. Supported blend modes are `normal`, `multiply`, `screen`, `add`, `subtract`, `darken`, and `lighten`.
+`image-composite` builds a new candidate from an ordered set of exact source images without mutating any source. Each layer can declare position, optional resize, nearest, bicubic or Lanczos sampling, opacity, a blend mode, and an optional alpha/luminance mask sourced from another exact sandbox input. `sourceRect` performs an exact crop before resizing and placement; `maskSourceRect` independently selects the mask region. Together they provide deterministic cut/copy/paste and masked paste without making a temporary flattened source. Supported blend modes are `normal`, `multiply`, `screen`, `add`, `subtract`, `darken`, and `lighten`.
+
+```json
+{
+  "sourceIndex": 2,
+  "sourceRect": { "x": 48, "y": 32, "width": 96, "height": 128 },
+  "maskSourceIndex": 3,
+  "maskSourceRect": { "x": 48, "y": 32, "width": 96, "height": 128 },
+  "x": 220,
+  "y": 140,
+  "width": 144,
+  "height": 192,
+  "sampling": "bicubic",
+  "opacity": 1,
+  "blendMode": "normal"
+}
+```
 
 The compiler rejects any composite canvas or explicitly resized layer whose area exceeds the registry's `maximumDecodedPixels` boundary. It also accounts for the active canvas, source, prepared layer, optional mask and blend-mode intermediates as one bounded working set. The Python runtime independently repeats both checks before allocating the canvas, resize target or blend surfaces, closes superseded Pillow images as each layer completes, and therefore fails closed when a hash-valid plan bypasses or tampers with compiler output.
 
@@ -436,10 +498,16 @@ This is intended for UI assembly, VFX overlays, sprite/accessory layers, control
   "requireAlpha": true,
   "rejectBlankFrames": true,
   "rejectIdenticalAdjacentFrames": true,
+  "consistencyProfile": "identity-locked",
   "thresholds": {
     "minimumChangedFraction": 0.001,
     "maximumChangedFraction": 0.45,
-    "maximumCentroidShiftPixels": 64
+    "maximumCentroidShiftPixels": 64,
+    "maximumAlphaBoundsWidthChangeFraction": 0.25,
+    "maximumAlphaBoundsHeightChangeFraction": 0.25,
+    "maximumVisibleMeanColourDistance": 32,
+    "maximumAlphaMassChangeFraction": 0.4,
+    "minimumCentroidAlignedAlphaIoU": 0.4
   },
   "preview": {
     "contactSheet": true,
@@ -457,6 +525,9 @@ The review task publishes:
 - per-frame dimensions, alpha use, alpha bounds, centroid, and decoded-pixel hash;
 - adjacent changed-pixel fractions;
 - alpha-centroid movement;
+- alpha-bounds size drift and alpha-mass drift;
+- visible mean-colour drift;
+- centroid-aligned alpha intersection-over-union;
 - blank, duplicate, dimension, alpha, movement, and excessive-change findings;
 - an indexed contact sheet;
 - an animation preview GIF;
@@ -584,6 +655,8 @@ independentApprovalPerformed = false
 
 Its provider request conforms to the repository-owned provider request input contract and is validated against that implementation in the permanent CI fixture.
 
+For continuity work, bind the exact canonical identity, direction master, previous key pose, next key pose, palette, line and material references that are actually needed; do not substitute a contact sheet for individual full-resolution references. Project Art accepts at most 16 semantic references. The OpenAI adapter sends `input_fidelity=high` explicitly for every edit or reference-conditioned request because the API default is low. Even with high input fidelity, generate or repair one bounded frame/layer at a time and use `sequence-review`, adjacent-frame comparison and loop closure before retaining the result.
+
 ## 5. Callable agent workbench
 
 The project-art workspace MCP now exposes the complete path-only workbench to ChatGPT, Claude and other trusted local agents instead of limiting them to intake and atlas creation.
@@ -636,6 +709,15 @@ On Windows, the optional Python launcher can be selected explicitly:
 EVAVO_ART_WORKSPACE_PYTHON=py
 ```
 
+For video reference extraction, place FFmpeg and ffprobe on `PATH` or pin their executable paths explicitly:
+
+```text
+EVAVO_ART_FFMPEG_BIN=C:\Tools\ffmpeg\bin\ffmpeg.exe
+EVAVO_ART_FFPROBE_BIN=C:\Tools\ffmpeg\bin\ffprobe.exe
+```
+
+The runtime resolves the real executable, verifies its reported tool identity, hashes it before use, records that identity in the extraction manifest and fails if the binary changes during the task.
+
 Each fixed child command is bounded by a ten-minute timeout by default. A trusted deployment may select a value from one second through thirty minutes:
 
 ```text
@@ -652,6 +734,7 @@ A practical agent flow is now:
 capability inspection
 → project intelligence
 → exact intake where needed
+→ optional exact video reference-frame extraction
 → sandbox plan compilation
 → atomic deterministic image or sprite execution
 → reference-derived plan compilation for visual work that cannot be deterministic
@@ -721,9 +804,13 @@ The permanent regression suite covers:
 - trim and exact canvas padding;
 - hidden transparent RGB repair;
 - outlines;
+- source-rectangle and mask-rectangle copy/paste;
+- directional rim-light and normal-map preparation;
+- governed video-frame extraction and exact tool fingerprints;
 - sheet slicing;
 - sheet assembly;
 - sequence manifests;
+- identity-locked geometry, alpha-mass, colour and silhouette continuity metrics;
 - contact sheets;
 - GIF previews;
 - onion skins;

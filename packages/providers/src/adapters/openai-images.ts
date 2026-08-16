@@ -421,7 +421,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
       protocolVersion: PROVIDER_PROTOCOL_VERSION,
       id: "openai-gpt-image",
       label: "OpenAI GPT Image",
-      version: "1.1.0",
+      version: "1.2.0",
       priority: options.priority ?? 1_000,
       capabilities: Object.freeze([
         ...OPENAI_IMAGE_CAPABILITIES,
@@ -513,6 +513,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
       form.append("quality", quality(request.quality));
       form.append("output_format", format);
       form.append("background", background);
+      form.append("input_fidelity", "high");
       for (const [index, reference] of imageReferences.entries()) {
         form.append(
           "image[]",
@@ -643,7 +644,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
         sourceSize: size,
         referenceRoles: imageReferences.map((entry) => entry.role),
         maskRole: mask?.role ?? null,
-        inputFidelity: "high-automatic",
+        inputFidelity: useEditEndpoint ? "high-explicit" : null,
       },
     };
   }

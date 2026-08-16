@@ -121,9 +121,14 @@ try {
   assert.ok(capabilities.summary.operations.includes('connected-matte-to-alpha'));
   assert.ok(capabilities.summary.operations.includes('defringe'));
   assert.ok(capabilities.summary.operations.includes('perspective-transform'));
+  assert.ok(capabilities.summary.operations.includes('rim-light'));
+  assert.ok(capabilities.summary.operations.includes('normal-map-from-height'));
   assert.ok(capabilities.summary.taskKinds.includes('image-master'));
   assert.ok(capabilities.summary.taskKinds.includes('motion-sequence'));
+  assert.ok(capabilities.summary.taskKinds.includes('video-frame-extract'));
   assert.ok(capabilities.summary.workflow.includes('persistent-artist-workspace'));
+  assert.ok(capabilities.summary.workflow.includes('multi-image-compositing'));
+  assert.ok(capabilities.summary.workflow.includes('video-reference-extraction'));
   assert.ok(capabilities.summary.referenceOperations.includes('in-between-frame'));
   assert.equal(capabilities.summary.relatedServers.visualReview, 'tools/project_art_review_mcp.mjs');
   assert.equal(capabilities.bytesFlowThroughMcp, false);

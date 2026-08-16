@@ -9,7 +9,9 @@
         "EVAVO_ART_WORKSPACE_ROOTS": "C:\\GitRepos;C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Incoming Art;C:\\EVAVO\\Evidence",
         "EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE": "false",
         "EVAVO_ART_WORKSPACE_PYTHON": "py",
-        "EVAVO_ART_WORKSPACE_MCP_TIMEOUT_MS": "600000"
+        "EVAVO_ART_WORKSPACE_MCP_TIMEOUT_MS": "600000",
+        "EVAVO_ART_FFMPEG_BIN": "C:\\Tools\\ffmpeg\\bin\\ffmpeg.exe",
+        "EVAVO_ART_FFPROBE_BIN": "C:\\Tools\\ffmpeg\\bin\\ffprobe.exe"
       }
     },
     "evavo-project-art-workspace-ingest": {

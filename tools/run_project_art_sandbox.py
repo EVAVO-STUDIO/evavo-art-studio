@@ -8,6 +8,7 @@ import json
 import math
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from collections import deque
@@ -32,6 +33,7 @@ from transparency_guard import inspect_transparency, require_transparency
 PLAN_SCHEMA = "evavo.project-art-sandbox-plan.v1"
 RECEIPT_SCHEMA = "evavo.project-art-sandbox-receipt.v1"
 PROCESSOR_ID = "python-pillow-project-art-sandbox"
+VIDEO_FRAME_MANIFEST_SCHEMA = "evavo.project-art-video-frame-extraction.v1"
 MAXIMUM_PLAN_BYTES = 64 * 1024 * 1024
 MAXIMUM_TASKS = 2_000
 MAXIMUM_EXTERNAL_SOURCES = 10_000
@@ -44,6 +46,11 @@ MAXIMUM_OUTPUT_BYTES = 2 * 1024 * 1024 * 1024
 MAXIMUM_TOTAL_OUTPUT_BYTES = 16 * 1024 * 1024 * 1024
 OUTPUT_ENCODING_OVERHEAD_BYTES = 1024 * 1024
 MAXIMUM_HIDDEN_RGB_PIXELS = 4_000_000
+MAXIMUM_NORMAL_MAP_PIXELS = 8_388_608
+MAXIMUM_MEDIA_TOOL_OUTPUT_BYTES = 1024 * 1024
+MEDIA_TOOL_TIMEOUT_SECONDS = 120
+MAXIMUM_VIDEO_FRAME_TIMESTAMPS = 512
+MAXIMUM_VIDEO_TIMESTAMP_MS = 86_400_000
 REVIEW_LABEL_HEIGHT = 18
 SHA256_CHARS = set("0123456789abcdef")
 Image.MAX_IMAGE_PIXELS = MAXIMUM_PIXELS
@@ -55,6 +62,21 @@ class SandboxError(ValueError):
 
 def fail(message: str) -> None:
     raise SandboxError(message)
+
+
+def governed_integer(value: Any, label: str, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
+        fail(f"{label} must be an integer between {minimum} and {maximum}")
+    return value
+
+
+def governed_number(value: Any, label: str, minimum: float, maximum: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        fail(f"{label} must be a finite number between {minimum} and {maximum}")
+    result = float(value)
+    if not math.isfinite(result) or not minimum <= result <= maximum:
+        fail(f"{label} must be a finite number between {minimum} and {maximum}")
+    return result
 
 
 SOURCE_ENCODED_ALPHA_INFO = "evavo.source-encoded-alpha"
@@ -95,6 +117,146 @@ def sha256_file(value: Path, maximum_bytes: int = MAXIMUM_SOURCE_BYTES) -> tuple
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest(), size
+
+
+def _controlled_media_tool(
+    executable: Path,
+    arguments: list[str],
+    label: str,
+    *,
+    timeout_seconds: int = MEDIA_TOOL_TIMEOUT_SECONDS,
+) -> subprocess.CompletedProcess[bytes]:
+    command = [str(executable), *arguments]
+    try:
+        with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
+            result = subprocess.run(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                shell=False,
+                timeout=timeout_seconds,
+                check=False,
+            )
+            stdout_size = os.fstat(stdout_file.fileno()).st_size
+            stderr_size = os.fstat(stderr_file.fileno()).st_size
+            if stdout_size > MAXIMUM_MEDIA_TOOL_OUTPUT_BYTES or stderr_size > MAXIMUM_MEDIA_TOOL_OUTPUT_BYTES:
+                fail(f"{label} exceeded its bounded diagnostic-output limit")
+            stdout_file.seek(0)
+            stderr_file.seek(0)
+            stdout = stdout_file.read(MAXIMUM_MEDIA_TOOL_OUTPUT_BYTES + 1)
+            stderr = stderr_file.read(MAXIMUM_MEDIA_TOOL_OUTPUT_BYTES + 1)
+    except subprocess.TimeoutExpired:
+        fail(f"{label} exceeded its {timeout_seconds}-second timeout")
+    except OSError as exc:
+        fail(f"{label} could not start: {exc}")
+    completed = subprocess.CompletedProcess(command, result.returncode, stdout, stderr)
+    if result.returncode != 0:
+        diagnostic = stderr.decode("utf-8", errors="replace").replace("\x00", " ").strip()
+        fail(f"{label} failed with exit code {result.returncode}: {diagnostic[:2000]}")
+    return completed
+
+
+def _media_tool_identity(tool: str) -> tuple[Path, dict[str, Any]]:
+    environment_names = (
+        ("EVAVO_ART_FFMPEG_BIN", "FFMPEG_BIN")
+        if tool == "ffmpeg"
+        else ("EVAVO_ART_FFPROBE_BIN", "FFPROBE_BIN")
+    )
+    configured = next(
+        (os.environ[name].strip() for name in environment_names if os.environ.get(name, "").strip()),
+        None,
+    )
+    candidate = configured or shutil.which(tool)
+    if not candidate:
+        fail(f"{tool} is required for video-frame-extract tasks")
+    try:
+        executable = Path(candidate).resolve(strict=True)
+    except OSError as exc:
+        fail(f"{tool} executable could not be resolved: {exc}")
+    if not executable.is_file():
+        fail(f"{tool} executable is not a regular file")
+    digest, size = sha256_file(executable)
+    version_result = _controlled_media_tool(
+        executable,
+        ["-version"],
+        f"{tool} version inspection",
+        timeout_seconds=15,
+    )
+    first_line = version_result.stdout.decode("utf-8", errors="replace").splitlines()
+    if not first_line or not first_line[0].strip():
+        fail(f"{tool} did not report a version")
+    if not first_line[0].strip().lower().startswith(f"{tool} version"):
+        fail(f"configured {tool} executable reported an unexpected identity")
+    verified_digest, verified_size = sha256_file(executable)
+    if verified_digest != digest or verified_size != size:
+        fail(f"{tool} executable changed during identity inspection")
+    return executable, {
+        "id": tool,
+        "version": first_line[0].strip()[:512],
+        "sha256": digest,
+        "bytes": size,
+    }
+
+
+def _revalidate_media_tool(executable: Path, identity: dict[str, Any]) -> None:
+    digest, size = sha256_file(executable)
+    if digest != identity["sha256"] or size != identity["bytes"]:
+        fail(f"{identity['id']} executable changed during video-frame extraction")
+
+
+def _probe_video(source: Path, ffprobe: Path) -> dict[str, Any]:
+    result = _controlled_media_tool(
+        ffprobe,
+        [
+            "-v",
+            "error",
+            "-protocol_whitelist",
+            "file",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=index,codec_name,pix_fmt,width,height,avg_frame_rate,r_frame_rate,nb_frames,duration:format=duration",
+            "-of",
+            "json",
+            str(source),
+        ],
+        "ffprobe video inspection",
+    )
+    try:
+        payload = json.loads(result.stdout.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        fail(f"ffprobe returned invalid JSON: {exc}")
+    streams = payload.get("streams") if isinstance(payload, dict) else None
+    if not isinstance(streams, list) or len(streams) != 1 or not isinstance(streams[0], dict):
+        fail("ffprobe did not return exactly one selected video stream")
+    stream = streams[0]
+    width = stream.get("width")
+    height = stream.get("height")
+    if isinstance(width, bool) or not isinstance(width, int) or isinstance(height, bool) or not isinstance(height, int):
+        fail("ffprobe returned invalid video dimensions")
+    duration_value = stream.get("duration")
+    if duration_value in (None, "N/A") and isinstance(payload.get("format"), dict):
+        duration_value = payload["format"].get("duration")
+    duration_ms = None
+    if duration_value not in (None, "N/A"):
+        try:
+            duration_ms = round(float(duration_value) * 1000)
+        except (TypeError, ValueError, OverflowError):
+            fail("ffprobe returned an invalid video duration")
+        if duration_ms < 1:
+            fail("ffprobe returned a non-positive video duration")
+    return {
+        "width": width,
+        "height": height,
+        "codecName": str(stream.get("codec_name") or "unknown")[:128],
+        "pixelFormat": str(stream.get("pix_fmt") or "unknown")[:128],
+        "averageFrameRate": str(stream.get("avg_frame_rate") or "unknown")[:128],
+        "nominalFrameRate": str(stream.get("r_frame_rate") or "unknown")[:128],
+        "declaredFrameCount": str(stream.get("nb_frames") or "unknown")[:128],
+        "durationMs": duration_ms,
+        "autorotationApplied": False,
+    }
 
 
 def canonical_json(value: Any) -> str:
@@ -372,6 +534,65 @@ def alpha_centroid(image: Image.Image) -> dict[str, float] | None:
     if total == 0:
         return None
     return {"x": weighted_x / total, "y": weighted_y / total}
+
+
+def alpha_mass_fraction(image: Image.Image) -> float:
+    values = image.getchannel("A").tobytes()
+    return sum(values) / max(1, len(values) * 255)
+
+
+def pixel_data(image: Image.Image) -> Any:
+    flattened = getattr(image, "get_flattened_data", None)
+    return flattened() if callable(flattened) else image.getdata()
+
+
+def visible_mean_rgb(image: Image.Image) -> dict[str, float] | None:
+    total_alpha = red_total = green_total = blue_total = 0
+    for red, green, blue, alpha in pixel_data(image):
+        if alpha == 0:
+            continue
+        total_alpha += alpha
+        red_total += red * alpha
+        green_total += green * alpha
+        blue_total += blue * alpha
+    if total_alpha == 0:
+        return None
+    return {
+        "red": red_total / total_alpha,
+        "green": green_total / total_alpha,
+        "blue": blue_total / total_alpha,
+    }
+
+
+def centroid_aligned_alpha_iou(
+    previous: Image.Image,
+    current: Image.Image,
+    previous_centroid: dict[str, float] | None,
+    current_centroid: dict[str, float] | None,
+) -> float | None:
+    if previous.size != current.size or previous_centroid is None or current_centroid is None:
+        return None
+    shift_x = round(previous_centroid["x"] - current_centroid["x"])
+    shift_y = round(previous_centroid["y"] - current_centroid["y"])
+    width, height = previous.size
+    previous_alpha = previous.getchannel("A").tobytes()
+    current_alpha = current.getchannel("A").tobytes()
+    intersection = union = 0
+    for y in range(height):
+        current_y = y - shift_y
+        for x in range(width):
+            previous_visible = previous_alpha[y * width + x] > 0
+            current_x = x - shift_x
+            current_visible = (
+                0 <= current_x < width
+                and 0 <= current_y < height
+                and current_alpha[current_y * width + current_x] > 0
+            )
+            if previous_visible and current_visible:
+                intersection += 1
+            if previous_visible or current_visible:
+                union += 1
+    return intersection / max(1, union)
 
 
 def image_pixel_sha256(image: Image.Image) -> str:
@@ -1051,6 +1272,204 @@ def _outer_glow(image: Image.Image, operation: dict[str, Any], maximum_pixels: i
         source_alpha.close()
 
 
+def _rim_light(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    """Apply a directional inner rim without changing the source silhouette."""
+    width = governed_integer(operation.get("width", 2), "rim-light.width", 1, 32)
+    angle = math.radians(
+        governed_number(operation.get("angleDegrees", 315), "rim-light.angleDegrees", -3600, 3600)
+    )
+    softness = governed_number(operation.get("softness", 0), "rim-light.softness", 0, 64)
+    opacity = governed_number(operation.get("opacity", 0.5), "rim-light.opacity", 0, 1)
+    colour = parse_colour(operation.get("colour", "#ffffff"), "rim-light.colour")
+    blend_mode = str(operation.get("blendMode", "screen"))
+    if blend_mode not in {"normal", "screen", "add"}:
+        fail("rim-light.blendMode must be normal, screen or add")
+
+    sample_x = round(math.cos(angle) * width)
+    sample_y = round(math.sin(angle) * width)
+    if sample_x == 0 and sample_y == 0:
+        sample_x = 1
+    source_alpha = image.getchannel("A")
+    neighbour_alpha = Image.new("L", image.size, 0)
+    directional_edge = None
+    softened_edge = None
+    clipped_edge = None
+    effective_mask = None
+    base_rgb = None
+    colour_rgb = None
+    blend_target = None
+    inverted_base = None
+    inverted_colour = None
+    multiplied = None
+    result_rgb = None
+    try:
+        # At output pixel (x, y), sample alpha at (x + sample_x, y + sample_y).
+        # Pixels opaque here and transparent toward the light become the rim.
+        neighbour_alpha.paste(source_alpha, (-sample_x, -sample_y))
+        directional_edge = ImageChops.subtract(source_alpha, neighbour_alpha)
+        softened_edge = (
+            directional_edge.filter(ImageFilter.GaussianBlur(radius=softness))
+            if softness > 0
+            else directional_edge.copy()
+        )
+        clipped_edge = ImageChops.multiply(softened_edge, source_alpha)
+        effective_opacity = opacity * (colour[3] / 255)
+        effective_mask = (
+            clipped_edge.point(lambda value: round(value * effective_opacity))
+            if effective_opacity != 1
+            else clipped_edge.copy()
+        )
+        base_rgb = image.convert("RGB")
+        colour_rgb = Image.new("RGB", image.size, colour[:3])
+        if blend_mode == "normal":
+            blend_target = colour_rgb.copy()
+        elif blend_mode == "add":
+            blend_target = ImageChops.add(base_rgb, colour_rgb, scale=1, offset=0)
+        else:
+            inverted_base = ImageOps.invert(base_rgb)
+            inverted_colour = ImageOps.invert(colour_rgb)
+            multiplied = ImageChops.multiply(inverted_base, inverted_colour)
+            blend_target = ImageOps.invert(multiplied)
+        result_rgb = Image.composite(blend_target, base_rgb, effective_mask)
+        result = result_rgb.convert("RGBA")
+        result.putalpha(source_alpha)
+        return result
+    finally:
+        for disposable in (
+            result_rgb,
+            multiplied,
+            inverted_colour,
+            inverted_base,
+            blend_target,
+            colour_rgb,
+            base_rgb,
+            effective_mask,
+            clipped_edge,
+            softened_edge,
+            directional_edge,
+            neighbour_alpha,
+            source_alpha,
+        ):
+            if disposable is not None:
+                disposable.close()
+
+
+def _normal_map_from_height(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    """Derive a normalized tangent-style normal map from luminance or alpha."""
+    pixels = image.width * image.height
+    if pixels > MAXIMUM_NORMAL_MAP_PIXELS:
+        fail(
+            "normal-map-from-height exceeds its bounded CPU pixel limit "
+            f"({pixels} > {MAXIMUM_NORMAL_MAP_PIXELS})"
+        )
+    source_kind = str(operation.get("source", "luminance"))
+    strength = governed_number(
+        operation.get("strength", 2),
+        "normal-map-from-height.strength",
+        0.01,
+        32,
+    )
+    blur_radius = governed_number(
+        operation.get("blurRadius", 0),
+        "normal-map-from-height.blurRadius",
+        0,
+        32,
+    )
+    invert_x_value = operation.get("invertX", False)
+    invert_y_value = operation.get("invertY", False)
+    preserve_alpha_value = operation.get("preserveAlpha", True)
+    if not isinstance(invert_x_value, bool) or not isinstance(invert_y_value, bool):
+        fail("normal-map-from-height invertX and invertY must be boolean")
+    if not isinstance(preserve_alpha_value, bool):
+        fail("normal-map-from-height preserveAlpha must be boolean")
+    invert_x = invert_x_value
+    invert_y = invert_y_value
+    preserve_alpha = preserve_alpha_value
+    if source_kind not in {"luminance", "alpha"}:
+        fail("normal-map-from-height.source must be luminance or alpha")
+
+    rgb_source = None
+    base_height = None
+    height = None
+    gradient_x = None
+    gradient_y = None
+    output_rgb = None
+    output_alpha = None
+    try:
+        if source_kind == "alpha":
+            base_height = image.getchannel("A")
+        else:
+            rgb_source = image.convert("RGB")
+            base_height = ImageOps.grayscale(rgb_source)
+        height = (
+            base_height.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+            if blur_radius > 0
+            else base_height.copy()
+        )
+        gradient_x = height.filter(
+            ImageFilter.Kernel(
+                (3, 3),
+                (-1, 0, 1, -2, 0, 2, -1, 0, 1),
+                scale=8,
+                offset=128,
+            )
+        )
+        gradient_y = height.filter(
+            ImageFilter.Kernel(
+                (3, 3),
+                (-1, -2, -1, 0, 0, 0, 1, 2, 1),
+                scale=8,
+                offset=128,
+            )
+        )
+        encoded = bytearray(pixels * 3)
+        cache: dict[tuple[int, int], bytes] = {}
+        for index, (encoded_x, encoded_y) in enumerate(
+            zip(pixel_data(gradient_x), pixel_data(gradient_y))
+        ):
+            x = index % image.width
+            y = index // image.width
+            if x == 0 or y == 0 or x == image.width - 1 or y == image.height - 1:
+                encoded_x = 128
+                encoded_y = 128
+            key = (encoded_x, encoded_y)
+            normal = cache.get(key)
+            if normal is None:
+                slope_x = ((encoded_x - 128) / 127) * strength
+                slope_y = ((encoded_y - 128) / 127) * strength
+                normal_x = slope_x if invert_x else -slope_x
+                normal_y = slope_y if invert_y else -slope_y
+                inverse_length = 1 / math.sqrt(normal_x * normal_x + normal_y * normal_y + 1)
+                normal = bytes((
+                    max(0, min(255, round((normal_x * inverse_length * 0.5 + 0.5) * 255))),
+                    max(0, min(255, round((normal_y * inverse_length * 0.5 + 0.5) * 255))),
+                    max(0, min(255, round((inverse_length * 0.5 + 0.5) * 255))),
+                ))
+                cache[key] = normal
+            offset = index * 3
+            encoded[offset:offset + 3] = normal
+        output_rgb = Image.frombytes("RGB", image.size, bytes(encoded))
+        result = output_rgb.convert("RGBA")
+        if preserve_alpha:
+            output_alpha = image.getchannel("A")
+            result.putalpha(output_alpha)
+        else:
+            result.putalpha(255)
+        return result
+    finally:
+        for disposable in (
+            output_alpha,
+            output_rgb,
+            gradient_y,
+            gradient_x,
+            height,
+            base_height,
+            rgb_source,
+        ):
+            if disposable is not None:
+                disposable.close()
+
+
 def apply_operation(
     image: Image.Image,
     operation: dict[str, Any],
@@ -1224,6 +1643,10 @@ def apply_operation(
         return _drop_shadow(image, operation, maximum_pixels)
     if op == "outer-glow":
         return _outer_glow(image, operation, maximum_pixels)
+    if op == "rim-light":
+        return _rim_light(image, operation)
+    if op == "normal-map-from-height":
+        return _normal_map_from_height(image, operation)
     fail(f"unsupported operation entered runtime: {op}")
 
 
@@ -1319,7 +1742,7 @@ def difference_fraction(left: Image.Image, right: Image.Image) -> float:
         return 1.0
     difference = ImageChops.difference(left, right)
     try:
-        changed = sum(1 for pixel in difference.getdata() if any(pixel))
+        changed = sum(1 for pixel in pixel_data(difference) if any(pixel))
         return changed / max(1, left.width * left.height)
     finally:
         difference.close()
@@ -1353,6 +1776,61 @@ def create_contact_sheet(
         sheet.alpha_composite(frame, (x, y))
         draw.text((column * cell_width + 4, y + cell_height + 2), f"{index:04d}", fill=(255, 255, 255, 255))
     return sheet
+
+
+def governed_review_thresholds(task: dict[str, Any]) -> tuple[str, dict[str, float]]:
+    profile = task.get("consistencyProfile", "off")
+    defaults = {
+        "off": {
+            "maximumCentroidShiftPixels": 1_000_000,
+            "maximumAlphaBoundsWidthChangeFraction": 1_000,
+            "maximumAlphaBoundsHeightChangeFraction": 1_000,
+            "maximumVisibleMeanColourDistance": 441.672956,
+            "maximumAlphaMassChangeFraction": 1_000,
+            "minimumCentroidAlignedAlphaIoU": 0,
+        },
+        "motion-family": {
+            "maximumCentroidShiftPixels": 96,
+            "maximumAlphaBoundsWidthChangeFraction": 0.75,
+            "maximumAlphaBoundsHeightChangeFraction": 0.75,
+            "maximumVisibleMeanColourDistance": 64,
+            "maximumAlphaMassChangeFraction": 1.25,
+            "minimumCentroidAlignedAlphaIoU": 0.1,
+        },
+        "identity-locked": {
+            "maximumCentroidShiftPixels": 48,
+            "maximumAlphaBoundsWidthChangeFraction": 0.35,
+            "maximumAlphaBoundsHeightChangeFraction": 0.35,
+            "maximumVisibleMeanColourDistance": 36,
+            "maximumAlphaMassChangeFraction": 0.55,
+            "minimumCentroidAlignedAlphaIoU": 0.3,
+        },
+    }
+    if not isinstance(profile, str) or profile not in defaults:
+        fail("sequence-review consistencyProfile must be off, motion-family or identity-locked")
+    raw = task.get("thresholds", {})
+    if not isinstance(raw, dict):
+        fail("sequence-review thresholds must be an object")
+    limits = {
+        "minimumChangedFraction": (0, 1, 0.0001),
+        "maximumChangedFraction": (0, 1, 1),
+        "maximumCentroidShiftPixels": (0, 1_000_000, defaults[profile]["maximumCentroidShiftPixels"]),
+        "maximumAlphaBoundsWidthChangeFraction": (0, 1_000, defaults[profile]["maximumAlphaBoundsWidthChangeFraction"]),
+        "maximumAlphaBoundsHeightChangeFraction": (0, 1_000, defaults[profile]["maximumAlphaBoundsHeightChangeFraction"]),
+        "maximumVisibleMeanColourDistance": (0, 441.672956, defaults[profile]["maximumVisibleMeanColourDistance"]),
+        "maximumAlphaMassChangeFraction": (0, 1_000, defaults[profile]["maximumAlphaMassChangeFraction"]),
+        "minimumCentroidAlignedAlphaIoU": (0, 1, defaults[profile]["minimumCentroidAlignedAlphaIoU"]),
+    }
+    unknown = set(raw) - set(limits)
+    if unknown:
+        fail(f"sequence-review thresholds contain unsupported fields: {', '.join(sorted(unknown))}")
+    thresholds = {
+        key: governed_number(raw.get(key, fallback), f"sequence-review.thresholds.{key}", minimum, maximum)
+        for key, (minimum, maximum, fallback) in limits.items()
+    }
+    if thresholds["minimumChangedFraction"] > thresholds["maximumChangedFraction"]:
+        fail("sequence-review minimumChangedFraction cannot exceed maximumChangedFraction")
+    return profile, thresholds
 
 
 def write_json_create_only(context: "RuntimeContext", target: Path, value: Any) -> None:
@@ -1610,6 +2088,8 @@ def maximum_task_output_files(context: RuntimeContext, task: dict[str, Any]) -> 
         return 1 + (1 if preview["difference"] else 0) + (1 if preview["overlay"] else 0)
     if kind == "image-master":
         return 2
+    if kind == "video-frame-extract":
+        return len(task["timestampsMs"]) + 1
     if kind == "motion-sequence":
         return int(task["frameCount"]) + 1 + (1 if task["preview"]["animatedGif"] else 0)
     return 1
@@ -1626,6 +2106,235 @@ def maximum_plan_output_files(context: RuntimeContext, tasks: list[dict[str, Any
                 "provide an explicit slice count or split the request"
             )
     return total
+
+
+def execute_video_frame_task(context: RuntimeContext, task: dict[str, Any]) -> None:
+    source_descriptor = task.get("source")
+    if (
+        not isinstance(source_descriptor, dict)
+        or source_descriptor.get("kind") != "external"
+        or not isinstance(source_descriptor.get("sourceId"), str)
+    ):
+        fail(f"video-frame-extract task {task.get('id')} source must be a bound external video")
+    source_record = context.sources.get(source_descriptor["sourceId"])
+    if not isinstance(source_record, dict) or source_record.get("mediaKind") != "video":
+        fail(f"video-frame-extract task {task.get('id')} source is not bound as video")
+    source_path = context.resolve_source_path(source_descriptor)
+    if source_path.suffix.lower() not in {".mp4", ".m4v", ".mov", ".webm", ".mkv", ".avi"}:
+        fail(f"video-frame-extract task {task.get('id')} source extension is not supported")
+    expected_width_value = task.get("expectedWidth")
+    expected_height_value = task.get("expectedHeight")
+    if (
+        isinstance(expected_width_value, bool)
+        or not isinstance(expected_width_value, int)
+        or isinstance(expected_height_value, bool)
+        or not isinstance(expected_height_value, int)
+    ):
+        fail(f"video-frame-extract task {task.get('id')} expected dimensions are invalid")
+    expected_width, expected_height = require_pixel_budget(
+        expected_width_value,
+        expected_height_value,
+        f"video-frame-extract task {task['id']} expected frame",
+        context.maximum_decoded_pixels,
+    )
+    require_active_pixel_budget(
+        [expected_width * expected_height * 2],
+        f"video-frame-extract task {task['id']} working set",
+        context.maximum_decoded_pixels,
+    )
+    timestamps_ms = task.get("timestampsMs")
+    if (
+        not isinstance(timestamps_ms, list)
+        or not 1 <= len(timestamps_ms) <= MAXIMUM_VIDEO_FRAME_TIMESTAMPS
+        or any(
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < 0
+            or value > MAXIMUM_VIDEO_TIMESTAMP_MS
+            for value in timestamps_ms
+        )
+        or any(value <= timestamps_ms[index - 1] for index, value in enumerate(timestamps_ms) if index > 0)
+    ):
+        fail(f"video-frame-extract task {task['id']} timestampsMs are invalid")
+    start_index = task.get("startIndex", 0)
+    if isinstance(start_index, bool) or not isinstance(start_index, int) or not 0 <= start_index <= 1_000_000:
+        fail(f"video-frame-extract task {task['id']} startIndex is invalid")
+    file_name_pattern = task.get("fileNamePattern")
+    if (
+        not isinstance(file_name_pattern, str)
+        or not 1 <= len(file_name_pattern) <= 512
+        or "{index}" not in file_name_pattern
+        or "/" in file_name_pattern
+        or "\\" in file_name_pattern
+        or "\x00" in file_name_pattern
+        or not file_name_pattern.endswith(".png")
+    ):
+        fail(f"video-frame-extract task {task['id']} fileNamePattern is invalid")
+    if not isinstance(task.get("preserveSourceAlpha", True), bool):
+        fail(f"video-frame-extract task {task['id']} preserveSourceAlpha must be boolean")
+    context.preflight_output_count(len(timestamps_ms) + 1, f"video-frame-extract task {task['id']}")
+    ffmpeg_path, ffmpeg_identity = _media_tool_identity("ffmpeg")
+    ffprobe_path, ffprobe_identity = _media_tool_identity("ffprobe")
+    probe = _probe_video(source_path, ffprobe_path)
+    if probe["width"] != expected_width or probe["height"] != expected_height:
+        fail(
+            f"video-frame-extract task {task['id']} source dimensions changed: "
+            f"expected {expected_width}x{expected_height}, observed {probe['width']}x{probe['height']}"
+        )
+    if probe["durationMs"] is not None and timestamps_ms[-1] >= int(probe["durationMs"]):
+        fail(
+            f"video-frame-extract task {task['id']} timestamp {timestamps_ms[-1]}ms "
+            f"is outside the {probe['durationMs']}ms source duration"
+        )
+
+    directory = target_path(
+        context.staging,
+        task["targetDirectory"],
+        f"task {task['id']} targetDirectory",
+    )
+    directory.mkdir(parents=True, exist_ok=False)
+    output_records: list[dict[str, Any]] = []
+    output_paths: list[Path] = []
+    frame_records: list[dict[str, Any]] = []
+    preserve_source_alpha = task.get("preserveSourceAlpha", True)
+    for offset, timestamp_ms in enumerate(timestamps_ms):
+        output_index = start_index + offset
+        file_name = (
+            file_name_pattern
+            .replace("{index}", f"{output_index:04d}")
+            .replace("{timestampMs}", str(timestamp_ms))
+        )
+        if "/" in file_name or "\\" in file_name or not file_name.endswith(".png"):
+            fail(f"video-frame-extract task {task['id']} produced an unsafe file name")
+        target = directory / file_name
+        context.preflight_output(
+            target,
+            expected_width * expected_height * 5 + OUTPUT_ENCODING_OVERHEAD_BYTES,
+            f"video-frame-extract task {task['id']} frame {offset}",
+        )
+        _controlled_media_tool(
+            ffmpeg_path,
+            [
+                "-nostdin",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-n",
+                "-protocol_whitelist",
+                "file",
+                "-noautorotate",
+                "-threads",
+                "1",
+                "-i",
+                str(source_path),
+                "-ss",
+                f"{timestamp_ms / 1000:.3f}",
+                "-map",
+                "0:v:0",
+                "-frames:v",
+                "1",
+                "-an",
+                "-sn",
+                "-dn",
+                "-threads",
+                "1",
+                "-pix_fmt",
+                "rgba" if preserve_source_alpha else "rgb24",
+                "-f",
+                "image2",
+                "-vcodec",
+                "png",
+                "-compression_level",
+                "9",
+                "-pred",
+                "mixed",
+                str(target),
+            ],
+            f"video-frame-extract task {task['id']} frame {offset}",
+        )
+        if not target.is_file() or target.is_symlink():
+            fail(f"video-frame-extract task {task['id']} did not create a regular PNG frame")
+        frame = load_image(
+            target,
+            context.maximum_decoded_pixels,
+            f"video-frame-extract task {task['id']} frame {offset}",
+        )
+        try:
+            if frame.size != (expected_width, expected_height):
+                fail(
+                    f"video-frame-extract task {task['id']} decoded frame dimensions changed: "
+                    f"expected {expected_width}x{expected_height}, observed {frame.width}x{frame.height}"
+                )
+            context.register_output(target, f"video-frame-extract task {task['id']} frame {offset}")
+            output = output_record(context.staging, target, frame, role="video-reference-frame")
+            admission = inspect_transparency(
+                frame,
+                "preferred",
+                encoded_has_alpha=bool(frame.info.get(SOURCE_ENCODED_ALPHA_INFO)),
+            )
+            output_records.append(output)
+            output_paths.append(target)
+            frame_records.append(
+                {
+                    "frameIndex": offset,
+                    "outputIndex": output_index,
+                    "timestampMs": timestamp_ms,
+                    "output": output,
+                    "transparencyInspection": admission,
+                    "deliveryAdmissionPerformed": False,
+                }
+            )
+        finally:
+            frame.close()
+
+    _revalidate_media_tool(ffmpeg_path, ffmpeg_identity)
+    _revalidate_media_tool(ffprobe_path, ffprobe_identity)
+    source = context.sources[task["source"]["sourceId"]]
+    manifest = with_document_hash(
+        {
+            "schema": VIDEO_FRAME_MANIFEST_SCHEMA,
+            "taskId": task["id"],
+            "source": {
+                "sourceId": source["sourceId"],
+                "path": source["path"],
+                "sha256": source["sha256"],
+                "bytes": source["bytes"],
+                "mediaType": source["mediaType"],
+            },
+            "probe": probe,
+            "tools": {"ffmpeg": ffmpeg_identity, "ffprobe": ffprobe_identity},
+            "selection": {
+                "mode": "requested-timestamps-ms",
+                "frameSemantics": "first-decodable-frame-at-or-after-requested-time",
+                "timestampsMs": timestamps_ms,
+                "sourceAutorotationApplied": False,
+                "preserveSourceAlpha": preserve_source_alpha,
+            },
+            "frames": frame_records,
+            "authority": {
+                "creativeApproval": False,
+                "deliveryAdmission": False,
+                "providerExecution": False,
+                "targetRepositoryMutation": False,
+                "publication": False,
+            },
+        }
+    )
+    manifest_path = directory / "video-frames.json"
+    write_json_create_only(context, manifest_path, manifest)
+    output_records.append(output_record(context.staging, manifest_path, role="video-frame-manifest"))
+    output_paths.append(manifest_path)
+    context.remember(
+        task["id"],
+        {
+            "taskId": task["id"],
+            "kind": task["kind"],
+            "status": "passed",
+            "frameCount": len(frame_records),
+            "outputs": output_records,
+        },
+        output_paths,
+    )
 
 
 def execute_image_task(context: RuntimeContext, task: dict[str, Any]) -> None:
@@ -1949,6 +2658,7 @@ def execute_assemble_task(context: RuntimeContext, task: dict[str, Any]) -> None
 
 
 def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
+    consistency_profile, thresholds = governed_review_thresholds(task)
     source_paths = [context.resolve_source_path(source) for source in task["sources"]]
     dimensions, source_pixels, maximum_frame_pixels = preflight_image_set(
         source_paths,
@@ -2024,6 +2734,12 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
             )
             bbox = alpha_bbox(frame)
             centroid = alpha_centroid(frame)
+            bounds_size = None if bbox is None else {
+                "width": bbox[2] - bbox[0],
+                "height": bbox[3] - bbox[1],
+            }
+            mass_fraction = alpha_mass_fraction(frame)
+            mean_rgb = visible_mean_rgb(frame)
             if expected_width is not None and frame.width != int(expected_width):
                 issues.append({"code": "width-mismatch", "frameIndex": index, "expected": expected_width, "actual": frame.width})
             if expected_height is not None and frame.height != int(expected_height):
@@ -2049,11 +2765,13 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                     "alpha": alpha,
                     "transparencyAdmission": admission,
                     "alphaBoundingBox": bbox,
+                    "alphaBoundsSize": bounds_size,
                     "alphaCentroid": centroid,
+                    "alphaMassFraction": mass_fraction,
+                    "visibleMeanRgb": mean_rgb,
                 }
             )
         transitions = []
-        thresholds = task["thresholds"]
         for index in range(1, len(frames)):
             changed = difference_fraction(frames[index - 1], frames[index])
             previous_centroid = frame_records[index - 1]["alphaCentroid"]
@@ -2064,11 +2782,40 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                     (previous_centroid["x"], previous_centroid["y"]),
                     (current_centroid["x"], current_centroid["y"]),
                 )
+            previous_bounds = frame_records[index - 1]["alphaBoundsSize"]
+            current_bounds = frame_records[index]["alphaBoundsSize"]
+            bounds_width_change = None
+            bounds_height_change = None
+            if previous_bounds and current_bounds:
+                bounds_width_change = abs(current_bounds["width"] - previous_bounds["width"]) / max(1, previous_bounds["width"])
+                bounds_height_change = abs(current_bounds["height"] - previous_bounds["height"]) / max(1, previous_bounds["height"])
+            previous_mass = float(frame_records[index - 1]["alphaMassFraction"])
+            current_mass = float(frame_records[index]["alphaMassFraction"])
+            mass_change = abs(current_mass - previous_mass) / max(1 / 255, previous_mass)
+            previous_colour = frame_records[index - 1]["visibleMeanRgb"]
+            current_colour = frame_records[index]["visibleMeanRgb"]
+            colour_distance = None
+            if previous_colour and current_colour:
+                colour_distance = math.dist(
+                    (previous_colour["red"], previous_colour["green"], previous_colour["blue"]),
+                    (current_colour["red"], current_colour["green"], current_colour["blue"]),
+                )
+            aligned_iou = centroid_aligned_alpha_iou(
+                frames[index - 1],
+                frames[index],
+                previous_centroid,
+                current_centroid,
+            )
             transition = {
                 "fromFrameIndex": index - 1,
                 "toFrameIndex": index,
                 "changedPixelFraction": changed,
                 "alphaCentroidShiftPixels": shift,
+                "alphaBoundsWidthChangeFraction": bounds_width_change,
+                "alphaBoundsHeightChangeFraction": bounds_height_change,
+                "alphaMassChangeFraction": mass_change,
+                "visibleMeanColourDistance": colour_distance,
+                "centroidAlignedAlphaIoU": aligned_iou,
             }
             transitions.append(transition)
             if task.get("rejectIdenticalAdjacentFrames", True) and changed == 0:
@@ -2079,10 +2826,22 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                 issues.append({"code": "excessive-frame-change", **transition})
             if shift is not None and shift > float(thresholds["maximumCentroidShiftPixels"]):
                 issues.append({"code": "centroid-shift-exceeded", **transition})
+            if bounds_width_change is not None and bounds_width_change > float(thresholds["maximumAlphaBoundsWidthChangeFraction"]):
+                issues.append({"code": "alpha-bounds-width-drift", **transition})
+            if bounds_height_change is not None and bounds_height_change > float(thresholds["maximumAlphaBoundsHeightChangeFraction"]):
+                issues.append({"code": "alpha-bounds-height-drift", **transition})
+            if mass_change > float(thresholds["maximumAlphaMassChangeFraction"]):
+                issues.append({"code": "alpha-mass-drift", **transition})
+            if colour_distance is not None and colour_distance > float(thresholds["maximumVisibleMeanColourDistance"]):
+                issues.append({"code": "visible-colour-drift", **transition})
+            if aligned_iou is not None and aligned_iou < float(thresholds["minimumCentroidAlignedAlphaIoU"]):
+                issues.append({"code": "centroid-aligned-silhouette-drift", **transition})
         manifest = {
             "schema": "evavo.project-art-sequence-review.v1",
             "taskId": task["id"],
             "status": "passed" if not issues else "blocked",
+            "consistencyProfile": consistency_profile,
+            "thresholds": thresholds,
             "frames": frame_records,
             "transitions": transitions,
             "issues": issues,
@@ -2202,6 +2961,36 @@ def _apply_layer_mask(image: Image.Image, mask_image: Image.Image | None, layer:
     return result
 
 
+def _validated_composite_rect(
+    rect: Any,
+    image_width: int,
+    image_height: int,
+    label: str,
+) -> tuple[int, int, int, int]:
+    if not isinstance(rect, dict):
+        fail(f"{label} must be an object")
+    values = tuple(rect.get(key) for key in ("x", "y", "width", "height"))
+    if any(isinstance(value, bool) or not isinstance(value, int) for value in values):
+        fail(f"{label} must contain integer x, y, width and height")
+    x, y, width, height = values
+    if x < 0 or y < 0 or width < 1 or height < 1 or x + width > image_width or y + height > image_height:
+        fail(f"{label} escaped its source image")
+    return x, y, width, height
+
+
+def _crop_composite_source(
+    image: Image.Image,
+    rect: dict[str, Any] | None,
+    label: str,
+) -> Image.Image:
+    if rect is None:
+        return image
+    x, y, width, height = _validated_composite_rect(rect, image.width, image.height, label)
+    cropped = image.crop((x, y, x + width, y + height))
+    image.close()
+    return cropped
+
+
 def _blend_overlap(base: Image.Image, layer: Image.Image, mode: str) -> Image.Image:
     normal = Image.alpha_composite(base, layer)
     if mode == "normal":
@@ -2279,8 +3068,19 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
                 context.maximum_decoded_pixels,
                 f"image-composite task {task['id']} layer {index} source",
             )
-            layer_width = int(layer.get("width", source_width))
-            layer_height = int(layer.get("height", source_height))
+            source_rect = layer.get("sourceRect")
+            if source_rect is not None:
+                _, _, source_rect_width, source_rect_height = _validated_composite_rect(
+                    source_rect,
+                    source_width,
+                    source_height,
+                    f"image-composite layer {index} sourceRect",
+                )
+            else:
+                source_rect_width = source_width
+                source_rect_height = source_height
+            layer_width = int(layer.get("width", source_rect_width))
+            layer_height = int(layer.get("height", source_rect_height))
             require_pixel_budget(
                 layer_width,
                 layer_height,
@@ -2289,6 +3089,8 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
             )
             mask_pixels = 0
             mask_index = layer.get("maskSourceIndex")
+            if mask_index is None and layer.get("maskSourceRect") is not None:
+                fail(f"image-composite layer {index} maskSourceRect requires maskSourceIndex")
             if mask_index is not None:
                 mask_index = int(mask_index)
                 if mask_index < 0 or mask_index >= len(source_paths):
@@ -2299,13 +3101,22 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
                     f"image-composite task {task['id']} layer {index} mask",
                 )
                 mask_pixels = mask_width * mask_height
+                mask_rect = layer.get("maskSourceRect")
+                if mask_rect is not None:
+                    _validated_composite_rect(
+                        mask_rect,
+                        mask_width,
+                        mask_height,
+                        f"image-composite layer {index} maskSourceRect",
+                    )
             blend_mode = layer.get("blendMode", "normal")
             canvas_multiplier = 3 if blend_mode == "normal" else 9
-            layer_multiplier = 6 if mask_index is not None else 4
+            layer_multiplier = 8 if mask_index is not None else 6
             require_active_pixel_budget(
                 [
                     canvas_pixels * canvas_multiplier,
-                    layer_width * layer_height * layer_multiplier,
+                    source_width * source_height,
+                    layer_width * layer_height * (layer_multiplier - 1),
                     mask_pixels,
                 ],
                 f"image-composite task {task['id']} layer {index} working set",
@@ -2321,6 +3132,11 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
             prepared = None
             layer_canvas = None
             try:
+                image = _crop_composite_source(
+                    image,
+                    source_rect,
+                    f"image-composite task {task['id']} layer {index} sourceRect",
+                )
                 if layer.get("width") is not None:
                     resized = image.resize(
                         (layer_width, layer_height),
@@ -2333,6 +3149,11 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
                         source_paths[mask_index],
                         context.maximum_decoded_pixels,
                         f"image-composite task {task['id']} layer {index} mask",
+                    )
+                    mask_image = _crop_composite_source(
+                        mask_image,
+                        layer.get("maskSourceRect"),
+                        f"image-composite task {task['id']} layer {index} maskSourceRect",
                     )
                 prepared = _apply_layer_mask(image, mask_image, layer)
                 layer_canvas = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
@@ -2348,6 +3169,8 @@ def execute_composite_task(context: RuntimeContext, task: dict[str, Any]) -> Non
                     "y": int(layer.get("y", 0)),
                     "opacity": layer.get("opacity", 1),
                     "blendMode": blend_mode,
+                    "sourceRect": source_rect,
+                    "maskSourceRect": layer.get("maskSourceRect"),
                     "width": prepared.width,
                     "height": prepared.height,
                 })
@@ -2395,7 +3218,7 @@ def image_compare_metrics(
         alpha_changed = 0
         total_delta = 0
         maximum_delta = 0
-        for values in difference.getdata():
+        for values in pixel_data(difference):
             if any(values):
                 changed += 1
             if values[3]:
@@ -2531,7 +3354,7 @@ def _mastering_metrics(image: Image.Image, profile: dict[str, Any]) -> tuple[dic
     shadow_threshold = int(profile.get("shadowThreshold", 0))
     highlight_threshold = int(profile.get("highlightThreshold", 255))
 
-    for pixel in image.getdata():
+    for pixel in pixel_data(image):
         red, green, blue, alpha = pixel
         if not colours_overflow:
             colours.add((red, green, blue, alpha))
@@ -3031,6 +3854,8 @@ def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, outpu
             kind = task.get("kind")
             if kind == "image":
                 execute_image_task(context, task)
+            elif kind == "video-frame-extract":
+                execute_video_frame_task(context, task)
             elif kind == "slice-sheet":
                 execute_slice_task(context, task)
             elif kind == "assemble-sheet":
@@ -3058,7 +3883,7 @@ def execute_plan(workspace: Path, plan: dict[str, Any], plan_bytes: bytes, outpu
                 "schema": RECEIPT_SCHEMA,
                 "processor": {
                     "id": PROCESSOR_ID,
-                    "version": "1.0.0",
+                    "version": "1.1.0",
                     "python": sys.version.split()[0],
                     "pillow": PILLOW_VERSION,
                 },

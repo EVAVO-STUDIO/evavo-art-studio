@@ -164,17 +164,20 @@ try {
   await mkdir(path.join(sourceRoot, 'chat'), { recursive: true });
   const first = path.join(sourceRoot, 'chat', 'white-king.png');
   const second = path.join(sourceRoot, 'chat', 'black-king.png');
+  const clip = path.join(sourceRoot, 'chat', 'turnaround.mov');
   await writeFile(first, onePixelPng(255, 244, 220));
   await writeFile(second, onePixelPng(24, 24, 28));
+  await writeFile(clip, Buffer.from('exact-reference-clip-fixture'));
   const firstBytes = await readFile(first);
   const secondBytes = await readFile(second);
+  const clipBytes = await readFile(clip);
 
   const request = {
     schema: 'evavo.persistent-artist-workspace-ingest-request.v1',
     workspaceId: 'artist-workspace',
     ingestId: 'chat-kings-001',
     createdBy: 'chatgpt-test',
-    note: 'Import two generated king sprite masters.',
+    note: 'Import two generated king sprite masters and one exact reference clip.',
     tags: ['battle-chess', 'chat-generated'],
     sourceRoots: [{ id: 'chat-attachments', path: sourceRoot }],
     items: [
@@ -202,6 +205,18 @@ try {
         origin: 'claude-generated',
         tags: ['black-king'],
       },
+      {
+        assetId: 'king-turnaround-reference',
+        sourceRootId: 'chat-attachments',
+        sourcePath: 'chat/turnaround.mov',
+        expectedSha256: sha256(clipBytes),
+        expectedBytes: clipBytes.length,
+        destinationPath: 'characters/kings/reference/turnaround.mov',
+        title: 'King turnaround reference clip',
+        role: 'video-reference',
+        origin: 'owner-supplied',
+        tags: ['turnaround', 'video-reference'],
+      },
     ],
   };
   const requestBytes = Buffer.from(`${JSON.stringify(request, null, 2)}\n`);
@@ -214,7 +229,8 @@ try {
     compiledAt: '2026-08-12T00:05:00.000Z',
   });
   assert.equal(plan.schema, WORKSPACE_INGEST_PLAN_SCHEMA);
-  assert.equal(plan.itemCount, 2);
+  assert.equal(plan.itemCount, 3);
+  assert.equal(plan.items.find((item) => item.assetId === 'king-turnaround-reference').mediaType, 'video/quicktime');
   assert.equal(plan.authority.externalSourceRead, true);
   assert.equal(plan.authority.workspaceWrite, true);
   assert.equal(plan.authority.storageWrite, false);
@@ -224,11 +240,12 @@ try {
 
   const summary = await runWorkspaceIngest(workspace, plan);
   assert.equal(summary.status, 'passed');
-  assert.equal(summary.itemCount, 2);
+  assert.equal(summary.itemCount, 3);
   assert.equal(summary.sourceMutation, false);
   assert.equal(summary.storageWrite, false);
   assert.deepEqual(await readFile(first), firstBytes);
   assert.deepEqual(await readFile(second), secondBytes);
+  assert.deepEqual(await readFile(clip), clipBytes);
   assert.deepEqual(
     await readFile(path.join(workspace, 'sources', 'characters', 'kings', 'white', 'white-king-master.png')),
     firstBytes,
@@ -236,6 +253,14 @@ try {
   assert.deepEqual(
     await readFile(path.join(workspace, 'working', 'characters', 'kings', 'white', 'white-king-master.png')),
     firstBytes,
+  );
+  assert.deepEqual(
+    await readFile(path.join(workspace, 'sources', 'characters', 'kings', 'reference', 'turnaround.mov')),
+    clipBytes,
+  );
+  assert.deepEqual(
+    await readFile(path.join(workspace, 'working', 'characters', 'kings', 'reference', 'turnaround.mov')),
+    clipBytes,
   );
   const provenance = JSON.parse(await readFile(path.join(workspace, 'manifests', 'ingests', 'chat-kings-001', 'items', 'white-king-master.json'), 'utf8'));
   const receipt = JSON.parse(await readFile(path.join(workspace, 'manifests', 'ingests', 'chat-kings-001', 'receipt.json'), 'utf8'));

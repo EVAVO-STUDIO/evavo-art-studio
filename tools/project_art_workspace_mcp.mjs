@@ -440,7 +440,7 @@ function run(executable, args, effects = {}) {
 function capabilities() {
   return summaryEnvelope({
     schema: 'evavo.project-art-workspace-capabilities.v1',
-    version: '2026-08-11.2',
+    version: '2026-08-16.1',
     writeEnabled,
     allowedRootCount: allowedRoots.length,
     commandTimeoutMs,
@@ -459,7 +459,10 @@ function capabilities() {
       'project-intelligence',
       'chat-or-local-intake',
       'deterministic-sandbox',
+      'multi-image-compositing',
+      'video-reference-extraction',
       'professional-mastering',
+      '2d-lighting-texture-preparation',
       'keyframed-motion-sequence',
       'sprite-sheet-and-atlas',
       'reference-derived-planning',

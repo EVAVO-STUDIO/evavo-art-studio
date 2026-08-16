@@ -282,6 +282,34 @@ try {
     );
   }
 
+  const normalMapCpuRequest = {
+    ...sandboxRequest,
+    sandboxId: 'normal-map-cpu-pixel-limit',
+    tasks: [
+      {
+        id: 'normal-map-cpu-pixel-limit',
+        kind: 'image',
+        source: 'art/hero.png',
+        targetPath: 'normal-map-cpu-pixel-limit.png',
+        operations: [
+          { op: 'resize', width: 3000, height: 3000 },
+          { op: 'normal-map-from-height', source: 'alpha' },
+        ],
+      },
+    ],
+  };
+  await expectProjectArtError(
+    compileProjectArtSandbox({
+      workspaceRoot: workspace,
+      request: normalMapCpuRequest,
+      requestBytes: Buffer.from(JSON.stringify(normalMapCpuRequest)),
+      registry,
+      registryBytes,
+      compiledAt: fixedTime,
+    }),
+    'PROJECT_ART_SANDBOX_PIXEL_LIMIT',
+  );
+
   const decodedPixelBudgetCases = [
     {
       id: 'oversized-image-operation',
@@ -647,6 +675,8 @@ try {
             {
               sourceIndex: 1,
               maskSourceIndex: 0,
+              sourceRect: { x: 2, y: 2, width: 4, height: 4 },
+              maskSourceRect: { x: 2, y: 2, width: 4, height: 4 },
               maskChannel: 'alpha',
               x: 8,
               y: 0,
@@ -704,6 +734,8 @@ try {
           expectedWidth: 8,
           expectedHeight: 8,
           requireAlpha: true,
+          consistencyProfile: 'identity-locked',
+          thresholds: { maximumVisibleMeanColourDistance: 441.672956 },
           preview: { contactSheet: true, animatedGif: true, onionSkins: true, columns: 2 },
         },
       ],
@@ -752,6 +784,22 @@ try {
     assert.equal(compositeResult.kind, 'image-composite');
     assert.equal(compositeResult.layerCount, 2);
     assert.equal(compositeResult.status, 'passed');
+    assert.deepEqual(compositeResult.layers[1].sourceRect, { x: 2, y: 2, width: 4, height: 4 });
+    assert.deepEqual(compositeResult.layers[1].maskSourceRect, { x: 2, y: 2, width: 4, height: 4 });
+    const compositePixels = run(
+      python.command,
+      [
+        ...python.prefix,
+        '-c',
+        [
+          'from PIL import Image',
+          `image=Image.open(${JSON.stringify(path.join(outputRoot, 'composite', 'hero-pair.png'))}).convert('RGBA')`,
+          'assert image.size == (16, 8)',
+          'assert image.getpixel((12, 4)) == (255, 0, 0, 191)',
+        ].join('\n'),
+      ],
+    );
+    assert.equal(compositePixels.status, 0, compositePixels.stderr || compositePixels.stdout);
     const compareResult = receipt.tasks.find((task) => task.taskId === 'compare-clean-hero');
     assert.equal(compareResult.kind, 'image-compare');
     assert.equal(compareResult.status, 'passed');
@@ -762,6 +810,13 @@ try {
     assert.equal(comparisonManifest.schema, 'evavo.project-art-image-comparison.v1');
     assert.equal(comparisonManifest.creativeApprovalPerformed, false);
     assert.equal(comparisonManifest.identityApprovalPerformed, false);
+    const sequenceManifest = JSON.parse(
+      await readFile(path.join(outputRoot, 'review', 'sequence-review.json'), 'utf8'),
+    );
+    assert.equal(sequenceManifest.consistencyProfile, 'identity-locked');
+    assert.equal(sequenceManifest.status, 'passed');
+    assert.equal(sequenceManifest.transitions[0].centroidAlignedAlphaIoU, 1);
+    assert.equal(typeof sequenceManifest.transitions[0].visibleMeanColourDistance, 'number');
     assert.equal(receipt.effects.sourceMutation, false);
     assert.equal(receipt.resourceUsage.externalSourceFiles, fullPlan.externalSources.length);
     assert.equal(
@@ -911,6 +966,58 @@ try {
       assert.match(boundedExecution.stderr, testCase.expected);
       await assert.rejects(access(boundedOutputRoot), (error) => error?.code === 'ENOENT');
     }
+
+    const rectangleAttack = structuredClone(fullPlan);
+    delete rectangleAttack.documentSha256;
+    rectangleAttack.sandboxId = 'runtime-composite-source-rectangle-type-attack';
+    rectangleAttack.runId = 'project-art-sandbox:runtime-composite-source-rectangle-type-attack';
+    rectangleAttack.tasks.find((task) => task.id === 'compose-hero').layers[1].sourceRect.x = true;
+    const rectangleAttackPlan = withDocumentHash(rectangleAttack);
+    const rectangleAttackPlanPath = path.join(workspace, 'runtime-composite-source-rectangle-type-attack.json');
+    await writeJsonCreateOnly(rectangleAttackPlanPath, rectangleAttackPlan);
+    const rectangleAttackOutput = path.join(workspace, 'runtime-composite-source-rectangle-type-attack-output');
+    const rectangleAttackExecution = run(
+      python.command,
+      [
+        ...python.prefix,
+        path.join(root, 'tools', 'run_project_art_sandbox.py'),
+        '--workspace-root',
+        workspace,
+        '--plan',
+        path.basename(rectangleAttackPlanPath),
+        '--output-root',
+        path.basename(rectangleAttackOutput),
+      ],
+    );
+    assert.notEqual(rectangleAttackExecution.status, 0);
+    assert.match(rectangleAttackExecution.stderr, /must contain integer x, y, width and height/u);
+    await assert.rejects(access(rectangleAttackOutput), (error) => error?.code === 'ENOENT');
+
+    const consistencyAttack = structuredClone(fullPlan);
+    delete consistencyAttack.documentSha256;
+    consistencyAttack.sandboxId = 'runtime-sequence-consistency-threshold-attack';
+    consistencyAttack.runId = 'project-art-sandbox:runtime-sequence-consistency-threshold-attack';
+    consistencyAttack.tasks.find((task) => task.id === 'review-walk').thresholds.maximumVisibleMeanColourDistance = 999;
+    const consistencyAttackPlan = withDocumentHash(consistencyAttack);
+    const consistencyAttackPlanPath = path.join(workspace, 'runtime-sequence-consistency-threshold-attack.json');
+    await writeJsonCreateOnly(consistencyAttackPlanPath, consistencyAttackPlan);
+    const consistencyAttackOutput = path.join(workspace, 'runtime-sequence-consistency-threshold-attack-output');
+    const consistencyAttackExecution = run(
+      python.command,
+      [
+        ...python.prefix,
+        path.join(root, 'tools', 'run_project_art_sandbox.py'),
+        '--workspace-root',
+        workspace,
+        '--plan',
+        path.basename(consistencyAttackPlanPath),
+        '--output-root',
+        path.basename(consistencyAttackOutput),
+      ],
+    );
+    assert.notEqual(consistencyAttackExecution.status, 0);
+    assert.match(consistencyAttackExecution.stderr, /maximumVisibleMeanColourDistance must be a finite number/u);
+    await assert.rejects(access(consistencyAttackOutput), (error) => error?.code === 'ENOENT');
 
     const runtimeWorkingSetCases = [
       {
