@@ -35,12 +35,23 @@ class ProjectArtAlphaAssociationTests(unittest.TestCase):
         try:
             self.assertEqual(source.tobytes(), before)
             self.assertEqual(
-                list(output.getdata()),
-                [
-                    (100, 50, 25, 128),
-                    (19, 201, 73, 255),
-                    (0, 0, 0, 0),
-                ],
+                output.tobytes(),
+                bytes(
+                    (
+                        100,
+                        50,
+                        25,
+                        128,
+                        19,
+                        201,
+                        73,
+                        255,
+                        0,
+                        0,
+                        0,
+                        0,
+                    )
+                ),
             )
         finally:
             output.close()
@@ -61,12 +72,23 @@ class ProjectArtAlphaAssociationTests(unittest.TestCase):
         )
         try:
             self.assertEqual(
-                list(output.getdata()),
-                [
-                    (199, 100, 50, 128),
-                    (19, 201, 73, 255),
-                    (0, 0, 0, 0),
-                ],
+                output.tobytes(),
+                bytes(
+                    (
+                        199,
+                        100,
+                        50,
+                        128,
+                        19,
+                        201,
+                        73,
+                        255,
+                        0,
+                        0,
+                        0,
+                        0,
+                    )
+                ),
             )
         finally:
             output.close()
@@ -97,8 +119,8 @@ class ProjectArtAlphaAssociationTests(unittest.TestCase):
         )
         try:
             self.assertEqual(
-                list(output.getdata()),
-                [(255, 26, 0, 100), (0, 0, 0, 0)],
+                output.tobytes(),
+                bytes((255, 26, 0, 100, 0, 0, 0, 0)),
             )
         finally:
             output.close()
