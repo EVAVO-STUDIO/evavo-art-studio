@@ -7,6 +7,8 @@ on:
       - "scripts/project-art/top-hat-pose-slot-production.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
+      - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-writer.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
       - ".github/workflows/project-art-top-hat-pose-slots.yml"
   pull_request:
@@ -14,6 +16,8 @@ on:
       - "scripts/project-art/top-hat-pose-slot-production.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
+      - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-writer.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
       - ".github/workflows/project-art-top-hat-pose-slots.yml"
   workflow_dispatch:
@@ -33,7 +37,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Verify runner and pose-slot production map
+      - name: Verify runner and pose-slot contracts
         run: |
           node --version
           node --test scripts/test-project-art-top-hat-pose-slot-production.mjs
+          node --test scripts/test-project-art-top-hat-pose-slot-writer.mjs
+      - name: Compile create-only production plan artifact
+        env:
+          PLAN_PATH: ${{ runner.temp }}/top-hat-pose-slot-production.json
+          RECEIPT_PATH: ${{ runner.temp }}/top-hat-pose-slot-production.receipt.json
+        run: |
+          node scripts/write-project-art-top-hat-pose-slot-production.mjs \
+            --output "$PLAN_PATH" > "$RECEIPT_PATH"
+          node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) JSON.parse(fs.readFileSync(file,"utf8"));' \
+            "$PLAN_PATH" "$RECEIPT_PATH"
+          sha256sum "$PLAN_PATH" "$RECEIPT_PATH"
+      - name: Upload bounded production map evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: top-hat-pose-slot-production-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/top-hat-pose-slot-production.json
+            ${{ runner.temp }}/top-hat-pose-slot-production.receipt.json
+          if-no-files-found: error
+          retention-days: 14

@@ -96,7 +96,7 @@ All six jobs are locked to the approved neutral, inhale and exhale anchors. Revi
 
 Presentation and conversational slots require explicit hand and finger review. Every candidate requires named human approval, an approval timestamp and the approved artifact SHA-256.
 
-## Usage
+## In-process usage
 
 Compile the exact current request in code:
 
@@ -111,13 +111,42 @@ const plan = compileProjectArtTopHatPoseSlotProduction(
 );
 ```
 
-Run the focused regression suite with:
+## Create-only plan artifact
+
+Agents, Runtime tooling and CI can materialize the same plan without copying or interpreting the mapping:
+
+```bash
+node scripts/write-project-art-top-hat-pose-slot-production.mjs \
+  --output /absolute/create-only/top-hat-pose-slot-production.json
+```
+
+The writer:
+
+- resolves and validates the ordinary output parent;
+- opens the target with create-only semantics and mode `0600`;
+- refuses to overwrite any existing path;
+- writes and synchronizes the complete deterministic plan;
+- rereads and byte-verifies the result;
+- emits an `evavo.project-art-top-hat-pose-slot-production-receipt.v1` receipt containing the plan hash, output hash, exact source commits and closed authority state.
+
+The dedicated workflow uploads the plan and receipt as the bounded artifact:
+
+```text
+top-hat-pose-slot-production-<exact-git-sha>
+```
+
+The artifact is production evidence, not an approval or release. It cannot fill a pose slot or activate a candidate.
+
+## Verification
+
+Run the focused regression suites with:
 
 ```bash
 node --test scripts/test-project-art-top-hat-pose-slot-production.mjs
+node --test scripts/test-project-art-top-hat-pose-slot-writer.mjs
 ```
 
-The dedicated GitHub workflow runs the same contract whenever the mapping, test, documentation, animation suite or workflow changes.
+The dedicated GitHub workflow runs both contracts, compiles the create-only plan, parses both JSON documents, reports their SHA-256 values and uploads them whenever the mapping, writer, animation suite, documentation or workflow changes.
 
 ## Current truth
 
