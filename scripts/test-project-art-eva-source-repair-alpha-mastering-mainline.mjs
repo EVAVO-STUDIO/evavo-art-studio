@@ -1,9 +1,21 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
   compileEvaSourceRepairAlphaMastering,
+  compileEvaSourceRepairAlphaMasteringFiles,
   evaSourceRepairAlphaMasteringCapabilities,
   sha256EvaSourceRepairAlphaBytes,
   sha256EvaSourceRepairAlphaDocument,
@@ -11,6 +23,7 @@ import {
 } from './project-art/eva-source-repair-alpha-mastering.mjs';
 import {
   encodeAvatarProviderFramePng,
+  finishAvatarFinalPassProviderFrame,
 } from './project-art/avatar-final-pass-provider-frame-finisher.mjs';
 import {
   inspectAvatarProviderCandidatePng,
@@ -338,6 +351,43 @@ function mutateProvider(input, mutateRequest, mutateReceipt) {
   return next;
 }
 
+function writeFileFixture(root) {
+  const value = fixture();
+  const inputRoot = path.join(root, 'inputs');
+  mkdirSync(inputRoot, { recursive: true });
+  const files = {
+    assurance: path.join(inputRoot, 'assurance.json'),
+    receipt: path.join(inputRoot, 'materialization.json'),
+    request: path.join(inputRoot, 'finisher-request.json'),
+    candidate: path.join(inputRoot, 'candidate.png'),
+    matte: path.join(inputRoot, 'alpha-matte.png'),
+  };
+  writeFileSync(files.assurance, `${JSON.stringify(value.candidateAssurance)}\n`, { mode: 0o600 });
+  writeFileSync(files.receipt, `${JSON.stringify(value.providerMaterializationReceipt)}\n`, { mode: 0o600 });
+  writeFileSync(files.request, `${JSON.stringify(value.providerFinisherRequest)}\n`, { mode: 0o600 });
+  writeFileSync(files.candidate, value.sourceSpaceCandidateBytes, { mode: 0o600 });
+  writeFileSync(files.matte, value.alphaMatteBytes, { mode: 0o600 });
+  return {
+    value,
+    files,
+    input: {
+      workspaceRoot: root,
+      frameId: FRAME_ID,
+      candidateAssuranceFile: files.assurance,
+      providerMaterializationReceiptFile: files.receipt,
+      providerFinisherRequestFile: files.request,
+      sourceSpaceCandidateFile: files.candidate,
+      sourceSpaceCandidatePath: CANDIDATE_PATH,
+      alphaMatteFile: files.matte,
+      alphaMattePath: MATTE_PATH,
+      expectedAlphaMatteSha256: value.expectedAlphaMatteSha256,
+      outputPath: OUTPUT_PATH,
+      authorization: value.authorization,
+      masteredAt: MASTERED_AT,
+    },
+  };
+}
+
 test('strict mainline boundary compiles one source-space candidate into production alpha', () => {
   const result = compileEvaSourceRepairAlphaMastering(fixture());
   assert.equal(result.status, 'alpha-mastered-awaiting-frame-finisher');
@@ -350,6 +400,8 @@ test('strict mainline boundary compiles one source-space candidate into producti
   assert.equal(verifyEvaSourceRepairAlphaMasteringDocument(result.report).alphaMasteringSha256, result.report.alphaMasteringSha256);
   const capabilities = evaSourceRepairAlphaMasteringCapabilities();
   assert.equal(capabilities.inputSnapshotsBeforeExecution, true);
+  assert.equal(capabilities.directSymlinkInputsRejected, true);
+  assert.equal(capabilities.workspaceRootSymlinkRejected, true);
   assert.equal(capabilities.alphaAssociation, 'straight');
   assert.equal(capabilities.premultiplied, false);
 });
@@ -377,6 +429,11 @@ test('rehashed provider authority, byte-count, commit and chronology drift fail 
     base,
     (request) => { request.unexpectedAuthority = false; },
   )));
+  assert.throws(() => compileEvaSourceRepairAlphaMastering(mutateProvider(
+    base,
+    undefined,
+    (receipt) => { receipt.source.candidateArtifactDescriptorSha256 = 'e'.repeat(64); },
+  )));
 });
 
 test('freshly rehashed report authority and unknown top-level fields fail closed', () => {
@@ -391,4 +448,61 @@ test('freshly rehashed report authority and unknown top-level fields fail closed
   assert.throws(() => verifyEvaSourceRepairAlphaMasteringDocument(
     rehash(widened, 'alphaMasteringSha256'),
   ));
+});
+
+test('file operator snapshots exact inputs, publishes atomically and remains frame-finisher compatible', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'eva-alpha-mainline-'));
+  try {
+    const written = writeFileFixture(root);
+    const result = compileEvaSourceRepairAlphaMasteringFiles(written.input);
+    assert.equal(result.status, 'alpha-mastered-awaiting-frame-finisher');
+    assert.equal(
+      readdirSync(root).some((entry) => entry.startsWith('.eva-alpha-input-')),
+      false,
+    );
+    for (const filePath of Object.values(result.outputFiles)) {
+      assert.equal(readFileSync(filePath).byteLength > 0, true);
+    }
+    const finished = finishAvatarFinalPassProviderFrame({
+      workspaceRoot: root,
+      materializationReceipt: result.materializationReceipt,
+      finisherRequest: result.finisherRequest,
+      finishedAt: '2026-08-15T11:09:00.000Z',
+    });
+    assert.equal(finished.report.preservation.visiblePixelsUnchanged, true);
+    assert.equal(finished.report.output.hiddenRgbTransparentPixels, 0);
+    assert.equal(finished.report.approvals.creative, false);
+    assert.throws(
+      () => compileEvaSourceRepairAlphaMasteringFiles(written.input),
+      /EVA_SOURCE_REPAIR_ALPHA_OUTPUT_ALREADY_EXISTS/u,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('file operator rejects a direct symlinked candidate before processing', (context) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'eva-alpha-symlink-'));
+  try {
+    const written = writeFileFixture(root);
+    const linkedCandidate = path.join(root, 'inputs', 'candidate-link.png');
+    try {
+      symlinkSync(written.files.candidate, linkedCandidate, 'file');
+    } catch (error) {
+      if (error?.code === 'EPERM' || error?.code === 'EACCES') {
+        context.skip('The current platform does not permit test symlink creation.');
+        return;
+      }
+      throw error;
+    }
+    assert.throws(
+      () => compileEvaSourceRepairAlphaMasteringFiles({
+        ...written.input,
+        sourceSpaceCandidateFile: linkedCandidate,
+      }),
+      /EVA_SOURCE_REPAIR_ALPHA_INPUT_FILE_INVALID/u,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
