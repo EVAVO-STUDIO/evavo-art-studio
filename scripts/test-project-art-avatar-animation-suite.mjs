@@ -8,6 +8,7 @@ import test from 'node:test';
 import {
   AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
   AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V1,
+  AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V2,
   AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA,
   AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA_V1,
   ProjectArtAvatarAnimationSuiteError,
@@ -130,7 +131,17 @@ test('compiler creates the complete professional Top Hat production plan', () =>
   assert.equal(plan.schema, AVATAR_ANIMATION_SUITE_PLAN_SCHEMA);
   assert.equal(plan.counts.idleVariants, 4);
   assert.equal(plan.counts.talkVariants, 6);
-  assert.ok(plan.counts.fullCharacterFrames > 300);
+  assert.equal(plan.counts.fullCharacterFrames, 732);
+  assert.equal(plan.counts.registeredPoseLayers, 17);
+  assert.equal(plan.counts.totalPlannedImages, 749);
+  assert.equal(plan.presentationCadence.minimumAuthoredFps, 24);
+  assert.equal(plan.presentationCadence.preferredAuthoredFps, 30);
+  assert.equal(plan.presentationCadence.displayTargetFps, 60);
+  assert.equal(plan.presentationCadence.boundedAlphaCrossfade, true);
+  assert.equal(
+    plan.presentationCadence.registeredMouthLayerKeepsBodyCadenceIndependent,
+    true,
+  );
   assert.ok(plan.clips.some((clip) => clip.id === 'hat-tip'));
   assert.ok(
     plan.identityLock.some((line) => line.includes('top-hat crown height')),
@@ -309,8 +320,13 @@ test('capabilities expose animation quality without claiming execution', () => {
   ]);
   assert.deepEqual(capabilities.acceptedPlanSchemas, [
     AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V1,
+    AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V2,
     AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
   ]);
+  assert.equal(capabilities.minimumAuthoredFps, 24);
+  assert.equal(capabilities.preferredAuthoredFps, 30);
+  assert.equal(capabilities.displayTargetFps, 60);
+  assert.equal(capabilities.boundedAlphaCrossfade, true);
   assert.equal(capabilities.fakeTransparencyGridAllowed, false);
   assert.equal(capabilities.providerExecution, false);
 });
@@ -368,3 +384,4 @@ test('MCP exposes and executes the bounded create-only compiler tool', async () 
     await rm(root, { recursive: true, force: true });
   }
 });
+

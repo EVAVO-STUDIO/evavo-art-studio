@@ -4,15 +4,17 @@ The avatar animation suite turns immutable identity references into a determinis
 
 ## Production matrix
 
-Every plan contains 25 clips and 332 planned images:
+Every v3 plan contains 25 clips and 749 planned images:
 
 - four anti-repeating idle loops plus attention, listening and thinking;
 - six talk performances with explicit talk-in and talk-out transitions;
 - single and double blinks, nod, wave, reactions, sleep and wake;
 - an EVA greeting or a Top Hat hat-tip with identity-specific geometry locks;
-- 315 full-character frames and 17 full-canvas, pixel-registered mouth and eye layers.
+- 732 full-character frames and 17 full-canvas, pixel-registered mouth and eye layers.
 
-Talking body frames deliberately use a separated mouth underlay. Runtime visemes select registered mouth poses from exact audio timing, with a 64 ms minimum visible hold, instead of crossfading whole-character mouth shapes. This keeps the body performance smooth while allowing lip motion to follow the rendered audio clock.
+Authored motion now has a 24 fps floor and a 30 fps preferred cadence. The runtime presents those approved frames on a refresh-synchronised 60 fps display clock. It may use a bounded 42–96 ms alpha crossfade between adjacent approved body frames, but never fabricates provider frames, never crossfades whole-body viseme substitutions, and keeps a registered mouth layer independent from body cadence. Reduced-motion presentation remains locked to the reviewed neutral frame.
+
+Talking body frames deliberately use a separated mouth underlay. Runtime visemes select registered mouth poses from exact audio timing, with a 64 ms minimum visible hold, instead of crossfading whole-character mouth shapes. This keeps the 24–30 fps authored body performance moving independently while the browser compositor presents it at 60 fps and lip motion follows the rendered audio clock.
 
 ## Transparency and continuity
 
@@ -47,7 +49,7 @@ pnpm run project-art:avatar-animation:compile -- \
   --compiled-at 2026-08-15T00:00:00Z
 ```
 
-The output path must not already exist. The plan binds the normalized request and the full plan with SHA-256 hashes, retains lossless RGBA PNG masters and declares lossless WebP/PNG runtime delivery.
+The output path must not already exist. The plan binds the normalized request and the full plan with SHA-256 hashes, retains lossless RGBA PNG masters and declares lossless WebP/PNG runtime delivery. New compiles emit `evavo.project-art-avatar-animation-suite-plan.v3`; v1 and v2 plans remain accepted for deterministic inspection.
 
 Legacy Cloudinary-only v1 requests and their v1 plan identifier remain permanently discoverable for deterministic compatibility, but they do not claim a full-body animation-master reference. New Top Hat production handoffs compile to v2.
 
@@ -60,3 +62,4 @@ Run the focused contract, file-safety and MCP tests with:
 ```bash
 pnpm run project-art:avatar-animation:check
 ```
+

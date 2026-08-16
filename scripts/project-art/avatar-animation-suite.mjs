@@ -15,10 +15,12 @@ export const AVATAR_ANIMATION_SUITE_REQUEST_SCHEMA =
   'evavo.project-art-avatar-animation-suite-request.v2';
 export const AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V1 =
   'evavo.project-art-avatar-animation-suite-plan.v1';
-export const AVATAR_ANIMATION_SUITE_PLAN_SCHEMA =
+export const AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V2 =
   'evavo.project-art-avatar-animation-suite-plan.v2';
+export const AVATAR_ANIMATION_SUITE_PLAN_SCHEMA =
+  'evavo.project-art-avatar-animation-suite-plan.v3';
 export const AVATAR_ANIMATION_SUITE_CAPABILITIES_SCHEMA =
-  'evavo.project-art-avatar-animation-suite-capabilities.v2';
+  'evavo.project-art-avatar-animation-suite-capabilities.v3';
 
 const IDENTIFIER = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
 const ASSET_ID = /^[a-f0-9]{32}$/u;
@@ -40,30 +42,30 @@ const AUTHORITY_KEYS = Object.freeze([
 ]);
 
 const CLIPS = Object.freeze([
-  clip('idle-primary', 'idle', 'loop', 16, 12, 'quiet neutral breathing'),
-  clip('idle-breathe', 'idle', 'loop', 18, 12, 'subtle asymmetric breath and posture life'),
-  clip('idle-weight-shift', 'idle', 'loop', 16, 12, 'small grounded weight transfer'),
-  clip('idle-glance', 'idle', 'loop', 14, 12, 'brief eye-led glance returning to neutral'),
-  clip('attention', 'idle', 'loop', 12, 12, 'alert neutral attention'),
-  clip('listening', 'listening', 'loop', 16, 12, 'engaged listening with restrained response'),
-  clip('thinking', 'thinking', 'ping-pong', 16, 12, 'considered thinking motion'),
-  clip('blink-single', 'blink', 'once', 5, 20, 'natural lid close, contact and reopen'),
-  clip('blink-double', 'blink', 'once', 8, 20, 'two unequal natural blinks'),
-  clip('talk-in', 'talk-in', 'once', 5, 15, 'neutral-to-speaking transition'),
-  clip('talk-neutral', 'talk-loop', 'loop', 16, 15, 'conversational neutral body cadence'),
-  clip('talk-soft', 'talk-loop', 'loop', 16, 15, 'warm quiet conversational cadence'),
-  clip('talk-engaged', 'talk-loop', 'loop', 16, 15, 'engaged forward conversational cadence'),
-  clip('talk-emphasis', 'talk-emotion', 'loop', 14, 15, 'one restrained emphasis beat'),
-  clip('talk-happy', 'talk-emotion', 'loop', 14, 15, 'pleased conversational cadence'),
-  clip('talk-concerned', 'talk-emotion', 'loop', 14, 15, 'concerned but composed cadence'),
-  clip('talk-out', 'talk-out', 'once', 5, 15, 'speaking-to-neutral transition'),
-  clip('nod', 'gesture', 'once', 10, 15, 'single readable agreement nod'),
-  clip('wave', 'wave', 'once', 14, 15, 'clean greeting wave with stable fingers'),
-  clip('pleased', 'emotion', 'once', 12, 12, 'subtle pleased reaction'),
-  clip('concerned', 'emotion', 'once', 12, 12, 'subtle concerned reaction'),
-  clip('error', 'emotion', 'once', 10, 12, 'clear restrained error reaction'),
-  clip('sleep', 'sleep', 'loop', 16, 8, 'calm closed-eye sleeping loop'),
-  clip('wake', 'gesture', 'once', 8, 12, 'sleep-to-neutral recovery'),
+  clip('idle-primary', 'idle', 'loop', 36, 24, 'quiet neutral breathing'),
+  clip('idle-breathe', 'idle', 'loop', 48, 24, 'subtle asymmetric breath and posture life'),
+  clip('idle-weight-shift', 'idle', 'loop', 40, 24, 'small grounded weight transfer'),
+  clip('idle-glance', 'idle', 'loop', 32, 24, 'brief eye-led glance returning to neutral'),
+  clip('attention', 'idle', 'loop', 30, 24, 'alert neutral attention'),
+  clip('listening', 'listening', 'loop', 40, 24, 'engaged listening with restrained response'),
+  clip('thinking', 'thinking', 'ping-pong', 40, 24, 'considered thinking motion'),
+  clip('blink-single', 'blink', 'once', 9, 30, 'natural lid close, contact and reopen'),
+  clip('blink-double', 'blink', 'once', 15, 30, 'two unequal natural blinks'),
+  clip('talk-in', 'talk-in', 'once', 12, 30, 'neutral-to-speaking transition'),
+  clip('talk-neutral', 'talk-loop', 'loop', 36, 30, 'conversational neutral body cadence'),
+  clip('talk-soft', 'talk-loop', 'loop', 36, 30, 'warm quiet conversational cadence'),
+  clip('talk-engaged', 'talk-loop', 'loop', 36, 30, 'engaged forward conversational cadence'),
+  clip('talk-emphasis', 'talk-emotion', 'loop', 32, 30, 'one restrained emphasis beat'),
+  clip('talk-happy', 'talk-emotion', 'loop', 32, 30, 'pleased conversational cadence'),
+  clip('talk-concerned', 'talk-emotion', 'loop', 32, 30, 'concerned but composed cadence'),
+  clip('talk-out', 'talk-out', 'once', 12, 30, 'speaking-to-neutral transition'),
+  clip('nod', 'gesture', 'once', 20, 30, 'single readable agreement nod'),
+  clip('wave', 'wave', 'once', 32, 30, 'clean greeting wave with stable fingers'),
+  clip('pleased', 'emotion', 'once', 24, 24, 'subtle pleased reaction'),
+  clip('concerned', 'emotion', 'once', 24, 24, 'subtle concerned reaction'),
+  clip('error', 'emotion', 'once', 20, 24, 'clear restrained error reaction'),
+  clip('sleep', 'sleep', 'loop', 48, 24, 'calm closed-eye sleeping loop'),
+  clip('wake', 'gesture', 'once', 18, 24, 'sleep-to-neutral recovery'),
 ]);
 
 const MOUTH_POSES = Object.freeze([
@@ -470,11 +472,11 @@ function signatureClip(characterId) {
         'hat-tip',
         'gesture',
         'once',
-        12,
-        15,
+        28,
+        30,
         'polished top-hat greeting without hat geometry drift',
       )
-    : clip('eva-greeting', 'gesture', 'once', 12, 15, 'warm restrained EVA greeting');
+    : clip('eva-greeting', 'gesture', 'once', 28, 30, 'warm restrained EVA greeting');
 }
 
 function identityRequirements(characterId) {
@@ -659,6 +661,20 @@ export function compileProjectArtAvatarAnimationSuite(value, options = {}) {
     clips,
     frameJobs,
     poseJobs,
+    presentationCadence: Object.freeze({
+      schema: 'evavo.project-art-avatar-display-cadence.v1',
+      minimumAuthoredFps: 24,
+      preferredAuthoredFps: 30,
+      displayTargetFps: 60,
+      browserRefreshSynchronized: true,
+      boundedAlphaCrossfade: true,
+      minimumBlendWindowMs: 42,
+      maximumBlendWindowMs: 96,
+      wholeBodyVisemeCrossfadeForbidden: true,
+      registeredMouthLayerKeepsBodyCadenceIndependent: true,
+      reducedMotionUsesNeutralFrame: true,
+      droppedFramePolicy: 'sample-current-logical-time-never-catch-up-burst',
+    }),
     routing: Object.freeze({
       idleVariants: Object.freeze([
         'idle-primary',
@@ -710,6 +726,10 @@ export function compileProjectArtAvatarAnimationSuite(value, options = {}) {
       trimTransparentBorders: false,
       hashBoundSequenceAndAtlas: true,
       retainLosslessMasters: true,
+      authoredFrameRateFloor: 24,
+      authoredFrameRatePreferred: 30,
+      presentationTargetFps: 60,
+      presentationCadenceSchema: 'evavo.project-art-avatar-display-cadence.v1',
     }),
     counts: Object.freeze({
       clips: clips.length,
@@ -788,6 +808,7 @@ export function projectArtAvatarAnimationSuiteCapabilities() {
     planSchema: AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
     acceptedPlanSchemas: Object.freeze([
       AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V1,
+      AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V2,
       AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
     ]),
     characters: Object.freeze(['eva-female', 'top-hat-man']),
@@ -796,6 +817,11 @@ export function projectArtAvatarAnimationSuiteCapabilities() {
     multipleTalkVariants: 6,
     separatedMouthAndEyeLayers: true,
     audioTimedVisemes: true,
+    minimumAuthoredFps: 24,
+    preferredAuthoredFps: 30,
+    displayTargetFps: 60,
+    boundedAlphaCrossfade: true,
+    registeredMouthLayerKeepsBodyCadenceIndependent: true,
     continuityLinkedFrameJobs: true,
     hashBoundAnimationIdentityMaster: true,
     allImageJobsIdentityReferenceBound: true,
@@ -810,3 +836,4 @@ export function projectArtAvatarAnimationSuiteCapabilities() {
     forcePush: false,
   });
 }
+
