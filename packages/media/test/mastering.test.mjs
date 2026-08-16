@@ -191,8 +191,11 @@ test("chroma extraction creates deterministic true alpha and decontaminated edge
   assert.ok(outerEdge[0] >= 245 && outerEdge[1] <= 10);
 
   const innerEdge = pixel(decoded, 4, 6);
-  assert.ok(innerEdge[3] > outerEdge[3] && innerEdge[3] < 255);
-  assert.ok(innerEdge[0] >= 245 && innerEdge[1] <= 10);
+  assert.deepEqual(
+    innerEdge,
+    [192, 63, 0, 255],
+    "non-key-dominant foreground colour remains opaque and unchanged",
+  );
 
   assert.deepEqual(pixel(decoded, 7, 7), [255, 0, 0, 255]);
   assert.deepEqual(
@@ -536,6 +539,25 @@ test("background recovery infers only a confident high-chroma edge matte", async
   );
 });
 
+test("background recovery hands a confidently inferred provider matte to extraction", async () => {
+  const candidate = await raster(96, 96, 4, (x, y) =>
+    x >= 31 && x <= 64 && y >= 20 && y <= 80
+      ? [225, 95, 45, 255]
+      : [33, 232, 28, 255],
+  );
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#13f00c",
+  });
+  assert.equal(result.evidence.strategy, "inferred-high-chroma-key");
+  assert.equal(result.evidence.classification.inferredMatte.hex, "#21e81c");
+  assert.equal(result.evidence.guarantees.realAlpha, true);
+  assert.equal(result.evidence.guarantees.transparentCanvasEdge, true);
+  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
+  const decoded = await rgba(result.png);
+  assert.deepEqual(pixel(decoded, 0, 0), [0, 0, 0, 0]);
+  assert.deepEqual(pixel(decoded, 48, 48), [225, 95, 45, 255]);
+});
+
 test("variable chroma recovery removes dark matte spill without a green outline", async () => {
   const candidate = await raster(96, 96, 4, (x, y) => {
     if (x >= 18 && x <= 77 && y >= 15 && y <= 79) {
@@ -563,7 +585,7 @@ test("variable chroma recovery removes dark matte spill without a green outline"
   );
 });
 
-test("provider halo repair rejects complementary edge paint instead of preserving an outline", async () => {
+test("provider halo repair preserves ambiguous non-key foreground for explicit artist guidance", async () => {
   const candidate = await raster(96, 96, 4, (x, y) => {
     if (x >= 20 && x <= 75 && y >= 20 && y <= 75) {
       return [10, 9, 10, 255];
@@ -576,22 +598,37 @@ test("provider halo repair rejects complementary edge paint instead of preservin
   const result = await recoverBackgroundAlpha(candidate, {
     matteColour: "#00ff00",
   });
-  assert.ok(result.evidence.output.providerHaloRepairPixels > 0);
-  assert.equal(
-    result.evidence.recomposition.excludedProviderHaloRepairPixels,
-    result.evidence.output.providerHaloRepairPixels,
-  );
+  assert.equal(result.evidence.output.providerForegroundHaloRepairPixels, 0);
   assert.equal(result.evidence.recomposition.mismatchPixels, 0);
   const decoded = await rgba(result.png);
-  const repaired = pixel(decoded, 48, 19);
-  assert.ok(repaired[3] > 0 && repaired[3] < 255);
+  assert.deepEqual(pixel(decoded, 48, 19), [174, 189, 157, 255]);
+});
+
+test("provider halo repair preserves legitimate high-contrast foreground detail near a silhouette", async () => {
+  const candidate = await raster(96, 96, 4, (x, y) => {
+    if (x >= 20 && x <= 75 && y >= 21 && y <= 75) {
+      return [238, 177, 143, 255];
+    }
+    if (x >= 20 && x <= 75 && y === 20) {
+      return [4, 3, 5, 255];
+    }
+    return [12, 239, 24, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate, {
+    matteColour: "#00ff00",
+  });
+  assert.equal(result.evidence.output.providerDistanceHaloRepairPixels, 0);
+  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
+  const decoded = await rgba(result.png);
+  const darkDetail = pixel(decoded, 48, 20);
+  assert.ok(darkDetail[3] > 240);
   assert.ok(
-    Math.max(repaired[0], repaired[1], repaired[2]) <= 20,
-    `provider halo colour remains: ${repaired}`,
+    Math.max(...darkDetail.slice(0, 3)) <= 24,
+    `foreground detail was repainted from an unrelated seed: ${darkDetail}`,
   );
 });
 
-test("provider halo repair catches a subtle matte-complement fringe below the generic colour-distance threshold", async () => {
+test("provider halo repair does not repaint a foreground-classified complementary colour", async () => {
   const candidate = await raster(96, 96, 4, (x, y) => {
     if (x >= 20 && x <= 75 && y >= 20 && y <= 75) {
       return [10, 9, 10, 255];
@@ -604,18 +641,11 @@ test("provider halo repair catches a subtle matte-complement fringe below the ge
   const result = await recoverBackgroundAlpha(candidate, {
     matteColour: "#00ff00",
   });
-  assert.ok(
-    result.evidence.output.providerComplementHaloRepairPixels > 0,
-  );
+  assert.equal(result.evidence.output.providerComplementHaloRepairPixels, 0);
   assert.equal(result.evidence.output.providerDistanceHaloRepairPixels, 0);
   assert.equal(result.evidence.recomposition.mismatchPixels, 0);
   const decoded = await rgba(result.png);
-  const repaired = pixel(decoded, 48, 19);
-  assert.ok(repaired[3] > 0 && repaired[3] < 255);
-  assert.ok(
-    Math.max(repaired[0], repaired[1], repaired[2]) <= 20,
-    `subtle provider halo colour remains: ${repaired}`,
-  );
+  assert.deepEqual(pixel(decoded, 48, 19), [32, 8, 34, 255]);
 });
 
 test("provider halo repair cleans visible matte-connected antialias colour without eroding coverage", async () => {

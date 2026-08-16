@@ -66,4 +66,49 @@ test("chroma spill suppression rejects grey and malformed mattes", async () => {
       error instanceof ChromaSpillSuppressionError &&
       error.code === "CHROMA_SPILL_MATTE_INVALID",
   );
+  await assert.rejects(
+    () =>
+      suppressChromaSpill(candidate, {
+        matteColour: "#808080",
+        allowInferredMatte: true,
+      }),
+    (error) =>
+      error instanceof ChromaSpillSuppressionError &&
+      error.code === "CHROMA_SPILL_MATTE_UNSAFE",
+  );
+});
+
+test("chroma spill suppression requires an explicit inferred high-chroma handoff", async () => {
+  const candidate = await raster(3, 1, (x) => {
+    if (x === 0) return [0, 0, 0, 0];
+    if (x === 1) return [25, 80, 20, 128];
+    return [232, 158, 108, 255];
+  });
+  await assert.rejects(
+    () => suppressChromaSpill(candidate, { matteColour: "#21e81c" }),
+    (error) =>
+      error instanceof ChromaSpillSuppressionError &&
+      error.code === "CHROMA_SPILL_MATTE_UNSAFE",
+  );
+  const result = await suppressChromaSpill(candidate, {
+    matteColour: "#21e81c",
+    allowInferredMatte: true,
+  });
+  assert.equal(result.evidence.matte.hex, "#21e81c");
+  assert.equal(result.evidence.matte.dominantChannel, "green");
+  assert.equal(result.evidence.thresholds.inferredMatteAccepted, true);
+});
+
+test("chroma spill suppression neutralizes key-coloured hidden RGB before texture filtering", async () => {
+  const candidate = await raster(2, 1, (x) =>
+    x === 0 ? [4, 220, 3, 0] : [30, 20, 25, 0],
+  );
+  const result = await suppressChromaSpill(candidate, {
+    matteColour: "#00ff00",
+  });
+  const output = await pixels(result.png);
+  assert.deepEqual([...output.subarray(0, 4)], [4, 4, 3, 0]);
+  assert.deepEqual([...output.subarray(4, 8)], [30, 20, 25, 0]);
+  assert.equal(result.evidence.output.hiddenRgbSuppressedPixels, 1);
+  assert.equal(result.evidence.output.maximumHiddenRgbSpill, 216);
 });

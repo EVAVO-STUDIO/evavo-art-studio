@@ -267,6 +267,8 @@ export async function handleMasteringCommand(
           extraction.evidence.matte?.hex ??
           extraction.evidence.classification.inferredMatte?.hex ??
           required(matteColour, "--matte"),
+        allowInferredMatte:
+          extraction.evidence.strategy === "inferred-high-chroma-key",
       })
     : null;
   const masteredPng = spillSuppression?.png ?? guidance?.png ?? extraction.png;

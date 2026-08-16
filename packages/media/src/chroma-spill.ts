@@ -4,6 +4,7 @@ import sharp from "sharp";
 
 export interface ChromaSpillSuppressionOptions {
   readonly matteColour: string;
+  readonly allowInferredMatte?: boolean;
   readonly tolerance?: number;
   readonly minimumAlpha?: number;
 }
@@ -22,10 +23,13 @@ export interface ChromaSpillSuppressionEvidence {
   readonly thresholds: Readonly<{
     tolerance: number;
     minimumAlpha: number;
+    inferredMatteAccepted: boolean;
   }>;
   readonly output: Readonly<{
     inspectedPixels: number;
     suppressedPixels: number;
+    hiddenRgbSuppressedPixels: number;
+    maximumHiddenRgbSpill: number;
     alphaReducedPixels: number;
     newlyTransparentPixels: number;
     maximumSpill: number;
@@ -74,10 +78,11 @@ function bounded(
   return resolved;
 }
 
-function parseMatte(value: string): Readonly<{
+function parseMatte(value: string, allowInferredMatte: boolean): Readonly<{
   channels: readonly [number, number, number];
   dominant: Channel;
   hex: string;
+  inferredMatteAccepted: boolean;
 }> {
   const normalized = value.trim().toLowerCase();
   if (!/^#[0-9a-f]{6}$/.test(normalized)) {
@@ -93,7 +98,13 @@ function parseMatte(value: string): Readonly<{
   ] as const;
   const maximum = Math.max(...channels);
   const minimum = Math.min(...channels);
-  if (maximum < 240 || maximum - minimum < 160) {
+  const declaredHighChroma = maximum >= 240 && maximum - minimum >= 160;
+  const confidentlyInferredHighChroma =
+    maximum >= 210 && minimum <= 45 && maximum - minimum >= 140;
+  if (
+    !declaredHighChroma &&
+    !(allowInferredMatte && confidentlyInferredHighChroma)
+  ) {
     throw new ChromaSpillSuppressionError(
       "CHROMA_SPILL_MATTE_UNSAFE",
       "matteColour must be a declared high-chroma key.",
@@ -103,6 +114,7 @@ function parseMatte(value: string): Readonly<{
     channels,
     dominant: channels.indexOf(maximum) as Channel,
     hex: normalized,
+    inferredMatteAccepted: !declaredHighChroma,
   });
 }
 
@@ -111,8 +123,20 @@ export async function suppressChromaSpill(
   options: ChromaSpillSuppressionOptions,
 ): Promise<ChromaSpillSuppressionResult> {
   const encoded = Buffer.from(input);
-  const matte = parseMatte(options.matteColour);
-  const tolerance = bounded(options.tolerance, 2, 0, 64, "tolerance");
+  if (
+    options.allowInferredMatte !== undefined &&
+    typeof options.allowInferredMatte !== "boolean"
+  ) {
+    throw new ChromaSpillSuppressionError(
+      "CHROMA_SPILL_OPTIONS_INVALID",
+      "allowInferredMatte must be boolean when supplied.",
+    );
+  }
+  const matte = parseMatte(
+    options.matteColour,
+    options.allowInferredMatte === true,
+  );
+  const tolerance = bounded(options.tolerance, 12, 0, 64, "tolerance");
   const minimumAlpha = bounded(
     options.minimumAlpha,
     0.018,
@@ -135,25 +159,38 @@ export async function suppressChromaSpill(
   );
   let inspectedPixels = 0;
   let suppressedPixels = 0;
+  let hiddenRgbSuppressedPixels = 0;
+  let maximumHiddenRgbSpill = 0;
   let alphaReducedPixels = 0;
   let newlyTransparentPixels = 0;
   let maximumSpill = 0;
 
   for (let offset = 0; offset < data.length; offset += 4) {
     const existingAlpha = data[offset + 3]! / 255;
-    if (existingAlpha <= 0) continue;
-    inspectedPixels += 1;
     const channels = [data[offset]!, data[offset + 1]!, data[offset + 2]!] as [
       number,
       number,
       number,
     ];
-    const spill = Math.max(
+    if (existingAlpha > 0) inspectedPixels += 1;
+    const rawSpill = Math.max(
       0,
       channels[matte.dominant] -
-        Math.max(...others.map((channel) => channels[channel])) -
-        tolerance,
+        Math.max(...others.map((channel) => channels[channel])),
     );
+    if (existingAlpha <= 0) {
+      if (rawSpill <= 0) continue;
+      maximumHiddenRgbSpill = Math.max(maximumHiddenRgbSpill, rawSpill);
+      channels[matte.dominant] = Math.max(
+        ...others.map((channel) => channels[channel]),
+      );
+      data[offset] = channels[0];
+      data[offset + 1] = channels[1];
+      data[offset + 2] = channels[2];
+      hiddenRgbSuppressedPixels += 1;
+      continue;
+    }
+    const spill = Math.max(0, rawSpill - tolerance);
     if (spill <= 0) continue;
     suppressedPixels += 1;
     maximumSpill = Math.max(maximumSpill, spill);
@@ -200,10 +237,16 @@ export async function suppressChromaSpill(
         hex: matte.hex,
         dominantChannel,
       }),
-      thresholds: Object.freeze({ tolerance, minimumAlpha }),
+      thresholds: Object.freeze({
+        tolerance,
+        minimumAlpha,
+        inferredMatteAccepted: matte.inferredMatteAccepted,
+      }),
       output: Object.freeze({
         inspectedPixels,
         suppressedPixels,
+        hiddenRgbSuppressedPixels,
+        maximumHiddenRgbSpill,
         alphaReducedPixels,
         newlyTransparentPixels,
         maximumSpill,

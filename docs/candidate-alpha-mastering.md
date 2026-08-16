@@ -15,6 +15,7 @@ provider candidate
   -> native-alpha preservation or deterministic background recovery
   -> edge colour recovery
   -> transparent RGB bleed
+  -> key-colour spill and hidden-RGB neutralisation
   -> decoded-pixel sprite QA
   -> immutable mastered candidate + evidence
   -> later comparison, selection and approval
@@ -71,11 +72,11 @@ Art Studio instead:
 6. Flood-fills only matte-like pixels connected to the canvas border.
 7. Preserves matching colours enclosed inside the subject.
 8. Builds bounded distance fields around the connected matte and confident foreground. Foreground seeds are eroded farther inward on large plates, so a one-pixel generated fringe can never teach the solver that spill is subject colour.
-9. Solves partial alpha against nearby inset foreground colour and the nearest confident local matte sample, so bounded provider noise, shading and resampling do not become an outline.
-10. Recovers foreground RGB using the compositing equation, a physically valid alpha bound and a bounded nonlinear-raster allowance rather than leaving green, magenta or dark chroma contamination.
-11. Detects complementary provider-painted edge colours that disagree with the inset subject reference. Chroma is projected along the axis opposite the local matte, so subtle magenta-on-green, yellow-on-blue, green-on-magenta and custom-matte fringes can be rejected even below the generic RGB-distance threshold. The repair covers both foreground-classified outliers and visible matte-connected antialias samples; the latter retain physically bounded coverage so cleanup does not erode the silhouette. Distance-triggered, matte-complement-triggered, foreground-edge and connected-matte-edge pixels are counted separately, replaced with audited inset subject colour instead of becoming a vivid outline, and excluded from exact source-plate recomposition proof.
-12. Clears distant hidden matte colour.
-13. Propagates bounded subject-colour bleed beneath nearby alpha-zero pixels for safer texture filtering.
+9. Solves partial alpha against nearby inset foreground colour and the nearest confident local matte sample. Foreground-classified pixels are altered only when they still carry the matte's dominant chroma and the projected alpha agrees with the physical RGB bound. Pink skin, grey antialiasing, black hair, white cuffs and other non-key foreground details therefore remain opaque and unchanged.
+10. Recovers eligible edge RGB using the compositing equation, a physically valid alpha bound and a bounded nonlinear-raster allowance rather than leaving green, magenta or dark chroma contamination.
+11. Restricts lossy provider-halo colour replacement to pixels already proven to belong to the border-connected matte. Distance and matte-complement repairs remain audited there, while ambiguous foreground-classified outlines are preserved for explicit protect/remove-mask guidance instead of being repainted from an unrelated inset seed.
+12. Clears distant hidden matte colour and propagates bounded subject-colour bleed beneath nearby alpha-zero pixels for safer texture filtering.
+13. When spill suppression is requested, accepts a provider-substituted matte only after the classifier selected `inferred-high-chroma-key`, removes material visible key spill, and neutralises key-coloured hidden RGB so interpolation cannot reveal a coloured background halo.
 14. Emits a deterministic lossless PNG and numeric evidence.
 
 For observed colour `C`, local matte `M`, foreground estimate `F` and alpha `a`:
@@ -84,7 +85,7 @@ For observed colour `C`, local matte `M`, foreground estimate `F` and alpha `a`:
 C = aF + (1-a)M
 ```
 
-The extractor estimates `a` by projecting `C-M` onto `F-M`, raises it to the minimum value that can reconstruct legal bounded RGB, then recovers foreground colour from the same equation. Every ordinary output pixel is recomposed against the same local matte field; any error beyond the declared allowance blocks the candidate. A provider-painted halo that is not a credible composite is repaired only inside the connected edge band, is counted separately, and retains its maximum source drift in evidence. Thresholds and evidence remain explicit; they are not silently lowered after a failure.
+The extractor estimates `a` by projecting `C-M` onto `F-M`, raises it to the minimum value that can reconstruct legal bounded RGB, then recovers foreground colour from the same equation. Foreground inference additionally requires key-channel dominance and bounded agreement between those two alpha estimates. Every ordinary output pixel is recomposed against the same local matte field; any error beyond the declared allowance blocks the candidate. A provider-painted halo that is not a credible composite is repaired only on the proven connected-matte side of the edge, is counted separately, and retains its maximum source drift in evidence. Thresholds and evidence remain explicit; they are not silently lowered after a failure.
 
 ## Evidence
 
@@ -105,7 +106,9 @@ The recovery evidence records:
 - edge pixels decontaminated;
 - transparent RGB bleed pixels created;
 - scale-aware foreground-seed inset;
+- foreground projection/physical-alpha agreement threshold;
 - provider-painted halo repairs and their maximum source-channel drift;
+- inferred-matte acceptance and visible/hidden key-spill suppression counts;
 - exact-recomposition pixel count, explicitly excluded halo-repair count, maximum observed error and maximum allowed error;
 - checkerboard segmentation, edge recovery and recomposition error when a painted grid was repaired;
 - visible border-band ownership and pre-existing non-opaque pixel counts when a solid-matte alpha-rim bypass was repaired.
@@ -184,6 +187,8 @@ pnpm art -- master-alpha `
 ```
 
 `--matte` is optional in automatic mode. Keep supplying it when the generation manifest declares a matte; the classifier can still recover if the provider returns real alpha, paints a checkerboard, or substitutes a different confidently flat high-chroma matte.
+
+When `--suppress-chroma-spill` is present and the provider substituted that matte, the CLI passes the classifier-proven inferred colour into spill suppression explicitly. The relaxed handoff is not available for grey or otherwise unsafe colours, and the CLI does not enable it merely because a caller declared a different matte.
 
 For `native-alpha` provider requests, orchestration validates both the encoded container and decoded pixels before candidate storage. PNG colour types without alpha, JPEG output, and WebP output without an alpha feature/chunk fail with `PROVIDER_NATIVE_ALPHA_MISSING`. Files that merely declare alpha but decode to a fully opaque alpha plane, a painted checkerboard, a token-transparent rim around a matte, an unsafe canvas edge, or any recovery strategy other than `native-alpha-preserved` fail with `PROVIDER_NATIVE_ALPHA_INVALID`. The provider bytes are not stored as a candidate and are never shown in a review preview; an explicitly allowed fallback provider may be tried instead. If a provider cannot supply genuine native alpha, route the request to an explicitly declared single-colour chroma-key job and master it through the separate recovery path—never ask it to imitate transparency with a checkerboard.
 

@@ -12,6 +12,7 @@ const PROVIDER_COMPLEMENT_HALO_FOREGROUND_DISTANCE = 12;
 const PROVIDER_COMPLEMENT_HALO_MINIMUM_SCORE = 10;
 const PROVIDER_COMPLEMENT_HALO_MINIMUM_EXCESS = 8;
 const PROVIDER_COMPLEMENT_HALO_MINIMUM_EDGE_DEPTH = 3;
+const FOREGROUND_PROJECTION_MAXIMUM_ALPHA_DISAGREEMENT = 0.01;
 
 export interface ChromaKeyExtractionOptions {
   readonly matteColour: string;
@@ -52,6 +53,7 @@ export interface ChromaKeyExtractionEvidence {
     providerComplementHaloMinimumScore: number;
     providerComplementHaloMinimumExcess: number;
     providerComplementHaloMaximumEdgeDepth: number;
+    foregroundProjectionMaximumAlphaDisagreement: number;
   }>;
   readonly border: Readonly<{
     pixels: number;
@@ -803,9 +805,24 @@ export async function extractChromaKeyAlpha(
         }
       : settings.matte;
     const matteLike = matteDistance[pixel]! <= connectionSquared;
+    const localMatteChannels = [localMatte.r, localMatte.g, localMatte.b];
+    const localMatteDominantChannel = localMatteChannels.indexOf(
+      Math.max(...localMatteChannels),
+    );
+    const sourceChannels = [sourceR, sourceG, sourceB];
+    const foregroundMatteSpill =
+      !background &&
+      sourceChannels[localMatteDominantChannel]! >=
+        Math.max(
+          ...sourceChannels.filter(
+            (_channel, channel) => channel !== localMatteDominantChannel,
+          ),
+        ) + 3;
     const edgeCandidate =
       background ||
-      (!matteLike && backgroundDistance[pixel]! <= settings.edgeSearchRadius);
+      (foregroundMatteSpill &&
+        !matteLike &&
+        backgroundDistance[pixel]! <= settings.edgeSearchRadius);
     const nearForeground =
       foregroundDistance[pixel]! <= settings.edgeSearchRadius &&
       nearestForeground[pixel]! >= 0;
@@ -838,94 +855,95 @@ export async function extractChromaKeyAlpha(
         projectedAlpha,
         minimumPhysicalAlpha(sourceR, sourceG, sourceB, localMatte),
       );
-      alpha = matteAlpha * (sourceAlpha / 255);
-      if (alpha > 0 && alpha < 0.997) {
-        red = recoverColour(
-          sourceR,
-          localMatte.r,
-          matteAlpha,
-          sourceData[seed]!,
-          maximumAllowedCompositeChannelError,
-        );
-        green = recoverColour(
-          sourceG,
-          localMatte.g,
-          matteAlpha,
-          sourceData[seed + 1]!,
-          maximumAllowedCompositeChannelError,
-        );
-        blue = recoverColour(
-          sourceB,
-          localMatte.b,
-          matteAlpha,
-          sourceData[seed + 2]!,
-          maximumAllowedCompositeChannelError,
-        );
-        if (red !== sourceR || green !== sourceG || blue !== sourceB) {
-          decontaminatedPixels += 1;
-        }
-      }
-
-      if (alpha > 1 / 255) {
-        const seedR = sourceData[seed]!;
-        const seedG = sourceData[seed + 1]!;
-        const seedB = sourceData[seed + 2]!;
-        const recoveredForegroundDistance = Math.hypot(
-          red - seedR,
-          green - seedG,
-          blue - seedB,
-        );
-        const distanceHalo =
-          recoveredForegroundDistance >= PROVIDER_HALO_FOREGROUND_DISTANCE;
-        const recoveredComplementScore = matteComplementScore(
-          red,
-          green,
-          blue,
-          localMatte,
-        );
-        const foregroundComplementScore = matteComplementScore(
-          seedR,
-          seedG,
-          seedB,
-          localMatte,
-        );
-        const complementHalo =
-          !distanceHalo &&
-          backgroundDistance[pixel]! <=
-            providerComplementHaloMaximumEdgeDepth &&
-          recoveredForegroundDistance >=
-            PROVIDER_COMPLEMENT_HALO_FOREGROUND_DISTANCE &&
-          recoveredComplementScore >=
-            PROVIDER_COMPLEMENT_HALO_MINIMUM_SCORE &&
-          recoveredComplementScore - foregroundComplementScore >=
-            PROVIDER_COMPLEMENT_HALO_MINIMUM_EXCESS;
-        if (distanceHalo || complementHalo) {
-          // Some image providers paint a complementary outline which is not
-          // an alpha composite of either the proven matte or nearby subject.
-          // Reject the outlier colour and reuse an inset subject reference.
-          // Foreground-classified outliers derive coverage from connected edge
-          // geometry; visible matte-connected antialias samples retain their
-          // physically bounded coverage so colour cleanup does not erode the
-          // silhouette. Both are separately audited and excluded from exact
-          // source-plate recomposition proof.
-          const spatialAlpha = Math.max(
-            0,
-            Math.min(1, (backgroundDistance[pixel]! - 0.25) / 1.5),
+      // For a foreground-classified pixel, the projection against the nearest
+      // inset seed and the physical RGB bound must agree before we infer any
+      // transparency. A large disagreement means that seed probably belongs
+      // to a different legitimate feature near the silhouette. Preserving the
+      // opaque source is safer than inventing a white or coloured spike.
+      const foregroundCompositeConsistent =
+        background ||
+        matteAlpha - projectedAlpha <=
+          FOREGROUND_PROJECTION_MAXIMUM_ALPHA_DISAGREEMENT;
+      if (foregroundCompositeConsistent) {
+        alpha = matteAlpha * (sourceAlpha / 255);
+        if (alpha > 0 && alpha < 0.997) {
+          red = recoverColour(
+            sourceR,
+            localMatte.r,
+            matteAlpha,
+            sourceData[seed]!,
+            maximumAllowedCompositeChannelError,
           );
-          if (!background) {
-            // The painted foreground outlier invalidates projection as an
-            // alpha estimate: a complementary fringe can project as opaque.
-            alpha = spatialAlpha * (sourceAlpha / 255);
+          green = recoverColour(
+            sourceG,
+            localMatte.g,
+            matteAlpha,
+            sourceData[seed + 1]!,
+            maximumAllowedCompositeChannelError,
+          );
+          blue = recoverColour(
+            sourceB,
+            localMatte.b,
+            matteAlpha,
+            sourceData[seed + 2]!,
+            maximumAllowedCompositeChannelError,
+          );
+          if (red !== sourceR || green !== sourceG || blue !== sourceB) {
+            decontaminatedPixels += 1;
           }
-          red = seedR;
-          green = seedG;
-          blue = seedB;
-          providerHaloRepaired = true;
-          providerHaloRepairPixels += 1;
-          if (distanceHalo) providerDistanceHaloRepairPixels += 1;
-          else providerComplementHaloRepairPixels += 1;
-          if (background) providerConnectedMatteHaloRepairPixels += 1;
-          else providerForegroundHaloRepairPixels += 1;
+        }
+
+        // Lossy provider-halo replacement is restricted to pixels already
+        // proven to belong to the border-connected matte. A foreground pixel's
+        // nearest inset seed can belong to a different legitimate feature;
+        // repainting it creates opaque white or coloured spikes.
+        if (background && alpha > 1 / 255) {
+          const seedR = sourceData[seed]!;
+          const seedG = sourceData[seed + 1]!;
+          const seedB = sourceData[seed + 2]!;
+          const recoveredForegroundDistance = Math.hypot(
+            red - seedR,
+            green - seedG,
+            blue - seedB,
+          );
+          const distanceHalo =
+            recoveredForegroundDistance >= PROVIDER_HALO_FOREGROUND_DISTANCE;
+          const recoveredComplementScore = matteComplementScore(
+            red,
+            green,
+            blue,
+            localMatte,
+          );
+          const foregroundComplementScore = matteComplementScore(
+            seedR,
+            seedG,
+            seedB,
+            localMatte,
+          );
+          const complementHalo =
+            !distanceHalo &&
+            backgroundDistance[pixel]! <=
+              providerComplementHaloMaximumEdgeDepth &&
+            recoveredForegroundDistance >=
+              PROVIDER_COMPLEMENT_HALO_FOREGROUND_DISTANCE &&
+            recoveredComplementScore >=
+              PROVIDER_COMPLEMENT_HALO_MINIMUM_SCORE &&
+            recoveredComplementScore - foregroundComplementScore >=
+              PROVIDER_COMPLEMENT_HALO_MINIMUM_EXCESS;
+          if (distanceHalo || complementHalo) {
+            // The connected edge colour is not a credible composite of the
+            // proven matte and nearby subject. Reuse the inset subject colour
+            // while retaining physically bounded coverage. These pixels are
+            // separately audited and excluded from exact recomposition proof.
+            red = seedR;
+            green = seedG;
+            blue = seedB;
+            providerHaloRepaired = true;
+            providerHaloRepairPixels += 1;
+            if (distanceHalo) providerDistanceHaloRepairPixels += 1;
+            else providerComplementHaloRepairPixels += 1;
+            providerConnectedMatteHaloRepairPixels += 1;
+          }
         }
       }
     }
@@ -1072,6 +1090,8 @@ export async function extractChromaKeyAlpha(
           PROVIDER_COMPLEMENT_HALO_MINIMUM_EXCESS,
         providerComplementHaloMaximumEdgeDepth:
           providerComplementHaloMaximumEdgeDepth,
+        foregroundProjectionMaximumAlphaDisagreement:
+          FOREGROUND_PROJECTION_MAXIMUM_ALPHA_DISAGREEMENT,
       },
       border: {
         pixels: borders.length,
