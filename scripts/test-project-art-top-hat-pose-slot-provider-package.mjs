@@ -335,21 +335,21 @@ test('capabilities truthfully disclose compile-only provider readiness', () => {
   assert.equal(capabilities.fakeTransparencyGridAllowed, false);
   assert.equal(capabilities.registeredMouthLayerOwnsVisemes, true);
   assert.equal(capabilities.bodyCadenceIndependentOfVisemes, true);
-  assert.equal(capabilities.syntheticBodyInbetweningAllowed, false);
+  assert.equal(capabilities.syntheticBodyInbetweeningAllowed, false);
   for (const key of [
     'providerExecution',
     'imageMutation',
     'candidateApproval',
-   'candidatePromotion',
+    'candidatePromotion',
     'poseSlotFilling',
-   'sequenceRelease',
+    'sequenceRelease',
     'repositoryMutation',
-   'gitCommit',
+    'gitCommit',
     'gitPush',
     'deployment',
     'publication',
     'runtimeActivation',
-   'forcePush',
+    'forcePush',
   ]) {
     assert.equal(capabilities[key], false);
   }
