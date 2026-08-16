@@ -23,7 +23,7 @@ const workspace = path.join(temporary, 'project');
 const external = path.join(temporary, 'external-art');
 const fixedTime = '2026-08-10T01:00:00.000Z';
 const png8 = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFklEQVR4nGP8z8DwnwEPYMInOXwUAAASWwIOH0pJXQAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAIUlEQVR42mNgoBQwwhj/GRj+o0kwMjAwMDARMoFyBZQDAHvVAghIZGrmAAAAAElFTkSuQmCC',
   'base64',
 );
 
