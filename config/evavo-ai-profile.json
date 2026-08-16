@@ -1,11 +1,11 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "kind": "evavo-studio-ai-profile",
   "studio": "art-studio",
   "minimumPlatform": {
-    "evavo-local-storage": "0.27.0",
-    "evavo-local-compute": "0.8.0",
-    "evavo-model-lab": "0.9.0"
+    "evavo-local-storage": "0.29.0",
+    "evavo-local-compute": "0.9.0",
+    "evavo-model-lab": "0.11.0"
   },
   "authorities": {
     "training": "evavo-model-lab",
@@ -15,6 +15,7 @@
   },
   "environments": [
     "visual",
+    "image-finishing",
     "video"
   ],
   "modelSlots": [
@@ -22,6 +23,7 @@
     "image-edit",
     "image-control",
     "image-segmentation",
+    "image-matting",
     "image-lora",
     "image-upscale",
     "image-restoration",
@@ -32,6 +34,33 @@
     "video-lora",
     "video-interpolation"
   ],
+  "imageFinishing": {
+    "operations": [
+      "inspect",
+      "remove-background",
+      "segment",
+      "matte",
+      "resize",
+      "crop",
+      "convert",
+      "optimize",
+      "upscale",
+      "restore",
+      "color-convert",
+      "metadata-clean",
+      "composite"
+    ],
+    "modelProfiles": [
+      "birefnet-dynamic",
+      "birefnet-hr-matting",
+      "sam2.1-hiera-small",
+      "real-esrgan-x4plus"
+    ],
+    "exactReviewedModelManifestRequired": true,
+    "implicitModelDownloadAllowed": false,
+    "jpegAlphaFlattenRequiresExplicitBackground": true,
+    "humanEdgeAndMaterialReviewRequired": true
+  },
   "videoGeneration": {
     "styles": [
       "realistic",
@@ -105,9 +134,11 @@
   "canonical": {
     "datasets": "bee://primary/EVAVO/AI/Datasets/Art",
     "models": "bee://primary/EVAVO/AI/Models/Visual",
+    "mattingModels": "bee://primary/EVAVO/AI/Models/Visual/Matting",
     "videoModels": "bee://primary/EVAVO/AI/Models/Video",
     "training": "bee://primary/EVAVO/AI/Training/Art",
-    "outputs": "bee://primary/EVAVO/AI/Outputs/Art"
+    "outputs": "bee://primary/EVAVO/AI/Outputs/Art",
+    "imageFinishingOutputs": "bee://primary/EVAVO/AI/Outputs/Images"
   },
   "policy": {
     "rawArtImmutable": true,

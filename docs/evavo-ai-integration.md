@@ -2,6 +2,8 @@
 
 Art Studio consumes the shared EVAVO creative-AI platform; it does not own a second ML stack. `evavo-model-lab` plans datasets, training and evaluation, `evavo-local-compute` executes bounded GPU work, and `evavo-local-storage` owns model, dataset and output placement.
 
+The shared `image-finishing` environment adds governed background removal, segmentation, high-resolution matting, resize/crop/convert/optimise, restoration/upscale, ICC-aware conversion, metadata cleaning and compositing. BiRefNet Dynamic/HR Matting, SAM 2.1 and Real-ESRGAN remain exact manifest-bound model assets on BeeStation; package installation does not download weights. Deterministic work uses ImageMagick/ExifTool/Pillow. JPEG flattening requires an explicit background and every matte still needs 100-percent/destination-size halo, spill, hair, fur, glass, hole and semi-transparent-material review.
+
 ## Local image and video lanes
 
 Use `evavo-model-lab studio-plan --studio art-studio --vram-gib 12` before choosing a trainer or model route. The governed local video lane supports realistic, cinematic, stylized and cel-oriented image-to-video work, plus first/last-frame and control-guided generation for loops. A 12 GB machine should use the platform's reviewed ComfyUI/offload routes where the direct upstream runtime requires more memory; a planner result is a capability and preflight decision, never a claim that weights are installed.
