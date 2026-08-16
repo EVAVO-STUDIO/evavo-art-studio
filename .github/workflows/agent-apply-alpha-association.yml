@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
 
-      - name: Apply, validate and publish integration commit
+      - name: Apply, validate and publish source integration
         shell: bash
         env:
           PATCH_PATH: agent-patches/explicit-alpha-association.patch
@@ -47,7 +47,6 @@ jobs:
           test "${GITHUB_REF_NAME}" = "agent/explicit-alpha-association"
           git apply --check --whitespace=error-all "${PATCH_PATH}"
           git apply --whitespace=error-all "${PATCH_PATH}"
-          rm "${PATCH_PATH}" .github/workflows/agent-apply-alpha-association.yml
 
           python -m compileall -q \
             tools/run_project_art_sandbox.py \
@@ -60,9 +59,16 @@ jobs:
             -v
           node scripts/check-project-art-workbench.mjs
           git diff --check
+          git diff --exit-code -- "${PATCH_PATH}" .github/workflows/agent-apply-alpha-association.yml
 
           git config user.name "EVAVO-STUDIO"
           git config user.email "evavo.studio@gmail.com"
-          git add -A
+          git add \
+            config/project-art-operations.v1.json \
+            tools/run_project_art_sandbox.py \
+            scripts/check-project-art-workbench.mjs \
+            scripts/test-project-art-workbench.mjs \
+            tools/project_art_atlas_execution.py \
+            scripts/test_project_art_atlas_alpha_bleed.py
           git commit -m "feat(project-art): add explicit alpha association"
           git push origin "HEAD:${GITHUB_REF_NAME}"
