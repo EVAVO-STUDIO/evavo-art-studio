@@ -33,7 +33,7 @@ const syntax = spawnSync(process.execPath, ['--check', path.join(root, 'tools/ra
 });
 assert.equal(syntax.status, 0, syntax.stderr || syntax.stdout);
 
-const python = process.env.EVAVO_RAW_ART_VISUAL_PYTHON || process.env.EVAVO_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+const python = process.env.EVAVO_RAW_ART_VISUAL_PYTHON || process.env.EVAVO_PYTHON || 'python';
 const pythonTests = spawnSync(python, ['-m', 'unittest', path.join(root, 'scripts/test_raw_art_visual_catalog.py')], {
   cwd: root, encoding: 'utf8', shell: false, windowsHide: true, timeout: 120_000,
 });
