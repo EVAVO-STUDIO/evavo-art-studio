@@ -68,6 +68,7 @@ def frame_metadata(placement: Placement) -> dict[str, Any]:
             "path": str(frame.source_path),
             "tags": list(frame.tags),
         },
+        "transparencyAdmission": frame.transparency_admission,
     }
 
 

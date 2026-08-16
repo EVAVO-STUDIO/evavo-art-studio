@@ -178,6 +178,7 @@ For deliberate local inspection without the runtime queue:
 pnpm art -- master-alpha `
   --input .\candidate.png `
   --output .\candidate.alpha.png `
+  --proof .\candidate.alpha.proof.png `
   --evidence .\candidate.alpha.evidence.json `
   --expectations .\frame-quality.json
 ```
@@ -199,9 +200,18 @@ Optional controls:
 --checker-foreground-seed-distance
 --checker-minimum-border-fraction
 --checker-maximum-composite-channel-error
+--protect-mask
+--remove-mask
+--proof
 ```
 
-The CLI writes atomically, emits JSON on stdout and exits with code `3` when blocking sprite QA fails. The PNG and evidence remain available for diagnosis and are still marked unapproved.
+Protect and remove masks provide bounded artist correction after automatic recovery. A mask can use alpha-painted strokes or opaque grayscale, must match the source canvas and must not strongly overlap the opposite-intent mask. Protect restores source RGB and alpha; remove reduces alpha. The CLI then rebuilds bounded transparent RGB bleed and can emit a solid black, white, grey, green and magenta proof sheet plus an alpha-mask tile with `--proof`. It never uses a checkerboard proof.
+
+The CLI refuses to overwrite the source or either artist mask. It writes atomically, emits JSON on stdout and exits with code `3` when blocking sprite QA fails. The PNG, proof and evidence remain available for diagnosis and are still marked unapproved.
+
+## Sheet and atlas admission
+
+Background recovery is not optional merely because the next step is a sprite sheet or atlas. Both atlas builders and the Project Art sheet slicer/assembler inspect decoded pixels before trim, slice or pack. Their default `alphaPolicy` is `required`: meaningful native alpha, a completely transparent canvas edge and no detected painted grid or matte. `preferred` supports mixed opaque/transparent inventories but still rejects detected fake backgrounds. `opaque` is reserved for intentionally opaque art and still rejects painted transparency grids. Per-frame admission evidence is retained in the output manifest or atlas evidence.
 
 ## Matte selection rules
 

@@ -493,6 +493,14 @@ function normalizeTargetPath(value, label, targetClaims) {
   return target;
 }
 
+function transparencyPolicy(value, label, fallback = 'required') {
+  const policy = value ?? fallback;
+  if (!['required', 'preferred', 'opaque'].includes(policy)) {
+    fail('PROJECT_ART_SANDBOX_TASK_INVALID', `${label} must be required, preferred or opaque.`);
+  }
+  return policy;
+}
+
 function normalizeImageTask(task, taskIndex, registry, targetClaims) {
   const targetPath = normalizeTargetPath(task.targetPath, `tasks[${taskIndex}].targetPath`, targetClaims);
   const outputFormat = task.outputFormat || extensionFormat(targetPath);
@@ -544,6 +552,7 @@ function normalizeSliceTask(task, taskIndex, registry, targetClaims) {
       : { count: boundedInteger(task.count, `tasks[${taskIndex}].count`, 1, 100_000) }),
     startIndex: boundedInteger(task.startIndex ?? 0, `tasks[${taskIndex}].startIndex`, 0, 1_000_000),
     rejectBlankFrames: task.rejectBlankFrames !== false,
+    alphaPolicy: transparencyPolicy(task.alphaPolicy, `tasks[${taskIndex}].alphaPolicy`),
   };
 }
 
@@ -599,6 +608,7 @@ function normalizeAssembleTask(task, taskIndex, registry, targetClaims) {
     ...(normalizedCell ? { cell: normalizedCell } : {}),
     padding,
     background: task.background ?? '#00000000',
+    alphaPolicy: transparencyPolicy(task.alphaPolicy, `tasks[${taskIndex}].alphaPolicy`),
   };
 }
 
@@ -738,6 +748,7 @@ function normalizeReviewTask(task, taskIndex, registry, targetClaims) {
       );
     }
   }
+  const requireAlpha = task.requireAlpha === true;
   return {
     id: safeId(task.id, `tasks[${taskIndex}].id`),
     kind: 'sequence-review',
@@ -745,7 +756,12 @@ function normalizeReviewTask(task, taskIndex, registry, targetClaims) {
     targetDirectory,
     expectedWidth,
     expectedHeight,
-    requireAlpha: task.requireAlpha === true,
+    requireAlpha,
+    alphaPolicy: transparencyPolicy(
+      task.alphaPolicy,
+      `tasks[${taskIndex}].alphaPolicy`,
+      requireAlpha ? 'required' : 'preferred',
+    ),
     rejectBlankFrames: task.rejectBlankFrames !== false,
     rejectIdenticalAdjacentFrames: task.rejectIdenticalAdjacentFrames !== false,
     thresholds: {

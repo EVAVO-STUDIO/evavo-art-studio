@@ -588,6 +588,14 @@ try {
           "draw.rectangle((1,1,6,6), fill=(0,255,0,255))",
           "draw.rectangle((9,1,14,6), fill=(0,0,255,255))",
           "sheet.save(root/'sheet.png')",
+          "checker=Image.new('RGBA',(128,128),(0,0,0,255))",
+          "pixels=checker.load()",
+          "for y in range(128):",
+          " for x in range(128):",
+          "  value=176 if ((x//16+y//16)&1) else 224",
+          "  pixels[x,y]=(value,value,value,255)",
+          "ImageDraw.Draw(checker).rectangle((40,24,87,111),fill=(210,90,55,255))",
+          "checker.save(root/'fake-checker.png')",
         ].join('\n'),
       ],
     );
@@ -710,6 +718,8 @@ try {
       registryBytes,
       compiledAt: fixedTime,
     });
+    assert.equal(fullPlan.tasks.find((task) => task.id === 'slice-walk').alphaPolicy, 'required');
+    assert.equal(fullPlan.tasks.find((task) => task.id === 'assemble-walk').alphaPolicy, 'required');
     const planPath = path.join(workspace, 'full-sandbox-plan.json');
     await writeJsonCreateOnly(planPath, fullPlan);
     const sourceBefore = sha256(await readFile(path.join(workspace, 'art', 'hero.png')));
@@ -765,6 +775,52 @@ try {
     );
     assert.equal(receipt.resourceUsage.receiptExcludedFromTaskOutputTotals, true);
     verifyDocumentHash(receipt);
+
+    const fakeTransparencyRequest = {
+      schema: 'evavo.project-art-sandbox-request.v1',
+      sandboxId: 'fake-transparency-sandbox',
+      projectId: 'fixture-game',
+      purpose: 'Prove painted checkerboards cannot enter sheet slicing.',
+      tasks: [
+        {
+          id: 'reject-fake-sheet',
+          kind: 'slice-sheet',
+          source: 'art/fake-checker.png',
+          targetDirectory: 'fake-frames',
+          frameWidth: 64,
+          frameHeight: 64,
+          count: 1,
+          alphaPolicy: 'opaque',
+        },
+      ],
+    };
+    const fakeTransparencyPlan = await compileProjectArtSandbox({
+      workspaceRoot: workspace,
+      request: fakeTransparencyRequest,
+      requestBytes: Buffer.from(JSON.stringify(fakeTransparencyRequest)),
+      registry,
+      registryBytes,
+      compiledAt: fixedTime,
+    });
+    const fakeTransparencyPlanPath = path.join(workspace, 'fake-transparency-plan.json');
+    await writeJsonCreateOnly(fakeTransparencyPlanPath, fakeTransparencyPlan);
+    const fakeTransparencyOutput = path.join(workspace, 'fake-transparency-output');
+    const fakeTransparencyExecution = run(
+      python.command,
+      [
+        ...python.prefix,
+        path.join(root, 'tools', 'run_project_art_sandbox.py'),
+        '--workspace-root',
+        workspace,
+        '--plan',
+        path.basename(fakeTransparencyPlanPath),
+        '--output-root',
+        path.basename(fakeTransparencyOutput),
+      ],
+    );
+    assert.notEqual(fakeTransparencyExecution.status, 0);
+    assert.match(fakeTransparencyExecution.stderr, /painted-checkerboard-detected/u);
+    await assert.rejects(access(fakeTransparencyOutput), (error) => error?.code === 'ENOENT');
 
     const runtimePublicationBudgetCases = [
       {

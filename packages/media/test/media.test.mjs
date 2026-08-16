@@ -29,6 +29,42 @@ async function sprite(filePath, colour, rect) {
   await sharp(data, { raw: { width, height, channels: 4 } }).png().toFile(filePath);
 }
 
+async function paintedCheckerboard(filePath) {
+  const width = 64;
+  const height = 64;
+  const tile = 8;
+  const data = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      const value = (Math.floor(x / tile) + Math.floor(y / tile)) % 2 ? 224 : 176;
+      data[offset] = value;
+      data[offset + 1] = value;
+      data[offset + 2] = value;
+      data[offset + 3] = 255;
+    }
+  }
+  await sharp(data, { raw: { width, height, channels: 4 } }).png().toFile(filePath);
+}
+
+async function paintedMatte(filePath, matte) {
+  const width = 64;
+  const height = 64;
+  const data = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      const subject = x >= 20 && x <= 43 && y >= 12 && y <= 55;
+      const colour = subject ? [210, 90, 55] : matte;
+      data[offset] = colour[0];
+      data[offset + 1] = colour[1];
+      data[offset + 2] = colour[2];
+      data[offset + 3] = 255;
+    }
+  }
+  await sharp(data, { raw: { width, height, channels: 4 } }).png().toFile(filePath);
+}
+
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-atlas-"));
   const source = path.join(root, "source");
@@ -97,6 +133,120 @@ test("validates source ids and animation references", () => {
       error instanceof SpriteAtlasInputError &&
       error.code === "SPRITE_ATLAS_MANIFEST_INVALID",
   );
+});
+
+test("defaults atlas inputs to required real transparency", () => {
+  const manifest = validateSpriteAtlasManifest({
+    schemaVersion: "1.0",
+    atlasId: "alpha-default",
+    frames: [{ id: "a", path: "a.png" }],
+    animations: [
+      {
+        name: "idle",
+        loopMode: "linear",
+        frames: [{ frameId: "a", durationMs: 100 }],
+      },
+    ],
+  });
+  assert.equal(manifest.settings.alphaPolicy, "required");
+});
+
+test("rejects painted checkerboards before atlas packing", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-atlas-fake-alpha-"));
+  const imagePath = path.join(root, "fake.png");
+  await paintedCheckerboard(imagePath);
+  const manifestPath = path.join(root, "atlas.json");
+  await writeFile(
+    manifestPath,
+    JSON.stringify({
+      schemaVersion: "1.0",
+      atlasId: "fake-alpha",
+      frames: [{ id: "fake", path: "fake.png" }],
+      animations: [
+        {
+          name: "idle",
+          loopMode: "linear",
+          frames: [{ frameId: "fake", durationMs: 100 }],
+        },
+      ],
+    }),
+  );
+  await assert.rejects(
+    () =>
+      buildSpriteAtlasPackage(manifestPath, path.join(root, "build"), {
+        allowedRoots: [root],
+      }),
+    (error) =>
+      error instanceof SpriteAtlasInputError &&
+      error.code === "SPRITE_ATLAS_FRAME_TRANSPARENCY_INVALID",
+  );
+});
+
+test("opaque atlas policy still rejects painted transparency grids", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-atlas-opaque-grid-"));
+  await paintedCheckerboard(path.join(root, "fake.png"));
+  const manifestPath = path.join(root, "atlas.json");
+  await writeFile(
+    manifestPath,
+    JSON.stringify({
+      schemaVersion: "1.0",
+      atlasId: "opaque-grid",
+      frames: [{ id: "fake", path: "fake.png" }],
+      animations: [
+        {
+          name: "idle",
+          loopMode: "none",
+          frames: [{ frameId: "fake", durationMs: 100 }],
+        },
+      ],
+      settings: { alphaPolicy: "opaque" },
+    }),
+  );
+  await assert.rejects(
+    () =>
+      buildSpriteAtlasPackage(manifestPath, path.join(root, "build"), {
+        allowedRoots: [root],
+      }),
+    (error) =>
+      error instanceof SpriteAtlasInputError &&
+      error.code === "SPRITE_ATLAS_FRAME_TRANSPARENCY_INVALID",
+  );
+});
+
+test("required and preferred atlas policies reject unmastered chroma mattes", async () => {
+  for (const [policy, matte] of [
+    ["required", [0, 255, 0]],
+    ["preferred", [255, 0, 255]],
+  ]) {
+    const root = await mkdtemp(path.join(os.tmpdir(), `evavo-atlas-${policy}-matte-`));
+    await paintedMatte(path.join(root, "fake.png"), matte);
+    const manifestPath = path.join(root, "atlas.json");
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        schemaVersion: "1.0",
+        atlasId: `${policy}-matte`,
+        frames: [{ id: "fake", path: "fake.png" }],
+        animations: [
+          {
+            name: "idle",
+            loopMode: "none",
+            frames: [{ frameId: "fake", durationMs: 100 }],
+          },
+        ],
+        settings: { alphaPolicy: policy },
+      }),
+    );
+    await assert.rejects(
+      () =>
+        buildSpriteAtlasPackage(manifestPath, path.join(root, "build"), {
+          allowedRoots: [root],
+        }),
+      (error) =>
+        error instanceof SpriteAtlasInputError &&
+        error.code === "SPRITE_ATLAS_FRAME_TRANSPARENCY_INVALID",
+    );
+  }
 });
 
 test("packs deterministically and keeps exact timing", async () => {

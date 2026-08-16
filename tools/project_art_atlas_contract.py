@@ -17,6 +17,8 @@ def fail(message: str) -> None:
 
 def canonical_json(value: Any) -> str:
     if value is None or isinstance(value, (str, int, float, bool)):
+        if isinstance(value, float) and value.is_integer():
+            value = int(value)
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     if isinstance(value, list):
         return "[" + ",".join(canonical_json(item) for item in value) + "]"

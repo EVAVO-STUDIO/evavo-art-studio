@@ -11,6 +11,7 @@ import {
   type SpriteAtlasAnimationFrame,
   type SpriteAtlasManifest,
   type SpriteAtlasSourceFrame,
+  type SpriteAtlasTransparencyPolicy,
   type TextureFiltering,
 } from "./types.js";
 
@@ -159,6 +160,17 @@ function textureFiltering(value: unknown): TextureFiltering {
   );
 }
 
+function alphaPolicy(value: unknown): SpriteAtlasTransparencyPolicy {
+  if (value === undefined) return "required";
+  if (value === "required" || value === "preferred" || value === "opaque") {
+    return value;
+  }
+  return fail(
+    "SPRITE_ATLAS_MANIFEST_INVALID",
+    "settings.alphaPolicy must be required, preferred or opaque.",
+  );
+}
+
 export function validateSpriteAtlasManifest(input: unknown): NormalizedSpriteAtlasManifest {
   if (!isRecord(input)) {
     fail("SPRITE_ATLAS_MANIFEST_INVALID", "Atlas manifest must be an object.");
@@ -237,6 +249,7 @@ export function validateSpriteAtlasManifest(input: unknown): NormalizedSpriteAtl
     frames,
     animations,
     settings: {
+      alphaPolicy: alphaPolicy(settings.alphaPolicy),
       maximumWidth,
       maximumHeight,
       padding,

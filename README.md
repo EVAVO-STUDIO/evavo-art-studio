@@ -31,7 +31,8 @@ This repository is intentionally broader than an image generator. It is the shar
 - executable decoded-pixel QA for alpha, fake checkerboards, flat mattes, edge halos, hidden transparent colour and safe bounds;
 - executable sequence QA for canvas, frame order, exact duration, pivot, baseline, ground contact and declared linked-cel duplicates;
 - descriptor-bound Brass static and animation evaluation that hashes and decodes one retained byte sequence, rejects path substitution or multi-frame sources, and publishes evidence with atomic create-only collision protection;
-- deterministic no-rotation MaxRects atlas production with transparent padding, edge extrusion, alpha-aware trim restoration and content hashes;
+- deterministic no-rotation MaxRects atlas production with fail-closed per-frame transparency admission, transparent padding, edge extrusion, alpha-aware trim restoration and content hashes;
+- artist-guided protect/remove masks, solid hostile-background proof sheets and explicit alpha-policy gates for frame, sheet and atlas work;
 - Godot 4.6.2 SpriteFrames descriptors and headless importers using AtlasTexture regions, trim margins, loop modes and exact relative durations;
 - immutable content-addressed artifact objects, descriptors, lineage, verification and compare-and-swap approved references;
 - crash-recoverable runtime transactions with idempotency, dependencies, capability claims, leases, heartbeats, retry, pause, cancellation, dead letter and redrive;
@@ -72,6 +73,7 @@ pnpm art -- provider-compile `
 pnpm art -- master-alpha `
   --input .\candidate.png `
   --output .\candidate.alpha.png `
+  --proof .\candidate.alpha.proof.png `
   --evidence .\candidate.alpha.evidence.json `
   --expectations .\frame-quality.json
 
@@ -145,7 +147,7 @@ The web workspace starts at `http://localhost:4200`. The private owner control r
 
 ChatGPT, Claude and trusted EVAVO agents can create a path-confined persistent workspace, preserve immutable originals, make append-only working snapshots, compile deterministic image or motion plans and prepare exact EVAVO Storage handoffs without sending image bytes through MCP arguments. Workspace writes require the explicit local write gate and remain separate from provider execution, creative approval, repository mutation and publication.
 
-The Project Art sandbox includes the deterministic operation families needed for professional finishing: crop, pad, translate, pixel-safe and continuous-tone resize, arbitrary rotation, affine and perspective transforms, colour replacement, grayscale, inversion, posterisation, thresholding, gamma, hue, curves, channel mixing, multiple blur and edge filters, alpha morphology, feathering, defringing, halo and matte cleanup, ordered compositing, shadows and glows. `image-master` applies a release profile and emits a self-hashed mastering report. `motion-sequence` renders bounded keyframed layers to PNG frames, an exact manifest and an optional GIF preview.
+The Project Art sandbox includes the deterministic operation families needed for professional finishing: crop, pad, translate, pixel-safe and continuous-tone resize, arbitrary rotation, affine and perspective transforms, colour replacement, grayscale, inversion, posterisation, thresholding, gamma, hue, curves, channel mixing, multiple blur and edge filters, alpha morphology, feathering, defringing, halo and matte cleanup, ordered compositing, shadows and glows. Sprite slicing and assembly default to strict decoded transparency admission and retain evidence for every source and output. `image-master` applies a release profile and emits a self-hashed mastering report. `motion-sequence` renders bounded keyframed layers to PNG frames, an exact manifest and an optional GIF preview.
 
 The avatar animation suite compiler expands pinned EVA or Top Hat identity references into a governed 25-clip production plan: four anti-repeating idles, six talk performances, speech transitions, reactions and a character-specific greeting. It schedules 315 continuity-linked full-character frames plus 17 pixel-registered mouth and eye layers. Top Hat v2 handoffs retain the canonical portrait while binding every image job to a full-body RGBA master by repository commit, tree, asset hash, manifest hash and reference-set digest. Each frame requires genuine alpha or a declared low-collision chroma matte, border-connected background recovery, colour decontamination and independent frame assurance; a painted checkerboard is always blocking. The compiler plans work only and cannot approve, publish or activate art.
 
@@ -308,10 +310,10 @@ Later frames may not be unrelated text-only generations. They inherit the approv
 
 Non-zero RGB beneath fully transparent pixels is not automatically a defect. It is accepted only when it behaves like deliberate edge bleed that agrees with nearby approved subject colour; unrelated matte contamination remains blocking.
 
-Atlas generation consumes approved individual frames. It never rotates directional art, never recursively compresses derivatives, retains source dimensions and trim offsets, leaves transparent padding around packed regions, extrudes only the subject edge, and hashes every source and output. Atlas metadata stores manifest-relative source references rather than machine-specific absolute paths.
+Atlas generation consumes approved individual frames. It defaults to `alphaPolicy: required`, decodes every frame before trimming, rejects painted grids and mattes, records frame-level admission evidence, never rotates directional art, never recursively compresses derivatives, retains source dimensions and trim offsets, leaves transparent padding around packed regions, extrudes only the subject edge, and hashes every source and output. The explicit `opaque` policy remains available for genuinely opaque art but still cannot admit a painted transparency grid. Atlas metadata stores manifest-relative source references rather than machine-specific absolute paths.
 
 Godot delivery is two-stage by design: Art Studio deterministically emits the atlas, descriptor and reviewed importer source; a local or authenticated engine worker may then run Godot headlessly to save the native SpriteFrames resource. Hosted API and MCP surfaces do not execute arbitrary binaries.
 
 The runtime journal, artifact hashes and evidence records are authoritative. pg-boss may wake distributed workers, but a queue acknowledgement cannot approve an asset or replace attempt history. Workers commit success only with valid immutable artifact IDs.
 
-See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/governed-provider-candidates.md`, `docs/candidate-alpha-mastering.md`, `docs/candidate-selection-and-promotion.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md`, `docs/runtime-operations-dashboard.md` and `docs/hub-integration.md`.
+See `docs/architecture.md`, `docs/technology-decisions.md`, `docs/quality-system.md`, `docs/sprite-continuity.md`, `docs/governed-provider-candidates.md`, `docs/candidate-alpha-mastering.md`, `docs/TRANSPARENCY_PRODUCTION_STANDARD.md`, `docs/candidate-selection-and-promotion.md`, `docs/executable-sprite-quality.md`, `docs/atlas-and-godot-delivery.md`, `docs/durable-runtime-and-artifacts.md`, `docs/runtime-operations-dashboard.md` and `docs/hub-integration.md`.

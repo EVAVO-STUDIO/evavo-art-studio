@@ -115,6 +115,10 @@ export async function compileProjectArtAtlas(
   }
   frames.sort((left, right) => left.id.localeCompare(right.id));
   const options = isObject(request.options) ? request.options : {};
+  const alphaPolicy = options.alphaPolicy ?? "required";
+  if (!new Set(["required", "preferred", "opaque"]).has(alphaPolicy)) {
+    fail("options.alphaPolicy must be required, preferred or opaque.");
+  }
   const body = {
     schema: PROJECT_ART_ATLAS_PLAN_SCHEMA,
     requestSchema: PROJECT_ART_ATLAS_REQUEST_SCHEMA,
@@ -125,6 +129,7 @@ export async function compileProjectArtAtlas(
     allowedSourceRoots: uniqueRoots,
     frames,
     options: {
+      alphaPolicy,
       trimAlpha: booleanValue(options.trimAlpha, true, "options.trimAlpha"),
       alphaThreshold: integer(options.alphaThreshold, 0, 0, 254, "options.alphaThreshold"),
       padding: integer(options.padding, 2, 0, 128, "options.padding"),

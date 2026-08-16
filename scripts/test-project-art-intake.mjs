@@ -36,6 +36,17 @@ try {
     "    draw.rectangle((4, 4, 3 + width, 3 + height), fill=(30 * index, 90, 180, 255))",
     "    draw.rectangle((6, 6, 8, 8), fill=(255, 255, 255, 128))",
     "    image.save(root / f'frame-{index}.png')",
+    "checker = Image.new('RGBA', (128, 128), (0, 0, 0, 255))",
+    "pixels = checker.load()",
+    "for y in range(128):",
+    "    for x in range(128):",
+    "        value = 176 if ((x // 16 + y // 16) & 1) else 224",
+    "        pixels[x, y] = (value, value, value, 255)",
+    "ImageDraw.Draw(checker).rectangle((40, 24, 87, 111), fill=(210, 90, 55, 255))",
+    "checker.save(root / 'fake-checker.png')",
+    "matte = Image.new('RGBA', (128, 128), (255, 0, 255, 255))",
+    "ImageDraw.Draw(matte).rectangle((40, 24, 87, 111), fill=(30, 110, 210, 255))",
+    "matte.save(root / 'fake-matte.png')",
   ].join("\n");
   run(py.executable, [...py.prefix, "-c", fixtureScript]);
 
@@ -164,6 +175,7 @@ try {
   ]);
   const compiledAtlas = JSON.parse(await readFile(atlasPlan, "utf8"));
   verifySelfHash(compiledAtlas, "planSha256");
+  assert.equal(compiledAtlas.options.alphaPolicy, "required");
   run(py.executable, [
     ...py.prefix,
     "tools/build_project_art_atlas.py",
@@ -185,6 +197,11 @@ try {
   );
   verifySelfHash(atlasManifest, "manifestSha256");
   assert.equal(Object.keys(atlasManifest.frames).length, 3);
+  for (const frame of Object.values(atlasManifest.frames)) {
+    assert.equal(frame.transparencyAdmission.passed, true);
+    assert.equal(frame.transparencyAdmission.policy, "required");
+    assert.equal(frame.transparencyAdmission.checkerboard.detected, false);
+  }
   const regions = Object.values(atlasManifest.frames).map((entry) => entry.frame);
   for (let leftIndex = 0; leftIndex < regions.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < regions.length; rightIndex += 1) {
@@ -199,6 +216,72 @@ try {
       assert.equal(overlap, false);
     }
   }
+
+  const fakeAtlasRequest = path.join(temporary, "fake-atlas-request.json");
+  const fakeAtlasPlan = path.join(temporary, "fake-atlas-plan.json");
+  await writeFile(
+    fakeAtlasRequest,
+    `${JSON.stringify({
+      schema: "evavo.project-art-atlas-request.v1",
+      atlasId: "fake-alpha",
+      projectId: "test-game",
+      outputName: "fake-alpha",
+      allowedSourceRoots: [incoming],
+      frames: [{ id: "fake", sourcePath: path.join(incoming, "fake-checker.png") }],
+      options: { alphaPolicy: "opaque" },
+    }, null, 2)}\n`,
+  );
+  run(process.execPath, [
+    "scripts/compile-project-art-atlas.mjs",
+    "--request",
+    fakeAtlasRequest,
+    "--output",
+    fakeAtlasPlan,
+    "--compiled-at",
+    "2026-08-09T08:02:00.000Z",
+  ]);
+  const fakeExecution = run(py.executable, [
+    ...py.prefix,
+    "tools/build_project_art_atlas.py",
+    "--plan",
+    fakeAtlasPlan,
+    "--output-root",
+    path.join(temporary, "fake-atlas"),
+  ], { expectFailure: true });
+  assert.match(fakeExecution.stderr, /painted-checkerboard-detected/u);
+
+  const matteAtlasRequest = path.join(temporary, "matte-atlas-request.json");
+  const matteAtlasPlan = path.join(temporary, "matte-atlas-plan.json");
+  await writeFile(
+    matteAtlasRequest,
+    `${JSON.stringify({
+      schema: "evavo.project-art-atlas-request.v1",
+      atlasId: "fake-matte",
+      projectId: "test-game",
+      outputName: "fake-matte",
+      allowedSourceRoots: [incoming],
+      frames: [{ id: "fake", sourcePath: path.join(incoming, "fake-matte.png") }],
+      options: { alphaPolicy: "preferred" },
+    }, null, 2)}\n`,
+  );
+  run(process.execPath, [
+    "scripts/compile-project-art-atlas.mjs",
+    "--request",
+    matteAtlasRequest,
+    "--output",
+    matteAtlasPlan,
+    "--compiled-at",
+    "2026-08-09T08:03:00.000Z",
+  ]);
+  const matteExecution = run(py.executable, [
+    ...py.prefix,
+    "tools/build_project_art_atlas.py",
+    "--plan",
+    matteAtlasPlan,
+    "--output-root",
+    path.join(temporary, "matte-atlas"),
+  ], { expectFailure: true });
+  assert.match(matteExecution.stderr, /painted-flat-matte-detected/u);
 
   const tamperedPlan = path.join(temporary, "tampered-plan.json");
   const tampered = structuredClone(plan);

@@ -1,9 +1,10 @@
 export const SPRITE_ATLAS_SCHEMA_VERSION = "1.0" as const;
-export const SPRITE_ATLAS_BUILDER_VERSION = "2026-07-29.1" as const;
+export const SPRITE_ATLAS_BUILDER_VERSION = "2026-08-16.1" as const;
 
 export type PowerOfTwoPolicy = "required" | "preferred" | "not-required";
 export type TextureFiltering = "nearest" | "linear";
 export type AtlasLoopMode = "none" | "linear" | "ping-pong";
+export type SpriteAtlasTransparencyPolicy = "required" | "preferred" | "opaque";
 
 export interface Point {
   readonly x: number;
@@ -40,6 +41,7 @@ export interface SpriteAtlasAnimation {
 }
 
 export interface SpriteAtlasSettings {
+  readonly alphaPolicy?: SpriteAtlasTransparencyPolicy;
   readonly maximumWidth?: number;
   readonly maximumHeight?: number;
   readonly padding?: number;
@@ -67,6 +69,7 @@ export interface SpriteAtlasManifest {
 }
 
 export interface NormalizedSpriteAtlasSettings {
+  readonly alphaPolicy: SpriteAtlasTransparencyPolicy;
   readonly maximumWidth: number;
   readonly maximumHeight: number;
   readonly padding: number;
@@ -173,12 +176,29 @@ export interface SpriteAtlasPackageData {
 }
 
 export interface SpriteAtlasPackageEvidence {
-  readonly schemaVersion: "1.0";
+  readonly schemaVersion: "2.0";
   readonly atlasId: string;
   readonly sourceManifestSha256: string;
   readonly atlasImageSha256: string;
   readonly atlasDataSha256: string;
   readonly frameSourceHashes: Readonly<Record<string, string>>;
+  readonly frameTransparencyAdmissions: Readonly<
+    Record<
+      string,
+      Readonly<{
+        policy: SpriteAtlasTransparencyPolicy;
+        strategy:
+          | "native-alpha-preserved"
+          | "preferred-opaque"
+          | "opaque-policy";
+        inputSha256: string;
+        admittedImageSha256: string;
+        nativeAlphaMeaningful: boolean;
+        transparentBorderFraction: number;
+        checkerboardDetected: false;
+      }>
+    >
+  >;
   readonly deterministicTool: Readonly<{
     name: "@evavo/art-media";
     version: typeof SPRITE_ATLAS_BUILDER_VERSION;

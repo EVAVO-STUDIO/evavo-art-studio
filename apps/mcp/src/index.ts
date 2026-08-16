@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/server";
@@ -7,7 +8,10 @@ import * as z from "zod/v4";
 import { validateArtBrief } from "@evavo/art-contracts";
 import { CAPABILITY_CATALOG, createProductionPlan } from "@evavo/art-core";
 import { writeGodotSpriteFramesImporter } from "@evavo/art-godot";
-import { buildSpriteAtlasPackage } from "@evavo/art-media";
+import {
+  buildSpriteAtlasPackage,
+  recoverBackgroundAlpha,
+} from "@evavo/art-media";
 import {
   analyseDecodedSpriteFrame,
   analyseSpriteSequenceManifestFile,
@@ -168,6 +172,49 @@ server.registerTool(
       );
     } catch (error: unknown) {
       return toolError("SPRITE_FRAME_QUALITY_REJECTED", error);
+    }
+  },
+);
+
+server.registerTool(
+  "inspect_transparency_candidate",
+  {
+    description:
+      "Classify one guarded local image as meaningful native alpha, a painted checkerboard, a declared matte, an inferred high-chroma matte or unsafe/ambiguous input. This read-only tool reconstructs only in memory and returns exact evidence plus the required next step; it never treats a checkerboard as transparency or writes a file.",
+    inputSchema: z.object({
+      imagePath: z.string().min(1),
+      matteColour: z.string().regex(/^#[0-9a-fA-F]{6}$/u).optional(),
+      allowCheckerboardRecovery: z.boolean().default(true),
+    }),
+  },
+  async ({ imagePath, matteColour, allowCheckerboardRecovery }) => {
+    try {
+      const safePath = assertPathWithinAllowedRoots(imagePath, allowedRoots());
+      const result = await recoverBackgroundAlpha(await readFile(safePath), {
+        ...(matteColour ? { matteColour } : {}),
+        allowCheckerboardRecovery,
+        allowHighChromaInference: true,
+      });
+      return textResult({
+        schemaVersion: "1.0",
+        imagePath: safePath,
+        classification: result.evidence.classification,
+        recoveryStrategy: result.evidence.strategy,
+        recoveredOutputSha256: result.evidence.outputSha256,
+        recommendedNextStep:
+          result.evidence.strategy === "native-alpha-preserved"
+            ? "Run decoded sprite quality, then transparency admission before sheet or atlas work."
+            : "Run master-alpha on a separate working copy, review the solid proof, then require transparency admission.",
+        writesPerformed: false,
+        evidence: result.evidence,
+      });
+    } catch (error: unknown) {
+      return toolError(
+        error && typeof error === "object" && "code" in error
+          ? String(error.code)
+          : "TRANSPARENCY_CANDIDATE_REJECTED",
+        error,
+      );
     }
   },
 );

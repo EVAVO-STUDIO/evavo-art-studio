@@ -24,6 +24,15 @@ Do not infer subject, canon, quality, sequence order, provenance or intended use
 - Preserve real alpha, canvas, pivot, palette, edge and frame-timing evidence unless an approved work order explicitly changes them.
 - Never replace transparent pixels with a checkerboard or other baked background.
 
+## Transparency production standard
+
+- A checkerboard is review UI, never image content. Do not request, generate, paste, export or accept a painted transparency grid.
+- Request native transparency only from a provider/model whose adapter advertises it, and still require decoded meaningful alpha plus a fully transparent canvas edge. Otherwise request one exact flat, high-chroma matte selected for low collision with the subject; green and magenta are choices, not defaults.
+- Keep every provider result as an immutable unapproved source. Master a working copy with `master-alpha`; never overwrite the source while diagnosing or repairing alpha.
+- Run transparency admission before slicing a sheet, assembling a sheet, packing an atlas or publishing a cut-out. Sprite and atlas inputs default to `alphaPolicy: required`. `opaque` is only for intentionally opaque art and never permits a painted grid.
+- If automatic recovery removes legitimate detail or retains background, use separate disjoint protect and remove masks. Review the result over black, white, grey, green and magenta solid plates plus the alpha-mask proof; never use a checkerboard proof because it can hide the exact failure being tested.
+- Do not weaken thresholds to make an ambiguous candidate pass. Preserve the evidence, correct the source or masks, rerun mastering, and require admission again.
+
 ## Style use
 
 Owner-supplied RAW_ART is primary evidence of the desired direction, but only named, visually inspected references may enter an approved style bank. Compare silhouettes, proportions, value grouping, palette ramps, material treatment, line or pixel language, lighting, camera, animation rhythm and UI density. State conflicts and outliers honestly.

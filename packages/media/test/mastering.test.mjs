@@ -6,7 +6,10 @@ import sharp from "sharp";
 import {
   ChromaKeyExtractionError,
   BackgroundAlphaRecoveryError,
+  AlphaGuidanceError,
   RasterPreflightError,
+  applyAlphaGuidance,
+  createTransparencyProofSheet,
   detectPaintedTransparencyCheckerboard,
   extractChromaKeyAlpha,
   preflightInpaintMask,
@@ -40,6 +43,76 @@ function pixel(decoded, x, y) {
   const offset = (y * decoded.info.width + x) * 4;
   return [...decoded.data.subarray(offset, offset + 4)];
 }
+
+test("artist protect and remove masks refine alpha without global colour deletion", async () => {
+  const source = await raster(16, 16, 4, (x, y) => {
+    if (x === 6 && y === 6) return [25, 90, 220, 255];
+    if (x >= 4 && x <= 11 && y >= 4 && y <= 11) return [220, 70, 35, 255];
+    return [0, 255, 0, 255];
+  });
+  const recovered = await raster(16, 16, 4, (x, y) => {
+    if (x === 2 && y === 2) return [220, 70, 35, 255];
+    if (x === 6 && y === 6) return [0, 0, 0, 0];
+    if (x >= 4 && x <= 11 && y >= 4 && y <= 11) return [220, 70, 35, 255];
+    return [0, 0, 0, 0];
+  });
+  const protectMask = await raster(16, 16, 4, (x, y) =>
+    x === 6 && y === 6 ? [255, 255, 255, 255] : [0, 0, 0, 0],
+  );
+  const removeMask = await raster(16, 16, 4, (x, y) =>
+    x === 2 && y === 2 ? [255, 255, 255, 255] : [0, 0, 0, 0],
+  );
+  const result = await applyAlphaGuidance(recovered, source, {
+    protectMask,
+    removeMask,
+  });
+  const decoded = await rgba(result.png);
+  assert.deepEqual(pixel(decoded, 6, 6), [25, 90, 220, 255]);
+  assert.equal(pixel(decoded, 2, 2)[3], 0);
+  assert.equal(result.evidence.restoredAlphaPixels, 1);
+  assert.equal(result.evidence.removedAlphaPixels, 1);
+  assert.equal(result.evidence.protectMask.interpretation, "alpha");
+  assert.equal(result.evidence.removeMask.interpretation, "alpha");
+});
+
+test("artist alpha guidance rejects conflicting strong masks", async () => {
+  const source = await raster(8, 8, 4, () => [200, 80, 40, 255]);
+  const recovered = await raster(8, 8, 4, (x, y) =>
+    x >= 2 && x <= 5 && y >= 2 && y <= 5
+      ? [200, 80, 40, 255]
+      : [0, 0, 0, 0],
+  );
+  const mask = await raster(8, 8, 4, (x, y) =>
+    x === 3 && y === 3 ? [255, 255, 255, 255] : [0, 0, 0, 0],
+  );
+  await assert.rejects(
+    () => applyAlphaGuidance(recovered, source, { protectMask: mask, removeMask: mask }),
+    (error) =>
+      error instanceof AlphaGuidanceError &&
+      error.code === "ALPHA_GUIDANCE_MASK_CONFLICT",
+  );
+});
+
+test("transparency proof uses solid hostile mattes plus an alpha mask, never a grid", async () => {
+  const candidate = await raster(16, 16, 4, (x, y) =>
+    x >= 4 && x <= 11 && y >= 4 && y <= 11
+      ? [220, 70, 35, 255]
+      : [0, 0, 0, 0],
+  );
+  const result = await createTransparencyProofSheet(candidate);
+  assert.equal(result.evidence.checkerboardUsed, false);
+  assert.equal(result.evidence.includesAlphaMask, true);
+  assert.deepEqual(result.evidence.backgrounds, [
+    "#000000",
+    "#ffffff",
+    "#808080",
+    "#00ff00",
+    "#ff00ff",
+  ]);
+  assert.equal(result.evidence.outputSha256.length, 64);
+  const metadata = await sharp(result.png).metadata();
+  assert.ok(metadata.width > 0 && metadata.height > 0);
+});
 
 test("inpaint mask preflight proves format, dimensions and editable alpha", async () => {
   const base = await raster(8, 8, 4, () => [180, 120, 80, 255]);

@@ -695,7 +695,7 @@ function recoverChannel(
   return clampByte(matte + (source - matte) / alpha);
 }
 
-function applyTransparentBleed(
+export function applyTransparentBleed(
   output: Buffer,
   width: number,
   height: number,

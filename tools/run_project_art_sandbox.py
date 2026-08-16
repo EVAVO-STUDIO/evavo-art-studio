@@ -27,6 +27,8 @@ try:
 except ImportError as exc:  # pragma: no cover - explicit runtime boundary
     raise SystemExit(f"Pillow is unavailable: {exc}")
 
+from transparency_guard import inspect_transparency, require_transparency
+
 PLAN_SCHEMA = "evavo.project-art-sandbox-plan.v1"
 RECEIPT_SCHEMA = "evavo.project-art-sandbox-receipt.v1"
 PROCESSOR_ID = "python-pillow-project-art-sandbox"
@@ -53,6 +55,31 @@ class SandboxError(ValueError):
 
 def fail(message: str) -> None:
     raise SandboxError(message)
+
+
+SOURCE_ENCODED_ALPHA_INFO = "evavo.source-encoded-alpha"
+
+
+def transparency_admission(
+    image: Image.Image,
+    label: str,
+    policy: str,
+    *,
+    use_source_encoding: bool = False,
+) -> dict[str, Any]:
+    try:
+        return require_transparency(
+            image,
+            label,
+            policy,
+            encoded_has_alpha=(
+                bool(image.info.get(SOURCE_ENCODED_ALPHA_INFO))
+                if use_source_encoding
+                else None
+            ),
+        )
+    except ValueError as exc:
+        fail(str(exc))
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -277,7 +304,15 @@ def load_image(
             maximum_pixels,
         )
         opened.load()
-        return ImageOps.exif_transpose(opened).convert("RGBA")
+        oriented = ImageOps.exif_transpose(opened)
+        encoded_has_alpha = (
+            "A" in oriented.getbands()
+            or oriented.mode in {"LA", "PA"}
+            or "transparency" in oriented.info
+        )
+        rgba = oriented.convert("RGBA")
+        rgba.info[SOURCE_ENCODED_ALPHA_INFO] = encoded_has_alpha
+        return rgba
 
 
 def preflight_image_set(
@@ -1638,8 +1673,15 @@ def execute_image_task(context: RuntimeContext, task: dict[str, Any]) -> None:
         if expected.get("height") is not None and image.height != int(expected["height"]):
             fail(f"task {task['id']} did not satisfy expected height")
         alpha = alpha_statistics(image)
-        if expected.get("meaningfulAlpha") is True and alpha["transparentPixels"] + alpha["partialPixels"] == 0:
-            fail(f"task {task['id']} requires meaningful alpha")
+        transparency = None
+        if expected.get("meaningfulAlpha") is True:
+            transparency = transparency_admission(
+                image,
+                f"task {task['id']} output",
+                "preferred",
+            )
+            if alpha["transparentPixels"] + alpha["partialPixels"] == 0:
+                fail(f"task {task['id']} requires meaningful alpha")
         target = target_path(context.staging, task["targetPath"], f"task {task['id']} target")
         save_image(context, image, target, task["outputFormat"])
         output = output_record(context.staging, target, image)
@@ -1652,6 +1694,7 @@ def execute_image_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                 "source": str(source_path),
                 "before": before,
                 "operations": operation_evidence,
+                "transparencyAdmission": transparency,
                 "outputs": [output],
             },
             [target],
@@ -1666,6 +1709,12 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
         source_path,
         context.maximum_decoded_pixels,
         f"task {task['id']} source",
+    )
+    source_transparency = transparency_admission(
+        image,
+        f"slice-sheet task {task['id']} source",
+        str(task.get("alphaPolicy", "required")),
+        use_source_encoding=True,
     )
     frame_width, frame_height = require_pixel_budget(
         int(task["frameWidth"]),
@@ -1700,6 +1749,11 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
         bbox = alpha_bbox(frame)
         if bbox is None and task.get("rejectBlankFrames", True):
             fail(f"slice-sheet task {task['id']} produced blank frame {offset}")
+        frame_transparency = transparency_admission(
+            frame,
+            f"slice-sheet task {task['id']} frame {offset}",
+            str(task.get("alphaPolicy", "required")),
+        )
         index = int(task["startIndex"]) + offset
         file_name = task["fileNamePattern"].replace("{index}", f"{index:04d}")
         target = directory / file_name
@@ -1714,6 +1768,7 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                 "column": column,
                 "row": row,
                 "sourceRectangle": {"x": left, "y": top, "width": frame_width, "height": frame_height},
+                "transparencyAdmission": frame_transparency,
                 "output": record,
             }
         )
@@ -1727,6 +1782,8 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
             "taskId": task["id"],
             "source": str(source_path),
             "sheet": {"width": image.width, "height": image.height, "columns": columns, "rows": rows},
+            "alphaPolicy": task.get("alphaPolicy", "required"),
+            "sourceTransparencyAdmission": source_transparency,
             "frames": frame_manifest,
         },
     )
@@ -1741,6 +1798,8 @@ def execute_slice_task(context: RuntimeContext, task: dict[str, Any]) -> None:
             "frameCount": count,
             "columns": columns,
             "rows": rows,
+            "alphaPolicy": task.get("alphaPolicy", "required"),
+            "sourceTransparencyAdmission": source_transparency,
             "outputs": outputs,
         },
         output_paths,
@@ -1826,7 +1885,9 @@ def execute_assemble_task(context: RuntimeContext, task: dict[str, Any]) -> None
         f"assemble-sheet task {task['id']} working set",
         context.maximum_decoded_pixels,
     )
+    alpha_policy = str(task.get("alphaPolicy", "required"))
     sheet = Image.new("RGBA", (width, height), parse_colour(task["background"], "assemble-sheet.background"))
+    source_transparency: list[dict[str, Any]] = []
     try:
         for index, source_path in enumerate(source_paths):
             frame = load_image(
@@ -1836,6 +1897,14 @@ def execute_assemble_task(context: RuntimeContext, task: dict[str, Any]) -> None
             )
             prepared = frame
             try:
+                source_transparency.append(
+                    transparency_admission(
+                        frame,
+                        f"assemble-sheet task {task['id']} source {index}",
+                        alpha_policy,
+                        use_source_encoding=True,
+                    )
+                )
                 prepared = fitted_cell(
                     frame,
                     cell_width,
@@ -1851,6 +1920,11 @@ def execute_assemble_task(context: RuntimeContext, task: dict[str, Any]) -> None
                 if prepared is not frame:
                     prepared.close()
                 frame.close()
+        sheet_transparency = transparency_admission(
+            sheet,
+            f"assemble-sheet task {task['id']} output",
+            alpha_policy,
+        )
         target = target_path(context.staging, task["targetPath"], f"task {task['id']} target")
         save_image(context, sheet, target, "png")
         context.remember(
@@ -1863,6 +1937,9 @@ def execute_assemble_task(context: RuntimeContext, task: dict[str, Any]) -> None
                 "columns": columns,
                 "rows": rows,
                 "cell": {"width": cell_width, "height": cell_height, "fit": fit, "sampling": sample},
+                "alphaPolicy": alpha_policy,
+                "sourceTransparencyAdmissions": source_transparency,
+                "outputTransparencyAdmission": sheet_transparency,
                 "outputs": [output_record(context.staging, target, sheet, role="sprite-sheet")],
             },
             [target],
@@ -1940,6 +2017,11 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
         first_size = frames[0].size
         for index, (source_path, frame) in enumerate(zip(source_paths, frames)):
             alpha = alpha_statistics(frame)
+            admission = inspect_transparency(
+                frame,
+                str(task.get("alphaPolicy", "required" if task.get("requireAlpha", False) else "preferred")),
+                encoded_has_alpha=bool(frame.info.get(SOURCE_ENCODED_ALPHA_INFO)),
+            )
             bbox = alpha_bbox(frame)
             centroid = alpha_centroid(frame)
             if expected_width is not None and frame.width != int(expected_width):
@@ -1948,8 +2030,14 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                 issues.append({"code": "height-mismatch", "frameIndex": index, "expected": expected_height, "actual": frame.height})
             if frame.size != first_size:
                 issues.append({"code": "sequence-dimension-drift", "frameIndex": index, "expected": list(first_size), "actual": list(frame.size)})
-            if task.get("requireAlpha", False) and alpha["transparentPixels"] + alpha["partialPixels"] == 0:
-                issues.append({"code": "alpha-required", "frameIndex": index})
+            for blocker in admission["blockers"]:
+                issues.append(
+                    {
+                        "code": "transparency-admission-failed",
+                        "frameIndex": index,
+                        "blocker": blocker,
+                    }
+                )
             if bbox is None and task.get("rejectBlankFrames", True):
                 issues.append({"code": "blank-frame", "frameIndex": index})
             frame_records.append(
@@ -1959,6 +2047,7 @@ def execute_review_task(context: RuntimeContext, task: dict[str, Any]) -> None:
                     "pixelSha256": image_pixel_sha256(frame),
                     "dimensions": {"width": frame.width, "height": frame.height},
                     "alpha": alpha,
+                    "transparencyAdmission": admission,
                     "alphaBoundingBox": bbox,
                     "alphaCentroid": centroid,
                 }

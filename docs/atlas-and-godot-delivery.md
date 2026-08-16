@@ -44,6 +44,7 @@ The manifest separates **unique source frames** from **animation references**. T
     }
   ],
   "settings": {
+    "alphaPolicy": "required",
     "maximumWidth": 4096,
     "maximumHeight": 4096,
     "padding": 2,
@@ -70,12 +71,13 @@ The manifest separates **unique source frames** from **animation references**. T
 - Frame duration is an exact positive integer in milliseconds.
 - `none`, `linear` and `ping-pong` are the only loop modes.
 - Empty frames are blocking unless the source frame explicitly declares `allowEmpty: true`.
+- `alphaPolicy` defaults to `required`; `preferred` is for genuinely mixed inventories and `opaque` is only for deliberately opaque art. A painted transparency grid is forbidden under every policy.
 - Output names are single file names, not paths.
 - Input and output paths must remain inside configured allowed roots after real-path resolution.
 
 ## Deterministic frame preparation
 
-Every source image is decoded through Sharp/libvips as one sRGB RGBA image page. Input bytes and decoded pixel counts are bounded before mastering.
+Every source image is decoded through Sharp/libvips as one sRGB RGBA image page. Input bytes and decoded pixel counts are bounded before mastering. Before trim or packing, required-alpha inputs must prove meaningful native alpha, a completely transparent canvas edge and no painted checkerboard or flat matte. The admission step canonicalizes hidden transparent RGB and records the recovery classification. Recoverable grids and mattes are deliberately rejected here: they must first become separately reviewed mastered frames rather than being silently changed during packaging.
 
 When trimming is enabled, the builder records:
 
@@ -125,7 +127,7 @@ The media package writes replaceable files safely on Windows and POSIX systems:
 
 - `<atlas>.png` — transparent sRGB atlas;
 - `<atlas>.atlas.json` — packed regions, source sizes, trim offsets, pivots, settings and exact animation timing;
-- `<atlas>.evidence.json` — source-manifest hash, atlas-image hash, atlas-data hash, source-frame hashes and deterministic tool version.
+- `<atlas>.evidence.json` — source-manifest hash, atlas-image hash, atlas-data hash, source-frame hashes, per-frame transparency policy and admission evidence, and deterministic tool version.
 
 Generated data records unique packed frames separately from animation references, so deliberate linked-cel reuse remains visible and auditable. Re-running the same build replaces prior outputs rather than failing because a Windows target file already exists.
 
@@ -212,6 +214,7 @@ Automated tests prove:
 - portable manifest-relative source metadata;
 - repeat builds over existing output files;
 - alpha-aware trim bounds;
+- default-required native-alpha admission plus painted-grid rejection under every alpha policy;
 - transparent padding and real edge extrusion through decoded output pixels;
 - bounded no-rotation packing;
 - exact duration reconstruction;

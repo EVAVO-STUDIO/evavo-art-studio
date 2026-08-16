@@ -73,7 +73,8 @@ Usage:
 
   evavo-art quality-frame --input frame.png --expectations frame-quality.json [--output report.json]
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
-  evavo-art master-alpha --input candidate.png --output candidate.alpha.png [--matte #00ff00] [--suppress-chroma-spill] [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json] [--maximum-composite-channel-error 8]
+  evavo-art inspect-alpha --input candidate.png [--matte #00ff00]
+  evavo-art master-alpha --input candidate.png --output candidate.alpha.png [--matte #00ff00] [--protect-mask keep.png] [--remove-mask erase.png] [--suppress-chroma-spill] [--proof candidate.alpha.proof.png] [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json] [--maximum-composite-channel-error 8]
   evavo-art atlas-build --manifest atlas.json --output-dir generated [--godot-project C:\\GitRepos\\game] [--godot-executable C:\\Path\\Godot_v4.6.2.exe]
 
   evavo-art provider-protocol [--output provider-protocol.json]
@@ -154,6 +155,9 @@ async function main(): Promise<void> {
       expectations: { type: "string", short: "e" },
       evidence: { type: "string" },
       matte: { type: "string" },
+      "protect-mask": { type: "string" },
+      "remove-mask": { type: "string" },
+      proof: { type: "string" },
       "connection-distance": { type: "string" },
       "opaque-seed-distance": { type: "string" },
       "edge-search-radius": { type: "string" },

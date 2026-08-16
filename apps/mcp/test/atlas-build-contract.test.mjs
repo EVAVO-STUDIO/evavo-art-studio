@@ -14,6 +14,10 @@ test("MCP atlas delivery is explicit, root-scoped and non-executing", async () =
     "buildSpriteAtlasPackage",
     "writeGodotSpriteFramesImporter",
     "executionAvailable: false",
+    '"inspect_transparency_candidate"',
+    "recoverBackgroundAlpha",
+    "allowCheckerboardRecovery",
+    "writesPerformed: false",
   ]) {
     assert.ok(source.includes(token), `missing ${token}`);
   }

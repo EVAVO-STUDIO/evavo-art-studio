@@ -4,6 +4,12 @@ import path from "node:path";
 import sharp from "sharp";
 
 import {
+  BackgroundAlphaRecoveryError,
+  detectPaintedTransparencyCheckerboard,
+  recoverBackgroundAlpha,
+  type BackgroundAlphaRecoveryEvidence,
+} from "./background-recovery.js";
+import {
   atomicWriteFile,
   readBoundedFile,
   resolveAllowedRoots,
@@ -24,6 +30,7 @@ import {
   type SpriteAtlasPackageData,
   type SpriteAtlasPackageEvidence,
   type SpriteAtlasPackageWriteResult,
+  type SpriteAtlasTransparencyPolicy,
 } from "./types.js";
 import { validateSpriteAtlasManifest } from "./validation.js";
 
@@ -35,6 +42,9 @@ function portableRelativePath(base: string, candidate: string): string {
   return relative || path.basename(candidate);
 }
 
+type FrameTransparencyAdmission =
+  SpriteAtlasPackageEvidence["frameTransparencyAdmissions"][string];
+
 async function decodeSourceFrame(
   id: string,
   inputPath: string,
@@ -44,7 +54,8 @@ async function decodeSourceFrame(
   tags: readonly string[],
   maximumInputBytes: number,
   maximumPixels: number,
-): Promise<DecodedAtlasSourceFrame> {
+  alphaPolicy: SpriteAtlasTransparencyPolicy,
+): Promise<Readonly<{ frame: DecodedAtlasSourceFrame; admission: FrameTransparencyAdmission }>> {
   const input = await readBoundedFile(inputPath, maximumInputBytes);
   let metadata: sharp.Metadata;
   try {
@@ -81,7 +92,90 @@ async function decodeSourceFrame(
     );
   }
 
-  const { data, info } = await sharp(input, {
+  let admittedInput = input;
+  let recoveryEvidence: BackgroundAlphaRecoveryEvidence | null = null;
+  let opaqueStrategy: "preferred-opaque" | "opaque-policy" | null = null;
+  if (alphaPolicy !== "opaque") {
+    try {
+      const recovered = await recoverBackgroundAlpha(input, {
+        allowCheckerboardRecovery: false,
+        allowHighChromaInference: true,
+        maximumInputBytes,
+        maximumPixels,
+        minimumNativeTransparentFraction: 0.005,
+        minimumNativeTransparentBorderFraction: 1,
+      });
+      recoveryEvidence = recovered.evidence;
+      if (recovered.evidence.strategy !== "native-alpha-preserved") {
+        throw new SpriteAtlasInputError(
+          "SPRITE_ATLAS_FRAME_TRANSPARENCY_INVALID",
+          `${id} contains a painted ${recovered.evidence.strategy === "checkerboard-recovery" ? "checkerboard" : "matte"} rather than native transparency. Master the source to real alpha before packing.`,
+        );
+      }
+      admittedInput = recovered.png;
+    } catch (error: unknown) {
+      if (
+        alphaPolicy === "preferred" &&
+        error instanceof BackgroundAlphaRecoveryError &&
+        error.code === "BACKGROUND_RECOVERY_UNRECOGNIZED"
+      ) {
+        const { data: opaqueData, info: opaqueInfo } = await sharp(input, {
+          failOn: "error",
+          limitInputPixels: maximumPixels,
+          pages: 1,
+          animated: false,
+        })
+          .ensureAlpha()
+          .toColourspace("srgb")
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        const checkerboard = detectPaintedTransparencyCheckerboard(
+          opaqueData,
+          opaqueInfo.width,
+          opaqueInfo.height,
+        );
+        if (checkerboard.detected) {
+          throw new SpriteAtlasInputError(
+            "SPRITE_ATLAS_FRAME_TRANSPARENCY_INVALID",
+            `${id} contains a painted checkerboard rather than native transparency.`,
+          );
+        }
+        opaqueStrategy = "preferred-opaque";
+      } else if (error instanceof SpriteAtlasInputError) {
+        throw error;
+      } else {
+        throw new SpriteAtlasInputError(
+          "SPRITE_ATLAS_FRAME_TRANSPARENCY_INVALID",
+          `${id} failed transparency admission: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  } else {
+    const { data: opaqueData, info: opaqueInfo } = await sharp(input, {
+      failOn: "error",
+      limitInputPixels: maximumPixels,
+      pages: 1,
+      animated: false,
+    })
+      .ensureAlpha()
+      .toColourspace("srgb")
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const checkerboard = detectPaintedTransparencyCheckerboard(
+      opaqueData,
+      opaqueInfo.width,
+      opaqueInfo.height,
+    );
+    if (checkerboard.detected) {
+      throw new SpriteAtlasInputError(
+        "SPRITE_ATLAS_FRAME_TRANSPARENCY_INVALID",
+        `${id} contains a painted checkerboard. Painted transparency grids are never valid atlas input, including under the opaque policy.`,
+      );
+    }
+    opaqueStrategy = "opaque-policy";
+  }
+
+  const { data, info } = await sharp(admittedInput, {
     failOn: "error",
     limitInputPixels: maximumPixels,
     pages: 1,
@@ -92,17 +186,40 @@ async function decodeSourceFrame(
     .raw()
     .toBuffer({ resolveWithObject: true });
 
+  const inputSha256 = sha256(input);
   return {
-    id,
-    sourcePath: sourceReference,
-    data,
-    width: info.width,
-    height: info.height,
-    sourceFormat: metadata.format ?? "unknown",
-    sourceHasAlpha: metadata.hasAlpha ?? false,
-    pivot: pivot ?? { x: info.width / 2, y: Math.max(0, info.height - 1) },
-    allowEmpty,
-    tags,
+    frame: {
+      id,
+      sourcePath: sourceReference,
+      data,
+      width: info.width,
+      height: info.height,
+      sourceFormat: metadata.format ?? "unknown",
+      sourceHasAlpha: metadata.hasAlpha ?? false,
+      pivot: pivot ?? { x: info.width / 2, y: Math.max(0, info.height - 1) },
+      allowEmpty,
+      tags,
+    },
+    admission: recoveryEvidence
+      ? {
+          policy: alphaPolicy,
+          strategy: "native-alpha-preserved",
+          inputSha256: recoveryEvidence.inputSha256,
+          admittedImageSha256: recoveryEvidence.outputSha256,
+          nativeAlphaMeaningful: true,
+          transparentBorderFraction:
+            recoveryEvidence.classification.transparentBorderFraction,
+          checkerboardDetected: false,
+        }
+      : {
+          policy: alphaPolicy,
+          strategy: opaqueStrategy!,
+          inputSha256,
+          admittedImageSha256: inputSha256,
+          nativeAlphaMeaningful: false,
+          transparentBorderFraction: 0,
+          checkerboardDetected: false,
+        },
   };
 }
 
@@ -137,23 +254,25 @@ export async function buildSpriteAtlasPackage(
   const manifestDirectory = path.dirname(manifestPath);
 
   const decoded: DecodedAtlasSourceFrame[] = [];
+  const transparencyAdmissions: Record<string, FrameTransparencyAdmission> = {};
   for (const frame of manifest.frames) {
     const sourcePath = await resolveInputPath(
       path.resolve(manifestDirectory, frame.path),
       allowedRoots,
     );
-    decoded.push(
-      await decodeSourceFrame(
-        frame.id,
-        sourcePath,
-        portableRelativePath(manifestDirectory, sourcePath),
-        frame.pivot,
-        frame.allowEmpty ?? false,
-        frame.tags ?? [],
-        maximumInputBytes,
-        maximumPixels,
-      ),
+    const admitted = await decodeSourceFrame(
+      frame.id,
+      sourcePath,
+      portableRelativePath(manifestDirectory, sourcePath),
+      frame.pivot,
+      frame.allowEmpty ?? false,
+      frame.tags ?? [],
+      maximumInputBytes,
+      maximumPixels,
+      manifest.settings.alphaPolicy,
     );
+    decoded.push(admitted.frame);
+    transparencyAdmissions[frame.id] = admitted.admission;
   }
 
   const prepared = decoded.map((frame) =>
@@ -217,13 +336,18 @@ export async function buildSpriteAtlasPackage(
   const dataJson = `${JSON.stringify(packageData, null, 2)}\n`;
   const atlasDataSha256 = sha256(dataJson);
   const evidence: SpriteAtlasPackageEvidence = {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     atlasId: manifest.atlasId,
     sourceManifestSha256: packageData.sourceManifestSha256,
     atlasImageSha256: packageData.atlasImage.sha256,
     atlasDataSha256,
     frameSourceHashes: Object.fromEntries(
       packageData.frames.map((frame) => [frame.id, frame.sourceRgbaSha256]),
+    ),
+    frameTransparencyAdmissions: Object.fromEntries(
+      Object.entries(transparencyAdmissions).sort(([left], [right]) =>
+        left.localeCompare(right),
+      ),
     ),
     deterministicTool: {
       name: "@evavo/art-media",

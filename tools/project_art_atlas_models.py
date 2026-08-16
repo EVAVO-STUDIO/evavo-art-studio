@@ -9,6 +9,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 Image.MAX_IMAGE_PIXELS = 220_000_000
 
 from project_art_atlas_contract import fail, secure_source, sha256_file, validate_hash
+from transparency_guard import require_transparency
 
 @dataclass(frozen=True)
 class PreparedFrame:
@@ -24,6 +25,7 @@ class PreparedFrame:
     pivot_x: float
     pivot_y: float
     tags: tuple[str, ...]
+    transparency_admission: dict[str, Any]
     image: Image.Image
 
 
@@ -50,11 +52,23 @@ def prepare_frame(item: dict[str, Any], roots: list[Path], options: dict[str, An
             opened.load()
             if int(getattr(opened, "n_frames", 1)) != 1:
                 fail(f"frames[{index}] must be a single-frame image.")
-            rgba = ImageOps.exif_transpose(opened).convert("RGBA")
+            oriented = ImageOps.exif_transpose(opened)
+            encoded_has_alpha = (
+                "A" in oriented.getbands()
+                or oriented.mode in {"LA", "PA"}
+                or "transparency" in oriented.info
+            )
+            rgba = oriented.convert("RGBA")
     except (UnidentifiedImageError, OSError) as exc:
         raise ValueError(f"frames[{index}] could not be decoded: {exc}") from exc
     if rgba.width * rgba.height > int(options.get("maximumDecodedPixelsPerFrame", 220_000_000)):
         fail(f"frames[{index}] exceeds maximum decoded pixels.")
+    transparency_admission = require_transparency(
+        rgba,
+        f"frames[{index}]",
+        str(options.get("alphaPolicy", "required")),
+        encoded_has_alpha=encoded_has_alpha,
+    )
 
     trim_x = trim_y = 0
     trim_width, trim_height = rgba.size
@@ -87,5 +101,6 @@ def prepare_frame(item: dict[str, Any], roots: list[Path], options: dict[str, An
         pivot_x=float(pivot["x"]),
         pivot_y=float(pivot["y"]),
         tags=tuple(str(tag) for tag in item.get("tags") or []),
+        transparency_admission=transparency_admission,
         image=image.copy(),
     )

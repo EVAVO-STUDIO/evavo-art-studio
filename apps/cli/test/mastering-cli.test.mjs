@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdtemp,
+  readFile,
+  readdir,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import sharp from "sharp";
 
 const cwd = new URL("..", import.meta.url);
 const CHROMA_CANDIDATE = Buffer.from(
@@ -11,13 +18,36 @@ const CHROMA_CANDIDATE = Buffer.from(
   "base64",
 );
 
+test("CLI inspects transparency without writing a recovered file", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-inspect-alpha-cli-"));
+  const input = path.join(root, "candidate.png");
+  await writeFile(input, CHROMA_CANDIDATE);
+  const result = spawnSync(
+    process.execPath,
+    ["dist/index.js", "inspect-alpha", "--input", input],
+    { cwd, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const inspection = JSON.parse(result.stdout);
+  assert.equal(inspection.writesPerformed, false);
+  assert.equal(inspection.recoveryStrategy, "inferred-high-chroma-key");
+  assert.deepEqual(await readdir(root), ["candidate.png"]);
+});
+
 test("CLI writes a deterministic unapproved alpha master and evidence", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-master-cli-"));
   const input = path.join(root, "candidate.png");
   const output = path.join(root, "candidate.alpha.png");
   const evidence = path.join(root, "candidate.alpha.evidence.json");
   const expectations = path.join(root, "frame-quality.json");
+  const protectMask = path.join(root, "protect-mask.png");
+  const proofPath = path.join(root, "candidate.alpha.proof.png");
   await writeFile(input, CHROMA_CANDIDATE);
+  const maskPixels = Buffer.alloc(14 * 14 * 4);
+  maskPixels[(7 * 14 + 7) * 4 + 3] = 255;
+  await sharp(maskPixels, { raw: { width: 14, height: 14, channels: 4 } })
+    .png()
+    .toFile(protectMask);
   await writeFile(
     expectations,
     JSON.stringify({
@@ -40,6 +70,10 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
       evidence,
       "--expectations",
       expectations,
+      "--protect-mask",
+      protectMask,
+      "--proof",
+      proofPath,
       "--opaque-seed-distance",
       "300",
       "--edge-search-radius",
@@ -56,14 +90,20 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
   assert.equal(summary.qualityPassed, true);
   assert.equal(summary.outputSha256.length, 64);
   assert.equal(summary.chromaSpillSuppressed, true);
+  assert.equal(summary.artistGuidanceApplied, true);
+  assert.equal(summary.proofPath, proofPath);
   await access(output);
   await access(evidence);
+  await access(proofPath);
   const proof = JSON.parse(await readFile(evidence, "utf8"));
+  assert.equal(proof.schemaVersion, "2.0");
   assert.equal(proof.approvalState, "unapproved");
   assert.equal(proof.promotionEligible, true);
   assert.equal(proof.extraction.strategy, "inferred-high-chroma-key");
   assert.equal(proof.extraction.matte.hex, "#00ff00");
   assert.equal(proof.spillSuppression.matte.hex, "#00ff00");
+  assert.equal(proof.guidance.protectMask.interpretation, "alpha");
+  assert.equal(proof.transparencyProof.evidence.checkerboardUsed, false);
   assert.ok(proof.extraction.output.transparentPixels > 0);
   assert.ok(proof.extraction.output.partialPixels > 0);
   assert.equal(proof.quality.passed, true);
@@ -91,4 +131,19 @@ test("CLI rejects an invalid declared matte before changing any pixels", async (
   assert.equal(result.status, 1);
   const error = JSON.parse(result.stderr);
   assert.equal(error.error.code, "BACKGROUND_RECOVERY_MATTE_INVALID");
+});
+
+test("CLI refuses to overwrite its immutable source", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-master-cli-source-"));
+  const input = path.join(root, "candidate.png");
+  await writeFile(input, CHROMA_CANDIDATE);
+  const before = await readFile(input);
+  const result = spawnSync(
+    process.execPath,
+    ["dist/index.js", "master-alpha", "--input", input, "--output", input],
+    { cwd, encoding: "utf8" },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /non-destructive/u);
+  assert.deepEqual(await readFile(input), before);
 });
