@@ -142,6 +142,16 @@
       "deterministic": true
     },
     {
+      "id": "alpha-premultiply",
+      "kind": "alpha-association",
+      "deterministic": true
+    },
+    {
+      "id": "alpha-unpremultiply",
+      "kind": "alpha-association",
+      "deterministic": true
+    },
+    {
       "id": "connected-matte-to-alpha",
       "kind": "alpha",
       "deterministic": true,
