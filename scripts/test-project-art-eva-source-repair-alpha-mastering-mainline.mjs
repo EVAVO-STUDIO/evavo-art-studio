@@ -500,7 +500,10 @@ test('file operator rejects a direct symlinked candidate before processing', (co
         ...written.input,
         sourceSpaceCandidateFile: linkedCandidate,
       }),
-      /EVA_SOURCE_REPAIR_ALPHA_INPUT_FILE_INVALID/u,
+      (error) => {
+        assert.equal(error?.code, 'EVA_SOURCE_REPAIR_ALPHA_INPUT_FILE_INVALID');
+        return true;
+      },
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
