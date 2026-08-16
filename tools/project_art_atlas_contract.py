@@ -52,6 +52,36 @@ def validate_hash(value: Any, label: str) -> str:
     return value
 
 
+def transparent_rgb_options(options: dict[str, Any]) -> dict[str, Any]:
+    enabled = options.get("transparentRgbBleed", True)
+    if not isinstance(enabled, bool):
+        fail("options.transparentRgbBleed must be boolean.")
+    radius = options.get("transparentRgbBleedRadius", 8)
+    if (
+        not isinstance(radius, int)
+        or isinstance(radius, bool)
+        or radius < 0
+        or radius > 64
+    ):
+        fail("options.transparentRgbBleedRadius must be an integer between 0 and 64.")
+    threshold = options.get(
+        "transparentRgbAlphaThreshold",
+        options.get("alphaThreshold", 0),
+    )
+    if (
+        not isinstance(threshold, int)
+        or isinstance(threshold, bool)
+        or threshold < 0
+        or threshold > 254
+    ):
+        fail("options.transparentRgbAlphaThreshold must be an integer between 0 and 254.")
+    return {
+        "transparentRgbBleed": enabled,
+        "transparentRgbBleedRadius": radius,
+        "transparentRgbAlphaThreshold": threshold,
+    }
+
+
 def validate_plan(plan: dict[str, Any]) -> None:
     if plan.get("schema") != PLAN_SCHEMA:
         fail(f"Plan must use {PLAN_SCHEMA}.")
@@ -84,6 +114,10 @@ def validate_plan(plan: dict[str, Any]) -> None:
         fail("Atlas output must be published atomically.")
     if plan.get("bytesFlowThroughMcp") is not False:
         fail("Atlas image bytes cannot flow through MCP.")
+    options = plan.get("options")
+    if not isinstance(options, dict):
+        fail("Plan options must be an object.")
+    transparent_rgb_options(options)
 
 
 def within(root: Path, candidate: Path) -> bool:

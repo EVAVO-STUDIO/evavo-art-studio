@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 
+import { python, run } from "./project-art/intake-test-support.mjs";
+
 const files = new Map([
   ["intake module", [
     "scripts/project-art/intake-contract.mjs",
@@ -19,6 +21,7 @@ const files = new Map([
     "scripts/project-art/atlas.mjs",
   ]],
   ["atlas executor", [
+    "tools/project_art_atlas_alpha_bleed.py",
     "tools/project_art_atlas_contract.py",
     "tools/project_art_atlas_models.py",
     "tools/project_art_atlas_packing.py",
@@ -29,9 +32,14 @@ const files = new Map([
   ["workspace MCP", ["tools/project_art_workspace_mcp.mjs"]],
   ["regression policy", [
     "scripts/project-art/intake-test-support.mjs",
+    "scripts/test-project-art-atlas-contract.mjs",
+    "scripts/test_project_art_atlas_alpha_bleed.py",
     ".github/workflows/project-art-workbench.yml",
   ]],
-  ["documentation", ["docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md"]],
+  ["documentation", [
+    "docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md",
+    "docs/PROJECT_ART_ATLAS_ALPHA_SAFETY.md",
+  ]],
 ]);
 const sources = new Map();
 for (const [label, paths] of files) {
@@ -64,13 +72,19 @@ const required = new Map([
     "evavo.project-art-atlas-plan.v1",
     "texturepacker-json-hash",
     "godot-region-map",
+    "transparentRgbBleed",
+    "transparentRgbBleedRadius",
+    "transparentRgbAlphaThreshold",
     "repositoryMutation: false",
   ]],
   ["atlas executor", [
     "evavo.project-art-atlas-receipt.v1",
+    "evavo.project-art-transparent-rgb-bleed.v1",
     "Atlas placements overlap",
     "Texture Atlas JSON Hash",
     "evavo.project-art-godot-region-map.v1",
+    "exactRgbaAtlasPaste",
+    "strongerAlphaRgbPreserved",
     "os.replace",
   ]],
   ["workspace MCP", [
@@ -97,12 +111,16 @@ const required = new Map([
     "regressions skipped: Pillow unavailable",
     "python-version: \"3.13.5\"",
     "PIL.__version__",
+    "hidden RGB",
+    "expectedSha256",
   ]],
   ["documentation", [
     "ChatGPT",
     "Claude",
     "EVAVO Storage",
     "sprite atlas",
+    "transparent RGB bleed",
+    "exact RGBA paste",
     "bytes never travel through MCP",
     "credential",
     "project-art:review:mcp",
@@ -121,4 +139,13 @@ for (const source of sources.values()) {
 }
 for (const error of errors) console.error(`  - ${error}`);
 if (errors.length) process.exit(1);
+
+run(process.execPath, ["scripts/test-project-art-atlas-contract.mjs"]);
+const py = python();
+run(py.executable, [
+  ...py.prefix,
+  "-m",
+  "unittest",
+  "scripts/test_project_art_atlas_alpha_bleed.py",
+]);
 console.log("Project-art chat intake and atlas contract passed");
