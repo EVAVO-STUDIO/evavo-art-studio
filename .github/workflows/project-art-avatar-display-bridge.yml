@@ -30,13 +30,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Use Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: "pnpm"
-      - name: Enable Corepack
-        run: corepack enable
       - name: Verify display bridge
         run: node --test scripts/test-project-art-avatar-display-bridge.mjs
