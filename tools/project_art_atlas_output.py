@@ -9,6 +9,7 @@ from PIL import Image
 
 from project_art_atlas_models import Placement
 
+
 def paste_extruded(
     atlas: Image.Image,
     image: Image.Image,
@@ -16,7 +17,9 @@ def paste_extruded(
     y: int,
     extrude: int,
 ) -> None:
-    atlas.alpha_composite(image, (x, y))
+    # Packing proves these regions do not overlap, so exact RGBA paste is both
+    # safe and necessary: alpha compositing would erase RGB beneath alpha zero.
+    atlas.paste(image, (x, y))
     if extrude <= 0:
         return
     width, height = image.size
@@ -24,10 +27,16 @@ def paste_extruded(
     right = image.crop((width - 1, 0, width, height)).resize((extrude, height), Image.Resampling.NEAREST)
     top = image.crop((0, 0, width, 1)).resize((width, extrude), Image.Resampling.NEAREST)
     bottom = image.crop((0, height - 1, width, height)).resize((width, extrude), Image.Resampling.NEAREST)
-    atlas.alpha_composite(left, (x - extrude, y))
-    atlas.alpha_composite(right, (x + width, y))
-    atlas.alpha_composite(top, (x, y - extrude))
-    atlas.alpha_composite(bottom, (x, y + height))
+    try:
+        atlas.paste(left, (x - extrude, y))
+        atlas.paste(right, (x + width, y))
+        atlas.paste(top, (x, y - extrude))
+        atlas.paste(bottom, (x, y + height))
+    finally:
+        left.close()
+        right.close()
+        top.close()
+        bottom.close()
     corners = [
         (image.getpixel((0, 0)), x - extrude, y - extrude),
         (image.getpixel((width - 1, 0)), x + width, y - extrude),
@@ -36,7 +45,10 @@ def paste_extruded(
     ]
     for colour, left_x, top_y in corners:
         patch = Image.new("RGBA", (extrude, extrude), colour)
-        atlas.alpha_composite(patch, (left_x, top_y))
+        try:
+            atlas.paste(patch, (left_x, top_y))
+        finally:
+            patch.close()
 
 
 def frame_metadata(placement: Placement) -> dict[str, Any]:
@@ -69,6 +81,7 @@ def frame_metadata(placement: Placement) -> dict[str, Any]:
             "tags": list(frame.tags),
         },
         "transparencyAdmission": frame.transparency_admission,
+        "transparentRgbBleed": frame.transparent_rgb_bleed,
     }
 
 

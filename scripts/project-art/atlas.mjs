@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   PROJECT_ART_ATLAS_PLAN_SCHEMA,
   PROJECT_ART_ATLAS_REQUEST_SCHEMA,
+  SHA256,
   absolutePath,
   booleanValue,
   canonicalJson,
@@ -119,6 +120,13 @@ export async function compileProjectArtAtlas(
   if (!new Set(["required", "preferred", "opaque"]).has(alphaPolicy)) {
     fail("options.alphaPolicy must be required, preferred or opaque.");
   }
+  const alphaThreshold = integer(
+    options.alphaThreshold,
+    0,
+    0,
+    254,
+    "options.alphaThreshold",
+  );
   const body = {
     schema: PROJECT_ART_ATLAS_PLAN_SCHEMA,
     requestSchema: PROJECT_ART_ATLAS_REQUEST_SCHEMA,
@@ -131,7 +139,26 @@ export async function compileProjectArtAtlas(
     options: {
       alphaPolicy,
       trimAlpha: booleanValue(options.trimAlpha, true, "options.trimAlpha"),
-      alphaThreshold: integer(options.alphaThreshold, 0, 0, 254, "options.alphaThreshold"),
+      alphaThreshold,
+      transparentRgbBleed: booleanValue(
+        options.transparentRgbBleed,
+        true,
+        "options.transparentRgbBleed",
+      ),
+      transparentRgbBleedRadius: integer(
+        options.transparentRgbBleedRadius,
+        8,
+        0,
+        64,
+        "options.transparentRgbBleedRadius",
+      ),
+      transparentRgbAlphaThreshold: integer(
+        options.transparentRgbAlphaThreshold,
+        alphaThreshold,
+        0,
+        254,
+        "options.transparentRgbAlphaThreshold",
+      ),
       padding: integer(options.padding, 2, 0, 128, "options.padding"),
       margin: integer(options.margin, 2, 0, 128, "options.margin"),
       extrude: integer(options.extrude, 1, 0, 32, "options.extrude"),

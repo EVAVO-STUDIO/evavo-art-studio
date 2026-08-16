@@ -8,10 +8,41 @@ from typing import Any
 
 from PIL import Image
 
-from project_art_atlas_contract import RECEIPT_SCHEMA, add_hash, existing_root, fail, sha256_bytes, sha256_file, validate_plan
+from project_art_atlas_contract import (
+    RECEIPT_SCHEMA,
+    add_hash,
+    existing_root,
+    fail,
+    sha256_bytes,
+    sha256_file,
+    transparent_rgb_options,
+    validate_plan,
+)
 from project_art_atlas_models import prepare_frame
 from project_art_atlas_output import frame_metadata, paste_extruded, regions_overlap, write_json
 from project_art_atlas_packing import choose_layout
+
+
+def _transparent_rgb_summary(prepared: list[Any], options: dict[str, Any]) -> dict[str, Any]:
+    evidence = [frame.transparent_rgb_bleed for frame in prepared]
+    return {
+        "schema": "evavo.project-art-atlas-transparent-rgb-summary.v1",
+        "enabled": bool(options["transparentRgbBleed"]),
+        "radius": int(options["transparentRgbBleedRadius"]),
+        "alphaThreshold": int(options["transparentRgbAlphaThreshold"]),
+        "frameCount": len(evidence),
+        "appliedFrameCount": sum(1 for item in evidence if item["applied"]),
+        "eligiblePixels": sum(int(item["eligiblePixels"]) for item in evidence),
+        "filledPixels": sum(int(item["filledPixels"]) for item in evidence),
+        "unreachedPixels": sum(int(item["unreachedPixels"]) for item in evidence),
+        "alphaPreserved": all(bool(item["guarantees"]["alphaPreserved"]) for item in evidence),
+        "strongerAlphaRgbPreserved": all(
+            bool(item["guarantees"]["strongerAlphaRgbPreserved"])
+            for item in evidence
+        ),
+        "exactRgbaAtlasPaste": True,
+    }
+
 
 def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[str, Any]:
     validate_plan(plan)
@@ -23,6 +54,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
         for index, value in enumerate(plan.get("allowedSourceRoots") or [])
     ]
     options = dict(plan.get("options") or {})
+    options.update(transparent_rgb_options(options))
     options["maximumDecodedPixelsPerFrame"] = int(
         (plan.get("limits") or {}).get("maximumDecodedPixelsPerFrame", 220_000_000)
     )
@@ -63,14 +95,22 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
         atlas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         for placement in placements:
             image = placement.frame.image
+            rotated_image = None
             if placement.rotated:
-                image = image.transpose(Image.Transpose.ROTATE_270)
-            paste_extruded(atlas, image, placement.x, placement.y, extrude)
+                rotated_image = image.transpose(Image.Transpose.ROTATE_270)
+                image = rotated_image
+            try:
+                paste_extruded(atlas, image, placement.x, placement.y, extrude)
+            finally:
+                if rotated_image is not None:
+                    rotated_image.close()
         atlas.save(paths["image"], format="PNG", optimize=True, compress_level=9)
+        atlas.close()
 
         ordered = sorted(placements, key=lambda item: item.frame.frame_id)
         frames_hash = {item.frame.frame_id: frame_metadata(item) for item in ordered}
         image_name = paths["image"].name
+        transparent_rgb = _transparent_rgb_summary(prepared, options)
         common_meta = {
             "app": "EVAVO Art Studio",
             "version": "1.0",
@@ -84,6 +124,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
             "padding": int(options["padding"]),
             "margin": int(options["margin"]),
             "extrude": extrude,
+            "transparentRgbBleed": transparent_rgb,
         }
         texture_packer = {
             "frames": frames_hash,
@@ -109,6 +150,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
                 },
                 "rotated": item.rotated,
                 "pivot": {"x": item.frame.pivot_x, "y": item.frame.pivot_y},
+                "transparentRgbBleed": item.frame.transparent_rgb_bleed,
             }
             for item in ordered
         }
@@ -117,6 +159,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
             "texture": image_name,
             "size": {"width": width, "height": height},
             "regions": godot_regions,
+            "transparentRgbBleed": transparent_rgb,
             "planSha256": plan["planSha256"],
         }
         manifest_body = {
@@ -128,6 +171,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
             "frameCount": len(ordered),
             "frames": frames_hash,
             "options": {key: value for key, value in options.items() if key != "maximumDecodedPixelsPerFrame"},
+            "transparentRgbBleed": transparent_rgb,
             "planSha256": plan["planSha256"],
             "sourceMutation": False,
             "repositoryMutation": False,
@@ -155,6 +199,7 @@ def execute(plan: dict[str, Any], plan_bytes: bytes, output_root: Path) -> dict[
             "planBytesSha256": sha256_bytes(plan_bytes),
             "frameCount": len(ordered),
             "size": {"width": width, "height": height},
+            "transparentRgbBleed": transparent_rgb,
             "outputs": outputs,
             "authority": plan["authority"],
             "createOnlyOutput": True,
