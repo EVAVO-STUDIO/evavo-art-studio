@@ -13,7 +13,7 @@ const CHECKOUT_SHA = "de0fac2e4500dabe0009e67214ff5f5447ce83dd";
 const PNPM_SETUP_SHA = "fc06bc1257f339d1d5d8b3a19a8cae5388b55320";
 const SETUP_NODE_SHA = "6044e13b5dc448c55e2357c09f80417699197238";
 const SETUP_PYTHON_SHA = "a309ff8b426b58ec0e2a45f0f869d46889d02405";
-const UPLOAD_ARTIFACT_SHA = "ea165f8d65b6e75b540449e92b4886f43607fa02";
+const UPLOAD_ARTIFACT_SHA = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
 const AUTOMATIC_VALIDATION_NOTE =
   "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.";
 const CURRENT_MAIN_RECEIPT_NOTE =
@@ -520,7 +520,7 @@ const requiredWorkflowTokens = [
   '"lockfileSha256": process.env.ART_STUDIO_LOCKFILE_SHA256',
   '"installedWithoutCommittedLockfile": false',
   '"deployment": "disabled"',
-  `actions/upload-artifact@${UPLOAD_ARTIFACT_SHA} # v4.6.2`,
+  `actions/upload-artifact@${UPLOAD_ARTIFACT_SHA} # v7.0.1`,
   "retention-days: 14",
 ];
 for (const token of requiredWorkflowTokens) {
