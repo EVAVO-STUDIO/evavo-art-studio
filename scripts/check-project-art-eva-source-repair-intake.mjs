@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -9,31 +10,25 @@ const files = Object.freeze({
   catalogue: 'scripts/project-art/eva-source-repair-catalogue.mjs',
   intake: 'scripts/project-art/eva-source-repair-intake.mjs',
   cli: 'scripts/compile-project-art-eva-source-repair-intake.mjs',
-  providerPackage:
-    'scripts/project-art/eva-source-repair-provider-package.mjs',
-  providerPackageCli:
-    'scripts/compile-project-art-eva-source-repair-provider-package.mjs',
-  providerReferences:
-    'scripts/project-art/avatar-final-pass-provider-references.mjs',
-  providerProtocol:
-    'scripts/project-art/avatar-final-pass-provider-protocol.mjs',
-  providerRuntimeConstants:
-    'scripts/project-art/avatar-final-pass-provider-runtime-constants.mjs',
-  providerRuntimeCli:
-    'scripts/avatar-final-pass-provider-runtime-cli.mjs',
-  candidateAssurance:
-    'scripts/project-art/eva-source-repair-candidate-assurance.mjs',
-  candidateAssuranceConstants:
-    'scripts/project-art/eva-source-repair-assurance-constants.mjs',
-  candidateAssuranceCli:
-    'scripts/compile-project-art-eva-source-repair-candidate-assurance.mjs',
-  candidateAssuranceTests:
-    'scripts/test-project-art-eva-source-repair-candidate-assurance.mjs',
+  providerPackage: 'scripts/project-art/eva-source-repair-provider-package.mjs',
+  providerPackageCli: 'scripts/compile-project-art-eva-source-repair-provider-package.mjs',
+  providerReferences: 'scripts/project-art/avatar-final-pass-provider-references.mjs',
+  providerProtocol: 'scripts/project-art/avatar-final-pass-provider-protocol.mjs',
+  providerRuntimeConstants: 'scripts/project-art/avatar-final-pass-provider-runtime-constants.mjs',
+  providerRuntimeCli: 'scripts/avatar-final-pass-provider-runtime-cli.mjs',
+  candidateAssurance: 'scripts/project-art/eva-source-repair-candidate-assurance.mjs',
+  candidateAssuranceConstants: 'scripts/project-art/eva-source-repair-assurance-constants.mjs',
+  candidateAssuranceCli: 'scripts/compile-project-art-eva-source-repair-candidate-assurance.mjs',
+  candidateAssuranceTests: 'scripts/test-project-art-eva-source-repair-candidate-assurance.mjs',
+  alphaMasteringCore: 'scripts/project-art/eva-source-repair-alpha-mastering-core.mjs',
+  alphaMastering: 'scripts/project-art/eva-source-repair-alpha-mastering.mjs',
+  alphaMasteringCli: 'scripts/compile-project-art-eva-source-repair-alpha-mastering.mjs',
+  alphaMasteringTests: 'scripts/test-project-art-eva-source-repair-alpha-mastering-mainline.mjs',
   tests: 'scripts/test-project-art-eva-source-repair-intake.mjs',
   finalPass: 'scripts/project-art/avatar-final-pass.mjs',
   docs: 'docs/PROJECT_ART_EVA_SOURCE_REPAIR_INTAKE.md',
-  candidateAssuranceDocs:
-    'docs/PROJECT_ART_EVA_SOURCE_REPAIR_CANDIDATE_ASSURANCE.md',
+  candidateAssuranceDocs: 'docs/PROJECT_ART_EVA_SOURCE_REPAIR_CANDIDATE_ASSURANCE.md',
+  alphaMasteringDocs: 'docs/PROJECT_ART_EVA_SOURCE_REPAIR_ALPHA_MASTERING.md',
   package: 'package.json',
 });
 
@@ -81,12 +76,9 @@ includes('intake', [
   "openSync(output, 'wx', 0o600)",
 ]);
 includes('cli', [
-  '--handoff',
-  '--manifest',
-  '--output',
+  '--handoff', '--manifest', '--output',
   'compileProjectArtEvaSourceRepairIntakeFile',
-  'providerExecution: false',
-  'candidateApproval: false',
+  'providerExecution: false', 'candidateApproval: false',
 ]);
 includes('tests', [
   'exact six-task handoff compiles into the existing provider boundary',
@@ -104,9 +96,7 @@ includes('providerPackage', [
   'evavo.project-art-eva-source-repair-provider-admissions-template.v1',
   'evavo.project-art-eva-source-repair-provider-admissions.v1',
   'evavo.project-art-eva-source-repair-provider-package.v1',
-  'defect-mask',
-  'maskAssurance',
-  'sealed-eva-source-repair-intake',
+  'defect-mask', 'maskAssurance', 'sealed-eva-source-repair-intake',
   'EVA_SOURCE_REPAIR_PROVIDER_MASK_ASSURANCE_INVALID',
   'MAXIMUM_AUTHORIZATION_WINDOW_MS',
   'maximumProviderCalls !== EXPECTED_TOTAL_JOBS',
@@ -117,11 +107,8 @@ includes('providerPackage', [
   "openSync(absolute, 'wx', 0o600)",
 ]);
 includes('providerPackageCli', [
-  "command === 'template'",
-  "command === 'compile'",
-  '--admissions',
-  'explicitProviderSubmissionRequired: true',
-  'providerExecution: false',
+  "command === 'template'", "command === 'compile'", '--admissions',
+  'explicitProviderSubmissionRequired: true', 'providerExecution: false',
 ]);
 includes('providerReferences', [
   "binding.bindingKey === 'defect-mask'",
@@ -136,10 +123,7 @@ includes('providerProtocol', [
   "transparency: sourceSpaceRepair ? 'opaque' : 'required'",
   "strategy: sourceSpaceRepair ? 'opaque-source' : 'native-alpha'",
 ]);
-includes('providerRuntimeConstants', [
-  "'edit-mask': 'defect-mask'",
-  "mask: 'mask'",
-]);
+includes('providerRuntimeConstants', ["'edit-mask': 'defect-mask'", "mask: 'mask'"]);
 includes('providerRuntimeCli', [
   'dispatch-package',
   'parseProjectArtEvaSourceRepairProviderPackageForDispatch',
@@ -158,7 +142,7 @@ includes('docs', [
   'mixed RGB and RGBA source encodings',
   'five known non-job dimension outliers',
   'true 8-bit RGBA source-space candidates',
-  "public `mask` role",
+  'public `mask` role',
   'zero changed RGBA pixels outside it',
   'two independent inspectors',
   'Top Hat Man production stays blocked',
@@ -171,9 +155,7 @@ includes('candidateAssurance', [
   'EVA_SOURCE_REPAIR_ASSURANCE_MASK_COMPONENT_COUNT_INVALID',
   'EVA_SOURCE_REPAIR_ASSURANCE_MASK_ENVELOPE_INVALID',
   'EVA_SOURCE_REPAIR_ASSURANCE_PROTECTED_PIXEL_CHANGED',
-  'changedProtectedPixels',
-  'alphaMasteringRequired',
-  'productionAlphaReady',
+  'changedProtectedPixels', 'alphaMasteringRequired', 'productionAlphaReady',
   'sealed-eva-source-repair-intake',
   'inspectEvaSourceRepairCandidateUnboundFileForTesting',
   "openSync(absolute, 'wx', 0o600)",
@@ -187,12 +169,8 @@ includes('candidateAssuranceConstants', [
   'eva-20260809-161524-frame-05',
 ]);
 includes('candidateAssuranceCli', [
-  "['mask', 'candidate']",
-  '--intake',
-  '--mask-sha256',
-  '--candidate-sha256',
-  'candidateApproval: false',
-  'runtimeActivationAllowed: false',
+  "['mask', 'candidate']", '--intake', '--mask-sha256', '--candidate-sha256',
+  'candidateApproval: false', 'runtimeActivationAllowed: false',
 ]);
 includes('candidateAssuranceTests', [
   'one changed protected pixel fails closed',
@@ -208,6 +186,52 @@ includes('candidateAssuranceDocs', [
   'cannot substitute an arbitrary source',
   'Agent-sized control surface',
 ]);
+includes('alphaMasteringCore', [
+  'evavo.project-art-eva-source-repair-alpha-mastering.v1',
+  'source-space-to-production-alpha',
+  'apply-production-alpha-once',
+  'EVA_SOURCE_REPAIR_ALPHA_SOURCE_SPACE_CANDIDATE_INVALID',
+  'EVA_SOURCE_REPAIR_ALPHA_MATTE_RGB_INVALID',
+  'EVA_SOURCE_REPAIR_ALPHA_MATTE_PROFILE_INVALID',
+  'EVA_SOURCE_REPAIR_ALPHA_VISIBLE_RGB_DRIFT',
+  'visibleRgbMismatches',
+  'alphaPlaneMatchesMatte',
+  'transparentRgbCleanPassed',
+  'frameFinisherCompatibleHandoff',
+  'createOnlyTransactionalBundle',
+]);
+includes('alphaMastering', [
+  'strictProviderDocuments',
+  'MATERIALIZATION_TRUE_KEYS',
+  'inputSnapshotsBeforeExecution: true',
+  'providerReceiptShapeValidated: true',
+  'providerAuthorityValidated: true',
+  'providerChronologyValidated: true',
+  'providerByteCountsValidated: true',
+  'rehashedTopLevelAndAuthorityDriftRejected: true',
+  "alphaAssociation: 'straight'",
+  'premultiplied: false',
+]);
+includes('alphaMasteringCli', [
+  '--candidate-assurance', '--provider-materialization',
+  '--provider-finisher-request', '--alpha-matte-sha256',
+  'apply-production-alpha-once', 'candidateApproval: false',
+  'sequenceReleaseAllowed: false', 'runtimeActivationAllowed: false',
+]);
+includes('alphaMasteringTests', [
+  'strict mainline boundary compiles one source-space candidate into production alpha',
+  'rehashed provider authority, byte-count, commit and chronology drift fail closed',
+  'freshly rehashed report authority and unknown top-level fields fail closed',
+  'inspectAvatarProviderCandidatePng',
+]);
+includes('alphaMasteringDocs', [
+  '# Project Art EVA source-repair alpha mastering',
+  'fully opaque RGBA source-space candidates',
+  'alpha 0:   RGB must be 0,0,0',
+  'alpha > 0: RGB must be 255,255,255',
+  'visible RGB mismatches',
+  'Technical alpha readiness is not creative approval.',
+]);
 
 const packageJson = JSON.parse(source.package);
 assert.equal(
@@ -222,25 +246,38 @@ assert.equal(
   packageJson.scripts['project-art:eva-source-repair:assurance'],
   'node scripts/compile-project-art-eva-source-repair-candidate-assurance.mjs',
 );
-assert.ok(
-  packageJson.scripts['project-art:check'].includes(
-    'pnpm run project-art:eva-source-repair:check',
-  ),
-);
+assert.ok(packageJson.scripts['project-art:check'].includes('pnpm run project-art:eva-source-repair:check'));
 
 for (const forbidden of [
-  'providerExecution: true',
-  'candidateApproval: true',
-  'candidatePromotion: true',
-  'runtimeActivationAllowed: true',
-  'topHatProductionMayStart: true',
-  'force: true',
-  'git push',
+  'providerExecution: true', 'candidateApproval: true', 'candidatePromotion: true',
+  'runtimeActivationAllowed: true', 'topHatProductionMayStart: true',
+  'force: true', 'git push',
 ]) {
   assert.ok(!source.intake.includes(forbidden), `intake contains ${forbidden}`);
 }
+for (const label of ['alphaMastering', 'alphaMasteringCore']) {
+  for (const forbidden of [
+    'candidateApproval: true', 'candidatePromotion: true',
+    'sequenceReleaseAllowed: true', 'runtimeActivationAllowed: true',
+    'publicationAllowed: true', 'forcePush: true', 'git push',
+  ]) {
+    assert.ok(!source[label].includes(forbidden), `${label} contains ${forbidden}`);
+  }
+}
+
+const alphaTest = spawnSync(
+  process.execPath,
+  ['--test', path.join(root, files.alphaMasteringTests)],
+  { cwd: root, encoding: 'utf8' },
+);
+assert.equal(
+  alphaTest.status,
+  0,
+  `alpha mastering mainline regressions failed\n${alphaTest.stdout}\n${alphaTest.stderr}`,
+);
 
 console.log('Project Art EVA source-repair intake guard passed.');
 console.log('- exact Runtime tasks bind both Git SHA-1 and materialized SHA-256 identities');
 console.log('- five masked edits and one endpoint-only in-between feed the existing provider chain');
+console.log('- source-space redraws cross exact provider-authority and immutable-input snapshots before alpha mastering');
 console.log('- provider authorization, candidate review, publication and activation remain separate');
