@@ -1,0 +1,65 @@
+name: Asset Fabricator multi-view reference handoff
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/game-art-production/asset-fabricator-reference-handoff.mjs"
+      - "scripts/game-art-production/asset-fabricator-reference-common.mjs"
+      - "scripts/game-art-production/asset-fabricator-reference-policy.mjs"
+      - "scripts/game-art-production/asset-fabricator-reference-handoff.test.mjs"
+      - "contracts/asset-fabricator-reference-handoff-v1.json"
+      - "docs/ASSET_FABRICATOR_REFERENCE_HANDOFF.md"
+      - ".github/workflows/asset-fabricator-reference-handoff.yml"
+  pull_request:
+    paths:
+      - "scripts/game-art-production/asset-fabricator-reference-handoff.mjs"
+      - "scripts/game-art-production/asset-fabricator-reference-common.mjs"
+      - "scripts/game-art-production/asset-fabricator-reference-policy.mjs"
+      - "scripts/game-art-production/asset-fabricator-reference-handoff.test.mjs"
+      - "contracts/asset-fabricator-reference-handoff-v1.json"
+      - "docs/ASSET_FABRICATOR_REFERENCE_HANDOFF.md"
+      - ".github/workflows/asset-fabricator-reference-handoff.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: art-reference-handoff-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Use governed Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check source syntax
+        run: node --check scripts/game-art-production/asset-fabricator-reference-handoff.mjs
+
+      - name: Run deterministic and adversarial tests
+        run: node --test scripts/game-art-production/asset-fabricator-reference-handoff.test.mjs
+
+      - name: Parse contract and inspect capabilities
+        run: |
+          node -e 'JSON.parse(require("fs").readFileSync("contracts/asset-fabricator-reference-handoff-v1.json", "utf8"))'
+          node scripts/game-art-production/asset-fabricator-reference-handoff.mjs capabilities \
+            | tee "${RUNNER_TEMP}/reference-capabilities.json"
+          grep -F '"automatic3dGeneration": false' "${RUNNER_TEMP}/reference-capabilities.json"
+          grep -F '"normalConvention": "opengl"' "${RUNNER_TEMP}/reference-capabilities.json"
+
+      - name: Prove validation leaves source clean
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
