@@ -1,0 +1,37 @@
+name: Project Art Avatar Display Bridge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/project-art/avatar-display-bridge.mjs"
+      - "scripts/test-project-art-avatar-display-bridge.mjs"
+      - "docs/PROJECT_ART_AVATAR_DISPLAY_BRIDGE.md"
+      - ".github/workflows/project-art-avatar-display-bridge.yml"
+  pull_request:
+    paths:
+      - "scripts/project-art/avatar-display-bridge.mjs"
+      - "scripts/test-project-art-avatar-display-bridge.mjs"
+      - "docs/PROJECT_ART_AVATAR_DISPLAY_BRIDGE.md"
+      - ".github/workflows/project-art-avatar-display-bridge.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-art-avatar-display-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Continuous cadence contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Verify runner and display bridge
+        run: |
+          node --version
+          node --test scripts/test-project-art-avatar-display-bridge.mjs
