@@ -34,7 +34,7 @@ const AUTHORITY_KEYS = Object.freeze([
 
 export class ProjectArtAvatarDisplayBridgeError extends Error {
   constructor(code, message = code) {
-    super(message);
+    super(message === code ? code : `${code}: ${message}`);
     this.name = 'ProjectArtAvatarDisplayBridgeError';
     this.code = code;
   }
