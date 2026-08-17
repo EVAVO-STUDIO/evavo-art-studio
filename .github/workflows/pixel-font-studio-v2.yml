@@ -92,7 +92,7 @@ jobs:
           test -x "${XVFB_RUN}"
           test -x "${XAUTH}"
           echo "EVAVO_PIXEL_FONT_XVFB_RUN=${XVFB_RUN}" >> "${GITHUB_ENV}"
-          xvfb-run -a -s "-screen 0 640x480x24 -nolisten tcp" sh -c 'test -n "${DISPLAY:-}"'
+          xvfb-run -a -s "-screen 0 640x480x24 -nolisten tcp" printenv DISPLAY >/dev/null
 
       - name: Download and verify official Godot 4.6.2
         shell: bash
