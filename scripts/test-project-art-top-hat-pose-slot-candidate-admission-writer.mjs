@@ -22,6 +22,11 @@ import {
   writeProjectArtTopHatPoseSlotCandidateAdmission,
 } from './write-project-art-top-hat-pose-slot-candidate-admission.mjs';
 
+function errorCode(pattern) {
+  return (error) =>
+    typeof error?.code === 'string' && pattern.test(error.code);
+}
+
 function writeJson(filePath, value) {
   writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, {
     encoding: 'utf8',
@@ -122,7 +127,7 @@ test('refuses overwrite and symbolic input without changing prior output', () =>
           ...paths,
           admittedAt: fixture.admittedAt,
         }),
-      /TOP_HAT_POSE_CANDIDATE_ADMISSION_WRITER_OUTPUT_EXISTS/u,
+      errorCode(/TOP_HAT_POSE_CANDIDATE_ADMISSION_WRITER_OUTPUT_EXISTS/u),
     );
     assert.deepEqual(readFileSync(paths.outputPath), before);
 
@@ -138,7 +143,7 @@ test('refuses overwrite and symbolic input without changing prior output', () =>
           outputPath: symbolicOutput,
           admittedAt: fixture.admittedAt,
         }),
-      /TOP_HAT_POSE_CANDIDATE_ADMISSION_WRITER_INPUT_INVALID/u,
+      errorCode(/TOP_HAT_POSE_CANDIDATE_ADMISSION_WRITER_INPUT_INVALID/u),
     );
     assert.equal(
       (() => {
