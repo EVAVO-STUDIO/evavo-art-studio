@@ -22,4 +22,5 @@ export * from "./revision-promotion-validation.js";
 export * from "./revision-promotion.js";
 export * from "./revision-promotion-jobs.js";
 export * from "./revision-promotion-protocol.js";
+export * from "./logo-matte.js";
 export { planTargetedRepair } from "./public-planner.js";

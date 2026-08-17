@@ -57,39 +57,19 @@ function workOrder() {
 
 function masteredAsset(frame) {
   const finalReviewedSha256 = hex(`final-reviewed:${frame.ordinal}`);
-  if (frame.currentMaster) {
-    const current = frame.currentMaster;
-    return {
-      provider: current.provider,
-      cloudName: current.cloudName,
-      assetId: current.assetId,
-      publicId: current.publicId,
-      version: current.version,
-      bytes: current.bytes,
-      width: current.width,
-      height: current.height,
-      format: current.format,
-      etag: current.etag,
-      secureUrl: current.secureUrl,
-      sha256: finalReviewedSha256,
-      createOnly: true,
-      overwrite: false,
-      immutable: true,
-    };
-  }
   const publicId = expectedEvaDenseMotionMasterPublicId(frame.ordinal);
   const version = 1_900_000_000 + frame.ordinal;
   return {
     provider: 'cloudinary',
     cloudName: 'dntogqtey',
-    assetId: hex(`asset:${frame.ordinal}`, 32),
+    assetId: hex(`dense-asset:${frame.ordinal}`, 32),
     publicId,
     version,
     bytes: 1_400_000 + frame.ordinal,
     width: 1024,
     height: 1536,
     format: 'png',
-    etag: hex(`etag:${frame.ordinal}`, 32),
+    etag: hex(`dense-etag:${frame.ordinal}`, 32),
     secureUrl:
       `https://res.cloudinary.com/dntogqtey/image/upload/` +
       `v${version}/${publicId}.png`,
@@ -193,6 +173,8 @@ test('seals one exact ten-frame release-evidence package without activation auth
   assert.equal(evidence.continuity.at(-1).fromOrdinal, 10);
   assert.equal(evidence.continuity.at(-1).toOrdinal, 1);
   assert.equal(evidence.gates.allTenFrameEvidenceComplete, true);
+  assert.equal(evidence.gates.allTenDenseMasterIdentitiesRequired, true);
+  assert.equal(evidence.gates.activeFallbackAssetsCannotSatisfyDenseSlots, true);
   assert.equal(evidence.gates.finalToFirstLoopClosurePassed, true);
   assert.equal(evidence.readiness.releaseEvidenceComplete, true);
   assert.equal(evidence.readiness.runtimeReceiptAssemblyReady, true);
@@ -203,26 +185,58 @@ test('seals one exact ten-frame release-evidence package without activation auth
   assert.deepEqual(verifyEvaDenseMotionReleaseEvidence(evidence), evidence);
 });
 
-test('retains exact active provenance and deterministic destinations for pending frames', () => {
+test('retains fallback provenance while requiring new dense identities for all ten frames', () => {
   const evidence = compileEvaDenseMotionReleaseEvidence(request());
   const current = EVA_DENSE_MOTION_WORK_ORDER_INTERNALS.sourceFrames;
   for (const frame of evidence.frames) {
     const source = current[frame.ordinal - 1];
-    if (source.currentMaster) {
-      assert.equal(frame.masteredAsset.assetId, source.currentMaster.assetId);
-      assert.equal(frame.masteredAsset.publicId, source.currentMaster.publicId);
-      assert.equal(frame.masteredAsset.version, source.currentMaster.version);
-    } else {
-      assert.equal(
-        frame.masteredAsset.publicId,
-        expectedEvaDenseMotionMasterPublicId(frame.ordinal),
-      );
-    }
+    assert.equal(
+      frame.masteredAsset.publicId,
+      expectedEvaDenseMotionMasterPublicId(frame.ordinal),
+    );
     assert.equal(frame.masteredAsset.createOnly, true);
     assert.equal(frame.masteredAsset.overwrite, false);
     assert.equal(frame.masteredAsset.immutable, true);
     assert.match(frame.masteredAsset.secureUrl, /\/image\/upload\/v\d+\//u);
+    if (source.currentMaster) {
+      assert.notEqual(frame.masteredAsset.assetId, source.currentMaster.assetId);
+      assert.notEqual(frame.masteredAsset.publicId, source.currentMaster.publicId);
+      assert.notEqual(frame.masteredAsset.version, source.currentMaster.version);
+      assert.notEqual(frame.masteredAsset.secureUrl, source.currentMaster.secureUrl);
+      assert.equal(
+        evidence.workOrder.sourceFamily.frames[frame.ordinal - 1].currentMaster
+          .assetId,
+        source.currentMaster.assetId,
+      );
+    }
   }
+});
+
+test('rejects reuse of active fallback assets as dense slots', () => {
+  const reused = structuredClone(request());
+  const source = EVA_DENSE_MOTION_WORK_ORDER_INTERNALS.sourceFrames[3];
+  const current = source.currentMaster;
+  reused.frames[3].masteredAsset = {
+    provider: current.provider,
+    cloudName: current.cloudName,
+    assetId: current.assetId,
+    publicId: current.publicId,
+    version: current.version,
+    bytes: current.bytes,
+    width: current.width,
+    height: current.height,
+    format: current.format,
+    etag: current.etag,
+    secureUrl: current.secureUrl,
+    sha256: reused.frames[3].evidence.finalReviewedSha256,
+    createOnly: true,
+    overwrite: false,
+    immutable: true,
+  };
+  assert.throws(
+    () => compileEvaDenseMotionReleaseEvidence(reused),
+    /EVA_DENSE_MOTION_RELEASE_EVIDENCE_ASSET_IDENTITY_INVALID/u,
+  );
 });
 
 test('rejects partial, reordered, duplicate and mutable frame evidence', () => {
@@ -365,13 +379,15 @@ test('CLI writes one permission-restricted create-only evidence package', () => 
   }
 });
 
-test('capabilities expose receipt assembly without publication or activation', () => {
+test('capabilities expose Runtime-compatible dense identities without activation', () => {
   const capabilities = evaDenseMotionReleaseEvidenceCapabilities();
   assert.equal(
     capabilities.requestSchema,
     EVA_DENSE_MOTION_RELEASE_EVIDENCE_REQUEST_SCHEMA,
   );
   assert.equal(capabilities.exactTenFrameSetRequired, true);
+  assert.equal(capabilities.allTenDenseMasterIdentitiesRequired, true);
+  assert.equal(capabilities.activeFallbackAssetsCannotSatisfyDenseSlots, true);
   assert.equal(capabilities.allTenContinuityEdgesRequired, true);
   assert.equal(capabilities.runtimeReceiptAssemblySupported, true);
   assert.equal(capabilities.providerExecution, false);

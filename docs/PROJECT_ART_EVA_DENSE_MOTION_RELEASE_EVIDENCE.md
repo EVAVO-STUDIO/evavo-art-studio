@@ -10,8 +10,23 @@ The source work order remains the authority for the family identity:
 - family: `eva-20260809-153620`
 - exact frame count: `10`
 - current production fallback: ordinals `4`, `5`, and `6`
-- pending mastered ordinals: `1`, `2`, `3`, `7`, `8`, `9`, and `10`
+- frames requiring new dense identities: all ordinals `1` through `10`
 - minimum dense Runtime release: `0.37.0`
+
+## Runtime-compatible dense identities
+
+The three existing production masters are fallback provenance only. They cannot satisfy ordinals `4`, `5`, or `6` in the dense family.
+
+Every ordinal must have a new deterministic dense-motion identity:
+
+```text
+evavo/avatar-runtime/eva-female/dense-motion/
+eva-20260809-153620-frame-NN-master-v1
+```
+
+This matches Runtime `0.37.0`, which requires the deterministic dense public ID for every receipt frame. Reusing an existing `identity-motion-v3` asset, asset ID, version or secure URL as a dense slot fails closed.
+
+The canonical work order still retains the complete existing provenance for ordinals `4`, `5`, and `6`. That provenance remains available for rollback and comparison while the current three-frame rig stays active.
 
 ## What the compiler accepts
 
@@ -68,8 +83,9 @@ Each mastered asset must be create-only and immutable:
 - `overwrite: false`
 - versioned secure URL required
 - unique asset ID, public ID and final SHA-256 required
+- deterministic dense public ID required for all ten ordinals
 
-For pending ordinals, the public ID must match the deterministic dense-motion destination from the work order. For active ordinals `4`, `5`, and `6`, the exact current production asset identity and version must remain unchanged.
+The current fallback asset identities remain preserved inside the work order, but they cannot be reused as dense masters.
 
 ## Review and continuity
 
@@ -125,4 +141,4 @@ The request must be a bounded, single-link regular UTF-8 JSON file with no symbo
 
 ## Current production effect
 
-Adding this boundary does not claim that the ten-frame evidence exists. It only defines and tests the exact admission contract that future, separately authorized mastering and review work must satisfy. Runtime `0.36.0` and the current three-frame rig remain unchanged.
+Adding this boundary does not claim that the ten-frame evidence exists. It defines and tests the exact admission contract that future, separately authorized mastering and review work must satisfy. Runtime `0.37.0` and the current three-frame rig remain unchanged until ten new deterministic dense masters pass the complete contract.

@@ -107,15 +107,18 @@ includes('docs', [
   'create-only',
 ]);
 includes('releaseEvidence', [
-  'evavo.project-art-eva-dense-motion-release-evidence-request.v1',
-  'evavo.project-art-eva-dense-motion-release-evidence.v1',
+  'evavo.project-art-eva-dense-motion-release-evidence-request.v2',
+  'evavo.project-art-eva-dense-motion-release-evidence.v2',
   'exactTenFrameSetRequired: true',
+  'allTenDenseMasterIdentitiesRequired: true',
+  'activeFallbackAssetsCannotSatisfyDenseSlots: true',
   'immutableVersionedCloudinaryAssetsRequired: true',
   'activeThreeFrameProvenanceRetained: true',
   'allTenContinuityEdgesRequired: true',
   'finalToFirstLoopClosureRequired: true',
   'runtimeReceiptAssemblyReady: true',
   'activeThreeFrameRigMustRemain: true',
+  'EVA_DENSE_MOTION_RELEASE_EVIDENCE_FALLBACK_REUSE_INVALID',
   'EVA_DENSE_MOTION_RELEASE_EVIDENCE_CONTENT_DRIFT',
 ]);
 includes('releaseCli', [
@@ -132,7 +135,8 @@ includes('releaseCli', [
 ]);
 includes('releaseTests', [
   'exact ten-frame release-evidence package',
-  'deterministic destinations for pending frames',
+  'new dense identities for all ten frames',
+  'active fallback assets as dense slots',
   'duplicate and mutable frame evidence',
   'continuity, runtime and authority drift',
   'rehashed semantic drift',
@@ -142,6 +146,8 @@ includes('releaseDocs', [
   '# Project Art EVA dense-motion release evidence',
   'final reviewed frame SHA-256',
   'immutable Cloudinary asset identity',
+  'new deterministic dense-motion identity',
+  'cannot be reused as dense masters',
   '10→1',
   'minimum dense Runtime release: `0.37.0`',
   'runtimeActivationAllowed: false',
@@ -214,6 +220,7 @@ console.log('Project Art EVA dense-motion work-order guard passed.');
 console.log('- exact ten-frame Runtime source identity is pinned to current governance');
 console.log('- only ordinals 1, 2, 3, 7, 8, 9 and 10 become mastering jobs');
 console.log('- the active 4, 5 and 6 provenance remains the production fallback');
+console.log('- all ten Runtime receipt slots require new deterministic dense identities');
 console.log('- release evidence binds ten final hashes and ten continuity edges');
 console.log('- alpha, identity, immutable delivery and named reviews fail closed');
 console.log('- Runtime receipt assembly is supported without publication or activation');
