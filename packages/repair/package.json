@@ -15,7 +15,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build --silent && node --test test/*.test.mjs"
+    "test": "npm run build --silent && node test/run-tests.mjs",
+    "test:logo": "npm run build --silent && node --test test/logo-matte.test.mjs"
   },
   "dependencies": {
     "@evavo/art-artifacts": "workspace:*",

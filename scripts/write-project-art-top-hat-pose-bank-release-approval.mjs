@@ -1,0 +1,242 @@
+#!/usr/bin/env node
+import {
+  closeSync,
+  fsyncSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import path from 'node:path';
+import process from 'node:process';
+import { pathToFileURL } from 'node:url';
+
+import {
+  assert,
+  deepFreeze,
+  sha256Bytes,
+  stableJsonFile,
+} from './project-art/avatar-final-pass-provider-runtime-common.mjs';
+import {
+  TOP_HAT_POSE_BANK_RELEASE_APPROVAL_RECEIPT_SCHEMA,
+} from './project-art/top-hat-pose-bank-release-approval-foundation.mjs';
+import {
+  admitProjectArtTopHatPoseBankReleaseApproval,
+  verifyProjectArtTopHatPoseBankReleaseApprovalAdmission,
+} from './project-art/top-hat-pose-bank-release-approval.mjs';
+
+function absolutePath(value, label) {
+  assert(
+    typeof value === 'string' && path.isAbsolute(value) && !value.includes('\0'),
+    'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_PATH_INVALID',
+    `${label} must be an absolute path.`,
+  );
+  return path.normalize(value);
+}
+
+function stableInputPath(value, label) {
+  const absolute = absolutePath(value, label);
+  const before = lstatSync(absolute);
+  assert(
+    before.isFile() && !before.isSymbolicLink() && before.nlink === 1,
+    'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_INPUT_INVALID',
+    `${label} must be a single-link ordinary file.`,
+  );
+  assert(
+    realpathSync(absolute) === absolute,
+    'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_INPUT_INVALID',
+    `${label} must not traverse a symbolic path.`,
+  );
+  return Object.freeze({ absolute, before });
+}
+
+function readStableJson(value, label) {
+  const input = stableInputPath(value, label);
+  const record = stableJsonFile(input.absolute, label);
+  const after = lstatSync(input.absolute);
+  for (const key of ['dev', 'ino', 'size', 'mtimeMs', 'ctimeMs']) {
+    assert(
+      input.before[key] === after[key],
+      'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_INPUT_CHANGED',
+      `${label} changed while being read.`,
+    );
+  }
+  return record.value;
+}
+
+function outputTarget(value) {
+  const absolute = absolutePath(value, 'outputPath');
+  const parent = path.dirname(absolute);
+  const metadata = lstatSync(parent);
+  assert(
+    metadata.isDirectory() && !metadata.isSymbolicLink(),
+    'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_OUTPUT_PARENT_INVALID',
+  );
+  assert(
+    realpathSync(parent) === parent,
+    'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_OUTPUT_PARENT_INVALID',
+  );
+  return absolute;
+}
+
+function removeOwnedPartial(filePath) {
+  try {
+    unlinkSync(filePath);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+}
+
+export function writeProjectArtTopHatPoseBankReleaseApproval({
+  releasePlanPath,
+  decisionPath,
+  outputPath,
+  admittedAt,
+}) {
+  const target = outputTarget(outputPath);
+  const releasePlan = readStableJson(releasePlanPath, 'releasePlanPath');
+  const decision = readStableJson(decisionPath, 'decisionPath');
+  const admission = admitProjectArtTopHatPoseBankReleaseApproval({
+    releasePlan,
+    decision,
+    ...(admittedAt ? { admittedAt } : {}),
+  });
+  const bytes = Buffer.from(`${JSON.stringify(admission, null, 2)}\n`, 'utf8');
+
+  let handle;
+  let created = false;
+  try {
+    handle = openSync(target, 'wx', 0o600);
+    created = true;
+    writeFileSync(handle, bytes);
+    fsyncSync(handle);
+  } catch (error) {
+    if (created) removeOwnedPartial(target);
+    if (error?.code === 'EEXIST') {
+      assert(
+        false,
+        'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_OUTPUT_EXISTS',
+        'The pose-bank release approval is create-only and already exists.',
+      );
+    }
+    throw error;
+  } finally {
+    if (handle !== undefined) closeSync(handle);
+  }
+
+  try {
+    const metadata = lstatSync(target);
+    assert(
+      metadata.isFile() &&
+        !metadata.isSymbolicLink() &&
+        metadata.nlink === 1 &&
+        (metadata.mode & 0o777) === 0o600 &&
+        metadata.size === bytes.length,
+      'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_OUTPUT_INVALID',
+    );
+    const written = readFileSync(target);
+    assert(
+      written.equals(bytes),
+      'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_OUTPUT_VERIFY_FAILED',
+    );
+    const reparsed = verifyProjectArtTopHatPoseBankReleaseApprovalAdmission(
+      JSON.parse(written.toString('utf8')),
+      { releasePlan, decision },
+    );
+    assert(
+      reparsed.releaseApprovalAdmissionSha256 ===
+        admission.releaseApprovalAdmissionSha256,
+      'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_OUTPUT_VERIFY_FAILED',
+    );
+  } catch (error) {
+    removeOwnedPartial(target);
+    throw error;
+  }
+
+  return deepFreeze({
+    schema: TOP_HAT_POSE_BANK_RELEASE_APPROVAL_RECEIPT_SCHEMA,
+    outputPath: target,
+    outputBytes: bytes.length,
+    outputSha256: sha256Bytes(bytes),
+    poseBankReleasePlanSha256: admission.poseBankReleasePlanSha256,
+    releaseApprovalDecisionSha256:
+      admission.releaseApprovalDecisionSha256,
+    releaseApprovalAdmissionSha256:
+      admission.releaseApprovalAdmissionSha256,
+    characterId: admission.characterId,
+    slotCount: admission.slotCount,
+    status: admission.status,
+    releaseApproved: true,
+    runtimePublicationEligible: true,
+    poseSlotFillingPerformed: false,
+    poseBankReleased: false,
+    runtimePublicationPerformed: false,
+    sequenceReleased: false,
+    runtimeActivationPerformed: false,
+    websiteInstallationPerformed: false,
+    repositoryMutationAuthority: false,
+    publicationAuthority: false,
+    forcePushAuthority: false,
+  });
+}
+
+function parseCli(argv) {
+  const flags = new Map();
+  for (let index = 0; index < argv.length; index += 2) {
+    const flag = argv[index];
+    const value = argv[index + 1];
+    assert(
+      typeof flag === 'string' && flag.startsWith('--') && value !== undefined,
+      'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_CLI_INVALID',
+    );
+    assert(
+      !flags.has(flag),
+      'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_CLI_INVALID',
+    );
+    flags.set(flag, value);
+  }
+  for (const flag of ['--plan', '--decision', '--output']) {
+    assert(
+      flags.has(flag),
+      'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_CLI_INVALID',
+      `Missing required flag ${flag}.`,
+    );
+  }
+  const allowed = new Set([
+    '--plan',
+    '--decision',
+    '--output',
+    '--admitted-at',
+  ]);
+  for (const flag of flags.keys()) {
+    assert(
+      allowed.has(flag),
+      'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_CLI_INVALID',
+      `Unknown flag ${flag}.`,
+    );
+  }
+  return Object.freeze({
+    releasePlanPath: flags.get('--plan'),
+    decisionPath: flags.get('--decision'),
+    outputPath: flags.get('--output'),
+    ...(flags.has('--admitted-at')
+      ? { admittedAt: flags.get('--admitted-at') }
+      : {}),
+  });
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  try {
+    const receipt = writeProjectArtTopHatPoseBankReleaseApproval(
+      parseCli(process.argv.slice(2)),
+    );
+    process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
+  } catch (error) {
+    process.stderr.write(`${
+      error?.code ?? 'TOP_HAT_POSE_BANK_RELEASE_APPROVAL_WRITER_FAILED'
+    }: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  }
+}

@@ -15,6 +15,8 @@ export const TOP_HAT_POSE_BANK_RELEASE_APPROVAL_RECEIPT_SCHEMA =
   'evavo.project-art-top-hat-pose-bank-release-approval-receipt.v1';
 
 export const TOP_HAT_POSE_BANK_RELEASE_APPROVAL_PROTOCOL = '2026-08-17.3';
+export const TOP_HAT_POSE_BANK_RELEASE_APPROVAL_DECISION =
+  'approve-top-hat-pose-bank-for-runtime-publication';
 export const TOP_HAT_POSE_BANK_RELEASE_APPROVAL_STATUS =
   'top-hat-pose-bank-release-approval-admitted-for-runtime-publication';
 
@@ -88,12 +90,16 @@ export function topHatPoseBankReleaseApprovalCapabilities() {
     decisionSchema: TOP_HAT_POSE_BANK_RELEASE_APPROVAL_DECISION_SCHEMA,
     admissionSchema: TOP_HAT_POSE_BANK_RELEASE_APPROVAL_ADMISSION_SCHEMA,
     receiptSchema: TOP_HAT_POSE_BANK_RELEASE_APPROVAL_RECEIPT_SCHEMA,
+    decision: TOP_HAT_POSE_BANK_RELEASE_APPROVAL_DECISION,
     characterId: 'top-hat-man',
     requiredPoseSlots: 6,
     exactReleasePlanSelfHashRequired: true,
     exactDecisionSelfHashRequired: true,
     exactSixSlotIdentityBindingRequired: true,
+    visiblePixelIdentityRequired: true,
+    alphaIdentityRequired: true,
     separateNamedHumanDecisionRequired: true,
+    externalHumanDecisionCannotBeFabricated: true,
     approvalDecisionMustFollowPlan: true,
     admissionMustFollowDecision: true,
     runtimePublicationEligibleOutput: true,
