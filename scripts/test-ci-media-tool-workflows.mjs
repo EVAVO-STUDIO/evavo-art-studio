@@ -20,6 +20,36 @@ const IMMUTABLE_EXTERNAL_ACTION =
   /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$/u;
 const IMMUTABLE_DOCKER_ACTION =
   /^docker:\/\/[^@\s]+@sha256:[0-9a-f]{64}$/u;
+const DISABLED_CHECKOUT_CREDENTIALS =
+  /\bpersist-credentials:\s*["']?false["']?(?=[ \t]*(?:[,}#]|$))/mu;
+const ENABLED_CHECKOUT_CREDENTIALS =
+  /\bpersist-credentials:\s*["']?true["']?(?=[ \t]*(?:[,}#]|$))/mu;
+const PERSISTED_CHECKOUT_ALLOWLIST = new Map([
+  [
+    ".github/workflows/finalize-pixel-typography-review.yml",
+    [
+      "permissions:\n  contents: write",
+      "git push origin HEAD:main",
+      "persist-credentials: true",
+    ],
+  ],
+  [
+    ".github/workflows/pixel-font-repository-publish.yml",
+    [
+      "TARGET_TOKEN: ${{ secrets.repository_token || secrets.EVAVO_PIXEL_FONT_REPOSITORY_TOKEN }}",
+      "--confirm-publish",
+      "persist-credentials: true",
+    ],
+  ],
+  [
+    ".github/workflows/repair-pixel-typography-review.yml",
+    [
+      "permissions:\n  contents: write",
+      "git push origin HEAD:main",
+      "persist-credentials: true",
+    ],
+  ],
+]);
 
 async function workflowSources() {
   const entries = await readdir(WORKFLOW_ROOT, { withFileTypes: true });
@@ -124,9 +154,13 @@ test("workflow runner and action identities are immutable", async () => {
   );
 });
 
-test("checkout steps never persist repository credentials", async () => {
+test("checkout credentials are disabled except for exact reviewed publishers", async () => {
+  const workflows = await workflowSources();
+  const sources = new Map(workflows.map((workflow) => [workflow.path, workflow.source]));
+  const persistedCounts = new Map();
   const violations = [];
-  for (const workflow of await workflowSources()) {
+
+  for (const workflow of workflows) {
     for (const step of workflowSteps(workflow.source)) {
       if (
         !actionReferences(step).some((reference) =>
@@ -135,15 +169,49 @@ test("checkout steps never persist repository credentials", async () => {
       ) {
         continue;
       }
-      if (!/^\s*persist-credentials:\s*["']?false["']?\s*(?:#.*)?$/mu.test(step)) {
-        violations.push(workflow.path);
+      if (DISABLED_CHECKOUT_CREDENTIALS.test(step)) continue;
+      if (
+        PERSISTED_CHECKOUT_ALLOWLIST.has(workflow.path) &&
+        ENABLED_CHECKOUT_CREDENTIALS.test(step)
+      ) {
+        persistedCounts.set(
+          workflow.path,
+          (persistedCounts.get(workflow.path) ?? 0) + 1,
+        );
+        continue;
+      }
+      violations.push(
+        `${workflow.path}: ${
+          ENABLED_CHECKOUT_CREDENTIALS.test(step)
+            ? "persisted credentials are not allowlisted"
+            : "checkout credential handling is not explicit"
+        }`,
+      );
+    }
+  }
+
+  for (const [workflowPath, requiredEvidence] of PERSISTED_CHECKOUT_ALLOWLIST) {
+    const source = sources.get(workflowPath);
+    if (source === undefined) {
+      violations.push(`${workflowPath}: allowlisted publisher is missing`);
+      continue;
+    }
+    if (persistedCounts.get(workflowPath) !== 1) {
+      violations.push(
+        `${workflowPath}: expected exactly one credential-persisting checkout`,
+      );
+    }
+    for (const evidence of requiredEvidence) {
+      if (!source.includes(evidence)) {
+        violations.push(`${workflowPath}: missing publisher evidence ${evidence}`);
       }
     }
   }
+
   assert.deepEqual(
     violations,
     [],
-    `Checkout steps persisting credentials:\n${violations.join("\n")}`,
+    `Checkout credential boundary violations:\n${violations.join("\n")}`,
   );
 });
 
