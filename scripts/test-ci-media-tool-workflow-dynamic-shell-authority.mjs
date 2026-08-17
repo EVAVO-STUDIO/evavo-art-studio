@@ -18,7 +18,8 @@ const DYNAMIC_EXECUTION_PRIMITIVES = Object.freeze([
   },
   {
     kind: "shell-source",
-    pattern: /^\s*(?:source|\.)\s+\S+/u,
+    pattern:
+      /(?:^|[;&|()]|\b(?:if|then|do|else))\s*(?:source|\.)\s+\S+/u,
   },
   {
     kind: "shell-command-string",
@@ -46,10 +47,10 @@ const DYNAMIC_EXECUTION_PRIMITIVES = Object.freeze([
   },
 ]);
 
-// Discovery begins fail-closed. The repository should not need dynamic shell
-// execution in workflow source. If an exact surface is ever necessary, it must
-// be reviewed separately with literal command text, immutable inputs, bounded
-// transport, and adversarial tests rather than silently grandfathered here.
+// Dynamic workflow execution remains zero-authority. If an exact surface is
+// ever necessary, it must be reviewed separately with literal command text,
+// immutable inputs, bounded transport and adversarial tests rather than being
+// silently grandfathered here.
 const APPROVED_DYNAMIC_EXECUTION = new Set([]);
 
 async function workflowSources() {
@@ -148,19 +149,24 @@ function runFields(step) {
 
 function dynamicShellSelectors(workflow) {
   const findings = [];
-  const lines = workflow.source.split(/\r?\n/u);
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const match = lines[index].match(/^\s*shell:\s*(.+?)\s*$/u);
-    if (!match || !match[1].includes("${{")) continue;
-    findings.push({
-      key: `${workflow.path}#shell-selector-line-${index + 1}::dynamic-shell-selector`,
-      kind: "dynamic-shell-selector",
-      line: index + 1,
-      path: workflow.path,
-      source: lines[index].trim(),
-      step: `shell-selector-line-${index + 1}`,
-    });
+  for (const step of workflowSteps(workflow.source)) {
+    const name = stepName(step);
+    const lines = step.source.split(/\r?\n/u);
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const match = lines[index].match(/^\s*shell:\s*(.+?)\s*$/u);
+      if (!match || !match[1].includes("${{")) continue;
+
+      findings.push({
+        key: `${workflow.path}#${name}::dynamic-shell-selector`,
+        kind: "dynamic-shell-selector",
+        line: step.startLine + index,
+        path: workflow.path,
+        source: lines[index].trim(),
+        step: name,
+      });
+    }
   }
 
   return findings;
@@ -244,6 +250,8 @@ test("dynamic shell primitives remain visible to the inventory", () => {
       "        run: eval \"$COMMAND\"",
       "      - name: Source",
       "        run: source \"$SCRIPT\"",
+      "      - name: Conditional source",
+      "        run: if test -f \"$SCRIPT\"; then source \"$SCRIPT\"; fi",
       "      - name: Command string",
       "        run: bash -lc 'printf ok'",
       "      - name: Pipe",
@@ -251,6 +259,10 @@ test("dynamic shell primitives remain visible to the inventory", () => {
       "      - name: PowerShell eval",
       "        shell: pwsh",
       "        run: Invoke-Expression $env:COMMAND",
+      "      - name: PowerShell command string",
+      "        run: pwsh -NoProfile -Command \"Write-Output ok\"",
+      "      - name: Cmd command string",
+      "        run: cmd.exe /c echo ok",
       "      - name: Dynamic interpreter",
       "        run: \"$SHELL\" -c \"$COMMAND\"",
       "      - name: Dynamic selector",
@@ -265,13 +277,16 @@ test("dynamic shell primitives remain visible to the inventory", () => {
     .sort();
 
   assert.deepEqual(observed, [
+    "Cmd command string::cmd-command-string",
     "Command string::shell-command-string",
+    "Conditional source::shell-source",
     "Dynamic interpreter::dynamic-shell-command",
+    "Dynamic selector::dynamic-shell-selector",
     "Eval::shell-eval",
     "Pipe::pipe-to-shell",
+    "PowerShell command string::powershell-command-string",
     "PowerShell eval::powershell-eval",
     "Source::shell-source",
-    "shell-selector-line-20::dynamic-shell-selector",
   ]);
 });
 
