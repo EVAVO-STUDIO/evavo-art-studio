@@ -1,0 +1,45 @@
+name: EVA Identity Motion Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/project-art/eva-identity-motion-release.mjs"
+      - "scripts/test-project-art-eva-identity-motion-release.mjs"
+      - "docs/PROJECT_ART_EVA_IDENTITY_MOTION.md"
+      - ".github/workflows/project-art-eva-identity-motion.yml"
+  pull_request:
+    paths:
+      - "scripts/project-art/eva-identity-motion-release.mjs"
+      - "scripts/test-project-art-eva-identity-motion-release.mjs"
+      - "docs/PROJECT_ART_EVA_IDENTITY_MOTION.md"
+      - ".github/workflows/project-art-eva-identity-motion.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eva-identity-motion-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Use governed Node
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Validate EVA identity motion
+        run: node --test scripts/test-project-art-eva-identity-motion-release.mjs
