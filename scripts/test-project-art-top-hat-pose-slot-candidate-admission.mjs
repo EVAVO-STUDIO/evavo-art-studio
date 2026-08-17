@@ -43,7 +43,7 @@ test('admits all six exact reviewed Top Hat candidates for release review only',
     );
     assert.equal(
       admission.status,
-      TOP_HAT_POSE_SLOT_CANDIDATE_ADMISION_STATUS,
+      TOP_HAT_POSE_SLOT_CANDIDATE_ADMISSION_STATUS,
     );
     assert.equal(admission.characterId, 'top-hat-man');
     assert.equal(admission.slotId, slotId);
@@ -114,7 +114,7 @@ test('rejects slot, adapter, dispatch and source-chain substitution', () => {
         dispatch: dispatchTamper,
       }),
     /TOP_HAT_POSE_CANDIDATE_ADMISSION_DISPATCH_MISMATCH|AVATAR_PROVIDER/u,
-   );
+  );
 
   const materializationTamper = structuredClone(
     fixture.materializationReceipt,
@@ -148,7 +148,7 @@ test('requires an approving named-human review with every gate passed', () => {
         frameReviewDecision: nonHuman,
       }),
     /TOP_HAT_POSE_CANDIDATE_ADMISSION_HUMAN_REVIEW_REQUIRED/u,
-   );
+  );
 
   const failedGate = structuredClone(fixture.frameReviewDecision);
   failedGate.gates.handsAndAnatomy = 'fail';
@@ -172,7 +172,7 @@ test('requires an approving named-human review with every gate passed', () => {
         frameReviewOutcome: widened,
       }),
     /TOP_HAT_POSE_CANDIDATE_ADMISSION_REVIEW_AUTHORITY_INVALID/u,
-   );
+  );
 });
 
 test('rejects changed, corrupt or mismatched final PNG bytes', () => {
@@ -207,7 +207,7 @@ test('rejects accessors, cycles and rehashed admission authority escalation', ()
   Object.defineProperty(accessor, 'notes', {
     enumerable: true,
     get() {
-      throw new Error('ust not execute');
+      throw new Error('must not execute');
     },
   });
   assert.throws(
@@ -235,8 +235,8 @@ test('capabilities disclose admission-only authority', () => {
     projectArtTopHatPoseSlotCandidateAdmissionCapabilities();
   assert.equal(
     capabilities.schema,
-    TOP_HAT_POSE_SLOT_CANDIDATE_ADMISION_CAPABILITIES_SCHEMA,
-   );
+    TOP_HAT_POSE_SLOT_CANDIDATE_ADMISSION_CAPABILITIES_SCHEMA,
+  );
   assert.equal(capabilities.requiredPoseSlots, 6);
   assert.equal(capabilities.oneCandidatePerAdmission, true);
   assert.equal(capabilities.namedHumanReviewRequired, true);
@@ -252,17 +252,17 @@ test('capabilities disclose admission-only authority', () => {
     'imageMutation',
     'creativeDecision',
     'candidateApproval',
-   'candidatePromotion',
+    'candidatePromotion',
     'poseSlotFilling',
-   'poseBankRelease',
+    'poseBankRelease',
     'sequenceRelease',
-   'repositoryMutation',
+    'repositoryMutation',
     'gitCommit',
-   'gitPush',
+    'gitPush',
     'deployment',
     'publication',
-   'runtimeActivation',
-   'forcePush',
+    'runtimeActivation',
+    'forcePush',
   ]) {
     assert.equal(capabilities[key], false);
   }
