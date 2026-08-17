@@ -10,6 +10,9 @@ import {
   inspectAvatarProviderCandidatePng,
 } from './avatar-final-pass-provider-candidate.mjs';
 import {
+  inspectAvatarProviderFramePng,
+} from './avatar-final-pass-provider-frame-finisher.mjs';
+import {
   parseAvatarFinalPassProviderRuntimeDispatch,
 } from './avatar-final-pass-provider-runtime-dispatch-core.mjs';
 import {
@@ -166,11 +169,18 @@ export function admitProjectArtTopHatPoseSlotCandidate({
   );
 
   const bytes = Buffer.from(finishedFrameBytes);
-  const png = inspectAvatarProviderCandidatePng(bytes, 1024, 1536, {
-    requireTransparentPixels: true,
-  });
+  const candidatePng = inspectAvatarProviderCandidatePng(
+    bytes,
+    1024,
+    1536,
+    { requireTransparentPixels: true },
+  );
+  const frameInspection = inspectAvatarProviderFramePng(bytes, 1024, 1536);
+  const { pixels: _pixels, ...png } = frameInspection;
   assert(
-    png.sha256 === frameReport.output.sha256 &&
+    candidatePng.sha256 === png.sha256 &&
+      candidatePng.byteLength === png.byteLength &&
+      png.sha256 === frameReport.output.sha256 &&
       png.sha256 === reviewOutcome.finalFrameSha256 &&
       png.byteLength === frameReport.output.bytes &&
       png.visiblePixels > 0 &&
