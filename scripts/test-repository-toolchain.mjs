@@ -239,7 +239,7 @@ try {
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
-      "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
       "actions/checkout@v6",
     ),
   );
@@ -249,7 +249,7 @@ try {
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
-      "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
+      "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
       "actions/setup-python@v6",
     ),
   );
@@ -259,7 +259,7 @@ try {
   mutateText(".github/workflows/repository-toolchain-authority.yml", (value) =>
     replaceRequired(
       value,
-      "actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238",
+      "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
       "actions/setup-node@v6",
     ),
   );

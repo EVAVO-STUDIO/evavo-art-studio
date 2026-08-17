@@ -9,10 +9,10 @@ const EXPECTED_PNPM = "10.13.1";
 const EXPECTED_PYTHON = "3.13.5";
 const EXPECTED_PILLOW = "12.2.0";
 const EXPECTED_LOCKFILE_VERSION = "9.0";
-const CHECKOUT_SHA = "de0fac2e4500dabe0009e67214ff5f5447ce83dd";
-const PNPM_SETUP_SHA = "fc06bc1257f339d1d5d8b3a19a8cae5388b55320";
-const SETUP_NODE_SHA = "6044e13b5dc448c55e2357c09f80417699197238";
-const SETUP_PYTHON_SHA = "a309ff8b426b58ec0e2a45f0f869d46889d02405";
+const CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1";
+const PNPM_SETUP_SHA = "0977fd99725f1db4007ccb2928dbb4e90d06cc86";
+const SETUP_NODE_SHA = "820762786026740c76f36085b0efc47a31fe5020";
+const SETUP_PYTHON_SHA = "5fda3b95a4ea91299a34e894583c3862153e4b97";
 const UPLOAD_ARTIFACT_SHA = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
 const AUTOMATIC_VALIDATION_NOTE =
   "Validation runs automatically on pushes to main and may also be manually dispatched for the exact current main SHA.";
@@ -468,13 +468,13 @@ const requiredWorkflowTokens = [
   '[[ "${ART_STUDIO_REQUEST_SOURCE}" == "evavo-development-studio" ]]',
   '[[ "${GITHUB_EVENT_NAME}" == "push" ]]',
   '[[ "${ART_STUDIO_REQUEST_SOURCE}" == "github-main-push" ]]',
-  `actions/checkout@${CHECKOUT_SHA} # v6.0.2`,
+  `actions/checkout@${CHECKOUT_SHA} # v7.0.1`,
   "ref: ${{ env.ART_STUDIO_EXPECTED_SHA }}",
   "fetch-depth: 0",
   "persist-credentials: false",
   "git show-ref --verify --quiet refs/remotes/origin/main",
   '[[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]',
-  `actions/setup-python@${SETUP_PYTHON_SHA} # v6.2.0`,
+  `actions/setup-python@${SETUP_PYTHON_SHA} # v7.0.0`,
   `python-version: "${EXPECTED_PYTHON}"`,
   "cache-dependency-path: requirements-image-pipeline.txt",
   "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt",
@@ -488,8 +488,8 @@ const requiredWorkflowTokens = [
   "tools/evaluate_brass_animation_sequence.py",
   "tools/verify_brass_creative_evaluation.py",
   "python tools/verify_brass_creative_evaluation.py",
-  `pnpm/action-setup@${PNPM_SETUP_SHA} # v4.4.0`,
-  `actions/setup-node@${SETUP_NODE_SHA} # v6.2.0`,
+  `pnpm/action-setup@${PNPM_SETUP_SHA} # v6.0.10`,
+  `actions/setup-node@${SETUP_NODE_SHA} # v7.0.0`,
   `node-version: "${EXPECTED_NODE}"`,
   `version: ${EXPECTED_PNPM}`,
   "package-manager-cache: false",
@@ -618,12 +618,12 @@ for (const token of [
   "permissions:\n  contents: read",
   "cancel-in-progress: true",
   "runs-on: ubuntu-24.04",
-  `actions/checkout@${CHECKOUT_SHA} # v6.0.2`,
+  `actions/checkout@${CHECKOUT_SHA} # v7.0.1`,
   "fetch-depth: 1",
   "persist-credentials: false",
-  `pnpm/action-setup@${PNPM_SETUP_SHA} # v4.4.0`,
+  `pnpm/action-setup@${PNPM_SETUP_SHA} # v6.0.10`,
   `version: ${EXPECTED_PNPM}`,
-  `actions/setup-node@${SETUP_NODE_SHA} # v6.2.0`,
+  `actions/setup-node@${SETUP_NODE_SHA} # v7.0.0`,
   `node-version: "${EXPECTED_NODE}"`,
   "package-manager-cache: false",
   "node scripts/check-repository-toolchain.mjs",

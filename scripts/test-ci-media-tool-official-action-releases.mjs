@@ -33,15 +33,15 @@ const APPROVED_ACTIONS = new Map([
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
   ],
   [
-    "pnpm/setup",
-    "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+    "pnpm/action-setup",
+    "pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86",
   ],
 ]);
 
 const REPLACED_ACTIONS = new Map([
   [
-    "pnpm/action-setup",
-    "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+    "pnpm/setup",
+    "pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86",
   ],
 ]);
 
