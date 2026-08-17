@@ -87,13 +87,18 @@ jobs:
       - name: Require explicit publication confirmation and token
         id: guard
         shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          EXPECTED_TARGET_HEAD: ${{ inputs.expected_target_head }}
+          PUBLISH_MODE: ${{ inputs.publish_mode }}
+          TARGET_REPOSITORY: ${{ inputs.target_repository }}
         run: |
           set -euo pipefail
-          test "${{ inputs.confirmation }}" = "PUBLISH"
+          test "$CONFIRMATION" = "PUBLISH"
           test -n "$TARGET_TOKEN"
-          [[ "${{ inputs.expected_target_head }}" =~ ^[0-9a-f]{40}$ ]]
-          test "${{ inputs.publish_mode }}" = "branch" -o "${{ inputs.publish_mode }}" = "direct-main"
-          target_slug="${{ inputs.target_repository }}"
+          [[ "$EXPECTED_TARGET_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          test "$PUBLISH_MODE" = "branch" -o "$PUBLISH_MODE" = "direct-main"
+          target_slug="$TARGET_REPOSITORY"
           echo "target_slug=${target_slug//\//-}" >> "$GITHUB_OUTPUT"
 
       - name: Check out exact Art Studio automation source
@@ -136,18 +141,27 @@ jobs:
 
       - name: Verify target identity and configure commit author
         shell: bash
+        env:
+          EXPECTED_TARGET_HEAD: ${{ inputs.expected_target_head }}
         run: |
           set -euo pipefail
-          test "$(git -C target rev-parse HEAD)" = "${{ inputs.expected_target_head }}"
+          test "$(git -C target rev-parse HEAD)" = "$EXPECTED_TARGET_HEAD"
           test -z "$(git -C target status --porcelain=v1 --untracked-files=all)"
           git -C target config user.name "EVAVO Pixel Font Delivery"
           git -C target config user.email "evavo.studio@gmail.com"
 
       - name: Compile, install, validate, commit and normally push
         shell: bash
+        env:
+          EXPECTED_TARGET_HEAD: ${{ inputs.expected_target_head }}
+          JOB_PATH: ${{ inputs.job_path }}
+          PUBLISH_BRANCH: ${{ inputs.publish_branch }}
+          PUBLISH_MODE: ${{ inputs.publish_mode }}
+          TARGET_BRANCH: ${{ inputs.target_branch }}
+          TARGET_REPOSITORY: ${{ inputs.target_repository }}
         run: |
           set -euo pipefail
-          job="$GITHUB_WORKSPACE/art-studio/${{ inputs.job_path }}"
+          job="$GITHUB_WORKSPACE/art-studio/$JOB_PATH"
           art_root="$GITHUB_WORKSPACE/art-studio"
           case "$(realpath "$job")" in
             "$art_root"/*) ;;
@@ -158,14 +172,14 @@ jobs:
             --job "$job"
             --target-root "$GITHUB_WORKSPACE/target"
             --allowlist "$art_root/config/pixel-font-repository-allowlist.v1.json"
-            --expected-head "${{ inputs.expected_target_head }}"
-            --repository "${{ inputs.target_repository }}"
-            --branch "${{ inputs.target_branch }}"
-            --publish-mode "${{ inputs.publish_mode }}"
+            --expected-head "$EXPECTED_TARGET_HEAD"
+            --repository "$TARGET_REPOSITORY"
+            --branch "$TARGET_BRANCH"
+            --publish-mode "$PUBLISH_MODE"
             --confirm-publish
           )
-          if test -n "${{ inputs.publish_branch }}"; then
-            args+=(--publish-branch "${{ inputs.publish_branch }}")
+          if test -n "$PUBLISH_BRANCH"; then
+            args+=(--publish-branch "$PUBLISH_BRANCH")
           fi
           node "$art_root/scripts/pixel-font-repository-delivery.mjs" "${args[@]}" \
             | tee "$RUNNER_TEMP/pixel-font-repository-publication.json"
