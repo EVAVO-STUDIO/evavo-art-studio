@@ -99,8 +99,8 @@ export function createTopHatPoseSlotCandidateAdmissionFixture(
       compiled,
     );
   const rawOutcome = structuredClone(
-    candidateRuntimeOutcome(dispatch, binding),
-   );
+    candidateRunOutcome(dispatch, binding),
+  );
   rawOutcome.completedAt = providerCompletedAt;
   rawOutcome.result.attempts[0].startedAt = providerStartedAt;
   rawOutcome.result.attempts[0].completedAt = providerCompletedAt;
@@ -108,7 +108,7 @@ export function createTopHatPoseSlotCandidateAdmissionFixture(
     dispatch,
     binding,
     rawOutcome,
-   );
+  );
   const source = parseAvatarProviderCandidateSourceChain({
     dispatch,
     binding,
@@ -273,10 +273,9 @@ export function createTopHatPoseSlotCandidateAdmissionFixture(
       forcePush: false,
     }),
   };
-
   const finisherRequest = candidateSelfHash(
     finisherRequestBody,
-   'finisherRequestSha256',
+    'finisherRequestSha256',
   );
   materializationBody.finisherHandoff = Object.freeze({
     path: paths.finisherRequest,
