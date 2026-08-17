@@ -1,11 +1,16 @@
-name: Ensure Pixel Typography native review publication
+name: Manual Pixel Typography native review reconciliation
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/repair-pixel-typography-review.yml"
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact current main commit SHA to authorize
+        required: true
+        type: string
+      confirmation:
+        description: Type RECONCILE_PIXEL_TYPOGRAPHY_REVIEW to authorize repository publication
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -25,9 +30,22 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
+      - name: Require explicit manual authorization
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          [[ "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          test "${EXPECTED_SHA}" = "${GITHUB_SHA}"
+          test "${CONFIRMATION}" = "RECONCILE_PIXEL_TYPOGRAPHY_REVIEW"
+
       - name: Check out exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.expected_sha }}
           fetch-depth: 0
           persist-credentials: true
 

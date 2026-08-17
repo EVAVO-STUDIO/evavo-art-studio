@@ -11,11 +11,13 @@ const WRITE_PERMISSION_ALLOWLIST = new Map([
   [
     ".github/workflows/finalize-pixel-typography-review.yml",
     {
-      events: ["push", "workflow_dispatch"],
+      events: ["workflow_dispatch"],
       writes: ["contents"],
       requiredEvidence: [
         "permissions:\n  contents: write",
         "persist-credentials: true",
+        "expected_sha:",
+        "FINALIZE_PIXEL_TYPOGRAPHY_REVIEW",
         "git push origin HEAD:main",
         'test "$remote" = "$published"',
         "cancel-in-progress: false",
@@ -30,6 +32,8 @@ const WRITE_PERMISSION_ALLOWLIST = new Map([
       requiredEvidence: [
         "permissions:\n  contents: write",
         "persist-credentials: true",
+        "expected_sha:",
+        "RECONCILE_PIXEL_TYPOGRAPHY_REVIEW",
         "git push origin HEAD:main",
         'test "$remote" = "$published"',
         "cancel-in-progress: false",
@@ -42,11 +46,14 @@ const PRIVILEGED_WORKFLOW_ALLOWLIST = new Map([
   [
     ".github/workflows/finalize-pixel-typography-review.yml",
     {
-      events: ["push", "workflow_dispatch"],
+      events: ["workflow_dispatch"],
       requiredEvidence: [
         "permissions:\n  contents: write",
         "persist-credentials: true",
+        "expected_sha:",
+        "FINALIZE_PIXEL_TYPOGRAPHY_REVIEW",
         "git push origin HEAD:main",
+        "Require explicit manual authorization",
         "Require exact current main and reviewed baseline files",
       ],
     },
@@ -58,8 +65,11 @@ const PRIVILEGED_WORKFLOW_ALLOWLIST = new Map([
       requiredEvidence: [
         "permissions:\n  contents: write",
         "persist-credentials: true",
+        "expected_sha:",
+        "RECONCILE_PIXEL_TYPOGRAPHY_REVIEW",
         "git push origin HEAD:main",
-        "Require explicit publication confirmation and token",
+        "Require explicit manual authorization",
+        "Publish only the governed reconciliation",
       ],
     },
   ],
@@ -382,5 +392,34 @@ test("workflow permissions never use write-all", async () => {
     violations,
     [],
     `write-all is forbidden:\n${violations.join("\n")}`,
+  );
+});
+
+
+test("repository write workflows are manual-only and SHA-confirmed", async () => {
+  const violations = [];
+  for (const workflow of await workflowSources()) {
+    if (writePermissions(workflow.source).length === 0) continue;
+    const events = exactSorted(workflowEvents(workflow.source));
+    if (events.length !== 1 || events[0] !== "workflow_dispatch") {
+      violations.push(
+        `${workflow.path}: write workflow events ${events.join(", ")}`,
+      );
+    }
+    for (const evidence of [
+      "expected_sha:",
+      "confirmation:",
+      "Require explicit manual authorization",
+      "ref: ${{ inputs.expected_sha }}",
+    ]) {
+      if (!workflow.source.includes(evidence)) {
+        violations.push(`${workflow.path}: missing manual guard ${evidence}`);
+      }
+    }
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    `Repository write workflows must be manual and SHA-bound:\n${violations.join("\n")}`,
   );
 });
