@@ -115,9 +115,9 @@ export function parseMaterialization(input, source) {
     receipt,
     MATERIALIZATION_KEYS,
     'candidate materialization receipt',
-    'TOP_HAT_POSE_CANDIDATE_ADMISION_MATERIALIZATION_KEYS_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_MATERIALIZATION_KEYS_INVALID',
   );
-  assert*
+  assert(
     receipt.schema === AVATAR_PROVIDER_CANDIDATE_MATERIALIZATION_SCHEMA &&
       receipt.protocolVersion === AVATAR_PROVIDER_CANDIDATE_PROTOCOL_VERSION &&
       receipt.status === 'candidate-materialized-awaiting-frame-finisher' &&
@@ -149,7 +149,7 @@ export function parseMaterialization(input, source) {
       receipt.output.height === 1536 &&
       receipt.output.createOnly === true &&
       receipt.output.unapproved === true,
-   'TOP_HAT_POSE_CANDIDATE_ADMISSION_MATERIALIZATION_OUTPUT_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_MATERIALIZATION_OUTPUT_INVALID',
   );
   digest(receipt.output.sha256, 'candidate materialization receipt.output.sha256');
   assert(
@@ -159,7 +159,7 @@ export function parseMaterialization(input, source) {
   falseApprovals(receipt.approvals, 'candidate materialization receipt.approvals');
   assert(
     isRecord(receipt.finisherHandoff),
-   'TOP_HAT_POSE_CANDIDATE_ADMISSION_MATERIALIZATION_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_MATERIALIZATION_INVALID',
   );
   canonicalPath(receipt.finisherHandoff.path, 'candidate materialization receipt.finisherHandoff.path');
   digest(
@@ -198,7 +198,7 @@ export function parseFinisherRequest(input, source, receipt) {
       request.candidateApproval === false &&
       request.candidatePromotion === false &&
       request.runtimeActivationAllowed === false,
-    'TOP_HAT_POSE_CANDIDATE_ADMISION_FINISHER_REQUEST_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_FINISHER_REQUEST_INVALID',
   );
   assert(
     isRecord(request.sourceCandidate) &&
@@ -223,7 +223,7 @@ export function parseFinisherReport(input, source, receipt, request) {
   const report = verifyFrameSelfHash(
     input,
     'frameFinisherSha256',
-   'frame-finisher report',
+    'frame-finisher report',
   );
   assert(
     report.schema === FRAME_FINISHER_REPORT_SCHEMA &&
@@ -242,13 +242,13 @@ export function parseFinisherReport(input, source, receipt, request) {
   );
   timestamp(report.finishedAt, 'frame-finisher report.finishedAt');
   assert(
-   isRecord(report.source) &&
-    report.source.path === request.sourceCandidate.path &&
+    isRecord(report.source) &&
+      report.source.path === request.sourceCandidate.path &&
       report.source.sha256 === request.sourceCandidate.sha256 &&
       report.source.bytes === request.sourceCandidate.bytes &&
       report.source.materializationSha256 === receipt.materializationSha256 &&
       report.source.finisherRequestSha256 === request.finisherRequestSha256,
-   'TOP_HAT_POSE_CANDIDATE_ADMISSION_FINISHER_REPORT_SOURCE_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_FINISHER_REPORT_SOURCE_INVALID',
   );
   assert(
     isRecord(report.output) &&
@@ -271,7 +271,7 @@ export function parseFinisherReport(input, source, receipt, request) {
       report.preservation.visibleBoundsUnchanged === true &&
       report.preservation.registrationUnchanged === true &&
       report.preservation.onlyHiddenTransparentRgbWasModified === true,
-   'TOP_HAT_POSE_CANDIDATE_ADMISSION_FINISHER_PRESERVATION_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_FINISHER_PRESERVATION_INVALID',
   );
   falseApprovals(report.approvals, 'frame-finisher report.approvals');
   return report;
