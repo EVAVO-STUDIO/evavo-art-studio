@@ -16,6 +16,9 @@ on:
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-job.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-dispatch.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-fixture.mjs"
+      - "scripts/project-art/top-hat-pose-slot-candidate-admission-foundation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-candidate-admission.mjs"
+      - "scripts/project-art/top-hat-pose-slot-candidate-admission-fixture.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
@@ -27,9 +30,13 @@ on:
       - "scripts/test-project-art-top-hat-pose-slot-provider-runtime-cli.mjs"
       - "scripts/top-hat-pose-slot-provider-runtime-cli.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-cli-files.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-candidate-admission.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-candidate-admission-writer.mjs"
+      - "scripts/write-project-art-top-hat-pose-slot-candidate-admission.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_PACKAGE.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_RUNTIME_ADAPTER.md"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_CANDIDATE_ADMISSION.md"
       - ".github/workflows/project-art-top-hat-pose-slots.yml"
   pull_request:
     paths:
@@ -45,6 +52,9 @@ on:
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-job.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-dispatch.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-fixture.mjs"
+      - "scripts/project-art/top-hat-pose-slot-candidate-admission-foundation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-candidate-admission.mjs"
+      - "scripts/project-art/top-hat-pose-slot-candidate-admission-fixture.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
@@ -56,9 +66,13 @@ on:
       - "scripts/test-project-art-top-hat-pose-slot-provider-runtime-cli.mjs"
       - "scripts/top-hat-pose-slot-provider-runtime-cli.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-cli-files.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-candidate-admission.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-candidate-admission-writer.mjs"
+      - "scripts/write-project-art-top-hat-pose-slot-candidate-admission.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_PACKAGE.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_RUNTIME_ADAPTER.md"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_CANDIDATE_ADMISSION.md"
       - ".github/workflows/project-art-top-hat-pose-slots.yml"
   workflow_dispatch:
 
@@ -71,9 +85,9 @@ concurrency:
 
 jobs:
   contract:
-    name: Runtime 0.34 pose-slot provider contract
+    name: Runtime 0.34 pose-slot provider and candidate contract
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,7 +100,7 @@ jobs:
         with:
           node-version: "22.14.0"
           package-manager-cache: false
-      - name: Verify pose-slot production, provider and guarded runtime contracts
+      - name: Verify pose-slot production, provider, runtime and candidate contracts
         run: |
           node --version
           node --test scripts/test-project-art-top-hat-pose-slot-production.mjs
@@ -95,13 +109,16 @@ jobs:
           node --test scripts/test-project-art-top-hat-pose-slot-provider-package-writer.mjs
           node --test scripts/test-project-art-top-hat-pose-slot-provider-runtime-adapter.mjs
           node --test scripts/test-project-art-top-hat-pose-slot-provider-runtime-cli.mjs
-      - name: Compile create-only production, provider and passive adapter evidence
+          node --test scripts/test-project-art-top-hat-pose-slot-candidate-admission.mjs
+          node --test scripts/test-project-art-top-hat-pose-slot-candidate-admission-writer.mjs
+      - name: Compile create-only production, provider and passive admission evidence
         env:
           PLAN_PATH: ${{ runner.temp }}/top-hat-pose-slot-production.json
           PLAN_RECEIPT_PATH: ${{ runner.temp }}/top-hat-pose-slot-production.receipt.json
           PROVIDER_PATH: ${{ runner.temp }}/top-hat-pose-slot-provider-package.json
           PROVIDER_RECEIPT_PATH: ${{ runner.temp }}/top-hat-pose-slot-provider-package.receipt.json
           ADAPTER_CAPABILITIES_PATH: ${{ runner.temp }}/top-hat-pose-slot-provider-runtime-adapter.capabilities.json
+          ADMISSION_CAPABILITIES_PATH: ${{ runner.temp }}/top-hat-pose-slot-candidate-admission.capabilities.json
         run: |
           node scripts/write-project-art-top-hat-pose-slot-production.mjs \
             --output "$PLAN_PATH" > "$PLAN_RECEIPT_PATH"
@@ -110,20 +127,26 @@ jobs:
           node --input-type=module -e '
             import { writeFileSync } from "node:fs";
             import { projectArtTopHatPoseSlotProviderRuntimeAdapterCapabilities } from "./scripts/project-art/top-hat-pose-slot-provider-runtime-adapter.mjs";
+            import { projectArtTopHatPoseSlotCandidateAdmissionCapabilities } from "./scripts/project-art/top-hat-pose-slot-candidate-admission.mjs";
             writeFileSync(
               process.env.ADAPTER_CAPABILITIES_PATH,
               `${JSON.stringify(projectArtTopHatPoseSlotProviderRuntimeAdapterCapabilities(), null, 2)}\n`,
+              { encoding: "utf8", mode: 0o600 },
+            );
+            writeFileSync(
+              process.env.ADMISSION_CAPABILITIES_PATH,
+              `${JSON.stringify(projectArtTopHatPoseSlotCandidateAdmissionCapabilities(), null, 2)}\n`,
               { encoding: "utf8", mode: 0o600 },
             );
           '
           node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) JSON.parse(fs.readFileSync(file,"utf8"));' \
             "$PLAN_PATH" "$PLAN_RECEIPT_PATH" \
             "$PROVIDER_PATH" "$PROVIDER_RECEIPT_PATH" \
-            "$ADAPTER_CAPABILITIES_PATH"
+            "$ADAPTER_CAPABILITIES_PATH" "$ADMISSION_CAPABILITIES_PATH"
           sha256sum \
             "$PLAN_PATH" "$PLAN_RECEIPT_PATH" \
             "$PROVIDER_PATH" "$PROVIDER_RECEIPT_PATH" \
-            "$ADAPTER_CAPABILITIES_PATH"
+            "$ADAPTER_CAPABILITIES_PATH" "$ADMISSION_CAPABILITIES_PATH"
       - name: Upload bounded production evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -134,5 +157,6 @@ jobs:
             ${{ runner.temp }}/top-hat-pose-slot-provider-package.json
             ${{ runner.temp }}/top-hat-pose-slot-provider-package.receipt.json
             ${{ runner.temp }}/top-hat-pose-slot-provider-runtime-adapter.capabilities.json
+            ${{ runner.temp }}/top-hat-pose-slot-candidate-admission.capabilities.json
           if-no-files-found: error
           retention-days: 14
