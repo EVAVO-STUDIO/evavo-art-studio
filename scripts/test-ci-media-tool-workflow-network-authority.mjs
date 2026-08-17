@@ -40,7 +40,10 @@ const NETWORK_PRIMITIVES = [
   },
   { kind: "ephemeral-pnpm-dlx", pattern: /(?:^|\s)pnpm\s+dlx(?:\s|$)/u },
   { kind: "ephemeral-yarn-dlx", pattern: /(?:^|\s)yarn\s+dlx(?:\s|$)/u },
-  { kind: "ephemeral-python-run", pattern: /(?:^|\s)(?:pipx\s+run|uvx)(?:\s|$)/u },
+  {
+    kind: "ephemeral-python-run",
+    pattern: /(?:^|\s)(?:pipx\s+run|uvx)(?:\s|$)/u,
+  },
   { kind: "git-clone", pattern: /(?:^|\s)git\s+clone(?:\s|$)/u },
   { kind: "docker-pull", pattern: /(?:^|\s)docker\s+pull(?:\s|$)/u },
   { kind: "go-install", pattern: /(?:^|\s)go\s+install(?:\s|$)/u },
@@ -51,10 +54,105 @@ const NETWORK_PRIMITIVES = [
   },
 ];
 
-// Discovery begins fail-closed. Each admitted surface must later be bound to
-// an exact workflow, exact step name and exact primitive kind with its own
-// transport, digest and execution contract.
-const APPROVED_SURFACES = new Set([]);
+const FINALIZER_SURFACE =
+  ".github/workflows/finalize-pixel-typography-review.yml#Materialize exact reviewed source overlay::python-urllib";
+const GODOT_SURFACE =
+  ".github/workflows/pixel-font-studio-v2.yml#Download and verify official Godot 4.6.2::curl";
+const RECONCILIATION_SURFACE =
+  ".github/workflows/repair-pixel-typography-review.yml#Reconcile exact reviewed native-review source::python-urllib";
+
+const APPROVED_SURFACE_CONTRACTS = new Map([
+  [
+    FINALIZER_SURFACE,
+    {
+      workflowRequired: [
+        "on:\n  workflow_dispatch:",
+        "expected_sha:",
+        "FINALIZE_PIXEL_TYPOGRAPHY_REVIEW",
+        "permissions:\n  contents: write",
+        "ref: ${{ inputs.expected_sha }}",
+        "persist-credentials: true",
+      ],
+      stepRequired: [
+        'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
+        '"Authorization": f"Bearer {token}"',
+        '"X-GitHub-Api-Version": "2022-11-28"',
+        "urllib.request.urlopen(request, timeout=60)",
+        'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
+        "path.write_bytes(data)",
+        'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
+        "if observed != blob:",
+      ],
+      orderedStepEvidence: [
+        'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
+        "urllib.request.urlopen(request, timeout=60)",
+        'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
+        "path.write_bytes(data)",
+        'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
+        "if observed != blob:",
+      ],
+    },
+  ],
+  [
+    GODOT_SURFACE,
+    {
+      workflowRequired: [
+        'GODOT_VERSION: "4.6.2"',
+        'GODOT_ARCHIVE_SHA256: "30e6b6d141f0cd5bebd629ad1d0ef1324e60091bb20662d026b402ba58c59937"',
+        "permissions:\n  contents: read",
+      ],
+      stepRequired: [
+        "curl --fail --location --proto '=https' --tlsv1.2",
+        "--retry 3 --retry-all-errors --connect-timeout 20 --max-time 180",
+        '"https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"',
+        'echo "${GODOT_ARCHIVE_SHA256}  ${archive}" | sha256sum --check --strict',
+        'unzip -q "$archive" -d "$RUNNER_TEMP/godot"',
+        'chmod +x "$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"',
+        '"$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" --version',
+      ],
+      orderedStepEvidence: [
+        "curl --fail --location --proto '=https' --tlsv1.2",
+        'echo "${GODOT_ARCHIVE_SHA256}  ${archive}" | sha256sum --check --strict',
+        'unzip -q "$archive" -d "$RUNNER_TEMP/godot"',
+        'chmod +x "$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"',
+        '"$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" --version',
+      ],
+    },
+  ],
+  [
+    RECONCILIATION_SURFACE,
+    {
+      workflowRequired: [
+        "on:\n  workflow_dispatch:",
+        "expected_sha:",
+        "RECONCILE_PIXEL_TYPOGRAPHY_REVIEW",
+        "permissions:\n  contents: write",
+        "ref: ${{ inputs.expected_sha }}",
+        "persist-credentials: true",
+      ],
+      stepRequired: [
+        'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
+        '"Authorization": f"Bearer {token}"',
+        '"X-GitHub-Api-Version": "2022-11-28"',
+        "urllib.request.urlopen(request, timeout=60)",
+        'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
+        "path.write_bytes(data)",
+        'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
+        "if observed != blob:",
+      ],
+      orderedStepEvidence: [
+        'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
+        "urllib.request.urlopen(request, timeout=60)",
+        'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
+        "path.write_bytes(data)",
+        'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
+        "if observed != blob:",
+      ],
+    },
+  ],
+]);
+
+const APPROVED_SURFACES = new Set(APPROVED_SURFACE_CONTRACTS.keys());
 
 async function workflowSources() {
   const entries = await readdir(WORKFLOW_ROOT, { withFileTypes: true });
@@ -106,16 +204,33 @@ function stepName(step) {
 }
 
 function runSource(step) {
-  if (!/^\s+run:\s*/mu.test(step.source) && !/^\s*-\s+run:\s*/mu.test(step.source)) {
+  if (
+    !/^\s+run:\s*/mu.test(step.source) &&
+    !/^\s*-\s+run:\s*/mu.test(step.source)
+  ) {
     return null;
   }
   return step.source;
 }
 
+function executableSource(step) {
+  const source = runSource(step);
+  if (source === null) return null;
+  return source
+    .split(/\r?\n/u)
+    .filter((rawLine) => {
+      const line = rawLine.trim();
+      if (/^!?\s*grep\b/u.test(line)) return false;
+      if (/^#/u.test(line)) return false;
+      return true;
+    })
+    .join("\n");
+}
+
 function networkSurfaces(workflow) {
   const surfaces = [];
   for (const step of workflowSteps(workflow.source)) {
-    const source = runSource(step);
+    const source = executableSource(step);
     if (source === null) continue;
     for (const primitive of NETWORK_PRIMITIVES) {
       if (!primitive.pattern.test(source)) continue;
@@ -126,10 +241,34 @@ function networkSurfaces(workflow) {
         step: name,
         startLine: step.startLine,
         kind: primitive.kind,
+        stepSource: step.source,
       });
     }
   }
   return surfaces;
+}
+
+function assertRequired(source, required, label, violations) {
+  for (const evidence of required) {
+    if (!source.includes(evidence)) {
+      violations.push(`${label}: missing evidence ${evidence}`);
+    }
+  }
+}
+
+function assertOrdered(source, evidence, label, violations) {
+  let previous = -1;
+  for (const item of evidence) {
+    const index = source.indexOf(item);
+    if (index < 0) {
+      violations.push(`${label}: missing ordered evidence ${item}`);
+      continue;
+    }
+    if (index <= previous) {
+      violations.push(`${label}: evidence is out of order ${item}`);
+    }
+    previous = index;
+  }
 }
 
 test("workflow network and ephemeral execution surfaces are exact-reviewed", async () => {
@@ -141,9 +280,7 @@ test("workflow network and ephemeral execution surfaces are exact-reviewed", asy
 
   for (const surface of observed) {
     if (!APPROVED_SURFACES.has(surface.key)) {
-      violations.push(
-        `${surface.key} (starts line ${surface.startLine})`,
-      );
+      violations.push(`${surface.key} (starts line ${surface.startLine})`);
     }
   }
   for (const approved of [...APPROVED_SURFACES].sort()) {
@@ -156,5 +293,59 @@ test("workflow network and ephemeral execution surfaces are exact-reviewed", asy
     violations,
     [],
     `Workflow network or ephemeral execution authority is unreviewed:\n${violations.join("\n")}`,
+  );
+});
+
+test("approved workflow network surfaces retain exact transport and digest contracts", async () => {
+  const workflows = await workflowSources();
+  const workflowMap = new Map(workflows.map((workflow) => [workflow.path, workflow]));
+  const surfaces = workflows.flatMap(networkSurfaces);
+  const surfaceMap = new Map(surfaces.map((surface) => [surface.key, surface]));
+  const violations = [];
+
+  for (const [key, contract] of APPROVED_SURFACE_CONTRACTS) {
+    const surface = surfaceMap.get(key);
+    if (surface === undefined) {
+      violations.push(`${key}: approved surface is missing`);
+      continue;
+    }
+    const workflow = workflowMap.get(surface.path);
+    assert.ok(workflow, surface.path);
+    assertRequired(workflow.source, contract.workflowRequired, key, violations);
+    assertRequired(surface.stepSource, contract.stepRequired, key, violations);
+    assertOrdered(
+      surface.stepSource,
+      contract.orderedStepEvidence,
+      key,
+      violations,
+    );
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `Approved network contracts drifted:\n${violations.join("\n")}`,
+  );
+});
+
+test("ephemeral remote package execution is forbidden", async () => {
+  const forbiddenKinds = new Set([
+    "ephemeral-npm-exec",
+    "ephemeral-pnpm-dlx",
+    "ephemeral-yarn-dlx",
+    "ephemeral-python-run",
+    "go-install",
+    "cargo-install",
+    "dotnet-tool-install",
+  ]);
+  const violations = (await workflowSources())
+    .flatMap(networkSurfaces)
+    .filter((surface) => forbiddenKinds.has(surface.kind))
+    .map((surface) => surface.key)
+    .sort();
+  assert.deepEqual(
+    violations,
+    [],
+    `Ephemeral remote execution is forbidden:\n${violations.join("\n")}`,
   );
 });
