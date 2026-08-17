@@ -11,7 +11,7 @@ The source work order remains the authority for the family identity:
 - exact frame count: `10`
 - current production fallback: ordinals `4`, `5`, and `6`
 - pending mastered ordinals: `1`, `2`, `3`, `7`, `8`, `9`, and `10`
-- minimum dense Runtime release: `0.37.0`
+- minimum dense release: Runtime `0.37.0`
 
 ## What the compiler accepts
 
