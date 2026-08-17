@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/book-studio-production-handoff.yml"
+      - "packages/contracts/package.json"
       - "packages/contracts/src/book-production.ts"
       - "packages/contracts/src/book-production-profile.ts"
       - "packages/contracts/src/book-production-docs-release.ts"
@@ -17,6 +18,7 @@ on:
       - "packages/contracts/src/book-production-promotion-adapter.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-production*.test.mjs"
+      - "pnpm-lock.yaml"
       - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
       - "docs/book-studio-production-handoff.md"
       - "docs/book-art-immutable-promotion-receipts.md"
@@ -26,6 +28,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/book-studio-production-handoff.yml"
+      - "packages/contracts/package.json"
       - "packages/contracts/src/book-production.ts"
       - "packages/contracts/src/book-production-profile.ts"
       - "packages/contracts/src/book-production-docs-release.ts"
@@ -38,6 +41,7 @@ on:
       - "packages/contracts/src/book-production-promotion-adapter.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-production*.test.mjs"
+      - "pnpm-lock.yaml"
       - "docs/BOOK_STUDIO_AND_ART_MIGRATION_AUTHORITY.v2.json"
       - "docs/book-studio-production-handoff.md"
       - "docs/book-art-immutable-promotion-receipts.md"
@@ -62,20 +66,32 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.13.1
+
       - name: Use governed Node.js runtime
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22.14.0
+          node-version: "22.14.0"
           package-manager-cache: false
+
+      - name: Install exact frozen contract compiler
+        run: pnpm install --frozen-lockfile --filter @evavo/art-contracts...
+
       - name: Verify migration authority
         run: node scripts/check-book-studio-production-handoff.mjs
+
       - name: Verify Book Illustration parity boundary
         run: node scripts/check-book-illustration-plan-parity.mjs
+
       - name: Compile dependency-light Book Art contracts
         run: |
           rm -rf packages/contracts/dist
           mkdir -p packages/contracts/dist
-          npm exec --yes --package=typescript@5.9.3 -- tsc \
+          pnpm --filter @evavo/art-contracts exec tsc \
             --target ES2022 \
             --lib ES2022,DOM,DOM.Iterable \
             --module NodeNext \
@@ -105,5 +121,15 @@ jobs:
             'export * from "./book-production-legacy-state-batch-safe.js";' \
             'export * from "./book-production-promotion-adapter.js";' \
             > packages/contracts/dist/index.js
+
       - name: Run Book Art contract, production-profile, Docs-release, illustration-parity, legacy-state, batch and immutable-promotion attacks
         run: node --test packages/contracts/test/book-production*.test.mjs
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf packages/contracts/dist
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
