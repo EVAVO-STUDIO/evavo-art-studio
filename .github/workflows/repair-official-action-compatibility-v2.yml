@@ -72,6 +72,43 @@ jobs:
             --manifest "${REPAIR_MANIFEST}" \
             > "${RUNNER_TEMP}/official-action-compatibility-repair.stdout.json"
 
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const target = "scripts/check-repository-toolchain.mjs";
+          let source = readFileSync(target, "utf8");
+          const replacements = [
+            {
+              from: 'actions/checkout@${CHECKOUT_SHA} # v6.0.2',
+              to: 'actions/checkout@${CHECKOUT_SHA} # v7.0.1',
+              expected: 2,
+            },
+            {
+              from: 'actions/setup-python@${SETUP_PYTHON_SHA} # v6.2.0',
+              to: 'actions/setup-python@${SETUP_PYTHON_SHA} # v7.0.0',
+              expected: 1,
+            },
+            {
+              from: 'pnpm/action-setup@${PNPM_SETUP_SHA} # v4.4.0',
+              to: 'pnpm/action-setup@${PNPM_SETUP_SHA} # v6.0.10',
+              expected: 2,
+            },
+            {
+              from: 'actions/setup-node@${SETUP_NODE_SHA} # v6.2.0',
+              to: 'actions/setup-node@${SETUP_NODE_SHA} # v7.0.0',
+              expected: 2,
+            },
+          ];
+          for (const replacement of replacements) {
+            const count = source.split(replacement.from).length - 1;
+            assert.equal(count, replacement.expected, replacement.from);
+            source = source.split(replacement.from).join(replacement.to);
+            assert.equal(source.includes(replacement.from), false, replacement.from);
+          }
+          writeFileSync(target, source, "utf8");
+          NODE
+
           rm -f \
             .github/workflows/repair-official-action-compatibility-v2.yml \
             scripts/repair-official-action-compatibility.mjs
