@@ -124,32 +124,125 @@ function continueOnErrorFinding(workflow, step, line, source) {
   return finding(workflow, step, "continue-on-error", line, source);
 }
 
+function stripShellQuotedContentAndComment(source) {
+  let output = "";
+  let quote = null;
+  let escaped = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+
+    if (quote !== null) {
+      if (quote === '"' && escaped) {
+        escaped = false;
+        output += " ";
+        continue;
+      }
+      if (quote === '"' && character === "\\") {
+        escaped = true;
+        output += " ";
+        continue;
+      }
+      if (character === quote) quote = null;
+      output += " ";
+      continue;
+    }
+
+    if (character === "'" || character === '"') {
+      quote = character;
+      output += " ";
+      continue;
+    }
+
+    if (
+      character === "#" &&
+      (index === 0 || /\s/u.test(source[index - 1] ?? ""))
+    ) {
+      output += " ".repeat(source.length - index);
+      break;
+    }
+
+    output += character;
+  }
+
+  return output;
+}
+
+function maskShellTests(source) {
+  return source
+    .replace(/\[\[[\s\S]*?\]\]/gu, (value) => " ".repeat(value.length))
+    .replace(/\(\([\s\S]*?\)\)/gu, (value) => " ".repeat(value.length));
+}
+
+function shellStructure(source) {
+  return maskShellTests(stripShellQuotedContentAndComment(source));
+}
+
+function heredocStart(source) {
+  const match = source.match(
+    /<<(-)?\s*(?:'([^']+)'|"([^"]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/u,
+  );
+  if (!match) return null;
+  return {
+    delimiter: match[2] ?? match[3] ?? match[4],
+    stripTabs: Boolean(match[1]),
+  };
+}
+
+function heredocDelimiterMatches(source, heredoc) {
+  const withoutYamlIndentation = source.trim();
+  if (withoutYamlIndentation === heredoc.delimiter) return true;
+  if (!heredoc.stripTabs) return false;
+  return source.replace(/^\t+/u, "").trim() === heredoc.delimiter;
+}
+
+function failClosedLogicalOrRhs(source) {
+  return (
+    /\b(?:exit|return)\s+(?:[1-9][0-9]*|-[0-9]+)\b/u.test(source) ||
+    /\bexit\s+\/b\s+[1-9][0-9]*\b/iu.test(source) ||
+    /(?:^|[;{]\s*)false(?:\s*(?:[;}])|$)/u.test(source) ||
+    /\bthrow\b/u.test(source)
+  );
+}
+
+function everyLogicalOrFailsClosed(source) {
+  const rhsSegments = source.split("||").slice(1);
+  return (
+    rhsSegments.length > 0 &&
+    rhsSegments.every((segment) => failClosedLogicalOrRhs(segment))
+  );
+}
+
 function shellSuppressionKinds(source) {
   const kinds = [];
+  const structural = shellStructure(source);
 
-  if (/(?:^|[;&])\s*set\s+\+e(?:\s|$)/u.test(source)) {
+  if (/(?:^|[;&])\s*set\s+\+e(?:\s|$)/u.test(structural)) {
     kinds.push("shell-errexit-disabled");
   }
-  if (/(?:^|[;&])\s*set\s+\+o\s+errexit(?:\s|$)/u.test(source)) {
+  if (/(?:^|[;&])\s*set\s+\+o\s+errexit(?:\s|$)/u.test(structural)) {
     kinds.push("shell-errexit-disabled");
   }
-  if (/(?:^|[;&])\s*set\s+\+o\s+pipefail(?:\s|$)/u.test(source)) {
+  if (/(?:^|[;&])\s*set\s+\+o\s+pipefail(?:\s|$)/u.test(structural)) {
     kinds.push("shell-pipefail-disabled");
   }
 
-  if (/\|\|\s*exit\s+\/b\s+0(?:\s|$)/iu.test(source)) {
+  if (/\|\|\s*exit\s+\/b\s+0(?:\s|$)/iu.test(structural)) {
     kinds.push("cmd-success-fallback");
   } else if (
-    /\|\|\s*(?:true|:|(?:exit|return)\s+0)(?:\s|$)/u.test(source)
+    /\|\|\s*(?:true|:|(?:exit|return)\s+0)(?:\s|$)/u.test(structural)
   ) {
     kinds.push("shell-success-fallback");
-  } else if (/\|\|/u.test(source)) {
+  } else if (
+    /\|\|/u.test(structural) &&
+    !everyLogicalOrFailsClosed(structural)
+  ) {
     kinds.push("shell-logical-or");
   }
 
   if (
-    !/\|\|/u.test(source) &&
-    /(?:^|[;&])\s*(?:true|:)\s*(?:#.*)?$/u.test(source)
+    !/\|\|/u.test(structural) &&
+    /(?:^|[;&])\s*(?:true|:)\s*$/u.test(structural)
   ) {
     kinds.push("shell-success-tail");
   }
@@ -170,6 +263,34 @@ function shellSuppressionKinds(source) {
   }
 
   return [...new Set(kinds)];
+}
+
+function runSuppressionFindings(workflow, step, run) {
+  const findings = [];
+  const lines = run.source.split(/\r?\n/u);
+  let heredoc = null;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawSource = lines[index];
+    const source = rawSource.trim();
+
+    if (heredoc !== null) {
+      if (heredocDelimiterMatches(rawSource, heredoc)) heredoc = null;
+      continue;
+    }
+
+    if (source.length === 0 || source.startsWith("#")) continue;
+
+    const startedHeredoc = heredocStart(rawSource);
+    for (const kind of shellSuppressionKinds(source)) {
+      findings.push(
+        finding(workflow, step, kind, run.startLine + index, source),
+      );
+    }
+    if (startedHeredoc !== null) heredoc = startedHeredoc;
+  }
+
+  return findings;
 }
 
 function failureSuppressionSurfaces(workflow) {
@@ -194,16 +315,7 @@ function failureSuppressionSurfaces(workflow) {
     }
 
     for (const run of runFields(step)) {
-      const lines = run.source.split(/\r?\n/u);
-      for (let index = 0; index < lines.length; index += 1) {
-        const source = lines[index].trim();
-        if (source.length === 0 || source.startsWith("#")) continue;
-        for (const kind of shellSuppressionKinds(source)) {
-          findings.push(
-            finding(workflow, name, kind, run.startLine + index, source),
-          );
-        }
-      }
+      findings.push(...runSuppressionFindings(workflow, name, run));
     }
   }
 
@@ -288,6 +400,17 @@ test("failure-suppression primitives remain visible to the inventory", () => {
       "      - name: Cmd success fallback",
       "        shell: cmd",
       "        run: cmd.exe /c exit /b 1 || exit /b 0",
+      "      - name: Fail-closed guard",
+      "        run: '[[ \"$VALUE\" == ok ]] || { echo bad >&2; exit 1; }'",
+      "      - name: Shell test logical or",
+      "        run: 'if [[ \"$LEFT\" == yes || \"$RIGHT\" == yes ]]; then printf ok; fi'",
+      "      - name: Quoted embedded JavaScript",
+      "        run: node -e 'const value = left || right'",
+      "      - name: Heredoc embedded JavaScript",
+      "        run: |",
+      "          node - <<'NODE'",
+      "          const value = left || right;",
+      "          NODE",
       "",
     ].join("\n"),
   };
