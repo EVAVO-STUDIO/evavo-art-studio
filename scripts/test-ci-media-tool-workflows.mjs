@@ -15,6 +15,11 @@ const FORBIDDEN_PATTERNS = [
   /sudo\s+apt-get\s+update/,
   /apt-get\s+install[^\n]*\bffmpeg\b/,
 ];
+const FLOATING_HOSTED_RUNNER = /\b(?:ubuntu|windows|macos)-latest\b/gu;
+const IMMUTABLE_EXTERNAL_ACTION =
+  /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$/u;
+const IMMUTABLE_DOCKER_ACTION =
+  /^docker:\/\/[^@\s]+@sha256:[0-9a-f]{64}$/u;
 
 async function workflowSources() {
   const entries = await readdir(WORKFLOW_ROOT, { withFileTypes: true });
@@ -34,6 +39,48 @@ async function workflowSources() {
   );
 }
 
+function actionReferences(source) {
+  const references = [];
+  for (const line of source.split(/\r?\n/u)) {
+    const match = line.match(/^\s*(?:-\s*)?uses:\s*(.+)$/u);
+    if (!match) continue;
+    const raw = match[1].trim();
+    const commentIndex = raw.search(/\s+#/u);
+    let reference = (commentIndex >= 0 ? raw.slice(0, commentIndex) : raw).trim();
+    if (
+      reference.length >= 2 &&
+      ((reference.startsWith('"') && reference.endsWith('"')) ||
+        (reference.startsWith("'") && reference.endsWith("'")))
+    ) {
+      reference = reference.slice(1, -1);
+    }
+    references.push(reference);
+  }
+  return references;
+}
+
+function workflowSteps(source) {
+  const lines = source.split(/\r?\n/u);
+  const steps = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const start = lines[index].match(/^(\s*)-\s+(?:name|id|uses):/u);
+    if (!start) continue;
+    const indentation = start[1].length;
+    let end = index + 1;
+    while (end < lines.length) {
+      const line = lines[end];
+      const nextStep = line.match(/^(\s*)-\s+(?:name|id|uses):/u);
+      if (nextStep && nextStep[1].length === indentation) break;
+      const leading = line.match(/^(\s*)/u)?.[1].length ?? 0;
+      if (line.trim().length > 0 && leading < indentation) break;
+      end += 1;
+    }
+    steps.push(lines.slice(index, end).join("\n"));
+    index = end - 1;
+  }
+  return steps;
+}
+
 test("workflows never perform unbounded apt or direct FFmpeg installation", async () => {
   const violations = [];
   for (const workflow of await workflowSources()) {
@@ -47,6 +94,56 @@ test("workflows never perform unbounded apt or direct FFmpeg installation", asyn
     violations,
     [],
     `Unbounded workflow media installation remains:\n${violations.join("\n")}`,
+  );
+});
+
+test("workflow runner and action identities are immutable", async () => {
+  const violations = [];
+  for (const workflow of await workflowSources()) {
+    const floatingRunners = [...workflow.source.matchAll(FLOATING_HOSTED_RUNNER)].map(
+      (match) => match[0],
+    );
+    for (const runner of floatingRunners) {
+      violations.push(`${workflow.path}: floating runner ${runner}`);
+    }
+    for (const reference of actionReferences(workflow.source)) {
+      if (reference.startsWith("./")) continue;
+      if (
+        IMMUTABLE_EXTERNAL_ACTION.test(reference) ||
+        IMMUTABLE_DOCKER_ACTION.test(reference)
+      ) {
+        continue;
+      }
+      violations.push(`${workflow.path}: mutable action ${reference}`);
+    }
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    `Workflow identities must be immutable:\n${violations.join("\n")}`,
+  );
+});
+
+test("checkout steps never persist repository credentials", async () => {
+  const violations = [];
+  for (const workflow of await workflowSources()) {
+    for (const step of workflowSteps(workflow.source)) {
+      if (
+        !actionReferences(step).some((reference) =>
+          reference.startsWith("actions/checkout@"),
+        )
+      ) {
+        continue;
+      }
+      if (!/^\s*persist-credentials:\s*["']?false["']?\s*(?:#.*)?$/mu.test(step)) {
+        violations.push(workflow.path);
+      }
+    }
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    `Checkout steps persisting credentials:\n${violations.join("\n")}`,
   );
 });
 
