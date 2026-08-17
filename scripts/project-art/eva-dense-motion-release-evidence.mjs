@@ -11,13 +11,13 @@ import {
 } from './eva-dense-motion-work-order.mjs';
 
 export const EVA_DENSE_MOTION_RELEASE_EVIDENCE_REQUEST_SCHEMA =
-  'evavo.project-art-eva-dense-motion-release-evidence-request.v1';
+  'evavo.project-art-eva-dense-motion-release-evidence-request.v2';
 export const EVA_DENSE_MOTION_RELEASE_EVIDENCE_SCHEMA =
-  'evavo.project-art-eva-dense-motion-release-evidence.v1';
+  'evavo.project-art-eva-dense-motion-release-evidence.v2';
 export const EVA_DENSE_MOTION_RELEASE_EVIDENCE_STATUS_SCHEMA =
-  'evavo.project-art-eva-dense-motion-release-evidence-status.v1';
+  'evavo.project-art-eva-dense-motion-release-evidence-status.v2';
 export const EVA_DENSE_MOTION_RELEASE_EVIDENCE_CAPABILITIES_SCHEMA =
-  'evavo.project-art-eva-dense-motion-release-evidence-capabilities.v1';
+  'evavo.project-art-eva-dense-motion-release-evidence-capabilities.v2';
 
 const SHA1 = /^[a-f0-9]{40}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -261,36 +261,26 @@ function parseAsset(value, sourceFrame, label) {
     fail('EVA_DENSE_MOTION_RELEASE_EVIDENCE_ASSET_INVALID', label);
   }
   digest(value.sha256, `${label}.sha256`);
-  const expectedPublicId = sourceFrame.currentMaster
-    ? sourceFrame.currentMaster.publicId
-    : expectedEvaDenseMotionMasterPublicId(sourceFrame.ordinal);
+  const expectedPublicId = expectedEvaDenseMotionMasterPublicId(
+    sourceFrame.ordinal,
+  );
   if (
     value.publicId !== expectedPublicId ||
     value.secureUrl !== expectedSecureUrl(value)
   ) {
     fail('EVA_DENSE_MOTION_RELEASE_EVIDENCE_ASSET_IDENTITY_INVALID', label);
   }
-  if (sourceFrame.currentMaster) {
-    for (const key of [
-      'provider',
-      'cloudName',
-      'assetId',
-      'publicId',
-      'version',
-      'bytes',
-      'width',
-      'height',
-      'format',
-      'etag',
-      'secureUrl',
-    ]) {
-      if (value[key] !== sourceFrame.currentMaster[key]) {
-        fail(
-          'EVA_DENSE_MOTION_RELEASE_EVIDENCE_ACTIVE_MASTER_DRIFT',
-          `${label}.${key}`,
-        );
-      }
-    }
+  if (
+    sourceFrame.currentMaster &&
+    (value.assetId === sourceFrame.currentMaster.assetId ||
+      value.publicId === sourceFrame.currentMaster.publicId ||
+      value.version === sourceFrame.currentMaster.version ||
+      value.secureUrl === sourceFrame.currentMaster.secureUrl)
+  ) {
+    fail(
+      'EVA_DENSE_MOTION_RELEASE_EVIDENCE_FALLBACK_REUSE_INVALID',
+      label,
+    );
   }
   return value;
 }
@@ -527,6 +517,8 @@ export function compileEvaDenseMotionReleaseEvidence(input) {
     gates: {
       allTenFrameEvidenceComplete: true,
       allTenFinalHashesUnique: true,
+      allTenDenseMasterIdentitiesRequired: true,
+      activeFallbackAssetsCannotSatisfyDenseSlots: true,
       allTenAssetsImmutable: true,
       allTenAlphaProfilesPassed: true,
       allTenNamedReviewsPassed: true,
@@ -668,6 +660,8 @@ export function evaDenseMotionReleaseEvidenceCapabilities() {
     exactWorkOrderFingerprintRequired: true,
     exactTenFrameSetRequired: true,
     exactSourceBlobIdentityRequired: true,
+    allTenDenseMasterIdentitiesRequired: true,
+    activeFallbackAssetsCannotSatisfyDenseSlots: true,
     immutableVersionedCloudinaryAssetsRequired: true,
     activeThreeFrameProvenanceRetained: true,
     uniqueFinalFrameHashesRequired: true,
