@@ -1,0 +1,125 @@
+name: Project Art Top Hat Pose Bank Release Approval
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/project-art/top-hat-pose-bank-release-plan*.mjs"
+      - "scripts/project-art/top-hat-pose-bank-release-approval*.mjs"
+      - "scripts/write-project-art-top-hat-pose-bank-release-plan.mjs"
+      - "scripts/write-project-art-top-hat-pose-bank-release-approval.mjs"
+      - "scripts/test-project-art-top-hat-pose-bank-release-plan*.mjs"
+      - "scripts/test-project-art-top-hat-pose-bank-release-approval*.mjs"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_PLAN.md"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_APPROVAL.md"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-plan.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-approval.yml"
+  pull_request:
+    paths:
+      - "scripts/project-art/top-hat-pose-bank-release-plan*.mjs"
+      - "scripts/project-art/top-hat-pose-bank-release-approval*.mjs"
+      - "scripts/write-project-art-top-hat-pose-bank-release-plan.mjs"
+      - "scripts/write-project-art-top-hat-pose-bank-release-approval.mjs"
+      - "scripts/test-project-art-top-hat-pose-bank-release-plan*.mjs"
+      - "scripts/test-project-art-top-hat-pose-bank-release-approval*.mjs"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_PLAN.md"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_APPROVAL.md"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-plan.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-approval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-art-top-hat-pose-bank-release-approval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Named-human six-slot release-approval contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Use supported Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Verify syntax and exact approval contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          node --check scripts/project-art/top-hat-pose-bank-release-plan-foundation.mjs
+          node --check scripts/project-art/top-hat-pose-bank-release-plan-fixture.mjs
+          node --check scripts/project-art/top-hat-pose-bank-release-plan.mjs
+          node --check scripts/project-art/top-hat-pose-bank-release-approval-foundation.mjs
+          node --check scripts/project-art/top-hat-pose-bank-release-approval-fixture.mjs
+          node --check scripts/project-art/top-hat-pose-bank-release-approval.mjs
+          node --check scripts/write-project-art-top-hat-pose-bank-release-plan.mjs
+          node --check scripts/write-project-art-top-hat-pose-bank-release-approval.mjs
+          node --check scripts/test-project-art-top-hat-pose-bank-release-plan.mjs
+          node --check scripts/test-project-art-top-hat-pose-bank-release-plan-writer.mjs
+          node --check scripts/test-project-art-top-hat-pose-bank-release-approval.mjs
+          node --check scripts/test-project-art-top-hat-pose-bank-release-approval-writer.mjs
+          node --test scripts/test-project-art-top-hat-pose-bank-release-plan.mjs
+          node --test scripts/test-project-art-top-hat-pose-bank-release-plan-writer.mjs
+          node --test scripts/test-project-art-top-hat-pose-bank-release-approval.mjs
+          node --test scripts/test-project-art-top-hat-pose-bank-release-approval-writer.mjs
+
+      - name: Verify closed execution authority disclosure
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF_NODE'
+          import {
+            projectArtTopHatPoseBankReleaseApprovalCapabilities,
+          } from './scripts/project-art/top-hat-pose-bank-release-approval.mjs';
+
+          const capabilities =
+            projectArtTopHatPoseBankReleaseApprovalCapabilities();
+          const closed = [
+            'providerExecution',
+            'runtimeEnqueue',
+            'imageMutation',
+            'creativeDecision',
+            'candidateApproval',
+            'candidatePromotion',
+            'poseSlotFilling',
+            'poseBankReleaseApproval',
+            'poseBankRelease',
+            'runtimePublication',
+            'sequenceRelease',
+            'repositoryMutation',
+            'gitCommit',
+            'gitPush',
+            'deployment',
+            'publication',
+            'runtimeActivation',
+            'websiteInstallation',
+            'forcePush',
+          ];
+          if (closed.some((key) => capabilities[key] !== false)) {
+            throw new Error('TOP_HAT_POSE_BANK_RELEASE_APPROVAL_AUTHORITY_WIDENED');
+          }
+          if (
+            capabilities.requiredPoseSlots !== 6 ||
+            capabilities.separateNamedHumanDecisionRequired !== true ||
+            capabilities.externalHumanDecisionCannotBeFabricated !== true ||
+            capabilities.runtimePublicationEligibleOutput !== true ||
+            capabilities.runtimePublicationTransactionStillRequired !== true ||
+            capabilities.websiteInstallationReviewStillRequired !== true
+          ) {
+            throw new Error('TOP_HAT_POSE_BANK_RELEASE_APPROVAL_CAPABILITIES_INVALID');
+          }
+          process.stdout.write(`${JSON.stringify(capabilities, null, 2)}\n`);
+          EOF_NODE
