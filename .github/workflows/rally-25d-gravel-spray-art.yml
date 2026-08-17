@@ -12,16 +12,17 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 22.14.0
+          node-version: "22.14.0"
+          package-manager-cache: false
       - name: Test deterministic gravel-spray jobs
         shell: bash
         run: |
@@ -53,7 +54,7 @@ jobs:
           set -euo pipefail
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: gravel-spray-art-${{ github.sha }}
