@@ -45,7 +45,7 @@ test("a classic VGA adventure project compiles rooms, actors, interface and curs
   assert.equal(project.gameType, "point-and-click-adventure");
   assert.equal(project.era, "dos-vga-1990s");
   assert.deepEqual(project.metadata.nativeCanvas, { width: 320, height: 200 });
-  assert.equal(project.metadata.testLabCommit, "0b07c4834e798776c86687791e6e54ea6816ce98");
+  assert.equal(project.metadata.testLabCommit, "85cf19244454b1a98c94765fd0806827f661579d");
 
   assert.deepEqual(room.assetContract.nativeDimensions, { width: 320, height: 160 });
   assert.equal(room.assetContract.alpha, "opaque");
