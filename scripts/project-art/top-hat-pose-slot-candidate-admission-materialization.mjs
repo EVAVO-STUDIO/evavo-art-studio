@@ -105,6 +105,25 @@ function falseApprovals(value, label) {
   }
 }
 
+function materializationSourceMismatches(receipt, source) {
+  if (!isRecord(receipt.source)) return Object.freeze(['source']);
+  const expected = Object.freeze({
+    runtimeDispatchSha256: source.dispatch.runtimeDispatchSha256,
+    runtimeBindingSha256: source.binding.runtimeBindingSha256,
+    runtimeOutcomeSha256: source.outcome.runtimeOutcomeSha256,
+    providerRequestId: source.providerRequestId,
+    providerRequestSha256: source.providerRequestSha256,
+    compiledPromptSha256: source.compiledPromptSha256,
+    candidateArtifactId: source.candidateArtifactId,
+    evidenceArtifactId: source.evidenceArtifactId,
+  });
+  return Object.freeze(
+    Object.entries(expected)
+      .filter(([key, value]) => receipt.source[key] !== value)
+      .map(([key]) => key),
+  );
+}
+
 export function parseMaterialization(input, source) {
   const receipt = verifyCandidateSelfHash(
     input,
@@ -125,20 +144,11 @@ export function parseMaterialization(input, source) {
     'TOP_HAT_POSE_CANDIDATE_ADMISSION_MATERIALIZATION_INVALID',
   );
   timestamp(receipt.materializedAt, 'candidate materialization receipt.materializedAt');
+  const sourceMismatches = materializationSourceMismatches(receipt, source);
   assert(
-    isRecord(receipt.source) &&
-      receipt.source.runtimeDispatchSha256 ===
-        source.dispatch.runtimeDispatchSha256 &&
-      receipt.source.runtimeBindingSha256 ===
-        source.binding.runtimeBindingSha256 &&
-      receipt.source.runtimeOutcomeSha256 ===
-        source.outcome.runtimeOutcomeSha256 &&
-      receipt.source.providerRequestId === source.providerRequestId &&
-      receipt.source.providerRequestSha256 === source.providerRequestSha256 &&
-      receipt.source.compiledPromptSha256 === source.compiledPromptSha256 &&
-      receipt.source.candidateArtifactId === source.candidateArtifactId &&
-      receipt.source.evidenceArtifactId === source.evidenceArtifactId,
+    sourceMismatches.length === 0,
     'TOP_HAT_POSE_CANDIDATE_ADMISSION_MATERIALIZATION_SOURCE_MISMATCH',
+    `Candidate materialization source fields differ: ${sourceMismatches.join(', ')}.`,
   );
   assert(
     isRecord(receipt.output) &&
