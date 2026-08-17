@@ -143,7 +143,7 @@ includes('releaseDocs', [
   'final reviewed frame SHA-256',
   'immutable Cloudinary asset identity',
   '10→1',
-  'Runtime `0.37.0`',
+  'minimum dense Runtime release: `0.37.0`',
   'runtimeActivationAllowed: false',
   'create-only',
 ]);
