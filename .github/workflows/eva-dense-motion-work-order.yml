@@ -12,12 +12,16 @@ on:
       - "scripts/compile-project-art-eva-dense-motion-work-order.mjs"
       - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
       - "scripts/test-project-art-eva-dense-motion-work-order.mjs"
+      - "scripts/project-art/eva-dense-motion-release-evidence.mjs"
+      - "scripts/compile-project-art-eva-dense-motion-release-evidence.mjs"
+      - "scripts/test-project-art-eva-dense-motion-release-evidence.mjs"
       - "scripts/project-art/avatar-final-pass-provider-candidate-png.mjs"
       - "scripts/project-art/avatar-final-pass-provider-frame-finisher.mjs"
       - "scripts/project-art/avatar-sequence-common.mjs"
       - "scripts/compile-project-art-avatar-sequence.mjs"
       - "scripts/compile-project-art-loop-closure.mjs"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_WORK_ORDER.md"
+      - "docs/PROJECT_ART_EVA_DENSE_MOTION_RELEASE_EVIDENCE.md"
   pull_request:
     paths:
       - ".github/workflows/eva-dense-motion-work-order.yml"
@@ -27,12 +31,16 @@ on:
       - "scripts/compile-project-art-eva-dense-motion-work-order.mjs"
       - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
       - "scripts/test-project-art-eva-dense-motion-work-order.mjs"
+      - "scripts/project-art/eva-dense-motion-release-evidence.mjs"
+      - "scripts/compile-project-art-eva-dense-motion-release-evidence.mjs"
+      - "scripts/test-project-art-eva-dense-motion-release-evidence.mjs"
       - "scripts/project-art/avatar-final-pass-provider-candidate-png.mjs"
       - "scripts/project-art/avatar-final-pass-provider-frame-finisher.mjs"
       - "scripts/project-art/avatar-sequence-common.mjs"
       - "scripts/compile-project-art-avatar-sequence.mjs"
       - "scripts/compile-project-art-loop-closure.mjs"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_WORK_ORDER.md"
+      - "docs/PROJECT_ART_EVA_DENSE_MOTION_RELEASE_EVIDENCE.md"
   workflow_dispatch:
 
 permissions:
@@ -58,7 +66,7 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Verify EVA dense-motion work-order boundary
+      - name: Verify EVA dense-motion work-order and release-evidence boundaries
         run: node scripts/check-project-art-eva-dense-motion-work-order.mjs
 
       - name: Verify validation leaves the repository clean

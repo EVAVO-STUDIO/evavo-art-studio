@@ -13,6 +13,14 @@ const files = Object.freeze({
   cli: 'scripts/compile-project-art-eva-dense-motion-work-order.mjs',
   tests: 'scripts/test-project-art-eva-dense-motion-work-order.mjs',
   docs: 'docs/PROJECT_ART_EVA_DENSE_MOTION_WORK_ORDER.md',
+  releaseEvidence:
+    'scripts/project-art/eva-dense-motion-release-evidence.mjs',
+  releaseCli:
+    'scripts/compile-project-art-eva-dense-motion-release-evidence.mjs',
+  releaseTests:
+    'scripts/test-project-art-eva-dense-motion-release-evidence.mjs',
+  releaseDocs:
+    'docs/PROJECT_ART_EVA_DENSE_MOTION_RELEASE_EVIDENCE.md',
   pngInspection:
     'scripts/project-art/avatar-final-pass-provider-candidate-png.mjs',
   frameFinisher:
@@ -98,6 +106,47 @@ includes('docs', [
   'Runtime `0.37.0`',
   'create-only',
 ]);
+includes('releaseEvidence', [
+  'evavo.project-art-eva-dense-motion-release-evidence-request.v1',
+  'evavo.project-art-eva-dense-motion-release-evidence.v1',
+  'exactTenFrameSetRequired: true',
+  'immutableVersionedCloudinaryAssetsRequired: true',
+  'activeThreeFrameProvenanceRetained: true',
+  'allTenContinuityEdgesRequired: true',
+  'finalToFirstLoopClosureRequired: true',
+  'runtimeReceiptAssemblyReady: true',
+  'activeThreeFrameRigMustRemain: true',
+  'EVA_DENSE_MOTION_RELEASE_EVIDENCE_CONTENT_DRIFT',
+]);
+includes('releaseCli', [
+  '--request',
+  '--output',
+  'MAXIMUM_REQUEST_BYTES',
+  'Request path cannot contain symbolic path components.',
+  "openSync(absolute, 'wx', 0o600)",
+  'providerExecution: false',
+  'cloudinaryUpload: false',
+  'publicationAllowed: false',
+  'deploymentAllowed: false',
+  'runtimeActivationAllowed: false',
+]);
+includes('releaseTests', [
+  'exact ten-frame release-evidence package',
+  'deterministic destinations for pending frames',
+  'duplicate and mutable frame evidence',
+  'continuity, runtime and authority drift',
+  'rehashed semantic drift',
+  'permission-restricted create-only evidence package',
+]);
+includes('releaseDocs', [
+  '# Project Art EVA dense-motion release evidence',
+  'final reviewed frame SHA-256',
+  'immutable Cloudinary asset identity',
+  '10→1',
+  'Runtime `0.37.0`',
+  'runtimeActivationAllowed: false',
+  'create-only',
+]);
 
 for (const forbidden of [
   'providerExecution: true',
@@ -115,9 +164,26 @@ for (const forbidden of [
     `dense work order contains ${forbidden}`,
   );
   assert.ok(!source.cli.includes(forbidden), `dense CLI contains ${forbidden}`);
+  assert.ok(
+    !source.releaseEvidence.includes(forbidden),
+    `dense release evidence contains ${forbidden}`,
+  );
+  assert.ok(
+    !source.releaseCli.includes(forbidden),
+    `dense release CLI contains ${forbidden}`,
+  );
 }
 
-for (const relative of [files.data, files.common, files.workOrder, files.cli, files.tests]) {
+for (const relative of [
+  files.data,
+  files.common,
+  files.workOrder,
+  files.cli,
+  files.tests,
+  files.releaseEvidence,
+  files.releaseCli,
+  files.releaseTests,
+]) {
   const syntax = spawnSync(process.execPath, ['--check', path.join(root, relative)], {
     cwd: root,
     encoding: 'utf8',
@@ -131,18 +197,23 @@ for (const relative of [files.data, files.common, files.workOrder, files.cli, fi
 
 const focused = spawnSync(
   process.execPath,
-  ['--test', path.join(root, files.tests)],
+  [
+    '--test',
+    path.join(root, files.tests),
+    path.join(root, files.releaseTests),
+  ],
   { cwd: root, encoding: 'utf8' },
 );
 assert.equal(
   focused.status,
   0,
-  `EVA dense-motion work-order tests failed\n${focused.stdout}\n${focused.stderr}`,
+  `EVA dense-motion tests failed\n${focused.stdout}\n${focused.stderr}`,
 );
 
 console.log('Project Art EVA dense-motion work-order guard passed.');
 console.log('- exact ten-frame Runtime source identity is pinned to current governance');
 console.log('- only ordinals 1, 2, 3, 7, 8, 9 and 10 become mastering jobs');
 console.log('- the active 4, 5 and 6 provenance remains the production fallback');
-console.log('- alpha, identity, continuity, loop and immutable upload gates fail closed');
-console.log('- publication and Runtime 0.37.0 activation remain separately authorized');
+console.log('- release evidence binds ten final hashes and ten continuity edges');
+console.log('- alpha, identity, immutable delivery and named reviews fail closed');
+console.log('- Runtime receipt assembly is supported without publication or activation');
