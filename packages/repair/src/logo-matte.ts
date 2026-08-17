@@ -158,7 +158,7 @@ export function removeFlatMatteFromRgba(
       transparentPixelCount,
       semiTransparentPixelCount,
       opaquePixelCount,
-      visibleBounds,
+      ...(visibleBounds ? { visibleBounds } : {}),
     },
   };
 }
