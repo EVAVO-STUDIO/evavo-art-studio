@@ -14,8 +14,8 @@ const workflowPath = path.join(
 );
 const workflow = readFileSync(workflowPath, 'utf8');
 
-const CHECKOUT_SHA = 'de0fac2e4500dabe0009e67214ff5f5447ce83dd';
-const SETUP_NODE_SHA = '6044e13b5dc448c55e2357c09f80417699197238';
+const CHECKOUT_SHA = '3d3c42e5aac5ba805825da76410c181273ba90b1';
+const SETUP_NODE_SHA = '820762786026740c76f36085b0efc47a31fe5020';
 const EXPECTED_USES = Object.freeze([
   `actions/checkout@${CHECKOUT_SHA}`,
   `actions/setup-node@${SETUP_NODE_SHA}`,
