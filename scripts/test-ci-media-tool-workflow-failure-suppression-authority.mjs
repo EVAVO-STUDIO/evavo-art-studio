@@ -68,6 +68,29 @@ function stepName(step) {
   return `unnamed-line-${step.startLine}`;
 }
 
+function unwrapYamlInlineRun(source) {
+  const trimmed = source.trim();
+  if (
+    trimmed.length >= 2 &&
+    trimmed.startsWith("'") &&
+    trimmed.endsWith("'")
+  ) {
+    return trimmed.slice(1, -1).replaceAll("''", "'");
+  }
+  if (
+    trimmed.length >= 2 &&
+    trimmed.startsWith('"') &&
+    trimmed.endsWith('"')
+  ) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  return source;
+}
+
 function runFields(step) {
   const lines = step.source.split(/\r?\n/u);
   const fields = [];
@@ -83,7 +106,7 @@ function runFields(step) {
     if (!blockIndicator) {
       fields.push({
         startLine: step.startLine + index,
-        source: inline,
+        source: unwrapYamlInlineRun(inline),
       });
       continue;
     }
@@ -387,6 +410,10 @@ test("failure-suppression primitives remain visible to the inventory", () => {
       "        run: set +o pipefail",
       "      - name: Success fallback",
       "        run: command-that-fails || true",
+      "      - name: Single-quoted success fallback",
+      "        run: 'command-that-fails || true'",
+      "      - name: Double-quoted success fallback",
+      "        run: \"command-that-fails || true\"",
       "      - name: Generic fallback",
       "        run: command-that-fails || echo recovered",
       "      - name: Success tail",
@@ -422,11 +449,13 @@ test("failure-suppression primitives remain visible to the inventory", () => {
   assert.deepEqual(observed, [
     "Cmd success fallback::cmd-success-fallback",
     "Continue on error::continue-on-error",
+    "Double-quoted success fallback::shell-success-fallback",
     "Errexit off::shell-errexit-disabled",
     "Generic fallback::shell-logical-or",
     "Pipefail off::shell-pipefail-disabled",
     "PowerShell preference::powershell-error-action-preference",
     "PowerShell switch::powershell-error-action",
+    "Single-quoted success fallback::shell-success-fallback",
     "Success fallback::shell-success-fallback",
     "Success tail::shell-success-tail",
   ]);
