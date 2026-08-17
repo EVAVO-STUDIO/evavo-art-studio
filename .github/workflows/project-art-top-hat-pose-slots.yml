@@ -9,6 +9,13 @@ on:
       - "scripts/project-art/top-hat-pose-slot-provider-foundation.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-validation.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-job.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-adapter.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-references.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-request.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-job.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-dispatch.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-fixture.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
@@ -16,8 +23,13 @@ on:
       - "scripts/test-project-art-top-hat-pose-slot-provider-package.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-provider-package.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-provider-package-writer.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-runtime-adapter.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-runtime-cli.mjs"
+      - "scripts/top-hat-pose-slot-provider-runtime-cli.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-cli-files.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_PACKAGE.md"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_RUNTIME_ADAPTER.md"
       - ".github/workflows/project-art-top-hat-pose-slots.yml"
   pull_request:
     paths:
@@ -26,6 +38,13 @@ on:
       - "scripts/project-art/top-hat-pose-slot-provider-foundation.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-validation.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-job.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-adapter.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-references.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-request.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-job.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-dispatch.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-fixture.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-production.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-production.mjs"
@@ -33,8 +52,13 @@ on:
       - "scripts/test-project-art-top-hat-pose-slot-provider-package.mjs"
       - "scripts/write-project-art-top-hat-pose-slot-provider-package.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-provider-package-writer.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-runtime-adapter.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-runtime-cli.mjs"
+      - "scripts/top-hat-pose-slot-provider-runtime-cli.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-cli-files.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PRODUCTION.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_PACKAGE.md"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_RUNTIME_ADAPTER.md"
       - ".github/workflows/project-art-top-hat-pose-slots.yml"
   workflow_dispatch:
 
@@ -62,30 +86,44 @@ jobs:
         with:
           node-version: "22.14.0"
           package-manager-cache: false
-      - name: Verify pose-slot production and provider contracts
+      - name: Verify pose-slot production, provider and guarded runtime contracts
         run: |
           node --version
           node --test scripts/test-project-art-top-hat-pose-slot-production.mjs
           node --test scripts/test-project-art-top-hat-pose-slot-writer.mjs
           node --test scripts/test-project-art-top-hat-pose-slot-provider-package.mjs
           node --test scripts/test-project-art-top-hat-pose-slot-provider-package-writer.mjs
-      - name: Compile create-only production and provider evidence
+          node --test scripts/test-project-art-top-hat-pose-slot-provider-runtime-adapter.mjs
+          node --test scripts/test-project-art-top-hat-pose-slot-provider-runtime-cli.mjs
+      - name: Compile create-only production, provider and passive adapter evidence
         env:
           PLAN_PATH: ${{ runner.temp }}/top-hat-pose-slot-production.json
           PLAN_RECEIPT_PATH: ${{ runner.temp }}/top-hat-pose-slot-production.receipt.json
           PROVIDER_PATH: ${{ runner.temp }}/top-hat-pose-slot-provider-package.json
           PROVIDER_RECEIPT_PATH: ${{ runner.temp }}/top-hat-pose-slot-provider-package.receipt.json
+          ADAPTER_CAPABILITIES_PATH: ${{ runner.temp }}/top-hat-pose-slot-provider-runtime-adapter.capabilities.json
         run: |
           node scripts/write-project-art-top-hat-pose-slot-production.mjs \
             --output "$PLAN_PATH" > "$PLAN_RECEIPT_PATH"
           node scripts/write-project-art-top-hat-pose-slot-provider-package.mjs \
             --output "$PROVIDER_PATH" > "$PROVIDER_RECEIPT_PATH"
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            import { projectArtTopHatPoseSlotProviderRuntimeAdapterCapabilities } from "./scripts/project-art/top-hat-pose-slot-provider-runtime-adapter.mjs";
+            writeFileSync(
+              process.env.ADAPTER_CAPABILITIES_PATH,
+              `${JSON.stringify(projectArtTopHatPoseSlotProviderRuntimeAdapterCapabilities(), null, 2)}\n`,
+              { encoding: "utf8", mode: 0o600 },
+            );
+          '
           node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) JSON.parse(fs.readFileSync(file,"utf8"));' \
             "$PLAN_PATH" "$PLAN_RECEIPT_PATH" \
-            "$PROVIDER_PATH" "$PROVIDER_RECEIPT_PATH"
+            "$PROVIDER_PATH" "$PROVIDER_RECEIPT_PATH" \
+            "$ADAPTER_CAPABILITIES_PATH"
           sha256sum \
             "$PLAN_PATH" "$PLAN_RECEIPT_PATH" \
-            "$PROVIDER_PATH" "$PROVIDER_RECEIPT_PATH"
+            "$PROVIDER_PATH" "$PROVIDER_RECEIPT_PATH" \
+            "$ADAPTER_CAPABILITIES_PATH"
       - name: Upload bounded production evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -95,5 +133,6 @@ jobs:
             ${{ runner.temp }}/top-hat-pose-slot-production.receipt.json
             ${{ runner.temp }}/top-hat-pose-slot-provider-package.json
             ${{ runner.temp }}/top-hat-pose-slot-provider-package.receipt.json
+            ${{ runner.temp }}/top-hat-pose-slot-provider-runtime-adapter.capabilities.json
           if-no-files-found: error
           retention-days: 14
