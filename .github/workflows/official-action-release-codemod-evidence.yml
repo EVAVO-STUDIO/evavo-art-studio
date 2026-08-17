@@ -1,0 +1,89 @@
+name: Official action release codemod evidence
+
+on:
+  push:
+    branches:
+      - fix/current-official-action-releases-20260817
+    paths:
+      - ".github/workflows/official-action-release-codemod-evidence.yml"
+      - "scripts/apply-current-official-action-releases.mjs"
+      - "scripts/test-ci-media-tool-official-action-releases.mjs"
+      - "scripts/test-ci-media-tool-workflows.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-action-release-codemod-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Materialize and validate review-only rewrite
+        shell: bash
+        run: |
+          set -euo pipefail
+          EVIDENCE_ROOT="${RUNNER_TEMP}/official-action-release-codemod"
+          mkdir -p "${EVIDENCE_ROOT}"
+
+          node scripts/apply-current-official-action-releases.mjs \
+            --manifest "${EVIDENCE_ROOT}/manifest.json" \
+            > "${EVIDENCE_ROOT}/manifest.stdout.json"
+          node --test scripts/test-ci-media-tool-*.mjs
+          git diff --check
+
+          mapfile -t CHANGED_FILES < <(
+            git diff --name-only -- \
+              .github/workflows \
+              scripts/test-ci-media-tool-workflows.mjs \
+              | LC_ALL=C sort
+          )
+          test "${#CHANGED_FILES[@]}" -gt 0
+          printf '%s\n' "${CHANGED_FILES[@]}" \
+            > "${EVIDENCE_ROOT}/changed-files.txt"
+          tar -czf "${EVIDENCE_ROOT}/rewritten-files.tar.gz" \
+            "${CHANGED_FILES[@]}"
+          git diff -- \
+            .github/workflows \
+            scripts/test-ci-media-tool-workflows.mjs \
+            > "${EVIDENCE_ROOT}/official-action-releases.patch"
+          (
+            cd "${EVIDENCE_ROOT}"
+            sha256sum \
+              manifest.json \
+              manifest.stdout.json \
+              changed-files.txt \
+              rewritten-files.tar.gz \
+              official-action-releases.patch \
+              > SHA256SUMS
+          )
+
+          git checkout -- \
+            .github/workflows \
+            scripts/test-ci-media-tool-workflows.mjs
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Upload bounded rewrite evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: official-action-release-codemod-${{ github.sha }}
+          path: ${{ runner.temp }}/official-action-release-codemod
+          if-no-files-found: error
+          retention-days: 7
