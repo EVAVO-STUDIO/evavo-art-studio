@@ -22,16 +22,20 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: "22.14.0"
+          package-manager-cache: false
       - run: node --check scripts/game-art-production/asset-fabricator-material-handoff.mjs
       - run: node --test tests/asset-fabricator-material-handoff.test.mjs
       - run: node -e "JSON.parse(require('fs').readFileSync('contracts/asset-fabricator-material-handoff-v1.json','utf8'))"

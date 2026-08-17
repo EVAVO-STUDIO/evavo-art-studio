@@ -8,6 +8,7 @@ on:
       - "scripts/game-art-production/asset-fabricator-reference-common.mjs"
       - "scripts/game-art-production/asset-fabricator-reference-policy.mjs"
       - "scripts/game-art-production/asset-fabricator-reference-handoff.test.mjs"
+      - "scripts/game-art-production/asset-fabricator-reference-workflow.test.mjs"
       - "contracts/asset-fabricator-reference-handoff-v1.json"
       - "docs/ASSET_FABRICATOR_REFERENCE_HANDOFF.md"
       - ".github/workflows/asset-fabricator-reference-handoff.yml"
@@ -17,6 +18,7 @@ on:
       - "scripts/game-art-production/asset-fabricator-reference-common.mjs"
       - "scripts/game-art-production/asset-fabricator-reference-policy.mjs"
       - "scripts/game-art-production/asset-fabricator-reference-handoff.test.mjs"
+      - "scripts/game-art-production/asset-fabricator-reference-workflow.test.mjs"
       - "contracts/asset-fabricator-reference-handoff-v1.json"
       - "docs/ASSET_FABRICATOR_REFERENCE_HANDOFF.md"
       - ".github/workflows/asset-fabricator-reference-handoff.yml"
@@ -31,19 +33,24 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out exact revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - name: Use governed Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
         with:
-          node-version: "22"
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Verify immutable workflow authority
+        run: node --test scripts/game-art-production/asset-fabricator-reference-workflow.test.mjs
 
       - name: Check source syntax
         run: node --check scripts/game-art-production/asset-fabricator-reference-handoff.mjs
