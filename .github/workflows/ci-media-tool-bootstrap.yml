@@ -6,8 +6,7 @@ on:
       - ".github/workflows/*.yml"
       - ".github/workflows/*.yaml"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - "scripts/test-ci-media-tool-bootstrap.mjs"
-      - "scripts/test-ci-media-tool-workflows.mjs"
+      - "scripts/test-ci-media-tool-*.mjs"
       - "package.json"
   push:
     branches:
@@ -16,8 +15,7 @@ on:
       - ".github/workflows/*.yml"
       - ".github/workflows/*.yaml"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - "scripts/test-ci-media-tool-bootstrap.mjs"
-      - "scripts/test-ci-media-tool-workflows.mjs"
+      - "scripts/test-ci-media-tool-*.mjs"
       - "package.json"
 
 permissions:
