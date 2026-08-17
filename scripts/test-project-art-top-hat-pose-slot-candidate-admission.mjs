@@ -21,6 +21,11 @@ import {
   sha256FrameFinisherDocument,
 } from './project-art/avatar-final-pass-provider-frame-finisher.mjs';
 
+function errorCode(pattern) {
+  return (error) =>
+    typeof error?.code === 'string' && pattern.test(error.code);
+}
+
 function rehashFrame(value, field) {
   const body = { ...value };
   delete body[field];
@@ -83,7 +88,7 @@ test('rejects slot, adapter, dispatch and source-chain substitution', () => {
         ...fixture,
         slotId: 'unplanned-pose',
       }),
-    /TOP_HAT_POSE_CANDIDATE_ADMISSION_SLOT_UNKNOWN/u,
+    errorCode(/TOP_HAT_POSE_CANDIDATE_ADMISSION_SLOT_UNKNOWN/u),
   );
 
   const adapterTamper = structuredClone(fixture.adapter);
@@ -98,7 +103,9 @@ test('rejects slot, adapter, dispatch and source-chain substitution', () => {
         ...fixture,
         adapter: adapterTamper,
       }),
-    /TOP_HAT_PROVIDER_RUNTIME_ADAPTER_MISMATCH|TOP_HAT_POSE_CANDIDATE/u,
+    errorCode(
+      /TOP_HAT_PROVIDER_RUNTIME_ADAPTER_MISMATCH|TOP_HAT_POSE_CANDIDATE/u,
+    ),
   );
 
   const dispatchTamper = structuredClone(fixture.dispatch);
@@ -113,7 +120,9 @@ test('rejects slot, adapter, dispatch and source-chain substitution', () => {
         ...fixture,
         dispatch: dispatchTamper,
       }),
-    /TOP_HAT_POSE_CANDIDATE_ADMISSION_DISPATCH_MISMATCH|AVATAR_PROVIDER/u,
+    errorCode(
+      /TOP_HAT_POSE_CANDIDATE_ADMISSION_DISPATCH_MISMATCH|AVATAR_PROVIDER/u,
+    ),
   );
 
   const materializationTamper = structuredClone(
@@ -131,7 +140,9 @@ test('rejects slot, adapter, dispatch and source-chain substitution', () => {
         ...fixture,
         materializationReceipt: materializationTamper,
       }),
-    /TOP_HAT_POSE_CANDIDATE_ADMISSION_MATERIALIZATION_SOURCE_MISMATCH/u,
+    errorCode(
+      /TOP_HAT_POSE_CANDIDATE_ADMISSION_MATERIALIZATION_SOURCE_MISMATCH/u,
+    ),
   );
 });
 
@@ -147,7 +158,7 @@ test('requires an approving named-human review with every gate passed', () => {
         ...fixture,
         frameReviewDecision: nonHuman,
       }),
-    /TOP_HAT_POSE_CANDIDATE_ADMISSION_HUMAN_REVIEW_REQUIRED/u,
+    errorCode(/TOP_HAT_POSE_CANDIDATE_ADMISSION_HUMAN_REVIEW_REQUIRED/u),
   );
 
   const failedGate = structuredClone(fixture.frameReviewDecision);
@@ -159,7 +170,7 @@ test('requires an approving named-human review with every gate passed', () => {
         ...fixture,
         frameReviewDecision: failedGate,
       }),
-    /TOP_HAT_POSE_CANDIDATE_ADMISSION_REVIEW_GATES_INVALID/u,
+    errorCode(/TOP_HAT_POSE_CANDIDATE_ADMISSION_REVIEW_GATES_INVALID/u),
   );
 
   const widened = structuredClone(fixture.frameReviewOutcome);
@@ -171,7 +182,7 @@ test('requires an approving named-human review with every gate passed', () => {
         ...fixture,
         frameReviewOutcome: widened,
       }),
-    /TOP_HAT_POSE_CANDIDATE_ADMISSION_REVIEW_AUTHORITY_INVALID/u,
+    errorCode(/TOP_HAT_POSE_CANDIDATE_ADMISSION_REVIEW_AUTHORITY_INVALID/u),
   );
 });
 
@@ -185,7 +196,9 @@ test('rejects changed, corrupt or mismatched final PNG bytes', () => {
         ...fixture,
         finishedFrameBytes: corrupt,
       }),
-    /AVATAR_PROVIDER_CANDIDATE_PNG|TOP_HAT_POSE_CANDIDATE_ADMISSION_FINAL_PNG_INVALID/u,
+    errorCode(
+      /AVATAR_PROVIDER_CANDIDATE_PNG|TOP_HAT_POSE_CANDIDATE_ADMISSION_FINAL_PNG_INVALID/u,
+    ),
   );
 
   const wrongHash = structuredClone(fixture.frameFinisherReport);
@@ -197,7 +210,7 @@ test('rejects changed, corrupt or mismatched final PNG bytes', () => {
         ...fixture,
         frameFinisherReport: wrongHash,
       }),
-    /TOP_HAT_POSE_CANDIDATE_ADMISSION/u,
+    errorCode(/TOP_HAT_POSE_CANDIDATE_ADMISSION/u),
   );
 });
 
@@ -216,7 +229,7 @@ test('rejects accessors, cycles and rehashed admission authority escalation', ()
         ...fixture,
         frameReviewOutcome: accessor,
       }),
-    /AVATAR_PROVIDER_RUNTIME_JSON_INVALID/u,
+    errorCode(/AVATAR_PROVIDER_RUNTIME_JSON_INVALID/u),
   );
 
   const admission = structuredClone(admit());
@@ -226,7 +239,7 @@ test('rejects accessors, cycles and rehashed admission authority escalation', ()
   admission.candidateAdmissionSha256 = sha256Document(body);
   assert.throws(
     () => parseProjectArtTopHatPoseSlotCandidateAdmission(admission),
-    /TOP_HAT_POSE_CANDIDATE_ADMISSION_AUTHORITY_INVALID/u,
+    errorCode(/TOP_HAT_POSE_CANDIDATE_ADMISSION_AUTHORITY_INVALID/u),
   );
 });
 
