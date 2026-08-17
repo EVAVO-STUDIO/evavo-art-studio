@@ -21,6 +21,43 @@ const SCANNER_PATH = "scripts/test-ci-media-tool-official-action-releases.mjs";
 const COMPATIBLE_PNPM_ACTION =
   "pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86";
 
+const GOVERNED_RELEASE_LABELS = [
+  {
+    reference:
+      "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+    label: "v7.0.1",
+  },
+  {
+    reference:
+      "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+    label: "v7.0.0",
+  },
+  {
+    reference:
+      "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+    label: "v7.0.0",
+  },
+  {
+    reference:
+      "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    label: "v7.0.1",
+  },
+  {
+    reference:
+      "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+    label: "v8.0.1",
+  },
+  {
+    reference:
+      "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    label: "v6.1.0",
+  },
+  {
+    reference: COMPATIBLE_PNPM_ACTION,
+    label: "v6.0.10",
+  },
+];
+
 const REPLACEMENTS = [
   {
     from: "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2",
@@ -100,6 +137,30 @@ function occurrenceCount(source, value) {
   return source.split(value).length - 1;
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function normalizeGovernedReleaseLabels(source) {
+  let normalized = source;
+  const counts = {};
+  for (const authority of GOVERNED_RELEASE_LABELS) {
+    const expected = `${authority.reference} # ${authority.label}`;
+    const pattern = new RegExp(
+      `${escapeRegExp(authority.reference)}\\s+#\\s+v\\d+\\.\\d+\\.\\d+`,
+      "gu",
+    );
+    let count = 0;
+    normalized = normalized.replace(pattern, (observed) => {
+      if (observed === expected) return observed;
+      count += 1;
+      return expected;
+    });
+    if (count > 0) counts[authority.reference] = count;
+  }
+  return { normalized, counts };
+}
+
 function updateScanner() {
   const before = readFileSync(SCANNER_PATH, "utf8");
   const oldApproved = `  [\n    "pnpm/setup",\n    "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",\n  ],`;
@@ -125,6 +186,9 @@ const trackedPaths = execFileSync("git", ["ls-files", "-z"])
   .sort();
 
 const totals = Object.fromEntries(REPLACEMENTS.map(({ from }) => [from, 0]));
+const releaseLabelTotals = Object.fromEntries(
+  GOVERNED_RELEASE_LABELS.map(({ reference }) => [reference, 0]),
+);
 const changed = [updateScanner()];
 
 for (const filePath of trackedPaths) {
@@ -151,9 +215,19 @@ for (const filePath of trackedPaths) {
     fileReplacements[replacement.from] = count;
   }
 
+  const labelNormalization = normalizeGovernedReleaseLabels(after);
+  after = labelNormalization.normalized;
+  for (const [reference, count] of Object.entries(labelNormalization.counts)) {
+    releaseLabelTotals[reference] += count;
+  }
+
   if (after === before) continue;
   writeFileSync(filePath, after, "utf8");
-  changed.push({ path: filePath, replacements: fileReplacements });
+  changed.push({
+    path: filePath,
+    replacements: fileReplacements,
+    releaseLabelReplacements: labelNormalization.counts,
+  });
 }
 
 const pnpmWorkflowChanges = changed.filter(
@@ -181,6 +255,18 @@ for (const filePath of trackedPaths) {
   for (const reference of forbidden) {
     if (source.includes(reference)) violations.push(`${filePath}: ${reference}`);
   }
+  for (const authority of GOVERNED_RELEASE_LABELS) {
+    const expected = `${authority.reference} # ${authority.label}`;
+    const pattern = new RegExp(
+      `${escapeRegExp(authority.reference)}\\s+#\\s+v\\d+\\.\\d+\\.\\d+`,
+      "gu",
+    );
+    for (const match of source.matchAll(pattern)) {
+      if (match[0] !== expected) {
+        violations.push(`${filePath}: stale release label ${match[0]}`);
+      }
+    }
+  }
 }
 assert.deepEqual(violations, []);
 
@@ -192,6 +278,7 @@ const manifest = {
   changedFilesBeforeTemporaryRemoval: changed.length,
   pnpmWorkflowChanges: pnpmWorkflowChanges.length,
   totals,
+  releaseLabelTotals,
   files: changed.sort((left, right) => left.path.localeCompare(right.path)),
 };
 
