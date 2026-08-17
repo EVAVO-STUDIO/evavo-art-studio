@@ -95,7 +95,7 @@ export function admitProjectArtTopHatPoseSlotCandidate({
         slot.reviewedTargetPath &&
       dispatch.candidateAdmission.expectedWidth === 1024 &&
       dispatch.candidateAdmission.expectedHeight === 1536,
-    'TOP_HAT_POSE_CANDIDATE_ADMISION_DISPATCH_SCOPE_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_DISPATCH_SCOPE_INVALID',
   );
   const topHatMetadata =
     dispatch.providerCompiler.input.metadata.topHatPoseSlot;
@@ -113,7 +113,7 @@ export function admitProjectArtTopHatPoseSlotCandidate({
       topHatMetadata.bodyCadenceIndependentOfVisemes === true &&
       topHatMetadata.registeredMouthLayerOwnsVisemes === true &&
       topHatMetadata.syntheticBodyInbetweeningAllowed === false,
-   'TOP_HAT_POSE_CANDIDATE_ADMISSION_METADATA_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_METADATA_INVALID',
   );
 
   const binding = parseAvatarFinalPassProviderRuntimeBinding(
@@ -158,7 +158,7 @@ export function admitProjectArtTopHatPoseSlotCandidate({
 
   assert(
     Date.parse(admittedAt) >= Date.parse(reviewOutcome.reviewedAt),
-   'TOP_HAT_POSE_CANDIDATE_ADMISSION_TIME_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_TIME_INVALID',
   );
   assert(
     frameReport.output.path === exactFinishedFramePath(source.candidateOutputPath),
@@ -259,4 +259,3 @@ export function admitProjectArtTopHatPoseSlotCandidate({
     candidateAdmissionSha256: sha256Document(body),
   });
 }
-
