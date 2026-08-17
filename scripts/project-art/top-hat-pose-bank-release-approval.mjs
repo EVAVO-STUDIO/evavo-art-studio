@@ -215,7 +215,6 @@ function parseSlots(value) {
     'candidateAdmissionSha256',
     'finalFramePath',
     'reviewedTargetPath',
-    'finalFrameSha256',
   ]) {
     const identities = slots.map((slot) => slot[key]);
     assert(
