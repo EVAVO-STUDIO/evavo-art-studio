@@ -100,17 +100,17 @@ jobs:
             --noUncheckedIndexedAccess \
             --exactOptionalPropertyTypes \
             --skipLibCheck \
-            --outDir packages/contracts/dist \
-            packages/contracts/src/book-production.ts \
-            packages/contracts/src/book-production-profile.ts \
-            packages/contracts/src/book-production-docs-release.ts \
-            packages/contracts/src/book-production-legacy-illustration-plan.ts \
-            packages/contracts/src/book-production-legacy-compat.ts \
-            packages/contracts/src/book-production-legacy-state-import.ts \
-            packages/contracts/src/book-production-legacy-state-import-safe.ts \
-            packages/contracts/src/book-production-legacy-state-batch.ts \
-            packages/contracts/src/book-production-legacy-state-batch-safe.ts \
-            packages/contracts/src/book-production-promotion-adapter.ts
+            --outDir dist \
+            src/book-production.ts \
+            src/book-production-profile.ts \
+            src/book-production-docs-release.ts \
+            src/book-production-legacy-illustration-plan.ts \
+            src/book-production-legacy-compat.ts \
+            src/book-production-legacy-state-import.ts \
+            src/book-production-legacy-state-import-safe.ts \
+            src/book-production-legacy-state-batch.ts \
+            src/book-production-legacy-state-batch-safe.ts \
+            src/book-production-promotion-adapter.ts
           printf '%s\n' \
             'export * from "./book-production.js";' \
             'export * from "./book-production-profile.js";' \
