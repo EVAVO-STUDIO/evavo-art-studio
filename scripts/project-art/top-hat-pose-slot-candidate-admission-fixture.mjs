@@ -473,7 +473,7 @@ export function createTopHatPoseSlotCandidateAdmissionFixture(
   const reviewDecisionBody = {
     schema: FRAME_REVIEW_DECISION_SCHEMA,
     protocolVersion: FRAME_FINISHER_PROTOCOL_VERSION,
-    reviewId: `top-hat-review:${slotId}`,
+    reviewId: `tophatreview${sha(slotId).slice(0, 32)}`,
     frameFinisherSha256: frameFinisherReport.frameFinisherSha256,
     reviewRequestSha256: frameReviewRequest.reviewRequestSha256,
     frameId: slotId,
