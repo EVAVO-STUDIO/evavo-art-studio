@@ -98,8 +98,15 @@ jobs:
           test -n "$TARGET_TOKEN"
           [[ "$EXPECTED_TARGET_HEAD" =~ ^[0-9a-f]{40}$ ]]
           test "$PUBLISH_MODE" = "branch" -o "$PUBLISH_MODE" = "direct-main"
-          target_slug="$TARGET_REPOSITORY"
-          echo "target_slug=${target_slug//\//-}" >> "$GITHUB_OUTPUT"
+          owner="${TARGET_REPOSITORY%%/*}"
+          repository_name="${TARGET_REPOSITORY#*/}"
+          test "$owner/$repository_name" = "$TARGET_REPOSITORY"
+          [[ "$owner" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]]
+          [[ "$repository_name" =~ ^[A-Za-z0-9._-]{1,100}$ ]]
+          test "$repository_name" != "."
+          test "$repository_name" != ".."
+          target_slug="$owner-$repository_name"
+          printf 'target_slug=%s\n' "$target_slug" >> "$GITHUB_OUTPUT"
 
       - name: Check out exact Art Studio automation source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
