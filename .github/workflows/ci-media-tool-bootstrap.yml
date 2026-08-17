@@ -6,6 +6,9 @@ on:
       - ".github/workflows/*.yml"
       - ".github/workflows/*.yaml"
       - "scripts/bootstrap-ci-media-tools.sh"
+      - "scripts/safe_archive_contract.py"
+      - "scripts/safe_extract_archive.py"
+      - "scripts/test_safe_extract_archive.py"
       - "scripts/test-ci-media-tool-*.mjs"
       - "package.json"
   push:
@@ -15,6 +18,9 @@ on:
       - ".github/workflows/*.yml"
       - ".github/workflows/*.yaml"
       - "scripts/bootstrap-ci-media-tools.sh"
+      - "scripts/safe_archive_contract.py"
+      - "scripts/safe_extract_archive.py"
+      - "scripts/test_safe_extract_archive.py"
       - "scripts/test-ci-media-tool-*.mjs"
       - "package.json"
 
@@ -72,6 +78,16 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
+      - name: Verify create-only archive extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B -m py_compile \
+            scripts/safe_archive_contract.py \
+            scripts/safe_extract_archive.py \
+            scripts/test_safe_extract_archive.py
+          python -B scripts/test_safe_extract_archive.py
+
       - name: Run bounded media bootstrap and workflow regressions
         run: node --test scripts/test-ci-media-tool-*.mjs
 
@@ -100,6 +116,8 @@ jobs:
           grep -F 'critical workflows permanently use the bounded bootstrap contract' scripts/test-ci-media-tool-bootstrap.mjs
           grep -F 'workflows never perform unbounded apt or direct FFmpeg installation' scripts/test-ci-media-tool-workflows.mjs
           grep -F 'media bootstrap fails after the configured bounded attempts' scripts/test-ci-media-tool-bootstrap.mjs
+          grep -F 'python -B scripts/safe_extract_archive.py' .github/workflows/pixel-font-studio-v2.yml
+          python -B scripts/test_safe_extract_archive.py
           node --test scripts/test-ci-media-tool-*.mjs
 
       - name: Run complete Art Studio validation
