@@ -13,6 +13,7 @@ import {
   FRAME_REVIEW_DECISION_SCHEMA,
   FRAME_REVIEW_OUTCOME_SCHEMA,
   FRAME_REVIEW_REQUEST_SCHEMA,
+  inspectAvatarProviderFramePng,
   sha256FrameFinisherDocument,
 } from './avatar-final-pass-provider-frame-finisher.mjs';
 import {
@@ -119,12 +120,24 @@ export function createTopHatPoseSlotCandidateAdmissionFixture(
     width: 1024,
     height: 1536,
   });
-  const png = inspectAvatarProviderCandidatePng(
+  const candidatePng = inspectAvatarProviderCandidatePng(
     finishedFrameBytes,
     1024,
     1536,
     { requireTransparentPixels: true },
   );
+  const frameInspection = inspectAvatarProviderFramePng(
+    finishedFrameBytes,
+    1024,
+    1536,
+  );
+  const { pixels: _pixels, ...png } = frameInspection;
+  if (
+    candidatePng.sha256 !== png.sha256 ||
+    candidatePng.byteLength !== png.byteLength
+  ) {
+    throw new Error('TOP_HAT_POSE_CANDIDATE_FIXTURE_PNG_EVIDENCE_MISMATCH');
+  }
   const paths = outputPaths(source.candidateOutputPath);
   const materializationId =
     `top-hat-materialization:${sha(`${slotId}:${outcome.runtimeOutcomeSha256}`).slice(0, 40)}`;
@@ -160,7 +173,7 @@ export function createTopHatPoseSlotCandidateAdmissionFixture(
       createOnly: true,
       unapproved: true,
     }),
-    png,
+    png: candidatePng,
     authorization: Object.freeze({
       action: 'materialize-unapproved-provider-candidate',
       actorClass: 'agent',
