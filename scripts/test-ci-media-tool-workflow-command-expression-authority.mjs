@@ -261,7 +261,10 @@ test("untrusted workflow expressions never interpolate directly into run command
   for (const finding of findings) {
     if (APPROVED_DIRECT_INTERPOLATIONS.has(finding.key)) continue;
     violations.push(
-      `${finding.path}#${finding.step}::${finding.kind} at line ${finding.line}: ${{ ${finding.expression} }}`,
+      `${finding.path}#${finding.step}::${finding.kind} at line ${finding.line}: ` +
+        "${{ " +
+        finding.expression +
+        " }}",
     );
   }
 
