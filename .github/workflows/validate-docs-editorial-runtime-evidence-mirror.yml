@@ -25,7 +25,7 @@ concurrency:
 jobs:
   exact-mirror:
     if: startsWith(github.head_ref, 'validation/docs-editorial-runtime-evidence-mirror-')
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 90
     steps:
       - name: Check out pull-request head
