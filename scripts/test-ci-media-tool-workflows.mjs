@@ -8,7 +8,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOW_ROOT = path.join(ROOT, ".github/workflows");
 const SHARED_BOOTSTRAP = "bash scripts/bootstrap-ci-media-tools.sh";
 const PINNED_PYTHON_ACTION =
-  "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405";
+  "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97";
 const PINNED_IMAGE_BACKEND =
   "python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt";
 const FORBIDDEN_PATTERNS = [
