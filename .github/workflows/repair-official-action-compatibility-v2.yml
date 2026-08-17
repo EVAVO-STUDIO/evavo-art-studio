@@ -1,0 +1,186 @@
+name: Repair official action compatibility v2
+
+on:
+  push:
+    branches:
+      - fix/current-official-action-releases-20260817
+    paths:
+      - ".github/workflows/repair-official-action-compatibility-v2.yml"
+      - "scripts/repair-official-action-compatibility.mjs"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-official-action-compatibility-v2
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact repair source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Verify exact bounded repair source
+        shell: bash
+        env:
+          PROMOTED_HEAD_SHA: 3da9c635decc02b3e5ebc244488fc2edd1e60bed
+          REVIEW_BASE_SHA: aeedc119a98a49f8f9500e3e3f47432969506105
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/fix/current-official-action-releases-20260817"
+          git merge-base --is-ancestor "${PROMOTED_HEAD_SHA}" HEAD
+          git merge-base --is-ancestor "${REVIEW_BASE_SHA}" HEAD
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+          mapfile -t OBSERVED < <(
+            git diff --name-only "${PROMOTED_HEAD_SHA}" HEAD -- | LC_ALL=C sort
+          )
+          EXPECTED=(
+            ".github/workflows/repair-official-action-compatibility-v2.yml"
+            "scripts/repair-official-action-compatibility.mjs"
+          )
+          diff -u \
+            <(printf '%s\n' "${EXPECTED[@]}" | LC_ALL=C sort) \
+            <(printf '%s\n' "${OBSERVED[@]}")
+          git diff --check "${PROMOTED_HEAD_SHA}" HEAD --
+
+      - name: Apply compatible action identities and coupled assertions
+        shell: bash
+        env:
+          REPAIR_MANIFEST: ${{ runner.temp }}/official-action-compatibility-repair.json
+        run: |
+          set -euo pipefail
+          node scripts/repair-official-action-compatibility.mjs \
+            --manifest "${REPAIR_MANIFEST}" \
+            > "${RUNNER_TEMP}/official-action-compatibility-repair.stdout.json"
+
+          rm -f \
+            .github/workflows/repair-official-action-compatibility-v2.yml \
+            scripts/repair-official-action-compatibility.mjs
+
+          MANIFEST_PATH="${REPAIR_MANIFEST}" node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { existsSync, readFileSync } from "node:fs";
+          const manifest = JSON.parse(readFileSync(process.env.MANIFEST_PATH, "utf8"));
+          assert.equal(
+            manifest.schema,
+            "evavo.ci-official-action-compatibility-repair.v1",
+          );
+          assert.equal(manifest.compatiblePnpmActionRelease, "v6.0.10");
+          assert.equal(manifest.pinnedPnpmVersion, "10.13.1");
+          assert.equal(manifest.pnpmWorkflowChanges, 36);
+          assert.ok(manifest.changedFilesBeforeTemporaryRemoval >= 37);
+          assert.equal(
+            existsSync(
+              ".github/workflows/repair-official-action-compatibility-v2.yml",
+            ),
+            false,
+          );
+          assert.equal(
+            existsSync("scripts/repair-official-action-compatibility.mjs"),
+            false,
+          );
+          NODE
+
+      - name: Validate repaired workflow contracts
+        shell: bash
+        env:
+          PROMOTED_HEAD_SHA: 3da9c635decc02b3e5ebc244488fc2edd1e60bed
+        run: |
+          set -euo pipefail
+          node --test scripts/test-ci-media-tool-*.mjs
+          node --test \
+            scripts/game-art-production/asset-fabricator-reference-workflow.test.mjs
+          node scripts/check-foundation-media-plan.mjs
+          node scripts/check-foundation-delivery-manifest.mjs
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+          git diff --check "${PROMOTED_HEAD_SHA}" --
+
+          mapfile -t FINAL_CHANGED < <(
+            git diff --name-only "${PROMOTED_HEAD_SHA}" -- | LC_ALL=C sort
+          )
+          test "${#FINAL_CHANGED[@]}" -ge 38
+          ! printf '%s\n' "${FINAL_CHANGED[@]}" \
+            | grep -Fqx '.github/workflows/repair-official-action-compatibility-v2.yml'
+          ! printf '%s\n' "${FINAL_CHANGED[@]}" \
+            | grep -Fqx 'scripts/repair-official-action-compatibility.mjs'
+          printf '%s\n' "${FINAL_CHANGED[@]}" \
+            > "${RUNNER_TEMP}/official-action-compatibility-final-files.txt"
+
+      - name: Commit exact compatibility repair
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git diff --cached --check
+
+          git commit \
+            -m "fix(ci): preserve pnpm 10 action compatibility" \
+            -m "Use signed pnpm/action-setup v6.0.10 because pnpm/setup requires pnpm 11+, retain governed pnpm 10.13.1, and update every coupled action-identity assertion to the reviewed current releases."
+
+          REPAIR_SHA="$(git rev-parse HEAD)"
+          echo "repair_sha=${REPAIR_SHA}" >> "${GITHUB_OUTPUT}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Upload objects and advance when authorized
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPAIR_SHA: ${{ steps.commit.outputs.repair_sha }}
+        run: |
+          set -euo pipefail
+          BRANCH="fix/current-official-action-releases-20260817"
+          REMOTE_BEFORE="$(
+            git ls-remote origin "refs/heads/${BRANCH}" | awk '{print $1}'
+          )"
+          test "${REMOTE_BEFORE}" = "${GITHUB_SHA}"
+
+          AUTHORIZATION="$(
+            printf 'x-access-token:%s' "${GITHUB_TOKEN}" | base64 -w0
+          )"
+          set +e
+          PUSH_OUTPUT="$(
+            git \
+              -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${AUTHORIZATION}" \
+              push origin "HEAD:refs/heads/${BRANCH}" 2>&1
+          )"
+          PUSH_STATUS=$?
+          set -e
+          printf '%s\n' "${PUSH_OUTPUT}"
+
+          if [ "${PUSH_STATUS}" -eq 0 ]; then
+            REMOTE_AFTER="$(
+              git ls-remote origin "refs/heads/${BRANCH}" | awk '{print $1}'
+            )"
+            test "${REMOTE_AFTER}" = "${REPAIR_SHA}"
+            echo "Branch advanced directly." >> "${GITHUB_STEP_SUMMARY}"
+          else
+            grep -F 'without `workflows` permission' <<< "${PUSH_OUTPUT}"
+            git cat-file -e "${REPAIR_SHA}^{commit}"
+            echo "Validated commit uploaded; connector ref promotion required." \
+              >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+          {
+            echo
+            echo "- Validated repair commit: \`${REPAIR_SHA}\`"
+            echo "- Compatible action: \`pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86\`"
+            echo "- Governed pnpm runtime: \`10.13.1\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
