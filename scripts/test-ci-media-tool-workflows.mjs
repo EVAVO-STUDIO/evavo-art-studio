@@ -20,6 +20,7 @@ const IMMUTABLE_EXTERNAL_ACTION =
   /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$/u;
 const IMMUTABLE_DOCKER_ACTION =
   /^docker:\/\/[^@\s]+@sha256:[0-9a-f]{64}$/u;
+const EXACT_PATCH_VERSION = /^\d+\.\d+\.\d+$/u;
 const DISABLED_CHECKOUT_CREDENTIALS =
   /\bpersist-credentials:\s*["']?false["']?(?=[ \t]*(?:[,}#]|$))/mu;
 const ENABLED_CHECKOUT_CREDENTIALS =
@@ -111,6 +112,15 @@ function workflowSteps(source) {
   return steps;
 }
 
+function scalarInput(step, key) {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const pattern = new RegExp(
+    `\\b${escapedKey}:\\s*["']?([^"'\\s,#}]+)["']?(?=[ \\t]*(?:[,}#]|$))`,
+    "mu",
+  );
+  return step.match(pattern)?.[1] ?? null;
+}
+
 test("workflows never perform unbounded apt or direct FFmpeg installation", async () => {
   const violations = [];
   for (const workflow of await workflowSources()) {
@@ -151,6 +161,36 @@ test("workflow runner and action identities are immutable", async () => {
     violations,
     [],
     `Workflow identities must be immutable:\n${violations.join("\n")}`,
+  );
+});
+
+test("Node and Python setup actions select exact patch releases", async () => {
+  const violations = [];
+  for (const workflow of await workflowSources()) {
+    for (const step of workflowSteps(workflow.source)) {
+      const references = actionReferences(step);
+      if (references.some((reference) => reference.startsWith("actions/setup-node@"))) {
+        const selector = scalarInput(step, "node-version");
+        if (!EXACT_PATCH_VERSION.test(selector ?? "")) {
+          violations.push(
+            `${workflow.path}: setup-node selector ${selector ?? "missing"}`,
+          );
+        }
+      }
+      if (references.some((reference) => reference.startsWith("actions/setup-python@"))) {
+        const selector = scalarInput(step, "python-version");
+        if (!EXACT_PATCH_VERSION.test(selector ?? "")) {
+          violations.push(
+            `${workflow.path}: setup-python selector ${selector ?? "missing"}`,
+          );
+        }
+      }
+    }
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    `Workflow runtime selectors must be exact patch releases:\n${violations.join("\n")}`,
   );
 });
 
