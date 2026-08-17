@@ -103,7 +103,7 @@ export function parseReviewRequest(input, source, report) {
   assert(
     Array.isArray(request.requiredGates) &&
       request.requiredGates.join('\0') === REVIEW_GATES.join('\0'),
-    'TOP_HAT_POSE_CANDIDATE_ADMISION_REVIEW_GATES_INVALID',
+    'TOP_HAT_POSE_CANDIDATE_ADMISSION_REVIEW_GATES_INVALID',
   );
   return request;
 }
@@ -150,7 +150,7 @@ export function parseReviewDecision(input, report, request) {
     'nativeScaleSha256',
     'contactSheetSha256',
     'identityReferenceSha256',
-   'adjacentFramesSha256',
+    'adjacentFramesSha256',
   ]) {
     digest(decision.evidence[key], `frame-review decision.evidence.${key}`);
   }
@@ -181,7 +181,7 @@ export function parseReviewDecision(input, report, request) {
 export function parseReviewOutcome(input, source, report, request, decision) {
   const outcome = verifyFrameSelfHash(
     input,
-   'reviewOutcomeSha256',
+    'reviewOutcomeSha256',
     'frame-review outcome',
   );
   assert(
