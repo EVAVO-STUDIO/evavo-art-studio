@@ -8,51 +8,46 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOW_ROOT = path.join(ROOT, ".github/workflows");
 
 const NETWORK_PRIMITIVES = [
-  { kind: "curl", pattern: /(?:^|\s)curl(?:\s|$)/u },
-  { kind: "wget", pattern: /(?:^|\s)wget(?:\s|$)/u },
-  {
-    kind: "powershell-web-request",
-    pattern:
-      /\b(?:Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer)\b/iu,
-  },
-  {
-    kind: "python-urllib",
-    pattern: /\burllib\.request\.(?:Request|urlopen|urlretrieve)\b/u,
-  },
-  {
-    kind: "python-requests",
-    pattern:
-      /\brequests\.(?:get|post|put|patch|delete|head|request)\s*\(/u,
-  },
-  {
-    kind: "python-httpx",
-    pattern: /\bhttpx\.(?:get|post|put|patch|delete|head|request)\s*\(/u,
-  },
-  { kind: "node-fetch", pattern: /\bfetch\s*\(/u },
-  {
-    kind: "node-http",
-    pattern: /\b(?:https?|undici)\.(?:get|request)\s*\(/u,
-  },
-  { kind: "github-api", pattern: /(?:^|\s)gh\s+api(?:\s|$)/u },
-  {
-    kind: "ephemeral-npm-exec",
-    pattern: /(?:^|\s)(?:npx|npm\s+(?:exec|x))(?:\s|$)/u,
-  },
-  { kind: "ephemeral-pnpm-dlx", pattern: /(?:^|\s)pnpm\s+dlx(?:\s|$)/u },
-  { kind: "ephemeral-yarn-dlx", pattern: /(?:^|\s)yarn\s+dlx(?:\s|$)/u },
-  {
-    kind: "ephemeral-python-run",
-    pattern: /(?:^|\s)(?:pipx\s+run|uvx)(?:\s|$)/u,
-  },
-  { kind: "git-clone", pattern: /(?:^|\s)git\s+clone(?:\s|$)/u },
-  { kind: "docker-pull", pattern: /(?:^|\s)docker\s+pull(?:\s|$)/u },
-  { kind: "go-install", pattern: /(?:^|\s)go\s+install(?:\s|$)/u },
-  { kind: "cargo-install", pattern: /(?:^|\s)cargo\s+install(?:\s|$)/u },
-  {
-    kind: "dotnet-tool-install",
-    pattern: /(?:^|\s)dotnet\s+tool\s+install(?:\s|$)/u,
-  },
-];
+  ["curl", /(?:^|\s)curl(?:\s|$)/u],
+  ["wget", /(?:^|\s)wget(?:\s|$)/u],
+  [
+    "powershell-web-request",
+    /\b(?:Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer)\b/iu,
+  ],
+  [
+    "python-urllib",
+    /\burllib\.request\.(?:Request|urlopen|urlretrieve)\b/u,
+  ],
+  [
+    "python-requests",
+    /\brequests\.(?:get|post|put|patch|delete|head|request)\s*\(/u,
+  ],
+  [
+    "python-httpx",
+    /\bhttpx\.(?:get|post|put|patch|delete|head|request)\s*\(/u,
+  ],
+  ["node-fetch", /\bfetch\s*\(/u],
+  ["node-http", /\b(?:https?|undici)\.(?:get|request)\s*\(/u],
+  ["github-api", /(?:^|\s)gh\s+api(?:\s|$)/u],
+  [
+    "ephemeral-npm-exec",
+    /(?:^|\s)(?:npx|npm\s+(?:exec|x))(?:\s|$)/u,
+  ],
+  ["ephemeral-pnpm-dlx", /(?:^|\s)pnpm\s+dlx(?:\s|$)/u],
+  ["ephemeral-yarn-dlx", /(?:^|\s)yarn\s+dlx(?:\s|$)/u],
+  [
+    "ephemeral-python-run",
+    /(?:^|\s)(?:pipx\s+run|uvx)(?:\s|$)/u,
+  ],
+  ["git-clone", /(?:^|\s)git\s+clone(?:\s|$)/u],
+  ["docker-pull", /(?:^|\s)docker\s+pull(?:\s|$)/u],
+  ["go-install", /(?:^|\s)go\s+install(?:\s|$)/u],
+  ["cargo-install", /(?:^|\s)cargo\s+install(?:\s|$)/u],
+  [
+    "dotnet-tool-install",
+    /(?:^|\s)dotnet\s+tool\s+install(?:\s|$)/u,
+  ],
+].map(([kind, pattern]) => ({ kind, pattern }));
 
 const FINALIZER_SURFACE =
   ".github/workflows/finalize-pixel-typography-review.yml#Materialize exact reviewed source overlay::python-urllib";
@@ -61,37 +56,41 @@ const GODOT_SURFACE =
 const RECONCILIATION_SURFACE =
   ".github/workflows/repair-pixel-typography-review.yml#Reconcile exact reviewed native-review source::python-urllib";
 
+function githubBlobContract(confirmation) {
+  return {
+    workflowRequired: [
+      "on:\n  workflow_dispatch:",
+      "expected_sha:",
+      confirmation,
+      "permissions:\n  contents: write",
+      "ref: ${{ inputs.expected_sha }}",
+      "persist-credentials: true",
+    ],
+    stepRequired: [
+      'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
+      '"Authorization": f"Bearer {token}"',
+      '"X-GitHub-Api-Version": "2022-11-28"',
+      "urllib.request.urlopen(request, timeout=60)",
+      'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
+      "path.write_bytes(data)",
+      'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
+      "if observed != blob:",
+    ],
+    orderedStepEvidence: [
+      'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
+      "urllib.request.urlopen(request, timeout=60)",
+      'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
+      "path.write_bytes(data)",
+      'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
+      "if observed != blob:",
+    ],
+  };
+}
+
 const APPROVED_SURFACE_CONTRACTS = new Map([
   [
     FINALIZER_SURFACE,
-    {
-      workflowRequired: [
-        "on:\n  workflow_dispatch:",
-        "expected_sha:",
-        "FINALIZE_PIXEL_TYPOGRAPHY_REVIEW",
-        "permissions:\n  contents: write",
-        "ref: ${{ inputs.expected_sha }}",
-        "persist-credentials: true",
-      ],
-      stepRequired: [
-        'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
-        '"Authorization": f"Bearer {token}"',
-        '"X-GitHub-Api-Version": "2022-11-28"',
-        "urllib.request.urlopen(request, timeout=60)",
-        'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
-        "path.write_bytes(data)",
-        'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
-        "if observed != blob:",
-      ],
-      orderedStepEvidence: [
-        'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
-        "urllib.request.urlopen(request, timeout=60)",
-        'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
-        "path.write_bytes(data)",
-        'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
-        "if observed != blob:",
-      ],
-    },
+    githubBlobContract("FINALIZE_PIXEL_TYPOGRAPHY_REVIEW"),
   ],
   [
     GODOT_SURFACE,
@@ -121,54 +120,26 @@ const APPROVED_SURFACE_CONTRACTS = new Map([
   ],
   [
     RECONCILIATION_SURFACE,
-    {
-      workflowRequired: [
-        "on:\n  workflow_dispatch:",
-        "expected_sha:",
-        "RECONCILE_PIXEL_TYPOGRAPHY_REVIEW",
-        "permissions:\n  contents: write",
-        "ref: ${{ inputs.expected_sha }}",
-        "persist-credentials: true",
-      ],
-      stepRequired: [
-        'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
-        '"Authorization": f"Bearer {token}"',
-        '"X-GitHub-Api-Version": "2022-11-28"',
-        "urllib.request.urlopen(request, timeout=60)",
-        'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
-        "path.write_bytes(data)",
-        'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
-        "if observed != blob:",
-      ],
-      orderedStepEvidence: [
-        'f"https://api.github.com/repos/{repository}/git/blobs/{blob}"',
-        "urllib.request.urlopen(request, timeout=60)",
-        'base64.b64decode(payload["content"].replace("\\n", ""), validate=True)',
-        "path.write_bytes(data)",
-        'subprocess.check_output(["git", "hash-object", relative], text=True).strip()',
-        "if observed != blob:",
-      ],
-    },
+    githubBlobContract("RECONCILE_PIXEL_TYPOGRAPHY_REVIEW"),
   ],
 ]);
-
 const APPROVED_SURFACES = new Set(APPROVED_SURFACE_CONTRACTS.keys());
 
 async function workflowSources() {
   const entries = await readdir(WORKFLOW_ROOT, { withFileTypes: true });
-  const workflowPaths = entries
-    .filter(
-      (entry) =>
-        entry.isFile() &&
-        (entry.name.endsWith(".yml") || entry.name.endsWith(".yaml")),
-    )
-    .map((entry) => path.join(WORKFLOW_ROOT, entry.name))
-    .sort();
   return Promise.all(
-    workflowPaths.map(async (workflowPath) => ({
-      path: path.relative(ROOT, workflowPath).replaceAll(path.sep, "/"),
-      source: await readFile(workflowPath, "utf8"),
-    })),
+    entries
+      .filter(
+        (entry) =>
+          entry.isFile() &&
+          (entry.name.endsWith(".yml") || entry.name.endsWith(".yaml")),
+      )
+      .map((entry) => path.join(WORKFLOW_ROOT, entry.name))
+      .sort()
+      .map(async (workflowPath) => ({
+        path: path.relative(ROOT, workflowPath).replaceAll(path.sep, "/"),
+        source: await readFile(workflowPath, "utf8"),
+      })),
   );
 }
 
@@ -199,30 +170,21 @@ function workflowSteps(source) {
 
 function stepName(step) {
   const name = step.source.match(/^\s*-\s+name:\s*["']?(.+?)["']?\s*$/mu)?.[1];
-  if (name) return name.trim();
-  return `unnamed-line-${step.startLine}`;
+  return name?.trim() ?? `unnamed-line-${step.startLine}`;
 }
 
-function runSource(step) {
+function executableSource(step) {
   if (
     !/^\s+run:\s*/mu.test(step.source) &&
     !/^\s*-\s+run:\s*/mu.test(step.source)
   ) {
     return null;
   }
-  return step.source;
-}
-
-function executableSource(step) {
-  const source = runSource(step);
-  if (source === null) return null;
-  return source
+  return step.source
     .split(/\r?\n/u)
     .filter((rawLine) => {
       const line = rawLine.trim();
-      if (/^!?\s*grep\b/u.test(line)) return false;
-      if (/^#/u.test(line)) return false;
-      return true;
+      return !/^!?\s*grep\b/u.test(line) && !/^#/u.test(line);
     })
     .join("\n");
 }
@@ -238,7 +200,6 @@ function networkSurfaces(workflow) {
       surfaces.push({
         key: `${workflow.path}#${name}::${primitive.kind}`,
         path: workflow.path,
-        step: name,
         startLine: step.startLine,
         kind: primitive.kind,
         stepSource: step.source,
@@ -259,7 +220,7 @@ function assertRequired(source, required, label, violations) {
 function assertOrdered(source, evidence, label, violations) {
   let previous = -1;
   for (const item of evidence) {
-    const index = source.indexOf(item);
+    const index = source.indexOf(item, previous + 1);
     if (index < 0) {
       violations.push(`${label}: missing ordered evidence ${item}`);
       continue;
@@ -299,8 +260,9 @@ test("workflow network and ephemeral execution surfaces are exact-reviewed", asy
 test("approved workflow network surfaces retain exact transport and digest contracts", async () => {
   const workflows = await workflowSources();
   const workflowMap = new Map(workflows.map((workflow) => [workflow.path, workflow]));
-  const surfaces = workflows.flatMap(networkSurfaces);
-  const surfaceMap = new Map(surfaces.map((surface) => [surface.key, surface]));
+  const surfaceMap = new Map(
+    workflows.flatMap(networkSurfaces).map((surface) => [surface.key, surface]),
+  );
   const violations = [];
 
   for (const [key, contract] of APPROVED_SURFACE_CONTRACTS) {
