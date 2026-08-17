@@ -1,0 +1,324 @@
+name: Repair official action compatibility
+
+on:
+  push:
+    branches:
+      - fix/current-official-action-releases-20260817
+    paths:
+      - ".github/workflows/repair-official-action-compatibility.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-official-action-compatibility
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact repair source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Verify exact bounded repair source
+        shell: bash
+        env:
+          PROMOTED_HEAD_SHA: 3da9c635decc02b3e5ebc244488fc2edd1e60bed
+          REVIEW_BASE_SHA: aeedc119a98a49f8f9500e3e3f47432969506105
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/fix/current-official-action-releases-20260817"
+          test "$(git rev-parse HEAD^)" = "${PROMOTED_HEAD_SHA}"
+          test "$(git rev-parse HEAD^^^)" = "${REVIEW_BASE_SHA}"
+          git merge-base --is-ancestor "${REVIEW_BASE_SHA}" HEAD
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+          mapfile -t OBSERVED < <(
+            git diff --name-only "${PROMOTED_HEAD_SHA}" HEAD -- | LC_ALL=C sort
+          )
+          EXPECTED=(
+            ".github/workflows/repair-official-action-compatibility.yml"
+          )
+          diff -u \
+            <(printf '%s\n' "${EXPECTED[@]}") \
+            <(printf '%s\n' "${OBSERVED[@]}")
+          git diff --check "${PROMOTED_HEAD_SHA}" HEAD --
+
+      - name: Apply compatible action identities and coupled assertions
+        shell: bash
+        env:
+          REPAIR_MANIFEST: ${{ runner.temp }}/official-action-compatibility-repair.json
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { execFileSync } from "node:child_process";
+          import {
+            existsSync,
+            readFileSync,
+            writeFileSync,
+          } from "node:fs";
+
+          const temporaryWorkflow =
+            ".github/workflows/repair-official-action-compatibility.yml";
+          const scannerPath =
+            "scripts/test-ci-media-tool-official-action-releases.mjs";
+          const compatiblePnpmAction =
+            "pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86";
+
+          const replacements = [
+            [
+              "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2",
+              `${compatiblePnpmAction} # v6.0.10`,
+            ],
+            [
+              "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+              compatiblePnpmAction,
+            ],
+            [
+              "pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0",
+              `${compatiblePnpmAction} # v6.0.10`,
+            ],
+            [
+              "pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
+              compatiblePnpmAction,
+            ],
+            [
+              "actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955",
+              "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            ],
+            [
+              "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            ],
+            [
+              "actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238",
+              "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+            ],
+            [
+              "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
+              "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+            ],
+            [
+              "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+              "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+            ],
+          ];
+
+          const tracked = execFileSync("git", ["ls-files", "-z"])
+            .toString("utf8")
+            .split("\0")
+            .filter(Boolean);
+          const changed = [];
+          const totals = Object.fromEntries(
+            replacements.map(([from]) => [from, 0]),
+          );
+
+          const scannerBefore = readFileSync(scannerPath, "utf8");
+          const oldApproved = `  [\n    "pnpm/setup",\n    "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",\n  ],`;
+          const newApproved = `  [\n    "pnpm/action-setup",\n    "${compatiblePnpmAction}",\n  ],`;
+          const oldReplaced = `const REPLACED_ACTIONS = new Map([\n  [\n    "pnpm/action-setup",\n    "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",\n  ],\n]);`;
+          const newReplaced = `const REPLACED_ACTIONS = new Map([\n  [\n    "pnpm/setup",\n    "${compatiblePnpmAction}",\n  ],\n]);`;
+          assert.equal(scannerBefore.split(oldApproved).length - 1, 1);
+          assert.equal(scannerBefore.split(oldReplaced).length - 1, 1);
+          const scannerAfter = scannerBefore
+            .replace(oldApproved, newApproved)
+            .replace(oldReplaced, newReplaced);
+          writeFileSync(scannerPath, scannerAfter, "utf8");
+          changed.push({
+            path: scannerPath,
+            reason: "compatible-pnpm-policy",
+          });
+
+          for (const filePath of tracked) {
+            if (
+              filePath === temporaryWorkflow ||
+              filePath === scannerPath ||
+              !existsSync(filePath)
+            ) {
+              continue;
+            }
+            const bytes = readFileSync(filePath);
+            if (bytes.includes(0)) continue;
+            const before = bytes.toString("utf8");
+            let after = before;
+            const fileCounts = {};
+            for (const [from, to] of replacements) {
+              const count = after.split(from).length - 1;
+              if (count === 0) continue;
+              after = after.split(from).join(to);
+              totals[from] += count;
+              fileCounts[from] = count;
+            }
+            if (after === before) continue;
+            writeFileSync(filePath, after, "utf8");
+            changed.push({
+              path: filePath,
+              replacements: fileCounts,
+            });
+          }
+
+          const pnpmWorkflowChanges = changed.filter(
+            (entry) =>
+              entry.path.startsWith(".github/workflows/") &&
+              entry.replacements?.[
+                "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2"
+              ] === 1,
+          );
+          assert.equal(pnpmWorkflowChanges.length, 36);
+
+          const manifest = {
+            schema: "evavo.ci-official-action-compatibility-repair.v1",
+            compatiblePnpmAction,
+            pinnedPnpmVersion: "10.13.1",
+            changedFilesBeforeTemporaryRemoval: changed.length,
+            totals,
+            files: changed.sort((left, right) =>
+              left.path.localeCompare(right.path),
+            ),
+          };
+          writeFileSync(
+            process.env.REPAIR_MANIFEST,
+            `${JSON.stringify(manifest, null, 2)}\n`,
+            "utf8",
+          );
+          process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+
+          rm -f .github/workflows/repair-official-action-compatibility.yml
+
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { execFileSync } from "node:child_process";
+          import { existsSync, readFileSync } from "node:fs";
+
+          const forbidden = [
+            "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+            "pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
+            "actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955",
+            "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238",
+            "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
+            "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          ];
+          const tracked = execFileSync("git", ["ls-files", "-z"])
+            .toString("utf8")
+            .split("\0")
+            .filter(Boolean)
+            .filter((filePath) => existsSync(filePath));
+          const violations = [];
+          for (const filePath of tracked) {
+            const bytes = readFileSync(filePath);
+            if (bytes.includes(0)) continue;
+            const source = bytes.toString("utf8");
+            for (const reference of forbidden) {
+              if (source.includes(reference)) {
+                violations.push(`${filePath}: ${reference}`);
+              }
+            }
+          }
+          assert.deepEqual(violations, []);
+
+          const changed = execFileSync(
+            "git",
+            ["diff", "--name-only", "3da9c635decc02b3e5ebc244488fc2edd1e60bed", "--"],
+            { encoding: "utf8" },
+          )
+            .trim()
+            .split(/\r?\n/u)
+            .filter(Boolean);
+          assert.ok(changed.length >= 38, changed.length);
+          assert.ok(
+            changed.includes(
+              "scripts/test-ci-media-tool-official-action-releases.mjs",
+            ),
+          );
+          assert.equal(
+            changed.includes(
+              ".github/workflows/repair-official-action-compatibility.yml",
+            ),
+            false,
+          );
+          NODE
+
+      - name: Validate repaired workflow contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/test-ci-media-tool-*.mjs
+          node --test \
+            scripts/game-art-production/asset-fabricator-reference-workflow.test.mjs
+          node scripts/check-foundation-media-plan.mjs
+          node scripts/check-foundation-delivery-manifest.mjs
+          node scripts/check-repository-toolchain.mjs
+          node scripts/test-repository-toolchain.mjs
+          git diff --check 3da9c635decc02b3e5ebc244488fc2edd1e60bed --
+
+      - name: Commit exact compatibility repair
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git diff --cached --check
+          test -z "$(git status --porcelain=v1 --untracked-files=all | grep '^??' || true)"
+
+          git commit \
+            -m "fix(ci): preserve pnpm 10 action compatibility" \
+            -m "Use the signed current pnpm/action-setup v6.0.10 commit because the pnpm/setup successor only supports pnpm 11+, retain the repository's governed pnpm 10.13.1 runtime, and update every coupled action-identity assertion to the reviewed current releases."
+
+          REPAIR_SHA="$(git rev-parse HEAD)"
+          echo "repair_sha=${REPAIR_SHA}" >> "${GITHUB_OUTPUT}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Upload objects and verify expected workflow-token refusal
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPAIR_SHA: ${{ steps.commit.outputs.repair_sha }}
+        run: |
+          set -euo pipefail
+          BRANCH="fix/current-official-action-releases-20260817"
+          REMOTE_BEFORE="$(
+            git ls-remote origin "refs/heads/${BRANCH}" | awk '{print $1}'
+          )"
+          test "${REMOTE_BEFORE}" = "${GITHUB_SHA}"
+
+          AUTHORIZATION="$(
+            printf 'x-access-token:%s' "${GITHUB_TOKEN}" | base64 -w0
+          )"
+          set +e
+          PUSH_OUTPUT="$(
+            git \
+              -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${AUTHORIZATION}" \
+              push origin "HEAD:refs/heads/${BRANCH}" 2>&1
+          )"
+          PUSH_STATUS=$?
+          set -e
+          printf '%s\n' "${PUSH_OUTPUT}"
+          test "${PUSH_STATUS}" -ne 0
+          grep -F 'without `workflows` permission' <<< "${PUSH_OUTPUT}"
+
+          git cat-file -e "${REPAIR_SHA}^{commit}"
+          {
+            echo "### Official action compatibility repair"
+            echo
+            echo "- Validated repair commit: \`${REPAIR_SHA}\`"
+            echo "- Compatible pnpm action: \`pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86\`"
+            echo "- Governed pnpm runtime retained: \`10.13.1\`"
+            echo "- Workflow token refusal was expected; connector ref promotion remains separate"
+          } >> "${GITHUB_STEP_SUMMARY}"
