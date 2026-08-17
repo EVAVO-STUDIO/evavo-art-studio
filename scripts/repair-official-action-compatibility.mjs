@@ -58,6 +58,34 @@ const REPLACEMENTS = [
     from: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     to: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
   },
+  {
+    from: "84cb39b217b10273981911c288cd62326dc7c6d2",
+    to: "0977fd99725f1db4007ccb2928dbb4e90d06cc86",
+  },
+  {
+    from: "fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
+    to: "0977fd99725f1db4007ccb2928dbb4e90d06cc86",
+  },
+  {
+    from: "08eba0b27e820071cde6df949e0beb9ba4906955",
+    to: "3d3c42e5aac5ba805825da76410c181273ba90b1",
+  },
+  {
+    from: "de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+    to: "3d3c42e5aac5ba805825da76410c181273ba90b1",
+  },
+  {
+    from: "6044e13b5dc448c55e2357c09f80417699197238",
+    to: "820762786026740c76f36085b0efc47a31fe5020",
+  },
+  {
+    from: "a309ff8b426b58ec0e2a45f0f869d46889d02405",
+    to: "5fda3b95a4ea91299a34e894583c3862153e4b97",
+  },
+  {
+    from: "ea165f8d65b6e75b540449e92b4886f43607fa02",
+    to: "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+  },
 ];
 
 function parseManifestPath() {
