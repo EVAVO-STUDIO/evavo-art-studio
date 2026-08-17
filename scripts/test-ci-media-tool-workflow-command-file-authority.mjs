@@ -34,10 +34,155 @@ const WRITE_PRIMITIVES = Object.freeze([
   },
 ]);
 
-// Discovery begins fail-closed. A later remediation may admit only exact
-// workflow/step/command-file surfaces with a reviewed write count and exact
-// validation, serialization and delimiter evidence. Nothing is grandfathered.
-const APPROVED_COMMAND_FILE_WRITES = new Map([]);
+function shellContract({ writeLines, evidence = [], forbidden = [] }) {
+  return Object.freeze({
+    evidence: Object.freeze(evidence),
+    forbidden: Object.freeze(forbidden),
+    primitiveKinds: Object.freeze(["shell-redirection"]),
+    writeCount: writeLines.length,
+    writeLines: Object.freeze(writeLines),
+  });
+}
+
+const APPROVED_COMMAND_FILE_WRITES = new Map([
+  [
+    ".github/workflows/ci-media-tool-bootstrap.yml#Route Python bytecode to runner-temporary storage::environment",
+    shellContract({
+      writeLines: [
+        'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
+      ],
+      evidence: [
+        "set -euo pipefail",
+        'PYTHON_CACHE_ROOT="${RUNNER_TEMP}/media-bootstrap-python-pycache"',
+        'mkdir -p "${PYTHON_CACHE_ROOT}"',
+      ],
+    }),
+  ],
+  [
+    ".github/workflows/ci.yml#Route Python bytecode to runner-temporary storage::environment",
+    shellContract({
+      writeLines: [
+        'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
+      ],
+      evidence: [
+        "set -euo pipefail",
+        'PYTHON_CACHE_ROOT="${RUNNER_TEMP}/python-pycache"',
+        'mkdir -p "${PYTHON_CACHE_ROOT}"',
+      ],
+    }),
+  ],
+  [
+    ".github/workflows/ci.yml#Verify committed lockfile identity::environment",
+    shellContract({
+      writeLines: [
+        'echo "ART_STUDIO_LOCKFILE_SHA256=${LOCKFILE_SHA256}" >> "${GITHUB_ENV}"',
+      ],
+      evidence: [
+        "git ls-files --error-unmatch -- pnpm-lock.yaml",
+        'LOCKFILE_SHA256="$(sha256sum pnpm-lock.yaml | awk \'{print $1}\')"',
+        '[[ "${LOCKFILE_SHA256}" =~ ^[0-9a-f]{64}$ ]]',
+      ],
+    }),
+  ],
+  [
+    ".github/workflows/ci.yml#Verify exact Python image toolchain::environment",
+    shellContract({
+      writeLines: [
+        'echo "ART_STUDIO_PYTHON_VERSION=${PYTHON_VERSION}" >> "${GITHUB_ENV}"',
+        'echo "ART_STUDIO_PILLOW_VERSION=${PILLOW_VERSION}" >> "${GITHUB_ENV}"',
+      ],
+      evidence: [
+        '[[ "${PYTHON_VERSION}" == "3.13.5" ]]',
+        '[[ "${PILLOW_VERSION}" == "12.2.0" ]]',
+      ],
+    }),
+  ],
+  [
+    ".github/workflows/comfyui-provider-adapter.yml#Route Python bytecode to runner-temporary storage::environment",
+    shellContract({
+      writeLines: [
+        'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
+      ],
+      evidence: [
+        "set -euo pipefail",
+        'PYTHON_CACHE_ROOT="${RUNNER_TEMP}/python-pycache"',
+        'mkdir -p "${PYTHON_CACHE_ROOT}"',
+      ],
+    }),
+  ],
+  [
+    ".github/workflows/pixel-font-repository-publish.yml#Require explicit publication confirmation and token::output",
+    shellContract({
+      writeLines: [
+        'printf \'target_slug=%s\\n\' "$target_slug" >> "$GITHUB_OUTPUT"',
+      ],
+      evidence: [
+        'owner="${TARGET_REPOSITORY%%/*}"',
+        'repository_name="${TARGET_REPOSITORY#*/}"',
+        'test "$owner/$repository_name" = "$TARGET_REPOSITORY"',
+        '[[ "$owner" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$ ]]',
+        '[[ "$repository_name" =~ ^[A-Za-z0-9._-]{1,100}$ ]]',
+        'test "$repository_name" != "."',
+        'test "$repository_name" != ".."',
+        'target_slug="$owner-$repository_name"',
+      ],
+      forbidden: ['echo "target_slug='],
+    }),
+  ],
+  [
+    ".github/workflows/pixel-font-studio-v2.yml#Verify native virtual-display runtime::environment",
+    shellContract({
+      writeLines: [
+        'echo "EVAVO_PIXEL_FONT_XVFB_RUN=${XVFB_RUN}" >> "${GITHUB_ENV}"',
+      ],
+      evidence: [
+        'XVFB_RUN="$(command -v xvfb-run)"',
+        'XAUTH="$(command -v xauth)"',
+        'test -x "${XVFB_RUN}"',
+        'test -x "${XAUTH}"',
+      ],
+    }),
+  ],
+  [
+    ".github/workflows/pixel-font-studio.yml#Route Python bytecode to runner-temporary storage::environment",
+    shellContract({
+      writeLines: [
+        'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
+      ],
+      evidence: [
+        "set -euo pipefail",
+        'PYTHON_CACHE_ROOT="${RUNNER_TEMP}/pixel-font-python-pycache"',
+        'mkdir -p "${PYTHON_CACHE_ROOT}"',
+      ],
+    }),
+  ],
+  [
+    ".github/workflows/project-art-review-studio.yml#Route Python bytecode outside the repository::environment",
+    shellContract({
+      writeLines: [
+        'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
+      ],
+      evidence: [
+        "set -euo pipefail",
+        'PYTHON_CACHE_ROOT="${RUNNER_TEMP}/project-art-review-pycache"',
+        'mkdir -p "${PYTHON_CACHE_ROOT}"',
+      ],
+    }),
+  ],
+  [
+    ".github/workflows/project-art-workbench.yml#Route Python bytecode outside the repository::environment",
+    shellContract({
+      writeLines: [
+        'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
+      ],
+      evidence: [
+        "set -euo pipefail",
+        'PYTHON_CACHE_ROOT="${RUNNER_TEMP}/project-art-pycache"',
+        'mkdir -p "${PYTHON_CACHE_ROOT}"',
+      ],
+    }),
+  ],
+]);
 
 async function workflowSources() {
   const entries = await readdir(WORKFLOW_ROOT, { withFileTypes: true });
@@ -169,8 +314,10 @@ function commandFileSurfaces(workflow) {
             primitiveKinds: new Set(),
             step: name,
             stepSource: step.source,
+            writeLines: [],
           };
           existing.lines.push(run.startLine + index);
+          existing.writeLines.push(line.trim());
           for (const primitive of primitives) {
             existing.primitiveKinds.add(primitive.kind);
           }
@@ -212,19 +359,28 @@ test("workflow command-file writes are exact-reviewed", async () => {
       );
     }
 
-    for (const evidence of contract.evidence ?? []) {
+    if (
+      JSON.stringify(surface.writeLines) !==
+      JSON.stringify(contract.writeLines)
+    ) {
+      violations.push(
+        `${surface.key}: expected write lines ${JSON.stringify(contract.writeLines)}, found ${JSON.stringify(surface.writeLines)}`,
+      );
+    }
+
+    for (const evidence of contract.evidence) {
       if (!surface.stepSource.includes(evidence)) {
         violations.push(`${surface.key}: missing evidence ${evidence}`);
       }
     }
 
-    for (const forbidden of contract.forbidden ?? []) {
+    for (const forbidden of contract.forbidden) {
       if (surface.stepSource.includes(forbidden)) {
         violations.push(`${surface.key}: forbidden evidence ${forbidden}`);
       }
     }
 
-    const expectedPrimitives = exactSorted(contract.primitiveKinds ?? []);
+    const expectedPrimitives = exactSorted(contract.primitiveKinds);
     if (
       JSON.stringify(surface.primitiveKinds) !==
       JSON.stringify(expectedPrimitives)
@@ -251,11 +407,24 @@ test("workflow command-file writes are exact-reviewed", async () => {
 test("workflow command-file contracts never admit direct GitHub expressions", () => {
   const violations = [];
   for (const [key, contract] of APPROVED_COMMAND_FILE_WRITES) {
-    for (const evidence of contract.evidence ?? []) {
-      if (evidence.includes("${{")) {
-        violations.push(`${key}: contract evidence contains direct expression`);
+    for (const text of [
+      ...contract.evidence,
+      ...contract.forbidden,
+      ...contract.writeLines,
+    ]) {
+      if (text.includes("${{")) {
+        violations.push(`${key}: contract text contains direct expression`);
       }
     }
   }
   assert.deepEqual(violations, []);
+});
+
+test("command-file authority remains limited to environment and output files", () => {
+  const kinds = new Set(
+    [...APPROVED_COMMAND_FILE_WRITES.keys()].map((key) =>
+      key.slice(key.lastIndexOf("::") + 2),
+    ),
+  );
+  assert.deepEqual(exactSorted(kinds), ["environment", "output"]);
 });
