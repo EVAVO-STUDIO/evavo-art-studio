@@ -93,9 +93,9 @@ jobs:
             echo "Detected out-of-band source drift after verification:"
             printf '%s\n' "$status"
             echo "Tracked diff summary:"
-            git diff --stat || true
+            git diff --stat
             echo "Tracked diff:"
-            git diff --no-ext-diff --text || true
+            git diff --no-ext-diff --text
             exit 1
           fi
           git diff --exit-code
