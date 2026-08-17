@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "toolchain": {
+      "runtime": "pnpm-script",
+      "entry": "toolchain:check",
+      "network": "disabled",
+      "timeoutSeconds": 1800,
+      "description": "Validate Art Studio's local creative toolchain and governed integration surface."
+    },
+    "check": {
+      "runtime": "pnpm-script",
+      "entry": "check",
+      "network": "disabled",
+      "timeoutSeconds": 14400,
+      "description": "Run Art Studio's complete deterministic repository validation."
+    }
+  }
+}
