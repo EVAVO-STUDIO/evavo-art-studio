@@ -61,6 +61,13 @@ jobs:
           node --input-type=module -e '
             import { projectArtTopHatPoseSlotProviderExecutionCapabilities } from "./scripts/project-art/top-hat-pose-slot-provider-execution.mjs";
             const value = projectArtTopHatPoseSlotProviderExecutionCapabilities();
-            if (value.maximumProviderCalls !== 1 || value.maximumRuntimeAttempts !== 1 || value.fallbackAllowed !== false || value.candidateApproval !== false || value.runtimeActivation !== false) process.exit(1);
+            const checks = [
+              value.maximumProviderCalls === 1,
+              value.maximumRuntimeAttempts === 1,
+              value.fallbackAllowed === false,
+              value.candidateApproval === false,
+              value.runtimeActivation === false,
+            ];
+            if (checks.includes(false)) process.exit(1);
             process.stdout.write(`${JSON.stringify(value)}\n`);
           '
