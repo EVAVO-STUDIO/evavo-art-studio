@@ -6,7 +6,7 @@ Photoshop-like transforms while leaving generative repair/inpainting and human
 creative approval to governed provider/review surfaces.
 """
 from __future__ import annotations
-import argparse, hashlib, json, os, sys
+import argparse, hashlib, json, os, re, sys
 from pathlib import Path
 from typing import Any
 try:
@@ -16,6 +16,7 @@ except ImportError as exc:
 
 SCHEMA="evavo.raster-workstation-plan.v1"; RECEIPT="evavo.raster-workstation-receipt.v1"
 MAX_BYTES=512*1024*1024; MAX_PIXELS=220_000_000; Image.MAX_IMAGE_PIXELS=MAX_PIXELS
+SHA256=re.compile(r'^[0-9a-f]{64}$')
 
 def fail(msg:str): raise ValueError(msg)
 def sha_bytes(b:bytes)->str: return hashlib.sha256(b).hexdigest()
@@ -34,6 +35,15 @@ def secure(root:Path,value:str,label:str,must_exist=False)->Path:
     for part in p.parts:
         cur=cur/part
         if cur.exists() and cur.is_symlink(): fail(f"{label} contains symlink")
+    return q
+
+def secure_absolute(root:Path,value:Path,label:str,must_exist=False)->Path:
+    q=Path(os.path.abspath(value)).resolve(strict=must_exist)
+    if not inside(root,q): fail(f"{label} escaped workspace")
+    current=root
+    for part in q.relative_to(root).parts:
+        current=current/part
+        if current.exists() and current.is_symlink(): fail(f"{label} contains symlink")
     return q
 
 def regular(p:Path,label:str):
@@ -137,13 +147,16 @@ def apply_op(base:Image.Image,op:dict[str,Any],workspace:Path)->Image.Image:
     fail(f"unsupported operation: {kind}")
 
 def main()->int:
-    ap=argparse.ArgumentParser(); ap.add_argument('--workspace-root',type=Path,required=True); ap.add_argument('--plan',type=Path,required=True); ap.add_argument('--receipt',type=Path,required=True); ns=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument('--workspace-root',type=Path,required=True); ap.add_argument('--plan',type=Path,required=True); ap.add_argument('--plan-sha256',required=True); ap.add_argument('--receipt',type=Path,required=True); ns=ap.parse_args()
     try:
         root=Path(os.path.abspath(ns.workspace_root)).resolve(strict=True)
         if root.is_symlink() or not root.is_dir(): fail('workspace-root invalid')
-        planp=Path(os.path.abspath(ns.plan)); regular(planp,'plan'); plan=json.loads(planp.read_text('utf-8'))
+        planp=secure_absolute(root,ns.plan,'plan',True); regular(planp,'plan'); plan_bytes=planp.read_bytes()
+        expected_plan=str(ns.plan_sha256).strip().lower()
+        if not SHA256.fullmatch(expected_plan) or sha_bytes(plan_bytes)!=expected_plan: fail('plan SHA-256 mismatch')
+        plan=json.loads(plan_bytes.decode('utf-8'))
         if plan.get('schema')!=SCHEMA or plan.get('createOnlyOutput') is not True or plan.get('sourceOverwrite') is not False: fail('plan authority boundary invalid')
-        inp=secure(root,plan['input'],'input',True); out=secure(root,plan['output'],'output',False); receipt=Path(os.path.abspath(ns.receipt))
+        inp=secure(root,plan['input'],'input',True); out=secure(root,plan['output'],'output',False); receipt=secure_absolute(root,ns.receipt,'receipt',False)
         if out.exists() or receipt.exists(): fail('output and receipt are create-only')
         source=inp.read_bytes(); expected=plan.get('sourceSha256')
         if expected and sha_bytes(source)!=expected: fail('source hash mismatch')
@@ -155,8 +168,8 @@ def main()->int:
         if str(plan.get('format','png')).lower()!='png': fail('workstation v1 runtime output must be png')
         image.save(out,format='PNG',optimize=False,compress_level=9)
         outb=out.read_bytes(); alpha=list(image.getchannel('A').get_flattened_data()); visible=sum(1 for x in alpha if x); partial=sum(1 for x in alpha if 0<x<255)
-        rec={'schema':RECEIPT,'status':'passed','sourceSha256':sha_bytes(source),'outputSha256':sha_bytes(outb),'outputBytes':len(outb),'width':image.width,'height':image.height,'visiblePixels':visible,'partialAlphaPixels':partial,'operations':[x.get('op') for x in plan.get('operations',[])],'createOnlyOutput':True,'sourceOverwrite':False,'automaticApproval':False,'repositoryMutation':False,'storageMutation':False,'forcePush':False}
+        rec={'schema':RECEIPT,'status':'passed','planSha256':expected_plan,'sourceSha256':sha_bytes(source),'outputSha256':sha_bytes(outb),'outputBytes':len(outb),'width':image.width,'height':image.height,'visiblePixels':visible,'partialAlphaPixels':partial,'operations':[x.get('op') for x in plan.get('operations',[])],'createOnlyOutput':True,'sourceOverwrite':False,'automaticApproval':False,'repositoryMutation':False,'storageMutation':False,'forcePush':False}
         receipt.parent.mkdir(parents=True,exist_ok=True); receipt.write_bytes(canonical(rec)); print(json.dumps(rec,sort_keys=True)); return 0
-    except (OSError,ValueError,KeyError,json.JSONDecodeError) as exc:
+    except (OSError,ValueError,KeyError,UnicodeError,json.JSONDecodeError) as exc:
         print(json.dumps({'schema':RECEIPT,'status':'failed','error':str(exc)[:1024]}),file=sys.stderr); return 2
 if __name__=='__main__': raise SystemExit(main())
