@@ -114,13 +114,13 @@ export function validateAutomationFabricClient(client) {
 
   exact(client.repositoryMutation, ["operatorRepository","entrypoint","transport","publicRemoteSurface","structuredMutationRequired","rawGitByDefault","rawGithubByDefault"], "Repository mutation binding");
   fail(client.repositoryMutation.operatorRepository === "EVAVO-STUDIO/evavo-github-mcp", "GitHub MCP must remain the low-level repository mutation authority.");
-  fail(client.repositoryMutation.entrypoint === "control-plane/agent-workspace-hardened-server.mjs", "Repository mutation must use the hardened agent-workspace entrypoint.");
+  fail(client.repositoryMutation.entrypoint === "control-plane/agent-workspace-mcp.mjs", "Repository mutation must use the live trusted-workstation agent-workspace MCP entrypoint.");
   fail(client.repositoryMutation.transport === "stdio" && client.repositoryMutation.publicRemoteSurface === "read-only", "Broad repository writes must remain local stdio while the public surface is read-only.");
   fail(client.repositoryMutation.structuredMutationRequired === true && client.repositoryMutation.rawGitByDefault === false && client.repositoryMutation.rawGithubByDefault === false, "Repository mutation must remain structured and raw Git/GitHub disabled by default.");
 
   exact(client.publication, ["operatorRepository","operator","normalPushOnly","liveRemoteRecheck","declaredPathsOnly","exactHeadRequired","exactStatusRequired","remoteShaVerification","forcePush","resetHard","clean","stashAsRecovery","rebase"], "Publication binding");
   fail(client.publication.operatorRepository === "EVAVO-STUDIO/evavo-development-studio", "Development Studio must remain the publication authority.");
-  fail(client.publication.operator === "scripts/Publish-EvavoRepoMain.ps1", "Development Studio publication operator drifted.");
+  fail(client.publication.operator === "scripts/mainline-publish.mjs", "Development Studio publication operator must resolve to the live guarded mainline publisher.");
   for (const key of ["normalPushOnly","liveRemoteRecheck","declaredPathsOnly","exactHeadRequired","exactStatusRequired","remoteShaVerification"]) fail(client.publication[key] === true, `Publication safety gate weakened: ${key}.`);
   for (const key of ["forcePush","resetHard","clean","stashAsRecovery","rebase"]) fail(client.publication[key] === false, `Destructive publication mode enabled: ${key}.`);
 
