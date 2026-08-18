@@ -12,7 +12,9 @@ const v5 = JSON.parse(fs.readFileSync(path.join(root, "config/automation-fabric-
 const clone = (value) => structuredClone(value);
 
 test("accepts the exact planner-bound EVA workstation task", () => {
-  assert.equal(validateTask(clone(task), script, clone(v5)).ok, true);
+  const result = validateTask(clone(task), script, clone(v5));
+  assert.equal(result.ok, true);
+  assert.equal(result.minimumLocalStorageVersion, "0.48.0");
 });
 
 test("rejects execution without planner receipt", () => {
@@ -55,8 +57,8 @@ test("rejects worker receipts being treated as publication evidence", () => {
 
 test("rejects a weaker Local Storage floor or v5 mismatch", () => {
   const taskCandidate = clone(task);
-  taskCandidate.minimumLocalStorageVersion = "0.42.0";
-  assert.throws(() => validateTask(taskCandidate, script, clone(v5)), /0\.42\.1/u);
+  taskCandidate.minimumLocalStorageVersion = "0.47.9";
+  assert.throws(() => validateTask(taskCandidate, script, clone(v5)), /0\.48\.0/u);
   const clientCandidate = clone(v5);
   clientCandidate.execution.plannerReceiptRequiredForUnmeasuredRepositoryTask = false;
   assert.throws(() => validateTask(clone(task), script, clientCandidate), /planner requirement/u);
