@@ -6,8 +6,10 @@ on:
     paths:
       - "tools/image_workstation.py"
       - "tools/sprite_workstation.py"
+      - "tools/game_art_workstation_mcp.mjs"
       - "scripts/test-image-workstation.py"
       - "scripts/test-sprite-workstation.py"
+      - "scripts/test-game-art-workstation-mcp.mjs"
       - "scripts/audit-pixel-art-candidate.mjs"
       - "scripts/test-pixel-art-candidate-audit.mjs"
       - "config/image-processing-recipes.v1.json"
@@ -17,8 +19,10 @@ on:
     paths:
       - "tools/image_workstation.py"
       - "tools/sprite_workstation.py"
+      - "tools/game_art_workstation_mcp.mjs"
       - "scripts/test-image-workstation.py"
       - "scripts/test-sprite-workstation.py"
+      - "scripts/test-game-art-workstation-mcp.mjs"
       - "scripts/audit-pixel-art-candidate.mjs"
       - "scripts/test-pixel-art-candidate-audit.mjs"
       - "config/image-processing-recipes.v1.json"
@@ -49,6 +53,8 @@ jobs:
       - run: python scripts/test-image-workstation.py -v
       - run: python scripts/test-sprite-workstation.py -v
       - run: node scripts/test-pixel-art-candidate-audit.mjs
+      - run: node scripts/test-game-art-workstation-mcp.mjs
+      - run: node --check tools/game_art_workstation_mcp.mjs
       - run: |
           git diff --check
           git diff --exit-code
@@ -74,6 +80,8 @@ jobs:
       - run: python scripts/test-image-workstation.py -v
       - run: python scripts/test-sprite-workstation.py -v
       - run: node scripts/test-pixel-art-candidate-audit.mjs
+      - run: node scripts/test-game-art-workstation-mcp.mjs
+      - run: node --check tools/game_art_workstation_mcp.mjs
       - shell: pwsh
         run: |
           git diff --check
