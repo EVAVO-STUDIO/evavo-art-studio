@@ -91,6 +91,25 @@ test("rejects disabled file-first PowerShell routing", () => {
   );
 });
 
+test("rejects the retired GitHub MCP hardened-server alias", () => {
+  const candidate = clone(automationClient);
+  candidate.repositoryMutation.entrypoint =
+    "control-plane/agent-workspace-hardened-server.mjs";
+  assert.throws(
+    () => validateAutomationFabricClient(candidate),
+    /live trusted-workstation agent-workspace MCP entrypoint/u,
+  );
+});
+
+test("rejects the retired Development Studio PowerShell publisher alias", () => {
+  const candidate = clone(automationClient);
+  candidate.publication.operator = "scripts/Publish-EvavoRepoMain.ps1";
+  assert.throws(
+    () => validateAutomationFabricClient(candidate),
+    /live guarded mainline publisher/u,
+  );
+});
+
 test("rejects a write-enabled public GitHub surface", () => {
   const candidate = clone(automationClient);
   candidate.repositoryMutation.publicRemoteSurface = "read-write";
