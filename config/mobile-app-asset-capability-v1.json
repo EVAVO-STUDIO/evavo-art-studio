@@ -1,0 +1,43 @@
+{
+  "schema": "evavo.mobile-app-asset-capability.v1",
+  "inputSchema": "evavo.mobile-app-production-plan.v1",
+  "outputSchema": "evavo.mobile-app-asset-plan.v1",
+  "owner": "EVAVO-STUDIO/evavo-art-studio",
+  "entrypoint": "scripts/compile-mobile-app-asset-plan.mjs",
+  "supportedPlatforms": ["android", "ios"],
+  "supportedKinds": [
+    "app-icon",
+    "adaptive-icon-foreground",
+    "adaptive-icon-background",
+    "notification-icon",
+    "launch-art",
+    "store-feature-graphic",
+    "store-screenshot-frame",
+    "in-app-illustration"
+  ],
+  "requiredContext": [
+    "app identity and purpose",
+    "brand palette, typography, tone and supplied references",
+    "device family, vendor companion, capabilities and constraints",
+    "audiences, primary jobs, screens and safety controls",
+    "asset purpose, background policy, visual constraints and exact runtime targets"
+  ],
+  "candidateWorkspace": "workspace://mobile-apps/<requestId>/<assetId>",
+  "review": {
+    "fullResolution": true,
+    "runtimeScale": true,
+    "accessibility": true,
+    "hostileBackgroundsWhenAlphaApplies": true,
+    "sourceAndCandidateSha256": true,
+    "humanApproval": true
+  },
+  "authority": {
+    "compileCandidateTasks": true,
+    "providerSelectionAtCompileTime": false,
+    "providerExecutionAtCompileTime": false,
+    "automaticApproval": false,
+    "writeRuntimeRepository": false,
+    "commitOrPushRuntimeMain": false,
+    "forcePush": false
+  }
+}
