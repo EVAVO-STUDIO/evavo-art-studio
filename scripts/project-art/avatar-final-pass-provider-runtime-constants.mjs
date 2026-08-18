@@ -10,7 +10,7 @@ export const AVATAR_FINAL_PASS_PROVIDER_RUNTIME_CAPABILITIES_SCHEMA =
   'evavo.project-art-avatar-final-pass-provider-runtime-capabilities.v1';
 export const AVATAR_FINAL_PASS_PROVIDER_RUNTIME_PROTOCOL_VERSION =
   '2026-08-13.1';
-export const GENERIC_PROVIDER_PROTOCOL_VERSION = '2026-08-07.3';
+export const GENERIC_PROVIDER_PROTOCOL_VERSION = '2026-08-15.1';
 
 export const SHA1_PATTERN = /^[a-f0-9]{40}$/u;
 export const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
