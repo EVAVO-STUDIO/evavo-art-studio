@@ -5,16 +5,26 @@ on:
     branches: [main]
     paths:
       - "config/automation-fabric-client-v5.json"
+      - "config/eva-dense-motion-workstation-task-v1.json"
       - "scripts/check-art-studio-workstation-v5-contract.mjs"
       - "scripts/test-art-studio-workstation-v5-contract.mjs"
+      - "scripts/Invoke-EvaDenseMotionWorkstationValidation.ps1"
+      - "scripts/check-eva-dense-motion-workstation-task.mjs"
+      - "scripts/test-eva-dense-motion-workstation-task.mjs"
       - "docs/AUTOMATION_FABRIC_V5.md"
+      - "docs/EVA_DENSE_MOTION_WORKSTATION_TASK.md"
       - ".github/workflows/art-studio-workstation-v5-contract.yml"
   pull_request:
     paths:
       - "config/automation-fabric-client-v5.json"
+      - "config/eva-dense-motion-workstation-task-v1.json"
       - "scripts/check-art-studio-workstation-v5-contract.mjs"
       - "scripts/test-art-studio-workstation-v5-contract.mjs"
+      - "scripts/Invoke-EvaDenseMotionWorkstationValidation.ps1"
+      - "scripts/check-eva-dense-motion-workstation-task.mjs"
+      - "scripts/test-eva-dense-motion-workstation-task.mjs"
       - "docs/AUTOMATION_FABRIC_V5.md"
+      - "docs/EVA_DENSE_MOTION_WORKSTATION_TASK.md"
       - ".github/workflows/art-studio-workstation-v5-contract.yml"
   workflow_dispatch:
 
@@ -41,12 +51,15 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Validate v5 runtime-truth contract
+      - name: Validate v5 runtime-truth and EVA exact-state task contracts
         run: |
           set -euo pipefail
           node --check scripts/check-art-studio-workstation-v5-contract.mjs
           node scripts/check-art-studio-workstation-v5-contract.mjs
           node --test scripts/test-art-studio-workstation-v5-contract.mjs
+          node --check scripts/check-eva-dense-motion-workstation-task.mjs
+          node scripts/check-eva-dense-motion-workstation-task.mjs
+          node --test scripts/test-eva-dense-motion-workstation-task.mjs
 
       - name: Confirm validation changed no source
         run: |
