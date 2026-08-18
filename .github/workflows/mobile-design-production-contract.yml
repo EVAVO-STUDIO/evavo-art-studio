@@ -1,0 +1,50 @@
+name: Mobile design production contract
+
+on:
+  pull_request:
+    paths:
+      - 'config/mobile/evavo-glasses.production-plan.json'
+      - 'scripts/compile-mobile-app-asset-plan.mjs'
+      - 'scripts/test-mobile-design-production-contract.mjs'
+      - '.github/workflows/mobile-design-production-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'config/mobile/evavo-glasses.production-plan.json'
+      - 'scripts/compile-mobile-app-asset-plan.mjs'
+      - 'scripts/test-mobile-design-production-contract.mjs'
+      - '.github/workflows/mobile-design-production-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-design-production-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Mobile design contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          lfs: false
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+
+      - name: Check mobile asset compiler syntax
+        run: node --check scripts/compile-mobile-app-asset-plan.mjs
+
+      - name: Validate mobile design production contract
+        run: node --test scripts/test-mobile-design-production-contract.mjs
+
+      - name: Verify checkout remained clean
+        run: test -z "$(git status --porcelain=v1 --untracked-files=all)"
