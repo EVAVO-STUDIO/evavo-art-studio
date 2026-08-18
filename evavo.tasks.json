@@ -125,6 +125,13 @@
       "timeoutSeconds": 300,
       "description": "Verify the exact-plan OpenAI image runner only accepts the governed five-phase reviewed-entry plan, strips unrelated credentials and endpoint overrides, binds the exact provider request, and fixes execution to openai-gpt-image with gpt-image-2."
     },
+    "mobile-identity-raster-review-contract": {
+      "runtime": "node-script",
+      "entry": "scripts/test-mobile-identity-raster-review.mjs",
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Verify immutable provider output can become only an independent review pack, explicit human-bound raster approval and derivative-only handoff without target-repository, device or publication authority."
+    },
     "toolchain": {
       "runtime": "pnpm-script",
       "entry": "toolchain:check",
