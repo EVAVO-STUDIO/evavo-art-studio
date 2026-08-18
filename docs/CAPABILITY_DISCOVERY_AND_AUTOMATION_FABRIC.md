@@ -49,7 +49,7 @@ Routine terminal commands must not be delegated to Greg while an automated recov
 
 ## PowerShell and process execution
 
-Substantial PowerShell must be written as a complete tracked `.ps1` file and invoked non-interactively through the canonical guard. Inline or encoded PowerShell is not the default Art Studio automation route.
+Art Studio automation is **file-first**. Substantial PowerShell must be written as a complete tracked `.ps1` file and invoked non-interactively through the canonical guard. Inline or encoded PowerShell is not the default Art Studio automation route.
 
 For repository work, Art Studio requires read-only measurement first and binds execution to the exact planner receipt. Native processes prefer argv-only execution, explicit native exit codes, bounded output retention and process-tree termination on timeout.
 
