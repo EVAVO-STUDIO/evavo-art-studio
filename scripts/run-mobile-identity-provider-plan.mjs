@@ -6,12 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 
-const STEP_SCRIPTS = Object.freeze({
-  select: 'scripts/select-raw-art-provider-runtime-jobs.mjs',
-  admit: 'scripts/admit-raw-art-provider-runtime-batch.mjs',
-  authorize: 'scripts/authorize-raw-art-provider-runtime-execution.mjs',
-  execute: 'scripts/mobile-identity-production.mjs',
-});
+const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime.mjs';
+const PREPARATION_ID = 'prepare';
 const EXPECTED_STEP_IDS = Object.freeze(['select', 'admit', 'authorize', 'execute']);
 const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_PROCESS_OUTPUT = 2 * 1024 * 1024;
@@ -50,28 +46,31 @@ function readPlan(file, expectedSha256) {
   const value = JSON.parse(bytes.toString('utf8'));
   return Object.freeze({ relative, target, value, fileSha256: actual });
 }
-function validateArgv(step, expectedScript) {
-  if (!Array.isArray(step.argv) || step.argv.length < 2 || step.argv.some((entry) => typeof entry !== 'string' || /[\0\r\n]/u.test(entry))) fail(`step ${step.id} argv is invalid`);
-  if (step.argv[0] !== 'node' || step.argv[1] !== expectedScript) fail(`step ${step.id} must execute the reviewed Node script ${expectedScript}`);
-  return Object.freeze([...step.argv]);
+function validateRuntimeArgv(step, expectedPhase) {
+  if (!step || typeof step !== 'object' || Array.isArray(step)) fail(`${expectedPhase} step is invalid`);
+  if (step.id !== expectedPhase) fail(`step must be ${expectedPhase}`);
+  if (!Array.isArray(step.argv) || step.argv.length < 3 || step.argv.some((entry) => typeof entry !== 'string' || /[\0\r\n]/u.test(entry))) fail(`step ${step.id} argv is invalid`);
+  if (step.argv[0] !== 'node' || step.argv[1] !== RUNTIME_SCRIPT || step.argv[2] !== expectedPhase) fail(`step ${step.id} must execute ${RUNTIME_SCRIPT} ${expectedPhase}`);
+  return Object.freeze({ ...step, argv: Object.freeze([...step.argv]) });
+}
+function validateOpenAIProvider(plan) {
+  if (plan.provider?.preferredAdapterId !== 'openai-gpt-image' || plan.provider?.preferredModel !== 'gpt-image-2') fail('provider plan must prefer openai-gpt-image with gpt-image-2');
+  if (!Array.isArray(plan.provider?.allowedAdapterIds) || plan.provider.allowedAdapterIds.length !== 1 || plan.provider.allowedAdapterIds[0] !== 'openai-gpt-image') fail('official OpenAI runner requires exactly the openai-gpt-image adapter');
 }
 export function validateMobileIdentityProviderExecutionPlan(plan) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) fail('execution plan must be an object');
   if (plan.schema !== 'evavo.mobile-identity-provider-execution-plan.v1' || plan.status !== 'governed-execution-ready') fail('execution plan is not governed-execution-ready');
   const { executionPlanSha256, ...unsigned } = plan;
   if (!/^[a-f0-9]{64}$/u.test(executionPlanSha256 ?? '') || sha256Object(unsigned) !== executionPlanSha256) fail('executionPlanSha256 mismatch');
-  if (plan.provider?.preferredAdapterId !== 'openai-gpt-image' || plan.provider?.preferredModel !== 'gpt-image-2') fail('provider plan must prefer openai-gpt-image with gpt-image-2');
-  if (!Array.isArray(plan.provider?.allowedAdapterIds) || !plan.provider.allowedAdapterIds.includes('openai-gpt-image')) fail('openai-gpt-image must be explicitly allowed');
-  if (plan.provider.allowedAdapterIds.some((id) => ['gpt-image', 'openai-image', 'comfyui'].includes(id))) fail('generic provider aliases are forbidden');
-  if (!Array.isArray(plan.steps) || plan.steps.length !== EXPECTED_STEP_IDS.length) fail('execution plan must contain exactly four governed stages');
-  const steps = plan.steps.map((step, index) => {
-    const expectedId = EXPECTED_STEP_IDS[index];
-    if (!step || step.id !== expectedId) fail(`execution plan step ${index} must be ${expectedId}`);
-    return Object.freeze({ ...step, argv: validateArgv(step, STEP_SCRIPTS[expectedId]) });
-  });
-  if (steps[3].argv[2] !== 'execute-authorized') fail('execute step must use mobile-identity execute-authorized');
-  if (plan.authority?.bypassSelection !== false || plan.authority?.bypassAdmission !== false || plan.authority?.bypassAuthorization !== false || plan.authority?.generationEqualsApproval !== false || plan.authority?.runtimePublication !== false || plan.authority?.forcePush !== false) fail('execution plan authority boundary is invalid');
-  return Object.freeze({ ...plan, steps: Object.freeze(steps) });
+  validateOpenAIProvider(plan);
+  if (plan.runtime?.schema !== 'evavo.mobile-identity-provider-runtime-batch.v1' || plan.runtime?.controlScript !== RUNTIME_SCRIPT || plan.runtime?.campaignMetadataRequired !== false || plan.runtime?.gameMetadataRequired !== false) fail('mobile identity runtime binding is invalid');
+  const preparation = validateRuntimeArgv(plan.preparation, PREPARATION_ID);
+  if (!Array.isArray(plan.steps) || plan.steps.length !== EXPECTED_STEP_IDS.length) fail('execution plan must contain exactly four governed stages after preparation');
+  const steps = plan.steps.map((step, index) => validateRuntimeArgv(step, EXPECTED_STEP_IDS[index]));
+  if (!preparation.argv.includes('--provider-request') || !preparation.argv.includes('--output')) fail('prepare step must bind provider request and runtime batch output');
+  if (!steps[2].argv.includes('--allowed-adapters') || !steps[3].argv.includes('--authorization')) fail('authorization and execution bindings are incomplete');
+  if (plan.authority?.bypassSelection !== false || plan.authority?.bypassAdmission !== false || plan.authority?.bypassAuthorization !== false || plan.authority?.generationEqualsApproval !== false || plan.authority?.runtimePublication !== false || plan.authority?.deviceAuthority !== false || plan.authority?.protocolAuthority !== false || plan.authority?.forcePush !== false) fail('execution plan authority boundary is invalid');
+  return Object.freeze({ ...plan, preparation, steps: Object.freeze(steps) });
 }
 function cleanBaseEnvironment(source) {
   const allowedNames = [
@@ -119,6 +118,9 @@ function run(executable, args, environment, secret, label, timeoutMs) {
   return Object.freeze({ status: result.status, stdout: redact(result.stdout, secret).slice(-4000) });
 }
 function pnpmExecutable() { return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'; }
+function executeRuntimeStep(step, environment, secret) {
+  run(process.execPath, step.argv.slice(1), environment, secret, `mobile identity ${step.id}`, 35 * 60 * 1000);
+}
 export function executeMobileIdentityProviderExecutionPlan(plan, sourceEnvironment = process.env) {
   const validated = validateMobileIdentityProviderExecutionPlan(plan);
   const providerEnv = createOpenAIProviderExecutionEnvironment(sourceEnvironment);
@@ -127,9 +129,11 @@ export function executeMobileIdentityProviderExecutionPlan(plan, sourceEnvironme
   run(pnpmExecutable(), ['run', 'build:domain'], buildEnv, '', 'Art Studio domain build', 20 * 60 * 1000);
   run(pnpmExecutable(), ['--filter', '@evavo/art-studio-worker', 'build'], buildEnv, '', 'Art Studio worker build', 10 * 60 * 1000);
   const executed = [];
+  executeRuntimeStep(validated.preparation, buildEnv, '');
+  executed.push(validated.preparation.id);
   for (const step of validated.steps) {
     const environment = step.id === 'execute' ? providerEnv : buildEnv;
-    run(process.execPath, step.argv.slice(1), environment, secret, `mobile identity ${step.id}`, 35 * 60 * 1000);
+    executeRuntimeStep(step, environment, step.id === 'execute' ? secret : '');
     executed.push(step.id);
   }
   return Object.freeze({
