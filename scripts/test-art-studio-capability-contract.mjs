@@ -41,6 +41,17 @@ test("rejects duplicate capability identities", () => {
   );
 });
 
+test("rejects removal of the book creative-direction capability", () => {
+  const candidate = clone(manifest);
+  candidate.capabilities = candidate.capabilities.filter(
+    (capability) => capability.id !== "art.book.direction",
+  );
+  assert.throws(
+    () => validateCapabilityManifest(candidate, schema, packageJson),
+    /Required capability art\.book\.direction is absent/u,
+  );
+});
+
 test("rejects a capability that claims publication", () => {
   const candidate = clone(manifest);
   candidate.capabilities[0].effects.push("publish");
