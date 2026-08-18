@@ -4,6 +4,7 @@ import {
   AVATAR_PROVIDER_RUNTIME_DISPATCH_SCHEMA,
   AVATAR_PROVIDER_RUNTIME_OUTCOME_SCHEMA,
   AVATAR_PROVIDER_RUNTIME_PROTOCOL_VERSION,
+  GENERIC_PROVIDER_PROTOCOL_VERSION,
 } from './avatar-final-pass-provider-candidate-constants.mjs';
 import {
   allFalseAuthority,
@@ -378,7 +379,7 @@ export function parseAvatarProviderCandidateSourceChain({
   const normalizedRequest = {
     ...dispatch.providerCompiler.input,
     requestId: binding.normalizedProviderRequestId,
-    protocolVersion: '2026-08-07.3',
+    protocolVersion: GENERIC_PROVIDER_PROTOCOL_VERSION,
   };
   assert(
     sha256Document(normalizedRequest) ===

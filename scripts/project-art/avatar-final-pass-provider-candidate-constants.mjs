@@ -14,7 +14,7 @@ export const AVATAR_PROVIDER_RUNTIME_BINDING_SCHEMA =
 export const AVATAR_PROVIDER_RUNTIME_OUTCOME_SCHEMA =
   'evavo.project-art-avatar-final-pass-provider-runtime-outcome.v1';
 export const AVATAR_PROVIDER_RUNTIME_PROTOCOL_VERSION = '2026-08-13.1';
-export const GENERIC_PROVIDER_PROTOCOL_VERSION = '2026-08-07.3';
+export const GENERIC_PROVIDER_PROTOCOL_VERSION = '2026-08-15.1';
 export const AVATAR_FINAL_PASS_PROVIDER_METADATA_SCHEMA =
   'evavo.project-art-avatar-final-pass-provider-metadata.v1';
 

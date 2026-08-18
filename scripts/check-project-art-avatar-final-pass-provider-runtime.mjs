@@ -68,7 +68,7 @@ requireTokens('constants', [
   'evavo.project-art-avatar-final-pass-provider-runtime-binding.v1',
   'evavo.project-art-avatar-final-pass-provider-runtime-outcome.v1',
   "'2026-08-13.1'",
-  "'2026-08-07.3'",
+  "GENERIC_PROVIDER_PROTOCOL_VERSION = '2026-08-15.1'",
   'avatar-provider-submit:',
   'explicitWriteEnabledRuntimeRequired',
 ]);
