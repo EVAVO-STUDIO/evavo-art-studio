@@ -34,20 +34,39 @@ def alpha_clean(im,threshold):
     a=im.getchannel('A').point(lambda x:255 if x>=threshold else 0); out=im.copy(); out.putalpha(a); return out
 def contain(im,w,h,anchor='bottom-center'):
     scale=min(w/im.width,h/im.height,1 if im.width<=w and im.height<=h else 999); nw=max(1,round(im.width*scale)); nh=max(1,round(im.height*scale)); im=im.resize((nw,nh),Image.Resampling.NEAREST); out=Image.new('RGBA',(w,h),(0,0,0,0)); x=(w-nw)//2; y=h-nh if anchor=='bottom-center' else (h-nh)//2; out.alpha_composite(im,(x,y)); return out
+def animation_items(plan,frames):
+    runtime={i:f for i,f in enumerate(frames) if f.get('runtime',True)}; grouped={}
+    for i,f in runtime.items():grouped.setdefault(f['animation'],[]).append((i,f))
+    configured=plan.get('animations') or {}; result=[]
+    names=list(dict.fromkeys([*grouped.keys(),*configured.keys()]))
+    for name in names:
+        cfg=configured.get(name,{})
+        sequence=cfg.get('sequence')
+        if sequence is None:
+            items=grouped.get(name,[])
+        else:
+            if not isinstance(sequence,list) or not sequence:fail(f'animation {name} sequence invalid')
+            items=[]
+            for raw in sequence:
+                if type(raw) is not int or raw not in runtime:fail(f'animation {name} sequence references non-runtime cell {raw}')
+                frame=runtime[raw]
+                if frame['animation']!=name:fail(f'animation {name} sequence references cell {raw} owned by {frame["animation"]}')
+                items.append((raw,frame))
+        if items:result.append((name,cfg,items))
+    return runtime,result
 def godot(plan,frames,atlas_res):
-    runtime=[(i,f) for i,f in enumerate(frames) if f.get('runtime',True)]
+    runtime,animations=animation_items(plan,frames)
     lines=[f'[gd_resource type="SpriteFrames" load_steps={len(runtime)+2} format=3]','',f'[ext_resource type="Texture2D" path="{atlas_res}" id="1_atlas"]','']
-    for i,f in runtime:
+    for i,f in runtime.items():
         sid=f'AtlasTexture_{i:04d}'; x,y,w,h=f['region']; lines += [f'[sub_resource type="AtlasTexture" id="{sid}"]','atlas = ExtResource("1_atlas")',f'region = Rect2({x}, {y}, {w}, {h})','']
-    by={}
-    for i,f in runtime:by.setdefault(f['animation'],[]).append((i,f))
     anim=[];default_fps=float(plan.get('defaultFps',8))
-    for name,items in by.items():
-        cfg=(plan.get('animations') or {}).get(name,{});fps=float(cfg.get('fps',default_fps));loop=bool(cfg.get('loop',True));arr=[]
+    for name,cfg,items in animations:
+        fps=float(cfg.get('fps',default_fps));loop=bool(cfg.get('loop',True));arr=[]
+        if fps<=0 or fps>240:fail(f'animation {name} fps invalid')
         for i,f in items:
             multiplier=float(f.get('durationMs') or 1000/fps)/(1000/fps);arr.append('{"duration": %.6f, "texture": SubResource("AtlasTexture_%04d")}'%(multiplier,i))
         anim.append('{\n"frames": [%s],\n"loop": %s,\n"name": &"%s",\n"speed": %.6f\n}'%(', '.join(arr),'true' if loop else 'false',name,fps))
-    lines += ['[resource]','animations = [%s]'%(',\n'.join(anim)),''];return '\n'.join(lines)
+    lines += ['[resource]','animations = [%s]'%(',\n'.join(anim)),''];return '\n'.join(lines),len(animations)
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--workspace-root',required=True);ap.add_argument('--plan',required=True);ap.add_argument('--plan-sha256',required=True);ap.add_argument('--output-root',required=True);ns=ap.parse_args()
     try:
@@ -96,9 +115,10 @@ def main():
         atlas_path=out/atlas_name;atlas.save(atlas_path,'PNG',optimize=False,compress_level=9)
         atlas_res=plan.get('godotAtlasPath')
         if not isinstance(atlas_res,str) or not atlas_res.startswith('res://'):fail('godotAtlasPath required')
+        tres,animation_count=godot(plan,manifest_frames,atlas_res)
         manifest={'schema':'evavo.sprite-workstation-manifest.v2','planSha256':expected_plan,'atlasFile':atlas_name,'atlasSha256':sha(atlas_path.read_bytes()),'size':{'width':aw,'height':ah},'cell':{'width':cw,'height':ch},'frames':manifest_frames,'animations':plan.get('animations',{}),'hardAlpha':bool(plan.get('hardAlpha',True)),'reservedFrameCount':reserved_count,'repositoryMutation':False,'automaticApproval':False}
-        jwrite(out/manifest_name,manifest);(out/tres_name).write_text(godot(plan,manifest_frames,atlas_res),encoding='utf-8')
-        receipt={'schema':RECEIPT,'status':'passed','planSha256':expected_plan,'frameCount':len(prepared),'runtimeFrameCount':sum(1 for f in prepared if f['runtime']),'reservedFrameCount':reserved_count,'animationCount':len({f['animation'] for f in prepared if f['runtime']}),'atlasSha256':manifest['atlasSha256'],'manifestSha256':sha((out/manifest_name).read_bytes()),'godotSha256':sha((out/tres_name).read_bytes()),'repositoryMutation':False,'storageMutation':False,'automaticApproval':False,'forcePush':False}
+        jwrite(out/manifest_name,manifest);(out/tres_name).write_text(tres,encoding='utf-8')
+        receipt={'schema':RECEIPT,'status':'passed','planSha256':expected_plan,'frameCount':len(prepared),'runtimeFrameCount':sum(1 for f in prepared if f['runtime']),'reservedFrameCount':reserved_count,'animationCount':animation_count,'atlasSha256':manifest['atlasSha256'],'manifestSha256':sha((out/manifest_name).read_bytes()),'godotSha256':sha((out/tres_name).read_bytes()),'repositoryMutation':False,'storageMutation':False,'automaticApproval':False,'forcePush':False}
         jwrite(out/'receipt.json',receipt);print(json.dumps(receipt,sort_keys=True));return 0
     except (OSError,ValueError,KeyError,UnicodeError,json.JSONDecodeError) as e:print(json.dumps({'schema':RECEIPT,'status':'failed','error':str(e)[:1024]}),file=sys.stderr);return 2
 if __name__=='__main__':raise SystemExit(main())
