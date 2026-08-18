@@ -1,91 +1,50 @@
-# Top Hat pose-slot live provider execution
+# Top Hat pose-slot provider execution
 
-This boundary closes the operational gap between the already-admitted Top Hat provider package and the existing candidate-admission/release chain.
+This boundary connects the admitted six-slot Top Hat provider package to the existing candidate-admission and release chain. It handles one already-authorized slot at a time and persists the standard runtime evidence needed by the existing candidate path.
 
-It does **one thing only**: execute one already-authorized Top Hat pose job through Art Studio's real provider Runtime and ArtifactStore, then emit the existing generic provider runtime outcome required by candidate admission.
+## Scope
 
-## Contract
+Supported slots are `blink-closed`, `listening-attentive`, `thinking-reflective`, `speech-neutral`, `presentation-open`, and `presentation-emphasis`.
 
-One invocation is bound to exactly one of:
+Each invocation requires the exact self-hashed Top Hat runtime adapter plus its reviewed file SHA-256. The original named-human run-once authorization must still be active. The executor uses one durable runtime reservation for that authorization, forces `maximumAttempts: 1`, disables fallback, restricts execution to the admitted adapter allowlist, verifies provider references before reservation, and verifies the immutable candidate/evidence artifacts after completion.
 
-- `blink-closed`
-- `listening-attentive`
-- `thinking-reflective`
-- `speech-neutral`
-- `presentation-open`
-- `presentation-emphasis`
+Reusing the same run-once authorization in the same durable runtime root is rejected. A failed provider attempt requires fresh named-human authorization before retry.
 
-The invocation requires the exact self-hashed Top Hat runtime adapter and the adapter file SHA-256. Dispatch compilation occurs at execution time so the original named-human `run-provider-once` authorization must still be active.
+This command does not materialize the scratch PNG, make a creative decision, approve or promote a candidate, fill a pose slot, release the six-pose bank, mutate another repository, publish, deploy, or activate Runtime. The current three-pose fallback remains the safe runtime until the real six-pose bank clears the later review and release gates.
 
-The executor preserves these boundaries:
+## Existing chain reused
 
-- one slot per invocation;
-- one Runtime job;
-- `maximumAttempts: 1`;
-- one provider handler invocation;
-- exact adapter allowlist from the admitted source job;
-- `allowFallback: false`;
-- three exact admitted body reference artifacts must already exist in the ArtifactStore;
-- provider candidate remains an unapproved intermediate artifact;
-- provider evidence remains immutable in the ArtifactStore;
-- no scratch-path materialization is performed by this command;
-- no candidate review, approval, promotion, pose-slot filling, release, repository mutation, publication, deployment or Runtime activation is performed.
-
-A failed provider attempt consumes the one-shot execution lane. The receipt requires a fresh named-human run-once authorization before any retry.
-
-## Existing contracts reused
-
-The executor does not create a parallel art pipeline. It recompiles and uses:
+The implementation keeps one art pipeline:
 
 ```text
 Top Hat runtime adapter
-→ guarded Top Hat runtime dispatch
-→ @evavo/art-providers runtime contract
-→ avatar final-pass runtime binding
-→ durable LocalRuntimeRepository job
-→ restricted provider RuntimeWorker
-→ immutable LocalArtifactStore candidate + evidence
-→ avatar final-pass provider runtime outcome
+→ guarded per-slot dispatch
+→ canonical provider runtime contract
+→ avatar runtime binding
+→ one-attempt durable Runtime job
+→ exact-adapter provider worker
+→ immutable candidate + evidence
+→ standard avatar provider outcome
 → existing Top Hat candidate admission
 ```
 
-Successful execution returns `candidate-generated-review-required`. The embedded generic runtime outcome must report `candidate-materialization-required` and a create-only materialization request.
+The executor also checks that the avatar bridge provider protocol matches the live provider package. The candidate source-chain parser now reads the same bridge constant, so provider protocol drift is caught explicitly instead of surfacing later during admission.
 
-## Build and execute
+## CLI outputs
 
-The runner builds the domain packages and worker before importing the live execution engine.
+The runner takes the adapter path, expected adapter file SHA-256, slot ID, runtime root, artifact root, optional worker ID, and four create-only output paths:
 
-PowerShell example:
+- dispatch output: standard avatar provider runtime dispatch;
+- binding output: standard validated runtime binding;
+- outcome output: standard provider runtime outcome when a provider attempt can be represented truthfully;
+- receipt output: Top Hat one-shot execution receipt.
 
-```powershell
-$adapter = 'evidence/top-hat/runtime-adapter.json'
-$sha = (Get-FileHash $adapter -Algorithm SHA256).Hash.ToLowerInvariant()
+The artifact root must already contain the admitted neutral, inhale, and exhale image artifacts referenced by the provider request. Missing, corrupt, non-image, or oversized provider references fail before the durable authorization reservation is created.
 
-node scripts/run-project-art-top-hat-pose-slot-provider.mjs `
-  --adapter $adapter `
-  --expected-adapter-file-sha256 $sha `
-  --slot-id presentation-open `
-  --runtime-root .runtime/top-hat-provider `
-  --artifact-root .artifacts/project-art `
-  --worker-id top-hat-provider-local `
-  --output evidence/top-hat/presentation-open.execution.json
-```
+If execution fails before an actual provider adapter attempt can be proven, no fabricated one-call provider outcome is emitted. The execution receipt records the runtime failure and leaves `providerCallCountVerified` false.
 
-`artifact-root` must be the Art Studio ArtifactStore containing the exact admitted neutral, inhale and exhale reference artifacts named by the provider request. Pointing the runner at an empty store correctly fails before a provider call.
+## Next stage
 
-Provider credentials and adapter configuration come from the normal Art Studio worker environment. The executor then restricts the registry to the exact adapter IDs admitted by the source job; unavailable admitted adapters fail closed.
+After a successful provider execution, use the standard dispatch, binding, outcome, candidate, and evidence with the existing candidate-admission flow. Materialization, decoded PNG and alpha checks, anatomy/identity/hand/continuity review, and the real named-human candidate decision remain separate. Repeat that process independently for all six slots; only then continue through the existing release, Runtime publication, website installation, and reversible rollout boundaries.
 
-## What happens next
-
-After a successful execution receipt:
-
-1. materialize the candidate to the governed scratch path with the existing create-only materializer;
-2. perform governed alpha extraction only when the provider result requires it;
-3. rerun the frame finisher and decoded PNG checks;
-4. perform independent anatomy, identity, silhouette, continuity and loop review;
-5. record the real named-human candidate decision;
-6. feed that evidence into the existing Top Hat candidate-admission boundary;
-7. repeat independently for all six slots;
-8. only after all six slots are admitted, continue through the already-existing release, Runtime publication, website installation and reversible rollout boundaries.
-
-Generation is not approval. A successful provider call does not make a pose production-ready and cannot activate the website or Runtime.
+Generation is not approval.
