@@ -4,12 +4,15 @@ on:
   push:
     branches:
       - main
-    paths:
+    paths: &capability_contract_paths
       - "evavo.capabilities.json"
       - "schemas/evavo.repository-capabilities.schema.json"
       - "config/automation-fabric-client-v2.json"
+      - "config/automation-fabric-client-v3.json"
       - "scripts/check-art-studio-capability-contract.mjs"
       - "scripts/test-art-studio-capability-contract.mjs"
+      - "scripts/check-art-studio-automation-fabric-v3.mjs"
+      - "scripts/test-art-studio-automation-fabric-v3.mjs"
       - "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md"
       - "package.json"
       - "tools/**"
@@ -17,18 +20,7 @@ on:
       - "packages/**"
       - ".github/workflows/art-studio-capability-contract.yml"
   pull_request:
-    paths:
-      - "evavo.capabilities.json"
-      - "schemas/evavo.repository-capabilities.schema.json"
-      - "config/automation-fabric-client-v2.json"
-      - "scripts/check-art-studio-capability-contract.mjs"
-      - "scripts/test-art-studio-capability-contract.mjs"
-      - "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md"
-      - "package.json"
-      - "tools/**"
-      - "apps/**"
-      - "packages/**"
-      - ".github/workflows/art-studio-capability-contract.yml"
+    paths: *capability_contract_paths
   workflow_dispatch:
 
 permissions:
@@ -44,23 +36,30 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out exact candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
           persist-credentials: false
 
       - name: Set up exact Node.js runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Validate capability discovery and Automation Fabric binding
+      - name: Validate capability discovery and reachable-generation binding
+        shell: bash
         run: |
           set -euo pipefail
           node scripts/check-art-studio-capability-contract.mjs
           node --test scripts/test-art-studio-capability-contract.mjs
+          node scripts/check-art-studio-automation-fabric-v3.mjs
+          node --test scripts/test-art-studio-automation-fabric-v3.mjs
 
       - name: Confirm validation changed no repository source
+        if: always()
+        shell: bash
         run: |
           set -euo pipefail
           git diff --check
