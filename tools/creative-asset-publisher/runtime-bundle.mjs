@@ -41,7 +41,11 @@ export function loadSealedBundle(distributionRoot, descriptor) {
     const partMetadata = fs.lstatSync(partPath);
     if (!partMetadata.isFile() || partMetadata.isSymbolicLink()) throw new Error(`Distribution part ${partName} is not an ordinary file.`);
     const rawText = fs.readFileSync(partPath, "utf8");
-    const encodedPart = rawText.endsWith("\n") ? rawText.slice(0, -1) : rawText;
+    const encodedPart = rawText.endsWith("\r\n")
+      ? rawText.slice(0, -2)
+      : rawText.endsWith("\n")
+        ? rawText.slice(0, -1)
+        : rawText;
     if (/[\r\n]/u.test(encodedPart) || encodedPart.length !== expectedPartCharacters) throw new Error(`Distribution part ${partName} has non-canonical text or length.`);
     if (sha256(Buffer.from(encodedPart, "utf8")) !== expectedPartSha) throw new Error(`Distribution part ${partName} SHA-256 verification failed.`);
     if (index < parts.length - 1 && (encodedPart.includes("=") || encodedPart.length % 4 !== 0)) throw new Error(`Distribution part ${partName} has premature base64 padding.`);
