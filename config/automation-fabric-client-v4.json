@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 2,
+  "kind": "evavo-automation-fabric-client",
+  "client": "evavo-art-studio",
+  "role": "governed-art-production-media-validation-and-provider-control",
+  "canonicalRepository": "EVAVO-STUDIO/evavo-local-storage",
+  "canonicalManifest": "config/automation-fabric-capabilities.json",
+  "fabricVersion": "3.0",
+  "minimumLocalStorageVersion": "0.42.0",
+  "minimumWorkstationAcceptanceCommit": "61ca89063644d4f868f1f8d35502b4011aa83910",
+  "reviewedLocalStorageMain": "308e535cb47b4dcb55ac95481c1a0170a8873484",
+  "reviewedDevelopmentStudioMain": "8cf7ba812ac5e58eeebab801d5919b861cb0ed46",
+  "poolId": "windows-local",
+  "defaultRouting": {
+    "preferWorkerFabric": true,
+    "manualTerminalRelayRequired": false,
+    "fileFirstPowerShell": true,
+    "powershellGuardRequired": true,
+    "capabilityRouted": true,
+    "receiptRequired": true,
+    "exactStateRepositoryTasks": true,
+    "resourceAwareAdmission": true,
+    "boundedProcessTreeTermination": true,
+    "automaticTransientRetryOnly": true
+  },
+  "workstationAcceptance": {
+    "command": "evavo-local-storage-workstation-accept",
+    "implementation": "evavo_local_storage.workstation_acceptance_v4:main",
+    "receiptSchemaVersion": 4,
+    "resourceBaselineRequired": true,
+    "runtimeCleanupAlwaysRuns": true,
+    "resourceFinalRequired": true,
+    "maximumAttempts": 3,
+    "trainingCrashBlindRetryAllowed": false,
+    "gpuResetAllowed": false,
+    "pageFileTreatedAsVram": false,
+    "workingRepositoriesPreserved": true
+  },
+  "repositoryTasks": {
+    "schemaVersion": 4,
+    "exactHeadRequired": true,
+    "exactStatusRequired": true,
+    "trackedScriptBytesRequired": true,
+    "credentialStrippingRequired": true,
+    "workerCommitAllowed": false,
+    "workerPushAllowed": false,
+    "workerPublicationAllowed": false
+  },
+  "workerRecovery": {
+    "probeOnlyByDefault": true,
+    "epochSafe": true,
+    "matchingReceiptCount": 1,
+    "queuedWorkCountsAsCompleted": false,
+    "duplicateExecutionAllowed": false
+  },
+  "approvedRoots": [
+    "C:\\GitRepos",
+    "C:\\Downloads",
+    "C:\\BEESTATION",
+    "approved-discovered-external-roots"
+  ],
+  "supportedWork": [
+    "powershell", "cmd", "bash", "wsl", "python", "node", "npm", "pnpm",
+    "curl-download", "git", "github", "archive", "artifact-mission",
+    "reviewed-downloaded-execution", "to-delete", "backup", "repo-maintenance",
+    "art-pipeline-validation", "image-toolchain", "godot-validation",
+    "provider-runtime", "guarded-main-publication", "exact-state-repository-task",
+    "resource-aware-workstation-acceptance"
+  ],
+  "repositoryMutation": {
+    "operatorRepository": "EVAVO-STUDIO/evavo-github-mcp",
+    "entrypoint": "control-plane/agent-workspace-mcp.mjs",
+    "transport": "stdio",
+    "publicRemoteSurface": "read-only",
+    "structuredMutationRequired": true,
+    "rawGitByDefault": false,
+    "rawGithubByDefault": false
+  },
+  "publication": {
+    "operatorRepository": "EVAVO-STUDIO/evavo-development-studio",
+    "operator": "scripts/mainline-publish.mjs",
+    "normalPushOnly": true,
+    "liveRemoteRecheck": true,
+    "declaredPathsOnly": true,
+    "exactHeadRequired": true,
+    "exactStatusRequired": true,
+    "remoteShaVerification": true,
+    "forcePush": false,
+    "resetHard": false,
+    "clean": false,
+    "stashAsRecovery": false,
+    "rebase": false
+  },
+  "executionEvidence": {
+    "workerReceiptIsPublicationEvidence": false,
+    "localExecutionIsPublicationPermission": false,
+    "providerReceiptIsGitPublicationEvidence": false,
+    "validationIsCreativeApproval": false,
+    "validationIsRuntimePromotion": false
+  },
+  "cleanup": {
+    "operator": "evavo-local-storage-to-delete",
+    "destination": "bee://primary/TO_DELETE/",
+    "localRecoveryCopyRetained": false,
+    "restoreAvailable": true,
+    "permanentPurgeAvailableToAgents": false
+  },
+  "downloadedExecution": {
+    "operator": "evavo-local-storage-exec",
+    "hashPinnedByDefault": true,
+    "reviewedPurposeRequired": true,
+    "downloadSuccessAloneAuthorizesExecution": false
+  }
+}
