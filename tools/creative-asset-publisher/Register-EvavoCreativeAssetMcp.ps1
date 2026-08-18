@@ -3,11 +3,14 @@ param(
     [string]$GitReposRoot = 'C:\GitRepos',
     [string[]]$ClientConfigPaths = @(),
     [string]$ServerName = 'evavo-creative-assets',
+    [string]$WorkstationServerName = 'evavo-game-art-workstation',
     [switch]$EnableWrite,
+    [switch]$EnableWorkstationWrite,
     [switch]$EnableDevelopmentStudioDispatch,
     [switch]$EnableStorageDispatch,
     [string[]]$StorageOperatorCommand = @(),
     [string]$StateRoot,
+    [string[]]$WorkstationRoots = @(),
     [switch]$EnableValidatedMain,
     [switch]$Force
 )
@@ -17,18 +20,23 @@ $ErrorActionPreference = 'Stop'
 
 if ($EnableValidatedMain) { $EnableDevelopmentStudioDispatch = $true }
 if (($EnableDevelopmentStudioDispatch -or $EnableStorageDispatch) -and -not $EnableWrite) {
-    throw 'Dispatch requires -EnableWrite.'
+    throw 'Publisher dispatch requires -EnableWrite.'
 }
 
 $GitReposRoot = [System.IO.Path]::GetFullPath($GitReposRoot)
-$Server = Join-Path $GitReposRoot 'evavo-art-studio\tools\creative-asset-publisher\mcp.mjs'
-if (-not (Test-Path -LiteralPath $Server -PathType Leaf)) {
-    throw "Creative Asset Publisher MCP server is missing: $Server"
+$ArtStudioRoot = Join-Path $GitReposRoot 'evavo-art-studio'
+$PublisherServer = Join-Path $ArtStudioRoot 'tools\creative-asset-publisher\mcp.mjs'
+$WorkstationServer = Join-Path $ArtStudioRoot 'tools\game_art_workstation_mcp.mjs'
+foreach ($RequiredServer in @($PublisherServer, $WorkstationServer)) {
+    if (-not (Test-Path -LiteralPath $RequiredServer -PathType Leaf)) {
+        throw "Required Art Studio MCP server is missing: $RequiredServer"
+    }
 }
+
 $Node = (Get-Command node -ErrorAction Stop).Source
-$Cli = Join-Path (Split-Path -Parent $Server) 'cli.mjs'
-$Verify = Join-Path (Split-Path -Parent $Server) 'verify.mjs'
-foreach ($RequiredFile in @($Cli, $Verify, (Join-Path (Split-Path -Parent $Server) 'distribution.json'))) {
+$Cli = Join-Path (Split-Path -Parent $PublisherServer) 'cli.mjs'
+$Verify = Join-Path (Split-Path -Parent $PublisherServer) 'verify.mjs'
+foreach ($RequiredFile in @($Cli, $Verify, (Join-Path (Split-Path -Parent $PublisherServer) 'distribution.json'))) {
     if (-not (Test-Path -LiteralPath $RequiredFile -PathType Leaf)) {
         throw "Creative Asset Publisher sealed runtime file is missing: $RequiredFile"
     }
@@ -50,23 +58,24 @@ if ($Capabilities.version -ne '0.4.1' -or
     $Capabilities.forcePushAvailable -ne $false) {
     throw 'Creative Asset Publisher capability boundary verification failed.'
 }
+
 if (-not $StateRoot) { $StateRoot = Join-Path $env:LOCALAPPDATA 'EVAVO\creative-asset-publisher' }
 $StateRoot = [System.IO.Path]::GetFullPath($StateRoot)
-$Environment = [ordered]@{
+$PublisherEnvironment = [ordered]@{
     EVAVO_GIT_REPOS_ROOT = $GitReposRoot
     EVAVO_CREATIVE_ASSET_STATE_ROOT = $StateRoot
     EVAVO_REPO_ROOTS = $GitReposRoot
-    EVAVO_CREATIVE_ASSET_PUBLISHER_CLI = (Join-Path (Split-Path -Parent $Server) 'cli.mjs')
+    EVAVO_CREATIVE_ASSET_PUBLISHER_CLI = $Cli
 }
-if ($EnableWrite) { $Environment['EVAVO_CREATIVE_ASSET_WRITE_ENABLED'] = '1' }
+if ($EnableWrite) { $PublisherEnvironment['EVAVO_CREATIVE_ASSET_WRITE_ENABLED'] = '1' }
 if ($EnableDevelopmentStudioDispatch) {
     $Adapter = Join-Path $GitReposRoot 'evavo-development-studio\scripts\creative-assets\creative-asset-mainline-adapter.mjs'
     if (-not (Test-Path -LiteralPath $Adapter -PathType Leaf)) {
         throw "Development Studio creative-asset adapter is missing: $Adapter"
     }
-    $Environment['EVAVO_CREATIVE_ASSET_DISPATCH_ENABLED'] = '1'
-    $Environment['EVAVO_CREATIVE_ASSET_DEVELOPMENT_APPLY_ENABLED'] = '1'
-    $Environment['EVAVO_CREATIVE_ASSET_OPERATOR_COMMAND_JSON'] = ConvertTo-Json -InputObject @($Node, $Adapter) -Compress
+    $PublisherEnvironment['EVAVO_CREATIVE_ASSET_DISPATCH_ENABLED'] = '1'
+    $PublisherEnvironment['EVAVO_CREATIVE_ASSET_DEVELOPMENT_APPLY_ENABLED'] = '1'
+    $PublisherEnvironment['EVAVO_CREATIVE_ASSET_OPERATOR_COMMAND_JSON'] = ConvertTo-Json -InputObject @($Node, $Adapter) -Compress
 }
 if ($EnableStorageDispatch) {
     if ($StorageOperatorCommand.Count -lt 1) {
@@ -82,19 +91,37 @@ if ($EnableStorageDispatch) {
         }
         $StorageOperatorCommand = @($PythonCommand.Source) + $PythonPrefix + @($StorageAdapter)
     }
-    $Environment['EVAVO_STORAGE_ART_INGEST_ROOTS'] = (Join-Path $StateRoot 'publication-handoffs')
-    $Environment['EVAVO_CREATIVE_ASSET_STORAGE_DISPATCH_ENABLED'] = '1'
-    $Environment['EVAVO_CREATIVE_ASSET_STORAGE_APPLY_ENABLED'] = '1'
-    $Environment['EVAVO_CREATIVE_ASSET_STORAGE_OPERATOR_COMMAND_JSON'] = ConvertTo-Json -InputObject @($StorageOperatorCommand) -Compress
+    $PublisherEnvironment['EVAVO_STORAGE_ART_INGEST_ROOTS'] = (Join-Path $StateRoot 'publication-handoffs')
+    $PublisherEnvironment['EVAVO_CREATIVE_ASSET_STORAGE_DISPATCH_ENABLED'] = '1'
+    $PublisherEnvironment['EVAVO_CREATIVE_ASSET_STORAGE_APPLY_ENABLED'] = '1'
+    $PublisherEnvironment['EVAVO_CREATIVE_ASSET_STORAGE_OPERATOR_COMMAND_JSON'] = ConvertTo-Json -InputObject @($StorageOperatorCommand) -Compress
 }
 
-$Definition = [pscustomobject][ordered]@{
-    command = $Node
-    args = @($Server)
-    env = $Environment
+if ($WorkstationRoots.Count -lt 1) {
+    $WorkstationRoots = @($GitReposRoot, (Join-Path $env:LOCALAPPDATA 'EVAVO'))
 }
+$WorkstationRoots = @($WorkstationRoots | ForEach-Object { [System.IO.Path]::GetFullPath($_) } | Select-Object -Unique)
+$WorkstationEnvironment = [ordered]@{
+    EVAVO_GAME_ART_WORKSTATION_ROOTS = ($WorkstationRoots -join [IO.Path]::PathSeparator)
+}
+if ($EnableWorkstationWrite) {
+    $WorkstationEnvironment['EVAVO_GAME_ART_WORKSTATION_ALLOW_WRITE'] = '1'
+}
+
+$PublisherDefinition = [pscustomobject][ordered]@{
+    command = $Node
+    args = @($PublisherServer)
+    env = $PublisherEnvironment
+}
+$WorkstationDefinition = [pscustomobject][ordered]@{
+    command = $Node
+    args = @($WorkstationServer)
+    env = $WorkstationEnvironment
+}
+
 $SnippetServers = New-Object PSCustomObject
-$SnippetServers | Add-Member -MemberType NoteProperty -Name $ServerName -Value $Definition
+$SnippetServers | Add-Member -MemberType NoteProperty -Name $ServerName -Value $PublisherDefinition
+$SnippetServers | Add-Member -MemberType NoteProperty -Name $WorkstationServerName -Value $WorkstationDefinition
 $Snippet = [pscustomobject][ordered]@{ mcpServers = $SnippetServers }
 
 foreach ($ConfigPathValue in $ClientConfigPaths) {
@@ -108,14 +135,16 @@ foreach ($ConfigPathValue in $ClientConfigPaths) {
         $Document | Add-Member -MemberType NoteProperty -Name 'mcpServers' -Value (New-Object PSCustomObject)
     }
     $Servers = $Document.mcpServers
-    $Exists = $Servers.PSObject.Properties.Name -contains $ServerName
-    if ($Exists -and -not $Force) {
-        throw "MCP server '$ServerName' already exists in $ConfigPath. Use -Force after review."
-    }
-    if ($Exists) {
-        $Servers.$ServerName = $Definition
-    } else {
-        $Servers | Add-Member -MemberType NoteProperty -Name $ServerName -Value $Definition
+    foreach ($Registration in @(
+        [pscustomobject]@{ Name = $ServerName; Definition = $PublisherDefinition },
+        [pscustomobject]@{ Name = $WorkstationServerName; Definition = $WorkstationDefinition }
+    )) {
+        $Exists = $Servers.PSObject.Properties.Name -contains $Registration.Name
+        if ($Exists -and -not $Force) {
+            throw "MCP server '$($Registration.Name)' already exists in $ConfigPath. Use -Force after review."
+        }
+        if ($Exists) { $Servers.($Registration.Name) = $Registration.Definition }
+        else { $Servers | Add-Member -MemberType NoteProperty -Name $Registration.Name -Value $Registration.Definition }
     }
     New-Item -ItemType Directory -Path (Split-Path -Parent $ConfigPath) -Force | Out-Null
     $Temporary = "$ConfigPath.evavo-$PID.tmp"
@@ -125,13 +154,17 @@ foreach ($ConfigPathValue in $ClientConfigPaths) {
 }
 
 [ordered]@{
-    contract = 'evavo.creative-asset-mcp-registration.v3'
-    serverName = $ServerName
-    server = $Definition
+    contract = 'evavo.creative-asset-mcp-registration.v4'
+    publisherServerName = $ServerName
+    workstationServerName = $WorkstationServerName
+    publisherServer = $PublisherDefinition
+    workstationServer = $WorkstationDefinition
     patchedConfigPaths = @($ClientConfigPaths)
     snippet = $Snippet
+    workstationWriteEnabled = [bool]$EnableWorkstationWrite
     developmentStudioDispatchEnabled = [bool]$EnableDevelopmentStudioDispatch
     storageDispatchEnabled = [bool]$EnableStorageDispatch
     artStudioGitCommit = $false
     artStudioGitPush = $false
+    forcePushAvailable = $false
 } | ConvertTo-Json -Depth 30
