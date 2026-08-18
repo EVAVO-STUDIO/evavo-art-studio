@@ -5,7 +5,7 @@ export const MOBILE_IDENTITY_SCHEMA = 'evavo.mobile-identity-production.v1';
 export const MOBILE_IDENTITY_APPROVAL_SCHEMA = 'evavo.mobile-identity-raster-approval.v1';
 
 const FORBIDDEN_MASTER_TYPES = new Set(['svg', 'wordmark', 'lettermark', 'hand-authored-vector', 'vector-concept']);
-const ALLOWED_PROVIDER_FAMILIES = new Set(['openai-image', 'gpt-image', 'comfyui']);
+const ALLOWED_PROVIDER_FAMILIES = new Set(['openai-gpt-image', 'comfyui']);
 const REVIEW_SIZES = Object.freeze([16, 24, 32, 48, 64, 128]);
 
 function assert(condition, message) { if (!condition) throw new Error(message); }
@@ -23,11 +23,11 @@ export function compileMobileIdentityProductionBrief(input) {
   const device = object(brief.device, 'device');
   const delivery = object(brief.delivery, 'delivery');
   const candidateCount = Number(brief.candidateCount ?? 6);
-  assert(Number.isInteger(candidateCount) && candidateCount >= 4 && candidateCount <= 12, 'candidateCount must be 4..12');
+  assert(Number.isInteger(candidateCount) && candidateCount >= 4 && candidateCount <= 8, 'candidateCount must be 4..8');
   const creativeMasterType = String(brief.creativeMasterType ?? 'raster-provider-generation');
   assert(!FORBIDDEN_MASTER_TYPES.has(creativeMasterType), 'mobile identity creative master cannot be SVG, wordmark, lettermark or hand-authored vector');
   assert(creativeMasterType === 'raster-provider-generation', 'mobile identity creative master must be raster-provider-generation');
-  const providerPreference = Array.isArray(brief.providerPreference) ? brief.providerPreference.map((entry) => text(entry, 'providerPreference entry', 80)) : ['gpt-image', 'comfyui'];
+  const providerPreference = Array.isArray(brief.providerPreference) ? brief.providerPreference.map((entry) => text(entry, 'providerPreference entry', 80)) : ['openai-gpt-image', 'comfyui'];
   assert(providerPreference.length > 0, 'at least one image-generation provider is required');
   for (const provider of providerPreference) assert(ALLOWED_PROVIDER_FAMILIES.has(provider), `unsupported mobile identity provider family: ${provider}`);
   const context = Object.freeze({
@@ -50,7 +50,7 @@ export function compileMobileIdentityProductionBrief(input) {
     schema: MOBILE_IDENTITY_SCHEMA, status: 'generation-required',
     creativeMaster: { type: 'raster-provider-generation', vectorMayBeDerivativeOnly: true, svgMayBeCreativeMaster: false, wordmarkMayBeCreativeMaster: false, textAllowed: false },
     candidateCount, providerPreference, context, contextSha256: hashObject(context),
-    generation: { operation: 'generate', width: 1024, height: 1024, opaque: true, prompt, promptSha256: sha256(prompt), immutableCandidates: true, approvalRequiredBeforeDelivery: true },
+    generation: { operation: 'generate', width: 1024, height: 1024, opaque: true, preferredOpenAIModel: 'gpt-image-2', prompt, promptSha256: sha256(prompt), immutableCandidates: true, approvalRequiredBeforeDelivery: true },
     review: { smallScalePixels: REVIEW_SIZES, masks: ['circle', 'squircle', 'android-adaptive'], rejectTextOrWordmark: true, rejectGenericAiCliches: true, requireStrongSilhouette: true, requireIosOpacity: true, requireAndroidSafeZone: true },
     delivery: { ios1024: safeRelative(delivery.ios1024, 'delivery.ios1024'), androidAdaptiveForeground: safeRelative(delivery.androidAdaptiveForeground, 'delivery.androidAdaptiveForeground'), androidNotification: delivery.androidNotification ? safeRelative(delivery.androidNotification, 'delivery.androidNotification') : null },
     authority: { providerExecutionGrantsApproval: false, rasterApprovalGrantsDeviceAuthority: false, vectorDerivativeGrantsCreativeApproval: false, targetRepositoryMutation: false, forcePush: false },
@@ -65,7 +65,8 @@ export function validateMobileIdentityRasterApproval(input) {
   assert(approval.sourceType === 'raster-provider-generation', 'approved mobile identity must originate from raster-provider-generation');
   assert(!FORBIDDEN_MASTER_TYPES.has(String(approval.sourceType)), 'forbidden creative master type');
   const providerFamily = text(approval.providerFamily, 'approval.providerFamily', 80);
-  assert(ALLOWED_PROVIDER_FAMILIES.has(providerFamily), 'approval is not bound to an allowed image-generation provider family');
+  assert(providerFamily === 'openai-gpt-image' || providerFamily.startsWith('comfyui:'), 'approval is not bound to the real Art Studio OpenAI GPT Image or ComfyUI adapter');
+  if (providerFamily === 'openai-gpt-image') assert(approval.providerModel === 'gpt-image-2' || approval.providerModel === 'gpt-image-2-2026-04-21', 'OpenAI mobile identity approval must use an admitted gpt-image-2 model');
   for (const [value, label] of [[approval.candidateSha256, 'candidateSha256'], [approval.contextSha256, 'contextSha256'], [approval.promptSha256, 'promptSha256']]) assert(/^[a-f0-9]{64}$/u.test(String(value)), `${label} must be SHA-256`);
   text(approval.generationReceiptId, 'approval.generationReceiptId', 256);
   const review = object(approval.review, 'approval.review');
