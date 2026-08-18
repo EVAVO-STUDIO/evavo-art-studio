@@ -38,6 +38,13 @@
       "timeoutSeconds": 300,
       "description": "Verify mobile identity provider execution composes Art Studio's existing explicit selection, runtime admission, time-bounded adapter authorization and durable worker execution without bypassing approval or publication boundaries."
     },
+    "mobile-identity-provider-runner-contract": {
+      "runtime": "node-script",
+      "entry": "scripts/test-mobile-identity-provider-runner.mjs",
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Verify the exact-plan OpenAI image runner only accepts the governed four-stage mobile identity plan, strips unrelated credentials and endpoint overrides, and fixes generation to openai-gpt-image with gpt-image-2."
+    },
     "toolchain": {
       "runtime": "pnpm-script",
       "entry": "toolchain:check",
