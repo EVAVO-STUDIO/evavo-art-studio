@@ -1,0 +1,96 @@
+name: EVA dense-motion workstation task
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "config/eva-dense-motion-workstation-task-v1.json"
+      - "config/automation-fabric-client-v5.json"
+      - "scripts/Invoke-EvaDenseMotionWorkstationValidation.ps1"
+      - "scripts/check-eva-dense-motion-workstation-task.mjs"
+      - "scripts/test-eva-dense-motion-workstation-task.mjs"
+      - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
+      - "scripts/project-art/eva-dense-motion-**"
+      - "docs/EVA_DENSE_MOTION_WORKSTATION_TASK.md"
+      - "docs/PROJECT_ART_EVA_DENSE_MOTION_**"
+      - ".github/workflows/eva-dense-motion-workstation-task.yml"
+  pull_request:
+    paths:
+      - "config/eva-dense-motion-workstation-task-v1.json"
+      - "config/automation-fabric-client-v5.json"
+      - "scripts/Invoke-EvaDenseMotionWorkstationValidation.ps1"
+      - "scripts/check-eva-dense-motion-workstation-task.mjs"
+      - "scripts/test-eva-dense-motion-workstation-task.mjs"
+      - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
+      - "scripts/project-art/eva-dense-motion-**"
+      - "docs/EVA_DENSE_MOTION_WORKSTATION_TASK.md"
+      - "docs/PROJECT_ART_EVA_DENSE_MOTION_**"
+      - ".github/workflows/eva-dense-motion-workstation-task.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eva-dense-motion-workstation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Validate planner-bound task contract
+        run: |
+          set -euo pipefail
+          node --check scripts/check-eva-dense-motion-workstation-task.mjs
+          node scripts/check-eva-dense-motion-workstation-task.mjs
+          node --test scripts/test-eva-dense-motion-workstation-task.mjs
+          node scripts/check-project-art-eva-dense-motion-work-order.mjs
+          node scripts/check-art-studio-workstation-v5-contract.mjs
+          node --test scripts/test-art-studio-workstation-v5-contract.mjs
+
+      - name: Confirm validation changed no source
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+  powershell-parse:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Parse tracked PowerShell task without executing it
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path '.\scripts\Invoke-EvaDenseMotionWorkstationValidation.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          )
+          if ($errors.Count -ne 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          Write-Host 'EVA dense-motion workstation PowerShell parse passed.'
