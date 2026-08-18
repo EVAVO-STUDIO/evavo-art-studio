@@ -1,0 +1,110 @@
+name: Project Art Top Hat Pose Bank Provider Campaign
+
+on:
+  pull_request:
+    paths:
+      - "packages/providers/src/**"
+      - "packages/runtime/src/**"
+      - "packages/artifacts/src/**"
+      - "apps/worker/src/provider-handlers.ts"
+      - "scripts/project-art/avatar-final-pass-provider-runtime-*.mjs"
+      - "scripts/project-art/avatar-final-pass-provider-candidate-*.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-*.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-execution.mjs"
+      - "scripts/project-art/top-hat-pose-bank-provider-campaign.mjs"
+      - "scripts/run-project-art-top-hat-pose-slot-provider.mjs"
+      - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs"
+      - "scripts/test-project-art-top-hat-pose-bank-provider-campaign.mjs"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_PROVIDER_CAMPAIGN.md"
+      - ".github/workflows/project-art-top-hat-pose-bank-provider-campaign.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packages/providers/src/**"
+      - "packages/runtime/src/**"
+      - "packages/artifacts/src/**"
+      - "apps/worker/src/provider-handlers.ts"
+      - "scripts/project-art/avatar-final-pass-provider-runtime-*.mjs"
+      - "scripts/project-art/avatar-final-pass-provider-candidate-*.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-*.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-execution.mjs"
+      - "scripts/project-art/top-hat-pose-bank-provider-campaign.mjs"
+      - "scripts/run-project-art-top-hat-pose-slot-provider.mjs"
+      - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs"
+      - "scripts/test-project-art-top-hat-pose-bank-provider-campaign.mjs"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_PROVIDER_CAMPAIGN.md"
+      - ".github/workflows/project-art-top-hat-pose-bank-provider-campaign.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-art-top-hat-pose-bank-provider-campaign-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.13.1
+
+      - name: Use supported Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact campaign dependency closure
+        run: |
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
+          pnpm --filter @evavo/art-studio-worker typecheck
+
+      - name: Recheck one-shot provider boundary
+        run: node --test scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs
+
+      - name: Run six-slot provider campaign regression
+        run: node --test scripts/test-project-art-top-hat-pose-bank-provider-campaign.mjs
+
+      - name: Verify campaign authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "preflightAllSlotsBeforeFirstProviderCall: true" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          grep -F "stopOnFirstFailure: true" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          grep -F "perSlotMaximumAttempts: 1" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          grep -F "providerFallbackAllowed: false" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          grep -F "candidateMaterialization: false" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          grep -F "candidateApproval: false" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          grep -F "poseSlotFilling: false" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          grep -F "sequenceRelease: false" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          grep -F "publication: false" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          grep -F "runtimeActivation: false" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          ! grep -F "candidateApproval: true" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          ! grep -F "publication: true" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+          ! grep -F "runtimeActivation: true" scripts/project-art/top-hat-pose-bank-provider-campaign.mjs
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
