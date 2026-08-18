@@ -11,7 +11,7 @@
       "description": "Verify the sealed Creative Asset Publisher runtime, checksums, MCP surface and least-authority publication boundary."
     },
     "creative-assets-windows": {
-      "runtime": "powershell-file",
+      "runtime": "powershell-script",
       "entry": "tools/creative-asset-publisher/Test-EvavoCreativeAssetPublisher.ps1",
       "network": "disabled",
       "timeoutSeconds": 1800,
