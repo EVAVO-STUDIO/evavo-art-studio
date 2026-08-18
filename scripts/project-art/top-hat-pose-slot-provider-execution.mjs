@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { lstat, mkdir } from 'node:fs/promises';
-import process from 'node:process';
 
 import { LocalArtifactStore } from '../../packages/artifacts/dist/index.js';
 import {
+  PROVIDER_PROTOCOL_VERSION,
   compileProviderCandidateRuntimeContract,
   compileProviderExecutionRoutingPlan,
   providerRequestSha256,
@@ -21,31 +21,64 @@ import {
   providerWorkerCapabilityProfiles,
   restrictProviderRegistry,
 } from '../../apps/worker/dist/provider-handlers.js';
+
+import {
+  compileAvatarFinalPassProviderRuntimeOutcome,
+  validateAvatarFinalPassCompiledProviderRuntimeContract,
+} from './avatar-final-pass-provider-runtime-dispatch.mjs';
+import {
+  GENERIC_PROVIDER_PROTOCOL_VERSION,
+} from './avatar-final-pass-provider-runtime-constants.mjs';
 import {
   compileProjectArtTopHatPoseSlotProviderRuntimeDispatch,
   parseProjectArtTopHatPoseSlotProviderRuntimeAdapter,
 } from './top-hat-pose-slot-provider-runtime-adapter.mjs';
 import {
-  validateAvatarFinalPassCompiledProviderRuntimeContract,
-} from './avatar-final-pass-provider-runtime-binding.mjs';
-import {
-  compileAvatarFinalPassProviderRuntimeOutcome,
-} from './avatar-final-pass-provider-runtime-outcome.mjs';
-import {
-  canonicalJson,
-  deepFreeze,
-  identifier,
-  sha256Document,
-  timestamp,
+  artifactId,
   assert,
+  boundedText,
+  deepFreeze,
+  digest,
+  identifier,
+  isRecord,
+  sha256Document,
+  sha256Text,
+  timestamp,
 } from './avatar-final-pass-provider-runtime-common.mjs';
 
 export const TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_SCHEMA =
   'evavo.project-art-top-hat-pose-slot-provider-execution.v1';
 export const TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_PROTOCOL_VERSION =
-  '2026-08-18.1';
+  '2026-08-19.1';
 export const TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_CAPABILITY =
   'top-hat-pose.execution-authorized';
+
+function normalizedAbsolutePath(value, label) {
+  assert(
+    typeof value === 'string' && value.length >= 1 && !value.includes('\0'),
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_PATH_INVALID',
+    `${label} is invalid.`,
+  );
+  const resolved = path.resolve(value);
+  assert(
+    resolved === value,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_PATH_INVALID',
+    `${label} must be absolute and normalized.`,
+  );
+  return resolved;
+}
+
+async function realDirectory(value, label, create = false) {
+  const root = normalizedAbsolutePath(value, label);
+  if (create) await mkdir(root, { recursive: true, mode: 0o700 });
+  const state = await lstat(root);
+  assert(
+    state.isDirectory() && !state.isSymbolicLink(),
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_PATH_INVALID',
+    `${label} must be a real directory.`,
+  );
+  return root;
+}
 
 function executionAuthority() {
   return Object.freeze({
@@ -53,177 +86,295 @@ function executionAuthority() {
     runtimeSubmission: false,
     runtimeRedrive: false,
     candidateMaterialization: false,
+    deterministicQa: false,
+    creativeReview: false,
     candidateApproval: false,
     candidatePromotion: false,
     poseSlotFilling: false,
     sequenceRelease: false,
-    repositoryMutation: false,
-    publication: false,
+    targetRepositoryMutation: false,
+    gitMutation: false,
     deployment: false,
+    publication: false,
     runtimeActivation: false,
     forcePush: false,
   });
 }
 
-function executionEffects(providerCallPerformed) {
+function sourceAuthorization(dispatch, now) {
+  const metadata = dispatch.providerCompiler.input?.metadata?.topHatPoseSlot;
+  assert(
+    isRecord(metadata) &&
+      metadata.guardedDispatchRequired === true &&
+      metadata.slotId === dispatch.frameId &&
+      isRecord(metadata.authorization) &&
+      metadata.authorization.actorClass === 'human' &&
+      metadata.authorization.maximumProviderCalls === 1,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_AUTHORIZATION_INVALID',
+  );
+  const occurredAt = timestamp(
+    metadata.authorization.occurredAt,
+    'topHatPoseSlot.authorization.occurredAt',
+  );
+  const expiresAt = timestamp(
+    metadata.authorization.expiresAt,
+    'topHatPoseSlot.authorization.expiresAt',
+  );
+  const current = now.getTime();
+  assert(
+    Number.isFinite(current) &&
+      current >= Date.parse(occurredAt) &&
+      current < Date.parse(expiresAt),
+    'TOP_HAT_PROVIDER_RUNTIME_AUTHORIZATION_EXPIRED',
+    `${dispatch.frameId} provider authorization is not active.`,
+  );
   return Object.freeze({
-    providerCallPerformed,
-    providerCallCount: providerCallPerformed ? 1 : 0,
-    candidateStoredInArtifactStore: providerCallPerformed,
-    candidateMaterializedToScratchPath: false,
-    candidateApproved: false,
-    candidatePromoted: false,
-    poseSlotFilled: false,
-    runtimeActivated: false,
-    repositoryMutated: false,
-    published: false,
+    actorClass: 'human',
+    actorId: boundedText(
+      metadata.authorization.actorId,
+      'topHatPoseSlot.authorization.actorId',
+      1,
+      256,
+    ),
+    occurredAt,
+    expiresAt,
+    evidenceSha256: digest(
+      metadata.authorization.evidenceSha256,
+      'topHatPoseSlot.authorization.evidenceSha256',
+    ),
+    maximumProviderCalls: 1,
   });
 }
 
-function absoluteDirectory(value, label) {
-  assert(typeof value === 'string' && value.length > 0, 'TOP_HAT_PROVIDER_EXECUTION_PATH_INVALID');
-  const resolved = path.resolve(value);
-  assert(resolved === value, 'TOP_HAT_PROVIDER_EXECUTION_PATH_INVALID', `${label} must be absolute and normalized.`);
-  return resolved;
-}
-
-async function ensureDirectory(value, label) {
-  const resolved = absoluteDirectory(value, label);
-  await mkdir(resolved, { recursive: true, mode: 0o700 });
-  const state = await lstat(resolved);
-  assert(state.isDirectory() && !state.isSymbolicLink(), 'TOP_HAT_PROVIDER_EXECUTION_PATH_INVALID', `${label} must be a real directory.`);
-  return resolved;
-}
-
-function exactAdapterAllowlist(request) {
-  const values = request.selection?.allowedAdapterIds;
-  assert(Array.isArray(values) && values.length >= 1 && values.length <= 16, 'TOP_HAT_PROVIDER_EXECUTION_ADAPTER_ALLOWLIST_INVALID');
-  const seen = new Set();
-  const result = [];
-  for (const value of values) {
-    const id = identifier(value, 'allowedAdapterId');
-    assert(!seen.has(id), 'TOP_HAT_PROVIDER_EXECUTION_ADAPTER_ALLOWLIST_INVALID');
-    seen.add(id);
-    result.push(id);
-  }
-  assert(request.selection.allowFallback === false, 'TOP_HAT_PROVIDER_EXECUTION_FALLBACK_FORBIDDEN');
-  if (request.selection.preferredAdapterId !== undefined) {
-    assert(seen.has(request.selection.preferredAdapterId), 'TOP_HAT_PROVIDER_EXECUTION_PREFERRED_ADAPTER_INVALID');
-  }
-  return Object.freeze(result);
-}
-
-function activeTopHatAuthorization(request, now = new Date()) {
-  const authorization = request.metadata?.topHatPoseSlot?.authorization;
-  assert(authorization && authorization.actorClass === 'human', 'TOP_HAT_PROVIDER_EXECUTION_AUTHORIZATION_INVALID');
-  assert(authorization.maximumProviderCalls === 1, 'TOP_HAT_PROVIDER_EXECUTION_AUTHORIZATION_INVALID');
-  timestamp(authorization.occurredAt, 'authorization.occurredAt');
-  timestamp(authorization.expiresAt, 'authorization.expiresAt');
-  const milliseconds = now.getTime();
-  assert(
-    milliseconds >= Date.parse(authorization.occurredAt) &&
-      milliseconds < Date.parse(authorization.expiresAt),
-    'TOP_HAT_PROVIDER_EXECUTION_AUTHORIZATION_EXPIRED',
+function authorizationReservationKey(dispatch, authorization) {
+  return sha256Text(
+    `${dispatch.providerCompiler.input.metadata.topHatPoseSlot.providerPackageSha256}\0${dispatch.frameId}\0${authorization.evidenceSha256}`,
   );
-  return authorization;
 }
 
-function isolatedRuntimeJob(compiled, dispatch) {
+function oneShotQueue(dispatch, authorization) {
+  return `top-hat-pose.provider.${authorizationReservationKey(dispatch, authorization).slice(0, 20)}`;
+}
+
+function oneShotRuntimeJob(compiled, dispatch, authorization) {
   const source = compiled.runtimeJob;
+  const reservationKey = authorizationReservationKey(dispatch, authorization);
+  const queue = oneShotQueue(dispatch, authorization);
   return Object.freeze({
     ...source,
-    queue: `top-hat-pose.provider.${dispatch.runtimeDispatchSha256.slice(0, 20)}`,
-    idempotencyKey: dispatch.submissionIdempotencyKey,
+    queue,
+    idempotencyKey: `top-hat-pose-once:${reservationKey}`,
     maximumAttempts: 1,
-    requiredCapabilities: Object.freeze([
-      ...new Set([
-        ...(source.requiredCapabilities ?? []),
+    requiredCapabilities: Object.freeze(
+      [...new Set([
+        ...source.requiredCapabilities,
         TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_CAPABILITY,
-      ]),
-    ].sort()),
+      ])].sort(),
+    ),
     labels: Object.freeze({
-      ...(source.labels ?? {}),
-      topHatPoseExecutionMode: 'single-authorized-call',
+      ...source.labels,
+      topHatPoseExecution: 'one-shot-v1',
       topHatPoseSlotId: dispatch.frameId,
-      topHatPoseRuntimeDispatchSha256: dispatch.runtimeDispatchSha256,
-      topHatPoseRuntimeBindingSha256: validateAvatarFinalPassCompiledProviderRuntimeContract(
-        dispatch,
-        compiled,
-      ).runtimeBindingSha256,
+      topHatRuntimeDispatchSha256: dispatch.runtimeDispatchSha256,
+      topHatSubmissionIdempotencyKey: dispatch.submissionIdempotencyKey,
+      topHatAuthorizationEvidenceSha256: authorization.evidenceSha256,
+      topHatAuthorizationReservationSha256: reservationKey,
     }),
   });
 }
 
-async function verifyInputReferences(request, artifacts) {
-  const verified = [];
-  for (const reference of request.references ?? []) {
-    const verification = await artifacts.verify(reference.artifactId);
-    assert(verification?.exists === true && verification.descriptorValid === true && verification.contentValid === true, 'TOP_HAT_PROVIDER_EXECUTION_REFERENCE_ARTIFACT_INVALID', `Reference artifact failed verification: ${reference.artifactId}`);
+function mapFailureClassification(value) {
+  if (['transient', 'permanent', 'incompatible', 'cancelled'].includes(value)) {
+    return value;
+  }
+  if (['timeout', 'deadline-exceeded', 'lease-expired'].includes(value)) {
+    return 'transient';
+  }
+  return 'permanent';
+}
+
+async function verifiedArtifactSummary(artifacts, artifactId, role) {
+  const verification = await artifacts.verify(artifactId);
+  assert(
+    verification.descriptorValid === true && verification.contentValid === true,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_ARTIFACT_INVALID',
+    `${role} artifact failed immutable verification.`,
+  );
+  const descriptor = await artifacts.get(artifactId);
+  assert(
+    descriptor,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_ARTIFACT_INVALID',
+    `${role} artifact descriptor is missing.`,
+  );
+  if (role === 'candidate') {
+    assert(
+      descriptor.storageClass === 'intermediate' &&
+        descriptor.labels.artifactRole === 'provider-candidate' &&
+        descriptor.labels.approvalState === 'unapproved' &&
+        descriptor.metadata?.finalDeliverable === false,
+      'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_CANDIDATE_ESCALATED',
+      'Provider candidate crossed its unapproved intermediate boundary.',
+    );
+  } else {
+    assert(
+      descriptor.storageClass === 'evidence',
+      'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_ARTIFACT_INVALID',
+      'Provider evidence must remain evidence storage.',
+    );
+  }
+  return Object.freeze({
+    artifactId,
+    contentHash: descriptor.contentHash,
+    mediaType: descriptor.mediaType,
+    storageClass: descriptor.storageClass,
+    artifactRole: descriptor.labels.artifactRole ?? null,
+    approvalState: descriptor.labels.approvalState ?? null,
+  });
+}
+
+async function preflightProviderReferences(artifacts, request, selectedAdapter) {
+  let totalBytes = 0;
+  const summaries = [];
+  for (const [index, reference] of request.references.entries()) {
     const descriptor = await artifacts.get(reference.artifactId);
-    assert(descriptor, 'TOP_HAT_PROVIDER_EXECUTION_REFERENCE_ARTIFACT_INVALID', `Reference artifact is missing: ${reference.artifactId}`);
-    verified.push(Object.freeze({
+    if (!descriptor) {
+      assert(
+        reference.required !== true,
+        'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_REFERENCE_MISSING',
+        `Required provider reference ${index} is missing from artifactRoot.`,
+      );
+      continue;
+    }
+    const verification = await artifacts.verify(reference.artifactId);
+    assert(
+      verification.descriptorValid === true && verification.contentValid === true,
+      'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_REFERENCE_INVALID',
+      `Provider reference ${index} failed immutable artifact verification.`,
+    );
+    assert(
+      descriptor.mediaType.startsWith('image/'),
+      'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_REFERENCE_INVALID',
+      `Provider reference ${index} is not an image artifact.`,
+    );
+    assert(
+      descriptor.sizeBytes <= 32 * 1024 * 1024 &&
+        descriptor.sizeBytes <= selectedAdapter.maximumSourceBytes,
+      'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_REFERENCE_TOO_LARGE',
+      `Provider reference ${index} exceeds the admitted provider source limit.`,
+    );
+    totalBytes += descriptor.sizeBytes;
+    assert(
+      totalBytes <= 128 * 1024 * 1024,
+      'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_REFERENCES_TOO_LARGE',
+      'Provider references exceed the aggregate source limit.',
+    );
+    summaries.push(Object.freeze({
       artifactId: reference.artifactId,
       role: reference.role,
       contentHash: descriptor.contentHash,
       mediaType: descriptor.mediaType,
+      sizeBytes: descriptor.sizeBytes,
+      required: reference.required,
     }));
   }
-  assert(verified.length === 3, 'TOP_HAT_PROVIDER_EXECUTION_REFERENCE_ARTIFACT_INVALID');
-  return Object.freeze(verified);
+  return Object.freeze(summaries);
 }
 
-async function verifyOutputArtifacts(result, completed, artifacts) {
-  assert(Array.isArray(result.candidateArtifacts) && result.candidateArtifacts.length === 1, 'TOP_HAT_PROVIDER_EXECUTION_CANDIDATE_COUNT_INVALID');
-  assert(typeof result.evidenceArtifact === 'string' && result.evidenceArtifact.length > 0, 'TOP_HAT_PROVIDER_EXECUTION_EVIDENCE_INVALID');
-  const expected = [result.candidateArtifacts[0], result.evidenceArtifact].sort();
-  const actual = [...completed.outputArtifacts].sort();
-  assert(canonicalJson(actual) === canonicalJson(expected), 'TOP_HAT_PROVIDER_EXECUTION_OUTPUT_ARTIFACT_MISMATCH');
-
-  const records = [];
-  for (const artifactId of expected) {
-    const verification = await artifacts.verify(artifactId);
-    assert(verification?.exists === true && verification.descriptorValid === true && verification.contentValid === true, 'TOP_HAT_PROVIDER_EXECUTION_OUTPUT_ARTIFACT_INVALID', `Output artifact failed verification: ${artifactId}`);
-    const descriptor = await artifacts.get(artifactId);
-    assert(descriptor, 'TOP_HAT_PROVIDER_EXECUTION_OUTPUT_ARTIFACT_INVALID', `Output artifact is missing: ${artifactId}`);
-    if (artifactId === result.candidateArtifacts[0]) {
-      assert(
-        descriptor.mediaType === 'image/png' &&
-          descriptor.storageClass === 'intermediate' &&
-          descriptor.labels?.artifactRole === 'provider-candidate' &&
-          descriptor.labels?.approvalState === 'unapproved' &&
-          descriptor.metadata?.finalDeliverable === false,
-        'TOP_HAT_PROVIDER_EXECUTION_CANDIDATE_AUTHORITY_INVALID',
-      );
-    }
-    records.push(Object.freeze({
-      artifactId,
-      contentHash: descriptor.contentHash,
-      mediaType: descriptor.mediaType,
-      storageClass: descriptor.storageClass,
-      artifactRole: descriptor.labels?.artifactRole ?? null,
-      approvalState: descriptor.labels?.approvalState ?? null,
-    }));
+function providerFailureAttempt(completed) {
+  const details = completed.failure?.details;
+  if (!isRecord(details) || !Array.isArray(details.attempts)) {
+    return Object.freeze({ verified: false, providerCallCount: null });
   }
-  return Object.freeze(records);
+  if (details.attempts.length !== 1 || !isRecord(details.attempts[0])) {
+    return Object.freeze({ verified: false, providerCallCount: null });
+  }
+  const attempt = details.attempts[0];
+  const classification = mapFailureClassification(
+    attempt.classification ?? completed.failure?.classification,
+  );
+  const evidenceArtifactId =
+    typeof details.evidenceArtifactId === 'string'
+      ? artifactId(details.evidenceArtifactId, 'provider failure evidenceArtifactId')
+      : null;
+  return Object.freeze({
+    verified: true,
+    providerCallCount: 1,
+    adapterId: boundedText(attempt.adapterId, 'provider failure adapterId', 1, 128),
+    model:
+      typeof attempt.model === 'string'
+        ? boundedText(attempt.model, 'provider failure model', 1, 256)
+        : null,
+    classification,
+    code: boundedText(
+      String(attempt.code ?? completed.failure?.code ?? 'PROVIDER_EXECUTION_FAILED'),
+      'provider failure code',
+      1,
+      256,
+    ),
+    message: boundedText(
+      String(attempt.message ?? completed.failure?.message ?? 'Provider execution failed.'),
+      'provider failure message',
+      1,
+      4096,
+    ),
+    evidenceArtifactId,
+  });
+}
+
+function runtimeFailureOutcome(dispatch, completed, completedAt, attempt) {
+  assert(
+    attempt?.verified === true && attempt.providerCallCount === 1,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_FAILURE_ATTEMPT_UNVERIFIED',
+  );
+  return Object.freeze({
+    kind: 'provider-failure',
+    submissionIdempotencyKey: dispatch.submissionIdempotencyKey,
+    providerCallCount: 1,
+    completedAt,
+    failure: Object.freeze({
+      code: attempt.code,
+      classification: attempt.classification,
+      message: attempt.message,
+      adapterId: attempt.adapterId,
+      model: attempt.model,
+      attemptCount: 1,
+      candidateCount: 0,
+    }),
+  });
 }
 
 export async function executeTopHatPoseSlotProvider({
-  adapter,
+  adapter: adapterInput,
   slotId,
-  runtimeRoot,
-  artifactRoot,
+  runtimeRoot: runtimeRootInput,
+  artifactRoot: artifactRootInput,
   workerId = 'top-hat-pose-provider-worker',
-  compiledAt = new Date().toISOString(),
   environment = process.env,
 }) {
-  const parsedAdapter = parseProjectArtTopHatPoseSlotProviderRuntimeAdapter(adapter);
+  const adapter = parseProjectArtTopHatPoseSlotProviderRuntimeAdapter(adapterInput);
   const selectedSlotId = identifier(slotId, 'slotId');
-  timestamp(compiledAt, 'compiledAt');
+  const now = new Date();
+  const compiledAt = now.toISOString();
   const dispatch = compileProjectArtTopHatPoseSlotProviderRuntimeDispatch({
-    adapter: parsedAdapter,
+    adapter,
     slotId: selectedSlotId,
     compiledAt,
   });
+  const authorization = sourceAuthorization(dispatch, now);
+
+  const runtimeRoot = await realDirectory(runtimeRootInput, 'runtimeRoot', true);
+  const artifactRoot = await realDirectory(artifactRootInput, 'artifactRoot', true);
+  assert(
+    runtimeRoot !== artifactRoot,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_PATH_INVALID',
+    'runtimeRoot and artifactRoot must be separate directories.',
+  );
+
+  assert(
+    PROVIDER_PROTOCOL_VERSION === GENERIC_PROVIDER_PROTOCOL_VERSION,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_PROTOCOL_DRIFT',
+    `Avatar provider bridge ${GENERIC_PROVIDER_PROTOCOL_VERSION} does not match provider runtime ${PROVIDER_PROTOCOL_VERSION}.`,
+  );
   const compiled = compileProviderCandidateRuntimeContract(
     dispatch.providerCompiler.input,
   );
@@ -233,202 +384,271 @@ export async function executeTopHatPoseSlotProvider({
   );
   const request = validateProviderCandidateRequest(compiled.request);
   assert(
-    providerRequestSha256(request) === binding.normalizedProviderRequestSha256,
-    'TOP_HAT_PROVIDER_EXECUTION_REQUEST_HASH_MISMATCH',
+    providerRequestSha256(request) === binding.normalizedProviderRequestSha256 &&
+      request.selection.allowFallback === false,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_REQUEST_MISMATCH',
   );
-  const authorization = activeTopHatAuthorization(request);
+
+  const allowedAdapterIds = Object.freeze([
+    ...request.selection.allowedAdapterIds,
+  ]);
   assert(
-    request.metadata.topHatPoseSlot.slotId === selectedSlotId,
-    'TOP_HAT_PROVIDER_EXECUTION_SLOT_MISMATCH',
+    allowedAdapterIds.length >= 1,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_ADAPTERS_INVALID',
+    'Top Hat provider execution requires at least one exact allowed adapter.',
   );
-  const allowedAdapterIds = exactAdapterAllowlist(request);
-
-  const normalizedRuntimeRoot = await ensureDirectory(runtimeRoot, 'runtimeRoot');
-  const normalizedArtifactRoot = await ensureDirectory(artifactRoot, 'artifactRoot');
-  assert(normalizedRuntimeRoot !== normalizedArtifactRoot, 'TOP_HAT_PROVIDER_EXECUTION_ROOT_COLLISION');
-
-  const runtime = new LocalRuntimeRepository({ root: normalizedRuntimeRoot });
-  const artifacts = new LocalArtifactStore({ root: normalizedArtifactRoot });
-  const inputArtifacts = await verifyInputReferences(request, artifacts);
-
   const baseRegistry = createProviderRegistryFromEnvironment(environment);
   const providerRegistry = restrictProviderRegistry(baseRegistry, allowedAdapterIds);
-  const routing = compileProviderExecutionRoutingPlan(request, providerRegistry.rank(request));
+  const routing = compileProviderExecutionRoutingPlan(
+    request,
+    providerRegistry.rank(request),
+  );
   assert(
-    routing.outcome === 'eligible' &&
-      routing.fallbackAllowed === false &&
-      routing.providerCallPerformedByInspection === false &&
-      routing.eligibleAdapters.length >= 1,
-    'TOP_HAT_PROVIDER_EXECUTION_ROUTING_INVALID',
+    routing.eligibleAdapters.length >= 1 &&
+      routing.inspection.fallbackAllowed === false &&
+      routing.inspection.providerCallPerformedByInspection === false,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_ROUTING_INVALID',
+  );
+  const selectedAdapter = routing.eligibleAdapters[0].adapter.descriptor;
+  const runtime = new LocalRuntimeRepository({ root: runtimeRoot });
+  const artifacts = new LocalArtifactStore({ root: artifactRoot });
+  const referencePreflight = await preflightProviderReferences(
+    artifacts,
+    request,
+    selectedAdapter,
   );
 
-  const runtimeJob = isolatedRuntimeJob(compiled, dispatch);
+  const runtimeJob = oneShotRuntimeJob(compiled, dispatch, authorization);
   const normalized = normalizeRuntimeJobSubmission(runtimeJob);
+  assert(
+    normalized.spec.maximumAttempts === 1 &&
+      normalized.spec.queue === oneShotQueue(dispatch, authorization) &&
+      normalized.spec.requiredCapabilities.includes(
+        TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_CAPABILITY,
+      ),
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_JOB_INVALID',
+  );
+
+  const existing = await runtime.get(normalized.spec.id);
+  assert(
+    existing === null,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_AUTHORIZATION_ALREADY_RESERVED',
+    `${selectedSlotId} run-once authorization is already reserved in this runtime root.`,
+  );
   const submitted = await runtime.submitBatch(
     [runtimeJob],
     `top-hat-pose:${authorization.actorId}`,
-    new Date(compiledAt),
+    now,
   );
-  assert(Array.isArray(submitted) && submitted.length === 1, 'TOP_HAT_PROVIDER_EXECUTION_RUNTIME_SUBMISSION_INVALID');
-  const admitted = submitted[0];
   assert(
-    admitted.id === normalized.spec.id &&
-      admitted.specHash === normalized.specHash &&
-      canonicalJson(admitted.spec) === canonicalJson(normalized.spec) &&
-      admitted.spec.maximumAttempts === 1 &&
-      admitted.attempts.length === 0 &&
-      admitted.state === 'queued',
-    'TOP_HAT_PROVIDER_EXECUTION_RUNTIME_SUBMISSION_INVALID',
+    submitted.length === 1 &&
+      submitted[0].id === normalized.spec.id &&
+      submitted[0].specHash === normalized.specHash &&
+      submitted[0].state === 'queued',
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_SUBMISSION_INVALID',
   );
 
-  let capturedResult = null;
-  let handlerInvocations = 0;
-  const rawHandlers = createProviderHandlers(providerRegistry);
-  const handlers = Object.fromEntries(
-    Object.entries(rawHandlers).map(([kind, handler]) => [kind, async (context) => {
-      activeTopHatAuthorization(request);
-      assert(handlerInvocations === 0, 'TOP_HAT_PROVIDER_EXECUTION_MULTIPLE_PROVIDER_CALLS');
+  let providerRunResult = null;
+  const providerHandlers = createProviderHandlers(providerRegistry);
+  const providerHandler = providerHandlers[normalized.spec.kind];
+  assert(
+    typeof providerHandler === 'function',
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_HANDLER_MISSING',
+  );
+  const handlers = Object.freeze({
+    [normalized.spec.kind]: async (context) => {
+      sourceAuthorization(dispatch, new Date());
       assert(
-        context.job.id === admitted.id &&
-          context.job.specHash === admitted.specHash &&
+        context.job.id === normalized.spec.id &&
+          context.job.specHash === normalized.specHash &&
           context.job.spec.maximumAttempts === 1 &&
-          context.job.spec.queue === admitted.spec.queue &&
-          context.job.spec.requiredCapabilities.includes(TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_CAPABILITY) &&
-          providerRequestSha256(validateProviderCandidateRequest(context.job.spec.payload)) === binding.normalizedProviderRequestSha256,
-        'TOP_HAT_PROVIDER_EXECUTION_WORKER_CLAIM_INVALID',
+          context.job.spec.queue === normalized.spec.queue &&
+          context.job.spec.requiredCapabilities.includes(
+            TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_CAPABILITY,
+          ) &&
+          providerRequestSha256(
+            validateProviderCandidateRequest(context.job.spec.payload),
+          ) === binding.normalizedProviderRequestSha256,
+        'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_CLAIM_INVALID',
       );
-      handlerInvocations += 1;
-      const response = await handler(context);
-      capturedResult = response?.result ?? null;
-      return response;
-    }]),
-  );
+      const result = await providerHandler(context);
+      providerRunResult = result?.result ?? null;
+      return result;
+    },
+  });
 
-  const executorId = identifier(workerId, 'workerId');
+  const resolvedWorkerId = identifier(workerId, 'workerId');
   const worker = new RuntimeWorker({
     runtime,
     artifacts,
     worker: {
-      id: executorId,
-      capabilities: Object.freeze([
-        ...new Set([
+      id: resolvedWorkerId,
+      capabilities: Object.freeze(
+        [...new Set([
           ...providerWorkerCapabilities(providerRegistry),
           TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_CAPABILITY,
-        ]),
-      ].sort()),
+        ])].sort(),
+      ),
       capabilityProfiles: providerWorkerCapabilityProfiles(providerRegistry),
-      queues: Object.freeze([admitted.spec.queue]),
+      queues: Object.freeze([normalized.spec.queue]),
     },
     handlers,
     concurrency: 1,
   });
+  const workerResult = await worker.runUntilIdle();
+  const completed = await runtime.get(normalized.spec.id);
+  assert(
+    completed &&
+      completed.specHash === normalized.specHash &&
+      ['succeeded', 'failed', 'dead-letter', 'cancelled'].includes(completed.state) &&
+      completed.attempts.length === 1,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_COMPLETION_INVALID',
+  );
+  assert(
+    workerResult.claimed === 1 &&
+      workerResult.succeeded +
+        workerResult.failed +
+        workerResult.cancelled +
+        workerResult.paused ===
+        1,
+    'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_WORKER_INVALID',
+  );
 
-  const runResult = await worker.runUntilIdle();
-  const completed = await runtime.get(admitted.id);
-  assert(completed && completed.specHash === admitted.specHash, 'TOP_HAT_PROVIDER_EXECUTION_RUNTIME_COMPLETION_INVALID');
-  assert(handlerInvocations <= 1 && completed.attempts.length <= 1, 'TOP_HAT_PROVIDER_EXECUTION_MULTIPLE_PROVIDER_CALLS');
-
-  if (completed.state !== 'succeeded') {
-    const body = {
-      schema: TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_SCHEMA,
-      protocolVersion: TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_PROTOCOL_VERSION,
-      status: 'provider-failed-review-required',
-      slotId: selectedSlotId,
-      completedAt: completed.finishedAt ?? new Date().toISOString(),
-      sourceAdapterSha256: parsedAdapter.adapterSha256,
-      runtimeDispatchSha256: dispatch.runtimeDispatchSha256,
-      runtimeBindingSha256: binding.runtimeBindingSha256,
-      runtime: Object.freeze({
-        jobId: completed.id,
-        specSha256: completed.specHash,
-        state: completed.state,
-        attempts: completed.attempts.length,
-        maximumAttempts: completed.spec.maximumAttempts,
-        queue: completed.spec.queue,
-        failure: completed.failure ?? null,
-      }),
-      worker: Object.freeze({ id: executorId, runResult }),
-      effects: executionEffects(handlerInvocations === 1),
-      authority: executionAuthority(),
-      requiredNextStep: 'fresh-human-run-provider-once-authorization-before-any-retry',
-    };
-    return deepFreeze({
-      ...body,
-      executionSha256: sha256Document(body),
-    });
-  }
-
-  assert(handlerInvocations === 1 && completed.attempts.length === 1, 'TOP_HAT_PROVIDER_EXECUTION_PROVIDER_CALL_COUNT_INVALID');
-  assert(capturedResult && typeof capturedResult === 'object', 'TOP_HAT_PROVIDER_EXECUTION_RESULT_MISSING');
-  const outputArtifacts = await verifyOutputArtifacts(capturedResult, completed, artifacts);
-  const completedAt = completed.finishedAt ?? new Date().toISOString();
-  const runtimeOutcome = compileAvatarFinalPassProviderRuntimeOutcome(
-    dispatch,
-    binding,
-    {
+  const completedAt = new Date().toISOString();
+  let outcome = null;
+  let candidateArtifact = null;
+  let evidenceArtifact = null;
+  let failureEvidenceArtifact = null;
+  let providerCallCount = null;
+  let providerCallCountVerified = false;
+  let failureAttempt = null;
+  if (completed.state === 'succeeded') {
+    assert(
+      isRecord(providerRunResult),
+      'TOP_HAT_PROVIDER_RUNTIME_EXECUTION_RESULT_MISSING',
+    );
+    const outcomeInput = Object.freeze({
       kind: 'candidate-run-result',
       submissionIdempotencyKey: dispatch.submissionIdempotencyKey,
       providerCallCount: 1,
       completedAt,
-      result: capturedResult,
-    },
-  );
-  assert(
-    runtimeOutcome.result.status === 'candidate-materialization-required' &&
-      runtimeOutcome.result.materializationRequest.createOnly === true &&
-      runtimeOutcome.result.approvals.runtime === false &&
-      runtimeOutcome.result.approvals.publication === false,
-    'TOP_HAT_PROVIDER_EXECUTION_OUTCOME_AUTHORITY_INVALID',
-  );
+      result: providerRunResult,
+    });
+    candidateArtifact = await verifiedArtifactSummary(
+      artifacts,
+      providerRunResult.candidateArtifacts[0],
+      'candidate',
+    );
+    evidenceArtifact = await verifiedArtifactSummary(
+      artifacts,
+      providerRunResult.evidenceArtifact,
+      'evidence',
+    );
+    outcome = compileAvatarFinalPassProviderRuntimeOutcome(
+      dispatch,
+      binding,
+      outcomeInput,
+    );
+    providerCallCount = 1;
+    providerCallCountVerified = true;
+  } else {
+    failureAttempt = providerFailureAttempt(completed);
+    providerCallCount = failureAttempt.providerCallCount;
+    providerCallCountVerified = failureAttempt.verified;
+    if (failureAttempt.evidenceArtifactId) {
+      failureEvidenceArtifact = await verifiedArtifactSummary(
+        artifacts,
+        failureAttempt.evidenceArtifactId,
+        'evidence',
+      );
+    }
+    if (failureAttempt.verified) {
+      outcome = compileAvatarFinalPassProviderRuntimeOutcome(
+        dispatch,
+        binding,
+        runtimeFailureOutcome(dispatch, completed, completedAt, failureAttempt),
+      );
+    }
+  }
 
-  const body = {
+  const receiptBody = {
     schema: TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_SCHEMA,
     protocolVersion: TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_PROTOCOL_VERSION,
-    status: 'candidate-generated-review-required',
-    slotId: selectedSlotId,
+    status: completed.state,
     completedAt,
-    sourceAdapterSha256: parsedAdapter.adapterSha256,
-    sourceProviderPackageSha256: parsedAdapter.sourceProviderPackageSha256,
-    productionPlanSha256: parsedAdapter.productionPlanSha256,
-    runtimeDispatch: dispatch,
-    runtimeBinding: binding,
-    providerRuntimeOutcome: runtimeOutcome,
+    slotId: selectedSlotId,
+    sourceAdapterSha256: adapter.adapterSha256,
+    sourceProviderPackageSha256: adapter.sourceProviderPackageSha256,
+    runtimeDispatchSha256: dispatch.runtimeDispatchSha256,
+    runtimeBindingSha256: binding.runtimeBindingSha256,
+    runtimeOutcomeSha256: outcome?.runtimeOutcomeSha256 ?? null,
+    submissionIdempotencyKey: dispatch.submissionIdempotencyKey,
+    authorization,
     runtime: Object.freeze({
-      jobId: completed.id,
-      specSha256: completed.specHash,
-      state: completed.state,
+      root: runtimeRoot,
+      jobId: normalized.spec.id,
+      specSha256: normalized.specHash,
+      queue: normalized.spec.queue,
+      maximumAttempts: 1,
       attempts: completed.attempts.length,
-      maximumAttempts: completed.spec.maximumAttempts,
-      queue: completed.spec.queue,
-      automaticRetry: false,
+      workerId: resolvedWorkerId,
     }),
     provider: Object.freeze({
       allowedAdapterIds,
       fallbackAllowed: false,
-      providerCallCount: 1,
-      candidateCount: 1,
-      adapterId: capturedResult.adapterId,
-      model: capturedResult.model,
+      providerCallCount,
+      providerCallCountVerified,
+      adapterId:
+        completed.state === 'succeeded'
+          ? providerRunResult.adapterId
+          : failureAttempt?.adapterId ?? null,
+      model:
+        completed.state === 'succeeded'
+          ? providerRunResult.model
+          : failureAttempt?.model ?? null,
     }),
-    worker: Object.freeze({ id: executorId, runResult }),
-    inputArtifacts,
-    outputArtifacts,
-    effects: executionEffects(true),
+    artifacts: Object.freeze({
+      root: artifactRoot,
+      candidate: candidateArtifact,
+      evidence: evidenceArtifact,
+      failureEvidence: failureEvidenceArtifact,
+      references: referencePreflight,
+    }),
+    failure:
+      completed.state === 'succeeded'
+        ? null
+        : Object.freeze({
+            runtimeFailure: completed.failure ?? null,
+            providerAttempt: failureAttempt,
+            freshHumanAuthorizationRequiredForRetry: true,
+          }),
+    effects: Object.freeze({
+      runtimeEnqueuePerformed: true,
+      providerExecutionPerformed: providerCallCount === 1,
+      candidateArtifactCreated: completed.state === 'succeeded',
+      evidenceArtifactCreated:
+        completed.state === 'succeeded' || failureEvidenceArtifact !== null,
+      candidateBytesMaterialized: false,
+      candidateApprovalPerformed: false,
+      candidatePromotionPerformed: false,
+      poseSlotFilled: false,
+      sequenceReleased: false,
+      repositoryMutationPerformed: false,
+      publicationPerformed: false,
+      runtimeActivationPerformed: false,
+    }),
     authority: executionAuthority(),
-    requiredNextSteps: Object.freeze([
-      'materialize-candidate-create-only',
-      ...(runtimeOutcome.result.requiresAlphaExtraction
-        ? ['perform-governed-alpha-extraction']
-        : []),
-      'rerun-avatar-frame-finisher',
-      'independent-art-anatomy-identity-continuity-review',
-      'named-human-candidate-admission',
-      'six-slot-release-review-after-all-slots-pass',
-    ]),
   };
-  return deepFreeze({
-    ...body,
-    executionSha256: sha256Document(body),
+  const receipt = deepFreeze({
+    ...receiptBody,
+    executionSha256: sha256Document(receiptBody),
+  });
+  return Object.freeze({
+    dispatch,
+    compiledRuntimeContract: compiled,
+    binding,
+    outcome,
+    receipt,
   });
 }
 
@@ -436,22 +656,29 @@ export function projectArtTopHatPoseSlotProviderExecutionCapabilities() {
   return Object.freeze({
     schema: 'evavo.project-art-top-hat-pose-slot-provider-execution-capabilities.v1',
     protocolVersion: TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_PROTOCOL_VERSION,
-    perSlotExecutionOnly: true,
-    exactExistingAdapterRequired: true,
-    sourceNamedHumanAuthorizationRequired: true,
-    sourceAuthorizationMustBeActiveAtCallTime: true,
-    maximumProviderCalls: 1,
+    executionSchema: TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_SCHEMA,
+    requiredExecutionCapability:
+      TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION_CAPABILITY,
+    exactTopHatAdapterRequired: true,
+    activeNamedHumanRunOnceAuthorizationRequired: true,
+    genericProviderContractCompiledAndBound: true,
+    durableRuntimeSubmission: true,
+    isolatedRuntimeQueue: true,
     maximumRuntimeAttempts: 1,
-    fallbackAllowed: false,
-    exactAdapterAllowlistRequired: true,
-    durableRuntimeUsed: true,
-    immutableArtifactStoreUsed: true,
-    genericRuntimeBindingReused: true,
-    genericRuntimeOutcomeReused: true,
+    authorizationReservationPerDurableRuntimeRoot: true,
+    providerReferencePreflightBeforeReservation: true,
+    providerFallbackAllowed: false,
+    exactAdapterAllowlistEnforced: true,
+    oneCandidatePerSlot: true,
+    immutableCandidateAndEvidenceVerification: true,
     candidateMaterialization: false,
     candidateApproval: false,
+    candidatePromotion: false,
     poseSlotFilling: false,
     sequenceRelease: false,
+    repositoryMutation: false,
+    gitPush: false,
+    deployment: false,
     publication: false,
     runtimeActivation: false,
     forcePush: false,
