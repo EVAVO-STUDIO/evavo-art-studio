@@ -36,7 +36,7 @@ def godot(plan,frames,atlas_res):
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--workspace-root',required=True);ap.add_argument('--plan',required=True);ap.add_argument('--output-root',required=True);ns=ap.parse_args()
     try:
-        root=Path(os.path.abspath(ns.workspace_root));planp=Path(os.path.abspath(ns.plan));out=Path(os.path.abspath(ns.output_root))
+        root=Path(os.path.abspath(ns.workspace_root)).resolve(strict=True);planp=Path(os.path.abspath(ns.plan));out=Path(os.path.abspath(ns.output_root))
         if root.is_symlink() or not root.is_dir():fail('workspace root invalid')
         if out.exists():fail('output root is create-only')
         plan=json.loads(planp.read_text('utf-8'))
