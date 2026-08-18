@@ -21,8 +21,9 @@ assert.ok(master.runtimeTargets.ios.includes(
 ));
 
 const adaptive = families.get('android-adaptive-icon');
-assert.equal(adaptive?.status, 'integrated-reviewed-runtime-identity');
+assert.equal(adaptive?.status, 'runtime-integrated-reviewed-derivative');
 for (const target of [
+  'apps/mobile/android/app/src/main/res/mipmap-anydpi/ic_launcher.xml',
   'apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml',
   'apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml',
   'apps/mobile/android/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml',
@@ -33,12 +34,13 @@ for (const target of [
   assert.ok(adaptive.runtimeTargets.android.includes(target), `Missing shipped adaptive icon target: ${target}`);
 }
 assert.ok(adaptive.requirements.some((value) => value.includes('Android 13')));
-assert.ok(adaptive.requirements.some((value) => value.includes('themed icon')));
+assert.ok(adaptive.requirements.some((value) => value.includes('themed icons')));
 
 const texture = families.get('control-surface-texture');
-assert.equal(texture?.status, 'platform-native-integrated');
-assert.ok(texture.requirements.some((value) => value.includes('iOS')));
-assert.ok(texture.requirements.some((value) => value.includes('Android')));
+assert.equal(texture?.status, 'platform-specific-runtime-state');
+assert.equal(texture?.runtimeStatus.ios, 'implemented-native-procedural');
+assert.equal(texture?.runtimeStatus.android, 'restrained-flat-native-surface');
+assert.ok(texture.requirements.some((value) => value.includes('do not claim platform parity')));
 
 assert.equal(plan.review.humanOrGovernedReviewRequired, true);
 assert.equal(plan.authority.mayGenerateCandidates, true);
