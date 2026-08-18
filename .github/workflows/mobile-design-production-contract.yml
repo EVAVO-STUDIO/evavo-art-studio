@@ -5,14 +5,34 @@ on:
     paths:
       - 'config/mobile/evavo-glasses.production-plan.json'
       - 'scripts/compile-mobile-app-asset-plan.mjs'
+      - 'scripts/mobile-identity-contract.mjs'
+      - 'scripts/mobile-identity-production.mjs'
+      - 'scripts/compile-mobile-identity-provider-request.mjs'
+      - 'scripts/compile-mobile-identity-execution-plan.mjs'
+      - 'scripts/run-mobile-identity-provider-plan.mjs'
       - 'scripts/test-mobile-design-production-contract.mjs'
+      - 'scripts/test-mobile-identity-production.mjs'
+      - 'scripts/test-mobile-identity-provider-request.mjs'
+      - 'scripts/test-mobile-identity-execution-plan.mjs'
+      - 'scripts/test-mobile-identity-provider-runner.mjs'
+      - 'evavo.tasks.json'
       - '.github/workflows/mobile-design-production-contract.yml'
   push:
     branches: [main]
     paths:
       - 'config/mobile/evavo-glasses.production-plan.json'
       - 'scripts/compile-mobile-app-asset-plan.mjs'
+      - 'scripts/mobile-identity-contract.mjs'
+      - 'scripts/mobile-identity-production.mjs'
+      - 'scripts/compile-mobile-identity-provider-request.mjs'
+      - 'scripts/compile-mobile-identity-execution-plan.mjs'
+      - 'scripts/run-mobile-identity-provider-plan.mjs'
       - 'scripts/test-mobile-design-production-contract.mjs'
+      - 'scripts/test-mobile-identity-production.mjs'
+      - 'scripts/test-mobile-identity-provider-request.mjs'
+      - 'scripts/test-mobile-identity-execution-plan.mjs'
+      - 'scripts/test-mobile-identity-provider-runner.mjs'
+      - 'evavo.tasks.json'
       - '.github/workflows/mobile-design-production-contract.yml'
   workflow_dispatch:
 
@@ -40,11 +60,22 @@ jobs:
         with:
           node-version: '22.14.0'
 
-      - name: Check mobile asset compiler syntax
-        run: node --check scripts/compile-mobile-app-asset-plan.mjs
+      - name: Check mobile identity compiler and runner syntax
+        run: |
+          node --check scripts/compile-mobile-app-asset-plan.mjs
+          node --check scripts/mobile-identity-contract.mjs
+          node --check scripts/mobile-identity-production.mjs
+          node --check scripts/compile-mobile-identity-provider-request.mjs
+          node --check scripts/compile-mobile-identity-execution-plan.mjs
+          node --check scripts/run-mobile-identity-provider-plan.mjs
 
-      - name: Validate mobile design production contract
-        run: node --test scripts/test-mobile-design-production-contract.mjs
+      - name: Validate mobile design and raster-first identity contracts
+        run: |
+          node --test scripts/test-mobile-design-production-contract.mjs
+          node scripts/test-mobile-identity-production.mjs
+          node scripts/test-mobile-identity-provider-request.mjs
+          node scripts/test-mobile-identity-execution-plan.mjs
+          node scripts/test-mobile-identity-provider-runner.mjs
 
       - name: Verify checkout remained clean
         run: test -z "$(git status --porcelain=v1 --untracked-files=all)"
