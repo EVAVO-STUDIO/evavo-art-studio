@@ -17,6 +17,13 @@
       "timeoutSeconds": 1800,
       "description": "Run the Windows worker verification for PowerShell syntax and the sealed Creative Asset Publisher runtime."
     },
+    "mobile-identity-contract": {
+      "runtime": "node-script",
+      "entry": "scripts/test-mobile-identity-production.mjs",
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Verify that mobile identity creative masters are provider-generated raster candidates, reject SVG/wordmark/vector-first shortcuts, and preserve Art Studio approval boundaries."
+    },
     "toolchain": {
       "runtime": "pnpm-script",
       "entry": "toolchain:check",
