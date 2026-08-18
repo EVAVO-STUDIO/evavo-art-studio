@@ -5,7 +5,7 @@
   "client": "evavo-art-studio",
   "role": "governed-art-production-media-validation-and-provider-control",
   "runtimeOwner": "EVAVO-STUDIO/evavo-local-storage",
-  "minimumLocalStorageVersion": "0.48.0",
+  "minimumLocalStorageVersion": "0.47.0",
   "reviewedLocalStorageMain": "308e535cb47b4dcb55ac95481c1a0170a8873484",
   "reviewedDevelopmentStudioMain": "8cf7ba812ac5e58eeebab801d5919b861cb0ed46",
   "poolId": "windows-local",
