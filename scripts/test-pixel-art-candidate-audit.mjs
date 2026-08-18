@@ -6,8 +6,9 @@ import path from 'node:path';
 import process from 'node:process';
 import zlib from 'node:zlib';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
-const AUDITOR = path.resolve(path.dirname(new URL(import.meta.url).pathname), 'audit-pixel-art-candidate.mjs');
+const AUDITOR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'audit-pixel-art-candidate.mjs');
 
 function crc32(bytes) {
   let c = 0xffffffff;
