@@ -18,7 +18,7 @@ A worker receipt, provider receipt or successful validation proves only the oper
 
 ## Current Automation Fabric runtime truth
 
-`config/automation-fabric-client-v5.json` binds Art Studio to Local Storage `0.47.0+` and the current schema-3 runtime-truth contract.
+`config/automation-fabric-client-v5.json` binds Art Studio to Local Storage `0.48.0+` and the current schema-3 runtime-truth contract.
 
 The current contract requires:
 
@@ -32,6 +32,15 @@ The current contract requires:
 - stable control-plane execution from exact current managed main;
 - fast-forward-only managed runtime updates with divergence quarantined rather than overwritten;
 - fresh exact-node and capability-routed pool receipts before routine work resumes.
+
+The approved execution roots now follow Local Storage's real root policy:
+
+- `C:\GitRepos`;
+- `%USERPROFILE%\Downloads` for the user's normal Downloads folder;
+- `resolved-beestation-root`, resolved by Local Storage rather than hard-coded; and
+- approved discovered external roots.
+
+The retired `C:\Downloads` location is not an active Art Studio execution root, and Art Studio must not assume `C:\BEESTATION`; BeeStation location is resolved by Local Storage.
 
 Source configuration, a queued workflow, task registration or a heartbeat alone are never treated as runtime proof.
 
