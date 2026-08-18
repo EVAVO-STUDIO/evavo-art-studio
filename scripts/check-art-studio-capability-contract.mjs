@@ -7,7 +7,7 @@ const HERE = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(HERE), "..");
 const INTERFACES = new Set(["api","automation","cli","desktop","game","library","mcp","mobile","openapi","testing","ui","web-app"]);
 const EFFECTS = new Set(["read","compute","network","write","execute","publish","financial"]);
-const REQUIRED_IDS = ["art.source.review","art.project.workspace","art.project.mastering","art.project.review","art.pixel-font.build","art.delivery.optimize","art.provider.plan","art.provider.execute","art.mcp.review","art.mcp.production","art.validation.execute"];
+const REQUIRED_IDS = ["art.source.review","art.project.workspace","art.project.mastering","art.project.review","art.pixel-font.build","art.delivery.optimize","art.provider.plan","art.provider.execute","art.mcp.review","art.mcp.production","art.book.direction","art.validation.execute"];
 const REQUIRED_FILES = ["evavo.capabilities.json","schemas/evavo.repository-capabilities.schema.json","config/automation-fabric-client-v2.json","scripts/check-art-studio-capability-contract.mjs","scripts/test-art-studio-capability-contract.mjs","docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md",".github/workflows/art-studio-capability-contract.yml"];
 const fail = (condition, message) => { if (!condition) throw new Error(message); };
 const record = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
