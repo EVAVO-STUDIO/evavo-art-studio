@@ -84,6 +84,7 @@ def main():
         prepared=[];reserved_count=0
         for index,item in enumerate(source):
             if not isinstance(item,dict):fail('frame entry invalid')
+            if 'cellIndex' in item and (type(item['cellIndex']) is not int or item['cellIndex']!=index):fail(f'frame cellIndex must equal physical atlas slot {index}')
             fid=item.get('id');anim=item.get('animation','reserved')
             if not SAFE.fullmatch(str(fid or '')) or not SAFE.fullmatch(str(anim or '')):fail('frame/animation id invalid')
             runtime=item.get('runtime',True)
