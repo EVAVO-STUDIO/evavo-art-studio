@@ -17,6 +17,13 @@
       "timeoutSeconds": 1800,
       "description": "Run the Windows worker verification for PowerShell syntax and the sealed Creative Asset Publisher runtime."
     },
+    "pixel-art-candidate-audit-test": {
+      "runtime": "node-script",
+      "entry": "scripts/test-pixel-art-candidate-audit.mjs",
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Verify the pixel-art technical gate blocks partial-alpha halos, palette overflow and wrong dimensions without granting approval or publication authority."
+    },
     "mobile-identity-focused": {
       "runtime": "node-script",
       "entry": "scripts/test-mobile-identity-focused.mjs",
