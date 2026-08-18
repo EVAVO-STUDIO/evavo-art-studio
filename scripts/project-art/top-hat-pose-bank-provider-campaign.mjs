@@ -217,11 +217,9 @@ export async function compileTopHatPoseBankProviderCampaignPlan({
   );
 
   const artifactRoot = await realDirectory(artifactRootInput, 'artifactRoot');
-  const artifacts = new LocalArtifactStore({ root: artifactRoot });
   const baseRegistry = createProviderRegistryFromEnvironment(environment);
-  const slots = [];
+  const routedSlots = [];
   const submissionKeys = new Set();
-  let verifiedReferenceCount = 0;
 
   for (const slotId of TOP_HAT_RUNTIME_EXPECTED_SLOTS) {
     const dispatch = compileProjectArtTopHatPoseSlotProviderRuntimeDispatch({
@@ -263,37 +261,55 @@ export async function compileTopHatPoseBankProviderCampaignPlan({
       'TOP_HAT_POSE_BANK_PROVIDER_CAMPAIGN_ROUTING_INVALID',
       `${slotId} has no eligible exact provider adapter.`,
     );
-    const selectedAdapter = routing.eligibleAdapters[0].adapter.descriptor;
-    const references = await preflightReferences(
-      artifacts,
-      request,
-      selectedAdapter,
-    );
-    verifiedReferenceCount += references.length;
     assert(
       !submissionKeys.has(dispatch.submissionIdempotencyKey),
       'TOP_HAT_POSE_BANK_PROVIDER_CAMPAIGN_DUPLICATE_SUBMISSION',
     );
     submissionKeys.add(dispatch.submissionIdempotencyKey);
-    slots.push(Object.freeze({
+    routedSlots.push(Object.freeze({
       slotId,
-      sourceJobEnvelopeSha256:
-        dispatch.providerCompiler.input.metadata.topHatPoseSlot
-          .providerJobEnvelopeSha256,
-      preflightRuntimeDispatchSha256: dispatch.runtimeDispatchSha256,
-      providerRequestInputSha256: dispatch.providerRequestInputSha256,
-      normalizedProviderRequestId: binding.normalizedProviderRequestId,
-      normalizedProviderRequestSha256: binding.normalizedProviderRequestSha256,
-      compiledPromptSha256: binding.compiledPromptSha256,
-      submissionIdempotencyKey: dispatch.submissionIdempotencyKey,
-      allowedAdapterIds: Object.freeze([...request.selection.allowedAdapterIds]),
+      dispatch,
+      binding,
+      request,
+      selectedAdapter: routing.eligibleAdapters[0].adapter.descriptor,
       eligibleAdapterIds: Object.freeze(
         routing.eligibleAdapters.map((entry) => entry.adapter.descriptor.id),
       ),
-      selectedAdapterId: selectedAdapter.id,
-      candidateOutputPath: dispatch.candidateAdmission.candidateOutputPath,
-      reviewedTargetPath: dispatch.candidateAdmission.reviewedTargetPath,
-      authorization: authorizationSummary(dispatch),
+    }));
+  }
+
+  const artifacts = new LocalArtifactStore({ root: artifactRoot });
+  const slots = [];
+  let verifiedReferenceCount = 0;
+  for (const routed of routedSlots) {
+    const references = await preflightReferences(
+      artifacts,
+      routed.request,
+      routed.selectedAdapter,
+    );
+    verifiedReferenceCount += references.length;
+    slots.push(Object.freeze({
+      slotId: routed.slotId,
+      sourceJobEnvelopeSha256:
+        routed.dispatch.providerCompiler.input.metadata.topHatPoseSlot
+          .providerJobEnvelopeSha256,
+      preflightRuntimeDispatchSha256: routed.dispatch.runtimeDispatchSha256,
+      providerRequestInputSha256: routed.dispatch.providerRequestInputSha256,
+      normalizedProviderRequestId: routed.binding.normalizedProviderRequestId,
+      normalizedProviderRequestSha256:
+        routed.binding.normalizedProviderRequestSha256,
+      compiledPromptSha256: routed.binding.compiledPromptSha256,
+      submissionIdempotencyKey: routed.dispatch.submissionIdempotencyKey,
+      allowedAdapterIds: Object.freeze([
+        ...routed.request.selection.allowedAdapterIds,
+      ]),
+      eligibleAdapterIds: routed.eligibleAdapterIds,
+      selectedAdapterId: routed.selectedAdapter.id,
+      candidateOutputPath:
+        routed.dispatch.candidateAdmission.candidateOutputPath,
+      reviewedTargetPath:
+        routed.dispatch.candidateAdmission.reviewedTargetPath,
+      authorization: authorizationSummary(routed.dispatch),
       references,
       providerExecutionPerformed: false,
       candidateMaterializationPerformed: false,
