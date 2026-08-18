@@ -1,0 +1,186 @@
+{
+  "schema": "evavo.artist-workspace-agent-suite.v1",
+  "version": 7,
+  "description": "Canonical path-only game-art production suite combining persistent Art Studio workspaces, exact chat/Library intake, technical pixel audit, deterministic raster editing, generated-sheet segmentation, animation preview, sprite/atlas/Godot packaging, Video Studio temporal handoff, durable Storage retention and Development Studio publication without granting any one creative tool Git or force-push authority.",
+  "configuration": "config/mcp.project-art-workspace.windows.example.json",
+  "minimumLocalStorageVersion": "0.48.0",
+  "executionRoots": [
+    "C:\\GitRepos",
+    "%USERPROFILE%\\Downloads",
+    "resolved-beestation-root",
+    "approved-discovered-external-roots"
+  ],
+  "servers": [
+    {
+      "id": "evavo-project-art-workspace",
+      "entrypoint": "tools/project_art_workspace_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_WORKSPACE_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["project-intelligence","deterministic-sandbox","reference-planning","temporary-intake","sprite-atlas","persistent-workspace-create","persistent-workspace-snapshot","evavo-storage-handoff"]
+    },
+    {
+      "id": "evavo-project-art-workspace-ingest",
+      "entrypoint": "tools/project_art_workspace_ingest_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_WORKSPACE_INGEST_ROOTS",
+      "sourceRootsEnvironment": "EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_WORKSPACE_INGEST_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["external-source-capabilities","external-source-plan-compilation","atomic-persistent-workspace-ingest"]
+    },
+    {
+      "id": "evavo-project-art-workspace-catalog",
+      "entrypoint": "tools/project_art_workspace_catalog_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_PERSISTENT_CATALOG_ROOTS",
+      "writeGateEnvironment": "EVAVO_PERSISTENT_CATALOG_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["workspace-catalog-capabilities","content-addressed-workspace-inventory","bounded-workspace-query","exact-duplicate-detection","workspace-drift-verification"]
+    },
+    {
+      "id": "evavo-project-art-workspace-jobs",
+      "entrypoint": "tools/project_art_workspace_jobs_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_WORKSPACE_JOB_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["workspace-job-capabilities","exact-job-plan-compilation","append-only-job-publication","lease-bounded-agent-claim","hash-chained-checkpoints","crash-resume-and-drift-verification"]
+    },
+    {
+      "id": "evavo-game-art-workstation",
+      "entrypoint": "tools/game_art_workstation_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_GAME_ART_WORKSTATION_ROOTS",
+      "writeGateEnvironment": "EVAVO_GAME_ART_WORKSTATION_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["pixel-art-technical-audit","exact-plan-raster-edit","exact-plan-sprite-atlas","godot-spriteframes-package"]
+    },
+    {
+      "id": "evavo-project-art-avatar-final-pass-provider",
+      "entrypoint": "tools/project_art_avatar_final_pass_provider_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["avatar-final-pass-provider-capabilities","sealed-final-pass-provider-compilation","one-candidate-redraw-envelopes","anatomy-safe-inbetween-envelopes","final-endpoint-hash-gating"]
+    },
+    {
+      "id": "evavo-project-art-avatar-final-pass-provider-runtime",
+      "entrypoint": "tools/project_art_avatar_final_pass_provider_runtime_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["avatar-provider-runtime-capabilities","exact-ready-job-dispatch","generic-runtime-contract-binding","candidate-or-failure-outcome-normalization","create-only-candidate-materialization-planning"]
+    },
+    {
+      "id": "evavo-project-art-avatar-final-pass-provider-candidate",
+      "entrypoint": "tools/project_art_avatar_final_pass_provider_candidate_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_ROOTS",
+      "artifactRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ARTIFACT_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["immutable-provider-artifact-verification","strict-rgba-png-admission","create-only-workspace-candidate-materialization","hash-bound-frame-finisher-handoff","restart-safe-materialization-readback"]
+    },
+    {
+      "id": "evavo-project-art-avatar-final-pass-provider-frame-finisher",
+      "entrypoint": "tools/project_art_avatar_final_pass_provider_frame_finisher_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["exact-candidate-finisher-chain-validation","strict-rgba-png-decoding-and-canonical-reencoding","hidden-transparent-rgb-cleanup","named-human-frame-review","final-frame-hash-admission"]
+    },
+    {
+      "id": "evavo-project-art-avatar-sequence-release",
+      "entrypoint": "tools/project_art_avatar_sequence_release_mcp.mjs",
+      "workspaceRootsEnvironment": "EVAVO_ART_AVATAR_SEQUENCE_RELEASE_ROOTS",
+      "writeGateEnvironment": "EVAVO_ART_AVATAR_SEQUENCE_RELEASE_MCP_ALLOW_WRITE",
+      "defaultWriteEnabled": false,
+      "toolGroups": ["exact-mastering-plan-and-final-frame-evidence","passed-loop-plan-review-and-receipt-admission","timing-and-release-basis-hashing","named-human-art-animation-and-runtime-approvals","atomic-create-only-sequence-release-sealing"]
+    }
+  ],
+  "externalCollaborators": [
+    {
+      "repository": "EVAVO-STUDIO/evavo-video-studio",
+      "surface": "src/creative-compositor-mcp.mjs",
+      "role": "temporal-extraction-and-deterministic-motion-compositing",
+      "executionGate": "EVAVO_VIDEO_COMPOSITOR_ALLOW_EXECUTE",
+      "exactPlanShaRequired": true,
+      "sourceHashRequired": true,
+      "outputPathBoundSeparately": true
+    },
+    {
+      "repository": "EVAVO-STUDIO/evavo-local-storage",
+      "role": "host-materialization-worker-routing-and-physical-storage-resolution",
+      "minimumVersion": "0.48.0"
+    },
+    {
+      "repository": "EVAVO-STUDIO/evavo-storage",
+      "role": "immutable-source-master-and-milestone-retention"
+    },
+    {
+      "repository": "EVAVO-STUDIO/evavo-development-studio",
+      "role": "validated-fast-forward-git-publication"
+    }
+  ],
+  "flows": [
+    {
+      "id": "chat-library-or-generated-image-to-reviewed-workspace",
+      "steps": ["materialize-provider-file-on-host","local-storage-content-addressed-retention","evavo_art_compile_workspace_ingest","evavo_art_run_workspace_ingest","evavo_art_compile_workspace_snapshot","evavo_art_run_workspace_snapshot"]
+    },
+    {
+      "id": "generated-sheet-to-reviewable-frames",
+      "steps": ["pixel-art-candidate-audit","game-art-sheet-segment","game-art-raster-edit","project-art-native-scale-review","game-art-animation-preview","reject-repair-or-continue"]
+    },
+    {
+      "id": "reviewed-frames-to-godot-sprite-package",
+      "steps": ["named-human-frame-selection","game-art-raster-edit","game-art-sprite-build","godot-spriteframes-package","runtime-animation-review","exact-hash-human-approval"]
+    },
+    {
+      "id": "video-derived-motion-to-game-art",
+      "steps": ["video-studio-exact-frame-sequence","video-studio-temporal-review","art-studio-frame-ingest","pixel-art-candidate-audit","game-art-raster-edit","game-art-animation-preview","game-art-sprite-build"]
+    },
+    {
+      "id": "approved-game-art-release",
+      "steps": ["retain-source-and-editable-master-in-evavo-storage","validate-target-repository-art-contract","development-studio-dry-run","development-studio-fast-forward-main-publication","verify-remote-sha"]
+    },
+    {
+      "id": "closed-loop-repair",
+      "steps": ["project-art-loop-closure-plan","immutable-frame-hash","bounded-repair-decision","provider-or-deterministic-repair","technical-recheck","native-scale-review","animation-preview","stop-on-failure-or-repeat-within-budget"]
+    }
+  ],
+  "workstationTasks": {
+    "pixelAudit": "pixel-art-candidate-audit",
+    "rasterEdit": "game-art-raster-edit",
+    "sheetSegment": "game-art-sheet-segment",
+    "animationPreview": "game-art-animation-preview",
+    "spriteBuild": "game-art-sprite-build"
+  },
+  "rules": {
+    "exactPlanShaRequiredForEffectingWorkstationTasks": true,
+    "sourceShaRequired": true,
+    "createOnlyOutputs": true,
+    "generatedContactSheetIsProductionAtlas": false,
+    "technicalPassEqualsCreativeApproval": false,
+    "automaticApproval": false,
+    "sourceOverwrite": false,
+    "sourceDeletion": false,
+    "workerGitPublication": false,
+    "artStudioGitPublication": false,
+    "videoStudioGitPublication": false,
+    "forcePush": false
+  },
+  "authority": {
+    "bytesFlowThroughMcp": false,
+    "arbitraryShell": false,
+    "sourceMutation": false,
+    "sourceDeletion": false,
+    "runtimeEnqueue": false,
+    "providerExecution": false,
+    "candidateMaterialization": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "storageWrite": false,
+    "repositoryMutation": false,
+    "gitPublication": false,
+    "deployment": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "forcePush": false
+  }
+}
