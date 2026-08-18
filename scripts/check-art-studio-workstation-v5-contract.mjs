@@ -56,6 +56,12 @@ export function validate(client) {
   for (const rootPath of ["C:\\GitRepos","C:\\Downloads","C:\\BEESTATION","approved-discovered-external-roots"]) fail(execution.approvedRoots.includes(rootPath), `Approved root missing: ${rootPath}.`);
   for (const capability of ["powershell","python","node","pnpm","git","github-cli","art-pipeline-validation","image-toolchain","provider-runtime"]) fail(execution.routineCapabilities.includes(capability), `Routine capability missing: ${capability}.`);
 
+  const fallback = client.githubActionsFallback;
+  fail(fallback.developmentStudioContract === "evavo-github-actions-worker-fallback", "GitHub Actions fallback contract drifted.");
+  fail(fallback.eligibleStatus === "provider-allocation-blocked", "Only pre-step provider allocation failure may use the worker fallback.");
+  for (const key of ["zeroStepsRequired","completedFailedRunRequired","exactBlockedRevisionRequired","plannerReceiptBoundToBlockedRevision","readOnlyValidationOnly"]) fail(fallback[key] === true, `GitHub Actions fallback requirement weakened: ${key}.`);
+  for (const key of ["githubActionsEquivalent","githubCheckStatusMutation","workerReceiptIsPublicationEvidence"]) fail(fallback[key] === false, `GitHub Actions fallback overclaim enabled: ${key}.`);
+
   for (const [key, value] of Object.entries(client.workerAuthority)) fail(value === false, `Worker authority widened: ${key}.`);
 
   const publication = client.publication;
@@ -74,6 +80,8 @@ export function validate(client) {
     minimumLocalStorageVersion: client.minimumLocalStorageVersion,
     plannerRequired: execution.plannerReceiptRequiredForUnmeasuredRepositoryTask,
     physicalAcceptanceRequired: true,
+    githubActionsFallbackStatus: fallback.eligibleStatus,
+    githubActionsEquivalent: false,
     workerPublicationAuthority: false,
   });
 }
