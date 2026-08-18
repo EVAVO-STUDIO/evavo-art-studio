@@ -139,7 +139,7 @@ def apply_op(base:Image.Image,op:dict[str,Any],workspace:Path)->Image.Image:
 def main()->int:
     ap=argparse.ArgumentParser(); ap.add_argument('--workspace-root',type=Path,required=True); ap.add_argument('--plan',type=Path,required=True); ap.add_argument('--receipt',type=Path,required=True); ns=ap.parse_args()
     try:
-        root=Path(os.path.abspath(ns.workspace_root))
+        root=Path(os.path.abspath(ns.workspace_root)).resolve(strict=True)
         if root.is_symlink() or not root.is_dir(): fail('workspace-root invalid')
         planp=Path(os.path.abspath(ns.plan)); regular(planp,'plan'); plan=json.loads(planp.read_text('utf-8'))
         if plan.get('schema')!=SCHEMA or plan.get('createOnlyOutput') is not True or plan.get('sourceOverwrite') is not False: fail('plan authority boundary invalid')
