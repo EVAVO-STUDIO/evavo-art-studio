@@ -47,7 +47,7 @@
   ],
   "repositoryMutation": {
     "operatorRepository": "EVAVO-STUDIO/evavo-github-mcp",
-    "entrypoint": "control-plane/agent-workspace-hardened-server.mjs",
+    "entrypoint": "control-plane/agent-workspace-mcp.mjs",
     "transport": "stdio",
     "publicRemoteSurface": "read-only",
     "structuredMutationRequired": true,
@@ -56,7 +56,7 @@
   },
   "publication": {
     "operatorRepository": "EVAVO-STUDIO/evavo-development-studio",
-    "operator": "scripts/Publish-EvavoRepoMain.ps1",
+    "operator": "scripts/mainline-publish.mjs",
     "normalPushOnly": true,
     "liveRemoteRecheck": true,
     "declaredPathsOnly": true,
