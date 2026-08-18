@@ -178,16 +178,8 @@ requireTokens('tests', [
 
 requireTokens('mcpTests', [
   'Project Art avatar final-pass provider runtime MCP regressions passed.',
-  'runtime capabilities are read-only and expose no execution authority',
-  'dispatch compile remains write-gated and uses exact ready job selection',
-  'runtime bind rejects unknown compiled contract fields',
-  'outcome compile rejects multiple provider calls',
-]);
-
-requireTokens('suite', [
-  'avatar final-pass provider runtime static guard',
-  'avatar final-pass provider runtime regression suite',
-  'avatar final-pass provider runtime MCP regression suite',
+  'MCP exposes four bounded runtime tools with entirely separate authority',
+  'MCP is write-gated and compiles dispatch, binding and outcome records create-only',
 ]);
 
 requireTokens('mcp', [
@@ -195,45 +187,114 @@ requireTokens('mcp', [
   'evavo_art_compile_avatar_final_pass_provider_runtime_dispatch',
   'evavo_art_bind_avatar_final_pass_provider_runtime_contract',
   'evavo_art_compile_avatar_final_pass_provider_runtime_outcome',
+  'EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_ROOTS',
   'EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_MCP_ALLOW_WRITE',
-  'assertAllowedRoot',
+  'runtimeEnqueue: false',
+  'providerExecution: false',
+  'candidateMaterialization: false',
+  'candidateApproval: false',
+  'runtimeActivation: false',
 ]);
 
 requireTokens('docs', [
-  'does not execute providers',
-  'separately authorized runtime',
-  'candidate-materialization-required',
-  'provider-failure-record-required',
-  'fresh named-human authorization',
-]);
-
-requireTokens('mcpConfig', [
-  'evavo-project-art-avatar-final-pass-provider-runtime',
-  'EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_MCP_ALLOW_WRITE',
-  'false',
-]);
-
-requireTokens('outcomeExample', [
+  '# Project Art avatar final-pass provider runtime bridge',
+  '@evavo/art-providers',
+  'compileProviderCandidateRuntimeContract',
+  'art.candidate.edit',
+  'art.candidate.generate',
+  'candidate-run-result',
   'provider-failure',
-  'providerCallCount',
-  'submissionIdempotencyKey',
+  'one provider call',
+  'one candidate',
+  'rerun the avatar frame finisher',
+  'does not execute a provider',
+  'does not approve or promote',
 ]);
 
-forbidTokens('facade', [
-  'spawn(',
-  'exec(',
-  'fetch(',
+const mcpConfig = JSON.parse(contents.get('mcpConfig'));
+const configured =
+  mcpConfig.mcpServers?.[
+    'evavo-project-art-avatar-final-pass-provider-runtime'
+  ];
+assert.ok(configured, 'dedicated runtime MCP config must register the server');
+assert.equal(configured.command, 'node');
+assert.ok(
+  configured.args[0].endsWith(
+    'project_art_avatar_final_pass_provider_runtime_mcp.mjs',
+  ),
+);
+assert.equal(
+  configured.env
+    .EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_MCP_ALLOW_WRITE,
+  'false',
+);
+
+const outcomeExample = JSON.parse(contents.get('outcomeExample'));
+assert.equal(outcomeExample.kind, 'candidate-run-result');
+assert.equal(outcomeExample.providerCallCount, 1);
+assert.equal(outcomeExample.result.candidateArtifacts.length, 1);
+assert.equal(
+  outcomeExample.result.routingInspection.providerCallPerformedByInspection,
+  false,
+);
+assert.equal(outcomeExample.result.routingInspection.fallbackAllowed, false);
+assert.equal(outcomeExample.result.attempts.length, 1);
+assert.equal(outcomeExample.result.attempts[0].outcome, 'succeeded');
+
+forbidTokens('dispatchCore', [
+  'candidateCount: 2',
+  'allowFallback: true',
+  'runtimeEnqueue: true',
   'providerExecution: true',
-  'runtimeActivation: true',
-]);
-forbidTokens('mcp', [
-  'providerExecution: true',
+  'candidateMaterialization: true',
+  'candidateApproval: true',
+  'candidatePromotion: true',
   'runtimeActivation: true',
   'forcePush: true',
+  'git push',
+  'child_process',
+]);
+forbidTokens('binding', [
+  'runtimeEnqueue: true',
+  'providerExecution: true',
+  'candidateMaterialization: true',
+  'candidateApproval: true',
+  'candidatePromotion: true',
+  'runtimeActivation: true',
+  'forcePush: true',
+  'git push',
+  'child_process',
+]);
+forbidTokens('outcome', [
+  'runtimeEnqueue: true',
+  'providerExecution: true',
+  'candidateMaterialization: true',
+  'candidateApproval: true',
+  'candidatePromotion: true',
+  'runtimeActivation: true',
+  'forcePush: true',
+  'git push',
+  'child_process',
+]);
+
+forbidTokens('mcp', [
+  'runtimeEnqueue: true',
+  'providerExecution: true',
+  'candidateMaterialization: true',
+  'candidateApproval: true',
+  'candidatePromotion: true',
+  'repositoryMutation: true',
+  'gitPush: true',
+  'runtimeActivation: true',
+  'forcePush: true',
+  'child_process',
+  'shell: true',
+  'git push',
 ]);
 
 console.log('Project Art avatar final-pass provider runtime guard passed.');
-console.log('- generic provider runtime compiler identity is explicit and current');
-console.log('- exact ready jobs become immutable runtime dispatches');
-console.log('- compiled contracts bind before any separately authorized execution');
-console.log('- candidate or failure outcomes remain separate from materialization and approval');
+console.log('- sealed ready jobs bind to the canonical @evavo/art-providers runtime compiler');
+console.log('- edit and generated in-between jobs retain exact one-call and one-candidate scope');
+console.log('- generic runtime contracts, outcomes and candidate artifacts are independently revalidated');
+console.log('- provider failures require fresh named-human authorization before any retry');
+console.log('- execution, materialization, approval, Git, publication and runtime activation remain separate');
