@@ -4,16 +4,30 @@ import argparse, hashlib, json, math, os, re, sys
 from pathlib import Path
 from PIL import Image, ImageOps
 SCHEMA='evavo.sprite-workstation-plan.v1'; RECEIPT='evavo.sprite-workstation-receipt.v1'; MAX_PIXELS=220_000_000
-SAFE=re.compile(r'^[A-Za-z0-9_.-]+$')
+SAFE=re.compile(r'^[A-Za-z0-9_.-]+$'); SHA256=re.compile(r'^[0-9a-f]{64}$')
 def fail(m): raise ValueError(m)
 def sha(b): return hashlib.sha256(b).hexdigest()
+def inside(root:Path,p:Path)->bool:
+    try:p.relative_to(root);return True
+    except ValueError:return False
 def safe(root:Path,v:str,label:str,exist=True):
     p=Path(v)
     if not v or p.is_absolute() or '..' in p.parts or '\\' in v: fail(f'{label} invalid')
     q=(root/p).resolve(strict=exist)
-    try:q.relative_to(root)
-    except ValueError: fail(f'{label} escaped root')
+    if not inside(root,q):fail(f'{label} escaped root')
+    current=root
+    for part in p.parts:
+        current=current/part
+        if current.exists() and current.is_symlink():fail(f'{label} contains symlink')
     if exist and (q.is_symlink() or not q.is_file()): fail(f'{label} must be regular file')
+    return q
+def safe_absolute(root:Path,v,label,exist=False):
+    q=Path(os.path.abspath(v)).resolve(strict=exist)
+    if not inside(root,q):fail(f'{label} escaped root')
+    current=root
+    for part in q.relative_to(root).parts:
+        current=current/part
+        if current.exists() and current.is_symlink():fail(f'{label} contains symlink')
     return q
 def jwrite(p:Path,v):p.write_text(json.dumps(v,sort_keys=True,indent=2)+'\n',encoding='utf-8')
 def alpha_clean(im,threshold):
@@ -34,12 +48,14 @@ def godot(plan,frames,atlas_res):
         anim.append('{\n"frames": [%s],\n"loop": %s,\n"name": &"%s",\n"speed": %.6f\n}'%(', '.join(arr),'true' if loop else 'false',name,fps))
     lines += ['[resource]','animations = [%s]'%(',\n'.join(anim)),''];return '\n'.join(lines)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--workspace-root',required=True);ap.add_argument('--plan',required=True);ap.add_argument('--output-root',required=True);ns=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--workspace-root',required=True);ap.add_argument('--plan',required=True);ap.add_argument('--plan-sha256',required=True);ap.add_argument('--output-root',required=True);ns=ap.parse_args()
     try:
-        root=Path(os.path.abspath(ns.workspace_root)).resolve(strict=True);planp=Path(os.path.abspath(ns.plan));out=Path(os.path.abspath(ns.output_root))
+        root=Path(os.path.abspath(ns.workspace_root)).resolve(strict=True);planp=safe_absolute(root,ns.plan,'plan',True);out=safe_absolute(root,ns.output_root,'output root',False)
         if root.is_symlink() or not root.is_dir():fail('workspace root invalid')
         if out.exists():fail('output root is create-only')
-        plan=json.loads(planp.read_text('utf-8'))
+        plan_bytes=planp.read_bytes();expected_plan=str(ns.plan_sha256).strip().lower()
+        if not SHA256.fullmatch(expected_plan) or sha(plan_bytes)!=expected_plan:fail('plan SHA-256 mismatch')
+        plan=json.loads(plan_bytes.decode('utf-8'))
         if plan.get('schema')!=SCHEMA or plan.get('repositoryMutation') is not False or plan.get('automaticApproval') is not False:fail('authority boundary invalid')
         cell=plan['cell'];cw,ch=int(cell['width']),int(cell['height']);cols=int(plan.get('columns',8));threshold=int(plan.get('alphaThreshold',128))
         if not(1<=cw<=4096 and 1<=ch<=4096 and 1<=cols<=64):fail('layout invalid')
@@ -69,9 +85,9 @@ def main():
         atlas_path=out/atlas_name;atlas.save(atlas_path,'PNG',optimize=False,compress_level=9)
         atlas_res=plan.get('godotAtlasPath')
         if not isinstance(atlas_res,str) or not atlas_res.startswith('res://'):fail('godotAtlasPath required')
-        manifest={'schema':'evavo.sprite-workstation-manifest.v1','atlasFile':atlas_name,'atlasSha256':sha(atlas_path.read_bytes()),'size':{'width':aw,'height':ah},'cell':{'width':cw,'height':ch},'frames':manifest_frames,'animations':plan.get('animations',{}),'hardAlpha':bool(plan.get('hardAlpha',True)),'repositoryMutation':False,'automaticApproval':False}
+        manifest={'schema':'evavo.sprite-workstation-manifest.v1','planSha256':expected_plan,'atlasFile':atlas_name,'atlasSha256':sha(atlas_path.read_bytes()),'size':{'width':aw,'height':ah},'cell':{'width':cw,'height':ch},'frames':manifest_frames,'animations':plan.get('animations',{}),'hardAlpha':bool(plan.get('hardAlpha',True)),'repositoryMutation':False,'automaticApproval':False}
         jwrite(out/manifest_name,manifest);(out/tres_name).write_text(godot(plan,manifest_frames,atlas_res),encoding='utf-8')
-        receipt={'schema':RECEIPT,'status':'passed','frameCount':len(prepared),'animationCount':len({f['animation'] for f in prepared}),'atlasSha256':manifest['atlasSha256'],'manifestSha256':sha((out/manifest_name).read_bytes()),'godotSha256':sha((out/tres_name).read_bytes()),'repositoryMutation':False,'storageMutation':False,'automaticApproval':False,'forcePush':False}
+        receipt={'schema':RECEIPT,'status':'passed','planSha256':expected_plan,'frameCount':len(prepared),'animationCount':len({f['animation'] for f in prepared}),'atlasSha256':manifest['atlasSha256'],'manifestSha256':sha((out/manifest_name).read_bytes()),'godotSha256':sha((out/tres_name).read_bytes()),'repositoryMutation':False,'storageMutation':False,'automaticApproval':False,'forcePush':False}
         jwrite(out/'receipt.json',receipt);print(json.dumps(receipt,sort_keys=True));return 0
-    except (OSError,ValueError,KeyError,json.JSONDecodeError) as e:print(json.dumps({'schema':RECEIPT,'status':'failed','error':str(e)[:1024]}),file=sys.stderr);return 2
+    except (OSError,ValueError,KeyError,UnicodeError,json.JSONDecodeError) as e:print(json.dumps({'schema':RECEIPT,'status':'failed','error':str(e)[:1024]}),file=sys.stderr);return 2
 if __name__=='__main__':raise SystemExit(main())
