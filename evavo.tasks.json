@@ -24,6 +24,13 @@
       "timeoutSeconds": 300,
       "description": "Verify that mobile identity creative masters are provider-generated raster candidates, reject SVG/wordmark/vector-first shortcuts, and preserve Art Studio approval boundaries."
     },
+    "mobile-identity-provider-request": {
+      "runtime": "node-script",
+      "entry": "scripts/test-mobile-identity-provider-request.mjs",
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Verify mobile identity production compiles into Art Studio's native identity-master provider protocol using exact OpenAI GPT Image or concrete ComfyUI adapter identities."
+    },
     "toolchain": {
       "runtime": "pnpm-script",
       "entry": "toolchain:check",
