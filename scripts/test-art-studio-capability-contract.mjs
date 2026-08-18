@@ -36,7 +36,8 @@ test("validates the repository capability and current runtime-truth contract", a
   assert.equal(result.automationFabric.githubActionsWorkerFallback, true);
   assert.equal(result.automationFabric.workerReceiptIsPublicationEvidence, false);
   assert.deepEqual(result.recovery.order, ["supervisor-first", "legacy-certified", "immutable-armer"]);
-  assert.equal(automationClient.reviewedLocalStorageMain, "87cc7a86c486954469a4c092b77cf2e49d07564c");
+  assert.equal(automationClient.reviewedLocalStorageMain, "0a618a955bea113a850a883c81f128eb2fcf0883");
+  assert.equal(automationClient.reviewedDevelopmentStudioMain, "ecc6a76bf98b5077980d0ab00d45707929a1c3e2");
   assert.deepEqual(automationClient.execution.approvedRoots, [
     "C:\\GitRepos",
     "%USERPROFILE%\\Downloads",
