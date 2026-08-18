@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
 const SCHEMA = 'evavo.mobile-identity-provider-execution-plan.v1';
+const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime.mjs';
 function fail(message) { throw new Error(message); }
 function object(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} must be an object`); return value; }
 function text(value, label, max = 512) { if (typeof value !== 'string' || !value.trim() || value.length > max) fail(`${label} must be non-empty text`); return value.trim(); }
@@ -27,6 +28,7 @@ export function compileMobileIdentityExecutionPlan(input) {
   if (allowedAdapterIds.some((id) => id === 'gpt-image' || id === 'openai-image' || id === 'comfyui')) fail('execution plan cannot contain generic provider aliases');
 
   const paths = object(root.paths, 'paths');
+  const providerRequestPath = safePath(paths.providerRequest, 'paths.providerRequest');
   const runtimeBatch = safePath(paths.runtimeBatch, 'paths.runtimeBatch');
   const selection = safePath(paths.selection, 'paths.selection');
   const admissionReceipt = safePath(paths.admissionReceipt, 'paths.admissionReceipt');
@@ -43,11 +45,12 @@ export function compileMobileIdentityExecutionPlan(input) {
   const expiresAt = text(root.expiresAt, 'expiresAt', 64);
   if (Date.parse(expiresAt) <= Date.parse(authorizedAt)) fail('expiresAt must be after authorizedAt');
 
+  const preparation = executionStep('prepare', ['node', RUNTIME_SCRIPT, 'prepare', '--provider-request', providerRequestPath, '--work-order', workOrderId, '--output', runtimeBatch], runtimeBatch, 'canonical-mobile-identity-runtime-contract-only');
   const steps = [
-    executionStep('select', ['node', 'scripts/select-raw-art-provider-runtime-jobs.mjs', '--runtime-batch', runtimeBatch, '--work-orders', workOrderId, '--selected-at', selectedAt, '--selected-by', actor, '--reason', 'mobile-identity-provider-generation', '--output', selection], selection, 'selection-only'),
-    executionStep('admit', ['node', 'scripts/admit-raw-art-provider-runtime-batch.mjs', '--runtime-batch', runtimeBatch, '--selection', selection, '--runtime-root', runtimeRoot, '--actor', actor, '--admitted-at', admittedAt, '--receipt', admissionReceipt], admissionReceipt, 'runtime-admission-only'),
-    executionStep('authorize', ['node', 'scripts/authorize-raw-art-provider-runtime-execution.mjs', '--runtime-batch', runtimeBatch, '--selection', selection, '--admission-receipt', admissionReceipt, '--runtime-root', runtimeRoot, '--artifact-root', artifactRoot, '--authorized-at', authorizedAt, '--expires-at', expiresAt, '--authorized-by', actor, '--reason', 'approved-mobile-identity-provider-generation', '--allowed-adapters', allowedAdapterIds.join(','), '--output', authorization], authorization, 'time-bounded-adapter-scoped-provider-execution'),
-    executionStep('execute', ['node', 'scripts/mobile-identity-production.mjs', 'execute-authorized', '--authorization', authorization, '--worker-id', 'mobile-identity-worker', '--worker-command', 'until-idle', '--receipt', executionReceipt], executionReceipt, 'unapproved-candidate-and-evidence-creation-only'),
+    executionStep('select', ['node', RUNTIME_SCRIPT, 'select', '--runtime-batch', runtimeBatch, '--work-order', workOrderId, '--selected-at', selectedAt, '--selected-by', actor, '--reason', 'mobile-identity-provider-generation', '--output', selection], selection, 'selection-only'),
+    executionStep('admit', ['node', RUNTIME_SCRIPT, 'admit', '--runtime-batch', runtimeBatch, '--selection', selection, '--runtime-root', runtimeRoot, '--actor', actor, '--admitted-at', admittedAt, '--receipt', admissionReceipt], admissionReceipt, 'runtime-admission-only'),
+    executionStep('authorize', ['node', RUNTIME_SCRIPT, 'authorize', '--runtime-batch', runtimeBatch, '--selection', selection, '--admission', admissionReceipt, '--runtime-root', runtimeRoot, '--artifact-root', artifactRoot, '--authorized-at', authorizedAt, '--expires-at', expiresAt, '--authorized-by', actor, '--reason', 'approved-mobile-identity-provider-generation', '--allowed-adapters', allowedAdapterIds.join(','), '--output', authorization], authorization, 'time-bounded-adapter-scoped-provider-execution'),
+    executionStep('execute', ['node', RUNTIME_SCRIPT, 'execute', '--runtime-batch', runtimeBatch, '--selection', selection, '--admission', admissionReceipt, '--authorization', authorization, '--worker-id', 'mobile-identity-worker', '--receipt', executionReceipt], executionReceipt, 'unapproved-candidate-and-evidence-creation-only'),
   ];
 
   const plan = {
@@ -60,12 +63,19 @@ export function compileMobileIdentityExecutionPlan(input) {
       preferredModel: nativeRequest.selection?.preferredModel ?? null,
       allowedAdapterIds,
     },
-    prerequisites: [
-      'runtime batch has already been compiled through the existing RAW_ART provider request/batch path',
-      'workOrderId belongs to the mobile identity request in that runtime batch',
-      'provider credentials remain environment/runtime concerns and are never written into this plan',
-    ],
+    runtime: {
+      schema: 'evavo.mobile-identity-provider-runtime-batch.v1',
+      controlScript: RUNTIME_SCRIPT,
+      campaignMetadataRequired: false,
+      gameMetadataRequired: false,
+    },
+    preparation,
     steps,
+    prerequisites: [
+      'provider request file bytes must match the reviewed mobile identity provider request supplied to this plan',
+      'provider credentials remain environment/runtime concerns and are never written into this plan',
+      'runtime and artifact roots remain separate private Art Studio working roots',
+    ],
     postconditions: [
       'provider outputs remain unapproved Art Studio candidates',
       'candidate review and raster approval are still required before Vector Studio or runtime integration',
