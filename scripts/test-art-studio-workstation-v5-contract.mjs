@@ -10,19 +10,37 @@ const client = JSON.parse(fs.readFileSync(path.join(root, "config/automation-fab
 const clone = () => structuredClone(client);
 
 test("accepts the reviewed Art Studio v5 runtime-truth boundary", () => {
-  assert.equal(validate(clone()).ok, true);
+  const result = validate(clone());
+  assert.equal(result.ok, true);
+  assert.equal(result.minimumLocalStorageVersion, "0.48.0");
+  assert.equal(result.workstationAcceptance, "v8");
+  assert.deepEqual(result.approvedRoots, [
+    "C:\\GitRepos",
+    "%USERPROFILE%\\Downloads",
+    "resolved-beestation-root",
+    "approved-discovered-external-roots",
+  ]);
 });
 
-test("rejects Local Storage below 0.42.1", () => {
+test("rejects Local Storage below 0.48.0", () => {
   const candidate = clone();
-  candidate.minimumLocalStorageVersion = "0.42.0";
-  assert.throws(() => validate(candidate), /0\.42\.1\+/u);
+  candidate.minimumLocalStorageVersion = "0.47.9";
+  assert.throws(() => validate(candidate), /0\.48\.0\+/u);
 });
 
-test("rejects a v3 workstation implementation", () => {
+test("rejects a pre-v8 workstation implementation", () => {
   const candidate = clone();
-  candidate.sourceContract.workstationAcceptanceImplementation = "evavo_local_storage.workstation_acceptance_v3:main";
-  assert.throws(() => validate(candidate), /resolve to v4/u);
+  candidate.sourceContract.workstationAcceptanceImplementation = "evavo_local_storage.workstation_acceptance_v7:main";
+  assert.throws(() => validate(candidate), /resolve to v8/u);
+});
+
+test("rejects retired physical roots", () => {
+  const downloads = clone();
+  downloads.execution.approvedRoots[1] = "C:\\Downloads";
+  assert.throws(() => validate(downloads), /Approved execution roots drifted/u);
+  const bee = clone();
+  bee.execution.approvedRoots[2] = "C:\\BEESTATION";
+  assert.throws(() => validate(bee), /Approved execution roots drifted/u);
 });
 
 test("rejects heartbeat-only reachability", () => {
@@ -41,6 +59,21 @@ test("rejects omitted tracked-script measurement", () => {
   const candidate = clone();
   candidate.execution.plannerMeasuresTrackedScriptSha256 = false;
   assert.throws(() => validate(candidate), /plannerMeasuresTrackedScriptSha256/u);
+});
+
+test("rejects weakened single-execution and managed-main truth", () => {
+  for (const key of [
+    "commandIdSingleExecutionRequired",
+    "duplicateCommandIssueMustFailBeforeExecution",
+    "terminalReceiptReplayMustBeIdempotent",
+    "stableControlPlaneMustExecuteExactCurrentManagedMain",
+    "managedRuntimeUpdatesMustBeFastForwardOnly",
+    "managedRuntimeDivergenceMustBeQuarantined",
+  ]) {
+    const candidate = clone();
+    candidate.truthRules[key] = false;
+    assert.throws(() => validate(candidate), new RegExp(key, "u"));
+  }
 });
 
 test("rejects worker push authority", () => {
