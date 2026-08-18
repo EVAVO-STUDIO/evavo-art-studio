@@ -20,48 +20,61 @@
     "pixel-art-candidate-audit": {
       "runtime": "node-script",
       "entry": "scripts/audit-pixel-art-candidate.mjs",
-      "arguments": [
-        "--input", "{{input}}",
-        "--role", "{{role}}",
-        "--max-partial-alpha-ratio", "{{maxPartialAlphaRatio}}",
-        "--max-colors", "{{maxColors}}",
-        "--require-alpha",
-        "--json"
-      ],
+      "arguments": ["--input", "{{input}}", "--role", "{{role}}", "--max-partial-alpha-ratio", "{{maxPartialAlphaRatio}}", "--max-colors", "{{maxColors}}", "--require-alpha", "--json"],
       "parameterSchema": {
         "schemaVersion": 1,
         "additionalProperties": false,
         "required": ["input"],
         "properties": {
-          "input": {
-            "type": "compute-path",
-            "pathKind": "file",
-            "access": "input"
-          },
-          "role": {
-            "type": "string",
-            "minimumLength": 1,
-            "maximumLength": 64,
-            "pattern": "^[A-Za-z0-9._-]+$",
-            "default": "production-sprite"
-          },
-          "maxPartialAlphaRatio": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1,
-            "default": 0
-          },
-          "maxColors": {
-            "type": "integer",
-            "minimum": 2,
-            "maximum": 65536,
-            "default": 256
-          }
+          "input": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "role": {"type": "string", "minimumLength": 1, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]+$", "default": "production-sprite"},
+          "maxPartialAlphaRatio": {"type": "number", "minimum": 0, "maximum": 1, "default": 0},
+          "maxColors": {"type": "integer", "minimum": 2, "maximum": 65536, "default": 256}
         }
       },
       "network": "disabled",
       "timeoutSeconds": 300,
       "description": "Audit one exact materialized PNG for dimensions, pixel layout, palette size and partial-alpha production blockers before creative approval."
+    },
+    "game-art-raster-edit": {
+      "runtime": "python-script",
+      "entry": "tools/image_workstation.py",
+      "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--receipt", "{{receipt}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["workspaceRoot", "plan", "planSha256", "receipt"],
+        "properties": {
+          "workspaceRoot": {"type": "compute-path", "pathKind": "directory", "access": "input"},
+          "plan": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "planSha256": {"type": "string", "minimumLength": 64, "maximumLength": 64, "pattern": "^[0-9a-f]{64}$"},
+          "receipt": {"type": "compute-path", "pathKind": "file", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["receipt"],
+      "network": "disabled",
+      "timeoutSeconds": 3600,
+      "description": "Execute one exact-plan, create-only deterministic raster edit inside an allowed EVAVO workspace."
+    },
+    "game-art-sprite-build": {
+      "runtime": "python-script",
+      "entry": "tools/sprite_workstation.py",
+      "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--output-root", "{{outputRoot}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["workspaceRoot", "plan", "planSha256", "outputRoot"],
+        "properties": {
+          "workspaceRoot": {"type": "compute-path", "pathKind": "directory", "access": "input"},
+          "plan": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "planSha256": {"type": "string", "minimumLength": 64, "maximumLength": 64, "pattern": "^[0-9a-f]{64}$"},
+          "outputRoot": {"type": "compute-path", "pathKind": "directory", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["outputRoot"],
+      "network": "disabled",
+      "timeoutSeconds": 3600,
+      "description": "Build one exact-plan create-only sprite atlas, manifest and Godot SpriteFrames package from reviewed frames."
     },
     "pixel-art-candidate-audit-test": {
       "runtime": "node-script",
