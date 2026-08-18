@@ -1,0 +1,121 @@
+{
+  "schema": "evavo.art-studio.mobile-design-contract.v1",
+  "product": "EVAVO Glasses",
+  "runtimeRepository": "EVAVO-STUDIO/evavo-glasses",
+  "integrationOwner": "EVAVO-STUDIO/evavo-development-studio",
+  "storageOwner": "EVAVO-STUDIO/evavo-local-storage",
+  "brand": {
+    "accent": "#FF244E",
+    "canvas": "#060608",
+    "surface": "#111115",
+    "text": "#F8F8FA",
+    "style": [
+      "minimal premium creative-technology control surface",
+      "black white and EVAVO cherry red",
+      "high-contrast editorial typography",
+      "restrained technical texture rather than generic AI gradients",
+      "clear hierarchy and visible state",
+      "no glossy sci-fi chrome",
+      "no generic dashboard template styling"
+    ]
+  },
+  "responsive": {
+    "phone": {
+      "layout": "single-column",
+      "minimumTouchTargetDp": 48,
+      "minimumTouchTargetPt": 44,
+      "priority": ["readiness", "active-session", "primary-actions", "local-stop"]
+    },
+    "tablet": {
+      "minimumWidthDp": 720,
+      "layout": "two-column-dashboard",
+      "iosMetricColumns": 4,
+      "iosQuickModeColumns": 3,
+      "maximumContentWidthPt": 1120,
+      "priority": ["persistent-context", "parallel-status", "bounded-actions", "local-stop"]
+    },
+    "accessibility": [
+      "dynamic-type-safe-copy",
+      "no-state-by-colour-alone",
+      "semantic-control-labels",
+      "high-contrast-text",
+      "minimum-touch-targets",
+      "reflow-before-text-truncation"
+    ]
+  },
+  "assetFamilies": [
+    {
+      "id": "app-icon-master",
+      "kind": "app-icon",
+      "status": "existing-reviewed-runtime-identity",
+      "purpose": "Preserve and refine the established GODMODE glasses mark without changing identity provenance.",
+      "platforms": ["ios", "android"],
+      "runtimeTargets": {
+        "ios": ["apps/mobile/ios/Resources/Assets.xcassets/AppIcon.appiconset/GODMODE-1024.png"],
+        "android": ["apps/mobile/android/app/src/main/res/mipmap-anydpi/ic_launcher.xml"]
+      },
+      "requirements": [
+        "recognisable at 16 24 32 48 64 and 128 pixels",
+        "no text inside the icon",
+        "black field white optical frame and cherry-red focal detail",
+        "preserve generous optical safe zone",
+        "no transparency in the iOS 1024 master",
+        "do not replace an approved identity asset without provenance evidence"
+      ]
+    },
+    {
+      "id": "android-adaptive-icon",
+      "kind": "adaptive-icon-foreground",
+      "status": "candidate-only",
+      "purpose": "Prepare adaptive foreground background and monochrome candidates derived from the established icon geometry.",
+      "platforms": ["android"],
+      "runtimeTargets": {
+        "android": [
+          "apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+          "apps/mobile/android/app/src/main/res/drawable/ic_launcher_foreground.xml",
+          "apps/mobile/android/app/src/main/res/drawable/ic_launcher_monochrome.xml"
+        ]
+      },
+      "requirements": [
+        "foreground geometry stays inside Android adaptive safe zones",
+        "monochrome variant remains legible for themed icons",
+        "background remains EVAVO canvas black",
+        "candidate must be visually compared with the shipped icon before handoff"
+      ]
+    },
+    {
+      "id": "control-surface-texture",
+      "kind": "in-app-illustration",
+      "status": "procedural-preferred",
+      "purpose": "Provide subtle authored depth to dashboard backgrounds without requiring decorative bitmap downloads.",
+      "platforms": ["ios", "android"],
+      "runtimeTargets": {
+        "ios": ["apps/mobile/ios/Sources/App/CompanionDesignSystem.swift"],
+        "android": ["apps/mobile/android/app/src/main/java/au/com/evavo/glasses/ui/EvavoViews.kt"]
+      },
+      "requirements": [
+        "procedural line grain or restrained radial field",
+        "must not compete with status or controls",
+        "must preserve contrast under accessibility settings",
+        "no stock texture aesthetic",
+        "no baked noise image when native rendering is sufficient"
+      ]
+    }
+  ],
+  "review": {
+    "candidateOnly": true,
+    "humanOrGovernedReviewRequired": true,
+    "runtimeScaleChecksRequired": true,
+    "phoneAndTabletReviewRequired": true,
+    "hostileBackgroundIconProofRequired": true,
+    "visualRegressionEvidenceRequired": true
+  },
+  "authority": {
+    "mayGenerateCandidates": true,
+    "mayApproveAssets": false,
+    "mayWriteRuntimeRepository": false,
+    "mayCommitOrPushRuntimeRepository": false,
+    "mayTreatGenerationAsApproval": false,
+    "mayChangeProductIdentityWithoutApproval": false
+  }
+}
