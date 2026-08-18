@@ -105,7 +105,7 @@ export function validateRecoveryChain(chain) {
   exact(chain, ["schemaVersion","kind","client","runtimeOwner","minimumLocalStorageVersion","order","rules","authority"], "Recovery chain");
   fail(chain.schemaVersion === 1 && chain.kind === "evavo-automation-fabric-recovery-chain" && chain.client === "evavo-art-studio", "Recovery chain identity drifted.");
   fail(chain.runtimeOwner === "EVAVO-STUDIO/evavo-local-storage", "Recovery chain runtime owner drifted.");
-  fail(atLeast(chain.minimumLocalStorageVersion, "0.47.0"), "Recovery chain requires Local Storage 0.47.0 or newer.");
+  fail(atLeast(chain.minimumLocalStorageVersion, "0.48.0"), "Recovery chain requires Local Storage 0.48.0 or newer.");
   fail(Array.isArray(chain.order) && chain.order.length === 3, "Recovery chain must contain exactly three ordered routes.");
   fail(JSON.stringify(chain.order.map((entry) => entry.id)) === JSON.stringify(["supervisor-first","legacy-certified","immutable-armer"]), "Recovery chain order changed.");
   fail(chain.order[0].entrypoint === "START-EVAVO-WORKER-FABRIC-SUPERVISOR-FIRST.ps1", "Supervisor-first recovery starter drifted.");
@@ -122,7 +122,7 @@ export function validateAutomationFabricClient(client) {
   exact(client, ["schemaVersion","kind","contractVersion","client","role","runtimeOwner","minimumLocalStorageVersion","reviewedLocalStorageMain","reviewedDevelopmentStudioMain","poolId","primaryNodeId","sourceContract","runtimeEvidenceStates","truthRules","routing","execution","githubActionsFallback","workerAuthority","publication","safety"], "Automation Fabric runtime-truth client");
   fail(client.schemaVersion === 3 && client.kind === "evavo-automation-fabric-runtime-truth-client" && client.contractVersion === 5 && client.client === "evavo-art-studio", "Automation Fabric v5 client identity is invalid.");
   fail(client.runtimeOwner === "EVAVO-STUDIO/evavo-local-storage", "Local Storage must remain the runtime owner.");
-  fail(atLeast(client.minimumLocalStorageVersion, "0.47.0"), "Automation Fabric requires evavo-local-storage 0.47.0 or newer.");
+  fail(atLeast(client.minimumLocalStorageVersion, "0.48.0"), "Automation Fabric requires evavo-local-storage 0.48.0 or newer.");
   fail(SHA.test(client.reviewedLocalStorageMain) && SHA.test(client.reviewedDevelopmentStudioMain), "Reviewed runtime revisions must be exact commit SHAs.");
   fail(client.poolId === "windows-local" && client.primaryNodeId === "windows-primary", "Automation Fabric worker identity drifted.");
   exact(client.sourceContract, ["capabilitiesPath","physicalAcceptanceScript","workstationAcceptanceCommand","workstationAcceptanceImplementation","recoveryChainContract","supervisorFirstRecoveryStarter","certifiedFallbackStarter","immutableRepairArmer","resilientInstaller","controlPlaneHealer","repositoryTaskPlanAction","repositoryTaskExecuteAction"], "Source contract");
@@ -149,7 +149,7 @@ export function validateAutomationFabricClient(client) {
   fail(client.execution.preferredRecoveryEntrypoint === "START-EVAVO-WORKER-FABRIC-SUPERVISOR-FIRST.ps1" && client.execution.legacyCertifiedRecoveryEntrypoint === "START-EVAVO-AUTOMATION-FABRIC-CERTIFIED.ps1" && client.execution.immutableRepairArmer === "ARM-EVAVO-WORKER-FABRIC-REPAIR.ps1", "Execution recovery chain drifted.");
   fail(client.execution.repositoryTaskPlanAction === "storage.repository_task_plan" && client.execution.repositoryTaskExecuteAction === "storage.repository_task_run", "Execution repository task route drifted.");
   fail(client.execution.maximumAttempts === 3, "Automatic retry budget must remain bounded to three attempts.");
-  fail(JSON.stringify(client.execution.approvedRoots) === JSON.stringify(["C:\\GitRepos","C:\\Downloads","C:\\BEESTATION","approved-discovered-external-roots"]), "Approved execution roots drifted.");
+  fail(JSON.stringify(client.execution.approvedRoots) === JSON.stringify(["C:\\GitRepos","%USERPROFILE%\\Downloads","resolved-beestation-root","approved-discovered-external-roots"]), "Approved execution roots drifted.");
   const routine = strings(client.execution.routineCapabilities, "routineCapabilities", 100, 100, true);
   for (const item of ["powershell","python","node","pnpm","git","github-cli","archive","art-pipeline-validation","image-toolchain","provider-runtime"]) fail(routine.includes(item), `Automation Fabric lacks ${item} routing.`);
   exact(client.githubActionsFallback, ["developmentStudioContract","eligibleStatus","zeroStepsRequired","completedFailedRunRequired","exactBlockedRevisionRequired","plannerReceiptBoundToBlockedRevision","readOnlyValidationOnly","githubActionsEquivalent","githubCheckStatusMutation","workerReceiptIsPublicationEvidence"], "GitHub Actions fallback");
@@ -163,7 +163,7 @@ export function validateAutomationFabricClient(client) {
   for (const key of ["forcePush","automaticMerge","automaticRebase"]) fail(client.publication[key] === false, `Destructive or automatic publication mode enabled: ${key}.`);
   for (const key of ["resetHard","gitClean","stashAsRecovery","permanentDelete","providerDeleteImpliedByWorkerAuthority","downloadAloneAuthorizesExecution","secretEnvironmentCallerOverride"]) fail(client.safety[key] === false, `Safety boundary weakened: ${key}.`);
   fail(client.safety.cleanupDestination === "bee://primary/TO_DELETE/", "Recoverable cleanup destination drifted.");
-  return { schema:"evavo.art-studio-automation-fabric-client-check.v6", client:client.client, poolId:client.poolId, minimumLocalStorageVersion:client.minimumLocalStorageVersion, workstationAcceptance:"v8", exactStateRepositoryTasks:true, supervisorFirstRecovery:true, commandIdSingleExecutionRequired:true, githubActionsWorkerFallback:true, workerReceiptIsPublicationEvidence:false, publicationAuthority:client.publication.operatorRepository };
+  return { schema:"evavo.art-studio-automation-fabric-client-check.v7", client:client.client, poolId:client.poolId, minimumLocalStorageVersion:client.minimumLocalStorageVersion, workstationAcceptance:"v8", exactStateRepositoryTasks:true, supervisorFirstRecovery:true, commandIdSingleExecutionRequired:true, githubActionsWorkerFallback:true, workerReceiptIsPublicationEvidence:false, publicationAuthority:client.publication.operatorRepository };
 }
 
 export async function checkRepository(root = ROOT) {
@@ -187,14 +187,14 @@ export async function checkRepository(root = ROOT) {
     readFile(path.join(root, "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md"), "utf8"),
   ]);
   for (const marker of ["node scripts/check-art-studio-capability-contract.mjs","node --test scripts/test-art-studio-capability-contract.mjs","git diff --exit-code","git status --porcelain=v1 --untracked-files=all","permissions:","contents: read"]) fail(workflow.includes(marker), `Capability workflow is missing marker: ${marker}`);
-  for (const marker of ["Development Studio","EVAVO GitHub MCP","Local Storage","worker receipt","does not grant publication","file-first","supervisor-first","0.47.0","workstation acceptance v8"]) fail(documentation.toLowerCase().includes(marker.toLowerCase()), `Capability documentation is missing boundary: ${marker}`);
-  return { schema:"evavo.art-studio-capability-and-automation-contract-check.v3", ok:true, manifest:manifestResult, automationFabric:clientResult, recovery:recoveryResult, sourceMutation:false, publication:false };
+  for (const marker of ["Development Studio","EVAVO GitHub MCP","Local Storage","worker receipt","does not grant publication","file-first","supervisor-first","0.48.0","workstation acceptance v8","%USERPROFILE%\\Downloads","resolved-beestation-root"]) fail(documentation.toLowerCase().includes(marker.toLowerCase()), `Capability documentation is missing boundary: ${marker}`);
+  return { schema:"evavo.art-studio-capability-and-automation-contract-check.v4", ok:true, manifest:manifestResult, automationFabric:clientResult, recovery:recoveryResult, sourceMutation:false, publication:false };
 }
 
 if (process.argv[1] !== undefined && path.resolve(process.argv[1]) === path.resolve(HERE)) {
   try {
     const result = await checkRepository();
-    console.log(`PASS ${result.manifest.capabilityCount} Art Studio capabilities, Local Storage 0.47 runtime truth, workstation acceptance v8 and supervisor-first recovery validated.`);
+    console.log(`PASS ${result.manifest.capabilityCount} Art Studio capabilities, Local Storage 0.48 runtime truth, workstation acceptance v8 and supervisor-first recovery validated.`);
   } catch (error) {
     console.error(`FAIL ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
