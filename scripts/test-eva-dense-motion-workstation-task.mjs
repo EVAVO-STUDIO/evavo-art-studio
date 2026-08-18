@@ -69,6 +69,6 @@ test("rejects unsafe PowerShell primitives or Git mutation", () => {
 });
 
 test("rejects missing strict native-exit handling", () => {
-  const weakened = script.replace("$global:LASTEXITCODE = 0", "$ignoredExitCode = 0");
+  const weakened = script.replaceAll("$global:LASTEXITCODE = 0", "$ignoredExitCode = 0");
   assert.throws(() => validateTask(clone(task), weakened, clone(v5)), /LASTEXITCODE/u);
 });
