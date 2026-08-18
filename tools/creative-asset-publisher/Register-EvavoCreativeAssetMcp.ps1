@@ -98,9 +98,31 @@ if ($EnableStorageDispatch) {
 }
 
 if ($WorkstationRoots.Count -lt 1) {
-    $WorkstationRoots = @($GitReposRoot, (Join-Path $env:LOCALAPPDATA 'EVAVO'))
+    $DefaultRoots = [System.Collections.Generic.List[string]]::new()
+    $DefaultRoots.Add($GitReposRoot)
+    $DefaultRoots.Add((Join-Path $env:USERPROFILE 'Downloads'))
+    $DefaultRoots.Add($StateRoot)
+    $BeeStationCandidates = [System.Collections.Generic.List[string]]::new()
+    if ($env:EVAVO_BEESTATION_PATH) { $BeeStationCandidates.Add($env:EVAVO_BEESTATION_PATH) }
+    $BeeStationCandidates.Add((Join-Path $env:USERPROFILE 'Beestation'))
+    $BeeStationCandidates.Add('C:\BEESTATION')
+    foreach ($Candidate in $BeeStationCandidates) {
+        if ($Candidate -and (Test-Path -LiteralPath $Candidate -PathType Container)) {
+            $DefaultRoots.Add([System.IO.Path]::GetFullPath($Candidate))
+            break
+        }
+    }
+    $WorkstationRoots = @($DefaultRoots)
 }
-$WorkstationRoots = @($WorkstationRoots | ForEach-Object { [System.IO.Path]::GetFullPath($_) } | Select-Object -Unique)
+$WorkstationRoots = @(
+    $WorkstationRoots |
+        Where-Object { $_ } |
+        ForEach-Object { [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($_)) } |
+        Select-Object -Unique
+)
+if ($WorkstationRoots -contains 'C:\Downloads') {
+    throw 'C:\Downloads is retired. Use %USERPROFILE%\Downloads.'
+}
 $WorkstationEnvironment = [ordered]@{
     EVAVO_GAME_ART_WORKSTATION_ROOTS = ($WorkstationRoots -join [IO.Path]::PathSeparator)
 }
@@ -108,16 +130,8 @@ if ($EnableWorkstationWrite) {
     $WorkstationEnvironment['EVAVO_GAME_ART_WORKSTATION_ALLOW_WRITE'] = '1'
 }
 
-$PublisherDefinition = [pscustomobject][ordered]@{
-    command = $Node
-    args = @($PublisherServer)
-    env = $PublisherEnvironment
-}
-$WorkstationDefinition = [pscustomobject][ordered]@{
-    command = $Node
-    args = @($WorkstationServer)
-    env = $WorkstationEnvironment
-}
+$PublisherDefinition = [pscustomobject][ordered]@{ command = $Node; args = @($PublisherServer); env = $PublisherEnvironment }
+$WorkstationDefinition = [pscustomobject][ordered]@{ command = $Node; args = @($WorkstationServer); env = $WorkstationEnvironment }
 
 $SnippetServers = New-Object PSCustomObject
 $SnippetServers | Add-Member -MemberType NoteProperty -Name $ServerName -Value $PublisherDefinition
@@ -126,11 +140,8 @@ $Snippet = [pscustomobject][ordered]@{ mcpServers = $SnippetServers }
 
 foreach ($ConfigPathValue in $ClientConfigPaths) {
     $ConfigPath = [System.IO.Path]::GetFullPath($ConfigPathValue)
-    if (Test-Path -LiteralPath $ConfigPath -PathType Leaf) {
-        $Document = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
-    } else {
-        $Document = New-Object PSCustomObject
-    }
+    if (Test-Path -LiteralPath $ConfigPath -PathType Leaf) { $Document = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json }
+    else { $Document = New-Object PSCustomObject }
     if (-not ($Document.PSObject.Properties.Name -contains 'mcpServers')) {
         $Document | Add-Member -MemberType NoteProperty -Name 'mcpServers' -Value (New-Object PSCustomObject)
     }
@@ -140,9 +151,7 @@ foreach ($ConfigPathValue in $ClientConfigPaths) {
         [pscustomobject]@{ Name = $WorkstationServerName; Definition = $WorkstationDefinition }
     )) {
         $Exists = $Servers.PSObject.Properties.Name -contains $Registration.Name
-        if ($Exists -and -not $Force) {
-            throw "MCP server '$($Registration.Name)' already exists in $ConfigPath. Use -Force after review."
-        }
+        if ($Exists -and -not $Force) { throw "MCP server '$($Registration.Name)' already exists in $ConfigPath. Use -Force after review." }
         if ($Exists) { $Servers.($Registration.Name) = $Registration.Definition }
         else { $Servers | Add-Member -MemberType NoteProperty -Name $Registration.Name -Value $Registration.Definition }
     }
@@ -154,11 +163,12 @@ foreach ($ConfigPathValue in $ClientConfigPaths) {
 }
 
 [ordered]@{
-    contract = 'evavo.creative-asset-mcp-registration.v4'
+    contract = 'evavo.creative-asset-mcp-registration.v5'
     publisherServerName = $ServerName
     workstationServerName = $WorkstationServerName
     publisherServer = $PublisherDefinition
     workstationServer = $WorkstationDefinition
+    workstationRoots = @($WorkstationRoots)
     patchedConfigPaths = @($ClientConfigPaths)
     snippet = $Snippet
     workstationWriteEnabled = [bool]$EnableWorkstationWrite
