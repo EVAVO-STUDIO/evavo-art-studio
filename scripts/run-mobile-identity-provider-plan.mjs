@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 
-const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime.mjs';
+const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime-entry.mjs';
+const RUNTIME_ENGINE = 'scripts/mobile-identity-provider-runtime.mjs';
 const PREPARATION_ID = 'prepare';
 const EXPECTED_STEP_IDS = Object.freeze(['select', 'admit', 'authorize', 'execute']);
 const PHASE_OPTIONS = Object.freeze({
@@ -121,7 +122,7 @@ export function validateMobileIdentityProviderExecutionPlan(plan) {
   if (!/^[a-f0-9]{64}$/u.test(executionPlanSha256 ?? '') || sha256Object(unsigned) !== executionPlanSha256) fail('executionPlanSha256 mismatch');
   validateOpenAIProvider(plan);
   if (!/^[a-f0-9]{64}$/u.test(plan.sourceProviderRequestSha256 ?? '')) fail('sourceProviderRequestSha256 is invalid');
-  if (plan.runtime?.schema !== 'evavo.mobile-identity-provider-runtime-batch.v1' || plan.runtime?.controlScript !== RUNTIME_SCRIPT || plan.runtime?.campaignMetadataRequired !== false || plan.runtime?.gameMetadataRequired !== false) fail('mobile identity runtime binding is invalid');
+  if (plan.runtime?.schema !== 'evavo.mobile-identity-provider-runtime-batch.v1' || plan.runtime?.controlScript !== RUNTIME_SCRIPT || plan.runtime?.engineScript !== RUNTIME_ENGINE || plan.runtime?.campaignMetadataRequired !== false || plan.runtime?.gameMetadataRequired !== false || plan.runtime?.repositoryRelativePlanPaths !== true || plan.runtime?.absoluteEngineRootsResolvedByEntry !== true) fail('mobile identity runtime binding is invalid');
   const preparation = validateRuntimeArgv(plan.preparation, PREPARATION_ID);
   if (!Array.isArray(plan.steps) || plan.steps.length !== EXPECTED_STEP_IDS.length) fail('execution plan must contain exactly four governed stages after preparation');
   const steps = plan.steps.map((step, index) => validateRuntimeArgv(step, EXPECTED_STEP_IDS[index]));
