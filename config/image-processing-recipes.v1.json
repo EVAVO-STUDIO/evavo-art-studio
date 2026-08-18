@@ -5,25 +5,8 @@
       "id": "sharp-delivery-optimizer",
       "kind": "repository-package",
       "entrypoint": "tools/run_art_delivery_optimizer.py",
-      "capabilities": [
-        "inspect",
-        "background-preserve",
-        "connected-matte-to-alpha",
-        "luminance-to-alpha",
-        "resize",
-        "convert",
-        "optimize",
-        "alpha-analyze",
-        "edge-decontaminate",
-        "hidden-rgb-rebuild",
-        "palette-normalize"
-      ],
-      "preferredFor": [
-        "png",
-        "webp",
-        "jpeg",
-        "tiff"
-      ],
+      "capabilities": ["inspect","background-preserve","connected-matte-to-alpha","luminance-to-alpha","resize","convert","optimize","alpha-analyze","edge-decontaminate","hidden-rgb-rebuild","palette-normalize"],
+      "preferredFor": ["png","webp","jpeg","tiff"],
       "fallbackRank": 0,
       "receiptSchema": "evavo.art-delivery-optimization-receipt.v1"
     },
@@ -31,26 +14,8 @@
       "id": "sharp-exact-canvas-runtime",
       "kind": "node",
       "entrypoint": "tools/process_image_with_sharp.mjs",
-      "capabilities": [
-        "inspect",
-        "background-preserve",
-        "connected-matte-to-alpha",
-        "luminance-to-alpha",
-        "canvas-normalize",
-        "resize",
-        "convert",
-        "optimize",
-        "alpha-analyze",
-        "edge-decontaminate",
-        "hidden-rgb-rebuild",
-        "palette-normalize"
-      ],
-      "preferredFor": [
-        "png",
-        "webp",
-        "jpeg",
-        "tiff"
-      ],
+      "capabilities": ["inspect","background-preserve","connected-matte-to-alpha","luminance-to-alpha","canvas-normalize","resize","convert","optimize","alpha-analyze","edge-decontaminate","hidden-rgb-rebuild","palette-normalize"],
+      "preferredFor": ["png","webp","jpeg","tiff"],
       "fallbackRank": 1,
       "receiptSchema": "evavo.image-processing-receipt.v1"
     },
@@ -58,36 +23,22 @@
       "id": "python-pillow-fallback",
       "kind": "python",
       "entrypoint": "tools/process_image_with_pillow.py",
-      "capabilities": [
-        "inspect",
-        "background-preserve",
-        "connected-matte-to-alpha",
-        "luminance-to-alpha",
-        "canvas-normalize",
-        "resize",
-        "convert",
-        "optimize",
-        "alpha-analyze",
-        "palette-normalize"
-      ],
-      "preferredFor": [
-        "png",
-        "webp",
-        "jpeg",
-        "tiff",
-        "bmp"
-      ],
+      "capabilities": ["inspect","background-preserve","connected-matte-to-alpha","luminance-to-alpha","canvas-normalize","resize","convert","optimize","alpha-analyze","palette-normalize"],
+      "preferredFor": ["png","webp","jpeg","tiff","bmp"],
       "fallbackRank": 2,
       "receiptSchema": "evavo.image-processing-receipt.v1"
+    },
+    {
+      "id": "raster-workstation",
+      "kind": "python",
+      "entrypoint": "tools/image_workstation.py",
+      "capabilities": ["crop","trim-alpha","resize","nearest-neighbour-resize","integer-scale","flip","rotate-90","canvas-normalize","alpha-threshold","mask-alpha","composite","erase-colour","replace-colour","levels","brightness","contrast","saturation","sharpen","palette-quantize","pixelate","outline"],
+      "preferredFor": ["png"],
+      "fallbackRank": 0,
+      "receiptSchema": "evavo.raster-workstation-receipt.v1"
     }
   ],
-  "nonDeterministicOperations": [
-    "reviewed-mask-to-alpha",
-    "retouch",
-    "inpaint",
-    "outpaint",
-    "linework-strengthen"
-  ],
+  "nonDeterministicOperations": ["reviewed-mask-to-alpha","retouch","inpaint","outpaint","linework-strengthen"],
   "rules": {
     "sourceOverwriteAllowed": false,
     "createOnlyOutput": true,
