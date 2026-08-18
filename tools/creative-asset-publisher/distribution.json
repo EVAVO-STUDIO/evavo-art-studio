@@ -1,0 +1,423 @@
+{
+  "contract": "evavo.creative-asset-publisher-sealed-distribution.v2",
+  "version": "0.4.1",
+  "package": {
+    "name": "@evavo/creative-asset-publisher",
+    "version": "0.4.1"
+  },
+  "compression": "brotli",
+  "archiveFormat": "ustar",
+  "bundleSha256": "c06f5c1fe669e0f0fa2f6328ba939a7b7fe5dd0d3486a6feee573d8c9665c4a2",
+  "bundleBytes": 83792,
+  "archiveSha256": "267bb2464f171792868442acc8e0098bcbd956281ae03ce3d4cdfac9bab2b038",
+  "archiveBytes": 542720,
+  "encodedCharacters": 111724,
+  "checksumsSha256": "1249e126d81cf5c33910483ab7547bcc4a81d420698b07c85d53613846e72c25",
+  "entryCount": 79,
+  "fileCount": 63,
+  "totalFileBytes": 478045,
+  "entrypoints": {
+    "cli": "src/cli.mjs",
+    "mcp": "src/mcp-server.mjs"
+  },
+  "parts": [
+    {
+      "path": "runtime.part-000.base64",
+      "sha256": "eff8028f4869a3cb5f8da0febf05a3c0fa13df2e4ba700213a8615254dfd8f67",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-001.base64",
+      "sha256": "f73d5f044f65a8be45a716a7c73a6ead8afabae6d15bbd983aa948ee75a69868",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-002.base64",
+      "sha256": "2348eb01fe0a2c411b685364a8393843b46bf3a062527097fe642745eff3fb96",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-003.base64",
+      "sha256": "932bc57dde56d1b0e97dc71a3e3c076c3bfe2d5acc56a96800fe55c441941f5c",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-004.base64",
+      "sha256": "335e2dfac359fc28c9c4402835cca4e1289284d94043a0f6fe0bc99e3126340f",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-005.base64",
+      "sha256": "b0e2657f2f6da5ba7c88dd37547a0ea8dffa5559a567e9d3d94b8cffee81275f",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-006.base64",
+      "sha256": "2793c6f509f710dcf89acac99e96718ce96008bc477c45cf034921b5c39aa0af",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-007.base64",
+      "sha256": "65d5341900af724c9266b80f3a42c53c5c02c6d8bd68485f654e8a47a3e00382",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-008.base64",
+      "sha256": "ee22e31cfbfe49d187a2afda6199f6235ea247819d350183646cce657aabdb69",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-009.base64",
+      "sha256": "129d79f1b1002229e0861a52e4eb9ce8096d20b8c931f1d0d7e0291a5784969c",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-010.base64",
+      "sha256": "925521335201695b3dbbe14869c4ad80c162e89720f962374b4d9f5df700e298",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-011.base64",
+      "sha256": "ff82ea8495adf2e3a029e3aa08ef6a949867ea023fa6edde691672dce071a803",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-012.base64",
+      "sha256": "aee23ee9701c3aae0a801e29240245aa9dfb97c4a2c3c7b2135792a391bd8fcf",
+      "encodedCharacters": 8192
+    },
+    {
+      "path": "runtime.part-013.base64",
+      "sha256": "46e995438c2453eaf2e827ec284ae562a44e8aca40676846b13190cf8ca3e330",
+      "encodedCharacters": 5228
+    }
+  ],
+  "runtimeFiles": [
+    {
+      "path": "INSTALL-MANIFEST.json",
+      "sha256": "26ca9a1af4aa4c65645ba74a6d902146527ce987c1bbd1ecb8e5ed558b5c1dca",
+      "bytes": 3629
+    },
+    {
+      "path": "README.md",
+      "sha256": "51a7ca111accdd1c84bfd202e91e99aa79c7e195c8fe86ef6c0c6e7e7ca03872",
+      "bytes": 9694
+    },
+    {
+      "path": "checksums.sha256",
+      "sha256": "1249e126d81cf5c33910483ab7547bcc4a81d420698b07c85d53613846e72c25",
+      "bytes": 6170
+    },
+    {
+      "path": "docs/AGENT_PLAYBOOK.md",
+      "sha256": "74e85d97b4caa5af9c579ed7b1c3a47d0a46021e4fcbc4d3e2049f2e57de1d86",
+      "bytes": 5567
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "sha256": "0298450b3c31e5c316e8350791821419c9c5d155caae71593d18daa64fbad649",
+      "bytes": 10123
+    },
+    {
+      "path": "docs/MCP.md",
+      "sha256": "a8308d47f59626215dd99ddf2fe22eea42dfb1045aa0b0ef8d3eacc2fc17fe0c",
+      "bytes": 5606
+    },
+    {
+      "path": "docs/WINDOWS_ROLLOUT.md",
+      "sha256": "294d74a4d6fd4da568c870e6817d8c51eff153eef5b2d0472b6124aaf2334852",
+      "bytes": 6537
+    },
+    {
+      "path": "examples/california-games/.evavo/creative-assets.json",
+      "sha256": "c97875ebe45f4a25e3e0047b6423db452687e39d05e33cbfe8060aa687be0ded",
+      "bytes": 3248
+    },
+    {
+      "path": "examples/requests/frame-sequence-request.json",
+      "sha256": "d11c61354cd0f3994841ef99fc2c7fe543562f979172909455098c976ddcecd1",
+      "bytes": 377
+    },
+    {
+      "path": "examples/requests/halfpipe-jax-godot-package.json",
+      "sha256": "bb86acf23bfe89d5b70125b5fdd91eb23ff215dcd634032f0cc2ef9a47e5f160",
+      "bytes": 784
+    },
+    {
+      "path": "integrations/art-studio/CREATIVE_ASSET_PUBLISHER.md",
+      "sha256": "03d00ec559c25a95179204a1668f6c99ce64fdc46a6e1b0ab14915d10007ba96",
+      "bytes": 2080
+    },
+    {
+      "path": "integrations/development-studio/CREATIVE_ASSET_MAINLINE_PUBLICATION.md",
+      "sha256": "e2b58b674dd6d10b39596c734719430b347c1cce416c0efd5f20a4ed40c93ba6",
+      "bytes": 5331
+    },
+    {
+      "path": "integrations/development-studio/creative-asset-mainline-adapter.mjs",
+      "sha256": "4911868d34d8f1a8a1bb055776d25ac11c50773235145769cd13c116d464e2c5",
+      "bytes": 39200
+    },
+    {
+      "path": "integrations/development-studio/sealed-mainline-publication.mjs",
+      "sha256": "c12165836fb74f4ad796cdb78bc1605229e7cd9d6b0cb0a4df28a9945d087fe8",
+      "bytes": 21885
+    },
+    {
+      "path": "integrations/local-storage/Invoke-EvavoCreativeAssetPublisher.ps1",
+      "sha256": "2703b988b0fa3f36d028df88cab5eb356279222304e8d735101db8b667cdc66e",
+      "bytes": 3568
+    },
+    {
+      "path": "integrations/local-storage/Watch-EvavoCreativeAssetHandoff.ps1",
+      "sha256": "74a391be3fd351074757c1fc72515e53ebb82f8eb5f503f0153ade1f8a50bbea",
+      "bytes": 6121
+    },
+    {
+      "path": "integrations/storage/CREATIVE_ASSET_PUBLICATION.md",
+      "sha256": "8fa67c866e7ae7f283115fdc4000c4f3d0e8edb416e2c0572b94a3ebfb12ee09",
+      "bytes": 2584
+    },
+    {
+      "path": "integrations/storage/creative-asset-publication-handoff.schema.json",
+      "sha256": "9452218e5c1594d3d10c0e83c6f4270fcc5377d2adb8fdb76028bfa7df5d4612",
+      "bytes": 4801
+    },
+    {
+      "path": "integrations/storage/creative_asset_storage_adapter.py",
+      "sha256": "3bea4b6ac92737fc62eb62c145288bc457111aad13045f2a6d560bc058a8a92e",
+      "bytes": 26332
+    },
+    {
+      "path": "integrations/video-studio/CREATIVE_ASSET_FRAME_HANDOFF.md",
+      "sha256": "1b0a3f96884738dc51f03d2a9c1b856239f688614397463c0bbfb3fda4c154c2",
+      "bytes": 923
+    },
+    {
+      "path": "integrations/video-studio/creative-frame-sequence.mjs",
+      "sha256": "82a910505282eca5f405147ef051fa3d05658c6ecb04adfbc1962e6c947d0726",
+      "bytes": 3710
+    },
+    {
+      "path": "package.json",
+      "sha256": "73a3d3f821fe212a2b12e90bbaa5d9b21e8dfc26b942ae9b6cada9611efd3f2b",
+      "bytes": 737
+    },
+    {
+      "path": "schemas/approval.schema.json",
+      "sha256": "283ec5e3ef3a95be313b95b06acffb4de3333fb774eb6e4ba2bbc46584818613",
+      "bytes": 3831
+    },
+    {
+      "path": "schemas/frame-sequence.schema.json",
+      "sha256": "32fc0a19556043f02fe3782a1e2aebe110d566259f688bb958493c7ba7c48932",
+      "bytes": 3410
+    },
+    {
+      "path": "schemas/intake.schema.json",
+      "sha256": "082a30ccc28d090abdca3b8b58498b5a012d4390fa9ba12a308593e7fd528e7c",
+      "bytes": 2082
+    },
+    {
+      "path": "schemas/project-binding.schema.json",
+      "sha256": "e3b42787ddde1cf624c9e98e0246bc763e8976548bbed5ad8d146a65253bcaf4",
+      "bytes": 9485
+    },
+    {
+      "path": "schemas/publication-plan.schema.json",
+      "sha256": "c376011572758b3df4bf364a042a28c6ee8b09b61e75c09457ee0b5f1bd36c79",
+      "bytes": 1630
+    },
+    {
+      "path": "schemas/receipt.schema.json",
+      "sha256": "5b4a4b368c33e95728ac15c32440c585419024de1880cbb5435d77ad4b76c2b4",
+      "bytes": 1351
+    },
+    {
+      "path": "schemas/repository-publication-request.schema.json",
+      "sha256": "8a4f37bc39640ffd84d1abe4c3de1b5d27f23e40d0181b5b30b5c0c0d3924ed2",
+      "bytes": 4931
+    },
+    {
+      "path": "scripts/Apply-EvavoCreativeAssetPublisher.ps1",
+      "sha256": "d4cc85b6a71325e5a001c28ad9db3cb56b59b17d6c49cb74e714ba158647ca7f",
+      "bytes": 1277
+    },
+    {
+      "path": "scripts/Register-EvavoCreativeAssetMcp.ps1",
+      "sha256": "80540de93c70f3f5665b0902d594e5a392967824d930d77a367b2049802959c2",
+      "bytes": 6114
+    },
+    {
+      "path": "scripts/apply.mjs",
+      "sha256": "c624e6c53a70036a218abe946dcd62f68030bede8d2c0d90c4be5cf044e9228e",
+      "bytes": 23127
+    },
+    {
+      "path": "scripts/check-package-integrity.mjs",
+      "sha256": "23d24813174854e078cc491060c524c55054b315a6f6e6aba7f9f631697171bf",
+      "bytes": 8801
+    },
+    {
+      "path": "scripts/check-python-adapter.mjs",
+      "sha256": "6d3abb4494dbc888999482a45af93f0ac1503df0fb967096eeca571f6a54a377",
+      "bytes": 2083
+    },
+    {
+      "path": "src/agent-paths.mjs",
+      "sha256": "8498a19b22907776bb22bc8bb700262e815a74536a7f6c352557f12864934d49",
+      "bytes": 2034
+    },
+    {
+      "path": "src/approval.mjs",
+      "sha256": "328e4603af4b5d4e4506fe63d5fed78f8eaa60a97b946195e9fe23495a57a3b6",
+      "bytes": 14123
+    },
+    {
+      "path": "src/binding-suggester.mjs",
+      "sha256": "7b0927d0cd081b7c9b31df10a29f90bd9aa9fcd5d0df3522b0de691c0fd0b798",
+      "bytes": 7752
+    },
+    {
+      "path": "src/canonical.mjs",
+      "sha256": "6ab371129130b43d7c1b346803017a48637c8b1745b2bf20aefa57914d39759c",
+      "bytes": 1373
+    },
+    {
+      "path": "src/cli.mjs",
+      "sha256": "a818b35ed2005539593a349b705d4d672f5e5e66c3c186014bd0077aef285ac2",
+      "bytes": 7799
+    },
+    {
+      "path": "src/config.mjs",
+      "sha256": "08ed3efdcccd267a1590ee414357c8912b369581654365824c84bd10de5b4535",
+      "bytes": 13945
+    },
+    {
+      "path": "src/contracts.mjs",
+      "sha256": "237603edcfd6044ec227e2cce5558905da55261f9c93f2d1639b0cd50cc964bc",
+      "bytes": 1909
+    },
+    {
+      "path": "src/executor.mjs",
+      "sha256": "147935294602bff4a88b2707a9324292ce63bf773a7cc863cf6201cc57660efd",
+      "bytes": 18331
+    },
+    {
+      "path": "src/git.mjs",
+      "sha256": "3a8e6068246c82ca9b774e7c229b3bba08e59813a5c7b22eed16d4983d2dc28d",
+      "bytes": 1328
+    },
+    {
+      "path": "src/godot.mjs",
+      "sha256": "837d65e13b2457024fdcbd8797257a8c6833165de47ba6b9fa0134de5a828c7a",
+      "bytes": 5126
+    },
+    {
+      "path": "src/intake.mjs",
+      "sha256": "e664a2c5399f9834cf3ab0ed4f1bb7a7dab0d80fb7f1e40da0415ded91946514",
+      "bytes": 7061
+    },
+    {
+      "path": "src/io.mjs",
+      "sha256": "39ac2db019cc13d5eb45bfdfc89e586a0bafc9a68fecda48bf81ca5cdd857736",
+      "bytes": 2562
+    },
+    {
+      "path": "src/mcp-server.mjs",
+      "sha256": "eea42f98927c93ef68221e4e39c0982c1aa1ae4e074418d5f72212e59c35ec36",
+      "bytes": 18718
+    },
+    {
+      "path": "src/media.mjs",
+      "sha256": "66fb1ad93fb0a562e3dd424f8ddf854b23677a8c91730a7637706ed5ba80d35d",
+      "bytes": 7998
+    },
+    {
+      "path": "src/naming.mjs",
+      "sha256": "56dabad01dba7f42e54ab8ffee8a5c3a54cc7c083a6e5af89f0f81e2ec862bb7",
+      "bytes": 2909
+    },
+    {
+      "path": "src/path-policy.mjs",
+      "sha256": "baf93adffa7b39348fd7a7091803af49b8b224bbe95645bbc18308f49ccaeb92",
+      "bytes": 3590
+    },
+    {
+      "path": "src/png.mjs",
+      "sha256": "e7a0deb99b35048b5c2fa10998ccc8703351e02bcae59694ee09af384f335225",
+      "bytes": 1203
+    },
+    {
+      "path": "src/project-context.mjs",
+      "sha256": "a2d3851f0f9f9dc1d0d14f8f62036a7dba6bfd14fb12a72a4a22ebf52c0432e5",
+      "bytes": 6479
+    },
+    {
+      "path": "src/publication-plan.mjs",
+      "sha256": "ce26dcffed3e97277b25949d5646776d52be6ef5fc02977c2cb291171cb813da",
+      "bytes": 21888
+    },
+    {
+      "path": "src/state.mjs",
+      "sha256": "2597215d9e5e6ded5fe66e34edf334eaaa055bdb6deddd11b27d5bea6f097b37",
+      "bytes": 1679
+    },
+    {
+      "path": "src/video-sequence.mjs",
+      "sha256": "fe6721d5efb4ff18f2a2a323d4de8a6157c0d92b506db27051eb0af6aa67f2a8",
+      "bytes": 4653
+    },
+    {
+      "path": "test/core.test.mjs",
+      "sha256": "08f50a6702c64a66574d4f405676bc41379810a2ab938e3c4828fc1c8e8f3c5d",
+      "bytes": 16285
+    },
+    {
+      "path": "test/installer.test.mjs",
+      "sha256": "881ca9f147ef36c181f49e5a5b4cdbaf75fe82085e113128ce9fb19c994bba9e",
+      "bytes": 12787
+    },
+    {
+      "path": "test/mcp-server.test.mjs",
+      "sha256": "46e44159473fbdf35e41c87193c5886c0356f513ca38caf11b04ad92bc4e11af",
+      "bytes": 4245
+    },
+    {
+      "path": "test/package-integrity.test.mjs",
+      "sha256": "0f6b77d66195577778d1de3cc64f2dc494977b334e5a3a7de4532263823adb7a",
+      "bytes": 2251
+    },
+    {
+      "path": "test/publication.test.mjs",
+      "sha256": "beaba33d22ee4609ace643dab82c8cb05609abd6e1bb5c944cc560417332dac7",
+      "bytes": 31121
+    },
+    {
+      "path": "test/sealed-mainline-publication.test.mjs",
+      "sha256": "98fab8ba44f28923a367c50dc208eef222db656ca0d2d3e7773dc82bd132965a",
+      "bytes": 11493
+    },
+    {
+      "path": "test/storage-adapter.test.mjs",
+      "sha256": "c56e154525a2495247225f47f197b582915ad2a930d785bc6dd991f4dc76be8b",
+      "bytes": 7338
+    },
+    {
+      "path": "verification/verification.json",
+      "sha256": "12141d011a52d16ae86b62b18870d3829ee01bb71938113d17b64575ad4c7eaf",
+      "bytes": 2936
+    }
+  ],
+  "extractionRoot": "EVAVO_CREATIVE_ASSET_RUNTIME_ROOT or LOCALAPPDATA/EVAVO/creative-asset-publisher",
+  "repositoryMutationAuthority": false,
+  "storageMutationAuthority": false,
+  "githubMcpMutationAuthority": false,
+  "developmentStudioSealedPublicationAuthority": true,
+  "sealedExecutionPackageRequired": true,
+  "exactShaProviderConfirmationRequired": true,
+  "repositoryReliabilityProfileRequired": true,
+  "rawMainlineApplyAuthority": false,
+  "directMainlinePublisherAuthority": false,
+  "forcePushAvailable": false
+}

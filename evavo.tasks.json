@@ -3,6 +3,20 @@
   "kind": "evavo-repository-task-manifest",
   "repository": "evavo-art-studio",
   "tasks": {
+    "creative-assets": {
+      "runtime": "node-script",
+      "entry": "tools/creative-asset-publisher/test-sealed-distribution.mjs",
+      "network": "disabled",
+      "timeoutSeconds": 1800,
+      "description": "Verify the sealed Creative Asset Publisher runtime, checksums, MCP surface and least-authority publication boundary."
+    },
+    "creative-assets-windows": {
+      "runtime": "powershell-file",
+      "entry": "tools/creative-asset-publisher/Test-EvavoCreativeAssetPublisher.ps1",
+      "network": "disabled",
+      "timeoutSeconds": 1800,
+      "description": "Run the Windows worker verification for PowerShell syntax and the sealed Creative Asset Publisher runtime."
+    },
     "toolchain": {
       "runtime": "pnpm-script",
       "entry": "toolchain:check",

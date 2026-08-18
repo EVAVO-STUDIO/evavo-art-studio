@@ -1,0 +1,52 @@
+name: Creative Asset Publisher
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/CREATIVE_ASSET_PUBLISHER.md"
+      - "tools/creative-asset-publisher/**"
+      - "evavo.tasks.json"
+      - ".github/workflows/creative-asset-publisher.yml"
+  pull_request:
+    paths:
+      - "docs/CREATIVE_ASSET_PUBLISHER.md"
+      - "tools/creative-asset-publisher/**"
+      - "evavo.tasks.json"
+      - ".github/workflows/creative-asset-publisher.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sealed-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+      - name: Validate JavaScript and sealed runtime
+        working-directory: tools/creative-asset-publisher
+        run: |
+          node --check run.mjs
+          node --check cli.mjs
+          node --check mcp.mjs
+          node --check verify.mjs
+          node --check test-sealed-distribution.mjs
+          node verify.mjs
+          node test-sealed-distribution.mjs
+
+  windows-worker-contract:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+      - name: Validate PowerShell and Windows worker contract
+        shell: pwsh
+        run: ./tools/creative-asset-publisher/Test-EvavoCreativeAssetPublisher.ps1
