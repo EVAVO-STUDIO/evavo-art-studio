@@ -31,6 +31,13 @@
       "timeoutSeconds": 300,
       "description": "Verify mobile identity production compiles into Art Studio's native identity-master provider protocol using exact OpenAI GPT Image or concrete ComfyUI adapter identities."
     },
+    "mobile-identity-execution-plan": {
+      "runtime": "node-script",
+      "entry": "scripts/test-mobile-identity-execution-plan.mjs",
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Verify mobile identity provider execution composes Art Studio's existing explicit selection, runtime admission, time-bounded adapter authorization and durable worker execution without bypassing approval or publication boundaries."
+    },
     "toolchain": {
       "runtime": "pnpm-script",
       "entry": "toolchain:check",
