@@ -90,6 +90,10 @@ export function mapTopHatRuntimeReferences(sourceJob) {
   });
 }
 
+function providerReferenceOrder(entry) {
+  return entry.role === 'canonical-identity' ? 0 : 1;
+}
+
 export function topHatRuntimeProviderImageReferences(admittedReferences) {
   const imageReferences = admittedReferences.filter(
     (entry) =>
@@ -105,15 +109,21 @@ export function topHatRuntimeProviderImageReferences(admittedReferences) {
     'TOP_HAT_PROVIDER_RUNTIME_IMAGE_REFERENCES_INCOMPLETE',
   );
   return Object.freeze(
-    imageReferences.map((entry) =>
-      Object.freeze({
-        artifactId: entry.artifactId,
-        role: entry.role,
-        strength: 1,
-        required: true,
-        note: entry.note,
-      }),
-    ),
+    imageReferences
+      .map((entry) =>
+        Object.freeze({
+          artifactId: entry.artifactId,
+          role: entry.role,
+          strength: 1,
+          required: true,
+          note: entry.note,
+        }),
+      )
+      .sort(
+        (left, right) =>
+          providerReferenceOrder(left) - providerReferenceOrder(right) ||
+          left.artifactId.localeCompare(right.artifactId),
+      ),
   );
 }
 
