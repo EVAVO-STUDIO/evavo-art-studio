@@ -35,11 +35,12 @@ def alpha_clean(im,threshold):
 def contain(im,w,h,anchor='bottom-center'):
     scale=min(w/im.width,h/im.height,1 if im.width<=w and im.height<=h else 999); nw=max(1,round(im.width*scale)); nh=max(1,round(im.height*scale)); im=im.resize((nw,nh),Image.Resampling.NEAREST); out=Image.new('RGBA',(w,h),(0,0,0,0)); x=(w-nw)//2; y=h-nh if anchor=='bottom-center' else (h-nh)//2; out.alpha_composite(im,(x,y)); return out
 def godot(plan,frames,atlas_res):
-    lines=[f'[gd_resource type="SpriteFrames" load_steps={len(frames)+2} format=3]','',f'[ext_resource type="Texture2D" path="{atlas_res}" id="1_atlas"]','']
-    for i,f in enumerate(frames):
+    runtime=[(i,f) for i,f in enumerate(frames) if f.get('runtime',True)]
+    lines=[f'[gd_resource type="SpriteFrames" load_steps={len(runtime)+2} format=3]','',f'[ext_resource type="Texture2D" path="{atlas_res}" id="1_atlas"]','']
+    for i,f in runtime:
         sid=f'AtlasTexture_{i:04d}'; x,y,w,h=f['region']; lines += [f'[sub_resource type="AtlasTexture" id="{sid}"]','atlas = ExtResource("1_atlas")',f'region = Rect2({x}, {y}, {w}, {h})','']
     by={}
-    for i,f in enumerate(frames):by.setdefault(f['animation'],[]).append((i,f))
+    for i,f in runtime:by.setdefault(f['animation'],[]).append((i,f))
     anim=[];default_fps=float(plan.get('defaultFps',8))
     for name,items in by.items():
         cfg=(plan.get('animations') or {}).get(name,{});fps=float(cfg.get('fps',default_fps));loop=bool(cfg.get('loop',True));arr=[]
@@ -61,20 +62,30 @@ def main():
         if not(1<=cw<=4096 and 1<=ch<=4096 and 1<=cols<=64):fail('layout invalid')
         source=plan.get('frames')
         if not isinstance(source,list) or not source or len(source)>4096:fail('frames invalid')
-        prepared=[]
-        for item in source:
-            fid=item['id'];anim=item['animation']
-            if not SAFE.fullmatch(fid) or not SAFE.fullmatch(anim):fail('frame/animation id invalid')
-            p=safe(root,item['path'],f'frame {fid}');b=p.read_bytes();expected=item.get('sha256')
-            if expected and sha(b)!=expected:fail(f'frame {fid} hash mismatch')
-            with Image.open(p) as im:im.load();frame=ImageOps.exif_transpose(im).convert('RGBA')
-            frame=alpha_clean(frame,threshold) if plan.get('hardAlpha',True) else frame
-            if plan.get('trimAlpha',False):
-                box=frame.getchannel('A').getbbox()
-                if not box:fail(f'frame {fid} empty')
-                frame=frame.crop(box)
-            frame=contain(frame,cw,ch,plan.get('anchor','bottom-center'))
-            prepared.append({'id':fid,'animation':anim,'durationMs':item.get('durationMs'),'pivot':item.get('pivot',{'x':cw//2,'y':ch}),'sourceSha256':sha(b),'image':frame})
+        prepared=[];reserved_count=0
+        for index,item in enumerate(source):
+            if not isinstance(item,dict):fail('frame entry invalid')
+            fid=item.get('id');anim=item.get('animation','reserved')
+            if not SAFE.fullmatch(str(fid or '')) or not SAFE.fullmatch(str(anim or '')):fail('frame/animation id invalid')
+            runtime=item.get('runtime',True)
+            if type(runtime) is not bool:fail(f'frame {fid} runtime invalid')
+            reserved=item.get('reserved',False)
+            if type(reserved) is not bool:fail(f'frame {fid} reserved invalid')
+            if reserved:
+                if runtime is not False or 'path' in item or 'sha256' in item:fail(f'reserved frame {fid} must be runtime=false and source-free')
+                frame=Image.new('RGBA',(cw,ch),(0,0,0,0));source_sha=None;reserved_count+=1
+            else:
+                p=safe(root,item['path'],f'frame {fid}');b=p.read_bytes();expected=item.get('sha256')
+                if not isinstance(expected,str) or not SHA256.fullmatch(expected) or sha(b)!=expected:fail(f'frame {fid} hash mismatch')
+                source_sha=expected
+                with Image.open(p) as im:im.load();frame=ImageOps.exif_transpose(im).convert('RGBA')
+                frame=alpha_clean(frame,threshold) if plan.get('hardAlpha',True) else frame
+                if plan.get('trimAlpha',False):
+                    box=frame.getchannel('A').getbbox()
+                    if not box:fail(f'frame {fid} empty')
+                    frame=frame.crop(box)
+                frame=contain(frame,cw,ch,plan.get('anchor','bottom-center'))
+            prepared.append({'id':fid,'animation':anim,'durationMs':item.get('durationMs'),'pivot':item.get('pivot',{'x':cw//2,'y':ch}),'sourceSha256':source_sha,'runtime':runtime,'reserved':reserved,'cellIndex':index,'image':frame})
         rows=math.ceil(len(prepared)/cols);aw,ah=cw*cols,ch*rows
         if aw*ah>MAX_PIXELS:fail('atlas exceeds pixel bound')
         atlas=Image.new('RGBA',(aw,ah),(0,0,0,0));manifest_frames=[]
@@ -85,9 +96,9 @@ def main():
         atlas_path=out/atlas_name;atlas.save(atlas_path,'PNG',optimize=False,compress_level=9)
         atlas_res=plan.get('godotAtlasPath')
         if not isinstance(atlas_res,str) or not atlas_res.startswith('res://'):fail('godotAtlasPath required')
-        manifest={'schema':'evavo.sprite-workstation-manifest.v1','planSha256':expected_plan,'atlasFile':atlas_name,'atlasSha256':sha(atlas_path.read_bytes()),'size':{'width':aw,'height':ah},'cell':{'width':cw,'height':ch},'frames':manifest_frames,'animations':plan.get('animations',{}),'hardAlpha':bool(plan.get('hardAlpha',True)),'repositoryMutation':False,'automaticApproval':False}
+        manifest={'schema':'evavo.sprite-workstation-manifest.v2','planSha256':expected_plan,'atlasFile':atlas_name,'atlasSha256':sha(atlas_path.read_bytes()),'size':{'width':aw,'height':ah},'cell':{'width':cw,'height':ch},'frames':manifest_frames,'animations':plan.get('animations',{}),'hardAlpha':bool(plan.get('hardAlpha',True)),'reservedFrameCount':reserved_count,'repositoryMutation':False,'automaticApproval':False}
         jwrite(out/manifest_name,manifest);(out/tres_name).write_text(godot(plan,manifest_frames,atlas_res),encoding='utf-8')
-        receipt={'schema':RECEIPT,'status':'passed','planSha256':expected_plan,'frameCount':len(prepared),'animationCount':len({f['animation'] for f in prepared}),'atlasSha256':manifest['atlasSha256'],'manifestSha256':sha((out/manifest_name).read_bytes()),'godotSha256':sha((out/tres_name).read_bytes()),'repositoryMutation':False,'storageMutation':False,'automaticApproval':False,'forcePush':False}
+        receipt={'schema':RECEIPT,'status':'passed','planSha256':expected_plan,'frameCount':len(prepared),'runtimeFrameCount':sum(1 for f in prepared if f['runtime']),'reservedFrameCount':reserved_count,'animationCount':len({f['animation'] for f in prepared if f['runtime']}),'atlasSha256':manifest['atlasSha256'],'manifestSha256':sha((out/manifest_name).read_bytes()),'godotSha256':sha((out/tres_name).read_bytes()),'repositoryMutation':False,'storageMutation':False,'automaticApproval':False,'forcePush':False}
         jwrite(out/'receipt.json',receipt);print(json.dumps(receipt,sort_keys=True));return 0
     except (OSError,ValueError,KeyError,UnicodeError,json.JSONDecodeError) as e:print(json.dumps({'schema':RECEIPT,'status':'failed','error':str(e)[:1024]}),file=sys.stderr);return 2
 if __name__=='__main__':raise SystemExit(main())
