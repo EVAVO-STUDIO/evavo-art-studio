@@ -1,0 +1,66 @@
+name: Project Art Top Hat Pose Provider Execution
+
+on:
+  pull_request:
+    paths:
+      - "scripts/project-art/top-hat-pose-slot-provider-execution.mjs"
+      - "scripts/run-project-art-top-hat-pose-slot-provider.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION.md"
+      - ".github/workflows/project-art-top-hat-pose-provider-execution.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/project-art/top-hat-pose-slot-provider-execution.mjs"
+      - "scripts/run-project-art-top-hat-pose-slot-provider.mjs"
+      - "scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs"
+      - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION.md"
+      - ".github/workflows/project-art-top-hat-pose-provider-execution.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-art-top-hat-pose-provider-execution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Use supported Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+      - name: Static execution contract tests
+        run: |
+          node --check scripts/project-art/top-hat-pose-slot-provider-execution.mjs
+          node --check scripts/run-project-art-top-hat-pose-slot-provider.mjs
+          node --check scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs
+          node --test scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs
+      - name: Install exact workspace dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.13.1 --activate
+          pnpm install --frozen-lockfile
+      - name: Build provider execution dependencies
+        run: |
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
+      - name: Import live executor without executing a provider
+        run: |
+          node --input-type=module -e '
+            import { projectArtTopHatPoseSlotProviderExecutionCapabilities } from "./scripts/project-art/top-hat-pose-slot-provider-execution.mjs";
+            const value = projectArtTopHatPoseSlotProviderExecutionCapabilities();
+            if (value.maximumProviderCalls !== 1 || value.maximumRuntimeAttempts !== 1 || value.fallbackAllowed !== false || value.candidateApproval !== false || value.runtimeActivation !== false) process.exit(1);
+            process.stdout.write(`${JSON.stringify(value)}\n`);
+          '
