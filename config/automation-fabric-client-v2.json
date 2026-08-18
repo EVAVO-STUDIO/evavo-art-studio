@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-automation-fabric-client",
+  "client": "evavo-art-studio",
+  "role": "governed-art-production-media-validation-and-provider-control",
+  "canonicalRepository": "EVAVO-STUDIO/evavo-local-storage",
+  "canonicalManifest": "config/automation-fabric-capabilities.json",
+  "minimumLocalStorageVersion": "0.36.0",
+  "poolId": "windows-local",
+  "defaultRouting": {
+    "preferWorkerFabric": true,
+    "manualTerminalRelayRequired": false,
+    "fileFirstPowerShell": true,
+    "powershellGuardRequired": true,
+    "capabilityRouted": true,
+    "receiptRequired": true
+  },
+  "approvedRoots": [
+    "C:\\GitRepos",
+    "C:\\Downloads",
+    "C:\\BEESTATION",
+    "approved-discovered-external-roots"
+  ],
+  "supportedWork": [
+    "powershell",
+    "cmd",
+    "bash",
+    "wsl",
+    "python",
+    "node",
+    "npm",
+    "pnpm",
+    "curl-download",
+    "git",
+    "github",
+    "archive",
+    "artifact-mission",
+    "reviewed-downloaded-execution",
+    "to-delete",
+    "backup",
+    "repo-maintenance",
+    "art-pipeline-validation",
+    "image-toolchain",
+    "godot-validation",
+    "provider-runtime",
+    "guarded-main-publication"
+  ],
+  "repositoryMutation": {
+    "operatorRepository": "EVAVO-STUDIO/evavo-github-mcp",
+    "entrypoint": "control-plane/agent-workspace-hardened-server.mjs",
+    "transport": "stdio",
+    "publicRemoteSurface": "read-only",
+    "structuredMutationRequired": true,
+    "rawGitByDefault": false,
+    "rawGithubByDefault": false
+  },
+  "publication": {
+    "operatorRepository": "EVAVO-STUDIO/evavo-development-studio",
+    "operator": "scripts/Publish-EvavoRepoMain.ps1",
+    "normalPushOnly": true,
+    "liveRemoteRecheck": true,
+    "declaredPathsOnly": true,
+    "exactHeadRequired": true,
+    "exactStatusRequired": true,
+    "remoteShaVerification": true,
+    "forcePush": false,
+    "resetHard": false,
+    "clean": false,
+    "stashAsRecovery": false,
+    "rebase": false
+  },
+  "executionEvidence": {
+    "workerReceiptIsPublicationEvidence": false,
+    "localExecutionIsPublicationPermission": false,
+    "providerReceiptIsGitPublicationEvidence": false,
+    "validationIsCreativeApproval": false,
+    "validationIsRuntimePromotion": false
+  },
+  "cleanup": {
+    "operator": "evavo-local-storage-to-delete",
+    "destination": "bee://primary/TO_DELETE/",
+    "localRecoveryCopyRetained": false,
+    "restoreAvailable": true,
+    "permanentPurgeAvailableToAgents": false
+  },
+  "downloadedExecution": {
+    "operator": "evavo-local-storage-exec",
+    "hashPinnedByDefault": true,
+    "reviewedPurposeRequired": true,
+    "downloadSuccessAloneAuthorizesExecution": false
+  }
+}
