@@ -93,8 +93,11 @@ jobs:
             import { PROVIDER_PROTOCOL_VERSION } from "./packages/providers/dist/index.js";
             import { GENERIC_PROVIDER_PROTOCOL_VERSION as runtimeBridge } from "./scripts/project-art/avatar-final-pass-provider-runtime-constants.mjs";
             import { GENERIC_PROVIDER_PROTOCOL_VERSION as candidateBridge } from "./scripts/project-art/avatar-final-pass-provider-candidate-constants.mjs";
-            if (PROVIDER_PROTOCOL_VERSION !== runtimeBridge || PROVIDER_PROTOCOL_VERSION !== candidateBridge) {
-              throw new Error(`provider protocol drift: provider=${PROVIDER_PROTOCOL_VERSION} runtime=${runtimeBridge} candidate=${candidateBridge}`);
+            if (PROVIDER_PROTOCOL_VERSION !== runtimeBridge) {
+              throw new Error(`provider/runtime protocol drift: provider=${PROVIDER_PROTOCOL_VERSION} runtime=${runtimeBridge}`);
+            }
+            if (PROVIDER_PROTOCOL_VERSION !== candidateBridge) {
+              throw new Error(`provider/candidate protocol drift: provider=${PROVIDER_PROTOCOL_VERSION} candidate=${candidateBridge}`);
             }
           '
           node --test scripts/test-project-art-avatar-final-pass-provider-runtime.mjs
