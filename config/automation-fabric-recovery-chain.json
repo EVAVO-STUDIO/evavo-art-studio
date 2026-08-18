@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-automation-fabric-recovery-chain",
+  "client": "evavo-art-studio",
+  "runtimeOwner": "EVAVO-STUDIO/evavo-local-storage",
+  "minimumLocalStorageVersion": "0.47.0",
+  "order": [
+    {
+      "id": "supervisor-first",
+      "entrypoint": "START-EVAVO-WORKER-FABRIC-SUPERVISOR-FIRST.ps1",
+      "requiresIndependentWindowsExecution": true,
+      "mailboxDependent": false
+    },
+    {
+      "id": "legacy-certified",
+      "entrypoint": "START-EVAVO-AUTOMATION-FABRIC-CERTIFIED.ps1",
+      "requiresIndependentWindowsExecution": true,
+      "mailboxDependent": false
+    },
+    {
+      "id": "immutable-armer",
+      "entrypoint": "ARM-EVAVO-WORKER-FABRIC-REPAIR.ps1",
+      "requiresIndependentWindowsExecution": false,
+      "mailboxDependent": false,
+      "createOnlyDelayedFallback": true
+    }
+  ],
+  "rules": {
+    "mailboxDependentRepairAllowedWhenMailboxUnreachable": false,
+    "exactNodeReceiptRequired": true,
+    "poolReceiptRequired": true,
+    "freshReceiptsRequiredBeforeRoutineWork": true,
+    "commandIdSingleExecutionRequired": true,
+    "terminalReceiptReplayMustBeIdempotent": true,
+    "managedRuntimeUpdatesMustBeFastForwardOnly": true,
+    "managedRuntimeDivergenceMustBeQuarantined": true
+  },
+  "authority": {
+    "repositoryCommit": false,
+    "repositoryPush": false,
+    "publication": false,
+    "providerPromotion": false,
+    "creativeApproval": false,
+    "runtimeActivation": false,
+    "forcePush": false
+  }
+}
