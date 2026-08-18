@@ -66,39 +66,49 @@
     {
       "id": "android-adaptive-icon",
       "kind": "adaptive-icon-foreground",
-      "status": "candidate-only",
-      "purpose": "Prepare adaptive foreground background and monochrome candidates derived from the established icon geometry.",
+      "status": "runtime-integrated-reviewed-derivative",
+      "purpose": "Track the shipped adaptive, round and Android 13 themed derivatives of the established GODMODE glasses geometry.",
       "platforms": ["android"],
       "runtimeTargets": {
         "android": [
+          "apps/mobile/android/app/src/main/res/mipmap-anydpi/ic_launcher.xml",
           "apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+          "apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+          "apps/mobile/android/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml",
+          "apps/mobile/android/app/src/main/res/mipmap-anydpi-v33/ic_launcher_round.xml",
           "apps/mobile/android/app/src/main/res/drawable/ic_launcher_foreground.xml",
           "apps/mobile/android/app/src/main/res/drawable/ic_launcher_monochrome.xml"
         ]
       },
       "requirements": [
         "foreground geometry stays inside Android adaptive safe zones",
-        "monochrome variant remains legible for themed icons",
+        "monochrome variant remains a single-colour mask for Android 13 themed icons",
         "background remains EVAVO canvas black",
-        "candidate must be visually compared with the shipped icon before handoff"
+        "foreground round and monochrome variants remain derived from the reviewed GODMODE geometry",
+        "new identity variants still require governed comparison before promotion"
       ]
     },
     {
       "id": "control-surface-texture",
       "kind": "in-app-illustration",
-      "status": "procedural-preferred",
-      "purpose": "Provide subtle authored depth to dashboard backgrounds without requiring decorative bitmap downloads.",
+      "status": "platform-specific-runtime-state",
+      "purpose": "Keep authored depth native and restrained while recording the actual implementation state per platform.",
       "platforms": ["ios", "android"],
+      "runtimeStatus": {
+        "ios": "implemented-native-procedural",
+        "android": "restrained-flat-native-surface"
+      },
       "runtimeTargets": {
         "ios": ["apps/mobile/ios/Sources/App/CompanionDesignSystem.swift"],
         "android": ["apps/mobile/android/app/src/main/java/au/com/evavo/glasses/ui/EvavoViews.kt"]
       },
       "requirements": [
-        "procedural line grain or restrained radial field",
+        "procedural line grain or restrained radial field when visual depth is used",
         "must not compete with status or controls",
         "must preserve contrast under accessibility settings",
         "no stock texture aesthetic",
-        "no baked noise image when native rendering is sufficient"
+        "no baked noise image when native rendering is sufficient",
+        "do not claim platform parity when the runtime implementations intentionally differ"
       ]
     }
   ],

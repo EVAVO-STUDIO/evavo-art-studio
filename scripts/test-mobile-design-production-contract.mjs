@@ -41,13 +41,31 @@ test('app identity points to the shipped iOS and Android icon surfaces', () => {
   ));
 });
 
-test('adaptive icon and dashboard texture remain candidate governed', () => {
+test('adaptive, round and themed Android icons match shipped reviewed derivatives', () => {
   const adaptive = family('android-adaptive-icon');
+  assert.equal(adaptive.status, 'runtime-integrated-reviewed-derivative');
+  for (const target of [
+    'apps/mobile/android/app/src/main/res/mipmap-anydpi/ic_launcher.xml',
+    'apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml',
+    'apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml',
+    'apps/mobile/android/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml',
+    'apps/mobile/android/app/src/main/res/mipmap-anydpi-v33/ic_launcher_round.xml',
+    'apps/mobile/android/app/src/main/res/drawable/ic_launcher_foreground.xml',
+    'apps/mobile/android/app/src/main/res/drawable/ic_launcher_monochrome.xml',
+  ]) {
+    assert.ok(adaptive.runtimeTargets.android.includes(target), `Missing shipped icon target: ${target}`);
+  }
+  assert.ok(adaptive.requirements.some((item) => item.includes('Android 13 themed icons')));
+  assert.ok(adaptive.requirements.some((item) => item.includes('reviewed GODMODE geometry')));
+});
+
+test('control-surface depth records the intentional native platform difference', () => {
   const texture = family('control-surface-texture');
-  assert.equal(adaptive.status, 'candidate-only');
-  assert.ok(adaptive.requirements.some((item) => item.includes('themed icons')));
-  assert.equal(texture.status, 'procedural-preferred');
+  assert.equal(texture.status, 'platform-specific-runtime-state');
+  assert.equal(texture.runtimeStatus.ios, 'implemented-native-procedural');
+  assert.equal(texture.runtimeStatus.android, 'restrained-flat-native-surface');
   assert.ok(texture.requirements.includes('no baked noise image when native rendering is sufficient'));
+  assert.ok(texture.requirements.some((item) => item.includes('do not claim platform parity')));
 });
 
 test('Art Studio cannot silently publish or approve runtime identity changes', () => {
