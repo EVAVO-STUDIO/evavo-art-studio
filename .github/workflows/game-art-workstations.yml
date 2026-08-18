@@ -5,9 +5,13 @@ on:
     branches: [main]
     paths:
       - "tools/image_workstation.py"
+      - "tools/sprite_sheet_segmenter.py"
+      - "tools/sprite_animation_preview.py"
       - "tools/sprite_workstation.py"
       - "tools/game_art_workstation_mcp.mjs"
       - "scripts/test-image-workstation.py"
+      - "scripts/test-sprite-sheet-segmenter.py"
+      - "scripts/test-sprite-animation-preview.py"
       - "scripts/test-sprite-workstation.py"
       - "scripts/test-game-art-workstation-mcp.mjs"
       - "scripts/audit-pixel-art-candidate.mjs"
@@ -18,9 +22,13 @@ on:
   pull_request:
     paths:
       - "tools/image_workstation.py"
+      - "tools/sprite_sheet_segmenter.py"
+      - "tools/sprite_animation_preview.py"
       - "tools/sprite_workstation.py"
       - "tools/game_art_workstation_mcp.mjs"
       - "scripts/test-image-workstation.py"
+      - "scripts/test-sprite-sheet-segmenter.py"
+      - "scripts/test-sprite-animation-preview.py"
       - "scripts/test-sprite-workstation.py"
       - "scripts/test-game-art-workstation-mcp.mjs"
       - "scripts/audit-pixel-art-candidate.mjs"
@@ -53,8 +61,10 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
       - run: python -m pip install --disable-pip-version-check pillow==12.2.0
-      - run: python -m py_compile tools/image_workstation.py tools/sprite_workstation.py scripts/test-image-workstation.py scripts/test-sprite-workstation.py
+      - run: python -m py_compile tools/image_workstation.py tools/sprite_sheet_segmenter.py tools/sprite_animation_preview.py tools/sprite_workstation.py scripts/test-image-workstation.py scripts/test-sprite-sheet-segmenter.py scripts/test-sprite-animation-preview.py scripts/test-sprite-workstation.py
       - run: python scripts/test-image-workstation.py -v
+      - run: python scripts/test-sprite-sheet-segmenter.py -v
+      - run: python scripts/test-sprite-animation-preview.py -v
       - run: python scripts/test-sprite-workstation.py -v
       - run: node scripts/test-pixel-art-candidate-audit.mjs
       - run: node scripts/test-game-art-workstation-mcp.mjs
@@ -80,8 +90,10 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
       - run: python -m pip install --disable-pip-version-check pillow==12.2.0
-      - run: python -m py_compile tools/image_workstation.py tools/sprite_workstation.py scripts/test-image-workstation.py scripts/test-sprite-workstation.py
+      - run: python -m py_compile tools/image_workstation.py tools/sprite_sheet_segmenter.py tools/sprite_animation_preview.py tools/sprite_workstation.py scripts/test-image-workstation.py scripts/test-sprite-sheet-segmenter.py scripts/test-sprite-animation-preview.py scripts/test-sprite-workstation.py
       - run: python scripts/test-image-workstation.py -v
+      - run: python scripts/test-sprite-sheet-segmenter.py -v
+      - run: python scripts/test-sprite-animation-preview.py -v
       - run: python scripts/test-sprite-workstation.py -v
       - run: node scripts/test-pixel-art-candidate-audit.mjs
       - run: node scripts/test-game-art-workstation-mcp.mjs
