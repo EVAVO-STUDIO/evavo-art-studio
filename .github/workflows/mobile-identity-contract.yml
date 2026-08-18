@@ -8,9 +8,12 @@ on:
       - "scripts/mobile-identity-production.mjs"
       - "scripts/compile-mobile-identity-provider-request.mjs"
       - "scripts/compile-mobile-identity-execution-plan.mjs"
+      - "scripts/mobile-identity-raster-review.mjs"
       - "scripts/test-mobile-identity-production.mjs"
       - "scripts/test-mobile-identity-provider-request.mjs"
       - "scripts/test-mobile-identity-execution-plan.mjs"
+      - "scripts/test-mobile-identity-raster-review.mjs"
+      - "scripts/test-mobile-identity-focused.mjs"
       - "evavo.tasks.json"
       - ".github/workflows/mobile-identity-contract.yml"
   pull_request:
@@ -19,9 +22,12 @@ on:
       - "scripts/mobile-identity-production.mjs"
       - "scripts/compile-mobile-identity-provider-request.mjs"
       - "scripts/compile-mobile-identity-execution-plan.mjs"
+      - "scripts/mobile-identity-raster-review.mjs"
       - "scripts/test-mobile-identity-production.mjs"
       - "scripts/test-mobile-identity-provider-request.mjs"
       - "scripts/test-mobile-identity-execution-plan.mjs"
+      - "scripts/test-mobile-identity-raster-review.mjs"
+      - "scripts/test-mobile-identity-focused.mjs"
       - "evavo.tasks.json"
       - ".github/workflows/mobile-identity-contract.yml"
   workflow_dispatch:
@@ -49,13 +55,16 @@ jobs:
       - run: node --check scripts/mobile-identity-production.mjs
       - run: node --check scripts/compile-mobile-identity-provider-request.mjs
       - run: node --check scripts/compile-mobile-identity-execution-plan.mjs
+      - run: node --check scripts/mobile-identity-raster-review.mjs
       - run: node --check scripts/test-mobile-identity-production.mjs
       - run: node --check scripts/test-mobile-identity-provider-request.mjs
       - run: node --check scripts/test-mobile-identity-execution-plan.mjs
+      - run: node --check scripts/test-mobile-identity-raster-review.mjs
       - run: node scripts/test-mobile-identity-production.mjs
       - run: node scripts/test-mobile-identity-provider-request.mjs
       - run: node scripts/test-mobile-identity-execution-plan.mjs
-      - run: node -e "const fs=require('node:fs'); const m=JSON.parse(fs.readFileSync('evavo.tasks.json','utf8')); if(m.tasks?.['mobile-identity-provider-request']?.entry!=='scripts/test-mobile-identity-provider-request.mjs' || m.tasks?.['mobile-identity-execution-plan']?.entry!=='scripts/test-mobile-identity-execution-plan.mjs') process.exit(2);"
+      - run: node --test scripts/test-mobile-identity-raster-review.mjs
+      - run: node -e "const fs=require('node:fs'); const m=JSON.parse(fs.readFileSync('evavo.tasks.json','utf8')); if(m.tasks?.['mobile-identity-provider-request']?.entry!=='scripts/test-mobile-identity-provider-request.mjs' || m.tasks?.['mobile-identity-execution-plan']?.entry!=='scripts/test-mobile-identity-execution-plan.mjs' || m.tasks?.['mobile-identity-raster-review-contract']?.entry!=='scripts/test-mobile-identity-raster-review.mjs') process.exit(2);"
       - run: |
           git diff --check
           git diff --exit-code
