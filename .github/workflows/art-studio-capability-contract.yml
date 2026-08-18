@@ -8,9 +8,13 @@ on:
       - "evavo.capabilities.json"
       - "schemas/evavo.repository-capabilities.schema.json"
       - "config/automation-fabric-client-v2.json"
+      - "config/automation-fabric-client-v5.json"
       - "scripts/check-art-studio-capability-contract.mjs"
       - "scripts/test-art-studio-capability-contract.mjs"
+      - "scripts/check-art-studio-workstation-v5-contract.mjs"
+      - "scripts/test-art-studio-workstation-v5-contract.mjs"
       - "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md"
+      - "docs/AUTOMATION_FABRIC_V5.md"
       - "package.json"
       - "tools/**"
       - "apps/**"
@@ -21,9 +25,13 @@ on:
       - "evavo.capabilities.json"
       - "schemas/evavo.repository-capabilities.schema.json"
       - "config/automation-fabric-client-v2.json"
+      - "config/automation-fabric-client-v5.json"
       - "scripts/check-art-studio-capability-contract.mjs"
       - "scripts/test-art-studio-capability-contract.mjs"
+      - "scripts/check-art-studio-workstation-v5-contract.mjs"
+      - "scripts/test-art-studio-workstation-v5-contract.mjs"
       - "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md"
+      - "docs/AUTOMATION_FABRIC_V5.md"
       - "package.json"
       - "tools/**"
       - "apps/**"
@@ -54,11 +62,13 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Validate capability discovery and Automation Fabric binding
+      - name: Validate capability discovery and Automation Fabric bindings
         run: |
           set -euo pipefail
           node scripts/check-art-studio-capability-contract.mjs
           node --test scripts/test-art-studio-capability-contract.mjs
+          node scripts/check-art-studio-workstation-v5-contract.mjs
+          node --test scripts/test-art-studio-workstation-v5-contract.mjs
 
       - name: Confirm validation changed no repository source
         run: |
