@@ -18,6 +18,7 @@ on:
       - 'scripts/test-mobile-identity-execution-plan.mjs'
       - 'scripts/test-mobile-identity-provider-runtime-contract.mjs'
       - 'scripts/test-mobile-identity-provider-runner.mjs'
+      - 'scripts/test-mobile-identity-focused.mjs'
       - 'evavo.tasks.json'
       - '.github/workflows/mobile-design-production-contract.yml'
   push:
@@ -38,6 +39,7 @@ on:
       - 'scripts/test-mobile-identity-execution-plan.mjs'
       - 'scripts/test-mobile-identity-provider-runtime-contract.mjs'
       - 'scripts/test-mobile-identity-provider-runner.mjs'
+      - 'scripts/test-mobile-identity-focused.mjs'
       - 'evavo.tasks.json'
       - '.github/workflows/mobile-design-production-contract.yml'
   workflow_dispatch:
@@ -80,15 +82,17 @@ jobs:
           node --check scripts/run-mobile-identity-provider-plan.mjs
           node --check scripts/test-mobile-identity-provider-runtime-contract.mjs
           node --check scripts/test-mobile-identity-provider-runner.mjs
+          node --check scripts/test-mobile-identity-focused.mjs
 
-      - name: Validate mobile design and raster-first identity contracts
+      - name: Validate mobile design contract
+        run: node --test scripts/test-mobile-design-production-contract.mjs
+
+      - name: Validate complete raster-first identity chain
+        run: node scripts/test-mobile-identity-focused.mjs
+
+      - name: Verify tracked worker manifest targets the focused chain
         run: |
-          node --test scripts/test-mobile-design-production-contract.mjs
-          node scripts/test-mobile-identity-production.mjs
-          node scripts/test-mobile-identity-provider-request.mjs
-          node scripts/test-mobile-identity-execution-plan.mjs
-          node scripts/test-mobile-identity-provider-runtime-contract.mjs
-          node scripts/test-mobile-identity-provider-runner.mjs
+          node -e "const fs=require('node:fs');const m=JSON.parse(fs.readFileSync('evavo.tasks.json','utf8'));const t=m.tasks?.['mobile-identity-focused'];if(!t||t.runtime!=='node-script'||t.entry!=='scripts/test-mobile-identity-focused.mjs'||t.network!=='disabled')process.exit(2);"
 
       - name: Verify checkout remained clean
         run: |
