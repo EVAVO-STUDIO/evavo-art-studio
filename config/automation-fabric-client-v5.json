@@ -5,8 +5,8 @@
   "client": "evavo-art-studio",
   "role": "governed-art-production-media-validation-and-provider-control",
   "runtimeOwner": "EVAVO-STUDIO/evavo-local-storage",
-  "minimumLocalStorageVersion": "0.47.0",
-  "reviewedLocalStorageMain": "308e535cb47b4dcb55ac95481c1a0170a8873484",
+  "minimumLocalStorageVersion": "0.48.0",
+  "reviewedLocalStorageMain": "87cc7a86c486954469a4c092b77cf2e49d07564c",
   "reviewedDevelopmentStudioMain": "8cf7ba812ac5e58eeebab801d5919b861cb0ed46",
   "poolId": "windows-local",
   "primaryNodeId": "windows-primary",
@@ -93,7 +93,7 @@
     "boundedProcessTreeTerminationRequired": true,
     "automaticTransientRetryOnly": true,
     "maximumAttempts": 3,
-    "approvedRoots": ["C:\\GitRepos","C:\\Downloads","C:\\BEESTATION","approved-discovered-external-roots"],
+    "approvedRoots": ["C:\\GitRepos","%USERPROFILE%\\Downloads","resolved-beestation-root","approved-discovered-external-roots"],
     "routineCapabilities": ["filesystem","powershell","cmd","bash","python","node","npm","pnpm","curl","git","github-cli","archive","beestation","external-storage","art-pipeline-validation","image-toolchain","provider-runtime"]
   },
   "githubActionsFallback": {
