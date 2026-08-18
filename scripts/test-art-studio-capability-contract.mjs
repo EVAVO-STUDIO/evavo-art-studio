@@ -28,7 +28,7 @@ test("validates the repository capability and current runtime-truth contract", a
   const result = await checkRepository(root);
   assert.equal(result.ok, true);
   assert.equal(result.manifest.publicationAuthority, false);
-  assert.equal(result.automationFabric.minimumLocalStorageVersion, "0.47.0");
+  assert.equal(result.automationFabric.minimumLocalStorageVersion, "0.48.0");
   assert.equal(result.automationFabric.workstationAcceptance, "v8");
   assert.equal(result.automationFabric.exactStateRepositoryTasks, true);
   assert.equal(result.automationFabric.supervisorFirstRecovery, true);
@@ -36,6 +36,13 @@ test("validates the repository capability and current runtime-truth contract", a
   assert.equal(result.automationFabric.githubActionsWorkerFallback, true);
   assert.equal(result.automationFabric.workerReceiptIsPublicationEvidence, false);
   assert.deepEqual(result.recovery.order, ["supervisor-first", "legacy-certified", "immutable-armer"]);
+  assert.equal(automationClient.reviewedLocalStorageMain, "87cc7a86c486954469a4c092b77cf2e49d07564c");
+  assert.deepEqual(automationClient.execution.approvedRoots, [
+    "C:\\GitRepos",
+    "%USERPROFILE%\\Downloads",
+    "resolved-beestation-root",
+    "approved-discovered-external-roots",
+  ]);
 });
 
 test("rejects duplicate capability identities", () => {
@@ -52,11 +59,20 @@ test("rejects a capability that claims publication", () => {
 
 test("rejects stale Local Storage floors and acceptance implementations", () => {
   const stale = clone(automationClient);
-  stale.minimumLocalStorageVersion = "0.46.9";
-  assert.throws(() => validateAutomationFabricClient(stale), /0\.47\.0 or newer/u);
+  stale.minimumLocalStorageVersion = "0.47.9";
+  assert.throws(() => validateAutomationFabricClient(stale), /0\.48\.0 or newer/u);
   const oldAcceptance = clone(automationClient);
   oldAcceptance.sourceContract.workstationAcceptanceImplementation = "evavo_local_storage.workstation_acceptance_v4:main";
   assert.throws(() => validateAutomationFabricClient(oldAcceptance), /workstation acceptance v8/u);
+});
+
+test("rejects legacy Downloads and BeeStation roots", () => {
+  const legacyDownloads = clone(automationClient);
+  legacyDownloads.execution.approvedRoots[1] = "C:\\Downloads";
+  assert.throws(() => validateAutomationFabricClient(legacyDownloads), /Approved execution roots drifted/u);
+  const legacyBeeStation = clone(automationClient);
+  legacyBeeStation.execution.approvedRoots[2] = "C:\\BEESTATION";
+  assert.throws(() => validateAutomationFabricClient(legacyBeeStation), /Approved execution roots drifted/u);
 });
 
 test("rejects execution without exact-state planning", () => {
