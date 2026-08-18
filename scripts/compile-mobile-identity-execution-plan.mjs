@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
 const SCHEMA = 'evavo.mobile-identity-provider-execution-plan.v1';
-const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime.mjs';
+const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime-entry.mjs';
 function fail(message) { throw new Error(message); }
 function object(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} must be an object`); return value; }
 function text(value, label, max = 512) { if (typeof value !== 'string' || !value.trim() || value.length > max) fail(`${label} must be non-empty text`); return value.trim(); }
@@ -66,8 +66,11 @@ export function compileMobileIdentityExecutionPlan(input) {
     runtime: {
       schema: 'evavo.mobile-identity-provider-runtime-batch.v1',
       controlScript: RUNTIME_SCRIPT,
+      engineScript: 'scripts/mobile-identity-provider-runtime.mjs',
       campaignMetadataRequired: false,
       gameMetadataRequired: false,
+      repositoryRelativePlanPaths: true,
+      absoluteEngineRootsResolvedByEntry: true,
     },
     preparation,
     steps,
@@ -75,6 +78,7 @@ export function compileMobileIdentityExecutionPlan(input) {
       'provider request file bytes must match the reviewed mobile identity provider request supplied to this plan',
       'provider credentials remain environment/runtime concerns and are never written into this plan',
       'runtime and artifact roots remain separate private Art Studio working roots',
+      'all execution phases enter through the reviewed mobile identity runtime entry boundary before the internal engine',
     ],
     postconditions: [
       'provider outputs remain unapproved Art Studio candidates',
