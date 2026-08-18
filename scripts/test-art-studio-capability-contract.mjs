@@ -10,29 +10,32 @@ import {
   checkRepository,
   validateAutomationFabricClient,
   validateCapabilityManifest,
+  validateRecoveryChain,
 } from "./check-art-studio-capability-contract.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const readJson = async (relative) =>
-  JSON.parse(await readFile(path.join(root, relative), "utf8"));
-
-const [manifest, schema, packageJson, automationClient] = await Promise.all([
+const readJson = async (relative) => JSON.parse(await readFile(path.join(root, relative), "utf8"));
+const [manifest, schema, packageJson, automationClient, recoveryChain] = await Promise.all([
   readJson("evavo.capabilities.json"),
   readJson("schemas/evavo.repository-capabilities.schema.json"),
   readJson("package.json"),
   readJson("config/automation-fabric-client-v5.json"),
+  readJson("config/automation-fabric-recovery-chain.json"),
 ]);
-
 const clone = (value) => structuredClone(value);
 
-test("validates the repository capability and v5 runtime-truth contract", async () => {
+test("validates the repository capability and current runtime-truth contract", async () => {
   const result = await checkRepository(root);
   assert.equal(result.ok, true);
   assert.equal(result.manifest.publicationAuthority, false);
-  assert.equal(result.automationFabric.workstationAcceptance, "v4");
+  assert.equal(result.automationFabric.minimumLocalStorageVersion, "0.47.0");
+  assert.equal(result.automationFabric.workstationAcceptance, "v8");
   assert.equal(result.automationFabric.exactStateRepositoryTasks, true);
+  assert.equal(result.automationFabric.supervisorFirstRecovery, true);
+  assert.equal(result.automationFabric.commandIdSingleExecutionRequired, true);
   assert.equal(result.automationFabric.githubActionsWorkerFallback, true);
   assert.equal(result.automationFabric.workerReceiptIsPublicationEvidence, false);
+  assert.deepEqual(result.recovery.order, ["supervisor-first", "legacy-certified", "immutable-armer"]);
 });
 
 test("rejects duplicate capability identities", () => {
@@ -47,37 +50,55 @@ test("rejects a capability that claims publication", () => {
   assert.throws(() => validateCapabilityManifest(candidate, schema, packageJson), /must not claim Git or mainline publication authority/u);
 });
 
-test("rejects stale Local Storage floors", () => {
-  const candidate = clone(automationClient);
-  candidate.minimumLocalStorageVersion = "0.42.0";
-  assert.throws(() => validateAutomationFabricClient(candidate), /0\.42\.1 or newer/u);
+test("rejects stale Local Storage floors and acceptance implementations", () => {
+  const stale = clone(automationClient);
+  stale.minimumLocalStorageVersion = "0.46.9";
+  assert.throws(() => validateAutomationFabricClient(stale), /0\.47\.0 or newer/u);
+  const oldAcceptance = clone(automationClient);
+  oldAcceptance.sourceContract.workstationAcceptanceImplementation = "evavo_local_storage.workstation_acceptance_v4:main";
+  assert.throws(() => validateAutomationFabricClient(oldAcceptance), /workstation acceptance v8/u);
 });
 
-test("rejects workstation acceptance below v4", () => {
-  const candidate = clone(automationClient);
-  candidate.sourceContract.workstationAcceptanceImplementation = "evavo_local_storage.workstation_acceptance_v3:main";
-  assert.throws(() => validateAutomationFabricClient(candidate), /workstation acceptance v4/u);
+test("rejects execution without exact-state planning", () => {
+  for (const key of ["plannerReceiptRequiredForUnmeasuredRepositoryTask","plannerMeasuresExactHead","plannerMeasuresExactStatusSha256","plannerMeasuresTrackedScriptSha256","trackedScriptBytesRequired"]) {
+    const candidate = clone(automationClient);
+    candidate.execution[key] = false;
+    assert.throws(() => validateAutomationFabricClient(candidate), new RegExp(key, "u"));
+  }
 });
 
-test("rejects execution without read-only repository planning", () => {
-  const candidate = clone(automationClient);
-  candidate.execution.plannerReceiptRequiredForUnmeasuredRepositoryTask = false;
-  assert.throws(() => validateAutomationFabricClient(candidate), /plannerReceiptRequiredForUnmeasuredRepositoryTask/u);
-});
-
-test("rejects exact-state measurement drift", () => {
-  const candidate = clone(automationClient);
-  candidate.execution.plannerMeasuresTrackedScriptSha256 = false;
-  assert.throws(() => validateAutomationFabricClient(candidate), /plannerMeasuresTrackedScriptSha256/u);
+test("rejects duplicate-command or replay weakening", () => {
+  for (const key of ["commandIdSingleExecutionRequired","duplicateCommandIssueMustFailBeforeExecution","terminalReceiptReplayMustBeIdempotent","stableControlPlaneMustExecuteExactCurrentManagedMain","managedRuntimeUpdatesMustBeFastForwardOnly","managedRuntimeDivergenceMustBeQuarantined"]) {
+    const candidate = clone(automationClient);
+    candidate.truthRules[key] = false;
+    assert.throws(() => validateAutomationFabricClient(candidate), new RegExp(key, "u"));
+  }
 });
 
 test("rejects unbounded or non-transient retries", () => {
-  const candidate = clone(automationClient);
-  candidate.execution.automaticTransientRetryOnly = false;
-  assert.throws(() => validateAutomationFabricClient(candidate), /automaticTransientRetryOnly/u);
+  const retry = clone(automationClient);
+  retry.execution.automaticTransientRetryOnly = false;
+  assert.throws(() => validateAutomationFabricClient(retry), /automaticTransientRetryOnly/u);
   const tooMany = clone(automationClient);
   tooMany.execution.maximumAttempts = 10;
   assert.throws(() => validateAutomationFabricClient(tooMany), /bounded to three attempts/u);
+});
+
+test("rejects recovery ordering drift and mailbox-dependent repair", () => {
+  const reordered = clone(recoveryChain);
+  [reordered.order[0], reordered.order[1]] = [reordered.order[1], reordered.order[0]];
+  assert.throws(() => validateRecoveryChain(reordered), /Recovery chain order changed/u);
+  const mailbox = clone(recoveryChain);
+  mailbox.rules.mailboxDependentRepairAllowedWhenMailboxUnreachable = true;
+  assert.throws(() => validateRecoveryChain(mailbox), /Dead mailbox must not repair itself/u);
+});
+
+test("rejects missing recovery receipts and non-fast-forward managed updates", () => {
+  for (const key of ["exactNodeReceiptRequired","poolReceiptRequired","freshReceiptsRequiredBeforeRoutineWork","managedRuntimeUpdatesMustBeFastForwardOnly","managedRuntimeDivergenceMustBeQuarantined"]) {
+    const candidate = clone(recoveryChain);
+    candidate.rules[key] = false;
+    assert.throws(() => validateRecoveryChain(candidate), new RegExp(key, "u"));
+  }
 });
 
 test("rejects GitHub Actions fallback outside zero-step provider allocation failure", () => {
@@ -104,23 +125,25 @@ test("rejects worker commit, push, approval, promotion, or activation authority"
     candidate.workerAuthority[key] = true;
     assert.throws(() => validateAutomationFabricClient(candidate), new RegExp(`Worker authority must remain closed: ${key}`, "u"));
   }
+  for (const key of Object.keys(recoveryChain.authority)) {
+    const candidate = clone(recoveryChain);
+    candidate.authority[key] = true;
+    assert.throws(() => validateRecoveryChain(candidate), new RegExp(`Recovery authority must remain closed: ${key}`, "u"));
+  }
 });
 
-test("rejects direct terminal delegation while remote recovery remains available", () => {
+test("rejects direct terminal delegation while recovery remains available", () => {
   const candidate = clone(automationClient);
   candidate.routing.askGregToPasteRoutineTerminalCommands = true;
   assert.throws(() => validateAutomationFabricClient(candidate), /must not be delegated to Greg/u);
 });
 
-test("rejects force push, automatic merge, and automatic rebase", () => {
+test("rejects force push, automatic merge, rebase and destructive cleanup", () => {
   for (const key of ["forcePush", "automaticMerge", "automaticRebase"]) {
     const candidate = clone(automationClient);
     candidate.publication[key] = true;
     assert.throws(() => validateAutomationFabricClient(candidate), new RegExp(`enabled: ${key}`, "u"));
   }
-});
-
-test("rejects destructive cleanup and secret override boundaries", () => {
   for (const key of ["resetHard","gitClean","stashAsRecovery","permanentDelete","providerDeleteImpliedByWorkerAuthority","downloadAloneAuthorizesExecution","secretEnvironmentCallerOverride"]) {
     const candidate = clone(automationClient);
     candidate.safety[key] = true;
