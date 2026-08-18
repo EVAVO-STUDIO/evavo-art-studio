@@ -6,8 +6,8 @@
   "role": "governed-art-production-media-validation-and-provider-control",
   "runtimeOwner": "EVAVO-STUDIO/evavo-local-storage",
   "minimumLocalStorageVersion": "0.42.1",
-  "reviewedLocalStorageMain": "3cd8932600a37c7fbc35757a3292b51873e64707",
-  "reviewedDevelopmentStudioMain": "c0c2e26ccac8b99e95158e35903730f5662c001d",
+  "reviewedLocalStorageMain": "a42e1a785b4ee4408037d3178961f5838958994c",
+  "reviewedDevelopmentStudioMain": "a7aa347f2afc3371b0870d28f7be00df9ade7f3d",
   "poolId": "windows-local",
   "primaryNodeId": "windows-primary",
   "sourceContract": {
@@ -19,36 +19,12 @@
     "repositoryTaskExecuteAction": "storage.repository_task_run"
   },
   "runtimeEvidenceStates": [
-    {
-      "state": "declared",
-      "proof": "machine-readable source contract exists",
-      "permitsRoutineWorkerUse": false
-    },
-    {
-      "state": "implemented",
-      "proof": "exact-source contract tests and native PowerShell parsing pass",
-      "permitsRoutineWorkerUse": false
-    },
-    {
-      "state": "installed",
-      "proof": "expected current-user scheduled tasks and exact runtime revision are verified",
-      "permitsRoutineWorkerUse": false
-    },
-    {
-      "state": "live",
-      "proof": "fresh identity-valid heartbeat from the expected runtime revision",
-      "permitsRoutineWorkerUse": false
-    },
-    {
-      "state": "reachable",
-      "proof": "one fresh exact-node and one capability-routed pool command each return exactly one correlated receipt",
-      "permitsRoutineWorkerUse": true
-    },
-    {
-      "state": "physically-accepted",
-      "proof": "bounded Windows acceptance proves execution, receipts, approved roots, archive round-trip and recoverable cleanup",
-      "permitsRoutineWorkerUse": true
-    }
+    {"state":"declared","proof":"machine-readable source contract exists","permitsRoutineWorkerUse":false},
+    {"state":"implemented","proof":"exact-source contract tests and native PowerShell parsing pass","permitsRoutineWorkerUse":false},
+    {"state":"installed","proof":"expected current-user scheduled tasks and exact runtime revision are verified","permitsRoutineWorkerUse":false},
+    {"state":"live","proof":"fresh identity-valid heartbeat from the expected runtime revision","permitsRoutineWorkerUse":false},
+    {"state":"reachable","proof":"one fresh exact-node and one capability-routed pool command each return exactly one correlated receipt","permitsRoutineWorkerUse":true},
+    {"state":"physically-accepted","proof":"bounded Windows acceptance proves execution, receipts, approved roots, archive round-trip and recoverable cleanup","permitsRoutineWorkerUse":true}
   ],
   "truthRules": {
     "sourceConfigurationIsRuntimeProof": false,
@@ -96,31 +72,20 @@
     "boundedProcessTreeTerminationRequired": true,
     "automaticTransientRetryOnly": true,
     "maximumAttempts": 3,
-    "approvedRoots": [
-      "C:\\GitRepos",
-      "C:\\Downloads",
-      "C:\\BEESTATION",
-      "approved-discovered-external-roots"
-    ],
-    "routineCapabilities": [
-      "filesystem",
-      "powershell",
-      "cmd",
-      "bash",
-      "python",
-      "node",
-      "npm",
-      "pnpm",
-      "curl",
-      "git",
-      "github-cli",
-      "archive",
-      "beestation",
-      "external-storage",
-      "art-pipeline-validation",
-      "image-toolchain",
-      "provider-runtime"
-    ]
+    "approvedRoots": ["C:\\GitRepos","C:\\Downloads","C:\\BEESTATION","approved-discovered-external-roots"],
+    "routineCapabilities": ["filesystem","powershell","cmd","bash","python","node","npm","pnpm","curl","git","github-cli","archive","beestation","external-storage","art-pipeline-validation","image-toolchain","provider-runtime"]
+  },
+  "githubActionsFallback": {
+    "developmentStudioContract": "evavo-github-actions-worker-fallback",
+    "eligibleStatus": "provider-allocation-blocked",
+    "zeroStepsRequired": true,
+    "completedFailedRunRequired": true,
+    "exactBlockedRevisionRequired": true,
+    "plannerReceiptBoundToBlockedRevision": true,
+    "readOnlyValidationOnly": true,
+    "githubActionsEquivalent": false,
+    "githubCheckStatusMutation": false,
+    "workerReceiptIsPublicationEvidence": false
   },
   "workerAuthority": {
     "repositoryCommitAllowed": false,
