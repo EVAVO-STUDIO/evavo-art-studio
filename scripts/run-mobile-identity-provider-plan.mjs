@@ -9,6 +9,13 @@ import process from 'node:process';
 const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime.mjs';
 const PREPARATION_ID = 'prepare';
 const EXPECTED_STEP_IDS = Object.freeze(['select', 'admit', 'authorize', 'execute']);
+const PHASE_OPTIONS = Object.freeze({
+  prepare: Object.freeze(['--provider-request', '--work-order', '--output']),
+  select: Object.freeze(['--runtime-batch', '--work-order', '--selected-at', '--selected-by', '--reason', '--output']),
+  admit: Object.freeze(['--runtime-batch', '--selection', '--runtime-root', '--actor', '--admitted-at', '--receipt']),
+  authorize: Object.freeze(['--runtime-batch', '--selection', '--admission', '--runtime-root', '--artifact-root', '--authorized-at', '--expires-at', '--authorized-by', '--reason', '--allowed-adapters', '--output']),
+  execute: Object.freeze(['--runtime-batch', '--selection', '--admission', '--authorization', '--worker-id', '--receipt']),
+});
 const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_PROCESS_OUTPUT = 2 * 1024 * 1024;
 
@@ -35,27 +42,77 @@ function parse(argv) {
   }
   return values;
 }
-function readPlan(file, expectedSha256) {
-  const relative = safeRelativePath(file, '--plan');
+function readBoundJson(file, label) {
+  const relative = safeRelativePath(file, label);
   const target = resolve(relative);
   const stat = lstatSync(target);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size <= 0 || stat.size > MAX_JSON_BYTES) fail('execution plan must be a regular JSON file <= 1 MiB');
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size <= 0 || stat.size > MAX_JSON_BYTES) fail(`${label} must identify a regular JSON file <= 1 MiB`);
   const bytes = readFileSync(target);
-  const actual = sha256Bytes(bytes);
-  if (!/^[a-f0-9]{64}$/u.test(expectedSha256) || actual !== expectedSha256) fail('execution plan file SHA-256 mismatch');
-  const value = JSON.parse(bytes.toString('utf8'));
-  return Object.freeze({ relative, target, value, fileSha256: actual });
+  let value;
+  try { value = JSON.parse(bytes.toString('utf8')); }
+  catch { fail(`${label} is not valid JSON`); }
+  return Object.freeze({ relative, target, value, fileSha256: sha256Bytes(bytes) });
+}
+function readPlan(file, expectedSha256) {
+  const record = readBoundJson(file, '--plan');
+  if (!/^[a-f0-9]{64}$/u.test(expectedSha256) || record.fileSha256 !== expectedSha256) fail('execution plan file SHA-256 mismatch');
+  return record;
+}
+function parsePhaseOptions(argv, phase) {
+  const allowed = PHASE_OPTIONS[phase];
+  if (!allowed) fail(`unsupported runtime phase ${phase}`);
+  const tail = argv.slice(3);
+  if (tail.length !== allowed.length * 2) fail(`step ${phase} must provide exactly its reviewed option set`);
+  const options = {};
+  for (let index = 0; index < tail.length; index += 2) {
+    const name = tail[index];
+    const value = tail[index + 1];
+    if (!allowed.includes(name)) fail(`step ${phase} contains unsupported option ${name}`);
+    if (Object.prototype.hasOwnProperty.call(options, name)) fail(`step ${phase} duplicates option ${name}`);
+    if (typeof value !== 'string' || !value || value.startsWith('--') || /[\0\r\n]/u.test(value)) fail(`step ${phase} option ${name} is invalid`);
+    options[name] = value;
+  }
+  for (const name of allowed) if (!Object.prototype.hasOwnProperty.call(options, name)) fail(`step ${phase} is missing ${name}`);
+  return Object.freeze(options);
 }
 function validateRuntimeArgv(step, expectedPhase) {
   if (!step || typeof step !== 'object' || Array.isArray(step)) fail(`${expectedPhase} step is invalid`);
   if (step.id !== expectedPhase) fail(`step must be ${expectedPhase}`);
   if (!Array.isArray(step.argv) || step.argv.length < 3 || step.argv.some((entry) => typeof entry !== 'string' || /[\0\r\n]/u.test(entry))) fail(`step ${step.id} argv is invalid`);
   if (step.argv[0] !== 'node' || step.argv[1] !== RUNTIME_SCRIPT || step.argv[2] !== expectedPhase) fail(`step ${step.id} must execute ${RUNTIME_SCRIPT} ${expectedPhase}`);
-  return Object.freeze({ ...step, argv: Object.freeze([...step.argv]) });
+  const options = parsePhaseOptions(step.argv, expectedPhase);
+  return Object.freeze({ ...step, argv: Object.freeze([...step.argv]), options });
 }
 function validateOpenAIProvider(plan) {
   if (plan.provider?.preferredAdapterId !== 'openai-gpt-image' || plan.provider?.preferredModel !== 'gpt-image-2') fail('provider plan must prefer openai-gpt-image with gpt-image-2');
   if (!Array.isArray(plan.provider?.allowedAdapterIds) || plan.provider.allowedAdapterIds.length !== 1 || plan.provider.allowedAdapterIds[0] !== 'openai-gpt-image') fail('official OpenAI runner requires exactly the openai-gpt-image adapter');
+}
+function assertPathBindings(plan) {
+  const prepare = plan.preparation.options;
+  const select = plan.steps[0].options;
+  const admit = plan.steps[1].options;
+  const authorize = plan.steps[2].options;
+  const execute = plan.steps[3].options;
+  const runtimeBatch = prepare['--output'];
+  if (select['--runtime-batch'] !== runtimeBatch || admit['--runtime-batch'] !== runtimeBatch || authorize['--runtime-batch'] !== runtimeBatch || execute['--runtime-batch'] !== runtimeBatch) fail('runtime batch path drifts between mobile identity phases');
+  if (prepare['--work-order'] !== plan.workOrderId || select['--work-order'] !== plan.workOrderId) fail('work-order binding drifted from the execution plan');
+  const selection = select['--output'];
+  if (admit['--selection'] !== selection || authorize['--selection'] !== selection || execute['--selection'] !== selection) fail('selection path drifts between mobile identity phases');
+  const admission = admit['--receipt'];
+  if (authorize['--admission'] !== admission || execute['--admission'] !== admission) fail('admission path drifts between mobile identity phases');
+  if (authorize['--output'] !== execute['--authorization']) fail('authorization path drifts between mobile identity phases');
+  if (admit['--runtime-root'] !== authorize['--runtime-root']) fail('runtime root drifts between admission and authorization');
+  if (authorize['--allowed-adapters'] !== 'openai-gpt-image') fail('authorization must be scoped exactly to openai-gpt-image');
+  safeRelativePath(prepare['--provider-request'], 'provider request path');
+  for (const [label, value] of [
+    ['runtime batch path', runtimeBatch],
+    ['selection path', selection],
+    ['admission path', admission],
+    ['authorization path', authorize['--output']],
+    ['execution receipt path', execute['--receipt']],
+    ['runtime root', admit['--runtime-root']],
+    ['artifact root', authorize['--artifact-root']],
+  ]) safeRelativePath(value, label);
 }
 export function validateMobileIdentityProviderExecutionPlan(plan) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) fail('execution plan must be an object');
@@ -63,14 +120,29 @@ export function validateMobileIdentityProviderExecutionPlan(plan) {
   const { executionPlanSha256, ...unsigned } = plan;
   if (!/^[a-f0-9]{64}$/u.test(executionPlanSha256 ?? '') || sha256Object(unsigned) !== executionPlanSha256) fail('executionPlanSha256 mismatch');
   validateOpenAIProvider(plan);
+  if (!/^[a-f0-9]{64}$/u.test(plan.sourceProviderRequestSha256 ?? '')) fail('sourceProviderRequestSha256 is invalid');
   if (plan.runtime?.schema !== 'evavo.mobile-identity-provider-runtime-batch.v1' || plan.runtime?.controlScript !== RUNTIME_SCRIPT || plan.runtime?.campaignMetadataRequired !== false || plan.runtime?.gameMetadataRequired !== false) fail('mobile identity runtime binding is invalid');
   const preparation = validateRuntimeArgv(plan.preparation, PREPARATION_ID);
   if (!Array.isArray(plan.steps) || plan.steps.length !== EXPECTED_STEP_IDS.length) fail('execution plan must contain exactly four governed stages after preparation');
   const steps = plan.steps.map((step, index) => validateRuntimeArgv(step, EXPECTED_STEP_IDS[index]));
-  if (!preparation.argv.includes('--provider-request') || !preparation.argv.includes('--output')) fail('prepare step must bind provider request and runtime batch output');
-  if (!steps[2].argv.includes('--allowed-adapters') || !steps[3].argv.includes('--authorization')) fail('authorization and execution bindings are incomplete');
   if (plan.authority?.bypassSelection !== false || plan.authority?.bypassAdmission !== false || plan.authority?.bypassAuthorization !== false || plan.authority?.generationEqualsApproval !== false || plan.authority?.runtimePublication !== false || plan.authority?.deviceAuthority !== false || plan.authority?.protocolAuthority !== false || plan.authority?.forcePush !== false) fail('execution plan authority boundary is invalid');
-  return Object.freeze({ ...plan, preparation, steps: Object.freeze(steps) });
+  const validated = Object.freeze({ ...plan, preparation, steps: Object.freeze(steps) });
+  assertPathBindings(validated);
+  return validated;
+}
+export function validateMobileIdentityProviderRequestBinding(document, validatedPlan) {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) fail('provider request document must be an object');
+  if (document.schema !== 'evavo.mobile-identity-provider-request.v1' || document.status !== 'provider-request-ready') fail('provider request document is not provider-request-ready');
+  const request = document.providerRequest;
+  if (!request || typeof request !== 'object' || Array.isArray(request)) fail('provider request payload is invalid');
+  const canonicalRequestSha256 = sha256Object(request);
+  if (!/^[a-f0-9]{64}$/u.test(document.providerRequestSha256 ?? '') || document.providerRequestSha256 !== canonicalRequestSha256) fail('providerRequestSha256 mismatch');
+  if (validatedPlan.sourceProviderRequestSha256 !== document.providerRequestSha256) fail('execution plan is bound to another provider request');
+  if (request.assetKind !== 'ui' || request.continuityPhase !== 'identity-master' || request.operation !== 'generate') fail('provider request is not a mobile identity-master generation request');
+  if (request.target?.width !== 1024 || request.target?.height !== 1024 || request.target?.transparency !== 'opaque' || request.target?.outputFormat !== 'png') fail('provider request target must be a 1024x1024 opaque PNG');
+  if (request.selection?.preferredAdapterId !== 'openai-gpt-image' || request.selection?.preferredModel !== 'gpt-image-2' || !Array.isArray(request.selection?.allowedAdapterIds) || request.selection.allowedAdapterIds.length !== 1 || request.selection.allowedAdapterIds[0] !== 'openai-gpt-image') fail('provider request must be scoped exactly to openai-gpt-image with gpt-image-2');
+  if (request.metadata?.creativeMasterType !== 'raster-provider-generation' || request.metadata?.releaseEligible !== false || request.metadata?.approvalRequired !== true) fail('provider request creative-master approval boundary is invalid');
+  return Object.freeze({ document, request, providerRequestSha256: canonicalRequestSha256 });
 }
 function cleanBaseEnvironment(source) {
   const allowedNames = [
@@ -123,6 +195,8 @@ function executeRuntimeStep(step, environment, secret) {
 }
 export function executeMobileIdentityProviderExecutionPlan(plan, sourceEnvironment = process.env) {
   const validated = validateMobileIdentityProviderExecutionPlan(plan);
+  const providerRequestRecord = readBoundJson(validated.preparation.options['--provider-request'], 'provider request path');
+  validateMobileIdentityProviderRequestBinding(providerRequestRecord.value, validated);
   const providerEnv = createOpenAIProviderExecutionEnvironment(sourceEnvironment);
   const secret = providerEnv.OPENAI_API_KEY;
   const buildEnv = cleanBaseEnvironment(sourceEnvironment);
@@ -140,6 +214,7 @@ export function executeMobileIdentityProviderExecutionPlan(plan, sourceEnvironme
     status: 'succeeded',
     schema: validated.schema,
     executionPlanSha256: validated.executionPlanSha256,
+    sourceProviderRequestSha256: validated.sourceProviderRequestSha256,
     providerAdapterId: 'openai-gpt-image',
     providerModel: 'gpt-image-2',
     networkProfile: 'openai-images-official-v1',
