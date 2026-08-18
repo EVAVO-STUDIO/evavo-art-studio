@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-eva-dense-motion-workstation-task",
+  "taskId": "eva-dense-motion-validate-v1",
+  "repository": "EVAVO-STUDIO/evavo-art-studio",
+  "scriptPath": "scripts/Invoke-EvaDenseMotionWorkstationValidation.ps1",
+  "denseMotionFamily": "eva-20260809-153620",
+  "pendingOrdinals": [1, 2, 3, 7, 8, 9, 10],
+  "minimumLocalStorageVersion": "0.42.1",
+  "worker": {
+    "target": "pool",
+    "poolId": "windows-local",
+    "fallbackNodeId": "windows-primary",
+    "requiredCapabilities": [
+      "powershell",
+      "node",
+      "git",
+      "art-pipeline-validation"
+    ],
+    "physicalAcceptanceRequired": true,
+    "plannerAction": "storage.repository_task_plan",
+    "executionAction": "storage.repository_task_run",
+    "plannerReceiptRequired": true,
+    "plannerMeasurements": {
+      "exactHeadSha": true,
+      "worktreeStatusSha256": true,
+      "trackedScriptSha256": true
+    },
+    "timeoutSeconds": 900,
+    "maximumOutputBytes": 1048576,
+    "maximumAttempts": 3,
+    "transientRetriesOnly": true
+  },
+  "authority": {
+    "sourceMutation": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "providerExecution": false,
+    "cloudinaryUpload": false,
+    "repositoryCommit": false,
+    "repositoryPush": false,
+    "publication": false,
+    "deployment": false,
+    "runtimeActivation": false,
+    "forcePush": false
+  },
+  "publication": {
+    "operatorRepository": "EVAVO-STUDIO/evavo-development-studio",
+    "operator": "scripts/mainline-publish.mjs",
+    "workerReceiptIsPublicationEvidence": false,
+    "plannerReceiptIsPublicationEvidence": false,
+    "physicalAcceptanceReceiptIsPublicationEvidence": false
+  }
+}
