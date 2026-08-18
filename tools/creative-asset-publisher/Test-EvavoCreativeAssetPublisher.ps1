@@ -30,6 +30,11 @@ if ($ParseErrors.Count -gt 0) {
 }
 
 $JavaScriptFiles = @(
+    'runtime-common.mjs',
+    'runtime-tar.mjs',
+    'runtime-verification.mjs',
+    'runtime-bundle.mjs',
+    'runtime-install.mjs',
     'run.mjs',
     'cli.mjs',
     'mcp.mjs',
@@ -82,6 +87,7 @@ if ($DistributionObject.status -ne 'passed') {
     runtimeFileCount = $DistributionObject.runtimeFileCount
     mcpToolCount = $DistributionObject.mcpToolCount
     parsedPowerShellFiles = @($PowerShellFiles.Name)
+    checkedJavaScriptFiles = @($JavaScriptFiles)
     repositoryMutationAuthority = $false
     storageMutationAuthority = $false
     forcePushAuthority = $false

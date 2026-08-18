@@ -19,18 +19,36 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: creative-asset-publisher-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sealed-runtime:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22.14.0"
+          package-manager-cache: false
+
       - name: Validate JavaScript and sealed runtime
         working-directory: tools/creative-asset-publisher
+        shell: bash
         run: |
+          set -euo pipefail
+          node --check runtime-common.mjs
+          node --check runtime-tar.mjs
+          node --check runtime-verification.mjs
+          node --check runtime-bundle.mjs
+          node --check runtime-install.mjs
           node --check run.mjs
           node --check cli.mjs
           node --check mcp.mjs
@@ -39,14 +57,43 @@ jobs:
           node verify.mjs
           node test-sealed-distribution.mjs
 
+      - name: Confirm validation changed no repository source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
   windows-worker-contract:
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22.14.0"
+          package-manager-cache: false
+
       - name: Validate PowerShell and Windows worker contract
         shell: pwsh
         run: ./tools/creative-asset-publisher/Test-EvavoCreativeAssetPublisher.ps1
+
+      - name: Confirm validation changed no repository source
+        shell: pwsh
+        run: |
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --cached --exit-code
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $Dirty = git status --porcelain=v1 --untracked-files=all
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($Dirty) { throw "Validation changed repository source: $Dirty" }
