@@ -12,6 +12,7 @@ function text(value, label, max = 512) { if (typeof value !== 'string' || !value
 function sha(value) { return createHash('sha256').update(JSON.stringify(value)).digest('hex'); }
 function safePath(value, label) { const result = text(value, label).replaceAll('\\', '/'); if (result.startsWith('/') || /^[A-Za-z]:\//u.test(result) || result.split('/').includes('..')) fail(`${label} must be repository-relative`); return result; }
 function readJson(file) { const target = resolve(file); const stat = lstatSync(target); if (!stat.isFile() || stat.isSymbolicLink() || stat.size <= 0 || stat.size > 1024 * 1024) fail('input must be a regular JSON file <= 1 MiB'); return JSON.parse(readFileSync(target, 'utf8')); }
+function executionStep(id, argv, creates, authority) { return Object.freeze({ id, argv: Object.freeze(argv), command: argv.join(' '), creates, authority }); }
 
 export function compileMobileIdentityExecutionPlan(input) {
   const root = object(input, 'input');
@@ -43,30 +44,10 @@ export function compileMobileIdentityExecutionPlan(input) {
   if (Date.parse(expiresAt) <= Date.parse(authorizedAt)) fail('expiresAt must be after authorizedAt');
 
   const steps = [
-    {
-      id: 'select',
-      command: `node scripts/select-raw-art-provider-runtime-jobs.mjs --runtime-batch ${runtimeBatch} --work-orders ${workOrderId} --selected-at ${selectedAt} --selected-by ${actor} --reason mobile-identity-provider-generation --output ${selection}`,
-      creates: selection,
-      authority: 'selection-only',
-    },
-    {
-      id: 'admit',
-      command: `node scripts/admit-raw-art-provider-runtime-batch.mjs --runtime-batch ${runtimeBatch} --selection ${selection} --runtime-root ${runtimeRoot} --actor ${actor} --admitted-at ${admittedAt} --receipt ${admissionReceipt}`,
-      creates: admissionReceipt,
-      authority: 'runtime-admission-only',
-    },
-    {
-      id: 'authorize',
-      command: `node scripts/authorize-raw-art-provider-runtime-execution.mjs --runtime-batch ${runtimeBatch} --selection ${selection} --admission-receipt ${admissionReceipt} --runtime-root ${runtimeRoot} --artifact-root ${artifactRoot} --authorized-at ${authorizedAt} --expires-at ${expiresAt} --authorized-by ${actor} --reason approved-mobile-identity-provider-generation --allowed-adapters ${allowedAdapterIds.join(',')} --output ${authorization}`,
-      creates: authorization,
-      authority: 'time-bounded-adapter-scoped-provider-execution',
-    },
-    {
-      id: 'execute',
-      command: `node scripts/mobile-identity-production.mjs execute-authorized --authorization ${authorization} --worker-id mobile-identity-worker --worker-command until-idle --receipt ${executionReceipt}`,
-      creates: executionReceipt,
-      authority: 'unapproved-candidate-and-evidence-creation-only',
-    },
+    executionStep('select', ['node', 'scripts/select-raw-art-provider-runtime-jobs.mjs', '--runtime-batch', runtimeBatch, '--work-orders', workOrderId, '--selected-at', selectedAt, '--selected-by', actor, '--reason', 'mobile-identity-provider-generation', '--output', selection], selection, 'selection-only'),
+    executionStep('admit', ['node', 'scripts/admit-raw-art-provider-runtime-batch.mjs', '--runtime-batch', runtimeBatch, '--selection', selection, '--runtime-root', runtimeRoot, '--actor', actor, '--admitted-at', admittedAt, '--receipt', admissionReceipt], admissionReceipt, 'runtime-admission-only'),
+    executionStep('authorize', ['node', 'scripts/authorize-raw-art-provider-runtime-execution.mjs', '--runtime-batch', runtimeBatch, '--selection', selection, '--admission-receipt', admissionReceipt, '--runtime-root', runtimeRoot, '--artifact-root', artifactRoot, '--authorized-at', authorizedAt, '--expires-at', expiresAt, '--authorized-by', actor, '--reason', 'approved-mobile-identity-provider-generation', '--allowed-adapters', allowedAdapterIds.join(','), '--output', authorization], authorization, 'time-bounded-adapter-scoped-provider-execution'),
+    executionStep('execute', ['node', 'scripts/mobile-identity-production.mjs', 'execute-authorized', '--authorization', authorization, '--worker-id', 'mobile-identity-worker', '--worker-command', 'until-idle', '--receipt', executionReceipt], executionReceipt, 'unapproved-candidate-and-evidence-creation-only'),
   ];
 
   const plan = {
