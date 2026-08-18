@@ -16,7 +16,9 @@ on:
       - "scripts/test-game-art-workstation-mcp.mjs"
       - "scripts/audit-pixel-art-candidate.mjs"
       - "scripts/test-pixel-art-candidate-audit.mjs"
+      - "scripts/check-game-art-automation-fabric.mjs"
       - "config/image-processing-recipes.v1.json"
+      - "config/artist-workspace-agent-suite.v7.json"
       - "evavo.tasks.json"
       - ".github/workflows/game-art-workstations.yml"
   pull_request:
@@ -33,7 +35,9 @@ on:
       - "scripts/test-game-art-workstation-mcp.mjs"
       - "scripts/audit-pixel-art-candidate.mjs"
       - "scripts/test-pixel-art-candidate-audit.mjs"
+      - "scripts/check-game-art-automation-fabric.mjs"
       - "config/image-processing-recipes.v1.json"
+      - "config/artist-workspace-agent-suite.v7.json"
       - "evavo.tasks.json"
       - ".github/workflows/game-art-workstations.yml"
   workflow_dispatch:
@@ -68,6 +72,7 @@ jobs:
       - run: python scripts/test-sprite-workstation.py -v
       - run: node scripts/test-pixel-art-candidate-audit.mjs
       - run: node scripts/test-game-art-workstation-mcp.mjs
+      - run: node scripts/check-game-art-automation-fabric.mjs
       - run: node --check tools/game_art_workstation_mcp.mjs
       - run: |
           git diff --check
@@ -97,6 +102,7 @@ jobs:
       - run: python scripts/test-sprite-workstation.py -v
       - run: node scripts/test-pixel-art-candidate-audit.mjs
       - run: node scripts/test-game-art-workstation-mcp.mjs
+      - run: node scripts/check-game-art-automation-fabric.mjs
       - run: node --check tools/game_art_workstation_mcp.mjs
       - shell: pwsh
         run: |
