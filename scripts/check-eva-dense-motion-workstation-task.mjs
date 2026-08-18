@@ -18,7 +18,7 @@ export function validateTask(task, scriptSource, v5Client) {
   fail(task.scriptPath === "scripts/Invoke-EvaDenseMotionWorkstationValidation.ps1", "EVA workstation script path drifted.");
   fail(task.denseMotionFamily === "eva-20260809-153620", "EVA dense-motion family drifted.");
   fail(JSON.stringify(task.pendingOrdinals) === JSON.stringify([1,2,3,7,8,9,10]), "EVA pending ordinals drifted.");
-  fail(semver(task.minimumLocalStorageVersion) && task.minimumLocalStorageVersion === "0.42.1", "EVA worker requires Local Storage 0.42.1.");
+  fail(semver(task.minimumLocalStorageVersion) && task.minimumLocalStorageVersion === "0.48.0", "EVA worker requires Local Storage 0.48.0.");
 
   const worker = task.worker;
   fail(worker.target === "pool" && worker.poolId === "windows-local" && worker.fallbackNodeId === "windows-primary", "EVA worker routing drifted.");
@@ -84,6 +84,7 @@ export function validateTask(task, scriptSource, v5Client) {
     pendingOrdinalCount: task.pendingOrdinals.length,
     plannerBound: true,
     physicalAcceptanceRequired: true,
+    minimumLocalStorageVersion: task.minimumLocalStorageVersion,
     repositoryWriteAuthority: false,
     publicationAuthority: false,
   });
