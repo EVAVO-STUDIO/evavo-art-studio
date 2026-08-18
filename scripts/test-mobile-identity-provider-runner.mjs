@@ -10,7 +10,8 @@ import {
   validateMobileIdentityProviderRequestBinding,
 } from './run-mobile-identity-provider-plan.mjs';
 
-const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime.mjs';
+const RUNTIME_ENTRY = 'scripts/mobile-identity-provider-runtime-entry.mjs';
+const RUNTIME_ENGINE = 'scripts/mobile-identity-provider-runtime.mjs';
 const shaObject = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const resealPlan = (value) => {
   const next = structuredClone(value);
@@ -54,17 +55,20 @@ const baseInput = {
 const plan = compileMobileIdentityExecutionPlan(baseInput);
 
 const validated = validateMobileIdentityProviderExecutionPlan(plan);
-assert.equal(validated.runtime.controlScript, RUNTIME_SCRIPT);
+assert.equal(validated.runtime.controlScript, RUNTIME_ENTRY);
+assert.equal(validated.runtime.engineScript, RUNTIME_ENGINE);
+assert.equal(validated.runtime.repositoryRelativePlanPaths, true);
+assert.equal(validated.runtime.absoluteEngineRootsResolvedByEntry, true);
 assert.equal(validated.runtime.gameMetadataRequired, false);
 assert.equal(validated.runtime.campaignMetadataRequired, false);
-assert.deepEqual(validated.preparation.argv.slice(0, 3), ['node', RUNTIME_SCRIPT, 'prepare']);
+assert.deepEqual(validated.preparation.argv.slice(0, 3), ['node', RUNTIME_ENTRY, 'prepare']);
 assert.equal(validated.preparation.options['--provider-request'], '.data/mobile-identity/provider-request.json');
 assert.deepEqual(validated.steps.map((step) => step.id), ['select', 'admit', 'authorize', 'execute']);
 assert.deepEqual(validated.steps.map((step) => step.argv.slice(0, 3)), [
-  ['node', RUNTIME_SCRIPT, 'select'],
-  ['node', RUNTIME_SCRIPT, 'admit'],
-  ['node', RUNTIME_SCRIPT, 'authorize'],
-  ['node', RUNTIME_SCRIPT, 'execute'],
+  ['node', RUNTIME_ENTRY, 'select'],
+  ['node', RUNTIME_ENTRY, 'admit'],
+  ['node', RUNTIME_ENTRY, 'authorize'],
+  ['node', RUNTIME_ENTRY, 'execute'],
 ]);
 assert.equal(validated.steps[2].options['--allowed-adapters'], 'openai-gpt-image');
 assert.deepEqual(validated.provider.allowedAdapterIds, ['openai-gpt-image']);
