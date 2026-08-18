@@ -5,7 +5,7 @@
   "role": "governed-art-production-media-validation-and-provider-control",
   "canonicalRepository": "EVAVO-STUDIO/evavo-local-storage",
   "canonicalManifest": "config/automation-fabric-capabilities.json",
-  "minimumLocalStorageVersion": "0.36.0",
+  "minimumLocalStorageVersion": "0.48.0",
   "poolId": "windows-local",
   "defaultRouting": {
     "preferWorkerFabric": true,
@@ -17,8 +17,8 @@
   },
   "approvedRoots": [
     "C:\\GitRepos",
-    "C:\\Downloads",
-    "C:\\BEESTATION",
+    "%USERPROFILE%\\Downloads",
+    "resolved-beestation-root",
     "approved-discovered-external-roots"
   ],
   "supportedWork": [
