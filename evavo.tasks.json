@@ -17,6 +17,52 @@
       "timeoutSeconds": 1800,
       "description": "Run the Windows worker verification for PowerShell syntax and the sealed Creative Asset Publisher runtime."
     },
+    "pixel-art-candidate-audit": {
+      "runtime": "node-script",
+      "entry": "scripts/audit-pixel-art-candidate.mjs",
+      "arguments": [
+        "--input", "{{input}}",
+        "--role", "{{role}}",
+        "--max-partial-alpha-ratio", "{{maxPartialAlphaRatio}}",
+        "--max-colors", "{{maxColors}}",
+        "--require-alpha",
+        "--json"
+      ],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["input"],
+        "properties": {
+          "input": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "role": {
+            "type": "string",
+            "minimumLength": 1,
+            "maximumLength": 64,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "default": "production-sprite"
+          },
+          "maxPartialAlphaRatio": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0
+          },
+          "maxColors": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 65536,
+            "default": 256
+          }
+        }
+      },
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Audit one exact materialized PNG for dimensions, pixel layout, palette size and partial-alpha production blockers before creative approval."
+    },
     "pixel-art-candidate-audit-test": {
       "runtime": "node-script",
       "entry": "scripts/test-pixel-art-candidate-audit.mjs",
