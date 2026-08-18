@@ -1,0 +1,69 @@
+name: Art Studio capability and Automation Fabric contract
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "evavo.capabilities.json"
+      - "schemas/evavo.repository-capabilities.schema.json"
+      - "config/automation-fabric-client-v2.json"
+      - "scripts/check-art-studio-capability-contract.mjs"
+      - "scripts/test-art-studio-capability-contract.mjs"
+      - "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md"
+      - "package.json"
+      - "tools/**"
+      - "apps/**"
+      - "packages/**"
+      - ".github/workflows/art-studio-capability-contract.yml"
+  pull_request:
+    paths:
+      - "evavo.capabilities.json"
+      - "schemas/evavo.repository-capabilities.schema.json"
+      - "config/automation-fabric-client-v2.json"
+      - "scripts/check-art-studio-capability-contract.mjs"
+      - "scripts/test-art-studio-capability-contract.mjs"
+      - "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md"
+      - "package.json"
+      - "tools/**"
+      - "apps/**"
+      - "packages/**"
+      - ".github/workflows/art-studio-capability-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: art-studio-capability-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Validate capability discovery and Automation Fabric binding
+        run: |
+          set -euo pipefail
+          node scripts/check-art-studio-capability-contract.mjs
+          node --test scripts/test-art-studio-capability-contract.mjs
+
+      - name: Confirm validation changed no repository source
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
