@@ -1,0 +1,57 @@
+name: Art Studio workstation v5 contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "config/automation-fabric-client-v5.json"
+      - "scripts/check-art-studio-workstation-v5-contract.mjs"
+      - "scripts/test-art-studio-workstation-v5-contract.mjs"
+      - "docs/AUTOMATION_FABRIC_V5.md"
+      - ".github/workflows/art-studio-workstation-v5-contract.yml"
+  pull_request:
+    paths:
+      - "config/automation-fabric-client-v5.json"
+      - "scripts/check-art-studio-workstation-v5-contract.mjs"
+      - "scripts/test-art-studio-workstation-v5-contract.mjs"
+      - "docs/AUTOMATION_FABRIC_V5.md"
+      - ".github/workflows/art-studio-workstation-v5-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: art-studio-workstation-v5-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Validate v5 runtime-truth contract
+        run: |
+          set -euo pipefail
+          node --check scripts/check-art-studio-workstation-v5-contract.mjs
+          node scripts/check-art-studio-workstation-v5-contract.mjs
+          node --test scripts/test-art-studio-workstation-v5-contract.mjs
+
+      - name: Confirm validation changed no source
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
