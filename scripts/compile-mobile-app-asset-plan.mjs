@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, posix, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const MOBILE_PRODUCTION_PLAN_SCHEMA = 'evavo.mobile-app-production-plan.v1';
@@ -322,7 +322,19 @@ function writeCreateOnly(pathValue, content) {
   if (!existsSync(dirname(path)) || existsSync(path)) fail('unsafe_output', 'Output parent must exist and output must not already exist.');
   writeFileSync(path, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
 }
-export const isDirectExecution = (entry = process.argv[1]) => Boolean(entry) && resolve(entry) === resolve(fileURLToPath(import.meta.url));
+function comparableExecutionPath(value, platform = process.platform) {
+  const pathTools = platform === 'win32' ? win32 : posix;
+  const normalized = pathTools.resolve(value);
+  return platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+export function isDirectExecution(
+  entry = process.argv[1],
+  modulePath = fileURLToPath(import.meta.url),
+  platform = process.platform,
+) {
+  if (!entry) return false;
+  return comparableExecutionPath(entry, platform) === comparableExecutionPath(modulePath, platform);
+}
 export function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
   const plan = compileMobileAppAssetPlan(readJson(options.input));

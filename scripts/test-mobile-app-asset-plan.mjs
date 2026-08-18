@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   compileMobileAppAssetPlan,
+  isDirectExecution,
   MOBILE_ASSET_PLAN_SCHEMA,
   MobileAssetPlanError,
 } from './compile-mobile-app-asset-plan.mjs';
@@ -131,5 +132,24 @@ test('rejects traversal and secret-bearing plans', () => {
   assert.throws(
     () => compileMobileAppAssetPlan(secret),
     (error) => error instanceof MobileAssetPlanError && error.code === 'secret_key_rejected',
+  );
+});
+
+test('CLI direct-execution detection is case-insensitive on Windows', () => {
+  assert.equal(
+    isDirectExecution(
+      'C:\\GitRepos\\evavo-art-studio\\scripts\\compile-mobile-app-asset-plan.mjs',
+      'c:\\gitrepos\\evavo-art-studio\\scripts\\compile-mobile-app-asset-plan.mjs',
+      'win32',
+    ),
+    true,
+  );
+  assert.equal(
+    isDirectExecution(
+      'C:\\GitRepos\\evavo-art-studio\\scripts\\other.mjs',
+      'C:\\GitRepos\\evavo-art-studio\\scripts\\compile-mobile-app-asset-plan.mjs',
+      'win32',
+    ),
+    false,
   );
 });
