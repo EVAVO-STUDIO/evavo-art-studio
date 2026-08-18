@@ -72,6 +72,8 @@
       "runtimeTargets": {
         "android": [
           "apps/mobile/android/app/src/main/res/mipmap-anydpi/ic_launcher.xml",
+          "apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+          "apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
           "apps/mobile/android/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml",
           "apps/mobile/android/app/src/main/res/mipmap-anydpi-v33/ic_launcher_round.xml",
           "apps/mobile/android/app/src/main/res/drawable/ic_launcher_foreground.xml",
@@ -80,9 +82,9 @@
       },
       "requirements": [
         "foreground geometry stays inside Android adaptive safe zones",
-        "monochrome variant remains a single-colour mask for themed icons",
+        "monochrome variant remains a single-colour mask for Android 13 themed icons",
         "background remains EVAVO canvas black",
-        "foreground and monochrome remain derived from the reviewed GODMODE geometry",
+        "foreground round and monochrome variants remain derived from the reviewed GODMODE geometry",
         "new identity variants still require governed comparison before promotion"
       ]
     },
