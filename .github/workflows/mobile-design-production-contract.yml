@@ -10,6 +10,7 @@ on:
       - 'scripts/compile-mobile-identity-provider-request.mjs'
       - 'scripts/compile-mobile-identity-execution-plan.mjs'
       - 'scripts/mobile-identity-provider-runtime.mjs'
+      - 'scripts/mobile-identity-provider-runtime-entry.mjs'
       - 'scripts/run-mobile-identity-provider-plan.mjs'
       - 'scripts/test-mobile-design-production-contract.mjs'
       - 'scripts/test-mobile-identity-production.mjs'
@@ -29,6 +30,7 @@ on:
       - 'scripts/compile-mobile-identity-provider-request.mjs'
       - 'scripts/compile-mobile-identity-execution-plan.mjs'
       - 'scripts/mobile-identity-provider-runtime.mjs'
+      - 'scripts/mobile-identity-provider-runtime-entry.mjs'
       - 'scripts/run-mobile-identity-provider-plan.mjs'
       - 'scripts/test-mobile-design-production-contract.mjs'
       - 'scripts/test-mobile-identity-production.mjs'
@@ -72,6 +74,7 @@ jobs:
           node --check scripts/compile-mobile-identity-provider-request.mjs
           node --check scripts/compile-mobile-identity-execution-plan.mjs
           node --check scripts/mobile-identity-provider-runtime.mjs
+          node --check scripts/mobile-identity-provider-runtime-entry.mjs
           node --check scripts/run-mobile-identity-provider-plan.mjs
           node --check scripts/test-mobile-identity-provider-runtime-contract.mjs
           node --check scripts/test-mobile-identity-provider-runner.mjs
