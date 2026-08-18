@@ -1,14 +1,22 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { compileMobileIdentityProductionBrief } from './mobile-identity-contract.mjs';
 import { compileMobileIdentityProviderRequest } from './compile-mobile-identity-provider-request.mjs';
 import { compileMobileIdentityExecutionPlan } from './compile-mobile-identity-execution-plan.mjs';
 import {
   createOpenAIProviderExecutionEnvironment,
   validateMobileIdentityProviderExecutionPlan,
+  validateMobileIdentityProviderRequestBinding,
 } from './run-mobile-identity-provider-plan.mjs';
 
 const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime.mjs';
+const shaObject = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const resealPlan = (value) => {
+  const next = structuredClone(value);
+  delete next.executionPlanSha256;
+  return { ...next, executionPlanSha256: shaObject(next) };
+};
 const production = compileMobileIdentityProductionBrief({
   app: { name: 'GODMODE', purpose: 'Premium EVAVO companion for Chronus M02S smart glasses.', productFamily: 'EVAVO Glasses' },
   brand: { studio: 'EVAVO Studio', palette: ['#060608', '#F7F7F9', '#FF244E'], principles: ['crafted, restrained, premium', 'never generic AI-looking'] },
@@ -50,6 +58,7 @@ assert.equal(validated.runtime.controlScript, RUNTIME_SCRIPT);
 assert.equal(validated.runtime.gameMetadataRequired, false);
 assert.equal(validated.runtime.campaignMetadataRequired, false);
 assert.deepEqual(validated.preparation.argv.slice(0, 3), ['node', RUNTIME_SCRIPT, 'prepare']);
+assert.equal(validated.preparation.options['--provider-request'], '.data/mobile-identity/provider-request.json');
 assert.deepEqual(validated.steps.map((step) => step.id), ['select', 'admit', 'authorize', 'execute']);
 assert.deepEqual(validated.steps.map((step) => step.argv.slice(0, 3)), [
   ['node', RUNTIME_SCRIPT, 'select'],
@@ -57,9 +66,17 @@ assert.deepEqual(validated.steps.map((step) => step.argv.slice(0, 3)), [
   ['node', RUNTIME_SCRIPT, 'authorize'],
   ['node', RUNTIME_SCRIPT, 'execute'],
 ]);
+assert.equal(validated.steps[2].options['--allowed-adapters'], 'openai-gpt-image');
 assert.deepEqual(validated.provider.allowedAdapterIds, ['openai-gpt-image']);
 assert.equal(validated.provider.preferredAdapterId, 'openai-gpt-image');
 assert.equal(validated.provider.preferredModel, 'gpt-image-2');
+
+const binding = validateMobileIdentityProviderRequestBinding(providerRequest, validated);
+assert.equal(binding.providerRequestSha256, providerRequest.providerRequestSha256);
+assert.equal(binding.request.assetKind, 'ui');
+assert.equal(binding.request.continuityPhase, 'identity-master');
+assert.equal(binding.request.metadata.releaseEligible, false);
+assert.equal(binding.request.metadata.approvalRequired, true);
 
 const providerEnv = createOpenAIProviderExecutionEnvironment({
   PATH: process.env.PATH ?? '',
@@ -90,9 +107,30 @@ assert.throws(
   () => createOpenAIProviderExecutionEnvironment({ PATH: process.env.PATH ?? '' }),
   /OPENAI_API_KEY/u,
 );
-const mutated = structuredClone(plan);
-mutated.steps[3].argv[1] = 'scripts/not-reviewed.mjs';
-assert.throws(() => validateMobileIdentityProviderExecutionPlan(mutated), /executionPlanSha256 mismatch|mobile-identity-provider-runtime/u);
+
+const mutatedScript = structuredClone(plan);
+mutatedScript.steps[3].argv[1] = 'scripts/not-reviewed.mjs';
+assert.throws(() => validateMobileIdentityProviderExecutionPlan(resealPlan(mutatedScript)), /mobile-identity-provider-runtime/u);
+
+const extraFlag = structuredClone(plan);
+extraFlag.steps[0].argv.push('--unexpected', 'value');
+assert.throws(() => validateMobileIdentityProviderExecutionPlan(resealPlan(extraFlag)), /exactly its reviewed option set|unsupported option/u);
+
+const pathDrift = structuredClone(plan);
+const runtimeBatchIndex = pathDrift.steps[3].argv.indexOf('--runtime-batch') + 1;
+pathDrift.steps[3].argv[runtimeBatchIndex] = '.data/mobile-identity/other-runtime-batch.json';
+assert.throws(() => validateMobileIdentityProviderExecutionPlan(resealPlan(pathDrift)), /runtime batch path drifts/u);
+
+const badDigest = structuredClone(providerRequest);
+badDigest.providerRequestSha256 = '0'.repeat(64);
+assert.throws(() => validateMobileIdentityProviderRequestBinding(badDigest, validated), /providerRequestSha256 mismatch/u);
+
+const wrongModel = structuredClone(providerRequest);
+wrongModel.providerRequest.selection.preferredModel = 'gpt-image-1';
+wrongModel.providerRequestSha256 = shaObject(wrongModel.providerRequest);
+const wrongModelPlan = resealPlan({ ...structuredClone(plan), sourceProviderRequestSha256: wrongModel.providerRequestSha256 });
+const wrongModelValidated = validateMobileIdentityProviderExecutionPlan(wrongModelPlan);
+assert.throws(() => validateMobileIdentityProviderRequestBinding(wrongModel, wrongModelValidated), /scoped exactly to openai-gpt-image with gpt-image-2/u);
 
 const fallbackRequest = compileMobileIdentityProviderRequest(production, { comfyUiProfileId: 'godmode-icon' });
 const fallbackPlan = compileMobileIdentityExecutionPlan({ ...baseInput, providerRequest: fallbackRequest });
