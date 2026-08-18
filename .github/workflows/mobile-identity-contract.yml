@@ -1,0 +1,38 @@
+name: Mobile identity raster production contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/mobile-identity-contract.mjs"
+      - "scripts/mobile-identity-production.mjs"
+      - "scripts/test-mobile-identity-production.mjs"
+      - ".github/workflows/mobile-identity-contract.yml"
+  pull_request:
+    paths:
+      - "scripts/mobile-identity-contract.mjs"
+      - "scripts/mobile-identity-production.mjs"
+      - "scripts/test-mobile-identity-production.mjs"
+      - ".github/workflows/mobile-identity-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+      - run: node --check scripts/mobile-identity-contract.mjs
+      - run: node --check scripts/mobile-identity-production.mjs
+      - run: node --check scripts/test-mobile-identity-production.mjs
+      - run: node scripts/test-mobile-identity-production.mjs
+      - run: git diff --check
