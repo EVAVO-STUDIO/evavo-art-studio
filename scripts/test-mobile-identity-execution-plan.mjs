@@ -4,6 +4,8 @@ import { compileMobileIdentityProductionBrief } from './mobile-identity-contract
 import { compileMobileIdentityProviderRequest } from './compile-mobile-identity-provider-request.mjs';
 import { compileMobileIdentityExecutionPlan } from './compile-mobile-identity-execution-plan.mjs';
 
+const RUNTIME_SCRIPT = 'scripts/mobile-identity-provider-runtime.mjs';
+
 const production = compileMobileIdentityProductionBrief({
   app: { name: 'GODMODE', purpose: 'Premium EVAVO companion for Chronus M02S smart glasses.', productFamily: 'EVAVO Glasses' },
   brand: { studio: 'EVAVO Studio', palette: ['#060608', '#F7F7F9', '#FF244E'], principles: ['crafted, restrained, premium', 'never generic AI-looking'] },
@@ -28,6 +30,7 @@ const input = {
   authorizedAt: '2026-08-18T09:15:10Z',
   expiresAt: '2026-08-18T09:45:10Z',
   paths: {
+    providerRequest: '.data/mobile-identity/provider-request.json',
     runtimeBatch: '.data/mobile-identity/runtime-batch.json',
     selection: '.data/mobile-identity/selection.json',
     admissionReceipt: '.data/mobile-identity/admission.json',
@@ -44,23 +47,37 @@ assert.equal(plan.status, 'governed-execution-ready');
 assert.equal(plan.provider.preferredAdapterId, 'openai-gpt-image');
 assert.equal(plan.provider.preferredModel, 'gpt-image-2');
 assert.deepEqual(plan.provider.allowedAdapterIds, ['openai-gpt-image', 'comfyui:godmode-icon']);
+assert.equal(plan.runtime.schema, 'evavo.mobile-identity-provider-runtime-batch.v1');
+assert.equal(plan.runtime.controlScript, RUNTIME_SCRIPT);
+assert.equal(plan.runtime.campaignMetadataRequired, false);
+assert.equal(plan.runtime.gameMetadataRequired, false);
+assert.equal(plan.preparation.id, 'prepare');
+assert.deepEqual(plan.preparation.argv.slice(0, 3), ['node', RUNTIME_SCRIPT, 'prepare']);
+assert.match(plan.preparation.command, /mobile-identity-provider-runtime\.mjs prepare/u);
+assert.match(plan.preparation.command, /--provider-request \.data\/mobile-identity\/provider-request\.json/u);
 assert.deepEqual(plan.steps.map((step) => step.id), ['select', 'admit', 'authorize', 'execute']);
-assert.match(plan.steps[0].command, /select-raw-art-provider-runtime-jobs\.mjs/u);
-assert.match(plan.steps[1].command, /admit-raw-art-provider-runtime-batch\.mjs/u);
-assert.match(plan.steps[2].command, /authorize-raw-art-provider-runtime-execution\.mjs/u);
+for (const [index, id] of ['select', 'admit', 'authorize', 'execute'].entries()) {
+  assert.deepEqual(plan.steps[index].argv.slice(0, 3), ['node', RUNTIME_SCRIPT, id]);
+}
 assert.match(plan.steps[2].command, /--allowed-adapters openai-gpt-image,comfyui:godmode-icon/u);
-assert.match(plan.steps[3].command, /mobile-identity-production\.mjs execute-authorized/u);
+assert.match(plan.steps[3].command, /mobile-identity-provider-runtime\.mjs execute/u);
 assert.equal(plan.authority.bypassSelection, false);
 assert.equal(plan.authority.bypassAdmission, false);
 assert.equal(plan.authority.bypassAuthorization, false);
 assert.equal(plan.authority.generationEqualsApproval, false);
 assert.equal(plan.authority.runtimePublication, false);
+assert.equal(plan.authority.deviceAuthority, false);
+assert.equal(plan.authority.protocolAuthority, false);
 assert.equal(plan.authority.forcePush, false);
 assert.match(plan.executionPlanSha256, /^[a-f0-9]{64}$/u);
 
 assert.throws(
   () => compileMobileIdentityExecutionPlan({ ...input, expiresAt: input.authorizedAt }),
   /expiresAt must be after authorizedAt/u,
+);
+assert.throws(
+  () => compileMobileIdentityExecutionPlan({ ...input, paths: { ...input.paths, providerRequest: '../escape.json' } }),
+  /repository-relative/u,
 );
 const badRequest = structuredClone(providerRequest);
 badRequest.providerRequest.selection.allowedAdapterIds = ['gpt-image'];
