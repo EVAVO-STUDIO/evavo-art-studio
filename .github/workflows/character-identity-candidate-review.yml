@@ -1,0 +1,37 @@
+name: Character Identity Candidate Review
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/character-identity-candidate-review-plan.mjs"
+      - "scripts/test-character-identity-candidate-review-plan.mjs"
+      - ".github/workflows/character-identity-candidate-review.yml"
+  pull_request:
+    paths:
+      - "scripts/character-identity-candidate-review-plan.mjs"
+      - "scripts/test-character-identity-candidate-review-plan.mjs"
+      - ".github/workflows/character-identity-candidate-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Candidate review planner / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        with:
+          persist-credentials: false
+      - name: Syntax-check review planner
+        run: node --check scripts/character-identity-candidate-review-plan.mjs
+      - name: Run review planner tests
+        run: node --test scripts/test-character-identity-candidate-review-plan.mjs
