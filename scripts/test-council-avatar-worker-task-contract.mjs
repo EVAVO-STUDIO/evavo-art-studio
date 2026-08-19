@@ -9,6 +9,10 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const client = JSON.parse(read("config/automation-fabric-client-v5.json"));
 const tasks = JSON.parse(read("evavo.tasks.json"));
 const worker = read("scripts/Test-CouncilAvatarWorkerStack.ps1");
+const criticRequestPath = "config/council-avatar-identities/council-critic.identity-request.json";
+const openReviewerRequestPath = "config/council-avatar-identities/council-open-reviewer.identity-request.json";
+const criticRequest = JSON.parse(read(criticRequestPath));
+const openReviewerRequest = JSON.parse(read(openReviewerRequestPath));
 
 test("Council avatar worker is a named exact-state fabric task", () => {
   assert.equal(client.sourceContract.councilAvatarWorkerTaskName, "council-avatar-worker-stack");
@@ -31,8 +35,30 @@ test("Council worker binds the six authoritative repository surfaces", () => {
     "config\\council.example.json",
     "src\\council-avatar-production-status.js",
     "src\\features\\council\\avatarPresentation.ts",
+    "config\\council-avatar-identities\\council-critic.identity-request.json",
+    "config\\council-avatar-identities\\council-open-reviewer.identity-request.json",
   ]) {
     assert.ok(worker.includes(token), `missing worker repository/source token: ${token}`);
+  }
+});
+
+test("Council identity bootstrap requests exist at the exact worker paths and remain unexecuted", () => {
+  for (const [request, characterId] of [
+    [criticRequest, "council-critic"],
+    [openReviewerRequest, "council-open-reviewer"],
+  ]) {
+    assert.equal(request.schema, "evavo.character-identity-master-request.v1");
+    assert.equal(request.character.id, characterId);
+    assert.equal(request.candidateSets, 4);
+    assert.deepEqual(request.views.map((view) => view.id), ["full-body-right", "full-body-left", "neutral-bust"]);
+    assert.equal(request.canvas.width, 1024);
+    assert.equal(request.canvas.height, 1536);
+    assert.equal(request.canvas.alpha, "transparent");
+    assert.equal(request.policy.providerExecution, false);
+    assert.equal(request.policy.providerAuthorizationRequired, true);
+    assert.equal(request.policy.reviewRequired, true);
+    assert.equal(request.policy.runtimeAsset, false);
+    assert.equal(request.policy.animationFamily, false);
   }
 });
 
