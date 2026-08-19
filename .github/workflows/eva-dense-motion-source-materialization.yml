@@ -1,0 +1,98 @@
+name: EVA dense-motion source materialization
+
+on:
+  pull_request:
+    paths:
+      - "config/eva-dense-motion-workstation-task-v1.json"
+      - "scripts/Invoke-EvaDenseMotionWorkstationValidation.ps1"
+      - "scripts/check-eva-dense-motion-workstation-task.mjs"
+      - "scripts/project-art/eva-dense-motion-source-preflight.mjs"
+      - "scripts/project-art/eva-dense-motion-source-materialization.mjs"
+      - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
+      - "scripts/project-art/eva-dense-motion-work-order*.mjs"
+      - "scripts/run-project-art-eva-dense-motion-source-materialization.mjs"
+      - "scripts/test-eva-dense-motion-workstation-task.mjs"
+      - "scripts/test-project-art-eva-dense-motion-source-materialization*.mjs"
+      - ".github/workflows/eva-dense-motion-source-materialization.yml"
+  push:
+    branches: [main]
+    paths:
+      - "config/eva-dense-motion-workstation-task-v1.json"
+      - "scripts/Invoke-EvaDenseMotionWorkstationValidation.ps1"
+      - "scripts/check-eva-dense-motion-workstation-task.mjs"
+      - "scripts/project-art/eva-dense-motion-source-preflight.mjs"
+      - "scripts/project-art/eva-dense-motion-source-materialization.mjs"
+      - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
+      - "scripts/project-art/eva-dense-motion-work-order*.mjs"
+      - "scripts/run-project-art-eva-dense-motion-source-materialization.mjs"
+      - "scripts/test-eva-dense-motion-workstation-task.mjs"
+      - "scripts/test-project-art-eva-dense-motion-source-materialization*.mjs"
+      - ".github/workflows/eva-dense-motion-source-materialization.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eva-dense-source-materialization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Syntax-check source materialization surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/project-art/eva-dense-motion-source-preflight.mjs
+          node --check scripts/project-art/eva-dense-motion-source-materialization.mjs
+          node --check scripts/run-project-art-eva-dense-motion-source-materialization.mjs
+          node --check scripts/check-eva-dense-motion-workstation-task.mjs
+          node --check scripts/test-eva-dense-motion-workstation-task.mjs
+          node --check scripts/test-project-art-eva-dense-motion-source-materialization.mjs
+          node --check scripts/test-project-art-eva-dense-motion-source-materialization-cli.mjs
+
+      - name: Run source preflight and workstation adversaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-eva-dense-motion-workstation-task.mjs
+          node --test scripts/test-eva-dense-motion-workstation-task.mjs
+
+      - name: Run source materialization regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test \
+            scripts/test-project-art-eva-dense-motion-source-materialization.mjs \
+            scripts/test-project-art-eva-dense-motion-source-materialization-cli.mjs
+
+      - name: Re-run ten-master programme regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/test-project-art-eva-dense-motion-ten-master.mjs
+
+      - name: Confirm validation changed no repository source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
