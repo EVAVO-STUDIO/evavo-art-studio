@@ -1,0 +1,28 @@
+name: local-ai-client
+
+on:
+  pull_request:
+    paths:
+      - "config/local-ai-client-v1.json"
+      - "scripts/check-local-ai-client-v1.mjs"
+      - ".github/workflows/local-ai-client.yml"
+  push:
+    branches: [main]
+    paths:
+      - "config/local-ai-client-v1.json"
+      - "scripts/check-local-ai-client-v1.mjs"
+      - ".github/workflows/local-ai-client.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: node scripts/check-local-ai-client-v1.mjs config/local-ai-client-v1.json
