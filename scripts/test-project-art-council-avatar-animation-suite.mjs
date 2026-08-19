@@ -100,6 +100,10 @@ function request(characterId) {
   };
 }
 
+function hasCode(code) {
+  return (error) => Boolean(error && typeof error === 'object' && error.code === code);
+}
+
 for (const characterId of ['council-critic', 'council-open-reviewer']) {
   test(`${characterId} compiles through the canonical 749-image animation suite`, () => {
     const plan = compileProjectArtAvatarAnimationSuite(request(characterId), {
@@ -143,7 +147,7 @@ test('Council animation requires v2 and a hash-bound full-body identity master',
   missing.animationIdentityMaster = null;
   assert.throws(
     () => compileProjectArtAvatarAnimationSuite(missing, { compiledAt: FIXED_TIME }),
-    /PROJECT_ART_AVATAR_ANIMATION_MASTER_REQUIRED/u,
+    hasCode('PROJECT_ART_AVATAR_ANIMATION_MASTER_REQUIRED'),
   );
 
   const legacy = request('council-critic');
@@ -151,7 +155,7 @@ test('Council animation requires v2 and a hash-bound full-body identity master',
   delete legacy.animationIdentityMaster;
   assert.throws(
     () => compileProjectArtAvatarAnimationSuite(legacy, { compiledAt: FIXED_TIME }),
-    /PROJECT_ART_AVATAR_ANIMATION_COUNCIL_V2_REQUIRED/u,
+    hasCode('PROJECT_ART_AVATAR_ANIMATION_COUNCIL_V2_REQUIRED'),
   );
 });
 
@@ -172,6 +176,6 @@ test('unrelated arbitrary character IDs remain rejected', () => {
   invalid.sessionId = 'random-avatar-animation-001';
   assert.throws(
     () => compileProjectArtAvatarAnimationSuite(invalid, { compiledAt: FIXED_TIME }),
-    /PROJECT_ART_AVATAR_ANIMATION_CHARACTER_INVALID/u,
+    hasCode('PROJECT_ART_AVATAR_ANIMATION_CHARACTER_INVALID'),
   );
 });
