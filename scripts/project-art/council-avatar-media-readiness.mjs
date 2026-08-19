@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { compileCouncilAvatarProductionProgram } from './council-avatar-production-program.mjs';
 import { compileCouncilAvatarIdentityBootstrap } from './council-avatar-identity-bootstrap.mjs';
+import { evaDenseMotionTenMasterCapabilities } from './eva-dense-motion-ten-master-program.mjs';
 import { TOP_HAT_RUNTIME_EXPECTED_SLOTS } from './top-hat-pose-slot-provider-runtime-foundation.mjs';
 
 export const COUNCIL_AVATAR_MEDIA_READINESS_SCHEMA =
@@ -11,6 +12,11 @@ const TOP_HAT_PROVIDER_CAMPAIGN =
   'scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs';
 const EVA_DENSE_WORK_ORDER_CHECKER =
   'scripts/check-project-art-eva-dense-motion-work-order.mjs';
+const EVA_TEN_MASTER_PROGRAM =
+  'scripts/project-art/eva-dense-motion-ten-master-program.mjs';
+const EVA_TEN_MASTER_COMPILER =
+  'scripts/compile-project-art-eva-dense-motion-ten-master.mjs';
+const EVA_WORKSTATION_TASK = 'config/eva-dense-motion-workstation-task-v1.json';
 const IDENTITY_MASTER_PLANNER = 'scripts/character-identity-master-plan.mjs';
 const IDENTITY_BOOTSTRAP_ADMISSION =
   'scripts/character-identity-bootstrap-admission.mjs';
@@ -144,12 +150,24 @@ function topHatReadiness(character) {
 }
 
 function evaReadiness(character) {
+  const tenMaster = evaDenseMotionTenMasterCapabilities();
+  assert(
+    tenMaster.exactTenNewMasterJobs === true &&
+      tenMaster.fallbackRemasterJobCount === 3 &&
+      tenMaster.legacyFallbackMaySatisfyFinalMasterGate === false &&
+      tenMaster.atomicTenMasterActivationRequired === true &&
+      tenMaster.providerExecution === false &&
+      tenMaster.cloudinaryUpload === false &&
+      tenMaster.runtimeActivation === false,
+    'COUNCIL_AVATAR_EVA_TEN_MASTER_CAPABILITY_DRIFT',
+  );
+
   return Object.freeze({
     seatId: character.seatId,
     seatLabel: character.seatLabel,
     characterId: character.characterId,
     characterLabel: character.characterLabel,
-    stage: 'identity-ready-dense-bootstrap-incomplete',
+    stage: 'identity-ready-ten-master-program-blocked',
     identityReady: true,
     authoredAnimationReady: false,
     productionReady: false,
@@ -159,6 +177,10 @@ function evaReadiness(character) {
       temporaryFallbackOrdinals: EVA_TEMPORARY_FALLBACK_ORDINALS,
       pendingMasteringOrdinals: EVA_PENDING_MASTERING_ORDINALS,
       finalRequiredNewDenseMasterOrdinals: EVA_FINAL_REQUIRED_DENSE_MASTER_ORDINALS,
+      tenMasterProductionProgramAvailable: true,
+      tenMasterRequiredNewMasterCount: 10,
+      fallbackRemasterOrdinals: EVA_TEMPORARY_FALLBACK_ORDINALS,
+      masteredDenseMasterCount: 0,
       legacyPoseReuseAllowedForFinalRelease: false,
       syntheticBodyTransformsAllowed: false,
     }),
@@ -167,26 +189,49 @@ function evaReadiness(character) {
       providerExecutionEstablished: false,
       providerSelectionEstablished: false,
       providerAuthorizationEstablished: false,
+      masteringPlanningSurfaceAvailable: true,
+      masteringExecutionSurfaceAvailable: false,
+      masteringExecutionEstablished: false,
       localValidationEntry: EVA_DENSE_WORK_ORDER_CHECKER,
+      tenMasterProgram: EVA_TEN_MASTER_PROGRAM,
+      tenMasterCompiler: EVA_TEN_MASTER_COMPILER,
+      tenMasterPlanningCommand: Object.freeze([
+        'node',
+        EVA_TEN_MASTER_COMPILER,
+        '--program-id',
+        '<program-id>',
+        '--actor-id',
+        '<actor-id>',
+        '--created-at',
+        '<iso-8601>',
+        '--output',
+        '<create-only-ten-master-program.json>',
+      ]),
+      workstationTask: EVA_WORKSTATION_TASK,
       namedWorkerTask: 'eva-avatar-worker-stack',
       providerRunner: null,
+      atomicTenMasterActivationRequired: true,
+      legacyFallbackMaySatisfyFinalMasterGate: false,
     }),
     blockers: Object.freeze([
-      'all ten immutable new dense-motion master identities are not complete',
-      'the temporary legacy/provenance fallback at ordinals 4, 5 and 6 may not become final release media',
-      'a governed EVA dense-motion provider execution transaction is not established by repository state',
+      'all ten immutable new dense-motion masters are not complete',
+      'the current fallback masters at ordinals 4, 5 and 6 may not satisfy the final ten-master release gate and require new dense-motion remasters',
+      'the ten-master planning surface is available, but no governed bulk mastering/upload execution evidence is established by repository state',
       'ten-edge continuity evidence including frame 10 to frame 1 loop closure is incomplete',
       'the complete 749-image authored animation family has not been approved and released',
     ]),
     requiredNextEvidence: Object.freeze([
-      'new deterministic dense identities for ordinals 1 through 10',
-      'immutable artifact hashes for all ten dense masters',
+      'self-hashed v2 ten-master production program bound to the exact ten source frames',
+      'new immutable asset IDs and master SHA-256 values for ordinals 1 through 10',
+      'candidate assurance, alpha mastering, frame-finisher, technical inspection and creative approval evidence for all ten masters',
+      'proof that legacy fallback assets at ordinals 4, 5 and 6 were not reused as final dense masters',
       'independent continuity review for all ten edges including 10 to 1',
-      'provider/admission/authorization evidence for any provider generation transaction',
       'complete authored animation-suite QA and approval evidence before Runtime publication',
     ]),
     downstreamGates: Object.freeze([
-      'complete and master all ten dense identities',
+      'compile the v2 ten-master production program',
+      'master and approve all ten new dense identities through the governed per-frame pipeline',
+      'prove ten unique immutable final master identities and exclude the legacy 4/5/6 fallback from the final set',
       'prove ten-edge continuity and loop closure',
       'compile the canonical 749-image animation suite',
       'independent QA and creative approval',
@@ -194,7 +239,7 @@ function evaReadiness(character) {
       'website installation and activation',
     ]),
     nextGate:
-      'complete the governed ten-master dense bootstrap without synthetic transforms or legacy-pose final release, then advance through the canonical animation suite',
+      'compile the governed v2 ten-master program, then collect per-frame mastering and approval evidence for all ten ordinals while retaining the live 4/5/6 fallback until atomic ten-master activation; planning does not grant mastering, upload or Runtime activation authority',
     authority: AUTHORITY,
   });
 }
@@ -352,6 +397,9 @@ export function compileCouncilAvatarMediaReadiness() {
       councilIdentityBootstrap: 'scripts/project-art/council-avatar-identity-bootstrap.mjs',
       topHatProviderCampaign: TOP_HAT_PROVIDER_CAMPAIGN,
       evaDenseMotionWorkOrderChecker: EVA_DENSE_WORK_ORDER_CHECKER,
+      evaDenseMotionTenMasterProgram: EVA_TEN_MASTER_PROGRAM,
+      evaDenseMotionTenMasterCompiler: EVA_TEN_MASTER_COMPILER,
+      evaDenseMotionWorkstationTask: EVA_WORKSTATION_TASK,
       councilWorkerTaskName: 'council-avatar-worker-stack',
       evaWorkerTaskName: 'eva-avatar-worker-stack',
       characterIdentityProviderCompiler: CHARACTER_IDENTITY_PROVIDER_COMPILER,
