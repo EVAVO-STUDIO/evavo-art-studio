@@ -6,9 +6,10 @@ import {
   compileCouncilAvatarProductionProgram,
   councilAvatarProductionCapabilities,
 } from '../scripts/project-art/council-avatar-production-program.mjs';
+import { compileCouncilAvatarMediaReadiness } from '../scripts/project-art/council-avatar-media-readiness.mjs';
 
 const SERVER_NAME = 'evavo-project-art-council-avatar-production';
-const SERVER_VERSION = '1.0.0';
+const SERVER_VERSION = '1.1.0';
 const MAXIMUM_MESSAGE_BYTES = 64 * 1024;
 
 function text(value) {
@@ -29,6 +30,12 @@ function tools() {
         'Compile the deterministic plan-only Council avatar production program, including identity briefs and the shared animation standard.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
+    {
+      name: 'evavo_art_council_avatar_media_readiness',
+      description:
+        'Return the deterministic read-only Council avatar media stage, exact blockers, available command surfaces and missing governed evidence for all four characters. This tool never executes providers, approves media, publishes assets or activates Runtime/website animation.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
   ];
 }
 
@@ -38,6 +45,9 @@ function call(params) {
   }
   if (params?.name === 'evavo_art_council_avatar_production_program') {
     return { content: text(compileCouncilAvatarProductionProgram()), isError: false };
+  }
+  if (params?.name === 'evavo_art_council_avatar_media_readiness') {
+    return { content: text(compileCouncilAvatarMediaReadiness()), isError: false };
   }
   throw new Error(`Unknown tool: ${String(params?.name ?? '')}`);
 }
