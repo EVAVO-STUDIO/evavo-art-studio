@@ -125,12 +125,12 @@ function fakeMaterializer(calls, failSlotId = null) {
   };
 }
 
-function withWorkspace(callback) {
+async function withWorkspace(callback) {
   const workspaceRoot = mkdtempSync(
     path.join(os.tmpdir(), 'top-hat-candidate-materialization-'),
   );
   try {
-    return callback(workspaceRoot);
+    return await callback(workspaceRoot);
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
@@ -148,9 +148,8 @@ test('preflights and materializes the exact six slots in canonical order', async
       authorization,
       plannedAt: '2026-08-16T12:32:40.000Z',
     };
-    const plan = await compileTopHatPoseBankCandidateMaterializationCampaignPlan(
-      input,
-    );
+    const plan =
+      await compileTopHatPoseBankCandidateMaterializationCampaignPlan(input);
     assert.equal(
       parseTopHatPoseBankCandidateMaterializationCampaignPlan(plan)
         .campaignPlanSha256,
@@ -164,6 +163,7 @@ test('preflights and materializes the exact six slots in canonical order', async
     assert.equal(plan.policy.providerExecutionAllowed, false);
     assert.equal(plan.policy.automaticReviewAllowed, false);
     assert.equal(plan.policy.automaticAdmissionAllowed, false);
+    assert.equal(plan.policy.automaticPromotionAllowed, false);
     assert.equal(plan.authority.candidateMaterialization, true);
     assert.equal(plan.authority.candidateApproval, false);
 
@@ -295,7 +295,10 @@ test('stops on the first materialization failure and never attempts later slots'
     assert.deepEqual(calls, TOP_HAT_RUNTIME_EXPECTED_SLOTS.slice(0, 3));
     assert.equal(result.receipt.status, 'failed');
     assert.equal(result.receipt.failure.slotId, failedSlot);
-    assert.equal(result.receipt.failure.code, 'FIXTURE_MATERIALIZATION_FAILURE');
+    assert.equal(
+      result.receipt.failure.code,
+      'FIXTURE_MATERIALIZATION_FAILURE',
+    );
     assert.equal(result.receipt.counts.attemptedSlots, 3);
     assert.equal(result.receipt.counts.materializedSlots, 2);
     assert.equal(result.receipt.effects.providerCallsPerformed, 0);
