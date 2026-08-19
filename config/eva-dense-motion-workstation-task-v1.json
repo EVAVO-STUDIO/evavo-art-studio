@@ -4,14 +4,17 @@
   "taskId": "eva-dense-motion-validate-v1",
   "repository": "EVAVO-STUDIO/evavo-art-studio",
   "scriptPath": "scripts/Invoke-EvaDenseMotionWorkstationValidation.ps1",
+  "sourceRepository": "EVAVO-STUDIO/evavo-avatar-runtime",
+  "sourcePreflightScript": "scripts/project-art/eva-dense-motion-source-preflight.mjs",
   "denseMotionFamily": "eva-20260809-153620",
   "pendingOrdinals": [1, 2, 3, 7, 8, 9, 10],
-  "minimumLocalStorageVersion": "0.48.0",
+  "minimumLocalStorageVersion": "0.48.4",
   "worker": {
     "target": "pool",
     "poolId": "windows-local",
     "fallbackNodeId": "windows-primary",
     "requiredCapabilities": [
+      "filesystem",
       "powershell",
       "node",
       "git",
