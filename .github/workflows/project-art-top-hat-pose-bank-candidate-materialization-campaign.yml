@@ -6,6 +6,8 @@ on:
       - "packages/artifacts/src/**"
       - "packages/media/src/**"
       - "packages/providers/src/**"
+      - "packages/runtime/src/**"
+      - "apps/worker/src/provider-handlers.ts"
       - "scripts/project-art/avatar-final-pass-provider-candidate-*.mjs"
       - "scripts/project-art/avatar-final-pass-provider-runtime-*.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-*.mjs"
@@ -23,6 +25,8 @@ on:
       - "packages/artifacts/src/**"
       - "packages/media/src/**"
       - "packages/providers/src/**"
+      - "packages/runtime/src/**"
+      - "apps/worker/src/provider-handlers.ts"
       - "scripts/project-art/avatar-final-pass-provider-candidate-*.mjs"
       - "scripts/project-art/avatar-final-pass-provider-runtime-*.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-*.mjs"
@@ -69,11 +73,11 @@ jobs:
       - name: Install frozen dependency graph
         run: pnpm install --frozen-lockfile
 
-      - name: Build exact materialization dependency closure
+      - name: Build exact campaign dependency closure
         run: |
-          pnpm --filter @evavo/art-artifacts build
-          pnpm --filter @evavo/art-media build
-          pnpm --filter @evavo/art-providers build
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
+          pnpm --filter @evavo/art-studio-worker typecheck
 
       - name: Run six-slot candidate materialization regressions
         run: node --test scripts/test-project-art-top-hat-pose-bank-candidate-materialization-*.mjs
