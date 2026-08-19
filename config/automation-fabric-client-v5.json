@@ -24,7 +24,8 @@
     "repositoryTaskPlanAction": "storage.repository_task_plan",
     "repositoryTaskExecuteAction": "storage.repository_task_run",
     "developmentStudioNamedTaskCompiler": "packages/runner-fabric/src/repository-task.ts",
-    "evaAvatarWorkerTaskName": "eva-avatar-worker-stack"
+    "evaAvatarWorkerTaskName": "eva-avatar-worker-stack",
+    "councilAvatarWorkerTaskName": "council-avatar-worker-stack"
   },
   "runtimeEvidenceStates": [
     {"state":"declared","proof":"machine-readable source contract exists","permitsRoutineWorkerUse":false},
