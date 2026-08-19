@@ -41,6 +41,7 @@ test('Council media readiness is four-seat, fail-closed and deterministic', () =
   assert.equal(first.identityReadyCount, 2);
   assert.equal(first.identityMasterGenerationCount, 2);
   assert.equal(first.productionReadyCount, 0);
+  assert.equal(first.providerExecutionSurfaceAvailableCount, 3);
   assert.equal(first.providerExecutionEstablishedCount, 0);
   assert.equal(first.totalPlannedImagesPerCharacter, 749);
   assert.equal(first.release.websiteActivationAllowed, false);
@@ -106,7 +107,7 @@ test('EVA readiness preserves the dense-bootstrap truth and refuses synthetic co
   assert.ok(eva.blockers.some((entry) => /10 to frame 1/u.test(entry)));
 });
 
-test('Critic and Open Reviewer derive their real 12-job identity bootstrap and stop before provider execution', () => {
+test('Critic and Open Reviewer derive their 12-job bootstrap and expose candidate-only provider execution', () => {
   const readiness = compileCouncilAvatarMediaReadiness();
   const expected = new Map([
     [
@@ -121,16 +122,35 @@ test('Critic and Open Reviewer derive their real 12-job identity bootstrap and s
 
   for (const [characterId, requestPath] of expected) {
     const character = byId(readiness, characterId);
-    assert.equal(character.stage, 'identity-master-provider-gate-required');
+    assert.equal(character.stage, 'identity-master-provider-execution-ready-for-evidence');
     assert.equal(character.identityReady, false);
     assert.equal(character.currentMedia.requestPath, requestPath);
     assert.equal(character.currentMedia.candidateSetCount, 4);
     assert.equal(character.currentMedia.viewsPerCandidateSet, 3);
     assert.equal(character.currentMedia.providerGenerationJobCount, 12);
     assert.equal(character.currentMedia.approvedIdentityMasterCount, 0);
-    assert.equal(character.execution.providerExecutionSurfaceAvailable, false);
+    assert.equal(character.execution.providerExecutionSurfaceAvailable, true);
     assert.equal(character.execution.providerExecutionEstablished, false);
-    assert.equal(character.execution.providerRunner, null);
+    assert.equal(character.execution.providerSelectionEstablished, false);
+    assert.equal(character.execution.providerAuthorizationEstablished, false);
+    assert.equal(
+      character.execution.providerCompiler,
+      'scripts/compile-project-art-character-identity-provider-runtime.mjs',
+    );
+    assert.equal(
+      character.execution.providerRunner,
+      'scripts/run-project-art-character-identity-provider.mjs',
+    );
+    assert.equal(character.execution.setAnchorViewId, 'full-body-right');
+    assert.deepEqual(character.execution.dependentViewIds, [
+      'full-body-left',
+      'neutral-bust',
+    ]);
+    assert.equal(character.execution.sameSetAnchorArtifactRequiredForDependentViews, true);
+    assert.equal(character.execution.maximumProviderCallsPerJob, 1);
+    assert.equal(character.execution.maximumRuntimeAttempts, 1);
+    assert.equal(character.execution.authorizationMaximumHours, 24);
+    assert.equal(character.execution.providerFallbackAllowed, false);
     assert.deepEqual(character.execution.planningCommands[0].slice(0, 3), [
       'node',
       'scripts/character-identity-master-plan.mjs',
@@ -161,15 +181,23 @@ test('Critic and Open Reviewer derive their real 12-job identity bootstrap and s
         /separate identity continuity review and approval receipt/u.test(entry),
       ),
     );
-    assert.match(character.nextEngineeringGate, /do not reuse the mobile-identity provider runtime/u);
+    assert.match(character.nextEngineeringGate, /full-body-right first/u);
+    assert.match(character.nextGate, /generation remains separate from identity approval/u);
   }
 });
 
-test('source contract makes missing character-identity execution explicit', () => {
+test('source contract exposes the governed character-identity compiler and executor', () => {
   const readiness = compileCouncilAvatarMediaReadiness();
   assert.equal(readiness.sourceContract.councilWorkerTaskName, 'council-avatar-worker-stack');
   assert.equal(readiness.sourceContract.evaWorkerTaskName, 'eva-avatar-worker-stack');
-  assert.equal(readiness.sourceContract.characterIdentityProviderExecutionSurface, null);
+  assert.equal(
+    readiness.sourceContract.characterIdentityProviderCompiler,
+    'scripts/compile-project-art-character-identity-provider-runtime.mjs',
+  );
+  assert.equal(
+    readiness.sourceContract.characterIdentityProviderExecutionSurface,
+    'scripts/run-project-art-character-identity-provider.mjs',
+  );
   assert.equal(readiness.sourceContract.unrelatedMobileIdentityProviderRuntimeMayBeReused, false);
 });
 
@@ -209,5 +237,6 @@ test('Council production MCP exposes the same media readiness result', () => {
   const direct = compileCouncilAvatarMediaReadiness();
   assert.equal(viaMcp.readinessSha256, direct.readinessSha256);
   assert.equal(viaMcp.productionReadyCount, 0);
+  assert.equal(viaMcp.providerExecutionSurfaceAvailableCount, 3);
   assert.equal(viaMcp.providerExecutionEstablishedCount, 0);
 });
