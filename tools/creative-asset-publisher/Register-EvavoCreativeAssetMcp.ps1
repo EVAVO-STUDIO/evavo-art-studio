@@ -61,6 +61,12 @@ if ($Capabilities.version -ne '0.4.1' -or
 
 if (-not $StateRoot) { $StateRoot = Join-Path $env:LOCALAPPDATA 'EVAVO\creative-asset-publisher' }
 $StateRoot = [System.IO.Path]::GetFullPath($StateRoot)
+$LocalStorageWorkspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'EVAVO\LocalStorage\workspaces\ArtStudio'))
+$LocalStorageStagingRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'EVAVO\LocalStorage\staging\ArtStudio'))
+if ($EnableWorkstationWrite) {
+    New-Item -ItemType Directory -Path $LocalStorageWorkspaceRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $LocalStorageStagingRoot -Force | Out-Null
+}
 $PublisherEnvironment = [ordered]@{
     EVAVO_GIT_REPOS_ROOT = $GitReposRoot
     EVAVO_CREATIVE_ASSET_STATE_ROOT = $StateRoot
@@ -100,6 +106,8 @@ if ($EnableStorageDispatch) {
 if ($WorkstationRoots.Count -lt 1) {
     $DefaultRoots = [System.Collections.Generic.List[string]]::new()
     $DefaultRoots.Add($GitReposRoot)
+    $DefaultRoots.Add($LocalStorageWorkspaceRoot)
+    $DefaultRoots.Add($LocalStorageStagingRoot)
     $DefaultRoots.Add((Join-Path $env:USERPROFILE 'Downloads'))
     $DefaultRoots.Add($StateRoot)
     $BeeStationCandidates = [System.Collections.Generic.List[string]]::new()
@@ -163,12 +171,14 @@ foreach ($ConfigPathValue in $ClientConfigPaths) {
 }
 
 [ordered]@{
-    contract = 'evavo.creative-asset-mcp-registration.v5'
+    contract = 'evavo.creative-asset-mcp-registration.v6'
     publisherServerName = $ServerName
     workstationServerName = $WorkstationServerName
     publisherServer = $PublisherDefinition
     workstationServer = $WorkstationDefinition
     workstationRoots = @($WorkstationRoots)
+    localStorageWorkspaceRoot = $LocalStorageWorkspaceRoot
+    localStorageStagingRoot = $LocalStorageStagingRoot
     patchedConfigPaths = @($ClientConfigPaths)
     snippet = $Snippet
     workstationWriteEnabled = [bool]$EnableWorkstationWrite
