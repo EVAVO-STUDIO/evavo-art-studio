@@ -13,8 +13,10 @@ on:
       - "scripts/project-art/top-hat-pose-bank-frame-finishing-campaign.mjs"
       - "scripts/project-art/top-hat-pose-bank-frame-review-intake-campaign.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
+      - "scripts/compile-project-art-top-hat-pose-bank-frame-review-decision-manifest.mjs"
       - "scripts/run-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs"
       - "scripts/test-project-art-avatar-frame-review-*.mjs"
+      - "scripts/test-project-art-top-hat-frame-review-decision-manifest.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_FRAME_REVIEW_INTAKE.md"
       - ".github/workflows/project-art-top-hat-pose-bank-frame-review-intake.yml"
@@ -31,8 +33,10 @@ on:
       - "scripts/project-art/top-hat-pose-bank-frame-finishing-campaign.mjs"
       - "scripts/project-art/top-hat-pose-bank-frame-review-intake-campaign.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
+      - "scripts/compile-project-art-top-hat-pose-bank-frame-review-decision-manifest.mjs"
       - "scripts/run-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs"
       - "scripts/test-project-art-avatar-frame-review-*.mjs"
+      - "scripts/test-project-art-top-hat-frame-review-decision-manifest.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_FRAME_REVIEW_INTAKE.md"
       - ".github/workflows/project-art-top-hat-pose-bank-frame-review-intake.yml"
@@ -83,11 +87,16 @@ jobs:
       - name: Run pinned human-decision regression
         run: node --test scripts/test-project-art-avatar-frame-review-pinned.mjs
 
+      - name: Run decision-manifest regression
+        run: node --test scripts/test-project-art-top-hat-frame-review-decision-manifest.mjs
+
       - name: Run six-slot named-human review-intake regressions
         run: node --test scripts/test-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs
 
-      - name: Import production CLI without execution
-        run: node -e "import('./scripts/run-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs')"
+      - name: Import production CLIs without execution
+        run: |
+          node -e "import('./scripts/compile-project-art-top-hat-pose-bank-frame-review-decision-manifest.mjs')"
+          node -e "import('./scripts/run-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs')"
 
       - name: Verify human-review authority boundary
         shell: bash
@@ -104,6 +113,7 @@ jobs:
           grep -F "sequenceRelease: false" scripts/project-art/top-hat-pose-bank-frame-review-intake-campaign.mjs
           grep -F "publication: false" scripts/project-art/top-hat-pose-bank-frame-review-intake-campaign.mjs
           grep -F "runtimeActivation: false" scripts/project-art/top-hat-pose-bank-frame-review-intake-campaign.mjs
+          grep -F "automaticDecisionCreationAllowed: false" scripts/compile-project-art-top-hat-pose-bank-frame-review-decision-manifest.mjs
           ! grep -F "admitProjectArtTopHatPoseSlotCandidate" scripts/project-art/top-hat-pose-bank-frame-review-intake-campaign.mjs
           ! grep -F "humanDecisionCreation: true" scripts/project-art/top-hat-pose-bank-frame-review-intake-campaign.mjs
           ! grep -F "candidateAdmission: true" scripts/project-art/top-hat-pose-bank-frame-review-intake-campaign.mjs
