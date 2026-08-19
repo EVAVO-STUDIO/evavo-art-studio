@@ -39,6 +39,18 @@ function isRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function deepFreezeJson(value) {
+  if (Array.isArray(value)) {
+    for (const entry of value) deepFreezeJson(entry);
+    return Object.freeze(value);
+  }
+  if (isRecord(value)) {
+    for (const entry of Object.values(value)) deepFreezeJson(entry);
+    return Object.freeze(value);
+  }
+  return value;
+}
+
 function isInside(root, target) {
   const relative = path.relative(root, target);
   return (
@@ -126,7 +138,7 @@ function stableJson(filePath, label) {
     absolute,
     bytes,
     fileSha256: sha256FrameFinisherBytes(bytes),
-    value,
+    value: deepFreezeJson(value),
   });
 }
 
@@ -192,20 +204,14 @@ export function preflightAvatarFinalPassProviderFrameReviewFiles({
     'AVATAR_FRAME_REVIEW_PREFLIGHT_BINDING_INVALID',
   );
 
-  const finished = stableFinishedFrame(
-    workspaceRoot,
-    report.value.output?.path,
-  );
+  const finished = stableFinishedFrame(workspaceRoot, report.value.output?.path);
   assert(
     finished.sha256 === report.value.output?.sha256 &&
       request.value.finishedFrame?.sha256 === finished.sha256,
     'AVATAR_FRAME_REVIEW_PREFLIGHT_FINISHED_FRAME_MISMATCH',
   );
   const outcomeRelative = reviewOutcomeRelativePath(report.value.source?.path);
-  const outcomeAbsolute = path.join(
-    workspaceRoot,
-    ...outcomeRelative.split('/'),
-  );
+  const outcomeAbsolute = path.join(workspaceRoot, ...outcomeRelative.split('/'));
   assert(
     isInside(workspaceRoot, outcomeAbsolute) && !existsSync(outcomeAbsolute),
     'AVATAR_FRAME_REVIEW_PREFLIGHT_OUTCOME_ALREADY_EXISTS',
@@ -216,10 +222,7 @@ export function preflightAvatarFinalPassProviderFrameReviewFiles({
     mkdtempSync(path.join(os.tmpdir(), 'evavo-frame-review-preflight-')),
   );
   try {
-    const shadowFinished = path.join(
-      shadowRoot,
-      ...finished.relative.split('/'),
-    );
+    const shadowFinished = path.join(shadowRoot, ...finished.relative.split('/'));
     mkdirSync(path.dirname(shadowFinished), { recursive: true, mode: 0o700 });
     copyFileSync(finished.absolute, shadowFinished);
     const shadow = reviewAvatarFinalPassProviderFrameFiles({
@@ -281,6 +284,11 @@ export function preflightAvatarFinalPassProviderFrameReviewFiles({
       outcomePath: Object.freeze({
         relative: outcomeRelative,
         absolute: outcomeAbsolute,
+      }),
+      validatedInputs: Object.freeze({
+        frameFinisherReport: report.value,
+        frameReviewRequest: request.value,
+        frameReviewDecision: decision.value,
       }),
     });
   } finally {
