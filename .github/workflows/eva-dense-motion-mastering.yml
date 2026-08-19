@@ -5,18 +5,22 @@ on:
     paths:
       - "scripts/project-art/eva-dense-motion-candidate-assurance.mjs"
       - "scripts/project-art/eva-dense-motion-alpha-mastering.mjs"
+      - "scripts/project-art/eva-dense-motion-mastering-campaign.mjs"
       - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
       - "scripts/project-art/eva-dense-motion-work-order*.mjs"
       - "scripts/test-project-art-eva-dense-motion-mastering.mjs"
+      - "scripts/test-project-art-eva-dense-motion-mastering-campaign.mjs"
       - ".github/workflows/eva-dense-motion-mastering.yml"
   push:
     branches: [main]
     paths:
       - "scripts/project-art/eva-dense-motion-candidate-assurance.mjs"
       - "scripts/project-art/eva-dense-motion-alpha-mastering.mjs"
+      - "scripts/project-art/eva-dense-motion-mastering-campaign.mjs"
       - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
       - "scripts/project-art/eva-dense-motion-work-order*.mjs"
       - "scripts/test-project-art-eva-dense-motion-mastering.mjs"
+      - "scripts/test-project-art-eva-dense-motion-mastering-campaign.mjs"
       - ".github/workflows/eva-dense-motion-mastering.yml"
   workflow_dispatch:
 
@@ -30,7 +34,7 @@ concurrency:
 jobs:
   contract:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,13 +55,21 @@ jobs:
           set -euo pipefail
           node --check scripts/project-art/eva-dense-motion-candidate-assurance.mjs
           node --check scripts/project-art/eva-dense-motion-alpha-mastering.mjs
+          node --check scripts/project-art/eva-dense-motion-mastering-campaign.mjs
           node --check scripts/test-project-art-eva-dense-motion-mastering.mjs
+          node --check scripts/test-project-art-eva-dense-motion-mastering-campaign.mjs
 
       - name: Run dense mastering execution regressions
         shell: bash
         run: |
           set -euo pipefail
           node --test scripts/test-project-art-eva-dense-motion-mastering.mjs
+
+      - name: Run ten-frame mastering campaign regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/test-project-art-eva-dense-motion-mastering-campaign.mjs
 
       - name: Re-run ten-master policy regression
         shell: bash
