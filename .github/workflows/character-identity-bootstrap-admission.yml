@@ -1,0 +1,43 @@
+name: Character Identity Bootstrap Admission
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/character-identity-master-plan.mjs"
+      - "scripts/test-character-identity-master-plan.mjs"
+      - "scripts/character-identity-bootstrap-admission.mjs"
+      - "scripts/test-character-identity-bootstrap-admission.mjs"
+      - ".github/workflows/character-identity-bootstrap-admission.yml"
+  pull_request:
+    paths:
+      - "scripts/character-identity-master-plan.mjs"
+      - "scripts/test-character-identity-master-plan.mjs"
+      - "scripts/character-identity-bootstrap-admission.mjs"
+      - "scripts/test-character-identity-bootstrap-admission.mjs"
+      - ".github/workflows/character-identity-bootstrap-admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Identity bootstrap planner / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        with:
+          persist-credentials: false
+      - name: Syntax-check planners
+        run: node --check scripts/character-identity-master-plan.mjs && node --check scripts/character-identity-bootstrap-admission.mjs
+      - name: Run identity-master planner tests
+        run: node --test scripts/test-character-identity-master-plan.mjs
+      - name: Run bootstrap-admission planner tests
+        run: node --test scripts/test-character-identity-bootstrap-admission.mjs
