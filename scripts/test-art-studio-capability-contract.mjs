@@ -28,7 +28,7 @@ test("validates the repository capability and current runtime-truth contract", a
   const result = await checkRepository(root);
   assert.equal(result.ok, true);
   assert.equal(result.manifest.publicationAuthority, false);
-  assert.equal(result.automationFabric.minimumLocalStorageVersion, "0.48.0");
+  assert.equal(result.automationFabric.minimumLocalStorageVersion, "0.48.4");
   assert.equal(result.automationFabric.workstationAcceptance, "v8");
   assert.equal(result.automationFabric.exactStateRepositoryTasks, true);
   assert.equal(result.automationFabric.supervisorFirstRecovery, true);
@@ -36,8 +36,8 @@ test("validates the repository capability and current runtime-truth contract", a
   assert.equal(result.automationFabric.githubActionsWorkerFallback, true);
   assert.equal(result.automationFabric.workerReceiptIsPublicationEvidence, false);
   assert.deepEqual(result.recovery.order, ["supervisor-first", "legacy-certified", "immutable-armer"]);
-  assert.equal(automationClient.reviewedLocalStorageMain, "0a618a955bea113a850a883c81f128eb2fcf0883");
-  assert.equal(automationClient.reviewedDevelopmentStudioMain, "ecc6a76bf98b5077980d0ab00d45707929a1c3e2");
+  assert.equal(automationClient.reviewedLocalStorageMain, "32a1ed2801aca3847ea96b787bd24dcf7b088393");
+  assert.equal(automationClient.reviewedDevelopmentStudioMain, "88e1d36f6006c25e3567f5e8d8d8979c54407d60");
   assert.deepEqual(automationClient.execution.approvedRoots, [
     "C:\\GitRepos",
     "%USERPROFILE%\\Downloads",
@@ -60,8 +60,8 @@ test("rejects a capability that claims publication", () => {
 
 test("rejects stale Local Storage floors and acceptance implementations", () => {
   const stale = clone(automationClient);
-  stale.minimumLocalStorageVersion = "0.47.9";
-  assert.throws(() => validateAutomationFabricClient(stale), /0\.48\.0 or newer/u);
+  stale.minimumLocalStorageVersion = "0.48.3";
+  assert.throws(() => validateAutomationFabricClient(stale), /0\.48\.4 or newer/u);
   const oldAcceptance = clone(automationClient);
   oldAcceptance.sourceContract.workstationAcceptanceImplementation = "evavo_local_storage.workstation_acceptance_v4:main";
   assert.throws(() => validateAutomationFabricClient(oldAcceptance), /workstation acceptance v8/u);
