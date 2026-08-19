@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - "evavo.capabilities.json"
+      - "evavo.tasks.json"
       - "schemas/evavo.repository-capabilities.schema.json"
       - "config/automation-fabric-client-v2.json"
       - "config/automation-fabric-client-v5.json"
       - "config/automation-fabric-recovery-chain.json"
+      - "scripts/Test-EvaAvatarWorkerStack.ps1"
       - "scripts/check-art-studio-capability-contract.mjs"
       - "scripts/test-art-studio-capability-contract.mjs"
       - "scripts/check-art-studio-workstation-v5-contract.mjs"
@@ -24,10 +26,12 @@ on:
   pull_request:
     paths:
       - "evavo.capabilities.json"
+      - "evavo.tasks.json"
       - "schemas/evavo.repository-capabilities.schema.json"
       - "config/automation-fabric-client-v2.json"
       - "config/automation-fabric-client-v5.json"
       - "config/automation-fabric-recovery-chain.json"
+      - "scripts/Test-EvaAvatarWorkerStack.ps1"
       - "scripts/check-art-studio-capability-contract.mjs"
       - "scripts/test-art-studio-capability-contract.mjs"
       - "scripts/check-art-studio-workstation-v5-contract.mjs"
@@ -67,6 +71,10 @@ jobs:
       - name: Validate capability discovery and Automation Fabric bindings
         run: |
           set -euo pipefail
+          node --check scripts/check-art-studio-capability-contract.mjs
+          node --check scripts/test-art-studio-capability-contract.mjs
+          node --check scripts/check-art-studio-workstation-v5-contract.mjs
+          node --check scripts/test-art-studio-workstation-v5-contract.mjs
           node scripts/check-art-studio-capability-contract.mjs
           node --test scripts/test-art-studio-capability-contract.mjs
           node scripts/check-art-studio-workstation-v5-contract.mjs
@@ -79,3 +87,30 @@ jobs:
           git diff --exit-code
           git diff --cached --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+  powershell-contract:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Parse EVA worker PowerShell without executing it
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Tokens = $null
+          $Errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'scripts\Test-EvaAvatarWorkerStack.ps1'),
+            [ref]$Tokens,
+            [ref]$Errors
+          )
+          if ($Errors.Count -gt 0) {
+            $Errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
