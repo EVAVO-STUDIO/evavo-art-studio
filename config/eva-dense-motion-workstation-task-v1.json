@@ -8,6 +8,17 @@
   "sourcePreflightScript": "scripts/project-art/eva-dense-motion-source-preflight.mjs",
   "denseMotionFamily": "eva-20260809-153620",
   "pendingOrdinals": [1, 2, 3, 7, 8, 9, 10],
+  "tenMasterPlanning": {
+    "schema": "evavo.project-art-eva-dense-motion-ten-master-program.v2",
+    "compilerScript": "scripts/compile-project-art-eva-dense-motion-ten-master.mjs",
+    "requiredFinalOrdinals": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "requiredNewMasterCount": 10,
+    "currentFallbackOrdinals": [4, 5, 6],
+    "fallbackRemasterOrdinals": [4, 5, 6],
+    "legacyFallbackMaySatisfyFinalMasterGate": false,
+    "atomicTenMasterActivationRequired": true,
+    "executionByThisTask": false
+  },
   "minimumLocalStorageVersion": "0.48.9",
   "worker": {
     "target": "pool",
