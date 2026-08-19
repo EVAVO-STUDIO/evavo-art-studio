@@ -373,7 +373,7 @@ export async function runTopHatPoseBankFrameReviewIntakeCampaign({
           reviewerActorId: preflight.reviewer.actorId,
           decisionSha256: preflight.decisionSha256,
           reviewOutcomeSha256: result.outcome.reviewOutcomeSha256,
-          status: result.outcome.status,
+          status: result.status,
           finalFrameSha256: result.outcome.finalFrameSha256,
           dependentInbetweenEndpointAllowed:
             result.outcome.dependentInbetweenEndpointAllowed,
