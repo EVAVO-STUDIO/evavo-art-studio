@@ -176,6 +176,13 @@
       "timeoutSeconds": 300,
       "description": "Verify immutable provider output can become only an independent review pack, explicit human-bound raster approval and derivative-only handoff without target-repository, device or publication authority."
     },
+    "eva-avatar-worker-stack": {
+      "runtime": "powershell-script",
+      "entry": "scripts/Test-EvaAvatarWorkerStack.ps1",
+      "network": "disabled",
+      "timeoutSeconds": 1800,
+      "description": "Run the exact-state Windows EVA validation stack across Art Studio, Avatar Runtime, Development Studio, Local Storage and EVA Chat without mutation, publication or runtime activation authority."
+    },
     "toolchain": {
       "runtime": "pnpm-script",
       "entry": "toolchain:check",
