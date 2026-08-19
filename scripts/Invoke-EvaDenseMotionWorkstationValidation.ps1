@@ -35,7 +35,7 @@ function Invoke-NativeJsonChecked {
     if ($exitCode -ne 0) { throw "$Label failed with native exit code $exitCode." }
     $text = ($output | Out-String).Trim()
     if (-not $text) { throw "$Label returned no JSON evidence." }
-    try { return ($text | ConvertFrom-Json -Depth 16) }
+    try { return ($text | ConvertFrom-Json -Depth 32) }
     catch { throw "$Label returned invalid JSON evidence." }
 }
 
@@ -59,6 +59,9 @@ try {
     Invoke-NativeChecked -FilePath $Node -ArgumentList @('scripts/check-project-art-eva-dense-motion-work-order.mjs') -Label 'EVA dense-motion work-order and release-evidence validation'
     Invoke-NativeChecked -FilePath $Node -ArgumentList @('--check','scripts/compile-project-art-eva-dense-motion-ten-master.mjs') -Label 'EVA ten-master compiler syntax validation'
     Invoke-NativeChecked -FilePath $Node -ArgumentList @('--test','scripts/test-project-art-eva-dense-motion-ten-master.mjs') -Label 'EVA ten-master planning regressions'
+    Invoke-NativeChecked -FilePath $Node -ArgumentList @('--check','scripts/project-art/eva-dense-motion-source-materialization.mjs') -Label 'EVA source materialization syntax validation'
+    Invoke-NativeChecked -FilePath $Node -ArgumentList @('--check','scripts/run-project-art-eva-dense-motion-source-materialization.mjs') -Label 'EVA source materialization CLI syntax validation'
+    Invoke-NativeChecked -FilePath $Node -ArgumentList @('--test','scripts/test-project-art-eva-dense-motion-source-materialization.mjs','scripts/test-project-art-eva-dense-motion-source-materialization-cli.mjs') -Label 'EVA source materialization regressions'
     Invoke-NativeChecked -FilePath $Node -ArgumentList @('scripts/check-art-studio-workstation-v5-contract.mjs') -Label 'Art Studio Automation Fabric v5 validation'
     Invoke-NativeChecked -FilePath $Node -ArgumentList @('--test','scripts/test-art-studio-workstation-v5-contract.mjs') -Label 'Art Studio Automation Fabric v5 adversarial tests'
 
@@ -66,13 +69,63 @@ try {
         'scripts/project-art/eva-dense-motion-source-preflight.mjs',
         '--runtime-root',
         $RuntimeRoot
-    ) -Label 'EVA dense-motion source media preflight'
-    if ($sourcePreflight.ok -ne $true -or [int]$sourcePreflight.pendingFrameCount -ne 7) {
-        throw 'EVA dense-motion source media preflight did not verify all seven pending frames.'
+    ) -Label 'EVA dense-motion ten-source media preflight'
+    if (
+        $sourcePreflight.ok -ne $true -or
+        [int]$sourcePreflight.sourceFrameCount -ne 10 -or
+        @($sourcePreflight.sourceOrdinals).Count -ne 10
+    ) {
+        throw 'EVA dense-motion source media preflight did not verify all ten required source frames.'
+    }
+
+    $TempRoot = Join-Path ([IO.Path]::GetTempPath()) ('evavo-eva-source-' + [Guid]::NewGuid().ToString('N'))
+    $ProgramPath = Join-Path $TempRoot 'ten-master-program.json'
+    $WorkspaceRoot = Join-Path $TempRoot 'workspace'
+    [void][IO.Directory]::CreateDirectory($TempRoot)
+    [void][IO.Directory]::CreateDirectory($WorkspaceRoot)
+    try {
+        Invoke-NativeChecked -FilePath $Node -ArgumentList @(
+            'scripts/compile-project-art-eva-dense-motion-ten-master.mjs',
+            '--program-id',
+            'eva-dense-source-workstation-preflight-v2',
+            '--actor-id',
+            'eva-dense-source-workstation-validator',
+            '--created-at',
+            '2026-08-20T01:20:00.000Z',
+            '--output',
+            $ProgramPath
+        ) -Label 'EVA ten-master workstation programme compilation'
+
+        $sourceMaterializationPlan = Invoke-NativeJsonChecked -FilePath $Node -ArgumentList @(
+            'scripts/run-project-art-eva-dense-motion-source-materialization.mjs',
+            'preflight',
+            '--program',
+            $ProgramPath,
+            '--runtime-root',
+            $RuntimeRoot,
+            '--workspace-root',
+            $WorkspaceRoot,
+            '--materialized-at',
+            '2026-08-20T01:21:00.000Z'
+        ) -Label 'EVA ten-source materialization campaign preflight'
+        if (
+            $sourceMaterializationPlan.status -ne 'ready-for-ten-source-frame-materialization' -or
+            @($sourceMaterializationPlan.frames).Count -ne 10 -or
+            $sourceMaterializationPlan.policy.allTenSourcesPreflightBeforeFirstWrite -ne $true -or
+            $sourceMaterializationPlan.policy.candidateCreationAllowed -ne $false -or
+            $sourceMaterializationPlan.policy.runtimeActivationAllowed -ne $false
+        ) {
+            throw 'EVA ten-source materialization campaign plan widened or lost exact coverage.'
+        }
+    }
+    finally {
+        if ([IO.Directory]::Exists($TempRoot)) {
+            [IO.Directory]::Delete($TempRoot, $true)
+        }
     }
 
     $result = [ordered]@{
-        schemaVersion = 2
+        schemaVersion = 3
         kind = 'evavo-eva-dense-motion-workstation-validation'
         ok = $true
         repository = 'EVAVO-STUDIO/evavo-art-studio'
@@ -81,6 +134,18 @@ try {
         worktreeEntryCount = @($statusLines).Count
         denseMotionFamily = 'eva-20260809-153620'
         pendingOrdinals = @(1, 2, 3, 7, 8, 9, 10)
+        sourceOrdinals = @(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+        sourceMaterialization = [ordered]@{
+            planSchema = 'evavo.project-art-eva-dense-motion-source-materialization-plan.v1'
+            campaignScript = 'scripts/run-project-art-eva-dense-motion-source-materialization.mjs'
+            requiredSourceFrameCount = 10
+            allTenSourcesPreflightBeforeFirstWrite = $true
+            byteForByteWorkspaceCopy = $true
+            completedFrameBoundaryResumeSupported = $true
+            midFramePartialStateRejected = $true
+            candidateCreationAllowed = $false
+            executionByValidationTask = $false
+        }
         tenMasterPlanning = [ordered]@{
             schema = 'evavo.project-art-eva-dense-motion-ten-master-program.v2'
             compilerScript = 'scripts/compile-project-art-eva-dense-motion-ten-master.mjs'
@@ -96,13 +161,18 @@ try {
             denseMotionGuard = 'passed'
             releaseEvidence = 'passed'
             tenMasterProgram = 'passed'
+            sourceMediaPreflight = 'passed'
+            sourceMaterializationContract = 'passed'
+            sourceMaterializationPlan = 'passed'
             automationFabricV5 = 'passed'
             automationFabricV5Adversarial = 'passed'
-            sourceMediaPreflight = 'passed'
         }
         sourcePreflight = $sourcePreflight
+        sourceMaterializationPlan = $sourceMaterializationPlan
         authority = [ordered]@{
             sourceMutation = $false
+            sourceCopyWrite = $false
+            candidateCreation = $false
             candidateApproval = $false
             candidatePromotion = $false
             providerExecution = $false
@@ -115,6 +185,6 @@ try {
             forcePush = $false
         }
     }
-    $result | ConvertTo-Json -Depth 16 -Compress
+    $result | ConvertTo-Json -Depth 32 -Compress
 }
 finally { Pop-Location }
