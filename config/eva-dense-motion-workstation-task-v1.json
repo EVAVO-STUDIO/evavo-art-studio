@@ -8,6 +8,20 @@
   "sourcePreflightScript": "scripts/project-art/eva-dense-motion-source-preflight.mjs",
   "denseMotionFamily": "eva-20260809-153620",
   "pendingOrdinals": [1, 2, 3, 7, 8, 9, 10],
+  "sourceMaterialization": {
+    "planSchema": "evavo.project-art-eva-dense-motion-source-materialization-plan.v1",
+    "campaignReceiptSchema": "evavo.project-art-eva-dense-motion-source-materialization-campaign-receipt.v1",
+    "preflightScript": "scripts/project-art/eva-dense-motion-source-preflight.mjs",
+    "campaignScript": "scripts/run-project-art-eva-dense-motion-source-materialization.mjs",
+    "requiredOrdinals": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "requiredSourceFrameCount": 10,
+    "allTenSourcesPreflightBeforeFirstWrite": true,
+    "byteForByteWorkspaceCopy": true,
+    "completedFrameBoundaryResumeSupported": true,
+    "midFramePartialStateRejected": true,
+    "candidateCreationAllowed": false,
+    "executionByValidationTask": false
+  },
   "tenMasterPlanning": {
     "schema": "evavo.project-art-eva-dense-motion-ten-master-program.v2",
     "compilerScript": "scripts/compile-project-art-eva-dense-motion-ten-master.mjs",
@@ -47,6 +61,8 @@
   },
   "authority": {
     "sourceMutation": false,
+    "sourceCopyWrite": false,
+    "candidateCreation": false,
     "candidateApproval": false,
     "candidatePromotion": false,
     "providerExecution": false,
