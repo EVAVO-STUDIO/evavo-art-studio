@@ -371,9 +371,31 @@ export function parseTopHatPoseBankCandidateMaterializationCampaignPlan(input) {
       plan.status === 'ready-for-six-slot-candidate-materialization' &&
       Array.isArray(plan.slots) &&
       plan.slots.length === TOP_HAT_RUNTIME_EXPECTED_SLOTS.length &&
-      plan.slots.every(
-        (entry, index) =>
-          entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index],
+      plan.slots.every((entry, index) => {
+        if (!isRecord(entry)) return false;
+        try {
+          digest(entry.runtimeDispatchSha256, `${entry.slotId}.runtimeDispatchSha256`);
+          digest(entry.runtimeBindingSha256, `${entry.slotId}.runtimeBindingSha256`);
+          digest(entry.runtimeOutcomeSha256, `${entry.slotId}.runtimeOutcomeSha256`);
+          digest(entry.providerRequestSha256, `${entry.slotId}.providerRequestSha256`);
+          digest(entry.compiledPromptSha256, `${entry.slotId}.compiledPromptSha256`);
+        } catch {
+          return false;
+        }
+        return (
+          entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index] &&
+          typeof entry.candidateOutputPath === 'string' &&
+          typeof entry.reviewedTargetPath === 'string' &&
+          isRecord(entry.outputs) &&
+          Object.values(entry.outputs).every(
+            (value) => typeof value === 'string' && path.isAbsolute(value),
+          )
+        );
+      }) &&
+      Array.isArray(plan.policy?.slotOrder) &&
+      plan.policy.slotOrder.length === TOP_HAT_RUNTIME_EXPECTED_SLOTS.length &&
+      plan.policy.slotOrder.every(
+        (slotId, index) => slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index],
       ) &&
       plan.policy?.preflightAllSlotsBeforeFirstWrite === true &&
       plan.policy?.sequential === true &&
@@ -384,6 +406,8 @@ export function parseTopHatPoseBankCandidateMaterializationCampaignPlan(input) {
       plan.policy?.automaticAdmissionAllowed === false &&
       plan.policy?.automaticPromotionAllowed === false &&
       plan.policy?.providerFallbackAllowed === false &&
+      isRecord(plan.effects) &&
+      Object.values(plan.effects).every((value) => value === 0) &&
       plan.authority?.candidateMaterialization === true &&
       AUTHORITY_KEYS.filter((key) => key !== 'candidateMaterialization').every(
         (key) => plan.authority?.[key] === false,
@@ -503,30 +527,82 @@ export function parseTopHatPoseBankCandidateMaterializationCampaignReceipt(input
     'campaignExecutionSha256',
     'Top Hat candidate materialization campaign receipt',
   );
+  const successful =
+    receipt.status === 'succeeded-awaiting-frame-finishing-and-human-review';
+  const failed = receipt.status === 'failed';
+  const slotCount = Array.isArray(receipt.slots) ? receipt.slots.length : -1;
+
   assert(
     receipt.schema ===
       TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_RECEIPT_SCHEMA &&
       receipt.protocolVersion ===
         TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_PROTOCOL_VERSION &&
-      (receipt.status ===
-        'succeeded-awaiting-frame-finishing-and-human-review' ||
-        receipt.status === 'failed') &&
+      (successful || failed) &&
       Array.isArray(receipt.slots) &&
-      receipt.slots.every(
-        (entry, index) =>
-          entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index],
-      ) &&
-      receipt.counts?.materializedSlots === receipt.slots.length &&
+      slotCount <= TOP_HAT_RUNTIME_EXPECTED_SLOTS.length &&
+      receipt.slots.every((entry, index) => {
+        if (!isRecord(entry)) return false;
+        try {
+          digest(entry.materializationSha256, `${entry.slotId}.materializationSha256`);
+          digest(entry.finisherRequestSha256, `${entry.slotId}.finisherRequestSha256`);
+        } catch {
+          return false;
+        }
+        return (
+          entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index] &&
+          entry.status === 'materialized-awaiting-frame-finisher' &&
+          typeof entry.materializationId === 'string' &&
+          entry.materializationId.length > 0 &&
+          typeof entry.candidatePath === 'string' &&
+          path.isAbsolute(entry.candidatePath) &&
+          typeof entry.materializationReceiptPath === 'string' &&
+          path.isAbsolute(entry.materializationReceiptPath) &&
+          typeof entry.finisherRequestPath === 'string' &&
+          path.isAbsolute(entry.finisherRequestPath)
+        );
+      }) &&
+      receipt.counts?.plannedSlots === TOP_HAT_RUNTIME_EXPECTED_SLOTS.length &&
+      receipt.counts?.materializedSlots === slotCount &&
+      receipt.counts?.remainingSlots ===
+        TOP_HAT_RUNTIME_EXPECTED_SLOTS.length - slotCount &&
       receipt.counts?.humanReviewsCreated === 0 &&
       receipt.counts?.candidateAdmissionsCreated === 0 &&
+      receipt.nextRequiredStage ===
+        'deterministic-frame-finishing-then-named-human-review' &&
+      receipt.effects?.candidateBundlesMaterialized === slotCount &&
+      receipt.effects?.frameFinisherRequestsCreated === slotCount &&
       receipt.effects?.providerCallsPerformed === 0 &&
       receipt.effects?.humanReviewsCreated === 0 &&
       receipt.effects?.candidateAdmissionsCreated === 0 &&
+      receipt.effects?.poseSlotsFilled === 0 &&
+      receipt.effects?.releasesCreated === 0 &&
       receipt.authority?.candidateMaterialization === true &&
       AUTHORITY_KEYS.filter((key) => key !== 'candidateMaterialization').every(
         (key) => receipt.authority?.[key] === false,
       ),
     'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_RECEIPT_INVALID',
   );
+
+  if (successful) {
+    assert(
+      slotCount === TOP_HAT_RUNTIME_EXPECTED_SLOTS.length &&
+        receipt.counts.attemptedSlots === TOP_HAT_RUNTIME_EXPECTED_SLOTS.length &&
+        receipt.counts.remainingSlots === 0 &&
+        receipt.failure === null,
+      'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_RECEIPT_SUCCESS_INVALID',
+    );
+  } else {
+    assert(
+      slotCount < TOP_HAT_RUNTIME_EXPECTED_SLOTS.length &&
+        receipt.counts.attemptedSlots === slotCount + 1 &&
+        isRecord(receipt.failure) &&
+        receipt.failure.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[slotCount] &&
+        typeof receipt.failure.code === 'string' &&
+        receipt.failure.code.length > 0 &&
+        typeof receipt.failure.message === 'string' &&
+        receipt.failure.message.length > 0,
+      'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_RECEIPT_FAILURE_INVALID',
+    );
+  }
   return receipt;
 }
