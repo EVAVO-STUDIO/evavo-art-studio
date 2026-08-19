@@ -6,9 +6,11 @@ on:
       - "config/council-avatar-identities/**"
       - "scripts/project-art/council-avatar-production-program.mjs"
       - "scripts/project-art/council-avatar-identity-bootstrap.mjs"
+      - "scripts/project-art/council-avatar-media-readiness.mjs"
       - "scripts/compile-project-art-council-avatar-production.mjs"
       - "scripts/test-project-art-council-avatar-production.mjs"
       - "scripts/test-project-art-council-avatar-identity-bootstrap.mjs"
+      - "scripts/test-project-art-council-avatar-media-readiness.mjs"
       - "scripts/test-project-art-council-avatar-animation-suite.mjs"
       - "tools/project_art_council_avatar_production_mcp.mjs"
       - "docs/PROJECT_ART_COUNCIL_AVATAR_PRODUCTION.md"
@@ -16,6 +18,9 @@ on:
       - "scripts/character-identity-bootstrap-admission.mjs"
       - "scripts/character-identity-candidate-review-plan.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
+      - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
+      - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
       - ".github/workflows/council-avatar-production.yml"
   push:
     branches: [main]
@@ -23,9 +28,11 @@ on:
       - "config/council-avatar-identities/**"
       - "scripts/project-art/council-avatar-production-program.mjs"
       - "scripts/project-art/council-avatar-identity-bootstrap.mjs"
+      - "scripts/project-art/council-avatar-media-readiness.mjs"
       - "scripts/compile-project-art-council-avatar-production.mjs"
       - "scripts/test-project-art-council-avatar-production.mjs"
       - "scripts/test-project-art-council-avatar-identity-bootstrap.mjs"
+      - "scripts/test-project-art-council-avatar-media-readiness.mjs"
       - "scripts/test-project-art-council-avatar-animation-suite.mjs"
       - "tools/project_art_council_avatar_production_mcp.mjs"
       - "docs/PROJECT_ART_COUNCIL_AVATAR_PRODUCTION.md"
@@ -33,6 +40,9 @@ on:
       - "scripts/character-identity-bootstrap-admission.mjs"
       - "scripts/character-identity-candidate-review-plan.mjs"
       - "scripts/project-art/avatar-animation-suite.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
+      - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
+      - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
       - ".github/workflows/council-avatar-production.yml"
 
 permissions:
@@ -66,11 +76,13 @@ jobs:
           set -euo pipefail
           node --check scripts/project-art/council-avatar-production-program.mjs
           node --check scripts/project-art/council-avatar-identity-bootstrap.mjs
+          node --check scripts/project-art/council-avatar-media-readiness.mjs
           node --check scripts/project-art/avatar-animation-suite.mjs
           node --check scripts/compile-project-art-council-avatar-production.mjs
           node --check tools/project_art_council_avatar_production_mcp.mjs
           node --check scripts/test-project-art-council-avatar-production.mjs
           node --check scripts/test-project-art-council-avatar-identity-bootstrap.mjs
+          node --check scripts/test-project-art-council-avatar-media-readiness.mjs
           node --check scripts/test-project-art-council-avatar-animation-suite.mjs
 
       - name: Run Council avatar production tests
@@ -80,6 +92,7 @@ jobs:
           node --test \
             scripts/test-project-art-council-avatar-production.mjs \
             scripts/test-project-art-council-avatar-identity-bootstrap.mjs \
+            scripts/test-project-art-council-avatar-media-readiness.mjs \
             scripts/test-project-art-council-avatar-animation-suite.mjs
 
       - name: Re-run canonical identity and animation contracts
