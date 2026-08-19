@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { runCharacterIdentityProviderCompilerCli } from './compile-project-art-character-identity-provider-runtime.mjs';
 import {
   CHARACTER_IDENTITY_PROVIDER_EXECUTION_SCHEMA,
   CHARACTER_IDENTITY_PROVIDER_PROTOCOL_VERSION,
@@ -96,6 +97,18 @@ function compileJob({
   });
   return { admission, authorization, adapter };
 }
+
+test('compiler rejects unknown flags instead of silently ignoring them', () => {
+  assert.throws(
+    () =>
+      runCharacterIdentityProviderCompilerCli([
+        'authorize',
+        '--unsupported-authority-flag',
+        'true',
+      ]),
+    (error) => error?.code === 'CHARACTER_IDENTITY_PROVIDER_COMPILER_CLI_INVALID',
+  );
+});
 
 test('executes one Critic set anchor candidate with no approval or release authority', async () => {
   const roots = temporaryRoots();
