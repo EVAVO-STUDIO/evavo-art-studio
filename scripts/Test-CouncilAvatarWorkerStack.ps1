@@ -106,8 +106,8 @@ Add-Check 'tool-git' ([bool]$Git) $(if ($Git) { $Git.Source } else { 'missing' }
 $ClientPath = Join-Path $Art 'config\automation-fabric-client-v5.json'
 $TasksPath = Join-Path $Art 'evavo.tasks.json'
 $ProgramPath = Join-Path $Art 'scripts\project-art\council-avatar-production-program.mjs'
-$CriticRequest = Join-Path $Art 'config\council-avatar-identities\council-critic.identity-master-request.json'
-$OpenReviewerRequest = Join-Path $Art 'config\council-avatar-identities\council-open-reviewer.identity-master-request.json'
+$CriticRequest = Join-Path $Art 'config\council-avatar-identities\council-critic.identity-request.json'
+$OpenReviewerRequest = Join-Path $Art 'config\council-avatar-identities\council-open-reviewer.identity-request.json'
 $RuntimeStatus = Join-Path $Runtime 'src\council-avatar-production-status.js'
 $RuntimePackage = Join-Path $Runtime 'package.json'
 $CouncilConfig = Join-Path $Council 'config\council.example.json'
@@ -233,19 +233,23 @@ if (Test-Path -LiteralPath $RuntimePackage -PathType Leaf) {
 
 if (Test-Path -LiteralPath $CriticRequest -PathType Leaf) {
     $Request = Get-Content -LiteralPath $CriticRequest -Raw | ConvertFrom-Json -ErrorAction Stop
+    Add-Check 'critic-request-schema' ($Request.schema -eq 'evavo.character-identity-master-request.v1') ([string]$Request.schema)
     Add-Check 'critic-request-character' ($Request.character.id -eq 'council-critic') ([string]$Request.character.id)
     Add-Check 'critic-request-candidate-sets' ([int]$Request.candidateSets -eq 4) ([string]$Request.candidateSets)
     Add-Check 'critic-request-view-count' (@($Request.views).Count -eq 3) ([string]@($Request.views).Count)
     Add-Check 'critic-request-provider-not-executed' ($Request.policy.providerExecution -eq $false) ([string]$Request.policy.providerExecution)
+    Add-Check 'critic-request-authorization-required' ($Request.policy.providerAuthorizationRequired -eq $true) ([string]$Request.policy.providerAuthorizationRequired)
     Add-Check 'critic-request-review-required' ($Request.policy.reviewRequired -eq $true) ([string]$Request.policy.reviewRequired)
 }
 
 if (Test-Path -LiteralPath $OpenReviewerRequest -PathType Leaf) {
     $Request = Get-Content -LiteralPath $OpenReviewerRequest -Raw | ConvertFrom-Json -ErrorAction Stop
+    Add-Check 'open-reviewer-request-schema' ($Request.schema -eq 'evavo.character-identity-master-request.v1') ([string]$Request.schema)
     Add-Check 'open-reviewer-request-character' ($Request.character.id -eq 'council-open-reviewer') ([string]$Request.character.id)
     Add-Check 'open-reviewer-request-candidate-sets' ([int]$Request.candidateSets -eq 4) ([string]$Request.candidateSets)
     Add-Check 'open-reviewer-request-view-count' (@($Request.views).Count -eq 3) ([string]@($Request.views).Count)
     Add-Check 'open-reviewer-request-provider-not-executed' ($Request.policy.providerExecution -eq $false) ([string]$Request.policy.providerExecution)
+    Add-Check 'open-reviewer-request-authorization-required' ($Request.policy.providerAuthorizationRequired -eq $true) ([string]$Request.policy.providerAuthorizationRequired)
     Add-Check 'open-reviewer-request-review-required' ($Request.policy.reviewRequired -eq $true) ([string]$Request.policy.reviewRequired)
 }
 
