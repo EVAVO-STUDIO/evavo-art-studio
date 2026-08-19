@@ -159,7 +159,7 @@ async function verifiedArtifactSummary(artifacts, artifactIdValue, role) {
   }
   return Object.freeze({
     artifactId: artifactIdValue,
-    contentHash: descriptor.contentHash,
+    contentHash: descriptor.contentSha256,
     mediaType: descriptor.mediaType,
     storageClass: descriptor.storageClass,
     artifactRole: descriptor.labels.artifactRole ?? null,
@@ -175,7 +175,7 @@ async function verifyIdentityAnchorArtifact(artifacts, adapter) {
   assert(
     verification.descriptorValid === true &&
       verification.contentValid === true &&
-      descriptor?.contentHash === anchor.candidateContentHash &&
+      descriptor?.contentSha256 === anchor.candidateContentHash &&
       descriptor?.storageClass === 'intermediate' &&
       descriptor?.labels.artifactRole === 'provider-candidate' &&
       descriptor?.labels.approvalState === 'unapproved' &&
