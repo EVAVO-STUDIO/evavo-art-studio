@@ -20,6 +20,10 @@ function valid(command = 'preflight') {
   ];
 }
 
+function hasCode(code) {
+  return (error) => error instanceof Error && error.code === code;
+}
+
 test('accepts only the exact preflight/run command contract', () => {
   for (const command of ['preflight', 'run']) {
     const parsed = parseEvaDenseMotionMasteringCliArgs(valid(command));
@@ -31,35 +35,35 @@ test('accepts only the exact preflight/run command contract', () => {
   }
 });
 
-test('rejects unknown, duplicate, missing and non-canonical controls', () => {
+test('rejects unknown, duplicate, missing and non-canonical controls with typed errors', () => {
   assert.throws(
     () => parseEvaDenseMotionMasteringCliArgs([
       ...valid(),
       '--pretend-approved',
       'true',
     ]),
-    /EVA_DENSE_MASTERING_CLI_INVALID/u,
+    hasCode('EVA_DENSE_MASTERING_CLI_INVALID'),
   );
   const duplicate = valid();
   duplicate.splice(3, 0, '--program', '/tmp/other.json');
   assert.throws(
     () => parseEvaDenseMotionMasteringCliArgs(duplicate),
-    /EVA_DENSE_MASTERING_CLI_INVALID/u,
+    hasCode('EVA_DENSE_MASTERING_CLI_INVALID'),
   );
   assert.throws(
     () => parseEvaDenseMotionMasteringCliArgs(valid().slice(0, -2)),
-    /EVA_DENSE_MASTERING_CLI_INVALID/u,
+    hasCode('EVA_DENSE_MASTERING_CLI_INVALID'),
   );
   const nonCanonical = valid();
   nonCanonical[nonCanonical.indexOf('--mastered-at') + 1] = '2026-08-20T00:20:00Z';
   assert.throws(
     () => parseEvaDenseMotionMasteringCliArgs(nonCanonical),
-    /EVA_DENSE_MASTERING_CLI_TIMESTAMP_INVALID/u,
+    hasCode('EVA_DENSE_MASTERING_CLI_TIMESTAMP_INVALID'),
   );
   const backwards = valid();
   backwards[backwards.indexOf('--finished-at') + 1] = '2026-08-20T00:19:00.000Z';
   assert.throws(
     () => parseEvaDenseMotionMasteringCliArgs(backwards),
-    /EVA_DENSE_MASTERING_CLI_TIME_ORDER_INVALID/u,
+    hasCode('EVA_DENSE_MASTERING_CLI_TIME_ORDER_INVALID'),
   );
 });
