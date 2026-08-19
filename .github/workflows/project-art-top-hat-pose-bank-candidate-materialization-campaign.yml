@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "packages/artifacts/src/**"
+      - "packages/media/src/**"
+      - "packages/providers/src/**"
       - "scripts/project-art/avatar-final-pass-provider-candidate-*.mjs"
       - "scripts/project-art/avatar-final-pass-provider-runtime-*.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-*.mjs"
@@ -19,6 +21,8 @@ on:
     branches: [main]
     paths:
       - "packages/artifacts/src/**"
+      - "packages/media/src/**"
+      - "packages/providers/src/**"
       - "scripts/project-art/avatar-final-pass-provider-candidate-*.mjs"
       - "scripts/project-art/avatar-final-pass-provider-runtime-*.mjs"
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-*.mjs"
@@ -65,8 +69,11 @@ jobs:
       - name: Install frozen dependency graph
         run: pnpm install --frozen-lockfile
 
-      - name: Build immutable artifact store dependency
-        run: pnpm --filter @evavo/art-artifacts build
+      - name: Build exact materialization dependency closure
+        run: |
+          pnpm --filter @evavo/art-artifacts build
+          pnpm --filter @evavo/art-media build
+          pnpm --filter @evavo/art-providers build
 
       - name: Run six-slot candidate materialization regressions
         run: node --test scripts/test-project-art-top-hat-pose-bank-candidate-materialization-*.mjs
