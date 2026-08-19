@@ -1,0 +1,106 @@
+name: Council avatar worker stack contract
+
+on:
+  pull_request:
+    paths:
+      - "scripts/Test-CouncilAvatarWorkerStack.ps1"
+      - "scripts/test-council-avatar-worker-task-contract.mjs"
+      - "config/automation-fabric-client-v5.json"
+      - "evavo.tasks.json"
+      - ".github/workflows/council-avatar-worker-stack.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/Test-CouncilAvatarWorkerStack.ps1"
+      - "scripts/test-council-avatar-worker-task-contract.mjs"
+      - "config/automation-fabric-client-v5.json"
+      - "evavo.tasks.json"
+      - ".github/workflows/council-avatar-worker-stack.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: council-avatar-worker-stack-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Validate task manifest and worker contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/test-council-avatar-worker-task-contract.mjs
+          node --test scripts/test-council-avatar-worker-task-contract.mjs
+
+      - name: Confirm validation changed no repository source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+  powershell-contract:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Parse Council worker PowerShell without executing it
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'scripts/Test-CouncilAvatarWorkerStack.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
+      - name: Validate task manifest and worker contract
+        shell: pwsh
+        run: node --test scripts/test-council-avatar-worker-task-contract.mjs
+
+      - name: Confirm validation changed no repository source
+        if: always()
+        shell: pwsh
+        run: |
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $status = git status --porcelain=v1 --untracked-files=all
+          if ($status) { Write-Error "Validation changed repository source: $status"; exit 1 }
