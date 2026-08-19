@@ -88,7 +88,9 @@ function realDirectory(value, label) {
   );
   const metadata = lstatSync(normalized);
   assert(
-    metadata.isDirectory() && !metadata.isSymbolicLink() && realpathSync(normalized) === normalized,
+    metadata.isDirectory() &&
+      !metadata.isSymbolicLink() &&
+      realpathSync(normalized) === normalized,
     'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_ROOT_INVALID',
     `${label} must be a real ordinary directory.`,
   );
@@ -115,7 +117,10 @@ function candidateBundlePaths(workspaceRoot, candidateOutputPath) {
       !candidateOutputPath.split('/').includes('..'),
     'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_PATH_INVALID',
   );
-  const candidate = path.resolve(workspaceRoot, ...candidateOutputPath.split('/'));
+  const candidate = path.resolve(
+    workspaceRoot,
+    ...candidateOutputPath.split('/'),
+  );
   const relative = path.relative(workspaceRoot, candidate);
   assert(
     relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative),
@@ -139,8 +144,14 @@ function normalizedAuthorization(input) {
       input.actorId.length <= 256,
     'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_AUTHORIZATION_INVALID',
   );
-  timestamp(input.occurredAt, 'candidate materialization authorization.occurredAt');
-  digest(input.evidenceSha256, 'candidate materialization authorization.evidenceSha256');
+  timestamp(
+    input.occurredAt,
+    'candidate materialization authorization.occurredAt',
+  );
+  digest(
+    input.evidenceSha256,
+    'candidate materialization authorization.evidenceSha256',
+  );
   return deepFreeze({
     action: input.action,
     actorClass: input.actorClass,
@@ -156,7 +167,8 @@ function exactSixSlots(slots) {
       slots.length === TOP_HAT_RUNTIME_EXPECTED_SLOTS.length &&
       slots.every(
         (entry, index) =>
-          isRecord(entry) && entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index],
+          isRecord(entry) &&
+          entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index],
       ),
     'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_SLOTS_INVALID',
     'The campaign must contain the exact six canonical slots in canonical order.',
@@ -165,11 +177,12 @@ function exactSixSlots(slots) {
 
 function prepareSource(adapter, entry) {
   const dispatch = parseAvatarFinalPassProviderRuntimeDispatch(entry.dispatch);
-  const expectedDispatch = compileProjectArtTopHatPoseSlotProviderRuntimeDispatch({
-    adapter,
-    slotId: entry.slotId,
-    compiledAt: dispatch.compiledAt,
-  });
+  const expectedDispatch =
+    compileProjectArtTopHatPoseSlotProviderRuntimeDispatch({
+      adapter,
+      slotId: entry.slotId,
+      compiledAt: dispatch.compiledAt,
+    });
   assert(
     canonicalJson(dispatch) === canonicalJson(expectedDispatch) &&
       dispatch.frameId === entry.slotId &&
@@ -178,7 +191,10 @@ function prepareSource(adapter, entry) {
       dispatch.candidateAdmission?.expectedHeight === 1536,
     'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_DISPATCH_MISMATCH',
   );
-  const binding = parseAvatarFinalPassProviderRuntimeBinding(entry.binding, dispatch);
+  const binding = parseAvatarFinalPassProviderRuntimeBinding(
+    entry.binding,
+    dispatch,
+  );
   const source = parseAvatarProviderCandidateSourceChain({
     dispatch,
     binding,
@@ -186,8 +202,7 @@ function prepareSource(adapter, entry) {
   });
   assert(
     source.outcome.result?.status === 'candidate-materialization-required' &&
-      source.outcome.result?.attempts?.length === 1 &&
-      source.outcome.result.attempts[0]?.outcome === 'succeeded' &&
+      source.outcome.providerCallCount === 1 &&
       source.dispatch.providerCompiler.input.selection?.allowFallback === false,
     'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_SOURCE_INVALID',
   );
@@ -269,20 +284,22 @@ async function prepareCampaign({
         `${entry.slotId} output already exists; campaign materialization is create-only.`,
       );
     }
-    planSlots.push(Object.freeze({
-      slotId: entry.slotId,
-      runtimeDispatchSha256: entry.dispatch.runtimeDispatchSha256,
-      runtimeBindingSha256: entry.binding.runtimeBindingSha256,
-      runtimeOutcomeSha256: entry.outcome.runtimeOutcomeSha256,
-      providerRequestId: entry.source.providerRequestId,
-      providerRequestSha256: entry.source.providerRequestSha256,
-      compiledPromptSha256: entry.source.compiledPromptSha256,
-      candidateArtifactId: entry.source.candidateArtifactId,
-      evidenceArtifactId: entry.source.evidenceArtifactId,
-      candidateOutputPath: entry.source.candidateOutputPath,
-      reviewedTargetPath: entry.source.reviewedTargetPath,
-      outputs,
-    }));
+    planSlots.push(
+      Object.freeze({
+        slotId: entry.slotId,
+        runtimeDispatchSha256: entry.dispatch.runtimeDispatchSha256,
+        runtimeBindingSha256: entry.binding.runtimeBindingSha256,
+        runtimeOutcomeSha256: entry.outcome.runtimeOutcomeSha256,
+        providerRequestId: entry.source.providerRequestId,
+        providerRequestSha256: entry.source.providerRequestSha256,
+        compiledPromptSha256: entry.source.compiledPromptSha256,
+        candidateArtifactId: entry.source.candidateArtifactId,
+        evidenceArtifactId: entry.source.evidenceArtifactId,
+        candidateOutputPath: entry.source.candidateOutputPath,
+        reviewedTargetPath: entry.source.reviewedTargetPath,
+        outputs,
+      }),
+    );
   }
 
   const body = {
@@ -324,10 +341,19 @@ async function prepareCampaign({
     ...body,
     campaignPlanSha256: sha256Document(body),
   });
-  return Object.freeze({ adapter, workspaceRoot, store, authorization, prepared, plan });
+  return Object.freeze({
+    adapter,
+    workspaceRoot,
+    store,
+    authorization,
+    prepared,
+    plan,
+  });
 }
 
-export async function compileTopHatPoseBankCandidateMaterializationCampaignPlan(input) {
+export async function compileTopHatPoseBankCandidateMaterializationCampaignPlan(
+  input,
+) {
   return (await prepareCampaign(input)).plan;
 }
 
@@ -338,12 +364,17 @@ export function parseTopHatPoseBankCandidateMaterializationCampaignPlan(input) {
     'Top Hat candidate materialization campaign plan',
   );
   assert(
-    plan.schema === TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_PLAN_SCHEMA &&
-      plan.protocolVersion === TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_PROTOCOL_VERSION &&
+    plan.schema ===
+      TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_PLAN_SCHEMA &&
+      plan.protocolVersion ===
+        TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_PROTOCOL_VERSION &&
       plan.status === 'ready-for-six-slot-candidate-materialization' &&
       Array.isArray(plan.slots) &&
       plan.slots.length === TOP_HAT_RUNTIME_EXPECTED_SLOTS.length &&
-      plan.slots.every((entry, index) => entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index]) &&
+      plan.slots.every(
+        (entry, index) =>
+          entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index],
+      ) &&
       plan.policy?.preflightAllSlotsBeforeFirstWrite === true &&
       plan.policy?.sequential === true &&
       plan.policy?.stopOnFirstFailure === true &&
@@ -351,6 +382,7 @@ export function parseTopHatPoseBankCandidateMaterializationCampaignPlan(input) {
       plan.policy?.providerExecutionAllowed === false &&
       plan.policy?.automaticReviewAllowed === false &&
       plan.policy?.automaticAdmissionAllowed === false &&
+      plan.policy?.automaticPromotionAllowed === false &&
       plan.policy?.providerFallbackAllowed === false &&
       plan.authority?.candidateMaterialization === true &&
       AUTHORITY_KEYS.filter((key) => key !== 'candidateMaterialization').every(
@@ -388,23 +420,27 @@ export async function runTopHatPoseBankCandidateMaterializationCampaign({
       });
       assert(
         result?.reused === false &&
-          result?.status === 'candidate-materialized-awaiting-frame-finisher' &&
+          result?.status ===
+            'candidate-materialized-awaiting-frame-finisher' &&
           result?.receipt?.output?.unapproved === true &&
           result?.finisherRequest?.candidateApproval === false &&
           result?.finisherRequest?.candidatePromotion === false &&
           result?.finisherRequest?.runtimeActivationAllowed === false,
         'TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_RESULT_INVALID',
       );
-      slots.push(Object.freeze({
-        slotId: entry.slotId,
-        status: 'materialized-awaiting-frame-finisher',
-        materializationId: result.materializationId,
-        materializationSha256: result.receipt.materializationSha256,
-        finisherRequestSha256: result.finisherRequest.finisherRequestSha256,
-        candidatePath: result.candidatePath,
-        materializationReceiptPath: result.receiptPath,
-        finisherRequestPath: result.finisherRequestPath,
-      }));
+      slots.push(
+        Object.freeze({
+          slotId: entry.slotId,
+          status: 'materialized-awaiting-frame-finisher',
+          materializationId: result.materializationId,
+          materializationSha256: result.receipt.materializationSha256,
+          finisherRequestSha256:
+            result.finisherRequest.finisherRequestSha256,
+          candidatePath: result.candidatePath,
+          materializationReceiptPath: result.receiptPath,
+          finisherRequestPath: result.finisherRequestPath,
+        }),
+      );
     } catch (error) {
       failure = Object.freeze({
         slotId: entry.slotId,
@@ -420,7 +456,8 @@ export async function runTopHatPoseBankCandidateMaterializationCampaign({
 
   const completedAt = timestamp(clock(), 'completedAt');
   const body = {
-    schema: TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_RECEIPT_SCHEMA,
+    schema:
+      TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_RECEIPT_SCHEMA,
     protocolVersion:
       TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_PROTOCOL_VERSION,
     status:
@@ -440,7 +477,8 @@ export async function runTopHatPoseBankCandidateMaterializationCampaign({
       candidateAdmissionsCreated: 0,
     }),
     failure,
-    nextRequiredStage: 'deterministic-frame-finishing-then-named-human-review',
+    nextRequiredStage:
+      'deterministic-frame-finishing-then-named-human-review',
     effects: Object.freeze({
       candidateBundlesMaterialized: slots.length,
       frameFinisherRequestsCreated: slots.length,
@@ -466,12 +504,18 @@ export function parseTopHatPoseBankCandidateMaterializationCampaignReceipt(input
     'Top Hat candidate materialization campaign receipt',
   );
   assert(
-    receipt.schema === TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_RECEIPT_SCHEMA &&
-      receipt.protocolVersion === TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_PROTOCOL_VERSION &&
-      (receipt.status === 'succeeded-awaiting-frame-finishing-and-human-review' ||
+    receipt.schema ===
+      TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_RECEIPT_SCHEMA &&
+      receipt.protocolVersion ===
+        TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN_PROTOCOL_VERSION &&
+      (receipt.status ===
+        'succeeded-awaiting-frame-finishing-and-human-review' ||
         receipt.status === 'failed') &&
       Array.isArray(receipt.slots) &&
-      receipt.slots.every((entry, index) => entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index]) &&
+      receipt.slots.every(
+        (entry, index) =>
+          entry.slotId === TOP_HAT_RUNTIME_EXPECTED_SLOTS[index],
+      ) &&
       receipt.counts?.materializedSlots === receipt.slots.length &&
       receipt.counts?.humanReviewsCreated === 0 &&
       receipt.counts?.candidateAdmissionsCreated === 0 &&
