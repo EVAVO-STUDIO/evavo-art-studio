@@ -12,7 +12,7 @@ const clone = () => structuredClone(client);
 test("accepts the reviewed Art Studio v5 runtime-truth boundary", () => {
   const result = validate(clone());
   assert.equal(result.ok, true);
-  assert.equal(result.minimumLocalStorageVersion, "0.48.0");
+  assert.equal(result.minimumLocalStorageVersion, "0.48.4");
   assert.equal(result.workstationAcceptance, "v8");
   assert.deepEqual(result.approvedRoots, [
     "C:\\GitRepos",
@@ -22,10 +22,10 @@ test("accepts the reviewed Art Studio v5 runtime-truth boundary", () => {
   ]);
 });
 
-test("rejects Local Storage below 0.48.0", () => {
+test("rejects Local Storage below 0.48.4", () => {
   const candidate = clone();
-  candidate.minimumLocalStorageVersion = "0.47.9";
-  assert.throws(() => validate(candidate), /0\.48\.0\+/u);
+  candidate.minimumLocalStorageVersion = "0.48.3";
+  assert.throws(() => validate(candidate), /0\.48\.4\+/u);
 });
 
 test("rejects a pre-v8 workstation implementation", () => {

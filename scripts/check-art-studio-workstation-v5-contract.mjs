@@ -31,7 +31,7 @@ export function validate(client) {
   fail(client.kind === "evavo-automation-fabric-runtime-truth-client", "Runtime-truth client kind drifted.");
   fail(client.contractVersion === 5 && client.client === "evavo-art-studio", "Art Studio v5 identity drifted.");
   fail(client.runtimeOwner === "EVAVO-STUDIO/evavo-local-storage", "Local Storage runtime authority drifted.");
-  fail(atLeast(client.minimumLocalStorageVersion, "0.48.0"), "Local Storage 0.48.0+ is required.");
+  fail(atLeast(client.minimumLocalStorageVersion, "0.48.4"), "Local Storage 0.48.4+ is required.");
   exactSha(client.reviewedLocalStorageMain, "Reviewed Local Storage");
   exactSha(client.reviewedDevelopmentStudioMain, "Reviewed Development Studio");
   fail(client.poolId === "windows-local" && client.primaryNodeId === "windows-primary", "Worker routing identity drifted.");
