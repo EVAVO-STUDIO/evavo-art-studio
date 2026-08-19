@@ -31,6 +31,8 @@ assert.deepEqual(requiredTasks,{
 for(const taskId of Object.values(requiredTasks)) assert.ok(tasks.tasks?.[taskId],`missing worker task ${taskId}`);
 for(const taskId of [requiredTasks.rasterEdit,requiredTasks.sheetSegment,requiredTasks.animationPreview,requiredTasks.spriteBuild]){
   const task=tasks.tasks[taskId];
+  assert.equal(task.runtime,'python-script',`${taskId} must remain a Python task`);
+  assert.equal(task.pythonEnvironment,'image-finishing',`${taskId} must use managed image-finishing Python`);
   assert.equal(task.network,'disabled',`${taskId} network must be disabled`);
   assert.ok(task.arguments.includes('{{planSha256}}'),`${taskId} must bind exact plan SHA`);
   assert.equal(task.parameterSchema?.properties?.planSha256?.pattern,'^[0-9a-f]{64}$',`${taskId} plan hash schema drift`);
@@ -59,4 +61,4 @@ for(const [key,value] of Object.entries(suite.authority)) assert.equal(value,fal
 const flowIds=new Set(suite.flows.map(x=>x.id));
 for(const id of ['generated-sheet-to-reviewable-frames','reviewed-frames-to-godot-sprite-package','video-derived-motion-to-game-art','approved-game-art-release','closed-loop-repair']) assert.ok(flowIds.has(id),`missing flow ${id}`);
 
-console.log(JSON.stringify({contract:'evavo.game-art-automation-fabric-check.v2',status:'passed',suiteVersion:7,mcpVersion:'1.2.0',serverCount:suite.servers.length,workerTaskCount:Object.keys(requiredTasks).length,forcePush:false,automaticApproval:false},null,2));
+console.log(JSON.stringify({contract:'evavo.game-art-automation-fabric-check.v3',status:'passed',suiteVersion:7,mcpVersion:'1.2.0',serverCount:suite.servers.length,workerTaskCount:Object.keys(requiredTasks).length,managedPythonEnvironment:'image-finishing',forcePush:false,automaticApproval:false},null,2));
