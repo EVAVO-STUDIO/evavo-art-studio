@@ -12,7 +12,7 @@ on:
       - "scripts/project-art/top-hat-pose-bank-candidate-materialization-campaign.mjs"
       - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
       - "scripts/run-project-art-top-hat-pose-bank-candidate-materialization-campaign.mjs"
-      - "scripts/test-project-art-top-hat-pose-bank-candidate-materialization-campaign.mjs"
+      - "scripts/test-project-art-top-hat-pose-bank-candidate-materialization-*.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN.md"
       - ".github/workflows/project-art-top-hat-pose-bank-candidate-materialization-campaign.yml"
   push:
@@ -27,7 +27,7 @@ on:
       - "scripts/project-art/top-hat-pose-bank-candidate-materialization-campaign.mjs"
       - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
       - "scripts/run-project-art-top-hat-pose-bank-candidate-materialization-campaign.mjs"
-      - "scripts/test-project-art-top-hat-pose-bank-candidate-materialization-campaign.mjs"
+      - "scripts/test-project-art-top-hat-pose-bank-candidate-materialization-*.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN.md"
       - ".github/workflows/project-art-top-hat-pose-bank-candidate-materialization-campaign.yml"
   workflow_dispatch:
@@ -68,8 +68,8 @@ jobs:
       - name: Build immutable artifact store dependency
         run: pnpm --filter @evavo/art-artifacts build
 
-      - name: Run six-slot candidate materialization regression
-        run: node --test scripts/test-project-art-top-hat-pose-bank-candidate-materialization-campaign.mjs
+      - name: Run six-slot candidate materialization regressions
+        run: node --test scripts/test-project-art-top-hat-pose-bank-candidate-materialization-*.mjs
 
       - name: Import production CLI without execution
         run: node -e "import('./scripts/run-project-art-top-hat-pose-bank-candidate-materialization-campaign.mjs')"
