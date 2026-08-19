@@ -175,7 +175,7 @@ test('rejects missing source identity or materialization enforcement', () => {
     /gitBlobSha1/u,
   );
 
-  const weakenedMaterialization = materialization.replace(
+  const weakenedMaterialization = materialization.replaceAll(
     'allTenSourcesPreflightBeforeFirstWrite: true',
     'allTenSourcesPreflightBeforeFirstWrite: false',
   );
