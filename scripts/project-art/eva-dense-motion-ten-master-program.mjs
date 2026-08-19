@@ -31,7 +31,7 @@ export const EVA_DENSE_MOTION_TEN_MASTER_CAPABILITIES_SCHEMA =
 export const EVA_DENSE_MOTION_FINAL_MASTER_ORDINALS = Object.freeze([
   1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 ]);
-export const EVA_DENSE_MOTION_FALLBACK_REMSTER_ORDINALS =
+export const EVA_DENSE_MOTION_FALLBACK_REMASTER_ORDINALS =
   EVA_DENSE_MOTION_ACTIVE_ORDINALS;
 export const EVA_DENSE_MOTION_TARGET_RUNTIME = Object.freeze({
   repository: 'EVAVO-STUDIO/evavo-avatar-runtime',
@@ -134,8 +134,7 @@ function finalMasterJob(source, outputRoot) {
       : null,
     finalMasterPolicy: Object.freeze({
       newDeterministicMasterRequired: true,
-      targetPublicIdMustDifferFromLegacyFallback:
-        currentFallback,
+      targetPublicIdMustDifferFromLegacyFallback: currentFallback,
       targetAssetIdMustBeNew: true,
       targetSha256MustBeNew: true,
       sourceBytesRemainReadOnly: true,
