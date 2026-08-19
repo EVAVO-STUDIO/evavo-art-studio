@@ -8,8 +8,10 @@ on:
       - "scripts/project-art/eva-dense-motion-mastering-campaign.mjs"
       - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
       - "scripts/project-art/eva-dense-motion-work-order*.mjs"
+      - "scripts/run-project-art-eva-dense-motion-mastering-campaign.mjs"
       - "scripts/test-project-art-eva-dense-motion-mastering.mjs"
       - "scripts/test-project-art-eva-dense-motion-mastering-campaign.mjs"
+      - "scripts/test-project-art-eva-dense-motion-mastering-cli.mjs"
       - ".github/workflows/eva-dense-motion-mastering.yml"
   push:
     branches: [main]
@@ -19,8 +21,10 @@ on:
       - "scripts/project-art/eva-dense-motion-mastering-campaign.mjs"
       - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
       - "scripts/project-art/eva-dense-motion-work-order*.mjs"
+      - "scripts/run-project-art-eva-dense-motion-mastering-campaign.mjs"
       - "scripts/test-project-art-eva-dense-motion-mastering.mjs"
       - "scripts/test-project-art-eva-dense-motion-mastering-campaign.mjs"
+      - "scripts/test-project-art-eva-dense-motion-mastering-cli.mjs"
       - ".github/workflows/eva-dense-motion-mastering.yml"
   workflow_dispatch:
 
@@ -56,8 +60,10 @@ jobs:
           node --check scripts/project-art/eva-dense-motion-candidate-assurance.mjs
           node --check scripts/project-art/eva-dense-motion-alpha-mastering.mjs
           node --check scripts/project-art/eva-dense-motion-mastering-campaign.mjs
+          node --check scripts/run-project-art-eva-dense-motion-mastering-campaign.mjs
           node --check scripts/test-project-art-eva-dense-motion-mastering.mjs
           node --check scripts/test-project-art-eva-dense-motion-mastering-campaign.mjs
+          node --check scripts/test-project-art-eva-dense-motion-mastering-cli.mjs
 
       - name: Run dense mastering execution regressions
         shell: bash
@@ -70,6 +76,12 @@ jobs:
         run: |
           set -euo pipefail
           node --test scripts/test-project-art-eva-dense-motion-mastering-campaign.mjs
+
+      - name: Run mastering CLI regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/test-project-art-eva-dense-motion-mastering-cli.mjs
 
       - name: Re-run ten-master policy regression
         shell: bash
