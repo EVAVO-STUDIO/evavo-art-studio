@@ -3,7 +3,8 @@
   "version": 7,
   "description": "Canonical path-only game-art production suite combining persistent Art Studio workspaces, exact chat/Library intake, technical pixel audit, deterministic raster editing, generated-sheet segmentation, animation preview, sprite/atlas/Godot packaging, Video Studio temporal handoff, durable Storage retention and Development Studio publication without granting any one creative tool Git or force-push authority.",
   "configuration": "config/mcp.project-art-workspace.windows.example.json",
-  "minimumLocalStorageVersion": "0.48.0",
+  "minimumLocalStorageVersion": "0.48.9",
+  "minimumLocalComputeVersion": "0.14.3",
   "executionRoots": [
     "C:\\GitRepos",
     "%USERPROFILE%\\Downloads",
@@ -50,7 +51,7 @@
       "workspaceRootsEnvironment": "EVAVO_GAME_ART_WORKSTATION_ROOTS",
       "writeGateEnvironment": "EVAVO_GAME_ART_WORKSTATION_ALLOW_WRITE",
       "defaultWriteEnabled": false,
-      "toolGroups": ["pixel-art-technical-audit","exact-plan-raster-edit","exact-plan-sprite-atlas","godot-spriteframes-package"]
+      "toolGroups": ["pixel-art-technical-audit","exact-plan-raster-edit","sheet-segmentation","animation-preview","exact-plan-sprite-atlas","godot-spriteframes-package"]
     },
     {
       "id": "evavo-project-art-avatar-final-pass-provider",
@@ -107,7 +108,20 @@
     {
       "repository": "EVAVO-STUDIO/evavo-local-storage",
       "role": "host-materialization-worker-routing-and-physical-storage-resolution",
-      "minimumVersion": "0.48.0"
+      "minimumVersion": "0.48.9",
+      "parameterizedTaskPlanAction": "storage.compute_parameterized_task_plan",
+      "parameterizedTaskSubmitAction": "storage.compute_parameterized_task_submit",
+      "logicalUrisOnly": true
+    },
+    {
+      "repository": "EVAVO-STUDIO/evavo-local-compute",
+      "role": "digest-bound-parameterized-local-art-execution",
+      "minimumVersion": "0.14.3",
+      "managedPythonEnvironment": "image-finishing",
+      "manifestDigestRequired": true,
+      "parameterDocumentDigestRequired": true,
+      "exactRepositoryRevisionSupported": true,
+      "inlineShell": false
     },
     {
       "repository": "EVAVO-STUDIO/evavo-storage",
@@ -156,6 +170,8 @@
     "sourceShaRequired": true,
     "createOnlyOutputs": true,
     "generatedContactSheetIsProductionAtlas": false,
+    "parameterizedWorkerBridgeRequired": true,
+    "managedImageFinishingPythonRequired": true,
     "technicalPassEqualsCreativeApproval": false,
     "automaticApproval": false,
     "sourceOverwrite": false,
