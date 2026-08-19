@@ -10,10 +10,12 @@ const EFFECTS = new Set(["read","compute","network","write","execute","publish",
 const REQUIRED_IDS = ["art.source.review","art.project.workspace","art.project.mastering","art.project.review","art.pixel-font.build","art.delivery.optimize","art.provider.plan","art.provider.execute","art.mcp.review","art.mcp.production","art.book.direction","art.validation.execute"];
 const REQUIRED_FILES = [
   "evavo.capabilities.json",
+  "evavo.tasks.json",
   "schemas/evavo.repository-capabilities.schema.json",
   "config/automation-fabric-client-v2.json",
   "config/automation-fabric-client-v5.json",
   "config/automation-fabric-recovery-chain.json",
+  "scripts/Test-EvaAvatarWorkerStack.ps1",
   "scripts/check-art-studio-capability-contract.mjs",
   "scripts/test-art-studio-capability-contract.mjs",
   "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md",
@@ -105,7 +107,7 @@ export function validateRecoveryChain(chain) {
   exact(chain, ["schemaVersion","kind","client","runtimeOwner","minimumLocalStorageVersion","order","rules","authority"], "Recovery chain");
   fail(chain.schemaVersion === 1 && chain.kind === "evavo-automation-fabric-recovery-chain" && chain.client === "evavo-art-studio", "Recovery chain identity drifted.");
   fail(chain.runtimeOwner === "EVAVO-STUDIO/evavo-local-storage", "Recovery chain runtime owner drifted.");
-  fail(atLeast(chain.minimumLocalStorageVersion, "0.48.0"), "Recovery chain requires Local Storage 0.48.0 or newer.");
+  fail(atLeast(chain.minimumLocalStorageVersion, "0.48.9"), "Recovery chain requires Local Storage 0.48.9 or newer.");
   fail(Array.isArray(chain.order) && chain.order.length === 3, "Recovery chain must contain exactly three ordered routes.");
   fail(JSON.stringify(chain.order.map((entry) => entry.id)) === JSON.stringify(["supervisor-first","legacy-certified","immutable-armer"]), "Recovery chain order changed.");
   fail(chain.order[0].entrypoint === "START-EVAVO-WORKER-FABRIC-SUPERVISOR-FIRST.ps1", "Supervisor-first recovery starter drifted.");
@@ -115,17 +117,17 @@ export function validateRecoveryChain(chain) {
   for (const key of ["exactNodeReceiptRequired","poolReceiptRequired","freshReceiptsRequiredBeforeRoutineWork","commandIdSingleExecutionRequired","terminalReceiptReplayMustBeIdempotent","managedRuntimeUpdatesMustBeFastForwardOnly","managedRuntimeDivergenceMustBeQuarantined"]) fail(chain.rules[key] === true, `Recovery rule weakened: ${key}.`);
   fail(chain.rules.mailboxDependentRepairAllowedWhenMailboxUnreachable === false, "Dead mailbox must not repair itself through the same mailbox.");
   for (const [key, value] of Object.entries(chain.authority)) fail(value === false, `Recovery authority must remain closed: ${key}.`);
-  return { schema:"evavo.art-studio-recovery-chain-check.v1", order:chain.order.map((entry) => entry.id), publicationAuthority:false };
+  return { schema:"evavo.art-studio-recovery-chain-check.v2", minimumLocalStorageVersion:chain.minimumLocalStorageVersion, order:chain.order.map((entry) => entry.id), publicationAuthority:false };
 }
 
 export function validateAutomationFabricClient(client) {
   exact(client, ["schemaVersion","kind","contractVersion","client","role","runtimeOwner","minimumLocalStorageVersion","reviewedLocalStorageMain","reviewedDevelopmentStudioMain","poolId","primaryNodeId","sourceContract","runtimeEvidenceStates","truthRules","routing","execution","githubActionsFallback","workerAuthority","publication","safety"], "Automation Fabric runtime-truth client");
   fail(client.schemaVersion === 3 && client.kind === "evavo-automation-fabric-runtime-truth-client" && client.contractVersion === 5 && client.client === "evavo-art-studio", "Automation Fabric v5 client identity is invalid.");
   fail(client.runtimeOwner === "EVAVO-STUDIO/evavo-local-storage", "Local Storage must remain the runtime owner.");
-  fail(atLeast(client.minimumLocalStorageVersion, "0.48.0"), "Automation Fabric requires evavo-local-storage 0.48.0 or newer.");
+  fail(atLeast(client.minimumLocalStorageVersion, "0.48.9"), "Automation Fabric requires evavo-local-storage 0.48.9 or newer.");
   fail(SHA.test(client.reviewedLocalStorageMain) && SHA.test(client.reviewedDevelopmentStudioMain), "Reviewed runtime revisions must be exact commit SHAs.");
   fail(client.poolId === "windows-local" && client.primaryNodeId === "windows-primary", "Automation Fabric worker identity drifted.");
-  exact(client.sourceContract, ["capabilitiesPath","physicalAcceptanceScript","workstationAcceptanceCommand","workstationAcceptanceImplementation","recoveryChainContract","supervisorFirstRecoveryStarter","certifiedFallbackStarter","immutableRepairArmer","resilientInstaller","controlPlaneHealer","repositoryTaskPlanAction","repositoryTaskExecuteAction"], "Source contract");
+  exact(client.sourceContract, ["capabilitiesPath","physicalAcceptanceScript","workstationAcceptanceCommand","workstationAcceptanceImplementation","recoveryChainContract","supervisorFirstRecoveryStarter","certifiedFallbackStarter","immutableRepairArmer","resilientInstaller","controlPlaneHealer","repositoryTaskPlanAction","repositoryTaskExecuteAction","developmentStudioNamedTaskCompiler","evaAvatarWorkerTaskName"], "Source contract");
   fail(client.sourceContract.capabilitiesPath === "config/automation-fabric-capabilities.json", "Canonical Local Storage capabilities path drifted.");
   fail(client.sourceContract.workstationAcceptanceCommand === "evavo-local-storage-workstation-accept", "Workstation acceptance command drifted.");
   fail(client.sourceContract.workstationAcceptanceImplementation === "evavo_local_storage.workstation_acceptance_v8:main", "Art Studio must require workstation acceptance v8.");
@@ -135,17 +137,19 @@ export function validateAutomationFabricClient(client) {
   fail(client.sourceContract.immutableRepairArmer === "ARM-EVAVO-WORKER-FABRIC-REPAIR.ps1", "Immutable repair armer changed.");
   fail(client.sourceContract.resilientInstaller === "INSTALL-EVAVO-WORKER-FABRIC-RESILIENT.ps1" && client.sourceContract.controlPlaneHealer === "HEAL-EVAVO-WORKER-CONTROL-PLANE.ps1", "Resilient worker control-plane bindings drifted.");
   fail(client.sourceContract.repositoryTaskPlanAction === "storage.repository_task_plan" && client.sourceContract.repositoryTaskExecuteAction === "storage.repository_task_run", "Exact-state repository task actions drifted.");
+  fail(client.sourceContract.developmentStudioNamedTaskCompiler === "packages/runner-fabric/src/repository-task.ts", "Development Studio named-task compiler drifted.");
+  fail(client.sourceContract.evaAvatarWorkerTaskName === "eva-avatar-worker-stack", "EVA worker task binding drifted.");
   const states = new Map(client.runtimeEvidenceStates.map((item) => [item.state, item]));
   for (const state of ["declared","implemented","workflow-queued","installed","live","reachable","physically-accepted"]) fail(states.has(state), `Runtime evidence state ${state} is missing.`);
   for (const state of ["declared","implemented","workflow-queued","installed","live"]) fail(states.get(state).permitsRoutineWorkerUse === false, `State ${state} must not authorize routine worker use.`);
   fail(states.get("reachable").permitsRoutineWorkerUse === true && states.get("physically-accepted").permitsRoutineWorkerUse === true, "Routine worker use requires reachable or physically accepted evidence.");
   for (const key of ["sourceConfigurationIsRuntimeProof","queuedWorkflowIsRuntimeProof","taskRegistrationIsRuntimeProof","heartbeatAloneIsReachabilityProof","missingReceiptMeansSuccess","staleReceiptMeansSuccess","duplicateExecutionAllowed","repositoryTaskPlannerReceiptIsPublicationEvidence","physicalAcceptanceReceiptIsPublicationEvidence","recoverySourcePresenceAloneMeansReachable","validationIsCreativeApproval","validationIsRuntimePromotion"]) fail(client.truthRules[key] === false, `Runtime truth rule weakened: ${key}.`);
-  for (const key of ["exactRequestToReceiptCorrelationRequired","commandIdSingleExecutionRequired","duplicateCommandIssueMustFailBeforeExecution","terminalReceiptReplayMustBeIdempotent","workerReceiptMustNameCommandId","workerReceiptMustNameNodeId","workerReceiptMustNameAction","workerReceiptMustBeSuccessful","repositoryTaskPlannerReceiptIsRuntimeMeasurement","unmeasuredRepositoryTaskMustPlanBeforeExecution","supervisorFirstRecoveryIsRuntimeProofOnlyAfterReceipts","stableControlPlaneMustExecuteExactCurrentManagedMain","managedRuntimeUpdatesMustBeFastForwardOnly","managedRuntimeDivergenceMustBeQuarantined"]) fail(client.truthRules[key] === true, `Runtime truth rule weakened: ${key}.`);
+  for (const key of ["exactRequestToReceiptCorrelationRequired","commandIdSingleExecutionRequired","duplicateCommandIssueMustFailBeforeExecution","terminalReceiptReplayMustBeIdempotent","workerReceiptMustNameCommandId","workerReceiptMustNameNodeId","workerReceiptMustNameAction","workerReceiptMustBeSuccessful","repositoryTaskPlannerReceiptIsRuntimeMeasurement","unmeasuredRepositoryTaskMustPlanBeforeExecution","namedTaskPlanMustBindManifestSha256","namedTaskPlanMustBindTaskSha256","supervisorFirstRecoveryIsRuntimeProofOnlyAfterReceipts","stableControlPlaneMustExecuteExactCurrentManagedMain","managedRuntimeUpdatesMustBeFastForwardOnly","managedRuntimeDivergenceMustBeQuarantined"]) fail(client.truthRules[key] === true, `Runtime truth rule weakened: ${key}.`);
   fail(client.routing.askGregToPasteRoutineTerminalCommands === false, "Routine terminal relay must not be delegated to Greg.");
   fail(client.routing.manualTerminalRelayAllowedOnlyAfterAllRemoteRecoveryRoutesFail === true, "Manual terminal relay may occur only after remote recovery routes fail.");
   fail(/supervisor-first/iu.test(client.routing.whenAllRemoteRecoveryRoutesUnavailable), "Recovery routing must remain supervisor-first.");
   fail(/do not enqueue additional repair commands/iu.test(client.routing.whenMailboxWorkerUnavailable), "Mailbox outage routing must not self-depend on the unavailable mailbox.");
-  for (const key of ["plannerReceiptRequiredForUnmeasuredRepositoryTask","plannerMeasuresExactHead","plannerMeasuresExactStatusSha256","plannerMeasuresTrackedScriptSha256","trackedScriptBytesRequired","credentialStrippingRequired","fileFirstPowerShell","powershellGuardRequired","explicitNativeExitCodeRequired","argvOnlyProcessesPreferred","resourceAwareAdmissionRequired","boundedProcessTreeTerminationRequired","automaticTransientRetryOnly"]) fail(client.execution[key] === true, `Execution safety gate weakened: ${key}.`);
+  for (const key of ["plannerReceiptRequiredForUnmeasuredRepositoryTask","plannerMeasuresExactHead","plannerMeasuresExactStatusSha256","plannerMeasuresTrackedScriptSha256","trackedScriptBytesRequired","namedRepositoryTaskDigestBindingRequired","credentialStrippingRequired","fileFirstPowerShell","powershellGuardRequired","explicitNativeExitCodeRequired","argvOnlyProcessesPreferred","resourceAwareAdmissionRequired","boundedProcessTreeTerminationRequired","automaticTransientRetryOnly"]) fail(client.execution[key] === true, `Execution safety gate weakened: ${key}.`);
   fail(client.execution.preferredRecoveryEntrypoint === "START-EVAVO-WORKER-FABRIC-SUPERVISOR-FIRST.ps1" && client.execution.legacyCertifiedRecoveryEntrypoint === "START-EVAVO-AUTOMATION-FABRIC-CERTIFIED.ps1" && client.execution.immutableRepairArmer === "ARM-EVAVO-WORKER-FABRIC-REPAIR.ps1", "Execution recovery chain drifted.");
   fail(client.execution.repositoryTaskPlanAction === "storage.repository_task_plan" && client.execution.repositoryTaskExecuteAction === "storage.repository_task_run", "Execution repository task route drifted.");
   fail(client.execution.maximumAttempts === 3, "Automatic retry budget must remain bounded to three attempts.");
@@ -163,17 +167,47 @@ export function validateAutomationFabricClient(client) {
   for (const key of ["forcePush","automaticMerge","automaticRebase"]) fail(client.publication[key] === false, `Destructive or automatic publication mode enabled: ${key}.`);
   for (const key of ["resetHard","gitClean","stashAsRecovery","permanentDelete","providerDeleteImpliedByWorkerAuthority","downloadAloneAuthorizesExecution","secretEnvironmentCallerOverride"]) fail(client.safety[key] === false, `Safety boundary weakened: ${key}.`);
   fail(client.safety.cleanupDestination === "bee://primary/TO_DELETE/", "Recoverable cleanup destination drifted.");
-  return { schema:"evavo.art-studio-automation-fabric-client-check.v7", client:client.client, poolId:client.poolId, minimumLocalStorageVersion:client.minimumLocalStorageVersion, workstationAcceptance:"v8", exactStateRepositoryTasks:true, supervisorFirstRecovery:true, commandIdSingleExecutionRequired:true, githubActionsWorkerFallback:true, workerReceiptIsPublicationEvidence:false, publicationAuthority:client.publication.operatorRepository };
+  return { schema:"evavo.art-studio-automation-fabric-client-check.v8", client:client.client, poolId:client.poolId, minimumLocalStorageVersion:client.minimumLocalStorageVersion, workstationAcceptance:"v8", exactStateRepositoryTasks:true, namedRepositoryTaskDigestBinding:true, evaAvatarWorkerTaskName:client.sourceContract.evaAvatarWorkerTaskName, supervisorFirstRecovery:true, commandIdSingleExecutionRequired:true, githubActionsWorkerFallback:true, workerReceiptIsPublicationEvidence:false, publicationAuthority:client.publication.operatorRepository };
+}
+
+function validateEvaAvatarWorkerTask(tasks, script) {
+  fail(tasks?.schemaVersion === 1 && tasks?.kind === "evavo-repository-task-manifest" && tasks?.repository === "evavo-art-studio", "Repository task manifest identity drifted.");
+  const task = tasks?.tasks?.["eva-avatar-worker-stack"];
+  fail(record(task), "EVA avatar worker task is missing.");
+  fail(task.runtime === "powershell-script", "EVA avatar worker task must use PowerShell.");
+  fail(task.entry === "scripts/Test-EvaAvatarWorkerStack.ps1", "EVA avatar worker task entrypoint drifted.");
+  fail(task.network === "disabled", "EVA avatar worker task must remain network-disabled.");
+  fail(Number.isSafeInteger(task.timeoutSeconds) && task.timeoutSeconds >= 300 && task.timeoutSeconds <= 1800, "EVA avatar worker task timeout is invalid.");
+  for (const marker of [
+    "Set-StrictMode -Version Latest",
+    "$global:LASTEXITCODE = 0",
+    "storage.repository_task_plan",
+    "storage.repository_task_run",
+    "expectedTaskManifestSha256",
+    "expectedTaskSha256",
+    "evavo_next_website_eva_identity_surface_v3",
+    "scripts/check-project-art-eva-dense-motion-work-order.mjs",
+    "tests/eva-dense-motion-admission.test.mjs",
+    "scripts/check-eva-avatar-frame-cadence.mjs",
+    "scripts/check-eva-avatar-alpha-compositing.mjs",
+    "repositoryMutation = $false",
+    "pushAuthority = $false",
+    "publicationAuthority = $false",
+    "runtimeActivation = $false",
+    "forcePush = $false",
+  ]) fail(script.includes(marker), `EVA avatar worker stack is missing marker: ${marker}`);
+  return { schema:"evavo.eva-avatar-worker-task-check.v1", taskName:"eva-avatar-worker-stack", runtime:task.runtime, network:task.network, publicationAuthority:false };
 }
 
 export async function checkRepository(root = ROOT) {
   const json = async (relative) => JSON.parse(await readFile(path.join(root, relative), "utf8"));
-  const [manifest,schema,packageJson,client,recovery] = await Promise.all([
+  const [manifest,schema,packageJson,client,recovery,tasks] = await Promise.all([
     json("evavo.capabilities.json"),
     json("schemas/evavo.repository-capabilities.schema.json"),
     json("package.json"),
     json("config/automation-fabric-client-v5.json"),
     json("config/automation-fabric-recovery-chain.json"),
+    json("evavo.tasks.json"),
   ]);
   const manifestResult = validateCapabilityManifest(manifest, schema, packageJson);
   const clientResult = validateAutomationFabricClient(client);
@@ -182,19 +216,21 @@ export async function checkRepository(root = ROOT) {
     const stat = await lstat(path.join(root, relative));
     fail(stat.isFile() && !stat.isSymbolicLink(), `Required capability-contract file is missing or linked: ${relative}`);
   }
-  const [workflow,documentation] = await Promise.all([
+  const [workflow,documentation,evaWorkerScript] = await Promise.all([
     readFile(path.join(root, ".github/workflows/art-studio-capability-contract.yml"), "utf8"),
     readFile(path.join(root, "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md"), "utf8"),
+    readFile(path.join(root, "scripts/Test-EvaAvatarWorkerStack.ps1"), "utf8"),
   ]);
+  const evaWorkerResult = validateEvaAvatarWorkerTask(tasks, evaWorkerScript);
   for (const marker of ["node scripts/check-art-studio-capability-contract.mjs","node --test scripts/test-art-studio-capability-contract.mjs","git diff --exit-code","git status --porcelain=v1 --untracked-files=all","permissions:","contents: read"]) fail(workflow.includes(marker), `Capability workflow is missing marker: ${marker}`);
-  for (const marker of ["Development Studio","EVAVO GitHub MCP","Local Storage","worker receipt","does not grant publication","file-first","supervisor-first","0.48.0","workstation acceptance v8","%USERPROFILE%\\Downloads","resolved-beestation-root"]) fail(documentation.toLowerCase().includes(marker.toLowerCase()), `Capability documentation is missing boundary: ${marker}`);
-  return { schema:"evavo.art-studio-capability-and-automation-contract-check.v4", ok:true, manifest:manifestResult, automationFabric:clientResult, recovery:recoveryResult, sourceMutation:false, publication:false };
+  for (const marker of ["Development Studio","EVAVO GitHub MCP","Local Storage","worker receipt","does not grant publication","file-first","supervisor-first","0.48.9","workstation acceptance v8","named repository task","eva-avatar-worker-stack","%USERPROFILE%\\Downloads","resolved-beestation-root"]) fail(documentation.toLowerCase().includes(marker.toLowerCase()), `Capability documentation is missing boundary: ${marker}`);
+  return { schema:"evavo.art-studio-capability-and-automation-contract-check.v5", ok:true, manifest:manifestResult, automationFabric:clientResult, recovery:recoveryResult, evaAvatarWorker:evaWorkerResult, sourceMutation:false, publication:false };
 }
 
 if (process.argv[1] !== undefined && path.resolve(process.argv[1]) === path.resolve(HERE)) {
   try {
     const result = await checkRepository();
-    console.log(`PASS ${result.manifest.capabilityCount} Art Studio capabilities, Local Storage 0.48 runtime truth, workstation acceptance v8 and supervisor-first recovery validated.`);
+    console.log(`PASS ${result.manifest.capabilityCount} Art Studio capabilities, Local Storage 0.48.9 runtime truth, workstation acceptance v8, digest-bound EVA worker tasks and supervisor-first recovery validated.`);
   } catch (error) {
     console.error(`FAIL ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
