@@ -1,0 +1,76 @@
+{
+  "schema": "evavo.character-identity-master-request.v1",
+  "requestId": "council-critic-identity-master-v1",
+  "project": {
+    "id": "council-avatars",
+    "title": "EVAVO Council Avatars"
+  },
+  "character": {
+    "id": "council-critic",
+    "label": "Critic",
+    "role": "critic",
+    "identityContract": "docs/PROJECT_ART_COUNCIL_AVATAR_PRODUCTION.md"
+  },
+  "purpose": "Create an original, identity-lockable Critic character for the EVAVO Council before any animation production begins.",
+  "candidateSets": 4,
+  "canvas": {
+    "width": 1024,
+    "height": 1536,
+    "alpha": "transparent"
+  },
+  "views": [
+    {
+      "id": "full-body-right",
+      "label": "full body slight right three-quarter",
+      "prompt": "Eye-level full-body presentation, slight right three-quarter orientation, complete head, hands and shoes visible, relaxed natural hands, no dramatic perspective."
+    },
+    {
+      "id": "full-body-left",
+      "label": "full body slight left three-quarter",
+      "prompt": "Same exact person and clothing from a slight left three-quarter orientation, eye level, complete silhouette and both hands clearly readable."
+    },
+    {
+      "id": "neutral-bust",
+      "label": "neutral identity bust",
+      "prompt": "Neutral chest-up identity view of the same exact person, calm direct gaze, no smile performance, face and hair details clear enough for continuity review."
+    }
+  ],
+  "style": {
+    "lock": "EVAVO-crafted editorial character design with premium creative-studio art direction. Original adult woman with a precise, formidable but not villain-coded presence. Short sculptural silver-black bob, sharply readable face, calm direct gaze, matte charcoal tailored coat with an asymmetric high collar over a simple black base layer, dark tailored trousers and grounded footwear. One restrained cherry-red construction detail such as a narrow seam or lapel insert. Realistic anatomy and fabric construction, clean readable silhouette, no generic AI-assistant or game-character look.",
+    "continuity": "Every view in a candidate set must show the same exact person, facial structure, age, skin tone, hair cut and colour, coat construction, collar shape, proportions, handedness, footwear, cherry-red detail placement, baseline and overall material language. Do not redesign between views.",
+    "mustHave": [
+      "complete adult human anatomy with natural hands and five stable fingers per visible hand",
+      "short sculptural silver-black bob with a consistent silhouette",
+      "matte charcoal asymmetric high-collar tailored coat",
+      "simple black base layer and dark tailored trousers",
+      "one restrained cherry-red seam or lapel construction detail",
+      "calm direct intelligent expression",
+      "strong readable full-body silhouette distinct from EVA and Top Hat Man",
+      "genuine transparent background with no scene or floor plate"
+    ],
+    "mustAvoid": [
+      "generic AI assistant styling",
+      "villain or evil character coding",
+      "cyberpunk neon or sci-fi glow",
+      "holograms or floating user interface elements",
+      "robot parts, glowing eyes, headsets or futuristic armour",
+      "EVA geometric black dress silhouette",
+      "Top Hat Man Victorian hat, moustache or historical tailoring",
+      "weapons, tactical gear or superhero costume language",
+      "logos, readable text, watermark, scenery or checkerboard transparency",
+      "cropped head, hands, fingers, feet or clothing hem"
+    ],
+    "originality": "Create a new EVAVO-owned Critic identity from this art direction. Do not reconstruct, imitate or closely derive any protected fictional character, celebrity, stock mascot or existing AI-assistant character. The visual language should feel deliberately art-directed for EVAVO rather than recognisable as another product or franchise."
+  },
+  "outputRoot": "artifacts/council-avatars/council-critic/identity-candidates-v1",
+  "policy": {
+    "protectedReconstructionAllowed": false,
+    "runtimeAsset": false,
+    "animationFamily": false,
+    "providerExecution": false,
+    "providerAuthorizationRequired": true,
+    "promotion": false,
+    "separateFiles": true,
+    "reviewRequired": true
+  }
+}
