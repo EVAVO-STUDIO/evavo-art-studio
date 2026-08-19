@@ -12,7 +12,8 @@ const mcpTest=fs.readFileSync(path.join(root,'scripts','test-game-art-workstatio
 
 assert.equal(suite.schema,'evavo.artist-workspace-agent-suite.v1');
 assert.equal(suite.version,7);
-assert.equal(suite.minimumLocalStorageVersion,'0.48.0');
+assert.equal(suite.minimumLocalStorageVersion,'0.48.9');
+assert.equal(suite.minimumLocalComputeVersion,'0.14.3');
 assert.deepEqual(suite.executionRoots,['C:\\GitRepos','%USERPROFILE%\\Downloads','resolved-beestation-root','approved-discovered-external-roots']);
 assert.equal(suite.executionRoots.includes('C:\\Downloads'),false);
 
@@ -49,16 +50,29 @@ const collaborators=Object.fromEntries(suite.externalCollaborators.map(x=>[x.rep
 assert.equal(collaborators['EVAVO-STUDIO/evavo-video-studio'].exactPlanShaRequired,true);
 assert.equal(collaborators['EVAVO-STUDIO/evavo-video-studio'].sourceHashRequired,true);
 assert.equal(collaborators['EVAVO-STUDIO/evavo-video-studio'].outputPathBoundSeparately,true);
-assert.equal(collaborators['EVAVO-STUDIO/evavo-local-storage'].minimumVersion,'0.48.0');
+const localStorage=collaborators['EVAVO-STUDIO/evavo-local-storage'];
+assert.equal(localStorage.minimumVersion,'0.48.9');
+assert.equal(localStorage.parameterizedTaskPlanAction,'storage.compute_parameterized_task_plan');
+assert.equal(localStorage.parameterizedTaskSubmitAction,'storage.compute_parameterized_task_submit');
+assert.equal(localStorage.logicalUrisOnly,true);
+const localCompute=collaborators['EVAVO-STUDIO/evavo-local-compute'];
+assert.equal(localCompute.minimumVersion,'0.14.3');
+assert.equal(localCompute.managedPythonEnvironment,'image-finishing');
+assert.equal(localCompute.manifestDigestRequired,true);
+assert.equal(localCompute.parameterDocumentDigestRequired,true);
+assert.equal(localCompute.exactRepositoryRevisionSupported,true);
+assert.equal(localCompute.inlineShell,false);
 
 for(const key of ['technicalPassEqualsCreativeApproval','automaticApproval','sourceOverwrite','sourceDeletion','workerGitPublication','artStudioGitPublication','videoStudioGitPublication','forcePush']) assert.equal(suite.rules[key],false,`${key} must remain false`);
 assert.equal(suite.rules.exactPlanShaRequiredForEffectingWorkstationTasks,true);
 assert.equal(suite.rules.sourceShaRequired,true);
 assert.equal(suite.rules.createOnlyOutputs,true);
 assert.equal(suite.rules.generatedContactSheetIsProductionAtlas,false);
+assert.equal(suite.rules.parameterizedWorkerBridgeRequired,true);
+assert.equal(suite.rules.managedImageFinishingPythonRequired,true);
 for(const [key,value] of Object.entries(suite.authority)) assert.equal(value,false,`authority.${key} must remain false`);
 
 const flowIds=new Set(suite.flows.map(x=>x.id));
 for(const id of ['generated-sheet-to-reviewable-frames','reviewed-frames-to-godot-sprite-package','video-derived-motion-to-game-art','approved-game-art-release','closed-loop-repair']) assert.ok(flowIds.has(id),`missing flow ${id}`);
 
-console.log(JSON.stringify({contract:'evavo.game-art-automation-fabric-check.v3',status:'passed',suiteVersion:7,mcpVersion:'1.2.0',serverCount:suite.servers.length,workerTaskCount:Object.keys(requiredTasks).length,managedPythonEnvironment:'image-finishing',forcePush:false,automaticApproval:false},null,2));
+console.log(JSON.stringify({contract:'evavo.game-art-automation-fabric-check.v4',status:'passed',suiteVersion:7,mcpVersion:'1.2.0',serverCount:suite.servers.length,workerTaskCount:Object.keys(requiredTasks).length,minimumLocalStorageVersion:suite.minimumLocalStorageVersion,minimumLocalComputeVersion:suite.minimumLocalComputeVersion,managedPythonEnvironment:'image-finishing',parameterizedWorkerBridge:true,forcePush:false,automaticApproval:false},null,2));
