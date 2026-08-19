@@ -9,6 +9,8 @@ APT_GET_BIN="${CI_MEDIA_APT_GET_BIN:-$(command -v apt-get || true)}"
 SUDO_BIN="${CI_MEDIA_SUDO_BIN:-$(command -v sudo || true)}"
 TIMEOUT_BIN="${CI_MEDIA_TIMEOUT_BIN:-$(command -v timeout || true)}"
 ENV_FILE="${CI_MEDIA_ENV_FILE:-${GITHUB_ENV:-}}"
+DIRECT_SOURCE_LIST="${CI_MEDIA_APT_DIRECT_SOURCE_LIST:-}"
+GENERATED_DIRECT_SOURCE_LIST=""
 
 fail() {
   printf 'Media tool bootstrap failed: %s\n' "$*" >&2
@@ -28,6 +30,13 @@ positive_integer "${UPDATE_TIMEOUT_SECONDS}" "CI_MEDIA_APT_UPDATE_TIMEOUT_SECOND
 positive_integer "${INSTALL_TIMEOUT_SECONDS}" "CI_MEDIA_APT_INSTALL_TIMEOUT_SECONDS"
 non_negative_integer "${RETRY_DELAY_SECONDS}" "CI_MEDIA_RETRY_DELAY_SECONDS"
 
+cleanup() {
+  if [[ -n "${GENERATED_DIRECT_SOURCE_LIST}" ]]; then
+    rm -f -- "${GENERATED_DIRECT_SOURCE_LIST}" || true
+  fi
+}
+trap cleanup EXIT
+
 resolve_media_path() {
   local configured="$1"
   local command_name="$2"
@@ -36,6 +45,39 @@ resolve_media_path() {
     return 0
   fi
   command -v "${command_name}" 2>/dev/null || true
+}
+
+prepare_direct_ubuntu_source_list() {
+  if [[ -n "${DIRECT_SOURCE_LIST}" ]]; then
+    [[ -r "${DIRECT_SOURCE_LIST}" ]] || fail "CI_MEDIA_APT_DIRECT_SOURCE_LIST is not readable: ${DIRECT_SOURCE_LIST}"
+    return 0
+  fi
+
+  [[ "$(uname -s)" == "Linux" ]] || return 1
+  [[ -r /etc/os-release ]] || return 1
+
+  local distro_id
+  local codename
+  local architecture
+  distro_id="$(. /etc/os-release; printf '%s' "${ID:-}")"
+  codename="$(. /etc/os-release; printf '%s' "${VERSION_CODENAME:-}")"
+  architecture="$(command -v dpkg >/dev/null 2>&1 && dpkg --print-architecture 2>/dev/null || true)"
+
+  [[ "${distro_id}" == "ubuntu" ]] || return 1
+  [[ "${architecture}" == "amd64" ]] || return 1
+  [[ "${codename}" =~ ^[a-z0-9.-]+$ ]] || return 1
+
+  local temp_root="${RUNNER_TEMP:-/tmp}"
+  mkdir -p -- "${temp_root}"
+  GENERATED_DIRECT_SOURCE_LIST="$(mktemp "${temp_root%/}/evavo-media-apt-sources.XXXXXX.list")"
+  chmod 0644 "${GENERATED_DIRECT_SOURCE_LIST}"
+  cat > "${GENERATED_DIRECT_SOURCE_LIST}" <<EOF
+deb https://archive.ubuntu.com/ubuntu ${codename} main restricted universe multiverse
+deb https://archive.ubuntu.com/ubuntu ${codename}-updates main restricted universe multiverse
+deb https://security.ubuntu.com/ubuntu ${codename}-security main restricted universe multiverse
+EOF
+  DIRECT_SOURCE_LIST="${GENERATED_DIRECT_SOURCE_LIST}"
+  return 0
 }
 
 FFMPEG_PATH="$(resolve_media_path "${CI_MEDIA_FFMPEG_BIN:-}" ffmpeg)"
@@ -56,9 +98,24 @@ install_media_tools() {
   for ((attempt = 1; attempt <= ATTEMPTS; attempt += 1)); do
     printf 'Media tool bootstrap attempt %s/%s\n' "${attempt}" "${ATTEMPTS}"
 
+    local -a source_options=()
+    if ((attempt > 1)); then
+      if prepare_direct_ubuntu_source_list; then
+        printf 'Retrying FFmpeg installation with a temporary direct official Ubuntu source list.\n'
+        source_options+=(
+          -o "Dir::Etc::sourcelist=${DIRECT_SOURCE_LIST}"
+          -o "Dir::Etc::sourceparts=-"
+          -o "APT::Get::List-Cleanup=0"
+        )
+      else
+        printf 'Direct official Ubuntu source fallback is unavailable; retrying configured package sources.\n'
+      fi
+    fi
+
     if "${SUDO_BIN}" -n env DEBIAN_FRONTEND=noninteractive \
       "${TIMEOUT_BIN}" --signal=TERM --kill-after=15s "${UPDATE_TIMEOUT_SECONDS}s" \
       "${APT_GET_BIN}" \
+      "${source_options[@]}" \
       -o Acquire::Retries=3 \
       -o Acquire::http::Timeout=30 \
       -o Acquire::https::Timeout=30 \
@@ -66,6 +123,7 @@ install_media_tools() {
       && "${SUDO_BIN}" -n env DEBIAN_FRONTEND=noninteractive \
       "${TIMEOUT_BIN}" --signal=TERM --kill-after=15s "${INSTALL_TIMEOUT_SECONDS}s" \
       "${APT_GET_BIN}" \
+      "${source_options[@]}" \
       -o Acquire::Retries=3 \
       -o Acquire::http::Timeout=30 \
       -o Acquire::https::Timeout=30 \
