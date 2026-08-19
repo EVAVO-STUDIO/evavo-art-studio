@@ -2,8 +2,8 @@ import { lstatSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 
 import {
-  reviewAvatarFinalPassProviderFrameFiles,
-} from './avatar-final-pass-provider-frame-finisher.mjs';
+  reviewAvatarFinalPassProviderFrameFilesPinned,
+} from './avatar-final-pass-provider-frame-review-pinned.mjs';
 import {
   preflightAvatarFinalPassProviderFrameReviewFiles,
 } from './avatar-final-pass-provider-frame-review-preflight.mjs';
@@ -257,6 +257,7 @@ async function prepareCampaign({
       allSixShadowReviewedBeforeFirstPersistentOutcome: true,
       decisionsMustBeExternallyAuthoredNamedHumanEvidence: true,
       automaticDecisionCreationAllowed: false,
+      exactDecisionFileShaPinnedAfterPreflight: true,
       exactShadowOutcomeHashReproductionRequired: true,
       mixedHumanDecisionsPreserved: true,
       sequentialPersistence: true,
@@ -317,6 +318,7 @@ export function parseTopHatPoseBankFrameReviewIntakePlan(input) {
       plan.policy?.allSixShadowReviewedBeforeFirstPersistentOutcome === true &&
       plan.policy?.decisionsMustBeExternallyAuthoredNamedHumanEvidence === true &&
       plan.policy?.automaticDecisionCreationAllowed === false &&
+      plan.policy?.exactDecisionFileShaPinnedAfterPreflight === true &&
       plan.policy?.exactShadowOutcomeHashReproductionRequired === true &&
       plan.policy?.mixedHumanDecisionsPreserved === true &&
       plan.policy?.stopOnFirstFailure === true &&
@@ -342,7 +344,7 @@ export function parseTopHatPoseBankFrameReviewIntakePlan(input) {
 }
 
 export async function runTopHatPoseBankFrameReviewIntakeCampaign({
-  persistReview = reviewAvatarFinalPassProviderFrameFiles,
+  persistReview = reviewAvatarFinalPassProviderFrameFilesPinned,
   ...input
 }) {
   assert(
@@ -360,6 +362,7 @@ export async function runTopHatPoseBankFrameReviewIntakeCampaign({
         frameFinisherReportPath: entry.frameFinisherReportPath,
         frameReviewRequestPath: entry.frameReviewRequestPath,
         frameReviewDecisionPath: decisionInput.decisionPath,
+        expectedDecisionFileSha256: preflight.decisionFileSha256,
         reviewedAt: preparedCampaign.reviewedAt,
       });
       validateRealOutcome(entry, preflight, result);
