@@ -23,6 +23,7 @@ export const AVATAR_ANIMATION_SUITE_CAPABILITIES_SCHEMA =
   'evavo.project-art-avatar-animation-suite-capabilities.v3';
 
 const IDENTIFIER = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
+const COUNCIL_CHARACTER_ID = /^council-[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const ASSET_ID = /^[a-f0-9]{32}$/u;
 const GIT_OBJECT_ID = /^[a-f0-9]{40}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -125,6 +126,14 @@ function id(value, label) {
     fail('PROJECT_ART_AVATAR_ANIMATION_IDENTIFIER_INVALID', `${label} is invalid.`);
   }
   return value;
+}
+
+function isSupportedCharacterId(characterId) {
+  return (
+    characterId === 'eva-female' ||
+    characterId === 'top-hat-man' ||
+    COUNCIL_CHARACTER_ID.test(characterId)
+  );
 }
 
 function integer(value, label, minimum, maximum) {
@@ -419,8 +428,14 @@ export function parseAvatarAnimationSuiteRequest(value) {
     'request',
   );
   const characterId = id(value.characterId, 'characterId');
-  if (!['eva-female', 'top-hat-man'].includes(characterId)) {
+  if (!isSupportedCharacterId(characterId)) {
     fail('PROJECT_ART_AVATAR_ANIMATION_CHARACTER_INVALID');
+  }
+  if (legacy && COUNCIL_CHARACTER_ID.test(characterId)) {
+    fail(
+      'PROJECT_ART_AVATAR_ANIMATION_COUNCIL_V2_REQUIRED',
+      'Council character animation requires the v2 request schema and a hash-bound full-body animation identity master.',
+    );
   }
   exact(value.targetCanvas, ['width', 'height'], 'targetCanvas');
   const targetCanvas = Object.freeze({
@@ -435,12 +450,12 @@ export function parseAvatarAnimationSuiteRequest(value) {
     : parseAnimationIdentityMaster(value.animationIdentityMaster, characterId);
   if (
     !legacy &&
-    characterId === 'top-hat-man' &&
+    characterId !== 'eva-female' &&
     animationIdentityMaster === null
   ) {
     fail(
       'PROJECT_ART_AVATAR_ANIMATION_MASTER_REQUIRED',
-      'Top Hat v2 requests require a hash-bound full-body animation identity master.',
+      'Top Hat and Council v2 requests require a hash-bound full-body animation identity master.',
     );
   }
   if (
@@ -467,30 +482,56 @@ export function parseAvatarAnimationSuiteRequest(value) {
 }
 
 function signatureClip(characterId) {
-  return characterId === 'top-hat-man'
-    ? clip(
-        'hat-tip',
-        'gesture',
-        'once',
-        28,
-        30,
-        'polished top-hat greeting without hat geometry drift',
-      )
-    : clip('eva-greeting', 'gesture', 'once', 28, 30, 'warm restrained EVA greeting');
+  if (characterId === 'top-hat-man') {
+    return clip(
+      'hat-tip',
+      'gesture',
+      'once',
+      28,
+      30,
+      'polished top-hat greeting without hat geometry drift',
+    );
+  }
+  if (characterId === 'eva-female') {
+    return clip(
+      'eva-greeting',
+      'gesture',
+      'once',
+      28,
+      30,
+      'warm restrained EVA greeting',
+    );
+  }
+  return clip(
+    'council-greeting',
+    'gesture',
+    'once',
+    28,
+    30,
+    'restrained role-appropriate Council greeting that preserves the approved identity master',
+  );
 }
 
 function identityRequirements(characterId) {
-  return characterId === 'top-hat-man'
-    ? Object.freeze([
-        'top-hat crown height, brim ellipse and band remain registered',
-        'face, moustache, costume tailoring and palette remain identity-locked',
-        'hands, fingers and any cane remain anatomically stable',
-      ])
-    : Object.freeze([
-        'face, hair silhouette, costume and palette remain identity-locked',
-        'hands and fingers remain anatomically stable',
-        'expression stays warm, intelligent and restrained',
-      ]);
+  if (characterId === 'top-hat-man') {
+    return Object.freeze([
+      'top-hat crown height, brim ellipse and band remain registered',
+      'face, moustache, costume tailoring and palette remain identity-locked',
+      'hands, fingers and any cane remain anatomically stable',
+    ]);
+  }
+  if (characterId === 'eva-female') {
+    return Object.freeze([
+      'face, hair silhouette, costume and palette remain identity-locked',
+      'hands and fingers remain anatomically stable',
+      'expression stays warm, intelligent and restrained',
+    ]);
+  }
+  return Object.freeze([
+    'face, hair silhouette, costume construction, role-specific details and palette remain identity-locked to the approved Council identity master',
+    'hands, fingers, body proportions, baseline and pivot remain anatomically and spatially stable',
+    'expression stays intelligent, human and restrained without generic AI-assistant, cyberpunk, robot or mascot drift',
+  ]);
 }
 
 function compileFrameJobs(
@@ -812,6 +853,9 @@ export function projectArtAvatarAnimationSuiteCapabilities() {
       AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
     ]),
     characters: Object.freeze(['eva-female', 'top-hat-man']),
+    characterIdPolicy: 'eva-female | top-hat-man | council-*',
+    councilCharactersSupported: true,
+    councilV2AnimationIdentityMasterRequired: true,
     completeClipMatrix: true,
     multipleIdleVariants: 4,
     multipleTalkVariants: 6,
@@ -836,4 +880,3 @@ export function projectArtAvatarAnimationSuiteCapabilities() {
     forcePush: false,
   });
 }
-
