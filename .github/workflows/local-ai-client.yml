@@ -16,13 +16,33 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: local-ai-client-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contract:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: "24"
-      - run: node scripts/check-local-ai-client-v1.mjs config/local-ai-client-v1.json
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+      - name: Validate local AI client contract
+        run: node scripts/check-local-ai-client-v1.mjs config/local-ai-client-v1.json
+      - name: Confirm validation changed no repository source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"

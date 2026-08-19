@@ -1,0 +1,77 @@
+{
+  "schema": "evavo.character-identity-master-request.v1",
+  "requestId": "council-open-reviewer-identity-master-v1",
+  "project": {
+    "id": "council-avatars",
+    "title": "EVAVO Council Avatars"
+  },
+  "character": {
+    "id": "council-open-reviewer",
+    "label": "Open Reviewer",
+    "role": "open-reviewer",
+    "identityContract": "docs/PROJECT_ART_COUNCIL_AVATAR_PRODUCTION.md"
+  },
+  "purpose": "Create an original, identity-lockable Open Reviewer character for the EVAVO Council before any animation production begins.",
+  "candidateSets": 4,
+  "canvas": {
+    "width": 1024,
+    "height": 1536,
+    "alpha": "transparent"
+  },
+  "views": [
+    {
+      "id": "full-body-right",
+      "label": "full body slight right three-quarter",
+      "prompt": "Eye-level full-body presentation, slight right three-quarter orientation, complete head, hands and shoes visible, relaxed asymmetric stance, natural hands and no dramatic perspective."
+    },
+    {
+      "id": "full-body-left",
+      "label": "full body slight left three-quarter",
+      "prompt": "Same exact person and clothing from a slight left three-quarter orientation, eye level, complete silhouette and both hands clearly readable."
+    },
+    {
+      "id": "neutral-bust",
+      "label": "neutral identity bust",
+      "prompt": "Neutral chest-up identity view of the same exact person, alert relaxed expression, face and close-cropped natural hair clear enough for continuity review."
+    }
+  ],
+  "style": {
+    "lock": "EVAVO-crafted editorial character design with premium creative-studio art direction. Original adult gender-neutral creative technologist with a warm dark complexion, close-cropped natural hair and an alert relaxed expression. Off-white structured studio/work jacket over a simple black shirt, dark straight trousers and grounded dark footwear. One small cherry-red stitched utility detail only. Slightly relaxed asymmetric stance, practical and independent rather than polished-corporate or futuristic. Realistic anatomy and fabric construction, clean readable silhouette, no generic AI-assistant styling.",
+    "continuity": "Every view in a candidate set must show the same exact person, facial structure, age, skin tone, hair shape, jacket construction, black base layer, trouser fit, proportions, handedness, footwear, cherry-red stitch placement, baseline and material language. Do not redesign between views.",
+    "mustHave": [
+      "complete adult human anatomy with natural hands and five stable fingers per visible hand",
+      "warm dark complexion and consistent close-cropped natural hair",
+      "off-white structured studio or work jacket",
+      "simple black shirt and dark straight trousers",
+      "one small restrained cherry-red stitched utility detail",
+      "alert relaxed practical expression",
+      "slightly asymmetric grounded full-body stance",
+      "strong readable silhouette distinct from EVA, Top Hat Man and the Critic",
+      "genuine transparent background with no scene or floor plate"
+    ],
+    "mustAvoid": [
+      "generic AI assistant styling",
+      "corporate stock-photo or startup-founder cliché",
+      "cyberpunk neon or sci-fi glow",
+      "holograms or floating user interface elements",
+      "robot parts, glowing eyes, headsets, smart glasses or futuristic armour",
+      "EVA geometric black dress silhouette",
+      "Top Hat Man Victorian hat, moustache or historical tailoring",
+      "Critic silver-black bob and charcoal high-collar coat",
+      "logos, readable text, watermark, scenery or checkerboard transparency",
+      "cropped head, hands, fingers, feet or jacket hem"
+    ],
+    "originality": "Create a new EVAVO-owned Open Reviewer identity from this art direction. Do not reconstruct, imitate or closely derive any protected fictional character, celebrity, stock mascot or existing AI-assistant character. The result should feel like a distinctive member of one EVAVO editorial cast rather than a recognisable external archetype."
+  },
+  "outputRoot": "artifacts/council-avatars/council-open-reviewer/identity-candidates-v1",
+  "policy": {
+    "protectedReconstructionAllowed": false,
+    "runtimeAsset": false,
+    "animationFamily": false,
+    "providerExecution": false,
+    "providerAuthorizationRequired": true,
+    "promotion": false,
+    "separateFiles": true,
+    "reviewRequired": true
+  }
+}
