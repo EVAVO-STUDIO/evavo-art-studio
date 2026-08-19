@@ -1,0 +1,74 @@
+name: One-shot EVA source fs constant repair
+
+on:
+  push:
+    branches:
+      - agent/eva-dense-motion-source-materialization
+    paths:
+      - ".github/workflows/one-shot-eva-source-fs-constant-repair.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-eva-source-fs-constant-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.repository == 'EVAVO-STUDIO/evavo-art-studio'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/eva-dense-motion-source-materialization
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Apply exact Node fs constants repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          target = Path('scripts/project-art/eva-dense-motion-source-materialization.mjs')
+          text = target.read_text(encoding='utf-8')
+          old_import = "import {\n  COPYFILE_EXCL,\n  closeSync,"
+          new_import = "import {\n  closeSync,"
+          old_tail = "  writeFileSync,\n} from 'node:fs';"
+          new_tail = "  writeFileSync,\n  constants as fsConstants,\n} from 'node:fs';"
+          old_call = "copyFileSync(staged[index], finals[index].absolute, COPYFILE_EXCL);"
+          new_call = "copyFileSync(\n        staged[index],\n        finals[index].absolute,\n        fsConstants.COPYFILE_EXCL,\n      );"
+
+          for label, needle in [
+              ('named import', old_import),
+              ('import tail', old_tail),
+              ('copy call', old_call),
+          ]:
+              count = text.count(needle)
+              if count != 1:
+                  raise SystemExit(f'{label} expected exactly once, found {count}')
+
+          text = text.replace(old_import, new_import)
+          text = text.replace(old_tail, new_tail)
+          text = text.replace(old_call, new_call)
+          if 'COPYFILE_EXCL,' in text or 'absolute, COPYFILE_EXCL' in text:
+              raise SystemExit('direct COPYFILE_EXCL usage remains')
+          target.write_text(text, encoding='utf-8', newline='\n')
+          PY
+          node --check scripts/project-art/eva-dense-motion-source-materialization.mjs
+          git diff --check
+
+      - name: Commit exact repair and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/one-shot-eva-source-fs-constant-repair.yml
+          git add scripts/project-art/eva-dense-motion-source-materialization.mjs
+          git config user.name "EVAVO governed automation"
+          git config user.email "automation@evavo.com.au"
+          git commit -m "fix(eva): use Node fs constants namespace"
+          git push origin HEAD:agent/eva-dense-motion-source-materialization
