@@ -16,6 +16,7 @@ import {
   canonicalRelativePath,
   deepFreeze,
   digest,
+  sha256Bytes,
   sha256Document,
   snapshotJsonValue,
   timestamp,
@@ -43,10 +44,11 @@ export const EVA_DENSE_MOTION_MASTERING_CAMPAIGN_RECEIPT_SCHEMA =
 export const EVA_DENSE_MOTION_MASTERING_CAMPAIGN_CAPABILITIES_SCHEMA =
   'evavo.project-art-eva-dense-motion-mastering-campaign-capabilities.v1';
 export const EVA_DENSE_MOTION_MASTERING_CAMPAIGN_PROTOCOL_VERSION =
-  '2026-08-20.1';
+  '2026-08-20.2';
 
 const MAXIMUM_JSON_BYTES = 8 * 1024 * 1024;
 const MAXIMUM_PNG_BYTES = 64 * 1024 * 1024;
+const FRAME_COUNT = 10;
 
 function authority() {
   return Object.freeze({
@@ -69,6 +71,16 @@ function authority() {
     publication: false,
     runtimeActivation: false,
     forcePush: false,
+  });
+}
+
+function approvals() {
+  return Object.freeze({
+    technical: false,
+    creative: false,
+    continuity: false,
+    loop: false,
+    runtime: false,
   });
 }
 
@@ -118,7 +130,7 @@ function stableFile(filePath, label, maximumBytes, minimumBytes) {
   for (const key of ['dev', 'ino', 'size', 'mtimeMs', 'ctimeMs']) {
     assert(before[key] === after[key], 'EVA_DENSE_MASTERING_CAMPAIGN_INPUT_CHANGED', label);
   }
-  return Object.freeze({ absolute, bytes });
+  return Object.freeze({ absolute, bytes, sha256: sha256Bytes(bytes) });
 }
 
 function stableJson(filePath, label) {
@@ -162,13 +174,27 @@ function genericPaths(job) {
 }
 
 function campaignReceiptRelative(program) {
-  const firstRoot = program.production.jobs[0].outputs.frameRoot;
-  const framesRoot = path.posix.dirname(firstRoot);
+  const firstFrameRoot = program.production.jobs[0].outputs.frameRoot;
+  const framesRoot = path.posix.dirname(firstFrameRoot);
   const outputRoot = path.posix.dirname(framesRoot);
   return `${outputRoot}/mastering.campaign.json`;
 }
 
-function verifyFrameReceipt(input, program, job) {
+function assertFrameAuthority(value) {
+  const expected = authority();
+  assert(
+    value &&
+      typeof value === 'object' &&
+      Object.keys(value).length === Object.keys(expected).length &&
+      Object.entries(expected).every(([key, expectedValue]) => value[key] === expectedValue),
+    'EVA_DENSE_MASTERING_FRAME_AUTHORITY_INVALID',
+  );
+}
+
+export function verifyEvaDenseMotionMasteringFrameReceipt(input, programInput, jobInput) {
+  const program = verifyEvaDenseMotionTenMasterProgram(programInput);
+  const job = jobInput ?? program.production.jobs.find((entry) => entry.ordinal === input?.ordinal);
+  assert(job, 'EVA_DENSE_MASTERING_FRAME_JOB_NOT_FOUND');
   const value = snapshotJsonValue(input, 'dense mastering frame receipt');
   assert(
     value?.schema === EVA_DENSE_MOTION_MASTERING_FRAME_RECEIPT_SCHEMA &&
@@ -180,28 +206,46 @@ function verifyFrameReceipt(input, program, job) {
       value.frameId === job.frameId,
     'EVA_DENSE_MASTERING_FRAME_RECEIPT_INVALID',
   );
-  digest(value.alphaMasteringSha256, 'frameReceipt.alphaMasteringSha256');
-  digest(value.materializationSha256, 'frameReceipt.materializationSha256');
-  digest(value.finisherRequestSha256, 'frameReceipt.finisherRequestSha256');
-  digest(value.frameFinisherSha256, 'frameReceipt.frameFinisherSha256');
-  digest(value.reviewRequestSha256, 'frameReceipt.reviewRequestSha256');
-  digest(value.finishedFrame?.sha256, 'frameReceipt.finishedFrame.sha256');
-  digest(value.frameReceiptSha256, 'frameReceipt.frameReceiptSha256');
-  const body = { ...value };
-  delete body.frameReceiptSha256;
+  for (const [label, digestValue] of [
+    ['alphaMasteringSha256', value.alphaMasteringSha256],
+    ['materializationSha256', value.materializationSha256],
+    ['finisherRequestSha256', value.finisherRequestSha256],
+    ['frameFinisherSha256', value.frameFinisherSha256],
+    ['reviewRequestSha256', value.reviewRequestSha256],
+    ['finishedFrame.sha256', value.finishedFrame?.sha256],
+    ['frameReceiptSha256', value.frameReceiptSha256],
+  ]) digest(digestValue, label);
+  timestamp(value.recordedAt, 'recordedAt');
+  canonicalRelativePath(value.finishedFrame?.path, 'finishedFrame.path');
   assert(
-    sha256Document(body) === value.frameReceiptSha256 &&
-      value.approvals?.technical === false &&
-      value.approvals?.creative === false &&
-      value.approvals?.runtime === false &&
+    value.finishedFrame?.width === 1024 &&
+      value.finishedFrame?.height === 1536 &&
+      value.finishedFrame?.hiddenRgbTransparentPixels === 0 &&
+      value.nextRequiredEvidence?.technicalInspection === job.outputs.technicalInspection &&
+      value.nextRequiredEvidence?.creativeApproval === job.outputs.creativeApproval &&
+      value.nextRequiredEvidence?.cloudinaryUploadReceipt === job.outputs.cloudinaryUploadReceipt &&
+      value.nextRequiredEvidence?.runtimeFrameEvidence === job.outputs.runtimeFrameEvidence &&
+      Object.values(value.approvals ?? {}).every((entry) => entry === false) &&
+      value.effects?.alphaMasters === 1 &&
+      value.effects?.frameFinisherBundles === 1 &&
+      value.effects?.technicalInspections === 0 &&
+      value.effects?.creativeApprovals === 0 &&
       value.effects?.cloudinaryUploads === 0 &&
       value.effects?.runtimeActivations === 0,
     'EVA_DENSE_MASTERING_FRAME_RECEIPT_INVALID',
   );
+  assertFrameAuthority(value.authority);
+  const body = { ...value };
+  delete body.frameReceiptSha256;
+  assert(
+    sha256Document(body) === value.frameReceiptSha256,
+    'EVA_DENSE_MASTERING_FRAME_RECEIPT_HASH_MISMATCH',
+  );
   return deepFreeze(value);
 }
 
-function verifyCampaignReceipt(input, program) {
+export function verifyEvaDenseMotionMasteringCampaignReceipt(input, programInput) {
+  const program = verifyEvaDenseMotionTenMasterProgram(programInput);
   const value = snapshotJsonValue(input, 'dense mastering campaign receipt');
   assert(
     value?.schema === EVA_DENSE_MOTION_MASTERING_CAMPAIGN_RECEIPT_SCHEMA &&
@@ -209,44 +253,59 @@ function verifyCampaignReceipt(input, program) {
       value.status === 'succeeded-awaiting-technical-and-creative-review' &&
       value.programSha256 === program.programSha256 &&
       Array.isArray(value.frames) &&
-      value.frames.length === 10 &&
-      value.effects?.alphaMastersProduced === 10 &&
-      value.effects?.frameFinisherBundlesProduced === 10 &&
+      value.frames.length === FRAME_COUNT &&
+      value.effects?.alphaMastersPresent === FRAME_COUNT &&
+      value.effects?.frameFinisherBundlesPresent === FRAME_COUNT &&
+      value.effects?.frameExecutionReceiptsPresent === FRAME_COUNT &&
+      Number.isSafeInteger(value.effects?.framesExecutedThisRun) &&
+      Number.isSafeInteger(value.effects?.framesReusedThisRun) &&
+      value.effects.framesExecutedThisRun >= 0 &&
+      value.effects.framesReusedThisRun >= 0 &&
+      value.effects.framesExecutedThisRun + value.effects.framesReusedThisRun === FRAME_COUNT &&
       value.effects?.technicalInspectionsCreated === 0 &&
       value.effects?.creativeApprovalsCreated === 0 &&
       value.effects?.cloudinaryUploadsPerformed === 0 &&
+      value.effects?.sequencesReleased === 0 &&
       value.effects?.runtimeActivationsPerformed === 0,
     'EVA_DENSE_MASTERING_CAMPAIGN_RECEIPT_INVALID',
   );
+  timestamp(value.completedAt, 'completedAt');
   digest(value.campaignReceiptSha256, 'campaignReceiptSha256');
+  value.frames.forEach((frame, index) => {
+    const job = program.production.jobs[index];
+    assert(
+      frame.ordinal === index + 1 &&
+        frame.frameId === job.frameId,
+      'EVA_DENSE_MASTERING_CAMPAIGN_FRAME_ORDER_INVALID',
+    );
+    for (const [label, digestValue] of [
+      ['frameReceiptSha256', frame.frameReceiptSha256],
+      ['alphaMasteringSha256', frame.alphaMasteringSha256],
+      ['frameFinisherSha256', frame.frameFinisherSha256],
+      ['finishedFrameSha256', frame.finishedFrameSha256],
+    ]) digest(digestValue, `frames[${index}].${label}`);
+  });
+  assertFrameAuthority(value.authority);
   const body = { ...value };
   delete body.campaignReceiptSha256;
   assert(
     sha256Document(body) === value.campaignReceiptSha256,
     'EVA_DENSE_MASTERING_CAMPAIGN_RECEIPT_HASH_MISMATCH',
   );
-  value.frames.forEach((frame, index) => {
-    assert(frame.ordinal === index + 1, 'EVA_DENSE_MASTERING_CAMPAIGN_FRAME_ORDER_INVALID');
-    digest(frame.frameReceiptSha256, `frames[${index}].frameReceiptSha256`);
-  });
   return deepFreeze(value);
 }
 
 function existingCompletedFrame(root, program, job) {
-  const semantic = resolveRelative(
-    root,
-    job.outputs.frameFinisherReceipt,
-    'frameFinisherReceipt',
-  );
+  const semantic = resolveRelative(root, job.outputs.frameFinisherReceipt, 'frameFinisherReceipt');
   if (!existsSync(semantic)) return null;
   const record = stableJson(semantic, 'existing dense mastering frame receipt');
-  const receipt = verifyFrameReceipt(record.value, program, job);
-  const finished = resolveRelative(root, receipt.finishedFrame.path, 'finishedFrame.path');
-  assert(existsSync(finished), 'EVA_DENSE_MASTERING_COMPLETED_FRAME_BYTES_MISSING');
-  const bytes = stableFile(finished, 'existing finished frame', MAXIMUM_PNG_BYTES, 57);
+  const receipt = verifyEvaDenseMotionMasteringFrameReceipt(record.value, program, job);
+  const finishedPath = resolveRelative(root, receipt.finishedFrame.path, 'finishedFrame.path');
+  assert(existsSync(finishedPath), 'EVA_DENSE_MASTERING_COMPLETED_FRAME_BYTES_MISSING');
+  const finished = stableFile(finishedPath, 'existing finished frame', MAXIMUM_PNG_BYTES, 57);
   assert(
-    sha256Document({ sha256: receipt.finishedFrame.sha256 }) &&
-      receipt.finishedFrame.bytes === bytes.bytes.length,
+    finished.sha256 === receipt.finishedFrame.sha256 &&
+      finished.bytes.length === receipt.finishedFrame.bytes,
     'EVA_DENSE_MASTERING_COMPLETED_FRAME_BYTES_INVALID',
   );
   return receipt;
@@ -266,31 +325,32 @@ function partialExecutionOutputs(root, job) {
 }
 
 function readPendingInputs(root, job) {
-  const candidate = stableFile(
-    resolveRelative(root, job.outputs.denseCandidate, 'denseCandidate'),
-    'dense candidate',
-    MAXIMUM_PNG_BYTES,
-    57,
-  );
-  const assurance = stableJson(
-    resolveRelative(root, job.outputs.candidateAssurance, 'candidateAssurance'),
-    'candidate assurance',
-  );
-  const matte = stableFile(
-    resolveRelative(root, job.outputs.alphaMatte, 'alphaMatte'),
-    'alpha matte',
-    MAXIMUM_PNG_BYTES,
-    57,
-  );
-  const review = stableJson(
-    resolveRelative(root, job.outputs.alphaMatteReview, 'alphaMatteReview'),
-    'alpha matte review',
-  );
-  const authorization = stableJson(
-    resolveRelative(root, authorizationRelative(job), 'alphaMasteringAuthorization'),
-    'alpha mastering authorization',
-  );
-  return Object.freeze({ candidate, assurance, matte, review, authorization });
+  return Object.freeze({
+    candidate: stableFile(
+      resolveRelative(root, job.outputs.denseCandidate, 'denseCandidate'),
+      'dense candidate',
+      MAXIMUM_PNG_BYTES,
+      57,
+    ),
+    assurance: stableJson(
+      resolveRelative(root, job.outputs.candidateAssurance, 'candidateAssurance'),
+      'candidate assurance',
+    ),
+    matte: stableFile(
+      resolveRelative(root, job.outputs.alphaMatte, 'alphaMatte'),
+      'alpha matte',
+      MAXIMUM_PNG_BYTES,
+      57,
+    ),
+    review: stableJson(
+      resolveRelative(root, job.outputs.alphaMatteReview, 'alphaMatteReview'),
+      'alpha matte review',
+    ),
+    authorization: stableJson(
+      resolveRelative(root, authorizationRelative(job), 'alphaMasteringAuthorization'),
+      'alpha mastering authorization',
+    ),
+  });
 }
 
 async function prepareCampaign({
@@ -320,7 +380,8 @@ async function prepareCampaign({
       masteredAt,
       finishedAt,
       campaignReceiptPath,
-      existingCampaignReceipt: verifyCampaignReceipt(existing.value, program),
+      existingCampaignReceipt:
+        verifyEvaDenseMotionMasteringCampaignReceipt(existing.value, program),
       prepared: Object.freeze([]),
     });
   }
@@ -370,7 +431,7 @@ async function prepareCampaign({
       }),
     }));
   }
-  assert(prepared.length === 10, 'EVA_DENSE_MASTERING_CAMPAIGN_FRAME_COUNT_INVALID');
+  assert(prepared.length === FRAME_COUNT, 'EVA_DENSE_MASTERING_CAMPAIGN_FRAME_COUNT_INVALID');
   const planBody = {
     schema: EVA_DENSE_MOTION_MASTERING_CAMPAIGN_PLAN_SCHEMA,
     protocolVersion: EVA_DENSE_MOTION_MASTERING_CAMPAIGN_PROTOCOL_VERSION,
@@ -382,9 +443,9 @@ async function prepareCampaign({
       ordinal: entry.job.ordinal,
       frameId: entry.job.frameId,
       mode: entry.mode,
-      ...(entry.expected ? { expected: entry.expected } : {
-        existingFrameReceiptSha256: entry.completed.frameReceiptSha256,
-      }),
+      ...(entry.expected
+        ? { expected: entry.expected }
+        : { existingFrameReceiptSha256: entry.completed.frameReceiptSha256 }),
     }))),
     policy: Object.freeze({
       allPendingFramesAlphaPreflightBeforeFirstWrite: true,
@@ -459,13 +520,7 @@ function buildFrameReceipt(program, job, mastered, finished, recordedAt) {
       cloudinaryUploadReceipt: job.outputs.cloudinaryUploadReceipt,
       runtimeFrameEvidence: job.outputs.runtimeFrameEvidence,
     }),
-    approvals: Object.freeze({
-      technical: false,
-      creative: false,
-      continuity: false,
-      loop: false,
-      runtime: false,
-    }),
+    approvals: approvals(),
     effects: Object.freeze({
       alphaMasters: 1,
       frameFinisherBundles: 1,
@@ -499,9 +554,12 @@ export async function runEvaDenseMotionMasteringCampaign({
   }
 
   const frameReceipts = [];
+  let framesExecutedThisRun = 0;
+  let framesReusedThisRun = 0;
   for (const entry of prepared.prepared) {
     if (entry.mode === 'reuse-completed-frame') {
       frameReceipts.push(entry.completed);
+      framesReusedThisRun += 1;
       continue;
     }
     const mastered = await masterFrame({
@@ -527,7 +585,8 @@ export async function runEvaDenseMotionMasteringCampaign({
     });
     assert(
       finisherPreflight.status === 'frame-finisher-preflight-ready' &&
-        finisherPreflight.frameId === entry.job.frameId,
+        finisherPreflight.frameId === entry.job.frameId &&
+        finisherPreflight.expectedFinishedFrame?.sha256,
       'EVA_DENSE_MASTERING_FINISHER_PREFLIGHT_RESULT_INVALID',
     );
     const finished = await finishFrame({
@@ -539,6 +598,7 @@ export async function runEvaDenseMotionMasteringCampaign({
     assert(
       finished.status === 'frame-finished-awaiting-human-review' &&
         finished.report?.frameId === entry.job.frameId &&
+        finished.report?.output?.sha256 === finisherPreflight.expectedFinishedFrame.sha256 &&
         finished.report?.output?.hiddenRgbTransparentPixels === 0 &&
         finished.report?.preservation?.visiblePixelsUnchanged === true &&
         finished.report?.preservation?.alphaUnchanged === true &&
@@ -560,9 +620,10 @@ export async function runEvaDenseMotionMasteringCampaign({
     );
     writeJsonCreateOnly(semanticReceiptPath, receipt);
     frameReceipts.push(receipt);
+    framesExecutedThisRun += 1;
   }
 
-  assert(frameReceipts.length === 10, 'EVA_DENSE_MASTERING_CAMPAIGN_FRAME_COUNT_INVALID');
+  assert(frameReceipts.length === FRAME_COUNT, 'EVA_DENSE_MASTERING_CAMPAIGN_FRAME_COUNT_INVALID');
   const receiptBody = {
     schema: EVA_DENSE_MOTION_MASTERING_CAMPAIGN_RECEIPT_SCHEMA,
     protocolVersion: EVA_DENSE_MOTION_MASTERING_CAMPAIGN_PROTOCOL_VERSION,
@@ -578,9 +639,11 @@ export async function runEvaDenseMotionMasteringCampaign({
       finishedFrameSha256: receipt.finishedFrame.sha256,
     }))),
     effects: Object.freeze({
-      alphaMastersProduced: 10,
-      frameFinisherBundlesProduced: 10,
-      frameExecutionReceiptsCreated: 10,
+      alphaMastersPresent: FRAME_COUNT,
+      frameFinisherBundlesPresent: FRAME_COUNT,
+      frameExecutionReceiptsPresent: FRAME_COUNT,
+      framesExecutedThisRun,
+      framesReusedThisRun,
       technicalInspectionsCreated: 0,
       creativeApprovalsCreated: 0,
       cloudinaryUploadsPerformed: 0,
@@ -620,6 +683,7 @@ export function evaDenseMotionMasteringCampaignCapabilities() {
     stopOnFirstFailure: true,
     completedFrameBoundaryResumeSupported: true,
     midFramePartialStateRejected: true,
+    resumedFrameBytesReverifiedBySha256: true,
     deterministicAlphaMastering: true,
     genericFrameFinisherReused: true,
     technicalInspectionExecution: false,
