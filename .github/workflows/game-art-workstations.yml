@@ -9,6 +9,9 @@ on:
       - "tools/sprite_animation_preview.py"
       - "tools/sprite_workstation.py"
       - "tools/game_art_workstation_mcp.mjs"
+      - "tools/creative-asset-publisher/Register-EvavoCreativeAssetMcp.ps1"
+      - "scripts/New-ProjectArtWorkspaceMcpConfig.ps1"
+      - "scripts/test-project-art-workspace-root-policy.mjs"
       - "scripts/test-image-workstation.py"
       - "scripts/test-sprite-sheet-segmenter.py"
       - "scripts/test-sprite-animation-preview.py"
@@ -18,6 +21,8 @@ on:
       - "scripts/test-pixel-art-candidate-audit.mjs"
       - "scripts/check-game-art-automation-fabric.mjs"
       - "scripts/check-games94-production-profile.mjs"
+      - "docs/PERSISTENT_ARTIST_WORKSPACE.md"
+      - "config/mcp.project-art-workspace.windows.example.json"
       - "config/image-processing-recipes.v1.json"
       - "config/artist-workspace-agent-suite.v7.json"
       - "config/game-art-production/profiles/games94-sports-arcade.v1.json"
@@ -31,6 +36,9 @@ on:
       - "tools/sprite_animation_preview.py"
       - "tools/sprite_workstation.py"
       - "tools/game_art_workstation_mcp.mjs"
+      - "tools/creative-asset-publisher/Register-EvavoCreativeAssetMcp.ps1"
+      - "scripts/New-ProjectArtWorkspaceMcpConfig.ps1"
+      - "scripts/test-project-art-workspace-root-policy.mjs"
       - "scripts/test-image-workstation.py"
       - "scripts/test-sprite-sheet-segmenter.py"
       - "scripts/test-sprite-animation-preview.py"
@@ -40,6 +48,8 @@ on:
       - "scripts/test-pixel-art-candidate-audit.mjs"
       - "scripts/check-game-art-automation-fabric.mjs"
       - "scripts/check-games94-production-profile.mjs"
+      - "docs/PERSISTENT_ARTIST_WORKSPACE.md"
+      - "config/mcp.project-art-workspace.windows.example.json"
       - "config/image-processing-recipes.v1.json"
       - "config/artist-workspace-agent-suite.v7.json"
       - "config/game-art-production/profiles/games94-sports-arcade.v1.json"
@@ -78,6 +88,7 @@ jobs:
       - run: python scripts/test-sprite-workstation.py -v
       - run: node scripts/test-pixel-art-candidate-audit.mjs
       - run: node scripts/test-game-art-workstation-mcp.mjs
+      - run: node scripts/test-project-art-workspace-root-policy.mjs
       - run: node scripts/check-game-art-automation-fabric.mjs
       - run: node scripts/check-games94-production-profile.mjs
       - run: node --check tools/game_art_workstation_mcp.mjs
@@ -109,6 +120,7 @@ jobs:
       - run: python scripts/test-sprite-workstation.py -v
       - run: node scripts/test-pixel-art-candidate-audit.mjs
       - run: node scripts/test-game-art-workstation-mcp.mjs
+      - run: node scripts/test-project-art-workspace-root-policy.mjs
       - run: node scripts/check-game-art-automation-fabric.mjs
       - run: node scripts/check-games94-production-profile.mjs
       - run: node --check tools/game_art_workstation_mcp.mjs
