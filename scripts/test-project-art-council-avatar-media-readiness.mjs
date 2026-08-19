@@ -43,6 +43,8 @@ test('Council media readiness is four-seat, fail-closed and deterministic', () =
   assert.equal(first.productionReadyCount, 0);
   assert.equal(first.providerExecutionSurfaceAvailableCount, 3);
   assert.equal(first.providerExecutionEstablishedCount, 0);
+  assert.equal(first.masteringExecutionSurfaceAvailableCount, 1);
+  assert.equal(first.masteringExecutionEstablishedCount, 0);
   assert.equal(first.totalPlannedImagesPerCharacter, 749);
   assert.equal(first.release.websiteActivationAllowed, false);
   assert.equal(first.release.runtimeActivationAllowed, false);
@@ -86,10 +88,10 @@ test('Top Hat readiness binds the real six-slot provider campaign without preten
   assert.ok(topHat.downstreamGates.includes('Avatar Runtime publication'));
 });
 
-test('EVA readiness exposes the ten-master planning program without pretending mastering is executable or complete', () => {
+test('EVA readiness exposes governed ten-frame mastering without pretending execution evidence or media exists', () => {
   const eva = byId(compileCouncilAvatarMediaReadiness(), 'eva-female');
 
-  assert.equal(eva.stage, 'identity-ready-ten-master-program-blocked');
+  assert.equal(eva.stage, 'identity-ready-ten-master-execution-ready-for-evidence');
   assert.equal(eva.identityReady, true);
   assert.equal(eva.currentMedia.denseBootstrapTargetCount, 10);
   assert.deepEqual(eva.currentMedia.temporaryFallbackOrdinals, [4, 5, 6]);
@@ -99,12 +101,17 @@ test('EVA readiness exposes the ten-master planning program without pretending m
   assert.equal(eva.currentMedia.tenMasterRequiredNewMasterCount, 10);
   assert.deepEqual(eva.currentMedia.fallbackRemasterOrdinals, [4, 5, 6]);
   assert.equal(eva.currentMedia.masteredDenseMasterCount, 0);
+  assert.equal(eva.currentMedia.realMasteringCampaignReceiptCount, 0);
+  assert.equal(eva.currentMedia.technicalInspectionCount, 0);
+  assert.equal(eva.currentMedia.creativeApprovalCount, 0);
+  assert.equal(eva.currentMedia.cloudinaryPublishedDenseMasterCount, 0);
+  assert.equal(eva.currentMedia.runtimeDenseMasterEvidenceCount, 0);
   assert.equal(eva.currentMedia.legacyPoseReuseAllowedForFinalRelease, false);
   assert.equal(eva.currentMedia.syntheticBodyTransformsAllowed, false);
   assert.equal(eva.execution.providerExecutionSurfaceAvailable, false);
   assert.equal(eva.execution.providerExecutionEstablished, false);
   assert.equal(eva.execution.masteringPlanningSurfaceAvailable, true);
-  assert.equal(eva.execution.masteringExecutionSurfaceAvailable, false);
+  assert.equal(eva.execution.masteringExecutionSurfaceAvailable, true);
   assert.equal(eva.execution.masteringExecutionEstablished, false);
   assert.equal(
     eva.execution.localValidationEntry,
@@ -123,17 +130,35 @@ test('EVA readiness exposes the ten-master planning program without pretending m
     'scripts/compile-project-art-eva-dense-motion-ten-master.mjs',
   ]);
   assert.equal(
+    eva.execution.masteringCampaign,
+    'scripts/project-art/eva-dense-motion-mastering-campaign.mjs',
+  );
+  assert.equal(eva.execution.masteringCampaignMode, 'workspace-local-deterministic');
+  assert.equal(eva.execution.allPendingFramesAlphaPreflightBeforeFirstWrite, true);
+  assert.equal(eva.execution.completedFrameBoundaryResumeSupported, true);
+  assert.equal(eva.execution.midFramePartialStateRejected, true);
+  assert.equal(eva.execution.minimumIndependentInspectorsPerCandidate, 2);
+  assert.equal(eva.execution.minimumInspectorConfidence, 0.95);
+  assert.equal(eva.execution.reviewedAlphaMatteRequiredPerFrame, true);
+  assert.equal(eva.execution.oneShotAlphaMasteringAuthorizationRequiredPerFrame, true);
+  assert.equal(eva.execution.authorizationMaximumHours, 24);
+  assert.equal(
     eva.execution.workstationTask,
     'config/eva-dense-motion-workstation-task-v1.json',
   );
   assert.equal(eva.execution.namedWorkerTask, 'eva-avatar-worker-stack');
   assert.equal(eva.execution.atomicTenMasterActivationRequired, true);
   assert.equal(eva.execution.legacyFallbackMaySatisfyFinalMasterGate, false);
-  assert.ok(eva.blockers.some((entry) => /bulk mastering\/upload execution evidence/u.test(entry)));
-  assert.ok(eva.requiredNextEvidence.some((entry) => /ordinals 1 through 10/u.test(entry)));
-  assert.ok(eva.requiredNextEvidence.some((entry) => /legacy fallback assets/u.test(entry)));
+  assert.ok(eva.blockers.some((entry) => /no real mastering campaign receipt/u.test(entry)));
+  assert.ok(eva.blockers.some((entry) => /confidence 0.95/u.test(entry)));
   assert.ok(eva.blockers.some((entry) => /10 to frame 1/u.test(entry)));
-  assert.match(eva.nextGate, /planning does not grant mastering, upload or Runtime activation authority/u);
+  assert.ok(eva.requiredNextEvidence.some((entry) => /ordinals 1 through 10/u.test(entry)));
+  assert.ok(eva.requiredNextEvidence.some((entry) => /ten-frame mastering campaign receipt/u.test(entry)));
+  assert.ok(eva.requiredNextEvidence.some((entry) => /legacy fallback assets/u.test(entry)));
+  assert.match(
+    eva.nextGate,
+    /grants no technical approval, creative approval, upload, sequence release or Runtime activation authority/u,
+  );
 });
 
 test('Critic and Open Reviewer derive their 12-job bootstrap and expose candidate-only provider execution', () => {
@@ -215,7 +240,7 @@ test('Critic and Open Reviewer derive their 12-job bootstrap and expose candidat
   }
 });
 
-test('source contract exposes EVA ten-master planning plus the governed character-identity executor', () => {
+test('source contract exposes EVA ten-master planning, mastering campaign and governed character-identity executor', () => {
   const readiness = compileCouncilAvatarMediaReadiness();
   assert.equal(readiness.sourceContract.councilWorkerTaskName, 'council-avatar-worker-stack');
   assert.equal(readiness.sourceContract.evaWorkerTaskName, 'eva-avatar-worker-stack');
@@ -226,6 +251,10 @@ test('source contract exposes EVA ten-master planning plus the governed characte
   assert.equal(
     readiness.sourceContract.evaDenseMotionTenMasterCompiler,
     'scripts/compile-project-art-eva-dense-motion-ten-master.mjs',
+  );
+  assert.equal(
+    readiness.sourceContract.evaDenseMotionMasteringCampaign,
+    'scripts/project-art/eva-dense-motion-mastering-campaign.mjs',
   );
   assert.equal(
     readiness.sourceContract.evaDenseMotionWorkstationTask,
@@ -280,7 +309,10 @@ test('Council production MCP exposes the same media readiness result', () => {
   assert.equal(viaMcp.productionReadyCount, 0);
   assert.equal(viaMcp.providerExecutionSurfaceAvailableCount, 3);
   assert.equal(viaMcp.providerExecutionEstablishedCount, 0);
+  assert.equal(viaMcp.masteringExecutionSurfaceAvailableCount, 1);
+  assert.equal(viaMcp.masteringExecutionEstablishedCount, 0);
   const eva = byId(viaMcp, 'eva-female');
   assert.equal(eva.execution.masteringPlanningSurfaceAvailable, true);
-  assert.equal(eva.execution.masteringExecutionSurfaceAvailable, false);
+  assert.equal(eva.execution.masteringExecutionSurfaceAvailable, true);
+  assert.equal(eva.execution.masteringExecutionEstablished, false);
 });
