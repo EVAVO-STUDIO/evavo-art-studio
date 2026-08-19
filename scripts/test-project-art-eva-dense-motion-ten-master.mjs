@@ -7,6 +7,7 @@ import test from 'node:test';
 
 import { runEvaDenseMotionTenMasterCompiler } from './compile-project-art-eva-dense-motion-ten-master.mjs';
 import {
+  EVA_DENSE_MOTION_FALLBACK_REMASTER_ORDINALS,
   EVA_DENSE_MOTION_FINAL_MASTER_ORDINALS,
   EVA_DENSE_MOTION_TARGET_RUNTIME,
   compileEvaDenseMotionTenMasterProgram,
@@ -27,10 +28,11 @@ function request() {
 test('compiles ten new deterministic master jobs while retaining the live three-frame rig only as fallback provenance', () => {
   const program = compileEvaDenseMotionTenMasterProgram(request());
   assert.equal(program.schema, 'evavo.project-art-eva-dense-motion-ten-master-program.v2');
+  assert.deepEqual(EVA_DENSE_MOTION_FALLBACK_REMASTER_ORDINALS, [4, 5, 6]);
   assert.equal(program.production.requiredNewMasterCount, 10);
   assert.equal(program.production.jobCount, 10);
   assert.deepEqual(program.production.requiredFinalOrdinals, EVA_DENSE_MOTION_FINAL_MASTER_ORDINALS);
-  assert.deepEqual(program.production.fallbackRemasterOrdinals, [4, 5, 6]);
+  assert.deepEqual(program.production.fallbackRemasterOrdinals, EVA_DENSE_MOTION_FALLBACK_REMASTER_ORDINALS);
   assert.equal(program.production.fallbackRemasterCount, 3);
   assert.deepEqual(program.production.newOnlyMasterOrdinals, [1, 2, 3, 7, 8, 9, 10]);
   assert.equal(program.production.newOnlyMasterCount, 7);
