@@ -183,6 +183,13 @@
       "timeoutSeconds": 1800,
       "description": "Run the exact-state Windows EVA validation stack across Art Studio, Avatar Runtime, Development Studio, Local Storage and EVA Chat without mutation, publication or runtime activation authority."
     },
+    "council-avatar-worker-stack": {
+      "runtime": "powershell-script",
+      "entry": "scripts/Test-CouncilAvatarWorkerStack.ps1",
+      "network": "disabled",
+      "timeoutSeconds": 1800,
+      "description": "Verify the exact four-seat Council avatar production truth across Art Studio, Avatar Runtime, The Council, Development Studio, Local Storage and next-website without provider, creative-approval, publication or runtime-activation authority."
+    },
     "toolchain": {
       "runtime": "pnpm-script",
       "entry": "toolchain:check",
