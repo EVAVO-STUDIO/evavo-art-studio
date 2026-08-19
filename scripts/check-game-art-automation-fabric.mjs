@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const suite=JSON.parse(fs.readFileSync(path.join(root,'config','artist-workspace-agent-suite.v7.json'),'utf8'));
 const tasks=JSON.parse(fs.readFileSync(path.join(root,'evavo.tasks.json'),'utf8'));
+const mcpSource=fs.readFileSync(path.join(root,'tools','game_art_workstation_mcp.mjs'),'utf8');
+const mcpTest=fs.readFileSync(path.join(root,'scripts','test-game-art-workstation-mcp.mjs'),'utf8');
 
 assert.equal(suite.schema,'evavo.artist-workspace-agent-suite.v1');
 assert.equal(suite.version,7);
@@ -34,6 +36,13 @@ for(const taskId of [requiredTasks.rasterEdit,requiredTasks.sheetSegment,require
   assert.equal(task.parameterSchema?.properties?.planSha256?.pattern,'^[0-9a-f]{64}$',`${taskId} plan hash schema drift`);
 }
 
+assert.match(mcpSource,/serverInfo:\{name:'evavo-game-art-workstation',version:'1\.2\.0'\}/u);
+for(const toolName of ['evavo_game_art_pixel_audit','evavo_game_art_raster_execute','evavo_game_art_sheet_segment','evavo_game_art_animation_preview','evavo_game_art_sprite_build']) assert.ok(mcpSource.includes(`name:'${toolName}'`),`MCP missing ${toolName}`);
+assert.match(mcpSource,/exactPlanShaRequiredForWrites:true/u);
+assert.match(mcpSource,/sheetSegmentation:\['alpha-components','authored-rectangles'\]/u);
+assert.match(mcpSource,/reviewOutputs:\['animation-gif','frame-strip'\]/u);
+assert.match(mcpTest,/version,'1\.2\.0'/u);
+
 const collaborators=Object.fromEntries(suite.externalCollaborators.map(x=>[x.repository,x]));
 assert.equal(collaborators['EVAVO-STUDIO/evavo-video-studio'].exactPlanShaRequired,true);
 assert.equal(collaborators['EVAVO-STUDIO/evavo-video-studio'].sourceHashRequired,true);
@@ -50,4 +59,4 @@ for(const [key,value] of Object.entries(suite.authority)) assert.equal(value,fal
 const flowIds=new Set(suite.flows.map(x=>x.id));
 for(const id of ['generated-sheet-to-reviewable-frames','reviewed-frames-to-godot-sprite-package','video-derived-motion-to-game-art','approved-game-art-release','closed-loop-repair']) assert.ok(flowIds.has(id),`missing flow ${id}`);
 
-console.log(JSON.stringify({contract:'evavo.game-art-automation-fabric-check.v1',status:'passed',suiteVersion:7,serverCount:suite.servers.length,workerTaskCount:Object.keys(requiredTasks).length,forcePush:false,automaticApproval:false},null,2));
+console.log(JSON.stringify({contract:'evavo.game-art-automation-fabric-check.v2',status:'passed',suiteVersion:7,mcpVersion:'1.2.0',serverCount:suite.servers.length,workerTaskCount:Object.keys(requiredTasks).length,forcePush:false,automaticApproval:false},null,2));
