@@ -12,8 +12,10 @@ const clone = () => structuredClone(client);
 test("accepts the reviewed Art Studio v5 runtime-truth boundary", () => {
   const result = validate(clone());
   assert.equal(result.ok, true);
-  assert.equal(result.minimumLocalStorageVersion, "0.48.4");
+  assert.equal(result.minimumLocalStorageVersion, "0.48.9");
   assert.equal(result.workstationAcceptance, "v8");
+  assert.equal(result.namedRepositoryTaskDigestBinding, true);
+  assert.equal(result.evaAvatarWorkerTaskName, "eva-avatar-worker-stack");
   assert.deepEqual(result.approvedRoots, [
     "C:\\GitRepos",
     "%USERPROFILE%\\Downloads",
@@ -22,16 +24,28 @@ test("accepts the reviewed Art Studio v5 runtime-truth boundary", () => {
   ]);
 });
 
-test("rejects Local Storage below 0.48.4", () => {
+test("rejects Local Storage below 0.48.9", () => {
   const candidate = clone();
-  candidate.minimumLocalStorageVersion = "0.48.3";
-  assert.throws(() => validate(candidate), /0\.48\.4\+/u);
+  candidate.minimumLocalStorageVersion = "0.48.8";
+  assert.throws(() => validate(candidate), /0\.48\.9\+/u);
 });
 
 test("rejects a pre-v8 workstation implementation", () => {
   const candidate = clone();
   candidate.sourceContract.workstationAcceptanceImplementation = "evavo_local_storage.workstation_acceptance_v7:main";
   assert.throws(() => validate(candidate), /resolve to v8/u);
+});
+
+test("rejects named-task compiler and EVA task drift", () => {
+  const compiler = clone();
+  compiler.sourceContract.developmentStudioNamedTaskCompiler = "packages/runner-fabric/src/legacy-task.ts";
+  assert.throws(() => validate(compiler), /named-task compiler/u);
+  const taskName = clone();
+  taskName.sourceContract.evaAvatarWorkerTaskName = "legacy-eva-task";
+  assert.throws(() => validate(taskName), /EVA worker task/u);
+  const digest = clone();
+  digest.execution.namedRepositoryTaskDigestBindingRequired = false;
+  assert.throws(() => validate(digest), /namedRepositoryTaskDigestBindingRequired/u);
 });
 
 test("rejects retired physical roots", () => {
@@ -55,10 +69,15 @@ test("rejects repository execution without a planner receipt", () => {
   assert.throws(() => validate(candidate), /plannerReceiptRequiredForUnmeasuredRepositoryTask/u);
 });
 
-test("rejects omitted tracked-script measurement", () => {
-  const candidate = clone();
-  candidate.execution.plannerMeasuresTrackedScriptSha256 = false;
-  assert.throws(() => validate(candidate), /plannerMeasuresTrackedScriptSha256/u);
+test("rejects omitted tracked-script or named-task digest measurement", () => {
+  const tracked = clone();
+  tracked.execution.plannerMeasuresTrackedScriptSha256 = false;
+  assert.throws(() => validate(tracked), /plannerMeasuresTrackedScriptSha256/u);
+  for (const key of ["namedTaskPlanMustBindManifestSha256", "namedTaskPlanMustBindTaskSha256"]) {
+    const candidate = clone();
+    candidate.truthRules[key] = false;
+    assert.throws(() => validate(candidate), new RegExp(key, "u"));
+  }
 });
 
 test("rejects weakened single-execution and managed-main truth", () => {
