@@ -44,7 +44,7 @@ export const EVA_DENSE_MOTION_MASTERING_CAMPAIGN_RECEIPT_SCHEMA =
 export const EVA_DENSE_MOTION_MASTERING_CAMPAIGN_CAPABILITIES_SCHEMA =
   'evavo.project-art-eva-dense-motion-mastering-campaign-capabilities.v1';
 export const EVA_DENSE_MOTION_MASTERING_CAMPAIGN_PROTOCOL_VERSION =
-  '2026-08-20.2';
+  '2026-08-20.3';
 
 const MAXIMUM_JSON_BYTES = 8 * 1024 * 1024;
 const MAXIMUM_PNG_BYTES = 64 * 1024 * 1024;
@@ -311,6 +311,23 @@ function existingCompletedFrame(root, program, job) {
   return receipt;
 }
 
+function verifyCompletedCampaignEvidence(root, program, campaignReceipt) {
+  const frames = program.production.jobs.map((job, index) => {
+    const frameReceipt = existingCompletedFrame(root, program, job);
+    assert(frameReceipt, 'EVA_DENSE_MASTERING_COMPLETED_FRAME_RECEIPT_MISSING');
+    const summary = campaignReceipt.frames[index];
+    assert(
+      frameReceipt.frameReceiptSha256 === summary.frameReceiptSha256 &&
+        frameReceipt.alphaMasteringSha256 === summary.alphaMasteringSha256 &&
+        frameReceipt.frameFinisherSha256 === summary.frameFinisherSha256 &&
+        frameReceipt.finishedFrame.sha256 === summary.finishedFrameSha256,
+      'EVA_DENSE_MASTERING_COMPLETED_CAMPAIGN_FRAME_MISMATCH',
+    );
+    return frameReceipt;
+  });
+  return Object.freeze(frames);
+}
+
 function partialExecutionOutputs(root, job) {
   const generic = genericPaths(job);
   return [
@@ -374,15 +391,22 @@ async function prepareCampaign({
   );
   if (existsSync(campaignReceiptPath)) {
     const existing = stableJson(campaignReceiptPath, 'existing mastering campaign receipt');
+    const existingCampaignReceipt =
+      verifyEvaDenseMotionMasteringCampaignReceipt(existing.value, program);
+    const completedFrames = verifyCompletedCampaignEvidence(
+      root,
+      program,
+      existingCampaignReceipt,
+    );
     return Object.freeze({
       program,
       root,
       masteredAt,
       finishedAt,
       campaignReceiptPath,
-      existingCampaignReceipt:
-        verifyEvaDenseMotionMasteringCampaignReceipt(existing.value, program),
+      existingCampaignReceipt,
       prepared: Object.freeze([]),
+      completedFrames,
     });
   }
 
@@ -454,6 +478,7 @@ async function prepareCampaign({
       createOnly: true,
       completedFrameBoundaryResumeSupported: true,
       midFramePartialStateRejected: true,
+      completedCampaignReplayReverifiesFinishedFrameBytes: true,
       technicalInspectionRequiredAfterCampaign: true,
       creativeApprovalRequiredAfterCampaign: true,
       partialPromotionAllowed: false,
@@ -484,6 +509,7 @@ export async function compileEvaDenseMotionMasteringCampaignPlan(input) {
       status: 'campaign-already-complete',
       programSha256: prepared.program.programSha256,
       campaignReceiptSha256: prepared.existingCampaignReceipt.campaignReceiptSha256,
+      completedFrameEvidenceReverified: true,
       authority: authority(),
     });
   }
@@ -548,6 +574,7 @@ export async function runEvaDenseMotionMasteringCampaign({
     return deepFreeze({
       status: prepared.existingCampaignReceipt.status,
       reused: true,
+      completedFrameEvidenceReverified: true,
       receiptPath: prepared.campaignReceiptPath,
       receipt: prepared.existingCampaignReceipt,
     });
@@ -684,6 +711,7 @@ export function evaDenseMotionMasteringCampaignCapabilities() {
     completedFrameBoundaryResumeSupported: true,
     midFramePartialStateRejected: true,
     resumedFrameBytesReverifiedBySha256: true,
+    completedCampaignReplayReverifiesFinishedFrameBytes: true,
     deterministicAlphaMastering: true,
     genericFrameFinisherReused: true,
     technicalInspectionExecution: false,
