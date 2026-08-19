@@ -62,12 +62,15 @@ test("Council identity bootstrap requests exist at the exact worker paths and re
   }
 });
 
-test("Council worker pins the reviewed production-truth revisions", () => {
+test("Council worker pins the reviewed production-truth and validation revisions", () => {
   for (const token of [
     "c312afa831ab240d3d8eb3c32f3c7413bd999b7b",
     "90068367db9144b909bc861f91887ea5f0010842",
+    "c736a6d6648d3f02ac5745458a4cea0e02eab00c",
     "f0183be83976b061027b307a2fb78ef4ed856821",
     "ee74a609a93e81b42c28a72122dc0f6b887cf328",
+    "minimumRuntimeValidationRevision = 'c736a6d6648d3f02ac5745458a4cea0e02eab00c'",
+    "runtime-reviewed-top-hat-checker-reachable",
     "evavo.council-avatar-worker-stack-check.v1",
   ]) {
     assert.ok(worker.includes(token), `missing reviewed Council worker token: ${token}`);
