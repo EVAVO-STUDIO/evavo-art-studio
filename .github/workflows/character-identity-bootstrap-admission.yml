@@ -21,6 +21,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: character-identity-bootstrap-admission-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Identity bootstrap planner / ${{ matrix.os }}
@@ -29,15 +33,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest]
+        os: [ubuntu-24.04, windows-2025]
     steps:
       - name: Check out exact candidate
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
           persist-credentials: false
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
       - name: Syntax-check planners
         run: node --check scripts/character-identity-master-plan.mjs && node --check scripts/character-identity-bootstrap-admission.mjs
       - name: Run identity-master planner tests
         run: node --test scripts/test-character-identity-master-plan.mjs
       - name: Run bootstrap-admission planner tests
         run: node --test scripts/test-character-identity-bootstrap-admission.mjs
+      - name: Confirm validation changed no repository source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
