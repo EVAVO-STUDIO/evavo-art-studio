@@ -1,6 +1,5 @@
 import { randomBytes } from 'node:crypto';
 import {
-  COPYFILE_EXCL,
   closeSync,
   copyFileSync,
   existsSync,
@@ -12,6 +11,7 @@ import {
   realpathSync,
   unlinkSync,
   writeFileSync,
+  constants as fsConstants,
 } from 'node:fs';
 import path from 'node:path';
 
@@ -228,7 +228,11 @@ function publishCreateOnlyFrameBundle(root, entries) {
       writeStaged(staged[index], finals[index].bytes);
     }
     for (let index = 0; index < finals.length; index += 1) {
-      copyFileSync(staged[index], finals[index].absolute, COPYFILE_EXCL);
+      copyFileSync(
+        staged[index],
+        finals[index].absolute,
+        fsConstants.COPYFILE_EXCL,
+      );
       published.push(finals[index].absolute);
     }
     for (const temporary of staged) safeUnlink(temporary);
