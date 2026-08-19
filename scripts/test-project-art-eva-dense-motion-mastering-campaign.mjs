@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -154,7 +155,11 @@ function authorizationRelative(job) {
   return `${job.outputs.frameRoot}/alpha-mastering.authorization.json`;
 }
 
-function prepareWorkspace(root, { lowConfidenceOrdinal = null } = {}) {
+function finishedRelative(job) {
+  return `${job.outputs.alphaMastered.slice(0, -4)}.finished.png`;
+}
+
+function prepareWorkspace(root) {
   const program = buildProgram();
   for (const job of program.production.jobs) {
     const candidate = candidatePng(job.ordinal);
@@ -165,12 +170,7 @@ function prepareWorkspace(root, { lowConfidenceOrdinal = null } = {}) {
       ordinal: job.ordinal,
       candidateBytes: candidate,
       candidatePath: job.outputs.denseCandidate,
-      frameAssurance: frameAssurance(
-        job.frameId,
-        candidateSha256,
-        job.ordinal,
-        job.ordinal === lowConfidenceOrdinal ? 0.94 : 0.99,
-      ),
+      frameAssurance: frameAssurance(job.frameId, candidateSha256, job.ordinal, 0.99),
       inspectedAt: '2026-08-20T00:11:00.000Z',
     });
     writeSemantic(root, job.outputs.candidateAssurance, assurance);
@@ -204,7 +204,7 @@ function prepareWorkspace(root, { lowConfidenceOrdinal = null } = {}) {
   return program;
 }
 
-test('preflights all ten frames, executes sequentially, and records zero approval or release authority', async () => {
+test('preflights all ten frames, executes sequentially, and rejects tampered replay bytes', async () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'eva-dense-mastering-campaign-'));
   try {
     const program = prepareWorkspace(root);
@@ -220,9 +220,10 @@ test('preflights all ten frames, executes sequentially, and records zero approva
     assert.equal(plan.policy.allPendingFramesAlphaPreflightBeforeFirstWrite, true);
     assert.equal(plan.policy.sequential, true);
     assert.equal(plan.policy.stopOnFirstFailure, true);
+    assert.equal(plan.policy.completedCampaignReplayReverifiesFinishedFrameBytes, true);
     assert.equal(plan.policy.cloudinaryUploadAllowed, false);
     assert.equal(plan.policy.runtimeActivationAllowed, false);
-    assert.ok(Object.values(plan.authority).filter((value) => value === true).length === 6);
+    assert.equal(Object.values(plan.authority).filter((value) => value === true).length, 6);
 
     const result = await runEvaDenseMotionMasteringCampaign({
       tenMasterProgram: program,
@@ -264,9 +265,24 @@ test('preflights all ten frames, executes sequentially, and records zero approva
       finishedAt: '2026-08-20T00:15:00.000Z',
     });
     assert.equal(replay.reused, true);
+    assert.equal(replay.completedFrameEvidenceReverified, true);
     assert.equal(
       replay.receipt.campaignReceiptSha256,
       result.receipt.campaignReceiptSha256,
+    );
+
+    const firstFinished = absolute(root, finishedRelative(program.production.jobs[0]));
+    const tampered = Buffer.from(readFileSync(firstFinished));
+    tampered[Math.max(8, tampered.length - 16)] ^= 0x01;
+    writeFileSync(firstFinished, tampered);
+    await assert.rejects(
+      () => runEvaDenseMotionMasteringCampaign({
+        tenMasterProgram: program,
+        workspaceRoot: root,
+        masteredAt: '2026-08-20T00:14:00.000Z',
+        finishedAt: '2026-08-20T00:15:00.000Z',
+      }),
+      /EVA_DENSE_MASTERING_COMPLETED_FRAME_BYTES_INVALID/u,
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -351,6 +367,7 @@ test('campaign capabilities preserve review, publication and runtime boundaries'
   assert.equal(capabilities.completedFrameBoundaryResumeSupported, true);
   assert.equal(capabilities.midFramePartialStateRejected, true);
   assert.equal(capabilities.resumedFrameBytesReverifiedBySha256, true);
+  assert.equal(capabilities.completedCampaignReplayReverifiesFinishedFrameBytes, true);
   assert.equal(capabilities.technicalInspectionExecution, false);
   assert.equal(capabilities.creativeReviewExecution, false);
   assert.equal(capabilities.cloudinaryUpload, false);
