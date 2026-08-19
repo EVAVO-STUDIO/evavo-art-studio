@@ -1,100 +1,43 @@
 {
+  "generatedBy": "scripts/New-ProjectArtWorkspaceMcpConfig.ps1",
+  "note": "Example only. Generate a machine-specific file so BeeStation, managed Python, FFmpeg and user roots are resolved from the live workstation.",
   "mcpServers": {
     "evavo-project-art-workspace": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_mcp.mjs"],
       "env": {
-        "EVAVO_ART_WORKSPACE_ROOTS": "C:\\GitRepos;C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Incoming Art;C:\\EVAVO\\Evidence",
+        "EVAVO_ART_WORKSPACE_ROOTS": "C:\\GitRepos;C:\\Users\\User\\AppData\\Local\\EVAVO\\LocalStorage\\workspaces\\ArtStudio;C:\\Users\\User\\AppData\\Local\\EVAVO\\LocalStorage\\staging\\ArtStudio;C:\\Users\\User\\Downloads",
         "EVAVO_ART_WORKSPACE_MCP_ALLOW_WRITE": "false",
-        "EVAVO_ART_WORKSPACE_PYTHON": "py",
+        "EVAVO_ART_WORKSPACE_PYTHON": "C:\\Users\\User\\AppData\\Local\\EVAVO\\AI\\runtime\\envs\\image-finishing\\Scripts\\python.exe",
         "EVAVO_ART_WORKSPACE_MCP_TIMEOUT_MS": "600000",
-        "EVAVO_ART_FFMPEG_BIN": "C:\\Tools\\ffmpeg\\bin\\ffmpeg.exe",
-        "EVAVO_ART_FFPROBE_BIN": "C:\\Tools\\ffmpeg\\bin\\ffprobe.exe"
+        "EVAVO_ART_FFMPEG_BIN": "ffmpeg",
+        "EVAVO_ART_FFPROBE_BIN": "ffprobe"
       }
     },
     "evavo-project-art-workspace-ingest": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_ingest_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_ingest_mcp.mjs"],
       "env": {
-        "EVAVO_ART_WORKSPACE_INGEST_ROOTS": "C:\\GitRepos;C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
-        "EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS": "C:\\Users\\Greg\\Downloads;C:\\EVAVO\\Incoming Art;C:\\GitRepos",
+        "EVAVO_ART_WORKSPACE_INGEST_ROOTS": "C:\\Users\\User\\AppData\\Local\\EVAVO\\LocalStorage\\workspaces\\ArtStudio;C:\\Users\\User\\AppData\\Local\\EVAVO\\LocalStorage\\staging\\ArtStudio",
+        "EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS": "C:\\Users\\User\\Downloads;C:\\GitRepos",
         "EVAVO_ART_WORKSPACE_INGEST_MCP_ALLOW_WRITE": "false",
         "EVAVO_ART_WORKSPACE_INGEST_MCP_TIMEOUT_MS": "600000"
       }
     },
     "evavo-project-art-workspace-catalog": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_catalog_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_catalog_mcp.mjs"],
       "env": {
-        "EVAVO_PERSISTENT_CATALOG_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
+        "EVAVO_PERSISTENT_CATALOG_ROOTS": "C:\\Users\\User\\AppData\\Local\\EVAVO\\LocalStorage\\workspaces\\ArtStudio;C:\\Users\\User\\AppData\\Local\\EVAVO\\LocalStorage\\workspaces\\ArtStudio\\evidence",
         "EVAVO_PERSISTENT_CATALOG_MCP_ALLOW_WRITE": "false"
       }
     },
     "evavo-project-art-workspace-jobs": {
       "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_jobs_mcp.mjs"
-      ],
+      "args": ["C:\\GitRepos\\evavo-art-studio\\tools\\project_art_workspace_jobs_mcp.mjs"],
       "env": {
-        "EVAVO_ART_WORKSPACE_JOB_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
+        "EVAVO_ART_WORKSPACE_JOB_ROOTS": "C:\\Users\\User\\AppData\\Local\\EVAVO\\LocalStorage\\workspaces\\ArtStudio;C:\\Users\\User\\AppData\\Local\\EVAVO\\LocalStorage\\staging\\ArtStudio",
         "EVAVO_ART_WORKSPACE_JOBS_MCP_ALLOW_WRITE": "false"
-      }
-    },
-    "evavo-project-art-avatar-final-pass-provider": {
-      "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_mcp.mjs"
-      ],
-      "env": {
-        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
-        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_MCP_ALLOW_WRITE": "false"
-      }
-    },
-    "evavo-project-art-avatar-final-pass-provider-runtime": {
-      "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_runtime_mcp.mjs"
-      ],
-      "env": {
-        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
-        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_RUNTIME_MCP_ALLOW_WRITE": "false"
-      }
-    },
-    "evavo-project-art-avatar-final-pass-provider-candidate": {
-      "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_candidate_mcp.mjs"
-      ],
-      "env": {
-        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
-        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_ARTIFACT_ROOTS": "C:\\EVAVO\\ArtArtifacts",
-        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_CANDIDATE_MCP_ALLOW_WRITE": "false"
-      }
-    },
-    "evavo-project-art-avatar-final-pass-provider-frame-finisher": {
-      "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_final_pass_provider_frame_finisher_mcp.mjs"
-      ],
-      "env": {
-        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
-        "EVAVO_ART_AVATAR_FINAL_PASS_PROVIDER_FRAME_FINISHER_MCP_ALLOW_WRITE": "false"
-      }
-    },
-    "evavo-project-art-avatar-sequence-release": {
-      "command": "node",
-      "args": [
-        "C:\\GitRepos\\evavo-art-studio\\tools\\project_art_avatar_sequence_release_mcp.mjs"
-      ],
-      "env": {
-        "EVAVO_ART_AVATAR_SEQUENCE_RELEASE_ROOTS": "C:\\EVAVO\\ArtWorkspaces;C:\\EVAVO\\Evidence",
-        "EVAVO_ART_AVATAR_SEQUENCE_RELEASE_MCP_ALLOW_WRITE": "false"
       }
     }
   }
