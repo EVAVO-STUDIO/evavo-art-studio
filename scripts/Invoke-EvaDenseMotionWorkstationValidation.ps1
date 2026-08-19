@@ -57,6 +57,8 @@ try {
 
     Invoke-NativeChecked -FilePath $Node -ArgumentList @('--check','scripts/check-project-art-eva-dense-motion-work-order.mjs') -Label 'EVA dense-motion guard syntax validation'
     Invoke-NativeChecked -FilePath $Node -ArgumentList @('scripts/check-project-art-eva-dense-motion-work-order.mjs') -Label 'EVA dense-motion work-order and release-evidence validation'
+    Invoke-NativeChecked -FilePath $Node -ArgumentList @('--check','scripts/compile-project-art-eva-dense-motion-ten-master.mjs') -Label 'EVA ten-master compiler syntax validation'
+    Invoke-NativeChecked -FilePath $Node -ArgumentList @('--test','scripts/test-project-art-eva-dense-motion-ten-master.mjs') -Label 'EVA ten-master planning regressions'
     Invoke-NativeChecked -FilePath $Node -ArgumentList @('scripts/check-art-studio-workstation-v5-contract.mjs') -Label 'Art Studio Automation Fabric v5 validation'
     Invoke-NativeChecked -FilePath $Node -ArgumentList @('--test','scripts/test-art-studio-workstation-v5-contract.mjs') -Label 'Art Studio Automation Fabric v5 adversarial tests'
 
@@ -79,9 +81,21 @@ try {
         worktreeEntryCount = @($statusLines).Count
         denseMotionFamily = 'eva-20260809-153620'
         pendingOrdinals = @(1, 2, 3, 7, 8, 9, 10)
+        tenMasterPlanning = [ordered]@{
+            schema = 'evavo.project-art-eva-dense-motion-ten-master-program.v2'
+            compilerScript = 'scripts/compile-project-art-eva-dense-motion-ten-master.mjs'
+            requiredFinalOrdinals = @(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+            requiredNewMasterCount = 10
+            currentFallbackOrdinals = @(4, 5, 6)
+            fallbackRemasterOrdinals = @(4, 5, 6)
+            legacyFallbackMaySatisfyFinalMasterGate = $false
+            atomicTenMasterActivationRequired = $true
+            executionByThisTask = $false
+        }
         checks = [ordered]@{
             denseMotionGuard = 'passed'
             releaseEvidence = 'passed'
+            tenMasterProgram = 'passed'
             automationFabricV5 = 'passed'
             automationFabricV5Adversarial = 'passed'
             sourceMediaPreflight = 'passed'
