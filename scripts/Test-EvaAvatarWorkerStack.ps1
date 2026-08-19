@@ -90,14 +90,20 @@ $ClientPath = Join-Path $Art 'config\automation-fabric-client-v5.json'
 $TasksPath = Join-Path $Art 'evavo.tasks.json'
 $LocalPyProject = Join-Path $LocalStorage 'pyproject.toml'
 $NamedTaskCompiler = Join-Path $Development 'packages\runner-fabric\src\repository-task.ts'
-$EvaSurface = Join-Path $Website 'src\shared\evaFemaleIdentitySurface.tsx'
+$EvaBoundary = Join-Path $Website 'src\shared\evaAvatarRenderSurface.tsx'
+$EvaQualityFallback = Join-Path $Website 'src\shared\evaFemaleQualityFallbackSurface.tsx'
+$EvaSparseCompatibility = Join-Path $Website 'src\shared\evaFemaleIdentitySurface.tsx'
+$EvaQualityCheck = Join-Path $Website 'scripts\check-eva-avatar-quality-fallback.mjs'
 
 foreach ($File in @(
     @($ClientPath, 'art-fabric-client'),
     @($TasksPath, 'art-task-manifest'),
     @($LocalPyProject, 'local-storage-pyproject'),
     @($NamedTaskCompiler, 'development-named-task-compiler'),
-    @($EvaSurface, 'website-eva-surface')
+    @($EvaBoundary, 'website-eva-boundary'),
+    @($EvaQualityFallback, 'website-eva-quality-fallback'),
+    @($EvaSparseCompatibility, 'website-eva-sparse-compatibility'),
+    @($EvaQualityCheck, 'website-eva-quality-check')
 )) {
     [void](Require-File $File[0] $File[1])
 }
@@ -148,15 +154,59 @@ if (Test-Path -LiteralPath $NamedTaskCompiler -PathType Leaf) {
     }
 }
 
-if (Test-Path -LiteralPath $EvaSurface -PathType Leaf) {
-    $Surface = Get-Content -LiteralPath $EvaSurface -Raw
+if (Test-Path -LiteralPath $EvaBoundary -PathType Leaf) {
+    $Boundary = Get-Content -LiteralPath $EvaBoundary -Raw
+    foreach ($Marker in @(
+        'evaLiveMode: "quality-first-static-high-resolution-fallback"',
+        'evaDenseReleaseRequired: true',
+        'evaDenseMotionRequiredFrameCount: 10',
+        'evaAuthoredAnimationTargetFps: 24',
+        'evaAuthoredAnimationPreferredFps: 30',
+        'evaCurrentRuntimePackageVersion: "0.38.0"',
+        'return <EvaFemaleQualityFallbackSurface {...surfaceProps} />;'
+    )) {
+        Add-Check ("website-eva-live-{0}" -f ($Marker -replace '[^A-Za-z0-9]+','-').Trim('-')) ($Boundary.Contains($Marker)) $Marker
+    }
+    $LiveStart = $Boundary.IndexOf('if (props.characterId === "eva-female")')
+    $TopHatStart = $Boundary.IndexOf('return <EvaTopHatDecodedRenderSurface {...props} />;', $LiveStart)
+    $LiveBranch = if ($LiveStart -ge 0 -and $TopHatStart -gt $LiveStart) { $Boundary.Substring($LiveStart, $TopHatStart - $LiveStart) } else { '' }
+    Add-Check 'website-eva-live-branch-bounded' ($LiveBranch.Length -gt 0) $("liveStart={0}; topHatStart={1}" -f $LiveStart, $TopHatStart)
+    Add-Check 'website-eva-sparse-renderer-not-live' (-not $LiveBranch.Contains('EvaFemaleIdentitySurface')) 'sparse compositor must remain compatibility-only'
+    Add-Check 'website-eva-legacy-atlas-not-live' (-not $LiveBranch.Contains('EvaProductionAvatarFrame')) 'low-resolution atlas must remain compatibility-only'
+}
+
+if (Test-Path -LiteralPath $EvaQualityFallback -PathType Leaf) {
+    $FallbackSource = Get-Content -LiteralPath $EvaQualityFallback -Raw
+    foreach ($Marker in @(
+        'evavo_next_website_eva_quality_fallback_surface_v1',
+        'EVA_FEMALE_DENSE_MOTION_REQUIRED_FRAME_COUNT = 10',
+        'EVA_FEMALE_AUTHORED_ANIMATION_TARGET_FPS = 24',
+        'EVA_FEMALE_AUTHORED_ANIMATION_PREFERRED_FPS = 30',
+        'data-avatar-source-count="1"',
+        'data-avatar-synthetic-body-motion="false"',
+        'data-avatar-synthetic-mouth="false"',
+        'data-avatar-mouth-layer="disabled-until-authored-registered-mouth"'
+    )) {
+        Add-Check ("website-eva-fallback-{0}" -f ($Marker -replace '[^A-Za-z0-9]+','-').Trim('-')) ($FallbackSource.Contains($Marker)) $Marker
+    }
+    foreach ($Forbidden in @(
+        'requestAnimationFrame(',
+        'sampleEvaFemaleIdentityMotion(',
+        'data-avatar-mouth-patch="matched-identity-family"'
+    )) {
+        Add-Check ("website-eva-fallback-forbid-{0}" -f ($Forbidden -replace '[^A-Za-z0-9]+','-').Trim('-')) (-not $FallbackSource.Contains($Forbidden)) $Forbidden
+    }
+}
+
+if (Test-Path -LiteralPath $EvaSparseCompatibility -PathType Leaf) {
+    $SparseSource = Get-Content -LiteralPath $EvaSparseCompatibility -Raw
     foreach ($Marker in @(
         'evavo_next_website_eva_identity_surface_v3',
         'EXPECTED_NATIVE_IMAGE_NODES = 9',
-        'role === "source" ? 1',
-        'document.visibilityState'
+        'sampleEvaFemaleIdentityMotion(',
+        'data-avatar-source-count="3"'
     )) {
-        Add-Check ("website-eva-{0}" -f ($Marker -replace '[^A-Za-z0-9]+','-').Trim('-')) ($Surface.Contains($Marker)) $Marker
+        Add-Check ("website-eva-compat-{0}" -f ($Marker -replace '[^A-Za-z0-9]+','-').Trim('-')) ($SparseSource.Contains($Marker)) $Marker
     }
 }
 
@@ -167,15 +217,18 @@ if ($Node) {
     [void](Invoke-NativeChecked 'runtime-eva-dense-motion' $Node.Source @('--test','tests/eva-dense-motion-admission.test.mjs','tests/voice-text.test.mjs') $Runtime)
     [void](Invoke-NativeChecked 'website-eva-cadence' $Node.Source @('scripts/check-eva-avatar-frame-cadence.mjs') $Website)
     [void](Invoke-NativeChecked 'website-eva-alpha' $Node.Source @('scripts/check-eva-avatar-alpha-compositing.mjs') $Website)
+    [void](Invoke-NativeChecked 'website-eva-quality-fallback' $Node.Source @('scripts/check-eva-avatar-quality-fallback.mjs') $Website)
 }
 
 $Result = [ordered]@{
-    contract = 'evavo.eva-avatar-worker-stack-check.v1'
+    contract = 'evavo.eva-avatar-worker-stack-check.v2'
     ok = ($Failures.Count -eq 0)
     checkedAt = [DateTimeOffset]::UtcNow.ToString('o')
     gitReposRoot = $GitReposRoot
     checks = @($Checks)
     failures = @($Failures)
+    liveEvaMode = 'quality-first-static-high-resolution-fallback'
+    denseMotionRequired = $true
     workerExecutionOnly = $true
     sourceMutation = $false
     repositoryMutation = $false
