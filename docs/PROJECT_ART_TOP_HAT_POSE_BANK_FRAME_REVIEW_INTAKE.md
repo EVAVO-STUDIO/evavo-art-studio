@@ -11,6 +11,7 @@ six-slot provider execution
 → six-slot candidate materialization
 → six-slot deterministic frame finishing
 → six externally authored named-human decisions
+→ hash-only decision manifest
 → shadow-validate all six decisions
 → persist six review outcomes
 → if and only if all six are human-approved: candidate-admission preflight
@@ -78,39 +79,48 @@ The intake stage does not force six approvals.
 
 If genuine human reviewers produce a mixture of approve, repair and reject decisions, those outcomes are preserved faithfully. A complete mixed review campaign is reported as:
 
-`success-human-review-recorded-repair-or-rejection-present`
+`succeeded-human-review-recorded-repair-or-rejection-present`
 
 and the next required stage is repair or replacement before candidate admission.
 
 Only a complete six-slot intake where all six genuine human decisions resolve to `final-frame-admitted` exposes `six-slot-candidate-admission-preflight` as the next stage. Even then, this intake campaign itself creates zero candidate admissions.
 
-## Decision manifest
+## Decision files and manifest
 
-The production CLI consumes a separate self-hashed manifest that points to the already-existing decision files. The manifest carries no review judgment of its own.
+Use one externally authored decision file per canonical slot. For the manifest compiler, place them in one directory using these exact names:
+
+```text
+blink-closed.frame-review-decision.json
+listening-attentive.frame-review-decision.json
+thinking-reflective.frame-review-decision.json
+speech-neutral.frame-review-decision.json
+presentation-open.frame-review-decision.json
+presentation-emphasis.frame-review-decision.json
+```
+
+The manifest compiler only stable-reads and hashes these six files. It does not parse them into approvals, create reviewer identities, add evidence, fill gates or modify the files.
+
+```powershell
+node scripts/compile-project-art-top-hat-pose-bank-frame-review-decision-manifest.mjs `
+  --decision-root 'C:\path\to\human-review-decisions' `
+  --output 'C:\path\to\human-review-decisions\decision-manifest.json'
+```
+
+The resulting self-hashed manifest contains all six canonical paths and their exact file SHA-256 values plus the fixed policy:
 
 ```json
 {
-  "schema": "evavo.project-art-top-hat-pose-bank-frame-review-decision-manifest.v1",
-  "protocolVersion": "2026-08-19.1",
-  "slots": [
-    {
-      "slotId": "blink-closed",
-      "decisionPath": "C:\\path\\to\\blink-closed.frame-review-decision.json",
-      "decisionFileSha256": "<lowercase-sha256>"
-    }
-  ],
   "policy": {
     "decisionsExternallyAuthored": true,
     "namedHumanRequired": true,
     "automaticDecisionCreationAllowed": false
-  },
-  "decisionManifestSha256": "<self-hash>"
+  }
 }
 ```
 
-The actual manifest must contain all six canonical slots in canonical order. The CLI stable-reads every referenced file and verifies each recorded file SHA before starting review intake.
+The manifest carries no review judgment of its own. The later shadow preflight still validates the full decision schema and requires `reviewer.actorClass: "human"`.
 
-## Production CLI
+## Production intake CLI
 
 ```powershell
 node scripts/run-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs `
@@ -124,7 +134,9 @@ node scripts/run-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs 
 
 The CLI verifies the exact successful finishing plan/execution evidence, exact workspace binding, decision-manifest self-hash and all six decision-file hashes before the campaign runs.
 
-The output evidence root is create-only and contains:
+The campaign itself runs once. That one run shadow-validates all six decisions before the first persistent review outcome, pins the exact decision bytes, then persists outcomes sequentially. The resulting already-self-hashed plan and receipt are written afterward into the create-only evidence root, preventing a second-preflight race between evidence planning and persistence.
+
+The output evidence root contains:
 
 ```text
 <output-root>/
