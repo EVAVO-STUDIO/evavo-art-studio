@@ -19,10 +19,12 @@ The original Critic and Open Reviewer identities use:
 - `scripts/run-project-art-character-identity-provider.mjs` for the actual durable provider transaction;
 - exactly one provider/model allow-list entry per admitted job;
 - no provider fallback;
-- at most one provider call and one runtime attempt per authorization;
+- at most one provider call and one runtime attempt per authorization within the authoritative durable runtime root;
 - authorization windows no longer than 24 hours;
 - candidate-only intermediate artifacts and immutable evidence;
 - no candidate, identity, animation, publication or activation approval by generation.
+
+The durable runtime root is part of the operational one-shot boundary: production automation must use the authoritative persistent runtime root rather than creating fresh roots to replay an authorization. The runtime rejects replay once the authorization reservation exists in that root.
 
 Each four-candidate-set campaign is continuity-bound. `full-body-right` must be generated first as the set anchor. `full-body-left` and `neutral-bust` may run only from the exact successful, still-unapproved `full-body-right` candidate artifact from that same set. The runtime re-verifies the immutable artifact before dependent execution and rejects cross-set anchor use.
 
