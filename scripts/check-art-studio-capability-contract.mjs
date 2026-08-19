@@ -127,7 +127,7 @@ export function validateAutomationFabricClient(client) {
   fail(atLeast(client.minimumLocalStorageVersion, "0.48.9"), "Automation Fabric requires evavo-local-storage 0.48.9 or newer.");
   fail(SHA.test(client.reviewedLocalStorageMain) && SHA.test(client.reviewedDevelopmentStudioMain), "Reviewed runtime revisions must be exact commit SHAs.");
   fail(client.poolId === "windows-local" && client.primaryNodeId === "windows-primary", "Automation Fabric worker identity drifted.");
-  exact(client.sourceContract, ["capabilitiesPath","physicalAcceptanceScript","workstationAcceptanceCommand","workstationAcceptanceImplementation","recoveryChainContract","supervisorFirstRecoveryStarter","certifiedFallbackStarter","immutableRepairArmer","resilientInstaller","controlPlaneHealer","repositoryTaskPlanAction","repositoryTaskExecuteAction","developmentStudioNamedTaskCompiler","evaAvatarWorkerTaskName"], "Source contract");
+  exact(client.sourceContract, ["capabilitiesPath","physicalAcceptanceScript","workstationAcceptanceCommand","workstationAcceptanceImplementation","recoveryChainContract","supervisorFirstRecoveryStarter","certifiedFallbackStarter","immutableRepairArmer","resilientInstaller","controlPlaneHealer","repositoryTaskPlanAction","repositoryTaskExecuteAction","developmentStudioNamedTaskCompiler","evaAvatarWorkerTaskName","councilAvatarWorkerTaskName"], "Source contract");
   fail(client.sourceContract.capabilitiesPath === "config/automation-fabric-capabilities.json", "Canonical Local Storage capabilities path drifted.");
   fail(client.sourceContract.workstationAcceptanceCommand === "evavo-local-storage-workstation-accept", "Workstation acceptance command drifted.");
   fail(client.sourceContract.workstationAcceptanceImplementation === "evavo_local_storage.workstation_acceptance_v8:main", "Art Studio must require workstation acceptance v8.");
@@ -139,6 +139,7 @@ export function validateAutomationFabricClient(client) {
   fail(client.sourceContract.repositoryTaskPlanAction === "storage.repository_task_plan" && client.sourceContract.repositoryTaskExecuteAction === "storage.repository_task_run", "Exact-state repository task actions drifted.");
   fail(client.sourceContract.developmentStudioNamedTaskCompiler === "packages/runner-fabric/src/repository-task.ts", "Development Studio named-task compiler drifted.");
   fail(client.sourceContract.evaAvatarWorkerTaskName === "eva-avatar-worker-stack", "EVA worker task binding drifted.");
+  fail(client.sourceContract.councilAvatarWorkerTaskName === "council-avatar-worker-stack", "Council avatar worker task binding drifted.");
   const states = new Map(client.runtimeEvidenceStates.map((item) => [item.state, item]));
   for (const state of ["declared","implemented","workflow-queued","installed","live","reachable","physically-accepted"]) fail(states.has(state), `Runtime evidence state ${state} is missing.`);
   for (const state of ["declared","implemented","workflow-queued","installed","live"]) fail(states.get(state).permitsRoutineWorkerUse === false, `State ${state} must not authorize routine worker use.`);
@@ -167,7 +168,7 @@ export function validateAutomationFabricClient(client) {
   for (const key of ["forcePush","automaticMerge","automaticRebase"]) fail(client.publication[key] === false, `Destructive or automatic publication mode enabled: ${key}.`);
   for (const key of ["resetHard","gitClean","stashAsRecovery","permanentDelete","providerDeleteImpliedByWorkerAuthority","downloadAloneAuthorizesExecution","secretEnvironmentCallerOverride"]) fail(client.safety[key] === false, `Safety boundary weakened: ${key}.`);
   fail(client.safety.cleanupDestination === "bee://primary/TO_DELETE/", "Recoverable cleanup destination drifted.");
-  return { schema:"evavo.art-studio-automation-fabric-client-check.v8", client:client.client, poolId:client.poolId, minimumLocalStorageVersion:client.minimumLocalStorageVersion, workstationAcceptance:"v8", exactStateRepositoryTasks:true, namedRepositoryTaskDigestBinding:true, evaAvatarWorkerTaskName:client.sourceContract.evaAvatarWorkerTaskName, supervisorFirstRecovery:true, commandIdSingleExecutionRequired:true, githubActionsWorkerFallback:true, workerReceiptIsPublicationEvidence:false, publicationAuthority:client.publication.operatorRepository };
+  return { schema:"evavo.art-studio-automation-fabric-client-check.v8", client:client.client, poolId:client.poolId, minimumLocalStorageVersion:client.minimumLocalStorageVersion, workstationAcceptance:"v8", exactStateRepositoryTasks:true, namedRepositoryTaskDigestBinding:true, evaAvatarWorkerTaskName:client.sourceContract.evaAvatarWorkerTaskName, councilAvatarWorkerTaskName:client.sourceContract.councilAvatarWorkerTaskName, supervisorFirstRecovery:true, commandIdSingleExecutionRequired:true, githubActionsWorkerFallback:true, workerReceiptIsPublicationEvidence:false, publicationAuthority:client.publication.operatorRepository };
 }
 
 function validateEvaAvatarWorkerTask(tasks, script) {
@@ -230,7 +231,7 @@ export async function checkRepository(root = ROOT) {
 if (process.argv[1] !== undefined && path.resolve(process.argv[1]) === path.resolve(HERE)) {
   try {
     const result = await checkRepository();
-    console.log(`PASS ${result.manifest.capabilityCount} Art Studio capabilities, Local Storage 0.48.9 runtime truth, workstation acceptance v8, digest-bound EVA worker tasks and supervisor-first recovery validated.`);
+    console.log(`PASS ${result.manifest.capabilityCount} Art Studio capabilities, Local Storage 0.48.9 runtime truth, workstation acceptance v8, digest-bound EVA and Council worker task bindings and supervisor-first recovery validated.`);
   } catch (error) {
     console.error(`FAIL ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;

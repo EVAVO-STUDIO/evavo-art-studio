@@ -33,6 +33,7 @@ test("current Art Studio runtime truth follows the reviewed worker estate", asyn
   assert.equal(result.automationFabric.exactStateRepositoryTasks, true);
   assert.equal(result.automationFabric.namedRepositoryTaskDigestBinding, true);
   assert.equal(result.automationFabric.evaAvatarWorkerTaskName, "eva-avatar-worker-stack");
+  assert.equal(result.automationFabric.councilAvatarWorkerTaskName, "council-avatar-worker-stack");
   assert.equal(result.automationFabric.supervisorFirstRecovery, true);
   assert.equal(result.automationFabric.commandIdSingleExecutionRequired, true);
   assert.equal(result.automationFabric.githubActionsWorkerFallback, true);
@@ -46,6 +47,7 @@ test("current Art Studio runtime truth follows the reviewed worker estate", asyn
   assert.equal(automationClient.reviewedDevelopmentStudioMain, "1f49e423a502d7a49864664a32239683ebdfb4da");
   assert.equal(automationClient.sourceContract.developmentStudioNamedTaskCompiler, "packages/runner-fabric/src/repository-task.ts");
   assert.equal(automationClient.sourceContract.evaAvatarWorkerTaskName, "eva-avatar-worker-stack");
+  assert.equal(automationClient.sourceContract.councilAvatarWorkerTaskName, "council-avatar-worker-stack");
   assert.deepEqual(automationClient.execution.approvedRoots, [
     "C:\\GitRepos",
     "%USERPROFILE%\\Downloads",
@@ -90,6 +92,10 @@ test("named task compiler and digest binding cannot drift", () => {
   const taskName = clone(automationClient);
   taskName.sourceContract.evaAvatarWorkerTaskName = "eva-worker";
   assert.throws(() => validateAutomationFabricClient(taskName), /EVA worker task binding drifted/u);
+
+  const councilTaskName = clone(automationClient);
+  councilTaskName.sourceContract.councilAvatarWorkerTaskName = "council-worker";
+  assert.throws(() => validateAutomationFabricClient(councilTaskName), /Council avatar worker task binding drifted/u);
 
   for (const key of ["namedTaskPlanMustBindManifestSha256", "namedTaskPlanMustBindTaskSha256"]) {
     const candidate = clone(automationClient);

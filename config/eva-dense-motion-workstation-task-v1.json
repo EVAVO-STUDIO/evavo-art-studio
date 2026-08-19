@@ -8,7 +8,7 @@
   "sourcePreflightScript": "scripts/project-art/eva-dense-motion-source-preflight.mjs",
   "denseMotionFamily": "eva-20260809-153620",
   "pendingOrdinals": [1, 2, 3, 7, 8, 9, 10],
-  "minimumLocalStorageVersion": "0.48.4",
+  "minimumLocalStorageVersion": "0.48.9",
   "worker": {
     "target": "pool",
     "poolId": "windows-local",

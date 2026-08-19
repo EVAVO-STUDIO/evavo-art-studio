@@ -13,6 +13,7 @@ const files = {
   docs: read('docs/PERSISTENT_ARTIST_WORKSPACE.md'),
   example: read('config/mcp.project-art-workspace.windows.example.json'),
 };
+const example = JSON.parse(files.example);
 
 const retired = [
   'C:\\EVAVO\\ArtWorkspaces',
@@ -47,6 +48,9 @@ test('legacy C EVAVO roots remain documentation-only negative examples', () => {
 
 test('example is generic rather than account-specific', () => {
   assert.equal(/Greg|Parker/u.test(files.example), false);
-  assert.match(files.example, /C:\\Users\\User\\Downloads/u);
-  assert.match(files.example, /image-finishing/u);
+  const workspace = example.mcpServers['evavo-project-art-workspace'];
+  const ingest = example.mcpServers['evavo-project-art-workspace-ingest'];
+  assert.equal(workspace.env.EVAVO_ART_WORKSPACE_ROOTS.split(';').includes('C:\\Users\\User\\Downloads'), true);
+  assert.equal(ingest.env.EVAVO_ART_WORKSPACE_INGEST_SOURCE_ROOTS.split(';').includes('C:\\Users\\User\\Downloads'), true);
+  assert.match(workspace.env.EVAVO_ART_WORKSPACE_PYTHON, /image-finishing/u);
 });

@@ -13,11 +13,11 @@ const script=fs.readFileSync(path.join(root,"scripts/Invoke-EvaDenseMotionWorkst
 const preflight=fs.readFileSync(path.join(root,"scripts/project-art/eva-dense-motion-source-preflight.mjs"),"utf8");
 const v5=JSON.parse(fs.readFileSync(path.join(root,"config/automation-fabric-client-v5.json"),"utf8"));
 const clone=(value)=>structuredClone(value);
-test("accepts planner-bound task with source preflight",()=>{const r=validateTask(clone(task),script,clone(v5),preflight);assert.equal(r.ok,true);assert.equal(r.minimumLocalStorageVersion,"0.48.4");assert.equal(r.sourcePreflightRequired,true);});
+test("accepts planner-bound task with source preflight",()=>{const r=validateTask(clone(task),script,clone(v5),preflight);assert.equal(r.ok,true);assert.equal(r.minimumLocalStorageVersion,"0.48.9");assert.equal(r.sourcePreflightRequired,true);});
 test("rejects execution without planner receipt",()=>{const c=clone(task);c.worker.plannerReceiptRequired=false;assert.throws(()=>validateTask(c,script,clone(v5),preflight),/Planner receipt/u);});
 test("rejects missing filesystem capability",()=>{const c=clone(task);c.worker.requiredCapabilities=c.worker.requiredCapabilities.filter(x=>x!=="filesystem");assert.throws(()=>validateTask(c,script,clone(v5),preflight),/filesystem/u);});
-test("rejects weaker Local Storage floor",()=>{const c=clone(task);c.minimumLocalStorageVersion="0.48.3";assert.throws(()=>validateTask(c,script,clone(v5),preflight),/0\.48\.4/u);});
-test("rejects v5 floor mismatch",()=>{const c=clone(v5);c.minimumLocalStorageVersion="0.48.3";assert.throws(()=>validateTask(clone(task),script,c,preflight),/floor differs/u);});
+test("rejects weaker Local Storage floor",()=>{const c=clone(task);c.minimumLocalStorageVersion="0.48.8";assert.throws(()=>validateTask(c,script,clone(v5),preflight),/0\.48\.9/u);});
+test("rejects v5 floor mismatch",()=>{const c=clone(v5);c.minimumLocalStorageVersion="0.48.8";assert.throws(()=>validateTask(clone(task),script,c,preflight),/floor differs/u);});
 test("rejects source repo or preflight drift",()=>{const c=clone(task);c.sourceRepository="EVAVO-STUDIO/other";assert.throws(()=>validateTask(c,script,clone(v5),preflight),/source repository/u);const d=clone(task);d.sourcePreflightScript="scripts/other.mjs";assert.throws(()=>validateTask(d,script,clone(v5),preflight),/preflight path/u);});
 test("rejects missing source identity enforcement",()=>{const weakened=preflight.replaceAll("gitBlobSha1", "removedIdentityFunction");assert.throws(()=>validateTask(clone(task),script,clone(v5),weakened),/gitBlobSha1/u);});
 test("rejects worker repository push and provider authority",()=>{for(const key of ["repositoryPush","publication","forcePush","candidatePromotion","providerExecution","cloudinaryUpload","runtimeActivation"]){const c=clone(task);c.authority[key]=true;assert.throws(()=>validateTask(c,script,clone(v5),preflight),new RegExp(key,"u"));}});

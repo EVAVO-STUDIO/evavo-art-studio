@@ -19,7 +19,7 @@ export function validateTask(task,scriptSource,v5Client,preflightSource=""){
   fail(task.sourcePreflightScript==="scripts/project-art/eva-dense-motion-source-preflight.mjs","EVA source preflight path drifted.");
   fail(task.denseMotionFamily==="eva-20260809-153620","EVA dense-motion family drifted.");
   fail(JSON.stringify(task.pendingOrdinals)===JSON.stringify([1,2,3,7,8,9,10]),"EVA pending ordinals drifted.");
-  fail(semver(task.minimumLocalStorageVersion)&&task.minimumLocalStorageVersion==="0.48.4","EVA worker requires Local Storage 0.48.4.");
+  fail(semver(task.minimumLocalStorageVersion)&&task.minimumLocalStorageVersion==="0.48.9","EVA worker requires Local Storage 0.48.9.");
   const worker=task.worker;
   fail(worker.target==="pool"&&worker.poolId==="windows-local"&&worker.fallbackNodeId==="windows-primary","EVA worker routing drifted.");
   for(const capability of ["filesystem","powershell","node","git","art-pipeline-validation"])fail(worker.requiredCapabilities.includes(capability),`EVA worker capability missing: ${capability}.`);
