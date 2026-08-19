@@ -5,9 +5,9 @@
   "client": "evavo-art-studio",
   "role": "governed-art-production-media-validation-and-provider-control",
   "runtimeOwner": "EVAVO-STUDIO/evavo-local-storage",
-  "minimumLocalStorageVersion": "0.48.4",
-  "reviewedLocalStorageMain": "32a1ed2801aca3847ea96b787bd24dcf7b088393",
-  "reviewedDevelopmentStudioMain": "88e1d36f6006c25e3567f5e8d8d8979c54407d60",
+  "minimumLocalStorageVersion": "0.48.9",
+  "reviewedLocalStorageMain": "65e048857b8abdcd60c5c7d2596a198f5e73a143",
+  "reviewedDevelopmentStudioMain": "1f49e423a502d7a49864664a32239683ebdfb4da",
   "poolId": "windows-local",
   "primaryNodeId": "windows-primary",
   "sourceContract": {
@@ -22,7 +22,9 @@
     "resilientInstaller": "INSTALL-EVAVO-WORKER-FABRIC-RESILIENT.ps1",
     "controlPlaneHealer": "HEAL-EVAVO-WORKER-CONTROL-PLANE.ps1",
     "repositoryTaskPlanAction": "storage.repository_task_plan",
-    "repositoryTaskExecuteAction": "storage.repository_task_run"
+    "repositoryTaskExecuteAction": "storage.repository_task_run",
+    "developmentStudioNamedTaskCompiler": "packages/runner-fabric/src/repository-task.ts",
+    "evaAvatarWorkerTaskName": "eva-avatar-worker-stack"
   },
   "runtimeEvidenceStates": [
     {"state":"declared","proof":"machine-readable source contract exists","permitsRoutineWorkerUse":false},
@@ -52,6 +54,8 @@
     "repositoryTaskPlannerReceiptIsRuntimeMeasurement": true,
     "repositoryTaskPlannerReceiptIsPublicationEvidence": false,
     "unmeasuredRepositoryTaskMustPlanBeforeExecution": true,
+    "namedTaskPlanMustBindManifestSha256": true,
+    "namedTaskPlanMustBindTaskSha256": true,
     "physicalAcceptanceReceiptIsPublicationEvidence": false,
     "supervisorFirstRecoveryIsRuntimeProofOnlyAfterReceipts": true,
     "recoverySourcePresenceAloneMeansReachable": false,
@@ -84,6 +88,7 @@
     "plannerMeasuresExactStatusSha256": true,
     "plannerMeasuresTrackedScriptSha256": true,
     "trackedScriptBytesRequired": true,
+    "namedRepositoryTaskDigestBindingRequired": true,
     "credentialStrippingRequired": true,
     "fileFirstPowerShell": true,
     "powershellGuardRequired": true,

@@ -31,7 +31,7 @@ export function validate(client) {
   fail(client.kind === "evavo-automation-fabric-runtime-truth-client", "Runtime-truth client kind drifted.");
   fail(client.contractVersion === 5 && client.client === "evavo-art-studio", "Art Studio v5 identity drifted.");
   fail(client.runtimeOwner === "EVAVO-STUDIO/evavo-local-storage", "Local Storage runtime authority drifted.");
-  fail(atLeast(client.minimumLocalStorageVersion, "0.48.4"), "Local Storage 0.48.4+ is required.");
+  fail(atLeast(client.minimumLocalStorageVersion, "0.48.9"), "Local Storage 0.48.9+ is required.");
   exactSha(client.reviewedLocalStorageMain, "Reviewed Local Storage");
   exactSha(client.reviewedDevelopmentStudioMain, "Reviewed Development Studio");
   fail(client.poolId === "windows-local" && client.primaryNodeId === "windows-primary", "Worker routing identity drifted.");
@@ -42,6 +42,8 @@ export function validate(client) {
   fail(source.workstationAcceptanceCommand === "evavo-local-storage-workstation-accept", "Workstation command drifted.");
   fail(source.workstationAcceptanceImplementation === "evavo_local_storage.workstation_acceptance_v8:main", "Workstation command must resolve to v8.");
   fail(source.repositoryTaskPlanAction === "storage.repository_task_plan" && source.repositoryTaskExecuteAction === "storage.repository_task_run", "Repository task actions drifted.");
+  fail(source.developmentStudioNamedTaskCompiler === "packages/runner-fabric/src/repository-task.ts", "Development Studio named-task compiler drifted.");
+  fail(source.evaAvatarWorkerTaskName === "eva-avatar-worker-stack", "EVA worker task binding drifted.");
   fail(source.supervisorFirstRecoveryStarter === "START-EVAVO-WORKER-FABRIC-SUPERVISOR-FIRST.ps1", "Supervisor-first recovery entrypoint drifted.");
 
   const states = new Map(client.runtimeEvidenceStates.map((entry) => [entry.state, entry]));
@@ -51,7 +53,7 @@ export function validate(client) {
 
   const truth = client.truthRules;
   for (const key of ["sourceConfigurationIsRuntimeProof","queuedWorkflowIsRuntimeProof","taskRegistrationIsRuntimeProof","heartbeatAloneIsReachabilityProof","missingReceiptMeansSuccess","staleReceiptMeansSuccess","duplicateExecutionAllowed","repositoryTaskPlannerReceiptIsPublicationEvidence","physicalAcceptanceReceiptIsPublicationEvidence","recoverySourcePresenceAloneMeansReachable","validationIsCreativeApproval","validationIsRuntimePromotion"]) fail(truth[key] === false, `Truth boundary weakened: ${key}.`);
-  for (const key of ["exactRequestToReceiptCorrelationRequired","commandIdSingleExecutionRequired","duplicateCommandIssueMustFailBeforeExecution","terminalReceiptReplayMustBeIdempotent","workerReceiptMustNameCommandId","workerReceiptMustNameNodeId","workerReceiptMustNameAction","workerReceiptMustBeSuccessful","repositoryTaskPlannerReceiptIsRuntimeMeasurement","unmeasuredRepositoryTaskMustPlanBeforeExecution","supervisorFirstRecoveryIsRuntimeProofOnlyAfterReceipts","stableControlPlaneMustExecuteExactCurrentManagedMain","managedRuntimeUpdatesMustBeFastForwardOnly","managedRuntimeDivergenceMustBeQuarantined"]) fail(truth[key] === true, `Truth requirement missing: ${key}.`);
+  for (const key of ["exactRequestToReceiptCorrelationRequired","commandIdSingleExecutionRequired","duplicateCommandIssueMustFailBeforeExecution","terminalReceiptReplayMustBeIdempotent","workerReceiptMustNameCommandId","workerReceiptMustNameNodeId","workerReceiptMustNameAction","workerReceiptMustBeSuccessful","repositoryTaskPlannerReceiptIsRuntimeMeasurement","unmeasuredRepositoryTaskMustPlanBeforeExecution","namedTaskPlanMustBindManifestSha256","namedTaskPlanMustBindTaskSha256","supervisorFirstRecoveryIsRuntimeProofOnlyAfterReceipts","stableControlPlaneMustExecuteExactCurrentManagedMain","managedRuntimeUpdatesMustBeFastForwardOnly","managedRuntimeDivergenceMustBeQuarantined"]) fail(truth[key] === true, `Truth requirement missing: ${key}.`);
 
   fail(client.routing.askGregToPasteRoutineTerminalCommands === false, "Routine work must not be delegated to Greg.");
   fail(client.routing.manualTerminalRelayAllowedOnlyAfterAllRemoteRecoveryRoutesFail === true, "Manual relay must remain last-resort only.");
@@ -59,7 +61,7 @@ export function validate(client) {
 
   const execution = client.execution;
   fail(execution.repositoryTaskPlanAction === "storage.repository_task_plan" && execution.repositoryTaskExecuteAction === "storage.repository_task_run", "Execution repository-task actions drifted.");
-  for (const key of ["plannerReceiptRequiredForUnmeasuredRepositoryTask","plannerMeasuresExactHead","plannerMeasuresExactStatusSha256","plannerMeasuresTrackedScriptSha256","trackedScriptBytesRequired","credentialStrippingRequired","fileFirstPowerShell","powershellGuardRequired","explicitNativeExitCodeRequired","argvOnlyProcessesPreferred","resourceAwareAdmissionRequired","boundedProcessTreeTerminationRequired","automaticTransientRetryOnly"]) fail(execution[key] === true, `Execution safety weakened: ${key}.`);
+  for (const key of ["plannerReceiptRequiredForUnmeasuredRepositoryTask","plannerMeasuresExactHead","plannerMeasuresExactStatusSha256","plannerMeasuresTrackedScriptSha256","trackedScriptBytesRequired","namedRepositoryTaskDigestBindingRequired","credentialStrippingRequired","fileFirstPowerShell","powershellGuardRequired","explicitNativeExitCodeRequired","argvOnlyProcessesPreferred","resourceAwareAdmissionRequired","boundedProcessTreeTerminationRequired","automaticTransientRetryOnly"]) fail(execution[key] === true, `Execution safety weakened: ${key}.`);
   fail(execution.maximumAttempts === 3, "Automatic attempts must remain bounded to three.");
   fail(JSON.stringify(execution.approvedRoots) === JSON.stringify(EXPECTED_ROOTS), "Approved execution roots drifted.");
   fail(!execution.approvedRoots.includes("C:\\Downloads"), "Retired C:\\Downloads root must remain disabled.");
@@ -84,12 +86,14 @@ export function validate(client) {
   fail(safety.cleanupDestination === "bee://primary/TO_DELETE/", "Cleanup destination drifted.");
 
   return Object.freeze({
-    schema: "evavo.art-studio-workstation-v5-contract.v2",
+    schema: "evavo.art-studio-workstation-v5-contract.v3",
     ok: true,
     runtimeOwner: client.runtimeOwner,
     minimumLocalStorageVersion: client.minimumLocalStorageVersion,
     workstationAcceptance: "v8",
     plannerRequired: execution.plannerReceiptRequiredForUnmeasuredRepositoryTask,
+    namedRepositoryTaskDigestBinding: execution.namedRepositoryTaskDigestBindingRequired,
+    evaAvatarWorkerTaskName: source.evaAvatarWorkerTaskName,
     physicalAcceptanceRequired: true,
     approvedRoots: [...EXPECTED_ROOTS],
     githubActionsFallbackStatus: fallback.eligibleStatus,

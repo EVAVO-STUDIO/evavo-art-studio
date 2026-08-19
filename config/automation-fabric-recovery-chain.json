@@ -3,7 +3,7 @@
   "kind": "evavo-automation-fabric-recovery-chain",
   "client": "evavo-art-studio",
   "runtimeOwner": "EVAVO-STUDIO/evavo-local-storage",
-  "minimumLocalStorageVersion": "0.48.0",
+  "minimumLocalStorageVersion": "0.48.9",
   "order": [
     {
       "id": "supervisor-first",

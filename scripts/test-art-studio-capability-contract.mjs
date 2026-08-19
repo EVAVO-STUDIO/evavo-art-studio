@@ -28,16 +28,24 @@ test("current Art Studio runtime truth follows the reviewed worker estate", asyn
   const result = await checkRepository(root);
   assert.equal(result.ok, true);
   assert.equal(result.manifest.publicationAuthority, false);
-  assert.equal(result.automationFabric.minimumLocalStorageVersion, "0.48.4");
+  assert.equal(result.automationFabric.minimumLocalStorageVersion, "0.48.9");
   assert.equal(result.automationFabric.workstationAcceptance, "v8");
   assert.equal(result.automationFabric.exactStateRepositoryTasks, true);
+  assert.equal(result.automationFabric.namedRepositoryTaskDigestBinding, true);
+  assert.equal(result.automationFabric.evaAvatarWorkerTaskName, "eva-avatar-worker-stack");
   assert.equal(result.automationFabric.supervisorFirstRecovery, true);
   assert.equal(result.automationFabric.commandIdSingleExecutionRequired, true);
   assert.equal(result.automationFabric.githubActionsWorkerFallback, true);
   assert.equal(result.automationFabric.workerReceiptIsPublicationEvidence, false);
+  assert.equal(result.evaAvatarWorker.taskName, "eva-avatar-worker-stack");
+  assert.equal(result.evaAvatarWorker.runtime, "powershell-script");
+  assert.equal(result.evaAvatarWorker.network, "disabled");
   assert.deepEqual(result.recovery.order, ["supervisor-first", "legacy-certified", "immutable-armer"]);
-  assert.equal(automationClient.reviewedLocalStorageMain, "32a1ed2801aca3847ea96b787bd24dcf7b088393");
-  assert.equal(automationClient.reviewedDevelopmentStudioMain, "88e1d36f6006c25e3567f5e8d8d8979c54407d60");
+  assert.equal(result.recovery.minimumLocalStorageVersion, "0.48.9");
+  assert.equal(automationClient.reviewedLocalStorageMain, "65e048857b8abdcd60c5c7d2596a198f5e73a143");
+  assert.equal(automationClient.reviewedDevelopmentStudioMain, "1f49e423a502d7a49864664a32239683ebdfb4da");
+  assert.equal(automationClient.sourceContract.developmentStudioNamedTaskCompiler, "packages/runner-fabric/src/repository-task.ts");
+  assert.equal(automationClient.sourceContract.evaAvatarWorkerTaskName, "eva-avatar-worker-stack");
   assert.deepEqual(automationClient.execution.approvedRoots, [
     "C:\\GitRepos",
     "%USERPROFILE%\\Downloads",
@@ -58,11 +66,11 @@ test("capabilities cannot claim publication or duplicate identities", () => {
 
 test("worker runtime rejects stale floors, roots and acceptance implementations", () => {
   const stale = clone(automationClient);
-  stale.minimumLocalStorageVersion = "0.47.9";
-  assert.throws(() => validateAutomationFabricClient(stale), /0\.48\.0 or newer/u);
+  stale.minimumLocalStorageVersion = "0.48.8";
+  assert.throws(() => validateAutomationFabricClient(stale), /0\.48\.9 or newer/u);
 
   const oldAcceptance = clone(automationClient);
-  oldAcceptance.sourceContract.workstationAcceptanceImplementation = "evavo_local_storage.workstation_acceptance_v4:main";
+  oldAcceptance.sourceContract.workstationAcceptanceImplementation = "evavo_local_storage.workstation_acceptance_v7:main";
   assert.throws(() => validateAutomationFabricClient(oldAcceptance), /workstation acceptance v8/u);
 
   const legacyDownloads = clone(automationClient);
@@ -72,6 +80,25 @@ test("worker runtime rejects stale floors, roots and acceptance implementations"
   const legacyBeeStation = clone(automationClient);
   legacyBeeStation.execution.approvedRoots[2] = "C:\\BEESTATION";
   assert.throws(() => validateAutomationFabricClient(legacyBeeStation), /Approved execution roots drifted/u);
+});
+
+test("named task compiler and digest binding cannot drift", () => {
+  const compiler = clone(automationClient);
+  compiler.sourceContract.developmentStudioNamedTaskCompiler = "packages/runner-fabric/src/legacy-task.ts";
+  assert.throws(() => validateAutomationFabricClient(compiler), /named-task compiler drifted/u);
+
+  const taskName = clone(automationClient);
+  taskName.sourceContract.evaAvatarWorkerTaskName = "eva-worker";
+  assert.throws(() => validateAutomationFabricClient(taskName), /EVA worker task binding drifted/u);
+
+  for (const key of ["namedTaskPlanMustBindManifestSha256", "namedTaskPlanMustBindTaskSha256"]) {
+    const candidate = clone(automationClient);
+    candidate.truthRules[key] = false;
+    assert.throws(() => validateAutomationFabricClient(candidate), new RegExp(key, "u"));
+  }
+  const execution = clone(automationClient);
+  execution.execution.namedRepositoryTaskDigestBindingRequired = false;
+  assert.throws(() => validateAutomationFabricClient(execution), /namedRepositoryTaskDigestBindingRequired/u);
 });
 
 test("exact-state execution, retries and recovery remain fail closed", () => {
@@ -92,6 +119,10 @@ test("exact-state execution, retries and recovery remain fail closed", () => {
   const mailbox = clone(recoveryChain);
   mailbox.rules.mailboxDependentRepairAllowedWhenMailboxUnreachable = true;
   assert.throws(() => validateRecoveryChain(mailbox), /Dead mailbox must not repair itself/u);
+
+  const oldRecovery = clone(recoveryChain);
+  oldRecovery.minimumLocalStorageVersion = "0.48.8";
+  assert.throws(() => validateRecoveryChain(oldRecovery), /0\.48\.9 or newer/u);
 });
 
 test("worker and recovery authority cannot escalate", () => {
