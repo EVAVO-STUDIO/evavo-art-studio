@@ -75,6 +75,22 @@ function exactArray(actual, expected, code) {
   }
 }
 
+function outputRootFromProgram(value) {
+  const firstFrameRoot = value.production?.jobs?.[0]?.outputs?.frameRoot;
+  const suffix = '/frames/frame-01';
+  if (
+    typeof firstFrameRoot !== 'string' ||
+    !firstFrameRoot.endsWith(suffix) ||
+    firstFrameRoot.length <= suffix.length
+  ) {
+    throw new Error('EVA_DENSE_MOTION_TEN_MASTER_PROGRAM_OUTPUT_ROOT_INVALID');
+  }
+  return canonicalRelativePath(
+    firstFrameRoot.slice(0, -suffix.length),
+    'program.outputRoot',
+  );
+}
+
 export function createEvaDenseMotionTenMasterRequest({
   programId,
   actorId,
@@ -256,6 +272,20 @@ export function verifyEvaDenseMotionTenMasterProgram(input) {
     )
   ) {
     throw new Error('EVA_DENSE_MOTION_TEN_MASTER_JOB_AUTHORITY_INVALID');
+  }
+  const expected = compileEvaDenseMotionTenMasterProgram(
+    createEvaDenseMotionTenMasterRequest({
+      programId: value.programId,
+      actorId: value.actorId,
+      createdAt: value.createdAt,
+      outputRoot: outputRootFromProgram(value),
+    }),
+  );
+  if (
+    canonicalEvaDenseMotionWorkOrderJson(value) !==
+    canonicalEvaDenseMotionWorkOrderJson(expected)
+  ) {
+    throw new Error('EVA_DENSE_MOTION_TEN_MASTER_PROGRAM_CONTENT_DRIFT');
   }
   return value;
 }
