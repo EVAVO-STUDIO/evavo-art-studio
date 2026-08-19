@@ -277,7 +277,7 @@ if (Test-Path -LiteralPath $LocalPyProject -PathType Leaf) {
 
 if ($Git) {
     Test-Ancestor $Git.Source $Art 'c312afa831ab240d3d8eb3c32f3c7413bd999b7b' 'art-reviewed-council-program-reachable'
-    Test-Ancestor $Git.Source $Runtime '90068367db9144b909bc861f91887ea5f0010842' 'runtime-reviewed-council-status-reachable'
+    Test-Ancestor $Git.Source $Runtime 'c736a6d6648d3f02ac5745458a4cea0e02eab00c' 'runtime-reviewed-top-hat-checker-reachable'
     Test-Ancestor $Git.Source $Council 'f0183be83976b061027b307a2fb78ef4ed856821' 'council-reviewed-roster-reachable'
     Test-Ancestor $Git.Source $Website 'ee74a609a93e81b42c28a72122dc0f6b887cf328' 'website-reviewed-council-truth-reachable'
 }
@@ -306,6 +306,7 @@ $Result = [ordered]@{
     authoredAnimationCompletionRequiredFor = @('top-hat-man','council-critic','eva-female','council-open-reviewer')
     websiteMayClaimAllCouncilAvatarsProductionReady = $false
     totalPlannedImagesPerCharacter = 749
+    minimumRuntimeValidationRevision = 'c736a6d6648d3f02ac5745458a4cea0e02eab00c'
     workerExecutionOnly = $true
     sourceMutation = $false
     repositoryMutation = $false
