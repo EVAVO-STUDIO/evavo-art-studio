@@ -86,6 +86,7 @@ async function fixture(t, prefix) {
   const root = await mkdtemp(path.join(os.tmpdir(), prefix));
   const bin = path.join(root, "bin");
   const environment = path.join(root, "github-env");
+  const directSources = path.join(root, "direct-ubuntu.list");
   await mkdir(bin, { recursive: true });
   t.after(async () => {
     await rm(root, { recursive: true, force: true });
@@ -94,6 +95,7 @@ async function fixture(t, prefix) {
     root,
     bin,
     environment,
+    directSources,
     ffmpeg: path.join(bin, "ffmpeg"),
     ffprobe: path.join(bin, "ffprobe"),
     aptGet: path.join(bin, "apt-get"),
@@ -153,20 +155,29 @@ exit 90
   assert.match(output, /ART_STUDIO_FFPROBE_SHA256=[0-9a-f]{64}/);
 });
 
-test("media bootstrap retries bounded apt work and validates installed tools", async (t) => {
+test("media bootstrap retries bounded apt work through an independent official Ubuntu source list", async (t) => {
   const paths = await fixture(t, "evavo-ci-media-retry-");
   const updateCount = path.join(paths.root, "update-count");
   const installCount = path.join(paths.root, "install-count");
+  const directMarker = path.join(paths.root, "direct-source-used");
   await writeForwarders(paths);
+  await writeFile(
+    paths.directSources,
+    "deb https://archive.ubuntu.com/ubuntu noble main universe\n",
+    "utf8",
+  );
   await executable(
     paths.aptGet,
     `#!/usr/bin/env bash
 set -euo pipefail
 command_name=""
+uses_direct_source=false
 for argument in "$@"; do
+  if [[ "\${argument}" == "Dir::Etc::sourcelist=${paths.directSources}" ]]; then
+    uses_direct_source=true
+  fi
   if [[ "\${argument}" == "update" || "\${argument}" == "install" ]]; then
     command_name="\${argument}"
-    break
   fi
 done
 if [[ "\${command_name}" == "update" ]]; then
@@ -174,10 +185,13 @@ if [[ "\${command_name}" == "update" ]]; then
   [[ ! -f "${updateCount}" ]] || count="$(cat "${updateCount}")"
   count=$((count + 1))
   printf '%s' "\${count}" > "${updateCount}"
-  ((count >= 2))
-  exit
+  if ((count == 1)); then exit 92; fi
+  [[ "\${uses_direct_source}" == "true" ]] || exit 94
+  touch "${directMarker}"
+  exit 0
 fi
 if [[ "\${command_name}" == "install" ]]; then
+  [[ "\${uses_direct_source}" == "true" ]] || exit 95
   count=0
   [[ ! -f "${installCount}" ]] || count="$(cat "${installCount}")"
   printf '%s' "$((count + 1))" > "${installCount}"
@@ -203,14 +217,17 @@ exit 91
     CI_MEDIA_APT_GET_BIN: paths.aptGet,
     CI_MEDIA_SUDO_BIN: paths.sudo,
     CI_MEDIA_TIMEOUT_BIN: paths.timeout,
+    CI_MEDIA_APT_DIRECT_SOURCE_LIST: paths.directSources,
     CI_MEDIA_APT_ATTEMPTS: "2",
     CI_MEDIA_RETRY_DELAY_SECONDS: "0",
   });
   assertSuccess(result);
   assert.equal(await readFile(updateCount, "utf8"), "2");
   assert.equal(await readFile(installCount, "utf8"), "1");
+  assert.equal(await exists(directMarker), true);
   assert.match(result.stdout, /attempt 1\/2/);
   assert.match(result.stdout, /attempt 2\/2/);
+  assert.match(result.stdout, /temporary direct official Ubuntu source list/);
 
   const output = await readFile(paths.environment, "utf8");
   assert.match(
@@ -255,6 +272,26 @@ exit 92
   assert.equal(await exists(paths.ffprobe), false);
 });
 
+test("media bootstrap rejects an unreadable explicit direct source list", async (t) => {
+  const paths = await fixture(t, "evavo-ci-media-source-list-");
+  await writeForwarders(paths);
+  await executable(paths.aptGet, "#!/usr/bin/env bash\nexit 92\n");
+
+  const result = runBootstrap({
+    CI_MEDIA_ENV_FILE: paths.environment,
+    CI_MEDIA_FFMPEG_BIN: paths.ffmpeg,
+    CI_MEDIA_FFPROBE_BIN: paths.ffprobe,
+    CI_MEDIA_APT_GET_BIN: paths.aptGet,
+    CI_MEDIA_SUDO_BIN: paths.sudo,
+    CI_MEDIA_TIMEOUT_BIN: paths.timeout,
+    CI_MEDIA_APT_DIRECT_SOURCE_LIST: path.join(paths.root, "missing.list"),
+    CI_MEDIA_APT_ATTEMPTS: "2",
+    CI_MEDIA_RETRY_DELAY_SECONDS: "0",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /CI_MEDIA_APT_DIRECT_SOURCE_LIST is not readable/);
+});
+
 test("critical workflows permanently use the bounded bootstrap contract", async () => {
   const [mainline, bookArt, workflow, bootstrap] = await Promise.all([
     readFile(MAINLINE_WORKFLOW, "utf8"),
@@ -283,6 +320,10 @@ test("critical workflows permanently use the bounded bootstrap contract", async 
   assert.match(workflow, /bash scripts\/bootstrap-ci-media-tools\.sh/);
   assert.match(bootstrap, /CI_MEDIA_APT_UPDATE_TIMEOUT_SECONDS:-120/);
   assert.match(bootstrap, /CI_MEDIA_APT_INSTALL_TIMEOUT_SECONDS:-180/);
+  assert.match(bootstrap, /CI_MEDIA_APT_DIRECT_SOURCE_LIST/);
+  assert.match(bootstrap, /archive\.ubuntu\.com\/ubuntu/);
+  assert.match(bootstrap, /security\.ubuntu\.com\/ubuntu/);
+  assert.match(bootstrap, /Dir::Etc::sourcelist/);
   assert.match(bootstrap, /--kill-after=15s/);
   assert.match(bootstrap, /Acquire::Retries=3/);
   assert.match(bootstrap, /package installation was skipped/);
