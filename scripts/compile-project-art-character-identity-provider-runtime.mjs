@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  lstatSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -11,28 +16,71 @@ import {
   compileCharacterIdentityProviderRuntimeAdapter,
 } from './project-art/character-identity-provider-runtime.mjs';
 
+const COMMAND_FLAGS = Object.freeze({
+  admit: Object.freeze([
+    '--identity-request',
+    '--job-id',
+    '--selection',
+    '--actor-id',
+    '--occurred-at',
+    '--evidence-sha256',
+    '--output',
+    '--anchor-execution-receipt',
+  ]),
+  authorize: Object.freeze([
+    '--provider-admission',
+    '--actor-id',
+    '--occurred-at',
+    '--expires-at',
+    '--evidence-sha256',
+    '--output',
+  ]),
+  adapter: Object.freeze([
+    '--identity-request',
+    '--provider-admission',
+    '--authorization',
+    '--compiled-at',
+    '--output',
+  ]),
+});
+
 function fail(message) {
   const error = new Error(message);
   error.code = 'CHARACTER_IDENTITY_PROVIDER_COMPILER_CLI_INVALID';
   throw error;
 }
 
+function usage() {
+  return [
+    'usage:',
+    '  compile-project-art-character-identity-provider-runtime.mjs admit --identity-request <json> --job-id <id> --selection <json> --actor-id <human> --occurred-at <iso> --evidence-sha256 <sha> --output <json> [--anchor-execution-receipt <json>]',
+    '  compile-project-art-character-identity-provider-runtime.mjs authorize --provider-admission <json> --actor-id <human> --occurred-at <iso> --expires-at <iso> --evidence-sha256 <sha> --output <json>',
+    '  compile-project-art-character-identity-provider-runtime.mjs adapter --identity-request <json> --provider-admission <json> --authorization <json> --compiled-at <iso> --output <json>',
+  ].join('\n');
+}
+
 function parseArgs(argv) {
+  if (!Array.isArray(argv) || argv.length < 1 || (argv.length - 1) % 2 !== 0) {
+    fail(usage());
+  }
   const command = argv[0];
+  const allowedFlags = COMMAND_FLAGS[command];
+  if (!allowedFlags) fail(usage());
+  const allowed = new Set(allowedFlags);
   const values = new Map();
   for (let index = 1; index < argv.length; index += 2) {
     const flag = argv[index];
     const value = argv[index + 1];
     if (
       typeof flag !== 'string' ||
-      !flag.startsWith('--') ||
+      !allowed.has(flag) ||
       typeof value !== 'string' ||
       !value ||
       value.startsWith('--') ||
       values.has(flag) ||
       /[\0\r\n]/u.test(value)
     ) {
-      fail('Arguments must be unique --name value pairs.');
+      fail(`Unsupported, duplicate or invalid argument for ${command}.`);
     }
     values.set(flag, value);
   }
@@ -47,7 +95,15 @@ function requireValue(values, name) {
 
 function readJson(file, label) {
   const absolute = path.resolve(file);
+  const before = lstatSync(absolute);
+  if (!before.isFile() || before.isSymbolicLink() || realpathSync(absolute) !== absolute) {
+    fail(`${label} must be an ordinary file on a real path.`);
+  }
   const bytes = readFileSync(absolute);
+  const after = lstatSync(absolute);
+  if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
+    fail(`${label} changed while being read.`);
+  }
   let value;
   try {
     value = JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/u, ''));
@@ -57,8 +113,28 @@ function readJson(file, label) {
   return { absolute, bytes, value };
 }
 
-function writeCreateOnly(file, value) {
+function createOnlyTarget(file) {
   const absolute = path.resolve(file);
+  const parent = path.dirname(absolute);
+  const state = lstatSync(parent);
+  if (
+    !state.isDirectory() ||
+    state.isSymbolicLink() ||
+    realpathSync(parent) !== path.resolve(parent)
+  ) {
+    fail('Output parent must be a real directory.');
+  }
+  try {
+    lstatSync(absolute);
+    fail('Output is create-only and already exists.');
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  return absolute;
+}
+
+function writeCreateOnly(file, value) {
+  const absolute = createOnlyTarget(file);
   writeFileSync(absolute, `${JSON.stringify(value, null, 2)}\n`, {
     encoding: 'utf8',
     mode: 0o600,
@@ -71,18 +147,8 @@ function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-function usage() {
-  return [
-    'usage:',
-    '  compile-project-art-character-identity-provider-runtime.mjs admit --identity-request <json> --job-id <id> --selection <json> --actor-id <human> --occurred-at <iso> --evidence-sha256 <sha> --output <json> [--anchor-execution-receipt <json>]',
-    '  compile-project-art-character-identity-provider-runtime.mjs authorize --provider-admission <json> --actor-id <human> --occurred-at <iso> --expires-at <iso> --evidence-sha256 <sha> --output <json>',
-    '  compile-project-art-character-identity-provider-runtime.mjs adapter --identity-request <json> --provider-admission <json> --authorization <json> --compiled-at <iso> --output <json>',
-  ].join('\n');
-}
-
 export function runCharacterIdentityProviderCompilerCli(argv = process.argv.slice(2)) {
   const { command, values } = parseArgs(argv);
-  if (!['admit', 'authorize', 'adapter'].includes(command)) fail(usage());
 
   if (command === 'admit') {
     const request = readJson(
