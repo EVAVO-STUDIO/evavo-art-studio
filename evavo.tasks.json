@@ -38,6 +38,7 @@
     },
     "game-art-raster-edit": {
       "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
       "entry": "tools/image_workstation.py",
       "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--receipt", "{{receipt}}"],
       "parameterSchema": {
@@ -54,10 +55,11 @@
       "parameterOutputs": ["receipt"],
       "network": "disabled",
       "timeoutSeconds": 3600,
-      "description": "Execute one exact-plan, create-only deterministic raster edit inside an allowed EVAVO workspace."
+      "description": "Execute one exact-plan, create-only deterministic raster edit inside an allowed EVAVO workspace using the managed image-finishing Python environment."
     },
     "game-art-sheet-segment": {
       "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
       "entry": "tools/sprite_sheet_segmenter.py",
       "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--output-root", "{{outputRoot}}"],
       "parameterSchema": {
@@ -74,10 +76,11 @@
       "parameterOutputs": ["outputRoot"],
       "network": "disabled",
       "timeoutSeconds": 3600,
-      "description": "Split one exact generated/reference sheet into create-only frame candidates by reviewed rectangles or bounded alpha components."
+      "description": "Split one exact generated/reference sheet into create-only frame candidates by reviewed rectangles or bounded alpha components using the managed image-finishing Python environment."
     },
     "game-art-animation-preview": {
       "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
       "entry": "tools/sprite_animation_preview.py",
       "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--output-root", "{{outputRoot}}"],
       "parameterSchema": {
@@ -94,10 +97,11 @@
       "parameterOutputs": ["outputRoot"],
       "network": "disabled",
       "timeoutSeconds": 1800,
-      "description": "Render a review-only nearest-neighbour animation GIF and frame strip from exact candidate-frame hashes."
+      "description": "Render a review-only nearest-neighbour animation GIF and frame strip from exact candidate-frame hashes using the managed image-finishing Python environment."
     },
     "game-art-sprite-build": {
       "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
       "entry": "tools/sprite_workstation.py",
       "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--output-root", "{{outputRoot}}"],
       "parameterSchema": {
@@ -114,7 +118,7 @@
       "parameterOutputs": ["outputRoot"],
       "network": "disabled",
       "timeoutSeconds": 3600,
-      "description": "Build one exact-plan create-only sprite atlas, manifest and Godot SpriteFrames package from reviewed frames."
+      "description": "Build one exact-plan create-only sprite atlas, manifest and Godot SpriteFrames package from reviewed frames using the managed image-finishing Python environment."
     },
     "pixel-art-candidate-audit-test": {
       "runtime": "node-script",
