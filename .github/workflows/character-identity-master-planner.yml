@@ -1,0 +1,37 @@
+name: Character Identity Master Planner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/character-identity-master-plan.mjs"
+      - "scripts/test-character-identity-master-plan.mjs"
+      - ".github/workflows/character-identity-master-planner.yml"
+  pull_request:
+    paths:
+      - "scripts/character-identity-master-plan.mjs"
+      - "scripts/test-character-identity-master-plan.mjs"
+      - ".github/workflows/character-identity-master-planner.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Identity planner / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        with:
+          persist-credentials: false
+      - name: Check planner syntax
+        run: node --check scripts/character-identity-master-plan.mjs
+      - name: Run planner contracts
+        run: node --test scripts/test-character-identity-master-plan.mjs
