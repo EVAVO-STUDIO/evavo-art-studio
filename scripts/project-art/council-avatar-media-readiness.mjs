@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto';
 
 import { compileCouncilAvatarProductionProgram } from './council-avatar-production-program.mjs';
 import { compileCouncilAvatarIdentityBootstrap } from './council-avatar-identity-bootstrap.mjs';
+import {
+  evaDenseMotionMasteringCampaignCapabilities,
+} from './eva-dense-motion-mastering-campaign.mjs';
 import { evaDenseMotionTenMasterCapabilities } from './eva-dense-motion-ten-master-program.mjs';
 import { TOP_HAT_RUNTIME_EXPECTED_SLOTS } from './top-hat-pose-slot-provider-runtime-foundation.mjs';
 
@@ -16,6 +19,8 @@ const EVA_TEN_MASTER_PROGRAM =
   'scripts/project-art/eva-dense-motion-ten-master-program.mjs';
 const EVA_TEN_MASTER_COMPILER =
   'scripts/compile-project-art-eva-dense-motion-ten-master.mjs';
+const EVA_MASTERING_CAMPAIGN =
+  'scripts/project-art/eva-dense-motion-mastering-campaign.mjs';
 const EVA_WORKSTATION_TASK = 'config/eva-dense-motion-workstation-task-v1.json';
 const IDENTITY_MASTER_PLANNER = 'scripts/character-identity-master-plan.mjs';
 const IDENTITY_BOOTSTRAP_ADMISSION =
@@ -151,6 +156,7 @@ function topHatReadiness(character) {
 
 function evaReadiness(character) {
   const tenMaster = evaDenseMotionTenMasterCapabilities();
+  const mastering = evaDenseMotionMasteringCampaignCapabilities();
   assert(
     tenMaster.exactTenNewMasterJobs === true &&
       tenMaster.fallbackRemasterJobCount === 3 &&
@@ -161,13 +167,26 @@ function evaReadiness(character) {
       tenMaster.runtimeActivation === false,
     'COUNCIL_AVATAR_EVA_TEN_MASTER_CAPABILITY_DRIFT',
   );
+  assert(
+    mastering.exactTenFrameCampaign === true &&
+      mastering.allPendingFramesAlphaPreflightBeforeFirstWrite === true &&
+      mastering.completedFrameBoundaryResumeSupported === true &&
+      mastering.midFramePartialStateRejected === true &&
+      mastering.resumedFrameBytesReverifiedBySha256 === true &&
+      mastering.technicalInspectionExecution === false &&
+      mastering.creativeReviewExecution === false &&
+      mastering.cloudinaryUpload === false &&
+      mastering.sequenceRelease === false &&
+      mastering.runtimeActivation === false,
+    'COUNCIL_AVATAR_EVA_MASTERING_CAPABILITY_DRIFT',
+  );
 
   return Object.freeze({
     seatId: character.seatId,
     seatLabel: character.seatLabel,
     characterId: character.characterId,
     characterLabel: character.characterLabel,
-    stage: 'identity-ready-ten-master-program-blocked',
+    stage: 'identity-ready-ten-master-execution-ready-for-evidence',
     identityReady: true,
     authoredAnimationReady: false,
     productionReady: false,
@@ -181,6 +200,11 @@ function evaReadiness(character) {
       tenMasterRequiredNewMasterCount: 10,
       fallbackRemasterOrdinals: EVA_TEMPORARY_FALLBACK_ORDINALS,
       masteredDenseMasterCount: 0,
+      realMasteringCampaignReceiptCount: 0,
+      technicalInspectionCount: 0,
+      creativeApprovalCount: 0,
+      cloudinaryPublishedDenseMasterCount: 0,
+      runtimeDenseMasterEvidenceCount: 0,
       legacyPoseReuseAllowedForFinalRelease: false,
       syntheticBodyTransformsAllowed: false,
     }),
@@ -190,7 +214,7 @@ function evaReadiness(character) {
       providerSelectionEstablished: false,
       providerAuthorizationEstablished: false,
       masteringPlanningSurfaceAvailable: true,
-      masteringExecutionSurfaceAvailable: false,
+      masteringExecutionSurfaceAvailable: true,
       masteringExecutionEstablished: false,
       localValidationEntry: EVA_DENSE_WORK_ORDER_CHECKER,
       tenMasterProgram: EVA_TEN_MASTER_PROGRAM,
@@ -207,6 +231,16 @@ function evaReadiness(character) {
         '--output',
         '<create-only-ten-master-program.json>',
       ]),
+      masteringCampaign: EVA_MASTERING_CAMPAIGN,
+      masteringCampaignMode: 'workspace-local-deterministic',
+      allPendingFramesAlphaPreflightBeforeFirstWrite: true,
+      completedFrameBoundaryResumeSupported: true,
+      midFramePartialStateRejected: true,
+      minimumIndependentInspectorsPerCandidate: 2,
+      minimumInspectorConfidence: 0.95,
+      reviewedAlphaMatteRequiredPerFrame: true,
+      oneShotAlphaMasteringAuthorizationRequiredPerFrame: true,
+      authorizationMaximumHours: 24,
       workstationTask: EVA_WORKSTATION_TASK,
       namedWorkerTask: 'eva-avatar-worker-stack',
       providerRunner: null,
@@ -214,32 +248,44 @@ function evaReadiness(character) {
       legacyFallbackMaySatisfyFinalMasterGate: false,
     }),
     blockers: Object.freeze([
+      'the governed deterministic ten-frame mastering surface exists, but no real mastering campaign receipt is established by repository state',
       'all ten immutable new dense-motion masters are not complete',
+      'real candidate assurance with at least two independent inspectors at confidence 0.95 or greater is not established for all ten frames',
+      'named-human reviewed alpha mattes and bounded one-shot alpha-mastering authorizations are not established for all ten frames',
       'the current fallback masters at ordinals 4, 5 and 6 may not satisfy the final ten-master release gate and require new dense-motion remasters',
-      'the ten-master planning surface is available, but no governed bulk mastering/upload execution evidence is established by repository state',
+      'independent technical inspection and named-human creative approval remain incomplete for all ten final masters',
       'ten-edge continuity evidence including frame 10 to frame 1 loop closure is incomplete',
+      'immutable Cloudinary publication and Avatar Runtime frame evidence are absent',
       'the complete 749-image authored animation family has not been approved and released',
     ]),
     requiredNextEvidence: Object.freeze([
       'self-hashed v2 ten-master production program bound to the exact ten source frames',
+      'real dense source-space candidate bytes for ordinals 1 through 10',
+      'candidate assurance covering every production check with at least two independent inspectors and minimum confidence 0.95',
+      'named-human reviewed alpha matte plus time-bounded one-shot alpha-mastering authorization for each frame',
+      'ten-frame mastering campaign receipt binding ten alpha-mastering and frame-finisher receipts',
       'new immutable asset IDs and master SHA-256 values for ordinals 1 through 10',
-      'candidate assurance, alpha mastering, frame-finisher, technical inspection and creative approval evidence for all ten masters',
+      'independent technical inspection and creative approval evidence for all ten masters',
       'proof that legacy fallback assets at ordinals 4, 5 and 6 were not reused as final dense masters',
       'independent continuity review for all ten edges including 10 to 1',
       'complete authored animation-suite QA and approval evidence before Runtime publication',
     ]),
     downstreamGates: Object.freeze([
       'compile the v2 ten-master production program',
-      'master and approve all ten new dense identities through the governed per-frame pipeline',
+      'materialize and assure all ten dense candidates',
+      'review all ten alpha mattes and issue bounded one-shot mastering authorizations',
+      'run the governed ten-frame deterministic mastering campaign',
+      'independently inspect and creatively approve all ten finished masters',
       'prove ten unique immutable final master identities and exclude the legacy 4/5/6 fallback from the final set',
       'prove ten-edge continuity and loop closure',
+      'publish reviewed masters immutably and assemble Avatar Runtime frame evidence',
       'compile the canonical 749-image animation suite',
-      'independent QA and creative approval',
+      'independent animation QA and creative approval',
       'Avatar Runtime publication',
       'website installation and activation',
     ]),
     nextGate:
-      'compile the governed v2 ten-master program, then collect per-frame mastering and approval evidence for all ten ordinals while retaining the live 4/5/6 fallback until atomic ten-master activation; planning does not grant mastering, upload or Runtime activation authority',
+      'supply real candidate assurance, reviewed alpha mattes and bounded one-shot mastering authorizations for all ten ordinals, then run the governed deterministic mastering campaign; the surface grants no technical approval, creative approval, upload, sequence release or Runtime activation authority',
     authority: AUTHORITY,
   });
 }
@@ -388,6 +434,12 @@ export function compileCouncilAvatarMediaReadiness() {
   const providerExecutionEstablishedCount = characters.filter(
     (character) => character.execution.providerExecutionEstablished,
   ).length;
+  const masteringExecutionSurfaceAvailableCount = characters.filter(
+    (character) => character.execution.masteringExecutionSurfaceAvailable === true,
+  ).length;
+  const masteringExecutionEstablishedCount = characters.filter(
+    (character) => character.execution.masteringExecutionEstablished === true,
+  ).length;
 
   const base = Object.freeze({
     schema: COUNCIL_AVATAR_MEDIA_READINESS_SCHEMA,
@@ -399,6 +451,7 @@ export function compileCouncilAvatarMediaReadiness() {
       evaDenseMotionWorkOrderChecker: EVA_DENSE_WORK_ORDER_CHECKER,
       evaDenseMotionTenMasterProgram: EVA_TEN_MASTER_PROGRAM,
       evaDenseMotionTenMasterCompiler: EVA_TEN_MASTER_COMPILER,
+      evaDenseMotionMasteringCampaign: EVA_MASTERING_CAMPAIGN,
       evaDenseMotionWorkstationTask: EVA_WORKSTATION_TASK,
       councilWorkerTaskName: 'council-avatar-worker-stack',
       evaWorkerTaskName: 'eva-avatar-worker-stack',
@@ -413,6 +466,8 @@ export function compileCouncilAvatarMediaReadiness() {
     productionReadyCount,
     providerExecutionSurfaceAvailableCount,
     providerExecutionEstablishedCount,
+    masteringExecutionSurfaceAvailableCount,
+    masteringExecutionEstablishedCount,
     totalPlannedImagesPerCharacter: program.animationStandard.totalPlannedImagesPerCharacter,
     characters,
     release: Object.freeze({
@@ -430,7 +485,9 @@ export function compileCouncilAvatarMediaReadiness() {
     identityReadyCount === 2 &&
       productionReadyCount === 0 &&
       providerExecutionSurfaceAvailableCount === 3 &&
-      providerExecutionEstablishedCount === 0,
+      providerExecutionEstablishedCount === 0 &&
+      masteringExecutionSurfaceAvailableCount === 1 &&
+      masteringExecutionEstablishedCount === 0,
     'COUNCIL_AVATAR_MEDIA_READINESS_EXPECTED_BLOCKER_DRIFT',
   );
 
