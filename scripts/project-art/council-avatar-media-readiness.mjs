@@ -16,6 +16,10 @@ const IDENTITY_BOOTSTRAP_ADMISSION =
   'scripts/character-identity-bootstrap-admission.mjs';
 const IDENTITY_CANDIDATE_REVIEW =
   'scripts/character-identity-candidate-review-plan.mjs';
+const CHARACTER_IDENTITY_PROVIDER_COMPILER =
+  'scripts/compile-project-art-character-identity-provider-runtime.mjs';
+const CHARACTER_IDENTITY_PROVIDER_RUNNER =
+  'scripts/run-project-art-character-identity-provider.mjs';
 
 const EVA_TEMPORARY_FALLBACK_ORDINALS = Object.freeze([4, 5, 6]);
 const EVA_PENDING_MASTERING_ORDINALS = Object.freeze([1, 2, 3, 7, 8, 9, 10]);
@@ -214,7 +218,7 @@ function newIdentityReadiness(character, bootstrapCharacter) {
     seatLabel: character.seatLabel,
     characterId: character.characterId,
     characterLabel: character.characterLabel,
-    stage: 'identity-master-provider-gate-required',
+    stage: 'identity-master-provider-execution-ready-for-evidence',
     identityReady: false,
     authoredAnimationReady: false,
     productionReady: false,
@@ -228,7 +232,7 @@ function newIdentityReadiness(character, bootstrapCharacter) {
       approvedIdentityMasterCount: 0,
     }),
     execution: Object.freeze({
-      providerExecutionSurfaceAvailable: false,
+      providerExecutionSurfaceAvailable: true,
       providerExecutionEstablished: false,
       providerSelectionEstablished: false,
       providerAuthorizationEstablished: false,
@@ -253,19 +257,26 @@ function newIdentityReadiness(character, bootstrapCharacter) {
         ]),
       ]),
       candidateReviewPlanner: IDENTITY_CANDIDATE_REVIEW,
-      providerRunner: null,
+      providerCompiler: CHARACTER_IDENTITY_PROVIDER_COMPILER,
+      providerRunner: CHARACTER_IDENTITY_PROVIDER_RUNNER,
+      setAnchorViewId: 'full-body-right',
+      dependentViewIds: Object.freeze(['full-body-left', 'neutral-bust']),
+      sameSetAnchorArtifactRequiredForDependentViews: true,
+      maximumProviderCallsPerJob: 1,
+      maximumRuntimeAttempts: 1,
+      authorizationMaximumHours: 24,
+      providerFallbackAllowed: false,
     }),
     blockers: Object.freeze([
       'no approved continuity-locked identity master exists',
       'provider selection and runtime profile are deferred',
-      'no character-identity provider execution runtime is established by repository state',
-      'time-bounded provider execution authorization is not established by repository state',
+      'no real provider admission, time-bounded authorization or execution receipts are established by repository state',
       'candidate generation receipts, exact artifact hashes and separate identity approval are absent',
     ]),
     requiredNextEvidence: Object.freeze([...admission.requiredNextEvidence]),
     downstreamGates: Object.freeze([
-      'establish a governed character-identity provider execution surface',
-      'execute the 12 admitted identity candidate jobs under bounded authorization',
+      'compile exact provider admission, bounded authorization and runtime adapter for each admitted identity candidate job',
+      'execute each candidate set anchor first, then execute its dependent views from the exact same-set unapproved anchor artifact',
       'materialize exact candidate artifact hashes and generation receipts',
       'review all three continuity views for each candidate set',
       'approve exactly one identity set under a separate identity approval receipt',
@@ -275,8 +286,9 @@ function newIdentityReadiness(character, bootstrapCharacter) {
       'website installation and activation',
     ]),
     nextEngineeringGate:
-      'add a governed character-identity provider execution transaction that consumes the exact bootstrap admission plus provider profile/admission/authorization evidence; do not reuse the mobile-identity provider runtime',
-    nextGate: admission.nextGate,
+      'bind an exact provider/model selection and a named-human authorization expiring within 24 hours to each admitted job; generate full-body-right first for each set, then generate left and bust views only from that exact unapproved same-set anchor candidate',
+    nextGate:
+      'execute candidate-only identity generation through the governed character-identity provider runtime; generation remains separate from identity approval, animation, publication and activation',
     authority: AUTHORITY,
   });
 }
@@ -325,6 +337,9 @@ export function compileCouncilAvatarMediaReadiness() {
 
   const identityReadyCount = characters.filter((character) => character.identityReady).length;
   const productionReadyCount = characters.filter((character) => character.productionReady).length;
+  const providerExecutionSurfaceAvailableCount = characters.filter(
+    (character) => character.execution.providerExecutionSurfaceAvailable,
+  ).length;
   const providerExecutionEstablishedCount = characters.filter(
     (character) => character.execution.providerExecutionEstablished,
   ).length;
@@ -339,7 +354,8 @@ export function compileCouncilAvatarMediaReadiness() {
       evaDenseMotionWorkOrderChecker: EVA_DENSE_WORK_ORDER_CHECKER,
       councilWorkerTaskName: 'council-avatar-worker-stack',
       evaWorkerTaskName: 'eva-avatar-worker-stack',
-      characterIdentityProviderExecutionSurface: null,
+      characterIdentityProviderCompiler: CHARACTER_IDENTITY_PROVIDER_COMPILER,
+      characterIdentityProviderExecutionSurface: CHARACTER_IDENTITY_PROVIDER_RUNNER,
       unrelatedMobileIdentityProviderRuntimeMayBeReused: false,
     }),
     seatCount: program.seatCount,
@@ -347,6 +363,7 @@ export function compileCouncilAvatarMediaReadiness() {
     identityReadyCount,
     identityMasterGenerationCount: characters.length - identityReadyCount,
     productionReadyCount,
+    providerExecutionSurfaceAvailableCount,
     providerExecutionEstablishedCount,
     totalPlannedImagesPerCharacter: program.animationStandard.totalPlannedImagesPerCharacter,
     characters,
@@ -364,6 +381,7 @@ export function compileCouncilAvatarMediaReadiness() {
   assert(
     identityReadyCount === 2 &&
       productionReadyCount === 0 &&
+      providerExecutionSurfaceAvailableCount === 3 &&
       providerExecutionEstablishedCount === 0,
     'COUNCIL_AVATAR_MEDIA_READINESS_EXPECTED_BLOCKER_DRIFT',
   );
