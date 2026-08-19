@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-art-studio-automation-fabric-upstream-review",
+  "reviewedAt": "2026-08-19T10:01:00+10:00",
+  "artStudio": {
+    "repository": "EVAVO-STUDIO/evavo-art-studio",
+    "baseCommit": "24fa094e88b74af1c74d08caddc0233bcd538d77",
+    "runtimeContract": "config/automation-fabric-client-v5.json",
+    "recoveryContract": "config/automation-fabric-recovery-chain.json"
+  },
+  "localStorage": {
+    "repository": "EVAVO-STUDIO/evavo-local-storage",
+    "reviewedMain": "cb10e3409f686d00eaeea5a53b3c391dbb125c55",
+    "packageVersion": "0.48.2",
+    "automationFabricSchemaVersion": 3,
+    "automationFabricVersion": "3.1",
+    "workstationAcceptance": "evavo-workstation-acceptance-v8",
+    "workstationAcceptanceCommand": "evavo-local-storage-workstation-accept",
+    "repositoryTaskPlanAction": "storage.repository_task_plan",
+    "repositoryTaskRunAction": "storage.repository_task_run",
+    "repositoryPlanWakeWorkflow": ".github/workflows/repository-plan-command-wake.yml",
+    "poolId": "windows-local",
+    "primaryNodeId": "windows-primary"
+  },
+  "developmentStudio": {
+    "repository": "EVAVO-STUDIO/evavo-development-studio",
+    "reviewedMain": "8fdcb2a2a96b8ac44866f721105bd4ae7d7f0f2c",
+    "publicationOperator": "scripts/mainline-publish.mjs",
+    "publicationCapability": "development.repository.publish",
+    "missionPublicationCapability": "development.repository.mission-publish"
+  },
+  "executionTruth": {
+    "readOnlyPlanBeforeUnmeasuredExecution": true,
+    "exactHeadRequired": true,
+    "exactStatusSha256Required": true,
+    "trackedScriptSha256Required": true,
+    "singleCorrelatedReceiptRequired": true,
+    "windowsExecutionReceiptRequired": true,
+    "queuedIssueIsSuccess": false,
+    "workerReceiptIsPublicationEvidence": false,
+    "manualTerminalRelayIsRoutinePath": false,
+    "resourceAwareAdmissionRequired": true,
+    "boundedProcessTreeTerminationRequired": true,
+    "maximumAutomaticAttempts": 3
+  },
+  "authority": {
+    "workerRepositoryCommit": false,
+    "workerRepositoryPush": false,
+    "workerPublication": false,
+    "workerCreativeApproval": false,
+    "workerProviderPromotion": false,
+    "workerRuntimeActivation": false,
+    "forcePush": false
+  }
+}
