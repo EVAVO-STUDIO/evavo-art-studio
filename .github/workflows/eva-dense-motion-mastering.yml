@@ -1,0 +1,75 @@
+name: EVA dense-motion mastering execution
+
+on:
+  pull_request:
+    paths:
+      - "scripts/project-art/eva-dense-motion-candidate-assurance.mjs"
+      - "scripts/project-art/eva-dense-motion-alpha-mastering.mjs"
+      - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
+      - "scripts/project-art/eva-dense-motion-work-order*.mjs"
+      - "scripts/test-project-art-eva-dense-motion-mastering.mjs"
+      - ".github/workflows/eva-dense-motion-mastering.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/project-art/eva-dense-motion-candidate-assurance.mjs"
+      - "scripts/project-art/eva-dense-motion-alpha-mastering.mjs"
+      - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
+      - "scripts/project-art/eva-dense-motion-work-order*.mjs"
+      - "scripts/test-project-art-eva-dense-motion-mastering.mjs"
+      - ".github/workflows/eva-dense-motion-mastering.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eva-dense-motion-mastering-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up exact Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Syntax-check dense mastering surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/project-art/eva-dense-motion-candidate-assurance.mjs
+          node --check scripts/project-art/eva-dense-motion-alpha-mastering.mjs
+          node --check scripts/test-project-art-eva-dense-motion-mastering.mjs
+
+      - name: Run dense mastering execution regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/test-project-art-eva-dense-motion-mastering.mjs
+
+      - name: Re-run ten-master policy regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/test-project-art-eva-dense-motion-ten-master.mjs
+
+      - name: Confirm validation changed no repository source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
