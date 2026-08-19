@@ -127,7 +127,10 @@ if (Test-Path -LiteralPath $TasksPath -PathType Leaf) {
 
 if (Test-Path -LiteralPath $LocalPyProject -PathType Leaf) {
     $LocalProject = Get-Content -LiteralPath $LocalPyProject -Raw
-    Add-Check 'local-storage-version-0.48.9' ($LocalProject.Contains('version = "0.48.9"')) '0.48.9'
+    $VersionMatch = [regex]::Match($LocalProject, '(?m)^version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"')
+    $LocalVersion = if ($VersionMatch.Success) { $VersionMatch.Groups[1].Value } else { 'unresolved' }
+    $LocalVersionOk = $VersionMatch.Success -and ([version]$LocalVersion -ge [version]'0.48.9')
+    Add-Check 'local-storage-version-floor' $LocalVersionOk $LocalVersion
     Add-Check 'local-storage-workstation-command-v8' ($LocalProject.Contains('evavo-local-storage-workstation-accept = "evavo_local_storage.workstation_acceptance_v8:main"')) 'workstation_acceptance_v8:main'
 }
 
