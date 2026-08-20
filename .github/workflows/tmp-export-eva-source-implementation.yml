@@ -1,6 +1,10 @@
 name: Temporary EVA source implementation export
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/tmp-export-eva-source-implementation.yml"
+      - "scripts/project-art/eva-dense-motion-source-materialization.mjs"
   push:
     branches:
       - agent/eva-source-integrity-follow-up
