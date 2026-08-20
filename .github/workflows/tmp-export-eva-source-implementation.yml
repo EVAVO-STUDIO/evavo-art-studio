@@ -24,10 +24,21 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Upload exact merged implementation
+      - name: Upload exact merged implementation fixture
         uses: actions/upload-artifact@v4
         with:
-          name: eva-source-implementation
-          path: scripts/project-art/eva-dense-motion-source-materialization.mjs
+          name: eva-source-implementation-fixture
+          path: |
+            scripts/project-art/avatar-final-pass-provider-candidate-common.mjs
+            scripts/project-art/eva-dense-motion-source-materialization.mjs
+            scripts/project-art/eva-dense-motion-source-preflight.mjs
+            scripts/project-art/png-structure-v1.mjs
+            scripts/project-art/eva-dense-motion-ten-master-program.mjs
+            scripts/project-art/eva-dense-motion-work-order.mjs
+            scripts/project-art/eva-dense-motion-work-order-common.mjs
+            scripts/project-art/eva-dense-motion-work-order-data.mjs
+            scripts/run-project-art-eva-dense-motion-source-materialization.mjs
+            scripts/test-project-art-eva-dense-motion-source-materialization.mjs
+            scripts/test-project-art-eva-dense-motion-source-materialization-cli.mjs
           if-no-files-found: error
           retention-days: 1
