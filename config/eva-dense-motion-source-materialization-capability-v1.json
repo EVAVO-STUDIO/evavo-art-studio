@@ -1,0 +1,49 @@
+{
+  "schema": "evavo.project-art-eva-dense-motion-source-materialization-capability.v1",
+  "protocolVersion": "1.0.0",
+  "characterId": "eva-female",
+  "familyId": "eva-20260809-153620",
+  "requiredOrdinals": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  "sourceRepository": "EVAVO-STUDIO/evavo-avatar-runtime",
+  "sourceRuntimeCommit": "c736a6d6648d3f02ac5745458a4cea0e02eab00c",
+  "sourceRuntimeTree": "ab17548e5178acd4e33d74a9fb57569482381a33",
+  "tenMasterProgram": "scripts/project-art/eva-dense-motion-ten-master-program.mjs",
+  "implementation": "scripts/project-art/eva-dense-motion-source-materialization.mjs",
+  "cli": "scripts/run-project-art-eva-dense-motion-source-materialization.mjs",
+  "test": "scripts/test-project-art-eva-dense-motion-source-materialization.mjs",
+  "workflow": ".github/workflows/eva-dense-motion-source-materialization.yml",
+  "execution": {
+    "exactTenSourceCampaign": true,
+    "allTenSourcesPreflightBeforeFirstWrite": true,
+    "exactRuntimeGitBlobSha1Required": true,
+    "fullPngStructureAndCrcRequired": true,
+    "exactCanvas": {
+      "width": 1024,
+      "height": 1536
+    },
+    "exactSourceByteCopyOnly": true,
+    "imageTransformationAllowed": false,
+    "createOnly": true,
+    "atomicCampaignPublication": true,
+    "partialStateRejected": true,
+    "completedReplayReverificationRequired": true
+  },
+  "downstreamAuthority": {
+    "candidateAssurance": false,
+    "alphaMatteAuthoring": false,
+    "alphaMastering": false,
+    "technicalInspection": false,
+    "creativeReview": false,
+    "creativeApproval": false,
+    "cloudinaryUpload": false,
+    "sequenceRelease": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "websiteActivation": false,
+    "repositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "deployment": false,
+    "forcePush": false
+  }
+}
