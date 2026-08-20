@@ -1,0 +1,14 @@
+{
+  "schema": "evavo.project-art-top-hat-real-provider-trigger.v1",
+  "campaignId": "top-hat-six-pose-candidates-2026-08-20",
+  "characterId": "top-hat-man",
+  "requiredPoseSlots": 6,
+  "maximumProviderCalls": 6,
+  "candidateCountPerSlot": 1,
+  "providerAdapterId": "openai-gpt-image",
+  "model": "gpt-image-1",
+  "execute": true,
+  "candidateApproval": false,
+  "publication": false,
+  "runtimeActivation": false
+}
