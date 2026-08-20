@@ -1,0 +1,29 @@
+name: Temporary EVA source implementation export
+
+on:
+  push:
+    branches:
+      - agent/eva-source-integrity-follow-up
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Upload exact merged implementation
+        uses: actions/upload-artifact@v4
+        with:
+          name: eva-source-implementation
+          path: scripts/project-art/eva-dense-motion-source-materialization.mjs
+          if-no-files-found: error
+          retention-days: 1
