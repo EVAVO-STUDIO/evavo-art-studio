@@ -17,6 +17,7 @@ export const ART_DIRECTION_OUTPUT_PROFILE_IDS = [
   "godot-4.6.2-character-sprite",
   "godot-4.6.2-isometric-character",
   "godot-4.6.2-tile-atlas",
+  "godot-4.6.2-environment-raster",
   "godot-4.6.2-particle-flipbook",
   "godot-4.6.2-ui-pixel",
   "godot-4.6.2-2.5d-billboard",
@@ -349,13 +350,7 @@ export interface NormalizedArtDirectionStyle {
     readonly notes: readonly string[];
   }>;
   readonly motion: Readonly<{
-    readonly timingFeel:
-      | "snappy"
-      | "weighty"
-      | "floaty"
-      | "mechanical"
-      | "naturalistic"
-      | "cinematic";
+    readonly timingFeel: "snappy" | "weighty" | "floaty" | "mechanical" | "naturalistic" | "cinematic";
     readonly keyPoseFirst: boolean;
     readonly exactFrameDurations: boolean;
     readonly maximumAnchorDriftPixels: number;
@@ -382,71 +377,20 @@ export interface NormalizedArtDirectionStyle {
 
 export interface NormalizedArtDirectionCompileRequest {
   readonly schemaVersion: "1.0";
-  readonly protocolVersion: typeof ART_DIRECTION_PROTOCOL_VERSION;
   readonly contractId: string;
   readonly presetId?: ArtDirectionPresetId;
-  readonly project: Readonly<{
-    readonly projectId: string;
-    readonly title: string;
-    readonly engine: string;
-    readonly engineVersion: string;
-    readonly gameGenre: string;
-    readonly targetPlatform: string;
-    readonly viewport?: Readonly<{ width: number; height: number }>;
-    readonly worldScale?: Readonly<{
-      readonly pixelsPerTile?: number;
-      readonly characterHeightPixels?: number;
-      readonly tileWidthPixels?: number;
-      readonly tileHeightPixels?: number;
-    }>;
-  }>;
+  readonly project: Required<ArtDirectionProjectInput>;
   readonly style: NormalizedArtDirectionStyle;
-  readonly asset: Readonly<{
-    readonly assetId: string;
-    readonly family: ArtAssetFamily;
-    readonly purpose: string;
-    readonly dimensions: Readonly<{ width: number; height: number }>;
-    readonly transparency: "required" | "preferred" | "opaque";
-    readonly animated: boolean;
-    readonly frameCount: number;
-    readonly framesPerSecond: number;
-    readonly loop: boolean;
-    readonly directionCount: number;
-    readonly directionNames: readonly string[];
-    readonly asymmetric: boolean;
-    readonly hasHeldItems: boolean;
-    readonly runtimeEquipmentSwaps: boolean;
-    readonly runtimeCostumeVariants: boolean;
-    readonly independentEffects: boolean;
-    readonly independentShadow: boolean;
-    readonly needsCollision: boolean;
-    readonly needsNormalMap: boolean;
-    readonly needsEmissionMap: boolean;
-    readonly largeDeformations: boolean;
-    readonly secondaryMotion: readonly ("hair" | "cloak" | "tail" | "equipment")[];
-    readonly tileFootprint?: Readonly<{ width: number; height: number }>;
-    readonly notes: readonly string[];
-  }>;
+  readonly asset: Required<ArtDirectionAssetInput>;
   readonly outputProfileIds: readonly ArtDirectionOutputProfileId[];
   readonly layerOverrides: readonly ArtDirectionLayerOverrideInput[];
   readonly metadata?: unknown;
 }
 
-export interface ArtDirectionPresetDefinition {
-  readonly id: ArtDirectionPresetId;
-  readonly title: string;
-  readonly description: string;
-  readonly lockedFields: readonly string[];
-  readonly compatibleFamilies: readonly ArtAssetFamily[];
-  readonly style: ArtDirectionStyleInput;
-  readonly defaultDirections: readonly string[];
-  readonly defaultOutputProfileIds: readonly ArtDirectionOutputProfileId[];
-}
-
 export interface ArtDirectionOutputProfileDefinition {
   readonly id: ArtDirectionOutputProfileId;
   readonly title: string;
-  readonly target: "godot-4.6.2" | "web" | "print" | "generic";
+  readonly target: "godot-4.6.2" | "web" | "generic" | "print";
   readonly compatibleFamilies: readonly ArtAssetFamily[];
   readonly requiresTransparency: boolean;
   readonly masterFormats: readonly string[];
@@ -464,18 +408,12 @@ export interface ArtDirectionOutputProfileDefinition {
   readonly importRecommendations: readonly string[];
 }
 
-export interface CompiledArtLayerDecision {
-  readonly id: string;
+export interface CompiledArtDirectionLayer {
   readonly role: ArtLayerRole;
   readonly treatment: ArtLayerTreatment;
-  readonly required: boolean;
   readonly contributesToColour: boolean;
-  readonly contributesToIdentity: boolean;
-  readonly interchangeable: boolean;
-  readonly timingIndependent: boolean;
-  readonly zOrder: number;
-  readonly reason: string;
-  readonly exportPolicy: "source-and-runtime" | "source-only" | "runtime-only" | "guide-only";
+  readonly required: boolean;
+  readonly notes: readonly string[];
 }
 
 export interface CompiledArtDirectionGate {
@@ -492,95 +430,39 @@ export interface CompiledArtDirectionContract {
   readonly contractId: string;
   readonly requestSha256: string;
   readonly contractSha256: string;
-  readonly preset: Readonly<{
-    readonly id?: ArtDirectionPresetId;
-    readonly title: string;
-    readonly lockedFields: readonly string[];
-  }>;
+  readonly preset: Readonly<{ id?: ArtDirectionPresetId; title: string; lockedFields: readonly string[] }>;
   readonly project: NormalizedArtDirectionCompileRequest["project"];
   readonly style: NormalizedArtDirectionStyle;
   readonly asset: NormalizedArtDirectionCompileRequest["asset"];
   readonly production: Readonly<{
-    readonly method: ArtProductionMethod;
-    readonly methodReasons: readonly string[];
-    readonly directionNames: readonly string[];
-    readonly frameUnit: "single-frame" | "single-layer" | "single-static" | "tile" | "cinematic-frame";
-    readonly pivot: Readonly<{ x: number; y: number }>;
-    readonly baseline: number;
-    readonly ySortOrigin: Readonly<{ x: number; y: number }>;
-    readonly tileFootprint?: Readonly<{ width: number; height: number }>;
-    readonly layers: readonly CompiledArtLayerDecision[];
-    readonly shot: Readonly<{
-      readonly include: readonly string[];
-      readonly exclude: readonly string[];
-      readonly framing: readonly string[];
-      readonly safePaddingPixels: number;
-      readonly cropPolicy: "full-motion-bounds" | "tile-bounds" | "full-canvas";
-      readonly backgroundPolicy: "transparent" | "opaque" | "separate-background";
-    }>;
+    method: ArtProductionMethod;
+    frameUnit: "single-layer" | "single-frame" | "single-static" | "tile" | "cinematic-frame";
+    layers: readonly CompiledArtDirectionLayer[];
+    shot: Readonly<{ include: readonly string[]; exclude: readonly string[]; framing: readonly string[]; safePaddingPixels: number }>;
+    pivot: Readonly<{ x: number; y: number }>;
+    ySortOrigin: Readonly<{ x: number; y: number }>;
   }>;
   readonly provider: Readonly<{
-    readonly unitOfWork: "one-frame" | "one-layer" | "one-static-asset" | "one-tile" | "one-cinematic-frame";
-    readonly orderedInstructions: readonly string[];
-    readonly immutableLocks: readonly string[];
-    readonly permittedChanges: readonly string[];
-    readonly prohibitedChanges: readonly string[];
+    unitOfWork: "one-layer" | "one-frame" | "one-static-asset" | "one-tile" | "one-cinematic-frame";
+    orderedInstructions: readonly string[];
+    immutableLocks: readonly string[];
+    permittedChanges: readonly string[];
+    prohibitedChanges: readonly string[];
   }>;
   readonly outputs: readonly ArtDirectionOutputProfileDefinition[];
   readonly qualityGates: readonly CompiledArtDirectionGate[];
   readonly delivery: Readonly<{
-    readonly sourceOfTruth: readonly string[];
-    readonly namingPattern: string;
-    readonly folderStructure: readonly string[];
-    readonly metadataSidecars: readonly string[];
-    readonly godot?: Readonly<{
-      readonly engineVersion: "4.6.2";
-      readonly nodeRecommendations: readonly string[];
-      readonly projectSettings: readonly string[];
-      readonly resourceOutputs: readonly string[];
+    sourceOfTruth: readonly string[];
+    namingPattern: string;
+    folderStructure: readonly string[];
+    metadataSidecars: readonly string[];
+    godot?: Readonly<{
+      engineVersion: "4.6.2";
+      nodeRecommendations: readonly string[];
+      projectSettings: readonly string[];
+      resourceOutputs: readonly string[];
     }>;
   }>;
   readonly warnings: readonly string[];
   readonly metadata?: unknown;
-}
-
-export interface CompiledArtDirectionJob {
-  readonly schemaVersion: "1.0";
-  readonly protocolVersion: typeof ART_DIRECTION_PROTOCOL_VERSION;
-  readonly request: NormalizedArtDirectionCompileRequest;
-  readonly requestSha256: string;
-  readonly executionMode: "deterministic-compile-only";
-  readonly runtimeJob: Readonly<{
-    readonly queue: "control";
-    readonly kind: "art.direction.compile";
-    readonly idempotencyKey: string;
-    readonly payload: NormalizedArtDirectionCompileRequest;
-    readonly inputArtifacts: readonly [];
-    readonly requiredCapabilities: readonly [
-      "art-direction.compile",
-      "style.preset.resolve",
-      "output-profile.compile",
-      "evidence.bundle",
-    ];
-    readonly maximumAttempts: 1;
-    readonly leaseDurationMs: 60_000;
-    readonly timeoutMs: 300_000;
-    readonly labels: Readonly<{
-      readonly contractId: string;
-      readonly assetId: string;
-      readonly projectId: string;
-    }>;
-  }>;
-}
-
-export class ArtDirectionError extends Error {
-  public readonly code: string;
-  public readonly details?: unknown;
-
-  public constructor(code: string, message: string, details?: unknown) {
-    super(message);
-    this.name = "ArtDirectionError";
-    this.code = code;
-    if (details !== undefined) this.details = details;
-  }
 }
