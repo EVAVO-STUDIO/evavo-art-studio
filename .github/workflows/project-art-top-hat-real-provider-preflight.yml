@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "scripts/run-project-art-top-hat-real-provider-campaign.mjs"
+      - "scripts/project-art/top-hat-pose-slot-production.mjs"
+      - "scripts/project-art/top-hat-pose-slot-provider-*.mjs"
+      - "scripts/run-project-art-top-hat-pose-*.mjs"
+      - "scripts/test-project-art-top-hat-pose-*.mjs"
       - "config/production/top-hat-pose-bank-provider-human-authorization-v1.json"
       - ".github/workflows/project-art-top-hat-real-provider-preflight.yml"
   workflow_dispatch:
@@ -14,10 +18,6 @@ permissions:
 concurrency:
   group: project-art-top-hat-real-provider-preflight-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  TOP_HAT_PINNED_RUNTIME_COMMIT: 524066fc95fee329e1a20f7c9aa7d805d94c8cc8
-  TOP_HAT_PINNED_RUNTIME_ROOT: .top-hat-pinned-avatar-runtime
 
 jobs:
   verify:
@@ -30,37 +30,6 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
-
-      - name: Check out exact admitted Runtime anchor source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: EVAVO-STUDIO/evavo-avatar-runtime
-          ref: ${{ env.TOP_HAT_PINNED_RUNTIME_COMMIT }}
-          path: ${{ env.TOP_HAT_PINNED_RUNTIME_ROOT }}
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Materialize and verify the three approved Top Hat anchors
-        shell: bash
-        run: |
-          set -euo pipefail
-          test ! -e assets/top-hat-man
-          mkdir -p assets/top-hat-man/candidates
-          install -m 0600 \
-            "${TOP_HAT_PINNED_RUNTIME_ROOT}/assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png" \
-            assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png
-          install -m 0600 \
-            "${TOP_HAT_PINNED_RUNTIME_ROOT}/assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png" \
-            assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png
-          install -m 0600 \
-            "${TOP_HAT_PINNED_RUNTIME_ROOT}/assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png" \
-            assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png
-          cat > "${RUNNER_TEMP}/top-hat-anchor-sha256.txt" <<'HASHES'
-          92cb290246a7629024dcb7768f4119f6a139d9c9f59e3d0545563e1f5b35575a  assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png
-          476ff3c1ca56e1f4ec622b94abfebf35a94b593a388177b3d9b3bce9347ed9a5  assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png
-          bd64eba4f22fd2d524ee7eb1826b2cc9cc9723cff5a764e36946d568b8cfd358  assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png
-          HASHES
-          sha256sum --check --strict "${RUNNER_TEMP}/top-hat-anchor-sha256.txt"
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -77,42 +46,98 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build exact provider dependency closure
+        shell: bash
         run: |
           set -euo pipefail
           pnpm run build:domain
           pnpm --filter @evavo/art-studio-worker build
           pnpm --filter @evavo/art-studio-worker typecheck
 
-      - name: Compile the six-slot real-provider preparation without provider calls
+      - name: Verify passive six-slot source and authorization truth
         shell: bash
         run: |
           set -euo pipefail
           node --check scripts/run-project-art-top-hat-real-provider-campaign.mjs
-          WORK_ROOT="${RUNNER_TEMP}/top-hat-real-provider-prepare-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          node scripts/run-project-art-top-hat-real-provider-campaign.mjs prepare \
-            --authorization-record "${GITHUB_WORKSPACE}/config/production/top-hat-pose-bank-provider-human-authorization-v1.json" \
-            --work-root "${WORK_ROOT}" \
-            > "${RUNNER_TEMP}/top-hat-real-provider-preparation.json"
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
-          const result = JSON.parse(readFileSync(process.env.RUNNER_TEMP + '/top-hat-real-provider-preparation.json', 'utf8'));
+          import {
+            TOP_HAT_ADMITTED_BODY_ANCHORS,
+            TOP_HAT_POSE_SLOT_RUNTIME_PIN,
+          } from './scripts/project-art/top-hat-pose-slot-production.mjs';
+          import {
+            createProjectArtTopHatPoseSlotProviderPackageRequest,
+            compileProjectArtTopHatPoseSlotProviderPackage,
+          } from './scripts/project-art/top-hat-pose-slot-provider-package.mjs';
+
+          const authorization = JSON.parse(
+            readFileSync(
+              './config/production/top-hat-pose-bank-provider-human-authorization-v1.json',
+              'utf8',
+            ),
+          );
           if (
-            result.status !== 'ready-for-six-real-provider-calls' ||
-            result.preparation?.counts?.slots !== 6 ||
-            result.preparation?.counts?.admittedAnchors !== 3 ||
-            result.preparation?.counts?.maximumProviderCalls !== 6 ||
-            result.preparation?.counts?.candidatesPerSlot !== 1 ||
-            result.providerExecutionPerformed !== false ||
-            Object.values(result.preparation?.authority ?? {}).some(Boolean)
-          ) throw new Error('Top Hat real-provider preparation contract failed.');
+            authorization.schema !== 'evavo.project-art-top-hat-real-provider-human-authorization.v1' ||
+            authorization.actorClass !== 'human' ||
+            authorization.maximumProviderCalls !== 6 ||
+            authorization.providerAdapterId !== 'openai-gpt-image' ||
+            authorization.model !== 'gpt-image-1' ||
+            authorization.candidateApprovalGranted !== false ||
+            authorization.publicationGranted !== false ||
+            authorization.runtimeActivationGranted !== false
+          ) throw new Error('Top Hat human authorization contract drifted.');
+
+          const expectedHashes = [
+            '92cb290246a7629024dcb7768f4119f6a139d9c9f59e3d0545563e1f5b35575a',
+            '476ff3c1ca56e1f4ec622b94abfebf35a94b593a388177b3d9b3bce9347ed9a5',
+            'bd64eba4f22fd2d524ee7eb1826b2cc9cc9723cff5a764e36946d568b8cfd358',
+          ];
+          if (
+            TOP_HAT_POSE_SLOT_RUNTIME_PIN.repository !== 'EVAVO-STUDIO/evavo-avatar-runtime' ||
+            TOP_HAT_POSE_SLOT_RUNTIME_PIN.commit !== '524066fc95fee329e1a20f7c9aa7d805d94c8cc8' ||
+            TOP_HAT_ADMITTED_BODY_ANCHORS.length !== 3 ||
+            TOP_HAT_ADMITTED_BODY_ANCHORS.some((anchor, index) =>
+              anchor.sha256 !== expectedHashes[index] ||
+              anchor.width !== 1024 ||
+              anchor.height !== 1536 ||
+              anchor.pixelFormat !== 'rgba8-straight' ||
+              anchor.approvalStatus !== 'approved-production-anchor'
+            )
+          ) throw new Error('Top Hat admitted anchor contract drifted.');
+
+          const request = createProjectArtTopHatPoseSlotProviderPackageRequest();
+          const packageValue = compileProjectArtTopHatPoseSlotProviderPackage(request);
+          if (
+            packageValue.counts.jobs !== 6 ||
+            packageValue.counts.maximumProviderCalls !== 6 ||
+            packageValue.counts.candidatesPerJob !== 1 ||
+            packageValue.providerExecutionPerformed !== false ||
+            packageValue.candidateApprovalPerformed !== false ||
+            packageValue.poseSlotsFilled !== false ||
+            packageValue.runtimeActivationPerformed !== false
+          ) throw new Error('Top Hat passive provider package contract drifted.');
           NODE
+
+      - name: Run guarded provider and six-slot campaign regressions
+        run: |
+          node --test scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs
+          node --test scripts/test-project-art-top-hat-pose-bank-provider-campaign.mjs
+
+      - name: Verify review-only authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "candidateApprovalPerformed: false" scripts/run-project-art-top-hat-real-provider-campaign.mjs
+          grep -F "publicationPerformed: false" scripts/run-project-art-top-hat-real-provider-campaign.mjs
+          grep -F "runtimeActivationPerformed: false" scripts/run-project-art-top-hat-real-provider-campaign.mjs
+          ! grep -F "candidateApprovalPerformed: true" scripts/run-project-art-top-hat-real-provider-campaign.mjs
+          ! grep -F "publicationPerformed: true" scripts/run-project-art-top-hat-real-provider-campaign.mjs
+          ! grep -F "runtimeActivationPerformed: true" scripts/run-project-art-top-hat-real-provider-campaign.mjs
 
       - name: Prove preflight changed no repository source
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf assets/top-hat-man "${TOP_HAT_PINNED_RUNTIME_ROOT}"
           find packages apps -type d -name dist -prune -exec rm -rf {} +
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
