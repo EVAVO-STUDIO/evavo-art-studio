@@ -8,6 +8,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { deflateSync } from 'node:zlib';
 
 import {
   compileEvaDenseMotionSourceFrameBundle,
@@ -19,23 +20,56 @@ import {
   gitBlobSha1,
 } from './project-art/eva-dense-motion-source-preflight.mjs';
 import {
+  pngCrc32,
+} from './project-art/png-structure-v1.mjs';
+import {
   compileEvaDenseMotionTenMasterProgram,
   createEvaDenseMotionTenMasterRequest,
 } from './project-art/eva-dense-motion-ten-master-program.mjs';
 
-function pngHeader({ width = 1024, height = 1536, colorType = 6 } = {}) {
-  const buffer = Buffer.alloc(33);
-  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write('IHDR', 12, 'ascii');
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  buffer[24] = 8;
-  buffer[25] = colorType;
-  buffer[26] = 0;
-  buffer[27] = 0;
-  buffer[28] = 0;
-  return buffer;
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+let canonicalPngFixture;
+
+function pngChunk(type, dataInput = Buffer.alloc(0)) {
+  const data = Buffer.from(dataInput);
+  const typeBytes = Buffer.from(type, 'ascii');
+  const output = Buffer.alloc(12 + data.length);
+  output.writeUInt32BE(data.length, 0);
+  typeBytes.copy(output, 4);
+  data.copy(output, 8);
+  output.writeUInt32BE(
+    pngCrc32(Buffer.concat([typeBytes, data])),
+    8 + data.length,
+  );
+  return output;
+}
+
+function validCanonicalPng() {
+  if (canonicalPngFixture) return Buffer.from(canonicalPngFixture);
+  const width = 1024;
+  const height = 1536;
+  const bytesPerPixel = 4;
+  const rowBytes = width * bytesPerPixel;
+  const raw = Buffer.alloc(height * (rowBytes + 1));
+  for (let y = 0; y < height; y += 1) {
+    const rowOffset = y * (rowBytes + 1);
+    raw[rowOffset] = y % 5;
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+  canonicalPngFixture = Buffer.concat([
+    PNG_SIGNATURE,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(raw)),
+    pngChunk('IEND'),
+  ]);
+  return Buffer.from(canonicalPngFixture);
 }
 
 function fixtureJob(sourceBytes) {
@@ -79,8 +113,8 @@ function canonicalProgram() {
   );
 }
 
-test('compiles a byte-for-byte source frame bundle without creating a candidate', () => {
-  const sourceBytes = Buffer.concat([pngHeader(), Buffer.from('source-frame-fixture')]);
+test('compiles a byte-for-byte, fully decoded source frame bundle without creating a candidate', () => {
+  const sourceBytes = validCanonicalPng();
   const job = fixtureJob(sourceBytes);
   const bundle = compileEvaDenseMotionSourceFrameBundle({
     programSha256: 'a'.repeat(64),
@@ -95,6 +129,12 @@ test('compiles a byte-for-byte source frame bundle without creating a candidate'
   assert.equal(bundle.receipt.source.gitBlobSha1, job.source.gitBlobSha1);
   assert.equal(bundle.inspection.png.width, 1024);
   assert.equal(bundle.inspection.png.height, 1536);
+  assert.equal(bundle.inspection.png.fullPngChunkStructureVerified, true);
+  assert.equal(bundle.inspection.png.everyPngChunkCrcVerified, true);
+  assert.equal(bundle.inspection.png.idatDecodeVerified, true);
+  assert.equal(bundle.inspection.png.scanlineFiltersVerified, true);
+  assert.equal(bundle.inspection.png.pixelReconstructionVerified, true);
+  assert.equal(bundle.inspection.png.nonInterlacedVerified, true);
   assert.equal(bundle.inspection.gates.candidateCreationAllowed, false);
   assert.equal(bundle.receipt.effects.candidatesCreated, 0);
   assert.equal(bundle.receipt.effects.alphaMastersCreated, 0);
@@ -106,7 +146,7 @@ test('compiles a byte-for-byte source frame bundle without creating a candidate'
 test('publishes the source, inspection and completion receipt create-only', () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'eva-source-publish-'));
   try {
-    const sourceBytes = Buffer.concat([pngHeader(), Buffer.from('publish-fixture')]);
+    const sourceBytes = validCanonicalPng();
     const job = fixtureJob(sourceBytes);
     const bundle = compileEvaDenseMotionSourceFrameBundle({
       programSha256: 'b'.repeat(64),
@@ -144,7 +184,7 @@ test('publishes the source, inspection and completion receipt create-only', () =
 });
 
 test('rejects source bytes that do not match the bound Git blob identity', () => {
-  const sourceBytes = Buffer.concat([pngHeader(), Buffer.from('identity-fixture')]);
+  const sourceBytes = validCanonicalPng();
   const job = fixtureJob(sourceBytes);
   job.source.gitBlobSha1 = '0'.repeat(40);
   assert.throws(
@@ -156,6 +196,22 @@ test('rejects source bytes that do not match the bound Git blob identity', () =>
         materializedAt: '2026-08-20T01:03:00.000Z',
       }),
     /EVA_DENSE_SOURCE_MATERIALIZATION_GIT_BLOB_MISMATCH/u,
+  );
+});
+
+test('rejects structurally invalid PNG bytes even when their Git identity is freshly bound', () => {
+  const sourceBytes = validCanonicalPng();
+  sourceBytes[sourceBytes.length - 1] ^= 0xff;
+  const job = fixtureJob(sourceBytes);
+  assert.throws(
+    () =>
+      compileEvaDenseMotionSourceFrameBundle({
+        programSha256: 'd'.repeat(64),
+        job,
+        sourceBytes,
+        materializedAt: '2026-08-20T01:03:30.000Z',
+      }),
+    /EVA_DENSE_SOURCE_PNG_CHUNK_CRC_INVALID/u,
   );
 });
 
@@ -173,6 +229,12 @@ test('plans all ten canonical source frames before any write', async () => {
         sourceFrameCount: 10,
         exactSourceIdentityVerified: true,
         exactCanvasVerified: true,
+        fullPngStructureAndCrcVerified: true,
+        idatDecodeVerified: true,
+        scanlineReconstructionVerified: true,
+        decodedPixelStatisticsRecorded: true,
+        nonInterlacedVerified: true,
+        noTrailingBytesVerified: true,
         allTenSourcesVerifiedBeforeMaterialization: true,
         sourceFrames: frames.map((frame, index) => ({
           ordinal: frame.ordinal,

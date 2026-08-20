@@ -10,6 +10,7 @@ import {
   EVA_DENSE_MOTION_FAMILY_ID,
   RAW_FRAMES,
 } from './eva-dense-motion-work-order-data.mjs';
+import { inspectPngStructure } from './png-structure-v1.mjs';
 
 export const EVA_DENSE_MOTION_SOURCE_PREFLIGHT_SCHEMA =
   'evavo.project-art-eva-dense-motion-source-preflight.v2';
@@ -19,10 +20,9 @@ export const EVA_DENSE_MOTION_SOURCE_ORDINALS = Object.freeze([
   1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 ]);
 
-const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-const SAFE_COLOR_TYPES = new Set([2, 4, 6]);
 const MAXIMUM_SOURCE_BYTES = 64 * 1024 * 1024;
 const SHA1 = /^[a-f0-9]{40}$/u;
+const ALLOWED_COLOR_TYPES = Object.freeze([2, 4, 6]);
 
 function fail(code, message = code) {
   const error = new Error(message === code ? code : `${code}: ${message}`);
@@ -61,44 +61,14 @@ export function sha256(bytes) {
 }
 
 export function inspectPngHeader(bytesInput) {
-  const bytes = Buffer.from(bytesInput ?? []);
-  if (bytes.length < 33) fail('EVA_DENSE_SOURCE_PNG_TOO_SHORT');
-  if (!bytes.subarray(0, 8).equals(PNG_SIGNATURE)) {
-    fail('EVA_DENSE_SOURCE_PNG_SIGNATURE_INVALID');
-  }
-  if (
-    bytes.readUInt32BE(8) !== 13 ||
-    bytes.toString('ascii', 12, 16) !== 'IHDR'
-  ) {
-    fail('EVA_DENSE_SOURCE_PNG_IHDR_INVALID');
-  }
-  const width = bytes.readUInt32BE(16);
-  const height = bytes.readUInt32BE(20);
-  const bitDepth = bytes[24];
-  const colorType = bytes[25];
-  const compressionMethod = bytes[26];
-  const filterMethod = bytes[27];
-  const interlaceMethod = bytes[28];
-  if (
-    width !== CANVAS.width ||
-    height !== CANVAS.height ||
-    bitDepth !== 8 ||
-    !SAFE_COLOR_TYPES.has(colorType) ||
-    compressionMethod !== 0 ||
-    filterMethod !== 0 ||
-    ![0, 1].includes(interlaceMethod)
-  ) {
-    fail('EVA_DENSE_SOURCE_PNG_ENCODING_INVALID');
-  }
-  return Object.freeze({
-    width,
-    height,
-    bitDepth,
-    colorType,
-    alphaChannelDeclared: colorType === 4 || colorType === 6,
-    compressionMethod,
-    filterMethod,
-    interlaceMethod,
+  return inspectPngStructure(bytesInput, {
+    expectedWidth: CANVAS.width,
+    expectedHeight: CANVAS.height,
+    expectedBitDepth: 8,
+    allowedColorTypes: ALLOWED_COLOR_TYPES,
+    requireNonInterlaced: true,
+    maximumBytes: MAXIMUM_SOURCE_BYTES,
+    errorPrefix: 'EVA_DENSE_SOURCE_PNG',
   });
 }
 
@@ -220,7 +190,7 @@ async function readStableContainedSource(runtimeRoot, frame) {
     !before.isFile() ||
     before.isSymbolicLink() ||
     before.nlink !== 1 ||
-    before.size < 33 ||
+    before.size < 45 ||
     before.size > MAXIMUM_SOURCE_BYTES
   ) {
     fail('EVA_DENSE_SOURCE_FILE_UNSAFE', frame.frameId);
@@ -274,6 +244,12 @@ async function inspectSourceSet({ runtimeRoot: runtimeRootInput, frames, include
     sourceOrdinals: EVA_DENSE_MOTION_SOURCE_ORDINALS,
     exactSourceIdentityVerified: true,
     exactCanvasVerified: true,
+    fullPngStructureAndCrcVerified: true,
+    idatDecodeVerified: true,
+    scanlineReconstructionVerified: true,
+    decodedPixelStatisticsRecorded: true,
+    nonInterlacedVerified: true,
+    noTrailingBytesVerified: true,
     allTenSourcesVerifiedBeforeMaterialization: true,
     sourceFrames: Object.freeze(results),
     authority: authority(),
@@ -305,6 +281,14 @@ export function evaDenseMotionSourcePreflightCapabilities() {
     symlinkRejection: true,
     hardlinkRejection: true,
     canonicalCanvas: CANVAS,
+    fullPngChunkStructureVerification: true,
+    everyPngChunkCrcVerification: true,
+    idatInflateVerification: true,
+    scanlineFilterVerification: true,
+    pixelReconstructionVerification: true,
+    decodedPixelStatistics: true,
+    nonInterlacedRequired: true,
+    trailingBytesRejected: true,
     sourceMutation: false,
     candidateCreation: false,
     providerExecution: false,

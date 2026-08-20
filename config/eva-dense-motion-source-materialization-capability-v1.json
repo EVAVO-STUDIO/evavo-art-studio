@@ -8,6 +8,8 @@
   "sourceRuntimeCommit": "c736a6d6648d3f02ac5745458a4cea0e02eab00c",
   "sourceRuntimeTree": "ab17548e5178acd4e33d74a9fb57569482381a33",
   "tenMasterProgram": "scripts/project-art/eva-dense-motion-ten-master-program.mjs",
+  "pngStructureValidator": "scripts/project-art/png-structure-v1.mjs",
+  "pngStructureTest": "scripts/test-project-art-png-structure-v1.mjs",
   "implementation": "scripts/project-art/eva-dense-motion-source-materialization.mjs",
   "cli": "scripts/run-project-art-eva-dense-motion-source-materialization.mjs",
   "test": "scripts/test-project-art-eva-dense-motion-source-materialization.mjs",
@@ -17,6 +19,11 @@
     "allTenSourcesPreflightBeforeFirstWrite": true,
     "exactRuntimeGitBlobSha1Required": true,
     "fullPngStructureAndCrcRequired": true,
+    "idatInflateRequired": true,
+    "scanlineReconstructionRequired": true,
+    "decodedPixelStatisticsRequired": true,
+    "nonInterlacedRequired": true,
+    "noTrailingBytesRequired": true,
     "exactCanvas": {
       "width": 1024,
       "height": 1536
