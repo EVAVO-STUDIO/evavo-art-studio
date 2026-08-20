@@ -13,7 +13,7 @@ import {
 import { compileCouncilAvatarMediaReadiness } from '../scripts/project-art/council-avatar-media-readiness.mjs';
 
 const SERVER_NAME = 'evavo-project-art-council-avatar-production';
-const SERVER_VERSION = '1.2.0';
+const SERVER_VERSION = '1.1.0';
 const MAXIMUM_MESSAGE_BYTES = 64 * 1024;
 
 function text(value) {
