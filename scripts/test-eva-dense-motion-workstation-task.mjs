@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { deflateSync } from 'node:zlib';
 
 import { validateTask } from './check-eva-dense-motion-workstation-task.mjs';
 import {
@@ -20,6 +21,7 @@ import {
   inspectPngHeader,
   preflightEvaDenseMotionSources,
 } from './project-art/eva-dense-motion-source-preflight.mjs';
+import { pngCrc32 } from './project-art/png-structure-v1.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const task = JSON.parse(
@@ -225,19 +227,57 @@ test('rejects unsafe PowerShell primitives', () => {
   }
 });
 
-function pngHeader({ width = 1024, height = 1536, colorType = 6 } = {}) {
-  const buffer = Buffer.alloc(33);
-  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write('IHDR', 12, 'ascii');
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  buffer[24] = 8;
-  buffer[25] = colorType;
-  buffer[26] = 0;
-  buffer[27] = 0;
-  buffer[28] = 0;
-  return buffer;
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const PNG_FIXTURE_CACHE = new Map();
+
+function pngChunk(type, dataInput = Buffer.alloc(0)) {
+  const data = Buffer.from(dataInput);
+  const typeBytes = Buffer.from(type, 'ascii');
+  const output = Buffer.alloc(12 + data.length);
+  output.writeUInt32BE(data.length, 0);
+  typeBytes.copy(output, 4);
+  data.copy(output, 8);
+  output.writeUInt32BE(
+    pngCrc32(Buffer.concat([typeBytes, data])),
+    8 + data.length,
+  );
+  return output;
+}
+
+function pngFixture({
+  width = 1024,
+  height = 1536,
+  colorType = 6,
+  marker = 0,
+} = {}) {
+  const cacheKey = `${width}:${height}:${colorType}:${marker}`;
+  if (PNG_FIXTURE_CACHE.has(cacheKey)) {
+    return Buffer.from(PNG_FIXTURE_CACHE.get(cacheKey));
+  }
+  const bytesPerPixel = { 2: 3, 3: 1, 4: 2, 6: 4 }[colorType] ?? 4;
+  const rowBytes = width * bytesPerPixel;
+  const raw = Buffer.alloc(height * (rowBytes + 1));
+  raw[1] = marker & 0xff;
+  if (bytesPerPixel > 1) raw[2] = (marker * 17) & 0xff;
+  if (bytesPerPixel > 2) raw[3] = (marker * 37) & 0xff;
+  if (colorType === 4) raw[2] = 255;
+  if (colorType === 6) raw[4] = 255;
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = colorType;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+  const parts = [PNG_SIGNATURE, pngChunk('IHDR', ihdr)];
+  if (colorType === 3) {
+    parts.push(pngChunk('PLTE', Buffer.from([0, 0, 0, 255, 255, 255])));
+  }
+  parts.push(pngChunk('IDAT', deflateSync(raw)), pngChunk('IEND'));
+  const value = Buffer.concat(parts);
+  PNG_FIXTURE_CACHE.set(cacheKey, value);
+  return Buffer.from(value);
 }
 
 async function sourceFixture() {
@@ -250,10 +290,10 @@ async function sourceFixture() {
   const frames = [];
   for (const ordinal of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     const relativePath = `assets/eva-female/frame-${ordinal}.png`;
-    const bytes = Buffer.concat([
-      pngHeader({ colorType: ordinal % 2 === 0 ? 2 : 6 }),
-      Buffer.from(`frame-${ordinal}`),
-    ]);
+    const bytes = pngFixture({
+      colorType: ordinal % 2 === 0 ? 2 : 6,
+      marker: ordinal,
+    });
     await writeFile(path.join(runtimeRoot, relativePath), bytes);
     frames.push({
       ordinal,
@@ -265,11 +305,15 @@ async function sourceFixture() {
   return { runtimeRoot, frames };
 }
 
-test('source preflight parses the production canvas', () => {
-  const value = inspectPngHeader(pngHeader());
+test('source preflight parses and reconstructs the production canvas', () => {
+  const value = inspectPngHeader(pngFixture());
   assert.equal(value.width, 1024);
   assert.equal(value.height, 1536);
   assert.equal(value.alphaChannelDeclared, true);
+  assert.equal(value.fullPngChunkStructureVerified, true);
+  assert.equal(value.everyPngChunkCrcVerified, true);
+  assert.equal(value.idatDecodeVerified, true);
+  assert.equal(value.pixelReconstructionVerified, true);
 });
 
 test('source preflight verifies all ten required source frames read-only', async () => {
@@ -280,6 +324,12 @@ test('source preflight verifies all ten required source frames read-only', async
     assert.deepEqual(result.sourceOrdinals, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     assert.equal(result.exactSourceIdentityVerified, true);
     assert.equal(result.exactCanvasVerified, true);
+    assert.equal(result.fullPngStructureAndCrcVerified, true);
+    assert.equal(result.idatDecodeVerified, true);
+    assert.equal(result.scanlineReconstructionVerified, true);
+    assert.equal(result.decodedPixelStatisticsRecorded, true);
+    assert.equal(result.nonInterlacedVerified, true);
+    assert.equal(result.noTrailingBytesVerified, true);
     assert.equal(result.allTenSourcesVerifiedBeforeMaterialization, true);
     assert.equal(result.authority.sourceMutation, false);
     assert.equal(result.authority.candidateCreation, false);
@@ -309,11 +359,11 @@ test('source preflight rejects byte identity drift', async () => {
 
 test('source preflight rejects wrong canvas or palette encoding', () => {
   assert.throws(
-    () => inspectPngHeader(pngHeader({ width: 512 })),
+    () => inspectPngHeader(pngFixture({ width: 512 })),
     /EVA_DENSE_SOURCE_PNG_ENCODING_INVALID/u,
   );
   assert.throws(
-    () => inspectPngHeader(pngHeader({ colorType: 3 })),
+    () => inspectPngHeader(pngFixture({ colorType: 3 })),
     /EVA_DENSE_SOURCE_PNG_ENCODING_INVALID/u,
   );
 });
@@ -350,7 +400,7 @@ test('source preflight rejects symlink and hardlink source substitution', async 
   const secondPath = path.join(fixture.runtimeRoot, fixture.frames[1].relativePath);
   const external = path.join(fixture.runtimeRoot, 'external.png');
   try {
-    await writeFile(external, Buffer.concat([pngHeader(), Buffer.from('external')]));
+    await writeFile(external, pngFixture({ marker: 101 }));
     await unlink(firstPath);
     await symlink(external, firstPath);
     await assert.rejects(
@@ -359,7 +409,7 @@ test('source preflight rejects symlink and hardlink source substitution', async 
     );
 
     await unlink(firstPath);
-    const firstBytes = Buffer.concat([pngHeader(), Buffer.from('frame-1')]);
+    const firstBytes = pngFixture({ marker: 1 });
     await writeFile(firstPath, firstBytes);
     fixture.frames[0] = {
       ...fixture.frames[0],
