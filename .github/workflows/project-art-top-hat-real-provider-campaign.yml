@@ -1,0 +1,171 @@
+name: Project Art Top Hat Real Provider Campaign
+
+on:
+  push:
+    branches:
+      - agent/top-hat-real-provider-campaign
+    paths:
+      - "config/production/top-hat-pose-bank-provider-trigger-v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-art-top-hat-real-provider-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-preparation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact authorized revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact provider dependency closure
+        run: |
+          set -euo pipefail
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
+          pnpm --filter @evavo/art-studio-worker typecheck
+
+      - name: Verify production runner syntax and six-slot preparation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/run-project-art-top-hat-real-provider-campaign.mjs
+          WORK_ROOT="${RUNNER_TEMP}/top-hat-real-provider-prepare-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          node scripts/run-project-art-top-hat-real-provider-campaign.mjs prepare \
+            --authorization-record "${GITHUB_WORKSPACE}/config/production/top-hat-pose-bank-provider-human-authorization-v1.json" \
+            --work-root "${WORK_ROOT}" \
+            > "${RUNNER_TEMP}/top-hat-real-provider-preparation.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const result = JSON.parse(readFileSync(process.env.RUNNER_TEMP + '/top-hat-real-provider-preparation.json', 'utf8'));
+          if (
+            result.status !== 'ready-for-six-real-provider-calls' ||
+            result.preparation?.counts?.slots !== 6 ||
+            result.preparation?.counts?.maximumProviderCalls !== 6 ||
+            result.providerExecutionPerformed !== false
+          ) throw new Error('Top Hat real-provider preparation contract failed.');
+          NODE
+
+      - name: Prove preparation changed no repository source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find packages apps -type d -name dist -prune -exec rm -rf {} +
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+  execute-six-candidates:
+    needs: verify-preparation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      EVAVO_ART_OPENAI_IMAGE_MODEL: gpt-image-1
+      EVAVO_ART_OPENAI_IMAGE_MODELS: gpt-image-1
+      EVAVO_ART_PROVIDER_MAX_RESPONSE_BYTES: "134217728"
+    steps:
+      - name: Check out exact authorized revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact provider dependency closure
+        run: |
+          set -euo pipefail
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
+          pnpm --filter @evavo/art-studio-worker typecheck
+
+      - name: Require configured server-side OpenAI image provider
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${OPENAI_API_KEY:-}" ]; then
+            echo "::error::OPENAI_API_KEY repository secret is required for the authorized six-candidate Top Hat campaign."
+            exit 1
+          fi
+
+      - name: Execute exactly six unapproved Top Hat candidates
+        id: execute
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK_ROOT="${RUNNER_TEMP}/top-hat-real-provider-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "work_root=${WORK_ROOT}" >> "${GITHUB_OUTPUT}"
+          node scripts/run-project-art-top-hat-real-provider-campaign.mjs run \
+            --authorization-record "${GITHUB_WORKSPACE}/config/production/top-hat-pose-bank-provider-human-authorization-v1.json" \
+            --work-root "${WORK_ROOT}" \
+            | tee "${RUNNER_TEMP}/top-hat-real-provider-result.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const result = JSON.parse(readFileSync(process.env.RUNNER_TEMP + '/top-hat-real-provider-result.json', 'utf8'));
+          if (
+            result.status !== 'succeeded-awaiting-human-frame-review' ||
+            result.exportManifest?.counts?.candidates !== 6 ||
+            result.exportManifest?.counts?.approved !== 0 ||
+            result.candidateApprovalPerformed !== false ||
+            result.publicationPerformed !== false ||
+            result.runtimeActivationPerformed !== false
+          ) throw new Error('Top Hat provider campaign result is not the required review-only six-candidate state.');
+          NODE
+
+      - name: Upload immutable candidates and execution evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: top-hat-real-provider-candidates-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/top-hat-real-provider-${{ github.run_id }}-${{ github.run_attempt }}
+            ${{ runner.temp }}/top-hat-real-provider-result.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Prove provider execution changed no repository source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find packages apps -type d -name dist -prune -exec rm -rf {} +
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
