@@ -117,15 +117,10 @@ jobs:
           node --check scripts/test-project-art-council-avatar-identity-bootstrap.mjs
           node --check scripts/test-project-art-council-avatar-media-readiness.mjs
           node --check scripts/test-project-art-council-avatar-animation-suite.mjs
-          python3 - <<'PY'
-          from pathlib import Path
-          for name in (
-              'scripts/project-art/council-avatar-procedural-renderer.py',
-              'scripts/project-art/compile-council-avatar-review-atlases.py',
-          ):
-              source = Path(name).read_text(encoding='utf-8')
-              compile(source, name, 'exec')
-          PY
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/council-avatar-python-pycache" \
+            python3 -m py_compile \
+              scripts/project-art/council-avatar-procedural-renderer.py \
+              scripts/project-art/compile-council-avatar-review-atlases.py
 
       - name: Compile deterministic procedural review summary
         shell: bash
