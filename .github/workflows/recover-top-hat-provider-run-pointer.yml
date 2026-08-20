@@ -32,9 +32,9 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          TARGET_HEAD_SHA: 7593ccc99447bec50e40ae83570b935703e9b24b
+          TARGET_HEAD_SHA: cf9cf37737566aec9db3fb6338f1221feb20e932
           TARGET_WORKFLOW_NAME: Project Art Top Hat Real Provider Campaign
-          POINTER_PATH: artifacts/top-hat-man/provider-campaign-r2/recovered-run-pointer.json
+          POINTER_PATH: artifacts/top-hat-man/provider-campaign-r3/recovered-run-pointer.json
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
@@ -131,7 +131,7 @@ jobs:
       - name: Publish bounded recovery pointer to execution branch
         shell: bash
         env:
-          POINTER_PATH: artifacts/top-hat-man/provider-campaign-r2/recovered-run-pointer.json
+          POINTER_PATH: artifacts/top-hat-man/provider-campaign-r3/recovered-run-pointer.json
           TARGET_BRANCH: agent/top-hat-real-provider-execution
         run: |
           set -euo pipefail
@@ -139,5 +139,5 @@ jobs:
           git config user.name "EVAVO Provider Run Recovery"
           git config user.email "evavo.studio@gmail.com"
           git add -- "${POINTER_PATH}"
-          git commit -m "chore(top-hat): record provider run artifact pointer"
+          git commit -m "chore(top-hat): record Runtime-backed provider run pointer"
           git push origin "HEAD:${TARGET_BRANCH}"
