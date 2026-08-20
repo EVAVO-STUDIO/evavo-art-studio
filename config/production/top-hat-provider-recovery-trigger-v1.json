@@ -1,6 +1,6 @@
 {
   "schema": "evavo.project-art-top-hat-provider-run-recovery-trigger.v1",
-  "targetHeadSha": "7593ccc99447bec50e40ae83570b935703e9b24b",
+  "targetHeadSha": "cf9cf37737566aec9db3fb6338f1221feb20e932",
   "targetWorkflowName": "Project Art Top Hat Real Provider Campaign",
   "recoverRunPointer": true
 }
