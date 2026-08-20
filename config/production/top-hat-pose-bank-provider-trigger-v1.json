@@ -1,8 +1,9 @@
 {
   "schema": "evavo.project-art-top-hat-real-provider-trigger.v1",
-  "campaignId": "top-hat-six-pose-candidates-2026-08-20-r2",
+  "campaignId": "top-hat-six-pose-candidates-2026-08-21-r3",
   "characterId": "top-hat-man",
-  "sourceCommit": "5f2859286e7b9b2823b34019a7d383adeb86c923",
+  "sourceRepository": "EVAVO-STUDIO/evavo-avatar-runtime",
+  "sourceCommit": "524066fc95fee329e1a20f7c9aa7d805d94c8cc8",
   "requiredPoseSlots": 6,
   "maximumProviderCalls": 6,
   "candidateCountPerSlot": 1,
