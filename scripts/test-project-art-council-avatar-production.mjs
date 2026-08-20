@@ -45,14 +45,17 @@ test('every Council character inherits the professional authored animation stand
   );
 });
 
-test('new Council identities are original role-specific transparent production briefs', () => {
+test('new Council identities are original alien role-specific transparent production briefs', () => {
   const program = compileCouncilAvatarProductionProgram();
   const newCharacters = program.characters.filter(
     (character) => character.identityStatus === 'identity-master-required',
   );
   assert.deepEqual(
-    newCharacters.map((character) => character.characterId),
-    ['council-critic', 'council-open-reviewer'],
+    newCharacters.map((character) => [character.characterId, character.characterLabel]),
+    [
+      ['council-critic', 'Veyra'],
+      ['council-open-reviewer', 'Moro Pell'],
+    ],
   );
   for (const character of newCharacters) {
     const brief = character.identityBrief;
@@ -62,13 +65,43 @@ test('new Council identities are original role-specific transparent production b
     assert.equal(brief.output.fullBodyRequired, true);
     assert.equal(brief.output.transparentBackgroundRequired, true);
     assert.match(brief.briefSha256, /^[a-f0-9]{64}$/u);
-    assert.match(brief.providerPrompt, /no holograms/u);
+    assert.match(brief.providerPrompt, /original adult .* elder/u);
+    assert.match(brief.providerPrompt, /protected-character imitation is forbidden/u);
     assert.match(brief.providerPrompt, /one complete character only/u);
     assert.ok(Object.values(brief.authority).every((value) => value === false));
   }
+  assert.match(newCharacters[0].identityBrief.providerPrompt, /four independently readable eyes/u);
+  assert.match(newCharacters[0].identityBrief.providerPrompt, /cranial sail/u);
+  assert.match(newCharacters[1].identityBrief.providerPrompt, /three clearly registered eyes/u);
+  assert.match(newCharacters[1].identityBrief.providerPrompt, /throat membrane/u);
   assert.notEqual(
     newCharacters[0].identityBrief.briefSha256,
     newCharacters[1].identityBrief.briefSha256,
+  );
+});
+
+test('procedural previsualisation is attached without becoming production readiness', () => {
+  const program = compileCouncilAvatarProductionProgram();
+  assert.equal(program.proceduralReview.version, '4.3.0');
+  assert.equal(program.proceduralReview.canonicalSeatCount, 4);
+  assert.equal(program.proceduralReview.characterCount, 5);
+  assert.equal(program.proceduralReview.previewOnlyCharacterCount, 1);
+  assert.equal(program.releasePolicy.proceduralReviewMayApproveIdentity, false);
+  assert.equal(program.releasePolicy.proceduralReviewMayApproveAnimation, false);
+  assert.equal(
+    program.releasePolicy.proceduralReviewMaySatisfyProductionMediaReadiness,
+    false,
+  );
+  assert.equal(program.releasePolicy.previewOnlyGuestMayOccupyCouncilSeat, false);
+  assert.ok(
+    program.characters.every(
+      (character) =>
+        character.proceduralReview.available === true &&
+        character.proceduralReview.identityMasterCandidate === false &&
+        character.proceduralReview.productionAdmissionEstablished === false &&
+        character.proceduralReview.runtimeActivationEstablished === false &&
+        character.proceduralReview.websiteActivationEstablished === false,
+    ),
   );
 });
 
@@ -94,7 +127,7 @@ test('Council presentation states map to authored clips without creating CSS mot
   assert.equal(program.releasePolicy.websiteMayActivateBeforeReviewedMediaComplete, false);
 });
 
-test('MCP exposes the same deterministic Council production program', () => {
+test('MCP exposes the same deterministic Council production and procedural review contracts', () => {
   const messages = [
     {
       jsonrpc: '2.0',
@@ -108,6 +141,12 @@ test('MCP exposes the same deterministic Council production program', () => {
       id: 3,
       method: 'tools/call',
       params: { name: 'evavo_art_council_avatar_production_program', arguments: {} },
+    },
+    {
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/call',
+      params: { name: 'evavo_art_council_avatar_procedural_review', arguments: {} },
     },
   ];
   const result = spawnSync(
@@ -125,10 +164,19 @@ test('MCP exposes the same deterministic Council production program', () => {
       (tool) => tool.name === 'evavo_art_council_avatar_production_program',
     ),
   );
+  assert.ok(
+    responses[1].result.tools.some(
+      (tool) => tool.name === 'evavo_art_council_avatar_procedural_review',
+    ),
+  );
   const program = JSON.parse(responses[2].result.content[0].text);
   assert.equal(program.characterCount, 4);
   assert.equal(program.identityMasterGenerationCount, 2);
   assert.equal(program.animationStandard.totalPlannedImagesPerCharacter, 749);
+  const proceduralReview = JSON.parse(responses[3].result.content[0].text);
+  assert.equal(proceduralReview.characterCount, 5);
+  assert.equal(proceduralReview.canonicalSeatCount, 4);
+  assert.equal(proceduralReview.authority.runtimeActivation, false);
 });
 
 test('capabilities are plan-only and reusable by ChatGPT, Claude and agents', () => {
@@ -143,6 +191,13 @@ test('capabilities are plan-only and reusable by ChatGPT, Claude and agents', ()
   assert.equal(capabilities.minimumAuthoredFps, 24);
   assert.equal(capabilities.preferredAuthoredFps, 30);
   assert.equal(capabilities.displayTargetFps, 60);
+  assert.equal(capabilities.proceduralReviewAvailable, true);
+  assert.equal(capabilities.proceduralReviewCharacterCount, 5);
+  assert.equal(capabilities.proceduralReviewCanonicalSeatCount, 4);
+  assert.equal(capabilities.proceduralReviewPreviewOnlyCharacterCount, 1);
+  assert.equal(capabilities.proceduralReviewIdentityApproval, false);
+  assert.equal(capabilities.proceduralReviewProductionAdmission, false);
   assert.equal(capabilities.providerExecution, false);
   assert.equal(capabilities.runtimeActivation, false);
+  assert.equal(capabilities.websiteActivation, false);
 });

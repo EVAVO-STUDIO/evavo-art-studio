@@ -6,10 +6,14 @@ import {
   compileCouncilAvatarProductionProgram,
   councilAvatarProductionCapabilities,
 } from '../scripts/project-art/council-avatar-production-program.mjs';
+import {
+  compileCouncilAvatarProceduralReview,
+  councilAvatarProceduralReviewCapabilities,
+} from '../scripts/project-art/council-avatar-procedural-review.mjs';
 import { compileCouncilAvatarMediaReadiness } from '../scripts/project-art/council-avatar-media-readiness.mjs';
 
 const SERVER_NAME = 'evavo-project-art-council-avatar-production';
-const SERVER_VERSION = '1.1.0';
+const SERVER_VERSION = '1.2.0';
 const MAXIMUM_MESSAGE_BYTES = 64 * 1024;
 
 function text(value) {
@@ -27,7 +31,19 @@ function tools() {
     {
       name: 'evavo_art_council_avatar_production_program',
       description:
-        'Compile the deterministic plan-only Council avatar production program, including identity briefs and the shared animation standard.',
+        'Compile the deterministic plan-only Council avatar production program, including identity briefs, procedural previsualisation evidence and the shared animation standard.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
+      name: 'evavo_art_council_avatar_procedural_review_capabilities',
+      description:
+        'Return bounded capabilities for the deterministic code-authored Council motion and atlas review surface. It grants no identity approval, production admission, publication, Runtime activation or website activation.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
+      name: 'evavo_art_council_avatar_procedural_review',
+      description:
+        'Compile the exact V4.3 procedural review contract for Top Hat Man, EVA, Veyra, Moro Pell and preview-only guest arbiter Nymm, including source hashes and local commands. This is previsualisation only and never an identity master.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
     {
@@ -45,6 +61,17 @@ function call(params) {
   }
   if (params?.name === 'evavo_art_council_avatar_production_program') {
     return { content: text(compileCouncilAvatarProductionProgram()), isError: false };
+  }
+  if (
+    params?.name === 'evavo_art_council_avatar_procedural_review_capabilities'
+  ) {
+    return {
+      content: text(councilAvatarProceduralReviewCapabilities()),
+      isError: false,
+    };
+  }
+  if (params?.name === 'evavo_art_council_avatar_procedural_review') {
+    return { content: text(compileCouncilAvatarProceduralReview()), isError: false };
   }
   if (params?.name === 'evavo_art_council_avatar_media_readiness') {
     return { content: text(compileCouncilAvatarMediaReadiness()), isError: false };

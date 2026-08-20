@@ -1,17 +1,17 @@
 {
   "schema": "evavo.character-identity-master-request.v1",
-  "requestId": "council-critic-identity-master-v1",
+  "requestId": "council-critic-identity-master-v2",
   "project": {
     "id": "council-avatars",
     "title": "EVAVO Council Avatars"
   },
   "character": {
     "id": "council-critic",
-    "label": "Critic",
+    "label": "Veyra, Council Critic",
     "role": "critic",
     "identityContract": "docs/PROJECT_ART_COUNCIL_AVATAR_PRODUCTION.md"
   },
-  "purpose": "Create an original, identity-lockable Critic character for the EVAVO Council before any animation production begins.",
+  "purpose": "Create an original, identity-lockable alien Critic called Veyra for the EVAVO Council before any animation production begins.",
   "candidateSets": 4,
   "canvas": {
     "width": 1024,
@@ -22,47 +22,52 @@
     {
       "id": "full-body-right",
       "label": "full body slight right three-quarter",
-      "prompt": "Eye-level full-body presentation, slight right three-quarter orientation, complete head, hands and shoes visible, relaxed natural hands, no dramatic perspective."
+      "prompt": "Eye-level full-body presentation, slight right three-quarter orientation, complete cranial sail, four eyes, both four-digit hands and both feet visible, calm grounded posture and no dramatic perspective."
     },
     {
       "id": "full-body-left",
       "label": "full body slight left three-quarter",
-      "prompt": "Same exact person and clothing from a slight left three-quarter orientation, eye level, complete silhouette and both hands clearly readable."
+      "prompt": "Same exact alien elder and garments from a slight left three-quarter orientation, eye level, complete silhouette, all four eyes and both four-digit hands clearly readable."
     },
     {
       "id": "neutral-bust",
       "label": "neutral identity bust",
-      "prompt": "Neutral chest-up identity view of the same exact person, calm direct gaze, no smile performance, face and hair details clear enough for continuity review."
+      "prompt": "Neutral chest-up identity view of the same exact alien elder, calm direct four-eyed gaze, cranial-sail attachment and face planes clear enough for strict continuity review."
     }
   ],
   "style": {
-    "lock": "EVAVO-crafted editorial character design with premium creative-studio art direction. Original adult woman with a precise, formidable but not villain-coded presence. Short sculptural silver-black bob, sharply readable face, calm direct gaze, matte charcoal tailored coat with an asymmetric high collar over a simple black base layer, dark tailored trousers and grounded footwear. One restrained cherry-red construction detail such as a narrow seam or lapel insert. Realistic anatomy and fabric construction, clean readable silhouette, no generic AI-assistant or game-character look.",
-    "continuity": "Every view in a candidate set must show the same exact person, facial structure, age, skin tone, hair cut and colour, coat construction, collar shape, proportions, handedness, footwear, cherry-red detail placement, baseline and overall material language. Do not redesign between views.",
+    "lock": "EVAVO-crafted editorial creature design with premium creative-studio art direction. Veyra is an original adult alien tribunal elder with an extremely tall narrow silhouette, four independently readable eyes arranged as two restrained pairs, a sculptural vertical cranial sail, bone-white skin with subtle mineral variation, and long controlled four-digit hands. Garments are black mineral-textured ceremonial work layers with practical construction and one faded Council-red seam. The presence is precise and formidable but never villain-coded, monstrous, cute, glossy or generic. Materials should feel authored and tactile, like a carefully built practical creature interpreted through EVAVO's restrained black, off-white and cherry-red language.",
+    "continuity": "Every view in a candidate set must show the same exact species design, age, four-eye placement, pupil shape, face planes, cranial-sail height and attachment, ear or breathing structures, bone-white skin pattern, four-digit hand anatomy, garment construction, red seam placement, proportions, handedness, feet, baseline and material language. Do not redesign, humanise or mutate the anatomy between views.",
     "mustHave": [
-      "complete adult human anatomy with natural hands and five stable fingers per visible hand",
-      "short sculptural silver-black bob with a consistent silhouette",
-      "matte charcoal asymmetric high-collar tailored coat",
-      "simple black base layer and dark tailored trousers",
-      "one restrained cherry-red seam or lapel construction detail",
-      "calm direct intelligent expression",
-      "strong readable full-body silhouette distinct from EVA and Top Hat Man",
-      "genuine transparent background with no scene or floor plate"
+      "one complete original adult alien tribunal elder named Veyra",
+      "exactly four independently readable eyes in the same registered arrangement",
+      "one tall sculptural cranial sail with a stable silhouette and attachment",
+      "two stable long hands with exactly four digits per hand",
+      "bone-white skin with restrained mineral variation rather than glow",
+      "black mineral-textured ceremonial work garments with believable construction",
+      "one faded Council-red seam or construction insert",
+      "calm precise intelligent expression without villain coding",
+      "strong narrow full-body silhouette distinct from EVA, Top Hat Man and Moro Pell",
+      "genuine transparent background with no scene, shadow plate or checkerboard"
     ],
     "mustAvoid": [
       "generic AI assistant styling",
-      "villain or evil character coding",
-      "cyberpunk neon or sci-fi glow",
+      "human woman, human bob haircut or ordinary human facial anatomy",
+      "villain, demon, undead, horror-monster or evil character coding",
+      "protected fictional creature reconstruction or recognisable franchise imitation",
+      "cyberpunk neon, sci-fi glow, glowing eyes or glossy game-character rendering",
       "holograms or floating user interface elements",
-      "robot parts, glowing eyes, headsets or futuristic armour",
-      "EVA geometric black dress silhouette",
-      "Top Hat Man Victorian hat, moustache or historical tailoring",
-      "weapons, tactical gear or superhero costume language",
-      "logos, readable text, watermark, scenery or checkerboard transparency",
-      "cropped head, hands, fingers, feet or clothing hem"
+      "robot parts, headsets, futuristic armour, weapons or tactical gear",
+      "EVA geometric dress silhouette",
+      "Top Hat Man hat, moustache, cane or historical tailoring",
+      "Moro Pell broad amphibious body, three eyes or throat membrane",
+      "extra eyes, missing eyes, unstable digit count or changing cranial-sail geometry",
+      "logos, readable text, watermark, scenery, contact sheet or checkerboard transparency",
+      "cropped cranial sail, hands, digits, feet or garment hem"
     ],
-    "originality": "Create a new EVAVO-owned Critic identity from this art direction. Do not reconstruct, imitate or closely derive any protected fictional character, celebrity, stock mascot or existing AI-assistant character. The visual language should feel deliberately art-directed for EVAVO rather than recognisable as another product or franchise."
+    "originality": "Create a new EVAVO-owned alien Critic identity from this direction. Do not reconstruct, imitate or closely derive any protected fictional character, celebrity, stock mascot, existing game alien or existing AI-assistant character. The result must read as one deliberately art-directed EVAVO Council elder rather than a recognisable external archetype."
   },
-  "outputRoot": "artifacts/council-avatars/council-critic/identity-candidates-v1",
+  "outputRoot": "artifacts/council-avatars/council-critic/identity-candidates-v2",
   "policy": {
     "protectedReconstructionAllowed": false,
     "runtimeAsset": false,
