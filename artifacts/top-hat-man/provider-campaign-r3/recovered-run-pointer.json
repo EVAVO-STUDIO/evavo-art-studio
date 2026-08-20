@@ -1,0 +1,25 @@
+{
+  "schema": "evavo.project-art-top-hat-provider-run-pointer.v1",
+  "recoveredAt": "2026-08-20T14:28:07.183Z",
+  "repository": "EVAVO-STUDIO/evavo-art-studio",
+  "targetHeadSha": "cf9cf37737566aec9db3fb6338f1221feb20e932",
+  "targetWorkflowName": "Project Art Top Hat Real Provider Campaign",
+  "status": "run-found",
+  "run": {
+    "id": 32380171137,
+    "runNumber": 6,
+    "runAttempt": 1,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "failure",
+    "headBranch": "agent/top-hat-real-provider-execution",
+    "headSha": "cf9cf37737566aec9db3fb6338f1221feb20e932",
+    "createdAt": "2026-08-20T14:26:44Z",
+    "updatedAt": "2026-08-20T14:27:25Z",
+    "htmlUrl": "https://github.com/EVAVO-STUDIO/evavo-art-studio/actions/runs/32380171137"
+  },
+  "artifacts": [],
+  "candidateApproval": false,
+  "publication": false,
+  "runtimeActivation": false
+}
