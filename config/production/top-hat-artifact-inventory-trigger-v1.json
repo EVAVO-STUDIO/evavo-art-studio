@@ -1,0 +1,6 @@
+{
+  "schema": "evavo.project-art-avatar-actions-artifact-inventory-trigger.v1",
+  "include": ["top-hat", "avatar", "council", "eva"],
+  "maximumPages": 20,
+  "inventory": true
+}
