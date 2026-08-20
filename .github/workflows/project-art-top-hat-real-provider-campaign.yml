@@ -20,6 +20,10 @@ concurrency:
   group: project-art-top-hat-real-provider-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  TOP_HAT_PINNED_SOURCE_COMMIT: 5f2859286e7b9b2823b34019a7d383adeb86c923
+  TOP_HAT_PINNED_SOURCE_ROOT: .top-hat-pinned-art-studio
+
 jobs:
   verify-preparation:
     runs-on: ubuntu-24.04
@@ -31,6 +35,37 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Check out exact admitted Top Hat anchor source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: EVAVO-STUDIO/evavo-art-studio
+          ref: ${{ env.TOP_HAT_PINNED_SOURCE_COMMIT }}
+          path: ${{ env.TOP_HAT_PINNED_SOURCE_ROOT }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Materialize and verify exact approved Top Hat anchors
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e assets/top-hat-man
+          mkdir -p assets/top-hat-man/candidates
+          install -m 0600 \
+            "${TOP_HAT_PINNED_SOURCE_ROOT}/assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png" \
+            assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png
+          install -m 0600 \
+            "${TOP_HAT_PINNED_SOURCE_ROOT}/assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png" \
+            assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png
+          install -m 0600 \
+            "${TOP_HAT_PINNED_SOURCE_ROOT}/assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png" \
+            assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png
+          cat > "${RUNNER_TEMP}/top-hat-anchor-sha256.txt" <<'HASHES'
+          92cb290246a7629024dcb7768f4119f6a139d9c9f59e3d0545563e1f5b35575a  assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png
+          476ff3c1ca56e1f4ec622b94abfebf35a94b593a388177b3d9b3bce9347ed9a5  assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png
+          bd64eba4f22fd2d524ee7eb1826b2cc9cc9723cff5a764e36946d568b8cfd358  assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png
+          HASHES
+          sha256sum --check --strict "${RUNNER_TEMP}/top-hat-anchor-sha256.txt"
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -69,6 +104,7 @@ jobs:
           if (
             result.status !== 'ready-for-six-real-provider-calls' ||
             result.preparation?.counts?.slots !== 6 ||
+            result.preparation?.counts?.admittedAnchors !== 3 ||
             result.preparation?.counts?.maximumProviderCalls !== 6 ||
             result.providerExecutionPerformed !== false
           ) throw new Error('Top Hat real-provider preparation contract failed.');
@@ -79,6 +115,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf assets/top-hat-man "${TOP_HAT_PINNED_SOURCE_ROOT}"
           find packages apps -type d -name dist -prune -exec rm -rf {} +
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
@@ -100,6 +137,37 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Check out exact admitted Top Hat anchor source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: EVAVO-STUDIO/evavo-art-studio
+          ref: ${{ env.TOP_HAT_PINNED_SOURCE_COMMIT }}
+          path: ${{ env.TOP_HAT_PINNED_SOURCE_ROOT }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Materialize and verify exact approved Top Hat anchors
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e assets/top-hat-man
+          mkdir -p assets/top-hat-man/candidates
+          install -m 0600 \
+            "${TOP_HAT_PINNED_SOURCE_ROOT}/assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png" \
+            assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png
+          install -m 0600 \
+            "${TOP_HAT_PINNED_SOURCE_ROOT}/assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png" \
+            assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png
+          install -m 0600 \
+            "${TOP_HAT_PINNED_SOURCE_ROOT}/assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png" \
+            assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png
+          cat > "${RUNNER_TEMP}/top-hat-anchor-sha256.txt" <<'HASHES'
+          92cb290246a7629024dcb7768f4119f6a139d9c9f59e3d0545563e1f5b35575a  assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png
+          476ff3c1ca56e1f4ec622b94abfebf35a94b593a388177b3d9b3bce9347ed9a5  assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png
+          bd64eba4f22fd2d524ee7eb1826b2cc9cc9723cff5a764e36946d568b8cfd358  assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png
+          HASHES
+          sha256sum --check --strict "${RUNNER_TEMP}/top-hat-anchor-sha256.txt"
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -170,6 +238,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf assets/top-hat-man "${TOP_HAT_PINNED_SOURCE_ROOT}"
           find packages apps -type d -name dist -prune -exec rm -rf {} +
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
