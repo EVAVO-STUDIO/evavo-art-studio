@@ -16,6 +16,9 @@ import {
   inspectEvaDenseMotionTenMasterProgram,
   verifyEvaDenseMotionTenMasterProgram,
 } from './project-art/eva-dense-motion-ten-master-program.mjs';
+import {
+  sha256EvaDenseMotionWorkOrderDocument,
+} from './project-art/eva-dense-motion-work-order-common.mjs';
 
 function request() {
   return createEvaDenseMotionTenMasterRequest({
@@ -23,6 +26,13 @@ function request() {
     actorId: 'eva-dense-ten-master-test',
     createdAt: '2026-08-19T13:30:00.000Z',
   });
+}
+
+function rehashProgram(program) {
+  const body = { ...program };
+  delete body.programSha256;
+  program.programSha256 = sha256EvaDenseMotionWorkOrderDocument(body);
+  return program;
 }
 
 test('compiles ten new deterministic master jobs while retaining the live three-frame rig only as fallback provenance', () => {
@@ -114,6 +124,30 @@ test('verification rejects a tampered job that reuses the legacy fallback public
   assert.throws(
     () => verifyEvaDenseMotionTenMasterProgram(tampered),
     /EVA_DENSE_MOTION_TEN_MASTER_PROGRAM_INVALID/u,
+  );
+});
+
+test('verification rejects self-hashed canonical source and Runtime substitutions', () => {
+  const sourceTampered = structuredClone(
+    compileEvaDenseMotionTenMasterProgram(request()),
+  );
+  sourceTampered.production.jobs[0].source.path =
+    'assets/eva-female/substituted-frame.png';
+  sourceTampered.production.jobs[0].source.gitBlobSha1 = '0'.repeat(40);
+  rehashProgram(sourceTampered);
+  assert.throws(
+    () => verifyEvaDenseMotionTenMasterProgram(sourceTampered),
+    /EVA_DENSE_MOTION_TEN_MASTER_PROGRAM_CONTENT_DRIFT/u,
+  );
+
+  const runtimeTampered = structuredClone(
+    compileEvaDenseMotionTenMasterProgram(request()),
+  );
+  runtimeTampered.targetRuntime.commit = '0'.repeat(40);
+  rehashProgram(runtimeTampered);
+  assert.throws(
+    () => verifyEvaDenseMotionTenMasterProgram(runtimeTampered),
+    /EVA_DENSE_MOTION_TEN_MASTER_PROGRAM_CONTENT_DRIFT/u,
   );
 });
 

@@ -1,0 +1,43 @@
+{
+  "schema": "evavo.project-art-eva-dense-motion-source-materialization-workstation-command.v1",
+  "status": "available-not-executed-by-repository-state",
+  "command": [
+    "node",
+    "scripts/run-project-art-eva-dense-motion-source-materialization.mjs",
+    "run",
+    "--program",
+    "<absolute-ten-master-program.json>",
+    "--runtime-root",
+    "<absolute-evavo-avatar-runtime-checkout>",
+    "--workspace-root",
+    "<absolute-existing-workspace-root>",
+    "--materialized-at",
+    "<canonical-iso-8601-utc>"
+  ],
+  "requiredSourceFrameCount": 10,
+  "expectedCreatedCandidateCount": 10,
+  "expectedCreatedSourceInspectionReceiptCount": 10,
+  "expectedCreatedSourceMaterializationReceiptCount": 10,
+  "expectedCreatedCampaignReceiptCount": 1,
+  "downstreamEffects": {
+    "candidateAssurances": 0,
+    "alphaMattes": 0,
+    "alphaMasters": 0,
+    "technicalInspections": 0,
+    "creativeApprovals": 0,
+    "cloudinaryUploads": 0,
+    "sequenceReleases": 0,
+    "runtimeActivations": 0
+  },
+  "authority": {
+    "repositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "cloudinaryUpload": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "websiteActivation": false,
+    "deployment": false,
+    "forcePush": false
+  }
+}
