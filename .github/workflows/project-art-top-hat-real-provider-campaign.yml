@@ -1,9 +1,14 @@
 name: Project Art Top Hat Real Provider Campaign
 
 on:
+  pull_request:
+    paths:
+      - "scripts/run-project-art-top-hat-real-provider-campaign.mjs"
+      - "config/production/top-hat-pose-bank-provider-human-authorization-v1.json"
+      - ".github/workflows/project-art-top-hat-real-provider-campaign.yml"
   push:
     branches:
-      - agent/top-hat-real-provider-campaign
+      - agent/top-hat-real-provider-execution
     paths:
       - "config/production/top-hat-pose-bank-provider-trigger-v1.json"
   workflow_dispatch:
@@ -79,6 +84,7 @@ jobs:
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
   execute-six-candidates:
+    if: github.event_name != 'pull_request'
     needs: verify-preparation
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -126,12 +132,10 @@ jobs:
           fi
 
       - name: Execute exactly six unapproved Top Hat candidates
-        id: execute
         shell: bash
         run: |
           set -euo pipefail
           WORK_ROOT="${RUNNER_TEMP}/top-hat-real-provider-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "work_root=${WORK_ROOT}" >> "${GITHUB_OUTPUT}"
           node scripts/run-project-art-top-hat-real-provider-campaign.mjs run \
             --authorization-record "${GITHUB_WORKSPACE}/config/production/top-hat-pose-bank-provider-human-authorization-v1.json" \
             --work-root "${WORK_ROOT}" \
