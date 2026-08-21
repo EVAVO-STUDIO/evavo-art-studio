@@ -14,6 +14,11 @@ import {
   compileCouncilIdentityCandidateCampaign,
   councilIdentityCandidateCampaignCapabilities,
 } from '../scripts/project-art/council-identity-candidate-campaign.mjs';
+import {
+  compileCouncilIdentityAnchorAdmissionPlan,
+  councilIdentityAnchorAdmissionCapabilities,
+  createCouncilIdentityAnchorAdmissionReviewTemplate,
+} from '../scripts/project-art/council-identity-anchor-admission.mjs';
 import { compileCouncilAvatarMediaReadiness } from '../scripts/project-art/council-avatar-media-readiness.mjs';
 
 const SERVER_NAME = 'evavo-project-art-council-avatar-production';
@@ -63,6 +68,24 @@ function tools() {
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
     {
+      name: 'evavo_art_council_identity_anchor_admission_capabilities',
+      description:
+        'Return the V4.5 compile-only capabilities for named-human review and compilation of exactly eight full-body-right provider admissions. No provider authorization or execution is granted.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
+      name: 'evavo_art_council_identity_anchor_admission_plan',
+      description:
+        'Compile the exact repository-bound V4.5 plan for the eight Veyra and Moro Pell full-body-right anchor admissions. Dependent views, provider authorization and execution remain blocked.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
+      name: 'evavo_art_council_identity_anchor_admission_review_template',
+      description:
+        'Return the exact V4.5 named-human review template required before eight anchor provider admissions may be compiled. The template grants no provider authorization, execution, approval, publication or activation authority.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
       name: 'evavo_art_council_avatar_media_readiness',
       description:
         'Return the deterministic read-only Council avatar media stage, exact blockers, available command surfaces and missing governed evidence for all four characters. This tool never executes providers, approves media, publishes assets or activates Runtime/website animation.',
@@ -101,6 +124,30 @@ function call(params) {
   if (params?.name === 'evavo_art_council_identity_candidate_campaign') {
     return {
       content: text(compileCouncilIdentityCandidateCampaign()),
+      isError: false,
+    };
+  }
+  if (
+    params?.name ===
+    'evavo_art_council_identity_anchor_admission_capabilities'
+  ) {
+    return {
+      content: text(councilIdentityAnchorAdmissionCapabilities()),
+      isError: false,
+    };
+  }
+  if (params?.name === 'evavo_art_council_identity_anchor_admission_plan') {
+    return {
+      content: text(compileCouncilIdentityAnchorAdmissionPlan()),
+      isError: false,
+    };
+  }
+  if (
+    params?.name ===
+    'evavo_art_council_identity_anchor_admission_review_template'
+  ) {
+    return {
+      content: text(createCouncilIdentityAnchorAdmissionReviewTemplate()),
       isError: false,
     };
   }
