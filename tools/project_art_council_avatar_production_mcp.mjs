@@ -10,6 +10,10 @@ import {
   compileCouncilAvatarProceduralReview,
   councilAvatarProceduralReviewCapabilities,
 } from '../scripts/project-art/council-avatar-procedural-review.mjs';
+import {
+  compileCouncilIdentityCandidateCampaign,
+  councilIdentityCandidateCampaignCapabilities,
+} from '../scripts/project-art/council-identity-candidate-campaign.mjs';
 import { compileCouncilAvatarMediaReadiness } from '../scripts/project-art/council-avatar-media-readiness.mjs';
 
 const SERVER_NAME = 'evavo-project-art-council-avatar-production';
@@ -47,6 +51,18 @@ function tools() {
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
     {
+      name: 'evavo_art_council_identity_candidate_campaign_capabilities',
+      description:
+        'Return the V4.4 compile-only Council identity candidate campaign capabilities: two characters, eight anchor jobs, sixteen dependent continuity-view jobs and no provider admission, authorization, execution, approval, publication or activation authority.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
+      name: 'evavo_art_council_identity_candidate_campaign',
+      description:
+        'Compile the exact repository-bound V4.4 24-job identity candidate campaign for Veyra and Moro Pell. All eight full-body-right anchors precede the sixteen same-set dependent views. This tool performs no provider call or approval.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
       name: 'evavo_art_council_avatar_media_readiness',
       description:
         'Return the deterministic read-only Council avatar media stage, exact blockers, available command surfaces and missing governed evidence for all four characters. This tool never executes providers, approves media, publishes assets or activates Runtime/website animation.',
@@ -72,6 +88,21 @@ function call(params) {
   }
   if (params?.name === 'evavo_art_council_avatar_procedural_review') {
     return { content: text(compileCouncilAvatarProceduralReview()), isError: false };
+  }
+  if (
+    params?.name ===
+    'evavo_art_council_identity_candidate_campaign_capabilities'
+  ) {
+    return {
+      content: text(councilIdentityCandidateCampaignCapabilities()),
+      isError: false,
+    };
+  }
+  if (params?.name === 'evavo_art_council_identity_candidate_campaign') {
+    return {
+      content: text(compileCouncilIdentityCandidateCampaign()),
+      isError: false,
+    };
   }
   if (params?.name === 'evavo_art_council_avatar_media_readiness') {
     return { content: text(compileCouncilAvatarMediaReadiness()), isError: false };

@@ -1,0 +1,10 @@
+{
+  "preferredAdapterId": "openai-gpt-image",
+  "preferredModel": "gpt-image-1",
+  "allowedAdapterIds": [
+    "openai-gpt-image"
+  ],
+  "allowFallback": false,
+  "requireSeed": false,
+  "seed": null
+}
