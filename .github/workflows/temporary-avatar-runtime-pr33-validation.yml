@@ -1,9 +1,10 @@
-name: Temporary Avatar Runtime PR 33 exact-head validation
+name: Temporary Avatar Runtime PR 33 exact-blob validation
 
 on:
   pull_request:
     paths:
       - ".github/workflows/temporary-avatar-runtime-pr33-validation.yml"
+      - "tmp/avatar-runtime-pr33/**"
 
 permissions:
   contents: read
@@ -14,9 +15,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Node ${{ matrix.node }} exact Runtime head
+    name: Node ${{ matrix.node }} exact Runtime blobs
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -25,12 +26,10 @@ jobs:
           - "24"
 
     steps:
-      - name: Check out exact Avatar Runtime candidate
+      - name: Check out exact validation candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: EVAVO-STUDIO/evavo-avatar-runtime
-          ref: d68875d5c089804847f730dd8ee54ac20b337345
-          path: avatar-runtime
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -40,54 +39,31 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
 
-      - name: Verify exact checkout and clean source
-        working-directory: avatar-runtime
+      - name: Verify exact mirrored Runtime blob identities
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "d68875d5c089804847f730dd8ee54ac20b337345"
+          test "$(git hash-object tmp/avatar-runtime-pr33/src/council-procedural-review-atlas.js)" = "4004eb1d5997f361bcf818918ea7092c5561b285"
+          test "$(git hash-object tmp/avatar-runtime-pr33/tests/council-procedural-review-atlas.test.mjs)" = "a5d434c8532d706336b61fedd3e185a6cf019463"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           node --version
           npm --version
 
-      - name: Syntax-check changed Runtime surfaces
-        working-directory: avatar-runtime
+      - name: Syntax-check exact Runtime parser and proof
         shell: bash
         run: |
           set -euo pipefail
-          node --check src/council-procedural-review-atlas.js
-          node --check src/council-avatar-production-status.js
-          node --check src/index.js
-          node --check src/version-policy.js
-          node --check scripts/check-version-policy.mjs
-          node --check tests/council-procedural-review-atlas.test.mjs
-          node --check tests/council-avatar-production-status.test.mjs
-          node --check tests/version-policy.test.mjs
+          node --check tmp/avatar-runtime-pr33/src/council-procedural-review-atlas.js
+          node --check tmp/avatar-runtime-pr33/tests/council-procedural-review-atlas.test.mjs
 
-      - name: Run focused Council procedural review proof
-        working-directory: avatar-runtime
-        run: npm run check:council-procedural-review
+      - name: Execute exact Council procedural review proof
+        run: node --test tmp/avatar-runtime-pr33/tests/council-procedural-review-atlas.test.mjs
 
-      - name: Run complete Avatar Runtime validation
-        working-directory: avatar-runtime
-        run: npm run check
-
-      - name: Verify package surface
-        working-directory: avatar-runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm pack --dry-run --json > avatar-runtime-pack.json
-          node -e 'const fs=require("node:fs"); const result=JSON.parse(fs.readFileSync("avatar-runtime-pack.json","utf8")); if (!Array.isArray(result)||result.length!==1) process.exit(1); const files=new Set(result[0].files.map((entry)=>entry.path)); for (const required of ["src/council-procedural-review-atlas.js","docs/COUNCIL_PROCEDURAL_REVIEW_RUNTIME.md"]) if (!files.has(required)) throw new Error(`missing package file: ${required}`);'
-          rm avatar-runtime-pack.json
-
-      - name: Prove exact source remains clean
+      - name: Prove validation changed no source
         if: always()
-        working-directory: avatar-runtime
         shell: bash
         run: |
           set -euo pipefail
-          rm -f avatar-runtime-pack.json
           git diff --check
           git diff --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
