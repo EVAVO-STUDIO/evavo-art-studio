@@ -39,25 +39,44 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
 
-      - name: Verify exact mirrored Runtime blob identities
+      - name: Verify exact Runtime blob identities and bounded dependency fixtures
         shell: bash
         run: |
           set -euo pipefail
           test "$(git hash-object tmp/avatar-runtime-pr33/src/council-procedural-review-atlas.js)" = "4004eb1d5997f361bcf818918ea7092c5561b285"
           test "$(git hash-object tmp/avatar-runtime-pr33/tests/council-procedural-review-atlas.test.mjs)" = "76c61aa5a5cfb03fe0c98af7da0711bb32401328"
+          test "$(git hash-object tmp/avatar-runtime-pr33/src/council-avatar-production-status.js)" = "75adc0a685a6947e70c87432aa2723a7a2a9246b"
+          test "$(git hash-object tmp/avatar-runtime-pr33/tests/council-avatar-production-status.test.mjs)" = "33d0241700f6d7f4ecfe94c9b58cf2e9158fb29c"
+          test "$(git hash-object tmp/avatar-runtime-pr33/src/council-character-assignments.js)" = "d31596825c3dd51bb2764cab43160d0976946622"
+          test "$(git hash-object tmp/avatar-runtime-pr33/src/version-policy.js)" = "63d54afe6380b801dbeaea5b20cf25435553f043"
+          test "$(git hash-object tmp/avatar-runtime-pr33/tests/version-policy.test.mjs)" = "d8ec48aec48bd71ff6e5a97def5d2caff057d110"
+          test "$(git hash-object tmp/avatar-runtime-pr33/characters/asset-packs.js)" = "02117b0b382f6c67430a44d2740fb2448ce936c1"
+          test "$(git hash-object tmp/avatar-runtime-pr33/src/eva-dense-motion-admission.js)" = "d6f348d97b0b8d1bc0ac061384adb4a7b9c99a8a"
+          test "$(git hash-object tmp/avatar-runtime-pr33/src/top-hat-body-pose-bank.js)" = "4ce3d548044eb1e876b14ab9a4863154d6e3114d"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           node --version
           npm --version
 
-      - name: Syntax-check exact Runtime parser and proof
+      - name: Syntax-check exact Runtime sources and proofs
         shell: bash
         run: |
           set -euo pipefail
           node --check tmp/avatar-runtime-pr33/src/council-procedural-review-atlas.js
           node --check tmp/avatar-runtime-pr33/tests/council-procedural-review-atlas.test.mjs
+          node --check tmp/avatar-runtime-pr33/src/council-avatar-production-status.js
+          node --check tmp/avatar-runtime-pr33/src/council-character-assignments.js
+          node --check tmp/avatar-runtime-pr33/tests/council-avatar-production-status.test.mjs
+          node --check tmp/avatar-runtime-pr33/src/version-policy.js
+          node --check tmp/avatar-runtime-pr33/tests/version-policy.test.mjs
 
       - name: Execute exact Council procedural review proof
         run: node --test tmp/avatar-runtime-pr33/tests/council-procedural-review-atlas.test.mjs
+
+      - name: Execute exact Council production-status integration proof
+        run: node --test tmp/avatar-runtime-pr33/tests/council-avatar-production-status.test.mjs
+
+      - name: Execute exact Runtime 0.39 version-policy proof
+        run: node --test tmp/avatar-runtime-pr33/tests/version-policy.test.mjs
 
       - name: Prove validation changed no source
         if: always()
