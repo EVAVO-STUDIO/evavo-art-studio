@@ -53,6 +53,15 @@ test('procedural review hashes exact safe renderer and atlas source bytes', () =
     assert.equal(bytes.byteLength, source.bytes);
   }
   assert.match(review.reviewSha256, /^[a-f0-9]{64}$/u);
+  const atlasSource = readFileSync(
+    path.join(
+      ROOT,
+      'scripts/project-art/compile-council-avatar-review-atlases.py',
+    ),
+    'utf8',
+  );
+  assert.ok(atlasSource.includes('current["image"].paste(image, (x, y))'));
+  assert.ok(!atlasSource.includes('current["image"].alpha_composite(image, (x, y))'));
 });
 
 test('procedural review remains previsualisation and cannot establish production truth', () => {

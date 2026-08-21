@@ -70,7 +70,10 @@ def pack_frames(frames: list[dict]) -> list[dict]:
             current = {"image": Image.new("RGBA", (PAGE_SIZE, PAGE_SIZE), (0, 0, 0, 0)), "x": PADDING, "y": PADDING, "rowHeight": 0, "frames": []}
             pages.append(current)
         x, y = current["x"], current["y"]
-        current["image"].alpha_composite(image, (x, y))
+        # Atlas packing must copy exact straight-alpha RGBA bytes. Alpha
+        # compositing can round edge RGB values even over a transparent page,
+        # which would invalidate the post-pack pixel-hash proof.
+        current["image"].paste(image, (x, y))
         packed = {**frame, "page": len(pages) - 1, "atlasRect": {"x": x, "y": y, "width": width, "height": height}}
         del packed["trimmed"]
         current["frames"].append(packed)
