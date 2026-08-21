@@ -29,6 +29,48 @@ const AUTHORITY = Object.freeze({
   deployment: false,
   forcePush: false,
 });
+const AUTHORITY_KEYS = Object.freeze(Object.keys(AUTHORITY).sort());
+const FORBIDDEN_TRUE_KEYS = new Set([
+  'providerExecution',
+  'providerExecutionPerformed',
+  'creativeApproval',
+  'creativeApprovalEstablished',
+  'creativeReviewPerformed',
+  'identityApproval',
+  'identityApprovalEstablished',
+  'identityApprovalPerformed',
+  'candidateApproval',
+  'candidateApprovalEstablished',
+  'candidateApprovalPerformed',
+  'candidatePromotion',
+  'candidatePromotionPerformed',
+  'productionAdmission',
+  'productionAdmissionEstablished',
+  'productionAdmissionPerformed',
+  'animationApproval',
+  'animationApprovalEstablished',
+  'animationProductionPerformed',
+  'sourceMutation',
+  'repositoryMutation',
+  'gitCommit',
+  'gitPush',
+  'publication',
+  'publicationGranted',
+  'publicationPerformed',
+  'runtimeActivation',
+  'runtimeActivationGranted',
+  'runtimeActivationEstablished',
+  'runtimeActivationPerformed',
+  'websiteActivation',
+  'websiteActivationGranted',
+  'websiteActivationEstablished',
+  'websiteActivationPerformed',
+  'deployment',
+  'deploymentGranted',
+  'deploymentPerformed',
+  'forcePush',
+  'identityMasterCandidate',
+]);
 
 const SOURCE_PATHS = Object.freeze([
   'scripts/project-art/council-avatar-procedural-renderer.py',
@@ -193,6 +235,35 @@ function sourceEvidence(relativePath) {
   });
 }
 
+function hasExactDeniedAuthority(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value).sort();
+  return (
+    keys.length === AUTHORITY_KEYS.length &&
+    keys.every(
+      (key, index) => key === AUTHORITY_KEYS[index] && value[key] === false,
+    )
+  );
+}
+
+function assertNoEscalation(value, location = 'artifact') {
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) =>
+      assertNoEscalation(entry, `${location}[${index}]`),
+    );
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+  for (const [key, child] of Object.entries(value)) {
+    if (child === true && FORBIDDEN_TRUE_KEYS.has(key)) {
+      throw new Error(
+        `COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_ESCALATION:${location}.${key}`,
+      );
+    }
+    assertNoEscalation(child, `${location}.${key}`);
+  }
+}
+
 export function compileCouncilAvatarProceduralReview() {
   const sourceFiles = Object.freeze(SOURCE_PATHS.map(sourceEvidence));
   const canonicalCharacters = CHARACTERS.filter((character) => character.canonicalSeat);
@@ -307,11 +378,14 @@ export function validateCouncilAvatarProceduralReviewArtifact(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_INVALID');
   }
+  assertNoEscalation(value);
   if (value.schema !== COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_SCHEMA) {
     throw new Error('COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_SCHEMA_INVALID');
   }
   if (
     value.status !== 'procedural-previsualisation-review-only' ||
+    value.renderer !==
+      'scripts/project-art/council-avatar-procedural-renderer.py' ||
     value.masterCanvas?.width !== 1024 ||
     value.masterCanvas?.height !== 1536 ||
     value.videoCanvas?.width !== 512 ||
@@ -326,17 +400,67 @@ export function validateCouncilAvatarProceduralReviewArtifact(value) {
   if (!Array.isArray(value.characters) || value.characters.length !== expected.characterCount) {
     throw new Error('COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_CHARACTER_COUNT_INVALID');
   }
-  const actualIds = value.characters.map((character) => character.characterId);
-  const expectedIds = expected.characters.map((character) => character.characterId);
-  if (actualIds.some((characterId, index) => characterId !== expectedIds[index])) {
-    throw new Error('COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_CHARACTER_ORDER_INVALID');
+  for (let characterIndex = 0; characterIndex < expected.characters.length; characterIndex += 1) {
+    const actualCharacter = value.characters[characterIndex];
+    const expectedCharacter = expected.characters[characterIndex];
+    if (
+      !actualCharacter ||
+      typeof actualCharacter !== 'object' ||
+      Array.isArray(actualCharacter) ||
+      actualCharacter.characterId !== expectedCharacter.characterId ||
+      actualCharacter.displayName !== expectedCharacter.displayName ||
+      actualCharacter.seatId !== expectedCharacter.seatId ||
+      actualCharacter.canonicalSeat !== expectedCharacter.canonicalSeat ||
+      actualCharacter.previewOnly !== expectedCharacter.previewOnly
+    ) {
+      throw new Error(
+        'COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_CHARACTER_BOUNDARY_INVALID',
+      );
+    }
+    if (
+      !Array.isArray(actualCharacter.clips) ||
+      actualCharacter.clips.length !== expected.clips.length
+    ) {
+      throw new Error(
+        'COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_CLIP_COUNT_INVALID',
+      );
+    }
+    for (let clipIndex = 0; clipIndex < expected.clips.length; clipIndex += 1) {
+      const actualClip = actualCharacter.clips[clipIndex];
+      const expectedClip = expected.clips[clipIndex];
+      const expectedFrameCount = Math.round(expectedClip.durationSeconds * 60);
+      if (
+        !actualClip ||
+        typeof actualClip !== 'object' ||
+        Array.isArray(actualClip) ||
+        actualClip.clipId !== expectedClip.clipId ||
+        actualClip.purpose !== expectedClip.purpose ||
+        actualClip.durationSeconds !== expectedClip.durationSeconds ||
+        actualClip.fps !== 60 ||
+        actualClip.frameCount !== expectedFrameCount ||
+        actualClip.loop !== true ||
+        actualClip.video !== `${expectedClip.clipId}.mp4` ||
+        actualClip.poster !== `${expectedClip.clipId}.poster.png` ||
+        actualClip.contactSheet !== `${expectedClip.clipId}.contact.png` ||
+        !Number.isInteger(actualClip.uniqueFrameCount) ||
+        actualClip.uniqueFrameCount < 1 ||
+        actualClip.uniqueFrameCount > expectedFrameCount ||
+        !Number.isInteger(actualClip.duplicateFrameCount) ||
+        actualClip.duplicateFrameCount !==
+          expectedFrameCount - actualClip.uniqueFrameCount ||
+        !Number.isFinite(actualClip.normalisedSeamEnergy) ||
+        actualClip.normalisedSeamEnergy < 0 ||
+        actualClip.normalisedSeamEnergy > 1 ||
+        typeof actualClip.sha256 !== 'string' ||
+        !SHA256.test(actualClip.sha256)
+      ) {
+        throw new Error(
+          'COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_CLIP_BOUNDARY_INVALID',
+        );
+      }
+    }
   }
-  if (
-    !value.authority ||
-    Object.entries(AUTHORITY).some(
-      ([key, expectedValue]) => value.authority[key] !== expectedValue,
-    )
-  ) {
+  if (!hasExactDeniedAuthority(value.authority)) {
     throw new Error('COUNCIL_AVATAR_PROCEDURAL_REVIEW_ARTIFACT_AUTHORITY_INVALID');
   }
   if (typeof value.manifestSha256 !== 'string' || !SHA256.test(value.manifestSha256)) {
@@ -346,6 +470,8 @@ export function validateCouncilAvatarProceduralReviewArtifact(value) {
     valid: true,
     schema: value.schema,
     characterCount: value.characters.length,
+    manifestHashSyntaxValidated: true,
+    manifestHashRecomputed: false,
     providerExecution: false,
     identityApproval: false,
     productionAdmission: false,
