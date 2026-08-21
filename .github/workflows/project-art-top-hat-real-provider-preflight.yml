@@ -8,6 +8,7 @@ on:
       - "scripts/project-art/top-hat-pose-slot-provider-*.mjs"
       - "scripts/run-project-art-top-hat-pose-*.mjs"
       - "scripts/test-project-art-top-hat-pose-*.mjs"
+      - "scripts/test-project-art-top-hat-anchor-source-truth.mjs"
       - "config/production/top-hat-pose-bank-provider-human-authorization-v1.json"
       - ".github/workflows/project-art-top-hat-real-provider-preflight.yml"
   workflow_dispatch:
@@ -16,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: project-art-top-hat-real-provider-preflight-${{ github.ref }}
+  group: project-art-top-hat-real-provider-preflight-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -86,23 +87,30 @@ jobs:
             authorization.runtimeActivationGranted !== false
           ) throw new Error('Top Hat human authorization contract drifted.');
 
+          const expectedRepository = 'EVAVO-STUDIO/evavo-avatar-runtime';
+          const expectedCommit = '524066fc95fee329e1a20f7c9aa7d805d94c8cc8';
+          const expectedTree = 'db8af48a71f1a2708c99f5cea220c7e7dd324e84';
           const expectedHashes = [
             '92cb290246a7629024dcb7768f4119f6a139d9c9f59e3d0545563e1f5b35575a',
             '476ff3c1ca56e1f4ec622b94abfebf35a94b593a388177b3d9b3bce9347ed9a5',
             'bd64eba4f22fd2d524ee7eb1826b2cc9cc9723cff5a764e36946d568b8cfd358',
           ];
           if (
-            TOP_HAT_POSE_SLOT_RUNTIME_PIN.repository !== 'EVAVO-STUDIO/evavo-avatar-runtime' ||
-            TOP_HAT_POSE_SLOT_RUNTIME_PIN.commit !== '524066fc95fee329e1a20f7c9aa7d805d94c8cc8' ||
+            TOP_HAT_POSE_SLOT_RUNTIME_PIN.repository !== expectedRepository ||
+            TOP_HAT_POSE_SLOT_RUNTIME_PIN.commit !== expectedCommit ||
+            TOP_HAT_POSE_SLOT_RUNTIME_PIN.tree !== expectedTree ||
             TOP_HAT_ADMITTED_BODY_ANCHORS.length !== 3 ||
             TOP_HAT_ADMITTED_BODY_ANCHORS.some((anchor, index) =>
+              anchor.repository !== expectedRepository ||
+              anchor.commit !== expectedCommit ||
+              anchor.tree !== expectedTree ||
               anchor.sha256 !== expectedHashes[index] ||
               anchor.width !== 1024 ||
               anchor.height !== 1536 ||
               anchor.pixelFormat !== 'rgba8-straight' ||
               anchor.approvalStatus !== 'approved-production-anchor'
             )
-          ) throw new Error('Top Hat admitted anchor contract drifted.');
+          ) throw new Error('Top Hat admitted Runtime anchor contract drifted.');
 
           const request = createProjectArtTopHatPoseSlotProviderPackageRequest();
           const packageValue = compileProjectArtTopHatPoseSlotProviderPackage(request);
@@ -119,6 +127,9 @@ jobs:
 
       - name: Run guarded provider and six-slot campaign regressions
         run: |
+          node --test scripts/test-project-art-top-hat-anchor-source-truth.mjs
+          node --test scripts/test-project-art-top-hat-pose-slot-production.mjs
+          node --test scripts/test-project-art-top-hat-pose-slot-provider-package.mjs
           node --test scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs
           node --test scripts/test-project-art-top-hat-pose-bank-provider-campaign.mjs
 
