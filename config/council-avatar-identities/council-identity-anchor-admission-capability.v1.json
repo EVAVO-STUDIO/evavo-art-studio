@@ -1,0 +1,22 @@
+{
+  "schema": "evavo.project-art-council-identity-anchor-admission-capability.v1",
+  "protocolVersion": "2026-08-21.1",
+  "version": "4.5.0",
+  "sourceCampaign": "scripts/project-art/council-identity-candidate-campaign.mjs",
+  "implementation": "scripts/project-art/council-identity-anchor-admission.mjs",
+  "cli": "scripts/compile-project-art-council-identity-anchor-admission.mjs",
+  "mcp": "tools/project_art_council_identity_anchor_admission_mcp.mjs",
+  "anchorAdmissionCount": 8,
+  "dependentAdmissionCount": 0,
+  "namedHumanReviewRequired": true,
+  "maximumReviewWindowHours": 24,
+  "createOnlyBundleOutput": true,
+  "providerAuthorizationCompilationAvailable": false,
+  "providerExecutionAvailable": false,
+  "candidateApprovalAvailable": false,
+  "identityApprovalAvailable": false,
+  "animationProductionAvailable": false,
+  "publicationAvailable": false,
+  "runtimeActivationAvailable": false,
+  "websiteActivationAvailable": false
+}
