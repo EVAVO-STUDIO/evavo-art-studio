@@ -103,7 +103,7 @@ concurrency:
 jobs:
   contract:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 20
     env:
       PYTHONPYCACHEPREFIX: ${{ runner.temp }}/council-avatar-python-pycache
     steps:
@@ -128,11 +128,24 @@ jobs:
           python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
           [[ "$(python -c 'import PIL; print(PIL.__version__)')" == "12.2.0" ]]
 
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.13.1
+
       - name: Set up exact Node.js runtime
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22.14.0"
           package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact provider and artifact implementations
+        run: |
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
 
       - name: Syntax-check Council avatar and identity surfaces
         shell: bash
