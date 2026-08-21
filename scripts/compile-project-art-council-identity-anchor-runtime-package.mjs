@@ -11,9 +11,11 @@ import { fileURLToPath } from 'node:url';
 import {
   compileCouncilIdentityAnchorRuntimePackagePlan,
   councilIdentityAnchorRuntimePackageCapabilities,
-  materializeCouncilIdentityAnchorRuntimePackage,
-  validateCouncilIdentityAnchorRuntimePackage,
 } from './project-art/council-identity-anchor-runtime-package.mjs';
+import {
+  materializeCouncilIdentityAnchorRuntimePackageStrict,
+  validateCouncilIdentityAnchorRuntimePackageStrict,
+} from './project-art/council-identity-anchor-runtime-package-strict.mjs';
 
 const COMMAND_FLAGS = Object.freeze({
   summary: Object.freeze([]),
@@ -148,7 +150,7 @@ export function runCouncilIdentityAnchorRuntimePackageCli(
       required(values, '--adapter-bundle'),
       'V4.7 Runtime adapter bundle',
     );
-    const result = materializeCouncilIdentityAnchorRuntimePackage({
+    const result = materializeCouncilIdentityAnchorRuntimePackageStrict({
       adapterBundle: adapterBundle.value,
       packagedAt: required(values, '--packaged-at'),
       packageRoot: required(values, '--package-root'),
@@ -162,6 +164,7 @@ export function runCouncilIdentityAnchorRuntimePackageCli(
       sourceAdapterBundleSha256:
         result.manifest.sourceAdapterSummary.bundleSha256,
       runtimeAdapterFilesPackaged: result.adapterFileCount,
+      strictManifestValidation: result.strictManifestValidation,
       providerExecutionsPerformed: 0,
       identityApprovalsEstablished: 0,
       runtimeActivation: false,
@@ -171,7 +174,7 @@ export function runCouncilIdentityAnchorRuntimePackageCli(
   return Object.freeze({
     status: 'passed',
     command,
-    ...validateCouncilIdentityAnchorRuntimePackage({
+    ...validateCouncilIdentityAnchorRuntimePackageStrict({
       packageRoot: required(values, '--package-root'),
     }),
   });
