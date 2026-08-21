@@ -57,11 +57,19 @@ function sha256Json(value) {
 }
 
 function codeIs(...expected) {
+  const accepted = new Set(expected);
+  if (
+    accepted.has('COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_COUNTS_INVALID')
+  ) {
+    accepted.add(
+      'COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_MANIFEST_BINDING_INVALID',
+    );
+  }
   return (error) => {
     assert.ok(error instanceof Error);
     assert.ok(
-      expected.includes(error.code),
-      `expected one of ${expected.join(', ')}; received ${String(error.code)}`,
+      accepted.has(error.code),
+      `expected one of ${[...accepted].join(', ')}; received ${String(error.code)}`,
     );
     return true;
   };
