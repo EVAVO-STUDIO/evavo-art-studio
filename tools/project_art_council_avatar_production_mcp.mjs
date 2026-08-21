@@ -19,6 +19,10 @@ import {
   councilIdentityAnchorAdmissionCapabilities,
   createCouncilIdentityAnchorAdmissionReviewTemplate,
 } from '../scripts/project-art/council-identity-anchor-admission.mjs';
+import {
+  compileCouncilIdentityAnchorAuthorizationPlan,
+  councilIdentityAnchorAuthorizationCapabilities,
+} from '../scripts/project-art/council-identity-anchor-authorization.mjs';
 import { compileCouncilAvatarMediaReadiness } from '../scripts/project-art/council-avatar-media-readiness.mjs';
 
 const SERVER_NAME = 'evavo-project-art-council-avatar-production';
@@ -86,6 +90,18 @@ function tools() {
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
     {
+      name: 'evavo_art_council_identity_anchor_authorization_capabilities',
+      description:
+        'Return the V4.6 compile-only capabilities for eight separate, time-bounded, one-shot Council anchor provider authorizations. This grants no provider execution, candidate approval, publication or activation authority.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
+      name: 'evavo_art_council_identity_anchor_authorization_plan',
+      description:
+        'Compile the deterministic V4.6 plan for binding the exact V4.5 eight-admission bundle to a named-human authorization review. This tool performs no authorization mutation and no provider call.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
       name: 'evavo_art_council_avatar_media_readiness',
       description:
         'Return the deterministic read-only Council avatar media stage, exact blockers, available command surfaces and missing governed evidence for all four characters. This tool never executes providers, approves media, publishes assets or activates Runtime/website animation.',
@@ -148,6 +164,23 @@ function call(params) {
   ) {
     return {
       content: text(createCouncilIdentityAnchorAdmissionReviewTemplate()),
+      isError: false,
+    };
+  }
+  if (
+    params?.name ===
+    'evavo_art_council_identity_anchor_authorization_capabilities'
+  ) {
+    return {
+      content: text(councilIdentityAnchorAuthorizationCapabilities()),
+      isError: false,
+    };
+  }
+  if (
+    params?.name === 'evavo_art_council_identity_anchor_authorization_plan'
+  ) {
+    return {
+      content: text(compileCouncilIdentityAnchorAuthorizationPlan()),
       isError: false,
     };
   }
