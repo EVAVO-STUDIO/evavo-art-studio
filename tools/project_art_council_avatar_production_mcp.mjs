@@ -23,6 +23,10 @@ import {
   compileCouncilIdentityAnchorAuthorizationPlan,
   councilIdentityAnchorAuthorizationCapabilities,
 } from '../scripts/project-art/council-identity-anchor-authorization.mjs';
+import {
+  compileCouncilIdentityAnchorRuntimeAdapterPlan,
+  councilIdentityAnchorRuntimeAdapterCapabilities,
+} from '../scripts/project-art/council-identity-anchor-runtime-adapters.mjs';
 import { compileCouncilAvatarMediaReadiness } from '../scripts/project-art/council-avatar-media-readiness.mjs';
 
 const SERVER_NAME = 'evavo-project-art-council-avatar-production';
@@ -99,6 +103,18 @@ function tools() {
       name: 'evavo_art_council_identity_anchor_authorization_plan',
       description:
         'Compile the deterministic V4.6 plan for binding the exact V4.5 eight-admission bundle to a named-human authorization review. This tool performs no authorization mutation and no provider call.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
+      name: 'evavo_art_council_identity_anchor_runtime_adapter_capabilities',
+      description:
+        'Return the V4.7 compile-only capabilities for eight exact Council anchor Runtime adapters. This performs no provider execution, authorization consumption, approval, publication or activation.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
+      name: 'evavo_art_council_identity_anchor_runtime_adapter_plan',
+      description:
+        'Compile the deterministic V4.7 plan for converting one exact active V4.6 authorization bundle into eight Runtime adapters. This tool performs no adapter mutation and no provider call.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
     {
@@ -181,6 +197,23 @@ function call(params) {
   ) {
     return {
       content: text(compileCouncilIdentityAnchorAuthorizationPlan()),
+      isError: false,
+    };
+  }
+  if (
+    params?.name ===
+    'evavo_art_council_identity_anchor_runtime_adapter_capabilities'
+  ) {
+    return {
+      content: text(councilIdentityAnchorRuntimeAdapterCapabilities()),
+      isError: false,
+    };
+  }
+  if (
+    params?.name === 'evavo_art_council_identity_anchor_runtime_adapter_plan'
+  ) {
+    return {
+      content: text(compileCouncilIdentityAnchorRuntimeAdapterPlan()),
       isError: false,
     };
   }
