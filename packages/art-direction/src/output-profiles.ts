@@ -15,6 +15,16 @@ const profiles: Readonly<Record<ArtDirectionOutputProfileId, ArtDirectionOutputP
     engineMetadata: ["SpriteFrames animation names", "per-frame duration multiplier", "loop mode", "AtlasTexture region and margin", "source-size and trim offset"],
     importRecommendations: ["AnimatedSprite2D for authored frame animation", "nearest filtering for pixel art", "centered=false or 2D pixel snap for pixel-perfect placement"],
   },
+  "godot-4.7.1-character-sprite": {
+    id: "godot-4.7.1-character-sprite", title: "Godot 4.7.1 character SpriteFrames", target: "godot-4.7.1",
+    compatibleFamilies: [...CHARACTER], requiresTransparency: true,
+    masterFormats: ["PNG RGBA individual frames", "ASEPRITE or ORA editable source"],
+    derivativeFormats: ["PNG no-rotation atlas", "Godot 4.7.1 SpriteFrames .tres", "AtlasTexture resources"], textureFiltering: "nearest",
+    atlas: { allowed: true, rotation: "forbidden", paddingPixels: 2, extrusionPixels: 1, trim: "alpha-aware" },
+    sourceRetention: ["individual lossless frames", "editable cels and layers", "exact frame durations", "pivots and baselines", "independent direction and animation tags", "source-size and trim metadata"],
+    engineMetadata: ["SpriteFrames animation names", "per-frame duration multiplier", "loop mode", "AtlasTexture region and margin", "source-size and trim offset", "direction ownership", "Godot 4.7.1 import identity"],
+    importRecommendations: ["AnimatedSprite2D for authored frame animation", "nearest filtering and integer placement", "forbid atlas rotation", "retain independently authored directions instead of runtime mirroring", "verify pivots, baselines and trim offsets in Godot 4.7.1"],
+  },
   "godot-4.6.2-isometric-character": {
     id: "godot-4.6.2-isometric-character", title: "Godot 4.6.2 isometric character family", target: "godot-4.6.2",
     compatibleFamilies: ["character", "creature", "prop"], requiresTransparency: true,
