@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { projectArtAvatarAnimationSuiteCapabilities } from './avatar-animation-suite.mjs';
+import { compileCouncilAvatarProceduralReview } from './council-avatar-procedural-review.mjs';
 
 export const COUNCIL_AVATAR_PRODUCTION_PROGRAM_SCHEMA =
   'evavo.project-art-council-avatar-production-program.v1';
@@ -23,13 +24,14 @@ const AUTHORITY = Object.freeze({
 
 const GLOBAL_VISUAL_LOCK = Object.freeze([
   'EVAVO-crafted editorial character design, never generic AI-assistant styling',
-  'full-body human-scale silhouette readable in a compact Council card',
+  'full-body silhouette readable in a compact Council card with complete head, hands or species-specific appendages and feet visible',
   'premium creative-studio art direction with restrained black, off-white and cherry-red accents',
-  'realistic anatomy and grounded clothing construction rather than glossy game-character armour',
+  'anatomy must be internally coherent to the approved species design, stable across every view and suitable for articulated animation',
+  'strange original alien Council members are allowed and encouraged where specified, but protected-character imitation is forbidden',
   'no holograms, floating UI, neon cyberpunk, glowing eyes, robot parts, headsets or generic AI iconography',
   'no text, logos, watermarks, checkerboards, scenery or contact-sheet layouts in provider output',
   'one complete character only on a 1024x1536 canvas with genuine transparent RGBA background',
-  'stable face, hair, costume, hands, proportions, baseline and pivot across every authored frame',
+  'stable face, eyes, cranial structures, costume, hands, proportions, baseline and pivot across every authored frame',
 ]);
 
 const CHARACTERS = Object.freeze([
@@ -83,19 +85,20 @@ const CHARACTERS = Object.freeze([
     seatId: 'critic',
     seatLabel: 'Critic',
     characterId: 'council-critic',
-    characterLabel: 'Critic',
+    characterLabel: 'Veyra',
     role: 'adversarial review, safety, risk, hidden assumptions and dissent',
     identityStatus: 'identity-master-required',
     motionStatus: 'not-started',
     identityDirection: Object.freeze([
-      'original adult woman with a precise, formidable editorial presence; never villain-coded or hostile',
-      'short sculptural silver-black bob, sharply readable face and calm direct gaze',
-      'matte charcoal tailored coat with asymmetric high collar over a simple black base layer',
-      'one restrained cherry-red construction detail such as a narrow seam or lapel insert, not a glowing accent',
-      'upright grounded posture with hands naturally relaxed and fully visible',
-      'silhouette must remain clearly distinct from EVA’s geometric dress and Top Hat Man’s historical tailoring',
+      'original adult alien tribunal elder called Veyra with a precise formidable editorial presence; never villain-coded or hostile',
+      'extremely tall narrow silhouette, four independently readable eyes and one sculptural cranial sail with stable registration',
+      'bone-white skin, black mineral-textured ceremonial work garments and one faded Council-red construction seam',
+      'long controlled hands with a consistent species-specific digit count and no unstable anatomy between views',
+      'calm direct gaze and restrained practical-creature-film material language rather than glossy game-character rendering',
+      'silhouette must remain clearly distinct from EVA’s geometric dress, Top Hat Man’s tailoring and Moro Pell’s broad amphibious body',
     ]),
     immediateWork: Object.freeze([
+      'review the procedural Veyra motion and silhouette proof without treating it as an identity master',
       'generate identity candidates from the canonical role brief',
       'select one identity-lock master after independent visual review',
       'master exact 1024x1536 RGBA transparency with clean hidden RGB and canvas clearance',
@@ -106,20 +109,21 @@ const CHARACTERS = Object.freeze([
     seatId: 'open-reviewer',
     seatLabel: 'Open Reviewer',
     characterId: 'council-open-reviewer',
-    characterLabel: 'Open Reviewer',
+    characterLabel: 'Moro Pell',
     role:
       'independent open-model review, practical alternatives and low-cost challenge',
     identityStatus: 'identity-master-required',
     motionStatus: 'not-started',
     identityDirection: Object.freeze([
-      'original adult gender-neutral creative technologist with an open, practical and independent presence',
-      'warm dark complexion, close-cropped natural hair and an alert relaxed expression',
-      'off-white structured studio/work jacket over a black shirt and dark straight trousers',
-      'small cherry-red stitched utility detail only; no futuristic gadgets or branded tech props',
-      'slightly relaxed asymmetric stance that still reads clearly in compact presentation',
-      'silhouette and value pattern must be clearly distinct from EVA, Top Hat Man and the Critic',
+      'original adult amphibious scholar elder called Moro Pell with an open practical and independent presence',
+      'low broad grounded silhouette, three clearly registered eyes and an articulated throat membrane that remains restrained in neutral views',
+      'moss-grey skin, worn ivory studio-work layers, dark underlayers and one visibly repaired cherry-red seam',
+      'oversized stable hands with a consistent species-specific digit count and heavy believable centre of mass',
+      'alert relaxed expression with practical creature-design materiality rather than cute mascot, startup-founder or generic AI-assistant styling',
+      'silhouette and value pattern must be clearly distinct from EVA, Top Hat Man and Veyra',
     ]),
     immediateWork: Object.freeze([
+      'review the procedural Moro Pell motion and silhouette proof without treating it as an identity master',
       'generate identity candidates from the canonical role brief',
       'select one identity-lock master after independent visual review',
       'master exact 1024x1536 RGBA transparency with clean hidden RGB and canvas clearance',
@@ -188,7 +192,7 @@ function identityBrief(character) {
       ...GLOBAL_VISUAL_LOCK,
       ...character.identityDirection,
       'camera is straight-on to very slight three-quarter, eye level, no dramatic perspective',
-      'character occupies approximately 82 percent of canvas height with complete head, hands and shoes visible',
+      'character occupies approximately 82 percent of canvas height with complete head, hands or appendages and feet visible',
       'neutral studio presentation pose suitable as the immutable identity reference for animation production',
     ]).join('. '),
     authority: AUTHORITY,
@@ -198,6 +202,7 @@ function identityBrief(character) {
 
 export function compileCouncilAvatarProductionProgram() {
   const animation = projectArtAvatarAnimationSuiteCapabilities();
+  const proceduralReview = compileCouncilAvatarProceduralReview();
   const animationStandard = Object.freeze({
     canonicalCompiler: 'scripts/project-art/avatar-animation-suite.mjs',
     completeClipMatrix: animation.completeClipMatrix,
@@ -231,21 +236,53 @@ export function compileCouncilAvatarProductionProgram() {
   ) {
     throw new Error('COUNCIL_AVATAR_CANONICAL_ANIMATION_STANDARD_DRIFT');
   }
+  if (
+    proceduralReview.canonicalSeatCount !== 4 ||
+    proceduralReview.characterCount !== 5 ||
+    proceduralReview.previewOnlyCharacterCount !== 1 ||
+    proceduralReview.totalReviewClipCount !== 25 ||
+    proceduralReview.authority.identityApproval !== false ||
+    proceduralReview.authority.runtimeActivation !== false ||
+    proceduralReview.authority.websiteActivation !== false
+  ) {
+    throw new Error('COUNCIL_AVATAR_PROCEDURAL_REVIEW_BOUNDARY_DRIFT');
+  }
 
-  const characters = CHARACTERS.map((character) =>
-    Object.freeze({
+  const reviewByCharacter = new Map(
+    proceduralReview.characters.map((character) => [character.characterId, character]),
+  );
+  const characters = CHARACTERS.map((character) => {
+    const reviewCharacter = reviewByCharacter.get(character.characterId);
+    if (!reviewCharacter || reviewCharacter.canonicalSeat !== true) {
+      throw new Error(
+        `COUNCIL_AVATAR_PROCEDURAL_REVIEW_CHARACTER_MISSING:${character.characterId}`,
+      );
+    }
+    return Object.freeze({
       ...character,
       visualLock: GLOBAL_VISUAL_LOCK,
       identityBrief:
         character.identityStatus === 'identity-master-required'
           ? identityBrief(character)
           : null,
+      proceduralReview: Object.freeze({
+        available: true,
+        displayName: reviewCharacter.displayName,
+        proceduralCodename: reviewCharacter.proceduralCodename,
+        clipIds: Object.freeze(proceduralReview.clips.map((clip) => clip.clipId)),
+        identityMasterCandidate: false,
+        identityApprovalEstablished: false,
+        animationApprovalEstablished: false,
+        productionAdmissionEstablished: false,
+        runtimeActivationEstablished: false,
+        websiteActivationEstablished: false,
+      }),
       animationStandard,
       councilStateMapping: COUNCIL_STATE_MAPPING,
       productionReady: false,
       authority: AUTHORITY,
-    }),
-  );
+    });
+  });
 
   const program = Object.freeze({
     schema: COUNCIL_AVATAR_PRODUCTION_PROGRAM_SCHEMA,
@@ -262,15 +299,20 @@ export function compileCouncilAvatarProductionProgram() {
     characters: Object.freeze(characters),
     globalVisualLock: GLOBAL_VISUAL_LOCK,
     animationStandard,
+    proceduralReview,
     councilStateMapping: COUNCIL_STATE_MAPPING,
     releasePolicy: Object.freeze({
       partialCharacterReleaseAllowed: false,
       sparsePoseApproximationMayClaimProductionAnimation: false,
+      proceduralReviewMayApproveIdentity: false,
+      proceduralReviewMayApproveAnimation: false,
+      proceduralReviewMaySatisfyProductionMediaReadiness: false,
       websiteMayActivateBeforeReviewedMediaComplete: false,
       everyCouncilSeatRequiresUniqueCharacter: true,
       everyCharacterRequiresIdentityLockBeforeAnimation: true,
       everyAnimationReleaseRequiresExactImmutableMediaIdentities: true,
       reducedMotionUsesReviewedStaticIdentity: true,
+      previewOnlyGuestMayOccupyCouncilSeat: false,
     }),
     authority: AUTHORITY,
   });
@@ -293,7 +335,16 @@ export function councilAvatarProductionCapabilities() {
     minimumAuthoredFps: program.animationStandard.minimumAuthoredFps,
     preferredAuthoredFps: program.animationStandard.preferredAuthoredFps,
     displayTargetFps: program.animationStandard.displayTargetFps,
+    proceduralReviewAvailable: true,
+    proceduralReviewCharacterCount: program.proceduralReview.characterCount,
+    proceduralReviewCanonicalSeatCount:
+      program.proceduralReview.canonicalSeatCount,
+    proceduralReviewPreviewOnlyCharacterCount:
+      program.proceduralReview.previewOnlyCharacterCount,
+    proceduralReviewIdentityApproval: false,
+    proceduralReviewProductionAdmission: false,
     providerExecution: false,
     runtimeActivation: false,
+    websiteActivation: false,
   });
 }

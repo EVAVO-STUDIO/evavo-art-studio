@@ -5,6 +5,9 @@ on:
     paths:
       - "config/council-avatar-identities/**"
       - "scripts/project-art/council-avatar-production-program.mjs"
+      - "scripts/project-art/council-avatar-procedural-review.mjs"
+      - "scripts/project-art/council-avatar-procedural-renderer.py"
+      - "scripts/project-art/compile-council-avatar-review-atlases.py"
       - "scripts/project-art/council-avatar-identity-bootstrap.mjs"
       - "scripts/project-art/council-avatar-media-readiness.mjs"
       - "scripts/project-art/character-identity-provider-contract.mjs"
@@ -14,7 +17,9 @@ on:
       - "scripts/run-project-art-character-identity-provider.mjs"
       - "scripts/test-project-art-character-identity-provider-runtime.mjs"
       - "scripts/compile-project-art-council-avatar-production.mjs"
+      - "scripts/compile-project-art-council-avatar-procedural-review.mjs"
       - "scripts/test-project-art-council-avatar-production.mjs"
+      - "scripts/test-project-art-council-avatar-procedural-review.mjs"
       - "scripts/test-project-art-council-avatar-identity-bootstrap.mjs"
       - "scripts/test-project-art-council-avatar-media-readiness.mjs"
       - "scripts/test-project-art-council-avatar-animation-suite.mjs"
@@ -28,12 +33,16 @@ on:
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
       - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
       - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
+      - "requirements-image-pipeline.txt"
       - ".github/workflows/council-avatar-production.yml"
   push:
     branches: [main]
     paths:
       - "config/council-avatar-identities/**"
       - "scripts/project-art/council-avatar-production-program.mjs"
+      - "scripts/project-art/council-avatar-procedural-review.mjs"
+      - "scripts/project-art/council-avatar-procedural-renderer.py"
+      - "scripts/project-art/compile-council-avatar-review-atlases.py"
       - "scripts/project-art/council-avatar-identity-bootstrap.mjs"
       - "scripts/project-art/council-avatar-media-readiness.mjs"
       - "scripts/project-art/character-identity-provider-contract.mjs"
@@ -43,7 +52,9 @@ on:
       - "scripts/run-project-art-character-identity-provider.mjs"
       - "scripts/test-project-art-character-identity-provider-runtime.mjs"
       - "scripts/compile-project-art-council-avatar-production.mjs"
+      - "scripts/compile-project-art-council-avatar-procedural-review.mjs"
       - "scripts/test-project-art-council-avatar-production.mjs"
+      - "scripts/test-project-art-council-avatar-procedural-review.mjs"
       - "scripts/test-project-art-council-avatar-identity-bootstrap.mjs"
       - "scripts/test-project-art-council-avatar-media-readiness.mjs"
       - "scripts/test-project-art-council-avatar-animation-suite.mjs"
@@ -57,6 +68,7 @@ on:
       - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
       - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
       - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
+      - "requirements-image-pipeline.txt"
       - ".github/workflows/council-avatar-production.yml"
 
 permissions:
@@ -70,6 +82,8 @@ jobs:
   contract:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/council-avatar-python-pycache
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,6 +91,20 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.5"
+          cache: pip
+          cache-dependency-path: requirements-image-pipeline.txt
+
+      - name: Install exact procedural review backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
+          [[ "$(python -c 'import PIL; print(PIL.__version__)')" == "12.2.0" ]]
 
       - name: Set up exact Node.js runtime
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -89,6 +117,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check scripts/project-art/council-avatar-production-program.mjs
+          node --check scripts/project-art/council-avatar-procedural-review.mjs
           node --check scripts/project-art/council-avatar-identity-bootstrap.mjs
           node --check scripts/project-art/council-avatar-media-readiness.mjs
           node --check scripts/project-art/character-identity-provider-contract.mjs
@@ -99,11 +128,35 @@ jobs:
           node --check scripts/test-project-art-character-identity-provider-runtime.mjs
           node --check scripts/project-art/avatar-animation-suite.mjs
           node --check scripts/compile-project-art-council-avatar-production.mjs
+          node --check scripts/compile-project-art-council-avatar-procedural-review.mjs
           node --check tools/project_art_council_avatar_production_mcp.mjs
           node --check scripts/test-project-art-council-avatar-production.mjs
+          node --check scripts/test-project-art-council-avatar-procedural-review.mjs
           node --check scripts/test-project-art-council-avatar-identity-bootstrap.mjs
           node --check scripts/test-project-art-council-avatar-media-readiness.mjs
           node --check scripts/test-project-art-council-avatar-animation-suite.mjs
+          python -m py_compile \
+            scripts/project-art/council-avatar-procedural-renderer.py \
+            scripts/project-art/compile-council-avatar-review-atlases.py
+
+      - name: Compile deterministic procedural review summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/compile-project-art-council-avatar-procedural-review.mjs summary
+          node scripts/compile-project-art-council-avatar-procedural-review.mjs capabilities
+
+      - name: Run procedural renderer and atlas round-trip proofs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/project-art/council-avatar-procedural-renderer.py --self-test
+          ATLAS_OUTPUT="${RUNNER_TEMP}/council-avatar-review-atlases"
+          rm -rf "${ATLAS_OUTPUT}"
+          python scripts/project-art/compile-council-avatar-review-atlases.py \
+            --renderer scripts/project-art/council-avatar-procedural-renderer.py \
+            --output "${ATLAS_OUTPUT}"
+          test -s "${ATLAS_OUTPUT}/atlas-manifest.json"
 
       - name: Run Council avatar production tests
         shell: bash
@@ -111,6 +164,7 @@ jobs:
           set -euo pipefail
           node --test \
             scripts/test-project-art-council-avatar-production.mjs \
+            scripts/test-project-art-council-avatar-procedural-review.mjs \
             scripts/test-project-art-council-avatar-identity-bootstrap.mjs \
             scripts/test-project-art-council-avatar-media-readiness.mjs \
             scripts/test-project-art-council-avatar-animation-suite.mjs
