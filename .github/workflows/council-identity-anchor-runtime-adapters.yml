@@ -1,0 +1,124 @@
+name: Council identity anchor Runtime adapters
+
+on:
+  pull_request:
+    paths:
+      - "config/council-avatar-identities/**"
+      - "scripts/project-art/council-identity-candidate-campaign.mjs"
+      - "scripts/project-art/council-identity-anchor-admission.mjs"
+      - "scripts/project-art/council-identity-anchor-authorization.mjs"
+      - "scripts/project-art/council-identity-anchor-runtime-adapters.mjs"
+      - "scripts/project-art/character-identity-provider-contract.mjs"
+      - "scripts/project-art/character-identity-provider-runtime.mjs"
+      - "scripts/compile-project-art-council-identity-anchor-runtime-adapters.mjs"
+      - "scripts/test-project-art-council-identity-anchor-runtime-adapters*.mjs"
+      - "scripts/test-ci-media-tool-council-identity-anchor-runtime-adapters.mjs"
+      - "tools/project_art_council_identity_anchor_runtime_adapters_mcp.mjs"
+      - "tools/project_art_council_avatar_production_mcp.mjs"
+      - "docs/PROJECT_ART_COUNCIL_IDENTITY_ANCHOR_RUNTIME_ADAPTERS.md"
+      - ".github/workflows/council-identity-anchor-runtime-adapters.yml"
+  push:
+    branches: [main]
+    paths:
+      - "config/council-avatar-identities/**"
+      - "scripts/project-art/council-identity-candidate-campaign.mjs"
+      - "scripts/project-art/council-identity-anchor-admission.mjs"
+      - "scripts/project-art/council-identity-anchor-authorization.mjs"
+      - "scripts/project-art/council-identity-anchor-runtime-adapters.mjs"
+      - "scripts/project-art/character-identity-provider-contract.mjs"
+      - "scripts/project-art/character-identity-provider-runtime.mjs"
+      - "scripts/compile-project-art-council-identity-anchor-runtime-adapters.mjs"
+      - "scripts/test-project-art-council-identity-anchor-runtime-adapters*.mjs"
+      - "scripts/test-ci-media-tool-council-identity-anchor-runtime-adapters.mjs"
+      - "tools/project_art_council_identity_anchor_runtime_adapters_mcp.mjs"
+      - "tools/project_art_council_avatar_production_mcp.mjs"
+      - "docs/PROJECT_ART_COUNCIL_IDENTITY_ANCHOR_RUNTIME_ADAPTERS.md"
+      - ".github/workflows/council-identity-anchor-runtime-adapters.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: council-anchor-runtime-adapters-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact checkout and clean source
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact provider, artifact and Runtime implementations
+        run: |
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
+
+      - name: Syntax-check V4.7 surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/project-art/council-identity-anchor-runtime-adapters.mjs
+          node --check scripts/compile-project-art-council-identity-anchor-runtime-adapters.mjs
+          node --check tools/project_art_council_identity_anchor_runtime_adapters_mcp.mjs
+          node --check tools/project_art_council_avatar_production_mcp.mjs
+          node --check scripts/test-project-art-council-identity-anchor-runtime-adapters.mjs
+          node --check scripts/test-project-art-council-identity-anchor-runtime-adapters-mcp.mjs
+          node --check scripts/test-ci-media-tool-council-identity-anchor-runtime-adapters.mjs
+
+      - name: Compile deterministic V4.7 summary and capabilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/compile-project-art-council-identity-anchor-runtime-adapters.mjs summary
+          node scripts/compile-project-art-council-identity-anchor-runtime-adapters.mjs capabilities
+
+      - name: Run V4.5 through V4.7 identity-gate regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test \
+            scripts/test-project-art-council-identity-anchor-admission.mjs \
+            scripts/test-project-art-council-identity-anchor-admission-mcp.mjs \
+            scripts/test-project-art-council-identity-anchor-authorization.mjs \
+            scripts/test-project-art-council-identity-anchor-authorization-mcp.mjs \
+            scripts/test-project-art-council-identity-anchor-runtime-adapters.mjs \
+            scripts/test-project-art-council-identity-anchor-runtime-adapters-mcp.mjs
+
+      - name: Prove exact source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
