@@ -10,6 +10,8 @@ on:
       - "scripts/project-art/compile-council-avatar-review-atlases.py"
       - "scripts/project-art/council-avatar-identity-bootstrap.mjs"
       - "scripts/project-art/council-avatar-media-readiness.mjs"
+      - "scripts/project-art/council-identity-candidate-campaign.mjs"
+      - "scripts/project-art/council-identity-anchor-admission.mjs"
       - "scripts/project-art/character-identity-provider-contract.mjs"
       - "scripts/project-art/character-identity-provider-execution.mjs"
       - "scripts/project-art/character-identity-provider-runtime.mjs"
@@ -18,14 +20,23 @@ on:
       - "scripts/test-project-art-character-identity-provider-runtime.mjs"
       - "scripts/compile-project-art-council-avatar-production.mjs"
       - "scripts/compile-project-art-council-avatar-procedural-review.mjs"
+      - "scripts/compile-project-art-council-identity-candidate-campaign.mjs"
+      - "scripts/compile-project-art-council-identity-anchor-admission.mjs"
       - "scripts/test-project-art-council-avatar-production.mjs"
       - "scripts/test-project-art-council-avatar-procedural-review.mjs"
       - "scripts/test-project-art-council-avatar-identity-bootstrap.mjs"
       - "scripts/test-project-art-council-avatar-media-readiness.mjs"
       - "scripts/test-project-art-council-avatar-animation-suite.mjs"
+      - "scripts/test-project-art-council-identity-candidate-campaign*.mjs"
+      - "scripts/test-project-art-council-identity-anchor-admission*.mjs"
+      - "scripts/test-ci-media-tool-council-identity-candidate-campaign.mjs"
+      - "scripts/test-ci-media-tool-council-identity-anchor-admission.mjs"
       - "tools/project_art_council_avatar_production_mcp.mjs"
+      - "tools/project_art_council_identity_anchor_admission_mcp.mjs"
       - "docs/PROJECT_ART_COUNCIL_AVATAR_PRODUCTION.md"
       - "docs/PROJECT_ART_COUNCIL_AVATAR_MEDIA_READINESS.md"
+      - "docs/PROJECT_ART_COUNCIL_IDENTITY_CANDIDATE_CAMPAIGN.md"
+      - "docs/PROJECT_ART_COUNCIL_IDENTITY_ANCHOR_ADMISSION.md"
       - "scripts/character-identity-master-plan.mjs"
       - "scripts/character-identity-bootstrap-admission.mjs"
       - "scripts/character-identity-candidate-review-plan.mjs"
@@ -45,6 +56,8 @@ on:
       - "scripts/project-art/compile-council-avatar-review-atlases.py"
       - "scripts/project-art/council-avatar-identity-bootstrap.mjs"
       - "scripts/project-art/council-avatar-media-readiness.mjs"
+      - "scripts/project-art/council-identity-candidate-campaign.mjs"
+      - "scripts/project-art/council-identity-anchor-admission.mjs"
       - "scripts/project-art/character-identity-provider-contract.mjs"
       - "scripts/project-art/character-identity-provider-execution.mjs"
       - "scripts/project-art/character-identity-provider-runtime.mjs"
@@ -53,14 +66,23 @@ on:
       - "scripts/test-project-art-character-identity-provider-runtime.mjs"
       - "scripts/compile-project-art-council-avatar-production.mjs"
       - "scripts/compile-project-art-council-avatar-procedural-review.mjs"
+      - "scripts/compile-project-art-council-identity-candidate-campaign.mjs"
+      - "scripts/compile-project-art-council-identity-anchor-admission.mjs"
       - "scripts/test-project-art-council-avatar-production.mjs"
       - "scripts/test-project-art-council-avatar-procedural-review.mjs"
       - "scripts/test-project-art-council-avatar-identity-bootstrap.mjs"
       - "scripts/test-project-art-council-avatar-media-readiness.mjs"
       - "scripts/test-project-art-council-avatar-animation-suite.mjs"
+      - "scripts/test-project-art-council-identity-candidate-campaign*.mjs"
+      - "scripts/test-project-art-council-identity-anchor-admission*.mjs"
+      - "scripts/test-ci-media-tool-council-identity-candidate-campaign.mjs"
+      - "scripts/test-ci-media-tool-council-identity-anchor-admission.mjs"
       - "tools/project_art_council_avatar_production_mcp.mjs"
+      - "tools/project_art_council_identity_anchor_admission_mcp.mjs"
       - "docs/PROJECT_ART_COUNCIL_AVATAR_PRODUCTION.md"
       - "docs/PROJECT_ART_COUNCIL_AVATAR_MEDIA_READINESS.md"
+      - "docs/PROJECT_ART_COUNCIL_IDENTITY_CANDIDATE_CAMPAIGN.md"
+      - "docs/PROJECT_ART_COUNCIL_IDENTITY_ANCHOR_ADMISSION.md"
       - "scripts/character-identity-master-plan.mjs"
       - "scripts/character-identity-bootstrap-admission.mjs"
       - "scripts/character-identity-candidate-review-plan.mjs"
@@ -81,7 +103,7 @@ concurrency:
 jobs:
   contract:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       PYTHONPYCACHEPREFIX: ${{ runner.temp }}/council-avatar-python-pycache
     steps:
@@ -112,7 +134,7 @@ jobs:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Syntax-check Council avatar surfaces
+      - name: Syntax-check Council avatar and identity surfaces
         shell: bash
         run: |
           set -euo pipefail
@@ -120,6 +142,8 @@ jobs:
           node --check scripts/project-art/council-avatar-procedural-review.mjs
           node --check scripts/project-art/council-avatar-identity-bootstrap.mjs
           node --check scripts/project-art/council-avatar-media-readiness.mjs
+          node --check scripts/project-art/council-identity-candidate-campaign.mjs
+          node --check scripts/project-art/council-identity-anchor-admission.mjs
           node --check scripts/project-art/character-identity-provider-contract.mjs
           node --check scripts/project-art/character-identity-provider-execution.mjs
           node --check scripts/project-art/character-identity-provider-runtime.mjs
@@ -129,22 +153,33 @@ jobs:
           node --check scripts/project-art/avatar-animation-suite.mjs
           node --check scripts/compile-project-art-council-avatar-production.mjs
           node --check scripts/compile-project-art-council-avatar-procedural-review.mjs
+          node --check scripts/compile-project-art-council-identity-candidate-campaign.mjs
+          node --check scripts/compile-project-art-council-identity-anchor-admission.mjs
           node --check tools/project_art_council_avatar_production_mcp.mjs
+          node --check tools/project_art_council_identity_anchor_admission_mcp.mjs
           node --check scripts/test-project-art-council-avatar-production.mjs
           node --check scripts/test-project-art-council-avatar-procedural-review.mjs
           node --check scripts/test-project-art-council-avatar-identity-bootstrap.mjs
           node --check scripts/test-project-art-council-avatar-media-readiness.mjs
           node --check scripts/test-project-art-council-avatar-animation-suite.mjs
+          node --check scripts/test-project-art-council-identity-candidate-campaign.mjs
+          node --check scripts/test-project-art-council-identity-candidate-campaign-mcp.mjs
+          node --check scripts/test-project-art-council-identity-anchor-admission.mjs
+          node --check scripts/test-project-art-council-identity-anchor-admission-mcp.mjs
           python -m py_compile \
             scripts/project-art/council-avatar-procedural-renderer.py \
             scripts/project-art/compile-council-avatar-review-atlases.py
 
-      - name: Compile deterministic procedural review summary
+      - name: Compile deterministic Council review and identity summaries
         shell: bash
         run: |
           set -euo pipefail
           node scripts/compile-project-art-council-avatar-procedural-review.mjs summary
           node scripts/compile-project-art-council-avatar-procedural-review.mjs capabilities
+          node scripts/compile-project-art-council-identity-candidate-campaign.mjs summary
+          node scripts/compile-project-art-council-identity-candidate-campaign.mjs capabilities
+          node scripts/compile-project-art-council-identity-anchor-admission.mjs summary
+          node scripts/compile-project-art-council-identity-anchor-admission.mjs capabilities
 
       - name: Run procedural renderer and atlas round-trip proofs
         shell: bash
@@ -158,7 +193,7 @@ jobs:
             --output "${ATLAS_OUTPUT}"
           test -s "${ATLAS_OUTPUT}/atlas-manifest.json"
 
-      - name: Run Council avatar production tests
+      - name: Run Council avatar and identity governance tests
         shell: bash
         run: |
           set -euo pipefail
@@ -167,7 +202,11 @@ jobs:
             scripts/test-project-art-council-avatar-procedural-review.mjs \
             scripts/test-project-art-council-avatar-identity-bootstrap.mjs \
             scripts/test-project-art-council-avatar-media-readiness.mjs \
-            scripts/test-project-art-council-avatar-animation-suite.mjs
+            scripts/test-project-art-council-avatar-animation-suite.mjs \
+            scripts/test-project-art-council-identity-candidate-campaign.mjs \
+            scripts/test-project-art-council-identity-candidate-campaign-mcp.mjs \
+            scripts/test-project-art-council-identity-anchor-admission.mjs \
+            scripts/test-project-art-council-identity-anchor-admission-mcp.mjs
 
       - name: Re-run canonical identity and animation contracts
         shell: bash
@@ -220,7 +259,11 @@ jobs:
       - name: Execute governed identity-provider fixture regressions
         env:
           EVAVO_ART_ENABLE_FIXTURE_PROVIDER: "true"
-        run: node --test scripts/test-project-art-character-identity-provider-runtime.mjs
+        run: |
+          node --test scripts/test-project-art-character-identity-provider-runtime.mjs
+          node --test \
+            scripts/test-project-art-council-identity-anchor-admission.mjs \
+            scripts/test-project-art-council-identity-anchor-admission-mcp.mjs
 
       - name: Confirm built fixture validation changed no repository source
         if: always()
