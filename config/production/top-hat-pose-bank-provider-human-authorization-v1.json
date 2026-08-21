@@ -1,0 +1,26 @@
+{
+  "schema": "evavo.project-art-top-hat-real-provider-human-authorization.v1",
+  "actorClass": "human",
+  "actorId": "greg-parker",
+  "authorizedAt": "2026-08-20T00:00:00.000Z",
+  "statement": "keeep going and make sure we are also generating all of the art sprites and animations and stuff are all done great and we review and fix any frames or issues up ok and make sure the actual presntation on the web and stuff of the animated aavtar looks great and is smooth animation and really quality and works well ok and make sure to upgrade it all and commit and push to main",
+  "scope": {
+    "characterId": "top-hat-man",
+    "poseSlots": [
+      "blink-closed",
+      "listening-attentive",
+      "thinking-reflective",
+      "speech-neutral",
+      "presentation-open",
+      "presentation-emphasis"
+    ],
+    "candidateCountPerSlot": 1,
+    "reviewRequiredBeforeAdmission": true
+  },
+  "maximumProviderCalls": 6,
+  "providerAdapterId": "openai-gpt-image",
+  "model": "gpt-image-1",
+  "candidateApprovalGranted": false,
+  "publicationGranted": false,
+  "runtimeActivationGranted": false
+}

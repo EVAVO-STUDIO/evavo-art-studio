@@ -60,7 +60,9 @@ export const TOP_HAT_ADMITTED_BODY_ANCHORS = Object.freeze([
   Object.freeze({
     id: 'neutral',
     role: 'canonical-full-body-identity-and-registration-anchor',
-    repository: ART_STUDIO_REPOSITORY,
+    repository: RUNTIME_REPOSITORY,
+    commit: TOP_HAT_POSE_SLOT_RUNTIME_PIN.commit,
+    tree: TOP_HAT_POSE_SLOT_RUNTIME_PIN.tree,
     path:
       'assets/top-hat-man/candidates/top-hat-man-full-body-master-v5.alpha.png',
     sha256:
@@ -74,7 +76,9 @@ export const TOP_HAT_ADMITTED_BODY_ANCHORS = Object.freeze([
   Object.freeze({
     id: 'inhale',
     role: 'approved-breath-inhale-anchor',
-    repository: ART_STUDIO_REPOSITORY,
+    repository: RUNTIME_REPOSITORY,
+    commit: TOP_HAT_POSE_SLOT_RUNTIME_PIN.commit,
+    tree: TOP_HAT_POSE_SLOT_RUNTIME_PIN.tree,
     path:
       'assets/top-hat-man/candidates/top-hat-man-idle-breathe-apex-v1.alpha.png',
     sha256:
@@ -88,7 +92,9 @@ export const TOP_HAT_ADMITTED_BODY_ANCHORS = Object.freeze([
   Object.freeze({
     id: 'exhale',
     role: 'approved-breath-exhale-anchor',
-    repository: ART_STUDIO_REPOSITORY,
+    repository: RUNTIME_REPOSITORY,
+    commit: TOP_HAT_POSE_SLOT_RUNTIME_PIN.commit,
+    tree: TOP_HAT_POSE_SLOT_RUNTIME_PIN.tree,
     path:
       'assets/top-hat-man/candidates/top-hat-man-idle-breathe-exhale-v1.alpha.png',
     sha256:
@@ -299,7 +305,9 @@ function parseAnchor(value, expected, index) {
     !IDENTIFIER.test(value.id) ||
     typeof value.sha256 !== 'string' ||
     !SHA256.test(value.sha256) ||
-    value.repository !== ART_STUDIO_REPOSITORY ||
+    value.repository !== RUNTIME_REPOSITORY ||
+    value.commit !== TOP_HAT_POSE_SLOT_RUNTIME_PIN.commit ||
+    value.tree !== TOP_HAT_POSE_SLOT_RUNTIME_PIN.tree ||
     value.width !== 1024 ||
     value.height !== 1536 ||
     value.pixelFormat !== 'rgba8-straight' ||
@@ -539,6 +547,7 @@ export function compileProjectArtTopHatPoseSlotProduction(value) {
       exactRuntimePoseBankPinRequired: true,
       exactArtStudioSourcePinRequired: true,
       exactApprovedAnchorHashesRequired: true,
+      exactApprovedAnchorSourceCommitRequired: true,
       allSourceClipsMustExistInAnimationSuite: true,
       fullCanvasPixelExactRegistrationRequired: true,
       realNativeAlphaRequired: true,
@@ -595,6 +604,9 @@ export function projectArtTopHatPoseSlotProductionCapabilities() {
     runtimePoseBankSchema: TOP_HAT_POSE_SLOT_RUNTIME_PIN.poseBankSchema,
     runtimePoseBankVersion: TOP_HAT_POSE_SLOT_RUNTIME_PIN.poseBankVersion,
     runtimePackageVersion: TOP_HAT_POSE_SLOT_RUNTIME_PIN.packageVersion,
+    admittedBodyAnchorSourceRepository: RUNTIME_REPOSITORY,
+    admittedBodyAnchorSourceCommit: TOP_HAT_POSE_SLOT_RUNTIME_PIN.commit,
+    admittedBodyAnchorSourceTree: TOP_HAT_POSE_SLOT_RUNTIME_PIN.tree,
     artStudioAnimationSuitePlanSchema:
       TOP_HAT_POSE_SLOT_ART_STUDIO_PIN.animationSuitePlanSchema,
     artStudioDisplayBridgePlanSchema:
