@@ -23,6 +23,8 @@ const ATLAS_COMPILER = path.join(
   ROOT,
   'scripts/project-art/compile-council-avatar-review-atlases.py',
 );
+const PROVIDER_RUNTIME_TEST =
+  'scripts/test-project-art-character-identity-provider-runtime.mjs';
 const NODE_TESTS = Object.freeze([
   'scripts/test-project-art-council-avatar-production.mjs',
   'scripts/test-project-art-council-avatar-procedural-review.mjs',
@@ -40,6 +42,7 @@ function sourceFingerprint() {
     RENDERER,
     ATLAS_COMPILER,
     ...NODE_TESTS.map((relativePath) => path.join(ROOT, relativePath)),
+    path.join(ROOT, PROVIDER_RUNTIME_TEST),
     path.join(
       ROOT,
       'scripts/project-art/council-avatar-procedural-review.mjs',
@@ -128,9 +131,11 @@ function assertAuthorityDenied(authority) {
 
 test(
   'established media-tool CI executes the complete Council V4.3 review proof',
-  { timeout: 10 * 60 * 1000 },
+  { timeout: 15 * 60 * 1000 },
   () => {
     const fingerprint = sourceFingerprint();
+    const requiresProviderFixture =
+      process.env.GITHUB_WORKFLOW === 'Project art workbench';
     const markerPath = process.env.RUNNER_TEMP
       ? path.join(
           process.env.RUNNER_TEMP,
@@ -147,6 +152,7 @@ test(
       assert.equal(marker.rendererSampledFrameCount, 100);
       assert.equal(marker.atlasClipCount, 6);
       assert.equal(marker.atlasFrameCount, 636);
+      assert.equal(marker.providerFixturePassed, requiresProviderFixture);
       return;
     }
 
@@ -178,6 +184,8 @@ test(
       path.join(process.env.RUNNER_TEMP ?? os.tmpdir(), 'evavo-council-atlas-'),
     );
     const atlasOutput = path.join(temporaryRoot, 'atlas');
+    let manifest;
+    let manifestBytes;
     try {
       const atlasResult = run(python.command, [
         ...python.prefix,
@@ -194,8 +202,8 @@ test(
 
       const manifestPath = path.join(atlasOutput, 'atlas-manifest.json');
       assert.ok(existsSync(manifestPath));
-      const manifestBytes = readFileSync(manifestPath);
-      const manifest = JSON.parse(manifestBytes.toString('utf8'));
+      manifestBytes = readFileSync(manifestPath);
+      manifest = JSON.parse(manifestBytes.toString('utf8'));
       assert.equal(
         manifest.schema,
         'evavo.project-art-council-avatar-procedural-review-atlas-manifest.v1',
@@ -217,7 +225,7 @@ test(
         assert.equal(clip.loop, true);
         assert.equal(clip.rotationAllowed, false);
         assert.equal(clip.stableBottomCentrePivot, true);
-        assert.ok(clip.frames.length === clip.frameCount);
+        assert.equal(clip.frames.length, clip.frameCount);
         assert.ok(
           clip.frames.every(
             (frame) =>
@@ -227,30 +235,46 @@ test(
         );
         assertAuthorityDenied(clip.authority);
       }
-
-      const marker = {
-        schema: 'evavo.council-avatar-ci-proof.v1',
-        status: 'passed',
-        sourceFingerprint: fingerprint,
-        nodeTestFileCount: NODE_TESTS.length,
-        rendererSampledFrameCount: selfTest.sampledFrameCount,
-        atlasClipCount: manifest.summary.clipCount,
-        atlasFrameCount: manifest.summary.frameCount,
-        atlasPageCount: manifest.summary.pageCount,
-        atlasManifestSha256: sha256(manifestBytes),
-        providerExecution: false,
-        identityApproval: false,
-        productionAdmission: false,
-        runtimeActivation: false,
-        websiteActivation: false,
-      };
-      if (markerPath) {
-        writeFileSync(markerPath, `${JSON.stringify(marker, null, 2)}\n`, {
-          flag: 'wx',
-        });
-      }
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+
+    let providerFixturePassed = false;
+    if (requiresProviderFixture) {
+      const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+      run(pnpm, ['--filter', '@evavo/art-studio-worker', 'build']);
+      run(process.execPath, ['--test', PROVIDER_RUNTIME_TEST], {
+        env: {
+          ...process.env,
+          EVAVO_ART_ENABLE_FIXTURE_PROVIDER: 'true',
+        },
+      });
+      providerFixturePassed = true;
+    }
+
+    assert.ok(manifest);
+    assert.ok(manifestBytes);
+    const marker = {
+      schema: 'evavo.council-avatar-ci-proof.v1',
+      status: 'passed',
+      sourceFingerprint: fingerprint,
+      nodeTestFileCount: NODE_TESTS.length,
+      rendererSampledFrameCount: selfTest.sampledFrameCount,
+      atlasClipCount: manifest.summary.clipCount,
+      atlasFrameCount: manifest.summary.frameCount,
+      atlasPageCount: manifest.summary.pageCount,
+      atlasManifestSha256: sha256(manifestBytes),
+      providerFixturePassed,
+      providerExecution: false,
+      identityApproval: false,
+      productionAdmission: false,
+      runtimeActivation: false,
+      websiteActivation: false,
+    };
+    if (markerPath) {
+      writeFileSync(markerPath, `${JSON.stringify(marker, null, 2)}\n`, {
+        flag: 'wx',
+      });
     }
   },
 );
