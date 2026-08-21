@@ -46,7 +46,7 @@ jobs:
           test "$(git hash-object tmp/avatar-runtime-pr33/src/council-procedural-review-atlas.js)" = "4004eb1d5997f361bcf818918ea7092c5561b285"
           test "$(git hash-object tmp/avatar-runtime-pr33/tests/council-procedural-review-atlas.test.mjs)" = "76c61aa5a5cfb03fe0c98af7da0711bb32401328"
           test "$(git hash-object tmp/avatar-runtime-pr33/src/council-avatar-production-status.js)" = "75adc0a685a6947e70c87432aa2723a7a2a9246b"
-          test "$(git hash-object tmp/avatar-runtime-pr33/tests/council-avatar-production-status.test.mjs)" = "33d0241700f6d7f4ecfe94c9b58cf2e9158fb29c"
+          test "$(git hash-object tmp/avatar-runtime-pr33/tests/council-avatar-production-status.test.mjs)" = "3b824fe5029f79275f2e8860fdb67ed4f162f1b0"
           test "$(git hash-object tmp/avatar-runtime-pr33/src/council-character-assignments.js)" = "d31596825c3dd51bb2764cab43160d0976946622"
           test "$(git hash-object tmp/avatar-runtime-pr33/src/version-policy.js)" = "63d54afe6380b801dbeaea5b20cf25435553f043"
           test "$(git hash-object tmp/avatar-runtime-pr33/tests/version-policy.test.mjs)" = "d8ec48aec48bd71ff6e5a97def5d2caff057d110"

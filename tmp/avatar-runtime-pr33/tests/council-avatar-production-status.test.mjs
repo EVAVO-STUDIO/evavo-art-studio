@@ -216,8 +216,8 @@ test("future admitted unique packs still require completed authored media", () =
   assert.equal(status.websiteMayClaimAllCouncilAvatarsProductionReady, false);
   assert.deepEqual(status.authoredAnimationCompletionRequiredFor, [
     "top-hat-man",
-    "eva-female",
     "council-critic",
+    "eva-female",
     "council-open-reviewer",
   ]);
 });
