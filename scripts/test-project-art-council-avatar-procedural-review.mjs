@@ -102,11 +102,11 @@ test('procedural renderer source uses canonical Council IDs and exposes a no-vid
   assert.ok(!source.includes('"moro-pell": render_moro'));
 });
 
-test('artifact validator rejects authority escalation and accepts bounded review evidence', () => {
-  const review = compileCouncilAvatarProceduralReview();
-  const artifact = {
+function boundedArtifact(review) {
+  return {
     schema: 'evavo.project-art-council-avatar-procedural-review-artifact.v1',
     status: 'procedural-previsualisation-review-only',
+    renderer: 'scripts/project-art/council-avatar-procedural-renderer.py',
     masterCanvas: { width: 1024, height: 1536 },
     videoCanvas: { width: 512, height: 768 },
     fps: 60,
@@ -114,16 +114,69 @@ test('artifact validator rejects authority escalation and accepts bounded review
     identityMasterCandidate: false,
     characters: review.characters.map((character) => ({
       characterId: character.characterId,
+      displayName: character.displayName,
+      seatId: character.seatId,
+      canonicalSeat: character.canonicalSeat,
+      previewOnly: character.previewOnly,
+      clips: review.clips.map((clip) => {
+        const frameCount = Math.round(clip.durationSeconds * 60);
+        return {
+          clipId: clip.clipId,
+          purpose: clip.purpose,
+          durationSeconds: clip.durationSeconds,
+          fps: 60,
+          frameCount,
+          loop: true,
+          video: `${clip.clipId}.mp4`,
+          poster: `${clip.clipId}.poster.png`,
+          contactSheet: `${clip.clipId}.contact.png`,
+          uniqueFrameCount: frameCount,
+          duplicateFrameCount: 0,
+          normalisedSeamEnergy: 0,
+          sha256: 'b'.repeat(64),
+        };
+      }),
     })),
     authority: { ...review.authority },
     manifestSha256: 'a'.repeat(64),
   };
-  assert.equal(validateCouncilAvatarProceduralReviewArtifact(artifact).valid, true);
+}
+
+test('artifact validator accepts exact bounded renderer evidence', () => {
+  const review = compileCouncilAvatarProceduralReview();
+  const validation = validateCouncilAvatarProceduralReviewArtifact(
+    boundedArtifact(review),
+  );
+  assert.equal(validation.valid, true);
+  assert.equal(validation.characterCount, 5);
+  assert.equal(validation.manifestHashSyntaxValidated, true);
+  assert.equal(validation.manifestHashRecomputed, false);
+  assert.equal(validation.providerExecution, false);
+  assert.equal(validation.identityApproval, false);
+  assert.equal(validation.productionAdmission, false);
+  assert.equal(validation.runtimeActivation, false);
+  assert.equal(validation.websiteActivation, false);
+});
+
+test('artifact validator rejects known, nested and unknown authority escalation', () => {
+  const review = compileCouncilAvatarProceduralReview();
+  const artifact = boundedArtifact(review);
   assert.throws(
     () =>
       validateCouncilAvatarProceduralReviewArtifact({
         ...artifact,
         authority: { ...artifact.authority, identityApproval: true },
+      }),
+    /ARTIFACT_ESCALATION/u,
+  );
+  assert.throws(
+    () =>
+      validateCouncilAvatarProceduralReviewArtifact({
+        ...artifact,
+        authority: {
+          ...artifact.authority,
+          unrecognisedPublicationAuthority: false,
+        },
       }),
     /AUTHORITY_INVALID/u,
   );
@@ -131,9 +184,72 @@ test('artifact validator rejects authority escalation and accepts bounded review
     () =>
       validateCouncilAvatarProceduralReviewArtifact({
         ...artifact,
+        characters: artifact.characters.map((character, characterIndex) => ({
+          ...character,
+          clips: character.clips.map((clip, clipIndex) =>
+            characterIndex === 0 && clipIndex === 0
+              ? { ...clip, runtimeActivationEstablished: true }
+              : clip,
+          ),
+        })),
+      }),
+    /ARTIFACT_ESCALATION/u,
+  );
+  assert.throws(
+    () =>
+      validateCouncilAvatarProceduralReviewArtifact({
+        ...artifact,
         identityMasterCandidate: true,
       }),
-    /BOUNDARY_INVALID/u,
+    /ARTIFACT_ESCALATION/u,
+  );
+});
+
+test('artifact validator binds canonical roster, Nymm boundary and complete clip order', () => {
+  const review = compileCouncilAvatarProceduralReview();
+  const artifact = boundedArtifact(review);
+  assert.throws(
+    () =>
+      validateCouncilAvatarProceduralReviewArtifact({
+        ...artifact,
+        characters: artifact.characters.map((character) =>
+          character.characterId === 'nymm-guest-arbiter'
+            ? { ...character, seatId: 'guest-arbiter', canonicalSeat: true }
+            : character,
+        ),
+      }),
+    /CHARACTER_BOUNDARY_INVALID/u,
+  );
+  assert.throws(
+    () =>
+      validateCouncilAvatarProceduralReviewArtifact({
+        ...artifact,
+        characters: artifact.characters.map((character, index) =>
+          index === 0
+            ? { ...character, clips: character.clips.slice(0, -1) }
+            : character,
+        ),
+      }),
+    /CLIP_COUNT_INVALID/u,
+  );
+  assert.throws(
+    () =>
+      validateCouncilAvatarProceduralReviewArtifact({
+        ...artifact,
+        characters: artifact.characters.map((character, index) =>
+          index === 0
+            ? {
+                ...character,
+                clips: [
+                  character.clips[1],
+                  character.clips[0],
+                  ...character.clips.slice(2),
+                ],
+              }
+            : character,
+        ),
+      }),
+    /CLIP_BOUNDARY_INVALID/u,
   );
 });
 
