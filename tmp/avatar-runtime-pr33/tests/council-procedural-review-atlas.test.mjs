@@ -37,6 +37,17 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function errorCodeIs(...expectedCodes) {
+  return (error) => {
+    assert.ok(error instanceof Error);
+    assert.ok(
+      expectedCodes.includes(error.code),
+      `expected one of ${expectedCodes.join(", ")}; received ${String(error.code)}`,
+    );
+    return true;
+  };
+}
+
 function pngHeader(width = 2048, height = 2048) {
   const bytes = Buffer.alloc(24);
   Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(bytes, 0);
@@ -267,28 +278,34 @@ test("manifest parser rejects roster, order, authority, path, pivot and overlap 
   ];
   assert.throws(
     () => parseCouncilProceduralReviewAtlasManifest(reordered),
-    /CLIP_PROFILE_INVALID|CLIP_ORDER_INVALID/u,
+    errorCodeIs(
+      "EVAVO_COUNCIL_REVIEW_ATLAS_CLIP_PROFILE_INVALID",
+      "EVAVO_COUNCIL_REVIEW_ATLAS_CLIP_ORDER_INVALID",
+    ),
   );
 
   const authority = structuredClone(base);
   authority.authority.runtimeActivation = true;
   assert.throws(
     () => parseCouncilProceduralReviewAtlasManifest(authority),
-    /AUTHORITY_INVALID/u,
+    errorCodeIs("EVAVO_COUNCIL_REVIEW_ATLAS_AUTHORITY_INVALID"),
   );
 
   const pathTraversal = structuredClone(base);
   pathTraversal.clips[0].pages[0].path = "../page.png";
   assert.throws(
     () => parseCouncilProceduralReviewAtlasManifest(pathTraversal),
-    /PATH_INVALID|PAGE_INVALID/u,
+    errorCodeIs(
+      "EVAVO_COUNCIL_REVIEW_ATLAS_PATH_INVALID",
+      "EVAVO_COUNCIL_REVIEW_ATLAS_PAGE_INVALID",
+    ),
   );
 
   const wrongPivot = structuredClone(base);
   wrongPivot.clips[2].frames[0].pivot.y = 300;
   assert.throws(
     () => parseCouncilProceduralReviewAtlasManifest(wrongPivot),
-    /NUMBER_INVALID/u,
+    errorCodeIs("EVAVO_COUNCIL_REVIEW_ATLAS_NUMBER_INVALID"),
   );
 
   const overlap = structuredClone(base);
@@ -297,7 +314,7 @@ test("manifest parser rejects roster, order, authority, path, pivot and overlap 
   };
   assert.throws(
     () => parseCouncilProceduralReviewAtlasManifest(overlap),
-    /FRAME_OVERLAP/u,
+    errorCodeIs("EVAVO_COUNCIL_REVIEW_ATLAS_FRAME_OVERLAP"),
   );
 });
 
@@ -313,7 +330,10 @@ test("file verifier rejects altered page and metadata bytes", async () => {
         parsed,
         async (relativePath) => changedPages.get(relativePath),
       ),
-    /PNG_INVALID|FILE_HASH_MISMATCH/u,
+    errorCodeIs(
+      "EVAVO_COUNCIL_REVIEW_ATLAS_PNG_INVALID",
+      "EVAVO_COUNCIL_REVIEW_ATLAS_FILE_HASH_MISMATCH",
+    ),
   );
 
   const second = fixture();
@@ -327,7 +347,7 @@ test("file verifier rejects altered page and metadata bytes", async () => {
         secondParsed,
         async (relativePath) => changedMetadata.get(relativePath),
       ),
-    /FILE_HASH_MISMATCH/u,
+    errorCodeIs("EVAVO_COUNCIL_REVIEW_ATLAS_FILE_HASH_MISMATCH"),
   );
 });
 
@@ -339,7 +359,7 @@ test("unknown clips and production-shaped requests fail closed", () => {
         characterId: "nymm-guest-arbiter",
         clipId: "speaking",
       }),
-    /CLIP_UNKNOWN/u,
+    errorCodeIs("EVAVO_COUNCIL_REVIEW_ATLAS_CLIP_UNKNOWN"),
   );
   assert.throws(
     () =>
@@ -347,7 +367,7 @@ test("unknown clips and production-shaped requests fail closed", () => {
         characterId: "council-critic",
         clipId: "production-release",
       }),
-    /CLIP_UNKNOWN/u,
+    errorCodeIs("EVAVO_COUNCIL_REVIEW_ATLAS_CLIP_UNKNOWN"),
   );
 });
 

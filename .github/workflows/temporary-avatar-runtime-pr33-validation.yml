@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git hash-object tmp/avatar-runtime-pr33/src/council-procedural-review-atlas.js)" = "4004eb1d5997f361bcf818918ea7092c5561b285"
-          test "$(git hash-object tmp/avatar-runtime-pr33/tests/council-procedural-review-atlas.test.mjs)" = "a5d434c8532d706336b61fedd3e185a6cf019463"
+          test "$(git hash-object tmp/avatar-runtime-pr33/tests/council-procedural-review-atlas.test.mjs)" = "76c61aa5a5cfb03fe0c98af7da0711bb32401328"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           node --version
           npm --version
