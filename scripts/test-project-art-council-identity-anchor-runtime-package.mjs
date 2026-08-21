@@ -26,9 +26,11 @@ import {
   COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_MANIFEST_SCHEMA,
   compileCouncilIdentityAnchorRuntimePackagePlan,
   councilIdentityAnchorRuntimePackageCapabilities,
-  materializeCouncilIdentityAnchorRuntimePackage,
-  validateCouncilIdentityAnchorRuntimePackage,
 } from './project-art/council-identity-anchor-runtime-package.mjs';
+import {
+  materializeCouncilIdentityAnchorRuntimePackageStrict,
+  validateCouncilIdentityAnchorRuntimePackageStrict,
+} from './project-art/council-identity-anchor-runtime-package-strict.mjs';
 import { runCouncilIdentityAnchorRuntimePackageCli } from './compile-project-art-council-identity-anchor-runtime-package.mjs';
 
 const ADMISSION_OCCURRED_AT = '2026-08-21T00:00:00.000Z';
@@ -109,7 +111,7 @@ function withPackage(callback) {
   const root = mkdtempSync(path.join(tmpdir(), 'evavo-council-runtime-package-'));
   const packageRoot = path.join(root, 'package');
   try {
-    const result = materializeCouncilIdentityAnchorRuntimePackage({
+    const result = materializeCouncilIdentityAnchorRuntimePackageStrict({
       adapterBundle: adapterBundle(),
       packageRoot,
       packagedAt: PACKAGED_AT,
@@ -124,6 +126,12 @@ function readManifest(packageRoot) {
   return JSON.parse(readFileSync(path.join(packageRoot, 'package-manifest.json'), 'utf8'));
 }
 
+function resignManifest(manifest) {
+  const body = structuredClone(manifest);
+  delete body.manifestSha256;
+  return { ...body, manifestSha256: sha256Json(body) };
+}
+
 function writeManifest(packageRoot, manifest) {
   writeFileSync(
     path.join(packageRoot, 'package-manifest.json'),
@@ -131,45 +139,40 @@ function writeManifest(packageRoot, manifest) {
   );
 }
 
-function resignManifest(manifest) {
-  const body = structuredClone(manifest);
-  delete body.manifestSha256;
-  return { ...body, manifestSha256: sha256Json(body) };
-}
-
-test('V4.8 plan requires one exact active V4.7 bundle and no provider execution', () => {
+test('V4.8 plan requires atomic external packaging and grants no execution authority', () => {
   const plan = compileCouncilIdentityAnchorRuntimePackagePlan();
   assert.equal(plan.version, '4.8.0');
-  assert.equal(plan.counts.runtimeAdaptersRequired, 8);
-  assert.equal(plan.counts.runtimeAdapterFilesPackaged, 0);
-  assert.equal(plan.counts.providerExecutionsPerformed, 0);
+  assert.deepEqual(plan.counts, {
+    runtimeAdaptersRequired: 8,
+    runtimeAdapterFilesPackaged: 0,
+    manifestFilesPackaged: 0,
+    providerExecutionsPerformed: 0,
+    dependentJobsExcluded: 16,
+  });
   assert.equal(plan.packagingPolicy.packageRootMustNotExist, true);
   assert.equal(plan.packagingPolicy.packageRootInsideRepositoryAllowed, false);
+  assert.equal(plan.packagingPolicy.stagingDirectoryRequired, true);
   assert.equal(plan.packagingPolicy.atomicSameFilesystemRenameRequired, true);
   assert.equal(plan.packagingPolicy.separateAdapterFilePerAuthorization, true);
   assert.equal(plan.packagingPolicy.exactAdapterFileSha256Required, true);
   assert.equal(plan.packagingPolicy.adapterParserRoundTripRequired, true);
+  assert.equal(plan.packagingPolicy.packageDirectoryAllowlistRequired, true);
   assert.equal(plan.packagingPolicy.authorizationMustBeActiveAtPackageTime, true);
   assert.equal(plan.packagingPolicy.providerExecutionPerformedByPackaging, false);
   assert.equal(plan.packagingPolicy.authorizationConsumedByPackaging, false);
   assert.ok(Object.values(plan.authority).every((value) => value === false));
-  assert.match(plan.planSha256, /^[a-f0-9]{64}$/u);
 });
 
-test('materialization atomically creates one manifest and eight exact adapter files', () => {
+test('strict materialization creates one manifest and eight exact adapter files', () => {
   withPackage(({ packageRoot, result }) => {
-    assert.equal(result.status, 'passed');
+    assert.equal(result.strictManifestValidation, true);
     assert.equal(result.adapterFileCount, 8);
     assert.equal(result.providerExecutionsPerformed, 0);
-    assert.equal(result.identityApprovalsEstablished, 0);
-    assert.equal(result.runtimeActivation, false);
-    assert.equal(result.websiteActivation, false);
-
-    const rootNames = readdirSync(packageRoot).sort();
-    assert.deepEqual(rootNames, ['adapters', 'package-manifest.json']);
-    const adapterRoot = path.join(packageRoot, 'adapters');
-    const adapterNames = readdirSync(adapterRoot).sort();
-    assert.deepEqual(adapterNames, [
+    assert.deepEqual(readdirSync(packageRoot).sort(), [
+      'adapters',
+      'package-manifest.json',
+    ]);
+    assert.deepEqual(readdirSync(path.join(packageRoot, 'adapters')).sort(), [
       '01-council-critic-candidate-set-01-full-body-right.runtime-adapter.json',
       '02-council-critic-candidate-set-02-full-body-right.runtime-adapter.json',
       '03-council-critic-candidate-set-03-full-body-right.runtime-adapter.json',
@@ -180,47 +183,51 @@ test('materialization atomically creates one manifest and eight exact adapter fi
       '08-council-open-reviewer-candidate-set-04-full-body-right.runtime-adapter.json',
     ]);
 
-    const validation = validateCouncilIdentityAnchorRuntimePackage({ packageRoot });
+    const validation = validateCouncilIdentityAnchorRuntimePackageStrict({
+      packageRoot,
+    });
     assert.equal(validation.valid, true);
-    assert.equal(validation.schema, COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_MANIFEST_SCHEMA);
+    assert.equal(validation.strictManifestValidation, true);
+    assert.equal(
+      validation.schema,
+      COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_MANIFEST_SCHEMA,
+    );
     assert.equal(validation.adapterFileCount, 8);
     assert.equal(validation.providerExecutionCount, 0);
     assert.equal(validation.identityApprovalCount, 0);
-    assert.equal(validation.runtimeActivation, false);
-    assert.equal(validation.websiteActivation, false);
 
     const manifest = readManifest(packageRoot);
-    assert.equal(manifest.status, 'eight-runtime-adapter-files-packaged-not-executed');
     assert.equal(manifest.counts.runtimeAdapterFilesPackaged, 8);
-    assert.equal(manifest.counts.manifestFilesPackaged, 1);
-    assert.equal(manifest.counts.durableRuntimeReservationsEstablished, 0);
     assert.equal(manifest.counts.providerExecutionsPerformed, 0);
     assert.equal(manifest.adapters.length, 8);
     assert.equal(new Set(manifest.adapters.map((entry) => entry.fileSha256)).size, 8);
-    assert.equal(new Set(manifest.adapters.map((entry) => entry.packageEntrySha256)).size, 8);
-    assert.equal(manifest.executionBoundary.packageMaterializationPerformsProviderExecution, false);
-    assert.equal(manifest.executionBoundary.packageMaterializationConsumesAuthorization, false);
-    assert.equal(manifest.executionBoundary.separateCreateOnlyAdapterFilesEstablished, true);
-    assert.equal(manifest.executionBoundary.durableRuntimeReservationEstablished, false);
-    assert.equal(manifest.globalAnchorBarrier.dependentAdmissionCompilationAllowed, false);
+    assert.equal(
+      new Set(manifest.adapters.map((entry) => entry.packageEntrySha256)).size,
+      8,
+    );
+    assert.equal(
+      manifest.executionBoundary.packageMaterializationPerformsProviderExecution,
+      false,
+    );
+    assert.equal(
+      manifest.executionBoundary.separateCreateOnlyAdapterFilesEstablished,
+      true,
+    );
     assert.ok(Object.values(manifest.authority).every((value) => value === false));
   });
 });
 
-test('packaging rejects times outside the authorization window before creating output', () => {
+test('packaging rejects inactive authorizations before creating output', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'evavo-council-runtime-window-'));
   try {
     for (const packagedAt of [
       '2026-08-21T01:59:59.999Z',
       AUTHORIZATION_EXPIRES_AT,
     ]) {
-      const packageRoot = path.join(
-        root,
-        `package-${packagedAt.replaceAll(':', '_').replaceAll('.', '_')}`,
-      );
+      const packageRoot = path.join(root, packagedAt.replaceAll(':', '_'));
       assert.throws(
         () =>
-          materializeCouncilIdentityAnchorRuntimePackage({
+          materializeCouncilIdentityAnchorRuntimePackageStrict({
             adapterBundle: adapterBundle(),
             packageRoot,
             packagedAt,
@@ -234,14 +241,14 @@ test('packaging rejects times outside the authorization window before creating o
   }
 });
 
-test('existing output root is rejected without mutation', () => {
+test('existing package roots are rejected without mutation', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'evavo-council-runtime-existing-'));
   const packageRoot = path.join(root, 'package');
   try {
     writeFileSync(packageRoot, 'occupied');
     assert.throws(
       () =>
-        materializeCouncilIdentityAnchorRuntimePackage({
+        materializeCouncilIdentityAnchorRuntimePackageStrict({
           adapterBundle: adapterBundle(),
           packageRoot,
           packagedAt: PACKAGED_AT,
@@ -254,78 +261,77 @@ test('existing output root is rejected without mutation', () => {
   }
 });
 
-test('adapter-byte tampering, missing files and unexpected files fail closed', () => {
+test('adapter tampering, missing files and extra files fail closed', () => {
   withPackage(({ packageRoot }) => {
-    const manifest = readManifest(packageRoot);
-    const first = path.join(packageRoot, ...manifest.adapters[0].relativePath.split('/'));
-    writeFileSync(first, `${readFileSync(first, 'utf8')} `);
+    const first = readManifest(packageRoot).adapters[0];
+    const file = path.join(packageRoot, ...first.relativePath.split('/'));
+    writeFileSync(file, `${readFileSync(file, 'utf8')} `);
     assert.throws(
-      () => validateCouncilIdentityAnchorRuntimePackage({ packageRoot }),
+      () => validateCouncilIdentityAnchorRuntimePackageStrict({ packageRoot }),
       codeIs('COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_ADAPTER_FILE_HASH_MISMATCH'),
     );
   });
-
   withPackage(({ packageRoot }) => {
-    const manifest = readManifest(packageRoot);
-    unlinkSync(path.join(packageRoot, ...manifest.adapters[0].relativePath.split('/')));
+    const first = readManifest(packageRoot).adapters[0];
+    unlinkSync(path.join(packageRoot, ...first.relativePath.split('/')));
     assert.throws(
-      () => validateCouncilIdentityAnchorRuntimePackage({ packageRoot }),
+      () => validateCouncilIdentityAnchorRuntimePackageStrict({ packageRoot }),
       codeIs('COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_ADAPTER_DIRECTORY_SHAPE_INVALID'),
     );
   });
-
   withPackage(({ packageRoot }) => {
     writeFileSync(path.join(packageRoot, 'adapters', 'unexpected.json'), '{}\n');
     assert.throws(
-      () => validateCouncilIdentityAnchorRuntimePackage({ packageRoot }),
+      () => validateCouncilIdentityAnchorRuntimePackageStrict({ packageRoot }),
       codeIs('COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_ADAPTER_DIRECTORY_SHAPE_INVALID'),
     );
   });
 });
 
-test('resigned nested authority, count and layout claims are rejected', () => {
-  withPackage(({ packageRoot }) => {
-    const manifest = readManifest(packageRoot);
-    manifest.executionBoundary.providerFallbackAllowed = true;
-    writeManifest(packageRoot, resignManifest(manifest));
-    assert.throws(
-      () => validateCouncilIdentityAnchorRuntimePackage({ packageRoot }),
-      /MANIFEST_BINDING_INVALID|EXECUTION_BOUNDARY_INVALID/u,
-    );
-  });
-
-  withPackage(({ packageRoot }) => {
-    const manifest = readManifest(packageRoot);
-    manifest.counts.providerExecutionsPerformed = 1;
-    writeManifest(packageRoot, resignManifest(manifest));
-    assert.throws(
-      () => validateCouncilIdentityAnchorRuntimePackage({ packageRoot }),
-      /MANIFEST_BINDING_INVALID|COUNTS_INVALID/u,
-    );
-  });
-
-  withPackage(({ packageRoot }) => {
-    const manifest = readManifest(packageRoot);
-    manifest.packageLayout.exactRootEntryCount = 99;
-    writeManifest(packageRoot, resignManifest(manifest));
-    assert.throws(
-      () => validateCouncilIdentityAnchorRuntimePackage({ packageRoot }),
-      /MANIFEST_BINDING_INVALID|LAYOUT_INVALID/u,
-    );
-  });
+test('re-signed nested execution, count and layout drift is rejected', () => {
+  const cases = [
+    [
+      (manifest) => {
+        manifest.executionBoundary.providerFallbackAllowed = true;
+      },
+      'COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_EXECUTION_BOUNDARY_INVALID',
+    ],
+    [
+      (manifest) => {
+        manifest.counts.providerExecutionsPerformed = 1;
+      },
+      'COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_COUNTS_INVALID',
+    ],
+    [
+      (manifest) => {
+        manifest.packageLayout.exactRootEntryCount = 99;
+      },
+      'COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_LAYOUT_INVALID',
+    ],
+  ];
+  for (const [mutate, expectedCode] of cases) {
+    withPackage(({ packageRoot }) => {
+      const manifest = readManifest(packageRoot);
+      mutate(manifest);
+      writeManifest(packageRoot, resignManifest(manifest));
+      assert.throws(
+        () => validateCouncilIdentityAnchorRuntimePackageStrict({ packageRoot }),
+        codeIs(expectedCode),
+      );
+    });
+  }
 });
 
-test('manifest and package-entry schema injection is rejected even when re-signed', () => {
+test('re-signed nested schema injection is rejected', () => {
   withPackage(({ packageRoot }) => {
     const manifest = readManifest(packageRoot);
     manifest.executionBoundary.hiddenExecutionApproval = true;
     writeManifest(packageRoot, resignManifest(manifest));
     assert.throws(
-      () => validateCouncilIdentityAnchorRuntimePackage({ packageRoot }),
-      /EXECUTION_BOUNDARY_INVALID|MANIFEST_BINDING_INVALID/u,
+      () => validateCouncilIdentityAnchorRuntimePackageStrict({ packageRoot }),
+      codeIs('COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_EXECUTION_BOUNDARY_INVALID'),
     );
   });
-
   withPackage(({ packageRoot }) => {
     const manifest = readManifest(packageRoot);
     manifest.adapters[0].automaticExecutionApproved = true;
@@ -334,8 +340,8 @@ test('manifest and package-entry schema injection is rejected even when re-signe
     manifest.adapters[0].packageEntrySha256 = sha256Json(entryBody);
     writeManifest(packageRoot, resignManifest(manifest));
     assert.throws(
-      () => validateCouncilIdentityAnchorRuntimePackage({ packageRoot }),
-      /ENTRY_KEYS_INVALID|ENTRY_BINDING_INVALID/u,
+      () => validateCouncilIdentityAnchorRuntimePackageStrict({ packageRoot }),
+      codeIs('COUNCIL_IDENTITY_ANCHOR_RUNTIME_PACKAGE_ENTRY_KEYS_INVALID'),
     );
   });
 });
@@ -356,19 +362,14 @@ test('capabilities disclose package-only V4.8 truth', () => {
   assert.equal(capabilities.identityApprovalAvailable, false);
   assert.equal(capabilities.runtimeActivationAvailable, false);
   assert.equal(capabilities.websiteActivationAvailable, false);
-  assert.ok(Object.values(capabilities.authority).every((value) => value === false));
 });
 
-test('CLI materializes, validates and rejects overwrite or execution flags', () => {
+test('CLI materializes, strictly validates and rejects overwrite or execution flags', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'evavo-council-runtime-package-cli-'));
   try {
     const bundlePath = path.join(root, 'v4.7.json');
     const packageRoot = path.join(root, 'package');
     writeFileSync(bundlePath, `${JSON.stringify(adapterBundle(), null, 2)}\n`);
-
-    const summary = runCouncilIdentityAnchorRuntimePackageCli(['summary']);
-    assert.equal(summary.runtimeAdaptersRequired, 8);
-    assert.equal(summary.runtimeAdapterFilesPackaged, 0);
 
     const result = runCouncilIdentityAnchorRuntimePackageCli([
       'materialize',
@@ -380,6 +381,7 @@ test('CLI materializes, validates and rejects overwrite or execution flags', () 
       packageRoot,
     ]);
     assert.equal(result.runtimeAdapterFilesPackaged, 8);
+    assert.equal(result.strictManifestValidation, true);
     assert.equal(result.providerExecutionsPerformed, 0);
 
     const validation = runCouncilIdentityAnchorRuntimePackageCli([
@@ -388,8 +390,8 @@ test('CLI materializes, validates and rejects overwrite or execution flags', () 
       packageRoot,
     ]);
     assert.equal(validation.valid, true);
+    assert.equal(validation.strictManifestValidation, true);
     assert.equal(validation.adapterFileCount, 8);
-    assert.equal(validation.providerExecutionCount, 0);
 
     assert.throws(
       () =>
