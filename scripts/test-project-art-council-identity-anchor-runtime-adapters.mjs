@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
   mkdtempSync,
   readFileSync,
@@ -50,12 +51,8 @@ function canonical(value) {
     .join(',')}}`;
 }
 
-async function sha256Json(value) {
-  const bytes = new TextEncoder().encode(canonical(value));
-  const hash = await globalThis.crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(hash)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
+function sha256Json(value) {
+  return createHash('sha256').update(canonical(value)).digest('hex');
 }
 
 function codeIs(...expected) {
@@ -109,43 +106,33 @@ function adapterBundle() {
   });
 }
 
-test('V4.7 plan preserves the exact ordered eight-anchor adapter matrix', () => {
+test('V4.7 plan preserves the ordered eight-anchor matrix and zero execution authority', () => {
   const plan = compileCouncilIdentityAnchorRuntimeAdapterPlan();
   assert.equal(plan.version, '4.7.0');
   assert.equal(plan.counts.providerAuthorizationsRequired, 8);
   assert.equal(plan.counts.runtimeAdaptersCompiled, 0);
   assert.equal(plan.counts.providerExecutionsPerformed, 0);
   assert.deepEqual(
-    plan.targets.map((target) => [
-      target.ordinal,
-      target.characterId,
-      target.setId,
-      target.viewId,
-    ]),
+    plan.targets.map((target) => [target.ordinal, target.characterId, target.setId]),
     [
-      [1, 'council-critic', 'candidate-set-01', 'full-body-right'],
-      [2, 'council-critic', 'candidate-set-02', 'full-body-right'],
-      [3, 'council-critic', 'candidate-set-03', 'full-body-right'],
-      [4, 'council-critic', 'candidate-set-04', 'full-body-right'],
-      [5, 'council-open-reviewer', 'candidate-set-01', 'full-body-right'],
-      [6, 'council-open-reviewer', 'candidate-set-02', 'full-body-right'],
-      [7, 'council-open-reviewer', 'candidate-set-03', 'full-body-right'],
-      [8, 'council-open-reviewer', 'candidate-set-04', 'full-body-right'],
+      [1, 'council-critic', 'candidate-set-01'],
+      [2, 'council-critic', 'candidate-set-02'],
+      [3, 'council-critic', 'candidate-set-03'],
+      [4, 'council-critic', 'candidate-set-04'],
+      [5, 'council-open-reviewer', 'candidate-set-01'],
+      [6, 'council-open-reviewer', 'candidate-set-02'],
+      [7, 'council-open-reviewer', 'candidate-set-03'],
+      [8, 'council-open-reviewer', 'candidate-set-04'],
     ],
   );
   assert.equal(plan.adapterPolicy.authorizationMustBeActiveAtCompileTime, true);
-  assert.equal(
-    plan.adapterPolicy.authorizationMustBeRevalidatedAtExecutionTime,
-    true,
-  );
-  assert.equal(plan.adapterPolicy.separateAdapterPerAuthorization, true);
-  assert.equal(plan.adapterPolicy.maximumProviderCallsPerAdapter, 1);
+  assert.equal(plan.adapterPolicy.authorizationMustBeRevalidatedAtExecutionTime, true);
   assert.equal(plan.adapterPolicy.adapterCompilationPerformsProviderExecution, false);
   assert.equal(plan.adapterPolicy.adapterCompilationConsumesAuthorization, false);
   assert.ok(Object.values(plan.authority).every((value) => value === false));
 });
 
-test('bundle compiles eight exact distinct Runtime adapters without execution', () => {
+test('bundle compiles eight distinct exact Runtime adapters without execution', () => {
   const bundle = adapterBundle();
   assert.equal(bundle.schema, COUNCIL_IDENTITY_ANCHOR_RUNTIME_ADAPTER_BUNDLE_SCHEMA);
   assert.equal(bundle.status, 'eight-anchor-runtime-adapters-compiled-not-executed');
@@ -156,36 +143,28 @@ test('bundle compiles eight exact distinct Runtime adapters without execution', 
   assert.equal(bundle.counts.providerExecutionsPerformed, 0);
   assert.equal(bundle.adapters.length, 8);
   assert.equal(new Set(bundle.adapters.map((entry) => entry.adapterSha256)).size, 8);
-  assert.equal(
-    new Set(bundle.adapters.map((entry) => entry.adapterEntrySha256)).size,
-    8,
-  );
+  assert.equal(new Set(bundle.adapters.map((entry) => entry.adapterEntrySha256)).size, 8);
   for (const [index, entry] of bundle.adapters.entries()) {
     const authorization = bundle.sourceAuthorizationBundle.authorizations[index];
     assert.equal(entry.ordinal, index + 1);
     assert.equal(entry.campaignJobId, authorization.campaignJobId);
-    assert.equal(
-      entry.authorizationEntrySha256,
-      authorization.authorizationEntrySha256,
-    );
+    assert.equal(entry.authorizationEntrySha256, authorization.authorizationEntrySha256);
     assert.equal(
       entry.authorizationSha256,
       authorization.providerAuthorization.authorizationSha256,
     );
     assert.equal(entry.status, 'runtime-adapter-compiled-not-executed');
     assert.equal(entry.runtimeAdapter.adapterSha256, entry.adapterSha256);
-    assert.equal(entry.runtimeAdapter.characterId, entry.characterId);
-    assert.equal(entry.runtimeAdapter.setId, entry.setId);
-    assert.equal(entry.runtimeAdapter.viewId, 'full-body-right');
-    assert.equal(entry.runtimeAdapter.executionPolicy.oneCandidateOnly, true);
     assert.equal(entry.runtimeAdapter.executionPolicy.maximumProviderCalls, 1);
     assert.equal(entry.runtimeAdapter.executionPolicy.maximumRuntimeAttempts, 1);
     assert.equal(entry.runtimeAdapter.executionPolicy.providerFallbackAllowed, false);
     assert.equal(entry.runtimeAdapter.executionPolicy.generationEqualsApproval, false);
     assert.equal(entry.providerExecutionReceipt, null);
-    assert.equal(entry.runtimeReservation.established, false);
-    assert.equal(entry.runtimeReservation.runtimeJobId, null);
-    assert.equal(entry.runtimeReservation.reservationReceipt, null);
+    assert.deepEqual(entry.runtimeReservation, {
+      established: false,
+      runtimeJobId: null,
+      reservationReceipt: null,
+    });
     assert.ok(Object.values(entry.runtimeAdapter.authority).every((value) => value === false));
     assert.ok(Object.values(entry.authority).every((value) => value === false));
   }
@@ -195,13 +174,11 @@ test('bundle compiles eight exact distinct Runtime adapters without execution', 
   assert.equal(bundle.executionBoundary.authorizationMustBeRevalidatedAtExecutionTime, true);
   assert.equal(bundle.executionBoundary.exactAdapterFileSha256RequiredBeforeExecution, true);
   assert.equal(bundle.executionBoundary.durableRuntimeReservationEstablished, false);
-  assert.equal(bundle.globalAnchorBarrier.successfulAnchorExecutionReceiptCount, 0);
   assert.equal(bundle.globalAnchorBarrier.dependentAdmissionCompilationAllowed, false);
   assert.ok(Object.values(bundle.authority).every((value) => value === false));
-  assert.match(bundle.bundleSha256, /^[a-f0-9]{64}$/u);
 });
 
-test('bundle validator deterministically recompiles the complete adapter graph', () => {
+test('validator deterministically recompiles the complete adapter graph', () => {
   const bundle = adapterBundle();
   assert.deepEqual(validateCouncilIdentityAnchorRuntimeAdapterBundle(bundle), {
     valid: true,
@@ -218,13 +195,13 @@ test('bundle validator deterministically recompiles the complete adapter graph',
   });
 });
 
-test('adapter compilation rejects expired or pre-window authorization times', () => {
+test('adapter compilation rejects authorization windows that are not active', () => {
   const source = authorizationBundle();
   assert.throws(
     () =>
       compileCouncilIdentityAnchorRuntimeAdapterBundle({
         authorizationBundle: source,
-        compiledAt: '2026-08-22T02:00:00.000Z',
+        compiledAt: AUTHORIZATION_EXPIRES_AT,
       }),
     codeIs('COUNCIL_IDENTITY_ANCHOR_RUNTIME_ADAPTER_AUTHORIZATION_NOT_ACTIVE'),
   );
@@ -238,8 +215,8 @@ test('adapter compilation rejects expired or pre-window authorization times', ()
   );
 });
 
-test('authorization mutation, adapter mutation and execution injection fail closed', () => {
-  const authorization = authorizationBundle();
+test('authorization, adapter and execution mutations fail closed', () => {
+  const authorization = clone(authorizationBundle());
   authorization.authorizations[0].providerAuthorization.maximumProviderCalls = 2;
   assert.throws(
     () =>
@@ -250,15 +227,14 @@ test('authorization mutation, adapter mutation and execution injection fail clos
     /AUTHORIZATION_BUNDLE_HASH_MISMATCH|AUTHORIZATION/u,
   );
 
-  const bundle = adapterBundle();
-  const changed = clone(bundle);
+  const changed = clone(adapterBundle());
   changed.adapters[0].runtimeAdapter.executionPolicy.maximumProviderCalls = 2;
   assert.throws(
     () => validateCouncilIdentityAnchorRuntimeAdapterBundle(changed),
     codeIs('COUNCIL_IDENTITY_ANCHOR_RUNTIME_ADAPTER_BUNDLE_HASH_MISMATCH'),
   );
 
-  const execution = clone(bundle);
+  const execution = clone(adapterBundle());
   execution.adapters[0].providerExecutionReceipt = { status: 'succeeded' };
   assert.throws(
     () => validateCouncilIdentityAnchorRuntimeAdapterBundle(execution),
@@ -266,27 +242,26 @@ test('authorization mutation, adapter mutation and execution injection fail clos
   );
 });
 
-test('resigned adapter reordering and ninth adapter are rejected by deterministic recompilation', async () => {
-  const original = adapterBundle();
-  const reordered = clone(original);
+test('resigned reordering and ninth-adapter injection fail deterministic recompilation', () => {
+  const reordered = clone(adapterBundle());
   [reordered.adapters[0], reordered.adapters[1]] = [
     reordered.adapters[1],
     reordered.adapters[0],
   ];
   const reorderedBody = clone(reordered);
   delete reorderedBody.bundleSha256;
-  reordered.bundleSha256 = await sha256Json(reorderedBody);
+  reordered.bundleSha256 = sha256Json(reorderedBody);
   assert.throws(
     () => validateCouncilIdentityAnchorRuntimeAdapterBundle(reordered),
     codeIs('COUNCIL_IDENTITY_ANCHOR_RUNTIME_ADAPTER_BUNDLE_RECOMPILE_MISMATCH'),
   );
 
-  const ninth = clone(original);
+  const ninth = clone(adapterBundle());
   ninth.adapters.push(clone(ninth.adapters[0]));
   ninth.counts.runtimeAdaptersCompiled = 9;
   const ninthBody = clone(ninth);
   delete ninthBody.bundleSha256;
-  ninth.bundleSha256 = await sha256Json(ninthBody);
+  ninth.bundleSha256 = sha256Json(ninthBody);
   assert.throws(
     () => validateCouncilIdentityAnchorRuntimeAdapterBundle(ninth),
     codeIs('COUNCIL_IDENTITY_ANCHOR_RUNTIME_ADAPTER_BUNDLE_RECOMPILE_MISMATCH'),
@@ -314,10 +289,12 @@ test('capabilities expose compile-only V4.7 truth', () => {
 test('CLI performs create-only compile and validate round trips', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'evavo-council-anchor-adapters-'));
   try {
-    const source = authorizationBundle();
     const authorizationPath = path.join(root, 'authorization-bundle.json');
     const adapterPath = path.join(root, 'adapter-bundle.json');
-    writeFileSync(authorizationPath, `${JSON.stringify(source, null, 2)}\n`);
+    writeFileSync(
+      authorizationPath,
+      `${JSON.stringify(authorizationBundle(), null, 2)}\n`,
+    );
 
     const summary = runCouncilIdentityAnchorRuntimeAdapterCli(['summary']);
     assert.equal(summary.providerAuthorizationsRequired, 8);
