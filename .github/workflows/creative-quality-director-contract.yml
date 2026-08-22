@@ -37,10 +37,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "${CREATIVE_QUALITY_CANDIDATE_SHA}" =~ ^[0-9a-f]{40}$ ]] || {
+          if [[ ! "${CREATIVE_QUALITY_CANDIDATE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Invalid Creative Quality candidate SHA" >&2
             exit 1
-          }
+          fi
 
       - name: Check out exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
