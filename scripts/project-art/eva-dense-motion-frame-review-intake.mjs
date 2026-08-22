@@ -22,7 +22,6 @@ import {
   deepFreeze,
   sha256Bytes,
   sha256Document,
-  snapshotJsonValue,
   timestamp,
 } from './avatar-final-pass-provider-candidate-common.mjs';
 import {
@@ -42,7 +41,6 @@ export const EVA_DENSE_MOTION_FRAME_REVIEW_INTAKE_PROTOCOL_VERSION =
   '2026-08-22.1';
 
 const FRAME_COUNT = 10;
-const MAXIMUM_JSON_BYTES = 8 * 1024 * 1024;
 
 function assert(condition, code, message = code) {
   if (!condition) {
@@ -103,37 +101,6 @@ function resolveRelative(root, relative, label) {
   const absolute = path.join(root, ...canonical.split('/'));
   assert(inside(root, absolute), 'EVA_DENSE_FRAME_REVIEW_PATH_ESCAPE', label);
   return absolute;
-}
-
-function stableJson(filePath, label) {
-  const lexical = path.resolve(filePath);
-  const before = lstatSync(lexical);
-  assert(
-    before.isFile() &&
-      !before.isSymbolicLink() &&
-      before.nlink === 1 &&
-      before.size >= 2 &&
-      before.size <= MAXIMUM_JSON_BYTES &&
-      realpathSync(lexical) === lexical,
-    'EVA_DENSE_FRAME_REVIEW_INPUT_INVALID',
-    label,
-  );
-  const bytes = readFileSync(lexical);
-  const after = lstatSync(lexical);
-  for (const field of ['dev', 'ino', 'size', 'mtimeMs', 'ctimeMs']) {
-    assert(
-      before[field] === after[field],
-      'EVA_DENSE_FRAME_REVIEW_INPUT_CHANGED',
-      label,
-    );
-  }
-  let value;
-  try {
-    value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-  } catch {
-    assert(false, 'EVA_DENSE_FRAME_REVIEW_JSON_INVALID', label);
-  }
-  return Object.freeze({ absolute: lexical, bytes, sha256: sha256Bytes(bytes), value });
 }
 
 function writeJsonCreateOnly(filePath, value) {
@@ -368,7 +335,11 @@ export function runEvaDenseMotionFrameReviewIntake({
     }),
     authority: authority(),
   };
-  return deepFreeze({ ...body, receiptSha256: sha256Document(body) });
+  const receipt = deepFreeze({
+    ...body,
+    receiptSha256: sha256Document(body),
+  });
+  return deepFreeze({ plan, receipt });
 }
 
 export function persistEvaDenseMotionFrameReviewIntakeEvidence({
@@ -377,6 +348,10 @@ export function persistEvaDenseMotionFrameReviewIntakeEvidence({
   receipt,
 }) {
   const outputRoot = realDirectory(outputInput, 'outputRoot');
+  assert(
+    receipt?.planSha256 === plan?.planSha256,
+    'EVA_DENSE_FRAME_REVIEW_EVIDENCE_PLAN_MISMATCH',
+  );
   const planPath = path.join(outputRoot, 'campaign-plan.json');
   const receiptPath = path.join(outputRoot, 'campaign-execution.json');
   assert(
@@ -397,6 +372,7 @@ export function evaDenseMotionFrameReviewIntakeCapabilities() {
     externallyAuthoredNamedHumanDecisionsRequired: true,
     allTenShadowReviewedBeforeFirstPersistentOutcome: true,
     exactDecisionFileShaPinnedAfterPreflight: true,
+    executedPreflightPlanReturnedForEvidencePersistence: true,
     automaticDecisionCreationAllowed: false,
     mixedHumanOutcomesPreserved: true,
     technicalInspectionCreated: false,
