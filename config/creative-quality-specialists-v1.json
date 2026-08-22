@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-art-creative-quality-specialists-v1",
+  "loopAssurance": {
+    "repository": "EVAVO-STUDIO/evavo-loop-studio",
+    "taskId": "external-loop-assurance",
+    "requiredModes": ["seamless", "finite-repeat"]
+  },
+  "authority": {
+    "providerExecution": false,
+    "creativeApproval": false,
+    "publication": false,
+    "clientRelease": false
+  }
+}

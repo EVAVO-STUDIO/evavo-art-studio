@@ -1,0 +1,170 @@
+name: Creative Quality Director contract
+
+on:
+  pull_request:
+    paths:
+      - "apps/cli/src/repair-cli.ts"
+      - "apps/cli/src/router-cli.ts"
+      - "apps/cli/test/creative-quality-director.test.mjs"
+      - "apps/cli/test/repair-router.test.mjs"
+      - "config/creative-quality-cel-v1.json"
+      - "config/creative-quality-specialists-v1.json"
+      - "docs/creative-quality-director.md"
+      - "evavo.tasks.json"
+      - "scripts/creative-quality-director-v2.mjs"
+      - "scripts/creative-quality-director.mjs"
+      - "scripts/test-creative-quality-director-contract.mjs"
+      - "scripts/test-creative-quality-director-v2.mjs"
+      - "scripts/test-creative-quality-director.mjs"
+      - ".github/workflows/creative-quality-director-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: creative-quality-director-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CREATIVE_QUALITY_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Validate exact candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${CREATIVE_QUALITY_CANDIDATE_SHA}" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "Invalid Creative Quality candidate SHA" >&2
+            exit 1
+          }
+
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CREATIVE_QUALITY_CANDIDATE_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${CREATIVE_QUALITY_CANDIDATE_SHA}" ]]
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Creative Quality source syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/creative-quality-director.mjs
+          node --check scripts/creative-quality-director-v2.mjs
+          node --check scripts/test-creative-quality-director.mjs
+          node --check scripts/test-creative-quality-director-v2.mjs
+          node --check scripts/test-creative-quality-director-contract.mjs
+
+      - name: Validate Creative Quality configuration
+        run: node scripts/creative-quality-director-v2.mjs validate
+
+      - name: Run Creative Quality source contracts
+        run: >-
+          node --test
+          scripts/test-creative-quality-director.mjs
+          scripts/test-creative-quality-director-v2.mjs
+          scripts/test-creative-quality-director-contract.mjs
+
+      - name: Build domain dependency closure
+        run: pnpm run build:domain
+
+      - name: Build and test compiled CLI contracts
+        run: pnpm --filter @evavo/art-studio-cli test
+
+      - name: Prove exact source remains clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          STATUS="$(git status --porcelain=v1 --untracked-files=all)"
+          if [ -n "${STATUS}" ]; then
+            printf 'Unexpected validation byproducts:\n%s\n' "${STATUS}" >&2
+            exit 1
+          fi
+
+      - name: Compile bounded validation receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' > "${RUNNER_TEMP}/creative-quality-director-validation.json"
+          import { createHash } from "node:crypto";
+
+          const canonicalSort = (value) => {
+            if (Array.isArray(value)) return value.map(canonicalSort);
+            if (!value || typeof value !== "object") return value;
+            return Object.fromEntries(
+              Object.keys(value)
+                .sort()
+                .map((key) => [key, canonicalSort(value[key])]),
+            );
+          };
+
+          const payload = {
+            schemaVersion: "1.0",
+            kind: "evavo.creative-quality-director-pr-validation.v1",
+            repository: process.env.GITHUB_REPOSITORY,
+            candidateSha: process.env.CREATIVE_QUALITY_CANDIDATE_SHA,
+            eventName: process.env.GITHUB_EVENT_NAME,
+            checks: [
+              "exact-candidate-checkout",
+              "frozen-dependency-install",
+              "source-syntax",
+              "configuration-validation",
+              "source-contract-tests",
+              "domain-dependency-build",
+              "compiled-cli-contract-tests",
+              "clean-source-proof",
+            ],
+            authority: {
+              providerExecution: false,
+              imageMutation: false,
+              creativeApproval: false,
+              publication: false,
+              clientRelease: false,
+              gitCommit: false,
+              gitPush: false,
+              deployment: false,
+            },
+            validation: "passed",
+          };
+
+          const receiptSha256 = createHash("sha256")
+            .update(JSON.stringify(canonicalSort(payload)))
+            .digest("hex");
+          process.stdout.write(
+            `${JSON.stringify({ ...payload, receiptSha256 }, null, 2)}\n`,
+          );
+          NODE
+
+      - name: Upload compact validation evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: creative-quality-director-${{ env.CREATIVE_QUALITY_CANDIDATE_SHA }}
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/creative-quality-director-validation.json
