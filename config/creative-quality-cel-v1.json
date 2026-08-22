@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-art-creative-quality-profile-v1",
+  "id": "authored-cel-creative-quality-v1",
+  "productionMethod": "authored-drawn-cel",
+  "maximumRevisionCycles": 5,
+  "reviewOrder": [
+    "story-read-and-silhouette",
+    "character-construction-and-acting",
+    "camera-layout-and-depth",
+    "authored-timing-and-contact",
+    "line-language-and-cleanup",
+    "palette-light-and-cel-shadows",
+    "effects-cause-shape-and-integration",
+    "loop-or-ending-behaviour",
+    "alpha-crop-and-delivery",
+    "rights-and-provenance"
+  ],
+  "forbiddenShortcuts": [
+    "random-line-jitter",
+    "global-grain-as-handmade-style",
+    "frame-wide-wobble",
+    "one-texture-over-every-material",
+    "generic-bloom-or-rim-light",
+    "independent-frame-regeneration",
+    "interpolation-over-authored-holds",
+    "one-pass-anime-filter"
+  ],
+  "loopPolicy": {
+    "modes": ["none", "seamless", "finite-repeat"],
+    "seamlessRequiresBoundaryEvidence": true,
+    "duplicateTerminalFrameForbidden": true,
+    "postInterpolationRecheckRequired": true
+  },
+  "failureRules": [
+    {
+      "code": "identity-averaging",
+      "department": "character-animation",
+      "intervention": "redraw-character-construction",
+      "targetedRepairStrategy": "source-replace",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["skull face body costume or silhouette anchors remain averaged"]
+    },
+    {
+      "code": "generic-face",
+      "department": "character-animation",
+      "intervention": "redraw-expression-and-face",
+      "targetedRepairStrategy": "source-replace",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["expression remains symmetrical vague or off-model"]
+    },
+    {
+      "code": "symmetrical-neutral-pose",
+      "department": "character-animation",
+      "intervention": "redraw-pose-and-line-of-action",
+      "targetedRepairStrategy": "source-replace",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["weight force contact or intention remains unreadable"]
+    },
+    {
+      "code": "camera-drift",
+      "department": "layout",
+      "intervention": "restore-approved-camera-and-geography",
+      "targetedRepairStrategy": "source-replace",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["camera height lens horizon or screen direction remains unstable"]
+    },
+    {
+      "code": "depth-flattening",
+      "department": "background",
+      "intervention": "repaint-depth-planes-and-occlusion",
+      "targetedRepairStrategy": "layer-recompose",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["foreground midground and background remain value-equivalent"]
+    },
+    {
+      "code": "uniform-line-weight",
+      "department": "cleanup",
+      "intervention": "redraw-line-hierarchy",
+      "targetedRepairStrategy": "masked-provider-inpaint",
+      "localizedProviderRepairAllowed": true,
+      "rejectIf": ["outer interior and detail lines remain mechanically equal"]
+    },
+    {
+      "code": "line-crawl",
+      "department": "cleanup",
+      "intervention": "stabilize-held-and-adjacent-lines",
+      "targetedRepairStrategy": "source-replace",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["held lines or facial landmarks continue to crawl"]
+    },
+    {
+      "code": "plastic-shading",
+      "department": "shade",
+      "intervention": "replace-soft-rendering-with-designed-cel-shadow-groups",
+      "targetedRepairStrategy": "masked-provider-inpaint",
+      "localizedProviderRepairAllowed": true,
+      "rejectIf": ["gradients glossy skin or generic rim light remain"]
+    },
+    {
+      "code": "palette-drift",
+      "department": "colour",
+      "intervention": "repaint-approved-palette-roles",
+      "targetedRepairStrategy": "masked-provider-inpaint",
+      "localizedProviderRepairAllowed": true,
+      "rejectIf": ["character material or effect swatches remain unstable"]
+    },
+    {
+      "code": "undirected-microdetail",
+      "department": "art-direction",
+      "intervention": "remove-noise-and-restore-focal-hierarchy",
+      "targetedRepairStrategy": "manual-review",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["detail density still competes with the story focal point"]
+    },
+    {
+      "code": "generic-cinematic-haze",
+      "department": "composite",
+      "intervention": "remove-generic-atmosphere-and-rebuild-physical-depth",
+      "targetedRepairStrategy": "layer-recompose",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["haze remains unmotivated or substitutes for depth design"]
+    },
+    {
+      "code": "hold-violation",
+      "department": "timing",
+      "intervention": "restore-held-drawing-and-replacement-cel-logic",
+      "targetedRepairStrategy": "source-replace",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["new motion remains inside an authored hold"]
+    },
+    {
+      "code": "motion-morph",
+      "department": "inbetween",
+      "intervention": "redraw-breakdowns-arcs-spacing-and-volumes",
+      "targetedRepairStrategy": "source-replace",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["forms continue to morph pump slide or average between keys"]
+    },
+    {
+      "code": "generic-particle-effects",
+      "department": "effects",
+      "intervention": "redesign-effect-key-shapes-and-exposure",
+      "targetedRepairStrategy": "source-replace",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["effect remains procedural noise without designed birth breakup and dissipation"]
+    },
+    {
+      "code": "effect-contact-light-missing",
+      "department": "effects",
+      "intervention": "add-motivated-contact-light-shadow-and-occlusion",
+      "targetedRepairStrategy": "layer-recompose",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["effect remains pasted over the scene"]
+    },
+    {
+      "code": "loop-boundary-pop",
+      "department": "timing",
+      "intervention": "rebuild-first-last-boundary-drawings-and-spacing",
+      "targetedRepairStrategy": "source-replace",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["pose volume line palette or luminance still jumps on repeated playback"]
+    },
+    {
+      "code": "loop-phase-lock",
+      "department": "effects",
+      "intervention": "offset-independent-cycle-phases",
+      "targetedRepairStrategy": "metadata-adjustment",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["all secondary cycles still restart in unison"]
+    },
+    {
+      "code": "duplicate-terminal-frame",
+      "department": "timing",
+      "intervention": "remove-duplicate-terminal-exposure",
+      "targetedRepairStrategy": "metadata-adjustment",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["the terminal duplicate remains in the delivered sequence"]
+    },
+    {
+      "code": "alpha-halo",
+      "department": "mastering",
+      "intervention": "remaster-alpha-and-edge-colour",
+      "targetedRepairStrategy": "alpha-remaster",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["halo matte contamination or unsafe transparent RGB remains"]
+    },
+    {
+      "code": "crop-risk",
+      "department": "mastering",
+      "intervention": "restore-safe-canvas-and-registration",
+      "targetedRepairStrategy": "layer-transform",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["silhouette or effects remain clipped at any reviewed frame"]
+    },
+    {
+      "code": "rights-or-provenance-risk",
+      "department": "art-direction",
+      "intervention": "stop-and-obtain-rights-safe-source-evidence",
+      "targetedRepairStrategy": "manual-review",
+      "localizedProviderRepairAllowed": false,
+      "rejectIf": ["protected imitation or missing source provenance remains"]
+    }
+  ],
+  "authority": {
+    "providerExecution": false,
+    "automaticCreativeApproval": false,
+    "sourceMutation": false,
+    "publication": false
+  }
+}

@@ -14,6 +14,11 @@ if (spritePlanAction) {
   // Preserve all --input/--output arguments and translate only the action token.
   process.argv[2] = spritePlanAction;
   await import("./sprite-plan-cli.js");
+} else if (command?.startsWith("repair-")) {
+  // Repair commands are intentionally isolated from the general CLI so the
+  // immutable repair planner, revision, ranking and promotion protocols remain
+  // reachable without weakening their separate authority boundaries.
+  await import("./repair-cli.js");
 } else {
   // Every existing Art Studio command remains owned by the established CLI.
   await import("./index.js");

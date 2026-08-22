@@ -20,16 +20,47 @@
     "pixel-art-candidate-audit": {
       "runtime": "node-script",
       "entry": "scripts/audit-pixel-art-candidate.mjs",
-      "arguments": ["--input", "{{input}}", "--role", "{{role}}", "--max-partial-alpha-ratio", "{{maxPartialAlphaRatio}}", "--max-colors", "{{maxColors}}", "--require-alpha", "--json"],
+      "arguments": [
+        "--input",
+        "{{input}}",
+        "--role",
+        "{{role}}",
+        "--max-partial-alpha-ratio",
+        "{{maxPartialAlphaRatio}}",
+        "--max-colors",
+        "{{maxColors}}",
+        "--require-alpha",
+        "--json"
+      ],
       "parameterSchema": {
         "schemaVersion": 1,
         "additionalProperties": false,
         "required": ["input"],
         "properties": {
-          "input": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "role": {"type": "string", "minimumLength": 1, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]+$", "default": "production-sprite"},
-          "maxPartialAlphaRatio": {"type": "number", "minimum": 0, "maximum": 1, "default": 0},
-          "maxColors": {"type": "integer", "minimum": 2, "maximum": 65536, "default": 256}
+          "input": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "role": {
+            "type": "string",
+            "minimumLength": 1,
+            "maximumLength": 64,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "default": "production-sprite"
+          },
+          "maxPartialAlphaRatio": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0
+          },
+          "maxColors": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 65536,
+            "default": 256
+          }
         }
       },
       "network": "disabled",
@@ -40,16 +71,42 @@
       "runtime": "python-script",
       "pythonEnvironment": "image-finishing",
       "entry": "tools/image_workstation.py",
-      "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--receipt", "{{receipt}}"],
+      "arguments": [
+        "--workspace-root",
+        "{{workspaceRoot}}",
+        "--plan",
+        "{{plan}}",
+        "--plan-sha256",
+        "{{planSha256}}",
+        "--receipt",
+        "{{receipt}}"
+      ],
       "parameterSchema": {
         "schemaVersion": 1,
         "additionalProperties": false,
         "required": ["workspaceRoot", "plan", "planSha256", "receipt"],
         "properties": {
-          "workspaceRoot": {"type": "compute-path", "pathKind": "directory", "access": "input"},
-          "plan": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "planSha256": {"type": "string", "minimumLength": 64, "maximumLength": 64, "pattern": "^[0-9a-f]{64}$"},
-          "receipt": {"type": "compute-path", "pathKind": "file", "access": "output"}
+          "workspaceRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "input"
+          },
+          "plan": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "planSha256": {
+            "type": "string",
+            "minimumLength": 64,
+            "maximumLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "receipt": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "output"
+          }
         }
       },
       "parameterOutputs": ["receipt"],
@@ -61,16 +118,42 @@
       "runtime": "python-script",
       "pythonEnvironment": "image-finishing",
       "entry": "tools/sprite_sheet_segmenter.py",
-      "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--output-root", "{{outputRoot}}"],
+      "arguments": [
+        "--workspace-root",
+        "{{workspaceRoot}}",
+        "--plan",
+        "{{plan}}",
+        "--plan-sha256",
+        "{{planSha256}}",
+        "--output-root",
+        "{{outputRoot}}"
+      ],
       "parameterSchema": {
         "schemaVersion": 1,
         "additionalProperties": false,
         "required": ["workspaceRoot", "plan", "planSha256", "outputRoot"],
         "properties": {
-          "workspaceRoot": {"type": "compute-path", "pathKind": "directory", "access": "input"},
-          "plan": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "planSha256": {"type": "string", "minimumLength": 64, "maximumLength": 64, "pattern": "^[0-9a-f]{64}$"},
-          "outputRoot": {"type": "compute-path", "pathKind": "directory", "access": "output"}
+          "workspaceRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "input"
+          },
+          "plan": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "planSha256": {
+            "type": "string",
+            "minimumLength": 64,
+            "maximumLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "outputRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "output"
+          }
         }
       },
       "parameterOutputs": ["outputRoot"],
@@ -82,16 +165,42 @@
       "runtime": "python-script",
       "pythonEnvironment": "image-finishing",
       "entry": "tools/sprite_animation_preview.py",
-      "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--output-root", "{{outputRoot}}"],
+      "arguments": [
+        "--workspace-root",
+        "{{workspaceRoot}}",
+        "--plan",
+        "{{plan}}",
+        "--plan-sha256",
+        "{{planSha256}}",
+        "--output-root",
+        "{{outputRoot}}"
+      ],
       "parameterSchema": {
         "schemaVersion": 1,
         "additionalProperties": false,
         "required": ["workspaceRoot", "plan", "planSha256", "outputRoot"],
         "properties": {
-          "workspaceRoot": {"type": "compute-path", "pathKind": "directory", "access": "input"},
-          "plan": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "planSha256": {"type": "string", "minimumLength": 64, "maximumLength": 64, "pattern": "^[0-9a-f]{64}$"},
-          "outputRoot": {"type": "compute-path", "pathKind": "directory", "access": "output"}
+          "workspaceRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "input"
+          },
+          "plan": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "planSha256": {
+            "type": "string",
+            "minimumLength": 64,
+            "maximumLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "outputRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "output"
+          }
         }
       },
       "parameterOutputs": ["outputRoot"],
@@ -103,16 +212,42 @@
       "runtime": "python-script",
       "pythonEnvironment": "image-finishing",
       "entry": "tools/sprite_workstation.py",
-      "arguments": ["--workspace-root", "{{workspaceRoot}}", "--plan", "{{plan}}", "--plan-sha256", "{{planSha256}}", "--output-root", "{{outputRoot}}"],
+      "arguments": [
+        "--workspace-root",
+        "{{workspaceRoot}}",
+        "--plan",
+        "{{plan}}",
+        "--plan-sha256",
+        "{{planSha256}}",
+        "--output-root",
+        "{{outputRoot}}"
+      ],
       "parameterSchema": {
         "schemaVersion": 1,
         "additionalProperties": false,
         "required": ["workspaceRoot", "plan", "planSha256", "outputRoot"],
         "properties": {
-          "workspaceRoot": {"type": "compute-path", "pathKind": "directory", "access": "input"},
-          "plan": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "planSha256": {"type": "string", "minimumLength": 64, "maximumLength": 64, "pattern": "^[0-9a-f]{64}$"},
-          "outputRoot": {"type": "compute-path", "pathKind": "directory", "access": "output"}
+          "workspaceRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "input"
+          },
+          "plan": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "planSha256": {
+            "type": "string",
+            "minimumLength": 64,
+            "maximumLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "outputRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "output"
+          }
         }
       },
       "parameterOutputs": ["outputRoot"],
@@ -189,6 +324,49 @@
       "network": "disabled",
       "timeoutSeconds": 1800,
       "description": "Verify the exact four-seat Council avatar production truth across Art Studio, Avatar Runtime, The Council, Development Studio, Local Storage and next-website without provider, creative-approval, publication or runtime-activation authority."
+    },
+    "creative-quality-review-contract": {
+      "runtime": "node-script",
+      "entry": "scripts/test-creative-quality-director-contract.mjs",
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Validate authored-cel anti-generic review, department-correct repair routing, exact-mask provider limits, Loop Studio delegation, loop and non-loop policy, bounded convergence and negative automatic approval or publication authority."
+    },
+    "creative-quality-review": {
+      "runtime": "node-script",
+      "entry": "scripts/creative-quality-director-v2.mjs",
+      "arguments": [
+        "compile",
+        "--profile",
+        "config/creative-quality-cel-v1.json",
+        "--specialists",
+        "config/creative-quality-specialists-v1.json",
+        "--input",
+        "{{input}}",
+        "--output",
+        "{{output}}"
+      ],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["input", "output"],
+        "properties": {
+          "input": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "output": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "output"
+          }
+        }
+      },
+      "parameterOutputs": ["output"],
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Compile one create-only Loop Studio-aware art-director review and bounded repair record without executing a provider, mutating source art, promoting a candidate, approving creative work or publishing media."
     },
     "toolchain": {
       "runtime": "pnpm-script",
