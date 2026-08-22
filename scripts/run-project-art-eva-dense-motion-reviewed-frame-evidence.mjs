@@ -149,7 +149,7 @@ function evidencePersistenceState(program, compiled, workspaceRoot) {
   return 'complete-identical';
 }
 
-function reconstructReceipt(compiled, persistenceState) {
+function reconstructCanonicalReceipt(compiled) {
   const body = {
     schema: EVA_DENSE_MOTION_REVIEWED_FRAME_EVIDENCE_RECEIPT_SCHEMA,
     protocolVersion: EVA_DENSE_MOTION_REVIEWED_FRAME_EVIDENCE_PROTOCOL_VERSION,
@@ -181,14 +181,7 @@ function reconstructReceipt(compiled, persistenceState) {
     },
     authority: compiled.authority,
   };
-  return Object.freeze({
-    ...body,
-    receiptSha256: sha256Document(body),
-    recovery: Object.freeze({
-      mode: persistenceState === 'complete-identical' ? 'exact-readback' : 'new-persistence',
-      existingEvidenceAcceptedOnlyWhenCompleteAndIdentical: true,
-    }),
-  });
+  return Object.freeze({ ...body, receiptSha256: sha256Document(body) });
 }
 
 function writeReceipt(outputRoot, receipt) {
@@ -232,23 +225,26 @@ export function main(argv = process.argv.slice(2)) {
     });
 
     const persistenceState = evidencePersistenceState(program, compiled, workspaceRoot);
-    let canonicalReceipt;
+    const reconstructed = reconstructCanonicalReceipt(compiled);
+    let receipt;
     if (persistenceState === 'absent') {
-      canonicalReceipt = persistEvaDenseMotionReviewedFrameEvidence({
+      receipt = persistEvaDenseMotionReviewedFrameEvidence({
         tenMasterProgram: program,
         workspaceRoot,
         compiled,
       });
+      if (!semanticEqual(receipt, reconstructed)) {
+        fail('EVA_DENSE_REVIEWED_EVIDENCE_CLI_RECEIPT_RECONSTRUCTION_MISMATCH');
+      }
     } else {
-      canonicalReceipt = reconstructReceipt(compiled, persistenceState);
-      const { recovery, ...withoutRecovery } = canonicalReceipt;
-      canonicalReceipt = Object.freeze(withoutRecovery);
-    }
-    const receipt = reconstructReceipt(compiled, persistenceState);
-    if (canonicalReceipt.receiptSha256 !== receipt.receiptSha256) {
-      fail('EVA_DENSE_REVIEWED_EVIDENCE_CLI_RECEIPT_RECONSTRUCTION_MISMATCH');
+      receipt = reconstructed;
     }
     const receiptWrite = writeReceipt(outputRoot, receipt);
+    const recovery = Object.freeze({
+      mode: persistenceState === 'complete-identical' ? 'exact-readback' : 'new-persistence',
+      existingEvidenceAcceptedOnlyWhenCompleteAndIdentical: true,
+      canonicalReceiptSelfHashPreserved: true,
+    });
     process.stdout.write(
       `${JSON.stringify({
         status: receipt.status,
@@ -258,7 +254,7 @@ export function main(argv = process.argv.slice(2)) {
         receiptPath: receiptWrite.path,
         receiptReused: receiptWrite.reused,
         persistenceState,
-        recovery: receipt.recovery,
+        recovery,
         effects: receipt.effects,
         authority: receipt.authority,
       }, null, 2)}\n`,
