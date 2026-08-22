@@ -1,0 +1,76 @@
+name: EVA dense-motion Cloudinary admission
+
+on:
+  pull_request:
+    paths:
+      - "scripts/project-art/eva-dense-motion-cloudinary-admission.mjs"
+      - "scripts/run-project-art-eva-dense-motion-cloudinary-admission.mjs"
+      - "scripts/test-project-art-eva-dense-motion-cloudinary-admission.mjs"
+      - "scripts/project-art/eva-dense-motion-reviewed-frame-evidence.mjs"
+      - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
+      - "docs/PROJECT_ART_EVA_DENSE_MOTION_CLOUDINARY_ADMISSION.md"
+      - ".github/workflows/eva-dense-motion-cloudinary-admission.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/project-art/eva-dense-motion-cloudinary-admission.mjs"
+      - "scripts/run-project-art-eva-dense-motion-cloudinary-admission.mjs"
+      - "scripts/test-project-art-eva-dense-motion-cloudinary-admission.mjs"
+      - "scripts/project-art/eva-dense-motion-reviewed-frame-evidence.mjs"
+      - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
+      - "docs/PROJECT_ART_EVA_DENSE_MOTION_CLOUDINARY_ADMISSION.md"
+      - ".github/workflows/eva-dense-motion-cloudinary-admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eva-dense-cloudinary-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Syntax-check Cloudinary boundary
+        run: |
+          node --check scripts/project-art/eva-dense-motion-cloudinary-admission.mjs
+          node --check scripts/run-project-art-eva-dense-motion-cloudinary-admission.mjs
+          node --check scripts/test-project-art-eva-dense-motion-cloudinary-admission.mjs
+
+      - name: Run Cloudinary contract guard
+        run: node scripts/test-project-art-eva-dense-motion-cloudinary-admission.mjs
+
+      - name: Verify offline authority remains closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "allTenReviewedBeforeProviderExecution: true" scripts/project-art/eva-dense-motion-cloudinary-admission.mjs
+          grep -F "providerExecutionRequiresSeparateNetworkAuthority: true" scripts/project-art/eva-dense-motion-cloudinary-admission.mjs
+          grep -F "overwrite: false" scripts/project-art/eva-dense-motion-cloudinary-admission.mjs
+          grep -F "providerExecution: false" scripts/project-art/eva-dense-motion-cloudinary-admission.mjs
+          grep -F "network: false" scripts/project-art/eva-dense-motion-cloudinary-admission.mjs
+          ! grep -F "providerExecution: true" scripts/project-art/eva-dense-motion-cloudinary-admission.mjs
+          ! grep -F "network: true" scripts/project-art/eva-dense-motion-cloudinary-admission.mjs
+          ! grep -F "runtimeActivation: true" scripts/project-art/eva-dense-motion-cloudinary-admission.mjs
+
+      - name: Prove source remains clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
