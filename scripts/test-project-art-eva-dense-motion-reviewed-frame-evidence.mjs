@@ -11,14 +11,8 @@ import {
 import { main as reviewedEvidenceCliMain } from './run-project-art-eva-dense-motion-reviewed-frame-evidence.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const campaignPath = path.join(
-  root,
-  'scripts/project-art/eva-dense-motion-reviewed-frame-evidence.mjs',
-);
-const cliPath = path.join(
-  root,
-  'scripts/run-project-art-eva-dense-motion-reviewed-frame-evidence.mjs',
-);
+const campaignPath = path.join(root, 'scripts/project-art/eva-dense-motion-reviewed-frame-evidence.mjs');
+const cliPath = path.join(root, 'scripts/run-project-art-eva-dense-motion-reviewed-frame-evidence.mjs');
 for (const target of [campaignPath, cliPath]) {
   const metadata = lstatSync(target);
   assert.equal(metadata.isFile(), true);
@@ -50,6 +44,24 @@ for (const marker of [
   assert.ok(campaign.includes(marker), marker);
 }
 
+for (const marker of [
+  "return 'complete-identical'",
+  'EVA_DENSE_REVIEWED_EVIDENCE_CLI_PARTIAL_PERSISTENCE',
+  'EVA_DENSE_REVIEWED_EVIDENCE_CLI_EXISTING_EVIDENCE_MISMATCH',
+  'reconstructCanonicalReceipt',
+  'sha256Document(body)',
+  'canonicalReceiptSelfHashPreserved: true',
+  "mode: persistenceState === 'complete-identical' ? 'exact-readback' : 'new-persistence'",
+  'if (!semanticEqual(receipt, reconstructed))',
+]) {
+  assert.ok(cli.includes(marker), marker);
+}
+assert.equal(
+  /receiptSha256:\s*sha256Document\(body\),\s*recovery:/u.test(cli),
+  false,
+  'recovery metadata must never enter the canonical self-hashed receipt',
+);
+
 for (const forbidden of [
   'humanDecisionCreation: true',
   'automaticCreativeDecision: true',
@@ -79,10 +91,7 @@ assert.ok(cli.includes('pathToFileURL(path.resolve(process.argv[1])).href'));
 assert.equal(typeof reviewedEvidenceCliMain, 'function');
 
 const capabilities = evaDenseMotionReviewedFrameEvidenceCapabilities();
-assert.equal(
-  EVA_DENSE_MOTION_REVIEWED_FRAME_EVIDENCE_PROTOCOL_VERSION,
-  '2026-08-22.1',
-);
+assert.equal(EVA_DENSE_MOTION_REVIEWED_FRAME_EVIDENCE_PROTOCOL_VERSION, '2026-08-22.1');
 assert.equal(capabilities.exactTenFrameSetRequired, true);
 assert.equal(capabilities.successfulMasteringCampaignRequired, true);
 assert.equal(capabilities.allTenNamedHumanApprovalsRequired, true);
@@ -104,4 +113,6 @@ console.log('EVA dense reviewed-frame evidence guard passed.');
 console.log('- final PNG is rechecked through structure and pixel inspection paths');
 console.log('- prior two-inspector candidate assurance remains required');
 console.log('- creative approval evidence is sealed only from named-human approval lineage');
+console.log('- complete identical evidence can recover a lost outer receipt safely');
+console.log('- partial or drifted persisted evidence remains fail-closed');
 console.log('- image mutation, upload, release and activation authority remain closed');
