@@ -30,6 +30,10 @@
       "types": "./dist/docs-release.d.ts",
       "import": "./dist/docs-release.js"
     },
+    "./docs-production-return": {
+      "types": "./dist/docs-production-return.d.ts",
+      "import": "./dist/docs-production-return.js"
+    },
     "./inspection": {
       "types": "./dist/inspection.d.ts",
       "import": "./dist/inspection.js"
