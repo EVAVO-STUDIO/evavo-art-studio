@@ -54,6 +54,9 @@ jobs:
       - name: Build and test Art Direction
         run: pnpm --filter @evavo/art-direction test
 
+      - name: Build domain dependency closure
+        run: pnpm run build:domain
+
       - name: Build general Art Studio CLI
         run: pnpm --filter @evavo/art-studio-cli build
 
