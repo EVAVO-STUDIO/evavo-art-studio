@@ -6,6 +6,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 import {
   persistEvaDenseMotionFrameReviewIntakeEvidence,
@@ -38,6 +39,7 @@ function argumentsFor(argv) {
       typeof value !== 'string' ||
       value.length === 0 ||
       value.startsWith('--') ||
+      /[\0\r\n]/u.test(value) ||
       values.has(name)
     ) {
       fail('EVA_DENSE_FRAME_REVIEW_CLI_ARGUMENT_INVALID', name ?? 'argument');
@@ -118,6 +120,9 @@ export function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+const invokedPath = process.argv[1]
+  ? pathToFileURL(path.resolve(process.argv[1])).href
+  : null;
+if (invokedPath === import.meta.url) {
   process.exitCode = main();
 }
