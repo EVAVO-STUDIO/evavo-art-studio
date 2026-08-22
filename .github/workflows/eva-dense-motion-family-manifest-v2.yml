@@ -1,0 +1,62 @@
+name: EVA dense-motion family manifest v2
+
+on:
+  pull_request:
+    paths:
+      - "scripts/project-art/eva-dense-motion-family-release-manifest-v2.mjs"
+      - "scripts/run-project-art-eva-dense-motion-family-release-manifest-v2.mjs"
+      - "scripts/test-project-art-eva-dense-motion-family-release-manifest-v2.mjs"
+      - "scripts/project-art/eva-dense-motion-family-release-assembly-v2.mjs"
+      - ".github/workflows/eva-dense-motion-family-manifest-v2.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/project-art/eva-dense-motion-family-release-manifest-v2.mjs"
+      - "scripts/run-project-art-eva-dense-motion-family-release-manifest-v2.mjs"
+      - "scripts/test-project-art-eva-dense-motion-family-release-manifest-v2.mjs"
+      - "scripts/project-art/eva-dense-motion-family-release-assembly-v2.mjs"
+      - ".github/workflows/eva-dense-motion-family-manifest-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eva-dense-family-manifest-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Use governed Node
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Syntax check manifest surface
+        run: |
+          node --check scripts/project-art/eva-dense-motion-family-release-manifest-v2.mjs
+          node --check scripts/run-project-art-eva-dense-motion-family-release-manifest-v2.mjs
+          node --check scripts/test-project-art-eva-dense-motion-family-release-manifest-v2.mjs
+
+      - name: Run two-stage manifest guard
+        run: node scripts/test-project-art-eva-dense-motion-family-release-manifest-v2.mjs
+
+      - name: Import CLI without execution
+        run: node -e "import('./scripts/run-project-art-eva-dense-motion-family-release-manifest-v2.mjs')"
+
+      - name: Prove validation leaves source clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
