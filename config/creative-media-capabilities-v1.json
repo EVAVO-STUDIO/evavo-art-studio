@@ -1,0 +1,266 @@
+{
+  "schema": "evavo_creative_media_capabilities_v1",
+  "studio": "evavo-art-studio",
+  "repository": "EVAVO-STUDIO/evavo-art-studio",
+  "fabricContractSha256": "517bc42c58a82459a85451f1d0712ac91429417ebaa355bec531ac11588d6cb9",
+  "taskManifestPath": "evavo.tasks.json",
+  "selection": {
+    "failClosedOnUnknownCapability": true,
+    "failClosedOnUnadmittedCapability": true
+  },
+  "authority": {
+    "allowArbitraryTaskName": false,
+    "allowArbitraryShell": false,
+    "allowProviderFallback": false,
+    "providerMayRewriteIntent": false,
+    "automaticCreativeApproval": false,
+    "publicationAuthority": false,
+    "gitMutation": false
+  },
+  "capabilities": [
+    {
+      "id": "art.fabric.validate",
+      "kind": "verification",
+      "admission": "fixed-task",
+      "network": "disabled",
+      "mutatesWorkspace": false,
+      "outputsEvidence": true,
+      "creativeAcceptanceAuthority": false,
+      "publicationAuthority": false,
+      "task": "creative-media-handoff-validate",
+      "parameters": [
+        {
+          "name": "handoff",
+          "kind": "compute-path-file",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "handoffSha256",
+          "kind": "sha256",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "art.pixel.audit",
+      "kind": "verification",
+      "admission": "fixed-task",
+      "network": "disabled",
+      "mutatesWorkspace": false,
+      "outputsEvidence": true,
+      "creativeAcceptanceAuthority": false,
+      "publicationAuthority": false,
+      "task": "pixel-art-candidate-audit",
+      "parameters": [
+        {
+          "name": "input",
+          "kind": "compute-path-file",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "role",
+          "kind": "string",
+          "required": false,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        {
+          "name": "maxPartialAlphaRatio",
+          "kind": "number",
+          "required": false,
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "name": "maxColors",
+          "kind": "integer",
+          "required": false,
+          "minimum": 2,
+          "maximum": 65536
+        }
+      ]
+    },
+    {
+      "id": "art.raster.edit",
+      "kind": "production",
+      "admission": "fixed-task",
+      "network": "disabled",
+      "mutatesWorkspace": true,
+      "outputsEvidence": true,
+      "creativeAcceptanceAuthority": false,
+      "publicationAuthority": false,
+      "task": "game-art-raster-edit",
+      "parameters": [
+        {
+          "name": "workspaceRoot",
+          "kind": "compute-path-directory",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "plan",
+          "kind": "compute-path-file",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "planSha256",
+          "kind": "sha256",
+          "required": true
+        },
+        {
+          "name": "receipt",
+          "kind": "compute-path-file",
+          "required": true,
+          "direction": "output"
+        }
+      ]
+    },
+    {
+      "id": "art.sheet.segment",
+      "kind": "production",
+      "admission": "fixed-task",
+      "network": "disabled",
+      "mutatesWorkspace": true,
+      "outputsEvidence": true,
+      "creativeAcceptanceAuthority": false,
+      "publicationAuthority": false,
+      "task": "game-art-sheet-segment",
+      "parameters": [
+        {
+          "name": "workspaceRoot",
+          "kind": "compute-path-directory",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "plan",
+          "kind": "compute-path-file",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "planSha256",
+          "kind": "sha256",
+          "required": true
+        },
+        {
+          "name": "outputRoot",
+          "kind": "compute-path-directory",
+          "required": true,
+          "direction": "output"
+        }
+      ]
+    },
+    {
+      "id": "art.animation.preview",
+      "kind": "review-artifact",
+      "admission": "fixed-task",
+      "network": "disabled",
+      "mutatesWorkspace": true,
+      "outputsEvidence": true,
+      "creativeAcceptanceAuthority": false,
+      "publicationAuthority": false,
+      "task": "game-art-animation-preview",
+      "parameters": [
+        {
+          "name": "workspaceRoot",
+          "kind": "compute-path-directory",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "plan",
+          "kind": "compute-path-file",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "planSha256",
+          "kind": "sha256",
+          "required": true
+        },
+        {
+          "name": "outputRoot",
+          "kind": "compute-path-directory",
+          "required": true,
+          "direction": "output"
+        }
+      ]
+    },
+    {
+      "id": "art.sprite.build",
+      "kind": "production",
+      "admission": "fixed-task",
+      "network": "disabled",
+      "mutatesWorkspace": true,
+      "outputsEvidence": true,
+      "creativeAcceptanceAuthority": false,
+      "publicationAuthority": false,
+      "task": "game-art-sprite-build",
+      "parameters": [
+        {
+          "name": "workspaceRoot",
+          "kind": "compute-path-directory",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "plan",
+          "kind": "compute-path-file",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "planSha256",
+          "kind": "sha256",
+          "required": true
+        },
+        {
+          "name": "outputRoot",
+          "kind": "compute-path-directory",
+          "required": true,
+          "direction": "output"
+        }
+      ]
+    },
+    {
+      "id": "art.quality.review",
+      "kind": "review",
+      "admission": "fixed-task",
+      "network": "disabled",
+      "mutatesWorkspace": true,
+      "outputsEvidence": true,
+      "creativeAcceptanceAuthority": false,
+      "publicationAuthority": false,
+      "task": "creative-quality-review",
+      "parameters": [
+        {
+          "name": "input",
+          "kind": "compute-path-file",
+          "required": true,
+          "direction": "input"
+        },
+        {
+          "name": "output",
+          "kind": "compute-path-file",
+          "required": true,
+          "direction": "output"
+        }
+      ]
+    },
+    {
+      "id": "art.provider.generate",
+      "kind": "production",
+      "admission": "native-unregistered",
+      "network": "not-admitted",
+      "mutatesWorkspace": true,
+      "outputsEvidence": true,
+      "creativeAcceptanceAuthority": false,
+      "publicationAuthority": false,
+      "nativeSurface": "mobile identity / provider runtime surfaces",
+      "note": "Provider generation exists behind separate reviewed-entry and authorization contracts and is not silently admitted as a generic campaign fallback."
+    }
+  ]
+}
