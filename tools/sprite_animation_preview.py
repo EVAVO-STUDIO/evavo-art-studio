@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import stat
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -100,17 +101,26 @@ def secure_source(root: Path, value: Any, label: str) -> Path:
     if relative.is_absolute() or ".." in relative.parts or any(part in {"", "."} for part in relative.parts):
         fail(f"{label} invalid")
     requested = root / relative
+    requested_state = requested.lstat()
+    if requested.is_symlink() or not stat.S_ISREG(requested_state.st_mode) or requested_state.st_nlink != 1:
+        fail(f"{label} must be an ordinary non-link file")
     resolved = requested.resolve(strict=True)
-    if not inside(root, resolved) or requested.resolve(strict=False) != resolved:
+    if not inside(root, resolved) or requested.absolute() != resolved:
         fail(f"{label} escaped or linked outside the workspace")
-    state = resolved.lstat()
-    if not stat.S_ISREG(state.st_mode) or resolved.is_symlink() or state.st_nlink != 1:
-        fail(f"{label} must be an ordinary file")
     return resolved
 
 
 def workspace_path(root: Path, value: str, label: str, *, must_exist: bool) -> Path:
-    candidate = Path(os.path.abspath(value)).resolve(strict=must_exist)
+    requested = Path(os.path.abspath(value))
+    if must_exist:
+        requested_state = requested.lstat()
+        if requested.is_symlink() or not stat.S_ISREG(requested_state.st_mode) or requested_state.st_nlink != 1:
+            fail(f"{label} must be an ordinary non-link file")
+        candidate = requested.resolve(strict=True)
+        if requested != candidate:
+            fail(f"{label} linked path forbidden")
+    else:
+        candidate = requested.resolve(strict=False)
     if not inside(root, candidate):
         fail(f"{label} escaped root")
     return candidate
@@ -152,7 +162,10 @@ def render_preview(
     plan_sha256: str,
     output_root: str,
 ) -> dict[str, Any]:
-    root = Path(os.path.abspath(workspace_root)).resolve(strict=True)
+    requested_root = Path(os.path.abspath(workspace_root))
+    root = requested_root.resolve(strict=True)
+    if requested_root != root or requested_root.is_symlink():
+        fail("workspace root linked path forbidden")
     root_state = root.lstat()
     if root.is_symlink() or not stat.S_ISDIR(root_state.st_mode):
         fail("workspace root invalid")
@@ -188,12 +201,18 @@ def render_preview(
     final_output = workspace_path(root, output_root, "output root", must_exist=False)
     if final_output.exists() or final_output.is_symlink():
         fail("output root is create-only")
-    parent = final_output.parent
+    parent = Path(os.path.abspath(output_root)).parent
+    parent_state = parent.lstat()
     parent_real = parent.resolve(strict=True)
-    if parent.is_symlink() or not parent_real.is_dir() or parent.resolve(strict=False) != parent_real or not inside(root, parent_real):
+    if (
+        parent.is_symlink()
+        or not stat.S_ISDIR(parent_state.st_mode)
+        or parent != parent_real
+        or not inside(root, parent_real)
+    ):
         fail("output root parent invalid")
 
-    staging = Path(tempfile.mkdtemp(prefix=f".{final_output.name}.preview-", dir=parent_real))
+    staging: Path | None = Path(tempfile.mkdtemp(prefix=f".{final_output.name}.preview-", dir=parent_real))
     os.chmod(staging, 0o700)
     try:
         rendered: list[Image.Image] = []
