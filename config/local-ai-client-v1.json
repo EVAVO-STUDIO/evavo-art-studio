@@ -3,7 +3,7 @@
   "kind": "evavo-local-ai-client-v1",
   "studio": "art-studio",
   "aliases": [],
-  "allowedWorkloads": ["image", "video", "training"],
+  "allowedWorkloads": ["text", "image", "video", "training"],
   "planner": {"server": "evavo-local-ai", "tool": "evavo_local_ai_plan"},
   "catalog": {"server": "evavo-local-ai", "tool": "evavo_local_ai_catalog"},
   "execution": {"repository": "EVAVO-STUDIO/evavo-local-compute", "provider": "evavo-local-execution", "arbitraryCommandTextAccepted": false},
