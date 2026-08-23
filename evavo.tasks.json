@@ -3,6 +3,40 @@
   "kind": "evavo-repository-task-manifest",
   "repository": "evavo-art-studio",
   "tasks": {
+    "creative-media-fabric-self-test": {
+      "runtime": "node-script",
+      "entry": "scripts/check-creative-media-fabric.mjs",
+      "arguments": ["--self-test"],
+      "network": "disabled",
+      "timeoutSeconds": 120,
+      "description": "Verify Art Studio's digest-bound cross-studio creative-media contract, finishing profile and authority boundaries without provider, source, Git or publication mutation."
+    },
+    "creative-media-handoff-validate": {
+      "runtime": "node-script",
+      "entry": "scripts/check-creative-media-fabric.mjs",
+      "arguments": ["--handoff", "{{handoff}}", "--sha256", "{{handoffSha256}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["handoff", "handoffSha256"],
+        "properties": {
+          "handoff": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "handoffSha256": {
+            "type": "string",
+            "minimumLength": 64,
+            "maximumLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "network": "disabled",
+      "timeoutSeconds": 120,
+      "description": "Validate one exact SHA-bound Creative Media Fabric handoff as Art Studio producer or receiver without rewriting intent, approving media, mutating source, committing or publishing."
+    },
     "creative-assets": {
       "runtime": "node-script",
       "entry": "tools/creative-asset-publisher/test-sealed-distribution.mjs",
