@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-local-ai-execution-client-v1",
+  "studio": "art-studio",
+  "workloads": {
+    "image": {"plan": "evavo-local-compute image-plan", "execute": "evavo-local-execution", "modelAdmissionRequired": true, "resourceAdmissionRequired": true, "physicalReceiptRequired": true},
+    "video": {"plan": "evavo-local-compute-video-campaign plan", "execute": "evavo-local-compute-video-campaign run", "modelAdmissionRequired": true, "resourceAdmissionRequired": true, "physicalReceiptRequired": true},
+    "training": {"plan": "evavo-local-compute ai-plan", "execute": "evavo-local-compute ai-submit", "modelAdmissionRequired": true, "resourceAdmissionRequired": true, "physicalReceiptRequired": true}
+  },
+  "authorities": {"models": "EVAVO-STUDIO/evavo-model-lab", "execution": "EVAVO-STUDIO/evavo-local-compute", "bytes": "EVAVO-STUDIO/evavo-local-storage", "durable": "EVAVO-STUDIO/evavo-storage"},
+  "policy": {"remoteFallbackAllowed": false, "modelPullDuringExecutionAllowed": false, "weightsInGit": false, "creativeApprovalGrantedByCompute": false, "publicationGrantedByCompute": false, "clientReleaseGrantedByCompute": false}
+}
