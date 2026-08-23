@@ -1,19 +1,6 @@
 name: Creative Media Fabric contract
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'contracts/creative-media-handoff-v1.schema.json'
-      - 'config/creative-media-fabric-v1.json'
-      - 'scripts/check-creative-media-fabric.mjs'
-      - '.github/workflows/creative-media-fabric.yml'
-  pull_request:
-    paths:
-      - 'contracts/creative-media-handoff-v1.schema.json'
-      - 'config/creative-media-fabric-v1.json'
-      - 'scripts/check-creative-media-fabric.mjs'
-      - '.github/workflows/creative-media-fabric.yml'
   workflow_dispatch:
 
 permissions:
