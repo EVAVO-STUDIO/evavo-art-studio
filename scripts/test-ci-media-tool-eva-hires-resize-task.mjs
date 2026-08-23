@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-const guard = new URL('./check-eva-premultiplied-alpha-resize-task.mjs', import.meta.url);
+const guard = fileURLToPath(
+  new URL('./check-eva-premultiplied-alpha-resize-task.mjs', import.meta.url),
+);
 
 test('EVA hires premultiplied-alpha named task stays fail-closed', () => {
-  const output = execFileSync(process.execPath, [guard.pathname], {
+  const output = execFileSync(process.execPath, [guard], {
     encoding: 'utf8',
     windowsHide: true,
   }).trim();
