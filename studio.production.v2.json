@@ -1,0 +1,72 @@
+{
+  "schema": "evavo_studio_production_manifest_v2",
+  "studioId": "art-studio",
+  "repository": "EVAVO-STUDIO/evavo-art-studio",
+  "runtime": {
+    "language": "node",
+    "version": "22.14.0"
+  },
+  "entrypoints": {
+    "validate": [
+      "node",
+      "scripts/check-studio-production-v2.mjs"
+    ],
+    "focused": [
+      "node",
+      "--test",
+      "test/studio-handoff-v2.test.mjs",
+      "test/character-performance-bank-v1.test.mjs"
+    ]
+  },
+  "contracts": [
+    {
+      "id": "studio-handoff-v2",
+      "path": "tools/studio-handoff-v2.mjs",
+      "role": "shared"
+    },
+    {
+      "id": "character-performance-bank-v1",
+      "path": "tools/character-performance-bank-v1.mjs",
+      "role": "quality"
+    },
+    {
+      "id": "character-performance-delivery-v1",
+      "path": "tools/character-performance-delivery-v1.mjs",
+      "role": "producer"
+    }
+  ],
+  "handoffs": {
+    "accepts": [],
+    "produces": [
+      "art-to-cel",
+      "art-to-video"
+    ]
+  },
+  "automation": {
+    "resumable": false,
+    "atomicCheckpoints": false,
+    "boundedRetries": false,
+    "maxAttemptsPerStep": 1,
+    "targetedRepair": true,
+    "replaySafe": true,
+    "networkRequiredDuringValidation": false,
+    "sourceMutationDuringValidation": false
+  },
+  "qualityGates": [
+    "identity-lock",
+    "alpha-integrity",
+    "safe-framing",
+    "protected-landmarks",
+    "palette-lock",
+    "line-quality",
+    "intentional-holds",
+    "named-creative-approval"
+  ],
+  "authority": {
+    "automaticCreativeApproval": false,
+    "automaticReleaseApproval": false,
+    "automaticPublication": false,
+    "automaticDeployment": false
+  },
+  "ciWorkflow": ".github/workflows/studio-production-v2.yml"
+}
