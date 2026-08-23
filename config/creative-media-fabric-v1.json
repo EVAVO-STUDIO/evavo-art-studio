@@ -1,0 +1,95 @@
+{
+  "schema": "evavo_creative_media_fabric_profile_v1",
+  "studioId": "evavo-art-studio",
+  "contract": {
+    "path": "contracts/creative-media-handoff-v1.schema.json",
+    "sha256": "517bc42c58a82459a85451f1d0712ac91429417ebaa355bec531ac11588d6cb9"
+  },
+  "interchange": {
+    "acceptsFrom": [
+      "particle-studio",
+      "evavo-video-studio",
+      "evavo-3d-studio",
+      "atmosphere-studio"
+    ],
+    "emitsTo": [
+      "particle-studio",
+      "evavo-video-studio",
+      "evavo-3d-studio",
+      "atmosphere-studio"
+    ],
+    "receiverRevalidationRequired": true,
+    "nativeQualityRemainsAuthoritative": true
+  },
+  "authority": {
+    "owns": [
+      "2D art direction",
+      "illustration and sprite identity",
+      "cel and frame-sequence craft",
+      "alpha and edge finishing",
+      "2D delivery derivatives"
+    ],
+    "doesNotOwn": [
+      "final editorial timeline",
+      "master 3D topology",
+      "particle simulation truth",
+      "long-form atmosphere programme"
+    ],
+    "providerMayRewriteIntent": false,
+    "autoApprove": false,
+    "publicationRequiresHuman": true
+  },
+  "creativeRules": {
+    "specificityAnchorsMin": 3,
+    "continuityAnchorsMin": 3,
+    "materialLogicMin": 2,
+    "motionLogicMin": 2,
+    "authoredImperfectionsMin": 2,
+    "genericAiPenaltyMax": 0.15,
+    "maxRepairAttempts": 3,
+    "smallestScopeRepairOnly": true,
+    "domainSignature": [
+      "Lock shape language, value hierarchy, line rhythm and material treatment before provider execution.",
+      "Preserve authored edge character and controlled irregularity instead of smoothing work into generic vector cleanliness.",
+      "Treat every animation sequence as one identity and motion system rather than independent generated frames.",
+      "Use exact alpha, palette, scale and derivative rules so finishing cannot silently alter the approved master."
+    ],
+    "forbiddenShortcuts": [
+      "generic-cinematic-haze-without-scene-cause",
+      "unmotivated-rim-light",
+      "automatic-camera-drift",
+      "default-cyan-magenta-neon-palette",
+      "uniform-detail-density",
+      "one-pass-style-filter-substitution",
+      "ai-text-or-glyph-artifacts",
+      "independent-frame-regeneration-for-continuity-work",
+      "unreferenced-provider-intent-rewrite",
+      "perfect-symmetry-without-design-reason",
+      "prompt-keyword-style-imitation",
+      "pillow-shading",
+      "haloed-or-fringed-alpha-edges",
+      "over-clean-vectorization-of-authored-texture"
+    ]
+  },
+  "qualityBinding": [
+    "shape language",
+    "identity continuity",
+    "edge and alpha integrity",
+    "sequence coherence",
+    "creative quality director review"
+  ],
+  "standards": {
+    "timeline": "OpenTimelineIO 0.18.1 when sequences enter editorial",
+    "colour": "OpenColorIO 2.5 / ACES 2 intent for scene-referred or cinematic assets",
+    "materials": "MaterialX/OpenPBR as reference semantics only when painting 3D-bound assets",
+    "web": "glTF 2.0 not owned; preserve receiver constraints",
+    "provenance": "C2PA 2.4 optional at final published export"
+  },
+  "automation": {
+    "selfTestCommand": "node scripts/check-creative-media-fabric.mjs --self-test",
+    "handoffValidationRequiresExactSha256": true,
+    "networkRequired": false,
+    "sourceMutation": false,
+    "gitMutation": false
+  }
+}
