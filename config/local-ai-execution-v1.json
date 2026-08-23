@@ -4,7 +4,7 @@
   "studio": "art-studio",
   "workloads": {
     "text": {"plan": "evavo-local-compute-consumer-infer", "execute": "evavo-local-compute-model-infer", "modelAdmissionRequired": true, "resourceAdmissionRequired": false, "physicalReceiptRequired": true},
-    "image": {"plan": "evavo-local-compute image-plan", "execute": "evavo-local-execution", "modelAdmissionRequired": true, "resourceAdmissionRequired": true, "physicalReceiptRequired": true},
+    "image": {"plan": "evavo-local-compute-image-ai", "execute": "evavo-local-compute ai-submit", "modelAdmissionRequired": true, "resourceAdmissionRequired": true, "physicalReceiptRequired": true},
     "video": {"plan": "evavo-local-compute-video-campaign plan", "execute": "evavo-local-compute-video-campaign run", "modelAdmissionRequired": true, "resourceAdmissionRequired": true, "physicalReceiptRequired": true},
     "training": {"plan": "evavo-local-compute ai-plan", "execute": "evavo-local-compute ai-submit", "modelAdmissionRequired": true, "resourceAdmissionRequired": true, "physicalReceiptRequired": true}
   },
