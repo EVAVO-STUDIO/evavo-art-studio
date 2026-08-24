@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "eva-hires-atlas-encode": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/eva_hires_atlas_encode.py",
+      "arguments": [
+        "--workspace-root",
+        "{{workspaceRoot}}",
+        "--plan",
+        "{{plan}}",
+        "--plan-sha256",
+        "{{planSha256}}",
+        "--atlas",
+        "{{atlas}}",
+        "--receipt",
+        "{{receipt}}"
+      ],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["workspaceRoot", "plan", "planSha256", "atlas", "receipt"],
+        "properties": {
+          "workspaceRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "input"
+          },
+          "plan": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "planSha256": {
+            "type": "string",
+            "minimumLength": 64,
+            "maximumLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "atlas": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "output"
+          },
+          "receipt": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "output"
+          }
+        }
+      },
+      "parameterOutputs": ["atlas", "receipt"],
+      "network": "disabled",
+      "timeoutSeconds": 3600,
+      "description": "Encode one exact 36-frame EVA reauthored high-resolution fixed-grid WebP atlas from SHA-bound reviewed tier frames, writing only a create-only atlas and receipt with no upload, approval, promotion, publication or runtime/website activation authority."
+    }
+  }
+}
