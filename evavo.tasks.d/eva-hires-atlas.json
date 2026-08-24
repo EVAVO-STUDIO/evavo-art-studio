@@ -6,22 +6,37 @@
     "eva-reviewed-hires-atlas-clean-master": {
       "runtime": "python-script",
       "pythonEnvironment": "image-finishing",
-      "entry": "tools/build_project_art_atlas.py",
+      "entry": "tools/eva_hires_atlas_clean_master.py",
       "arguments": [
+        "--workspace-root",
+        "{{workspaceRoot}}",
         "--plan",
         "{{plan}}",
+        "--plan-sha256",
+        "{{planSha256}}",
         "--output-root",
         "{{outputRoot}}"
       ],
       "parameterSchema": {
         "schemaVersion": 1,
         "additionalProperties": false,
-        "required": ["plan", "outputRoot"],
+        "required": ["workspaceRoot", "plan", "planSha256", "outputRoot"],
         "properties": {
+          "workspaceRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "input"
+          },
           "plan": {
             "type": "compute-path",
             "pathKind": "file",
             "access": "input"
+          },
+          "planSha256": {
+            "type": "string",
+            "minimumLength": 64,
+            "maximumLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
           },
           "outputRoot": {
             "type": "compute-path",
@@ -33,7 +48,7 @@
       "parameterOutputs": ["outputRoot"],
       "network": "disabled",
       "timeoutSeconds": 3600,
-      "description": "Build one exact-plan, create-only RGBA PNG atlas clean master plus deterministic manifests and SHA-bound receipt for reviewed EVA high-resolution frames. This is an intermediate clean-master stage only and grants no creative approval, WebP delivery approval, Cloudinary upload, runtime/website activation, publication or repository authority."
+      "description": "Build one exact SHA-bound fixed-grid EVA RGBA PNG atlas clean master from 36 reviewed tier frames without trimming, rotation, reordering, resizing or shelf packing. Reopen the encoded PNG and require exact RGBA parity for every frame rectangle. The output is create-only and grants no creative approval, WebP delivery approval, Cloudinary upload, runtime/website activation, publication or repository authority."
     }
   }
 }
