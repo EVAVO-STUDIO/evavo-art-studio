@@ -116,6 +116,32 @@ function measurements(bank) {
   }));
 }
 
+function approvedDelivery() {
+  const bank = compileCharacterPerformanceBank(bankRequest());
+  const review = reviewCharacterPerformanceBank({
+    bank,
+    measurements: measurements(bank),
+    reviewId: "clean-review",
+  });
+  const approval = approveCharacterPerformanceBank({
+    bank,
+    review,
+    decisionId: "approve-eva",
+    actorId: "greg",
+    actorRole: "creative-director",
+    approvalEvidenceSha256: sha("8"),
+    observedAt: "2026-08-23T00:02:00.000Z",
+  });
+  const delivery = compileCharacterPerformanceDelivery({
+    bank,
+    review,
+    approval,
+    producerCommit: "d".repeat(40),
+    createdAt: "2026-08-23T00:03:00.000Z",
+  });
+  return { bank, review, approval, delivery };
+}
+
 test("compiles a deterministic identity-locked bank with intentional holds", () => {
   const first = compileCharacterPerformanceBank(bankRequest());
   const reversed = bankRequest();
@@ -162,33 +188,12 @@ test("routes the smallest failing slot to targeted repair", () => {
   );
 });
 
-test("records named creative approval and emits exact Art-to-Cel and Art-to-Video handoffs", () => {
-  const bank = compileCharacterPerformanceBank(bankRequest());
-  const review = reviewCharacterPerformanceBank({
-    bank,
-    measurements: measurements(bank),
-    reviewId: "clean-review",
-  });
-  const approval = approveCharacterPerformanceBank({
-    bank,
-    review,
-    decisionId: "approve-eva",
-    actorId: "greg",
-    actorRole: "creative-director",
-    approvalEvidenceSha256: sha("8"),
-    observedAt: "2026-08-23T00:02:00.000Z",
-  });
+test("records named creative approval and emits exact cross-bound Art handoffs", () => {
+  const { bank, review, approval, delivery } = approvedDelivery();
   assert.equal(
     verifyCharacterPerformanceApproval(approval, bank, review),
     approval.approvalSha256,
   );
-  const delivery = compileCharacterPerformanceDelivery({
-    bank,
-    review,
-    approval,
-    producerCommit: "d".repeat(40),
-    createdAt: "2026-08-23T00:03:00.000Z",
-  });
   assert.equal(
     verifyCharacterPerformanceDelivery(delivery),
     delivery.deliverySha256,
@@ -203,6 +208,30 @@ test("records named creative approval and emits exact Art-to-Cel and Art-to-Vide
   assert.equal(delivery.artToCel.authority.releaseApprovalIncluded, false);
   assert.equal(delivery.artToCel.authority.publicationAuthority, false);
   assert.equal(delivery.artToCel.assets.length, bank.slots.length - 1);
+  const sourceBinding = delivery.artToVideo.evidence.find(
+    (row) => row.kind === "art-to-cel-source-handoff",
+  );
+  assert.equal(sourceBinding.sha256, delivery.artToCel.handoffSha256);
+  assert.equal(sourceBinding.metadata.handoffId, delivery.artToCel.handoffId);
+});
+
+test("rejects a redigested Art delivery whose Video handoff loses its Cel source binding", () => {
+  const { delivery } = approvedDelivery();
+  const tampered = structuredClone(delivery);
+  tampered.artToVideo.evidence = tampered.artToVideo.evidence.filter(
+    (row) => row.kind !== "art-to-cel-source-handoff",
+  );
+  const handoffUnsigned = { ...tampered.artToVideo };
+  delete handoffUnsigned.handoffSha256;
+  tampered.artToVideo.handoffSha256 = verifyStudioHandoff(
+    compileCharacterPerformanceDelivery({
+      ...approvedDelivery(),
+    }),
+  );
+  assert.throws(
+    () => verifyCharacterPerformanceDelivery(tampered),
+    /digest mismatch|exact Art-to-Cel source handoff/,
+  );
 });
 
 test("detects semantic bank tampering", () => {
