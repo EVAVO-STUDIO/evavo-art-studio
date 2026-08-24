@@ -105,6 +105,7 @@ function handoff({
   createdAt,
   consumer,
   type,
+  extraEvidence = [],
 }) {
   return compileStudioHandoff({
     schema: "evavo_studio_handoff_request_v2",
@@ -144,6 +145,7 @@ function handoff({
           actorId: approval.actorId,
         },
       },
+      ...extraEvidence,
     ],
     authority: {
       candidateOnly: false,
@@ -208,6 +210,14 @@ export function compileCharacterPerformanceDelivery(input) {
       ? identifier(request.videoConsumer, "videoConsumer")
       : "video-studio",
     type: "art-to-video",
+    extraEvidence: [
+      {
+        evidenceId: "art-to-cel-source-handoff",
+        kind: "art-to-cel-source-handoff",
+        sha256: artToCel.handoffSha256,
+        metadata: { handoffId: artToCel.handoffId },
+      },
+    ],
   });
   const body = {
     schema: CHARACTER_PERFORMANCE_DELIVERY_SCHEMA,
@@ -248,6 +258,16 @@ export function verifyCharacterPerformanceDelivery(input) {
     value.artToVideo.handoffType !== "art-to-video"
   ) {
     throw new Error("character performance delivery contains the wrong handoff types");
+  }
+  const sourceBindings = value.artToVideo.evidence.filter(
+    (row) => row.kind === "art-to-cel-source-handoff",
+  );
+  if (
+    sourceBindings.length !== 1 ||
+    sourceBindings[0].sha256 !== value.artToCel.handoffSha256 ||
+    sourceBindings[0].metadata?.handoffId !== value.artToCel.handoffId
+  ) {
+    throw new Error("Art-to-Video handoff is not bound to the exact Art-to-Cel source handoff");
   }
   if (
     value.authority.publicationAuthority ||
