@@ -1,0 +1,234 @@
+{
+  "schema": "evavo.game-art-campaign-request.v1",
+  "campaignId": "night-shift-station-v1",
+  "version": "1.0.0",
+  "planningEpoch": "2026-08-24T02:10:00.000Z",
+  "sourceRepository": "EVAVO-STUDIO/evavo-adventure-studio",
+  "targetRepository": "EVAVO-STUDIO/evavo-adventure-studio",
+  "batchSize": 10,
+  "lastBatchPolicy": "allow-partial-no-padding",
+  "generationPolicy": {
+    "oneAssetPerImage": true,
+    "separateImagesOnly": true,
+    "contactSheetsForbiddenForRuntime": true,
+    "readableTextForbiddenInGeneratedArt": true,
+    "originalEvavoArtRequired": true,
+    "referenceBytesForbidden": true,
+    "humanApprovalRequired": true,
+    "automaticPromotionForbidden": true
+  },
+  "poseLibraries": {
+    "night-shift-officer-walk": [
+      "walk phase 01, east-facing, compact stride opening from neutral duty posture",
+      "walk phase 02, east-facing, weight moving onto left side, clean leg separation",
+      "walk phase 03, east-facing, LEFT planted-foot contact, stable foot against floor",
+      "walk phase 04, east-facing, passing pose with restrained torso rise",
+      "walk phase 05, east-facing, stride opening toward right side",
+      "walk phase 06, east-facing, weight transferring toward right foot",
+      "walk phase 07, east-facing, RIGHT planted-foot contact, stable foot against floor",
+      "walk phase 08, east-facing, passing pose returning smoothly toward idle"
+    ]
+  },
+  "games": [
+    {
+      "id": "night-shift",
+      "title": "Night Shift — Station Vertical Slice",
+      "productionOrder": 1,
+      "technical": {
+        "nativeCanvas": { "width": 320, "height": 200 },
+        "runtimeCanvas": { "width": 320, "height": 200 },
+        "presentationCanvas": { "width": 1280, "height": 800 },
+        "textureFiltering": "nearest",
+        "integerScaleOnly": true,
+        "pixelSnapRequired": true,
+        "authoringScale": 1
+      },
+      "style": {
+        "lock": "ORIGINAL EVAVO early-1990s procedural VGA production. Grounded municipal observation, small proportionate actors, selective silhouette contrast, broad intentional pixel clusters, restrained material dithering, practical fluorescent/night lighting. Final runtime art is native 320x200-era pixel work, not modern pixel-art styling and not a retro filter.",
+        "continuity": "Night officer wears practical dark navy duty uniform with restrained brown leather/equipment and natural skin values. Station is mundane municipal architecture with institutional fluorescent light. Preserve exact native geometry and all Adventure Studio pivot/foot/occlusion requirements.",
+        "negatives": [
+          "universal black outline around characters or props",
+          "soft antialiasing or semitransparent edges",
+          "AI-like single-pixel microtexture or pseudo-detail",
+          "modern cinematic bloom HDR chromatic aberration depth of field",
+          "oversized modern UI-like props or readability cheats",
+          "anime proportions superhero posture or exaggerated squash stretch",
+          "copied proprietary Police Quest characters rooms icons or animation frames"
+        ],
+        "originality": "Historical Sierra/SCI1 production discipline is a process reference only. Draw wholly original EVAVO characters, station architecture, props and animation poses; do not reproduce proprietary art or bytes."
+      },
+      "outputRoot": "production/night-shift/station",
+      "families": [
+        {
+          "id": "officer-performance",
+          "label": "Night officer native performance strip",
+          "kind": "sequence",
+          "phase": "vertical-slice",
+          "priority": 1,
+          "dimensions": { "width": 20, "height": 46 },
+          "authoringCanvas": { "width": 20, "height": 46 },
+          "alpha": "transparent",
+          "runtimeRoot": "art/night-shift/officer-frames",
+          "prompt": "Original municipal night officer, east-facing, tiny early-90s VGA actor. Work directly at 20x46 rendered pixels with binary transparency, no antialiasing and no full-body outline. Preserve body mass, uniform/material clusters and stable floor contact across all poses.",
+          "continuity": "All twelve frames share the same identity, proportions, uniform, palette roles, foot point, shadow anchor and hand attachment logic. Walk contact must not skate. Reach/inspect/notebook are economical one-beat poses.",
+          "reviewPreset": "night-shift-officer-native-vga",
+          "pivot": { "x": 12, "y": 46 },
+          "ySortOrigin": { "x": 12, "y": 46 },
+          "directions": ["east"],
+          "subjects": [
+            {
+              "id": "officer",
+              "label": "Night officer",
+              "prompt": "Anonymous original municipal night officer, average working posture, dark navy duty clothing and restrained leather equipment; no recognisable proprietary police-game character design.",
+              "continuityKey": "night-shift-officer-v1"
+            }
+          ],
+          "clips": [
+            {
+              "id": "idle",
+              "label": "Idle",
+              "frames": 1,
+              "fps": 10,
+              "loop": "hold",
+              "directions": ["east"],
+              "poses": ["grounded neutral duty stance, readable small silhouette, no hero pose"],
+              "prompt": "Neutral idle pose. Feet planted, shoulders relaxed, hands economical, face readable only through intentional native clusters."
+            },
+            {
+              "id": "walk",
+              "label": "Eight-frame walk",
+              "frames": 8,
+              "fps": 10,
+              "loop": "linear",
+              "directions": ["east"],
+              "poseLibrary": "night-shift-officer-walk",
+              "prompt": "Eight authored gait phases. Clean negative space between legs where needed, restrained head/torso bob, no tween-like smoothing. Frames 03 and 07 are the planted contacts."
+            },
+            {
+              "id": "reach",
+              "label": "Practical reach",
+              "frames": 1,
+              "fps": 8,
+              "loop": "none",
+              "directions": ["east"],
+              "poses": ["one-arm practical reach for radio keys or latch, stable feet and body scale"],
+              "prompt": "Short practical reach with one clear hand gesture; avoid noisy finger anatomy."
+            },
+            {
+              "id": "inspect",
+              "label": "Inspect",
+              "frames": 1,
+              "fps": 6,
+              "loop": "none",
+              "directions": ["east"],
+              "poses": ["brief attentive lean/read pose with stable foot anchor and clear gaze direction"],
+              "prompt": "Economical inspect/read pose for briefing, vehicle observation or receipt."
+            },
+            {
+              "id": "notebook",
+              "label": "Notebook",
+              "frames": 1,
+              "fps": 5,
+              "loop": "none",
+              "directions": ["east"],
+              "poses": ["compact notebook-writing pose, one hand stabilises pad and other marks it"],
+              "prompt": "Small readable notebook gesture with no oversized prop or cinematic pose."
+            }
+          ]
+        },
+        {
+          "id": "station-masters",
+          "label": "Station native room and props",
+          "kind": "catalogue",
+          "phase": "vertical-slice",
+          "priority": 2,
+          "dimensions": { "width": 320, "height": 200 },
+          "authoringCanvas": { "width": 320, "height": 200 },
+          "alpha": "mixed",
+          "runtimeRoot": "art/night-shift/station",
+          "prompt": "Original mundane municipal station imagery for a 320x200 early-90s VGA procedural adventure. Exact practical scale, restrained institutional materials and lighting, no modern cinematic treatment.",
+          "continuity": "Same station architecture, fluorescent value family, furniture scale and officer-era prop language across all assets. Props remain practical-sized at native resolution.",
+          "reviewPreset": "night-shift-station-native-vga",
+          "items": [
+            {
+              "id": "background",
+              "label": "Municipal briefing room background",
+              "prompt": "Full 320x200 station briefing room plate, grounded municipal architecture, institutional fluorescent light, clear walkable floor, desk and exit geometry preserved, no people baked into the plate.",
+              "dimensions": { "width": 320, "height": 200 },
+              "authoringCanvas": { "width": 320, "height": 200 },
+              "alpha": "opaque"
+            },
+            {
+              "id": "sergeant",
+              "label": "Desk sergeant",
+              "prompt": "Original fixed desk sergeant actor, west-facing working posture, restrained uniform detail, small native-scale silhouette.",
+              "dimensions": { "width": 22, "height": 42 },
+              "authoringCanvas": { "width": 22, "height": 42 },
+              "alpha": "transparent"
+            },
+            {
+              "id": "radio",
+              "label": "Portable radio",
+              "prompt": "Practical early portable duty radio on charger, readable at 16x14 without scaling it into a UI symbol.",
+              "dimensions": { "width": 16, "height": 14 },
+              "authoringCanvas": { "width": 16, "height": 14 },
+              "alpha": "transparent"
+            },
+            {
+              "id": "keys",
+              "label": "Vehicle keys",
+              "prompt": "Small duty vehicle key ring, legible as an object at 12x8 through silhouette and metal highlight only.",
+              "dimensions": { "width": 12, "height": 8 },
+              "authoringCanvas": { "width": 12, "height": 8 },
+              "alpha": "transparent"
+            },
+            {
+              "id": "door",
+              "label": "Station exit door",
+              "prompt": "Station exit door asset matching room geometry, flat practical municipal construction, no signage text.",
+              "dimensions": { "width": 30, "height": 60 },
+              "authoringCanvas": { "width": 30, "height": 60 },
+              "alpha": "transparent"
+            },
+            {
+              "id": "briefing",
+              "label": "Briefing sheet",
+              "prompt": "Small pinned or laid briefing sheet, paper shape and marks only; generated readable text is forbidden because runtime copy is separate.",
+              "dimensions": { "width": 22, "height": 18 },
+              "authoringCanvas": { "width": 22, "height": 18 },
+              "alpha": "transparent"
+            },
+            {
+              "id": "desk-front",
+              "label": "Desk foreground occlusion plate",
+              "prompt": "Transparent full-canvas 320x200 foreground plate containing only the desk-front pixels that should occlude the officer. Everything else fully transparent.",
+              "dimensions": { "width": 320, "height": 200 },
+              "authoringCanvas": { "width": 320, "height": 200 },
+              "alpha": "transparent"
+            },
+            {
+              "id": "door-frame",
+              "label": "Door-frame foreground occlusion plate",
+              "prompt": "Transparent full-canvas 320x200 foreground plate containing only the near door-frame pixels used for baseline occlusion. Everything else fully transparent.",
+              "dimensions": { "width": 320, "height": 200 },
+              "authoringCanvas": { "width": 320, "height": 200 },
+              "alpha": "transparent"
+            }
+          ]
+        }
+      ],
+      "expected": { "images": 20, "batches": 3 }
+    }
+  ],
+  "fontFamilies": [
+    {
+      "id": "night-shift-system-font",
+      "displayName": "Night Shift System 5x7",
+      "buildOrder": 1,
+      "requestPath": "EVAVO-STUDIO/evavo-adventure-studio:night-shift.foundation-technical-sources.zip#art/night-shift/system-font.png",
+      "faces": ["regular"],
+      "review": "Use the deterministic 96x48 indexed 5x7 font source from Adventure Studio. Do not regenerate, smooth or substitute a system font."
+    }
+  ],
+  "expected": { "images": 20, "batches": 3 }
+}
