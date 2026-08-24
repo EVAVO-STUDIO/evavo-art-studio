@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "eva-reviewed-hires-atlas-clean-master": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/build_project_art_atlas.py",
+      "arguments": [
+        "--plan",
+        "{{plan}}",
+        "--output-root",
+        "{{outputRoot}}"
+      ],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["plan", "outputRoot"],
+        "properties": {
+          "plan": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "outputRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "output"
+          }
+        }
+      },
+      "parameterOutputs": ["outputRoot"],
+      "network": "disabled",
+      "timeoutSeconds": 3600,
+      "description": "Build one exact-plan, create-only RGBA PNG atlas clean master plus deterministic manifests and SHA-bound receipt for reviewed EVA high-resolution frames. This is an intermediate clean-master stage only and grants no creative approval, WebP delivery approval, Cloudinary upload, runtime/website activation, publication or repository authority."
+    }
+  }
+}
