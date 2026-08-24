@@ -11,7 +11,11 @@ import {
   compileCharacterPerformanceDelivery,
   verifyCharacterPerformanceDelivery,
 } from "../tools/character-performance-delivery-v1.mjs";
-import { verifyStudioHandoff } from "../tools/studio-handoff-v2.mjs";
+import {
+  compileStudioHandoff,
+  digestStudioValue,
+  verifyStudioHandoff,
+} from "../tools/studio-handoff-v2.mjs";
 
 const sha = (character) => character.repeat(64);
 const roles = ["idle", "listen", "speak", "gesture", "transition"];
@@ -116,6 +120,32 @@ function measurements(bank) {
   }));
 }
 
+function approvedDelivery() {
+  const bank = compileCharacterPerformanceBank(bankRequest());
+  const review = reviewCharacterPerformanceBank({
+    bank,
+    measurements: measurements(bank),
+    reviewId: "clean-review",
+  });
+  const approval = approveCharacterPerformanceBank({
+    bank,
+    review,
+    decisionId: "approve-eva",
+    actorId: "greg",
+    actorRole: "creative-director",
+    approvalEvidenceSha256: sha("8"),
+    observedAt: "2026-08-23T00:02:00.000Z",
+  });
+  const delivery = compileCharacterPerformanceDelivery({
+    bank,
+    review,
+    approval,
+    producerCommit: "d".repeat(40),
+    createdAt: "2026-08-23T00:03:00.000Z",
+  });
+  return { bank, review, approval, delivery };
+}
+
 test("compiles a deterministic identity-locked bank with intentional holds", () => {
   const first = compileCharacterPerformanceBank(bankRequest());
   const reversed = bankRequest();
@@ -162,33 +192,12 @@ test("routes the smallest failing slot to targeted repair", () => {
   );
 });
 
-test("records named creative approval and emits exact Art-to-Cel and Art-to-Video handoffs", () => {
-  const bank = compileCharacterPerformanceBank(bankRequest());
-  const review = reviewCharacterPerformanceBank({
-    bank,
-    measurements: measurements(bank),
-    reviewId: "clean-review",
-  });
-  const approval = approveCharacterPerformanceBank({
-    bank,
-    review,
-    decisionId: "approve-eva",
-    actorId: "greg",
-    actorRole: "creative-director",
-    approvalEvidenceSha256: sha("8"),
-    observedAt: "2026-08-23T00:02:00.000Z",
-  });
+test("records named creative approval and emits exact cross-bound Art handoffs", () => {
+  const { bank, review, approval, delivery } = approvedDelivery();
   assert.equal(
     verifyCharacterPerformanceApproval(approval, bank, review),
     approval.approvalSha256,
   );
-  const delivery = compileCharacterPerformanceDelivery({
-    bank,
-    review,
-    approval,
-    producerCommit: "d".repeat(40),
-    createdAt: "2026-08-23T00:03:00.000Z",
-  });
   assert.equal(
     verifyCharacterPerformanceDelivery(delivery),
     delivery.deliverySha256,
@@ -203,6 +212,42 @@ test("records named creative approval and emits exact Art-to-Cel and Art-to-Vide
   assert.equal(delivery.artToCel.authority.releaseApprovalIncluded, false);
   assert.equal(delivery.artToCel.authority.publicationAuthority, false);
   assert.equal(delivery.artToCel.assets.length, bank.slots.length - 1);
+  const sourceBinding = delivery.artToVideo.evidence.find(
+    (row) => row.kind === "art-to-cel-source-handoff",
+  );
+  assert.equal(sourceBinding.sha256, delivery.artToCel.handoffSha256);
+  assert.equal(sourceBinding.metadata.handoffId, delivery.artToCel.handoffId);
+});
+
+test("rejects a redigested Art delivery whose Video handoff loses its Cel source binding", () => {
+  const { delivery } = approvedDelivery();
+  const original = delivery.artToVideo;
+  const artToVideo = compileStudioHandoff({
+    schema: "evavo_studio_handoff_request_v2",
+    handoffType: original.handoffType,
+    productionId: original.productionId,
+    producer: original.producer,
+    consumer: original.consumer,
+    creativeIntentSha256: original.creativeIntentSha256,
+    continuitySha256: original.continuitySha256,
+    createdAt: original.createdAt,
+    assets: original.assets,
+    evidence: original.evidence.filter(
+      (row) => row.kind !== "art-to-cel-source-handoff",
+    ),
+    authority: original.authority,
+    metadata: original.metadata,
+  });
+  const tamperedBody = { ...delivery, artToVideo };
+  delete tamperedBody.deliverySha256;
+  const tampered = {
+    ...tamperedBody,
+    deliverySha256: digestStudioValue(tamperedBody),
+  };
+  assert.throws(
+    () => verifyCharacterPerformanceDelivery(tampered),
+    /exact Art-to-Cel source handoff/,
+  );
 });
 
 test("detects semantic bank tampering", () => {
