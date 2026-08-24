@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -33,6 +34,15 @@ export const BRASS_ART_REVIEW_TOOL_NAMES = Object.freeze([
   "inspect_art_batch_quality",
   "inspect_sprite_sequence_quality",
 ] as const);
+export const ART_REVIEW_SPECIALIST_RECEIPT =
+  "evavo_art_studio_review_specialist_receipt_v1";
+
+const READ_ONLY_ANNOTATIONS = Object.freeze({
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+});
 
 function samePath(left: string, right: string): boolean {
   const normalize = (value: string) => {
@@ -55,6 +65,48 @@ function canonicalDirectory(value: string, label: string): string {
     throw new Error(`${label} must use its canonical path.`);
   }
   return resolved;
+}
+
+function canonicalJson(value: unknown): string {
+  const visit = (child: unknown): unknown => {
+    if (Array.isArray(child)) return child.map(visit);
+    if (child && typeof child === "object") {
+      return Object.fromEntries(
+        Object.entries(child as Record<string, unknown>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, visit(item)]),
+      );
+    }
+    return child;
+  };
+  return JSON.stringify(visit(value));
+}
+
+function reviewReceipt(toolName: string, value: unknown) {
+  const evidenceSha256 = createHash("sha256")
+    .update(canonicalJson(value))
+    .digest("hex");
+  const receiptPayload = {
+    contractVersion: ART_REVIEW_SPECIALIST_RECEIPT,
+    authority: "EVAVO-STUDIO/evavo-art-studio",
+    toolName,
+    evidenceSha256,
+    reviewOnly: true,
+    creativeApprovalPerformed: false,
+    artifactMutationPerformed: false,
+    providerExecutionPerformed: false,
+    publicationPerformed: false,
+    completionAuthority: false,
+    completionEvidenceEligible: false,
+  };
+  const receiptSha256 = createHash("sha256")
+    .update(canonicalJson(receiptPayload))
+    .digest("hex");
+  return Object.freeze({
+    ...receiptPayload,
+    receiptId: `art-studio-review:${receiptSha256}`,
+    receiptSha256,
+  });
 }
 
 export function reviewAllowedRoots(
@@ -110,6 +162,8 @@ export function reviewCapabilityDocument(
     publicationAuthority: false,
     arbitraryShellAllowed: false,
     arbitraryGitArgumentsAllowed: false,
+    specialistReceiptContract: ART_REVIEW_SPECIALIST_RECEIPT,
+    completionAuthority: false,
     truthBoundaries: Object.freeze([
       "Repository, frame, batch and sequence inspection are evidence, not creative approval.",
       "A production plan is not provider execution or asset generation.",
@@ -121,13 +175,19 @@ export function reviewCapabilityDocument(
 
 const server = new McpServer({
   name: "evavo-art-studio-brass-review",
-  version: "1.2.0",
+  version: "1.3.0",
 });
 
-const textResult = (value: unknown) => ({
+const textResult = (toolName: string, value: unknown) => ({
   content: [
     { type: "text" as const, text: JSON.stringify(value, null, 2) },
   ],
+  structuredContent: {
+    reviewEvidence: value,
+    specialistEvidence: reviewReceipt(toolName, value),
+    completionAuthority: false,
+    completionEvidenceEligible: false,
+  },
 });
 
 function toolError(code: string, error: unknown) {
@@ -155,8 +215,9 @@ server.registerTool(
     description:
       "Describe the seven-tool Brass art-review profile and its permanent no-write authority.",
     inputSchema: z.object({}),
+    annotations: READ_ONLY_ANNOTATIONS,
   },
-  async () => textResult(reviewCapabilityDocument()),
+  async () => textResult("art_review_capabilities", reviewCapabilityDocument()),
 );
 
 server.registerTool(
@@ -165,8 +226,9 @@ server.registerTool(
     description:
       "Validate an EVAVO Art Studio art brief without creating work, writing files or calling an art provider.",
     inputSchema: z.object({ brief: z.unknown() }),
+    annotations: READ_ONLY_ANNOTATIONS,
   },
-  async ({ brief }) => textResult(validateArtBrief(brief)),
+  async ({ brief }) => textResult("validate_art_brief", validateArtBrief(brief)),
 );
 
 server.registerTool(
@@ -175,6 +237,7 @@ server.registerTool(
     description:
       "Compile a valid art brief into deterministic roles, quality gates and deliverables without execution.",
     inputSchema: z.object({ brief: z.unknown() }),
+    annotations: READ_ONLY_ANNOTATIONS,
   },
   async ({ brief }) => {
     const validation = validateArtBrief(brief);
@@ -193,7 +256,10 @@ server.registerTool(
         ],
       };
     }
-    return textResult(createProductionPlan(validation.value));
+    return textResult(
+      "compile_art_production_plan",
+      createProductionPlan(validation.value),
+    );
   },
 );
 
@@ -203,12 +269,13 @@ server.registerTool(
     description:
       "Inspect one configured local project for engine context, current art and likely asset gaps. Paths and symlinks outside the explicit review roots are rejected.",
     inputSchema: z.object({ repositoryPath: z.string().min(1) }),
+    annotations: READ_ONLY_ANNOTATIONS,
   },
   async ({ repositoryPath }) => {
     try {
       const roots = reviewAllowedRoots();
       const safePath = assertPathWithinAllowedRoots(repositoryPath, roots);
-      return textResult(await inspectRepository(safePath));
+      return textResult("inspect_art_repository", await inspectRepository(safePath));
     } catch (error: unknown) {
       return toolError("ART_REPOSITORY_REVIEW_REJECTED", error);
     }
@@ -224,12 +291,14 @@ server.registerTool(
       imagePath: z.string().min(1),
       expectations: z.unknown(),
     }),
+    annotations: READ_ONLY_ANNOTATIONS,
   },
   async ({ imagePath, expectations }) => {
     try {
       const roots = reviewAllowedRoots();
       const safePath = assertPathWithinAllowedRoots(imagePath, roots);
       return textResult(
+        "inspect_sprite_frame_quality",
         analyseDecodedSpriteFrame(
           await decodeSpriteFrame(safePath),
           expectations,
@@ -266,6 +335,7 @@ server.registerTool(
         .optional(),
       detail: z.enum(["summary", "failures", "all"]).optional(),
     }),
+    annotations: READ_ONLY_ANNOTATIONS,
   },
   async ({
     directoryPath,
@@ -280,6 +350,7 @@ server.registerTool(
   }) => {
     try {
       return textResult(
+        "inspect_art_batch_quality",
         await reviewArtBatchDirectory({
           directoryPath,
           roleId,
@@ -305,12 +376,14 @@ server.registerTool(
     description:
       "Inspect one root-restricted sprite-sequence manifest for canvas, timing, ordering, pivots, baselines, ground contact and linked-cel identity without writing output.",
     inputSchema: z.object({ manifestPath: z.string().min(1) }),
+    annotations: READ_ONLY_ANNOTATIONS,
   },
   async ({ manifestPath }) => {
     try {
       const roots = reviewAllowedRoots();
       const safePath = assertPathWithinAllowedRoots(manifestPath, roots);
       return textResult(
+        "inspect_sprite_sequence_quality",
         await analyseSpriteSequenceManifestFile(safePath, {
           allowedRoots: roots,
         }),
