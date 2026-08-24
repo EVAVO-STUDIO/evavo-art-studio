@@ -11,7 +11,11 @@ import {
   compileCharacterPerformanceDelivery,
   verifyCharacterPerformanceDelivery,
 } from "../tools/character-performance-delivery-v1.mjs";
-import { verifyStudioHandoff } from "../tools/studio-handoff-v2.mjs";
+import {
+  compileStudioHandoff,
+  digestStudioValue,
+  verifyStudioHandoff,
+} from "../tools/studio-handoff-v2.mjs";
 
 const sha = (character) => character.repeat(64);
 const roles = ["idle", "listen", "speak", "gesture", "transition"];
@@ -217,20 +221,32 @@ test("records named creative approval and emits exact cross-bound Art handoffs",
 
 test("rejects a redigested Art delivery whose Video handoff loses its Cel source binding", () => {
   const { delivery } = approvedDelivery();
-  const tampered = structuredClone(delivery);
-  tampered.artToVideo.evidence = tampered.artToVideo.evidence.filter(
-    (row) => row.kind !== "art-to-cel-source-handoff",
-  );
-  const handoffUnsigned = { ...tampered.artToVideo };
-  delete handoffUnsigned.handoffSha256;
-  tampered.artToVideo.handoffSha256 = verifyStudioHandoff(
-    compileCharacterPerformanceDelivery({
-      ...approvedDelivery(),
-    }),
-  );
+  const original = delivery.artToVideo;
+  const artToVideo = compileStudioHandoff({
+    schema: "evavo_studio_handoff_request_v2",
+    handoffType: original.handoffType,
+    productionId: original.productionId,
+    producer: original.producer,
+    consumer: original.consumer,
+    creativeIntentSha256: original.creativeIntentSha256,
+    continuitySha256: original.continuitySha256,
+    createdAt: original.createdAt,
+    assets: original.assets,
+    evidence: original.evidence.filter(
+      (row) => row.kind !== "art-to-cel-source-handoff",
+    ),
+    authority: original.authority,
+    metadata: original.metadata,
+  });
+  const tamperedBody = { ...delivery, artToVideo };
+  delete tamperedBody.deliverySha256;
+  const tampered = {
+    ...tamperedBody,
+    deliverySha256: digestStudioValue(tamperedBody),
+  };
   assert.throws(
     () => verifyCharacterPerformanceDelivery(tampered),
-    /digest mismatch|exact Art-to-Cel source handoff/,
+    /exact Art-to-Cel source handoff/,
   );
 });
 
