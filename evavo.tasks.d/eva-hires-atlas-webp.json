@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "eva-reviewed-hires-atlas-webp-encode": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/eva_hires_atlas_webp_encode.py",
+      "arguments": [
+        "--workspace-root",
+        "{{workspaceRoot}}",
+        "--plan",
+        "{{plan}}",
+        "--plan-sha256",
+        "{{planSha256}}",
+        "--receipt",
+        "{{receipt}}"
+      ],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["workspaceRoot", "plan", "planSha256", "receipt"],
+        "properties": {
+          "workspaceRoot": {
+            "type": "compute-path",
+            "pathKind": "directory",
+            "access": "input"
+          },
+          "plan": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "input"
+          },
+          "planSha256": {
+            "type": "string",
+            "minimumLength": 64,
+            "maximumLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "receipt": {
+            "type": "compute-path",
+            "pathKind": "file",
+            "access": "output"
+          }
+        }
+      },
+      "parameterOutputs": ["receipt"],
+      "network": "disabled",
+      "timeoutSeconds": 3600,
+      "description": "Encode one exact SHA-bound reviewed EVA RGBA PNG atlas clean master to create-only WebP, decode it again, require exact alpha and bounded atlas/per-frame visible-RGB error, and emit a create-only receipt. No approval, Cloudinary upload, promotion, runtime/website activation, publication or repository authority is granted."
+    }
+  }
+}
