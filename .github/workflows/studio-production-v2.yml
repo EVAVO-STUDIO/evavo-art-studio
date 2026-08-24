@@ -1,0 +1,78 @@
+name: Studio production v2
+
+on:
+  pull_request:
+    paths:
+      - "studio.production.v2.json"
+      - "contracts/studio-production-v2.schema.json"
+      - "scripts/check-studio-production-v2.mjs"
+      - "tools/studio-handoff-v2.mjs"
+      - "test/studio-handoff-v2.test.mjs"
+      - "contracts/evavo-studio-handoff-v2.schema.json"
+      - "contracts/STUDIO_HANDOFF_V2.md"
+      - "contracts/CHARACTER_PERFORMANCE_BANK_V1.md"
+      - "tools/character-performance-bank-v1.mjs"
+      - "tools/character-performance-delivery-v1.mjs"
+      - "test/character-performance-bank-v1.test.mjs"
+      - ".github/workflows/studio-production-v2.yml"
+  push:
+    branches: [main]
+    paths:
+      - "studio.production.v2.json"
+      - "contracts/studio-production-v2.schema.json"
+      - "scripts/check-studio-production-v2.mjs"
+      - "tools/studio-handoff-v2.mjs"
+      - "test/studio-handoff-v2.test.mjs"
+      - "contracts/evavo-studio-handoff-v2.schema.json"
+      - "contracts/STUDIO_HANDOFF_V2.md"
+      - "contracts/CHARACTER_PERFORMANCE_BANK_V1.md"
+      - "tools/character-performance-bank-v1.mjs"
+      - "tools/character-performance-delivery-v1.mjs"
+      - "test/character-performance-bank-v1.test.mjs"
+      - ".github/workflows/studio-production-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-production-v2-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Art production contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          lfs: false
+          submodules: false
+
+      - name: Set up governed Node 22.14.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Validate production manifest and declared files
+        run: node scripts/check-studio-production-v2.mjs
+
+      - name: Run networkless character production contracts
+        run: >-
+          node --test
+          test/studio-handoff-v2.test.mjs
+          test/character-performance-bank-v1.test.mjs
+
+      - name: Compile-check production modules
+        run: |
+          node --check tools/studio-handoff-v2.mjs
+          node --check tools/character-performance-bank-v1.mjs
+          node --check tools/character-performance-delivery-v1.mjs
+
+      - name: Confirm checkout remains unchanged
+        if: always()
+        run: test -z "$(git status --porcelain=v1 --untracked-files=all)"
