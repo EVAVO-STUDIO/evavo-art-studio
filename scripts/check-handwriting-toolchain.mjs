@@ -13,6 +13,7 @@ const requiredFiles = [
   'tools/handwriting_whole_mark.py',
   'tools/handwriting_document_bridge.py',
   'tools/handwriting_coverage.py',
+  'contracts/handwriting-document-export.v1.schema.json',
   'scripts/check-handwriting-all.mjs',
   'scripts/test_document_ink_finisher.py',
   'scripts/test_handwriting_atlas.py',
@@ -23,6 +24,14 @@ const requiredFiles = [
 ];
 for (const relative of requiredFiles) {
   if (!fs.existsSync(path.join(root, relative))) throw new Error(`missing handwriting toolchain file: ${relative}`);
+}
+const exportContract = JSON.parse(fs.readFileSync(path.join(root, 'contracts', 'handwriting-document-export.v1.schema.json'), 'utf8'));
+if (exportContract?.properties?.schema?.const !== 'evavo.art-studio.document-personal-marks-export.v1') {
+  throw new Error('handwriting export contract schema identity is invalid');
+}
+const truth = exportContract?.properties?.truthBoundary?.properties;
+if (!truth || truth.signatureSynthesizedFromGlyphs?.const !== false || truth.requiresDocumentStudioApprovalForPdfExecution?.const !== true) {
+  throw new Error('handwriting export contract weakened signature/document approval boundary');
 }
 const allTasks = {};
 for (const fragmentPath of fragmentPaths) {
@@ -77,9 +86,9 @@ if (!descriptions.includes('never synthesizes signatures') && !descriptions.incl
 console.log(JSON.stringify({
   ok: true,
   fragments: fragmentPaths.map((item) => path.relative(root, item).replaceAll('\\', '/')),
+  exportContract: 'contracts/handwriting-document-export.v1.schema.json',
   requiredTasks: [...requiredTasks.keys()],
   requiredFiles,
-  unifiedAcceptanceRunner: 'scripts/check-handwriting-all.mjs',
   networkUsed: false,
   signingApprovalAuthority: false,
 }, null, 2));
