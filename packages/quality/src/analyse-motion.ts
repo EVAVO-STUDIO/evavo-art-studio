@@ -23,6 +23,7 @@ export interface AnimationMotionQualityRequest {
   readonly rootLandmarkId?: string;
   readonly maximumRootStepPixels?: number;
   readonly loopClosureTolerancePixels?: number;
+  readonly loopClosureLandmarkIds?: readonly string[];
   readonly requiredLandmarkIds?: readonly string[];
   readonly attachmentConstraints?: readonly AnimationAttachmentConstraint[];
   readonly frames: readonly AnimationMotionFrameEvidence[];
@@ -75,14 +76,43 @@ function gate(
   };
 }
 
-function requireNonNegativeFinite(value: number, field: string): number {
-  if (!Number.isFinite(value) || value < 0) {
+function requireNonNegativeFinite(value: unknown, field: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
     throw new SpriteQualityInputError(
       "ANIMATION_MOTION_INVALID_THRESHOLD",
       `${field} must be a finite number greater than or equal to zero.`,
     );
   }
   return value;
+}
+
+function requireStringList(value: unknown, field: string): readonly string[] {
+  if (!Array.isArray(value)) {
+    throw new SpriteQualityInputError(
+      "ANIMATION_MOTION_INVALID_LANDMARK_LIST",
+      `${field} must be an array of non-empty landmark ids.`,
+    );
+  }
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string" || !item.trim()) {
+      throw new SpriteQualityInputError(
+        "ANIMATION_MOTION_INVALID_LANDMARK_LIST",
+        `${field} must contain only non-empty landmark ids.`,
+      );
+    }
+    const id = item.trim();
+    if (seen.has(id)) {
+      throw new SpriteQualityInputError(
+        "ANIMATION_MOTION_DUPLICATE_LANDMARK_ID",
+        `${field} contains duplicate landmark id ${id}.`,
+      );
+    }
+    seen.add(id);
+    result.push(id);
+  }
+  return result;
 }
 
 function validateRequest(input: AnimationMotionQualityRequest): AnimationMotionQualityRequest {
@@ -114,6 +144,18 @@ function validateRequest(input: AnimationMotionQualityRequest): AnimationMotionQ
   if (input.loopClosureTolerancePixels !== undefined) {
     requireNonNegativeFinite(input.loopClosureTolerancePixels, "loopClosureTolerancePixels");
   }
+  if (input.rootLandmarkId !== undefined && (typeof input.rootLandmarkId !== "string" || !input.rootLandmarkId.trim())) {
+    throw new SpriteQualityInputError(
+      "ANIMATION_MOTION_INVALID_ROOT_LANDMARK",
+      "rootLandmarkId must be non-empty when supplied.",
+    );
+  }
+  if (input.requiredLandmarkIds !== undefined) {
+    requireStringList(input.requiredLandmarkIds, "requiredLandmarkIds");
+  }
+  if (input.loopClosureLandmarkIds !== undefined) {
+    requireStringList(input.loopClosureLandmarkIds, "loopClosureLandmarkIds");
+  }
   if (!Array.isArray(input.frames) || input.frames.length < 2) {
     throw new SpriteQualityInputError(
       "ANIMATION_MOTION_FRAME_COUNT",
@@ -123,6 +165,12 @@ function validateRequest(input: AnimationMotionQualityRequest): AnimationMotionQ
 
   const seenIndices = new Set<number>();
   for (const frame of input.frames) {
+    if (!frame || typeof frame !== "object") {
+      throw new SpriteQualityInputError(
+        "ANIMATION_MOTION_INVALID_FRAME",
+        "Every motion-evidence frame must be an object.",
+      );
+    }
     if (!Number.isInteger(frame.frameIndex) || frame.frameIndex < 0) {
       throw new SpriteQualityInputError(
         "ANIMATION_MOTION_FRAME_INDEX",
@@ -142,7 +190,22 @@ function validateRequest(input: AnimationMotionQualityRequest): AnimationMotionQ
         "Every motion-evidence frame requires a non-empty frameId.",
       );
     }
-    for (const [landmarkId, point] of Object.entries(frame.landmarks ?? {})) {
+    if (!frame.landmarks || typeof frame.landmarks !== "object") {
+      throw new SpriteQualityInputError(
+        "ANIMATION_MOTION_INVALID_LANDMARKS",
+        `Frame ${frame.frameId} requires a landmark map.`,
+      );
+    }
+    if (
+      frame.plantedLandmarkId !== undefined &&
+      (typeof frame.plantedLandmarkId !== "string" || !frame.plantedLandmarkId.trim())
+    ) {
+      throw new SpriteQualityInputError(
+        "ANIMATION_MOTION_INVALID_PLANTED_LANDMARK",
+        `Frame ${frame.frameId} has an invalid plantedLandmarkId.`,
+      );
+    }
+    for (const [landmarkId, point] of Object.entries(frame.landmarks)) {
       if (!landmarkId.trim() || !finitePoint(point)) {
         throw new SpriteQualityInputError(
           "ANIMATION_MOTION_INVALID_LANDMARK",
@@ -161,8 +224,23 @@ function validateRequest(input: AnimationMotionQualityRequest): AnimationMotionQ
     }
   }
 
+  if (input.attachmentConstraints !== undefined && !Array.isArray(input.attachmentConstraints)) {
+    throw new SpriteQualityInputError(
+      "ANIMATION_MOTION_INVALID_ATTACHMENTS",
+      "attachmentConstraints must be an array when supplied.",
+    );
+  }
   for (const constraint of input.attachmentConstraints ?? []) {
-    if (!constraint.id.trim() || !constraint.fromLandmarkId.trim() || !constraint.toLandmarkId.trim()) {
+    if (
+      !constraint ||
+      typeof constraint !== "object" ||
+      typeof constraint.id !== "string" ||
+      !constraint.id.trim() ||
+      typeof constraint.fromLandmarkId !== "string" ||
+      !constraint.fromLandmarkId.trim() ||
+      typeof constraint.toLandmarkId !== "string" ||
+      !constraint.toLandmarkId.trim()
+    ) {
       throw new SpriteQualityInputError(
         "ANIMATION_MOTION_INVALID_ATTACHMENT",
         "Attachment constraints require non-empty ids and landmark ids.",
@@ -184,14 +262,13 @@ export function analyseAnimationMotion(
   const gates: SpriteQualityGateResult[] = [];
 
   const missingRequired: Array<{ frameId: string; landmarkId: string }> = [];
+  const requiredIds = new Set(request.requiredLandmarkIds ?? []);
+  if (request.rootLandmarkId) requiredIds.add(request.rootLandmarkId);
   for (const frame of request.frames) {
-    for (const landmarkId of request.requiredLandmarkIds ?? []) {
+    for (const landmarkId of requiredIds) {
       if (!frame.landmarks[landmarkId]) {
         missingRequired.push({ frameId: frame.frameId, landmarkId });
       }
-    }
-    if (request.rootLandmarkId && !frame.landmarks[request.rootLandmarkId]) {
-      missingRequired.push({ frameId: frame.frameId, landmarkId: request.rootLandmarkId });
     }
     if (frame.plantedLandmarkId && !frame.landmarks[frame.plantedLandmarkId]) {
       missingRequired.push({ frameId: frame.frameId, landmarkId: frame.plantedLandmarkId });
@@ -359,15 +436,14 @@ export function analyseAnimationMotion(
   if (request.loop) {
     const first = request.frames[0]!;
     const last = request.frames[request.frames.length - 1]!;
-    const ids = new Set([
-      ...(request.requiredLandmarkIds ?? []),
-      ...(request.rootLandmarkId ? [request.rootLandmarkId] : []),
-    ]);
-    for (const landmarkId of ids) {
+    const loopIds = request.loopClosureLandmarkIds ?? (request.rootLandmarkId ? [request.rootLandmarkId] : []);
+    for (const landmarkId of loopIds) {
       const a = first.landmarks[landmarkId];
       const b = last.landmarks[landmarkId];
       if (a && b) {
         loopClosure.push({ landmarkId, distancePixels: distance(a, b) });
+      } else {
+        loopClosure.push({ landmarkId, distancePixels: Number.POSITIVE_INFINITY });
       }
     }
   }
@@ -377,13 +453,21 @@ export function analyseAnimationMotion(
   gates.push(
     gate(
       "motion-loop-closure",
-      !request.loop ? "skipped" : loopFailures.length === 0 ? "pass" : "fail",
-      request.loop,
+      !request.loop
+        ? "skipped"
+        : loopClosure.length === 0
+          ? "skipped"
+          : loopFailures.length === 0
+            ? "pass"
+            : "fail",
+      request.loop && loopClosure.length > 0,
       !request.loop
         ? "Sequence is not declared as a loop."
-        : loopFailures.length === 0
-          ? "First and last motion landmarks close within tolerance."
-          : "Loop endpoints do not close within the declared tolerance.",
+        : loopClosure.length === 0
+          ? "No loop-closure landmarks were declared."
+          : loopFailures.length === 0
+            ? "Declared seam anchors close within tolerance."
+            : "Loop seam anchors do not close within the declared tolerance.",
       { tolerancePixels: loopClosureTolerance, landmarks: loopClosure, failures: loopFailures },
       loopFailures.length,
       loopClosureTolerance,
