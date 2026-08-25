@@ -13,11 +13,13 @@ const fragmentPaths = [
   path.join(root, 'evavo.tasks.d', 'handwriting-fiducial-detect.json'),
   path.join(root, 'evavo.tasks.d', 'handwriting-registration-review.json'),
   path.join(root, 'evavo.tasks.d', 'handwriting-multiline.json'),
+  path.join(root, 'evavo.tasks.d', 'handwriting-paragraph.json'),
 ];
 const requiredFiles = [
   'tools/document_ink_finisher.py',
   'tools/handwriting_atlas.py',
   'tools/handwriting_multiline.py',
+  'tools/handwriting_paragraph.py',
   'tools/handwriting_whole_mark.py',
   'tools/handwriting_document_bridge.py',
   'tools/handwriting_coverage.py',
@@ -34,6 +36,7 @@ const requiredFiles = [
   'scripts/test_document_ink_finisher.py',
   'scripts/test_handwriting_atlas.py',
   'scripts/test_handwriting_multiline.py',
+  'scripts/test_handwriting_paragraph.py',
   'scripts/test_handwriting_whole_mark.py',
   'scripts/test_handwriting_document_bridge.py',
   'scripts/test_handwriting_coverage.py',
@@ -84,6 +87,7 @@ const requiredTasks = new Map([
   ['handwriting-atlas-build', ['tools/handwriting_atlas.py', true]],
   ['handwriting-atlas-render', ['tools/handwriting_atlas.py', true]],
   ['handwriting-multiline-render', ['tools/handwriting_multiline.py', true]],
+  ['handwriting-paragraph-render', ['tools/handwriting_paragraph.py', true]],
   ['handwriting-atlas-coverage', ['tools/handwriting_coverage.py', false]],
   ['handwriting-capture-spec', ['tools/handwriting_capture_spec.py', true]],
   ['handwriting-capture-gap', ['tools/handwriting_capture_gap.py', true]],
@@ -117,6 +121,8 @@ const registrationReviewDescription = String(allTasks['handwriting-registration-
 if (!registrationReviewDescription.includes('proposal sha-256') || !registrationReviewDescription.includes('review')) throw new Error('registration review task must remain proposal-digest bound');
 const multilineDescription = String(allTasks['handwriting-multiline-render']?.description ?? '').toLowerCase();
 if (!multilineDescription.includes('genuine') || !multilineDescription.includes('fail closed') || !multilineDescription.includes('no font fallback')) throw new Error('multiline handwriting task must preserve genuine/fail-closed rendering boundary');
+const paragraphDescription = String(allTasks['handwriting-paragraph-render']?.description ?? '').toLowerCase();
+if (!paragraphDescription.includes('measured genuine handwriting advances') || !paragraphDescription.includes('arbitrary word splitting') || !paragraphDescription.includes('no computer-font fallback')) throw new Error('paragraph handwriting task must preserve measured-genuine wrapping boundary');
 console.log(JSON.stringify({
   ok: true,
   fragments: fragmentPaths.map((item) => path.relative(root, item).replaceAll('\\', '/')),
