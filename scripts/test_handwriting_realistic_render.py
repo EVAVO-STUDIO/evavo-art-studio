@@ -86,6 +86,21 @@ class HandwritingRealisticRenderTests(unittest.TestCase):
             self.assertFalse(result["truthBoundary"]["fontFallbackUsed"])
             self.assertFalse(result["truthBoundary"]["syntheticHandwritingGenerated"])
 
+    def test_baseline_uses_bounded_random_walk_not_independent_jumps(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            atlas = _atlas(module, root)
+            result = module.render_text(atlas, "AAAAAAAA", root / "baseline.png", seed="baseline", style="natural-uppercase")
+            self.assertEqual(result["baselineModel"]["mode"], "bounded-random-walk-v1")
+            target = float(result["targetInkHeightPx"])
+            max_drift = target * result["baselineModel"]["maximumDriftFractionOfInkHeight"]
+            max_step = max_drift * result["baselineModel"]["stepFractionOfMaximumDrift"]
+            drifts = [float(item["baselineDriftPx"]) for item in result["tokens"]]
+            self.assertTrue(all(abs(value) <= max_drift + 0.001 for value in drifts))
+            self.assertTrue(all(abs(right - left) <= max_step + 0.001 for left, right in zip(drifts, drifts[1:])))
+            self.assertTrue(all(abs(float(item["localBaselineJitterPx"])) <= max_drift * 0.28 + 0.001 for item in result["tokens"]))
+
     def test_same_seed_is_pixel_deterministic(self) -> None:
         module = _load_module()
         with tempfile.TemporaryDirectory() as directory:
@@ -95,6 +110,7 @@ class HandwritingRealisticRenderTests(unittest.TestCase):
             second = module.render_text(atlas, "AAAAAA", root / "b.png", seed="same", style="natural-uppercase")
             self.assertEqual(first["outputSha256"], second["outputSha256"])
             self.assertEqual([x["variant"] for x in first["tokens"]], [x["variant"] for x in second["tokens"]])
+            self.assertEqual([x["baselineDriftPx"] for x in first["tokens"]], [x["baselineDriftPx"] for x in second["tokens"]])
 
     def test_rejects_line_breaks_and_control_whitespace(self) -> None:
         module = _load_module()
