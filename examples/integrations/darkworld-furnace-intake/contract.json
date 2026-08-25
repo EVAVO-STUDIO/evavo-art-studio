@@ -8,10 +8,12 @@
     "entrypoint": "examples/integrations/darkworld-furnace-intake/intake_candidate.mjs",
     "requires": ["node", "python3"],
     "pythonOverrideArgument": "--python",
+    "outputRootSemantics": "When --output-root is supplied it is the exact job output directory. The adapter does not append the job id again.",
     "pnpmRequiredAtRuntime": false,
     "sourceMutation": false,
     "consumerRuntimeAdmission": false
   },
+  "jobOutputFiles": ["intake-request.json", "intake-plan.json", "workspace/"],
   "jobs": [
     {"id":"env-background","output":"assets/environments/furnace_intake/background.png"},
     {"id":"env-mid-structure","output":"assets/environments/furnace_intake/mid_structure.png"},
@@ -19,6 +21,6 @@
     {"id":"env-foreground","output":"assets/environments/furnace_intake/foreground.png"},
     {"id":"env-glow","output":"assets/environments/furnace_intake/glow.png"}
   ],
-  "returnEvidence": ["source_hash","candidate_hash","mastered_output_hash","review_reference","delivery_profile"],
+  "returnEvidence": ["source_hash","candidate_hash","mastered_output_hash","review_reference","delivery_profile","job_output_directory"],
   "runtimeAdmissionAuthority": "consumer"
 }
