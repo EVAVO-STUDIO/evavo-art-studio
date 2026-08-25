@@ -144,7 +144,7 @@ test("fails closed when required visual dependencies do not exist", () => {
   );
 });
 
-test("enforces batch candidate budget and provider artifact identity", () => {
+test("enforces batch candidate budget and exact dependency artifact identity", () => {
   assert.throws(
     () =>
       compileAnimationProviderBatch(
@@ -153,12 +153,10 @@ test("enforces batch candidate budget and provider artifact identity", () => {
     /candidateCount must be an integer from 1 to 3/,
   );
 
-  const badPlan = plan({ canonicalIdentityArtifactId: "artifact_not-a-content-id" });
+  const invalidPose = baseRequest("hero-walk-right:keys");
+  invalidPose.poseControlArtifactIds["1"] = "artifact_not-a-content-id";
   assert.throws(
-    () =>
-      compileAnimationProviderBatch(
-        baseRequest("hero-walk-right:keys", { plan: badPlan }),
-      ),
-    /plan\.canonicalIdentityArtifactId must be a canonical artifact/,
+    () => compileAnimationProviderBatch(invalidPose),
+    /poseControlArtifactIds\.1 must be a canonical artifact/,
   );
 });
