@@ -12,6 +12,8 @@ MULTILINE_SCHEMA = "evavo.art-studio.handwriting-multiline-render.v1"
 PARAGRAPH_SCHEMA = "evavo.art-studio.handwriting-paragraph-render.v1"
 QA_SCHEMA = "evavo.art-studio.handwriting-realism-qa.v1"
 BALANCED_MODE = "deterministic-shuffled-genuine-variant-bag-v1"
+BASELINE_MODE = "bounded-random-walk-v1"
+SPACE_MODE = "measured-space-with-bounded-variation-v1"
 
 
 def _load(path: Path) -> dict:
@@ -58,6 +60,7 @@ def _single_metrics(receipt: dict, atlas_counts: dict[str, int]) -> dict:
     by_token: dict[str, list[int]] = defaultdict(list)
     rotations = []
     scales = []
+    baseline_drifts = []
     cycles_by_token: dict[str, list[int]] = defaultdict(list)
     for item in tokens:
         if not isinstance(item, dict):
@@ -71,10 +74,13 @@ def _single_metrics(receipt: dict, atlas_counts: dict[str, int]) -> dict:
                 cycles_by_token[token].append(cycle)
         rotation = item.get("rotationDegrees")
         scale = item.get("scale")
+        drift = item.get("baselineDriftPx")
         if isinstance(rotation, (int, float)) and not isinstance(rotation, bool):
             rotations.append(float(rotation))
         if isinstance(scale, (int, float)) and not isinstance(scale, bool):
             scales.append(float(scale))
+        if isinstance(drift, (int, float)) and not isinstance(drift, bool):
+            baseline_drifts.append(float(drift))
 
     repeated = {token: values for token, values in by_token.items() if len(values) >= 2}
     repeat_metrics = []
@@ -105,6 +111,7 @@ def _single_metrics(receipt: dict, atlas_counts: dict[str, int]) -> dict:
         })
 
     low_bank = sorted(token for token in by_token if atlas_counts.get(token, 0) < 2)
+    baseline_steps = [abs(right - left) for left, right in zip(baseline_drifts, baseline_drifts[1:])]
     return {
         "tokenCount": len(tokens),
         "uniqueTokenCount": len(by_token),
@@ -115,6 +122,29 @@ def _single_metrics(receipt: dict, atlas_counts: dict[str, int]) -> dict:
         "balancedBagCycleFailures": bag_cycle_failures,
         "rotationStdDegrees": round(_std(rotations), 5),
         "scaleStd": round(_std(scales), 6),
+        "baselineDriftStdPx": round(_std(baseline_drifts), 5),
+        "maximumBaselineDriftStepPx": round(max(baseline_steps, default=0.0), 5),
+    }
+
+
+def _single_session_models(receipt: dict) -> dict:
+    baseline = receipt.get("baselineModel") if isinstance(receipt.get("baselineModel"), dict) else {}
+    spacing = receipt.get("wordSpacing") if isinstance(receipt.get("wordSpacing"), dict) else {}
+    spaces = spacing.get("spaces") if isinstance(spacing.get("spaces"), list) else []
+    spacing_factors = [
+        float(item["variationFactor"])
+        for item in spaces
+        if isinstance(item, dict)
+        and isinstance(item.get("variationFactor"), (int, float))
+        and not isinstance(item.get("variationFactor"), bool)
+    ]
+    return {
+        "baselineMode": baseline.get("mode"),
+        "wordSpacingMode": spacing.get("mode"),
+        "spaceCount": len(spaces),
+        "spaceVariationFactorMin": round(min(spacing_factors), 5) if spacing_factors else None,
+        "spaceVariationFactorMax": round(max(spacing_factors), 5) if spacing_factors else None,
+        "maximumSpaceVariationFraction": spacing.get("maximumVariationFraction"),
     }
 
 
@@ -172,13 +202,50 @@ def evaluate(atlas_path: Path, receipt_path: Path) -> dict:
 
     if schema == SINGLE_SCHEMA:
         single = _single_metrics(receipt, atlas_counts)
+        session = _single_session_models(receipt)
         metrics["singleLine"] = single
+        metrics["sessionModels"] = session
         repeated_with_choice = any(
             item["occurrences"] >= 2 and item["availableGenuineVariants"] >= 2
             for item in single["repeatedTokens"]
         )
         if repeated_with_choice and not balanced:
             warnings.append({"code": "legacy-variant-selection", "severity": "medium", "detail": "Repeated text did not prove use of the preferred balanced genuine-variant bag."})
+        if balanced and session["baselineMode"] != BASELINE_MODE:
+            warnings.append({"code": "legacy-baseline-model", "severity": "medium", "detail": "Balanced render did not prove use of the smooth bounded baseline model."})
+        source_text = receipt.get("text") if isinstance(receipt.get("text"), str) else ""
+        if balanced and " " in source_text and session["wordSpacingMode"] != SPACE_MODE:
+            warnings.append({"code": "legacy-word-spacing", "severity": "medium", "detail": "Balanced render with word spaces did not prove bounded measured space variation."})
+        baseline = receipt.get("baselineModel") if isinstance(receipt.get("baselineModel"), dict) else {}
+        if baseline.get("mode") == BASELINE_MODE:
+            target = receipt.get("targetInkHeightPx")
+            fraction = baseline.get("maximumDriftFractionOfInkHeight")
+            step_fraction = baseline.get("stepFractionOfMaximumDrift")
+            if all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in (target, fraction, step_fraction)):
+                max_drift = float(target) * float(fraction)
+                max_step = max_drift * float(step_fraction)
+                drifts = [
+                    abs(float(item["baselineDriftPx"]))
+                    for item in receipt.get("tokens", [])
+                    if isinstance(item, dict) and isinstance(item.get("baselineDriftPx"), (int, float))
+                ]
+                if max(drifts, default=0.0) > max_drift + 0.02 or single["maximumBaselineDriftStepPx"] > max_step + 0.02:
+                    warnings.append({"code": "baseline-model-bound-violation", "severity": "high"})
+        spacing = receipt.get("wordSpacing") if isinstance(receipt.get("wordSpacing"), dict) else {}
+        if spacing.get("mode") == SPACE_MODE:
+            maximum = spacing.get("maximumVariationFraction")
+            if not isinstance(maximum, (int, float)) or isinstance(maximum, bool) or not 0 <= float(maximum) <= 0.10:
+                warnings.append({"code": "word-spacing-bound-invalid", "severity": "high"})
+            else:
+                lower = 1.0 - float(maximum) - 0.001
+                upper = 1.0 + float(maximum) + 0.001
+                factors = [
+                    float(item["variationFactor"])
+                    for item in spacing.get("spaces", [])
+                    if isinstance(item, dict) and isinstance(item.get("variationFactor"), (int, float))
+                ]
+                if any(value < lower or value > upper for value in factors):
+                    warnings.append({"code": "word-spacing-bound-violation", "severity": "high"})
         if single["immediateSameVariantRepeatCount"]:
             warnings.append({"code": "immediate-variant-repeat", "severity": "high", "detail": "A repeated token reused the same captured variant immediately."})
         if single["underVariedRepeatedTokens"]:
@@ -223,6 +290,7 @@ def evaluate(atlas_path: Path, receipt_path: Path) -> dict:
         "warnings": warnings,
         "recommendations": [
             "Use the preferred realistic renderer so repeated tokens consume each genuine variant before bag refill.",
+            "Use the preferred smooth baseline and bounded measured word-spacing session models.",
             "Prefer at least three genuine variants for frequently repeated letters and punctuation.",
             "Use whole genuine fragments for common captured fragments where available.",
             "Review hostile-background proof at final placement scale, not only enlarged on screen.",
