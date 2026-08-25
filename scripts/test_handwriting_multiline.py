@@ -53,7 +53,7 @@ class HandwritingMultilineTests(unittest.TestCase):
         atlas_module.build_atlas(catalog, asset_root=assets, output=atlas)
         return atlas
 
-    def test_renders_real_line_breaks_and_blank_lines(self) -> None:
+    def test_renders_real_line_breaks_blank_lines_and_coherent_session_scale(self) -> None:
         module = _load(MULTILINE_TOOL, "handwriting_multiline")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -69,9 +69,22 @@ class HandwritingMultilineTests(unittest.TestCase):
             self.assertEqual(result["inkLineCount"], 2)
             self.assertEqual(result["blankLineCount"], 1)
             self.assertGreater(result["pixelSize"][1], result["pixelSize"][0] // 2)
+            self.assertGreater(result["sharedTargetInkHeightPx"], 0)
+            self.assertEqual(result["lineScaleNormalization"]["minimum"], 0.88)
+            self.assertEqual(result["lineScaleNormalization"]["maximum"], 1.12)
+            self.assertTrue(result["lineScaleNormalization"]["wholeLineRigidScaleOnly"])
+            ink_lines = [line for line in result["lines"] if not line["blank"]]
+            self.assertEqual(len(ink_lines), 2)
+            for line in ink_lines:
+                self.assertGreaterEqual(line["lineScale"], 0.88)
+                self.assertLessEqual(line["lineScale"], 1.12)
+                self.assertGreater(line["sourceTargetInkHeightPx"], 0)
+                self.assertGreater(line["effectiveTargetInkHeightPx"], 0)
             self.assertFalse(result["truthBoundary"]["fontFallbackUsed"])
             self.assertFalse(result["truthBoundary"]["syntheticHandwritingGenerated"])
             self.assertTrue(result["truthBoundary"]["lineImagesRenderedByGenuineAtlas"])
+            self.assertTrue(result["truthBoundary"]["lineScaleNormalizedAsWholeRigidRaster"])
+            self.assertFalse(result["truthBoundary"]["strokeDeformation"])
 
     def test_is_deterministic_for_same_seed(self) -> None:
         module = _load(MULTILINE_TOOL, "handwriting_multiline_determinism")
@@ -83,6 +96,7 @@ class HandwritingMultilineTests(unittest.TestCase):
             one = module.render_multiline(atlas, "AB\nBA", first, seed="same", style="uppercase")
             two = module.render_multiline(atlas, "AB\nBA", second, seed="same", style="uppercase")
             self.assertEqual(one["outputSha256"], two["outputSha256"])
+            self.assertEqual(one["sharedTargetInkHeightPx"], two["sharedTargetInkHeightPx"])
 
     def test_missing_character_still_fails_closed(self) -> None:
         module = _load(MULTILINE_TOOL, "handwriting_multiline_missing")
