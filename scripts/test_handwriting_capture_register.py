@@ -117,6 +117,7 @@ class HandwritingCaptureRegisterTests(unittest.TestCase):
                 },
                 "reviewEvidence": {
                     "proposalSha256": "1" * 64,
+                    "reviewArtifactSha256": "2" * 64,
                     "decision": "accept",
                     "cornersChanged": False,
                     "manualReviewCompleted": True,
@@ -127,6 +128,31 @@ class HandwritingCaptureRegisterTests(unittest.TestCase):
             self.assertTrue(report["manualReviewCompleted"])
             layout = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(layout["registrationEvidence"]["proposalSha256"], "1" * 64)
+            self.assertEqual(layout["registrationEvidence"]["reviewArtifactSha256"], "2" * 64)
+
+    def test_rejects_review_without_review_artifact_digest(self):
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            photo = root / "page.png"
+            Image.new("RGB", (1000, 1400), "white").save(photo)
+            sheet_path = root / "sheet.json"
+            reg_path = root / "reviewed.json"
+            sheet_path.write_text(json.dumps(_sheet(module)), encoding="utf-8")
+            reg_path.write_text(json.dumps({
+                "schema": module.REGISTRATION_SCHEMA,
+                "page": 1,
+                "cornersPx": _corners(),
+                "detectionEvidence": {"manualReviewRequired": True},
+                "reviewEvidence": {
+                    "proposalSha256": "1" * 64,
+                    "decision": "accept",
+                    "cornersChanged": False,
+                    "manualReviewCompleted": True,
+                },
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "reviewArtifactSha256"):
+                module.register(sheet_path, reg_path, photo, root / "layout.json")
 
     def test_rejects_registration_corner_outside_photo(self):
         module = _load_module()
