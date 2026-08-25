@@ -1,0 +1,12 @@
+{
+  "schema": "evavo.darkworld.furnace-art-candidate.v1",
+  "jobId": "env-glow",
+  "consumer": "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer",
+  "output": "assets/environments/furnace_intake/glow.png",
+  "canvas": {"width": 1280, "height": 360, "alpha": true},
+  "objective": "Transparent emissive/glow plate for furnace mouths, hot seams and motivated reflected warmth. Concentrate emission in the Furnace frame and keep the Intake frame comparatively cold and dark.",
+  "visualGrammar": ["restrained orange-red furnace emission", "hot metal seams", "soft reflected warmth", "smoke-muted bloom", "late-90s prerendered lighting plate"],
+  "mustNotContain": ["neon signage", "purple/cyan cyberpunk wash", "global bloom haze", "painted characters", "HUD", "unmotivated light sources"],
+  "protectedFacts": ["two-room temperature contrast", "player silhouette readability", "crusher warning readability", "camera composition"],
+  "returnEvidence": ["source_hash", "candidate_hash", "review_reference", "mastered_output_hash", "delivery_profile"]
+}
