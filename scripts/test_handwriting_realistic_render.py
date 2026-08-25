@@ -101,6 +101,23 @@ class HandwritingRealisticRenderTests(unittest.TestCase):
             self.assertTrue(all(abs(right - left) <= max_step + 0.001 for left, right in zip(drifts, drifts[1:])))
             self.assertTrue(all(abs(float(item["localBaselineJitterPx"])) <= max_drift * 0.28 + 0.001 for item in result["tokens"]))
 
+    def test_word_spaces_keep_measured_base_with_small_variation(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            atlas = _atlas(module, root)
+            result = module.render_text(atlas, "AA AA AA", root / "spaces.png", seed="spaces", style="natural-uppercase")
+            spacing = result["wordSpacing"]
+            self.assertEqual(spacing["mode"], "measured-space-with-bounded-variation-v1")
+            self.assertEqual(spacing["maximumVariationFraction"], 0.06)
+            self.assertEqual(len(spacing["spaces"]), 2)
+            for item in spacing["spaces"]:
+                factor = float(item["variationFactor"])
+                self.assertGreaterEqual(factor, 0.94)
+                self.assertLessEqual(factor, 1.06)
+                expected = float(item["baseAdvancePx"]) * factor
+                self.assertAlmostEqual(float(item["renderedAdvancePx"]), expected, delta=0.02)
+
     def test_same_seed_is_pixel_deterministic(self) -> None:
         module = _load_module()
         with tempfile.TemporaryDirectory() as directory:
