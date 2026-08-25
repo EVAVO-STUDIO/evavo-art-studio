@@ -11,6 +11,7 @@ const fragmentPaths = [
   path.join(root, 'evavo.tasks.d', 'handwriting-capture-sheet.json'),
   path.join(root, 'evavo.tasks.d', 'handwriting-capture-register.json'),
   path.join(root, 'evavo.tasks.d', 'handwriting-fiducial-detect.json'),
+  path.join(root, 'evavo.tasks.d', 'handwriting-registration-review.json'),
 ];
 const requiredFiles = [
   'tools/document_ink_finisher.py',
@@ -23,8 +24,10 @@ const requiredFiles = [
   'tools/handwriting_capture_sheet.py',
   'tools/handwriting_capture_register.py',
   'tools/handwriting_fiducial_detect.py',
+  'tools/handwriting_registration_review.py',
   'contracts/handwriting-document-export.v1.schema.json',
   'contracts/handwriting-photo-registration.v1.schema.json',
+  'contracts/handwriting-registration-review.v1.schema.json',
   'scripts/check-handwriting-all.mjs',
   'scripts/test_document_ink_finisher.py',
   'scripts/test_handwriting_atlas.py',
@@ -36,6 +39,7 @@ const requiredFiles = [
   'scripts/test_handwriting_capture_sheet.py',
   'scripts/test_handwriting_capture_register.py',
   'scripts/test_handwriting_fiducial_detect.py',
+  'scripts/test_handwriting_registration_review.py',
   'scripts/test_handwriting_export_contract.py',
   'docs/DOCUMENT_INK_FINISHING.md',
 ];
@@ -52,9 +56,11 @@ for (const corner of ['topLeft', 'topRight', 'bottomRight', 'bottomLeft']) {
   if (!registrationContract?.properties?.cornersPx?.properties?.[corner]) throw new Error(`handwriting registration contract is missing ${corner}`);
 }
 const detectionEvidence = registrationContract?.properties?.detectionEvidence?.properties;
-if (!detectionEvidence || detectionEvidence.method?.const !== 'solid-square-fiducials-v1' || detectionEvidence.manualReviewRequired?.const !== true) {
-  throw new Error('handwriting registration contract weakened fiducial review evidence');
-}
+if (!detectionEvidence || detectionEvidence.method?.const !== 'solid-square-fiducials-v1' || detectionEvidence.manualReviewRequired?.const !== true) throw new Error('handwriting registration contract weakened fiducial review evidence');
+const reviewEvidence = registrationContract?.properties?.reviewEvidence?.properties;
+if (!reviewEvidence || reviewEvidence.decision?.const !== 'accept' || reviewEvidence.manualReviewCompleted?.const !== true) throw new Error('handwriting registration contract weakened completed-review evidence');
+const reviewContract = JSON.parse(fs.readFileSync(path.join(root, 'contracts', 'handwriting-registration-review.v1.schema.json'), 'utf8'));
+if (reviewContract?.properties?.schema?.const !== 'evavo.art-studio.handwriting-registration-review.v1' || reviewContract?.properties?.decision?.const !== 'accept') throw new Error('handwriting registration review contract identity/decision is invalid');
 const allTasks = {};
 for (const fragmentPath of fragmentPaths) {
   if (!fs.existsSync(fragmentPath)) throw new Error(`missing handwriting task fragment: ${path.relative(root, fragmentPath)}`);
@@ -78,6 +84,7 @@ const requiredTasks = new Map([
   ['handwriting-capture-sheet', ['tools/handwriting_capture_sheet.py', true]],
   ['handwriting-capture-register', ['tools/handwriting_capture_register.py', true]],
   ['handwriting-fiducial-detect', ['tools/handwriting_fiducial_detect.py', true]],
+  ['handwriting-registration-review', ['tools/handwriting_registration_review.py', true]],
   ['handwriting-whole-mark-select', ['tools/handwriting_atlas.py', false]],
   ['handwriting-whole-mark-render', ['tools/handwriting_whole_mark.py', true]],
   ['handwriting-document-export', ['tools/handwriting_document_bridge.py', true]],
@@ -100,11 +107,14 @@ const descriptions = Object.values(allTasks).map((task) => String(task.descripti
 if (!descriptions.includes('never synthesizes signatures') && !descriptions.includes('never synthesizes signatures from glyphs')) throw new Error('handwriting task descriptions must preserve the whole-signature boundary');
 const fiducialDescription = String(allTasks['handwriting-fiducial-detect']?.description ?? '').toLowerCase();
 if (!fiducialDescription.includes('review-required') || !fiducialDescription.includes('fails closed')) throw new Error('fiducial detector must preserve review/fail-closed boundary');
+const registrationReviewDescription = String(allTasks['handwriting-registration-review']?.description ?? '').toLowerCase();
+if (!registrationReviewDescription.includes('proposal sha-256') || !registrationReviewDescription.includes('review')) throw new Error('registration review task must remain proposal-digest bound');
 console.log(JSON.stringify({
   ok: true,
   fragments: fragmentPaths.map((item) => path.relative(root, item).replaceAll('\\', '/')),
   exportContract: 'contracts/handwriting-document-export.v1.schema.json',
   registrationContract: 'contracts/handwriting-photo-registration.v1.schema.json',
+  registrationReviewContract: 'contracts/handwriting-registration-review.v1.schema.json',
   requiredTasks: [...requiredTasks.keys()],
   requiredFiles,
   networkUsed: false,
