@@ -129,6 +129,21 @@ test("fails closed on malformed, unsupported or non-canonical runtime input", ()
   assert.throws(
     () =>
       compileAnimationDirectorPlan(
+        request({ canvas: { width: 8193, height: 128 } }),
+      ),
+    /canvas.width cannot exceed 8192/,
+  );
+  assert.throws(
+    () => compileAnimationDirectorPlan(request({ clipId: "hero walk right" })),
+    /clipId must use 1 to 128 letters/,
+  );
+  assert.throws(
+    () => compileAnimationDirectorPlan(request({ subjectId: "hero/right" })),
+    /subjectId must use 1 to 128 letters/,
+  );
+  assert.throws(
+    () =>
+      compileAnimationDirectorPlan(
         request({ canonicalIdentityArtifactId: "artifact_identity_hero" }),
       ),
     /canonicalIdentityArtifactId must be a canonical artifact/,
