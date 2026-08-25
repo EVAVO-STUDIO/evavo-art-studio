@@ -22,6 +22,7 @@ const requiredFiles = [
   'tools/handwriting_capture_sheet.py',
   'tools/handwriting_capture_register.py',
   'contracts/handwriting-document-export.v1.schema.json',
+  'contracts/handwriting-photo-registration.v1.schema.json',
   'scripts/check-handwriting-all.mjs',
   'scripts/test_document_ink_finisher.py',
   'scripts/test_handwriting_atlas.py',
@@ -39,23 +40,20 @@ for (const relative of requiredFiles) {
   if (!fs.existsSync(path.join(root, relative))) throw new Error(`missing handwriting toolchain file: ${relative}`);
 }
 const exportContract = JSON.parse(fs.readFileSync(path.join(root, 'contracts', 'handwriting-document-export.v1.schema.json'), 'utf8'));
-if (exportContract?.properties?.schema?.const !== 'evavo.art-studio.document-personal-marks-export.v1') {
-  throw new Error('handwriting export contract schema identity is invalid');
-}
+if (exportContract?.properties?.schema?.const !== 'evavo.art-studio.document-personal-marks-export.v1') throw new Error('handwriting export contract schema identity is invalid');
 const truth = exportContract?.properties?.truthBoundary?.properties;
-if (!truth || truth.signatureSynthesizedFromGlyphs?.const !== false || truth.requiresDocumentStudioApprovalForPdfExecution?.const !== true) {
-  throw new Error('handwriting export contract weakened signature/document approval boundary');
+if (!truth || truth.signatureSynthesizedFromGlyphs?.const !== false || truth.requiresDocumentStudioApprovalForPdfExecution?.const !== true) throw new Error('handwriting export contract weakened signature/document approval boundary');
+const registrationContract = JSON.parse(fs.readFileSync(path.join(root, 'contracts', 'handwriting-photo-registration.v1.schema.json'), 'utf8'));
+if (registrationContract?.properties?.schema?.const !== 'evavo.art-studio.handwriting-photo-registration.v1') throw new Error('handwriting registration contract schema identity is invalid');
+for (const corner of ['topLeft', 'topRight', 'bottomRight', 'bottomLeft']) {
+  if (!registrationContract?.properties?.cornersPx?.properties?.[corner]) throw new Error(`handwriting registration contract is missing ${corner}`);
 }
 const allTasks = {};
 for (const fragmentPath of fragmentPaths) {
   if (!fs.existsSync(fragmentPath)) throw new Error(`missing handwriting task fragment: ${path.relative(root, fragmentPath)}`);
   const fragment = JSON.parse(fs.readFileSync(fragmentPath, 'utf8'));
-  if (fragment.kind !== 'evavo-repository-task-manifest-fragment' || fragment.repository !== 'evavo-art-studio') {
-    throw new Error(`handwriting task fragment identity is invalid: ${path.relative(root, fragmentPath)}`);
-  }
-  if (!fragment.tasks || typeof fragment.tasks !== 'object' || Array.isArray(fragment.tasks)) {
-    throw new Error(`handwriting task fragment tasks must be an object: ${path.relative(root, fragmentPath)}`);
-  }
+  if (fragment.kind !== 'evavo-repository-task-manifest-fragment' || fragment.repository !== 'evavo-art-studio') throw new Error(`handwriting task fragment identity is invalid: ${path.relative(root, fragmentPath)}`);
+  if (!fragment.tasks || typeof fragment.tasks !== 'object' || Array.isArray(fragment.tasks)) throw new Error(`handwriting task fragment tasks must be an object: ${path.relative(root, fragmentPath)}`);
   for (const [name, task] of Object.entries(fragment.tasks)) {
     if (allTasks[name]) throw new Error(`duplicate handwriting task across fragments: ${name}`);
     allTasks[name] = task;
@@ -79,31 +77,24 @@ const requiredTasks = new Map([
 for (const [name, [entry, mustCreateOutput]] of requiredTasks) {
   const task = allTasks[name];
   if (!task) throw new Error(`missing handwriting task: ${name}`);
-  if (task.runtime !== 'python-script' || task.pythonEnvironment !== 'image-finishing' || task.entry !== entry) {
-    throw new Error(`unsafe handwriting task binding: ${name}`);
-  }
+  if (task.runtime !== 'python-script' || task.pythonEnvironment !== 'image-finishing' || task.entry !== entry) throw new Error(`unsafe handwriting task binding: ${name}`);
   if (task.network !== 'disabled') throw new Error(`network must be disabled for ${name}`);
   const schema = task.parameterSchema;
-  if (!schema || schema.schemaVersion !== 1 || schema.additionalProperties !== false) {
-    throw new Error(`strict parameter schema required for ${name}`);
-  }
+  if (!schema || schema.schemaVersion !== 1 || schema.additionalProperties !== false) throw new Error(`strict parameter schema required for ${name}`);
   const args = Array.isArray(task.arguments) ? task.arguments.map((value) => String(value).toLowerCase()) : [];
-  if (args.some((value) => ['--approve', '--approved', 'approved=true'].includes(value))) {
-    throw new Error(`task ${name} must not grant approval authority`);
-  }
+  if (args.some((value) => ['--approve', '--approved', 'approved=true'].includes(value))) throw new Error(`task ${name} must not grant approval authority`);
   const outputs = task.parameterOutputs;
   if (!Array.isArray(outputs)) throw new Error(`parameterOutputs must be an array for ${name}`);
   if (mustCreateOutput && outputs.length < 1) throw new Error(`create-only task ${name} requires explicit outputs`);
   if (!mustCreateOutput && outputs.length !== 0) throw new Error(`read-only task ${name} must not claim file outputs`);
 }
 const descriptions = Object.values(allTasks).map((task) => String(task.description ?? '').toLowerCase()).join('\n');
-if (!descriptions.includes('never synthesizes signatures') && !descriptions.includes('never synthesizes signatures from glyphs')) {
-  throw new Error('handwriting task descriptions must preserve the whole-signature boundary');
-}
+if (!descriptions.includes('never synthesizes signatures') && !descriptions.includes('never synthesizes signatures from glyphs')) throw new Error('handwriting task descriptions must preserve the whole-signature boundary');
 console.log(JSON.stringify({
   ok: true,
   fragments: fragmentPaths.map((item) => path.relative(root, item).replaceAll('\\', '/')),
   exportContract: 'contracts/handwriting-document-export.v1.schema.json',
+  registrationContract: 'contracts/handwriting-photo-registration.v1.schema.json',
   requiredTasks: [...requiredTasks.keys()],
   requiredFiles,
   networkUsed: false,
