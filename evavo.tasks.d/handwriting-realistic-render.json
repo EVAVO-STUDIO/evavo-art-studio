@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "handwriting-realistic-render": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_realistic_render.py",
+      "arguments": ["{{atlas}}", "{{text}}", "{{output}}", "--seed", "{{seed}}", "--style", "{{style}}", "--proof", "{{proof}}", "--receipt", "{{receipt}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["atlas", "text", "output", "seed", "proof", "receipt"],
+        "properties": {
+          "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "text": {"type": "string", "minimumLength": 1, "maximumLength": 1024},
+          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"},
+          "style": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]*$", "default": ""},
+          "proof": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "receipt": {"type": "compute-path", "pathKind": "file", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["output", "proof", "receipt"],
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Preferred production single-line handwriting renderer. Uses deterministic shuffled bags of genuine captured variants so every available variant is used before refill, avoids same-variant bag boundaries, preserves measured advance and only applies bounded rigid whole-glyph transforms. Missing characters fail closed; no computer-font fallback or synthetic handwriting."
+    },
+    "handwriting-realistic-multiline-render": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_balanced_multiline.py",
+      "arguments": ["{{atlas}}", "{{text}}", "{{output}}", "--seed", "{{seed}}", "--style", "{{style}}", "--line-spacing-factor", "{{lineSpacingFactor}}", "--proof", "{{proof}}", "--receipt", "{{receipt}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["atlas", "text", "output", "seed", "proof", "receipt"],
+        "properties": {
+          "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "text": {"type": "string", "minimumLength": 1, "maximumLength": 8192},
+          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"},
+          "style": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]*$", "default": ""},
+          "lineSpacingFactor": {"type": "number", "minimum": 0.2, "maximum": 2.0, "default": 0.55},
+          "proof": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "receipt": {"type": "compute-path", "pathKind": "file", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["output", "proof", "receipt"],
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Preferred production multiline handwriting renderer. Each line uses balanced genuine variant bags, then only bounded whole-line rigid scale and translation are used for coherent session size and natural line starts. Blank lines are preserved. Missing characters fail closed; no font fallback or synthetic handwriting."
+    },
+    "handwriting-realistic-paragraph-render": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_balanced_paragraph.py",
+      "arguments": ["{{atlas}}", "{{text}}", "{{output}}", "--seed", "{{seed}}", "--max-width-px", "{{maxWidthPx}}", "--style", "{{style}}", "--line-spacing-factor", "{{lineSpacingFactor}}", "--proof", "{{proof}}", "--receipt", "{{receipt}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["atlas", "text", "output", "seed", "maxWidthPx", "proof", "receipt"],
+        "properties": {
+          "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "text": {"type": "string", "minimumLength": 1, "maximumLength": 8192},
+          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"},
+          "maxWidthPx": {"type": "integer", "minimum": 120, "maximum": 8192},
+          "style": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]*$", "default": ""},
+          "lineSpacingFactor": {"type": "number", "minimum": 0.2, "maximum": 2.0, "default": 0.55},
+          "proof": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "receipt": {"type": "compute-path", "pathKind": "file", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["output", "proof", "receipt"],
+      "network": "disabled",
+      "timeoutSeconds": 360,
+      "description": "Preferred production paragraph handwriting renderer. Wraps only at safe whitespace boundaries using normalized measured genuine advances, renders each line with balanced genuine variant bags, preserves explicit paragraph breaks and refuses arbitrary word splitting. No computer-font fallback or synthetic handwriting."
+    }
+  }
+}
