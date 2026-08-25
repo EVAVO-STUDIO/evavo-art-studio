@@ -7,20 +7,44 @@
       "runtime": "python-script",
       "pythonEnvironment": "image-finishing",
       "entry": "tools/handwriting_capture_spec.py",
-      "arguments": ["{{output}}", "--profile-id", "{{profileId}}"],
+      "arguments": ["{{output}}", "--profile-id", "{{profileId}}", "--lowercase-variants", "{{lowercaseVariants}}", "--punctuation-variants", "{{punctuationVariants}}"],
       "parameterSchema": {
         "schemaVersion": 1,
         "additionalProperties": false,
         "required": ["output", "profileId"],
         "properties": {
           "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "profileId": {"type": "string", "minimumLength": 1, "maximumLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"}
+          "profileId": {"type": "string", "minimumLength": 1, "maximumLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+          "lowercaseVariants": {"type": "integer", "minimum": 1, "maximum": 6, "default": 3},
+          "punctuationVariants": {"type": "integer", "minimum": 1, "maximum": 6, "default": 3}
         }
       },
       "parameterOutputs": ["output"],
       "network": "disabled",
       "timeoutSeconds": 120,
-      "description": "Create a deterministic worksheet specification for collecting genuine missing handwriting variants such as lowercase letters, digits, punctuation, common fragments, names and signatures. Creates no handwriting itself and grants no document approval authority."
+      "description": "Create a deterministic worksheet specification for a variation-rich genuine handwriting bank: lowercase letters and punctuation default to three genuine variants, digits to three, fragments to two and whole names/signatures to four. Creates no handwriting itself and grants no document approval authority."
+    },
+    "handwriting-capture-spec-full": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_capture_spec.py",
+      "arguments": ["{{output}}", "--profile-id", "{{profileId}}", "--include-uppercase", "--lowercase-variants", "{{lowercaseVariants}}", "--uppercase-variants", "{{uppercaseVariants}}", "--punctuation-variants", "{{punctuationVariants}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["output", "profileId"],
+        "properties": {
+          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "profileId": {"type": "string", "minimumLength": 1, "maximumLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+          "lowercaseVariants": {"type": "integer", "minimum": 1, "maximum": 6, "default": 3},
+          "uppercaseVariants": {"type": "integer", "minimum": 1, "maximum": 6, "default": 3},
+          "punctuationVariants": {"type": "integer", "minimum": 1, "maximum": 6, "default": 3}
+        }
+      },
+      "parameterOutputs": ["output"],
+      "network": "disabled",
+      "timeoutSeconds": 120,
+      "description": "Create a deterministic full alphabet worksheet specification for a variation-rich genuine handwriting bank, including independently configurable 1-6 genuine lowercase, uppercase and punctuation variants. Creates no handwriting itself and grants no document approval authority."
     }
   }
 }
