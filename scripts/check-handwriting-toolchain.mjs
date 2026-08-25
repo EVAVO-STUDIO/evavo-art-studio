@@ -57,8 +57,10 @@ for (const corner of ['topLeft', 'topRight', 'bottomRight', 'bottomLeft']) {
 }
 const detectionEvidence = registrationContract?.properties?.detectionEvidence?.properties;
 if (!detectionEvidence || detectionEvidence.method?.const !== 'solid-square-fiducials-v1' || detectionEvidence.manualReviewRequired?.const !== true) throw new Error('handwriting registration contract weakened fiducial review evidence');
-const reviewEvidence = registrationContract?.properties?.reviewEvidence?.properties;
+const reviewEvidenceSchema = registrationContract?.properties?.reviewEvidence;
+const reviewEvidence = reviewEvidenceSchema?.properties;
 if (!reviewEvidence || reviewEvidence.decision?.const !== 'accept' || reviewEvidence.manualReviewCompleted?.const !== true) throw new Error('handwriting registration contract weakened completed-review evidence');
+if (!Array.isArray(reviewEvidenceSchema?.required) || !reviewEvidenceSchema.required.includes('proposalSha256') || !reviewEvidenceSchema.required.includes('reviewArtifactSha256')) throw new Error('handwriting registration contract must bind proposal and review artifact digests');
 const reviewContract = JSON.parse(fs.readFileSync(path.join(root, 'contracts', 'handwriting-registration-review.v1.schema.json'), 'utf8'));
 if (reviewContract?.properties?.schema?.const !== 'evavo.art-studio.handwriting-registration-review.v1' || reviewContract?.properties?.decision?.const !== 'accept') throw new Error('handwriting registration review contract identity/decision is invalid');
 const allTasks = {};
