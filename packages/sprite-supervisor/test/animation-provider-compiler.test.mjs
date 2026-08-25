@@ -68,19 +68,29 @@ function baseRequest(batchId, overrides = {}) {
   };
 }
 
-test("compiles key-pose work into provider-valid sprite-frame requests", () => {
+test("compiles key-pose work into plan-bound provider-valid sprite-frame requests", () => {
   const result = compileAnimationProviderBatch(
     baseRequest("hero-walk-right:keys"),
   );
 
   assert.equal(result.phase, "key-pose");
   assert.equal(result.requests.length, 2);
-  assert.equal(result.authority.providerExecution, false);
+  assert.match(result.planSha256, /^[a-f0-9]{64}$/);
+  assert.deepEqual(result.authority, {
+    providerExecution: false,
+    runtimeSubmission: false,
+    creativeApproval: false,
+    artifactPromotion: false,
+    repositoryMutation: false,
+    publication: false,
+  });
   for (const request of result.requests) {
     assert.equal(request.assetKind, "sprite-frame");
     assert.equal(request.continuityPhase, "key-pose");
     assert.equal(request.candidateCount, 2);
     assert.equal(request.target.transparency, "required");
+    assert.equal(request.metadata.animationDirectorPlanSha256, result.planSha256);
+    assert.equal(request.metadata.authority.runtimeSubmission, false);
     assert.ok(request.references.some((entry) => entry.role === "canonical-identity" && entry.required));
     assert.ok(request.references.some((entry) => entry.role === "direction-master" && entry.required));
     assert.ok(request.references.some((entry) => entry.role === "pose-control" && entry.required));
@@ -101,6 +111,7 @@ test("binds first in-between group to retained key poses 1 and 5", () => {
   ]);
   for (const request of result.requests) {
     assert.equal(request.continuityPhase, "in-between");
+    assert.equal(request.metadata.animationDirectorPlanSha256, result.planSha256);
     assert.equal(
       request.references.find((entry) => entry.role === "previous-key-pose").artifactId,
       artifact("c"),
@@ -126,6 +137,19 @@ test("binds second in-between group to retained key poses 5 then 1", () => {
       artifact("c"),
     );
   }
+});
+
+test("exact director plan identity is stable and changes with authored plan input", () => {
+  const first = compileAnimationProviderBatch(baseRequest("hero-walk-right:keys"));
+  const second = compileAnimationProviderBatch(baseRequest("hero-walk-right:keys"));
+  assert.equal(first.planSha256, second.planSha256);
+
+  const changed = compileAnimationProviderBatch(
+    baseRequest("hero-walk-right:keys", {
+      plan: plan({ fps: 9 }),
+    }),
+  );
+  assert.notEqual(changed.planSha256, first.planSha256);
 });
 
 test("fails closed when required visual dependencies do not exist", () => {
