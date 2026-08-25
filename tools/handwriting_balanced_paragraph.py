@@ -15,6 +15,7 @@ SCHEMA = paragraph_tool.SCHEMA
 
 
 def render_paragraph(*args, **kwargs):
+    receipt = kwargs.get("receipt")
     original = paragraph_tool.render_multiline
     paragraph_tool.render_multiline = balanced_render_multiline
     try:
@@ -25,6 +26,9 @@ def render_paragraph(*args, **kwargs):
         "mode": "deterministic-shuffled-genuine-variant-bag-v1",
         "balancedAcrossEachWrappedLine": True,
     }
+    if receipt is not None:
+        receipt_path = Path(receipt)
+        receipt_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return result
 
 
@@ -52,8 +56,6 @@ def main(argv: list[str] | None = None) -> int:
             proof=Path(args.proof) if args.proof else None,
             receipt=Path(args.receipt) if args.receipt else None,
         )
-        if args.receipt:
-            Path(args.receipt).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True))
         return 0
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
