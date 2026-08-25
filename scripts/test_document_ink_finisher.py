@@ -51,6 +51,66 @@ class DocumentInkFinisherTests(unittest.TestCase):
                 module.master_transparent_ink(source, output)
             self.assertEqual(output.read_bytes(), b"do-not-overwrite")
 
+    def test_photo_extraction_removes_coloured_uneven_paper(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "photo.png"
+            output = root / "extracted.png"
+            proof = root / "proof.png"
+            image = Image.new("RGB", (220, 120))
+            px = image.load()
+            for y in range(image.height):
+                for x in range(image.width):
+                    # Uneven pink/purple photographed paper with a diagonal shadow.
+                    shade = int((x / image.width) * 18 + (y / image.height) * 14)
+                    px[x, y] = (238 - shade, 217 - shade // 2, 226 - shade // 3)
+            draw = ImageDraw.Draw(image)
+            draw.line((45, 62, 170, 50), fill=(34, 30, 45), width=5)
+            image.save(source)
+            receipt = module.extract_photo_handwriting(source, output, kind="text", proof=proof)
+            self.assertTrue(receipt["paperCastRemoved"])
+            self.assertTrue(receipt["shadowGradientRemoved"])
+            self.assertFalse(receipt["syntheticHandwritingGenerated"])
+            self.assertFalse(receipt["strokeGeometryChanged"])
+            extracted = Image.open(output).convert("RGBA")
+            alpha = extracted.getchannel("A")
+            self.assertEqual(alpha.getextrema()[0], 0)
+            self.assertGreater(alpha.getextrema()[1], 180)
+            self.assertTrue(proof.is_file())
+            self.assertEqual(len(receipt["hostileBackgroundProofSha256"]), 64)
+
+    def test_photo_extraction_keep_rect_excludes_neighbouring_mark(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "photo.png"
+            output = root / "kept.png"
+            image = Image.new("RGB", (180, 90), (235, 224, 226))
+            draw = ImageDraw.Draw(image)
+            draw.line((28, 45, 80, 38), fill=(28, 27, 36), width=5)
+            draw.line((135, 25, 155, 65), fill=(28, 27, 36), width=5)
+            image.save(source)
+            receipt = module.extract_photo_handwriting(
+                source,
+                output,
+                crop_rect=(10, 10, 170, 80),
+                keep_rect=(0, 0, 95, 70),
+                kind="signature",
+            )
+            self.assertEqual(receipt["inkKeepRect"], [0, 0, 95, 70])
+            extracted = Image.open(output).convert("RGBA")
+            self.assertLess(extracted.width, 110)
+
+    def test_photo_extraction_fails_closed_on_clipped_ink(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "photo.png"
+            output = root / "bad.png"
+            image = Image.new("RGB", (100, 60), (236, 225, 225))
+            ImageDraw.Draw(image).line((0, 30, 75, 26), fill=(25, 25, 30), width=5)
+            image.save(source)
+            with self.assertRaisesRegex(ValueError, "touches crop edge"):
+                module.extract_photo_handwriting(source, output, kind="text")
+
     def test_transform_is_deterministic_and_bounded(self) -> None:
         first = module.natural_transform(seed="job-1", kind="signature")
         second = module.natural_transform(seed="job-1", kind="signature")
