@@ -12,4 +12,5 @@ export * from "./alpha-guidance.js";
 export * from "./transparency-proof.js";
 export * from "./chroma-spill.js";
 export * from "./aseprite-interchange.js";
+export * from "./aseprite-interchange-result.js";
 export { atomicWriteFile } from "./files.js";
