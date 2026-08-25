@@ -290,7 +290,7 @@ export function analyseAnimationMotion(
     landmarkId: string;
     startFrameId: string;
     endFrameId: string;
-    maximumDriftPixels: number;
+    maximumDriftPixels: number | null;
   }> = [];
   const plantedFailures: typeof plantedSegments = [];
   let start = 0;
@@ -308,16 +308,15 @@ export function analyseAnimationMotion(
       end += 1;
     }
     const anchor = request.frames[start]!.landmarks[landmarkId];
-    let maximumDriftPixels = Number.POSITIVE_INFINITY;
+    let maximumDriftPixels: number | null = anchor ? 0 : null;
     if (anchor) {
-      maximumDriftPixels = 0;
       for (let index = start; index <= end; index += 1) {
         const point = request.frames[index]!.landmarks[landmarkId];
         if (!point) {
-          maximumDriftPixels = Number.POSITIVE_INFINITY;
+          maximumDriftPixels = null;
           break;
         }
-        maximumDriftPixels = Math.max(maximumDriftPixels, distance(anchor, point));
+        maximumDriftPixels = Math.max(maximumDriftPixels ?? 0, distance(anchor, point));
       }
     }
     const segment = {
@@ -327,7 +326,10 @@ export function analyseAnimationMotion(
       maximumDriftPixels,
     };
     plantedSegments.push(segment);
-    if (maximumDriftPixels > request.plantedLandmarkDriftTolerancePixels) {
+    if (
+      maximumDriftPixels === null ||
+      maximumDriftPixels > request.plantedLandmarkDriftTolerancePixels
+    ) {
       plantedFailures.push(segment);
     }
     start = end + 1;
@@ -345,31 +347,31 @@ export function analyseAnimationMotion(
         ? "No planted-landmark segments were declared."
         : plantedFailures.length === 0
           ? "Every planted landmark remains within its drift tolerance."
-          : "One or more planted landmarks slide beyond the allowed tolerance.",
+          : "One or more planted landmarks are missing or slide beyond the allowed tolerance.",
       { segments: plantedSegments, failures: plantedFailures },
       plantedFailures.length,
       request.plantedLandmarkDriftTolerancePixels,
     ),
   );
 
-  const rootSteps: Array<{ fromFrameId: string; toFrameId: string; distancePixels: number }> = [];
+  const rootSteps: Array<{ fromFrameId: string; toFrameId: string; distancePixels: number | null }> = [];
   if (request.rootLandmarkId && request.maximumRootStepPixels !== undefined) {
     for (let index = 1; index < request.frames.length; index += 1) {
       const previous = request.frames[index - 1]!;
       const current = request.frames[index]!;
       const a = previous.landmarks[request.rootLandmarkId];
       const b = current.landmarks[request.rootLandmarkId];
-      if (a && b) {
-        rootSteps.push({
-          fromFrameId: previous.frameId,
-          toFrameId: current.frameId,
-          distancePixels: distance(a, b),
-        });
-      }
+      rootSteps.push({
+        fromFrameId: previous.frameId,
+        toFrameId: current.frameId,
+        distancePixels: a && b ? distance(a, b) : null,
+      });
     }
   }
   const rootFailures = rootSteps.filter(
-    (step) => step.distancePixels > (request.maximumRootStepPixels ?? Number.POSITIVE_INFINITY),
+    (step) =>
+      step.distancePixels === null ||
+      step.distancePixels > (request.maximumRootStepPixels ?? Number.MAX_SAFE_INTEGER),
   );
   gates.push(
     gate(
@@ -384,7 +386,7 @@ export function analyseAnimationMotion(
         ? "No maximum root step was declared."
         : rootFailures.length === 0
           ? "Root motion remains within the declared per-frame step tolerance."
-          : "Root motion contains one or more discontinuous jumps.",
+          : "Root motion contains missing measurements or one or more discontinuous jumps.",
       { rootLandmarkId: request.rootLandmarkId ?? null, steps: rootSteps, failures: rootFailures },
       rootFailures.length,
       request.maximumRootStepPixels,
@@ -425,14 +427,14 @@ export function analyseAnimationMotion(
         ? "No attachment constraints were declared."
         : attachmentFailures.length === 0
           ? "Every declared attachment remains connected within tolerance."
-          : "One or more declared attachments separate beyond tolerance.",
+          : "One or more declared attachments are missing or separate beyond tolerance.",
       { failures: attachmentFailures },
       attachmentFailures.length,
     ),
   );
 
   const loopClosureTolerance = request.loopClosureTolerancePixels ?? 0;
-  const loopClosure: Array<{ landmarkId: string; distancePixels: number }> = [];
+  const loopClosure: Array<{ landmarkId: string; distancePixels: number | null }> = [];
   if (request.loop) {
     const first = request.frames[0]!;
     const last = request.frames[request.frames.length - 1]!;
@@ -440,15 +442,16 @@ export function analyseAnimationMotion(
     for (const landmarkId of loopIds) {
       const a = first.landmarks[landmarkId];
       const b = last.landmarks[landmarkId];
-      if (a && b) {
-        loopClosure.push({ landmarkId, distancePixels: distance(a, b) });
-      } else {
-        loopClosure.push({ landmarkId, distancePixels: Number.POSITIVE_INFINITY });
-      }
+      loopClosure.push({
+        landmarkId,
+        distancePixels: a && b ? distance(a, b) : null,
+      });
     }
   }
   const loopFailures = loopClosure.filter(
-    (entry) => entry.distancePixels > loopClosureTolerance,
+    (entry) =>
+      entry.distancePixels === null ||
+      entry.distancePixels > loopClosureTolerance,
   );
   gates.push(
     gate(
@@ -467,7 +470,7 @@ export function analyseAnimationMotion(
           ? "No loop-closure landmarks were declared."
           : loopFailures.length === 0
             ? "Declared seam anchors close within tolerance."
-            : "Loop seam anchors do not close within the declared tolerance.",
+            : "Loop seam anchors are missing or do not close within the declared tolerance.",
       { tolerancePixels: loopClosureTolerance, landmarks: loopClosure, failures: loopFailures },
       loopFailures.length,
       loopClosureTolerance,
