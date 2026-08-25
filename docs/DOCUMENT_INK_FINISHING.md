@@ -187,31 +187,42 @@ Reject a finished personal mark or handwriting render when any paper halo/cast, 
 
 ## Tests and focused acceptance
 
+The preferred handwriting-only acceptance command is:
+
 ```powershell
+node scripts/check-handwriting-all.mjs
+```
+
+It first validates the governed task fragments, required source/test/doc files, managed Python environment, network-disabled bindings, strict parameter schemas, create-only versus read-only output policy and absence of approval authority. It then runs all five focused Python handwriting suites.
+
+Individual commands remain useful while diagnosing a failure:
+
+```powershell
+node scripts/check-handwriting-toolchain.mjs
 python -m unittest scripts/test_document_ink_finisher.py
 python -m unittest scripts/test_handwriting_atlas.py
 python -m unittest scripts/test_handwriting_document_bridge.py
 python -m unittest scripts/test_handwriting_whole_mark.py
 python -m unittest scripts/test_handwriting_coverage.py
-node scripts/check-handwriting-toolchain.mjs
 ```
 
-The Python suites cover photographed-paper cleanup, transparency/edge preservation, create-only policy, deterministic bounded transforms, genuine-variant selection, natural advance measurement, longest-fragment matching, repeat avoidance, missing-character fail-closed behaviour, whole-signature-only selection/rendering, coverage/integrity reporting and Document Studio export. `check-handwriting-toolchain.mjs` validates the governed task fragment, required source/test/doc files, managed Python environment, network-disabled execution, strict parameter schemas, create-only versus read-only output policy and the absence of approval authority.
+The Python suites cover photographed-paper cleanup, transparency/edge preservation, create-only policy, deterministic bounded transforms, genuine-variant selection, natural advance measurement, longest-fragment matching, repeat avoidance, missing-character fail-closed behaviour, whole-signature-only selection/rendering, coverage/integrity reporting and Document Studio export.
 
 ## Governed private-node tasks
 
-Art Studio exposes these operations through `evavo.tasks.d/document-ink-finishing.json` using the managed `image-finishing` Python environment, logical compute paths and network disabled:
+Art Studio exposes these operations through `evavo.tasks.d/document-ink-finishing.json` and `evavo.tasks.d/handwriting-coverage.json` using the managed `image-finishing` Python environment, logical compute paths and network disabled:
 
 - `document-ink-extract-photo`;
 - `document-ink-master`;
 - `document-ink-integrate`;
 - `handwriting-atlas-build`;
 - `handwriting-atlas-render`;
+- `handwriting-atlas-coverage`;
 - `handwriting-whole-mark-select`;
 - `handwriting-whole-mark-render`;
 - `handwriting-document-export`.
 
-The tasks create only private derivatives/atlases/proofs/evidence or return sanitized selection hashes. They grant no form-field selection, signing approval, publication or repository authority.
+The tasks create only private derivatives/atlases/proofs/evidence or return sanitized selection/coverage data. They grant no form-field selection, signing approval, publication or repository authority.
 
 ## Document Studio handoff
 
