@@ -6,6 +6,8 @@ import {
   compileAnimationDirectorPlan,
 } from "../dist/index.js";
 
+const artifact = (hex) => `artifact_${hex.repeat(64)}`;
+
 function request(overrides = {}) {
   return {
     clipId: "hero-walk-right",
@@ -14,8 +16,8 @@ function request(overrides = {}) {
     direction: "right",
     motionStyle: "vga-adventure",
     canvas: { width: 96, height: 128 },
-    canonicalIdentityArtifactId: "artifact_identity_hero",
-    directionMasterArtifactId: "artifact_direction_right",
+    canonicalIdentityArtifactId: artifact("a"),
+    directionMasterArtifactId: artifact("b"),
     ...overrides,
   };
 }
@@ -112,7 +114,7 @@ test("uses rational per-frame timing instead of rounding milliseconds", () => {
   );
 });
 
-test("fails closed on malformed or unsupported runtime input", () => {
+test("fails closed on malformed, unsupported or non-canonical runtime input", () => {
   assert.throws(
     () => compileAnimationDirectorPlan(request({ fps: 31 })),
     /fps must be between 4 and 30/,
@@ -127,9 +129,16 @@ test("fails closed on malformed or unsupported runtime input", () => {
   assert.throws(
     () =>
       compileAnimationDirectorPlan(
-        request({ canonicalIdentityArtifactId: "   " }),
+        request({ canonicalIdentityArtifactId: "artifact_identity_hero" }),
       ),
-    /canonicalIdentityArtifactId must be non-empty/,
+    /canonicalIdentityArtifactId must be a canonical artifact/,
+  );
+  assert.throws(
+    () =>
+      compileAnimationDirectorPlan(
+        request({ directionMasterArtifactId: "artifact_direction_right" }),
+      ),
+    /directionMasterArtifactId must be a canonical artifact/,
   );
   assert.throws(
     () => compileAnimationDirectorPlan(request({ action: "run" })),
