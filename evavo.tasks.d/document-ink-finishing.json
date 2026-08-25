@@ -65,6 +65,15 @@
       "parameterOutputs": [], "network": "disabled", "timeoutSeconds": 120,
       "description": "Select a whole genuine signature or handwritten-name variant by hash/style. Returns no private path and never synthesizes signatures from letter glyphs."
     },
+    "handwriting-whole-mark-render": {
+      "runtime": "python-script", "pythonEnvironment": "image-finishing", "entry": "tools/handwriting_whole_mark.py",
+      "arguments": ["{{atlas}}", "{{output}}", "--kind", "{{kind}}", "--seed", "{{seed}}", "--style", "{{style}}", "--previous-sha256", "{{previousSha256}}", "--proof", "{{proof}}", "--receipt", "{{receipt}}"],
+      "parameterSchema": {"schemaVersion": 1, "additionalProperties": false, "required": ["atlas", "output", "kind", "seed", "proof", "receipt"], "properties": {
+        "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"}, "output": {"type": "compute-path", "pathKind": "file", "access": "output"}, "kind": {"type": "string", "pattern": "^(signature|name)$"}, "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"}, "style": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]*$", "default": ""}, "previousSha256": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^(?:|[a-f0-9]{64})$", "default": ""}, "proof": {"type": "compute-path", "pathKind": "file", "access": "output"}, "receipt": {"type": "compute-path", "pathKind": "file", "access": "output"}
+      }},
+      "parameterOutputs": ["output", "proof", "receipt"], "network": "disabled", "timeoutSeconds": 180,
+      "description": "Render a create-only whole genuine handwritten name or signature variant with bounded whole-raster scale/rotation and hostile-background proof. Never synthesizes signatures from glyphs or changes stroke geometry."
+    },
     "handwriting-document-export": {
       "runtime": "python-script", "pythonEnvironment": "image-finishing", "entry": "tools/handwriting_document_bridge.py",
       "arguments": ["{{atlas}}", "{{output}}"],
