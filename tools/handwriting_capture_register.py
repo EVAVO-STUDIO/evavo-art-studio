@@ -103,6 +103,23 @@ def _kind(slot: dict) -> str:
     return "mark"
 
 
+def _require_review_if_detected(registration: dict) -> dict | None:
+    detection = registration.get("detectionEvidence")
+    if detection is None:
+        return None
+    if not isinstance(detection, dict) or detection.get("manualReviewRequired") is not True:
+        raise ValueError("auto-detected registration has invalid detection evidence")
+    review = registration.get("reviewEvidence")
+    if not isinstance(review, dict):
+        raise ValueError("auto-detected registration requires explicit review evidence before slot projection")
+    if review.get("decision") != "accept" or review.get("manualReviewCompleted") is not True:
+        raise ValueError("auto-detected registration review is not accepted/completed")
+    proposal_sha = str(review.get("proposalSha256") or "")
+    if not re.fullmatch(r"[a-f0-9]{64}", proposal_sha):
+        raise ValueError("auto-detected registration review lacks valid proposalSha256")
+    return review
+
+
 def register(sheet_manifest_path: Path, registration_path: Path, source_image: Path, output: Path, *, page: int | None = None) -> dict:
     if output.exists():
         raise ValueError(f"create-only layout output already exists: {output}")
@@ -112,6 +129,7 @@ def register(sheet_manifest_path: Path, registration_path: Path, source_image: P
         raise ValueError("invalid handwriting capture sheet manifest")
     if registration.get("schema") != REGISTRATION_SCHEMA:
         raise ValueError("invalid handwriting photo registration schema")
+    review_evidence = _require_review_if_detected(registration)
     selected_page = int(page or registration.get("page") or 1)
     if selected_page < 1 or selected_page > int(sheet.get("pageCount") or 0):
         raise ValueError("registration page is outside capture sheet page count")
@@ -177,20 +195,27 @@ def register(sheet_manifest_path: Path, registration_path: Path, source_image: P
             "items": [item],
         })
 
+    registration_evidence = {
+        "source": "generated-capture-sheet-four-corner-registration",
+        "page": selected_page,
+        "pageSizeMm": [page_w, page_h],
+        "cornersPx": corners,
+        "cropMarginPx": crop_margin,
+        "keepMarginPx": keep_margin,
+        "autoDetected": isinstance(registration.get("detectionEvidence"), dict),
+        "manualReviewCompleted": review_evidence is not None if isinstance(registration.get("detectionEvidence"), dict) else True,
+    }
+    if review_evidence is not None:
+        registration_evidence["proposalSha256"] = review_evidence["proposalSha256"]
+        registration_evidence["cornersChangedDuringReview"] = bool(review_evidence.get("cornersChanged"))
+
     layout = {
         "schema": DOCUMENT_LAYOUT_SCHEMA,
         "sourceSha256": _sha_file(source_image),
         "sourcePixelSize": [width, height],
         "allowKeepRegionOverlap": False,
         "rows": rows,
-        "registrationEvidence": {
-            "source": "generated-capture-sheet-four-corner-registration",
-            "page": selected_page,
-            "pageSizeMm": [page_w, page_h],
-            "cornersPx": corners,
-            "cropMarginPx": crop_margin,
-            "keepMarginPx": keep_margin,
-        },
+        "registrationEvidence": registration_evidence,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(layout, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -201,6 +226,8 @@ def register(sheet_manifest_path: Path, registration_path: Path, source_image: P
         "entryCount": len(rows),
         "sourceSha256": layout["sourceSha256"],
         "sourcePixelSize": layout["sourcePixelSize"],
+        "autoDetected": registration_evidence["autoDetected"],
+        "manualReviewCompleted": registration_evidence["manualReviewCompleted"],
         "privatePathsReturned": False,
         "handwritingBytesReturned": False,
     }
