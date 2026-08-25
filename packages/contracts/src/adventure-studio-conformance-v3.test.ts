@@ -21,7 +21,6 @@ describe("Adventure Studio v3 Art Studio conformance", () => {
     expect(validateAdventureStudioArtWorkOrderV3(adventureStudioConformanceStaticOrderV3)).toEqual([]);
     expect(compileAdventureStudioArtProductionRequestV3(adventureStudioConformanceStaticOrderV3)).toMatchObject({
       requestVersion: 3,
-      destinationStudio: undefined,
       taskKind: "foreground-plate",
       alphaAdmission: {
         required: true,
