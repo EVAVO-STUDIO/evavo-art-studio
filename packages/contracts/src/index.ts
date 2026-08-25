@@ -1,6 +1,7 @@
 export * from "./adventure-studio-handoff.js";
 export * from "./adventure-studio-handoff-v2.js";
 export * from "./adventure-studio-handoff-v3.js";
+export * from "./adventure-studio-protocol-v3.js";
 export * from "./adventure-studio-review-v3.js";
 export * from "./book-art-candidate-set.js";
 export {
