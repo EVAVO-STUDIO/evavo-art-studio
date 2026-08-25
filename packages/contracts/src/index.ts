@@ -1,5 +1,6 @@
 export * from "./adventure-studio-handoff.js";
 export * from "./adventure-studio-handoff-v2.js";
+export * from "./adventure-studio-handoff-v3.js";
 export * from "./book-art-candidate-set.js";
 export {
   compileBookArtCandidateSetWorkOrder,
