@@ -39,7 +39,7 @@ python tools/handwriting_capture_spec.py <capture-spec.json> --profile-id <priva
 
 ## Printable capture sheets
 
-`tools/handwriting_capture_sheet.py` turns the blank specification into printable A4 SVG worksheets. Each page contains large writing boxes, stable slot IDs, known millimetre geometry and four black corner fiducials. It also writes `capture-sheet-manifest.json` containing every slot's box and recommended ink-keep geometry.
+`tools/handwriting_capture_sheet.py` turns the blank specification into printable A4 SVG worksheets. Each page contains large writing boxes, stable slot IDs, known millimetre geometry and four black 7 mm fiducials whose centres are fixed at `(14,14)`, `(196,14)`, `(196,283)` and `(14,283)` millimetres. It also writes `capture-sheet-manifest.json` containing every slot's box and recommended ink-keep geometry.
 
 ```powershell
 python tools/handwriting_capture_sheet.py <capture-spec.json> <create-only-sheet-directory>
@@ -47,9 +47,24 @@ python tools/handwriting_capture_sheet.py <capture-spec.json> <create-only-sheet
 
 The SVG sheets contain prompts only. They contain no generated handwriting, signature images or private personal-mark bytes. Print or view the page, write each requested sample naturally inside its box, then photograph the completed page.
 
+## Fail-closed fiducial detection
+
+`tools/handwriting_fiducial_detect.py` can propose the four physical page corners from a photographed generated worksheet by detecting the four printed solid-square fiducials.
+
+```powershell
+python tools/handwriting_fiducial_detect.py `
+  <private-photographed-page.jpg> `
+  <create-only-registration.json> `
+  --page 1
+```
+
+The detector searches each image quadrant for one plausible high-fill square marker. It rejects missing markers and ambiguous quadrants rather than choosing a weak candidate. Because the printed squares are inset from the paper edge, their detected centres are **not** treated as page corners. The tool solves a projective transform from the known 14 mm fiducial-centre geometry and extrapolates the true A4 page corners.
+
+Every automatic result records `manualReviewRequired=true`. Auto-detection is therefore a registration **proposal**, not capture admission. Review the four proposed page corners against the photographed page before using them downstream. If detection is ambiguous, provide reviewed corners manually instead.
+
 ## Four-corner photo registration
 
-For each photographed worksheet page, provide the pixel coordinates of the four page corners using `contracts/handwriting-photo-registration.v1.schema.json`:
+Registration files use `contracts/handwriting-photo-registration.v1.schema.json`:
 
 ```json
 {
@@ -69,7 +84,7 @@ Then run:
 ```powershell
 python tools/handwriting_capture_register.py `
   <capture-sheet-manifest.json> `
-  <registration.json> `
+  <reviewed-registration.json> `
   <private-photographed-page.jpg> `
   <create-only-document-studio-layout.json> `
   --page 1
@@ -84,7 +99,7 @@ The generated layout then feeds Document Studio's existing governed path:
 3. captured derivatives are reviewed/proofed and admitted into the private atlas/profile;
 4. coverage and capture-gap checks are rerun.
 
-This removes fixed-grid guessing from future capture sheets while still requiring reviewed four-corner registration and downstream clear-edge/hostile-background QA.
+This removes fixed-grid guessing from future capture sheets while retaining explicit registration review and downstream clear-edge/hostile-background QA.
 
 ## Capture gap planning
 
@@ -96,7 +111,7 @@ python tools/handwriting_capture_gap.py <capture-spec.json> <private-atlas.json>
 
 For each token or whole-mark kind it reports required variants, current genuine variants and missing variants. The maintenance loop is therefore:
 
-**coverage → capture spec → gap plan → printable sheet → write naturally → photograph → four-corner register → Document Studio capture → atlas rebuild → coverage/gap again.**
+**coverage → capture spec → gap plan → printable sheet → write naturally → photograph → fiducial proposal → review registration → project slots → Document Studio capture → atlas rebuild → coverage/gap again.**
 
 It never creates replacement handwriting for a missing slot.
 
@@ -116,6 +131,6 @@ Run:
 node scripts/check-handwriting-all.mjs
 ```
 
-That command validates the governed handwriting task fragments and contracts, then runs the focused suites for photograph extraction, atlas rendering, whole marks, Document Studio bridge, coverage reporting, capture specification, gap planning, printable sheet generation, projective photo registration and contract compatibility.
+That command validates the governed handwriting task fragments and contracts, then runs the focused suites for photograph extraction, atlas rendering, whole marks, Document Studio bridge, coverage reporting, capture specification, gap planning, printable sheet generation, fail-closed fiducial detection, projective photo registration and contract compatibility.
 
 All governed handwriting tasks use the managed `image-finishing` Python environment with network disabled. They create only private workflow artifacts or return sanitized read-only reports and never grant signing or document-execution approval.
