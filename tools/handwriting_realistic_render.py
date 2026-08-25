@@ -112,7 +112,9 @@ def render_text(
     tracking = float(cfg.get("trackingPx", 1.5))
     rotation_limit = max(0.0, min(2.0, float(cfg.get("rotationDegrees", 0.45))))
     scale_jitter = max(0.0, min(0.05, float(cfg.get("scaleJitterFraction", 0.012))))
-    baseline_jitter = max(0.0, min(0.08, float(cfg.get("baselineJitterFraction", 0.016)))) * target_h
+    baseline_limit = max(0.0, min(0.08, float(cfg.get("baselineJitterFraction", 0.016)))) * target_h
+    baseline_step = baseline_limit * 0.22
+    local_baseline_limit = baseline_limit * 0.28
     all_advances = [
         float(item["naturalAdvancePx"])
         for entries in glyphs.values()
@@ -129,6 +131,7 @@ def render_text(
     space_advance = max(target_h * 0.35, median_advance * float(cfg.get("spaceFactor", 0.48)))
 
     cursor = 0.0
+    baseline_drift = 0.0
     rendered: list[tuple[object, float, float]] = []
     evidence: list[dict] = []
     for token in selected:
@@ -152,7 +155,13 @@ def render_text(
             raise ValueError("selected handwriting variant became empty")
         rx0, ry0, rx1, ry1 = bbox
         x_jitter = rng.uniform(-0.55, 0.55)
-        y_jitter = rng.uniform(-baseline_jitter, baseline_jitter)
+        if baseline_limit > 0:
+            baseline_drift = max(-baseline_limit, min(baseline_limit, baseline_drift + rng.uniform(-baseline_step, baseline_step)))
+            local_baseline = rng.uniform(-local_baseline_limit, local_baseline_limit)
+        else:
+            baseline_drift = 0.0
+            local_baseline = 0.0
+        y_jitter = baseline_drift + local_baseline
         x = cursor - rx0 + x_jitter
         y = baseline - ry1 + y_jitter
         rendered.append((image, x, y))
@@ -169,6 +178,8 @@ def render_text(
             "scale": round(scale, 5),
             "rotationDegrees": round(angle, 4),
             "baselineOffsetPx": round(y_jitter, 4),
+            "baselineDriftPx": round(baseline_drift, 4),
+            "localBaselineJitterPx": round(local_baseline, 4),
             "horizontalOffsetPx": round(x_jitter, 4),
             "aspectRatioPreserved": True,
             "strokeDeformation": False,
@@ -215,6 +226,12 @@ def render_text(
             "usesEveryAvailableVariantBeforeRefill": True,
             "avoidsSameVariantAcrossBagBoundary": True,
         },
+        "baselineModel": {
+            "mode": "bounded-random-walk-v1",
+            "maximumDriftFractionOfInkHeight": round(baseline_limit / target_h if target_h else 0.0, 5),
+            "stepFractionOfMaximumDrift": 0.22,
+            "localJitterFractionOfMaximumDrift": 0.28,
+        },
         "tokens": evidence,
         "truthBoundary": {
             "fontFallbackUsed": False,
@@ -229,7 +246,7 @@ def render_text(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Render genuine handwriting with balanced captured-variant usage")
+    parser = argparse.ArgumentParser(description="Render genuine handwriting with balanced captured-variant usage and smooth baseline drift")
     parser.add_argument("atlas")
     parser.add_argument("text")
     parser.add_argument("output")
