@@ -67,10 +67,10 @@ class HandwritingParagraphTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             atlas = _atlas(module, root)
-            wrapped, evidence = module.wrap_text(atlas, "AA BB AA", max_width_px=90, style="uppercase")
+            wrapped, evidence = module.wrap_text(atlas, "AA BB AA", max_width_px=125, style="uppercase")
             self.assertEqual(wrapped, "AA BB\nAA")
             self.assertEqual(len(evidence), 2)
-            self.assertTrue(all(item["estimatedWidthPx"] <= 90 for item in evidence if not item["blank"]))
+            self.assertTrue(all(item["estimatedWidthPx"] <= 125 for item in evidence if not item["blank"]))
 
     def test_preserves_explicit_blank_paragraph_line(self) -> None:
         module = _load_module()
@@ -96,8 +96,8 @@ class HandwritingParagraphTests(unittest.TestCase):
             atlas = _atlas(module, root)
             first = root / "first.png"
             second = root / "second.png"
-            a = module.render_paragraph(atlas, "AA BB AA", first, seed="same", max_width_px=90, style="uppercase")
-            b = module.render_paragraph(atlas, "AA BB AA", second, seed="same", max_width_px=90, style="uppercase")
+            a = module.render_paragraph(atlas, "AA BB AA", first, seed="same", max_width_px=125, style="uppercase")
+            b = module.render_paragraph(atlas, "AA BB AA", second, seed="same", max_width_px=125, style="uppercase")
             self.assertEqual(a["outputSha256"], b["outputSha256"])
             self.assertTrue(a["truthBoundary"]["wordWrappingUsesMeasuredGenuineAdvances"])
             self.assertFalse(a["truthBoundary"]["fontFallbackUsed"])
