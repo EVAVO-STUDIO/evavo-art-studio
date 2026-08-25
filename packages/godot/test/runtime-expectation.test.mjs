@@ -30,12 +30,12 @@ function descriptor(overrides = {}) {
         loopMode: "linear",
         loopModeValue: 1,
         framesPerSecond: 8,
-        totalDurationMs: 375,
-        frames: [1, 2, 3].map((frame) => ({
-          frameId: `walk-${frame}`,
-          durationMs: 125,
-          relativeDuration: 1,
-        })),
+        totalDurationMs: 500,
+        frames: [
+          { frameId: "walk-1", durationMs: 125, relativeDuration: 1 },
+          { frameId: "walk-2", durationMs: 250, relativeDuration: 2 },
+          { frameId: "walk-3", durationMs: 125, relativeDuration: 1 },
+        ],
       },
     ],
     ...overrides,
@@ -67,6 +67,7 @@ test("compiles a self-hashed Test Lab expectation only after descriptor acceptan
   assert.equal(result.schema, GODOT_SPRITE_ANIMATION_RUNTIME_EXPECTATION_SCHEMA);
   assert.equal(result.clipId, "walk-right");
   assert.deepEqual(result.frameIds, ["walk-1", "walk-2", "walk-3"]);
+  assert.deepEqual(result.frameDurationMicros, [125000, 250000, 125000]);
   assert.equal(result.maximumPivotDriftPixels, 0);
   assert.match(result.expectationSha256, /^[a-f0-9]{64}$/);
   assert.equal(result.runId, result.expectationSha256.slice(0, 20));
