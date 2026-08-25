@@ -55,7 +55,7 @@ test("plans an eight-drawing walk from two key contacts and bounded in-betweens"
   ]);
 });
 
-test("locks identity, anchors and measurable motion continuity", () => {
+test("locks identity, anchors and provider-valid temporal roles", () => {
   const plan = compileAnimationDirectorPlan(request());
 
   assert.deepEqual(plan.qualityRequirements, {
@@ -90,6 +90,13 @@ test("locks identity, anchors and measurable motion continuity", () => {
       frame.providerReferenceRoles.includes("pose-control"),
     ),
   );
+  for (const frameNumber of [2, 3, 4, 6, 7, 8]) {
+    const frame = plan.frames[frameNumber - 1];
+    assert.ok(frame.providerReferenceRoles.includes("previous-key-pose"));
+    assert.ok(frame.providerReferenceRoles.includes("next-key-pose"));
+  }
+  assert.equal(plan.frames[0].providerReferenceRoles.includes("previous-key-pose"), false);
+  assert.equal(plan.frames[4].providerReferenceRoles.includes("previous-key-pose"), false);
 });
 
 test("uses rational per-frame timing instead of rounding milliseconds", () => {
@@ -142,8 +149,8 @@ test("fails closed on malformed or unsupported runtime input", () => {
   );
 });
 
-test("non-looping clips do not fabricate a dependency back to frame one", () => {
+test("non-looping playback still keeps terminal key guidance for generation", () => {
   const plan = compileAnimationDirectorPlan(request({ loop: false }));
   assert.equal(plan.qualityRequirements.loopClosureRequired, false);
-  assert.deepEqual(plan.generationBatches[2].dependsOnFrames, [5]);
+  assert.deepEqual(plan.generationBatches[2].dependsOnFrames, [5, 1]);
 });
