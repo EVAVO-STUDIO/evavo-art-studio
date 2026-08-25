@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "handwriting-realism-qa": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_realism_qa.py",
+      "arguments": ["{{atlas}}", "{{receipt}}", "--output", "{{output}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["atlas", "receipt", "output"],
+        "properties": {
+          "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "receipt": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "output": {"type": "compute-path", "pathKind": "file", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["output"],
+      "network": "disabled",
+      "timeoutSeconds": 120,
+      "description": "Create a read-only realism QA report for a genuine handwriting render receipt. Flags mechanical-looking repetition, insufficient genuine variant diversity, overly uniform transforms, line-start regularity and line-size inconsistency. Never modifies handwriting, never creates replacement strokes, and grants no document or signing authority."
+    }
+  }
+}
