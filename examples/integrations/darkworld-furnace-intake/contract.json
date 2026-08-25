@@ -4,6 +4,14 @@
   "consumerRequest": "examples/cinematic_precision_platformer/showcase/furnace_art_studio_request.json",
   "authority": "art-studio",
   "capabilities": ["art.project.workspace","art.project.mastering","art.project.review","art.delivery.optimize"],
+  "execution": {
+    "entrypoint": "examples/integrations/darkworld-furnace-intake/intake_candidate.mjs",
+    "requires": ["node", "python3"],
+    "pythonOverrideArgument": "--python",
+    "pnpmRequiredAtRuntime": false,
+    "sourceMutation": false,
+    "consumerRuntimeAdmission": false
+  },
   "jobs": [
     {"id":"env-background","output":"assets/environments/furnace_intake/background.png"},
     {"id":"env-mid-structure","output":"assets/environments/furnace_intake/mid_structure.png"},
