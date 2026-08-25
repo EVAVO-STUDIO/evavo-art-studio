@@ -28,6 +28,7 @@ for (const test of [
   'scripts/test_handwriting_coverage.py',
   'scripts/test_handwriting_capture_spec.py',
   'scripts/test_handwriting_capture_gap.py',
+  'scripts/test_handwriting_capture_sheet.py',
   'scripts/test_handwriting_export_contract.py',
 ]) {
   run(python, ['-m', 'unittest', test]);
@@ -38,5 +39,5 @@ console.log(JSON.stringify({
   check: 'handwriting-all',
   networkUsed: false,
   signingApprovalAuthority: false,
-  suites: 8,
+  suites: 9,
 }, null, 2));
