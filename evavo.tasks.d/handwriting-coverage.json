@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "handwriting-atlas-coverage": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_coverage.py",
+      "arguments": ["{{atlas}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["atlas"],
+        "properties": {
+          "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"}
+        }
+      },
+      "parameterOutputs": [],
+      "network": "disabled",
+      "timeoutSeconds": 120,
+      "description": "Report genuine handwriting atlas coverage and verify root confinement/SHA pins without rendering, copying image bytes, using font fallback or granting signing/PDF authority."
+    }
+  }
+}
