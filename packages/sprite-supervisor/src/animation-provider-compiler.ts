@@ -1,8 +1,13 @@
-import type { ArtifactId } from "@evavo/art-artifacts";
-import type {
-  AnimationDirectorPlan,
-  AnimationFramePlan,
-  AnimationGenerationBatch,
+import {
+  normalizeJson,
+  stableStringify,
+  type ArtifactId,
+} from "@evavo/art-artifacts";
+import {
+  compileAnimationDirectorPlan,
+  type AnimationDirectorPlan,
+  type AnimationFramePlan,
+  type AnimationGenerationBatch,
 } from "@evavo/art-direction";
 import {
   validateProviderCandidateRequest,
@@ -14,7 +19,7 @@ import {
   type ProviderStyleEnvelopeInput,
 } from "@evavo/art-providers";
 
-export const ANIMATION_PROVIDER_COMPILER_VERSION = "2026-08-25.1" as const;
+export const ANIMATION_PROVIDER_COMPILER_VERSION = "2026-08-25.2" as const;
 
 export interface AnimationProviderBatchCompileRequest {
   readonly plan: AnimationDirectorPlan;
@@ -59,6 +64,48 @@ function artifactId(value: unknown, field: string): ArtifactId {
     fail(`${field} must be a canonical artifact_[64 lowercase hex] id.`);
   }
   return value as ArtifactId;
+}
+
+function verifiedPlan(input: AnimationDirectorPlan): AnimationDirectorPlan {
+  if (!input || typeof input !== "object") {
+    fail("plan must be an Animation Director plan object.");
+  }
+  let canonical: AnimationDirectorPlan;
+  try {
+    canonical = compileAnimationDirectorPlan({
+      clipId: input.clipId,
+      subjectId: input.subjectId,
+      action: input.action,
+      direction: input.direction,
+      motionStyle: input.motionStyle,
+      fps: input.fps,
+      canvas: input.canvas,
+      canonicalIdentityArtifactId: input.canonicalIdentityArtifactId,
+      ...(input.directionMasterArtifactId
+        ? { directionMasterArtifactId: input.directionMasterArtifactId }
+        : {}),
+      loop: input.loop,
+    });
+  } catch (error: unknown) {
+    fail(
+      `plan cannot be canonically recompiled: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  let submitted: string;
+  let expected: string;
+  try {
+    submitted = stableStringify(normalizeJson(input));
+    expected = stableStringify(normalizeJson(canonical));
+  } catch (error: unknown) {
+    fail(
+      `plan must be canonical JSON data: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (submitted !== expected) {
+    fail("plan does not match the canonical Animation Director compilation.");
+  }
+  return canonical;
 }
 
 function findBatch(
@@ -116,7 +163,7 @@ function temporalReferences(
       role: "previous-key-pose",
       required: true,
       strength: 1,
-      note: `Approved or retained key pose frame ${previousFrame} for ${batch.id}.`,
+      note: `Retained key pose frame ${previousFrame} for ${batch.id}.`,
     },
     {
       artifactId: artifactId(
@@ -126,7 +173,7 @@ function temporalReferences(
       role: "next-key-pose",
       required: true,
       strength: 1,
-      note: `Approved or retained key pose frame ${nextFrame} for ${batch.id}.`,
+      note: `Retained key pose frame ${nextFrame} for ${batch.id}.`,
     },
   ];
 }
@@ -285,10 +332,7 @@ export function compileAnimationProviderBatch(
   if (!request || typeof request !== "object") {
     fail("request must be an object.");
   }
-  const plan = request.plan;
-  if (!plan || typeof plan !== "object" || !Array.isArray(plan.frames) || !Array.isArray(plan.generationBatches)) {
-    fail("plan must be an Animation Director plan.");
-  }
+  const plan = verifiedPlan(request.plan);
   const batch = findBatch(plan, request.batchId);
   const count = candidateCount(request.candidateCount, batch.maximumCandidatesPerFrame);
   const requests = batch.frames.map((frameNumber) =>
