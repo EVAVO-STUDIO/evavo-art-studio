@@ -115,6 +115,12 @@ def register(sheet_manifest_path: Path, registration_path: Path, source_image: P
     selected_page = int(page or registration.get("page") or 1)
     if selected_page < 1 or selected_page > int(sheet.get("pageCount") or 0):
         raise ValueError("registration page is outside capture sheet page count")
+    crop_margin = int(registration.get("cropMarginPx", 36))
+    keep_margin = int(registration.get("keepMarginPx", 6))
+    if not 0 <= crop_margin <= 512:
+        raise ValueError("registration cropMarginPx must be between 0 and 512")
+    if not 0 <= keep_margin <= 128:
+        raise ValueError("registration keepMarginPx must be between 0 and 128")
     if not source_image.is_file():
         raise ValueError(f"source image is missing: {source_image}")
 
@@ -166,8 +172,8 @@ def register(sheet_manifest_path: Path, registration_path: Path, source_image: P
             "id": f"row-{slot_id}",
             "kind": kind,
             "style": slot.get("style"),
-            "cropMarginPx": int(registration.get("cropMarginPx", 36)),
-            "keepMarginPx": int(registration.get("keepMarginPx", 6)),
+            "cropMarginPx": crop_margin,
+            "keepMarginPx": keep_margin,
             "items": [item],
         })
 
@@ -182,6 +188,8 @@ def register(sheet_manifest_path: Path, registration_path: Path, source_image: P
             "page": selected_page,
             "pageSizeMm": [page_w, page_h],
             "cornersPx": corners,
+            "cropMarginPx": crop_margin,
+            "keepMarginPx": keep_margin,
         },
     }
     output.parent.mkdir(parents=True, exist_ok=True)
