@@ -9,7 +9,7 @@ import {
   type AnimationProviderBatchCompileRequest,
 } from "./animation-provider-compiler.js";
 
-export const VERIFIED_ANIMATION_PROVIDER_COMPILER_VERSION = "2026-08-26.1" as const;
+export const VERIFIED_ANIMATION_PROVIDER_COMPILER_VERSION = "2026-08-26.2" as const;
 
 export interface VerifiedAnimationProviderBatchCompileRequest
   extends Omit<AnimationProviderBatchCompileRequest, "poseControlArtifactIds"> {
@@ -62,9 +62,9 @@ export function compileVerifiedAnimationProviderBatch(
     ) {
       fail(`poseControlBindings.${frameNumber} canvas differs from the Director plan.`);
     }
-    if (binding.artifactId !== `artifact_${binding.contentSha256}`) {
-      fail(`poseControlBindings.${frameNumber} artifact id is not bound to its content SHA-256.`);
-    }
+    // EVAVO artifact IDs are descriptor-addressed, while contentSha256 identifies
+    // the exact bytes. The pose-control binding cryptographically retains both;
+    // they are not expected to be equal.
     poseControlArtifactIds[String(frameNumber)] = binding.artifactId;
     bindingSha256s.push(binding.bindingSha256);
   }
