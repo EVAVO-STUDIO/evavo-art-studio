@@ -41,6 +41,17 @@
         "downsampleScale": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
         "manualReviewRequired": {"const": true}
       }
+    },
+    "reviewEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposalSha256", "decision", "cornersChanged", "manualReviewCompleted"],
+      "properties": {
+        "proposalSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "decision": {"const": "accept"},
+        "cornersChanged": {"type": "boolean"},
+        "manualReviewCompleted": {"const": true}
+      }
     }
   },
   "$defs": {
