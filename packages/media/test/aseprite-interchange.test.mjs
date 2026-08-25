@@ -31,7 +31,14 @@ test("compiles a fixed batch-mode Aseprite sheet and metadata invocation", () =>
   assert.equal(plan.outputs.createOnly, true);
   assert.equal(plan.authority.processExecution, false);
   assert.equal(plan.authority.sourceOverwrite, false);
-  assert.deepEqual(plan.arguments.slice(0, 2), ["-b", "C:\\Art\\hero.aseprite"]);
+  assert.deepEqual(plan.arguments.slice(0, 6), [
+    "-b",
+    "--list-tags",
+    "--list-slices",
+    "--tag",
+    "walk-right",
+    "C:\\Art\\hero.aseprite",
+  ]);
   for (const token of [
     "--tag",
     "--list-tags",
