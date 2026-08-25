@@ -8,6 +8,7 @@ export interface AdventureStudioArtReviewIssueV3 {
   readonly code: AdventureCreativeIssueCodeV3;
   readonly severity: "blocking" | "major" | "minor";
   readonly message: string;
+  readonly frameIds: readonly string[];
   readonly region?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   readonly evidenceDigests: readonly string[];
   readonly suggestedRepair: string;
