@@ -33,7 +33,7 @@ def _atlas(path: Path, variants: int = 3) -> Path:
     return path
 
 
-def _single(path: Path, variants: list[int], *, balanced: bool = False) -> Path:
+def _single(path: Path, variants: list[int], *, balanced: bool = False, text: str | None = None) -> Path:
     tokens = []
     for index, variant in enumerate(variants):
         item = {
@@ -44,10 +44,13 @@ def _single(path: Path, variants: list[int], *, balanced: bool = False) -> Path:
         }
         if balanced:
             item["variantCycle"] = index // 3 + 1
+            item["baselineDriftPx"] = 0.04 * index
         tokens.append(item)
     value = {
         "schema": "evavo.art-studio.handwriting-render.v1",
         "style": "uppercase",
+        "text": text or ("A" * len(variants)),
+        "targetInkHeightPx": 38.0,
         "tokens": tokens,
         "truthBoundary": {
             "fontFallbackUsed": False,
@@ -60,6 +63,12 @@ def _single(path: Path, variants: list[int], *, balanced: bool = False) -> Path:
             "mode": "deterministic-shuffled-genuine-variant-bag-v1",
             "usesEveryAvailableVariantBeforeRefill": True,
             "avoidsSameVariantAcrossBagBoundary": True,
+        }
+        value["baselineModel"] = {
+            "mode": "bounded-random-walk-v1",
+            "maximumDriftFractionOfInkHeight": 0.016,
+            "stepFractionOfMaximumDrift": 0.22,
+            "localJitterFractionOfMaximumDrift": 0.28,
         }
     path.write_text(json.dumps(value), encoding="utf-8")
     return path
@@ -74,6 +83,7 @@ class HandwritingRealismQaTests(unittest.TestCase):
             self.assertEqual(result["grade"], "strong")
             self.assertEqual(result["warnings"], [])
             self.assertTrue(result["metrics"]["balancedVariantSelection"]["used"])
+            self.assertEqual(result["metrics"]["sessionModels"]["baselineMode"], "bounded-random-walk-v1")
             self.assertTrue(result["truthBoundary"]["readOnlyDiagnostic"])
             self.assertFalse(result["truthBoundary"]["handwritingModified"])
 
@@ -85,6 +95,42 @@ class HandwritingRealismQaTests(unittest.TestCase):
             codes = {item["code"] for item in result["warnings"]}
             self.assertIn("legacy-variant-selection", codes)
             self.assertFalse(result["metrics"]["balancedVariantSelection"]["used"])
+
+    def test_flags_missing_baseline_model_on_claimed_balanced_render(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = _single(root / "receipt.json", [0, 1, 2], balanced=True)
+            value = json.loads(receipt.read_text(encoding="utf-8"))
+            value.pop("baselineModel")
+            receipt.write_text(json.dumps(value), encoding="utf-8")
+            result = module.evaluate(_atlas(root / "atlas.json"), receipt)
+            self.assertIn("legacy-baseline-model", {item["code"] for item in result["warnings"]})
+
+    def test_flags_missing_word_spacing_model_when_balanced_text_has_spaces(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = _single(root / "receipt.json", [0, 1, 2], balanced=True, text="AA AA")
+            result = module.evaluate(_atlas(root / "atlas.json"), receipt)
+            self.assertIn("legacy-word-spacing", {item["code"] for item in result["warnings"]})
+
+    def test_accepts_bounded_word_spacing_model(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = _single(root / "receipt.json", [0, 1, 2], balanced=True, text="AA AA")
+            value = json.loads(receipt.read_text(encoding="utf-8"))
+            value["wordSpacing"] = {
+                "mode": "measured-space-with-bounded-variation-v1",
+                "maximumVariationFraction": 0.06,
+                "spaces": [{"variationFactor": 1.03}],
+            }
+            receipt.write_text(json.dumps(value), encoding="utf-8")
+            result = module.evaluate(_atlas(root / "atlas.json"), receipt)
+            codes = {item["code"] for item in result["warnings"]}
+            self.assertNotIn("legacy-word-spacing", codes)
+            self.assertNotIn("word-spacing-bound-violation", codes)
 
     def test_flags_immediate_same_variant_repeat(self) -> None:
         module = _load_module()
