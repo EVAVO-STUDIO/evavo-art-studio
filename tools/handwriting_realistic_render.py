@@ -10,6 +10,8 @@ try:
 except ModuleNotFoundError:  # direct `python tools/handwriting_realistic_render.py`
     import handwriting_atlas as atlas_tool  # type: ignore
 
+SPACE_VARIATION_FRACTION = 0.06
+
 
 def _candidate_bag(entries: list[dict], *, style: str | None, rng, previous: int | None) -> list[tuple[int, dict]]:
     candidates = [
@@ -128,15 +130,26 @@ def render_text(
     if not all_advances:
         raise ValueError("atlas contains no valid natural advances")
     median_advance = sorted(all_advances)[len(all_advances) // 2]
-    space_advance = max(target_h * 0.35, median_advance * float(cfg.get("spaceFactor", 0.48)))
+    base_space_advance = max(target_h * 0.35, median_advance * float(cfg.get("spaceFactor", 0.48)))
 
     cursor = 0.0
     baseline_drift = 0.0
     rendered: list[tuple[object, float, float]] = []
     evidence: list[dict] = []
+    spaces: list[dict] = []
+    space_index = 0
     for token in selected:
         if token["kind"] == "space":
-            cursor += space_advance
+            space_index += 1
+            factor = 1.0 + rng.uniform(-SPACE_VARIATION_FRACTION, SPACE_VARIATION_FRACTION)
+            advance = base_space_advance * factor
+            cursor += advance
+            spaces.append({
+                "index": space_index,
+                "baseAdvancePx": round(base_space_advance, 3),
+                "variationFactor": round(factor, 5),
+                "renderedAdvancePx": round(advance, 3),
+            })
             continue
         item = token["item"]
         image = token["image"]
@@ -232,6 +245,11 @@ def render_text(
             "stepFractionOfMaximumDrift": 0.22,
             "localJitterFractionOfMaximumDrift": 0.28,
         },
+        "wordSpacing": {
+            "mode": "measured-space-with-bounded-variation-v1",
+            "maximumVariationFraction": SPACE_VARIATION_FRACTION,
+            "spaces": spaces,
+        },
         "tokens": evidence,
         "truthBoundary": {
             "fontFallbackUsed": False,
@@ -246,7 +264,7 @@ def render_text(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Render genuine handwriting with balanced captured-variant usage and smooth baseline drift")
+    parser = argparse.ArgumentParser(description="Render genuine handwriting with balanced captured variants and smooth session rhythm")
     parser.add_argument("atlas")
     parser.add_argument("text")
     parser.add_argument("output")
