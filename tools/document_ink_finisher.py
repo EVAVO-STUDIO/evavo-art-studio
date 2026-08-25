@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import io
 import json
-import math
 import random
 from pathlib import Path
 
@@ -28,6 +26,11 @@ def _file_sha(path: Path) -> str:
 def _rng(seed: str) -> random.Random:
     digest = hashlib.sha256(seed.encode("utf-8")).digest()
     return random.Random(int.from_bytes(digest[:8], "big"))
+
+
+def _require_create_only(path: Path, label: str) -> None:
+    if path.exists():
+        raise ValueError(f"{label} already exists; document ink finishing is create-only: {path}")
 
 
 def choose_genuine_variant(asset_paths: list[Path], *, seed: str, previous_sha256: str | None = None) -> dict:
@@ -65,6 +68,9 @@ def natural_transform(*, seed: str, kind: str) -> dict:
 
 def master_transparent_ink(source: Path, output: Path, *, trim_threshold: int = 8, padding: int = 8, feather: float = 0.25) -> dict:
     Image, _, ImageFilter = _pil()
+    if not source.is_file():
+        raise ValueError(f"personal mark source is missing: {source}")
+    _require_create_only(output, "master output")
     image = Image.open(source).convert("RGBA")
     alpha = image.getchannel("A")
     mask = alpha.point(lambda value: 255 if value > trim_threshold else 0)
@@ -77,8 +83,6 @@ def master_transparent_ink(source: Path, output: Path, *, trim_threshold: int = 
     image = image.crop((x0, y0, x1, y1))
     if feather > 0:
         image.putalpha(image.getchannel("A").filter(ImageFilter.GaussianBlur(feather)))
-    # Neutralise RGB hidden under fully transparent pixels to avoid matte fringes
-    # after downstream resampling. Visible pen RGB is left untouched.
     pixels = image.load()
     for y in range(image.height):
         for x in range(image.width):
@@ -96,11 +100,15 @@ def master_transparent_ink(source: Path, output: Path, *, trim_threshold: int = 
         "featherRadiusPx": feather,
         "visibleInkRgbPreserved": True,
         "syntheticHandwritingGenerated": False,
+        "createOnly": True,
     }
 
 
 def integrate_into_paper(mark_path: Path, background_path: Path, output: Path, *, seed: str, kind: str, opacity: float = 1.0, blur_radius: float = 0.22) -> dict:
     Image, ImageChops, ImageFilter = _pil()
+    if not mark_path.is_file() or not background_path.is_file():
+        raise ValueError("mark and background inputs must be existing files")
+    _require_create_only(output, "integration output")
     if not 0.65 <= opacity <= 1.0:
         raise ValueError("opacity must be between 0.65 and 1.0")
     mark = Image.open(mark_path).convert("RGBA")
@@ -142,6 +150,7 @@ def integrate_into_paper(mark_path: Path, background_path: Path, output: Path, *
         "blendMode": "multiply-local-paper",
         "wholePageDegradationApplied": False,
         "syntheticHandwritingGenerated": False,
+        "createOnly": True,
     }
 
 
@@ -166,14 +175,14 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        evidence = Path(args.evidence) if args.evidence else None
+        if evidence is not None:
+            _require_create_only(evidence, "evidence output")
         if args.command == "master":
             result = master_transparent_ink(Path(args.source), Path(args.output))
         else:
             result = integrate_into_paper(Path(args.mark), Path(args.background), Path(args.output), seed=args.seed, kind=args.kind, opacity=args.opacity)
-        if args.evidence:
-            evidence = Path(args.evidence)
-            if evidence.exists():
-                raise ValueError(f"evidence output already exists: {evidence}")
+        if evidence is not None:
             evidence.parent.mkdir(parents=True, exist_ok=True)
             evidence.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True))
