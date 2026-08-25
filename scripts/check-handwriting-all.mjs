@@ -24,6 +24,7 @@ for (const test of [
   'scripts/test_document_ink_finisher.py',
   'scripts/test_handwriting_atlas.py',
   'scripts/test_handwriting_multiline.py',
+  'scripts/test_handwriting_paragraph.py',
   'scripts/test_handwriting_whole_mark.py',
   'scripts/test_handwriting_document_bridge.py',
   'scripts/test_handwriting_coverage.py',
@@ -43,5 +44,5 @@ console.log(JSON.stringify({
   check: 'handwriting-all',
   networkUsed: false,
   signingApprovalAuthority: false,
-  suites: 13,
+  suites: 14,
 }, null, 2));
