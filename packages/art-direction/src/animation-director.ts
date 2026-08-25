@@ -1,4 +1,4 @@
-export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.6" as const;
+export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.7" as const;
 export const ANIMATION_DIRECTOR_PLAN_KIND =
   "evavo.animation-director.plan" as const;
 
@@ -108,6 +108,8 @@ export interface AnimationDirectorPlan {
 }
 
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const MAX_PROVIDER_DIMENSION = 8_192;
 
 const WALK_ROLES: AnimationFrameRole[] = [
   "contact",
@@ -142,6 +144,16 @@ function requireNonBlank(value: unknown, field: string): string {
   return normalized;
 }
 
+function requireSafeId(value: unknown, field: string): string {
+  const normalized = requireNonBlank(value, field);
+  if (!SAFE_ID.test(normalized)) {
+    throw new Error(
+      `${field} must use 1 to 128 letters, digits, dots, underscores, colons or hyphens`,
+    );
+  }
+  return normalized;
+}
+
 function requireArtifactId(value: unknown, field: string): AnimationArtifactId {
   const normalized = requireNonBlank(value, field);
   if (!ARTIFACT_ID.test(normalized)) {
@@ -155,6 +167,14 @@ function requirePositiveInteger(value: unknown, field: string): number {
     throw new Error(`${field} must be a positive integer`);
   }
   return value;
+}
+
+function requireDimension(value: unknown, field: string): number {
+  const dimension = requirePositiveInteger(value, field);
+  if (dimension > MAX_PROVIDER_DIMENSION) {
+    throw new Error(`${field} cannot exceed ${MAX_PROVIDER_DIMENSION}`);
+  }
+  return dimension;
 }
 
 function requireMotionStyle(value: unknown): AnimationMotionStyle {
@@ -251,14 +271,14 @@ export function compileAnimationDirectorPlan(
     throw new Error("animation director request must be an object");
   }
   if (request.action !== "walk") {
-    throw new Error("action must be walk in animation director protocol 2026-08-25.6");
+    throw new Error("action must be walk in animation director protocol 2026-08-25.7");
   }
   if (!request.canvas || typeof request.canvas !== "object") {
     throw new Error("canvas must be an object");
   }
 
-  const clipId = requireNonBlank(request.clipId, "clipId");
-  const subjectId = requireNonBlank(request.subjectId, "subjectId");
+  const clipId = requireSafeId(request.clipId, "clipId");
+  const subjectId = requireSafeId(request.subjectId, "subjectId");
   const canonicalIdentityArtifactId = requireArtifactId(
     request.canonicalIdentityArtifactId,
     "canonicalIdentityArtifactId",
@@ -272,8 +292,8 @@ export function compileAnimationDirectorPlan(
         );
   const motionStyle = requireMotionStyle(request.motionStyle);
   const direction = requireDirection(request.direction);
-  const width = requirePositiveInteger(request.canvas.width, "canvas.width");
-  const height = requirePositiveInteger(request.canvas.height, "canvas.height");
+  const width = requireDimension(request.canvas.width, "canvas.width");
+  const height = requireDimension(request.canvas.height, "canvas.height");
   const fps = walkFps(request.fps, motionStyle);
   const loop = request.loop ?? true;
   if (typeof loop !== "boolean") {
