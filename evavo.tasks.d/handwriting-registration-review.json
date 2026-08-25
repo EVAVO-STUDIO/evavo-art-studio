@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "handwriting-registration-review": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_registration_review.py",
+      "arguments": ["{{proposal}}", "{{review}}", "{{reviewedRegistration}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["proposal", "review", "reviewedRegistration"],
+        "properties": {
+          "proposal": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "review": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "reviewedRegistration": {"type": "compute-path", "pathKind": "file", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["reviewedRegistration"],
+      "network": "disabled",
+      "timeoutSeconds": 120,
+      "description": "Bind an explicit review artifact to an auto-detected handwriting page registration proposal using the proposal SHA-256 and reviewed corner coordinates. Creates one reviewed registration; returns no handwriting bytes and grants no signing or document-execution authority."
+    }
+  }
+}
