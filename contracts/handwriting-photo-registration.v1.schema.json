@@ -20,6 +20,27 @@
         "bottomRight": {"$ref": "#/$defs/point"},
         "bottomLeft": {"$ref": "#/$defs/point"}
       }
+    },
+    "detectionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "fiducialCentersPx", "downsampleScale", "manualReviewRequired"],
+      "properties": {
+        "method": {"const": "solid-square-fiducials-v1"},
+        "fiducialCentersPx": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["topLeft", "topRight", "bottomRight", "bottomLeft"],
+          "properties": {
+            "topLeft": {"$ref": "#/$defs/point"},
+            "topRight": {"$ref": "#/$defs/point"},
+            "bottomRight": {"$ref": "#/$defs/point"},
+            "bottomLeft": {"$ref": "#/$defs/point"}
+          }
+        },
+        "downsampleScale": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "manualReviewRequired": {"const": true}
+      }
     }
   },
   "$defs": {
@@ -29,6 +50,7 @@
         {"type": "number", "minimum": 0},
         {"type": "number", "minimum": 0}
       ],
+      "items": false,
       "minItems": 2,
       "maxItems": 2
     }
