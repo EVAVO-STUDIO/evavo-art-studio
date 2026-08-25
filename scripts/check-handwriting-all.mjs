@@ -18,11 +18,13 @@ function run(command, args) {
 }
 
 run(process.execPath, ['scripts/check-handwriting-toolchain.mjs']);
+run(process.execPath, ['scripts/check-handwriting-realistic.mjs']);
 
 const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 for (const test of [
   'scripts/test_document_ink_finisher.py',
   'scripts/test_handwriting_atlas.py',
+  'scripts/test_handwriting_realistic_render.py',
   'scripts/test_handwriting_multiline.py',
   'scripts/test_handwriting_paragraph.py',
   'scripts/test_handwriting_realism_qa.py',
@@ -46,5 +48,6 @@ console.log(JSON.stringify({
   check: 'handwriting-all',
   networkUsed: false,
   signingApprovalAuthority: false,
-  suites: 16,
+  suites: 17,
+  preferredProductionRenderer: 'deterministic-shuffled-genuine-variant-bag-v1',
 }, null, 2));
