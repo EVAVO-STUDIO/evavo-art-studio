@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.local/schemas/art-studio/handwriting-photo-registration.v1.schema.json",
+  "title": "EVAVO Art Studio Handwriting Photo Registration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "page", "cornersPx"],
+  "properties": {
+    "schema": {"const": "evavo.art-studio.handwriting-photo-registration.v1"},
+    "page": {"type": "integer", "minimum": 1, "maximum": 128},
+    "cropMarginPx": {"type": "integer", "minimum": 0, "maximum": 512, "default": 36},
+    "keepMarginPx": {"type": "integer", "minimum": 0, "maximum": 128, "default": 6},
+    "cornersPx": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topLeft", "topRight", "bottomRight", "bottomLeft"],
+      "properties": {
+        "topLeft": {"$ref": "#/$defs/point"},
+        "topRight": {"$ref": "#/$defs/point"},
+        "bottomRight": {"$ref": "#/$defs/point"},
+        "bottomLeft": {"$ref": "#/$defs/point"}
+      }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "array",
+      "prefixItems": [
+        {"type": "number", "minimum": 0},
+        {"type": "number", "minimum": 0}
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}
