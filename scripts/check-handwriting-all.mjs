@@ -25,6 +25,7 @@ for (const test of [
   'scripts/test_document_ink_finisher.py',
   'scripts/test_handwriting_atlas.py',
   'scripts/test_handwriting_realistic_render.py',
+  'scripts/test_handwriting_balanced_wrappers.py',
   'scripts/test_handwriting_multiline.py',
   'scripts/test_handwriting_paragraph.py',
   'scripts/test_handwriting_realism_qa.py',
@@ -48,6 +49,6 @@ console.log(JSON.stringify({
   check: 'handwriting-all',
   networkUsed: false,
   signingApprovalAuthority: false,
-  suites: 17,
+  suites: 18,
   preferredProductionRenderer: 'deterministic-shuffled-genuine-variant-bag-v1',
 }, null, 2));
