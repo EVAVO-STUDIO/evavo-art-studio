@@ -1,3 +1,4 @@
+export * from "./adventure-studio-handoff.js";
 export * from "./book-art-candidate-set.js";
 export {
   compileBookArtCandidateSetWorkOrder,
