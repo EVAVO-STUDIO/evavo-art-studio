@@ -1,14 +1,21 @@
+import { createHash } from "node:crypto";
+
+import {
+  compileAnimationDirectorPlan,
+  type AnimationDirectorPlan,
+} from "./animation-director.js";
 import {
   compileAnimationPoseControl,
   type AnimationPoseControlManifest,
 } from "./animation-pose-control.js";
-import type { AnimationDirectorPlan } from "./animation-director.js";
 
-export const SIDE_VIEW_BIPED_WALK_TEMPLATE_VERSION = "2026-08-26.1" as const;
+export const SIDE_VIEW_BIPED_WALK_TEMPLATE_VERSION = "2026-08-26.2" as const;
 
 export interface SideViewBipedWalkPoseSet {
   readonly templateId: "side-view-biped-walk";
   readonly templateVersion: typeof SIDE_VIEW_BIPED_WALK_TEMPLATE_VERSION;
+  readonly templateSha256: string;
+  readonly animationDirectorPlanSha256: string;
   readonly clipId: string;
   readonly direction: "left" | "right";
   readonly poses: readonly AnimationPoseControlManifest[];
@@ -26,6 +33,20 @@ type Pose = Readonly<Record<string, Point>>;
 
 function fail(message: string): never {
   throw new Error(`Side-view biped walk template failed: ${message}`);
+}
+
+function stable(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
+  const object = value as Record<string, unknown>;
+  return `{${Object.keys(object)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stable(object[key])}`)
+    .join(",")}}`;
+}
+
+function digest(value: unknown): string {
+  return createHash("sha256").update(stable(value)).digest("hex");
 }
 
 function mirror(point: Point): Point {
@@ -66,63 +87,21 @@ function pose(
 // Right-facing authored walk landmarks. The stance foot remains position-locked
 // through its four-frame support phase. Arm swing opposes the leading leg.
 const RIGHT_FACING_POSES: readonly Pose[] = [
-  pose(
-    0.56,
-    { x: 0.34, y: 0.92 }, { x: 0.67, y: 0.92 },
-    { x: 0.41, y: 0.75 }, { x: 0.59, y: 0.75 },
-    { x: 0.62, y: 0.56 }, { x: 0.39, y: 0.53 },
-    { x: 0.56, y: 0.43 }, { x: 0.44, y: 0.42 },
-  ),
-  pose(
-    0.59,
-    { x: 0.34, y: 0.92 }, { x: 0.61, y: 0.90 },
-    { x: 0.40, y: 0.77 }, { x: 0.55, y: 0.78 },
-    { x: 0.59, y: 0.58 }, { x: 0.42, y: 0.55 },
-    { x: 0.55, y: 0.46 }, { x: 0.45, y: 0.45 },
-  ),
-  pose(
-    0.56,
-    { x: 0.34, y: 0.92 }, { x: 0.52, y: 0.80 },
-    { x: 0.41, y: 0.76 }, { x: 0.51, y: 0.70 },
-    { x: 0.54, y: 0.56 }, { x: 0.47, y: 0.54 },
-    { x: 0.52, y: 0.44 }, { x: 0.48, y: 0.44 },
-  ),
-  pose(
-    0.53,
-    { x: 0.34, y: 0.92 }, { x: 0.42, y: 0.85 },
-    { x: 0.40, y: 0.74 }, { x: 0.46, y: 0.72 },
-    { x: 0.47, y: 0.53 }, { x: 0.55, y: 0.51 },
-    { x: 0.48, y: 0.41 }, { x: 0.52, y: 0.41 },
-  ),
-  pose(
-    0.56,
-    { x: 0.67, y: 0.92 }, { x: 0.34, y: 0.92 },
-    { x: 0.59, y: 0.75 }, { x: 0.41, y: 0.75 },
-    { x: 0.39, y: 0.53 }, { x: 0.62, y: 0.56 },
-    { x: 0.44, y: 0.42 }, { x: 0.56, y: 0.43 },
-  ),
-  pose(
-    0.59,
-    { x: 0.61, y: 0.90 }, { x: 0.34, y: 0.92 },
-    { x: 0.55, y: 0.78 }, { x: 0.40, y: 0.77 },
-    { x: 0.42, y: 0.55 }, { x: 0.59, y: 0.58 },
-    { x: 0.45, y: 0.45 }, { x: 0.55, y: 0.46 },
-  ),
-  pose(
-    0.56,
-    { x: 0.52, y: 0.80 }, { x: 0.34, y: 0.92 },
-    { x: 0.51, y: 0.70 }, { x: 0.41, y: 0.76 },
-    { x: 0.47, y: 0.54 }, { x: 0.54, y: 0.56 },
-    { x: 0.48, y: 0.44 }, { x: 0.52, y: 0.44 },
-  ),
-  pose(
-    0.53,
-    { x: 0.42, y: 0.85 }, { x: 0.34, y: 0.92 },
-    { x: 0.46, y: 0.72 }, { x: 0.40, y: 0.74 },
-    { x: 0.55, y: 0.51 }, { x: 0.47, y: 0.53 },
-    { x: 0.52, y: 0.41 }, { x: 0.48, y: 0.41 },
-  ),
+  pose(0.56, { x: 0.34, y: 0.92 }, { x: 0.67, y: 0.92 }, { x: 0.41, y: 0.75 }, { x: 0.59, y: 0.75 }, { x: 0.62, y: 0.56 }, { x: 0.39, y: 0.53 }, { x: 0.56, y: 0.43 }, { x: 0.44, y: 0.42 }),
+  pose(0.59, { x: 0.34, y: 0.92 }, { x: 0.61, y: 0.90 }, { x: 0.40, y: 0.77 }, { x: 0.55, y: 0.78 }, { x: 0.59, y: 0.58 }, { x: 0.42, y: 0.55 }, { x: 0.55, y: 0.46 }, { x: 0.45, y: 0.45 }),
+  pose(0.56, { x: 0.34, y: 0.92 }, { x: 0.52, y: 0.80 }, { x: 0.41, y: 0.76 }, { x: 0.51, y: 0.70 }, { x: 0.54, y: 0.56 }, { x: 0.47, y: 0.54 }, { x: 0.52, y: 0.44 }, { x: 0.48, y: 0.44 }),
+  pose(0.53, { x: 0.34, y: 0.92 }, { x: 0.42, y: 0.85 }, { x: 0.40, y: 0.74 }, { x: 0.46, y: 0.72 }, { x: 0.47, y: 0.53 }, { x: 0.55, y: 0.51 }, { x: 0.48, y: 0.41 }, { x: 0.52, y: 0.41 }),
+  pose(0.56, { x: 0.67, y: 0.92 }, { x: 0.34, y: 0.92 }, { x: 0.59, y: 0.75 }, { x: 0.41, y: 0.75 }, { x: 0.39, y: 0.53 }, { x: 0.62, y: 0.56 }, { x: 0.44, y: 0.42 }, { x: 0.56, y: 0.43 }),
+  pose(0.59, { x: 0.61, y: 0.90 }, { x: 0.34, y: 0.92 }, { x: 0.55, y: 0.78 }, { x: 0.40, y: 0.77 }, { x: 0.42, y: 0.55 }, { x: 0.59, y: 0.58 }, { x: 0.45, y: 0.45 }, { x: 0.55, y: 0.46 }),
+  pose(0.56, { x: 0.52, y: 0.80 }, { x: 0.34, y: 0.92 }, { x: 0.51, y: 0.70 }, { x: 0.41, y: 0.76 }, { x: 0.47, y: 0.54 }, { x: 0.54, y: 0.56 }, { x: 0.48, y: 0.44 }, { x: 0.52, y: 0.44 }),
+  pose(0.53, { x: 0.42, y: 0.85 }, { x: 0.34, y: 0.92 }, { x: 0.46, y: 0.72 }, { x: 0.40, y: 0.74 }, { x: 0.55, y: 0.51 }, { x: 0.47, y: 0.53 }, { x: 0.52, y: 0.41 }, { x: 0.48, y: 0.41 }),
 ] as const;
+
+const TEMPLATE_SHA256 = digest({
+  templateId: "side-view-biped-walk",
+  templateVersion: SIDE_VIEW_BIPED_WALK_TEMPLATE_VERSION,
+  rightFacingPoses: RIGHT_FACING_POSES,
+});
 
 function mirroredPose(input: Pose): Pose {
   return Object.fromEntries(
@@ -130,10 +109,37 @@ function mirroredPose(input: Pose): Pose {
   );
 }
 
+function canonicalPlan(input: AnimationDirectorPlan): AnimationDirectorPlan {
+  let rebuilt: AnimationDirectorPlan;
+  try {
+    rebuilt = compileAnimationDirectorPlan({
+      clipId: input.clipId,
+      subjectId: input.subjectId,
+      action: input.action,
+      direction: input.direction,
+      motionStyle: input.motionStyle,
+      fps: input.fps,
+      canvas: input.canvas,
+      canonicalIdentityArtifactId: input.canonicalIdentityArtifactId,
+      ...(input.directionMasterArtifactId
+        ? { directionMasterArtifactId: input.directionMasterArtifactId }
+        : {}),
+      loop: input.loop,
+    });
+  } catch (error: unknown) {
+    fail(`Director plan cannot be canonically recompiled: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (stable(rebuilt) !== stable(input)) {
+    fail("Director plan is noncanonical or was mutated after compilation.");
+  }
+  return rebuilt;
+}
+
 export function compileSideViewBipedWalkPoseControls(
-  plan: AnimationDirectorPlan,
+  input: AnimationDirectorPlan,
 ): SideViewBipedWalkPoseSet {
-  if (!plan || typeof plan !== "object") fail("plan must be an Animation Director plan.");
+  if (!input || typeof input !== "object") fail("plan must be an Animation Director plan.");
+  const plan = canonicalPlan(input);
   if (plan.action !== "walk" || plan.frames.length !== 8) {
     fail("template requires the eight-phase walk Director plan.");
   }
@@ -169,7 +175,7 @@ export function compileSideViewBipedWalkPoseControls(
         kind: "authored",
         id: "side-view-biped-walk-template",
         version: SIDE_VIEW_BIPED_WALK_TEMPLATE_VERSION,
-        configSha256: plan.protocolVersion.padEnd(64, "0").slice(0, 64).replace(/[^a-f0-9]/g, "0"),
+        configSha256: TEMPLATE_SHA256,
       },
     });
   });
@@ -177,6 +183,8 @@ export function compileSideViewBipedWalkPoseControls(
   return {
     templateId: "side-view-biped-walk",
     templateVersion: SIDE_VIEW_BIPED_WALK_TEMPLATE_VERSION,
+    templateSha256: TEMPLATE_SHA256,
+    animationDirectorPlanSha256: digest(plan),
     clipId: plan.clipId,
     direction: plan.direction,
     poses,
