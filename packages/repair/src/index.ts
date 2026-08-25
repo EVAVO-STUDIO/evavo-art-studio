@@ -26,4 +26,6 @@ export * from "./logo-matte.js";
 export * from "./logo-surface-readiness.js";
 export * from "./animation-motion-repair.js";
 export * from "./animation-motion-repair-provider.js";
+export * from "./animation-appearance-repair.js";
+export * from "./animation-appearance-repair-provider.js";
 export { planTargetedRepair } from "./public-planner.js";
