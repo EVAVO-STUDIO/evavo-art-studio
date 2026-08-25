@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
@@ -31,12 +32,11 @@ if (!allowed.has(jobId)) throw new Error(`unsupported Darkworld Furnace Art Stud
 
 const candidatePath = path.resolve(candidate);
 const sourceRoot = path.resolve(workspaceRoot);
-const batchRoot = path.resolve(
-  outputOverride ?? path.join(process.cwd(), ".art-studio", "darkworld-furnace", jobId),
-);
+const batchRoot = path.resolve(outputOverride ?? path.join(process.cwd(), ".art-studio", "darkworld-furnace", jobId));
 const requestPath = path.join(batchRoot, "intake-request.json");
 const planPath = path.join(batchRoot, "intake-plan.json");
 const workspacePath = path.join(batchRoot, "workspace");
+const evidencePath = path.join(batchRoot, "furnace-intake-evidence.json");
 await mkdir(batchRoot, { recursive: true });
 
 const request = {
@@ -69,8 +69,31 @@ function run(command, args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
 run(process.execPath, ["scripts/compile-project-art-intake.mjs", "--request", requestPath, "--output", planPath]);
 run(pythonCommand, ["tools/run_project_art_intake.py", "--plan", planPath, "--output-root", workspacePath]);
+
+const candidateBytes = await readFile(candidatePath);
+const requestBytes = await readFile(requestPath);
+const planBytes = await readFile(planPath);
+const evidence = {
+  schema: "evavo.darkworld.furnace-art-intake-evidence.v1",
+  status: "intake-passed",
+  jobId,
+  candidate: candidatePath,
+  candidateSha256: sha256(candidateBytes),
+  intakeRequest: { path: requestPath, sha256: sha256(requestBytes) },
+  intakePlan: { path: planPath, sha256: sha256(planBytes) },
+  workspace: workspacePath,
+  jobOutputDirectory: batchRoot,
+  createdBy,
+  producerAuthority: "EVAVO-STUDIO/evavo-art-studio",
+  runtimeAdmissionAuthority: "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer",
+};
+await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, { flag: "wx" });
 
 console.log(JSON.stringify({
   status: "passed",
@@ -80,6 +103,8 @@ console.log(JSON.stringify({
   intakeRequest: requestPath,
   intakePlan: planPath,
   workspace: workspacePath,
+  evidence: evidencePath,
+  candidateSha256: evidence.candidateSha256,
   pythonCommand,
-  runtimeAdmissionAuthority: "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer",
+  runtimeAdmissionAuthority: evidence.runtimeAdmissionAuthority,
 }, null, 2));
