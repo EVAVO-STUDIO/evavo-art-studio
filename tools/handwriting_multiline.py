@@ -6,7 +6,10 @@ import json
 import tempfile
 from pathlib import Path
 
-from tools.handwriting_atlas import render_text
+try:
+    from tools.handwriting_atlas import render_text
+except ModuleNotFoundError:  # direct `python tools/handwriting_multiline.py`
+    from handwriting_atlas import render_text
 
 SCHEMA = "evavo.art-studio.handwriting-multiline-render.v1"
 
@@ -75,7 +78,6 @@ def render_multiline(
             rendered_lines.append({
                 "kind": "ink",
                 "line": index + 1,
-                "path": path,
                 "result": result,
                 "image": Image.open(path).convert("RGBA"),
             })
@@ -88,23 +90,19 @@ def render_multiline(
         blank_advance = median_height + gap
         width = max(item["image"].width for item in rendered_lines if item["kind"] == "ink")
         height = 0
-        placements = []
         for item in rendered_lines:
             if item["kind"] == "blank":
                 height += blank_advance
-                placements.append({"line": item["line"], "blank": True, "yPx": height})
-                continue
-            image = item["image"]
-            placements.append({"line": item["line"], "blank": False, "yPx": height, "pixelSize": [image.width, image.height]})
-            height += image.height + gap
+            else:
+                height += item["image"].height + gap
         height = max(1, height - gap)
         canvas = Image.new("RGBA", (max(1, width), height), (0, 0, 0, 0))
         y = 0
         line_results = []
         for item in rendered_lines:
             if item["kind"] == "blank":
+                line_results.append({"line": item["line"], "blank": True, "yPx": y})
                 y += blank_advance
-                line_results.append({"line": item["line"], "blank": True})
                 continue
             image = item["image"]
             canvas.alpha_composite(image, (0, y))
@@ -112,6 +110,7 @@ def render_multiline(
             line_results.append({
                 "line": item["line"],
                 "blank": False,
+                "yPx": y,
                 "text": result.get("text"),
                 "outputSha256": result.get("outputSha256"),
                 "pixelSize": result.get("pixelSize"),
