@@ -1,4 +1,4 @@
-export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.2" as const;
+export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.3" as const;
 export const ANIMATION_DIRECTOR_PLAN_KIND =
   "evavo.animation-director.plan" as const;
 
@@ -92,6 +92,7 @@ export interface AnimationDirectorPlan {
     plantedFootDriftTolerancePixels: number;
     rootLandmarkId: "root";
     requiredLandmarkIds: readonly ["root", "leftFoot", "rightFoot"];
+    loopClosureLandmarkIds: readonly ["root"];
     maximumRootStepPixels: number;
     loopClosureTolerancePixels: number;
     alphaRequired: true;
@@ -239,7 +240,7 @@ export function compileAnimationDirectorPlan(
     throw new Error("animation director request must be an object");
   }
   if (request.action !== "walk") {
-    throw new Error("action must be walk in animation director protocol 2026-08-25.2");
+    throw new Error("action must be walk in animation director protocol 2026-08-25.3");
   }
   if (!request.canvas || typeof request.canvas !== "object") {
     throw new Error("canvas must be an object");
@@ -342,6 +343,7 @@ export function compileAnimationDirectorPlan(
       plantedFootDriftTolerancePixels: plantedFootTolerance(motionStyle),
       rootLandmarkId: "root",
       requiredLandmarkIds: ["root", "leftFoot", "rightFoot"],
+      loopClosureLandmarkIds: ["root"],
       maximumRootStepPixels: maximumRootStep(motionStyle),
       loopClosureTolerancePixels: loopClosureTolerance(motionStyle),
       alphaRequired: true,
