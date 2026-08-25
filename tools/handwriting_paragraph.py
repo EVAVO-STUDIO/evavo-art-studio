@@ -14,6 +14,7 @@ except ModuleNotFoundError:
     from handwriting_multiline import render_multiline  # type: ignore
 
 SCHEMA = "evavo.art-studio.handwriting-paragraph-render.v1"
+MEASUREMENT_MODEL = "normalized-genuine-advance-v1"
 
 
 def _load(path: Path) -> dict:
@@ -33,24 +34,58 @@ def _sha_file(path: Path) -> str:
 
 def _median(values: list[float]) -> float:
     if not values:
-        raise ValueError("cannot measure handwriting atlas without genuine glyph advances")
+        raise ValueError("cannot measure handwriting atlas without genuine glyph metrics")
     ordered = sorted(values)
     return ordered[len(ordered) // 2]
 
 
-def _variant_advance(entries: list[dict], style: str | None) -> float:
-    values = []
-    for item in entries:
-        if not isinstance(item, dict):
-            continue
-        if style and str(item.get("style") or "").casefold() != style.casefold():
-            continue
-        advance = item.get("naturalAdvancePx")
-        if isinstance(advance, (int, float)) and not isinstance(advance, bool) and float(advance) > 0:
-            values.append(float(advance))
+def _eligible(entries: list[dict], style: str | None) -> list[dict]:
+    values = [
+        item for item in entries
+        if isinstance(item, dict)
+        and (not style or str(item.get("style") or "").casefold() == style.casefold())
+    ]
     if not values:
         raise ValueError(f"no genuine handwriting variant is available for requested style {style!r}")
-    return _median(values)
+    return values
+
+
+def _ink_metrics(item: dict) -> tuple[float, float, float]:
+    box = item.get("inkBox")
+    if not isinstance(box, list) or len(box) != 4:
+        raise ValueError("genuine handwriting atlas variant lacks inkBox metrics")
+    try:
+        ink_w = float(box[2]) - float(box[0])
+        ink_h = float(box[3]) - float(box[1])
+        natural = float(item.get("naturalAdvancePx"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("genuine handwriting atlas variant has invalid advance/ink metrics") from exc
+    if ink_w <= 0 or ink_h <= 0 or natural <= 0:
+        raise ValueError("genuine handwriting atlas variant has non-positive advance/ink metrics")
+    return ink_w, ink_h, natural
+
+
+def _target_ink_height(tokens: list[str], glyphs: dict[str, list[dict]], style: str | None) -> float:
+    heights = []
+    for token in tokens:
+        if token.isspace():
+            continue
+        entries = glyphs.get(token)
+        if not isinstance(entries, list) or not entries:
+            raise ValueError(f"genuine handwriting atlas is missing token {token!r}")
+        for item in _eligible(entries, style):
+            _ink_w, ink_h, _natural = _ink_metrics(item)
+            heights.append(ink_h)
+    return _median(heights)
+
+
+def _normalized_variant_advance(item: dict, target_h: float) -> float:
+    ink_w, ink_h, natural = _ink_metrics(item)
+    scale = target_h / ink_h
+    rendered_ink_w = ink_w * scale
+    normalized = natural * scale
+    # Mirror handwriting_atlas.render_text(): preserve genuine advance but cap padding-derived gaps.
+    return max(rendered_ink_w + 1.0, min(normalized, rendered_ink_w + target_h * 0.30))
 
 
 def _measure_text(atlas: dict, text: str, *, style: str | None) -> float:
@@ -60,25 +95,20 @@ def _measure_text(atlas: dict, text: str, *, style: str | None) -> float:
     tokens = atlas_tool._tokenize(text, glyphs)
     rendering = atlas.get("rendering") if isinstance(atlas.get("rendering"), dict) else {}
     tracking = float(rendering.get("trackingPx", 1.5))
+    target_h = _target_ink_height(tokens, glyphs, style)
+
     all_advances = [
         float(item["naturalAdvancePx"])
         for entries in glyphs.values()
         if isinstance(entries, list)
         for item in entries
-        if isinstance(item, dict) and isinstance(item.get("naturalAdvancePx"), (int, float)) and float(item["naturalAdvancePx"]) > 0
+        if isinstance(item, dict)
+        and isinstance(item.get("naturalAdvancePx"), (int, float))
+        and not isinstance(item.get("naturalAdvancePx"), bool)
+        and float(item["naturalAdvancePx"]) > 0
     ]
     median_advance = _median(all_advances)
-    # Match the single-line renderer's conservative space rhythm without needing raster generation.
-    representative_ink = []
-    for entries in glyphs.values():
-        if not isinstance(entries, list):
-            continue
-        for item in entries:
-            ink = item.get("inkSize") if isinstance(item, dict) else None
-            if isinstance(ink, list) and len(ink) == 2 and isinstance(ink[1], (int, float)) and float(ink[1]) > 0:
-                representative_ink.append(float(ink[1]))
-    median_ink_h = _median(representative_ink) if representative_ink else median_advance
-    space_advance = max(median_ink_h * 0.35, median_advance * float(rendering.get("spaceFactor", 0.48)))
+    space_advance = max(target_h * 0.35, median_advance * float(rendering.get("spaceFactor", 0.48)))
 
     width = 0.0
     glyph_count = 0
@@ -89,7 +119,8 @@ def _measure_text(atlas: dict, text: str, *, style: str | None) -> float:
         entries = glyphs.get(token)
         if not isinstance(entries, list) or not entries:
             raise ValueError(f"genuine handwriting atlas is missing token {token!r}")
-        width += _variant_advance(entries, style)
+        advances = [_normalized_variant_advance(item, target_h) for item in _eligible(entries, style)]
+        width += _median(advances)
         glyph_count += 1
     if glyph_count > 1:
         width += tracking * (glyph_count - 1)
@@ -132,6 +163,7 @@ def wrap_text(atlas_path: Path, text: str, *, max_width_px: int, style: str | No
                     "blank": False,
                     "estimatedWidthPx": round(line_width, 3),
                     "maxWidthPx": max_width_px,
+                    "measurementModel": MEASUREMENT_MODEL,
                 })
                 current = word
             else:
@@ -145,6 +177,7 @@ def wrap_text(atlas_path: Path, text: str, *, max_width_px: int, style: str | No
                 "blank": False,
                 "estimatedWidthPx": round(line_width, 3),
                 "maxWidthPx": max_width_px,
+                "measurementModel": MEASUREMENT_MODEL,
             })
     return "\n".join(output_lines), evidence
 
@@ -186,6 +219,7 @@ def render_paragraph(
         "wrappedText": wrapped,
         "style": style,
         "maxWidthPx": max_width_px,
+        "measurementModel": MEASUREMENT_MODEL,
         "lineCount": multiline["lineCount"],
         "inkLineCount": multiline["inkLineCount"],
         "blankLineCount": multiline["blankLineCount"],
@@ -199,6 +233,7 @@ def render_paragraph(
             "fontFallbackUsed": False,
             "syntheticHandwritingGenerated": False,
             "wordWrappingUsesMeasuredGenuineAdvances": True,
+            "wrappingMatchesNormalizedInkHeightModel": True,
             "wordsSplitWithoutCapturedGlyphBoundary": False,
             "strokeDeformation": False,
         },
