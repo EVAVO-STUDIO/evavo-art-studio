@@ -58,6 +58,7 @@ describe("Adventure Studio v3 art review loop", () => {
           code: "alpha-halo",
           severity: "blocking",
           message: "Visible pale fringe on hostile black plate.",
+          frameIds: [],
           evidenceDigests: ["sha256:alpha-proof"],
           suggestedRepair: "Defringe the affected edge only and preserve the registered painted plate.",
         },
