@@ -6,6 +6,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fragmentPaths = [
   path.join(root, 'evavo.tasks.d', 'document-ink-finishing.json'),
   path.join(root, 'evavo.tasks.d', 'handwriting-coverage.json'),
+  path.join(root, 'evavo.tasks.d', 'handwriting-capture-spec.json'),
 ];
 const requiredFiles = [
   'tools/document_ink_finisher.py',
@@ -13,6 +14,7 @@ const requiredFiles = [
   'tools/handwriting_whole_mark.py',
   'tools/handwriting_document_bridge.py',
   'tools/handwriting_coverage.py',
+  'tools/handwriting_capture_spec.py',
   'contracts/handwriting-document-export.v1.schema.json',
   'scripts/check-handwriting-all.mjs',
   'scripts/test_document_ink_finisher.py',
@@ -20,6 +22,7 @@ const requiredFiles = [
   'scripts/test_handwriting_whole_mark.py',
   'scripts/test_handwriting_document_bridge.py',
   'scripts/test_handwriting_coverage.py',
+  'scripts/test_handwriting_capture_spec.py',
   'scripts/test_handwriting_export_contract.py',
   'docs/DOCUMENT_INK_FINISHING.md',
 ];
@@ -56,6 +59,7 @@ const requiredTasks = new Map([
   ['handwriting-atlas-build', ['tools/handwriting_atlas.py', true]],
   ['handwriting-atlas-render', ['tools/handwriting_atlas.py', true]],
   ['handwriting-atlas-coverage', ['tools/handwriting_coverage.py', false]],
+  ['handwriting-capture-spec', ['tools/handwriting_capture_spec.py', true]],
   ['handwriting-whole-mark-select', ['tools/handwriting_atlas.py', false]],
   ['handwriting-whole-mark-render', ['tools/handwriting_whole_mark.py', true]],
   ['handwriting-document-export', ['tools/handwriting_document_bridge.py', true]],
