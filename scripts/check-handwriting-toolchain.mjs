@@ -10,6 +10,7 @@ const fragmentPaths = [
   path.join(root, 'evavo.tasks.d', 'handwriting-capture-gap.json'),
   path.join(root, 'evavo.tasks.d', 'handwriting-capture-sheet.json'),
   path.join(root, 'evavo.tasks.d', 'handwriting-capture-register.json'),
+  path.join(root, 'evavo.tasks.d', 'handwriting-fiducial-detect.json'),
 ];
 const requiredFiles = [
   'tools/document_ink_finisher.py',
@@ -21,6 +22,7 @@ const requiredFiles = [
   'tools/handwriting_capture_gap.py',
   'tools/handwriting_capture_sheet.py',
   'tools/handwriting_capture_register.py',
+  'tools/handwriting_fiducial_detect.py',
   'contracts/handwriting-document-export.v1.schema.json',
   'contracts/handwriting-photo-registration.v1.schema.json',
   'scripts/check-handwriting-all.mjs',
@@ -33,6 +35,7 @@ const requiredFiles = [
   'scripts/test_handwriting_capture_gap.py',
   'scripts/test_handwriting_capture_sheet.py',
   'scripts/test_handwriting_capture_register.py',
+  'scripts/test_handwriting_fiducial_detect.py',
   'scripts/test_handwriting_export_contract.py',
   'docs/DOCUMENT_INK_FINISHING.md',
 ];
@@ -70,6 +73,7 @@ const requiredTasks = new Map([
   ['handwriting-capture-gap', ['tools/handwriting_capture_gap.py', true]],
   ['handwriting-capture-sheet', ['tools/handwriting_capture_sheet.py', true]],
   ['handwriting-capture-register', ['tools/handwriting_capture_register.py', true]],
+  ['handwriting-fiducial-detect', ['tools/handwriting_fiducial_detect.py', true]],
   ['handwriting-whole-mark-select', ['tools/handwriting_atlas.py', false]],
   ['handwriting-whole-mark-render', ['tools/handwriting_whole_mark.py', true]],
   ['handwriting-document-export', ['tools/handwriting_document_bridge.py', true]],
@@ -90,6 +94,8 @@ for (const [name, [entry, mustCreateOutput]] of requiredTasks) {
 }
 const descriptions = Object.values(allTasks).map((task) => String(task.description ?? '').toLowerCase()).join('\n');
 if (!descriptions.includes('never synthesizes signatures') && !descriptions.includes('never synthesizes signatures from glyphs')) throw new Error('handwriting task descriptions must preserve the whole-signature boundary');
+const fiducialDescription = String(allTasks['handwriting-fiducial-detect']?.description ?? '').toLowerCase();
+if (!fiducialDescription.includes('review-required') || !fiducialDescription.includes('fails closed')) throw new Error('fiducial detector must preserve review/fail-closed boundary');
 console.log(JSON.stringify({
   ok: true,
   fragments: fragmentPaths.map((item) => path.relative(root, item).replaceAll('\\', '/')),
