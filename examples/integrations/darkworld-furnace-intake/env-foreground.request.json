@@ -1,0 +1,12 @@
+{
+  "schema": "evavo.darkworld.furnace-art-candidate.v1",
+  "jobId": "env-foreground",
+  "consumer": "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer",
+  "output": "assets/environments/furnace_intake/foreground.png",
+  "canvas": {"width": 1280, "height": 360, "alpha": true},
+  "objective": "Transparent foreground occluder plate with pipes, grates, chains, framing and industrial silhouettes that create deep cinematic staging while preserving the player readability and authored occlusion behavior.",
+  "visualGrammar": ["heavy foreground silhouettes", "dirty iron", "grates", "pipes", "restrained asymmetric composition", "late-90s cinematic depth"],
+  "mustNotContain": ["full-screen obstruction", "player", "guard", "HUD", "baked gameplay prompts", "generic cyberpunk neon", "random decorative clutter that hides interactions"],
+  "protectedFacts": ["player readability corridor", "foreground occlusion zones", "camera centres", "room split", "cover and crusher readability"],
+  "returnEvidence": ["source_hash", "candidate_hash", "review_reference", "mastered_output_hash", "delivery_profile"]
+}
