@@ -1,5 +1,6 @@
 import {
   normalizeJson,
+  sha256,
   stableStringify,
   type ArtifactId,
 } from "@evavo/art-artifacts";
@@ -19,7 +20,7 @@ import {
   type ProviderStyleEnvelopeInput,
 } from "@evavo/art-providers";
 
-export const ANIMATION_PROVIDER_COMPILER_VERSION = "2026-08-25.2" as const;
+export const ANIMATION_PROVIDER_COMPILER_VERSION = "2026-08-25.3" as const;
 
 export interface AnimationProviderBatchCompileRequest {
   readonly plan: AnimationDirectorPlan;
@@ -40,12 +41,14 @@ export interface AnimationProviderBatchCompilation {
   readonly schemaVersion: "1.0";
   readonly compilerVersion: typeof ANIMATION_PROVIDER_COMPILER_VERSION;
   readonly planProtocolVersion: AnimationDirectorPlan["protocolVersion"];
+  readonly planSha256: string;
   readonly clipId: string;
   readonly batchId: string;
   readonly phase: AnimationGenerationBatch["phase"];
   readonly requests: readonly NormalizedProviderCandidateRequest[];
   readonly authority: Readonly<{
     providerExecution: false;
+    runtimeSubmission: false;
     creativeApproval: false;
     artifactPromotion: false;
     repositoryMutation: false;
@@ -64,6 +67,16 @@ function artifactId(value: unknown, field: string): ArtifactId {
     fail(`${field} must be a canonical artifact_[64 lowercase hex] id.`);
   }
   return value as ArtifactId;
+}
+
+function canonicalJson(value: unknown): string {
+  try {
+    return stableStringify(normalizeJson(value));
+  } catch (error: unknown) {
+    fail(
+      `value must be canonical JSON data: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 function verifiedPlan(input: AnimationDirectorPlan): AnimationDirectorPlan {
@@ -92,17 +105,7 @@ function verifiedPlan(input: AnimationDirectorPlan): AnimationDirectorPlan {
     );
   }
 
-  let submitted: string;
-  let expected: string;
-  try {
-    submitted = stableStringify(normalizeJson(input));
-    expected = stableStringify(normalizeJson(canonical));
-  } catch (error: unknown) {
-    fail(
-      `plan must be canonical JSON data: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (submitted !== expected) {
+  if (canonicalJson(input) !== canonicalJson(canonical)) {
     fail("plan does not match the canonical Animation Director compilation.");
   }
   return canonical;
@@ -228,6 +231,7 @@ function referencesForFrame(
 
 function requestForFrame(
   plan: AnimationDirectorPlan,
+  planSha256: string,
   batch: AnimationGenerationBatch,
   frame: AnimationFramePlan,
   request: AnimationProviderBatchCompileRequest,
@@ -298,6 +302,7 @@ function requestForFrame(
     ...(request.selection ? { selection: request.selection } : {}),
     metadata: {
       animationDirectorProtocolVersion: plan.protocolVersion,
+      animationDirectorPlanSha256: planSha256,
       animationProviderCompilerVersion: ANIMATION_PROVIDER_COMPILER_VERSION,
       clipId: plan.clipId,
       batchId: batch.id,
@@ -315,6 +320,7 @@ function requestForFrame(
       loopClosureLandmarkIds: plan.qualityRequirements.loopClosureLandmarkIds,
       authority: {
         providerExecution: false,
+        runtimeSubmission: false,
         creativeApproval: false,
         artifactPromotion: false,
         repositoryMutation: false,
@@ -333,22 +339,32 @@ export function compileAnimationProviderBatch(
     fail("request must be an object.");
   }
   const plan = verifiedPlan(request.plan);
+  const planSha256 = sha256(canonicalJson(plan));
   const batch = findBatch(plan, request.batchId);
   const count = candidateCount(request.candidateCount, batch.maximumCandidatesPerFrame);
   const requests = batch.frames.map((frameNumber) =>
-    requestForFrame(plan, batch, framePlan(plan, frameNumber), request, count),
+    requestForFrame(
+      plan,
+      planSha256,
+      batch,
+      framePlan(plan, frameNumber),
+      request,
+      count,
+    ),
   );
 
   return {
     schemaVersion: "1.0",
     compilerVersion: ANIMATION_PROVIDER_COMPILER_VERSION,
     planProtocolVersion: plan.protocolVersion,
+    planSha256,
     clipId: plan.clipId,
     batchId: batch.id,
     phase: batch.phase,
     requests,
     authority: {
       providerExecution: false,
+      runtimeSubmission: false,
       creativeApproval: false,
       artifactPromotion: false,
       repositoryMutation: false,
