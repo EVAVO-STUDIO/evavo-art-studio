@@ -60,7 +60,6 @@ test("compiles a self-hashed Test Lab expectation only after descriptor acceptan
     descriptorSha256: "a".repeat(64),
     animationDirectorPlanSha256: "b".repeat(64),
     animation: animation(),
-    maximumFrameTimingErrorMs: 3,
     maximumPivotDriftPixels: 0,
   });
 
@@ -68,10 +67,22 @@ test("compiles a self-hashed Test Lab expectation only after descriptor acceptan
   assert.equal(result.clipId, "walk-right");
   assert.deepEqual(result.frameIds, ["walk-1", "walk-2", "walk-3"]);
   assert.deepEqual(result.frameDurationMicros, [125000, 250000, 125000]);
+  assert.equal(result.maximumFrameTimingErrorMs, 20);
   assert.equal(result.maximumPivotDriftPixels, 0);
   assert.match(result.expectationSha256, /^[a-f0-9]{64}$/);
   assert.equal(result.runId, result.expectationSha256.slice(0, 20));
   assert.ok(Object.values(result.authority).every((value) => value === false));
+});
+
+test("allows a stricter explicit observed-cadence tolerance when a lane can support it", () => {
+  const result = compileGodotSpriteAnimationRuntimeExpectation({
+    descriptor: descriptor(),
+    descriptorSha256: "a".repeat(64),
+    animationDirectorPlanSha256: "b".repeat(64),
+    animation: animation(),
+    maximumFrameTimingErrorMs: 3,
+  });
+  assert.equal(result.maximumFrameTimingErrorMs, 3);
 });
 
 test("fails closed when descriptor semantics do not match the requested runtime expectation", () => {
