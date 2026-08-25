@@ -74,6 +74,7 @@ test("compiles key-pose work into plan-bound provider-valid sprite-frame request
   );
 
   assert.equal(result.phase, "key-pose");
+  assert.equal(result.productionRoute, "art-studio-sprite");
   assert.equal(result.requests.length, 2);
   assert.match(result.planSha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(result.authority, {
@@ -90,6 +91,7 @@ test("compiles key-pose work into plan-bound provider-valid sprite-frame request
     assert.equal(request.candidateCount, 2);
     assert.equal(request.target.transparency, "required");
     assert.equal(request.metadata.animationDirectorPlanSha256, result.planSha256);
+    assert.equal(request.metadata.productionRoute, "art-studio-sprite");
     assert.equal(request.metadata.authority.runtimeSubmission, false);
     assert.ok(request.references.some((entry) => entry.role === "canonical-identity" && entry.required));
     assert.ok(request.references.some((entry) => entry.role === "direction-master" && entry.required));
@@ -150,6 +152,18 @@ test("exact director plan identity is stable and changes with authored plan inpu
     }),
   );
   assert.notEqual(changed.planSha256, first.planSha256);
+});
+
+test("refuses to bypass Cel Animation Studio for traditional-cel production", () => {
+  assert.throws(
+    () =>
+      compileAnimationProviderBatch(
+        baseRequest("hero-walk-right:keys", {
+          plan: plan({ motionStyle: "traditional-cel" }),
+        }),
+      ),
+    /Cel Animation Studio X-sheet/,
+  );
 });
 
 test("fails closed when required visual dependencies do not exist", () => {
