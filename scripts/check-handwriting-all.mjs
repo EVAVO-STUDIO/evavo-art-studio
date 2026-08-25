@@ -31,6 +31,7 @@ for (const test of [
   'scripts/test_handwriting_capture_sheet.py',
   'scripts/test_handwriting_capture_register.py',
   'scripts/test_handwriting_fiducial_detect.py',
+  'scripts/test_handwriting_registration_review.py',
   'scripts/test_handwriting_export_contract.py',
 ]) {
   run(python, ['-m', 'unittest', test]);
@@ -41,5 +42,5 @@ console.log(JSON.stringify({
   check: 'handwriting-all',
   networkUsed: false,
   signingApprovalAuthority: false,
-  suites: 11,
+  suites: 12,
 }, null, 2));
