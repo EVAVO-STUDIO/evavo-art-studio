@@ -4,4 +4,5 @@ export * from "./decode.js";
 export * from "./analyse-frame.js";
 export * from "./analyse-sequence.js";
 export * from "./analyse-motion.js";
+export * from "./motion-evidence.js";
 export * from "./sequence-files.js";
