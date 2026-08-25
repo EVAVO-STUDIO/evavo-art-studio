@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const ASEPRITE_INTERCHANGE_PLAN_VERSION = "2026-08-25.1" as const;
+export const ASEPRITE_INTERCHANGE_PLAN_VERSION = "2026-08-25.2" as const;
 export const ASEPRITE_INTERCHANGE_PLAN_KIND =
   "evavo.aseprite-interchange.plan" as const;
 
@@ -38,6 +38,7 @@ export interface AsepriteInterchangePlan {
   readonly outputs: Readonly<{
     sheetPath: string;
     dataPath: string;
+    createOnly: true;
   }>;
   readonly arguments: readonly string[];
   readonly planSha256: string;
@@ -189,7 +190,7 @@ export function compileAsepriteInterchangePlan(
       sha256: executableSha256,
     },
     sourcePath,
-    outputs: { sheetPath, dataPath },
+    outputs: { sheetPath, dataPath, createOnly: true as const },
     arguments: args,
     authority: {
       processExecution: false as const,
