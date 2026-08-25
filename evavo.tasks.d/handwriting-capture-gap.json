@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "handwriting-capture-gap": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_capture_gap.py",
+      "arguments": ["{{spec}}", "{{atlas}}", "--output", "{{report}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["spec", "atlas", "report"],
+        "properties": {
+          "spec": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "report": {"type": "compute-path", "pathKind": "file", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["report"],
+      "network": "disabled",
+      "timeoutSeconds": 120,
+      "description": "Compare a desired genuine handwriting capture specification with the current atlas and create a sanitized gap report listing missing tokens and missing genuine-variant counts. Does not create handwriting or grant document approval authority."
+    }
+  }
+}
