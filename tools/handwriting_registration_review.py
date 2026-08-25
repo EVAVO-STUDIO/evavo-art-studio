@@ -19,7 +19,7 @@ def _load(path: Path) -> dict:
 def _sha_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024, b"")):
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
 
