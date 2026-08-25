@@ -55,6 +55,12 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {"required": ["reviewEvidence"]},
+      "then": {"required": ["detectionEvidence"]}
+    }
+  ],
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "point": {
