@@ -19,7 +19,7 @@ def _load(path: Path) -> dict:
 def _sha_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+        for chunk in iter(lambda: handle.read(1024 * 1024, b"")):
             h.update(chunk)
     return h.hexdigest()
 
@@ -27,12 +27,17 @@ def _sha_file(path: Path) -> str:
 def _corners(value, *, label: str) -> dict[str, list[float]]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be an object")
+    if set(value) != {"topLeft", "topRight", "bottomRight", "bottomLeft"}:
+        raise ValueError(f"{label} must contain exactly four named page corners")
     result: dict[str, list[float]] = {}
     for key in ("topLeft", "topRight", "bottomRight", "bottomLeft"):
         point = value.get(key)
         if not isinstance(point, list) or len(point) != 2:
             raise ValueError(f"{label}.{key} must contain x,y")
-        x, y = float(point[0]), float(point[1])
+        try:
+            x, y = float(point[0]), float(point[1])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{label}.{key} must contain numeric x,y") from exc
         if x < 0 or y < 0:
             raise ValueError(f"{label}.{key} must be non-negative")
         result[key] = [round(x, 3), round(y, 3)]
@@ -51,6 +56,10 @@ def bind_review(proposal_path: Path, review_path: Path, output: Path) -> dict:
         raise ValueError("registration proposal is not a review-required auto-detection result")
     if review.get("schema") != REVIEW_SCHEMA:
         raise ValueError("invalid handwriting registration review schema")
+    allowed_review = {"schema", "proposalSha256", "decision", "reviewedCornersPx"}
+    unknown_review = set(review) - allowed_review
+    if unknown_review:
+        raise ValueError("registration review contains unsupported field(s): " + ", ".join(sorted(unknown_review)))
     actual_proposal_sha = _sha_file(proposal_path)
     if str(review.get("proposalSha256") or "").casefold() != actual_proposal_sha:
         raise ValueError("registration review proposalSha256 does not match selected proposal")
@@ -58,11 +67,13 @@ def bind_review(proposal_path: Path, review_path: Path, output: Path) -> dict:
         raise ValueError("registration review decision must be accept")
     reviewed_corners = _corners(review.get("reviewedCornersPx"), label="reviewedCornersPx")
     proposed_corners = _corners(proposal.get("cornersPx"), label="proposal.cornersPx")
+    review_sha = _sha_file(review_path)
     corners_changed = reviewed_corners != proposed_corners
     reviewed = dict(proposal)
     reviewed["cornersPx"] = reviewed_corners
     reviewed["reviewEvidence"] = {
         "proposalSha256": actual_proposal_sha,
+        "reviewArtifactSha256": review_sha,
         "decision": "accept",
         "cornersChanged": corners_changed,
         "manualReviewCompleted": True,
@@ -73,6 +84,7 @@ def bind_review(proposal_path: Path, review_path: Path, output: Path) -> dict:
         "ok": True,
         "schema": REGISTRATION_SCHEMA,
         "proposalSha256": actual_proposal_sha,
+        "reviewArtifactSha256": review_sha,
         "reviewedRegistrationSha256": _sha_file(output),
         "cornersChanged": corners_changed,
         "manualReviewCompleted": True,
