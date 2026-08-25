@@ -1,0 +1,12 @@
+{
+  "schema": "evavo.darkworld.furnace-art-candidate.v1",
+  "jobId": "env-gameplay-skin",
+  "consumer": "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer",
+  "output": "assets/environments/furnace_intake/gameplay_skin.png",
+  "canvas": {"width": 1280, "height": 360, "alpha": true},
+  "objective": "Transparent gameplay-plane skin aligned to the locked collision/traversal lane. Add worn floor surfaces, wall contact detail, grime, rivets, seams, residue and believable industrial material transitions without altering gameplay geometry.",
+  "visualGrammar": ["late-1990s cinematic platformer", "physical grime", "worn iron", "soot", "oil staining", "restrained warm/cold contrast", "clear foot contact"],
+  "mustNotContain": ["new platforms", "fake ledges", "player", "guard", "HUD", "collision-significant protrusions", "neon cyberpunk", "modern signage"],
+  "protectedFacts": ["floor height", "traversal lane", "cover anchor", "crusher damage volume", "guard encounter anchor", "camera framing"],
+  "returnEvidence": ["source_hash", "candidate_hash", "review_reference", "mastered_output_hash", "delivery_profile"]
+}
