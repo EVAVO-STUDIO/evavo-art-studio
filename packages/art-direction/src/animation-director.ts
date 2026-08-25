@@ -1,4 +1,4 @@
-export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.5" as const;
+export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.6" as const;
 export const ANIMATION_DIRECTOR_PLAN_KIND =
   "evavo.animation-director.plan" as const;
 
@@ -21,6 +21,7 @@ export const ANIMATION_FRAME_ROLES = [
 ] as const;
 export type AnimationFrameRole = (typeof ANIMATION_FRAME_ROLES)[number];
 
+export type AnimationArtifactId = `artifact_${string}`;
 export type AnimationFoot = "left" | "right" | "none";
 export type AnimationFootLandmarkId = "leftFoot" | "rightFoot" | null;
 
@@ -35,8 +36,8 @@ export interface AnimationDirectorRequest {
     width: number;
     height: number;
   };
-  canonicalIdentityArtifactId: string;
-  directionMasterArtifactId?: string;
+  canonicalIdentityArtifactId: AnimationArtifactId;
+  directionMasterArtifactId?: AnimationArtifactId;
   loop?: boolean;
 }
 
@@ -79,8 +80,8 @@ export interface AnimationDirectorPlan {
   loop: boolean;
   fps: number;
   canvas: AnimationDirectorRequest["canvas"];
-  canonicalIdentityArtifactId: string;
-  directionMasterArtifactId?: string;
+  canonicalIdentityArtifactId: AnimationArtifactId;
+  directionMasterArtifactId?: AnimationArtifactId;
   frames: AnimationFramePlan[];
   generationBatches: AnimationGenerationBatch[];
   qualityRequirements: {
@@ -105,6 +106,8 @@ export interface AnimationDirectorPlan {
     publication: false;
   };
 }
+
+const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/;
 
 const WALK_ROLES: AnimationFrameRole[] = [
   "contact",
@@ -137,6 +140,14 @@ function requireNonBlank(value: unknown, field: string): string {
     throw new Error(`${field} must be non-empty`);
   }
   return normalized;
+}
+
+function requireArtifactId(value: unknown, field: string): AnimationArtifactId {
+  const normalized = requireNonBlank(value, field);
+  if (!ARTIFACT_ID.test(normalized)) {
+    throw new Error(`${field} must be a canonical artifact_[64 lowercase hex] id`);
+  }
+  return normalized as AnimationArtifactId;
 }
 
 function requirePositiveInteger(value: unknown, field: string): number {
@@ -240,7 +251,7 @@ export function compileAnimationDirectorPlan(
     throw new Error("animation director request must be an object");
   }
   if (request.action !== "walk") {
-    throw new Error("action must be walk in animation director protocol 2026-08-25.5");
+    throw new Error("action must be walk in animation director protocol 2026-08-25.6");
   }
   if (!request.canvas || typeof request.canvas !== "object") {
     throw new Error("canvas must be an object");
@@ -248,10 +259,17 @@ export function compileAnimationDirectorPlan(
 
   const clipId = requireNonBlank(request.clipId, "clipId");
   const subjectId = requireNonBlank(request.subjectId, "subjectId");
-  const canonicalIdentityArtifactId = requireNonBlank(
+  const canonicalIdentityArtifactId = requireArtifactId(
     request.canonicalIdentityArtifactId,
     "canonicalIdentityArtifactId",
   );
+  const directionMasterArtifactId =
+    request.directionMasterArtifactId === undefined
+      ? undefined
+      : requireArtifactId(
+          request.directionMasterArtifactId,
+          "directionMasterArtifactId",
+        );
   const motionStyle = requireMotionStyle(request.motionStyle);
   const direction = requireDirection(request.direction);
   const width = requirePositiveInteger(request.canvas.width, "canvas.width");
@@ -270,7 +288,7 @@ export function compileAnimationDirectorPlan(
       "canonical-identity",
       "pose-control",
     ];
-    if (request.directionMasterArtifactId) {
+    if (directionMasterArtifactId) {
       referenceRoles.push("direction-master");
     }
     if (!keyPose) {
@@ -300,14 +318,7 @@ export function compileAnimationDirectorPlan(
     fps,
     canvas: { width, height },
     canonicalIdentityArtifactId,
-    ...(request.directionMasterArtifactId
-      ? {
-          directionMasterArtifactId: requireNonBlank(
-            request.directionMasterArtifactId,
-            "directionMasterArtifactId",
-          ),
-        }
-      : {}),
+    ...(directionMasterArtifactId ? { directionMasterArtifactId } : {}),
     frames,
     generationBatches: [
       {
