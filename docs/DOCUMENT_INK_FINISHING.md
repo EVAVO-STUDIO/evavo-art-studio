@@ -48,6 +48,28 @@ python tools/handwriting_capture_spec.py `
 
 Use `--include-uppercase` only when a fresh uppercase bank is also needed. Every slot declares its token, variant number, style and QA requirements. The capture spec is safe to keep as workflow metadata, but the subsequently photographed sheets and transparent derivatives remain private personal-mark assets and must not be committed to Git.
 
+## Capture gap planning
+
+`tools/handwriting_capture_gap.py` compares the desired capture specification with the current genuine atlas and reports **exactly what still needs to be collected**.
+
+```powershell
+python tools/handwriting_capture_gap.py `
+  <capture-spec.json> `
+  <private-atlas.json> `
+  --output <create-only-gap-report.json>
+```
+
+For each token or whole-mark kind it reports required variant count, current genuine variant count and missing variant count. The intended maintenance loop is:
+
+1. create/reuse the capture specification;
+2. compare it with the current atlas;
+3. collect only missing genuine samples;
+4. extract/admit those samples with reviewed crop + keep regions;
+5. rebuild the atlas;
+6. rerun coverage and gap checks until the required bank is complete.
+
+This prevents repeated collection of handwriting already captured and makes lowercase/symbol expansion measurable. It never creates replacement handwriting for a missing slot.
+
 ## Whole names and signatures
 
 Use `tools/handwriting_whole_mark.py` to render a whole genuine name/signature variant. It verifies the source SHA and applies only bounded whole-raster scale/rotation before generating transparent output, hostile-background proof and receipt. Signature receipts state `signatureSynthesizedFromGlyphs=false`.
@@ -64,6 +86,6 @@ Run:
 node scripts/check-handwriting-all.mjs
 ```
 
-That command validates the governed handwriting task fragments and export contract, then runs the focused suites for photograph extraction, atlas rendering, whole marks, Document Studio bridge, coverage reporting, capture-spec generation and contract compatibility.
+That command validates the governed handwriting task fragments and export contract, then runs the focused suites for photograph extraction, atlas rendering, whole marks, Document Studio bridge, coverage reporting, capture-spec generation, capture-gap planning and contract compatibility.
 
 All governed handwriting tasks use the managed `image-finishing` Python environment with network disabled. They create only private workflow artifacts or return sanitized read-only reports and never grant signing or document-execution approval.
