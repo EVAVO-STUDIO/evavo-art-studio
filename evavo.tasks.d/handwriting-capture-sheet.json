@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "handwriting-capture-sheet": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_capture_sheet.py",
+      "arguments": ["{{spec}}", "{{outputDirectory}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["spec", "outputDirectory"],
+        "properties": {
+          "spec": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "outputDirectory": {"type": "compute-path", "pathKind": "directory", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["outputDirectory"],
+      "network": "disabled",
+      "timeoutSeconds": 120,
+      "description": "Render printable blank SVG handwriting capture sheets plus known box geometry and corner fiducials from a capture specification. Contains no generated handwriting, signature image or private personal-mark bytes and grants no document approval authority."
+    }
+  }
+}
