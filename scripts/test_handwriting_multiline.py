@@ -73,17 +73,23 @@ class HandwritingMultilineTests(unittest.TestCase):
             self.assertEqual(result["lineScaleNormalization"]["minimum"], 0.88)
             self.assertEqual(result["lineScaleNormalization"]["maximum"], 1.12)
             self.assertTrue(result["lineScaleNormalization"]["wholeLineRigidScaleOnly"])
+            self.assertEqual(result["lineStartVariation"]["fractionOfSharedInkHeight"], 0.04)
+            self.assertTrue(result["lineStartVariation"]["wholeLineTranslationOnly"])
             ink_lines = [line for line in result["lines"] if not line["blank"]]
             self.assertEqual(len(ink_lines), 2)
+            max_start = result["sharedTargetInkHeightPx"] * 0.04 + 0.01
             for line in ink_lines:
                 self.assertGreaterEqual(line["lineScale"], 0.88)
                 self.assertLessEqual(line["lineScale"], 1.12)
                 self.assertGreater(line["sourceTargetInkHeightPx"], 0)
                 self.assertGreater(line["effectiveTargetInkHeightPx"], 0)
+                self.assertLessEqual(abs(line["lineStartOffsetPx"]), max_start)
+                self.assertGreaterEqual(line["xPx"], 0)
             self.assertFalse(result["truthBoundary"]["fontFallbackUsed"])
             self.assertFalse(result["truthBoundary"]["syntheticHandwritingGenerated"])
             self.assertTrue(result["truthBoundary"]["lineImagesRenderedByGenuineAtlas"])
             self.assertTrue(result["truthBoundary"]["lineScaleNormalizedAsWholeRigidRaster"])
+            self.assertTrue(result["truthBoundary"]["lineStartVariationIsWholeRigidTranslation"])
             self.assertFalse(result["truthBoundary"]["strokeDeformation"])
 
     def test_is_deterministic_for_same_seed(self) -> None:
@@ -97,6 +103,9 @@ class HandwritingMultilineTests(unittest.TestCase):
             two = module.render_multiline(atlas, "AB\nBA", second, seed="same", style="uppercase")
             self.assertEqual(one["outputSha256"], two["outputSha256"])
             self.assertEqual(one["sharedTargetInkHeightPx"], two["sharedTargetInkHeightPx"])
+            one_offsets = [line.get("lineStartOffsetPx") for line in one["lines"] if not line["blank"]]
+            two_offsets = [line.get("lineStartOffsetPx") for line in two["lines"] if not line["blank"]]
+            self.assertEqual(one_offsets, two_offsets)
 
     def test_missing_character_still_fails_closed(self) -> None:
         module = _load(MULTILINE_TOOL, "handwriting_multiline_missing")
