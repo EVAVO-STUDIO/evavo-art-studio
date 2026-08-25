@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const ASEPRITE_INTERCHANGE_PLAN_VERSION = "2026-08-25.3" as const;
+export const ASEPRITE_INTERCHANGE_PLAN_VERSION = "2026-08-25.4" as const;
 export const ASEPRITE_INTERCHANGE_PLAN_KIND =
   "evavo.aseprite-interchange.plan" as const;
 
@@ -18,6 +18,7 @@ export interface AsepriteInterchangePlanRequest {
     sha256: string;
   }>;
   readonly sourcePath: string;
+  readonly sourceSha256: string;
   readonly sheetPath: string;
   readonly dataPath: string;
   readonly sheetType?: AsepriteSheetType;
@@ -34,7 +35,10 @@ export interface AsepriteInterchangePlan {
   readonly kind: typeof ASEPRITE_INTERCHANGE_PLAN_KIND;
   readonly version: typeof ASEPRITE_INTERCHANGE_PLAN_VERSION;
   readonly executable: AsepriteInterchangePlanRequest["executable"];
-  readonly sourcePath: string;
+  readonly source: Readonly<{
+    path: string;
+    sha256: string;
+  }>;
   readonly outputs: Readonly<{
     sheetPath: string;
     dataPath: string;
@@ -76,6 +80,14 @@ function text(value: unknown, field: string, maximum = 2048): string {
     fail(`${field} must be a non-empty safe string.`);
   }
   return value;
+}
+
+function sha(value: unknown, field: string): string {
+  const normalized = text(value, field, 64);
+  if (!SHA256.test(normalized)) {
+    fail(`${field} must be 64 lowercase hexadecimal characters.`);
+  }
+  return normalized;
 }
 
 function integer(value: unknown, field: string, fallback = 0): number {
@@ -124,12 +136,10 @@ export function compileAsepriteInterchangePlan(
   if (!request || typeof request !== "object") fail("request must be an object.");
   const executablePath = text(request.executable?.path, "executable.path");
   const executableVersion = text(request.executable?.version, "executable.version", 256);
-  const executableSha256 = text(request.executable?.sha256, "executable.sha256", 64);
-  if (!SHA256.test(executableSha256)) {
-    fail("executable.sha256 must be 64 lowercase hexadecimal characters.");
-  }
+  const executableSha256 = sha(request.executable?.sha256, "executable.sha256");
   const sourcePath = text(request.sourcePath, "sourcePath");
   sourceExtension(sourcePath);
+  const sourceSha256 = sha(request.sourceSha256, "sourceSha256");
   const sheetPath = text(request.sheetPath, "sheetPath");
   if (!sheetPath.toLowerCase().endsWith(".png")) {
     fail("sheetPath must end in .png.");
@@ -189,7 +199,7 @@ export function compileAsepriteInterchangePlan(
       version: executableVersion,
       sha256: executableSha256,
     },
-    sourcePath,
+    source: { path: sourcePath, sha256: sourceSha256 },
     outputs: { sheetPath, dataPath, createOnly: true as const },
     arguments: args,
     authority: {
