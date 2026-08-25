@@ -6,6 +6,7 @@ import {
 } from "@evavo/art-artifacts";
 import {
   compileAnimationDirectorPlan,
+  resolveAnimationProductionRoute,
   type AnimationDirectorPlan,
   type AnimationFramePlan,
   type AnimationGenerationBatch,
@@ -20,7 +21,7 @@ import {
   type ProviderStyleEnvelopeInput,
 } from "@evavo/art-providers";
 
-export const ANIMATION_PROVIDER_COMPILER_VERSION = "2026-08-25.3" as const;
+export const ANIMATION_PROVIDER_COMPILER_VERSION = "2026-08-25.4" as const;
 
 export interface AnimationProviderBatchCompileRequest {
   readonly plan: AnimationDirectorPlan;
@@ -42,6 +43,7 @@ export interface AnimationProviderBatchCompilation {
   readonly compilerVersion: typeof ANIMATION_PROVIDER_COMPILER_VERSION;
   readonly planProtocolVersion: AnimationDirectorPlan["protocolVersion"];
   readonly planSha256: string;
+  readonly productionRoute: "art-studio-sprite";
   readonly clipId: string;
   readonly batchId: string;
   readonly phase: AnimationGenerationBatch["phase"];
@@ -304,6 +306,7 @@ function requestForFrame(
       animationDirectorProtocolVersion: plan.protocolVersion,
       animationDirectorPlanSha256: planSha256,
       animationProviderCompilerVersion: ANIMATION_PROVIDER_COMPILER_VERSION,
+      productionRoute: "art-studio-sprite",
       clipId: plan.clipId,
       batchId: batch.id,
       phase: batch.phase,
@@ -339,6 +342,10 @@ export function compileAnimationProviderBatch(
     fail("request must be an object.");
   }
   const plan = verifiedPlan(request.plan);
+  const routing = resolveAnimationProductionRoute(plan.motionStyle);
+  if (!routing.directSpriteProviderCompilationAllowed) {
+    fail(`${routing.reason} Route: ${routing.route}.`);
+  }
   const planSha256 = sha256(canonicalJson(plan));
   const batch = findBatch(plan, request.batchId);
   const count = candidateCount(request.candidateCount, batch.maximumCandidatesPerFrame);
@@ -358,6 +365,7 @@ export function compileAnimationProviderBatch(
     compilerVersion: ANIMATION_PROVIDER_COMPILER_VERSION,
     planProtocolVersion: plan.protocolVersion,
     planSha256,
+    productionRoute: "art-studio-sprite",
     clipId: plan.clipId,
     batchId: batch.id,
     phase: batch.phase,
