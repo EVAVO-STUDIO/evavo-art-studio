@@ -141,10 +141,12 @@ def _detect_one(gray, quadrant: str) -> dict:
         "bottomRight": (width * (196.0 / PAGE_W_MM), height * (283.0 / PAGE_H_MM)),
         "bottomLeft": (width * (14.0 / PAGE_W_MM), height * (283.0 / PAGE_H_MM)),
     }[quadrant]
+
     def score(item: dict) -> float:
         cx, cy = item["center"]
         distance = math.hypot((cx - expected[0]) / width, (cy - expected[1]) / height)
         return item["fill"] * 3.0 + math.log1p(item["area"]) * 0.25 - distance * 7.0 - abs(math.log(item["aspect"]))
+
     plausible.sort(key=score, reverse=True)
     best = plausible[0]
     if len(plausible) > 1 and score(best) - score(plausible[1]) < 0.18:
@@ -168,8 +170,9 @@ def detect(source_image: Path, output: Path, *, page: int = 1) -> dict:
     if scale < 1.0:
         gray = gray.resize((max(1, round(gray.width * scale)), max(1, round(gray.height * scale))), Image.Resampling.BILINEAR)
     detections = {name: _detect_one(gray, name) for name in FIDUCIAL_CENTERS_MM}
-    detected_centers = [(detections[name]["center"][0] / scale, detections[name]["center"][1] / scale) for name in ("topLeft", "topRight", "bottomRight", "bottomLeft")]
-    reference_centers = [FIDUCIAL_CENTERS_MM[name] for name in ("topLeft", "topRight", "bottomRight", "bottomLeft")]
+    ordered_names = ("topLeft", "topRight", "bottomRight", "bottomLeft")
+    detected_centers = [(detections[name]["center"][0] / scale, detections[name]["center"][1] / scale) for name in ordered_names]
+    reference_centers = [FIDUCIAL_CENTERS_MM[name] for name in ordered_names]
     h = _homography(reference_centers, detected_centers)
     page_corners = {
         "topLeft": _project(h, 0.0, 0.0),
@@ -179,10 +182,8 @@ def detect(source_image: Path, output: Path, *, page: int = 1) -> dict:
     }
     width, height = original_size
     for name, (x, y) in page_corners.items():
-        tolerance_x = width * 0.08
-        tolerance_y = height * 0.08
-        if not (-tolerance_x <= x <= width + tolerance_x and -tolerance_y <= y <= height + tolerance_y):
-            raise ValueError(f"detected fiducials extrapolate implausible page corner {name}")
+        if not (0 <= x <= width and 0 <= y <= height):
+            raise ValueError(f"detected fiducials imply cropped/out-of-image page corner {name}")
     registration = {
         "schema": REGISTRATION_SCHEMA,
         "page": page,
@@ -191,7 +192,7 @@ def detect(source_image: Path, output: Path, *, page: int = 1) -> dict:
         "keepMarginPx": 6,
         "detectionEvidence": {
             "method": "solid-square-fiducials-v1",
-            "fiducialCentersPx": {name: [round(detected_centers[index][0], 3), round(detected_centers[index][1], 3)] for index, name in enumerate(("topLeft", "topRight", "bottomRight", "bottomLeft"))},
+            "fiducialCentersPx": {name: [round(detected_centers[index][0], 3), round(detected_centers[index][1], 3)] for index, name in enumerate(ordered_names)},
             "downsampleScale": round(scale, 6),
             "manualReviewRequired": True,
         },
