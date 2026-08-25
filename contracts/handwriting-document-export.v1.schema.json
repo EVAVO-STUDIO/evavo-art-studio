@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.com.au/schemas/art-studio/handwriting-document-export.v1.schema.json",
+  "title": "EVAVO Art Studio Handwriting Document Export",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "sourceAtlasSha256", "atlasId", "assetRoot", "marks", "dateGlyphs", "textGlyphs", "text", "truthBoundary"],
+  "properties": {
+    "schema": {"const": "evavo.art-studio.document-personal-marks-export.v1"},
+    "sourceAtlasSha256": {"$ref": "#/$defs/sha256"},
+    "atlasId": {"type": "string", "minLength": 1, "maxLength": 128},
+    "assetRoot": {"type": "string", "minLength": 1},
+    "marks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signature", "name"],
+      "properties": {
+        "signature": {"$ref": "#/$defs/variants"},
+        "name": {"$ref": "#/$defs/variants"}
+      }
+    },
+    "dateGlyphs": {
+      "type": "object",
+      "minProperties": 10,
+      "propertyNames": {"pattern": "^[0-9./-]$"},
+      "additionalProperties": {"$ref": "#/$defs/variants"}
+    },
+    "textGlyphs": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"minLength": 1, "maxLength": 32},
+      "additionalProperties": {"$ref": "#/$defs/variants"}
+    },
+    "text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trackingPx", "spacePx", "baselinePx", "spacingPx", "scaleFraction", "rotationDegrees"],
+      "properties": {
+        "trackingPx": {"type": "number", "minimum": -5, "maximum": 30},
+        "spacePx": {"type": "number", "exclusiveMinimum": 0, "maximum": 120},
+        "baselinePx": {"type": "number", "minimum": 0, "maximum": 5},
+        "spacingPx": {"type": "number", "minimum": 0, "maximum": 5},
+        "scaleFraction": {"type": "number", "minimum": 0, "maximum": 0.08},
+        "rotationDegrees": {"type": "number", "minimum": 0, "maximum": 3}
+      }
+    },
+    "truthBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["imageBytesCopied", "fontFallbackUsed", "syntheticHandwritingGenerated", "signatureSynthesizedFromGlyphs", "requiresDocumentStudioApprovalForPdfExecution"],
+      "properties": {
+        "imageBytesCopied": {"const": false},
+        "fontFallbackUsed": {"const": false},
+        "syntheticHandwritingGenerated": {"const": false},
+        "signatureSynthesizedFromGlyphs": {"const": false},
+        "requiresDocumentStudioApprovalForPdfExecution": {"const": true}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "file": {"type": "string", "minLength": 1, "pattern": "^(?![A-Za-z]:)(?!/)(?!.*(?:^|[\\/])\\.\\.(?:[\\/]|$)).+\\.png$"},
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "sha256", "advancePx"],
+        "properties": {
+          "file": {"$ref": "#/$defs/file"},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "advancePx": {"type": "number", "exclusiveMinimum": 0},
+          "style": {"type": "string", "minLength": 1, "maxLength": 64},
+          "label": {"type": "string", "minLength": 1, "maxLength": 128},
+          "inkBox": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}, {"type": "number"}, {"type": "number"}], "items": false, "minItems": 4, "maxItems": 4},
+          "sideBearingPx": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["left", "right", "top", "bottom"],
+            "properties": {
+              "left": {"type": "number", "minimum": 0},
+              "right": {"type": "number", "minimum": 0},
+              "top": {"type": "number", "minimum": 0},
+              "bottom": {"type": "number", "minimum": 0}
+            }
+          }
+        }
+      }
+    }
+  }
+}
