@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const ASEPRITE_INTERCHANGE_PLAN_VERSION = "2026-08-25.2" as const;
+export const ASEPRITE_INTERCHANGE_PLAN_VERSION = "2026-08-25.3" as const;
 export const ASEPRITE_INTERCHANGE_PLAN_KIND =
   "evavo.aseprite-interchange.plan" as const;
 
@@ -154,10 +154,10 @@ export function compileAsepriteInterchangePlan(
 
   const args = [
     "-b",
-    sourcePath,
-    ...(tag ? ["--tag", tag] : []),
     "--list-tags",
     "--list-slices",
+    ...(tag ? ["--tag", tag] : []),
+    sourcePath,
     "--format",
     "json-array",
     "--sheet-type",
