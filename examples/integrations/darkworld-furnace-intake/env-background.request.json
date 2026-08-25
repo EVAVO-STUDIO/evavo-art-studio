@@ -1,0 +1,51 @@
+{
+  "schema": "evavo.integration.darkworld-furnace-art-request.v1",
+  "jobId": "env-background",
+  "consumer": "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer",
+  "consumerOutput": "assets/environments/furnace_intake/background.png",
+  "canvas": {"width": 1280, "height": 360, "alpha": false},
+  "authoredFrame": {"width": 640, "height": 360, "rooms": 2},
+  "creativeDirection": {
+    "subject": "oppressive alien-industrial furnace intake architecture spanning two authored side-on cinematic platformer frames",
+    "composition": "strict side-on gameplay readability, dark cold intake at left, hotter furnace architecture at right, deep structural layering without moving gameplay anchors",
+    "materials": ["aged iron", "oxidised steel", "soot-dark masonry", "riveted industrial panels", "heat-stained furnace structure"],
+    "lighting": "cold low ambient structure against restrained warm furnace emission; no neon",
+    "eraGrammar": "late-1990s premium CD-ROM cinematic platformer pre-rendered/painted environment",
+    "mustRemainOriginal": true
+  },
+  "protectedFacts": [
+    "do not bake player, guard, HUD, cover or crusher into background",
+    "do not move the floor/traversal lane",
+    "do not imply geometry that contradicts the consumer collision layout",
+    "preserve two 640x360 authored camera frames across the 1280x360 plate"
+  ],
+  "reject": [
+    "generic cyberpunk",
+    "neon sci-fi",
+    "clean modern factory",
+    "modern tactical signage",
+    "photoreal contemporary industrial photography",
+    "fantasy steampunk ornament",
+    "AI-like random piping with no structural logic",
+    "baked characters or UI"
+  ],
+  "producerFlow": [
+    "provider candidate generation under Art Studio authority",
+    "Project Art immutable intake",
+    "bounded mastering",
+    "review evidence",
+    "delivery optimisation",
+    "return mastered candidate plus hashes; no Darkworld mutation"
+  ],
+  "returnEvidence": [
+    "job_id",
+    "provider_or_generator",
+    "candidate_hash",
+    "intake_plan_hash",
+    "mastered_output_hash",
+    "review_reference",
+    "delivery_profile",
+    "unresolved_risks"
+  ],
+  "runtimeAdmissionAuthority": "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer"
+}
