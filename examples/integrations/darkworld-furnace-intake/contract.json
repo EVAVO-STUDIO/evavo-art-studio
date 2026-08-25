@@ -13,7 +13,27 @@
     "sourceMutation": false,
     "consumerRuntimeAdmission": false
   },
-  "jobOutputFiles": ["intake-request.json", "intake-plan.json", "workspace/"],
+  "jobOutputFiles": ["intake-request.json", "intake-plan.json", "workspace/", "furnace-intake-evidence.json"],
+  "producerEvidence": {
+    "schema": "evavo.darkworld.furnace-art-intake-evidence.v1",
+    "file": "furnace-intake-evidence.json",
+    "status": "intake-passed",
+    "binds": [
+      "jobId",
+      "candidate",
+      "candidateSha256",
+      "intakeRequest.path",
+      "intakeRequest.sha256",
+      "intakePlan.path",
+      "intakePlan.sha256",
+      "workspace",
+      "jobOutputDirectory",
+      "createdBy",
+      "producerAuthority",
+      "runtimeAdmissionAuthority"
+    ],
+    "createOnly": true
+  },
   "jobs": [
     {"id":"env-background","output":"assets/environments/furnace_intake/background.png"},
     {"id":"env-mid-structure","output":"assets/environments/furnace_intake/mid_structure.png"},
@@ -21,6 +41,13 @@
     {"id":"env-foreground","output":"assets/environments/furnace_intake/foreground.png"},
     {"id":"env-glow","output":"assets/environments/furnace_intake/glow.png"}
   ],
-  "returnEvidence": ["source_hash","candidate_hash","mastered_output_hash","review_reference","delivery_profile","job_output_directory"],
+  "returnEvidence": [
+    "candidate_sha256",
+    "intake_request_sha256",
+    "intake_plan_sha256",
+    "workspace",
+    "job_output_directory",
+    "producer_authority"
+  ],
   "runtimeAdmissionAuthority": "consumer"
 }
