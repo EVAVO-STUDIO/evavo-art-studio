@@ -19,27 +19,29 @@ A separate generic `animation-studio` repository would duplicate those boundarie
 - a canonical identity reference on every frame;
 - optional direction-master references;
 - explicit pose-control requirements;
-- previous-frame and next-key-pose reference roles for dependent drawings;
+- provider-compatible previous-key-pose and next-key-pose roles for dependent drawings;
 - two key contact poses followed by two bounded in-between groups;
 - planted-foot continuity requirements and style-specific drift tolerances;
 - explicit `root`, `leftFoot` and `rightFoot` landmark requirements;
 - style-specific maximum root-step and loop-seam tolerances;
-- pivot, baseline, camera, alpha and loop locks;
+- pivot, baseline, camera, alpha and playback-loop locks;
 - an all-false authority boundary for provider execution, approval, promotion, repository mutation and publication.
 
 The compiler deliberately rejects unsupported actions in this protocol revision. Expanding the action vocabulary without motion-specific semantics would produce generic animation plans and is not considered progress.
 
 ## Generation strategy
 
-The intended production order is:
+The implemented production path is now:
 
 ```text
 canonical identity + direction master
   -> motion profile
   -> pose plan
-  -> key contacts
-  -> key-pose review
-  -> dependency-bounded in-betweens
+  -> Animation Director frame/batch plan
+  -> pose-control artifacts
+  -> key-pose provider requests
+  -> retained key-pose artifacts
+  -> in-between provider requests bound to both keys
   -> motion evidence
   -> sequence and motion QA
   -> targeted repair
@@ -48,11 +50,28 @@ canonical identity + direction master
   -> Godot runtime validation
 ```
 
-Batch size is a worker/resource limit, not an animation-design rule. Frames are grouped by motion dependency. A future provider may execute several related frame candidates in one bounded call, but every retained drawing remains an independently addressable immutable artifact.
+Batch size is a worker/resource limit, not an animation-design rule. Frames are grouped by motion dependency. Every retained drawing remains an independently addressable immutable artifact.
+
+Generation topology and playback topology are deliberately separate. Frames 6–8 of the walk require retained key poses 5 and 1 as structural neighbours even when the delivered clip is configured not to loop. That satisfies the provider contract's two-sided in-between requirement without falsely enabling runtime loop playback or loop-closure approval.
+
+## Governed provider bridge
+
+`@evavo/art-sprite-supervisor` now exposes `compileAnimationProviderBatch`. It translates one exact Animation Director generation batch into the existing provider-neutral candidate-request contract and then passes every request through `validateProviderCandidateRequest`.
+
+The bridge does not execute a provider. It requires concrete visual dependencies:
+
+- a canonical identity artifact;
+- an optional direction-master artifact when the plan declares one;
+- one pose-control artifact for every requested drawing;
+- both retained key-pose artifacts for any in-between batch.
+
+Missing or malformed artifact identities fail before a provider request exists. In-between work cannot replace a missing retained key pose with prose, a chat thumbnail or an unrelated previous frame. Candidate count is also bounded by the Animation Director batch budget.
+
+Each normalized provider request retains the animation protocol, batch, frame role, rational timing, planted-foot identity, landmark requirements and an all-false approval/publication authority record in metadata. Provider execution remains a later independently authorised runtime effect.
 
 ## Motion evidence and QA
 
-`@evavo/art-quality` now exposes `analyseAnimationMotion`. It consumes supplied per-frame landmark evidence and evaluates motion independently from the Animation Director.
+`@evavo/art-quality` exposes `analyseAnimationMotion`. It consumes supplied per-frame landmark evidence and evaluates motion independently from the Animation Director.
 
 The first implemented gates are:
 
@@ -70,21 +89,22 @@ Landmark coordinates are provider-neutral evidence. They may come from reviewed 
 
 ## Provider controls
 
-Art Studio's governed ComfyUI profile contract already supports canonical identity, direction master, previous/next key poses, pose, edge and depth controls, palette and line references. Animation Director should compile into those existing semantic roles rather than introduce provider-specific graph concepts.
+Art Studio's governed ComfyUI profile contract already supports canonical identity, direction master, previous/next key poses, pose, edge and depth controls, palette and line references. The new provider bridge uses those existing semantic roles rather than introducing provider-specific graph concepts.
 
-Pose guidance is intentionally abstract. An implementation may use an authored 2D skeleton, OpenPose-compatible control image, silhouette, depth guide, 3D mannequin projection or another reviewed structural representation. The Animation Director owns the semantic pose and contact constraints; the provider adapter owns how a reviewed workflow consumes them.
+Pose guidance is intentionally abstract. An implementation may use an authored 2D skeleton, OpenPose-compatible control image, silhouette, depth guide, 3D mannequin projection or another reviewed structural representation. Animation Director owns semantic pose/contact constraints; the provider adapter owns how an authorised reviewed workflow consumes the bound artifacts.
 
 ## Timing and interchange
 
 Animation timing remains explicit source data. Aseprite is a useful optional editable interchange because its CLI can export tagged frame ranges, layers, sprite sheets and JSON metadata, and its frame model retains per-frame duration. It must not become the canonical EVAVO authority: EVAVO manifests remain the source of timing, identity, provenance and approval state.
 
-Godot `SpriteFrames` likewise supports animation FPS, per-frame relative duration and none/linear/ping-pong loop modes. The Art Studio delivery adapter should translate reviewed EVAVO timing into those runtime semantics without changing authored timing.
+Godot `SpriteFrames` likewise supports animation FPS, per-frame relative duration and none/linear/ping-pong loop modes. The existing Art Studio Godot delivery descriptor already retains these values, so reviewed EVAVO timing can be translated without inventing another playback format.
 
 ## Remaining quality work
 
-The current motion analyser is intentionally deterministic and evidence-driven; it does not perform pose detection by itself. The next useful QA additions are:
+The current motion analyser is intentionally deterministic and evidence-driven; it does not perform pose detection by itself. The next useful additions are:
 
 - a governed landmark/pose extraction adapter with exact model/runtime provenance;
+- binding provider candidates to their derived/corrected landmark evidence;
 - limb-length and joint-angle stability where anatomy is relevant;
 - facing-direction evidence;
 - weapon-tip and prop trajectory continuity;
@@ -106,11 +126,10 @@ Scratch/working frames may be regenerated and repaired within bounded authorised
 ## Next implementation slices
 
 1. Add a governed pose/landmark evidence producer and structural-control image binding.
-2. Compile Animation Director frame plans into existing provider-neutral candidate requests.
-3. Bind provider results to motion evidence and use failed motion gates to produce targeted repair requests.
-4. Add Aseprite import/export with exact tool/version fingerprinting and no arbitrary script surface.
-5. Add a Godot walk-cycle smoke fixture that verifies frame order, timing, pivot, loop mode and atlas sampling in Game Test Lab.
-6. Extend motion profiles only after the walk fixture is proven: run, jump/land, climb, sword attack and hit reaction are the next useful families.
-7. Route traditional-cel profiles through Cel Animation Studio rather than duplicating X-sheet logic.
+2. Bind provider results to motion evidence and use failed motion gates to produce targeted repair requests.
+3. Add Aseprite import/export with exact tool/version fingerprinting and no arbitrary script surface.
+4. Add a Godot walk-cycle smoke fixture that verifies frame order, timing, pivot, loop mode and atlas sampling in Game Test Lab.
+5. Extend motion profiles only after the walk fixture is proven: run, jump/land, climb, sword attack and hit reaction are the next useful families.
+6. Route traditional-cel profiles through Cel Animation Studio rather than duplicating X-sheet logic.
 
 The definition of done for the first slice is not "a plan compiles". It is one canonical character moving through this entire path and producing a visually reviewed, technically clean walk cycle that plays correctly in the target Godot runtime.
