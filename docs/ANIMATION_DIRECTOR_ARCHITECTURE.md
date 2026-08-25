@@ -22,7 +22,9 @@ A separate generic `animation-studio` repository would duplicate those boundarie
 - previous-frame and next-key-pose reference roles for dependent drawings;
 - two key contact poses followed by two bounded in-between groups;
 - planted-foot continuity requirements and style-specific drift tolerances;
-- pivot, baseline, camera, alpha and loop-closure locks;
+- explicit `root`, `leftFoot` and `rightFoot` landmark requirements;
+- style-specific maximum root-step and loop-seam tolerances;
+- pivot, baseline, camera, alpha and loop locks;
 - an all-false authority boundary for provider execution, approval, promotion, repository mutation and publication.
 
 The compiler deliberately rejects unsupported actions in this protocol revision. Expanding the action vocabulary without motion-specific semantics would produce generic animation plans and is not considered progress.
@@ -38,7 +40,8 @@ canonical identity + direction master
   -> key contacts
   -> key-pose review
   -> dependency-bounded in-betweens
-  -> adjacent-frame and loop review
+  -> motion evidence
+  -> sequence and motion QA
   -> targeted repair
   -> alpha/frame mastering
   -> atlas/package
@@ -46,6 +49,24 @@ canonical identity + direction master
 ```
 
 Batch size is a worker/resource limit, not an animation-design rule. Frames are grouped by motion dependency. A future provider may execute several related frame candidates in one bounded call, but every retained drawing remains an independently addressable immutable artifact.
+
+## Motion evidence and QA
+
+`@evavo/art-quality` now exposes `analyseAnimationMotion`. It consumes supplied per-frame landmark evidence and evaluates motion independently from the Animation Director.
+
+The first implemented gates are:
+
+- required-landmark presence;
+- planted-landmark lock across each contiguous planted segment;
+- maximum root movement between adjacent drawings;
+- optional attachment constraints such as hand-to-weapon grip distance;
+- explicit loop-seam anchor closure.
+
+This separation is deliberate. Animation Director states what evidence is required; Quality evaluates evidence that was actually produced. Neither package invents landmark detections or claims creative approval.
+
+Loop closure is seam-aware. A valid walk does not require every limb in the last drawing to equal the first drawing. The first walk profile therefore closes the stable `root` seam anchor while foot and limb progression remain governed by pose, contact and adjacent-frame constraints. Additional motion families can declare different seam anchors where appropriate.
+
+Landmark coordinates are provider-neutral evidence. They may come from reviewed authored controls, a pinned pose estimator, a 3D projection, manually corrected anchors or another governed analyser. The analyser never treats the existence of landmark JSON as proof that the landmarks are visually correct; provenance and analyser identity must be retained by the caller.
 
 ## Provider controls
 
@@ -59,18 +80,16 @@ Animation timing remains explicit source data. Aseprite is a useful optional edi
 
 Godot `SpriteFrames` likewise supports animation FPS, per-frame relative duration and none/linear/ping-pong loop modes. The Art Studio delivery adapter should translate reviewed EVAVO timing into those runtime semantics without changing authored timing.
 
-## Quality work still required
+## Remaining quality work
 
-The current Art Studio sequence checks catch important image continuity failures, but the Animation Director needs dedicated motion analyzers before the walk slice is production-proven. Highest-value additions are:
+The current motion analyser is intentionally deterministic and evidence-driven; it does not perform pose detection by itself. The next useful QA additions are:
 
-- planted-foot lock measured in subject-local coordinates;
-- root/centre-of-mass trajectory continuity;
-- optional joint and limb-length stability;
-- hand-to-prop or hand-to-weapon attachment stability;
-- facing and camera stability;
-- final-to-first pose and root closure;
+- a governed landmark/pose extraction adapter with exact model/runtime provenance;
+- limb-length and joint-angle stability where anatomy is relevant;
+- facing-direction evidence;
+- weapon-tip and prop trajectory continuity;
 - temporal palette, line-weight and lighting flicker;
-- runtime-scale playback review rather than contact-sheet-only review.
+- runtime-scale playback evidence rather than contact-sheet-only review.
 
 These analyzers must produce evidence and blockers, not creative approval.
 
@@ -86,10 +105,10 @@ Scratch/working frames may be regenerated and repaired within bounded authorised
 
 ## Next implementation slices
 
-1. Add pose-plan artifacts and structural-control image binding.
+1. Add a governed pose/landmark evidence producer and structural-control image binding.
 2. Compile Animation Director frame plans into existing provider-neutral candidate requests.
-3. Add planted-foot/root/prop motion QA and loop-closure evidence.
-4. Add Aseprite import/export adapter with exact tool/version fingerprinting and no arbitrary script surface.
+3. Bind provider results to motion evidence and use failed motion gates to produce targeted repair requests.
+4. Add Aseprite import/export with exact tool/version fingerprinting and no arbitrary script surface.
 5. Add a Godot walk-cycle smoke fixture that verifies frame order, timing, pivot, loop mode and atlas sampling in Game Test Lab.
 6. Extend motion profiles only after the walk fixture is proven: run, jump/land, climb, sword attack and hit reaction are the next useful families.
 7. Route traditional-cel profiles through Cel Animation Studio rather than duplicating X-sheet logic.
