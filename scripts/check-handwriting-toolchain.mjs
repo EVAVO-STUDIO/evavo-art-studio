@@ -48,6 +48,8 @@ const requiredFiles = [
   'scripts/test_handwriting_registration_review.py',
   'scripts/test_handwriting_export_contract.py',
   'docs/DOCUMENT_INK_FINISHING.md',
+  'docs/HANDWRITING_MULTILINE.md',
+  'docs/HANDWRITING_PARAGRAPH.md',
 ];
 for (const relative of requiredFiles) {
   if (!fs.existsSync(path.join(root, relative))) throw new Error(`missing handwriting toolchain file: ${relative}`);
@@ -90,6 +92,7 @@ const requiredTasks = new Map([
   ['handwriting-paragraph-render', ['tools/handwriting_paragraph.py', true]],
   ['handwriting-atlas-coverage', ['tools/handwriting_coverage.py', false]],
   ['handwriting-capture-spec', ['tools/handwriting_capture_spec.py', true]],
+  ['handwriting-capture-spec-full', ['tools/handwriting_capture_spec.py', true]],
   ['handwriting-capture-gap', ['tools/handwriting_capture_gap.py', true]],
   ['handwriting-capture-sheet', ['tools/handwriting_capture_sheet.py', true]],
   ['handwriting-capture-register', ['tools/handwriting_capture_register.py', true]],
@@ -123,6 +126,11 @@ const multilineDescription = String(allTasks['handwriting-multiline-render']?.de
 if (!multilineDescription.includes('genuine') || !multilineDescription.includes('fail closed') || !multilineDescription.includes('no font fallback')) throw new Error('multiline handwriting task must preserve genuine/fail-closed rendering boundary');
 const paragraphDescription = String(allTasks['handwriting-paragraph-render']?.description ?? '').toLowerCase();
 if (!paragraphDescription.includes('measured genuine handwriting advances') || !paragraphDescription.includes('arbitrary word splitting') || !paragraphDescription.includes('no computer-font fallback')) throw new Error('paragraph handwriting task must preserve measured-genuine wrapping boundary');
+for (const taskName of ['handwriting-capture-spec', 'handwriting-capture-spec-full']) {
+  const props = allTasks[taskName]?.parameterSchema?.properties;
+  if (props?.lowercaseVariants?.default !== 3 || props?.punctuationVariants?.default !== 3) throw new Error(`${taskName} must default lowercase/punctuation capture targets to three genuine variants`);
+}
+if (allTasks['handwriting-capture-spec-full']?.parameterSchema?.properties?.uppercaseVariants?.default !== 3) throw new Error('full handwriting capture spec must default uppercase to three genuine variants');
 console.log(JSON.stringify({
   ok: true,
   fragments: fragmentPaths.map((item) => path.relative(root, item).replaceAll('\\', '/')),
