@@ -10,6 +10,9 @@ export const ANIMATION_MOTION_STYLES = [
 ] as const;
 export type AnimationMotionStyle = (typeof ANIMATION_MOTION_STYLES)[number];
 
+export const ANIMATION_DIRECTIONS = ["left", "right", "up", "down"] as const;
+export type AnimationDirection = (typeof ANIMATION_DIRECTIONS)[number];
+
 export const ANIMATION_FRAME_ROLES = [
   "contact",
   "down",
@@ -24,7 +27,7 @@ export interface AnimationDirectorRequest {
   clipId: string;
   subjectId: string;
   action: "walk";
-  direction: "left" | "right" | "up" | "down";
+  direction: AnimationDirection;
   motionStyle: AnimationMotionStyle;
   fps?: number;
   canvas: {
@@ -69,7 +72,7 @@ export interface AnimationDirectorPlan {
   clipId: string;
   subjectId: string;
   action: "walk";
-  direction: AnimationDirectorRequest["direction"];
+  direction: AnimationDirection;
   motionStyle: AnimationMotionStyle;
   loop: boolean;
   fps: number;
@@ -118,7 +121,10 @@ const WALK_PLANTED_FEET: AnimationFoot[] = [
   "right",
 ];
 
-function requireNonBlank(value: string, field: string): string {
+function requireNonBlank(value: unknown, field: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`${field} must be a string`);
+  }
   const normalized = value.trim();
   if (!normalized) {
     throw new Error(`${field} must be non-empty`);
@@ -126,11 +132,33 @@ function requireNonBlank(value: string, field: string): string {
   return normalized;
 }
 
-function requirePositiveInteger(value: number, field: string): number {
-  if (!Number.isInteger(value) || value <= 0) {
+function requirePositiveInteger(value: unknown, field: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
     throw new Error(`${field} must be a positive integer`);
   }
   return value;
+}
+
+function requireMotionStyle(value: unknown): AnimationMotionStyle {
+  if (
+    typeof value !== "string" ||
+    !ANIMATION_MOTION_STYLES.includes(value as AnimationMotionStyle)
+  ) {
+    throw new Error(
+      `motionStyle must be one of ${ANIMATION_MOTION_STYLES.join(", ")}`,
+    );
+  }
+  return value as AnimationMotionStyle;
+}
+
+function requireDirection(value: unknown): AnimationDirection {
+  if (
+    typeof value !== "string" ||
+    !ANIMATION_DIRECTIONS.includes(value as AnimationDirection)
+  ) {
+    throw new Error(`direction must be one of ${ANIMATION_DIRECTIONS.join(", ")}`);
+  }
+  return value as AnimationDirection;
 }
 
 function walkFps(requested: number | undefined, style: AnimationMotionStyle): number {
@@ -169,16 +197,31 @@ function plantedFootTolerance(style: AnimationMotionStyle): number {
 export function compileAnimationDirectorPlan(
   request: AnimationDirectorRequest,
 ): AnimationDirectorPlan {
+  if (!request || typeof request !== "object") {
+    throw new Error("animation director request must be an object");
+  }
+  if (request.action !== "walk") {
+    throw new Error("action must be walk in animation director protocol 2026-08-25.1");
+  }
+  if (!request.canvas || typeof request.canvas !== "object") {
+    throw new Error("canvas must be an object");
+  }
+
   const clipId = requireNonBlank(request.clipId, "clipId");
   const subjectId = requireNonBlank(request.subjectId, "subjectId");
   const canonicalIdentityArtifactId = requireNonBlank(
     request.canonicalIdentityArtifactId,
     "canonicalIdentityArtifactId",
   );
+  const motionStyle = requireMotionStyle(request.motionStyle);
+  const direction = requireDirection(request.direction);
   const width = requirePositiveInteger(request.canvas.width, "canvas.width");
   const height = requirePositiveInteger(request.canvas.height, "canvas.height");
-  const fps = walkFps(request.fps, request.motionStyle);
+  const fps = walkFps(request.fps, motionStyle);
   const loop = request.loop ?? true;
+  if (typeof loop !== "boolean") {
+    throw new Error("loop must be a boolean when supplied");
+  }
 
   const frames: AnimationFramePlan[] = WALK_ROLES.map((role, index) => {
     const frame = index + 1;
@@ -212,8 +255,8 @@ export function compileAnimationDirectorPlan(
     clipId,
     subjectId,
     action: "walk",
-    direction: request.direction,
-    motionStyle: request.motionStyle,
+    direction,
+    motionStyle,
     loop,
     fps,
     canvas: { width, height },
@@ -256,7 +299,7 @@ export function compileAnimationDirectorPlan(
       baselineLocked: true,
       cameraLocked: true,
       loopClosureRequired: loop,
-      plantedFootDriftTolerancePixels: plantedFootTolerance(request.motionStyle),
+      plantedFootDriftTolerancePixels: plantedFootTolerance(motionStyle),
       alphaRequired: true,
     },
     authority: {
