@@ -14,12 +14,14 @@ const fragmentPaths = [
   path.join(root, 'evavo.tasks.d', 'handwriting-registration-review.json'),
   path.join(root, 'evavo.tasks.d', 'handwriting-multiline.json'),
   path.join(root, 'evavo.tasks.d', 'handwriting-paragraph.json'),
+  path.join(root, 'evavo.tasks.d', 'handwriting-realism-qa.json'),
 ];
 const requiredFiles = [
   'tools/document_ink_finisher.py',
   'tools/handwriting_atlas.py',
   'tools/handwriting_multiline.py',
   'tools/handwriting_paragraph.py',
+  'tools/handwriting_realism_qa.py',
   'tools/handwriting_whole_mark.py',
   'tools/handwriting_document_bridge.py',
   'tools/handwriting_coverage.py',
@@ -37,6 +39,8 @@ const requiredFiles = [
   'scripts/test_handwriting_atlas.py',
   'scripts/test_handwriting_multiline.py',
   'scripts/test_handwriting_paragraph.py',
+  'scripts/test_handwriting_realism_qa.py',
+  'scripts/test_handwriting_asset_confinement.py',
   'scripts/test_handwriting_whole_mark.py',
   'scripts/test_handwriting_document_bridge.py',
   'scripts/test_handwriting_coverage.py',
@@ -90,6 +94,7 @@ const requiredTasks = new Map([
   ['handwriting-atlas-render', ['tools/handwriting_atlas.py', true]],
   ['handwriting-multiline-render', ['tools/handwriting_multiline.py', true]],
   ['handwriting-paragraph-render', ['tools/handwriting_paragraph.py', true]],
+  ['handwriting-realism-qa', ['tools/handwriting_realism_qa.py', true]],
   ['handwriting-atlas-coverage', ['tools/handwriting_coverage.py', false]],
   ['handwriting-capture-spec', ['tools/handwriting_capture_spec.py', true]],
   ['handwriting-capture-spec-full', ['tools/handwriting_capture_spec.py', true]],
@@ -126,6 +131,8 @@ const multilineDescription = String(allTasks['handwriting-multiline-render']?.de
 if (!multilineDescription.includes('genuine') || !multilineDescription.includes('fail closed') || !multilineDescription.includes('no font fallback')) throw new Error('multiline handwriting task must preserve genuine/fail-closed rendering boundary');
 const paragraphDescription = String(allTasks['handwriting-paragraph-render']?.description ?? '').toLowerCase();
 if (!paragraphDescription.includes('measured genuine handwriting advances') || !paragraphDescription.includes('arbitrary word splitting') || !paragraphDescription.includes('no computer-font fallback')) throw new Error('paragraph handwriting task must preserve measured-genuine wrapping boundary');
+const realismDescription = String(allTasks['handwriting-realism-qa']?.description ?? '').toLowerCase();
+if (!realismDescription.includes('read-only realism qa') || !realismDescription.includes('mechanical-looking') || !realismDescription.includes('never modifies handwriting')) throw new Error('handwriting realism QA task must remain diagnostic-only');
 for (const taskName of ['handwriting-capture-spec', 'handwriting-capture-spec-full']) {
   const props = allTasks[taskName]?.parameterSchema?.properties;
   if (props?.lowercaseVariants?.default !== 3 || props?.punctuationVariants?.default !== 3) throw new Error(`${taskName} must default lowercase/punctuation capture targets to three genuine variants`);
