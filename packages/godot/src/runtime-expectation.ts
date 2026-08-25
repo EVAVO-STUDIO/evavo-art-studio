@@ -157,10 +157,14 @@ export function compileGodotSpriteAnimationRuntimeExpectation(
     durationMicros(frame.durationMs, frame.frameId),
   );
 
+  // Wall-clock frame-change observations are scheduler/render-cadence evidence,
+  // not the authored timing source of truth. Exact configured timing is checked
+  // independently from SpriteFrames metadata in Test Lab; 20 ms avoids making
+  // a healthy 60 Hz desktop fail because one signal arrived on the next render tick.
   const maximumFrameTimingErrorMs = boundedInteger(
     request.maximumFrameTimingErrorMs,
     "maximumFrameTimingErrorMs",
-    3,
+    20,
     1,
     1000,
   );
