@@ -42,6 +42,7 @@ func _init() -> void:
     if sprite_frames.has_animation(&"default"):
         sprite_frames.remove_animation(&"default")
 
+    var animation_metadata: Dictionary = {}
     for animation in descriptor["animations"]:
         var animation_name := StringName(String(animation["name"]))
         sprite_frames.add_animation(animation_name)
@@ -54,6 +55,8 @@ func _init() -> void:
             _:
                 sprite_frames.set_animation_loop_mode(animation_name, SpriteFrames.LOOP_NONE)
 
+        var ordered_frame_ids: Array[String] = []
+        var duration_micros: Array[int] = []
         for frame_entry in animation["frames"]:
             var frame_id := String(frame_entry["frameId"])
             if not frame_map.has(frame_id):
@@ -83,10 +86,21 @@ func _init() -> void:
                 texture,
                 float(frame_entry["relativeDuration"])
             )
+            ordered_frame_ids.append(frame_id)
+            duration_micros.append(int(round(float(frame_entry["durationMs"]) * 1000.0)))
+
+        animation_metadata[String(animation_name)] = {
+            "frame_ids": ordered_frame_ids,
+            "duration_micros": duration_micros,
+            "frames_per_second": float(animation["framesPerSecond"]),
+            "loop_mode": String(animation["loopMode"]),
+            "total_duration_ms": float(animation["totalDurationMs"])
+        }
 
     sprite_frames.set_meta("evavo_atlas_id", String(descriptor["atlasId"]))
     sprite_frames.set_meta("evavo_target_engine", String(descriptor["targetEngine"]))
     sprite_frames.set_meta("evavo_frame_metadata", frame_metadata)
+    sprite_frames.set_meta("evavo_animation_metadata", animation_metadata)
     sprite_frames.set_meta("evavo_texture_filtering", String(descriptor["textureFiltering"]))
 
     var result := ResourceSaver.save(sprite_frames, String(descriptor["outputResourcePath"]))
