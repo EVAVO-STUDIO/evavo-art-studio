@@ -4,6 +4,7 @@ export * from "./decode.js";
 export * from "./analyse-frame.js";
 export * from "./analyse-sequence.js";
 export * from "./analyse-motion.js";
+export * from "./analyse-temporal-appearance.js";
 export * from "./motion-evidence.js";
 export * from "./motion-evidence-lineage.js";
 export * from "./motion-quality-input.js";
