@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "document-ink-master": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/document_ink_finisher.py",
+      "arguments": ["master", "{{source}}", "{{output}}", "--evidence", "{{evidence}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["source", "output", "evidence"],
+        "properties": {
+          "source": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["output", "evidence"],
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Create one transparent mastered derivative from an already captured genuine handwriting/signature PNG, preserving visible pen RGB while cleaning hidden matte RGB and producing create-only SHA-bound evidence. Grants no form-field selection, signing approval, publication or repository authority."
+    },
+    "document-ink-integrate": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/document_ink_finisher.py",
+      "arguments": ["integrate", "{{mark}}", "{{background}}", "{{output}}", "--kind", "{{kind}}", "--seed", "{{seed}}", "--opacity", "{{opacity}}", "--evidence", "{{evidence}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["mark", "background", "output", "evidence", "kind", "seed"],
+        "properties": {
+          "mark": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "background": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "kind": {"type": "string", "minimumLength": 4, "maximumLength": 9, "pattern": "^(signature|name|date)$"},
+          "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"},
+          "opacity": {"type": "number", "minimum": 0.65, "maximum": 1.0, "default": 1.0}
+        }
+      },
+      "parameterOutputs": ["output", "evidence"],
+      "network": "disabled",
+      "timeoutSeconds": 300,
+      "description": "Integrate one genuine transparent personal mark into an already selected local paper patch using bounded rigid transform, blur and multiply blending. Creates only the derivative and evidence; cannot choose a form field, approve a signature placement, mutate source documents or publish."
+    }
+  }
+}
