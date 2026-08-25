@@ -96,7 +96,7 @@ test("uses rational per-frame timing instead of rounding milliseconds", () => {
   );
 });
 
-test("fails closed on invalid dimensions, fps and blank identity", () => {
+test("fails closed on malformed or unsupported runtime input", () => {
   assert.throws(
     () => compileAnimationDirectorPlan(request({ fps: 31 })),
     /fps must be between 4 and 30/,
@@ -114,6 +114,22 @@ test("fails closed on invalid dimensions, fps and blank identity", () => {
         request({ canonicalIdentityArtifactId: "   " }),
       ),
     /canonicalIdentityArtifactId must be non-empty/,
+  );
+  assert.throws(
+    () => compileAnimationDirectorPlan(request({ action: "run" })),
+    /action must be walk/,
+  );
+  assert.throws(
+    () => compileAnimationDirectorPlan(request({ motionStyle: "generic-ai" })),
+    /motionStyle must be one of/,
+  );
+  assert.throws(
+    () => compileAnimationDirectorPlan(request({ direction: "diagonal" })),
+    /direction must be one of/,
+  );
+  assert.throws(
+    () => compileAnimationDirectorPlan(request({ loop: "yes" })),
+    /loop must be a boolean/,
   );
 });
 
