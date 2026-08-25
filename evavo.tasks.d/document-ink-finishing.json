@@ -3,6 +3,30 @@
   "kind": "evavo-repository-task-manifest-fragment",
   "repository": "evavo-art-studio",
   "tasks": {
+    "document-ink-extract-photo": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/document_ink_finisher.py",
+      "arguments": ["extract-photo", "{{source}}", "{{output}}", "--kind", "{{kind}}", "--crop", "{{crop}}", "--keep", "{{keep}}", "--proof", "{{proof}}", "--evidence", "{{evidence}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["source", "output", "proof", "evidence", "kind"],
+        "properties": {
+          "source": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "proof": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "kind": {"type": "string", "minimumLength": 4, "maximumLength": 9, "pattern": "^(signature|name|date|text|glyph|symbol)$"},
+          "crop": {"type": "string", "minimumLength": 0, "maximumLength": 96, "pattern": "^(?:|[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?)$", "default": ""},
+          "keep": {"type": "string", "minimumLength": 0, "maximumLength": 96, "pattern": "^(?:|[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?)$", "default": ""}
+        }
+      },
+      "parameterOutputs": ["output", "proof", "evidence"],
+      "network": "disabled",
+      "timeoutSeconds": 600,
+      "description": "Extract one genuine handwriting sample from a photographed page using local illumination/paper correction, reviewed crop and optional inner keep region, tiny photographic-noise suppression, hidden-paper RGB decontamination, clear-edge admission and hostile-background proofing. Creates only transparent output, proof and SHA-bound evidence; never redraws handwriting and grants no signing, field-selection, publication or repository authority."
+    },
     "document-ink-master": {
       "runtime": "python-script",
       "pythonEnvironment": "image-finishing",
@@ -37,7 +61,7 @@
           "background": {"type": "compute-path", "pathKind": "file", "access": "input"},
           "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
           "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "kind": {"type": "string", "minimumLength": 4, "maximumLength": 9, "pattern": "^(signature|name|date)$"},
+          "kind": {"type": "string", "minimumLength": 4, "maximumLength": 9, "pattern": "^(signature|name|date|text)$"},
           "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"},
           "opacity": {"type": "number", "minimum": 0.65, "maximum": 1.0, "default": 1.0}
         }
