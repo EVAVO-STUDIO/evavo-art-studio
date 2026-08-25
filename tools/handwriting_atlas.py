@@ -7,12 +7,13 @@ import json
 import math
 import random
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ATLAS_SCHEMA = "evavo.art-studio.handwriting-atlas.v1"
 RENDER_SCHEMA = "evavo.art-studio.handwriting-render.v1"
 MARK_SCHEMA = "evavo.art-studio.handwriting-whole-mark.v1"
 _SHA_RE = re.compile(r"^[a-f0-9]{64}$")
+_DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
 
 def _pil():
@@ -50,11 +51,14 @@ def _write_create_only(path: Path, value: dict) -> None:
 
 
 def _safe_asset(root: Path, relative: str) -> Path:
-    raw = Path(relative)
-    if raw.is_absolute():
-        raise ValueError("handwriting atlas assets must use paths relative to assetRoot")
+    if not isinstance(relative, str) or not relative or _DRIVE_RE.match(relative) or relative.startswith(("/", "\\")):
+        raise ValueError("handwriting atlas assets must use confined relative paths beneath assetRoot")
+    normalized = relative.replace("\\", "/")
+    pure = PurePosixPath(normalized)
+    if pure.is_absolute() or ".." in pure.parts:
+        raise ValueError(f"handwriting asset escapes assetRoot: {relative}")
     root = root.resolve()
-    path = (root / raw).resolve()
+    path = (root / Path(*pure.parts)).resolve()
     try:
         path.relative_to(root)
     except ValueError as exc:
@@ -120,7 +124,7 @@ def build_atlas(catalog_path: Path, *, asset_root: Path, output: Path) -> dict:
             seen_sha.add(sha)
             metrics = _alpha_metrics(path)
             item = {
-                "file": Path(entry["file"]).as_posix(),
+                "file": PurePosixPath(entry["file"].replace("\\", "/")).as_posix(),
                 "sha256": sha,
                 **metrics,
                 "style": entry.get("style"),
@@ -150,7 +154,7 @@ def build_atlas(catalog_path: Path, *, asset_root: Path, output: Path) -> dict:
             if expected and str(expected).casefold() != sha:
                 raise ValueError(f"whole mark {kind} variant {index} sha256 mismatch")
             values.append({
-                "file": Path(entry["file"]).as_posix(),
+                "file": PurePosixPath(entry["file"].replace("\\", "/")).as_posix(),
                 "sha256": sha,
                 "style": entry.get("style"),
                 "label": entry.get("label"),
@@ -279,7 +283,10 @@ def render_text(atlas_path: Path, text: str, output: Path, *, seed: str, style: 
     rotation_limit = max(0.0, min(2.0, float(cfg.get("rotationDegrees", 0.45))))
     scale_jitter = max(0.0, min(0.05, float(cfg.get("scaleJitterFraction", 0.012))))
     baseline_jitter = max(0.0, min(0.08, float(cfg.get("baselineJitterFraction", 0.016)))) * target_h
-    median_advance = sorted(float(item["naturalAdvancePx"]) for entries in glyphs.values() for item in entries)[sum(len(entries) for entries in glyphs.values()) // 2]
+    all_advances = [float(item["naturalAdvancePx"]) for entries in glyphs.values() for item in entries if isinstance(item, dict) and isinstance(item.get("naturalAdvancePx"), (int, float)) and not isinstance(item.get("naturalAdvancePx"), bool) and float(item["naturalAdvancePx"]) > 0]
+    if not all_advances:
+        raise ValueError("atlas contains no valid natural advances")
+    median_advance = sorted(all_advances)[len(all_advances) // 2]
     space_advance = max(target_h * 0.35, median_advance * float(cfg.get("spaceFactor", 0.48)))
     cursor = 0.0
     rendered = []
@@ -307,7 +314,6 @@ def render_text(atlas_path: Path, text: str, output: Path, *, seed: str, style: 
         y = baseline - ry1 + y_jitter
         rendered.append((image, x, y))
         normalized_advance = max(1.0, float(item.get("naturalAdvancePx", rx1 - rx0)) * scale)
-        # Keep genuine rhythm, but prevent safety padding from creating large gaps.
         normalized_advance = max((rx1 - rx0) + 1.0, min(normalized_advance, (rx1 - rx0) + target_h * 0.30))
         cursor += normalized_advance + tracking
         evidence.append({
