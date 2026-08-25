@@ -9,7 +9,7 @@ function walkEvidence(overrides = {}) {
     { frameId: "f2", frameIndex: 1, plantedLandmarkId: "leftFoot", landmarks: { root: { x: 51, y: 81 }, leftFoot: { x: 32.5, y: 120 }, rightFoot: { x: 63, y: 116 }, rightHand: { x: 65, y: 60 }, swordGrip: { x: 67, y: 61 } } },
     { frameId: "f3", frameIndex: 2, plantedLandmarkId: "rightFoot", landmarks: { root: { x: 52, y: 80 }, leftFoot: { x: 38, y: 116 }, rightFoot: { x: 68, y: 120 }, rightHand: { x: 64, y: 60 }, swordGrip: { x: 66, y: 61 } } },
     { frameId: "f4", frameIndex: 3, plantedLandmarkId: "rightFoot", landmarks: { root: { x: 50.5, y: 80 }, leftFoot: { x: 44, y: 118 }, rightFoot: { x: 68.5, y: 120 }, rightHand: { x: 65, y: 60 }, swordGrip: { x: 67, y: 61 } } },
-    { frameId: "f5", frameIndex: 4, plantedLandmarkId: "leftFoot", landmarks: { root: { x: 50, y: 80 }, leftFoot: { x: 32, y: 120 }, rightFoot: { x: 68, y: 120 }, rightHand: { x: 66, y: 60 }, swordGrip: { x: 68, y: 61 } } },
+    { frameId: "f5", frameIndex: 4, plantedLandmarkId: "leftFoot", landmarks: { root: { x: 50, y: 80 }, leftFoot: { x: 37, y: 117 }, rightFoot: { x: 62, y: 120 }, rightHand: { x: 63, y: 59 }, swordGrip: { x: 65, y: 60 } } },
   ];
   return {
     sequenceId: "hero-walk",
@@ -18,6 +18,7 @@ function walkEvidence(overrides = {}) {
     rootLandmarkId: "root",
     maximumRootStepPixels: 3,
     loopClosureTolerancePixels: 1,
+    loopClosureLandmarkIds: ["root"],
     requiredLandmarkIds: ["root", "leftFoot", "rightFoot"],
     attachmentConstraints: [
       {
@@ -32,7 +33,7 @@ function walkEvidence(overrides = {}) {
   };
 }
 
-test("passes planted foot, root, attachment and loop motion constraints", () => {
+test("passes planted foot, root, attachment and seam-aware loop constraints", () => {
   const report = analyseAnimationMotion(walkEvidence());
   assert.equal(report.passed, true);
   assert.equal(report.summary.plantedSegments, 3);
@@ -65,6 +66,16 @@ test("blocks root discontinuity and loop endpoint drift", () => {
   assert.equal(report.passed, false);
   assert.equal(report.gates.find((entry) => entry.id === "motion-root-step").status, "fail");
   assert.equal(report.gates.find((entry) => entry.id === "motion-loop-closure").status, "fail");
+});
+
+test("missing required landmark fails explicitly without non-finite evidence", () => {
+  const request = walkEvidence();
+  delete request.frames[1].landmarks.leftFoot;
+  const report = analyseAnimationMotion(request);
+  assert.equal(report.passed, false);
+  assert.equal(report.gates.find((entry) => entry.id === "motion-required-landmarks").status, "fail");
+  const json = JSON.stringify(report);
+  assert.doesNotMatch(json, /Infinity|NaN/);
 });
 
 test("fails closed when motion evidence is malformed", () => {
