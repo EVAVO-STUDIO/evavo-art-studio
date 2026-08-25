@@ -4,12 +4,13 @@ import argparse
 import hashlib
 import io
 import json
-import math
 import random
-from pathlib import Path
+import re
+from pathlib import Path, PurePosixPath
 
 ATLAS_SCHEMA = "evavo.art-studio.handwriting-atlas.v1"
 RECEIPT_SCHEMA = "evavo.art-studio.handwriting-whole-mark-render.v1"
+_DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
 
 def _pil():
@@ -41,11 +42,14 @@ def _rng(seed: str, kind: str) -> random.Random:
 
 
 def _safe_asset(root: Path, relative: str) -> Path:
-    raw = Path(relative)
-    if raw.is_absolute():
-        raise ValueError("whole handwriting mark asset path must be relative to assetRoot")
+    if not isinstance(relative, str) or not relative or _DRIVE_RE.match(relative) or relative.startswith(("/", "\\")):
+        raise ValueError("whole handwriting mark asset path must be confined and relative to assetRoot")
+    normalized = relative.replace("\\", "/")
+    pure = PurePosixPath(normalized)
+    if pure.is_absolute() or ".." in pure.parts:
+        raise ValueError("whole handwriting mark asset escapes assetRoot")
     root = root.resolve()
-    path = (root / raw).resolve()
+    path = (root / Path(*pure.parts)).resolve()
     try:
         path.relative_to(root)
     except ValueError as exc:
@@ -134,8 +138,6 @@ def render_whole_mark(
     x1, y1 = min(image.width, x1 + pad), min(image.height, y1 + pad)
     image = image.crop((x0, y0, x1, y1))
 
-    # Clear hidden matte RGB where alpha is fully transparent. Semitransparent
-    # pixels preserve the photographed ink colour; no stroke-level edits occur.
     px = image.load()
     for y in range(image.height):
         for x in range(image.width):
