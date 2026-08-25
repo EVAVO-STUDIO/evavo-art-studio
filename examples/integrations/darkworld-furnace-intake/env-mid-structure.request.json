@@ -1,0 +1,12 @@
+{
+  "schema": "evavo.darkworld.furnace-art-candidate.v1",
+  "jobId": "env-mid-structure",
+  "consumer": "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer",
+  "output": "assets/environments/furnace_intake/mid_structure.png",
+  "canvas": {"width": 1280, "height": 360, "alpha": true},
+  "objective": "Transparent structural midground plate for the two-frame Furnace Intake cinematic-platformer benchmark. Provide industrial supports, pipe runs, masonry/metal framing and authored depth structure that registers exactly over the locked background and gameplay geometry.",
+  "visualGrammar": ["late-1990s premium cinematic platformer", "aged iron", "oxidised steel", "soot-dark masonry", "cold intake frame", "warm furnace spill", "hand-authored irregularity", "strong side-on silhouette readability"],
+  "mustNotContain": ["player", "guard", "HUD", "baked cover gameplay marker", "baked crusher damage geometry", "generic neon cyberpunk", "modern clean factory", "unmotivated procedural pipe noise"],
+  "protectedFacts": ["640x360 authored room framing", "floor and traversal lane", "room split and camera centres", "cover anchor", "crusher anchor", "guard anchor"],
+  "returnEvidence": ["source_hash", "candidate_hash", "review_reference", "mastered_output_hash", "delivery_profile"]
+}
