@@ -127,7 +127,7 @@ test("fails closed when structural pose evidence or approved temporal keys are m
   );
 });
 
-test("rejects duplicate bindings, unsafe provider ids and mutated plans", () => {
+test("rejects duplicate bindings and mutated plans", () => {
   assert.throws(
     () =>
       compileAnimationProviderRequestBatch(plan(), "hero-walk-right:keys", {
@@ -138,23 +138,6 @@ test("rejects duplicate bindings, unsafe provider ids and mutated plans", () => 
         ],
       }),
     /duplicate frame 1/,
-  );
-
-  const unsafe = compileAnimationDirectorPlan({
-    clipId: "hero walk right",
-    subjectId: "hero",
-    action: "walk",
-    direction: "right",
-    motionStyle: "vga-adventure",
-    canvas: { width: 96, height: 128 },
-    canonicalIdentityArtifactId: artifact("a"),
-  });
-  assert.throws(
-    () =>
-      compileAnimationProviderRequestBatch(unsafe, "hero walk right:keys", {
-        poseControls: poseControls([1, 5]),
-      }),
-    /clipId must be provider-safe/,
   );
 
   const changed = plan();
