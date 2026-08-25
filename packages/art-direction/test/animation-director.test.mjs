@@ -55,7 +55,7 @@ test("plans an eight-drawing walk from two key contacts and bounded in-betweens"
   ]);
 });
 
-test("locks identity, baseline, pivot, camera, alpha and planted-foot continuity", () => {
+test("locks identity, anchors and measurable motion continuity", () => {
   const plan = compileAnimationDirectorPlan(request());
 
   assert.deepEqual(plan.qualityRequirements, {
@@ -65,11 +65,19 @@ test("locks identity, baseline, pivot, camera, alpha and planted-foot continuity
     cameraLocked: true,
     loopClosureRequired: true,
     plantedFootDriftTolerancePixels: 1,
+    rootLandmarkId: "root",
+    requiredLandmarkIds: ["root", "leftFoot", "rightFoot"],
+    maximumRootStepPixels: 4,
+    loopClosureTolerancePixels: 2,
     alphaRequired: true,
   });
   assert.deepEqual(
     plan.frames.map((frame) => frame.plantedFoot),
     ["left", "left", "left", "left", "right", "right", "right", "right"],
+  );
+  assert.deepEqual(
+    plan.frames.map((frame) => frame.plantedLandmarkId),
+    ["leftFoot", "leftFoot", "leftFoot", "leftFoot", "rightFoot", "rightFoot", "rightFoot", "rightFoot"],
   );
   assert.ok(
     plan.frames.every((frame) =>
