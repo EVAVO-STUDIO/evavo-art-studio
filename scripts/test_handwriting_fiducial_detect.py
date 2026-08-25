@@ -16,15 +16,15 @@ except ImportError:
 
 @unittest.skipUnless(PIL_AVAILABLE, "Pillow is optional")
 class HandwritingFiducialDetectionTests(unittest.TestCase):
-    def _photo(self, path: Path, *, ambiguous: bool = False) -> None:
+    def _photo(self, path: Path, *, ambiguous: bool = False, cropped: bool = False) -> None:
         width, height = 1000, 1400
         image = Image.new("RGB", (width, height), (244, 242, 238))
         draw = ImageDraw.Draw(image)
         centers = {
-            "tl": (95, 78),
-            "tr": (905, 92),
-            "br": (886, 1320),
-            "bl": (108, 1302),
+            "tl": (40, 40) if cropped else (95, 78),
+            "tr": (960, 40) if cropped else (905, 92),
+            "br": (960, 1360) if cropped else (886, 1320),
+            "bl": (40, 1360) if cropped else (108, 1302),
         }
         for cx, cy in centers.values():
             draw.rectangle((cx - 17, cy - 17, cx + 17, cy + 17), fill=(4, 4, 4))
@@ -52,6 +52,7 @@ class HandwritingFiducialDetectionTests(unittest.TestCase):
             self.assertEqual(registration["page"], 2)
             self.assertEqual(set(registration["cornersPx"]), {"topLeft", "topRight", "bottomRight", "bottomLeft"})
             self.assertTrue(registration["detectionEvidence"]["manualReviewRequired"])
+            self.assertEqual(registration["detectionEvidence"]["method"], "solid-square-fiducials-v1")
             self.assertLess(registration["cornersPx"]["topLeft"][0], 60)
             self.assertLess(registration["cornersPx"]["topLeft"][1], 60)
             self.assertGreater(registration["cornersPx"]["bottomRight"][0], 940)
@@ -63,6 +64,14 @@ class HandwritingFiducialDetectionTests(unittest.TestCase):
             source = root / "photo.png"
             self._photo(source, ambiguous=True)
             with self.assertRaisesRegex(ValueError, "ambiguous fiducial detection"):
+                detect(source, root / "registration.json")
+
+    def test_rejects_photo_that_crops_physical_page_edges(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "photo.png"
+            self._photo(source, cropped=True)
+            with self.assertRaisesRegex(ValueError, "cropped/out-of-image page corner"):
                 detect(source, root / "registration.json")
 
     def test_create_only_registration(self) -> None:
