@@ -82,7 +82,7 @@ test("writes a Godot 4.6.2 descriptor and headless importer", async () => {
   ]);
 });
 
-test("importer uses public SpriteFrames timing and loop APIs", () => {
+test("importer uses public SpriteFrames APIs and retains EVAVO runtime telemetry metadata", () => {
   for (const token of [
     "AtlasTexture.new()",
     "texture.region = Rect2(",
@@ -93,6 +93,11 @@ test("importer uses public SpriteFrames timing and loop APIs", () => {
     "sprite_frames.add_frame",
     "ResourceSaver.save",
     'set_meta("evavo_frame_metadata"',
+    'set_meta("evavo_animation_metadata"',
+    '"frame_ids": ordered_frame_ids',
+    '"duration_micros": duration_micros',
+    '"frames_per_second": float(animation["framesPerSecond"])',
+    '"loop_mode": String(animation["loopMode"])',
   ]) {
     assert.ok(GODOT_SPRITE_FRAMES_IMPORTER.includes(token), `missing ${token}`);
   }
