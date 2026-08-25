@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.com.au/schemas/adventure-creative-production-v3.schema.json",
+  "title": "EVAVO Adventure Creative Production V3",
+  "description": "Portable producer/consumer contract for governed Adventure Studio art and cel-animation handoffs. The Adventure Studio TypeScript v3 protocol remains authoritative; this schema mirrors its work-order, review and accepted-delivery receipts for cross-studio validation.",
+  "oneOf": [
+    { "$ref": "#/$defs/workOrder" },
+    { "$ref": "#/$defs/review" },
+    { "$ref": "#/$defs/delivery" }
+  ],
+  "$defs": {
+    "digest": { "type": "string", "minLength": 8 },
+    "size": { "type": "object", "additionalProperties": false, "required": ["width", "height"], "properties": { "width": { "type": "integer", "minimum": 1 }, "height": { "type": "integer", "minimum": 1 } } },
+    "point": { "type": "object", "additionalProperties": false, "required": ["x", "y"], "properties": { "x": { "type": "number" }, "y": { "type": "number" } } },
+    "rect": { "type": "object", "additionalProperties": false, "required": ["x", "y", "width", "height"], "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "width": { "type": "number", "exclusiveMinimum": 0 }, "height": { "type": "number", "exclusiveMinimum": 0 } } },
+    "framePlan": {
+      "type": "object", "additionalProperties": false,
+      "required": ["frameId", "role", "exposureTicks", "requiredNeighbourFrameIds"],
+      "properties": {
+        "frameId": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["hold", "contact", "passing", "extreme", "breakdown", "inbetween", "smear", "replacement"] },
+        "exposureTicks": { "type": "integer", "minimum": 1 },
+        "sourceRect": { "$ref": "#/$defs/rect" }, "pivot": { "$ref": "#/$defs/point" }, "footPoint": { "$ref": "#/$defs/point" },
+        "handAnchors": { "type": "object", "additionalProperties": { "$ref": "#/$defs/point" } },
+        "shadowAnchor": { "$ref": "#/$defs/point" },
+        "requiredNeighbourFrameIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "preserveFromApprovedFrameId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "issueCode": { "enum": ["identity-drift", "proportion-drift", "costume-drift", "style-drift", "palette-drift", "perspective-drift", "layout-drift", "silhouette-drift", "pose-drift", "anchor-drift", "ground-contact-drift", "frame-count-mismatch", "frame-order-mismatch", "exposure-timing-mismatch", "loop-closure-mismatch", "neighbour-continuity-mismatch", "crop-or-safe-bounds", "occlusion-mismatch", "fake-transparency-checkerboard", "missing-real-alpha", "matte-residue", "alpha-halo", "transparent-rgb-contamination", "soft-alpha-when-binary-required", "unexpected-text-or-symbol", "reference-authority-mismatch", "source-byte-mismatch"] },
+    "repairScope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["issueId", "issueCode", "targetFrameIds", "repairInstruction", "preserveFrameIds", "preserveRegions", "allowRegenerateWholeAsset"],
+      "properties": {
+        "issueId": { "type": "string", "minLength": 1 }, "issueCode": { "$ref": "#/$defs/issueCode" },
+        "targetFrameIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "targetRegion": { "$ref": "#/$defs/rect" }, "repairInstruction": { "type": "string", "minLength": 1 },
+        "preserveFrameIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "preserveRegions": { "type": "array", "items": { "$ref": "#/$defs/rect" } }, "allowRegenerateWholeAsset": { "type": "boolean" }
+      }
+    },
+    "workOrder": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contractVersion", "workOrderId", "projectId", "assetId", "destinationStudio", "taskKind", "revision", "sourceRevisionDigest", "nativeSize", "alphaPolicy", "preserveNativeCanvas", "authorities", "invariants", "forbiddenDrift", "artDirection", "reviewChecklist", "rejectionRules", "transparencyPolicy", "iterationPolicy", "requestedRepairs"],
+      "properties": {
+        "contractVersion": { "const": 3 }, "workOrderId": { "type": "string", "minLength": 1 }, "projectId": { "type": "string", "minLength": 1 }, "assetId": { "type": "string", "minLength": 1 },
+        "destinationStudio": { "enum": ["art-studio", "cel-animation-studio"] },
+        "taskKind": { "enum": ["background-layout", "background-paint", "foreground-plate", "prop", "ui-art", "portrait-closeup", "character-model-sheet", "character-key-pose", "animation-sequence", "cutscene-shot", "effects-sequence"] },
+        "revision": { "type": "integer", "minimum": 1 }, "replacesRevision": { "type": "integer", "minimum": 1 }, "sourceRevisionDigest": { "$ref": "#/$defs/digest" }, "nativeSize": { "$ref": "#/$defs/size" },
+        "alphaPolicy": { "enum": ["opaque", "binary", "soft", "required"] }, "preserveNativeCanvas": { "type": "boolean" },
+        "authorities": { "type": "object", "additionalProperties": false, "required": ["profileId", "styleDigest", "referenceDigests"], "properties": { "profileId": { "type": "string", "minLength": 1 }, "styleDigest": { "$ref": "#/$defs/digest" }, "paletteDigest": { "$ref": "#/$defs/digest" }, "modelSheetDigest": { "$ref": "#/$defs/digest" }, "environmentLayoutDigest": { "$ref": "#/$defs/digest" }, "xSheetDigest": { "$ref": "#/$defs/digest" }, "referenceDigests": { "type": "array", "items": { "$ref": "#/$defs/digest" }, "uniqueItems": true }, "previousApprovedArtifactDigest": { "$ref": "#/$defs/digest" } } },
+        "invariants": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "forbiddenDrift": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "artDirection": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "reviewChecklist": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "rejectionRules": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "framePlan": { "type": "array", "items": { "$ref": "#/$defs/framePlan" }, "minItems": 1 },
+        "sequencePolicy": { "type": "object", "additionalProperties": false, "required": ["independentFrameGenerationForbidden", "exactExposureTimingRequired", "modelSheetConformanceRequired", "xSheetConformanceRequired", "immediateNeighbourReviewRequired", "loopClosureReviewRequired"], "properties": { "independentFrameGenerationForbidden": { "const": true }, "exactExposureTimingRequired": { "const": true }, "modelSheetConformanceRequired": { "type": "boolean" }, "xSheetConformanceRequired": { "type": "boolean" }, "immediateNeighbourReviewRequired": { "type": "boolean" }, "loopClosureReviewRequired": { "type": "boolean" } } },
+        "transparencyPolicy": { "type": "object", "additionalProperties": false, "required": ["checkerboardForbidden", "decodedAlphaRequired", "transparentCanvasEdgeRequired", "matteResidueForbidden", "haloFringeForbidden", "transparentRgbContaminationForbidden", "hostilePlateReviewRequired"], "properties": { "checkerboardForbidden": { "const": true }, "decodedAlphaRequired": { "type": "boolean" }, "transparentCanvasEdgeRequired": { "type": "boolean" }, "matteResidueForbidden": { "const": true }, "haloFringeForbidden": { "const": true }, "transparentRgbContaminationForbidden": { "const": true }, "hostilePlateReviewRequired": { "type": "boolean" } } },
+        "iterationPolicy": { "type": "object", "additionalProperties": false, "required": ["maximumRevisionPasses", "compareAgainstPreviousApproved", "requireIssueClosureEvidence", "preferTargetedRepair", "fullRegenerationRequiresExplicitReason"], "properties": { "maximumRevisionPasses": { "type": "integer", "minimum": 1, "maximum": 3 }, "compareAgainstPreviousApproved": { "type": "boolean" }, "requireIssueClosureEvidence": { "const": true }, "preferTargetedRepair": { "const": true }, "fullRegenerationRequiresExplicitReason": { "const": true } } },
+        "requestedRepairs": { "type": "array", "items": { "$ref": "#/$defs/repairScope" } }
+      },
+      "allOf": [{ "if": { "properties": { "taskKind": { "enum": ["animation-sequence", "cutscene-shot", "effects-sequence"] } }, "required": ["taskKind"] }, "then": { "required": ["framePlan", "sequencePolicy"] } }]
+    },
+    "reviewIssue": { "type": "object", "additionalProperties": false, "required": ["issueId", "code", "severity", "message", "frameIds", "evidenceDigests", "suggestedRepair"], "properties": { "issueId": { "type": "string", "minLength": 1 }, "code": { "$ref": "#/$defs/issueCode" }, "severity": { "enum": ["blocking", "major", "minor"] }, "message": { "type": "string", "minLength": 1 }, "frameIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }, "region": { "$ref": "#/$defs/rect" }, "evidenceDigests": { "type": "array", "items": { "$ref": "#/$defs/digest" } }, "suggestedRepair": { "type": "string", "minLength": 1 } } },
+    "review": { "type": "object", "additionalProperties": false, "required": ["reviewVersion", "workOrderId", "revision", "candidateArtifactDigest", "disposition", "issues", "closedIssueIds", "reviewerEvidenceDigest"], "properties": { "reviewVersion": { "const": 3 }, "workOrderId": { "type": "string", "minLength": 1 }, "revision": { "type": "integer", "minimum": 1 }, "candidateArtifactDigest": { "$ref": "#/$defs/digest" }, "disposition": { "enum": ["candidate", "repair-required", "review-required", "accepted", "rejected"] }, "issues": { "type": "array", "items": { "$ref": "#/$defs/reviewIssue" } }, "closedIssueIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }, "alphaEvidenceDigest": { "$ref": "#/$defs/digest" }, "sequenceEvidenceDigest": { "$ref": "#/$defs/digest" }, "styleEvidenceDigest": { "$ref": "#/$defs/digest" }, "reviewerEvidenceDigest": { "$ref": "#/$defs/digest" } } },
+    "delivery": { "type": "object", "additionalProperties": false, "required": ["deliveryVersion", "workOrderId", "revision", "assetId", "approvedArtifactDigest", "approvedByteLength", "mediaType", "nativeSize", "reviewEvidenceDigest", "sourceLineageDigests"], "properties": { "deliveryVersion": { "const": 3 }, "workOrderId": { "type": "string", "minLength": 1 }, "revision": { "type": "integer", "minimum": 1 }, "assetId": { "type": "string", "minLength": 1 }, "approvedArtifactDigest": { "$ref": "#/$defs/digest" }, "approvedByteLength": { "type": "integer", "minimum": 1 }, "mediaType": { "type": "string", "minLength": 1 }, "nativeSize": { "$ref": "#/$defs/size" }, "alphaEvidenceDigest": { "$ref": "#/$defs/digest" }, "sequenceEvidenceDigest": { "$ref": "#/$defs/digest" }, "reviewEvidenceDigest": { "$ref": "#/$defs/digest" }, "sourceLineageDigests": { "type": "array", "items": { "$ref": "#/$defs/digest" }, "minItems": 1, "uniqueItems": true } } }
+  }
+}
