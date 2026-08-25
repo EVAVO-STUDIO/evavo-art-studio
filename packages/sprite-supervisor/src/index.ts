@@ -20,3 +20,4 @@ export * from "./automatic-finalization-validation.js";
 export { compileAutomaticSpriteFinalizationWorkflow } from "./mirrored-finalization-compiler.js";
 export * from "./automatic-finalization-protocol.js";
 export * from "./animation-provider-compiler.js";
+export * from "./verified-animation-provider-compiler.js";
