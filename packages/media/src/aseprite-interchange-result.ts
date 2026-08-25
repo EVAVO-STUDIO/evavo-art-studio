@@ -7,7 +7,7 @@ import {
   type AsepriteInterchangePlan,
 } from "./aseprite-interchange.js";
 
-export const ASEPRITE_INTERCHANGE_RECEIPT_VERSION = "2026-08-25.1" as const;
+export const ASEPRITE_INTERCHANGE_RECEIPT_VERSION = "2026-08-25.2" as const;
 export const ASEPRITE_INTERCHANGE_RECEIPT_KIND =
   "evavo.aseprite-interchange.receipt" as const;
 
@@ -20,14 +20,11 @@ export interface AsepriteInterchangeOutputEvidence {
   readonly sourceSha256: string;
   readonly sheet: Readonly<{
     path: string;
-    sha256: string;
-    bytes: number;
+    bytes: Uint8Array;
   }>;
   readonly data: Readonly<{
     path: string;
-    sha256: string;
-    bytes: number;
-    json: unknown;
+    bytes: Uint8Array;
   }>;
   readonly exitCode: number;
   readonly stdoutSha256: string;
@@ -69,6 +66,7 @@ export interface AsepriteInterchangeReceipt {
 }
 
 const SHA256 = /^[a-f0-9]{64}$/;
+const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 
 function fail(message: string): never {
   throw new Error(`Aseprite interchange result invalid: ${message}`);
@@ -129,6 +127,18 @@ function digest(value: unknown): string {
   return createHash("sha256").update(stable(value)).digest("hex");
 }
 
+function exactBytes(value: unknown, field: string, maximum: number): Uint8Array {
+  if (!(value instanceof Uint8Array) || value.byteLength < 1) {
+    fail(`${field} must be non-empty bytes.`);
+  }
+  if (value.byteLength > maximum) fail(`${field} exceeds the bounded byte limit.`);
+  return value;
+}
+
+function bytesSha256(value: Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 function canonicalPlan(plan: AsepriteInterchangePlan): AsepriteInterchangePlan {
   if (
     !plan ||
@@ -140,10 +150,11 @@ function canonicalPlan(plan: AsepriteInterchangePlan): AsepriteInterchangePlan {
   }
   const args = plan.arguments;
   const tagIndex = args.indexOf("--tag");
-  const sourceIndex = args.indexOf(plan.sourcePath);
+  const sourceIndex = args.indexOf(plan.source.path);
   const rebuilt = compileAsepriteInterchangePlan({
     executable: plan.executable,
-    sourcePath: plan.sourcePath,
+    sourcePath: plan.source.path,
+    sourceSha256: plan.source.sha256,
     sheetPath: plan.outputs.sheetPath,
     dataPath: plan.outputs.dataPath,
     sheetType: args[args.indexOf("--sheet-type") + 1] as
@@ -186,7 +197,7 @@ function parseFrames(value: unknown): readonly { filename: string; durationMs: n
   });
 }
 
-function parseTags(value: unknown, frameCount: number): readonly {
+function parseTags(value: unknown): readonly {
   name: string;
   from: number;
   to: number;
@@ -202,9 +213,7 @@ function parseTags(value: unknown, frameCount: number): readonly {
     seen.add(name);
     const from = nonNegativeInteger(tag.from, `data.json.meta.frameTags[${index}].from`);
     const to = nonNegativeInteger(tag.to, `data.json.meta.frameTags[${index}].to`);
-    if (from > to || to >= frameCount) {
-      fail(`frame tag ${name} range is outside exported frame metadata.`);
-    }
+    if (from > to) fail(`frame tag ${name} has an invalid range.`);
     const direction =
       tag.direction === undefined
         ? undefined
@@ -241,31 +250,52 @@ export function compileAsepriteInterchangeReceipt(
   ) {
     fail("observed executable identity differs from the planned executable.");
   }
+  if (sha(evidence.sourceSha256, "evidence.sourceSha256") !== plan.source.sha256) {
+    fail("observed source bytes differ from the planned source identity.");
+  }
   if (evidence.sheet.path !== plan.outputs.sheetPath) {
     fail("sheet output path differs from the plan.");
   }
   if (evidence.data.path !== plan.outputs.dataPath) {
     fail("data output path differs from the plan.");
   }
-  const sheetSha256 = sha(evidence.sheet.sha256, "evidence.sheet.sha256");
-  const dataSha256 = sha(evidence.data.sha256, "evidence.data.sha256");
-  const sourceSha256 = sha(evidence.sourceSha256, "evidence.sourceSha256");
-  const stdoutSha256 = sha(evidence.stdoutSha256, "evidence.stdoutSha256");
-  const stderrSha256 = sha(evidence.stderrSha256, "evidence.stderrSha256");
-  const sheetBytes = positiveInteger(evidence.sheet.bytes, "evidence.sheet.bytes");
-  const dataBytes = positiveInteger(evidence.data.bytes, "evidence.data.bytes");
 
-  const json = object(evidence.data.json, "evidence.data.json");
-  const frames = parseFrames(json.frames);
-  const meta = object(json.meta, "evidence.data.json.meta");
-  const frameTags = parseTags(meta.frameTags, frames.length);
+  const sheetBytes = exactBytes(
+    evidence.sheet.bytes,
+    "evidence.sheet.bytes",
+    512 * 1024 * 1024,
+  );
+  if (sheetBytes.byteLength < PNG_SIGNATURE.length) {
+    fail("sheet output is too short to be a PNG.");
+  }
+  for (let index = 0; index < PNG_SIGNATURE.length; index += 1) {
+    if (sheetBytes[index] !== PNG_SIGNATURE[index]) {
+      fail("sheet output does not have a PNG signature.");
+    }
+  }
+  const dataBytes = exactBytes(
+    evidence.data.bytes,
+    "evidence.data.bytes",
+    64 * 1024 * 1024,
+  );
+  let json: unknown;
+  try {
+    json = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(dataBytes));
+  } catch (error: unknown) {
+    fail(
+      `data output is not valid UTF-8 JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const dataObject = object(json, "data.json");
+  const frames = parseFrames(dataObject.frames);
+  const meta = object(dataObject.meta, "data.json.meta");
+  const frameTags = parseTags(meta.frameTags);
   const slices = parseSlices(meta.slices);
 
   const plannedTagIndex = plan.arguments.indexOf("--tag");
   if (plannedTagIndex >= 0) {
     const plannedTag = plan.arguments[plannedTagIndex + 1]!;
-    const matched = frameTags.find((tag) => tag.name === plannedTag);
-    if (!matched) {
+    if (!frameTags.some((tag) => tag.name === plannedTag)) {
       fail(`planned tag ${plannedTag} is absent from exported metadata.`);
     }
   }
@@ -274,17 +304,25 @@ export function compileAsepriteInterchangeReceipt(
     kind: ASEPRITE_INTERCHANGE_RECEIPT_KIND,
     version: ASEPRITE_INTERCHANGE_RECEIPT_VERSION,
     planSha256: plan.planSha256,
-    sourceSha256,
+    sourceSha256: plan.source.sha256,
     executable: plan.executable,
     outputs: {
-      sheet: { path: plan.outputs.sheetPath, sha256: sheetSha256, bytes: sheetBytes },
-      data: { path: plan.outputs.dataPath, sha256: dataSha256, bytes: dataBytes },
+      sheet: {
+        path: plan.outputs.sheetPath,
+        sha256: bytesSha256(sheetBytes),
+        bytes: sheetBytes.byteLength,
+      },
+      data: {
+        path: plan.outputs.dataPath,
+        sha256: bytesSha256(dataBytes),
+        bytes: dataBytes.byteLength,
+      },
     },
     frames,
     frameTags,
     slices,
-    stdoutSha256,
-    stderrSha256,
+    stdoutSha256: sha(evidence.stdoutSha256, "evidence.stdoutSha256"),
+    stderrSha256: sha(evidence.stderrSha256, "evidence.stderrSha256"),
     authority: {
       creativeApproval: false as const,
       artifactPromotion: false as const,
