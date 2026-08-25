@@ -45,9 +45,10 @@
     "reviewEvidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["proposalSha256", "decision", "cornersChanged", "manualReviewCompleted"],
+      "required": ["proposalSha256", "reviewArtifactSha256", "decision", "cornersChanged", "manualReviewCompleted"],
       "properties": {
-        "proposalSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "proposalSha256": {"$ref": "#/$defs/sha256"},
+        "reviewArtifactSha256": {"$ref": "#/$defs/sha256"},
         "decision": {"const": "accept"},
         "cornersChanged": {"type": "boolean"},
         "manualReviewCompleted": {"const": true}
@@ -55,6 +56,7 @@
     }
   },
   "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "point": {
       "type": "array",
       "prefixItems": [
