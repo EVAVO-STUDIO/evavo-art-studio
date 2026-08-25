@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.local/schemas/art-studio/handwriting-registration-review.v1.schema.json",
+  "title": "EVAVO Art Studio Handwriting Registration Review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "proposalSha256", "decision", "reviewedCornersPx"],
+  "properties": {
+    "schema": {"const": "evavo.art-studio.handwriting-registration-review.v1"},
+    "proposalSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "decision": {"const": "accept"},
+    "reviewedCornersPx": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topLeft", "topRight", "bottomRight", "bottomLeft"],
+      "properties": {
+        "topLeft": {"$ref": "#/$defs/point"},
+        "topRight": {"$ref": "#/$defs/point"},
+        "bottomRight": {"$ref": "#/$defs/point"},
+        "bottomLeft": {"$ref": "#/$defs/point"}
+      }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "array",
+      "prefixItems": [{"type": "number", "minimum": 0}, {"type": "number", "minimum": 0}],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}
