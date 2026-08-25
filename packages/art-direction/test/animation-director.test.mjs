@@ -67,6 +67,7 @@ test("locks identity, anchors and measurable motion continuity", () => {
     plantedFootDriftTolerancePixels: 1,
     rootLandmarkId: "root",
     requiredLandmarkIds: ["root", "leftFoot", "rightFoot"],
+    loopClosureLandmarkIds: ["root"],
     maximumRootStepPixels: 4,
     loopClosureTolerancePixels: 2,
     alphaRequired: true,
