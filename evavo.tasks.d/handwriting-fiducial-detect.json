@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "handwriting-fiducial-detect": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_fiducial_detect.py",
+      "arguments": ["{{sourceImage}}", "{{registration}}", "--page", "{{page}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["sourceImage", "registration"],
+        "properties": {
+          "sourceImage": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "registration": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "page": {"type": "integer", "minimum": 1, "maximum": 64, "default": 1}
+        }
+      },
+      "parameterOutputs": ["registration"],
+      "network": "disabled",
+      "timeoutSeconds": 180,
+      "description": "Detect the four printed solid-square fiducials on a photographed EVAVO handwriting capture worksheet and create a review-required four-corner registration proposal. Fails closed on missing or ambiguous markers, returns no handwriting bytes, and grants no capture admission, signing or document-execution authority."
+    }
+  }
+}
