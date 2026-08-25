@@ -34,8 +34,22 @@ class DocumentInkFinisherTests(unittest.TestCase):
             self.assertTrue(output.is_file())
             self.assertTrue(receipt["visibleInkRgbPreserved"])
             self.assertFalse(receipt["syntheticHandwritingGenerated"])
+            self.assertTrue(receipt["createOnly"])
             mastered = Image.open(output).convert("RGBA")
             self.assertEqual(mastered.getchannel("A").getextrema()[0], 0)
+
+    def test_master_refuses_existing_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "mark.png"
+            output = root / "master.png"
+            image = Image.new("RGBA", (80, 40), (0, 0, 0, 0))
+            ImageDraw.Draw(image).line((10, 20, 70, 18), fill=(25, 35, 70, 230), width=3)
+            image.save(source)
+            output.write_bytes(b"do-not-overwrite")
+            with self.assertRaisesRegex(ValueError, "create-only"):
+                module.master_transparent_ink(source, output)
+            self.assertEqual(output.read_bytes(), b"do-not-overwrite")
 
     def test_transform_is_deterministic_and_bounded(self) -> None:
         first = module.natural_transform(seed="job-1", kind="signature")
@@ -73,6 +87,7 @@ class DocumentInkFinisherTests(unittest.TestCase):
             self.assertEqual(receipt["blendMode"], "multiply-local-paper")
             self.assertFalse(receipt["wholePageDegradationApplied"])
             self.assertFalse(receipt["syntheticHandwritingGenerated"])
+            self.assertTrue(receipt["createOnly"])
 
 
 if __name__ == "__main__":
