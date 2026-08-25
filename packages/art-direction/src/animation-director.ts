@@ -1,4 +1,4 @@
-export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.4" as const;
+export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.5" as const;
 export const ANIMATION_DIRECTOR_PLAN_KIND =
   "evavo.animation-director.plan" as const;
 
@@ -240,7 +240,7 @@ export function compileAnimationDirectorPlan(
     throw new Error("animation director request must be an object");
   }
   if (request.action !== "walk") {
-    throw new Error("action must be walk in animation director protocol 2026-08-25.4");
+    throw new Error("action must be walk in animation director protocol 2026-08-25.5");
   }
   if (!request.canvas || typeof request.canvas !== "object") {
     throw new Error("canvas must be an object");
@@ -274,10 +274,7 @@ export function compileAnimationDirectorPlan(
       referenceRoles.push("direction-master");
     }
     if (!keyPose) {
-      referenceRoles.push("previous-key-pose");
-      if (frame < 5 || loop) {
-        referenceRoles.push("next-key-pose");
-      }
+      referenceRoles.push("previous-key-pose", "next-key-pose");
     }
     return {
       frame,
@@ -331,7 +328,7 @@ export function compileAnimationDirectorPlan(
         id: `${clipId}:inbetweens-b`,
         phase: "in-between",
         frames: [6, 7, 8],
-        dependsOnFrames: loop ? [5, 1] : [5],
+        dependsOnFrames: [5, 1],
         maximumCandidatesPerFrame: 3,
       },
     ],
