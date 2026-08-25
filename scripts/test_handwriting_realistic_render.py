@@ -96,6 +96,16 @@ class HandwritingRealisticRenderTests(unittest.TestCase):
             self.assertEqual(first["outputSha256"], second["outputSha256"])
             self.assertEqual([x["variant"] for x in first["tokens"]], [x["variant"] for x in second["tokens"]])
 
+    def test_rejects_line_breaks_and_control_whitespace(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            atlas = _atlas(module, root)
+            with self.assertRaisesRegex(ValueError, "line breaks"):
+                module.render_text(atlas, "AA\nAA", root / "newline.png", seed="bad", style="natural-uppercase")
+            with self.assertRaisesRegex(ValueError, "control whitespace"):
+                module.render_text(atlas, "AA\tAA", root / "tab.png", seed="bad", style="natural-uppercase")
+
     def test_missing_character_still_fails_closed(self) -> None:
         module = _load_module()
         with tempfile.TemporaryDirectory() as directory:
