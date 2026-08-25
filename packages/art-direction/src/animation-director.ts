@@ -1,4 +1,4 @@
-export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.1" as const;
+export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.2" as const;
 export const ANIMATION_DIRECTOR_PLAN_KIND =
   "evavo.animation-director.plan" as const;
 
@@ -22,6 +22,7 @@ export const ANIMATION_FRAME_ROLES = [
 export type AnimationFrameRole = (typeof ANIMATION_FRAME_ROLES)[number];
 
 export type AnimationFoot = "left" | "right" | "none";
+export type AnimationFootLandmarkId = "leftFoot" | "rightFoot" | null;
 
 export interface AnimationDirectorRequest {
   clipId: string;
@@ -48,6 +49,7 @@ export interface AnimationFramePlan {
     denominator: number;
   };
   plantedFoot: AnimationFoot;
+  plantedLandmarkId: AnimationFootLandmarkId;
   groundContactRequired: boolean;
   providerReferenceRoles: Array<
     | "canonical-identity"
@@ -88,6 +90,10 @@ export interface AnimationDirectorPlan {
     cameraLocked: true;
     loopClosureRequired: boolean;
     plantedFootDriftTolerancePixels: number;
+    rootLandmarkId: "root";
+    requiredLandmarkIds: readonly ["root", "leftFoot", "rightFoot"];
+    maximumRootStepPixels: number;
+    loopClosureTolerancePixels: number;
     alphaRequired: true;
   };
   authority: {
@@ -194,6 +200,38 @@ function plantedFootTolerance(style: AnimationMotionStyle): number {
   }
 }
 
+function maximumRootStep(style: AnimationMotionStyle): number {
+  switch (style) {
+    case "cinematic-naturalistic":
+      return 6;
+    case "traditional-cel":
+      return 8;
+    case "arcade-snappy":
+      return 8;
+    case "vga-adventure":
+      return 4;
+  }
+}
+
+function loopClosureTolerance(style: AnimationMotionStyle): number {
+  switch (style) {
+    case "cinematic-naturalistic":
+      return 3;
+    case "traditional-cel":
+      return 4;
+    case "arcade-snappy":
+      return 3;
+    case "vga-adventure":
+      return 2;
+  }
+}
+
+function footLandmarkId(foot: AnimationFoot): AnimationFootLandmarkId {
+  if (foot === "left") return "leftFoot";
+  if (foot === "right") return "rightFoot";
+  return null;
+}
+
 export function compileAnimationDirectorPlan(
   request: AnimationDirectorRequest,
 ): AnimationDirectorPlan {
@@ -201,7 +239,7 @@ export function compileAnimationDirectorPlan(
     throw new Error("animation director request must be an object");
   }
   if (request.action !== "walk") {
-    throw new Error("action must be walk in animation director protocol 2026-08-25.1");
+    throw new Error("action must be walk in animation director protocol 2026-08-25.2");
   }
   if (!request.canvas || typeof request.canvas !== "object") {
     throw new Error("canvas must be an object");
@@ -225,6 +263,7 @@ export function compileAnimationDirectorPlan(
 
   const frames: AnimationFramePlan[] = WALK_ROLES.map((role, index) => {
     const frame = index + 1;
+    const plantedFoot = WALK_PLANTED_FEET[index]!;
     const referenceRoles: AnimationFramePlan["providerReferenceRoles"] = [
       "canonical-identity",
       "pose-control",
@@ -243,7 +282,8 @@ export function compileAnimationDirectorPlan(
       role,
       phase: index / WALK_ROLES.length,
       duration: { numeratorMs: 1000, denominator: fps },
-      plantedFoot: WALK_PLANTED_FEET[index]!,
+      plantedFoot,
+      plantedLandmarkId: footLandmarkId(plantedFoot),
       groundContactRequired: true,
       providerReferenceRoles: referenceRoles,
     };
@@ -300,6 +340,10 @@ export function compileAnimationDirectorPlan(
       cameraLocked: true,
       loopClosureRequired: loop,
       plantedFootDriftTolerancePixels: plantedFootTolerance(motionStyle),
+      rootLandmarkId: "root",
+      requiredLandmarkIds: ["root", "leftFoot", "rightFoot"],
+      maximumRootStepPixels: maximumRootStep(motionStyle),
+      loopClosureTolerancePixels: loopClosureTolerance(motionStyle),
       alphaRequired: true,
     },
     authority: {
