@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-repository-task-manifest-fragment",
+  "repository": "evavo-art-studio",
+  "tasks": {
+    "handwriting-paragraph-render": {
+      "runtime": "python-script",
+      "pythonEnvironment": "image-finishing",
+      "entry": "tools/handwriting_paragraph.py",
+      "arguments": ["{{atlas}}", "{{text}}", "{{output}}", "--seed", "{{seed}}", "--max-width-px", "{{maxWidthPx}}", "--style", "{{style}}", "--line-spacing-factor", "{{lineSpacingFactor}}", "--proof", "{{proof}}", "--receipt", "{{receipt}}"],
+      "parameterSchema": {
+        "schemaVersion": 1,
+        "additionalProperties": false,
+        "required": ["atlas", "text", "output", "seed", "maxWidthPx", "proof", "receipt"],
+        "properties": {
+          "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"},
+          "text": {"type": "string", "minimumLength": 1, "maximumLength": 8192},
+          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"},
+          "maxWidthPx": {"type": "integer", "minimum": 120, "maximum": 8192},
+          "style": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]*$", "default": ""},
+          "lineSpacingFactor": {"type": "number", "minimum": 0.2, "maximum": 2.0, "default": 0.55},
+          "proof": {"type": "compute-path", "pathKind": "file", "access": "output"},
+          "receipt": {"type": "compute-path", "pathKind": "file", "access": "output"}
+        }
+      },
+      "parameterOutputs": ["output", "proof", "receipt"],
+      "network": "disabled",
+      "timeoutSeconds": 600,
+      "description": "Wrap short paragraphs at whitespace using measured genuine handwriting advances, then render through the genuine multiline atlas path. Single oversized words and missing characters fail closed; no computer-font fallback, arbitrary word splitting, synthetic handwriting or document-execution authority."
+    }
+  }
+}
