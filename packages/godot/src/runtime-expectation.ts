@@ -27,6 +27,7 @@ export interface GodotSpriteAnimationRuntimeExpectation {
   readonly animationDirectorPlanSha256: string;
   readonly godotDescriptorSha256: string;
   readonly frameIds: readonly string[];
+  readonly frameDurationMicros: readonly number[];
   readonly framesPerSecond: number;
   readonly loopMode: "none" | "linear" | "ping-pong";
   readonly maximumFrameTimingErrorMs: number;
@@ -98,6 +99,23 @@ function digest(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+function durationMicros(durationMs: number, frameId: string): number {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    fail(
+      "GODOT_ANIMATION_RUNTIME_EXPECTATION_INVALID",
+      `frame ${frameId} duration must be finite and greater than zero.`,
+    );
+  }
+  const micros = Math.round(durationMs * 1000);
+  if (!Number.isSafeInteger(micros) || micros <= 0) {
+    fail(
+      "GODOT_ANIMATION_RUNTIME_EXPECTATION_INVALID",
+      `frame ${frameId} duration cannot be represented as integer microseconds.`,
+    );
+  }
+  return micros;
+}
+
 export function compileGodotSpriteAnimationRuntimeExpectation(
   request: GodotSpriteAnimationRuntimeExpectationCompileRequest,
 ): GodotSpriteAnimationRuntimeExpectation {
@@ -126,6 +144,19 @@ export function compileGodotSpriteAnimationRuntimeExpectation(
     );
   }
 
+  const animation = request.descriptor.animations.find(
+    (entry) => entry.name === request.animation.animationName,
+  );
+  if (!animation) {
+    fail(
+      "GODOT_ANIMATION_RUNTIME_EXPECTATION_DESCRIPTOR_BLOCKED",
+      "accepted animation is missing from the descriptor.",
+    );
+  }
+  const frameDurationMicros = animation.frames.map((frame) =>
+    durationMicros(frame.durationMs, frame.frameId),
+  );
+
   const maximumFrameTimingErrorMs = boundedInteger(
     request.maximumFrameTimingErrorMs,
     "maximumFrameTimingErrorMs",
@@ -147,6 +178,7 @@ export function compileGodotSpriteAnimationRuntimeExpectation(
     animationDirectorPlanSha256,
     godotDescriptorSha256: descriptorSha256,
     frameIds: [...request.animation.frameIds],
+    frameDurationMicros,
     framesPerSecond: request.animation.framesPerSecond,
     loopMode: request.animation.loopMode,
     maximumFrameTimingErrorMs,
