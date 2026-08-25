@@ -9,6 +9,7 @@ const requiredFiles = [
   'tools/handwriting_balanced_multiline.py',
   'tools/handwriting_balanced_paragraph.py',
   'scripts/test_handwriting_realistic_render.py',
+  'scripts/test_handwriting_balanced_wrappers.py',
   'evavo.tasks.d/handwriting-realistic-render.json',
 ];
 for (const relative of requiredFiles) {
@@ -38,7 +39,7 @@ for (const [name, entry] of expected) {
     throw new Error(`strict parameter schema required for ${name}`);
   }
   const description = String(task.description ?? '').toLowerCase();
-  if (!description.includes('genuine') || !description.includes('no computer-font fallback') && !description.includes('no font fallback')) {
+  if (!description.includes('genuine') || (!description.includes('no computer-font fallback') && !description.includes('no font fallback'))) {
     throw new Error(`${name} must preserve genuine/no-font-fallback policy`);
   }
 }
@@ -54,6 +55,7 @@ console.log(JSON.stringify({
   ok: true,
   fragment: 'evavo.tasks.d/handwriting-realistic-render.json',
   requiredTasks: [...expected.keys()],
+  requiredFiles,
   networkUsed: false,
   fontFallbackUsed: false,
   syntheticHandwritingGenerated: false,
