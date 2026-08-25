@@ -1,0 +1,16 @@
+{
+  "schema": "evavo.integration.darkworld-furnace-art.v1",
+  "consumer": "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer",
+  "consumerRequest": "examples/cinematic_precision_platformer/showcase/furnace_art_studio_request.json",
+  "authority": "art-studio",
+  "capabilities": ["art.project.workspace","art.project.mastering","art.project.review","art.delivery.optimize"],
+  "jobs": [
+    {"id":"env-background","output":"assets/environments/furnace_intake/background.png"},
+    {"id":"env-mid-structure","output":"assets/environments/furnace_intake/mid_structure.png"},
+    {"id":"env-gameplay-skin","output":"assets/environments/furnace_intake/gameplay_skin.png"},
+    {"id":"env-foreground","output":"assets/environments/furnace_intake/foreground.png"},
+    {"id":"env-glow","output":"assets/environments/furnace_intake/glow.png"}
+  ],
+  "returnEvidence": ["source_hash","candidate_hash","mastered_output_hash","review_reference","delivery_profile"],
+  "runtimeAdmissionAuthority": "consumer"
+}
