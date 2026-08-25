@@ -54,23 +54,24 @@ The SVG sheets contain prompts only. They contain no generated handwriting, sign
 ```powershell
 python tools/handwriting_fiducial_detect.py `
   <private-photographed-page.jpg> `
-  <create-only-registration.json> `
+  <create-only-registration-proposal.json> `
   --page 1
 ```
 
-The detector searches each image quadrant for one plausible high-fill square marker. It rejects missing markers and ambiguous quadrants rather than choosing a weak candidate. Because the printed squares are inset from the paper edge, their detected centres are **not** treated as page corners. The tool solves a projective transform from the known 14 mm fiducial-centre geometry and extrapolates the true A4 page corners.
+The detector searches each image quadrant for one plausible high-fill square marker. It rejects missing markers, ambiguous quadrants and photographs whose inferred physical page is cropped outside the image. Because the printed squares are inset from the paper edge, their detected centres are **not** treated as page corners. The tool solves a projective transform from the known 14 mm fiducial-centre geometry and extrapolates the true A4 page corners.
 
-Every automatic result records `manualReviewRequired=true`. Auto-detection is therefore a registration **proposal**, not capture admission. Review the four proposed page corners against the photographed page before using them downstream. If detection is ambiguous, provide reviewed corners manually instead.
+Every automatic result records `manualReviewRequired=true`. Auto-detection is therefore a registration **proposal**, not trusted capture geometry.
 
-## Four-corner photo registration
+## Digest-bound registration review
 
-Registration files use `contracts/handwriting-photo-registration.v1.schema.json`:
+An auto-detected proposal must be reviewed before slot projection. Review artifacts use `contracts/handwriting-registration-review.v1.schema.json` and bind to the exact proposal SHA-256.
 
 ```json
 {
-  "schema": "evavo.art-studio.handwriting-photo-registration.v1",
-  "page": 1,
-  "cornersPx": {
+  "schema": "evavo.art-studio.handwriting-registration-review.v1",
+  "proposalSha256": "<sha256-of-registration-proposal>",
+  "decision": "accept",
+  "reviewedCornersPx": {
     "topLeft": [120, 80],
     "topRight": [3900, 110],
     "bottomRight": [3880, 2920],
@@ -79,7 +80,20 @@ Registration files use `contracts/handwriting-photo-registration.v1.schema.json`
 }
 ```
 
-Then run:
+After checking the proposed corners against the photographed page, bind the review:
+
+```powershell
+python tools/handwriting_registration_review.py `
+  <registration-proposal.json> `
+  <review.json> `
+  <create-only-reviewed-registration.json>
+```
+
+The review tool verifies `proposalSha256`, records whether the corners changed during review and creates a reviewed registration with `manualReviewCompleted=true`. It does not read or return handwriting pixels. `handwriting_capture_register.py` rejects any auto-detected registration that lacks this review evidence. Manual corner registrations remain valid directly because their corners were explicitly supplied rather than auto-detected.
+
+## Four-corner photo registration
+
+Registration files use `contracts/handwriting-photo-registration.v1.schema.json`. Project known worksheet slots only from a manual registration or from the reviewed output above:
 
 ```powershell
 python tools/handwriting_capture_register.py `
@@ -90,7 +104,7 @@ python tools/handwriting_capture_register.py `
   --page 1
 ```
 
-The registration tool computes a four-point projective mapping from A4 millimetres to the photographed image and maps every known writing slot into source-image pixel geometry. It emits `evavo.document-studio.personal-marks-sheet-layout.v1`, including source-image SHA-256 and dimensions. It does not return handwriting pixels.
+The registration tool computes a four-point projective mapping from A4 millimetres to the photographed image and maps every known writing slot into source-image pixel geometry. It emits `evavo.document-studio.personal-marks-sheet-layout.v1`, including source-image SHA-256, dimensions, whether the corners came from auto-detection and the completed review evidence. It does not return handwriting pixels.
 
 The generated layout then feeds Document Studio's existing governed path:
 
@@ -98,8 +112,6 @@ The generated layout then feeds Document Studio's existing governed path:
 2. `personal-marks-capture` performs the private photographed-paper cleanup/extraction;
 3. captured derivatives are reviewed/proofed and admitted into the private atlas/profile;
 4. coverage and capture-gap checks are rerun.
-
-This removes fixed-grid guessing from future capture sheets while retaining explicit registration review and downstream clear-edge/hostile-background QA.
 
 ## Capture gap planning
 
@@ -111,7 +123,7 @@ python tools/handwriting_capture_gap.py <capture-spec.json> <private-atlas.json>
 
 For each token or whole-mark kind it reports required variants, current genuine variants and missing variants. The maintenance loop is therefore:
 
-**coverage → capture spec → gap plan → printable sheet → write naturally → photograph → fiducial proposal → review registration → project slots → Document Studio capture → atlas rebuild → coverage/gap again.**
+**coverage → capture spec → gap plan → printable sheet → write naturally → photograph → fiducial proposal → digest-bound corner review → project slots → Document Studio capture → atlas rebuild → coverage/gap again.**
 
 It never creates replacement handwriting for a missing slot.
 
@@ -131,6 +143,6 @@ Run:
 node scripts/check-handwriting-all.mjs
 ```
 
-That command validates the governed handwriting task fragments and contracts, then runs the focused suites for photograph extraction, atlas rendering, whole marks, Document Studio bridge, coverage reporting, capture specification, gap planning, printable sheet generation, fail-closed fiducial detection, projective photo registration and contract compatibility.
+That command validates the governed handwriting task fragments and contracts, then runs the focused suites for photograph extraction, atlas rendering, whole marks, Document Studio bridge, coverage reporting, capture specification, gap planning, printable sheet generation, fail-closed fiducial detection, digest-bound registration review, projective photo registration and contract compatibility.
 
 All governed handwriting tasks use the managed `image-finishing` Python environment with network disabled. They create only private workflow artifacts or return sanitized read-only reports and never grant signing or document-execution approval.
