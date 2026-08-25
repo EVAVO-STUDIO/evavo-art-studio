@@ -13,4 +13,5 @@ export * from "./transparency-proof.js";
 export * from "./chroma-spill.js";
 export * from "./aseprite-interchange.js";
 export * from "./aseprite-interchange-result.js";
+export * from "./pose-control-render.js";
 export { atomicWriteFile } from "./files.js";
