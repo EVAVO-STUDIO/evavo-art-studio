@@ -5,7 +5,7 @@ Art Studio owns the visual finishing rules for genuine handwritten personal-mark
 ## Ownership boundary
 
 - **Document Studio**: form/PDF understanding, reviewed source/keep capture geometry, provenance, private profile construction, genuine date/text composition, candidate field geometry, reviewed execution plan, source-hash binding, PDF application and post-write visual QA.
-- **Art Studio**: photographed-paper extraction, illumination/paper-cast correction, alpha cleanup, transparent-edge mastering, hostile-background proofing, multi-variant handwriting atlases, natural glyph spacing/side-bearing, whole-name/signature variant selection and rendering, capture-sheet generation/registration, rigid visual transforms, local paper integration and image-level quality evidence.
+- **Art Studio**: photographed-paper extraction, illumination/paper-cast correction, alpha cleanup, transparent-edge mastering, hostile-background proofing, multi-variant handwriting atlases, natural glyph spacing/side-bearing, whole-name/signature variant selection and rendering, capture-sheet generation/registration, multiline/paragraph composition, rigid visual transforms, local paper integration and image-level quality evidence.
 - **Local Storage**: private physical asset boundary and logical-URI resolution on the Windows node.
 - Genuine signature/name/month/digit/letter source bytes and private capture manifests never belong in Git.
 
@@ -25,17 +25,28 @@ Use `tools/document_ink_finisher.py extract-photo` with a generous source crop p
 
 `tools/handwriting_atlas.py` builds a SHA-pinned multi-variant atlas from already-admitted transparent genuine captures. It measures visible ink bounds, side-bearing and natural advance. Rendering prefers longest genuine fragments, avoids immediate variant repeats, preserves word spaces and aspect ratio, uses a shared ink-height/baseline and only tiny whole-glyph rigid variation.
 
+For longer content, `handwriting-multiline-render` stacks genuine single-line renders with a shared writing-session scale and tiny deterministic whole-line start variation. `handwriting-paragraph-render` additionally wraps at whitespace using the same normalized genuine-advance model. Neither path splits words arbitrarily or introduces a font fallback.
+
 ## Coverage
 
 `tools/handwriting_coverage.py <private-atlas.json>` reports exactly what the atlas can genuinely write. It verifies SHA pins/root confinement and reports complete/missing uppercase, lowercase and digits plus fragments, styles, whole-name counts and whole-signature counts. Missing characters are explicit.
 
 ## Capture worksheet specification
 
-`tools/handwriting_capture_spec.py` creates a deterministic blank capture specification for collecting missing genuine samples. The default requests lowercase `a-z` twice, digits `0-9` three times, common punctuation/separators twice, `.com` and Jan-Dec twice, plus four whole name and four whole signature samples. It creates no handwriting.
+`tools/handwriting_capture_spec.py` creates a deterministic blank capture specification for collecting missing genuine samples. The variation-rich default requests:
+
+- lowercase `a-z`: three genuine variants each;
+- digits `0-9`: three genuine variants each;
+- common punctuation/separators: three genuine variants each;
+- `.com` and Jan-Dec fragments: two genuine variants each;
+- whole handwritten name: four genuine samples;
+- whole signature: four genuine samples.
 
 ```powershell
 python tools/handwriting_capture_spec.py <capture-spec.json> --profile-id <private-profile-id>
 ```
+
+Use the governed `handwriting-capture-spec-full` task, or `--include-uppercase`, when a full alphabet refresh is wanted. Uppercase defaults to three genuine variants per letter. Lowercase, uppercase and punctuation targets are independently configurable from 1–6 variants. Existing two-variant banks remain valid genuine partial coverage; `handwriting-capture-gap` requests only the additional real samples needed to reach the selected target.
 
 ## Printable capture sheets
 
@@ -89,7 +100,7 @@ python tools/handwriting_registration_review.py `
   <create-only-reviewed-registration.json>
 ```
 
-The review tool verifies `proposalSha256`, records whether the corners changed during review and creates a reviewed registration with `manualReviewCompleted=true`. It does not read or return handwriting pixels. `handwriting_capture_register.py` rejects any auto-detected registration that lacks this review evidence. Manual corner registrations remain valid directly because their corners were explicitly supplied rather than auto-detected.
+The review tool verifies `proposalSha256`, records the SHA-256 of the exact review artifact, records whether the corners changed during review and creates a reviewed registration with `manualReviewCompleted=true`. It rejects already-reviewed proposals, preventing nested/replayed review chains. It does not read or return handwriting pixels. `handwriting_capture_register.py` rejects any auto-detected registration that lacks this review evidence. Manual corner registrations remain valid directly because their corners were explicitly supplied rather than auto-detected.
 
 ## Four-corner photo registration
 
@@ -104,11 +115,11 @@ python tools/handwriting_capture_register.py `
   --page 1
 ```
 
-The registration tool computes a four-point projective mapping from A4 millimetres to the photographed image and maps every known writing slot into source-image pixel geometry. It emits `evavo.document-studio.personal-marks-sheet-layout.v1`, including source-image SHA-256, dimensions, whether the corners came from auto-detection and the completed review evidence. It does not return handwriting pixels.
+The registration tool computes a four-point projective mapping from A4 millimetres to the photographed image and maps every known writing slot into source-image pixel geometry. It emits `evavo.document-studio.personal-marks-sheet-layout.v1`, including source-image SHA-256, dimensions, whether the corners came from auto-detection, the proposal digest and the review-artifact digest. It does not return handwriting pixels.
 
 The generated layout then feeds Document Studio's existing governed path:
 
-1. `personal-marks-sheet-layout` compiles the registered `inkRect`s into a source-SHA-bound capture manifest with wide source crops and inner keep regions;
+1. `personal-marks-sheet-layout` validates the review provenance and compiles the registered `inkRect`s into a source-SHA-bound capture manifest with wide source crops and inner keep regions;
 2. `personal-marks-capture` performs the private photographed-paper cleanup/extraction;
 3. captured derivatives are reviewed/proofed and admitted into the private atlas/profile;
 4. coverage and capture-gap checks are rerun.
@@ -143,6 +154,6 @@ Run:
 node scripts/check-handwriting-all.mjs
 ```
 
-That command validates the governed handwriting task fragments and contracts, then runs the focused suites for photograph extraction, atlas rendering, whole marks, Document Studio bridge, coverage reporting, capture specification, gap planning, printable sheet generation, fail-closed fiducial detection, digest-bound registration review, projective photo registration and contract compatibility.
+That command validates the governed handwriting task fragments and contracts, then runs the focused suites for photograph extraction, atlas rendering, multiline rendering, paragraph wrapping, whole marks, Document Studio bridge, coverage reporting, capture specification, gap planning, printable sheet generation, fail-closed fiducial detection, digest-bound registration review, projective photo registration and contract compatibility.
 
 All governed handwriting tasks use the managed `image-finishing` Python environment with network disabled. They create only private workflow artifacts or return sanitized read-only reports and never grant signing or document-execution approval.
