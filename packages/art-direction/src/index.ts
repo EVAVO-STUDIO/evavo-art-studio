@@ -14,3 +14,4 @@ export * from "./animation-director.js";
 export * from "./animation-routing.js";
 export * from "./animation-cel-handoff.js";
 export * from "./animation-pose-control.js";
+export * from "./animation-pose-control-verification.js";
