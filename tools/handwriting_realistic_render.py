@@ -38,6 +38,13 @@ def render_text(
     proof: Path | None = None,
     receipt: Path | None = None,
 ) -> dict:
+    if not isinstance(text, str) or not text:
+        raise ValueError("single-line handwriting text is empty")
+    if "\n" in text or "\r" in text:
+        raise ValueError("single-line handwriting cannot contain line breaks; use multiline or paragraph rendering")
+    if any(character in text for character in ("\t", "\v", "\f")):
+        raise ValueError("single-line handwriting cannot contain control whitespace; use ordinary spaces")
+
     Image = atlas_tool._pil()
     atlas = atlas_tool._load(atlas_path)
     if atlas.get("schema") != atlas_tool.ATLAS_SCHEMA:
