@@ -35,7 +35,7 @@ class HandwritingRegistrationReviewTests(unittest.TestCase):
         }), encoding="utf-8")
         return path
 
-    def test_binds_review_to_exact_proposal_sha(self) -> None:
+    def test_binds_review_to_exact_proposal_and_review_sha(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             proposal = self._proposal(root)
@@ -49,12 +49,15 @@ class HandwritingRegistrationReviewTests(unittest.TestCase):
                     "topLeft": [11, 10], "topRight": [990, 12], "bottomRight": [988, 1390], "bottomLeft": [12, 1388]
                 }
             }), encoding="utf-8")
+            review_sha = _sha(review)
             report = bind_review(proposal, review, output)
             result = json.loads(output.read_text(encoding="utf-8"))
             self.assertTrue(report["ok"])
             self.assertTrue(report["cornersChanged"])
             self.assertTrue(result["reviewEvidence"]["manualReviewCompleted"])
             self.assertEqual(result["reviewEvidence"]["proposalSha256"], _sha(proposal))
+            self.assertEqual(result["reviewEvidence"]["reviewArtifactSha256"], review_sha)
+            self.assertEqual(report["reviewArtifactSha256"], review_sha)
 
     def test_rejects_review_bound_to_different_proposal(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -70,6 +73,23 @@ class HandwritingRegistrationReviewTests(unittest.TestCase):
                 }
             }), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "proposalSha256"):
+                bind_review(proposal, review, root / "reviewed.json")
+
+    def test_rejects_review_with_unknown_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proposal = self._proposal(root)
+            review = root / "review.json"
+            review.write_text(json.dumps({
+                "schema": "evavo.art-studio.handwriting-registration-review.v1",
+                "proposalSha256": _sha(proposal),
+                "decision": "accept",
+                "reviewedCornersPx": {
+                    "topLeft": [10, 10], "topRight": [990, 12], "bottomRight": [988, 1390], "bottomLeft": [12, 1388]
+                },
+                "extra": True,
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unsupported field"):
                 bind_review(proposal, review, root / "reviewed.json")
 
     def test_rejects_non_detected_registration_as_proposal(self) -> None:
