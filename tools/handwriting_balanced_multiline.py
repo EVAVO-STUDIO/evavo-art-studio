@@ -15,6 +15,7 @@ SCHEMA = multiline_tool.SCHEMA
 
 
 def render_multiline(*args, **kwargs):
+    receipt = kwargs.get("receipt")
     original = multiline_tool.render_text
     multiline_tool.render_text = balanced_render_text
     try:
@@ -25,6 +26,9 @@ def render_multiline(*args, **kwargs):
         "mode": "deterministic-shuffled-genuine-variant-bag-v1",
         "balancedPerLine": True,
     }
+    if receipt is not None:
+        receipt_path = Path(receipt)
+        receipt_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return result
 
 
@@ -50,8 +54,6 @@ def main(argv: list[str] | None = None) -> int:
             proof=Path(args.proof) if args.proof else None,
             receipt=Path(args.receipt) if args.receipt else None,
         )
-        if args.receipt:
-            Path(args.receipt).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True))
         return 0
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
