@@ -12,12 +12,12 @@ function value(name) {
 const candidate = value("--candidate");
 const jobId = value("--job");
 const workspaceRoot = value("--workspace");
-const outputRoot = value("--output-root") ?? path.join(process.cwd(), ".art-studio", "darkworld-furnace");
+const outputOverride = value("--output-root");
 const createdBy = value("--created-by") ?? "darkworld-production-agent";
 const pythonCommand = value("--python") ?? (process.platform === "win32" ? "python" : "python3");
 
 if (!candidate || !jobId || !workspaceRoot) {
-  throw new Error("usage: node intake_candidate.mjs --candidate <absolute-file> --job <job-id> --workspace <absolute-source-root> [--output-root <dir>] [--created-by <id>] [--python <python-executable>]");
+  throw new Error("usage: node intake_candidate.mjs --candidate <absolute-file> --job <job-id> --workspace <absolute-source-root> [--output-root <job-output-dir>] [--created-by <id>] [--python <python-executable>]");
 }
 
 const allowed = new Map([
@@ -31,7 +31,9 @@ if (!allowed.has(jobId)) throw new Error(`unsupported Darkworld Furnace Art Stud
 
 const candidatePath = path.resolve(candidate);
 const sourceRoot = path.resolve(workspaceRoot);
-const batchRoot = path.resolve(outputRoot, jobId);
+const batchRoot = path.resolve(
+  outputOverride ?? path.join(process.cwd(), ".art-studio", "darkworld-furnace", jobId),
+);
 const requestPath = path.join(batchRoot, "intake-request.json");
 const planPath = path.join(batchRoot, "intake-plan.json");
 const workspacePath = path.join(batchRoot, "workspace");
@@ -74,6 +76,7 @@ console.log(JSON.stringify({
   status: "passed",
   jobId,
   candidate: candidatePath,
+  jobOutputDirectory: batchRoot,
   intakeRequest: requestPath,
   intakePlan: planPath,
   workspace: workspacePath,
