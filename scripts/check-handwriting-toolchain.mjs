@@ -13,6 +13,7 @@ const requiredFiles = [
   'tools/handwriting_whole_mark.py',
   'tools/handwriting_document_bridge.py',
   'tools/handwriting_coverage.py',
+  'scripts/check-handwriting-all.mjs',
   'scripts/test_document_ink_finisher.py',
   'scripts/test_handwriting_atlas.py',
   'scripts/test_handwriting_whole_mark.py',
@@ -78,6 +79,7 @@ console.log(JSON.stringify({
   fragments: fragmentPaths.map((item) => path.relative(root, item).replaceAll('\\', '/')),
   requiredTasks: [...requiredTasks.keys()],
   requiredFiles,
+  unifiedAcceptanceRunner: 'scripts/check-handwriting-all.mjs',
   networkUsed: false,
   signingApprovalAuthority: false,
 }, null, 2));
