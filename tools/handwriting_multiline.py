@@ -30,6 +30,11 @@ def _sha_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    return ordered[len(ordered) // 2]
+
+
 def render_multiline(
     atlas: Path,
     text: str,
@@ -75,20 +80,47 @@ def render_multiline(
                 seed=f"{seed}|line:{index + 1}",
                 style=style,
             )
+            target_ink = result.get("targetInkHeightPx")
+            if not isinstance(target_ink, (int, float)) or isinstance(target_ink, bool) or float(target_ink) <= 0:
+                raise ValueError("single-line handwriting receipt lacks targetInkHeightPx")
             rendered_lines.append({
                 "kind": "ink",
                 "line": index + 1,
                 "result": result,
                 "image": Image.open(path).convert("RGBA"),
+                "sourceTargetInkHeightPx": float(target_ink),
             })
 
-        ink_heights = [item["image"].height for item in rendered_lines if item["kind"] == "ink"]
-        if not ink_heights:
+        ink_items = [item for item in rendered_lines if item["kind"] == "ink"]
+        if not ink_items:
             raise ValueError("multiline handwriting contains no ink")
-        median_height = sorted(ink_heights)[len(ink_heights) // 2]
+        shared_target_ink = _median([item["sourceTargetInkHeightPx"] for item in ink_items])
+
+        # Preserve one coherent writing-session scale across lines. The transform is applied
+        # to the entire already-rendered line, so individual captured glyph strokes are never morphed.
+        for item in ink_items:
+            source_target = item["sourceTargetInkHeightPx"]
+            raw_scale = shared_target_ink / source_target
+            scale = max(0.88, min(1.12, raw_scale))
+            source_image = item["image"]
+            source_size = [source_image.width, source_image.height]
+            if abs(scale - 1.0) > 0.0005:
+                source_image = source_image.resize(
+                    (max(1, round(source_image.width * scale)), max(1, round(source_image.height * scale))),
+                    Image.Resampling.LANCZOS,
+                )
+            item["image"] = source_image
+            item["lineScale"] = scale
+            item["rawLineScale"] = raw_scale
+            item["sourcePixelSize"] = source_size
+            item["normalizedPixelSize"] = [source_image.width, source_image.height]
+            item["effectiveTargetInkHeightPx"] = source_target * scale
+
+        ink_heights = [item["image"].height for item in ink_items]
+        median_height = round(_median([float(value) for value in ink_heights]))
         gap = max(4, round(median_height * float(line_spacing_factor)))
         blank_advance = median_height + gap
-        width = max(item["image"].width for item in rendered_lines if item["kind"] == "ink")
+        width = max(item["image"].width for item in ink_items)
         height = 0
         for item in rendered_lines:
             if item["kind"] == "blank":
@@ -112,8 +144,13 @@ def render_multiline(
                 "blank": False,
                 "yPx": y,
                 "text": result.get("text"),
-                "outputSha256": result.get("outputSha256"),
-                "pixelSize": result.get("pixelSize"),
+                "sourceOutputSha256": result.get("outputSha256"),
+                "sourcePixelSize": item["sourcePixelSize"],
+                "pixelSize": item["normalizedPixelSize"],
+                "sourceTargetInkHeightPx": round(item["sourceTargetInkHeightPx"], 3),
+                "effectiveTargetInkHeightPx": round(item["effectiveTargetInkHeightPx"], 3),
+                "lineScale": round(item["lineScale"], 6),
+                "rawLineScale": round(item["rawLineScale"], 6),
                 "tokenCount": len(result.get("tokens", [])),
             })
             y += image.height + gap
@@ -142,6 +179,8 @@ def render_multiline(
         "blankLineCount": sum(1 for item in line_results if item["blank"]),
         "lineSpacingFactor": float(line_spacing_factor),
         "lineGapPx": gap,
+        "sharedTargetInkHeightPx": round(shared_target_ink, 3),
+        "lineScaleNormalization": {"minimum": 0.88, "maximum": 1.12, "wholeLineRigidScaleOnly": True},
         "pixelSize": [canvas.width, canvas.height],
         "outputSha256": _sha_file(output),
         "hostileBackgroundProofSha256": proof_sha,
@@ -150,6 +189,7 @@ def render_multiline(
             "fontFallbackUsed": False,
             "syntheticHandwritingGenerated": False,
             "lineImagesRenderedByGenuineAtlas": True,
+            "lineScaleNormalizedAsWholeRigidRaster": True,
             "strokeDeformation": False,
         },
     }
