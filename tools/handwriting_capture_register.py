@@ -10,6 +10,7 @@ from pathlib import Path
 SHEET_SCHEMA = "evavo.art-studio.handwriting-capture-sheet.v1"
 REGISTRATION_SCHEMA = "evavo.art-studio.handwriting-photo-registration.v1"
 DOCUMENT_LAYOUT_SCHEMA = "evavo.document-studio.personal-marks-sheet-layout.v1"
+_SHA_RE = re.compile(r"^[a-f0-9]{64}$")
 
 
 def _pil():
@@ -115,8 +116,13 @@ def _require_review_if_detected(registration: dict) -> dict | None:
     if review.get("decision") != "accept" or review.get("manualReviewCompleted") is not True:
         raise ValueError("auto-detected registration review is not accepted/completed")
     proposal_sha = str(review.get("proposalSha256") or "")
-    if not re.fullmatch(r"[a-f0-9]{64}", proposal_sha):
+    review_sha = str(review.get("reviewArtifactSha256") or "")
+    if not _SHA_RE.fullmatch(proposal_sha):
         raise ValueError("auto-detected registration review lacks valid proposalSha256")
+    if not _SHA_RE.fullmatch(review_sha):
+        raise ValueError("auto-detected registration review lacks valid reviewArtifactSha256")
+    if not isinstance(review.get("cornersChanged"), bool):
+        raise ValueError("auto-detected registration review lacks cornersChanged boolean")
     return review
 
 
@@ -207,6 +213,7 @@ def register(sheet_manifest_path: Path, registration_path: Path, source_image: P
     }
     if review_evidence is not None:
         registration_evidence["proposalSha256"] = review_evidence["proposalSha256"]
+        registration_evidence["reviewArtifactSha256"] = review_evidence["reviewArtifactSha256"]
         registration_evidence["cornersChangedDuringReview"] = bool(review_evidence.get("cornersChanged"))
 
     layout = {
