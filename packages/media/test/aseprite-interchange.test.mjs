@@ -11,6 +11,7 @@ function request(overrides = {}) {
       sha256: "a".repeat(64),
     },
     sourcePath: "C:\\Art\\hero.aseprite",
+    sourceSha256: "b".repeat(64),
     sheetPath: "C:\\Art\\exports\\hero.png",
     dataPath: "C:\\Art\\exports\\hero.json",
     sheetType: "packed",
@@ -28,6 +29,7 @@ function request(overrides = {}) {
 test("compiles a fixed batch-mode Aseprite sheet and metadata invocation", () => {
   const plan = compileAsepriteInterchangePlan(request());
   assert.match(plan.planSha256, /^[a-f0-9]{64}$/);
+  assert.equal(plan.source.sha256, "b".repeat(64));
   assert.equal(plan.outputs.createOnly, true);
   assert.equal(plan.authority.processExecution, false);
   assert.equal(plan.authority.sourceOverwrite, false);
@@ -64,6 +66,10 @@ test("fails closed on unsafe identities, formats and arbitrary values", () => {
     /executable\.sha256/,
   );
   assert.throws(
+    () => compileAsepriteInterchangePlan(request({ sourceSha256: "bad" })),
+    /sourceSha256/,
+  );
+  assert.throws(
     () => compileAsepriteInterchangePlan(request({ sourcePath: "C:\\Art\\hero.png" })),
     /\.ase or \.aseprite/,
   );
@@ -81,8 +87,10 @@ test("fails closed on unsafe identities, formats and arbitrary values", () => {
   );
 });
 
-test("changes the plan identity when export semantics change", () => {
+test("changes the plan identity when source or export semantics change", () => {
   const first = compileAsepriteInterchangePlan(request());
   const second = compileAsepriteInterchangePlan(request({ trim: false }));
+  const third = compileAsepriteInterchangePlan(request({ sourceSha256: "c".repeat(64) }));
   assert.notEqual(first.planSha256, second.planSha256);
+  assert.notEqual(first.planSha256, third.planSha256);
 });
