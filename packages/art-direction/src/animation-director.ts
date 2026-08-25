@@ -1,4 +1,4 @@
-export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.3" as const;
+export const ANIMATION_DIRECTOR_PROTOCOL_VERSION = "2026-08-25.4" as const;
 export const ANIMATION_DIRECTOR_PLAN_KIND =
   "evavo.animation-director.plan" as const;
 
@@ -54,7 +54,7 @@ export interface AnimationFramePlan {
   providerReferenceRoles: Array<
     | "canonical-identity"
     | "direction-master"
-    | "previous-approved-frame"
+    | "previous-key-pose"
     | "next-key-pose"
     | "pose-control"
   >;
@@ -240,7 +240,7 @@ export function compileAnimationDirectorPlan(
     throw new Error("animation director request must be an object");
   }
   if (request.action !== "walk") {
-    throw new Error("action must be walk in animation director protocol 2026-08-25.3");
+    throw new Error("action must be walk in animation director protocol 2026-08-25.4");
   }
   if (!request.canvas || typeof request.canvas !== "object") {
     throw new Error("canvas must be an object");
@@ -265,6 +265,7 @@ export function compileAnimationDirectorPlan(
   const frames: AnimationFramePlan[] = WALK_ROLES.map((role, index) => {
     const frame = index + 1;
     const plantedFoot = WALK_PLANTED_FEET[index]!;
+    const keyPose = frame === 1 || frame === 5;
     const referenceRoles: AnimationFramePlan["providerReferenceRoles"] = [
       "canonical-identity",
       "pose-control",
@@ -272,11 +273,11 @@ export function compileAnimationDirectorPlan(
     if (request.directionMasterArtifactId) {
       referenceRoles.push("direction-master");
     }
-    if (frame > 1) {
-      referenceRoles.push("previous-approved-frame");
-    }
-    if (![1, 5].includes(frame)) {
-      referenceRoles.push("next-key-pose");
+    if (!keyPose) {
+      referenceRoles.push("previous-key-pose");
+      if (frame < 5 || loop) {
+        referenceRoles.push("next-key-pose");
+      }
     }
     return {
       frame,
