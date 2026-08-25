@@ -51,6 +51,10 @@ if (registrationContract?.properties?.schema?.const !== 'evavo.art-studio.handwr
 for (const corner of ['topLeft', 'topRight', 'bottomRight', 'bottomLeft']) {
   if (!registrationContract?.properties?.cornersPx?.properties?.[corner]) throw new Error(`handwriting registration contract is missing ${corner}`);
 }
+const detectionEvidence = registrationContract?.properties?.detectionEvidence?.properties;
+if (!detectionEvidence || detectionEvidence.method?.const !== 'solid-square-fiducials-v1' || detectionEvidence.manualReviewRequired?.const !== true) {
+  throw new Error('handwriting registration contract weakened fiducial review evidence');
+}
 const allTasks = {};
 for (const fragmentPath of fragmentPaths) {
   if (!fs.existsSync(fragmentPath)) throw new Error(`missing handwriting task fragment: ${path.relative(root, fragmentPath)}`);
