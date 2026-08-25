@@ -124,6 +124,20 @@ def _component_cleanup(image, *, alpha_threshold: int, minimum_pixels: int) -> t
     return cleaned, len(small)
 
 
+def _prune_low_alpha(image, *, cutoff: int) -> int:
+    alpha = image.getchannel("A")
+    px = alpha.load()
+    removed = 0
+    for y in range(alpha.height):
+        for x in range(alpha.width):
+            value = px[x, y]
+            if 0 < value < cutoff:
+                px[x, y] = 0
+                removed += 1
+    image.putalpha(alpha)
+    return removed
+
+
 def _edge_contact(image, *, threshold: int = 16, guard: int = 3) -> list[str]:
     alpha = image.getchannel("A")
     width, height = alpha.size
@@ -149,8 +163,6 @@ def _neutralise_transparent_rgb(image) -> None:
             if a == 0:
                 px[x, y] = (0, 0, 0, 0)
             elif a < 224:
-                # Preserve the photographed pen hue but keep paper colour out of
-                # antialiased edges so the mark survives light/dark backgrounds.
                 maximum = max(r, g, b, 1)
                 scale = min(1.0, 96.0 / maximum)
                 px[x, y] = (round(r * scale), round(g * scale), round(b * scale), a)
@@ -171,7 +183,7 @@ def extract_photo_handwriting(
     require_clear_edges: bool = True,
     proof: Path | None = None,
 ) -> dict:
-    Image, _, ImageDraw, ImageFilter = _pil()
+    Image, ImageChops, ImageDraw, ImageFilter = _pil()
     if kind not in {"signature", "name", "date", "text", "glyph", "symbol"}:
         raise ValueError("unsupported photographed handwriting kind")
     if not source.is_file():
@@ -187,7 +199,6 @@ def extract_photo_handwriting(
     if not (0 <= x0 < x1 <= full.width and 0 <= y0 < y1 <= full.height):
         raise ValueError("crop rectangle is outside source image")
     crop = full.crop(crop_rect)
-
     radius = max(24.0, min(crop.width, crop.height) / 4.0)
     local_paper = crop.filter(ImageFilter.GaussianBlur(radius=radius))
     source_px = crop.load()
@@ -206,7 +217,9 @@ def extract_photo_handwriting(
             maximum = max(r, g, b, 1)
             colour_scale = min(1.0, 100.0 / maximum)
             out_px[x, y] = (round(r * colour_scale), round(g * colour_scale), round(b * colour_scale), alpha)
-    rgba.putalpha(rgba.getchannel("A").filter(ImageFilter.GaussianBlur(radius=0.28)))
+    softened = rgba.getchannel("A").filter(ImageFilter.GaussianBlur(radius=0.28))
+    softened = softened.point(lambda value: 0 if value < weak_alpha_cutoff else value)
+    rgba.putalpha(softened)
 
     applied_keep = None
     if keep_rect is not None:
@@ -219,15 +232,16 @@ def extract_photo_handwriting(
         rgba.putalpha(ImageChops.multiply(alpha, mask))
         applied_keep = [kx0, ky0, kx1, ky1]
 
-    # Glyphs can reject more tiny JPEG components; signature/name cleanup is
-    # intentionally conservative to preserve disconnected flourishes/dots.
     minimum_pixels = 10 if kind in {"glyph", "symbol", "text", "date"} else 3
     rgba, removed_components = _component_cleanup(rgba, alpha_threshold=24, minimum_pixels=minimum_pixels)
+    pruned_low_alpha = _prune_low_alpha(rgba, cutoff=max(weak_alpha_cutoff, trim_threshold))
     _neutralise_transparent_rgb(rgba)
 
-    edge_contact = _edge_contact(rgba, threshold=max(trim_threshold, 16), guard=3)
+    edge_probe = rgba.crop(tuple(applied_keep)) if applied_keep is not None else rgba
+    edge_contact = _edge_contact(edge_probe, threshold=max(trim_threshold, 16), guard=3)
     if require_clear_edges and edge_contact:
-        raise ValueError("trusted photographed handwriting touches crop edge(s): " + ", ".join(edge_contact))
+        boundary = "keep rectangle" if applied_keep is not None else "crop"
+        raise ValueError("trusted photographed handwriting touches " + boundary + " edge(s): " + ", ".join(edge_contact))
 
     alpha = rgba.getchannel("A")
     bbox = alpha.point(lambda value: 255 if value > trim_threshold else 0).getbbox()
@@ -236,6 +250,7 @@ def extract_photo_handwriting(
     bx0, by0, bx1, by1 = bbox
     trim_box = [max(0, bx0 - padding), max(0, by0 - padding), min(rgba.width, bx1 + padding), min(rgba.height, by1 + padding)]
     mastered = rgba.crop(tuple(trim_box))
+    pruned_low_alpha += _prune_low_alpha(mastered, cutoff=max(weak_alpha_cutoff, trim_threshold))
     _neutralise_transparent_rgb(mastered)
     output.parent.mkdir(parents=True, exist_ok=True)
     mastered.save(output, format="PNG", optimize=True)
@@ -268,6 +283,8 @@ def extract_photo_handwriting(
         "paperCastRemoved": True,
         "shadowGradientRemoved": True,
         "weakPhotographicNoiseSuppressed": True,
+        "postSoftenAlphaPruneApplied": True,
+        "prunedLowAlphaPixelCount": pruned_low_alpha,
         "removedTinyComponents": removed_components,
         "edgeContactSides": edge_contact,
         "cropEdgeClear": not edge_contact,
@@ -296,6 +313,7 @@ def master_transparent_ink(source: Path, output: Path, *, trim_threshold: int = 
     image = image.crop((x0, y0, x1, y1))
     if feather > 0:
         image.putalpha(image.getchannel("A").filter(ImageFilter.GaussianBlur(feather)))
+    _prune_low_alpha(image, cutoff=max(trim_threshold, 8))
     _neutralise_transparent_rgb(image)
     output.parent.mkdir(parents=True, exist_ok=True)
     image.save(output, format="PNG", optimize=True)
