@@ -35,20 +35,24 @@ class HandwritingRegistrationReviewTests(unittest.TestCase):
         }), encoding="utf-8")
         return path
 
+    def _review(self, root: Path, proposal: Path) -> Path:
+        review = root / "review.json"
+        review.write_text(json.dumps({
+            "schema": "evavo.art-studio.handwriting-registration-review.v1",
+            "proposalSha256": _sha(proposal),
+            "decision": "accept",
+            "reviewedCornersPx": {
+                "topLeft": [11, 10], "topRight": [990, 12], "bottomRight": [988, 1390], "bottomLeft": [12, 1388]
+            }
+        }), encoding="utf-8")
+        return review
+
     def test_binds_review_to_exact_proposal_and_review_sha(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             proposal = self._proposal(root)
-            review = root / "review.json"
+            review = self._review(root, proposal)
             output = root / "reviewed.json"
-            review.write_text(json.dumps({
-                "schema": "evavo.art-studio.handwriting-registration-review.v1",
-                "proposalSha256": _sha(proposal),
-                "decision": "accept",
-                "reviewedCornersPx": {
-                    "topLeft": [11, 10], "topRight": [990, 12], "bottomRight": [988, 1390], "bottomLeft": [12, 1388]
-                }
-            }), encoding="utf-8")
             review_sha = _sha(review)
             report = bind_review(proposal, review, output)
             result = json.loads(output.read_text(encoding="utf-8"))
@@ -91,6 +95,25 @@ class HandwritingRegistrationReviewTests(unittest.TestCase):
             }), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "unsupported field"):
                 bind_review(proposal, review, root / "reviewed.json")
+
+    def test_rejects_nested_review_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proposal = self._proposal(root)
+            first_review = self._review(root, proposal)
+            reviewed = root / "reviewed.json"
+            bind_review(proposal, first_review, reviewed)
+            second_review = root / "review-2.json"
+            second_review.write_text(json.dumps({
+                "schema": "evavo.art-studio.handwriting-registration-review.v1",
+                "proposalSha256": _sha(reviewed),
+                "decision": "accept",
+                "reviewedCornersPx": {
+                    "topLeft": [11, 10], "topRight": [990, 12], "bottomRight": [988, 1390], "bottomLeft": [12, 1388]
+                }
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "already reviewed"):
+                bind_review(reviewed, second_review, root / "reviewed-2.json")
 
     def test_rejects_non_detected_registration_as_proposal(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
