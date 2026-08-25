@@ -8,134 +8,71 @@
       "pythonEnvironment": "image-finishing",
       "entry": "tools/document_ink_finisher.py",
       "arguments": ["extract-photo", "{{source}}", "{{output}}", "--kind", "{{kind}}", "--crop", "{{crop}}", "--keep", "{{keep}}", "--proof", "{{proof}}", "--evidence", "{{evidence}}"],
-      "parameterSchema": {
-        "schemaVersion": 1,
-        "additionalProperties": false,
-        "required": ["source", "output", "proof", "evidence", "kind"],
-        "properties": {
-          "source": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "proof": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "kind": {"type": "string", "minimumLength": 4, "maximumLength": 9, "pattern": "^(signature|name|date|text|glyph|symbol)$"},
-          "crop": {"type": "string", "minimumLength": 0, "maximumLength": 96, "pattern": "^(?:|[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?)$", "default": ""},
-          "keep": {"type": "string", "minimumLength": 0, "maximumLength": 96, "pattern": "^(?:|[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?)$", "default": ""}
-        }
-      },
-      "parameterOutputs": ["output", "proof", "evidence"],
-      "network": "disabled",
-      "timeoutSeconds": 600,
+      "parameterSchema": {"schemaVersion": 1, "additionalProperties": false, "required": ["source", "output", "proof", "evidence", "kind"], "properties": {
+        "source": {"type": "compute-path", "pathKind": "file", "access": "input"},
+        "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
+        "proof": {"type": "compute-path", "pathKind": "file", "access": "output"},
+        "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"},
+        "kind": {"type": "string", "minimumLength": 4, "maximumLength": 9, "pattern": "^(signature|name|date|text|glyph|symbol)$"},
+        "crop": {"type": "string", "minimumLength": 0, "maximumLength": 96, "pattern": "^(?:|[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?)$", "default": ""},
+        "keep": {"type": "string", "minimumLength": 0, "maximumLength": 96, "pattern": "^(?:|[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?,[0-9]+(?:\\.[0-9]+)?)$", "default": ""}
+      }},
+      "parameterOutputs": ["output", "proof", "evidence"], "network": "disabled", "timeoutSeconds": 600,
       "description": "Extract one genuine handwriting sample from a photographed page using local illumination/paper correction, reviewed crop and optional inner keep region, tiny photographic-noise suppression, hidden-paper RGB decontamination, clear-edge admission and hostile-background proofing. Creates only transparent output, proof and SHA-bound evidence; never redraws handwriting and grants no signing, field-selection, publication or repository authority."
     },
     "document-ink-master": {
-      "runtime": "python-script",
-      "pythonEnvironment": "image-finishing",
-      "entry": "tools/document_ink_finisher.py",
+      "runtime": "python-script", "pythonEnvironment": "image-finishing", "entry": "tools/document_ink_finisher.py",
       "arguments": ["master", "{{source}}", "{{output}}", "--evidence", "{{evidence}}"],
-      "parameterSchema": {
-        "schemaVersion": 1,
-        "additionalProperties": false,
-        "required": ["source", "output", "evidence"],
-        "properties": {
-          "source": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"}
-        }
-      },
-      "parameterOutputs": ["output", "evidence"],
-      "network": "disabled",
-      "timeoutSeconds": 300,
+      "parameterSchema": {"schemaVersion": 1, "additionalProperties": false, "required": ["source", "output", "evidence"], "properties": {
+        "source": {"type": "compute-path", "pathKind": "file", "access": "input"}, "output": {"type": "compute-path", "pathKind": "file", "access": "output"}, "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"}
+      }},
+      "parameterOutputs": ["output", "evidence"], "network": "disabled", "timeoutSeconds": 300,
       "description": "Create one transparent mastered derivative from an already captured genuine handwriting/signature PNG, preserving visible pen RGB while cleaning hidden matte RGB and producing create-only SHA-bound evidence. Grants no form-field selection, signing approval, publication or repository authority."
     },
     "document-ink-integrate": {
-      "runtime": "python-script",
-      "pythonEnvironment": "image-finishing",
-      "entry": "tools/document_ink_finisher.py",
+      "runtime": "python-script", "pythonEnvironment": "image-finishing", "entry": "tools/document_ink_finisher.py",
       "arguments": ["integrate", "{{mark}}", "{{background}}", "{{output}}", "--kind", "{{kind}}", "--seed", "{{seed}}", "--opacity", "{{opacity}}", "--evidence", "{{evidence}}"],
-      "parameterSchema": {
-        "schemaVersion": 1,
-        "additionalProperties": false,
-        "required": ["mark", "background", "output", "evidence", "kind", "seed"],
-        "properties": {
-          "mark": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "background": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "kind": {"type": "string", "minimumLength": 4, "maximumLength": 9, "pattern": "^(signature|name|date|text)$"},
-          "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"},
-          "opacity": {"type": "number", "minimum": 0.65, "maximum": 1.0, "default": 1.0}
-        }
-      },
-      "parameterOutputs": ["output", "evidence"],
-      "network": "disabled",
-      "timeoutSeconds": 300,
+      "parameterSchema": {"schemaVersion": 1, "additionalProperties": false, "required": ["mark", "background", "output", "evidence", "kind", "seed"], "properties": {
+        "mark": {"type": "compute-path", "pathKind": "file", "access": "input"}, "background": {"type": "compute-path", "pathKind": "file", "access": "input"}, "output": {"type": "compute-path", "pathKind": "file", "access": "output"}, "evidence": {"type": "compute-path", "pathKind": "file", "access": "output"},
+        "kind": {"type": "string", "minimumLength": 4, "maximumLength": 9, "pattern": "^(signature|name|date|text)$"}, "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"}, "opacity": {"type": "number", "minimum": 0.65, "maximum": 1.0, "default": 1.0}
+      }},
+      "parameterOutputs": ["output", "evidence"], "network": "disabled", "timeoutSeconds": 300,
       "description": "Integrate one genuine transparent personal mark into an already selected local paper patch using bounded rigid transform, blur and multiply blending. Creates only the derivative and evidence; cannot choose a form field, approve a signature placement, mutate source documents or publish."
     },
     "handwriting-atlas-build": {
-      "runtime": "python-script",
-      "pythonEnvironment": "image-finishing",
-      "entry": "tools/handwriting_atlas.py",
-      "arguments": ["build", "{{catalog}}", "{{assetRoot}}", "{{atlas}}"],
-      "parameterSchema": {
-        "schemaVersion": 1,
-        "additionalProperties": false,
-        "required": ["catalog", "assetRoot", "atlas"],
-        "properties": {
-          "catalog": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "assetRoot": {"type": "compute-path", "pathKind": "directory", "access": "input"},
-          "atlas": {"type": "compute-path", "pathKind": "file", "access": "output"}
-        }
-      },
-      "parameterOutputs": ["atlas"],
-      "network": "disabled",
-      "timeoutSeconds": 300,
+      "runtime": "python-script", "pythonEnvironment": "image-finishing", "entry": "tools/handwriting_atlas.py", "arguments": ["build", "{{catalog}}", "{{assetRoot}}", "{{atlas}}"],
+      "parameterSchema": {"schemaVersion": 1, "additionalProperties": false, "required": ["catalog", "assetRoot", "atlas"], "properties": {
+        "catalog": {"type": "compute-path", "pathKind": "file", "access": "input"}, "assetRoot": {"type": "compute-path", "pathKind": "directory", "access": "input"}, "atlas": {"type": "compute-path", "pathKind": "file", "access": "output"}
+      }},
+      "parameterOutputs": ["atlas"], "network": "disabled", "timeoutSeconds": 300,
       "description": "Build a create-only SHA-pinned multi-variant handwriting atlas from genuine transparent captures, measuring ink bounds and natural side-bearing/advance. No font fallback, synthesis or document authority."
     },
     "handwriting-atlas-render": {
-      "runtime": "python-script",
-      "pythonEnvironment": "image-finishing",
-      "entry": "tools/handwriting_atlas.py",
+      "runtime": "python-script", "pythonEnvironment": "image-finishing", "entry": "tools/handwriting_atlas.py",
       "arguments": ["render", "{{atlas}}", "{{text}}", "{{output}}", "--seed", "{{seed}}", "--style", "{{style}}", "--proof", "{{proof}}", "--receipt", "{{receipt}}"],
-      "parameterSchema": {
-        "schemaVersion": 1,
-        "additionalProperties": false,
-        "required": ["atlas", "text", "output", "seed", "proof", "receipt"],
-        "properties": {
-          "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "text": {"type": "string", "minimumLength": 1, "maximumLength": 1024},
-          "output": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"},
-          "style": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]*$", "default": ""},
-          "proof": {"type": "compute-path", "pathKind": "file", "access": "output"},
-          "receipt": {"type": "compute-path", "pathKind": "file", "access": "output"}
-        }
-      },
-      "parameterOutputs": ["output", "proof", "receipt"],
-      "network": "disabled",
-      "timeoutSeconds": 300,
+      "parameterSchema": {"schemaVersion": 1, "additionalProperties": false, "required": ["atlas", "text", "output", "seed", "proof", "receipt"], "properties": {
+        "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"}, "text": {"type": "string", "minimumLength": 1, "maximumLength": 1024}, "output": {"type": "compute-path", "pathKind": "file", "access": "output"}, "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"}, "style": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]*$", "default": ""}, "proof": {"type": "compute-path", "pathKind": "file", "access": "output"}, "receipt": {"type": "compute-path", "pathKind": "file", "access": "output"}
+      }},
+      "parameterOutputs": ["output", "proof", "receipt"], "network": "disabled", "timeoutSeconds": 300,
       "description": "Render create-only text from genuine captured glyph/fragment variants with measured natural advance, repeat avoidance, bounded whole-glyph variation and hostile-background proof. Missing characters fail closed; no computer-font fallback."
     },
     "handwriting-whole-mark-select": {
-      "runtime": "python-script",
-      "pythonEnvironment": "image-finishing",
-      "entry": "tools/handwriting_atlas.py",
+      "runtime": "python-script", "pythonEnvironment": "image-finishing", "entry": "tools/handwriting_atlas.py",
       "arguments": ["select-mark", "{{atlas}}", "--kind", "{{kind}}", "--seed", "{{seed}}", "--style", "{{style}}", "--previous-sha256", "{{previousSha256}}"],
-      "parameterSchema": {
-        "schemaVersion": 1,
-        "additionalProperties": false,
-        "required": ["atlas", "kind", "seed"],
-        "properties": {
-          "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"},
-          "kind": {"type": "string", "pattern": "^(signature|name)$"},
-          "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"},
-          "style": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]*$", "default": ""},
-          "previousSha256": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^(?:|[a-f0-9]{64})$", "default": ""}
-        }
-      },
-      "parameterOutputs": [],
-      "network": "disabled",
-      "timeoutSeconds": 120,
+      "parameterSchema": {"schemaVersion": 1, "additionalProperties": false, "required": ["atlas", "kind", "seed"], "properties": {
+        "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"}, "kind": {"type": "string", "pattern": "^(signature|name)$"}, "seed": {"type": "string", "minimumLength": 1, "maximumLength": 256, "pattern": "^[A-Za-z0-9._:/-]+$"}, "style": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^[A-Za-z0-9._-]*$", "default": ""}, "previousSha256": {"type": "string", "minimumLength": 0, "maximumLength": 64, "pattern": "^(?:|[a-f0-9]{64})$", "default": ""}
+      }},
+      "parameterOutputs": [], "network": "disabled", "timeoutSeconds": 120,
       "description": "Select a whole genuine signature or handwritten-name variant by hash/style. Returns no private path and never synthesizes signatures from letter glyphs."
+    },
+    "handwriting-document-export": {
+      "runtime": "python-script", "pythonEnvironment": "image-finishing", "entry": "tools/handwriting_document_bridge.py",
+      "arguments": ["{{atlas}}", "{{output}}"],
+      "parameterSchema": {"schemaVersion": 1, "additionalProperties": false, "required": ["atlas", "output"], "properties": {
+        "atlas": {"type": "compute-path", "pathKind": "file", "access": "input"}, "output": {"type": "compute-path", "pathKind": "file", "access": "output"}
+      }},
+      "parameterOutputs": ["output"], "network": "disabled", "timeoutSeconds": 120,
+      "description": "Export a create-only private Document Studio handwriting/profile seed from the measured Art Studio atlas. Reuses hashes/relative references/metrics only, copies no image bytes, preserves whole genuine name/signature variants and grants no PDF execution approval."
     }
   }
 }
