@@ -5,7 +5,7 @@ Art Studio owns the visual finishing rules for genuine handwritten personal-mark
 ## Ownership boundary
 
 - **Document Studio**: form/PDF understanding, reviewed source/keep capture geometry, provenance, private profile construction, genuine date/text composition, candidate field geometry, reviewed execution plan, source-hash binding, PDF application and post-write visual QA.
-- **Art Studio**: photographed-paper extraction, illumination/paper-cast correction, alpha cleanup, transparent-edge mastering, hostile-background proofing, multi-variant handwriting atlases, natural glyph spacing/side-bearing, whole-name/signature variant selection and rendering, rigid visual transforms, local paper integration and image-level quality evidence.
+- **Art Studio**: photographed-paper extraction, illumination/paper-cast correction, alpha cleanup, transparent-edge mastering, hostile-background proofing, multi-variant handwriting atlases, natural glyph spacing/side-bearing, whole-name/signature variant selection and rendering, capture-sheet generation/registration, rigid visual transforms, local paper integration and image-level quality evidence.
 - **Local Storage**: private physical asset boundary and logical-URI resolution on the Windows node.
 - Genuine signature/name/month/digit/letter source bytes and private capture manifests never belong in Git.
 
@@ -31,44 +31,74 @@ Use `tools/document_ink_finisher.py extract-photo` with a generous source crop p
 
 ## Capture worksheet specification
 
-`tools/handwriting_capture_spec.py` creates a deterministic **blank capture specification** for collecting missing genuine samples. It does not create handwriting. The default spec requests:
-
-- lowercase `a-z`, two natural variants each;
-- digits `0-9`, three variants each;
-- common punctuation/separators including `/ . , - @ & ( ) + #`;
-- `.com` plus Jan-Dec fragments;
-- four whole handwritten-name samples;
-- four whole signature samples.
+`tools/handwriting_capture_spec.py` creates a deterministic blank capture specification for collecting missing genuine samples. The default requests lowercase `a-z` twice, digits `0-9` three times, common punctuation/separators twice, `.com` and Jan-Dec twice, plus four whole name and four whole signature samples. It creates no handwriting.
 
 ```powershell
-python tools/handwriting_capture_spec.py `
-  <create-only-capture-spec.json> `
-  --profile-id <private-profile-id>
+python tools/handwriting_capture_spec.py <capture-spec.json> --profile-id <private-profile-id>
 ```
 
-Use `--include-uppercase` only when a fresh uppercase bank is also needed. Every slot declares its token, variant number, style and QA requirements. The capture spec is safe to keep as workflow metadata, but the subsequently photographed sheets and transparent derivatives remain private personal-mark assets and must not be committed to Git.
+## Printable capture sheets
+
+`tools/handwriting_capture_sheet.py` turns the blank specification into printable A4 SVG worksheets. Each page contains large writing boxes, stable slot IDs, known millimetre geometry and four black corner fiducials. It also writes `capture-sheet-manifest.json` containing every slot's box and recommended ink-keep geometry.
+
+```powershell
+python tools/handwriting_capture_sheet.py <capture-spec.json> <create-only-sheet-directory>
+```
+
+The SVG sheets contain prompts only. They contain no generated handwriting, signature images or private personal-mark bytes. Print or view the page, write each requested sample naturally inside its box, then photograph the completed page.
+
+## Four-corner photo registration
+
+For each photographed worksheet page, provide the pixel coordinates of the four page corners using `contracts/handwriting-photo-registration.v1.schema.json`:
+
+```json
+{
+  "schema": "evavo.art-studio.handwriting-photo-registration.v1",
+  "page": 1,
+  "cornersPx": {
+    "topLeft": [120, 80],
+    "topRight": [3900, 110],
+    "bottomRight": [3880, 2920],
+    "bottomLeft": [135, 2940]
+  }
+}
+```
+
+Then run:
+
+```powershell
+python tools/handwriting_capture_register.py `
+  <capture-sheet-manifest.json> `
+  <registration.json> `
+  <private-photographed-page.jpg> `
+  <create-only-document-studio-layout.json> `
+  --page 1
+```
+
+The registration tool computes a four-point projective mapping from A4 millimetres to the photographed image and maps every known writing slot into source-image pixel geometry. It emits `evavo.document-studio.personal-marks-sheet-layout.v1`, including source-image SHA-256 and dimensions. It does not return handwriting pixels.
+
+The generated layout then feeds Document Studio's existing governed path:
+
+1. `personal-marks-sheet-layout` compiles the registered `inkRect`s into a source-SHA-bound capture manifest with wide source crops and inner keep regions;
+2. `personal-marks-capture` performs the private photographed-paper cleanup/extraction;
+3. captured derivatives are reviewed/proofed and admitted into the private atlas/profile;
+4. coverage and capture-gap checks are rerun.
+
+This removes fixed-grid guessing from future capture sheets while still requiring reviewed four-corner registration and downstream clear-edge/hostile-background QA.
 
 ## Capture gap planning
 
-`tools/handwriting_capture_gap.py` compares the desired capture specification with the current genuine atlas and reports **exactly what still needs to be collected**.
+`tools/handwriting_capture_gap.py` compares the desired capture specification with the current genuine atlas and reports exactly what still needs to be collected.
 
 ```powershell
-python tools/handwriting_capture_gap.py `
-  <capture-spec.json> `
-  <private-atlas.json> `
-  --output <create-only-gap-report.json>
+python tools/handwriting_capture_gap.py <capture-spec.json> <private-atlas.json> --output <gap-report.json>
 ```
 
-For each token or whole-mark kind it reports required variant count, current genuine variant count and missing variant count. The intended maintenance loop is:
+For each token or whole-mark kind it reports required variants, current genuine variants and missing variants. The maintenance loop is therefore:
 
-1. create/reuse the capture specification;
-2. compare it with the current atlas;
-3. collect only missing genuine samples;
-4. extract/admit those samples with reviewed crop + keep regions;
-5. rebuild the atlas;
-6. rerun coverage and gap checks until the required bank is complete.
+**coverage → capture spec → gap plan → printable sheet → write naturally → photograph → four-corner register → Document Studio capture → atlas rebuild → coverage/gap again.**
 
-This prevents repeated collection of handwriting already captured and makes lowercase/symbol expansion measurable. It never creates replacement handwriting for a missing slot.
+It never creates replacement handwriting for a missing slot.
 
 ## Whole names and signatures
 
@@ -76,7 +106,7 @@ Use `tools/handwriting_whole_mark.py` to render a whole genuine name/signature v
 
 ## Document Studio handoff
 
-`tools/handwriting_document_bridge.py` exports a create-only profile seed under `contracts/handwriting-document-export.v1.schema.json`. The export copies no image bytes. Document Studio performs a separate admission step and retains all PDF approval/source-hash authority.
+`tools/handwriting_document_bridge.py` exports a create-only profile seed under `contracts/handwriting-document-export.v1.schema.json`. The export copies no image bytes. Document Studio admits that export through the governed `personal-marks-art-import` path, creates an import receipt and retains all PDF approval/source-hash authority.
 
 ## Focused acceptance
 
@@ -86,6 +116,6 @@ Run:
 node scripts/check-handwriting-all.mjs
 ```
 
-That command validates the governed handwriting task fragments and export contract, then runs the focused suites for photograph extraction, atlas rendering, whole marks, Document Studio bridge, coverage reporting, capture-spec generation, capture-gap planning and contract compatibility.
+That command validates the governed handwriting task fragments and contracts, then runs the focused suites for photograph extraction, atlas rendering, whole marks, Document Studio bridge, coverage reporting, capture specification, gap planning, printable sheet generation, projective photo registration and contract compatibility.
 
 All governed handwriting tasks use the managed `image-finishing` Python environment with network disabled. They create only private workflow artifacts or return sanitized read-only reports and never grant signing or document-execution approval.
