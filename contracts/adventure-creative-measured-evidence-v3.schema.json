@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.dev/contracts/adventure-creative-measured-evidence-v3.schema.json",
+  "title": "Adventure Creative Measured Delivery Evidence v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidenceVersion", "workOrderId", "revision", "artifactWidth", "artifactHeight", "artifactByteLength", "alpha", "styleDigest", "protectedInvariantDigests"],
+  "properties": {
+    "evidenceVersion": { "const": 3 },
+    "workOrderId": { "type": "string", "minLength": 1 },
+    "revision": { "type": "integer", "minimum": 1 },
+    "artifactWidth": { "type": "integer", "minimum": 1 },
+    "artifactHeight": { "type": "integer", "minimum": 1 },
+    "artifactByteLength": { "type": "integer", "minimum": 1 },
+    "styleDigest": { "type": "string", "minLength": 1 },
+    "paletteDigest": { "type": "string", "minLength": 1 },
+    "modelSheetDigest": { "type": "string", "minLength": 1 },
+    "xSheetDigest": { "type": "string", "minLength": 1 },
+    "protectedInvariantDigests": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "alpha": { "$ref": "#/$defs/alphaEvidence" },
+    "sequence": { "$ref": "#/$defs/sequenceEvidence" }
+  },
+  "$defs": {
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+    },
+    "alphaEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "hasAlphaChannel", "zeroAlphaPixels", "partialAlphaPixels", "opaquePixels", "minimumAlpha", "maximumAlpha", "checkerboardDetected", "checkerboardScore", "matteResiduePixels", "alphaHaloPixels", "transparentRgbContaminationPixels"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "hasAlphaChannel": { "type": "boolean" },
+        "zeroAlphaPixels": { "type": "integer", "minimum": 0 },
+        "partialAlphaPixels": { "type": "integer", "minimum": 0 },
+        "opaquePixels": { "type": "integer", "minimum": 0 },
+        "minimumAlpha": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "maximumAlpha": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "checkerboardDetected": { "type": "boolean" },
+        "checkerboardScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "matteResiduePixels": { "type": "integer", "minimum": 0 },
+        "alphaHaloPixels": { "type": "integer", "minimum": 0 },
+        "transparentRgbContaminationPixels": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "measuredFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frameId", "width", "height", "trimX", "trimY", "trimWidth", "trimHeight", "exposureTicks", "handAnchors", "contactStable", "alpha"],
+      "properties": {
+        "frameId": { "type": "string", "minLength": 1 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "trimX": { "type": "integer", "minimum": 0 },
+        "trimY": { "type": "integer", "minimum": 0 },
+        "trimWidth": { "type": "integer", "minimum": 1 },
+        "trimHeight": { "type": "integer", "minimum": 1 },
+        "exposureTicks": { "type": "integer", "minimum": 1 },
+        "pivot": { "$ref": "#/$defs/point" },
+        "footPoint": { "$ref": "#/$defs/point" },
+        "shadowAnchor": { "$ref": "#/$defs/point" },
+        "handAnchors": { "type": "object", "additionalProperties": { "$ref": "#/$defs/point" } },
+        "contactStable": { "type": "boolean" },
+        "alpha": { "$ref": "#/$defs/alphaEvidence" }
+      }
+    },
+    "sequenceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actualFrameIds", "duplicateFrameIds", "missingFrameIds", "unexpectedFrameIds", "frames", "maximumObservedTrimJitterPixels", "maximumObservedAnchorDriftPixels", "loopClosureDeltaPixels", "neighbourContinuityScore", "modelSheetConformanceScore", "xSheetConformanceScore", "styleConsistencyScore", "proportionConsistencyScore", "paletteConsistencyScore"],
+      "properties": {
+        "actualFrameIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "duplicateFrameIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "missingFrameIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "unexpectedFrameIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "frames": { "type": "array", "items": { "$ref": "#/$defs/measuredFrame" } },
+        "maximumObservedTrimJitterPixels": { "type": "number", "minimum": 0 },
+        "maximumObservedAnchorDriftPixels": { "type": "number", "minimum": 0 },
+        "loopClosureDeltaPixels": { "type": "number", "minimum": 0 },
+        "neighbourContinuityScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "modelSheetConformanceScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "xSheetConformanceScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "styleConsistencyScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "proportionConsistencyScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "paletteConsistencyScore": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}
