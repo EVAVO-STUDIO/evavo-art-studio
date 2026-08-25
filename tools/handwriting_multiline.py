@@ -12,6 +12,7 @@ except ModuleNotFoundError:  # direct `python tools/handwriting_multiline.py`
     from handwriting_atlas import render_text
 
 SCHEMA = "evavo.art-studio.handwriting-multiline-render.v1"
+LINE_START_JITTER_FRACTION = 0.04
 
 
 def _pil():
@@ -33,6 +34,13 @@ def _sha_file(path: Path) -> str:
 def _median(values: list[float]) -> float:
     ordered = sorted(values)
     return ordered[len(ordered) // 2]
+
+
+def _signed_unit(seed: str) -> float:
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    integer = int.from_bytes(digest[:8], "big")
+    unit = integer / float((1 << 64) - 1)
+    return unit * 2.0 - 1.0
 
 
 def render_multiline(
@@ -109,18 +117,22 @@ def render_multiline(
                     (max(1, round(source_image.width * scale)), max(1, round(source_image.height * scale))),
                     Image.Resampling.LANCZOS,
                 )
+            line_start_offset = _signed_unit(f"{seed}|line-start:{item['line']}") * shared_target_ink * LINE_START_JITTER_FRACTION
             item["image"] = source_image
             item["lineScale"] = scale
             item["rawLineScale"] = raw_scale
             item["sourcePixelSize"] = source_size
             item["normalizedPixelSize"] = [source_image.width, source_image.height]
             item["effectiveTargetInkHeightPx"] = source_target * scale
+            item["lineStartOffsetPx"] = line_start_offset
 
         ink_heights = [item["image"].height for item in ink_items]
         median_height = round(_median([float(value) for value in ink_heights]))
         gap = max(4, round(median_height * float(line_spacing_factor)))
         blank_advance = median_height + gap
-        width = max(item["image"].width for item in ink_items)
+        min_x = min(0.0, min(item["lineStartOffsetPx"] for item in ink_items))
+        max_x = max(item["lineStartOffsetPx"] + item["image"].width for item in ink_items)
+        width = max(1, round(max_x - min_x))
         height = 0
         for item in rendered_lines:
             if item["kind"] == "blank":
@@ -128,7 +140,7 @@ def render_multiline(
             else:
                 height += item["image"].height + gap
         height = max(1, height - gap)
-        canvas = Image.new("RGBA", (max(1, width), height), (0, 0, 0, 0))
+        canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         y = 0
         line_results = []
         for item in rendered_lines:
@@ -137,12 +149,15 @@ def render_multiline(
                 y += blank_advance
                 continue
             image = item["image"]
-            canvas.alpha_composite(image, (0, y))
+            x = round(item["lineStartOffsetPx"] - min_x)
+            canvas.alpha_composite(image, (x, y))
             result = item["result"]
             line_results.append({
                 "line": item["line"],
                 "blank": False,
+                "xPx": x,
                 "yPx": y,
+                "lineStartOffsetPx": round(item["lineStartOffsetPx"], 3),
                 "text": result.get("text"),
                 "sourceOutputSha256": result.get("outputSha256"),
                 "sourcePixelSize": item["sourcePixelSize"],
@@ -181,6 +196,7 @@ def render_multiline(
         "lineGapPx": gap,
         "sharedTargetInkHeightPx": round(shared_target_ink, 3),
         "lineScaleNormalization": {"minimum": 0.88, "maximum": 1.12, "wholeLineRigidScaleOnly": True},
+        "lineStartVariation": {"fractionOfSharedInkHeight": LINE_START_JITTER_FRACTION, "wholeLineTranslationOnly": True},
         "pixelSize": [canvas.width, canvas.height],
         "outputSha256": _sha_file(output),
         "hostileBackgroundProofSha256": proof_sha,
@@ -190,6 +206,7 @@ def render_multiline(
             "syntheticHandwritingGenerated": False,
             "lineImagesRenderedByGenuineAtlas": True,
             "lineScaleNormalizedAsWholeRigidRaster": True,
+            "lineStartVariationIsWholeRigidTranslation": True,
             "strokeDeformation": False,
         },
     }
