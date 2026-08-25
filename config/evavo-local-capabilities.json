@@ -1,0 +1,9 @@
+{
+  "schemaVersion":1,"kind":"evavo-repository-local-capabilities","repository":"EVAVO-STUDIO/evavo-art-studio","profileId":"art-studio",
+  "fabric":"EVAVO-STUDIO/evavo-development-studio:config/local-capability-fabric-v1.json",
+  "execution":{"preferLocalWhenPhysicallyAccepted":true,"mcp":"evavo-local-execution","localAiMcp":"evavo-local-ai","fabricMcp":"evavo-local-capability-fabric","allowedShells":["powershell","python","bash","cmd"],"selfHeal":true,"boundedRepairAttempts":2,"publishThroughDevelopmentStudio":true},
+  "models":{"roles":["text","vision-segmentation"],"starterAutoHydrate":true,"largeCreativeAutoHydrate":false,"creativeModelRoute":"model-lab-hardware-mission","trainingRoute":"model-lab-admission-only"},
+  "storage":{"activeLocalRoot":"%LOCALAPPDATA%\\EVAVO\\AI\\Models","warmCanonicalRoot":"bee://primary/EVAVO/AI","executeFromNetworkStorage":false,"activateByVerifiedLocalCopy":true,"releaseAfterVerifiedWarmSync":true},
+  "validation":{"default":"changed-surface-targeted","afterRepair":["affected task","one relevant media/runtime smoke"],"fullRepository":"release-or-high-risk-only","fullFleet":"explicit-request-only"},
+  "safety":{"preserveDirtyWorktrees":true,"forcePush":false,"resetHard":false,"gitClean":false,"autoRebase":false}
+}
