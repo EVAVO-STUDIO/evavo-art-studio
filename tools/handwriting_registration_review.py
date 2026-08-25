@@ -51,6 +51,8 @@ def bind_review(proposal_path: Path, review_path: Path, output: Path) -> dict:
     review = _load(review_path)
     if proposal.get("schema") != REGISTRATION_SCHEMA:
         raise ValueError("input proposal is not a handwriting photo registration")
+    if proposal.get("reviewEvidence") is not None:
+        raise ValueError("registration proposal is already reviewed; nested review chains are not allowed")
     detection = proposal.get("detectionEvidence")
     if not isinstance(detection, dict) or detection.get("manualReviewRequired") is not True:
         raise ValueError("registration proposal is not a review-required auto-detection result")
