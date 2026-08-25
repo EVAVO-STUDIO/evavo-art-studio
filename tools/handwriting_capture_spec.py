@@ -7,19 +7,42 @@ from pathlib import Path
 SCHEMA = "evavo.art-studio.handwriting-capture-spec.v1"
 
 DEFAULT_GROUPS = [
-    {"id": "lowercase", "tokens": list("abcdefghijklmnopqrstuvwxyz"), "variants": 2, "kind": "glyph", "style": "natural-lowercase"},
+    {"id": "lowercase", "tokens": list("abcdefghijklmnopqrstuvwxyz"), "variants": 3, "kind": "glyph", "style": "natural-lowercase"},
     {"id": "digits", "tokens": list("0123456789"), "variants": 3, "kind": "glyph", "style": "natural-numeric"},
-    {"id": "punctuation", "tokens": ["/", ".", ",", "-", "@", "&", "(", ")", "+", "#"], "variants": 2, "kind": "glyph", "style": "natural-symbol"},
+    {"id": "punctuation", "tokens": ["/", ".", ",", "-", "@", "&", "(", ")", "+", "#"], "variants": 3, "kind": "glyph", "style": "natural-symbol"},
     {"id": "fragments", "tokens": [".com", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], "variants": 2, "kind": "fragment", "style": "natural-fragment"},
     {"id": "name", "tokens": ["FULL_NAME"], "variants": 4, "kind": "name", "style": "natural"},
     {"id": "signature", "tokens": ["SIGNATURE"], "variants": 4, "kind": "signature", "style": "natural"},
 ]
 
 
-def build_spec(*, profile_id: str, include_uppercase: bool = False) -> dict:
+def _bounded_variants(value: int, *, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 6:
+        raise ValueError(f"{label} must be an integer between 1 and 6")
+    return value
+
+
+def build_spec(
+    *,
+    profile_id: str,
+    include_uppercase: bool = False,
+    lowercase_variants: int = 3,
+    uppercase_variants: int = 3,
+    punctuation_variants: int = 3,
+) -> dict:
+    if not isinstance(profile_id, str) or not profile_id or len(profile_id) > 128:
+        raise ValueError("profile_id must contain 1..128 characters")
+    lowercase_variants = _bounded_variants(lowercase_variants, label="lowercase_variants")
+    uppercase_variants = _bounded_variants(uppercase_variants, label="uppercase_variants")
+    punctuation_variants = _bounded_variants(punctuation_variants, label="punctuation_variants")
     groups = [dict(group) for group in DEFAULT_GROUPS]
+    for group in groups:
+        if group["id"] == "lowercase":
+            group["variants"] = lowercase_variants
+        elif group["id"] == "punctuation":
+            group["variants"] = punctuation_variants
     if include_uppercase:
-        groups.insert(0, {"id": "uppercase", "tokens": list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), "variants": 2, "kind": "glyph", "style": "natural-uppercase"})
+        groups.insert(0, {"id": "uppercase", "tokens": list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), "variants": uppercase_variants, "kind": "glyph", "style": "natural-uppercase"})
     slots = []
     order = 0
     for group in groups:
@@ -40,11 +63,12 @@ def build_spec(*, profile_id: str, include_uppercase: bool = False) -> dict:
     return {
         "schema": SCHEMA,
         "profileId": profile_id,
+        "captureIntent": "variation-rich-genuine-handwriting-bank",
         "instructions": {
             "pen": "Use the same normal pen and writing pressure you would naturally use on forms.",
             "paper": "Use plain unruled paper with generous spacing between samples.",
             "capture": "Photograph the full sheet square-on with all four paper edges visible where practical and avoid flash hotspots.",
-            "authenticity": "Write every requested sample naturally. Do not trace or copy a previous sample stroke-for-stroke.",
+            "authenticity": "Write every requested sample naturally. Do not trace or copy a previous sample stroke-for-stroke; genuine variants should retain normal human variation.",
             "privacy": "Treat photographed sheets and all transparent derivatives as private personal-mark assets; do not commit them to Git.",
         },
         "groups": groups,
@@ -66,11 +90,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("output")
     parser.add_argument("--profile-id", required=True)
     parser.add_argument("--include-uppercase", action="store_true")
+    parser.add_argument("--lowercase-variants", type=int, default=3)
+    parser.add_argument("--uppercase-variants", type=int, default=3)
+    parser.add_argument("--punctuation-variants", type=int, default=3)
     args = parser.parse_args(argv)
     output = Path(args.output)
     if output.exists():
         raise SystemExit("create-only output already exists")
-    value = build_spec(profile_id=args.profile_id, include_uppercase=args.include_uppercase)
+    value = build_spec(
+        profile_id=args.profile_id,
+        include_uppercase=args.include_uppercase,
+        lowercase_variants=args.lowercase_variants,
+        uppercase_variants=args.uppercase_variants,
+        punctuation_variants=args.punctuation_variants,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({"ok": True, "schema": SCHEMA, "slotCount": len(value["slots"]), "privateAssetPathsReturned": False}, sort_keys=True))
