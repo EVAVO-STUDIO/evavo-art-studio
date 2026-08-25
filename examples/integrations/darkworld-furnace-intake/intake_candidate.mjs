@@ -14,9 +14,10 @@ const jobId = value("--job");
 const workspaceRoot = value("--workspace");
 const outputRoot = value("--output-root") ?? path.join(process.cwd(), ".art-studio", "darkworld-furnace");
 const createdBy = value("--created-by") ?? "darkworld-production-agent";
+const pythonCommand = value("--python") ?? (process.platform === "win32" ? "python" : "python3");
 
 if (!candidate || !jobId || !workspaceRoot) {
-  throw new Error("usage: node intake_candidate.mjs --candidate <absolute-file> --job <job-id> --workspace <absolute-source-root> [--output-root <dir>] [--created-by <id>]");
+  throw new Error("usage: node intake_candidate.mjs --candidate <absolute-file> --job <job-id> --workspace <absolute-source-root> [--output-root <dir>] [--created-by <id>] [--python <python-executable>]");
 }
 
 const allowed = new Map([
@@ -67,8 +68,7 @@ function run(command, args) {
 }
 
 run(process.execPath, ["scripts/compile-project-art-intake.mjs", "--request", requestPath, "--output", planPath]);
-const py = process.platform === "win32" ? "python" : "python3";
-run(py, ["tools/run_project_art_intake.py", "--plan", planPath, "--output-root", workspacePath]);
+run(pythonCommand, ["tools/run_project_art_intake.py", "--plan", planPath, "--output-root", workspacePath]);
 
 console.log(JSON.stringify({
   status: "passed",
@@ -77,5 +77,6 @@ console.log(JSON.stringify({
   intakeRequest: requestPath,
   intakePlan: planPath,
   workspace: workspacePath,
+  pythonCommand,
   runtimeAdmissionAuthority: "EVAVO-STUDIO/godot-462-darkworld-cinematic-platformer",
 }, null, 2));
