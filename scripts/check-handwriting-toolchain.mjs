@@ -20,6 +20,7 @@ const requiredFiles = [
   'scripts/test_handwriting_whole_mark.py',
   'scripts/test_handwriting_document_bridge.py',
   'scripts/test_handwriting_coverage.py',
+  'scripts/test_handwriting_export_contract.py',
   'docs/DOCUMENT_INK_FINISHING.md',
 ];
 for (const relative of requiredFiles) {
