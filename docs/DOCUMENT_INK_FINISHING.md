@@ -93,6 +93,16 @@ Rendering prefers the longest genuine fragment, chooses among genuine variants d
 
 This creates the useful behaviour of a personal handwriting font — repeated letters and numbers do not always look identical — without inventing new pen strokes.
 
+## Coverage and integrity reporting
+
+`tools/handwriting_coverage.py` inspects a private atlas without rendering anything. It verifies root confinement and SHA pins and reports exactly what the atlas can genuinely write.
+
+```powershell
+python tools/handwriting_coverage.py <private-atlas.json>
+```
+
+The report includes complete/missing uppercase, lowercase and digit coverage; per-token variant counts; captured symbols/fragments; whole-name/signature counts; style coverage; checked/pinned asset counts; and the same no-font-fallback/no-signature-synthesis truth boundary. Missing lowercase or punctuation is reported explicitly instead of being silently substituted.
+
 ## Names and signatures
 
 Use this hierarchy:
@@ -175,16 +185,18 @@ The atlas renderer similarly defaults to approximately ±0.45° whole-glyph rota
 
 Reject a finished personal mark or handwriting render when any paper halo/cast, residual camera shadow, isolated photographic speckles, clipping, neighbouring handwriting, excessive blur, stretched aspect ratio, implausible spacing/centering, colour mismatch, mechanically repeated variants, ignored natural advance, synthetic stroke deformation or out-of-region change is visible.
 
-## Tests
+## Tests and focused acceptance
 
 ```powershell
 python -m unittest scripts/test_document_ink_finisher.py
 python -m unittest scripts/test_handwriting_atlas.py
 python -m unittest scripts/test_handwriting_document_bridge.py
 python -m unittest scripts/test_handwriting_whole_mark.py
+python -m unittest scripts/test_handwriting_coverage.py
+node scripts/check-handwriting-toolchain.mjs
 ```
 
-The focused suites cover photographed-paper cleanup, transparency/edge preservation, create-only policy, deterministic bounded transforms, genuine-variant selection, natural advance measurement, longest-fragment matching, repeat avoidance, missing-character fail-closed behaviour, whole-signature-only selection/rendering and Document Studio export.
+The Python suites cover photographed-paper cleanup, transparency/edge preservation, create-only policy, deterministic bounded transforms, genuine-variant selection, natural advance measurement, longest-fragment matching, repeat avoidance, missing-character fail-closed behaviour, whole-signature-only selection/rendering, coverage/integrity reporting and Document Studio export. `check-handwriting-toolchain.mjs` validates the governed task fragment, required source/test/doc files, managed Python environment, network-disabled execution, strict parameter schemas, create-only versus read-only output policy and the absence of approval authority.
 
 ## Governed private-node tasks
 
