@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 
 ATLAS_SCHEMA = "evavo.art-studio.handwriting-atlas.v1"
@@ -11,6 +11,7 @@ SINGLE_SCHEMA = "evavo.art-studio.handwriting-render.v1"
 MULTILINE_SCHEMA = "evavo.art-studio.handwriting-multiline-render.v1"
 PARAGRAPH_SCHEMA = "evavo.art-studio.handwriting-paragraph-render.v1"
 QA_SCHEMA = "evavo.art-studio.handwriting-realism-qa.v1"
+BALANCED_MODE = "deterministic-shuffled-genuine-variant-bag-v1"
 
 
 def _load(path: Path) -> dict:
@@ -57,6 +58,7 @@ def _single_metrics(receipt: dict, atlas_counts: dict[str, int]) -> dict:
     by_token: dict[str, list[int]] = defaultdict(list)
     rotations = []
     scales = []
+    cycles_by_token: dict[str, list[int]] = defaultdict(list)
     for item in tokens:
         if not isinstance(item, dict):
             continue
@@ -64,6 +66,9 @@ def _single_metrics(receipt: dict, atlas_counts: dict[str, int]) -> dict:
         variant = item.get("variant")
         if isinstance(token, str) and isinstance(variant, int):
             by_token[token].append(variant)
+            cycle = item.get("variantCycle")
+            if isinstance(cycle, int) and not isinstance(cycle, bool):
+                cycles_by_token[token].append(cycle)
         rotation = item.get("rotationDegrees")
         scale = item.get("scale")
         if isinstance(rotation, (int, float)) and not isinstance(rotation, bool):
@@ -74,11 +79,23 @@ def _single_metrics(receipt: dict, atlas_counts: dict[str, int]) -> dict:
     repeated = {token: values for token, values in by_token.items() if len(values) >= 2}
     repeat_metrics = []
     immediate_repeat_count = 0
+    under_varied = []
+    bag_cycle_failures = []
     for token, variants in sorted(repeated.items()):
         distinct = len(set(variants))
         available = atlas_counts.get(token, 0)
         immediate = sum(1 for left, right in zip(variants, variants[1:]) if left == right)
         immediate_repeat_count += immediate
+        if len(variants) >= 3 and available >= 3 and distinct < min(3, available):
+            under_varied.append(token)
+        cycles = cycles_by_token.get(token, [])
+        if cycles and available >= 2:
+            grouped: dict[int, list[int]] = defaultdict(list)
+            for variant, cycle in zip(variants, cycles):
+                grouped[cycle].append(variant)
+            for cycle, used in grouped.items():
+                if len(used) >= available and len(set(used[:available])) < available:
+                    bag_cycle_failures.append({"token": token, "cycle": cycle})
         repeat_metrics.append({
             "token": token,
             "occurrences": len(variants),
@@ -87,19 +104,15 @@ def _single_metrics(receipt: dict, atlas_counts: dict[str, int]) -> dict:
             "immediateSameVariantRepeats": immediate,
         })
 
-    under_varied = [
-        item["token"]
-        for item in repeat_metrics
-        if item["occurrences"] >= 3 and item["availableGenuineVariants"] >= 3 and item["distinctVariantsUsed"] < 2
-    ]
     low_bank = sorted(token for token in by_token if atlas_counts.get(token, 0) < 2)
     return {
         "tokenCount": len(tokens),
         "uniqueTokenCount": len(by_token),
         "repeatedTokens": repeat_metrics,
         "immediateSameVariantRepeatCount": immediate_repeat_count,
-        "underVariedRepeatedTokens": under_varied,
+        "underVariedRepeatedTokens": sorted(set(under_varied)),
         "tokensWithOnlyOneGenuineVariant": low_bank,
+        "balancedBagCycleFailures": bag_cycle_failures,
         "rotationStdDegrees": round(_std(rotations), 5),
         "scaleStd": round(_std(scales), 6),
     }
@@ -127,6 +140,11 @@ def _multiline_metrics(receipt: dict) -> dict:
     }
 
 
+def _balanced_variant_selection(receipt: dict) -> bool:
+    selection = receipt.get("variantSelection")
+    return isinstance(selection, dict) and selection.get("mode") == BALANCED_MODE
+
+
 def evaluate(atlas_path: Path, receipt_path: Path) -> dict:
     atlas = _load(atlas_path)
     receipt = _load(receipt_path)
@@ -145,14 +163,28 @@ def evaluate(atlas_path: Path, receipt_path: Path) -> dict:
     atlas_counts = _atlas_variant_counts(atlas, style)
     warnings: list[dict] = []
     metrics: dict = {}
+    balanced = _balanced_variant_selection(receipt)
+    metrics["balancedVariantSelection"] = {
+        "mode": receipt.get("variantSelection", {}).get("mode") if isinstance(receipt.get("variantSelection"), dict) else None,
+        "preferredProductionMode": BALANCED_MODE,
+        "used": balanced,
+    }
 
     if schema == SINGLE_SCHEMA:
         single = _single_metrics(receipt, atlas_counts)
         metrics["singleLine"] = single
+        repeated_with_choice = any(
+            item["occurrences"] >= 2 and item["availableGenuineVariants"] >= 2
+            for item in single["repeatedTokens"]
+        )
+        if repeated_with_choice and not balanced:
+            warnings.append({"code": "legacy-variant-selection", "severity": "medium", "detail": "Repeated text did not prove use of the preferred balanced genuine-variant bag."})
         if single["immediateSameVariantRepeatCount"]:
             warnings.append({"code": "immediate-variant-repeat", "severity": "high", "detail": "A repeated token reused the same captured variant immediately."})
         if single["underVariedRepeatedTokens"]:
             warnings.append({"code": "under-varied-repeat", "severity": "medium", "tokens": single["underVariedRepeatedTokens"]})
+        if single["balancedBagCycleFailures"]:
+            warnings.append({"code": "balanced-bag-cycle-failure", "severity": "high", "cycles": single["balancedBagCycleFailures"]})
         if single["tokensWithOnlyOneGenuineVariant"]:
             warnings.append({"code": "single-variant-bank", "severity": "medium", "tokens": single["tokensWithOnlyOneGenuineVariant"]})
         if single["tokenCount"] >= 8 and single["rotationStdDegrees"] < 0.05 and single["scaleStd"] < 0.001:
@@ -160,6 +192,8 @@ def evaluate(atlas_path: Path, receipt_path: Path) -> dict:
     else:
         multi = _multiline_metrics(receipt)
         metrics["multiline"] = multi
+        if multi["inkLineCount"] >= 1 and not balanced:
+            warnings.append({"code": "legacy-variant-selection", "severity": "medium", "detail": "Multiline render did not prove use of balanced genuine-variant bags."})
         if not multi["allLineScalesWithinBound"]:
             warnings.append({"code": "line-scale-out-of-bound", "severity": "high"})
         if multi["inkLineCount"] >= 3 and multi["lineStartStdPx"] < 0.35:
@@ -188,6 +222,7 @@ def evaluate(atlas_path: Path, receipt_path: Path) -> dict:
         "metrics": metrics,
         "warnings": warnings,
         "recommendations": [
+            "Use the preferred realistic renderer so repeated tokens consume each genuine variant before bag refill.",
             "Prefer at least three genuine variants for frequently repeated letters and punctuation.",
             "Use whole genuine fragments for common captured fragments where available.",
             "Review hostile-background proof at final placement scale, not only enlarged on screen.",
