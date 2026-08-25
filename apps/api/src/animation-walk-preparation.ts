@@ -20,7 +20,7 @@ import {
   type VerifiedAnimationProviderBatchCompilation,
 } from "@evavo/art-sprite-supervisor";
 
-export const WALK_GENERATION_PREPARATION_VERSION = "2026-08-26.1" as const;
+export const WALK_GENERATION_PREPARATION_VERSION = "2026-08-26.2" as const;
 
 export interface PrepareSideViewWalkGenerationRequest {
   readonly director: AnimationDirectorRequest;
@@ -87,10 +87,6 @@ function digest(value: unknown): string {
   return createHash("sha256").update(stable(value)).digest("hex");
 }
 
-function expectedArtifactId(contentSha256: string): ArtifactId {
-  return `artifact_${contentSha256}` as ArtifactId;
-}
-
 function verifyStoredPoseArtifact(
   stored: StoredArtifact,
   contentSha256: string,
@@ -98,8 +94,10 @@ function verifyStoredPoseArtifact(
 ): void {
   if (
     stored.contentSha256 !== contentSha256 ||
-    stored.artifactId !== expectedArtifactId(contentSha256) ||
-    stored.mediaType !== "image/png"
+    stored.contentHash !== `sha256:${contentSha256}` ||
+    !/^artifact_[a-f0-9]{64}$/.test(stored.artifactId) ||
+    stored.mediaType !== "image/png" ||
+    stored.storageClass !== "evidence"
   ) {
     fail(`stored pose-control artifact identity differs for ${frameId}.`);
   }
