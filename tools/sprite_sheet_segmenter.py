@@ -14,6 +14,8 @@ from typing import Any
 
 from PIL import Image, ImageOps
 
+from transparency_guard import require_transparency
+
 SCHEMA = "evavo.sprite-sheet-segmentation-plan.v1"
 RECEIPT = "evavo.sprite-sheet-segmentation-receipt.v1"
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -157,6 +159,49 @@ def frame_metrics(image: Image.Image) -> dict[str, Any]:
     }
 
 
+def alpha_mass_grid_boxes(
+    image: Image.Image,
+    *,
+    rows: int,
+    columns: int,
+    threshold: int,
+) -> list[tuple[int, int, int, int, int]]:
+    """Derive uneven grid cells from row-local alpha mass without changing pixels."""
+    if not 1 <= rows <= 32 or not 1 <= columns <= 32 or rows * columns > MAX_COMPONENTS:
+        fail("gridAuto rows and columns are outside reviewed bounds")
+    alpha = image.getchannel("A")
+    pixels = alpha.load()
+    boxes: list[tuple[int, int, int, int, int]] = []
+    for row in range(rows):
+        top = round(row * image.height / rows)
+        bottom = round((row + 1) * image.height / rows)
+        weights = [sum(1 for y in range(top, bottom) if pixels[x, y] >= threshold) for x in range(image.width)]
+        centers = [(index + 0.5) * image.width / columns for index in range(columns)]
+        for _iteration in range(16):
+            groups: list[list[tuple[int, int]]] = [[] for _ in centers]
+            for x, weight in enumerate(weights):
+                if weight:
+                    nearest = min(range(columns), key=lambda index: abs(x - centers[index]))
+                    groups[nearest].append((x, weight))
+            if any(not group for group in groups):
+                fail(f"gridAuto row {row} does not contain {columns} separable alpha-mass groups")
+            centers = [sum(x * weight for x, weight in group) / sum(weight for _, weight in group) for group in groups]
+        boundaries = [0]
+        boundaries.extend(round((centers[index] + centers[index + 1]) / 2) for index in range(columns - 1))
+        boundaries.append(image.width)
+        for column in range(columns):
+            left, right = boundaries[column], boundaries[column + 1]
+            active = [(x, y) for y in range(top, bottom) for x in range(left, right) if pixels[x, y] >= threshold]
+            if not active:
+                fail(f"gridAuto row {row} column {column} is empty")
+            min_x = min(x for x, _ in active)
+            min_y = min(y for _, y in active)
+            max_x = max(x for x, _ in active) + 1
+            max_y = max(y for _, y in active) + 1
+            boxes.append((min_x, min_y, max_x, max_y, len(active)))
+    return boxes
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workspace-root", type=Path, required=True)
@@ -189,6 +234,8 @@ def main() -> int:
         output_root.mkdir()
 
         image = open_rgba(source_path)
+        alpha_policy = str(plan.get("alphaPolicy", "required"))
+        require_transparency(image, "sprite sheet", alpha_policy)
         threshold = int(plan.get("alphaThreshold", 128))
         if not 1 <= threshold <= 255:
             fail("alphaThreshold is invalid")
@@ -219,8 +266,19 @@ def main() -> int:
                 if x < 0 or y < 0 or width < 1 or height < 1 or x + width > image.width or y + height > image.height:
                     fail("rectangle lies outside source")
                 segments.append({"id": frame_id, "box": [x, y, x + width, y + height], "componentPixels": None})
+        elif mode == "grid-auto":
+            rows = int(plan.get("rows", 0))
+            columns = int(plan.get("columns", 0))
+            frame_ids = plan.get("frameIds")
+            if not isinstance(frame_ids, list) or len(frame_ids) != rows * columns:
+                fail("gridAuto frameIds must name every row-major cell")
+            if any(not isinstance(frame_id, str) or not SAFE_ID.fullmatch(frame_id) for frame_id in frame_ids):
+                fail("gridAuto frameIds contain an invalid id")
+            boxes = alpha_mass_grid_boxes(image, rows=rows, columns=columns, threshold=threshold)
+            for index, (left, top, right, bottom, pixels) in enumerate(boxes):
+                segments.append({"id": frame_ids[index], "box": [left, top, right, bottom], "componentPixels": pixels})
         else:
-            fail("mode must be components or rectangles")
+            fail("mode must be components, rectangles or grid-auto")
         if not segments:
             fail("no segments were produced")
 

@@ -95,6 +95,22 @@ pnpm art -- master-alpha `
 
 The Project Art sandbox supplies additional deterministic artist controls, including alpha erode/dilate, feather, threshold, defringe, edge decontamination, hidden-RGB rebuild, curves, masks, compositing and pixel-safe transforms. Those operations never replace the final transparency admission gate.
 
+## Uneven generated sprite grids
+
+Run `master-alpha` and transparency admission before segmentation. The create-only
+`tools/sprite_sheet_segmenter.py` supports `mode: "grid-auto"` for reviewed sheets
+whose figures are arranged in a declared row/column grid but are not centered in
+equal rectangles. The mode derives row-local boundaries from decoded alpha mass,
+then emits named row-major frames and exact source boxes in the receipt. It does
+not recover a matte, guess direction names, approve frames, overwrite the source,
+or accept a painted checkerboard/flat matte as transparency.
+
+Required plan fields are `rows`, `columns`, and one safe `frameIds` entry per cell.
+Use canonical direction names in the reviewed order when segmenting directional
+sprites. If a row cannot support the declared number of alpha-mass groups, the
+operation fails closed and requires corrected alpha, explicit rectangles, or a
+reviewed source repair.
+
 ## Proof views
 
 Use solid black, white, middle-grey, green and magenta plates plus an explicit black/white alpha-mask view. These reveal pale fringes, dark fringes, chroma spill, holes and silhouette erosion. Do not use a checkerboard proof: its alternating edges can camouflage the same painted-grid and halo defects being reviewed.
