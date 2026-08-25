@@ -5,5 +5,6 @@ export * from "./analyse-frame.js";
 export * from "./analyse-sequence.js";
 export * from "./analyse-motion.js";
 export * from "./motion-evidence.js";
+export * from "./motion-evidence-lineage.js";
 export * from "./motion-quality-input.js";
 export * from "./sequence-files.js";
