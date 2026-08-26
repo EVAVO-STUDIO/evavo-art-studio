@@ -63,6 +63,7 @@ def recover(
     matte_colour: tuple[int, int, int] | None = None,
     min_visible_island: int = 0,
     remove_all_matte: bool = False,
+    despill: str | None = None,
 ) -> tuple[Image.Image, dict[str, object]]:
     rgb = image.convert("RGB")
     width, height = rgb.size
@@ -160,6 +161,29 @@ def recover(
         if value:
             data[index * 4:index * 4 + 4] = b"\x00\x00\x00\x00"
             removed_count += 1
+    if despill == "auto":
+        average = tuple(round(sum(colour[channel] for colour in colours) / len(colours)) for channel in range(3))
+        if average[1] > average[0] + 30 and average[1] > average[2] + 30:
+            despill = "green"
+        elif average[0] > average[1] + 30 and average[2] > average[1] + 30:
+            despill = "magenta"
+        else:
+            despill = None
+    despilled_pixels = 0
+    if despill:
+        for index in range(width * height):
+            base = index * 4
+            r, g, b, a = data[base:base + 4]
+            if not a:
+                continue
+            if despill == "green" and g > r + 8 and g > b + 8:
+                data[base + 1] = max(r, b)
+                despilled_pixels += 1
+            elif despill == "magenta" and r > g + 8 and b > g + 8:
+                neutral = max(g, min(r, b))
+                data[base] = neutral
+                data[base + 2] = neutral
+                despilled_pixels += 1
     output = Image.frombytes("RGBA", (width, height), bytes(data))
     visible = width * height - removed_count
     if not removed_count or not visible:
@@ -179,6 +203,8 @@ def recover(
         "island_removed_pixels": island_removed,
         "remove_all_matte_regions": remove_all_matte,
         "enclosed_matte_removed_pixels": enclosed_matte_removed,
+        "despill": despill,
+        "despilled_pixels": despilled_pixels,
         "removed_pixels": removed_count,
         "visible_pixels": visible,
         "transparent_fraction": removed_count / (width * height),
@@ -205,6 +231,10 @@ def main() -> None:
         "--remove-all-matte", action="store_true",
         help="also remove matte-like regions enclosed by the subject; useful for chroma sprite sheets",
     )
+    parser.add_argument(
+        "--despill", choices=("auto", "green", "magenta"),
+        help="neutralize residual chroma on visible antialiased edge pixels",
+    )
     args = parser.parse_args()
     if args.input.resolve() == args.output.resolve() or args.output.exists():
         raise SystemExit("output must be a new path separate from the immutable source")
@@ -221,7 +251,7 @@ def main() -> None:
     output, evidence = recover(
         Image.open(args.input), args.border_band, args.threshold,
         args.fringe_threshold, args.fringe_passes, matte, args.min_visible_island,
-        args.remove_all_matte,
+        args.remove_all_matte, args.despill,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     output.save(args.output, optimize=True)
