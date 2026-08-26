@@ -62,6 +62,7 @@ def recover(
     fringe_passes: int = 3,
     matte_colour: tuple[int, int, int] | None = None,
     min_visible_island: int = 0,
+    remove_all_matte: bool = False,
 ) -> tuple[Image.Image, dict[str, object]]:
     rgb = image.convert("RGB")
     width, height = rgb.size
@@ -94,6 +95,13 @@ def recover(
             for next_x in range(max(0, x - 1), min(width, x + 2)):
                 if next_x != x or next_y != y:
                     queue.append((next_x, next_y))
+
+    enclosed_matte_removed = 0
+    if remove_all_matte:
+        for offset, value in enumerate(matte_like):
+            if value and not removed[offset]:
+                removed[offset] = 1
+                enclosed_matte_removed += 1
 
     fringe_limit = fringe_threshold * fringe_threshold
     fringe_removed = 0
@@ -159,9 +167,8 @@ def recover(
     evidence = {
         "schema": "evavo.painted-checkerboard-recovery.v1",
         "method": (
-            "declared-matte-plus-edge-connected-removal"
-            if matte_colour is not None
-            else "two-colour-border-model-plus-edge-connected-removal"
+            ("declared-matte" if matte_colour is not None else "two-colour-border-model")
+            + ("-plus-all-matte-regions" if remove_all_matte else "-plus-edge-connected-removal")
         ),
         "checker_colours": ["#" + "".join(f"{channel:02x}" for channel in colour) for colour in colours],
         "distance_threshold": threshold,
@@ -170,6 +177,8 @@ def recover(
         "fringe_removed_pixels": fringe_removed,
         "minimum_visible_island_pixels": min_visible_island,
         "island_removed_pixels": island_removed,
+        "remove_all_matte_regions": remove_all_matte,
+        "enclosed_matte_removed_pixels": enclosed_matte_removed,
         "removed_pixels": removed_count,
         "visible_pixels": visible,
         "transparent_fraction": removed_count / (width * height),
@@ -192,6 +201,10 @@ def main() -> None:
         "--min-visible-island", type=int, default=0,
         help="remove disconnected visible components smaller than this pixel count",
     )
+    parser.add_argument(
+        "--remove-all-matte", action="store_true",
+        help="also remove matte-like regions enclosed by the subject; useful for chroma sprite sheets",
+    )
     args = parser.parse_args()
     if args.input.resolve() == args.output.resolve() or args.output.exists():
         raise SystemExit("output must be a new path separate from the immutable source")
@@ -208,6 +221,7 @@ def main() -> None:
     output, evidence = recover(
         Image.open(args.input), args.border_band, args.threshold,
         args.fringe_threshold, args.fringe_passes, matte, args.min_visible_island,
+        args.remove_all_matte,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     output.save(args.output, optimize=True)
