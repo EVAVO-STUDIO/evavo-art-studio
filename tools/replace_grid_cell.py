@@ -25,11 +25,10 @@ def main() -> None:
         raise SystemExit("base and donor dimensions must match")
     if args.columns < 1 or args.rows < 1 or not 0 <= args.cell < args.columns * args.rows:
         raise SystemExit("invalid grid dimensions or cell index")
-    if base.width % args.columns or base.height % args.rows:
-        raise SystemExit("image dimensions must divide evenly into the requested grid")
-    cell_width, cell_height = base.width // args.columns, base.height // args.rows
     column, row = args.cell % args.columns, args.cell // args.columns
-    box = (column * cell_width, row * cell_height, (column + 1) * cell_width, (row + 1) * cell_height)
+    xs = [round(index * base.width / args.columns) for index in range(args.columns + 1)]
+    ys = [round(index * base.height / args.rows) for index in range(args.rows + 1)]
+    box = (xs[column], ys[row], xs[column + 1], ys[row + 1])
     base.paste(donor.crop(box), box)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     base.save(args.output, optimize=True)
