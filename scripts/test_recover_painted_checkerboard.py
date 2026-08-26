@@ -30,6 +30,20 @@ class PaintedCheckerboardRecoveryTest(unittest.TestCase):
         self.assertGreater(evidence["transparent_fraction"], 0.5)
         self.assertEqual(0, evidence["fringe_removed_pixels"])
 
+    def test_removes_declared_black_matte_without_erasing_black_interior(self) -> None:
+        image = Image.new("RGB", (64, 64), (0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((16, 8, 47, 60), fill=(185, 170, 145))
+        draw.rectangle((25, 20, 38, 45), fill=(0, 0, 0))
+        result, evidence = MODULE.recover(
+            image, border_band=4, threshold=2, fringe_threshold=2,
+            fringe_passes=1, matte_colour=(0, 0, 0),
+        )
+        alpha = result.getchannel("A")
+        self.assertEqual(0, alpha.getpixel((0, 0)))
+        self.assertEqual(255, alpha.getpixel((30, 30)))
+        self.assertEqual("declared-matte-plus-edge-connected-removal", evidence["method"])
+
 
 if __name__ == "__main__":
     unittest.main()

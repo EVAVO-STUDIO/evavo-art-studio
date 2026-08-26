@@ -60,18 +60,21 @@ def recover(
     threshold: int = 22,
     fringe_threshold: int = 42,
     fringe_passes: int = 3,
+    matte_colour: tuple[int, int, int] | None = None,
 ) -> tuple[Image.Image, dict[str, object]]:
     rgb = image.convert("RGB")
     width, height = rgb.size
-    colours = two_means(border_pixels(rgb, min(border_band, width // 4, height // 4)))
-    if distance_sq(colours[0], colours[1]) < 5 * 5:
+    colours = (matte_colour,) if matte_colour is not None else two_means(
+        border_pixels(rgb, min(border_band, width // 4, height // 4))
+    )
+    if len(colours) == 2 and distance_sq(colours[0], colours[1]) < 5 * 5:
         raise ValueError("estimated checker colours are not sufficiently distinct")
     limit = threshold * threshold
     matte_like = bytearray(width * height)
     for y in range(height):
         for x in range(width):
             colour = rgb.getpixel((x, y))
-            if min(distance_sq(colour, colours[0]), distance_sq(colour, colours[1])) <= limit:
+            if min(distance_sq(colour, matte) for matte in colours) <= limit:
                 matte_like[y * width + x] = 1
 
     removed = bytearray(width * height)
@@ -101,7 +104,7 @@ def recover(
                 if removed[offset]:
                     continue
                 colour = rgb.getpixel((x, y))
-                if min(distance_sq(colour, colours[0]), distance_sq(colour, colours[1])) > fringe_limit:
+                if min(distance_sq(colour, matte) for matte in colours) > fringe_limit:
                     continue
                 touches_transparency = any(
                     removed[next_y * width + next_x]
@@ -130,7 +133,11 @@ def recover(
         raise ValueError("checkerboard recovery did not produce meaningful alpha")
     evidence = {
         "schema": "evavo.painted-checkerboard-recovery.v1",
-        "method": "two-colour-border-model-plus-edge-connected-removal",
+        "method": (
+            "declared-matte-plus-edge-connected-removal"
+            if matte_colour is not None
+            else "two-colour-border-model-plus-edge-connected-removal"
+        ),
         "checker_colours": ["#" + "".join(f"{channel:02x}" for channel in colour) for colour in colours],
         "distance_threshold": threshold,
         "fringe_distance_threshold": fringe_threshold,
@@ -153,13 +160,23 @@ def main() -> None:
     parser.add_argument("--threshold", type=int, default=22)
     parser.add_argument("--fringe-threshold", type=int, default=42)
     parser.add_argument("--fringe-passes", type=int, default=3)
+    parser.add_argument("--matte", help="optional declared matte as #RRGGBB")
     args = parser.parse_args()
     if args.input.resolve() == args.output.resolve() or args.output.exists():
         raise SystemExit("output must be a new path separate from the immutable source")
     source = args.input.read_bytes()
+    matte = None
+    if args.matte:
+        value = args.matte.removeprefix("#")
+        if len(value) != 6:
+            raise SystemExit("--matte must use #RRGGBB")
+        try:
+            matte = tuple(int(value[index:index + 2], 16) for index in (0, 2, 4))
+        except ValueError as exc:
+            raise SystemExit("--matte must use #RRGGBB") from exc
     output, evidence = recover(
         Image.open(args.input), args.border_band, args.threshold,
-        args.fringe_threshold, args.fringe_passes,
+        args.fringe_threshold, args.fringe_passes, matte,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     output.save(args.output, optimize=True)
