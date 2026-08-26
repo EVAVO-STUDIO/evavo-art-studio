@@ -61,6 +61,7 @@ def recover(
     fringe_threshold: int = 42,
     fringe_passes: int = 3,
     matte_colour: tuple[int, int, int] | None = None,
+    min_visible_island: int = 0,
 ) -> tuple[Image.Image, dict[str, object]]:
     rgb = image.convert("RGB")
     width, height = rgb.size
@@ -120,6 +121,30 @@ def recover(
             removed[offset] = 1
         fringe_removed += len(additions)
 
+    island_removed = 0
+    if min_visible_island > 0:
+        visited = bytearray(width * height)
+        for start in range(width * height):
+            if removed[start] or visited[start]:
+                continue
+            component: list[int] = []
+            queue_offsets = deque([start])
+            visited[start] = 1
+            while queue_offsets:
+                offset = queue_offsets.popleft()
+                component.append(offset)
+                x, y = offset % width, offset // width
+                for next_y in range(max(0, y - 1), min(height, y + 2)):
+                    for next_x in range(max(0, x - 1), min(width, x + 2)):
+                        next_offset = next_y * width + next_x
+                        if not removed[next_offset] and not visited[next_offset]:
+                            visited[next_offset] = 1
+                            queue_offsets.append(next_offset)
+            if len(component) < min_visible_island:
+                for offset in component:
+                    removed[offset] = 1
+                island_removed += len(component)
+
     rgba = rgb.convert("RGBA")
     data = bytearray(rgba.tobytes())
     removed_count = 0
@@ -143,6 +168,8 @@ def recover(
         "fringe_distance_threshold": fringe_threshold,
         "fringe_passes": fringe_passes,
         "fringe_removed_pixels": fringe_removed,
+        "minimum_visible_island_pixels": min_visible_island,
+        "island_removed_pixels": island_removed,
         "removed_pixels": removed_count,
         "visible_pixels": visible,
         "transparent_fraction": removed_count / (width * height),
@@ -161,6 +188,10 @@ def main() -> None:
     parser.add_argument("--fringe-threshold", type=int, default=42)
     parser.add_argument("--fringe-passes", type=int, default=3)
     parser.add_argument("--matte", help="optional declared matte as #RRGGBB")
+    parser.add_argument(
+        "--min-visible-island", type=int, default=0,
+        help="remove disconnected visible components smaller than this pixel count",
+    )
     args = parser.parse_args()
     if args.input.resolve() == args.output.resolve() or args.output.exists():
         raise SystemExit("output must be a new path separate from the immutable source")
@@ -176,7 +207,7 @@ def main() -> None:
             raise SystemExit("--matte must use #RRGGBB") from exc
     output, evidence = recover(
         Image.open(args.input), args.border_band, args.threshold,
-        args.fringe_threshold, args.fringe_passes, matte,
+        args.fringe_threshold, args.fringe_passes, matte, args.min_visible_island,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     output.save(args.output, optimize=True)

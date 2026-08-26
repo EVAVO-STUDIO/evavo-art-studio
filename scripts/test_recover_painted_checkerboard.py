@@ -44,6 +44,20 @@ class PaintedCheckerboardRecoveryTest(unittest.TestCase):
         self.assertEqual(255, alpha.getpixel((30, 30)))
         self.assertEqual("declared-matte-plus-edge-connected-removal", evidence["method"])
 
+    def test_removes_small_visible_islands_without_erasing_subject(self) -> None:
+        image = Image.new("RGB", (80, 64), (255, 255, 255))
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((20, 12, 59, 58), fill=(40, 50, 60))
+        draw.rectangle((4, 4, 5, 5), fill=(230, 220, 210))
+        result, evidence = MODULE.recover(
+            image, threshold=2, fringe_threshold=2, fringe_passes=1,
+            matte_colour=(255, 255, 255), min_visible_island=16,
+        )
+        alpha = result.getchannel("A")
+        self.assertEqual(0, alpha.getpixel((4, 4)))
+        self.assertEqual(255, alpha.getpixel((30, 30)))
+        self.assertEqual(4, evidence["island_removed_pixels"])
+
 
 if __name__ == "__main__":
     unittest.main()
