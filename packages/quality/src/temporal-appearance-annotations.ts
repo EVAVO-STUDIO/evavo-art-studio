@@ -43,6 +43,15 @@ function text(value: unknown, field: string, maximum = 2000): string {
   return value;
 }
 
+function isTemporalAppearanceMetric(value: unknown): value is TemporalAppearanceMetric {
+  return (
+    value === "luma" ||
+    value === "chroma" ||
+    value === "palette" ||
+    value === "edge-density"
+  );
+}
+
 function key(fromFrameId: string, toFrameId: string, metric: TemporalAppearanceMetric): string {
   return `${fromFrameId}\0${toFrameId}\0${metric}`;
 }
@@ -68,21 +77,28 @@ export function applyTemporalAppearanceAnnotations(
     report.adjacentPairs.map((pair: TemporalAppearancePairEvidence) => `${pair.fromFrameId}\0${pair.toFrameId}`),
   );
   const exemptions = new Set<string>();
-  const normalized = annotations.map((annotation, index) => {
+  const normalized: TemporalAppearanceDiscontinuityAnnotation[] = annotations.map((annotation, index) => {
     if (!annotation || typeof annotation !== "object") fail(`annotations[${index}] must be an object.`);
-    const fromFrameId = text(annotation.fromFrameId, `annotations[${index}].fromFrameId`, 256);
-    const toFrameId = text(annotation.toFrameId, `annotations[${index}].toFrameId`, 256);
+    const candidate = annotation as unknown as Record<string, unknown>;
+    const fromFrameId = text(candidate.fromFrameId, `annotations[${index}].fromFrameId`, 256);
+    const toFrameId = text(candidate.toFrameId, `annotations[${index}].toFrameId`, 256);
     if (!knownPairs.has(`${fromFrameId}\0${toFrameId}`)) {
       fail(`annotations[${index}] does not identify an adjacent analysed frame pair.`);
     }
-    if (!Array.isArray(annotation.metrics) || annotation.metrics.length === 0) {
+    const rawMetrics = candidate.metrics;
+    if (!Array.isArray(rawMetrics) || rawMetrics.length === 0) {
       fail(`annotations[${index}].metrics must be non-empty.`);
     }
-    const metrics = [...new Set(annotation.metrics)];
-    if (metrics.length !== annotation.metrics.length || metrics.some((metric) => !["luma", "chroma", "palette", "edge-density"].includes(metric))) {
-      fail(`annotations[${index}].metrics contains duplicates or unsupported metrics.`);
+    const metrics: TemporalAppearanceMetric[] = [];
+    const seenMetrics = new Set<TemporalAppearanceMetric>();
+    for (const metric of rawMetrics) {
+      if (!isTemporalAppearanceMetric(metric) || seenMetrics.has(metric)) {
+        fail(`annotations[${index}].metrics contains duplicates or unsupported metrics.`);
+      }
+      seenMetrics.add(metric);
+      metrics.push(metric);
     }
-    const reason = text(annotation.reason, `annotations[${index}].reason`);
+    const reason = text(candidate.reason, `annotations[${index}].reason`);
     for (const metric of metrics) exemptions.add(key(fromFrameId, toFrameId, metric));
     return { fromFrameId, toFrameId, metrics, reason };
   });

@@ -35,6 +35,15 @@ export interface AnimationAnatomyStabilityReport {
   }>;
 }
 
+interface AnimationAnatomySegmentMeasurement {
+  readonly frameId: string;
+  readonly lengthPixels: number | null;
+}
+
+interface AnimationAnatomySegmentFailure extends AnimationAnatomySegmentMeasurement {
+  readonly relativeDeviation: number | null;
+}
+
 function fail(message: string): never {
   throw new SpriteQualityInputError("ANIMATION_ANATOMY_INVALID", message);
 }
@@ -119,7 +128,7 @@ export function analyseAnimationAnatomyStability(
       fail(`segment ${segment.id}.blocking must be boolean when supplied.`);
     }
 
-    const measurements = request.frames.map((frame) => {
+    const measurements: AnimationAnatomySegmentMeasurement[] = request.frames.map((frame) => {
       const from = frame.landmarks[segment.fromLandmarkId];
       const to = frame.landmarks[segment.toLandmarkId];
       return {
@@ -131,15 +140,17 @@ export function analyseAnimationAnatomyStability(
       .map((entry) => entry.lengthPixels)
       .filter((value): value is number => value !== null && value > 0);
     const referenceLength = validLengths.length > 0 ? median(validLengths) : null;
-    const failures = measurements.flatMap((entry) => {
+    const failures: AnimationAnatomySegmentFailure[] = [];
+    for (const entry of measurements) {
       if (entry.lengthPixels === null || referenceLength === null || referenceLength <= 0) {
-        return [{ ...entry, relativeDeviation: null }];
+        failures.push({ ...entry, relativeDeviation: null });
+        continue;
       }
       const relativeDeviation = Math.abs(entry.lengthPixels - referenceLength) / referenceLength;
-      return relativeDeviation > segment.maximumRelativeDeviation
-        ? [{ ...entry, relativeDeviation }]
-        : [];
-    });
+      if (relativeDeviation > segment.maximumRelativeDeviation) {
+        failures.push({ ...entry, relativeDeviation });
+      }
+    }
     const blocking = segment.blocking ?? true;
     gates.push({
       id: `anatomy-segment:${segment.id}`,

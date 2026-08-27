@@ -82,7 +82,7 @@ test("compiles provider work only from canonical pose-control bindings", () => {
   const result = compileVerifiedAnimationProviderBatch(request());
   assert.equal(result.requests.length, 2);
   assert.equal(result.poseControlBindingSha256s.length, 2);
-  assert.equal(result.verifiedCompilerVersion, "2026-08-26.1");
+  assert.equal(result.verifiedCompilerVersion, "2026-08-26.2");
   for (const providerRequest of result.requests) {
     const frameNumber = Number(providerRequest.frameId.split("f").at(-1));
     const pose = providerRequest.references.find((entry) => entry.role === "pose-control");
