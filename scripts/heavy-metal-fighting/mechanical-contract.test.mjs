@@ -11,6 +11,12 @@ test("mechanical contract locks all four distinct Frame identities and authority
   assert.equal(new Set(normalized.frames.map((frame) => frame.motionIdentity)).size, 4);
   assert.ok(normalized.frames.every((frame) => frame.landmarks.length >= 18));
   assert.ok(normalized.frames.every((frame) => frame.hardpoints.length >= 5));
+  const bastion = normalized.frames.find((frame) => frame.id === "bastion");
+  assert.deepEqual(
+    bastion.hardpoints.slice(0, 2).map((hardpoint) => hardpoint.id),
+    ["left-hydraulic-impact-ram", "right-hydraulic-impact-ram"],
+  );
+  assert.ok(!JSON.stringify(bastion).includes("forearm-tool"));
   assert.equal(normalized.authority.providerMayDefineCanon, false);
   assert.equal(normalized.authority.providerMayGeneratePackedRuntimeAtlas, false);
   assert.equal(normalized.authority.targetRepositoryMutationForbidden, true);

@@ -139,13 +139,13 @@
   ],
   "hardpoints": [
     {
-      "id": "left-forearm-tool",
+      "id": "left-hydraulic-impact-ram",
       "side": "left",
       "attachment": "left-wrist-mount",
       "clearance": "attack-lane"
     },
     {
-      "id": "right-forearm-tool",
+      "id": "right-hydraulic-impact-ram",
       "side": "right",
       "attachment": "right-wrist-mount",
       "clearance": "attack-lane"
@@ -174,7 +174,7 @@
     "mode": "runtime-mirror-safe",
     "requiredReview": true,
     "rules": [
-      "piston-tools-remain-declared-per-side",
+      "hydraulic-impact-rams-remain-declared-per-side",
       "load-tabs-may-mirror-because-they-are-not-text",
       "no-readable-markings-baked-into-body-cels"
     ]
@@ -182,7 +182,7 @@
   "bodyEffectBoundary": {
     "bodyOwned": [
       "piston-rods",
-      "forearm-tool-housings",
+      "hydraulic-impact-ram-housings",
       "heel-anchors",
       "dorsal-shutters",
       "system-lamps"
