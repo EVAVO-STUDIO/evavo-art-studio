@@ -1,4 +1,5 @@
 .gitattributes text eol=lf
+config/*.payload.b64.part-* text eol=lf
 tools/raw_art_visual_catalog.py text eol=lf
 tools/raw_art_visual_catalog_mcp.mjs text eol=lf
 scripts/test_raw_art_visual_catalog.py text eol=lf
