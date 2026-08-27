@@ -5,6 +5,11 @@ import sharp, { type Metadata } from "sharp";
 const DEFAULT_MAXIMUM_INPUT_BYTES = 50 * 1024 * 1024;
 const DEFAULT_MAXIMUM_PIXELS = 16_777_216;
 const SUPPORTED_MASK_FORMATS = new Set(["png", "webp"]);
+const SUPPORTED_OUTPUT_MEDIA_TYPES = new Set<RasterOutputMediaType>([
+  "image/png",
+  "image/webp",
+  "image/jpeg",
+]);
 
 export interface InpaintMaskPreflightOptions {
   readonly maximumInputBytes?: number;
@@ -36,6 +41,46 @@ export interface InpaintMaskPreflightEvidence {
   readonly compatible: true;
 }
 
+export type RasterOutputMediaType =
+  | "image/png"
+  | "image/webp"
+  | "image/jpeg";
+export type RasterOutputAlphaPolicy = "any" | "required" | "forbidden";
+export type RasterOutputValidationMode = "evidence" | "strict";
+export type RasterOutputIssueCode =
+  | "RASTER_OUTPUT_MEDIA_TYPE_MISMATCH"
+  | "RASTER_OUTPUT_DIMENSIONS_MISMATCH"
+  | "RASTER_OUTPUT_ALPHA_REQUIRED"
+  | "RASTER_OUTPUT_ALPHA_FORBIDDEN";
+
+export interface RasterOutputPreflightOptions
+  extends InpaintMaskPreflightOptions {
+  readonly expectedMediaType: RasterOutputMediaType;
+  readonly expectedWidth?: number;
+  readonly expectedHeight?: number;
+  readonly alphaPolicy?: RasterOutputAlphaPolicy;
+  readonly mode?: RasterOutputValidationMode;
+}
+
+export interface RasterOutputPreflightEvidence {
+  readonly schemaVersion: "1.0";
+  readonly actual: RasterInputEvidence &
+    Readonly<{ mediaType: RasterOutputMediaType }>;
+  readonly expected: Readonly<{
+    mediaType: RasterOutputMediaType;
+    width?: number;
+    height?: number;
+    alphaPolicy: RasterOutputAlphaPolicy;
+  }>;
+  readonly checks: Readonly<{
+    mediaTypeMatches: boolean;
+    dimensionsMatch: boolean;
+    alphaMatches: boolean;
+  }>;
+  readonly issues: readonly RasterOutputIssueCode[];
+  readonly compatible: boolean;
+}
+
 export class RasterPreflightError extends Error {
   public readonly code: string;
 
@@ -61,6 +106,16 @@ function boundedInteger(
     );
   }
   return result;
+}
+
+function positiveInteger(value: number | undefined, name: string): number {
+  if (!Number.isInteger(value) || value! < 1 || value! > 65_535) {
+    throw new RasterPreflightError(
+      "RASTER_PREFLIGHT_OPTIONS_INVALID",
+      `${name} must be an integer between 1 and 65535.`,
+    );
+  }
+  return value!;
 }
 
 function bytes(input: Buffer | Uint8Array, maximum: number, name: string): Buffer {
@@ -126,6 +181,147 @@ async function inspect(
     pages,
     hasAlpha: metadata.hasAlpha ?? false,
   };
+}
+
+function outputMediaType(format: string): RasterOutputMediaType {
+  if (format === "png") return "image/png";
+  if (format === "webp") return "image/webp";
+  if (format === "jpeg") return "image/jpeg";
+  throw new RasterPreflightError(
+    "RASTER_OUTPUT_FORMAT_UNSUPPORTED",
+    `Raster output format ${format || "unknown"} is not PNG, WebP or JPEG.`,
+  );
+}
+
+function outputValidationMode(
+  value: RasterOutputValidationMode | undefined,
+): RasterOutputValidationMode {
+  const result = value ?? "strict";
+  if (result !== "strict" && result !== "evidence") {
+    throw new RasterPreflightError(
+      "RASTER_PREFLIGHT_OPTIONS_INVALID",
+      "mode must be strict or evidence.",
+    );
+  }
+  return result;
+}
+
+function alphaPolicy(
+  value: RasterOutputAlphaPolicy | undefined,
+): RasterOutputAlphaPolicy {
+  const result = value ?? "any";
+  if (result !== "any" && result !== "required" && result !== "forbidden") {
+    throw new RasterPreflightError(
+      "RASTER_PREFLIGHT_OPTIONS_INVALID",
+      "alphaPolicy must be any, required or forbidden.",
+    );
+  }
+  return result;
+}
+
+function issueMessage(
+  issue: RasterOutputIssueCode,
+  evidence: RasterOutputPreflightEvidence,
+): string {
+  if (issue === "RASTER_OUTPUT_MEDIA_TYPE_MISMATCH") {
+    return `Raster output decoded as ${evidence.actual.mediaType}, but ${evidence.expected.mediaType} was required.`;
+  }
+  if (issue === "RASTER_OUTPUT_DIMENSIONS_MISMATCH") {
+    return `Raster output decoded as ${evidence.actual.width}x${evidence.actual.height}, but ${evidence.expected.width}x${evidence.expected.height} was required.`;
+  }
+  if (issue === "RASTER_OUTPUT_ALPHA_REQUIRED") {
+    return "Raster output must contain a real alpha channel.";
+  }
+  return "Raster output must not contain an alpha channel.";
+}
+
+export async function preflightRasterOutput(
+  input: Buffer | Uint8Array,
+  options: RasterOutputPreflightOptions,
+): Promise<RasterOutputPreflightEvidence> {
+  if (!SUPPORTED_OUTPUT_MEDIA_TYPES.has(options.expectedMediaType)) {
+    throw new RasterPreflightError(
+      "RASTER_PREFLIGHT_OPTIONS_INVALID",
+      "expectedMediaType must be image/png, image/webp or image/jpeg.",
+    );
+  }
+  const maximumInputBytes = boundedInteger(
+    options.maximumInputBytes,
+    DEFAULT_MAXIMUM_INPUT_BYTES,
+    1_024,
+    512 * 1024 * 1024,
+    "maximumInputBytes",
+  );
+  const maximumPixels = boundedInteger(
+    options.maximumPixels,
+    DEFAULT_MAXIMUM_PIXELS,
+    1,
+    67_108_864,
+    "maximumPixels",
+  );
+  if (
+    (options.expectedWidth === undefined) !==
+    (options.expectedHeight === undefined)
+  ) {
+    throw new RasterPreflightError(
+      "RASTER_PREFLIGHT_OPTIONS_INVALID",
+      "expectedWidth and expectedHeight must be provided together.",
+    );
+  }
+  const expectedDimensions =
+    options.expectedWidth === undefined
+      ? undefined
+      : {
+          width: positiveInteger(options.expectedWidth, "expectedWidth"),
+          height: positiveInteger(options.expectedHeight, "expectedHeight"),
+        };
+  const requiredAlpha = alphaPolicy(options.alphaPolicy);
+  const mode = outputValidationMode(options.mode);
+  const outputBytes = bytes(input, maximumInputBytes, "Raster output");
+  const inspected = await inspect(outputBytes, maximumPixels, "Raster output");
+  const actualMediaType = outputMediaType(inspected.format);
+  const mediaTypeMatches = actualMediaType === options.expectedMediaType;
+  const dimensionsMatch =
+    expectedDimensions === undefined ||
+    (inspected.width === expectedDimensions.width &&
+      inspected.height === expectedDimensions.height);
+  const alphaMatches =
+    requiredAlpha === "any" ||
+    (requiredAlpha === "required" ? inspected.hasAlpha : !inspected.hasAlpha);
+  const issues: RasterOutputIssueCode[] = [];
+  if (!mediaTypeMatches) issues.push("RASTER_OUTPUT_MEDIA_TYPE_MISMATCH");
+  if (!dimensionsMatch) issues.push("RASTER_OUTPUT_DIMENSIONS_MISMATCH");
+  if (!alphaMatches) {
+    issues.push(
+      requiredAlpha === "required"
+        ? "RASTER_OUTPUT_ALPHA_REQUIRED"
+        : "RASTER_OUTPUT_ALPHA_FORBIDDEN",
+    );
+  }
+  const evidence: RasterOutputPreflightEvidence = {
+    schemaVersion: "1.0",
+    actual: {
+      ...inspected,
+      mediaType: actualMediaType,
+    },
+    expected: {
+      mediaType: options.expectedMediaType,
+      ...(expectedDimensions ?? {}),
+      alphaPolicy: requiredAlpha,
+    },
+    checks: {
+      mediaTypeMatches,
+      dimensionsMatch,
+      alphaMatches,
+    },
+    issues,
+    compatible: issues.length === 0,
+  };
+  const firstIssue = issues[0];
+  if (mode === "strict" && firstIssue) {
+    throw new RasterPreflightError(firstIssue, issueMessage(firstIssue, evidence));
+  }
+  return evidence;
 }
 
 export async function preflightInpaintMask(
