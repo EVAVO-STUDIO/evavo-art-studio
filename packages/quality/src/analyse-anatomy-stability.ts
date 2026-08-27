@@ -1,6 +1,6 @@
 import { SpriteQualityInputError, type Point, type SpriteQualityGateResult } from "./types.js";
 
-export const ANIMATION_ANATOMY_STABILITY_VERSION = "2026-08-26.1" as const;
+export const ANIMATION_ANATOMY_STABILITY_VERSION = "2026-08-26.2" as const;
 
 export interface AnimationAnatomyFrameEvidence {
   readonly frameId: string;
@@ -20,6 +20,15 @@ export interface AnimationAnatomyStabilityRequest {
   readonly sequenceId: string;
   readonly frames: readonly AnimationAnatomyFrameEvidence[];
   readonly segments: readonly AnimationAnatomySegmentConstraint[];
+}
+
+interface AnimationAnatomyMeasurement {
+  readonly frameId: string;
+  readonly lengthPixels: number | null;
+}
+
+interface AnimationAnatomyFailure extends AnimationAnatomyMeasurement {
+  readonly relativeDeviation: number | null;
 }
 
 export interface AnimationAnatomyStabilityReport {
@@ -119,7 +128,7 @@ export function analyseAnimationAnatomyStability(
       fail(`segment ${segment.id}.blocking must be boolean when supplied.`);
     }
 
-    const measurements = request.frames.map((frame) => {
+    const measurements: AnimationAnatomyMeasurement[] = request.frames.map((frame) => {
       const from = frame.landmarks[segment.fromLandmarkId];
       const to = frame.landmarks[segment.toLandmarkId];
       return {
@@ -131,15 +140,17 @@ export function analyseAnimationAnatomyStability(
       .map((entry) => entry.lengthPixels)
       .filter((value): value is number => value !== null && value > 0);
     const referenceLength = validLengths.length > 0 ? median(validLengths) : null;
-    const failures = measurements.flatMap((entry) => {
+    const failures: AnimationAnatomyFailure[] = [];
+    for (const entry of measurements) {
       if (entry.lengthPixels === null || referenceLength === null || referenceLength <= 0) {
-        return [{ ...entry, relativeDeviation: null }];
+        failures.push({ ...entry, relativeDeviation: null });
+        continue;
       }
       const relativeDeviation = Math.abs(entry.lengthPixels - referenceLength) / referenceLength;
-      return relativeDeviation > segment.maximumRelativeDeviation
-        ? [{ ...entry, relativeDeviation }]
-        : [];
-    });
+      if (relativeDeviation > segment.maximumRelativeDeviation) {
+        failures.push({ ...entry, relativeDeviation });
+      }
+    }
     const blocking = segment.blocking ?? true;
     gates.push({
       id: `anatomy-segment:${segment.id}`,

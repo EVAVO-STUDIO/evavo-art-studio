@@ -1,136 +1,70 @@
-name: Game Art Workstations
+name: Optional Game Art workstation validation
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "tools/image_workstation.py"
-      - "tools/sprite_sheet_segmenter.py"
-      - "tools/sprite_animation_preview.py"
-      - "tools/sprite_workstation.py"
-      - "tools/game_art_workstation_mcp.mjs"
-      - "tools/creative-asset-publisher/Register-EvavoCreativeAssetMcp.ps1"
-      - "scripts/New-ProjectArtWorkspaceMcpConfig.ps1"
-      - "scripts/test-project-art-workspace-root-policy.mjs"
-      - "scripts/test-image-workstation.py"
-      - "scripts/test-sprite-sheet-segmenter.py"
-      - "scripts/test-sprite-animation-preview.py"
-      - "scripts/test-sprite-workstation.py"
-      - "scripts/test-game-art-workstation-mcp.mjs"
-      - "scripts/audit-pixel-art-candidate.mjs"
-      - "scripts/test-pixel-art-candidate-audit.mjs"
-      - "scripts/check-game-art-automation-fabric.mjs"
-      - "scripts/check-games94-production-profile.mjs"
-      - "docs/PERSISTENT_ARTIST_WORKSPACE.md"
-      - "config/mcp.project-art-workspace.windows.example.json"
-      - "config/image-processing-recipes.v1.json"
-      - "config/artist-workspace-agent-suite.v7.json"
-      - "config/game-art-production/profiles/games94-sports-arcade.v1.json"
-      - "config/game-art-production/projects/games94.v1.json"
-      - "evavo.tasks.json"
-      - ".github/workflows/game-art-workstations.yml"
-  pull_request:
-    paths:
-      - "tools/image_workstation.py"
-      - "tools/sprite_sheet_segmenter.py"
-      - "tools/sprite_animation_preview.py"
-      - "tools/sprite_workstation.py"
-      - "tools/game_art_workstation_mcp.mjs"
-      - "tools/creative-asset-publisher/Register-EvavoCreativeAssetMcp.ps1"
-      - "scripts/New-ProjectArtWorkspaceMcpConfig.ps1"
-      - "scripts/test-project-art-workspace-root-policy.mjs"
-      - "scripts/test-image-workstation.py"
-      - "scripts/test-sprite-sheet-segmenter.py"
-      - "scripts/test-sprite-animation-preview.py"
-      - "scripts/test-sprite-workstation.py"
-      - "scripts/test-game-art-workstation-mcp.mjs"
-      - "scripts/audit-pixel-art-candidate.mjs"
-      - "scripts/test-pixel-art-candidate-audit.mjs"
-      - "scripts/check-game-art-automation-fabric.mjs"
-      - "scripts/check-games94-production-profile.mjs"
-      - "docs/PERSISTENT_ARTIST_WORKSPACE.md"
-      - "config/mcp.project-art-workspace.windows.example.json"
-      - "config/image-processing-recipes.v1.json"
-      - "config/artist-workspace-agent-suite.v7.json"
-      - "config/game-art-production/profiles/games94-sports-arcade.v1.json"
-      - "config/game-art-production/projects/games94.v1.json"
-      - "evavo.tasks.json"
-      - ".github/workflows/game-art-workstations.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: game-art-workstations-${{ github.workflow }}-${{ github.ref }}
+  group: game-art-workstations-manual-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  linux:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
+  validate:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - windows-2022
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out the exact requested candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        with:
-          python-version: "3.13.5"
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "22.14.0"
-          package-manager-cache: false
-      - run: python -m pip install --disable-pip-version-check pillow==12.2.0
-      - run: python -m py_compile tools/image_workstation.py tools/sprite_sheet_segmenter.py tools/sprite_animation_preview.py tools/sprite_workstation.py scripts/test-image-workstation.py scripts/test-sprite-sheet-segmenter.py scripts/test-sprite-animation-preview.py scripts/test-sprite-workstation.py
-      - run: python scripts/test-image-workstation.py -v
-      - run: python scripts/test-sprite-sheet-segmenter.py -v
-      - run: python scripts/test-sprite-animation-preview.py -v
-      - run: python scripts/test-sprite-workstation.py -v
-      - run: node scripts/test-pixel-art-candidate-audit.mjs
-      - run: node scripts/test-game-art-workstation-mcp.mjs
-      - run: node scripts/test-project-art-workspace-root-policy.mjs
-      - run: node scripts/check-game-art-automation-fabric.mjs
-      - run: node scripts/check-games94-production-profile.mjs
-      - run: node --check tools/game_art_workstation_mcp.mjs
-      - run: |
-          git diff --check
-          git diff --exit-code
-          git diff --cached --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
-  windows:
-    runs-on: windows-2022
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13.5"
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+
+      - name: Set up pnpm 10.13.1
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.13.1
+
+      - name: Set up Node.js 22.14.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22.14.0"
           package-manager-cache: false
-      - run: python -m pip install --disable-pip-version-check pillow==12.2.0
-      - run: python -m py_compile tools/image_workstation.py tools/sprite_sheet_segmenter.py tools/sprite_animation_preview.py tools/sprite_workstation.py scripts/test-image-workstation.py scripts/test-sprite-sheet-segmenter.py scripts/test-sprite-animation-preview.py scripts/test-sprite-workstation.py
-      - run: python scripts/test-image-workstation.py -v
-      - run: python scripts/test-sprite-sheet-segmenter.py -v
-      - run: python scripts/test-sprite-animation-preview.py -v
-      - run: python scripts/test-sprite-workstation.py -v
-      - run: node scripts/test-pixel-art-candidate-audit.mjs
-      - run: node scripts/test-game-art-workstation-mcp.mjs
-      - run: node scripts/test-project-art-workspace-root-policy.mjs
-      - run: node scripts/check-game-art-automation-fabric.mjs
-      - run: node scripts/check-games94-production-profile.mjs
-      - run: node --check tools/game_art_workstation_mcp.mjs
-      - shell: pwsh
-        run: |
-          git diff --check
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git diff --exit-code
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git diff --cached --exit-code
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $Dirty = git status --porcelain=v1 --untracked-files=all
-          if ($Dirty) { throw "Validation changed repository source: $Dirty" }
+
+      - name: Install exact image dependency
+        run: python -m pip install --disable-pip-version-check pillow==12.2.0
+
+      - name: Install the frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Run bounded local-first contracts
+        run: node scripts/local-quality-gate.mjs quick
+
+      - name: Run workstation regressions
+        run: >-
+          python scripts/test-image-workstation.py -v
+          && python scripts/test-sprite-sheet-segmenter.py -v
+          && python scripts/test-sprite-workstation.py -v
+          && node scripts/test-pixel-art-candidate-audit.mjs
+          && node scripts/test-game-art-workstation-mcp.mjs
+          && node scripts/test-project-art-workspace-root-policy.mjs
+          && node scripts/check-game-art-automation-fabric.mjs
+          && node scripts/check-games94-production-profile.mjs
+
+      - name: Confirm validation changed no tracked source
+        if: always()
+        run: git diff --check

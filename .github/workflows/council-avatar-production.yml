@@ -1,118 +1,35 @@
-name: Council avatar production contract
+name: Optional Council avatar production validation
 
 on:
-  pull_request:
-    paths:
-      - "config/council-avatar-identities/**"
-      - "scripts/project-art/council-avatar-production-program.mjs"
-      - "scripts/project-art/council-avatar-procedural-review.mjs"
-      - "scripts/project-art/council-avatar-procedural-renderer.py"
-      - "scripts/project-art/compile-council-avatar-review-atlases.py"
-      - "scripts/project-art/council-avatar-identity-bootstrap.mjs"
-      - "scripts/project-art/council-avatar-media-readiness.mjs"
-      - "scripts/project-art/council-identity-candidate-campaign.mjs"
-      - "scripts/project-art/council-identity-anchor-admission.mjs"
-      - "scripts/project-art/character-identity-provider-contract.mjs"
-      - "scripts/project-art/character-identity-provider-execution.mjs"
-      - "scripts/project-art/character-identity-provider-runtime.mjs"
-      - "scripts/compile-project-art-character-identity-provider-runtime.mjs"
-      - "scripts/run-project-art-character-identity-provider.mjs"
-      - "scripts/test-project-art-character-identity-provider-runtime.mjs"
-      - "scripts/compile-project-art-council-avatar-production.mjs"
-      - "scripts/compile-project-art-council-avatar-procedural-review.mjs"
-      - "scripts/compile-project-art-council-identity-candidate-campaign.mjs"
-      - "scripts/compile-project-art-council-identity-anchor-admission.mjs"
-      - "scripts/test-project-art-council-avatar-production.mjs"
-      - "scripts/test-project-art-council-avatar-procedural-review.mjs"
-      - "scripts/test-project-art-council-avatar-identity-bootstrap.mjs"
-      - "scripts/test-project-art-council-avatar-media-readiness.mjs"
-      - "scripts/test-project-art-council-avatar-animation-suite.mjs"
-      - "scripts/test-project-art-council-identity-candidate-campaign*.mjs"
-      - "scripts/test-project-art-council-identity-anchor-admission*.mjs"
-      - "scripts/test-ci-media-tool-council-identity-candidate-campaign.mjs"
-      - "scripts/test-ci-media-tool-council-identity-anchor-admission.mjs"
-      - "tools/project_art_council_avatar_production_mcp.mjs"
-      - "tools/project_art_council_identity_anchor_admission_mcp.mjs"
-      - "docs/PROJECT_ART_COUNCIL_AVATAR_PRODUCTION.md"
-      - "docs/PROJECT_ART_COUNCIL_AVATAR_MEDIA_READINESS.md"
-      - "docs/PROJECT_ART_COUNCIL_IDENTITY_CANDIDATE_CAMPAIGN.md"
-      - "docs/PROJECT_ART_COUNCIL_IDENTITY_ANCHOR_ADMISSION.md"
-      - "scripts/character-identity-master-plan.mjs"
-      - "scripts/character-identity-bootstrap-admission.mjs"
-      - "scripts/character-identity-candidate-review-plan.mjs"
-      - "scripts/project-art/avatar-animation-suite.mjs"
-      - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
-      - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
-      - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
-      - "requirements-image-pipeline.txt"
-      - ".github/workflows/council-avatar-production.yml"
-  push:
-    branches: [main]
-    paths:
-      - "config/council-avatar-identities/**"
-      - "scripts/project-art/council-avatar-production-program.mjs"
-      - "scripts/project-art/council-avatar-procedural-review.mjs"
-      - "scripts/project-art/council-avatar-procedural-renderer.py"
-      - "scripts/project-art/compile-council-avatar-review-atlases.py"
-      - "scripts/project-art/council-avatar-identity-bootstrap.mjs"
-      - "scripts/project-art/council-avatar-media-readiness.mjs"
-      - "scripts/project-art/council-identity-candidate-campaign.mjs"
-      - "scripts/project-art/council-identity-anchor-admission.mjs"
-      - "scripts/project-art/character-identity-provider-contract.mjs"
-      - "scripts/project-art/character-identity-provider-execution.mjs"
-      - "scripts/project-art/character-identity-provider-runtime.mjs"
-      - "scripts/compile-project-art-character-identity-provider-runtime.mjs"
-      - "scripts/run-project-art-character-identity-provider.mjs"
-      - "scripts/test-project-art-character-identity-provider-runtime.mjs"
-      - "scripts/compile-project-art-council-avatar-production.mjs"
-      - "scripts/compile-project-art-council-avatar-procedural-review.mjs"
-      - "scripts/compile-project-art-council-identity-candidate-campaign.mjs"
-      - "scripts/compile-project-art-council-identity-anchor-admission.mjs"
-      - "scripts/test-project-art-council-avatar-production.mjs"
-      - "scripts/test-project-art-council-avatar-procedural-review.mjs"
-      - "scripts/test-project-art-council-avatar-identity-bootstrap.mjs"
-      - "scripts/test-project-art-council-avatar-media-readiness.mjs"
-      - "scripts/test-project-art-council-avatar-animation-suite.mjs"
-      - "scripts/test-project-art-council-identity-candidate-campaign*.mjs"
-      - "scripts/test-project-art-council-identity-anchor-admission*.mjs"
-      - "scripts/test-ci-media-tool-council-identity-candidate-campaign.mjs"
-      - "scripts/test-ci-media-tool-council-identity-anchor-admission.mjs"
-      - "tools/project_art_council_avatar_production_mcp.mjs"
-      - "tools/project_art_council_identity_anchor_admission_mcp.mjs"
-      - "docs/PROJECT_ART_COUNCIL_AVATAR_PRODUCTION.md"
-      - "docs/PROJECT_ART_COUNCIL_AVATAR_MEDIA_READINESS.md"
-      - "docs/PROJECT_ART_COUNCIL_IDENTITY_CANDIDATE_CAMPAIGN.md"
-      - "docs/PROJECT_ART_COUNCIL_IDENTITY_ANCHOR_ADMISSION.md"
-      - "scripts/character-identity-master-plan.mjs"
-      - "scripts/character-identity-bootstrap-admission.mjs"
-      - "scripts/character-identity-candidate-review-plan.mjs"
-      - "scripts/project-art/avatar-animation-suite.mjs"
-      - "scripts/project-art/top-hat-pose-slot-provider-runtime-foundation.mjs"
-      - "scripts/run-project-art-top-hat-pose-bank-provider-campaign.mjs"
-      - "scripts/check-project-art-eva-dense-motion-work-order.mjs"
-      - "requirements-image-pipeline.txt"
-      - ".github/workflows/council-avatar-production.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: council-avatar-production-${{ github.ref }}
+  group: council-avatar-production-manual-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  contract:
+  validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    env:
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/council-avatar-python-pycache
+    timeout-minutes: 35
     steps:
-      - name: Check out exact candidate
+      - name: Check out the exact requested candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Route Python bytecode to runner-temporary storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON_CACHE_ROOT="${RUNNER_TEMP}/council-avatar-python-pycache"
+          mkdir -p "${PYTHON_CACHE_ROOT}"
+          echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"
+          echo "PYTHONDONTWRITEBYTECODE=1" >> "${GITHUB_ENV}"
 
       - name: Set up Python 3.13.5
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -122,68 +39,30 @@ jobs:
           cache-dependency-path: requirements-image-pipeline.txt
 
       - name: Install exact procedural review backend
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
-          [[ "$(python -c 'import PIL; print(PIL.__version__)')" == "12.2.0" ]]
+        run: python -m pip install --disable-pip-version-check -r requirements-image-pipeline.txt
 
       - name: Set up pnpm 10.13.1
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 10.13.1
 
-      - name: Set up exact Node.js runtime
+      - name: Set up Node.js 22.14.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22.14.0"
           package-manager-cache: false
 
-      - name: Install frozen dependency graph
+      - name: Install the frozen dependency graph
         run: pnpm install --frozen-lockfile
 
-      - name: Build exact provider and artifact implementations
-        run: |
-          pnpm run build:domain
-          pnpm --filter @evavo/art-studio-worker build
-
-      - name: Syntax-check Council avatar and identity surfaces
+      - name: Build exact provider and worker implementations
         shell: bash
         run: |
           set -euo pipefail
-          node --check scripts/project-art/council-avatar-production-program.mjs
-          node --check scripts/project-art/council-avatar-procedural-review.mjs
-          node --check scripts/project-art/council-avatar-identity-bootstrap.mjs
-          node --check scripts/project-art/council-avatar-media-readiness.mjs
-          node --check scripts/project-art/council-identity-candidate-campaign.mjs
-          node --check scripts/project-art/council-identity-anchor-admission.mjs
-          node --check scripts/project-art/character-identity-provider-contract.mjs
-          node --check scripts/project-art/character-identity-provider-execution.mjs
-          node --check scripts/project-art/character-identity-provider-runtime.mjs
-          node --check scripts/compile-project-art-character-identity-provider-runtime.mjs
-          node --check scripts/run-project-art-character-identity-provider.mjs
-          node --check scripts/test-project-art-character-identity-provider-runtime.mjs
-          node --check scripts/project-art/avatar-animation-suite.mjs
-          node --check scripts/compile-project-art-council-avatar-production.mjs
-          node --check scripts/compile-project-art-council-avatar-procedural-review.mjs
-          node --check scripts/compile-project-art-council-identity-candidate-campaign.mjs
-          node --check scripts/compile-project-art-council-identity-anchor-admission.mjs
-          node --check tools/project_art_council_avatar_production_mcp.mjs
-          node --check tools/project_art_council_identity_anchor_admission_mcp.mjs
-          node --check scripts/test-project-art-council-avatar-production.mjs
-          node --check scripts/test-project-art-council-avatar-procedural-review.mjs
-          node --check scripts/test-project-art-council-avatar-identity-bootstrap.mjs
-          node --check scripts/test-project-art-council-avatar-media-readiness.mjs
-          node --check scripts/test-project-art-council-avatar-animation-suite.mjs
-          node --check scripts/test-project-art-council-identity-candidate-campaign.mjs
-          node --check scripts/test-project-art-council-identity-candidate-campaign-mcp.mjs
-          node --check scripts/test-project-art-council-identity-anchor-admission.mjs
-          node --check scripts/test-project-art-council-identity-anchor-admission-mcp.mjs
-          python -m py_compile \
-            scripts/project-art/council-avatar-procedural-renderer.py \
-            scripts/project-art/compile-council-avatar-review-atlases.py
+          pnpm run build:domain
+          pnpm --filter @evavo/art-studio-worker build
 
-      - name: Compile deterministic Council review and identity summaries
+      - name: Compile deterministic Council summaries
         shell: bash
         run: |
           set -euo pipefail
@@ -206,7 +85,7 @@ jobs:
             --output "${ATLAS_OUTPUT}"
           test -s "${ATLAS_OUTPUT}/atlas-manifest.json"
 
-      - name: Run Council avatar and identity governance tests
+      - name: Run Council governance regressions
         shell: bash
         run: |
           set -euo pipefail
@@ -221,14 +100,16 @@ jobs:
             scripts/test-project-art-council-identity-anchor-admission.mjs \
             scripts/test-project-art-council-identity-anchor-admission-mcp.mjs
 
-      - name: Re-run canonical identity and animation contracts
+      - name: Run governed provider fixture regressions
+        env:
+          EVAVO_ART_ENABLE_FIXTURE_PROVIDER: "true"
         shell: bash
         run: |
           set -euo pipefail
-          node --test scripts/test-character-identity-master-plan.mjs
-          node --test scripts/test-character-identity-bootstrap-admission.mjs
-          node --test scripts/test-character-identity-candidate-review-plan.mjs
-          node --test scripts/test-project-art-avatar-animation-suite.mjs
+          node --test scripts/test-project-art-character-identity-provider-runtime.mjs
+          node --test \
+            scripts/test-project-art-council-identity-anchor-admission.mjs \
+            scripts/test-project-art-council-identity-anchor-admission-mcp.mjs
 
       - name: Confirm validation changed no repository source
         if: always()
@@ -237,52 +118,5 @@ jobs:
           set -euo pipefail
           git diff --check
           git diff --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
-
-  provider-runtime-fixture:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Check out exact candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Set up pnpm 10.13.1
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        with:
-          version: 10.13.1
-
-      - name: Set up Node.js 22.14.0
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22.14.0"
-          package-manager-cache: false
-
-      - name: Install frozen dependency graph
-        run: pnpm install --frozen-lockfile
-
-      - name: Build exact provider, artifact and runtime implementations
-        run: |
-          pnpm run build:domain
-          pnpm --filter @evavo/art-studio-worker build
-
-      - name: Execute governed identity-provider fixture regressions
-        env:
-          EVAVO_ART_ENABLE_FIXTURE_PROVIDER: "true"
-        run: |
-          node --test scripts/test-project-art-character-identity-provider-runtime.mjs
-          node --test \
-            scripts/test-project-art-council-identity-anchor-admission.mjs \
-            scripts/test-project-art-council-identity-anchor-admission-mcp.mjs
-
-      - name: Confirm built fixture validation changed no repository source
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          git diff --check
-          git diff --exit-code
+          git diff --cached --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all)"

@@ -10,6 +10,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +24,14 @@ MAX_PIXELS = 64_000_000
 MAX_PLAN_BYTES = 8 * 1024 * 1024
 MAX_FRAME_BYTES = 256 * 1024 * 1024
 MAX_DURATION_MS = 60_000
+STABLE_READ_ATTEMPTS = 4
+STABLE_READ_RETRY_SECONDS = 0.02
 
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+
+
+class _RetryableShortRead(RuntimeError):
+    """Signals a stable ordinary file that returned an unexpected early EOF."""
 
 
 def fail(message: str) -> None:
@@ -55,7 +62,7 @@ def same_identity(left: os.stat_result, right: os.stat_result) -> bool:
     )
 
 
-def stable_bytes(file: Path, maximum: int, label: str) -> bytes:
+def _stable_bytes_once(file: Path, maximum: int, label: str) -> bytes:
     before = file.lstat()
     if (
         not stat.S_ISREG(before.st_mode)
@@ -75,7 +82,11 @@ def stable_bytes(file: Path, maximum: int, label: str) -> bytes:
         while remaining:
             chunk = os.read(descriptor, min(1024 * 1024, remaining))
             if not chunk:
-                fail(f"{label} short read")
+                observed = os.fstat(descriptor)
+                current = file.lstat()
+                if not same_identity(opened, observed) or not same_identity(observed, current):
+                    fail(f"{label} changed during read")
+                raise _RetryableShortRead(label)
             chunks.append(chunk)
             remaining -= len(chunk)
         after = os.fstat(descriptor)
@@ -84,6 +95,17 @@ def stable_bytes(file: Path, maximum: int, label: str) -> bytes:
         return b"".join(chunks)
     finally:
         os.close(descriptor)
+
+
+def stable_bytes(file: Path, maximum: int, label: str) -> bytes:
+    for attempt in range(STABLE_READ_ATTEMPTS):
+        try:
+            return _stable_bytes_once(file, maximum, label)
+        except _RetryableShortRead:
+            if attempt + 1 >= STABLE_READ_ATTEMPTS:
+                fail(f"{label} short read after {STABLE_READ_ATTEMPTS} stable attempts")
+            time.sleep(STABLE_READ_RETRY_SECONDS * (attempt + 1))
+    raise AssertionError("stable read retry loop exhausted unexpectedly")
 
 
 def inside(root: Path, candidate: Path) -> bool:

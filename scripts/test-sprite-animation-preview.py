@@ -57,6 +57,48 @@ def expect_failure(fn, text: str, output: Path, parent: Path) -> None:
         raise AssertionError(f"failed preview left private staging: {leftovers}")
 
 
+def assert_stable_read_retry(file: Path) -> None:
+    real_read = preview.os.read
+    real_sleep = preview.time.sleep
+    empty_reads = 1
+
+    def one_transient_empty_read(descriptor: int, maximum: int) -> bytes:
+        nonlocal empty_reads
+        if empty_reads:
+            empty_reads -= 1
+            return b""
+        return real_read(descriptor, maximum)
+
+    preview.os.read = one_transient_empty_read
+    preview.time.sleep = lambda _seconds: None
+    try:
+        recovered = preview.stable_bytes(file, preview.MAX_FRAME_BYTES, "transient frame")
+    finally:
+        preview.os.read = real_read
+        preview.time.sleep = real_sleep
+    if hashlib.sha256(recovered).hexdigest() != sha256(file):
+        raise AssertionError("stable read retry changed source bytes")
+
+
+def assert_stable_read_exhaustion(file: Path) -> None:
+    real_read = preview.os.read
+    real_sleep = preview.time.sleep
+    preview.os.read = lambda _descriptor, _maximum: b""
+    preview.time.sleep = lambda _seconds: None
+    try:
+        try:
+            preview.stable_bytes(file, preview.MAX_FRAME_BYTES, "blocked frame")
+        except ValueError as exc:
+            expected = f"short read after {preview.STABLE_READ_ATTEMPTS} stable attempts"
+            if expected not in str(exc):
+                raise AssertionError(f"unexpected stable read exhaustion: {exc}") from exc
+        else:
+            raise AssertionError("repeated short reads were not rejected")
+    finally:
+        preview.os.read = real_read
+        preview.time.sleep = real_sleep
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="evavo-preview-contract-") as temporary:
         workspace = Path(temporary).resolve()
@@ -64,6 +106,8 @@ def main() -> int:
         frame_b = workspace / "frame-b.png"
         make_frame(frame_a, 64)
         make_frame(frame_b, 192)
+        assert_stable_read_retry(frame_a)
+        assert_stable_read_exhaustion(frame_a)
 
         plan = workspace / "plan.json"
         plan_sha = write_plan(
@@ -199,9 +243,10 @@ def main() -> int:
 
     print(json.dumps({
         "ok": True,
-        "contract": "evavo-sprite-animation-preview-timing-v2",
+        "contract": "evavo-sprite-animation-preview-timing-v3",
         "perFrameDurationsApplied": True,
         "exactFrameShaRequired": True,
+        "boundedStableReadRetry": True,
         "createOnlyPromotion": True,
         "failureRollback": True,
         "sourceSymlinksRejected": True,
