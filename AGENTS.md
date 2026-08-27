@@ -38,7 +38,7 @@ Do not infer subject, canon, quality, sequence order, provenance or intended use
 
 - The persistent workspace is the visual memory. Bring every required full-resolution source, reference, mask and extracted frame into it; do not rely on chat thumbnails or an earlier contact sheet as the only copy.
 - Use individual immutable references with semantic roles. Keep canonical identity, direction master, previous pose, next pose, palette, line, material and layer context separate. Never send a provider-made sprite sheet or contact sheet as a substitute for the required originals.
-- OpenAI edit/reference jobs must retain the adapter's explicit `input_fidelity=high`. Do not remove that field or describe the API default as high.
+- OpenAI edit/reference fidelity is model-specific. Omit `input_fidelity` for `gpt-image-2` and its snapshots because those models always process image inputs at high fidelity and reject the configurable field; record that evidence as `high-automatic`. Retain explicit `input_fidelity=high` for earlier supported GPT Image models and record `high-explicit`.
 - Generate or repair one bounded frame or retained layer at a time. Compare it to its immediate neighbours before requesting the next frame; never design an animation as unrelated independent images.
 - Use `video-frame-extract` for exact timestamp-selected reference frames. The resulting PNGs and manifest are reference evidence, not admitted sprite assets.
 - Use `image-composite.sourceRect` and `maskSourceRect` for deterministic crop/copy/paste work between exact images. Preserve body, prop, face, VFX and correction layers separately until the reviewed export boundary.
