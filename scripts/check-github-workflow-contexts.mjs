@@ -4,64 +4,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const WORKFLOW_ROOT = path.join(REPOSITORY_ROOT, ".github", "workflows");
+const ACTIVE_WORKFLOW_RELATIVE_ROOT = ".github/workflows";
+const ARCHIVE_RELATIVE_ROOT = "ops/github-actions-reference";
+const ARCHIVE_WORKFLOW_RELATIVE_ROOT = `${ARCHIVE_RELATIVE_ROOT}/workflows`;
+const ACTIVE_README = `${ACTIVE_WORKFLOW_RELATIVE_ROOT}/README.md`;
+const ARCHIVE_README = `${ARCHIVE_RELATIVE_ROOT}/README.md`;
 const EXPRESSION_CONTEXT = /\$\{\{[\s\S]*?\}\}/gu;
 const RUNNER_CONTEXT = /\brunner\s*\./u;
-const MANUAL_ONLY_CORE_WORKFLOWS = new Set([
-  ".github/workflows/ci.yml",
-  ".github/workflows/game-art-workstations.yml",
-  ".github/workflows/council-avatar-production.yml",
-]);
+const WORKFLOW_FILE = /\.ya?ml$/u;
 
 function indentation(line) {
   return line.length - line.trimStart().length;
-}
-
-
-function workflowTriggers(lines) {
-  const onIndex = lines.findIndex((line) => /^on:\s*(?:#.*)?$/u.test(line));
-  if (onIndex < 0) {
-    const inline = lines.find((line) => /^on:\s*\S/u.test(line));
-    if (!inline) return [];
-    const value = inline.replace(/^on:\s*/u, "").replace(/\s+#.*$/u, "").trim();
-    if (value.startsWith("[") && value.endsWith("]")) {
-      return value.slice(1, -1).split(",").map((entry) => entry.trim()).filter(Boolean);
-    }
-    return value ? [value] : [];
-  }
-  const triggers = [];
-  for (let index = onIndex + 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (!line.trim() || line.trimStart().startsWith("#")) continue;
-    if (indentation(line) === 0) break;
-    const match = /^ {2}([A-Za-z_][A-Za-z0-9_-]*):/u.exec(line);
-    if (match) triggers.push(match[1]);
-  }
-  return triggers;
-}
-
-function manualOnlyWorkflowErrors(lines, fileName) {
-  if (!MANUAL_ONLY_CORE_WORKFLOWS.has(fileName)) return [];
-  const triggers = workflowTriggers(lines);
-  const errors = [];
-  if (!triggers.includes("workflow_dispatch")) {
-    errors.push({
-      file: fileName,
-      line: 1,
-      code: "CORE_WORKFLOW_MANUAL_DISPATCH_REQUIRED",
-      message: "core hosted validation must remain explicitly manual and locally reproducible.",
-    });
-  }
-  const automatic = triggers.filter((trigger) => trigger !== "workflow_dispatch");
-  if (automatic.length) {
-    errors.push({
-      file: fileName,
-      line: 1,
-      code: "CORE_WORKFLOW_AUTOMATIC_TRIGGER_FORBIDDEN",
-      message: `core hosted validation may not run automatically (${automatic.join(", ")}); local validation is authoritative.`,
-    });
-  }
-  return errors;
 }
 
 function blockContainsRunner(lines, startIndex, blockIndent) {
@@ -79,7 +32,7 @@ function blockContainsRunner(lines, startIndex, blockIndent) {
 export function scanWorkflowContextErrors(content, fileName = "workflow.yml") {
   if (typeof content !== "string") throw new TypeError("workflow content must be a string");
   const lines = content.replace(/\r\n?/gu, "\n").split("\n");
-  const errors = [...manualOnlyWorkflowErrors(lines, fileName)];
+  const errors = [];
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     if (/^env:\s*(?:#.*)?$/u.test(line)) {
@@ -120,29 +73,111 @@ export function scanWorkflowContextErrors(content, fileName = "workflow.yml") {
   return errors;
 }
 
-function workflowFiles(root) {
-  if (!fs.existsSync(root)) return [];
-  return fs.readdirSync(root, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && /\.ya?ml$/u.test(entry.name))
-    .map((entry) => path.join(root, entry.name))
-    .sort((left, right) => left.localeCompare(right));
+function repositoryPath(root, absolutePath) {
+  return path.relative(root, absolutePath).replaceAll(path.sep, "/");
 }
 
-export function checkWorkflowContexts(root = WORKFLOW_ROOT) {
-  const files = workflowFiles(root);
-  const errors = files.flatMap((file) =>
-    scanWorkflowContextErrors(fs.readFileSync(file, "utf8"), path.relative(REPOSITORY_ROOT, file).replaceAll(path.sep, "/")),
+function inventoryDirectory(repositoryRoot, relativeRoot) {
+  const root = path.join(repositoryRoot, relativeRoot);
+  if (!fs.existsSync(root)) return Object.freeze({ files: [], links: [] });
+  const files = [];
+  const links = [];
+  const pending = [root];
+  while (pending.length) {
+    const current = pending.pop();
+    const entries = fs.readdirSync(current, { withFileTypes: true })
+      .sort((left, right) => right.name.localeCompare(left.name));
+    for (const entry of entries) {
+      const absolute = path.join(current, entry.name);
+      if (entry.isSymbolicLink()) {
+        links.push(repositoryPath(repositoryRoot, absolute));
+      } else if (entry.isDirectory()) {
+        pending.push(absolute);
+      } else if (entry.isFile()) {
+        files.push(repositoryPath(repositoryRoot, absolute));
+      }
+    }
+  }
+  files.sort((left, right) => left.localeCompare(right));
+  links.sort((left, right) => left.localeCompare(right));
+  return Object.freeze({ files, links });
+}
+
+export function checkHostedAutomationPolicy(options = {}) {
+  const repositoryRoot = path.resolve(options.repositoryRoot ?? REPOSITORY_ROOT);
+  const active = inventoryDirectory(repositoryRoot, ACTIVE_WORKFLOW_RELATIVE_ROOT);
+  const archive = inventoryDirectory(repositoryRoot, ARCHIVE_RELATIVE_ROOT);
+  const activeWorkflows = active.files.filter((file) => WORKFLOW_FILE.test(file));
+  const archivedWorkflows = archive.files.filter((file) =>
+    file.startsWith(`${ARCHIVE_WORKFLOW_RELATIVE_ROOT}/`) && WORKFLOW_FILE.test(file),
   );
+  const errors = [];
+
+  for (const file of activeWorkflows) {
+    errors.push({
+      file,
+      line: 1,
+      code: "HOSTED_AUTOMATION_ACTIVE_WORKFLOW_FORBIDDEN",
+      message: "Art Studio is local-first: active GitHub Actions workflow YAML is forbidden on the zero-cost operating path.",
+    });
+  }
+  for (const file of active.files.filter((file) => file !== ACTIVE_README)) {
+    if (WORKFLOW_FILE.test(file)) continue;
+    errors.push({
+      file,
+      line: 1,
+      code: "HOSTED_AUTOMATION_ACTIVE_DIRECTORY_UNEXPECTED_FILE",
+      message: "Only the zero-cost policy README may remain in .github/workflows.",
+    });
+  }
+  for (const file of [...active.links, ...archive.links]) {
+    errors.push({
+      file,
+      line: 1,
+      code: "HOSTED_AUTOMATION_SYMLINK_FORBIDDEN",
+      message: "Hosted automation policy roots may not contain symbolic links.",
+    });
+  }
+  if (!active.files.includes(ACTIVE_README)) {
+    errors.push({
+      file: ACTIVE_README,
+      line: 1,
+      code: "HOSTED_AUTOMATION_ACTIVE_README_REQUIRED",
+      message: "The active workflow directory must retain its explicit zero-cost policy README.",
+    });
+  }
+  if (!archive.files.includes(ARCHIVE_README)) {
+    errors.push({
+      file: ARCHIVE_README,
+      line: 1,
+      code: "HOSTED_AUTOMATION_ARCHIVE_README_REQUIRED",
+      message: "The inactive workflow reference archive requires an operating-boundary README.",
+    });
+  }
+  if (!archivedWorkflows.length) {
+    errors.push({
+      file: ARCHIVE_WORKFLOW_RELATIVE_ROOT,
+      line: 1,
+      code: "HOSTED_AUTOMATION_ARCHIVE_REQUIRED",
+      message: "Legacy hosted workflow definitions must remain outside .github/workflows as inactive reference evidence.",
+    });
+  }
+
   return Object.freeze({
-    schema: "evavo.art-studio.workflow-context-check.v1",
-    checkedFiles: files.length,
+    schema: "evavo.art-studio.hosted-automation-policy.v2",
+    activeWorkflowRoot: ACTIVE_WORKFLOW_RELATIVE_ROOT,
+    archiveWorkflowRoot: ARCHIVE_WORKFLOW_RELATIVE_ROOT,
+    activeWorkflowFiles: activeWorkflows,
+    archivedWorkflowCount: archivedWorkflows.length,
     errors,
     passed: errors.length === 0,
+    githubActionsRequired: false,
+    vercelRequired: false,
   });
 }
 
 function main() {
-  const report = checkWorkflowContexts();
+  const report = checkHostedAutomationPolicy();
   const stream = report.passed ? process.stdout : process.stderr;
   stream.write(`${JSON.stringify(report, null, 2)}\n`);
   if (!report.passed) process.exitCode = 1;

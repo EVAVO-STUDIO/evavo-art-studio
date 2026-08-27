@@ -1,5 +1,13 @@
 # EVAVO Art Studio agent rules
 
+## Zero-cost execution boundary
+
+- Art Studio is local-first. The governed Windows workstation and `node scripts/local-quality-gate.mjs` are the authoritative validation path.
+- `.github/workflows` must contain no `.yml` or `.yaml` files. Former definitions under `ops/github-actions-reference/workflows` are inert historical reference, not executable authority.
+- Do not restore GitHub Actions triggers, add a Vercel deployment dependency, or move validation into hosted CI merely to bypass a local failure.
+- Install and retain the checkout-local pre-push hook with `node scripts/setup-local-hooks.mjs`. A push to `main` requires the complete local `pnpm check`.
+- The local gate must not call providers, deploy, publish, promote artifacts, mutate repositories beyond the requested commit, or write to EVAVO Storage.
+
 ## RAW_ART first
 
 When a game repository contains `raw_Art`, `RAW_ART`, `Raw_Art` or `raw_art`, treat that folder as immutable owner-supplied source evidence.

@@ -1,6 +1,9 @@
 .gitattributes text eol=lf
 .githooks/* text eol=lf
 .github/workflows/*.yml text eol=lf
+ops/github-actions-reference/workflows/*.yaml text eol=lf
+.github/workflows/README.md text eol=lf
+ops/github-actions-reference/workflows/*.yml text eol=lf
 config/*.payload.b64.part-* text eol=lf
 tools/raw_art_visual_catalog.py text eol=lf
 tools/raw_art_visual_catalog_mcp.mjs text eol=lf

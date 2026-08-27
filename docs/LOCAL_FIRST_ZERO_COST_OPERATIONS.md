@@ -1,11 +1,12 @@
 # Local-first, zero-cost Art Studio operation
 
-Art Studio treats the Windows workstation as the authoritative validation and production environment. GitHub stores source history and Vercel may publish a reviewed web surface, but neither hosted service is required to prove that a change is correct.
+Art Studio treats the governed Windows workstation as the authoritative validation and production environment. GitHub stores source history and Vercel may publish a deliberately reviewed web surface, but neither hosted service is required to prove that a change is correct.
 
 ## Operating boundary
 
 - Local validation is authoritative before a push to `main`.
-- GitHub Actions are optional remote observations. A skipped or unavailable hosted workflow never blocks local work.
+- There are no active GitHub Actions workflow YAML files under `.github/workflows`.
+- The former workflow definitions are preserved as inert reference material under `ops/github-actions-reference/workflows`; GitHub does not execute them from that location.
 - Vercel is not a build farm, test runner, artifact store or background worker for Art Studio.
 - Provider execution, media processing, durable jobs and repository writes remain on governed local infrastructure unless a task explicitly opts into another reviewed runtime.
 - No local gate makes a provider call, deploys a site, promotes an artifact or mutates EVAVO Storage.
@@ -37,7 +38,7 @@ node scripts/local-quality-gate.mjs changed
 # Run the complete repository validation locally
 node scripts/local-quality-gate.mjs full
 
-# Validate workflow expression contexts without running Actions
+# Prove that hosted automation is inactive and archived safely
 node scripts/check-github-workflow-contexts.mjs
 ```
 
@@ -45,9 +46,9 @@ Commands are spawned with argument arrays rather than a shell. Changed repositor
 
 ## GitHub Actions policy
 
-Workflow files remain useful as portable documentation and an optional second environment. The three broad hosted mirrors (`ci.yml`, `game-art-workstations.yml` and `council-avatar-production.yml`) are manual-dispatch only: pushes and pull requests do not start them. The default operating model does not assume Actions capacity, artifacts, caches, secrets or availability.
+`.github/workflows` contains only a policy README. Any `.yml` or `.yaml` file in that active directory is a blocking policy violation. This makes ordinary pushes, pull requests, schedules and external events incapable of starting Art Studio Actions jobs.
 
-The local workflow validator rejects automatic triggers on those broad mirrors and catches expressions that GitHub would reject before creating a job, including `runner.*` references in workflow-level or job-level `env` blocks. Narrow specialist workflows may remain as optional observations, but no local build, test, provider, mastering, review or publication path waits for them.
+The previous workflow definitions remain versioned beneath `ops/github-actions-reference/workflows` for historical review and portability. They are not current operating authority and they do not consume hosted execution from that location. Restoring one requires an explicit budget decision, a security review and an intentional policy change; copying YAML back into `.github/workflows` without that decision is rejected by the local gate.
 
 ## Vercel policy
 
