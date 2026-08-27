@@ -40,6 +40,24 @@ function rgbaPng(width, height, pixels, interlace = 0) {
   return Buffer.concat([signature, chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(Buffer.concat(rawRows))), chunk('IEND', Buffer.alloc(0))]);
 }
 
+function indexedPng(width, height, indices, palette, transparency = Buffer.alloc(0)) {
+  assert.equal(indices.length, width * height);
+  assert.equal(palette.length % 3, 0);
+  const signature = Buffer.from([137,80,78,71,13,10,26,10]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; ihdr[9] = 3; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+  const rawRows = [];
+  for (let y = 0; y < height; y += 1) {
+    rawRows.push(Buffer.from([0]));
+    rawRows.push(Buffer.from(indices.slice(y * width, (y + 1) * width)));
+  }
+  const chunks = [signature, chunk('IHDR', ihdr), chunk('PLTE', Buffer.from(palette))];
+  if (transparency.length) chunks.push(chunk('tRNS', transparency));
+  chunks.push(chunk('IDAT', zlib.deflateSync(Buffer.concat(rawRows))), chunk('IEND', Buffer.alloc(0)));
+  return Buffer.concat(chunks);
+}
+
 function run(file, args = []) {
   return spawnSync(process.execPath, [AUDITOR, '--input', file, '--require-alpha', '--json', ...args], {
     encoding: 'utf8', shell: false, windowsHide: true, timeout: 30_000
@@ -82,10 +100,22 @@ try {
   assert.ok(dimensionReport.findings.some((item) => item.code === 'wrong_width'));
   assert.ok(dimensionReport.findings.some((item) => item.code === 'wrong_height'));
 
+  const indexed = path.join(root, 'indexed-unused-palette-slots.png');
+  fs.writeFileSync(indexed, indexedPng(2, 1, [0, 1], [
+    255,0,0, 0,0,0, 0,255,0, 0,0,255
+  ], Buffer.from([255, 0, 255, 255])));
+  const indexedRun = run(indexed, ['--max-colors', '2']);
+  assert.equal(indexedRun.status, 0, indexedRun.stderr);
+  const indexedReport = JSON.parse(indexedRun.stdout);
+  assert.equal(indexedReport.metrics.uniqueColorCount, 2);
+  assert.equal(indexedReport.metrics.opaquePixels, 1);
+  assert.equal(indexedReport.metrics.transparentPixels, 1);
+  assert.equal(indexedReport.metrics.visiblePixels, 1);
+
   console.log(JSON.stringify({
     contract: 'evavo.pixel-art-candidate-audit-test.v1',
     status: 'passed',
-    tests: 4,
+    tests: 5,
     mutationAuthority: false,
     automaticApproval: false
   }, null, 2));
