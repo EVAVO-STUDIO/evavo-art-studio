@@ -967,8 +967,67 @@ test("OpenAI inpaint puts the editable base first, preserves reference order and
   const mask = captured.init.body.get("mask");
   assert.ok(mask instanceof Blob);
   assert.equal(mask.name, "mask.png");
-  assert.equal(captured.init.body.get("input_fidelity"), "high");
+  assert.equal(captured.init.body.get("input_fidelity"), null);
   assert.equal(captured.init.body.get("model"), "gpt-image-2");
   assert.equal(captured.init.body.get("n"), "2");
+  assert.equal(result.metadata.inputFidelity, "high-automatic");
+});
+
+test("OpenAI edit input fidelity remains explicit for earlier GPT Image models", async () => {
+  const fixture = await artifactFixture();
+  let captured;
+  const adapter = new OpenAIImageProviderAdapter({
+    apiKey: "test-key-abcdefghijklmnopqrstuvwxyz0123456789",
+    baseUrl: "https://example.test/v1",
+    model: "gpt-image-1.5",
+    allowedModels: ["gpt-image-1.5"],
+    fetch: async (url, init) => {
+      captured = { url, init };
+      return new Response(
+        JSON.stringify({
+          data: [{ b64_json: PNG_BASE64 }, { b64_json: PNG_BASE64 }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    },
+  });
+  const normalized = validateProviderCandidateRequest(
+    request({
+      operation: "inpaint",
+      continuityPhase: "repair",
+      references: [
+        ref(fixture.mask, "mask"),
+        ref(fixture.canonical, "canonical-identity"),
+        ref(fixture.base, "base-image"),
+      ],
+    }),
+  );
+  const compiled = compileProviderCandidatePrompt(normalized);
+  const resolved = [];
+  for (const reference of normalized.references) {
+    resolved.push({
+      ...reference,
+      artifact: await fixture.store.get(reference.artifactId),
+      bytes: await fixture.store.read(reference.artifactId),
+    });
+  }
+
+  const result = await adapter.execute(
+    {
+      request: normalized,
+      requestSha256: providerRequestSha256(normalized),
+      compiledPrompt: compiled.text,
+      compiledPromptSha256: compiled.sha256,
+      references: resolved,
+    },
+    {
+      signal: new AbortController().signal,
+      requestedAt: new Date("2026-07-29T00:00:00Z"),
+    },
+  );
+
+  assert.equal(captured.url, "https://example.test/v1/images/edits");
+  assert.equal(captured.init.body.get("model"), "gpt-image-1.5");
+  assert.equal(captured.init.body.get("input_fidelity"), "high");
   assert.equal(result.metadata.inputFidelity, "high-explicit");
 });

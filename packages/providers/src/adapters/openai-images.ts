@@ -44,6 +44,7 @@ const OPENAI_IMAGE_CAPABILITIES = Object.freeze([
 ] as const satisfies readonly ProviderCapability[]);
 
 const OPENAI_NATIVE_ALPHA_MODEL = /^gpt-image-1(?:\.5|-mini)?(?:$|-)/u;
+const OPENAI_AUTOMATIC_HIGH_INPUT_FIDELITY_MODEL = /^gpt-image-2(?:$|-)/u;
 
 const REFERENCE_ROLE_ORDER = Object.freeze([
   "base-image",
@@ -234,6 +235,15 @@ function supportsNativeAlpha(model: string): boolean {
   return OPENAI_NATIVE_ALPHA_MODEL.test(model);
 }
 
+function editInputFidelity(model: string): Readonly<{
+  readonly requestValue?: "high";
+  readonly evidence: "high-automatic" | "high-explicit";
+}> {
+  return OPENAI_AUTOMATIC_HIGH_INPUT_FIDELITY_MODEL.test(model)
+    ? Object.freeze({ evidence: "high-automatic" })
+    : Object.freeze({ requestValue: "high", evidence: "high-explicit" });
+}
+
 function quality(value: "draft" | "standard" | "high"): "low" | "medium" | "high" {
   if (value === "draft") return "low";
   if (value === "high") return "high";
@@ -421,7 +431,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
       protocolVersion: PROVIDER_PROTOCOL_VERSION,
       id: "openai-gpt-image",
       label: "OpenAI GPT Image",
-      version: "1.2.0",
+      version: "1.2.1",
       priority: options.priority ?? 1_000,
       capabilities: Object.freeze([
         ...OPENAI_IMAGE_CAPABILITIES,
@@ -487,6 +497,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
     }
     const useEditEndpoint =
       resolved.references.length > 0 || request.operation !== "generate";
+    const inputFidelity = useEditEndpoint ? editInputFidelity(model) : undefined;
     const background =
       request.background.strategy === "native-alpha"
         ? "transparent"
@@ -513,7 +524,9 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
       form.append("quality", quality(request.quality));
       form.append("output_format", format);
       form.append("background", background);
-      form.append("input_fidelity", "high");
+      if (inputFidelity?.requestValue) {
+        form.append("input_fidelity", inputFidelity.requestValue);
+      }
       for (const [index, reference] of imageReferences.entries()) {
         form.append(
           "image[]",
@@ -644,7 +657,7 @@ export class OpenAIImageProviderAdapter implements ProviderAdapter {
         sourceSize: size,
         referenceRoles: imageReferences.map((entry) => entry.role),
         maskRole: mask?.role ?? null,
-        inputFidelity: useEditEndpoint ? "high-explicit" : null,
+        inputFidelity: inputFidelity?.evidence ?? null,
       },
     };
   }
