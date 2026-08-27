@@ -21,8 +21,15 @@
     "purpose": "retain current game compatibility and fallback validation while production-master-v3 is migrated"
   },
   "productionMasterV3": {
-    "status": "planned-production-target-not-yet-game-authoritative",
-    "migrationRequiredBeforeFinalPromotion": true,
+    "status": "game-authoritative-production-target",
+    "migrationRequiredBeforeFinalPromotion": false,
+    "gameContract": {
+      "repository": "EVAVO-STUDIO/steel-dominion",
+      "path": "scripts/presentation/production_fighter_atlas_contract.gd",
+      "schema": "steel-dominion.production-fighter-atlas.v3",
+      "contractId": "production_master_v3",
+      "verifiedHead": "bee21c1dd503a948ac4a94036a179339feec8e1e"
+    },
     "cell": { "width": 160, "height": 160 },
     "pivot": { "x": 80, "y": 152 },
     "groundLineY": 152,
@@ -35,7 +42,7 @@
     "atlas": { "width": 2560, "height": 2560 },
     "launchFrames": 4,
     "launchBodyCels": 896,
-    "generationGate": "construction-concepts-pilots-ui-and-style-proof-may-begin-now; final-body-cel-promotion-requires-game-atlas-v3-migration",
+    "generationGate": "bastion-canonical-identity-model-sheet-and-native-style-proof-required-before-full-body-cel-production; final-promotion-requires-complete-atlas-runtime-motion-and-human-approval",
     "reason": "A 160-pixel native cell gives the giant Frames enough screen presence, silhouette room and attack extension at 640x360 without baking effects into the body. A 256-slot atlas keeps the runtime regular while retaining 32 future/reserved slots."
   },
   "productionTotals": {
@@ -207,6 +214,6 @@
     "reversal owns its own body bank in production-master-v3",
     "Overdrive Pilot cut-ins do not replace the fourteen-cel Frame body sequence",
     "reserved slots remain empty until a game-authoritative requirement exists",
-    "final promotion is blocked until steel-dominion adopts the production-master-v3 atlas contract and exports a matching live manifest"
+    "final promotion requires a matching steel-dominion production-v3 manifest, complete runtime evidence and named human approval"
   ]
 }

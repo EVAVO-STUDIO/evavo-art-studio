@@ -64,15 +64,16 @@ test("Frame scale envelopes remain distinct and safe inside the 160x160 native c
   assert.equal(new Set(Object.values(frames).map((frame) => frame.motionCadence)).size, 4);
 });
 
-test("production-master inventory grows only the Frame-body family and keeps promotion gated until the game migrates", async () => {
+test("production-master inventory follows the migrated game contract and keeps art promotion governed", async () => {
   const census = await load();
   assert.equal(census.productionTotals.legacyCampaignSourceImages, 1157);
   assert.equal(census.productionTotals.legacyFrameBodyCels, 480);
   assert.equal(census.productionTotals.productionMasterFrameBodyCels, 896);
   assert.equal(census.productionTotals.additionalFrameBodyCels, 416);
   assert.equal(census.productionTotals.productionMasterSourceImages, 1573);
-  assert.equal(census.productionMasterV3.migrationRequiredBeforeFinalPromotion, true);
-  assert.match(census.productionMasterV3.generationGate, /final-body-cel-promotion-requires-game-atlas-v3-migration/);
+  assert.equal(census.productionMasterV3.status, "game-authoritative-production-target");
+  assert.equal(census.productionMasterV3.migrationRequiredBeforeFinalPromotion, false);
+  assert.match(census.productionMasterV3.generationGate, /bastion-canonical-identity-model-sheet-and-native-style-proof/);
   assert.equal(verifySpriteProductionCensus(census).status, "passed");
   assert.equal(spriteProductionCensusSummary(census).productionTotals.productionMasterSourceImages, 1573);
 });
@@ -89,9 +90,9 @@ test("unsafe census mutations fail closed", async () => {
   overflow.frameVisualEnvelopes.citadel.maximumBodyWidthPx = 153;
   assert.throws(() => normalizeSpriteProductionCensus(overflow), /violates transparent safety/);
 
-  const prematureAuthority = structuredClone(census);
-  prematureAuthority.productionMasterV3.status = "implemented";
-  assert.throws(() => normalizeSpriteProductionCensus(prematureAuthority), /must remain explicitly non-authoritative/);
+  const staleAuthority = structuredClone(census);
+  staleAuthority.productionMasterV3.status = "planned-production-target-not-yet-game-authoritative";
+  assert.throws(() => normalizeSpriteProductionCensus(staleAuthority), /must identify the migrated game-authoritative target/);
 
   const badTotal = structuredClone(census);
   badTotal.productionTotals.productionMasterSourceImages = 1572;

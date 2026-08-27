@@ -129,6 +129,13 @@ export function normalizeSpriteProductionCensus(input) {
   const normalizedMaster = {
     status: nonEmptyString(master.status, "productionMasterV3.status"),
     migrationRequiredBeforeFinalPromotion: master.migrationRequiredBeforeFinalPromotion === true,
+    gameContract: deepFreeze({
+      repository: nonEmptyString(master.gameContract?.repository, "productionMasterV3.gameContract.repository"),
+      path: nonEmptyString(master.gameContract?.path, "productionMasterV3.gameContract.path"),
+      schema: nonEmptyString(master.gameContract?.schema, "productionMasterV3.gameContract.schema"),
+      contractId: nonEmptyString(master.gameContract?.contractId, "productionMasterV3.gameContract.contractId"),
+      verifiedHead: nonEmptyString(master.gameContract?.verifiedHead, "productionMasterV3.gameContract.verifiedHead"),
+    }),
     cell: size(master.cell, "productionMasterV3.cell"),
     pivot: point(master.pivot, "productionMasterV3.pivot"),
     groundLineY: positiveInteger(master.groundLineY, "productionMasterV3.groundLineY"),
@@ -144,8 +151,12 @@ export function normalizeSpriteProductionCensus(input) {
     generationGate: nonEmptyString(master.generationGate, "productionMasterV3.generationGate"),
     reason: nonEmptyString(master.reason, "productionMasterV3.reason"),
   };
-  assert(normalizedMaster.status === "planned-production-target-not-yet-game-authoritative", "productionMasterV3 must remain explicitly non-authoritative until the game migrates.");
-  assert(normalizedMaster.migrationRequiredBeforeFinalPromotion, "productionMasterV3 migration gate must remain enabled.");
+  assert(normalizedMaster.status === "game-authoritative-production-target", "productionMasterV3 must identify the migrated game-authoritative target.");
+  assert(!normalizedMaster.migrationRequiredBeforeFinalPromotion, "productionMasterV3 migration gate must be disabled after game-contract adoption.");
+  assert(normalizedMaster.gameContract.repository === "EVAVO-STUDIO/steel-dominion", "productionMasterV3 must remain linked to Steel Dominion.");
+  assert(normalizedMaster.gameContract.schema === "steel-dominion.production-fighter-atlas.v3", "productionMasterV3 game schema drifted.");
+  assert(normalizedMaster.gameContract.contractId === "production_master_v3", "productionMasterV3 game contract id drifted.");
+  assert(/^[0-9a-f]{40}$/.test(normalizedMaster.gameContract.verifiedHead), "productionMasterV3 verified game HEAD must be a full commit SHA.");
   assert(normalizedMaster.pivot.y === normalizedMaster.groundLineY, "pivot.y must equal groundLineY.");
   assert(normalizedMaster.atlas.width === normalizedMaster.cell.width * normalizedMaster.columns, "production atlas width is inconsistent.");
   assert(normalizedMaster.atlas.height === normalizedMaster.cell.height * normalizedMaster.rows, "production atlas height is inconsistent.");
@@ -275,7 +286,7 @@ export function verifySpriteProductionCensus(census) {
     ["all-frame-envelopes-safe", Object.values(census.frameVisualEnvelopes).every((frame) => frame.maximumBodyWidthPx <= 152 && frame.maximumBodyHeightPx <= 148)],
     ["distinct-cadence-profiles", new Set(Object.values(census.frameVisualEnvelopes).map((frame) => frame.motionCadence)).size === 4],
     ["production-total-1573", census.productionTotals.productionMasterSourceImages === 1573],
-    ["migration-gate-enabled", census.productionMasterV3.migrationRequiredBeforeFinalPromotion === true],
+    ["game-contract-migration-complete", census.productionMasterV3.migrationRequiredBeforeFinalPromotion === false],
   ].map(([id, passed]) => deepFreeze({ id, passed }));
   const failed = checks.filter((check) => !check.passed);
   return deepFreeze({
