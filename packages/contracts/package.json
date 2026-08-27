@@ -13,9 +13,9 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build --silent && node --test test/*.test.mjs"
+    "test": "npm run build --silent && node --test test"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

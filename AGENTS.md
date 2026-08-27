@@ -63,3 +63,10 @@ Generated or edited work remains an unapproved derivative until it is compared w
 - Godot Game Test Lab evidence before any runtime promotion.
 
 Read `docs/RAW_ART_FOLDER_WORKBENCH.md`, `docs/RAW_ART_VISUAL_CATALOG.md` and `docs/RAW_ART_AGENT_WORKSHOP.md` before changing a game-art pipeline.
+
+## Contract package boundaries
+
+- Keep production TypeScript under `packages/contracts/src/` and executable contract verification under `packages/contracts/test/`.
+- Contract tests run against the freshly built `dist` package through Node's built-in test runner. Do not add a second test framework to `@evavo/art-contracts`.
+- Never compile, publish or retain `.test` or `.spec` artifacts in `packages/contracts/dist`; the package build must clean stale output before compiling.
+- When adding a new contract, add its public export, its post-build conformance tests and any cross-studio fingerprint checks in the same change.
