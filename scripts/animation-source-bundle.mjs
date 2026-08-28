@@ -7,11 +7,14 @@ import { pathToFileURL } from "node:url";
 import {
   ANIMATION_SOURCE_BUNDLE_SCHEMA,
   ANIMATION_SOURCE_BUNDLE_SCHEMA_SHA256,
-  compileAnimationSourceBundle,
   readJson,
-  verifyAnimationSourceBundleFiles,
   writeJsonAtomic,
 } from "./lib/animation-source-bundle.mjs";
+import {
+  SUPPORTED_ANIMATION_SOURCE_IMAGE_MEDIA_TYPES,
+  compileAnimationSourceBundleStable,
+  verifyAnimationSourceBundleFilesStable,
+} from "./lib/animation-source-stable-observation.mjs";
 
 function usage() {
   return [
@@ -20,8 +23,9 @@ function usage() {
     "  node scripts/animation-source-bundle.mjs verify <manifest.json> [--root <source-root>] [--output <receipt.json>]",
     "  node scripts/animation-source-bundle.mjs manifest",
     "",
-    "Compilation measures source bytes, probes PNG dimensions, binds approval",
-    "to the canonical digest, and writes the manifest atomically.",
+    "Compilation observes every source before and after delegated work, reads",
+    "bytes and image geometry from one opened handle, binds approval to the",
+    "canonical digest, and writes the manifest atomically without copying media.",
   ].join("\n");
 }
 
@@ -88,7 +92,7 @@ export async function runAnimationSourceBundleCli(args) {
     await output(undefined, {
       service:
         "evavo-art-studio-animation-source-bundle",
-      version: "1.0.0",
+      version: "1.1.0",
       schema: ANIMATION_SOURCE_BUNDLE_SCHEMA,
       schemaSha256:
         ANIMATION_SOURCE_BUNDLE_SCHEMA_SHA256,
@@ -96,11 +100,19 @@ export async function runAnimationSourceBundleCli(args) {
       producer: "evavo-art-studio",
       consumer: "cel-animation-studio",
       mediaVerification: [
-        "sha256",
+        "stable-before-after-observation",
+        "single-handle-sha256",
         "byte-length",
         "png-ihdr",
+        "jpeg-sof",
+        "gif-logical-screen",
+        "webp-canvas",
       ],
-      pathPolicy: "portable-relative-no-symlinks",
+      supportedImageMediaTypes:
+        SUPPORTED_ANIMATION_SOURCE_IMAGE_MEDIA_TYPES,
+      pathPolicy:
+        "portable-relative-no-symlinks-stable-identity",
+      sourceCopyRequired: false,
       authority: {
         providerExecution: false,
         renderExecution: false,
@@ -128,7 +140,7 @@ export async function runAnimationSourceBundleCli(args) {
       );
     }
     const request = await readJson(subject);
-    const bundle = await compileAnimationSourceBundle(
+    const bundle = await compileAnimationSourceBundleStable(
       request,
       options.root,
       { concurrency },
@@ -140,6 +152,7 @@ export async function runAnimationSourceBundleCli(args) {
       bundleDigest: bundle.bundleDigest,
       approvalState: bundle.approval.state,
       assetCount: bundle.assets.length,
+      stableSourceObservation: true,
     });
     return;
   }
@@ -150,7 +163,7 @@ export async function runAnimationSourceBundleCli(args) {
       ? resolve(options.root)
       : dirname(resolve(subject));
     const receipt =
-      await verifyAnimationSourceBundleFiles(
+      await verifyAnimationSourceBundleFilesStable(
         bundle,
         sourceRoot,
         { concurrency },

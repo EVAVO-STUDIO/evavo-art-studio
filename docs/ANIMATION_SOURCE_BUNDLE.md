@@ -2,21 +2,29 @@
 
 ## Purpose
 
-Art Studio can now compile a real set of approved local media into a deterministic, byte-verifiable handoff for Cel Animation Studio.
+Art Studio compiles a real set of approved local media into a deterministic, byte-verifiable handoff for Cel Animation Studio.
 
-The bundle closes the gap between a valid animation brief and the exact files used by the downstream production. It records every relative path, byte length, SHA-256 digest, frame slot, canvas property, timebase, continuity digest and approval attestation.
+The bundle closes the gap between a valid animation brief and the exact files used downstream. It records every portable relative path, byte length, SHA-256 digest, frame slot, canvas property, timebase, continuity digest and approval attestation.
 
-The contract is:
+The shared contract is:
 
 ```text
 contracts/animation-source-bundle-v1.schema.json
 ```
 
-The executable implementation is:
+The canonical manifest implementation is:
 
 ```text
 scripts/lib/animation-source-bundle.mjs
 ```
+
+The stable local file-observation boundary is:
+
+```text
+scripts/lib/animation-source-stable-observation.mjs
+```
+
+The public CLI always uses the stable boundary rather than calling the lower-level compiler or verifier directly.
 
 ## Authority boundary
 
@@ -36,6 +44,40 @@ The manifest always carries these fixed restrictions:
 ```
 
 Cel Animation Studio still owns X-sheet timing, exposure choices, drawing roles, render approval and final promotion.
+
+## Stable source observation
+
+A path check alone is not enough for production evidence because another process can replace or modify a file between checking it and reading it. Art Studio therefore observes every source before and after compile or verify work.
+
+For each asset, the stable boundary:
+
+1. validates the portable relative path;
+2. resolves it beneath the real source root;
+3. rejects a symlinked source file;
+4. records filesystem identity and timestamps;
+5. opens the file once;
+6. reads SHA-256 bytes and image geometry through that one opened file handle;
+7. rechecks the opened handle after reading;
+8. closes the handle and proves the original path still names the same file identity;
+9. repeats the complete observation after delegated compilation or verification;
+10. rejects any changed bytes, geometry, path identity, file identity or source-set membership.
+
+The delegated compiler and verifier results are also compared with the stable observation. A temporary swap followed by restoration cannot silently produce a bundle or receipt for different bytes.
+
+This protection does not duplicate source media. It reads source files in bounded chunks and stores only compact evidence. That keeps it suitable for the governed Windows workstation and EVAVO Storage without creating a second copy of every art file on `C:`.
+
+## Supported image evidence
+
+Image declarations fail closed. The stable boundary independently checks dimensions and signatures for:
+
+- PNG through its signature and IHDR;
+- JPEG through a valid start marker and SOF frame header;
+- GIF through its version signature and logical screen descriptor;
+- WebP through RIFF/WEBP and VP8, VP8L or VP8X canvas metadata.
+
+PNG, JPEG, GIF and WebP are the supported image media types for this handoff. Other `image/*` declarations are rejected instead of trusting unverified dimensions. Non-image media remains byte-length and SHA-256 bound.
+
+When compiling a supported non-PNG image, Art Studio supplies the measured dimensions to the canonical compiler. The request does not need to duplicate dimensions that can be read from the source bytes.
 
 ## Compile a bundle
 
@@ -109,19 +151,30 @@ node scripts/animation-source-bundle.mjs compile `
 
 Compilation:
 
-1. rejects unsafe or non-portable paths;
-2. resolves every source under the declared root;
-3. rejects symlinked files and realpath escapes;
-4. streams SHA-256 instead of buffering whole media;
-5. checks exact byte lengths;
-6. probes PNG signatures and IHDR dimensions;
-7. sorts assets into canonical frame order;
-8. binds approval to the exact bundle digest;
-9. writes the manifest through a temporary sibling followed by atomic rename.
+1. performs a stable pre-operation observation;
+2. measures exact bytes and supported image geometry;
+3. compiles the canonical manifest;
+4. performs a stable post-operation observation;
+5. proves the compiler used the same source evidence;
+6. sorts assets into canonical frame order;
+7. binds approval to the exact bundle digest;
+8. writes the manifest through a temporary sibling followed by atomic rename.
+
+Control bounded local parallelism when working with slower storage:
+
+```powershell
+node scripts/animation-source-bundle.mjs compile `
+  .\workfiles\animation-source-request.json `
+  --root .\workfiles\animation-source `
+  --output .\artifacts\animation-source-bundle.json `
+  --concurrency 2
+```
+
+Concurrency is bounded from 1 to 16. The default is 4.
 
 ## Verify a bundle
 
-Art Studio can independently verify its own emitted bundle before handoff:
+Art Studio independently verifies its emitted bundle before handoff:
 
 ```powershell
 node scripts/animation-source-bundle.mjs verify `
@@ -130,7 +183,30 @@ node scripts/animation-source-bundle.mjs verify `
   --output .\artifacts\animation-source-verification.json
 ```
 
-The verification receipt is deterministic for the same bundle and source bytes. It remains candidate-only and does not approve downstream work.
+Verification performs the same before-and-after observation and proves that both the immutable bundle and the delegated receipt describe the observed bytes. The receipt remains candidate-only and does not approve downstream work.
+
+Inspect the machine-readable local capability manifest with:
+
+```powershell
+node scripts/animation-source-bundle.mjs manifest
+```
+
+## Library cancellation and progress
+
+The stable library accepts an `AbortSignal`, an async `onProgress` callback and an async `onPhase` callback. These hooks allow a local worker, MCP boundary or desktop interface to cancel long reads and report progress without adding network or hosted-job dependencies.
+
+```js
+const bundle = await compileAnimationSourceBundleStable(request, sourceRoot, {
+  concurrency: 4,
+  chunkBytes: 1024 * 1024,
+  signal: controller.signal,
+  onProgress: ({ relativePath, bytesRead, totalBytes }) => {
+    console.log(relativePath, bytesRead, totalBytes);
+  },
+});
+```
+
+Read chunks are bounded from 64 KiB to 8 MiB. The default is 1 MiB.
 
 ## Path policy
 
@@ -146,6 +222,7 @@ Manifest paths use forward-slash relative paths only. The runtime rejects:
 - Windows device aliases;
 - trailing spaces or dots;
 - symlink and realpath escapes;
+- replacement of a checked path;
 - duplicate asset IDs or normalized paths.
 
 ## Approval integrity
@@ -154,11 +231,26 @@ Manifest paths use forward-slash relative paths only. The runtime rejects:
 
 An approved attestation must name the same `bundleDigest`. Changing the timeline, asset metadata, continuity identity or source digest invalidates the approval instead of silently carrying it forward.
 
+Stable observation does not create, broaden or infer approval. It only proves which bytes were observed.
+
+## Local-first operation
+
+The source-bundle path requires no GitHub Actions, scheduled workflows, Vercel functions, hosted queues or cloud workers. Compilation, verification, image probing, digest calculation and tests run on the local workstation.
+
+The implementation has no provider-execution, render, deployment, publication, Git mutation or force-push authority.
+
 ## Local validation
 
 ```powershell
 node scripts/check-animation-source-bundle.mjs
 node --test scripts/test-ci-media-tool-animation-source-bundle.mjs
+node --test scripts/test-ci-media-tool-animation-source-stable-observation.mjs
 ```
 
-The check validates the schema fingerprint, canonical fixture, runtime boundaries and regression suite without GitHub Actions, Vercel or any external provider.
+The broader local media contract includes both suites automatically:
+
+```powershell
+pnpm ci:media-tools:test
+```
+
+These checks validate the schema fingerprint, canonical fixture, runtime boundaries, stable file identity, source replacement rejection, common image probes, cancellation and regression behavior without GitHub Actions, Vercel or an external provider.
