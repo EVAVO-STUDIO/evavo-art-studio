@@ -117,6 +117,27 @@ test("Art Studio rejects soundtrack context that gains distributor or reinterpre
   assert.ok(result.issues.some((entry) => entry.path === "authority"));
 });
 
+test("Art Studio rejects unknown authority-like fields instead of ignoring them", () => {
+  const brief = {
+    ...baseBrief,
+    authority: { ...baseBrief.authority, automaticPublication: true },
+  };
+  const result = validateSoundtrackArtworkBrief(brief);
+  assert.equal(result.success, false);
+  assert.ok(result.issues.some((entry) => entry.path === "authority.automaticPublication"));
+});
+
+test("Art Studio rejects inconsistent soundtrack contrast counts", () => {
+  const brief = {
+    ...baseBrief,
+    musicCreativeContext: { ...boundedMusicContext, adjacentContrastCount: 1 },
+    review: { ...baseBrief.review, useValidatedMusicCreativeContextWhenSupplied: true },
+  };
+  const result = validateSoundtrackArtworkBrief(brief);
+  assert.equal(result.success, false);
+  assert.ok(result.issues.some((entry) => entry.path === "musicCreativeContext.adjacentContrasts"));
+});
+
 test("Art Studio rejects supplied music context when review refuses to use validated context", () => {
   const brief = {
     ...baseBrief,
