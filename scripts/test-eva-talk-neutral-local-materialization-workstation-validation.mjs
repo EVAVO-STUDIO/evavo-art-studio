@@ -17,6 +17,28 @@ const SCRIPT_PATH = path.join(
   ROOT,
   'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
 );
+const ATTRIBUTES_PATH = path.join(ROOT, '.gitattributes');
+const EXPECTED_CHANGED_FILES = Object.freeze([
+  '.gitattributes',
+  'config/eva-talk-neutral-local-materialization-campaign-v1.json',
+  'config/eva-talk-neutral-local-materialization-capability-v1.json',
+  'config/eva-talk-neutral-local-materialization-workstation-validation-v1.json',
+  'docs/EVA_TALK_NEUTRAL_LOCAL_MATERIALIZATION_QUEUE.md',
+  'docs/eva-talk-neutral-local-materialization-operator-checklist.md',
+  'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
+  'scripts/check-eva-talk-neutral-local-materialization-queue.mjs',
+  'scripts/eva-talk-neutral-local-materialization-queue.mjs',
+  'scripts/project-art/eva-talk-neutral-local-materialization-queue.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-campaign.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-claims.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-common.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-completion.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-init.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-png.mjs',
+  'scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs',
+  'scripts/test-eva-talk-neutral-local-materialization-queue.mjs',
+  'scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs',
+]);
 
 function readOrdinaryText(filePath, label) {
   const stat = fs.lstatSync(filePath);
@@ -35,10 +57,16 @@ function readJson(filePath, label) {
 }
 
 function allFalse(record) {
-  return Object.values(record).every((value) => value === false);
+  return (
+    record &&
+    typeof record === 'object' &&
+    !Array.isArray(record) &&
+    Object.values(record).length > 0 &&
+    Object.values(record).every((value) => value === false)
+  );
 }
 
-test('workstation validation manifest binds the exact local gate', () => {
+test('workstation validation manifest binds exact head and exact main', () => {
   const capability = readJson(CAPABILITY_PATH, 'capability');
   const validation = readJson(VALIDATION_PATH, 'workstation validation');
 
@@ -73,12 +101,17 @@ test('workstation validation manifest binds the exact local gate', () => {
     'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
     '-ExpectedHeadSha',
     '<exact-pr-head-sha>',
+    '-ExpectedMainSha',
+    '<exact-origin-main-sha>',
   ]);
   assert.deepEqual(validation.requiredEnvironment, {
     operatingSystem: 'windows',
+    powershell: 'pwsh',
     node: '22.14.0',
     pnpm: '10.13.1',
+    repositoryOrigin: 'EVAVO-STUDIO/evavo-art-studio',
     cleanWorkingTree: true,
+    originMainPresent: true,
     networkRequiredByQueueChecks: false,
     githubActionsRequired: false,
     vercelRequired: false,
@@ -90,8 +123,18 @@ test('workstation validation manifest binds the exact local gate', () => {
     concurrentWorkerClaimRace: true,
     realCliLifecycleExercise: true,
     completeRepositoryPnpmCheck: true,
-    gitDiffCheck: true,
+    toolchainVersionCheck: true,
+    repositoryIdentityCheck: true,
+    exactHeadCheck: true,
+    exactOriginMainCheck: true,
+    mainAncestorOfHeadCheck: true,
+    exactChangedFileSetCheck: true,
+    diffRangeCheck: true,
     cleanTreeAfterValidation: true,
+  });
+  assert.deepEqual(validation.expectedChangeEvidence, {
+    changedFileCount: EXPECTED_CHANGED_FILES.length,
+    changedFiles: EXPECTED_CHANGED_FILES,
   });
   assert.deepEqual(validation.expectedQueueEvidence, {
     packetCount: 8,
@@ -104,29 +147,45 @@ test('workstation validation manifest binds the exact local gate', () => {
   assert.equal(allFalse(validation.authority), true);
 });
 
-test('PowerShell gate checks exact HEAD, full pnpm validation and clean replay', () => {
+test('PowerShell gate proves exact repository and toolchain state locally', () => {
   const source = readOrdinaryText(SCRIPT_PATH, 'workstation validation script');
 
   for (const required of [
     "[ValidatePattern('^[0-9a-f]{40}$')]",
     '$ExpectedHeadSha',
-    "& $Git 'rev-parse' 'HEAD'",
-    "& $Git 'status' '--porcelain=v1' '--untracked-files=all'",
+    '$ExpectedMainSha',
+    '$IsWindows',
+    "$ExpectedRepository = 'EVAVO-STUDIO/evavo-art-studio'",
+    "$ExpectedNodeVersion = 'v22.14.0'",
+    "$ExpectedPnpmVersion = '10.13.1'",
+    "'refs/remotes/origin/main'",
+    "'merge-base'",
+    "'--is-ancestor'",
+    "'rev-list'",
+    "'--count'",
+    "'--name-only'",
+    "'--diff-filter=ACMRD'",
+    '$ExpectedChangedFiles',
+    'Compare-Object',
+    '$DiffRange',
     "'scripts/check-eva-talk-neutral-local-materialization-queue.mjs'",
     "'scripts/test-eva-talk-neutral-local-materialization-queue.mjs'",
     "'scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs'",
     "'scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs'",
-    "'--test'",
     "'scripts/eva-talk-neutral-local-materialization-queue.mjs'",
     "'init'",
     "'claim'",
     "'heartbeat'",
     "'fail'",
     "'status'",
-    "Invoke-NativeChecked -FilePath $Pnpm -ArgumentList @('check')",
-    "Invoke-NativeChecked -FilePath $Git -ArgumentList @('diff', '--check')",
+    "Invoke-NativeChecked -FilePath $Pnpm -ArgumentList @(",
+    "'check'",
+    "'diff'",
+    "'--check'",
     "completeLocalPnpmCheck = 'passed'",
     'repositoryCleanAfterValidation = $true',
+    'expectedMainSha = $ExpectedMainSha',
+    'changedFileCount = $FinalState.changedFiles.Count',
     'networkAccess = $false',
     'providerExecution = $false',
     'candidateApproval = $false',
@@ -151,10 +210,14 @@ test('PowerShell gate checks exact HEAD, full pnpm validation and clean replay',
     'test-eva-talk-neutral-local-materialization-queue-cli.mjs',
     'test-eva-talk-neutral-local-materialization-workstation-validation.mjs',
   ];
-  assert.equal(
-    syntaxTargets.every((target) => source.includes(target)),
-    true,
-  );
+  assert.equal(syntaxTargets.every((target) => source.includes(target)), true);
+
+  for (const expectedPath of EXPECTED_CHANGED_FILES) {
+    assert.ok(
+      source.includes(`'${expectedPath}'`),
+      `workstation gate omits expected changed path ${expectedPath}`,
+    );
+  }
 
   for (const forbidden of [
     'Invoke-WebRequest',
@@ -165,6 +228,7 @@ test('PowerShell gate checks exact HEAD, full pnpm validation and clean replay',
     'gh workflow',
     'vercel deploy',
     'force-with-lease',
+    'fetch origin',
     'Remove-Item $RepoRoot',
   ]) {
     assert.equal(
@@ -175,7 +239,23 @@ test('PowerShell gate checks exact HEAD, full pnpm validation and clean replay',
   }
 });
 
-test('operator documentation exposes the exact-head local validation command', () => {
+test('line-ending policy covers the complete queue validation surface', () => {
+  const source = readOrdinaryText(ATTRIBUTES_PATH, '.gitattributes');
+  for (const required of [
+    'config/eva-talk-neutral-local-materialization-*.json text eol=lf',
+    'scripts/project-art/eva-talk-neutral-local-*.mjs text eol=lf',
+    'scripts/eva-talk-neutral-local-materialization-queue.mjs text eol=lf',
+    'scripts/check-eva-talk-neutral-local-materialization-queue.mjs text eol=lf',
+    'scripts/test-eva-talk-neutral-local-materialization-*.mjs text eol=lf',
+    'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1 text eol=lf',
+    'docs/EVA_TALK_NEUTRAL_LOCAL_MATERIALIZATION_QUEUE.md text eol=lf',
+    'docs/eva-talk-neutral-local-materialization-operator-checklist.md text eol=lf',
+  ]) {
+    assert.ok(source.includes(required), `.gitattributes omits ${required}`);
+  }
+});
+
+test('operator documentation exposes the exact head and main command', () => {
   const guide = readOrdinaryText(
     path.join(ROOT, 'docs/EVA_TALK_NEUTRAL_LOCAL_MATERIALIZATION_QUEUE.md'),
     'queue guide',
@@ -191,6 +271,9 @@ test('operator documentation exposes the exact-head local validation command', (
   for (const source of [guide, checklist]) {
     assert.ok(source.includes('Invoke-EvaTalkNeutralLocalQueueValidation.ps1'));
     assert.ok(source.includes('ExpectedHeadSha'));
+    assert.ok(source.includes('ExpectedMainSha'));
+    assert.ok(source.includes('origin/main'));
     assert.ok(source.includes('pnpm check'));
+    assert.ok(source.includes('git diff --check'));
   }
 });
