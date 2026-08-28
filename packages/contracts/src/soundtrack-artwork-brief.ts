@@ -14,6 +14,8 @@ export type SoundtrackArtworkBrief = Readonly<Record<string, unknown>>;
 const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
 const isNonNegativeInteger = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value) && value >= 0;
+const isPositiveInteger = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value) && value > 0;
 
 function validateStringCountMap(value: unknown, path: string, issues: ValidationIssue[]): void {
   if (!isRecord(value)) {
@@ -34,10 +36,10 @@ function validateMusicCreativeContext(value: unknown, issues: ValidationIssue[])
     return;
   }
   const source = value.source;
-  if (!isRecord(source) || !isNonEmptyString(source.path) || !isNonEmptyString(source.sha256) || !isNonNegativeInteger(source.bytes)) {
-    issue(issues, "musicCreativeContext.source", "must bind a path, sha256 and byte length.");
+  if (!isRecord(source) || !isNonEmptyString(source.path) || !isNonEmptyString(source.sha256) || source.sha256.length !== 64 || !isPositiveInteger(source.bytes)) {
+    issue(issues, "musicCreativeContext.source", "must bind a path, 64-character sha256 and positive byte length.");
   }
-  if (!isNonNegativeInteger(value.trackCount) || value.trackCount < 1) {
+  if (!isPositiveInteger(value.trackCount)) {
     issue(issues, "musicCreativeContext.trackCount", "must be a positive integer.");
   }
   if (value.styleCoverageComplete !== true) {
@@ -53,10 +55,13 @@ function validateMusicCreativeContext(value: unknown, issues: ValidationIssue[])
     issue(issues, "musicCreativeContext.adjacentContrasts", "must be an array.");
   } else {
     value.adjacentContrasts.forEach((row, index) => {
-      if (!isRecord(row) || !isNonNegativeInteger(row.fromTrack) || !isNonNegativeInteger(row.toTrack) || !Array.isArray(row.changedDimensions) || !row.changedDimensions.every(isNonEmptyString)) {
-        issue(issues, `musicCreativeContext.adjacentContrasts[${index}]`, "must contain track numbers and changedDimensions strings.");
+      if (!isRecord(row) || !isPositiveInteger(row.fromTrack) || !isPositiveInteger(row.toTrack) || !Array.isArray(row.changedDimensions) || !row.changedDimensions.every(isNonEmptyString)) {
+        issue(issues, `musicCreativeContext.adjacentContrasts[${index}]`, "must contain positive track numbers and changedDimensions strings.");
       }
     });
+    if (isNonNegativeInteger(value.adjacentContrastCount) && value.adjacentContrasts.length !== value.adjacentContrastCount) {
+      issue(issues, "musicCreativeContext.adjacentContrasts", "length must equal adjacentContrastCount.");
+    }
   }
   for (const [field, expected] of [
     ["useAsCreativeContextOnly", true],
@@ -92,7 +97,7 @@ export function validateSoundtrackArtworkBrief(input: unknown): ValidationResult
     issue(issues, "typography", "typography contract is invalid.");
   }
   const master = input.master;
-  if (!isRecord(master) || master.aspectRatio !== "1:1" || !isFiniteNumber(master.preferredWorkingPixels) || !isFiniteNumber(master.minimumAcceptedPixels) || !isFiniteNumber(master.maximumAcceptedPixels) || master.colorSpace !== "sRGB" || !Array.isArray(master.acceptedFormats) || !master.acceptedFormats.every(isNonEmptyString) || master.noArtificialUpscaling !== true || master.retainLayeredEditableSource !== true) {
+  if (!isRecord(master) || master.aspectRatio !== "1:1" || !isFiniteNumber(master.preferredWorkingPixels) || !isFiniteNumber(master.minimumAcceptedPixels) || !isFiniteNumber(master.maximumAcceptedPixels) || master.preferredWorkingPixels <= 0 || master.minimumAcceptedPixels <= 0 || master.maximumAcceptedPixels < master.minimumAcceptedPixels || master.colorSpace !== "sRGB" || !Array.isArray(master.acceptedFormats) || !master.acceptedFormats.every(isNonEmptyString) || master.noArtificialUpscaling !== true || master.retainLayeredEditableSource !== true) {
     issue(issues, "master", "square soundtrack master contract is invalid.");
   }
   if (!Array.isArray(input.deliverables) || !input.deliverables.every(isNonEmptyString)) issue(issues, "deliverables", "must be a string array.");
@@ -101,8 +106,10 @@ export function validateSoundtrackArtworkBrief(input: unknown): ValidationResult
   if (!isRecord(review) || review.fitWithMusicAndGameIdentity !== true || review.doNotForceLiteralAudioGenreIllustration !== true || review.thumbnailLegibility !== true || review.platformSafeCrop !== true || review.rightsAndLicensingCheck !== true || review.humanCreativeApprovalRequired !== true) {
     issue(issues, "review", "review policy is invalid.");
   }
-  if (input.musicCreativeContext !== null && input.musicCreativeContext !== undefined && review?.useValidatedMusicCreativeContextWhenSupplied !== true) {
-    issue(issues, "review.useValidatedMusicCreativeContextWhenSupplied", "must be true when musicCreativeContext is supplied.");
+  if (input.musicCreativeContext !== null && input.musicCreativeContext !== undefined) {
+    if (!isRecord(review) || review.useValidatedMusicCreativeContextWhenSupplied !== true) {
+      issue(issues, "review.useValidatedMusicCreativeContextWhenSupplied", "must be true when musicCreativeContext is supplied.");
+    }
   }
 
   const authority = input.authority;
