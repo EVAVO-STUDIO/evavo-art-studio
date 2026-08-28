@@ -128,6 +128,8 @@ for (const token of [
   "ANIMATION_SOURCE_OUTPUT_EXISTS",
   "ANIMATION_SOURCE_OUTPUT_LOCKED",
   "ANIMATION_SOURCE_OUTPUT_ATOMIC_REPLACE_UNAVAILABLE",
+  "ANIMATION_SOURCE_OUTPUT_PARENT_CHANGED",
+  "ANIMATION_SOURCE_OUTPUT_PUBLISH_IDENTITY_CHANGED",
   "await link(temporary, destination)",
   "await rename(temporary, destination)",
   "verifyPublished",
@@ -200,6 +202,7 @@ for (const token of [
   "CLI output is create-only unless replacement is explicit",
   "CLI refuses to overwrite control documents or source media",
   "CLI rejects ambiguous and unsafe byte-limit options",
+  "CLI rejects meaningless output-only options before reading control documents",
 ]) {
   requireIncludes(
     cliSafetyTest,

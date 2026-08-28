@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { constants } from "node:fs";
 import {
   lstat,
   link,
@@ -109,6 +110,69 @@ async function ensureOrdinaryDirectoryPath(path) {
     }
   }
   return absolute;
+}
+
+async function observeOrdinaryDirectory(path) {
+  const state = await lstat(path, { bigint: true });
+  if (state.isSymbolicLink() || !state.isDirectory()) {
+    fail(
+      "ANIMATION_SOURCE_OUTPUT_PARENT_INVALID",
+      path,
+    );
+  }
+  return statFingerprint(state);
+}
+
+async function verifyParentAnchor(anchor) {
+  let currentReal;
+  try {
+    currentReal = await realpath(anchor.requestedPath);
+  } catch (error) {
+    fail(
+      "ANIMATION_SOURCE_OUTPUT_PARENT_CHANGED",
+      error instanceof Error ? error.message : anchor.requestedPath,
+    );
+  }
+  if (pathKey(currentReal) !== pathKey(anchor.realPath)) {
+    fail(
+      "ANIMATION_SOURCE_OUTPUT_PARENT_CHANGED",
+      anchor.requestedPath,
+    );
+  }
+  let current;
+  try {
+    current = await observeOrdinaryDirectory(anchor.realPath);
+  } catch (error) {
+    fail(
+      "ANIMATION_SOURCE_OUTPUT_PARENT_CHANGED",
+      error instanceof Error ? error.message : anchor.realPath,
+    );
+  }
+  if (!sameIdentity(anchor.identity, current)) {
+    fail(
+      "ANIMATION_SOURCE_OUTPUT_PARENT_CHANGED",
+      anchor.realPath,
+    );
+  }
+}
+
+async function anchorDestination(path) {
+  const requestedDestination = resolve(path);
+  const requestedParent = await ensureOrdinaryDirectoryPath(
+    dirname(requestedDestination),
+  );
+  const realParent = await realpath(requestedParent);
+  const identity = await observeOrdinaryDirectory(realParent);
+  const anchor = Object.freeze({
+    requestedPath: requestedParent,
+    realPath: realParent,
+    identity,
+  });
+  await verifyParentAnchor(anchor);
+  return Object.freeze({
+    anchor,
+    destination: join(realParent, basename(requestedDestination)),
+  });
 }
 
 async function canonicalCandidate(path) {
@@ -260,25 +324,51 @@ async function writeTemporary(path, bytes) {
 }
 
 async function verifyPublished(destination, bytes) {
-  const state = await lstat(destination, { bigint: true });
+  const pathBefore = await lstat(destination, { bigint: true });
   if (
-    state.isSymbolicLink() ||
-    !state.isFile() ||
-    state.nlink !== 1n
+    pathBefore.isSymbolicLink() ||
+    !pathBefore.isFile() ||
+    pathBefore.nlink !== 1n
   ) {
     fail(
       "ANIMATION_SOURCE_OUTPUT_PUBLISH_VERIFY_FAILED",
       destination,
     );
   }
-  if (state.size !== BigInt(bytes.length)) {
+  if (pathBefore.size !== BigInt(bytes.length)) {
     fail(
       "ANIMATION_SOURCE_OUTPUT_PUBLISH_SIZE_MISMATCH",
       destination,
     );
   }
-  const handle = await open(destination, "r");
+
+  const flags =
+    constants.O_RDONLY |
+    (typeof constants.O_NOFOLLOW === "number"
+      ? constants.O_NOFOLLOW
+      : 0);
+  let handle;
   try {
+    handle = await open(destination, flags);
+  } catch (error) {
+    fail(
+      "ANIMATION_SOURCE_OUTPUT_PUBLISH_OPEN_FAILED",
+      error instanceof Error ? error.message : destination,
+    );
+  }
+
+  try {
+    const before = statFingerprint(pathBefore);
+    const opened = statFingerprint(
+      await handle.stat({ bigint: true }),
+    );
+    if (!sameFingerprint(before, opened)) {
+      fail(
+        "ANIMATION_SOURCE_OUTPUT_PUBLISH_IDENTITY_CHANGED",
+        destination,
+      );
+    }
+
     const buffer = Buffer.alloc(bytes.length);
     let offset = 0;
     while (offset < buffer.length) {
@@ -299,6 +389,22 @@ async function verifyPublished(destination, bytes) {
     if (!buffer.equals(bytes)) {
       fail(
         "ANIMATION_SOURCE_OUTPUT_PUBLISH_BYTES_MISMATCH",
+        destination,
+      );
+    }
+
+    const handleAfter = statFingerprint(
+      await handle.stat({ bigint: true }),
+    );
+    const pathAfter = statFingerprint(
+      await lstat(destination, { bigint: true }),
+    );
+    if (
+      !sameFingerprint(opened, handleAfter) ||
+      !sameFingerprint(opened, pathAfter)
+    ) {
+      fail(
+        "ANIMATION_SOURCE_OUTPUT_PUBLISH_IDENTITY_CHANGED",
         destination,
       );
     }
@@ -332,14 +438,15 @@ export async function writeAnimationSourceJson(
     );
   }
 
-  const destination = resolve(path);
   const maximumBytes = normalizeMaximumBytes(options.maximumBytes);
   const bytes = serialize(value, maximumBytes);
-  await ensureOrdinaryDirectoryPath(dirname(destination));
+  const anchored = await anchorDestination(path);
+  const { anchor, destination } = anchored;
   await assertNoProtectedCollision(
     destination,
     options.protectedPaths ?? [],
   );
+  await verifyParentAnchor(anchor);
 
   const lockPath = `${destination}.lock`;
   const lockHandle = await open(lockPath, "wx", 0o600).catch(
@@ -358,6 +465,7 @@ export async function writeAnimationSourceJson(
     lockFingerprint = statFingerprint(
       await lockHandle.stat({ bigint: true }),
     );
+    await verifyParentAnchor(anchor);
     const existing = await snapshotExistingDestination(destination);
     if (existing && options.replace !== true) {
       fail(
@@ -371,6 +479,7 @@ export async function writeAnimationSourceJson(
     let published = false;
     try {
       temporaryFingerprint = await writeTemporary(temporary, bytes);
+      await verifyParentAnchor(anchor);
 
       const current =
         await snapshotExistingDestination(destination);
@@ -418,7 +527,9 @@ export async function writeAnimationSourceJson(
         published = true;
       }
 
+      await verifyParentAnchor(anchor);
       await verifyPublished(destination, bytes);
+      await verifyParentAnchor(anchor);
       const digest = createHash("sha256")
         .update(bytes)
         .digest("hex");
@@ -441,9 +552,12 @@ export async function writeAnimationSourceJson(
       }
     }
   } finally {
-    await lockHandle.close();
-    if (lockFingerprint) {
-      await removeOwnedPath(lockPath, lockFingerprint);
+    try {
+      await lockHandle.close();
+    } finally {
+      if (lockFingerprint) {
+        await removeOwnedPath(lockPath, lockFingerprint);
+      }
     }
   }
 }

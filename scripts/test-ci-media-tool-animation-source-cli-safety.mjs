@@ -312,3 +312,60 @@ test("CLI rejects ambiguous and unsafe byte-limit options", async () => {
     await rm(value.root, { recursive: true, force: true });
   }
 });
+
+test("CLI rejects meaningless output-only options before reading control documents", () => {
+  const missing = path.join(os.tmpdir(), "evavo-control-does-not-exist.json");
+
+  const unknown = run(["unknown", missing]);
+  assert.notEqual(unknown.status, 0);
+  assert.match(
+    unknown.stderr,
+    /ANIMATION_SOURCE_BUNDLE_COMMAND_UNKNOWN:unknown/u,
+  );
+  assert.doesNotMatch(
+    unknown.stderr,
+    /CONTROL_DOCUMENT_NOT_FOUND/u,
+  );
+
+  const incompleteCompile = run(["compile", missing]);
+  assert.notEqual(incompleteCompile.status, 0);
+  assert.match(
+    incompleteCompile.stderr,
+    /ANIMATION_SOURCE_BUNDLE_COMPILE_REQUIRES_ROOT_AND_OUTPUT/u,
+  );
+  assert.doesNotMatch(
+    incompleteCompile.stderr,
+    /CONTROL_DOCUMENT_NOT_FOUND/u,
+  );
+
+  const replaceWithoutOutput = run([
+    "verify",
+    missing,
+    "--replace-output",
+  ]);
+  assert.notEqual(replaceWithoutOutput.status, 0);
+  assert.match(
+    replaceWithoutOutput.stderr,
+    /ANIMATION_SOURCE_BUNDLE_REPLACE_REQUIRES_OUTPUT/u,
+  );
+  assert.doesNotMatch(
+    replaceWithoutOutput.stderr,
+    /CONTROL_DOCUMENT_NOT_FOUND/u,
+  );
+
+  const limitWithoutOutput = run([
+    "verify",
+    missing,
+    "--max-output-bytes",
+    "1024",
+  ]);
+  assert.notEqual(limitWithoutOutput.status, 0);
+  assert.match(
+    limitWithoutOutput.stderr,
+    /ANIMATION_SOURCE_BUNDLE_MAX_OUTPUT_REQUIRES_OUTPUT/u,
+  );
+  assert.doesNotMatch(
+    limitWithoutOutput.stderr,
+    /CONTROL_DOCUMENT_NOT_FOUND/u,
+  );
+});

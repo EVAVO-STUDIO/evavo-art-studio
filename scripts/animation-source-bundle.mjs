@@ -193,6 +193,11 @@ export async function runAnimationSourceBundleCli(args) {
     return;
   }
 
+  if (command !== "compile" && command !== "verify") {
+    throw new Error(
+      `ANIMATION_SOURCE_BUNDLE_COMMAND_UNKNOWN:${command}`,
+    );
+  }
   if (!subject) {
     throw new Error(
       `ANIMATION_SOURCE_BUNDLE_SUBJECT_REQUIRED:${command}`,
@@ -212,17 +217,36 @@ export async function runAnimationSourceBundleCli(args) {
     MAX_ANIMATION_SOURCE_OUTPUT_BYTES,
     "ANIMATION_SOURCE_BUNDLE_MAX_OUTPUT_BYTES_INVALID",
   );
+  if (command === "compile" && (!options.root || !options.output)) {
+    throw new Error(
+      "ANIMATION_SOURCE_BUNDLE_COMPILE_REQUIRES_ROOT_AND_OUTPUT",
+    );
+  }
+  if (
+    command === "verify" &&
+    options["replace-output"] === true &&
+    !options.output
+  ) {
+    throw new Error(
+      "ANIMATION_SOURCE_BUNDLE_REPLACE_REQUIRES_OUTPUT",
+    );
+  }
+  if (
+    command === "verify" &&
+    options["max-output-bytes"] !== undefined &&
+    !options.output
+  ) {
+    throw new Error(
+      "ANIMATION_SOURCE_BUNDLE_MAX_OUTPUT_REQUIRES_OUTPUT",
+    );
+  }
+
   const control =
     await readAnimationSourceControlDocument(subject, {
       maximumBytes: maximumControlBytes,
     });
 
   if (command === "compile") {
-    if (!options.root || !options.output) {
-      throw new Error(
-        "ANIMATION_SOURCE_BUNDLE_COMPILE_REQUIRES_ROOT_AND_OUTPUT",
-      );
-    }
     const bundle = await compileAnimationSourceBundleStable(
       control.value,
       options.root,
@@ -294,7 +318,7 @@ export async function runAnimationSourceBundleCli(args) {
   }
 
   throw new Error(
-    `ANIMATION_SOURCE_BUNDLE_COMMAND_UNKNOWN:${command}`,
+    `ANIMATION_SOURCE_BUNDLE_COMMAND_UNREACHABLE:${command}`,
   );
 }
 

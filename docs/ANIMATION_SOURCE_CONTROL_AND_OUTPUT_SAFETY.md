@@ -70,6 +70,8 @@ node scripts/animation-source-bundle.mjs verify `
 
 The writer:
 
+- resolves and pins the ordinary parent-directory identity before writing;
+- rechecks that parent identity before and after publication;
 - rejects symbolic-link parents and destinations;
 - rejects hard-linked destinations;
 - refuses to target the request, manifest, or any declared source asset;
@@ -78,6 +80,8 @@ The writer:
 - publishes a new file without overwriting an existing path;
 - uses atomic rename only for an explicitly requested replacement;
 - never performs delete-first replacement;
+- opens the published destination without following links where supported;
+- verifies the published handle and path retain one identity;
 - verifies the published bytes and length;
 - removes temporary and lock files only when their filesystem identity still matches the writer's own file.
 

@@ -262,3 +262,53 @@ test("output destinations reject hard links, linked parents and oversized JSON",
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("generated JSON rejects symbolic destinations, active locks and invalid serialization", async (t) => {
+  const root = await fixture("evavo-output-invalid-");
+  try {
+    const destination = path.join(root, "output.json");
+    const lockPath = `${destination}.lock`;
+    await writeFile(lockPath, "occupied\n", "utf8");
+    await assert.rejects(
+      writeAnimationSourceJson(destination, { blocked: true }),
+      /ANIMATION_SOURCE_OUTPUT_LOCKED/u,
+    );
+    assert.equal(await readFile(lockPath, "utf8"), "occupied\n");
+    await rm(lockPath);
+
+    const circular = {};
+    circular.self = circular;
+    await assert.rejects(
+      writeAnimationSourceJson(destination, circular),
+      /ANIMATION_SOURCE_OUTPUT_JSON_SERIALIZE_FAILED/u,
+    );
+    await assert.rejects(
+      writeAnimationSourceJson(destination, undefined),
+      /ANIMATION_SOURCE_OUTPUT_JSON_SERIALIZE_FAILED/u,
+    );
+    await assert.rejects(
+      writeAnimationSourceJson(destination, { invalid: true }, {
+        replace: "yes",
+      }),
+      /ANIMATION_SOURCE_OUTPUT_REPLACE_INVALID/u,
+    );
+
+    if (process.platform !== "win32") {
+      const target = path.join(root, "target.json");
+      const symbolic = path.join(root, "symbolic.json");
+      await writeFile(target, '{"safe":true}\n', "utf8");
+      await symlink(target, symbolic);
+      await assert.rejects(
+        writeAnimationSourceJson(symbolic, { unsafe: true }, {
+          replace: true,
+        }),
+        /ANIMATION_SOURCE_OUTPUT_DESTINATION_INVALID/u,
+      );
+      assert.equal(await readFile(target, "utf8"), '{"safe":true}\n');
+    } else {
+      t.diagnostic("symbolic destination case is covered on non-Windows hosts");
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
