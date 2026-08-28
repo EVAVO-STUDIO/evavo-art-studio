@@ -87,6 +87,30 @@ test("legacy v2 rejects URL variants, encoded dots, escaped dots and portable ca
   }
 });
 
+test("legacy v2 treats JavaScript comments as token gaps, not scanner bypasses", async () => {
+  const root = await legacyFixture();
+  try {
+    const cases = [
+      ["apps/api/src/commented-named.ts", 'import/*a*/{ readJson }/*b*/from/*c*/"../../../../scripts/lib/animation-source-bundle.mjs";\nvoid readJson;\n'],
+      ["apps/api/src/commented-export.ts", 'export/*a*/{ writeJsonAtomic }/*b*/from/*c*/"../../../../scripts/lib/animation-source-bundle.mjs";\n'],
+      ["apps/api/src/commented-namespace.ts", 'import/*a*/* as bundle/*b*/from/*c*/"../../../../scripts/lib/animation-source-bundle.mjs";\nvoid bundle;\n'],
+      ["tools/commented-dynamic.mjs", 'const bundle = await import/*a*/(/*b*/"../scripts/lib/animation-source-bundle.mjs?legacy=1"/*c*/, { with: { type: "json" } });\nvoid bundle;\n'],
+      ["tools/commented-require.cjs", 'const bundle = require/*a*/(/*b*/"../scripts/lib/animation-source-bundle.mjs#legacy"/*c*/);\nvoid bundle;\n'],
+    ];
+    for (const [trackedPath, content] of cases) {
+      await track(root, trackedPath, content);
+    }
+    const report = await inspectAnimationSourceLegacyUsageV2(root);
+    assert.equal(report.status, "failed");
+    assert.equal(report.violations.length, cases.length);
+    assert.ok(report.violations.some((entry) => entry.accesses.includes("readJson")));
+    assert.ok(report.violations.some((entry) => entry.accesses.includes("writeJsonAtomic")));
+    assert.ok(report.violations.some((entry) => entry.accesses.includes("dynamic-import")));
+  } finally {
+    await removeFixture(root);
+  }
+});
+
 test("legacy v2 rejects namespace, star, default, require and dynamic module access", async () => {
   const root = await legacyFixture();
   try {

@@ -1,16 +1,18 @@
 import { codePointCompare } from "./animation-source-legacy-common-v2.mjs";
 
+const GAP = String.raw`(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*(?:\r?\n|$))*`;
 const MODULE = String.raw`["'][^"']*animation-source-bundle(?:\.|%2e|\\u\{0*2e\}|\\u0*2e|\\x2e)mjs(?:[?#][^"']*)?["']`;
+const IDENTIFIER = String.raw`[A-Za-z_$][\w$]*`;
 const NAMED = new RegExp(
-  String.raw`\b(?:import|export)\s*(?:type\s+)?\{([\s\S]*?)\}\s*from\s*${MODULE}`,
+  String.raw`\b(?:import|export)${GAP}(?:type${GAP})?\{([\s\S]*?)\}${GAP}from${GAP}${MODULE}`,
   "giu",
 );
 const PATTERNS = Object.freeze([
-  [new RegExp(String.raw`\bimport\s*\*\s*as\s*[A-Za-z_$][\w$]*\s*from\s*${MODULE}`, "giu"), "namespace-import"],
-  [new RegExp(String.raw`\bexport\s*\*\s*from\s*${MODULE}`, "giu"), "star-reexport"],
-  [new RegExp(String.raw`\bimport\s*\(\s*${MODULE}(?:\s*,[\s\S]*?)?\s*\)`, "giu"), "dynamic-import"],
-  [new RegExp(String.raw`\brequire\s*\(\s*${MODULE}\s*\)`, "giu"), "require-import"],
-  [new RegExp(String.raw`\bimport\s+(?:type\s+)?(?!\{|\*)[A-Za-z_$][\w$]*(?:\s*,\s*(?:\{[\s\S]*?\}|\*\s*as\s*[A-Za-z_$][\w$]*))?\s*from\s*${MODULE}`, "giu"), "default-import"],
+  [new RegExp(String.raw`\bimport${GAP}\*${GAP}as${GAP}${IDENTIFIER}${GAP}from${GAP}${MODULE}`, "giu"), "namespace-import"],
+  [new RegExp(String.raw`\bexport${GAP}\*${GAP}from${GAP}${MODULE}`, "giu"), "star-reexport"],
+  [new RegExp(String.raw`\bimport${GAP}\(${GAP}${MODULE}(?:${GAP},[\s\S]*?)?${GAP}\)`, "giu"), "dynamic-import"],
+  [new RegExp(String.raw`\brequire${GAP}\(${GAP}${MODULE}${GAP}\)`, "giu"), "require-import"],
+  [new RegExp(String.raw`\bimport${GAP}(?:type${GAP})?(?!\{|\*)${IDENTIFIER}(?:${GAP},${GAP}(?:\{[\s\S]*?\}|\*${GAP}as${GAP}${IDENTIFIER}))?${GAP}from${GAP}${MODULE}`, "giu"), "default-import"],
 ]);
 const HELPERS = Object.freeze(["readJson", "writeJsonAtomic"]);
 const COMMENT = /\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/gu;
