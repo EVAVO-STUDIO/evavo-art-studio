@@ -164,7 +164,7 @@ node scripts/eva-talk-neutral-local-materialization-queue.mjs status `
 
 Status reports pending, claimed, completed, failed and packet-only orphan counts. It also reports lease expiry, heartbeat count and whether worker evidence is present. Status is read-only.
 
-## Validation
+## Focused validation
 
 Run the focused local contract suite from the repository root:
 
@@ -180,9 +180,21 @@ node --check scripts/eva-talk-neutral-local-materialization-queue.mjs
 node scripts/check-eva-talk-neutral-local-materialization-queue.mjs
 node --test scripts/test-eva-talk-neutral-local-materialization-queue.mjs
 node --test scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs
+node --test scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs
 ```
 
-Before any push to `main`, Art Studio's complete local `pnpm check` remains authoritative.
+## Exact-head Windows workstation gate
+
+Before the draft pull request may be considered for `main`, run the repository-owned Windows gate against the exact pull-request head SHA:
+
+```powershell
+pwsh -NoLogo -NoProfile -File scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1 `
+  -ExpectedHeadSha <exact-pr-head-sha>
+```
+
+`Invoke-EvaTalkNeutralLocalQueueValidation.ps1` refuses a dirty tree or a mismatched `ExpectedHeadSha`. It syntax-checks the complete queue surface, runs the static contract checker and focused tests, performs a real local CLI lifecycle exercise, runs the repository-authoritative `pnpm check`, runs `git diff --check`, and confirms validation left the worktree clean.
+
+The script emits one JSON receipt only after every gate passes. It does not call a provider, use GitHub Actions, use Vercel, create candidates, approve art, publish, activate Runtime, deploy, commit or push.
 
 ## Downstream boundary
 
