@@ -10,13 +10,18 @@
     "-File",
     "scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1",
     "-ExpectedHeadSha",
-    "<exact-pr-head-sha>"
+    "<exact-pr-head-sha>",
+    "-ExpectedMainSha",
+    "<exact-origin-main-sha>"
   ],
   "requiredEnvironment": {
     "operatingSystem": "windows",
+    "powershell": "pwsh",
     "node": "22.14.0",
     "pnpm": "10.13.1",
+    "repositoryOrigin": "EVAVO-STUDIO/evavo-art-studio",
     "cleanWorkingTree": true,
+    "originMainPresent": true,
     "networkRequiredByQueueChecks": false,
     "githubActionsRequired": false,
     "vercelRequired": false
@@ -28,8 +33,38 @@
     "concurrentWorkerClaimRace": true,
     "realCliLifecycleExercise": true,
     "completeRepositoryPnpmCheck": true,
-    "gitDiffCheck": true,
+    "toolchainVersionCheck": true,
+    "repositoryIdentityCheck": true,
+    "exactHeadCheck": true,
+    "exactOriginMainCheck": true,
+    "mainAncestorOfHeadCheck": true,
+    "exactChangedFileSetCheck": true,
+    "diffRangeCheck": true,
     "cleanTreeAfterValidation": true
+  },
+  "expectedChangeEvidence": {
+    "changedFileCount": 19,
+    "changedFiles": [
+      ".gitattributes",
+      "config/eva-talk-neutral-local-materialization-campaign-v1.json",
+      "config/eva-talk-neutral-local-materialization-capability-v1.json",
+      "config/eva-talk-neutral-local-materialization-workstation-validation-v1.json",
+      "docs/EVA_TALK_NEUTRAL_LOCAL_MATERIALIZATION_QUEUE.md",
+      "docs/eva-talk-neutral-local-materialization-operator-checklist.md",
+      "scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1",
+      "scripts/check-eva-talk-neutral-local-materialization-queue.mjs",
+      "scripts/eva-talk-neutral-local-materialization-queue.mjs",
+      "scripts/project-art/eva-talk-neutral-local-materialization-queue.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-campaign.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-claims.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-common.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-completion.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-init.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-png.mjs",
+      "scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs",
+      "scripts/test-eva-talk-neutral-local-materialization-queue.mjs",
+      "scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs"
+    ]
   },
   "expectedQueueEvidence": {
     "packetCount": 8,
