@@ -185,16 +185,25 @@ node --test scripts/test-eva-talk-neutral-local-materialization-workstation-vali
 
 ## Exact-head Windows workstation gate
 
-Before the draft pull request may be considered for `main`, run the repository-owned Windows gate against the exact pull-request head SHA:
+The authoritative landing gate must run under `pwsh` on Windows with Node.js `22.14.0` and pnpm `10.13.1`. Fetch `origin/main` before running the gate, then bind both the pull-request head and the fetched mainline SHA:
 
 ```powershell
+git fetch --prune origin main
+$ExpectedHeadSha = (git rev-parse HEAD).Trim()
+$ExpectedMainSha = (git rev-parse refs/remotes/origin/main).Trim()
+
 pwsh -NoLogo -NoProfile -File scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1 `
-  -ExpectedHeadSha <exact-pr-head-sha>
+  -ExpectedHeadSha $ExpectedHeadSha `
+  -ExpectedMainSha $ExpectedMainSha
 ```
 
-`Invoke-EvaTalkNeutralLocalQueueValidation.ps1` refuses a dirty tree or a mismatched `ExpectedHeadSha`. It syntax-checks the complete queue surface, runs the static contract checker and focused tests, performs a real local CLI lifecycle exercise, runs the repository-authoritative `pnpm check`, runs `git diff --check`, and confirms validation left the worktree clean.
+The gate itself performs no network request. It refuses a dirty worktree, a non-Windows host, an unexpected repository origin, a toolchain version mismatch, a mismatched `HEAD`, a stale or mismatched `origin/main`, or a head that does not contain expected main as an ancestor.
 
-The script emits one JSON receipt only after every gate passes. It does not call a provider, use GitHub Actions, use Vercel, create candidates, approve art, publish, activate Runtime, deploy, commit or push.
+It also requires the exact declared 19-file pull-request change set, runs `git diff --check <main>..<head>`, syntax-checks the complete queue surface, runs the static contract checker and focused tests, performs a real local CLI lifecycle exercise, runs the repository-authoritative `pnpm check`, repeats the range diff check, and proves validation left the refs and worktree unchanged.
+
+Standard output contains the final compressed JSON receipt only. Native validation diagnostics are written to standard error. A successful receipt binds `headSha`, `mainSha`, the exact changed-file inventory, toolchain versions and closed authority.
+
+The gate does not call a provider, use GitHub Actions, use Vercel, create candidates, approve art, publish, activate Runtime, deploy, commit or push.
 
 ## Downstream boundary
 
