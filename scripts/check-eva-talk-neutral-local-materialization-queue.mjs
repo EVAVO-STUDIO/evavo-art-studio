@@ -11,18 +11,33 @@ import {
 } from './project-art/eva-talk-neutral-local-materialization-queue.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const capabilityPath = path.join(
-  root,
-  'config/eva-talk-neutral-local-materialization-capability-v1.json',
-);
-const campaignPath = path.join(
-  root,
+const capabilityPath =
+  'config/eva-talk-neutral-local-materialization-capability-v1.json';
+const campaignPath =
+  'config/eva-talk-neutral-local-materialization-campaign-v1.json';
+const workstationValidationPath =
+  'config/eva-talk-neutral-local-materialization-workstation-validation-v1.json';
+const EXPECTED_CHANGED_FILES = Object.freeze([
+  '.gitattributes',
   'config/eva-talk-neutral-local-materialization-campaign-v1.json',
-);
-const workstationValidationPath = path.join(
-  root,
+  'config/eva-talk-neutral-local-materialization-capability-v1.json',
   'config/eva-talk-neutral-local-materialization-workstation-validation-v1.json',
-);
+  'docs/EVA_TALK_NEUTRAL_LOCAL_MATERIALIZATION_QUEUE.md',
+  'docs/eva-talk-neutral-local-materialization-operator-checklist.md',
+  'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
+  'scripts/check-eva-talk-neutral-local-materialization-queue.mjs',
+  'scripts/eva-talk-neutral-local-materialization-queue.mjs',
+  'scripts/project-art/eva-talk-neutral-local-materialization-queue.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-campaign.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-claims.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-common.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-completion.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-init.mjs',
+  'scripts/project-art/eva-talk-neutral-local-queue-png.mjs',
+  'scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs',
+  'scripts/test-eva-talk-neutral-local-materialization-queue.mjs',
+  'scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs',
+]);
 
 function readOrdinary(relative) {
   const target = path.join(root, ...relative.split('/'));
@@ -33,13 +48,29 @@ function readOrdinary(relative) {
   );
   const source = fs.readFileSync(target, 'utf8');
   assert.ok(
-    source.length > 0 && !source.includes('\r') && source.charCodeAt(0) !== 0xfeff,
+    source.length > 0 &&
+      !source.includes('\r') &&
+      source.charCodeAt(0) !== 0xfeff,
     `${relative} must be nonempty LF text without BOM`,
   );
   return source;
 }
 
-const capability = JSON.parse(fs.readFileSync(capabilityPath, 'utf8'));
+function readJson(relative) {
+  return JSON.parse(readOrdinary(relative));
+}
+
+function allFalse(record) {
+  return (
+    record &&
+    typeof record === 'object' &&
+    !Array.isArray(record) &&
+    Object.values(record).length > 0 &&
+    Object.values(record).every((value) => value === false)
+  );
+}
+
+const capability = readJson(capabilityPath);
 assert.equal(
   capability.schema,
   'evavo.project-art-eva-talk-neutral-local-materialization-capability.v1',
@@ -49,7 +80,7 @@ assert.equal(capability.characterId, 'eva-female');
 assert.equal(capability.clipId, 'talk-neutral');
 assert.equal(
   capability.workstationValidation,
-  'config/eva-talk-neutral-local-materialization-workstation-validation-v1.json',
+  workstationValidationPath,
 );
 assert.deepEqual(capability.queue, {
   batchCount: 8,
@@ -83,15 +114,19 @@ assert.deepEqual(capability.outputAdmission, {
   uniqueOutputBodiesRequired: true,
   manifestPreparedFromClaimOutputs: true,
 });
-assert.equal(capability.execution.localFilesystemOnly, true);
-assert.equal(capability.execution.zeroCost, true);
-assert.equal(capability.execution.providerExecutionIncluded, false);
-assert.equal(capability.execution.networkAccessIncluded, false);
-assert.equal(capability.execution.hostedCiRequired, false);
-assert.equal(capability.execution.vercelRequired, false);
-assert.ok(Object.values(capability.authority).every((value) => value === false));
+assert.deepEqual(capability.execution, {
+  localFilesystemOnly: true,
+  zeroCost: true,
+  providerCredentialsIncluded: false,
+  providerExecutionIncluded: false,
+  networkAccessIncluded: false,
+  hostedCiRequired: false,
+  vercelRequired: false,
+});
+assert.equal(allFalse(capability.authority), true);
 
 const requiredFiles = [
+  '.gitattributes',
   capability.campaign,
   capability.implementation,
   ...capability.modules,
@@ -105,18 +140,14 @@ const requiredFiles = [
 assert.equal(new Set(requiredFiles).size, requiredFiles.length);
 for (const relative of requiredFiles) readOrdinary(relative);
 
-const campaign = parseEvaTalkNeutralLocalCampaign(
-  JSON.parse(fs.readFileSync(campaignPath, 'utf8')),
-);
+const campaign = parseEvaTalkNeutralLocalCampaign(readJson(campaignPath));
 assert.equal(campaign.candidateProgram.batchCount, 8);
 assert.equal(campaign.candidateProgram.imagesPerBatch, 10);
 assert.equal(campaign.candidateProgram.candidateCount, 80);
 assert.equal(campaign.candidateProgram.selectionTargetFrameCount, 36);
-assert.ok(Object.values(campaign.authority).every((value) => value === false));
+assert.equal(allFalse(campaign.authority), true);
 
-const workstationValidation = JSON.parse(
-  fs.readFileSync(workstationValidationPath, 'utf8'),
-);
+const workstationValidation = readJson(workstationValidationPath);
 assert.equal(
   workstationValidation.schema,
   'evavo.project-art-eva-talk-neutral-local-materialization-workstation-validation.v1',
@@ -141,12 +172,17 @@ assert.deepEqual(workstationValidation.command, [
   'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
   '-ExpectedHeadSha',
   '<exact-pr-head-sha>',
+  '-ExpectedMainSha',
+  '<exact-origin-main-sha>',
 ]);
 assert.deepEqual(workstationValidation.requiredEnvironment, {
   operatingSystem: 'windows',
+  powershell: 'pwsh',
   node: '22.14.0',
   pnpm: '10.13.1',
+  repositoryOrigin: 'EVAVO-STUDIO/evavo-art-studio',
   cleanWorkingTree: true,
+  originMainPresent: true,
   networkRequiredByQueueChecks: false,
   githubActionsRequired: false,
   vercelRequired: false,
@@ -158,8 +194,18 @@ assert.deepEqual(workstationValidation.validation, {
   concurrentWorkerClaimRace: true,
   realCliLifecycleExercise: true,
   completeRepositoryPnpmCheck: true,
-  gitDiffCheck: true,
+  toolchainVersionCheck: true,
+  repositoryIdentityCheck: true,
+  exactHeadCheck: true,
+  exactOriginMainCheck: true,
+  mainAncestorOfHeadCheck: true,
+  exactChangedFileSetCheck: true,
+  diffRangeCheck: true,
   cleanTreeAfterValidation: true,
+});
+assert.deepEqual(workstationValidation.expectedChangeEvidence, {
+  changedFileCount: EXPECTED_CHANGED_FILES.length,
+  changedFiles: EXPECTED_CHANGED_FILES,
 });
 assert.deepEqual(workstationValidation.expectedQueueEvidence, {
   packetCount: 8,
@@ -169,23 +215,43 @@ assert.deepEqual(workstationValidation.expectedQueueEvidence, {
   campaignSha256:
     'e6c4c23eac5d5e6074e334599f19da53ca6a56073857dcd9fc6443ab1f065d74',
 });
-assert.ok(
-  Object.values(workstationValidation.authority).every(
-    (value) => value === false,
-  ),
-);
+assert.equal(allFalse(workstationValidation.authority), true);
+
+const attributes = readOrdinary('.gitattributes');
+for (const required of [
+  'config/eva-talk-neutral-local-materialization-*.json text eol=lf',
+  'scripts/project-art/eva-talk-neutral-local-*.mjs text eol=lf',
+  'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1 text eol=lf',
+  'scripts/test-eva-talk-neutral-local-materialization-*.mjs text eol=lf',
+]) {
+  assert.ok(attributes.includes(required), `.gitattributes is missing ${required}`);
+}
 
 const workstationScript = readOrdinary(
   'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
 );
 for (const required of [
+  '[Parameter(Mandatory = $true)]',
   '$ExpectedHeadSha',
-  "& $Git 'rev-parse' 'HEAD'",
-  "@('check')",
-  "@('diff', '--check')",
+  '$ExpectedMainSha',
+  '$IsWindows',
+  "$ExpectedNodeVersion = 'v22.14.0'",
+  "$ExpectedPnpmVersion = '10.13.1'",
+  "$ExpectedRepository = 'EVAVO-STUDIO/evavo-art-studio'",
+  "'refs/remotes/origin/main'",
+  "'merge-base'",
+  "'--is-ancestor'",
+  "'--name-only'",
+  "'--diff-filter=ACMRD'",
+  '$ExpectedChangedFiles',
   "'scripts/check-eva-talk-neutral-local-materialization-queue.mjs'",
   "'scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs'",
+  "'diff'",
+  "'--check'",
+  '$DiffRange',
   'repositoryCleanAfterValidation = $true',
+  'expectedMainSha = $ExpectedMainSha',
+  'changedFileCount = $FinalState.changedFiles.Count',
 ]) {
   assert.ok(
     workstationScript.includes(required),
@@ -195,11 +261,13 @@ for (const required of [
 for (const forbidden of [
   'Invoke-WebRequest',
   'Invoke-RestMethod',
+  'Start-Process',
   'git push',
   'git commit',
   'gh workflow',
   'vercel deploy',
   'force-with-lease',
+  'fetch origin',
 ]) {
   assert.equal(
     workstationScript.toLowerCase().includes(forbidden.toLowerCase()),
@@ -277,7 +345,7 @@ console.log(
   '- completion requires ten exact unique 1024x1536 RGBA PNG bodies and a deterministic output manifest',
 );
 console.log(
-  '- exact-head Windows validation runs focused checks, complete pnpm check, diff check and clean-tree verification',
+  '- Windows release validation binds exact HEAD, exact origin/main, ancestry, toolchain, changed files and diff range',
 );
 console.log(
   '- provider, network, approval, publication, Runtime, website, deployment and Git authority remain false',
