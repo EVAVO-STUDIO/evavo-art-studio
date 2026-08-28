@@ -64,6 +64,29 @@ test("legacy v2 does not treat a production test-prefixed filename as a test bou
   }
 });
 
+test("legacy v2 rejects URL variants, encoded dots, escaped dots and portable case variants", async () => {
+  const root = await legacyFixture();
+  try {
+    const cases = [
+      ["apps/api/src/query.ts", 'import { readJson } from "../../../../scripts/lib/animation-source-bundle.mjs?legacy=1";\nvoid readJson;\n'],
+      ["apps/api/src/fragment.ts", 'import { readJson } from "../../../../scripts/lib/animation-source-bundle.mjs#legacy";\nvoid readJson;\n'],
+      ["apps/api/src/percent.ts", 'import { readJson } from "../../../../scripts/lib/animation-source-bundle%2Emjs";\nvoid readJson;\n'],
+      ["apps/api/src/unicode.ts", 'import { readJson } from "../../../../scripts/lib/animation-source-bundle\\u002emjs";\nvoid readJson;\n'],
+      ["apps/api/src/hex.ts", 'import { readJson } from "../../../../scripts/lib/animation-source-bundle\\x2emjs";\nvoid readJson;\n'],
+      ["apps/api/src/case.ts", 'import type { readJson } from "../../../../scripts/lib/Animation-Source-Bundle.mjs";\n'],
+    ];
+    for (const [trackedPath, content] of cases) {
+      await track(root, trackedPath, content);
+    }
+    const report = await inspectAnimationSourceLegacyUsageV2(root);
+    assert.equal(report.status, "failed");
+    assert.equal(report.violations.length, cases.length);
+    assert.ok(report.violations.every((entry) => entry.accesses.includes("readJson")));
+  } finally {
+    await removeFixture(root);
+  }
+});
+
 test("legacy v2 rejects namespace, star, default, require and dynamic module access", async () => {
   const root = await legacyFixture();
   try {
@@ -71,8 +94,8 @@ test("legacy v2 rejects namespace, star, default, require and dynamic module acc
       ["apps/api/src/namespace.ts", 'import * as bundle from "../../../../scripts/lib/animation-source-bundle.mjs";\nvoid bundle;\n'],
       ["apps/api/src/default.ts", 'import bundle from "../../../../scripts/lib/animation-source-bundle.mjs";\nvoid bundle;\n'],
       ["packages/example/src/star.ts", 'export * from "../../../../scripts/lib/animation-source-bundle.mjs";\n'],
-      ["tools/dynamic.mjs", 'const bundle = await import("../scripts/lib/animation-source-bundle.mjs");\nvoid bundle;\n'],
-      ["tools/require.cjs", 'const bundle = require("../scripts/lib/animation-source-bundle.mjs");\nvoid bundle;\n'],
+      ["tools/dynamic.mjs", 'const bundle = await import("../scripts/lib/animation-source-bundle.mjs?legacy=1", { with: { type: "json" } });\nvoid bundle;\n'],
+      ["tools/require.cjs", 'const bundle = require("../scripts/lib/animation-source-bundle.mjs#legacy");\nvoid bundle;\n'],
     ];
     for (const [trackedPath, content] of cases) await track(root, trackedPath, content);
     const report = await inspectAnimationSourceLegacyUsageV2(root);
