@@ -131,3 +131,16 @@ node --test scripts/test-ci-media-tool-animation-source-control-boundary.mjs
 node scripts/check-animation-source-bundle.mjs
 pnpm run animation-source:check
 ```
+
+## Legacy compatibility boundary
+
+The canonical bundle library retains `readJson` and `writeJsonAtomic` only as a narrow compatibility surface for the historical regression contract. New production code must use `readAnimationSourceControlDocument` and `writeAnimationSourceJson`.
+
+The local governance check enumerates Git-tracked JavaScript and TypeScript files and rejects production code that references a legacy helper through `animation-source-bundle.mjs`. Test files may retain compatibility coverage, but production scripts, apps, packages and tools cannot make the old helpers authoritative again.
+
+```powershell
+node --test scripts/test-ci-media-tool-animation-source-legacy-boundary.mjs
+node scripts/check-animation-source-bundle.mjs
+```
+
+The scan is local, bounded, strict-UTF-8, tracked-file-only and rejects symbolic code files. It neither executes providers nor requires GitHub Actions or Vercel.

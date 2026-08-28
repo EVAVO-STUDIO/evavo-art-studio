@@ -3,14 +3,20 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   ANIMATION_SOURCE_BUNDLE_SCHEMA_SHA256,
   assertAnimationSourceBundle,
 } from "./lib/animation-source-bundle.mjs";
+import {
+  assertAnimationSourceLegacyUsage,
+} from "./lib/animation-source-legacy-boundary.mjs";
 
 const failures = [];
-const read = (path) => readFile(resolve(path), "utf8");
+const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+const read = (path) =>
+  readFile(resolve(repositoryRoot, path), "utf8");
 
 function requireCondition(condition, message) {
   if (!condition) failures.push(message);
@@ -33,10 +39,12 @@ const [
   stableObservation,
   controlDocument,
   outputWriter,
+  legacyBoundary,
   cli,
   stableTest,
   controlBoundaryTest,
   cliSafetyTest,
+  legacyBoundaryTest,
   documentation,
   safetyDocumentation,
 ] = await Promise.all([
@@ -49,10 +57,12 @@ const [
   read("scripts/lib/animation-source-stable-observation.mjs"),
   read("scripts/lib/animation-source-control-document.mjs"),
   read("scripts/lib/animation-source-output.mjs"),
+  read("scripts/lib/animation-source-legacy-boundary.mjs"),
   read("scripts/animation-source-bundle.mjs"),
   read("scripts/test-ci-media-tool-animation-source-stable-observation.mjs"),
   read("scripts/test-ci-media-tool-animation-source-control-boundary.mjs"),
   read("scripts/test-ci-media-tool-animation-source-cli-safety.mjs"),
+  read("scripts/test-ci-media-tool-animation-source-legacy-boundary.mjs"),
   read("docs/ANIMATION_SOURCE_BUNDLE.md"),
   read("docs/ANIMATION_SOURCE_CONTROL_AND_OUTPUT_SAFETY.md"),
 ]);
@@ -142,6 +152,32 @@ requireCondition(
 );
 
 for (const token of [
+  "ANIMATION_SOURCE_LEGACY_PRODUCTION_USAGE_FORBIDDEN",
+  "git",
+  "ls-files",
+  "trackedFileCount",
+  "githubActionsRequired: false",
+  "vercelRequired: false",
+]) {
+  requireIncludes(legacyBoundary, token, "legacy compatibility boundary");
+}
+
+try {
+  const legacyUsage =
+    await assertAnimationSourceLegacyUsage(repositoryRoot);
+  requireCondition(
+    legacyUsage.status === "passed",
+    "legacy compatibility boundary did not pass",
+  );
+} catch (error) {
+  failures.push(
+    `legacy compatibility boundary failed: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+  );
+}
+
+for (const token of [
   'commands: ["compile", "verify", "manifest"]',
   "compileAnimationSourceBundleStable",
   "verifyAnimationSourceBundleFilesStable",
@@ -212,6 +248,20 @@ for (const token of [
 }
 
 for (const token of [
+  "legacy JSON helpers remain compatible only inside non-production boundaries",
+  "production named imports and re-exports of legacy helpers fail closed",
+  "namespace and dynamic legacy access cannot bypass the production scan",
+  "untracked files are outside repository authority",
+  "tracked symbolic code files fail instead of being followed",
+]) {
+  requireIncludes(
+    legacyBoundaryTest,
+    token,
+    "legacy compatibility regression",
+  );
+}
+
+for (const token of [
   "Animation Source Bundle",
   "node scripts/animation-source-bundle.mjs compile",
   "node scripts/animation-source-bundle.mjs verify",
@@ -247,6 +297,7 @@ for (const source of [
   stableObservation,
   controlDocument,
   outputWriter,
+  legacyBoundary,
   cli,
 ]) {
   for (const forbidden of [

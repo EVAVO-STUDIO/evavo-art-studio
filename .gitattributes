@@ -40,3 +40,5 @@ scripts/test-ci-media-tool-animation-source-cli-safety.mjs text eol=lf
 docs/ANIMATION_SOURCE_BUNDLE.md text eol=lf
 docs/ANIMATION_SOURCE_CONTROL_AND_OUTPUT_SAFETY.md text eol=lf
 AGENTS.md text eol=lf
+scripts/lib/animation-source-legacy-boundary.mjs text eol=lf
+scripts/test-ci-media-tool-animation-source-legacy-boundary.mjs text eol=lf
