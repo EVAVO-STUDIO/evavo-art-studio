@@ -72,14 +72,19 @@
 
 ## Repository validation before main
 
-- [ ] Fetch the exact pull-request head and confirm the worktree is clean.
-- [ ] Record the 40-character pull-request head SHA.
-- [ ] Run `pwsh -NoLogo -NoProfile -File scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1 -ExpectedHeadSha <exact-pr-head-sha>`.
-- [ ] Confirm `Invoke-EvaTalkNeutralLocalQueueValidation.ps1` returns JSON with `ok=true` and the exact `ExpectedHeadSha`.
-- [ ] Confirm all syntax checks, focused tests, the concurrent claim race and the real CLI lifecycle exercise passed.
+- [ ] Use the governed Windows workstation with `pwsh`, Node.js `22.14.0` and pnpm `10.13.1`.
+- [ ] Confirm `origin` resolves to `EVAVO-STUDIO/evavo-art-studio`.
+- [ ] Fetch the latest `origin/main` before validation.
+- [ ] Confirm the worktree is clean.
+- [ ] Record the exact 40-character pull-request head SHA as `ExpectedHeadSha`.
+- [ ] Record `refs/remotes/origin/main` as `ExpectedMainSha`.
+- [ ] Run `pwsh -NoLogo -NoProfile -File scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1 -ExpectedHeadSha <exact-pr-head-sha> -ExpectedMainSha <exact-origin-main-sha>`.
+- [ ] Confirm the JSON receipt has `ok=true`, the exact `headSha`, the exact `mainSha`, and `changedFileCount=19`.
+- [ ] Confirm expected main is an ancestor of the exact head and the branch is at least one commit ahead.
+- [ ] Confirm the receipt contains the complete expected changed-file inventory with no additions or omissions.
+- [ ] Confirm all 12 syntax checks, focused tests, the concurrent claim race and the real CLI lifecycle exercise passed.
 - [ ] Confirm the repository-authoritative complete local `pnpm check` passed.
-- [ ] Confirm `git diff --check` passed.
-- [ ] Confirm validation left no generated files or worktree changes.
-- [ ] Re-fetch latest `main` immediately before landing.
-- [ ] Confirm the branch is not behind `main` and the changed-file set is still expected.
+- [ ] Confirm `git diff --check <main>..<head>` passed before and after validation.
+- [ ] Confirm validation left `HEAD`, `origin/main` and the worktree unchanged.
+- [ ] Re-read PR #350 immediately before landing and confirm the exact validated head is still current.
 - [ ] Merge without force push or history rewrite.
