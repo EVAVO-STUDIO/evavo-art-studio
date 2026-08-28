@@ -19,6 +19,10 @@ const campaignPath = path.join(
   root,
   'config/eva-talk-neutral-local-materialization-campaign-v1.json',
 );
+const workstationValidationPath = path.join(
+  root,
+  'config/eva-talk-neutral-local-materialization-workstation-validation-v1.json',
+);
 
 function readOrdinary(relative) {
   const target = path.join(root, ...relative.split('/'));
@@ -29,8 +33,8 @@ function readOrdinary(relative) {
   );
   const source = fs.readFileSync(target, 'utf8');
   assert.ok(
-    source.length > 0 && !source.includes('\r'),
-    `${relative} must be nonempty LF text`,
+    source.length > 0 && !source.includes('\r') && source.charCodeAt(0) !== 0xfeff,
+    `${relative} must be nonempty LF text without BOM`,
   );
   return source;
 }
@@ -43,6 +47,10 @@ assert.equal(
 assert.equal(capability.protocolVersion, EVA_TALK_NEUTRAL_LOCAL_PROTOCOL_VERSION);
 assert.equal(capability.characterId, 'eva-female');
 assert.equal(capability.clipId, 'talk-neutral');
+assert.equal(
+  capability.workstationValidation,
+  'config/eva-talk-neutral-local-materialization-workstation-validation-v1.json',
+);
 assert.deepEqual(capability.queue, {
   batchCount: 8,
   imagesPerBatch: 10,
@@ -91,6 +99,8 @@ const requiredFiles = [
   capability.checker,
   ...capability.tests,
   ...capability.documentation,
+  capability.workstationValidation,
+  'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
 ];
 assert.equal(new Set(requiredFiles).size, requiredFiles.length);
 for (const relative of requiredFiles) readOrdinary(relative);
@@ -103,6 +113,100 @@ assert.equal(campaign.candidateProgram.imagesPerBatch, 10);
 assert.equal(campaign.candidateProgram.candidateCount, 80);
 assert.equal(campaign.candidateProgram.selectionTargetFrameCount, 36);
 assert.ok(Object.values(campaign.authority).every((value) => value === false));
+
+const workstationValidation = JSON.parse(
+  fs.readFileSync(workstationValidationPath, 'utf8'),
+);
+assert.equal(
+  workstationValidation.schema,
+  'evavo.project-art-eva-talk-neutral-local-materialization-workstation-validation.v1',
+);
+assert.equal(
+  workstationValidation.protocolVersion,
+  EVA_TALK_NEUTRAL_LOCAL_PROTOCOL_VERSION,
+);
+assert.equal(
+  workstationValidation.status,
+  'available-not-executed-by-repository-state',
+);
+assert.equal(
+  workstationValidation.script,
+  'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
+);
+assert.deepEqual(workstationValidation.command, [
+  'pwsh',
+  '-NoLogo',
+  '-NoProfile',
+  '-File',
+  'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
+  '-ExpectedHeadSha',
+  '<exact-pr-head-sha>',
+]);
+assert.deepEqual(workstationValidation.requiredEnvironment, {
+  operatingSystem: 'windows',
+  node: '22.14.0',
+  pnpm: '10.13.1',
+  cleanWorkingTree: true,
+  networkRequiredByQueueChecks: false,
+  githubActionsRequired: false,
+  vercelRequired: false,
+});
+assert.deepEqual(workstationValidation.validation, {
+  syntaxChecks: 12,
+  staticContractCheck: true,
+  focusedNodeTests: true,
+  concurrentWorkerClaimRace: true,
+  realCliLifecycleExercise: true,
+  completeRepositoryPnpmCheck: true,
+  gitDiffCheck: true,
+  cleanTreeAfterValidation: true,
+});
+assert.deepEqual(workstationValidation.expectedQueueEvidence, {
+  packetCount: 8,
+  imagesPerPacket: 10,
+  candidateCount: 80,
+  semanticSelectionTargetFrameCount: 36,
+  campaignSha256:
+    'e6c4c23eac5d5e6074e334599f19da53ca6a56073857dcd9fc6443ab1f065d74',
+});
+assert.ok(
+  Object.values(workstationValidation.authority).every(
+    (value) => value === false,
+  ),
+);
+
+const workstationScript = readOrdinary(
+  'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
+);
+for (const required of [
+  '$ExpectedHeadSha',
+  "& $Git 'rev-parse' 'HEAD'",
+  "@('check')",
+  "@('diff', '--check')",
+  "'scripts/check-eva-talk-neutral-local-materialization-queue.mjs'",
+  "'scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs'",
+  'repositoryCleanAfterValidation = $true',
+]) {
+  assert.ok(
+    workstationScript.includes(required),
+    `workstation script is missing ${required}`,
+  );
+}
+for (const forbidden of [
+  'Invoke-WebRequest',
+  'Invoke-RestMethod',
+  'git push',
+  'git commit',
+  'gh workflow',
+  'vercel deploy',
+  'force-with-lease',
+]) {
+  assert.equal(
+    workstationScript.toLowerCase().includes(forbidden.toLowerCase()),
+    false,
+    `workstation script retained forbidden token ${forbidden}`,
+  );
+}
 
 const runtimeCapabilities = evaTalkNeutralLocalQueueCapabilities();
 assert.equal(runtimeCapabilities.protocolVersion, capability.protocolVersion);
@@ -171,6 +275,9 @@ console.log(
 );
 console.log(
   '- completion requires ten exact unique 1024x1536 RGBA PNG bodies and a deterministic output manifest',
+);
+console.log(
+  '- exact-head Windows validation runs focused checks, complete pnpm check, diff check and clean-tree verification',
 );
 console.log(
   '- provider, network, approval, publication, Runtime, website, deployment and Git authority remain false',
