@@ -51,6 +51,19 @@ test("legacy v2 rejects named imports and re-exports", async () => {
   }
 });
 
+test("legacy v2 does not treat a production test-prefixed filename as a test boundary", async () => {
+  const root = await legacyFixture();
+  try {
+    await track(root, "apps/api/src/test-runtime.ts",
+      'import { readJson } from "../../../../scripts/lib/animation-source-bundle.mjs";\nvoid readJson;\n');
+    const report = await inspectAnimationSourceLegacyUsageV2(root);
+    assert.equal(report.status, "failed");
+    assert.equal(report.violations[0].trackedPath, "apps/api/src/test-runtime.ts");
+  } finally {
+    await removeFixture(root);
+  }
+});
+
 test("legacy v2 rejects namespace, star, default, require and dynamic module access", async () => {
   const root = await legacyFixture();
   try {

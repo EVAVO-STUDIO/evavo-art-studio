@@ -78,7 +78,10 @@ export function isNonProductionPath(value) {
   return value === "scripts/lib/animation-source-bundle.mjs" ||
     value === "scripts/check-animation-source-bundle.mjs" ||
     value.startsWith("scripts/lib/animation-source-legacy-") ||
-    name.startsWith("test-") ||
+    value.startsWith("scripts/test-") ||
+    value.startsWith("scripts/test_") ||
+    value.startsWith("test/") ||
+    value.startsWith("tests/") ||
     name.includes(".test.") ||
     name.includes(".spec.") ||
     value.includes("/test/") ||
