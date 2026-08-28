@@ -1,0 +1,75 @@
+{
+  "schema": "evavo.project-art-eva-talk-neutral-local-materialization-campaign.v1",
+  "protocolVersion": "2026-08-28.1",
+  "campaignId": "eva-talk-neutral-local-campaign-20260828-v1",
+  "createdAt": "2026-08-28T00:00:00.000Z",
+  "characterId": "eva-female",
+  "clipId": "talk-neutral",
+  "sourcePlan": {
+    "schema": "evavo.project-art-avatar-animation-suite-plan.v3",
+    "repository": "EVAVO-STUDIO/evavo-art-studio",
+    "path": "scripts/project-art/avatar-animation-suite.mjs",
+    "clipId": "talk-neutral",
+    "targetFrameCount": 36
+  },
+  "candidateProgram": {
+    "batchCount": 8,
+    "imagesPerBatch": 10,
+    "candidateCount": 80,
+    "selectionTargetFrameCount": 36
+  },
+  "canvas": {
+    "width": 1024,
+    "height": 1536,
+    "format": "png",
+    "alpha": "rgba8-straight"
+  },
+  "references": {
+    "canonicalIdentityRequired": true,
+    "animationIdentityMasterRequired": true,
+    "previousApprovedFrameRequiredAfterFirstSlot": true,
+    "contactSheetAsSourceForbidden": true,
+    "sourceBytesEmbeddedInQueue": false
+  },
+  "promptContract": {
+    "oneImagePerSlot": true,
+    "contactSheetForbidden": true,
+    "spriteSheetForbidden": true,
+    "nativeTransparencyPreferred": true,
+    "paintedCheckerboardForbidden": true,
+    "cameraLocked": true,
+    "cropLocked": true,
+    "scaleLocked": true,
+    "floorPositionLocked": true,
+    "identityLocked": true,
+    "anatomyLocked": true,
+    "independentFrameRedesignForbidden": true,
+    "localWorkerOnly": true
+  },
+  "reviewBoundary": {
+    "outputsRemainUnapprovedCandidates": true,
+    "semanticOrderingRequiresSeparateReview": true,
+    "continuityReviewRequired": true,
+    "alphaMasteringRequired": true,
+    "technicalInspectionRequired": true,
+    "creativeApprovalRequired": true,
+    "runtimeReceiptRequired": true
+  },
+  "authority": {
+    "networkAccess": false,
+    "providerExecution": false,
+    "paidExecution": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "sourceMutation": false,
+    "repositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "websiteActivation": false,
+    "deployment": false,
+    "forcePush": false
+  },
+  "campaignSha256": "50722fe7a97eddeaac894122bb2995cddef9737074ebf6ab82ddb64bdb675f5b"
+}
