@@ -1,0 +1,29 @@
+{
+  "schema": "evavo.animation-source-contract-lock.v1",
+  "contractSchema": "evavo.animation-source-bundle.v1",
+  "schemaSha256": "sha256:b8e355066d1f937acf7d3e60998b38d8a133fcaf719e5f760efc206cbf01bedd",
+  "contractSetDigest": "sha256:25494dbbf6a511850dd3b43b818cde01e36654666d3672bd8d08d8eb291e8f0b",
+  "files": [
+    {
+      "path": "contracts/animation-source-bundle-v1.schema.json",
+      "gitBlobSha1": "e40479179fcba48256c579099b3edbbe5a68fa2a"
+    },
+    {
+      "path": "contracts/fixtures/animation-source-bundle-v1.json",
+      "gitBlobSha1": "fb282fb8c3fe6cca9219ceda3896105c46c6373a"
+    },
+    {
+      "path": "scripts/lib/animation-source-bundle.mjs",
+      "gitBlobSha1": "74a0685783e7d1259bc1e63aa1a6ae7af8b28d23"
+    }
+  ],
+  "peerRepositories": [
+    "evavo-art-studio",
+    "cel-animation-studio"
+  ],
+  "authority": {
+    "networkRequired": false,
+    "automaticRewrite": false,
+    "repositoryMutation": false
+  }
+}
