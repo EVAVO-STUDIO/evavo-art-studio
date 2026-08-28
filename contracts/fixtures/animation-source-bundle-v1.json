@@ -1,0 +1,84 @@
+{
+  "schema": "evavo.animation-source-bundle.v1",
+  "bundleId": "hero-walk-right-source-v1",
+  "createdAt": "2026-08-28T00:00:00.000Z",
+  "producer": {
+    "studio": "evavo-art-studio",
+    "version": "0.1.0",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "project": {
+    "projectId": "fixture-project",
+    "sceneId": "scene-001",
+    "shotId": "shot-010"
+  },
+  "timeline": {
+    "framesPerSecond": {
+      "numerator": 24,
+      "denominator": 1
+    },
+    "startFrame": 1,
+    "endFrame": 2,
+    "frameCount": 2,
+    "cadence": "twos",
+    "loopMode": "seamless"
+  },
+  "canvas": {
+    "width": 2,
+    "height": 2,
+    "pixelAspectRatio": {
+      "numerator": 1,
+      "denominator": 1
+    },
+    "colourSpace": "sRGB",
+    "alphaMode": "straight"
+  },
+  "creativeIntentSha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "continuitySha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "assets": [
+    {
+      "assetId": "hero-key-0001",
+      "role": "key-pose",
+      "relativePath": "frames/hero-key-0001.png",
+      "mediaType": "image/png",
+      "byteLength": 77,
+      "sha256": "sha256:5331b957ef1f272fa51d16e8d6d844a4db5767975fb2ce987544594b2d96744f",
+      "width": 2,
+      "height": 2,
+      "frameNumber": 1,
+      "layerId": "hero",
+      "sourceArtifactId": "artifact_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "assetId": "hero-key-0002",
+      "role": "key-pose",
+      "relativePath": "frames/hero-key-0002.png",
+      "mediaType": "image/png",
+      "byteLength": 68,
+      "sha256": "sha256:980055f32603462384baae4a3dbfa580f0579627bb98c190f84443a047126613",
+      "width": 2,
+      "height": 2,
+      "frameNumber": 2,
+      "layerId": "hero",
+      "sourceArtifactId": "artifact_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "authority": {
+    "candidateOnly": true,
+    "providerExecution": false,
+    "renderExecution": false,
+    "xSheetAuthority": "cel-animation-studio",
+    "creativeApprovalIncluded": true,
+    "publication": false,
+    "repositoryMutation": false
+  },
+  "bundleDigest": "sha256:66e24fa35fb53699b4283210c78f023162be1cdf48f80cddf0f037cbc3f53d7c",
+  "approval": {
+    "state": "approved",
+    "approvedBundleDigest": "sha256:66e24fa35fb53699b4283210c78f023162be1cdf48f80cddf0f037cbc3f53d7c",
+    "approvedBy": "fixture-director",
+    "approvedAt": "2026-08-28T00:05:00.000Z",
+    "decisionReason": "Approved fixture source evidence for contract parity.",
+    "approvalDigest": "sha256:b478177edb4881ff73580fa4d2ecb20f6611ab66393711674a15b52f0d6aa986"
+  }
+}
