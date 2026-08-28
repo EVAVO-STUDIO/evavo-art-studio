@@ -1,7 +1,22 @@
 import { codePointCompare } from "./animation-source-legacy-common-v2.mjs";
 
 const GAP = String.raw`(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*(?:\r?\n|$))*`;
-const MODULE_SUFFIX = String.raw`animation-source-bundle(?:\.|%2e|\\u\{0*2e\}|\\u0*2e|\\x2e)mjs`;
+
+function escapeRegexCharacter(value) {
+  return value.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
+}
+
+function encodedCharacterPattern(value) {
+  const codePoint = value.codePointAt(0);
+  const hexadecimal = codePoint.toString(16);
+  const byteHexadecimal = hexadecimal.padStart(2, "0");
+  const unicodeHexadecimal = hexadecimal.padStart(4, "0");
+  return String.raw`(?:${escapeRegexCharacter(value)}|%${byteHexadecimal}|\\x${byteHexadecimal}|\\u${unicodeHexadecimal}|\\u\{0*${hexadecimal}\})`;
+}
+
+const MODULE_SUFFIX = [..."animation-source-bundle.mjs"]
+  .map(encodedCharacterPattern)
+  .join("");
 const MODULE = String.raw`["'][^"']*${MODULE_SUFFIX}(?:[?#][^"']*)?["']`;
 const TEMPLATE_MODULE = String.raw`\x60(?:\\[\s\S]|[^\x60\\])*${MODULE_SUFFIX}(?:[?#](?:\\[\s\S]|[^\x60\\])*)?\x60`;
 const RUNTIME_MODULE = String.raw`(?:${MODULE}|${TEMPLATE_MODULE})`;
