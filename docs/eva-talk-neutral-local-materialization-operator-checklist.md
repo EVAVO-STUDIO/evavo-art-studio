@@ -72,10 +72,14 @@
 
 ## Repository validation before main
 
-- [ ] Run the focused checker and both queue test files.
-- [ ] Run a real CLI initialise, claim, heartbeat, fail and status exercise in a temporary directory.
-- [ ] Run `git diff --check`.
-- [ ] Run complete local `pnpm check`.
-- [ ] Confirm validation left no generated files in the repository.
+- [ ] Fetch the exact pull-request head and confirm the worktree is clean.
+- [ ] Record the 40-character pull-request head SHA.
+- [ ] Run `pwsh -NoLogo -NoProfile -File scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1 -ExpectedHeadSha <exact-pr-head-sha>`.
+- [ ] Confirm `Invoke-EvaTalkNeutralLocalQueueValidation.ps1` returns JSON with `ok=true` and the exact `ExpectedHeadSha`.
+- [ ] Confirm all syntax checks, focused tests, the concurrent claim race and the real CLI lifecycle exercise passed.
+- [ ] Confirm the repository-authoritative complete local `pnpm check` passed.
+- [ ] Confirm `git diff --check` passed.
+- [ ] Confirm validation left no generated files or worktree changes.
 - [ ] Re-fetch latest `main` immediately before landing.
+- [ ] Confirm the branch is not behind `main` and the changed-file set is still expected.
 - [ ] Merge without force push or history rewrite.
