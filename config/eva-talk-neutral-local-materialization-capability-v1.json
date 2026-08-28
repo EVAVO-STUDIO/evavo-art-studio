@@ -17,12 +17,14 @@
   "checker": "scripts/check-eva-talk-neutral-local-materialization-queue.mjs",
   "tests": [
     "scripts/test-eva-talk-neutral-local-materialization-queue.mjs",
-    "scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs"
+    "scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs",
+    "scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs"
   ],
   "documentation": [
     "docs/EVA_TALK_NEUTRAL_LOCAL_MATERIALIZATION_QUEUE.md",
     "docs/eva-talk-neutral-local-materialization-operator-checklist.md"
   ],
+  "workstationValidation": "config/eva-talk-neutral-local-materialization-workstation-validation-v1.json",
   "queue": {
     "batchCount": 8,
     "imagesPerBatch": 10,
