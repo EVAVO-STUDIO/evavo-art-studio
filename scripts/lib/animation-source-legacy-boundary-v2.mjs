@@ -31,7 +31,10 @@ export async function inspectAnimationSourceLegacyUsageV2(root = process.cwd()) 
       failLegacy("ANIMATION_SOURCE_LEGACY_V2_SCAN_TOO_LARGE", String(scannedBytes));
     }
     scannedFileCount += 1;
-    const accesses = legacyAnimationSourceAccesses(observed.source);
+    const accesses = legacyAnimationSourceAccesses(
+      observed.source,
+      trackedPath,
+    );
     if (accesses.length) {
       violations.push(Object.freeze({ trackedPath, accesses }));
     }
