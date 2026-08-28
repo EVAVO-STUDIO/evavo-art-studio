@@ -42,3 +42,6 @@ docs/ANIMATION_SOURCE_CONTROL_AND_OUTPUT_SAFETY.md text eol=lf
 AGENTS.md text eol=lf
 scripts/lib/animation-source-legacy-boundary.mjs text eol=lf
 scripts/test-ci-media-tool-animation-source-legacy-boundary.mjs text eol=lf
+scripts/lib/animation-source-legacy-*-v2.mjs text eol=lf
+scripts/test-support/animation-source-legacy-v2-fixture.mjs text eol=lf
+scripts/test-ci-media-tool-animation-source-legacy-v2-*.mjs text eol=lf
