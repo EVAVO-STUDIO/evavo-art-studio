@@ -1,18 +1,81 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $true)]
     [ValidatePattern('^[0-9a-f]{40}$')]
-    [string]$ExpectedHeadSha = ''
+    [string]$ExpectedHeadSha,
+
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[0-9a-f]{40}$')]
+    [string]$ExpectedMainSha
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
+if (-not $IsWindows) {
+    throw 'The EVA talk-neutral queue release gate must run under pwsh on Windows.'
+}
+
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $Node = (Get-Command node -ErrorAction Stop).Source
 $Pnpm = (Get-Command pnpm -ErrorAction Stop).Source
 $Git = (Get-Command git -ErrorAction Stop).Source
+$ExpectedRepository = 'EVAVO-STUDIO/evavo-art-studio'
+$ExpectedNodeVersion = 'v22.14.0'
+$ExpectedPnpmVersion = '10.13.1'
+$OriginPattern = '^(?:https://github\.com/EVAVO-STUDIO/evavo-art-studio(?:\.git)?|git@github\.com:EVAVO-STUDIO/evavo-art-studio(?:\.git)?|ssh://git@github\.com/EVAVO-STUDIO/evavo-art-studio(?:\.git)?|git://github\.com/EVAVO-STUDIO/evavo-art-studio(?:\.git)?)$'
+$ExpectedChangedFiles = @(
+    '.gitattributes',
+    'config/eva-talk-neutral-local-materialization-campaign-v1.json',
+    'config/eva-talk-neutral-local-materialization-capability-v1.json',
+    'config/eva-talk-neutral-local-materialization-workstation-validation-v1.json',
+    'docs/EVA_TALK_NEUTRAL_LOCAL_MATERIALIZATION_QUEUE.md',
+    'docs/eva-talk-neutral-local-materialization-operator-checklist.md',
+    'scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1',
+    'scripts/check-eva-talk-neutral-local-materialization-queue.mjs',
+    'scripts/eva-talk-neutral-local-materialization-queue.mjs',
+    'scripts/project-art/eva-talk-neutral-local-materialization-queue.mjs',
+    'scripts/project-art/eva-talk-neutral-local-queue-campaign.mjs',
+    'scripts/project-art/eva-talk-neutral-local-queue-claims.mjs',
+    'scripts/project-art/eva-talk-neutral-local-queue-common.mjs',
+    'scripts/project-art/eva-talk-neutral-local-queue-completion.mjs',
+    'scripts/project-art/eva-talk-neutral-local-queue-init.mjs',
+    'scripts/project-art/eva-talk-neutral-local-queue-png.mjs',
+    'scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs',
+    'scripts/test-eva-talk-neutral-local-materialization-queue.mjs',
+    'scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs'
+)
+
+function Write-NativeDiagnostic {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$Output
+    )
+
+    foreach ($Line in $Output) {
+        [Console]::Error.WriteLine([string]$Line)
+    }
+}
+
+function Invoke-NativeCaptured {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string[]]$ArgumentList,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    $global:LASTEXITCODE = 0
+    $output = @(& $FilePath @ArgumentList 2>&1)
+    $exitCode = [int]$global:LASTEXITCODE
+    if ($exitCode -ne 0) {
+        Write-NativeDiagnostic -Output $output
+        throw "$Label failed with native exit code $exitCode."
+    }
+
+    return @($output | ForEach-Object { [string]$_ })
+}
 
 function Invoke-NativeChecked {
     param(
@@ -21,12 +84,19 @@ function Invoke-NativeChecked {
         [Parameter(Mandatory = $true)][string]$Label
     )
 
-    $global:LASTEXITCODE = 0
-    & $FilePath @ArgumentList
-    $exitCode = [int]$global:LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "$Label failed with native exit code $exitCode."
-    }
+    $output = @(Invoke-NativeCaptured -FilePath $FilePath -ArgumentList $ArgumentList -Label $Label)
+    Write-NativeDiagnostic -Output $output
+}
+
+function Invoke-NativeTextChecked {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string[]]$ArgumentList,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    $output = @(Invoke-NativeCaptured -FilePath $FilePath -ArgumentList $ArgumentList -Label $Label)
+    return (($output -join "`n").Trim())
 }
 
 function Invoke-NativeJsonChecked {
@@ -36,14 +106,7 @@ function Invoke-NativeJsonChecked {
         [Parameter(Mandatory = $true)][string]$Label
     )
 
-    $global:LASTEXITCODE = 0
-    $output = @(& $FilePath @ArgumentList)
-    $exitCode = [int]$global:LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "$Label failed with native exit code $exitCode."
-    }
-
-    $text = ($output | Out-String).Trim()
+    $text = Invoke-NativeTextChecked -FilePath $FilePath -ArgumentList $ArgumentList -Label $Label
     if (-not $text) {
         throw "$Label returned no JSON evidence."
     }
@@ -57,33 +120,133 @@ function Invoke-NativeJsonChecked {
 }
 
 function Read-GitStatus {
-    $global:LASTEXITCODE = 0
-    $lines = @(& $Git 'status' '--porcelain=v1' '--untracked-files=all')
-    if ([int]$global:LASTEXITCODE -ne 0) {
-        throw 'Unable to read the repository worktree status.'
+    return @(
+        Invoke-NativeCaptured -FilePath $Git -ArgumentList @(
+            'status',
+            '--porcelain=v1',
+            '--untracked-files=all'
+        ) -Label 'Repository worktree status'
+    )
+}
+
+function Assert-ExactRepositoryState {
+    $HeadSha = Invoke-NativeTextChecked -FilePath $Git -ArgumentList @(
+        'rev-parse',
+        '--verify',
+        'HEAD'
+    ) -Label 'Exact repository HEAD'
+
+    if ($HeadSha -notmatch '^[0-9a-f]{40}$' -or $HeadSha -ne $ExpectedHeadSha) {
+        throw "Repository HEAD $HeadSha does not match expected head $ExpectedHeadSha."
     }
-    return @($lines)
+
+    $OriginUrl = Invoke-NativeTextChecked -FilePath $Git -ArgumentList @(
+        'remote',
+        'get-url',
+        'origin'
+    ) -Label 'Repository origin URL'
+
+    if ($OriginUrl -notmatch $OriginPattern) {
+        throw "Repository origin $OriginUrl is not $ExpectedRepository."
+    }
+
+    $OriginMainSha = Invoke-NativeTextChecked -FilePath $Git -ArgumentList @(
+        'rev-parse',
+        '--verify',
+        'refs/remotes/origin/main'
+    ) -Label 'Fetched origin/main'
+
+    if (
+        $OriginMainSha -notmatch '^[0-9a-f]{40}$' -or
+        $OriginMainSha -ne $ExpectedMainSha
+    ) {
+        throw "Fetched origin/main $OriginMainSha does not match expected main $ExpectedMainSha."
+    }
+
+    Invoke-NativeChecked -FilePath $Git -ArgumentList @(
+        'merge-base',
+        '--is-ancestor',
+        $ExpectedMainSha,
+        $HeadSha
+    ) -Label 'Main ancestry check'
+
+    $AheadText = Invoke-NativeTextChecked -FilePath $Git -ArgumentList @(
+        'rev-list',
+        '--count',
+        "$ExpectedMainSha..$HeadSha"
+    ) -Label 'Pull-request commit count'
+
+    $AheadCount = 0
+    if (-not [int]::TryParse($AheadText, [ref]$AheadCount) -or $AheadCount -lt 1) {
+        throw 'The exact pull-request head must contain at least one commit after expected main.'
+    }
+
+    $ObservedChangedFiles = @(
+        Invoke-NativeCaptured -FilePath $Git -ArgumentList @(
+            'diff',
+            '--name-only',
+            '--diff-filter=ACMRD',
+            "$ExpectedMainSha..$HeadSha",
+            '--'
+        ) -Label 'Exact changed-file inventory' |
+            Where-Object { $_ } |
+            Sort-Object -Unique
+    )
+
+    $ChangedFileDifference = @(
+        Compare-Object -ReferenceObject $ExpectedChangedFiles -DifferenceObject $ObservedChangedFiles
+    )
+    if (
+        $ObservedChangedFiles.Count -ne $ExpectedChangedFiles.Count -or
+        $ChangedFileDifference.Count -ne 0
+    ) {
+        throw (
+            "The pull-request changed-file set drifted.`nExpected:`n" +
+            ($ExpectedChangedFiles -join "`n") +
+            "`nObserved:`n" +
+            ($ObservedChangedFiles -join "`n")
+        )
+    }
+
+    return [pscustomobject]@{
+        headSha = $HeadSha
+        originMainSha = $OriginMainSha
+        originUrl = $OriginUrl
+        aheadCount = $AheadCount
+        changedFiles = $ObservedChangedFiles
+    }
 }
 
 Push-Location $RepoRoot
 try {
-    $global:LASTEXITCODE = 0
-    $HeadSha = (& $Git 'rev-parse' 'HEAD').Trim()
-    if (
-        [int]$global:LASTEXITCODE -ne 0 -or
-        $HeadSha -notmatch '^[0-9a-f]{40}$'
-    ) {
-        throw 'Unable to resolve the exact repository HEAD.'
+    $NodeVersion = Invoke-NativeTextChecked -FilePath $Node -ArgumentList @(
+        '--version'
+    ) -Label 'Node.js version check'
+    if ($NodeVersion -ne $ExpectedNodeVersion) {
+        throw "Node.js $ExpectedNodeVersion is required; observed $NodeVersion."
     }
 
-    if ($ExpectedHeadSha -and $HeadSha -ne $ExpectedHeadSha) {
-        throw "Repository HEAD $HeadSha does not match expected head $ExpectedHeadSha."
+    $PnpmVersion = Invoke-NativeTextChecked -FilePath $Pnpm -ArgumentList @(
+        '--version'
+    ) -Label 'pnpm version check'
+    if ($PnpmVersion -ne $ExpectedPnpmVersion) {
+        throw "pnpm $ExpectedPnpmVersion is required; observed $PnpmVersion."
     }
 
-    $InitialStatus = Read-GitStatus
-    if (@($InitialStatus).Count -ne 0) {
+    $InitialStatus = @(Read-GitStatus)
+    if ($InitialStatus.Count -ne 0) {
         throw 'The EVA talk-neutral queue validation requires a clean working tree.'
     }
+
+    $InitialState = Assert-ExactRepositoryState
+    $DiffRange = "$ExpectedMainSha..$ExpectedHeadSha"
+
+    Invoke-NativeChecked -FilePath $Git -ArgumentList @(
+        'diff',
+        '--check',
+        $DiffRange,
+        '--'
+    ) -Label 'Pull-request diff formatting check'
 
     $NodeFiles = @(
         'scripts/project-art/eva-talk-neutral-local-queue-common.mjs',
@@ -101,7 +264,10 @@ try {
     )
 
     foreach ($File in $NodeFiles) {
-        Invoke-NativeChecked -FilePath $Node -ArgumentList @('--check', $File) -Label "Syntax check: $File"
+        Invoke-NativeChecked -FilePath $Node -ArgumentList @(
+            '--check',
+            $File
+        ) -Label "Syntax check: $File"
     }
 
     Invoke-NativeChecked -FilePath $Node -ArgumentList @(
@@ -115,11 +281,15 @@ try {
         'scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs'
     ) -Label 'EVA talk-neutral local queue focused tests'
 
-    $TempRoot = Join-Path ([IO.Path]::GetTempPath()) ('evavo-eva-talk-neutral-queue-' + [Guid]::NewGuid().ToString('N'))
+    $TempRoot = Join-Path ([IO.Path]::GetTempPath()) (
+        'evavo-eva-talk-neutral-queue-' + [Guid]::NewGuid().ToString('N')
+    )
     $QueueRoot = Join-Path $TempRoot 'queue'
     [void][IO.Directory]::CreateDirectory($TempRoot)
     try {
-        $CampaignPath = Join-Path $RepoRoot 'config\eva-talk-neutral-local-materialization-campaign-v1.json'
+        $CampaignPath = Join-Path $RepoRoot (
+            'config\eva-talk-neutral-local-materialization-campaign-v1.json'
+        )
         $Initialised = Invoke-NativeJsonChecked -FilePath $Node -ArgumentList @(
             'scripts/eva-talk-neutral-local-materialization-queue.mjs',
             'init',
@@ -231,21 +401,48 @@ try {
         }
     }
 
-    Invoke-NativeChecked -FilePath $Pnpm -ArgumentList @('check') -Label 'Complete local Art Studio validation'
-    Invoke-NativeChecked -FilePath $Git -ArgumentList @('diff', '--check') -Label 'Repository diff formatting check'
+    Invoke-NativeChecked -FilePath $Pnpm -ArgumentList @(
+        'check'
+    ) -Label 'Complete local Art Studio validation'
 
-    $FinalStatus = Read-GitStatus
-    if (@($FinalStatus).Count -ne 0) {
+    Invoke-NativeChecked -FilePath $Git -ArgumentList @(
+        'diff',
+        '--check',
+        $DiffRange,
+        '--'
+    ) -Label 'Post-validation pull-request diff formatting check'
+
+    $FinalStatus = @(Read-GitStatus)
+    if ($FinalStatus.Count -ne 0) {
         throw 'Validation changed repository source or retained generated residue.'
     }
 
+    $FinalState = Assert-ExactRepositoryState
+    if (
+        $FinalState.headSha -ne $InitialState.headSha -or
+        $FinalState.originMainSha -ne $InitialState.originMainSha
+    ) {
+        throw 'Repository refs changed during validation.'
+    }
+
     $Result = [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
         kind = 'evavo-eva-talk-neutral-local-queue-workstation-validation'
         ok = $true
-        repository = 'EVAVO-STUDIO/evavo-art-studio'
-        headSha = $HeadSha
-        expectedHeadSha = if ($ExpectedHeadSha) { $ExpectedHeadSha } else { $null }
+        repository = $ExpectedRepository
+        originUrl = $FinalState.originUrl
+        headSha = $FinalState.headSha
+        expectedHeadSha = $ExpectedHeadSha
+        mainSha = $FinalState.originMainSha
+        expectedMainSha = $ExpectedMainSha
+        aheadCount = $FinalState.aheadCount
+        changedFileCount = $FinalState.changedFiles.Count
+        changedFiles = @($FinalState.changedFiles)
+        diffRange = $DiffRange
+        operatingSystem = 'windows'
+        powershellVersion = $PSVersionTable.PSVersion.ToString()
+        nodeVersion = $NodeVersion.TrimStart('v')
+        pnpmVersion = $PnpmVersion
         campaignId = 'eva-talk-neutral-local-campaign-20260828-v2'
         campaignSha256 = 'e6c4c23eac5d5e6074e334599f19da53ca6a56073857dcd9fc6443ab1f065d74'
         packetCount = 8
