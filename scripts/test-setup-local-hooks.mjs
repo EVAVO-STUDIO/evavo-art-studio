@@ -9,6 +9,7 @@ import {
   EXPECTED_PRE_PUSH_CONTENT,
   installLocalHooks,
   localHooksStatus,
+  parseHookArguments,
   validatePrePushHook,
 } from "./setup-local-hooks.mjs";
 
@@ -17,6 +18,7 @@ function git(root, ...args) {
     cwd: root,
     encoding: "utf8",
     shell: false,
+    windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
   assert.equal(result.status, 0, result.stderr);
@@ -27,14 +29,37 @@ function fixture(content = EXPECTED_PRE_PUSH_CONTENT) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "evavo-local-hooks-"));
   git(root, "init");
   fs.mkdirSync(path.join(root, ".githooks"));
-  fs.writeFileSync(path.join(root, ".githooks", "pre-push"), content, { mode: 0o755 });
-  if (process.platform !== "win32") fs.chmodSync(path.join(root, ".githooks", "pre-push"), 0o755);
+  fs.writeFileSync(path.join(root, ".githooks", "pre-push"), content, {
+    mode: 0o755,
+  });
+  if (process.platform !== "win32") {
+    fs.chmodSync(path.join(root, ".githooks", "pre-push"), 0o755);
+  }
   return root;
 }
 
 test("the governed hook invokes the canonical local push profile", () => {
   assert.match(EXPECTED_PRE_PUSH_CONTENT, /local-quality-gate\.mjs push/u);
-  assert.doesNotMatch(EXPECTED_PRE_PUSH_CONTENT, /vercel|workflow_dispatch|actions\//u);
+  assert.doesNotMatch(
+    EXPECTED_PRE_PUSH_CONTENT,
+    /vercel|workflow_dispatch|actions\//u,
+  );
+});
+
+test("hook setup arguments reject conflicting or unknown operations", () => {
+  assert.deepEqual(parseHookArguments([]), {
+    planOnly: false,
+    checkOnly: false,
+  });
+  assert.deepEqual(parseHookArguments(["--check"]), {
+    planOnly: false,
+    checkOnly: true,
+  });
+  assert.throws(
+    () => parseHookArguments(["--plan", "--check"]),
+    /cannot be combined/u,
+  );
+  assert.throws(() => parseHookArguments(["--global"]), /supported arguments/u);
 });
 
 test("hook installation is checkout-local, idempotent and verifiable", () => {
@@ -46,7 +71,10 @@ test("hook installation is checkout-local, idempotent and verifiable", () => {
     assert.equal(installed.configuredHooksPath, ".githooks");
     assert.equal(installed.hookError, null);
     assert.equal(installLocalHooks(root).configured, true);
-    assert.equal(git(root, "config", "--local", "--get", "core.hooksPath"), ".githooks");
+    assert.equal(
+      git(root, "config", "--local", "--get", "core.hooksPath"),
+      ".githooks",
+    );
     assert.equal(validatePrePushHook(root).path, ".githooks/pre-push");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -56,9 +84,31 @@ test("hook installation is checkout-local, idempotent and verifiable", () => {
 test("installer refuses to overwrite a drifted governed hook", () => {
   const root = fixture("#!/bin/sh\necho bypass\n");
   try {
-    assert.equal(localHooksStatus(root).hookError.code, "LOCAL_HOOK_CONTENT_DRIFT");
+    assert.equal(
+      localHooksStatus(root).hookError.code,
+      "LOCAL_HOOK_CONTENT_DRIFT",
+    );
     assert.throws(() => installLocalHooks(root), /refusing to overwrite/u);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("installer rejects a linked hooks directory before writing outside checkout", {
+  skip: process.platform === "win32",
+}, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "evavo-local-hooks-link-"));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "evavo-local-hooks-outside-"));
+  try {
+    git(root, "init");
+    fs.symlinkSync(outside, path.join(root, ".githooks"), "dir");
+    assert.throws(
+      () => installLocalHooks(root),
+      /must be an ordinary directory/u,
+    );
+    assert.equal(fs.existsSync(path.join(outside, "pre-push")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
   }
 });

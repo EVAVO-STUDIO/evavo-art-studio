@@ -8,7 +8,11 @@ import {
   storageThresholds,
 } from "./check-local-storage-headroom.mjs";
 
-export const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+export const REPOSITORY_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
+export const DEFAULT_TERMINATION_GRACE_MS = 5_000;
 const COMMANDS = new Set(["once", "until-idle", "daemon"]);
 
 function fail(code, message) {
@@ -18,9 +22,24 @@ function fail(code, message) {
   throw error;
 }
 
+function boundedInteger(value, fallback, minimum, maximum, label) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
+    fail(
+      "LOCAL_WORKER_INTEGER_INVALID",
+      `${label} must be an integer from ${minimum} to ${maximum}.`,
+    );
+  }
+  return parsed;
+}
+
 export function workerCommandLine(command) {
   if (!COMMANDS.has(command)) {
-    fail("LOCAL_WORKER_COMMAND_INVALID", "worker command must be once, until-idle or daemon.");
+    fail(
+      "LOCAL_WORKER_COMMAND_INVALID",
+      "worker command must be once, until-idle or daemon.",
+    );
   }
   return Object.freeze([
     "pnpm",
@@ -32,14 +51,20 @@ export function workerCommandLine(command) {
   ]);
 }
 
-function terminateProcessTree(child, force = false) {
+function terminateProcessTree(child, force = false, options = {}) {
   if (!child?.pid) return;
-  if (process.platform === "win32") {
-    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
-      shell: false,
-      stdio: "ignore",
-      timeout: 10_000,
-    });
+  const platform = options.platform ?? process.platform;
+  if (platform === "win32") {
+    (options.spawnSync ?? spawnSync)(
+      "taskkill",
+      ["/PID", String(child.pid), "/T", "/F"],
+      {
+        shell: false,
+        stdio: "ignore",
+        timeout: 10_000,
+        windowsHide: true,
+      },
+    );
     return;
   }
   const signal = force ? "SIGKILL" : "SIGTERM";
@@ -49,7 +74,7 @@ function terminateProcessTree(child, force = false) {
     try {
       child.kill(signal);
     } catch {
-      // Already stopped.
+      // The child has already stopped.
     }
   }
 }
@@ -58,57 +83,107 @@ export async function runLocalWorker(command, options = {}) {
   const root = options.root ?? REPOSITORY_ROOT;
   const environment = { ...process.env, ...(options.environment ?? {}) };
   const thresholds = storageThresholds(environment, options);
-  inspectArtStudioStorage({ root, environment, ...thresholds });
+  const inspect = options.inspectStorage ?? inspectArtStudioStorage;
+  const spawnChild = options.spawn ?? spawn;
+  const terminate =
+    options.terminateProcessTree ??
+    ((child, force) => terminateProcessTree(child, force, options));
+  const terminationGraceMs = boundedInteger(
+    options.terminationGraceMs ?? environment.EVAVO_ART_WORKER_TERMINATION_GRACE_MS,
+    DEFAULT_TERMINATION_GRACE_MS,
+    0,
+    60_000,
+    "worker termination grace",
+  );
+
+  inspect({ root, environment, ...thresholds });
   const [executable, ...args] = workerCommandLine(command);
-  const child = spawn(executable, args, {
+  const child = spawnChild(executable, args, {
     cwd: root,
     env: environment,
     shell: false,
-    stdio: "inherit",
-    detached: process.platform !== "win32",
+    stdio: options.stdio ?? "inherit",
+    detached: (options.platform ?? process.platform) !== "win32",
     windowsHide: true,
   });
+
   let storageFailure;
   let checking = false;
+  let stopping = false;
+  let forceTimer;
+  const requestStop = () => {
+    if (stopping || child.exitCode !== null || child.signalCode !== null) return;
+    stopping = true;
+    terminate(child, false);
+    forceTimer = setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) {
+        terminate(child, true);
+      }
+    }, terminationGraceMs);
+    forceTimer.unref?.();
+  };
   const check = () => {
-    if (checking || child.exitCode !== null || child.signalCode !== null) return;
+    if (
+      checking ||
+      stopping ||
+      child.exitCode !== null ||
+      child.signalCode !== null
+    ) {
+      return;
+    }
     checking = true;
     try {
-      inspectArtStudioStorage({ root, environment, ...thresholds });
+      inspect({ root, environment, ...thresholds });
     } catch (error) {
       storageFailure = error;
-      terminateProcessTree(child, false);
+      requestStop();
     } finally {
       checking = false;
     }
   };
-  const timer = command === "daemon" ? setInterval(check, thresholds.intervalMs) : undefined;
+  const timer =
+    command === "daemon"
+      ? setInterval(check, thresholds.intervalMs)
+      : undefined;
   timer?.unref?.();
-  const stop = () => terminateProcessTree(child, false);
-  options.signal?.addEventListener("abort", stop, { once: true });
+
+  const onAbort = () => requestStop();
+  if (options.signal?.aborted) onAbort();
+  else options.signal?.addEventListener("abort", onAbort, { once: true });
+
   try {
     const result = await new Promise((resolve, reject) => {
       child.once("error", reject);
       child.once("exit", (code, signal) => resolve({ code, signal }));
     });
     if (storageFailure) throw storageFailure;
-    if (options.signal?.aborted) return Object.freeze({ status: "cancelled", ...result });
+    if (options.signal?.aborted) {
+      return Object.freeze({ status: "cancelled", ...result });
+    }
     if (result.code !== 0) {
       fail(
         "LOCAL_WORKER_EXITED",
-        `worker exited with code ${result.code ?? "unknown"}${result.signal ? ` (${result.signal})` : ""}.`,
+        `worker exited with code ${result.code ?? "unknown"}${
+          result.signal ? ` (${result.signal})` : ""
+        }.`,
       );
     }
     return Object.freeze({ status: "passed", ...result });
   } finally {
     if (timer) clearInterval(timer);
-    options.signal?.removeEventListener("abort", stop);
+    if (forceTimer) clearTimeout(forceTimer);
+    options.signal?.removeEventListener("abort", onAbort);
   }
 }
 
 async function main() {
   const command = process.argv[2] ?? "once";
-  if (process.argv.length > 3) fail("LOCAL_WORKER_ARGUMENT_UNSUPPORTED", "unexpected worker arguments.");
+  if (process.argv.length > 3) {
+    fail(
+      "LOCAL_WORKER_ARGUMENT_UNSUPPORTED",
+      "unexpected worker arguments.",
+    );
+  }
   const controller = new AbortController();
   const stop = () => controller.abort();
   process.once("SIGINT", stop);
@@ -118,14 +193,23 @@ async function main() {
       root: REPOSITORY_ROOT,
       signal: controller.signal,
     });
-    process.stdout.write(`${JSON.stringify({ service: "evavo-art-studio-local-worker", command, ...result })}\n`);
+    process.stdout.write(
+      `${JSON.stringify({
+        service: "evavo-art-studio-local-worker",
+        command,
+        ...result,
+      })}\n`,
+    );
   } finally {
     process.removeListener("SIGINT", stop);
     process.removeListener("SIGTERM", stop);
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   main().catch((error) => {
     process.stderr.write(
       `${JSON.stringify({
