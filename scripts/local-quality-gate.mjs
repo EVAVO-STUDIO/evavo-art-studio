@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 export * from "./local-quality-gate-library.mjs";
 export {
   RUNTIME_CONTRACT_COMMAND,
+  buildPlan,
   buildRuntimePlan,
   parseGateArguments,
+  planForChanges,
   runCommand,
   runLocalQualityGate,
   runLocalQualityGateCli,

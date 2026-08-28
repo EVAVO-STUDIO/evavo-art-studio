@@ -6,8 +6,10 @@ import { spawn as spawnChild, spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  buildPlan,
   buildRuntimePlan,
   parseGateArguments,
+  planForChanges,
   runCommand,
   runLocalQualityGate,
   runLocalQualityGateCli,
@@ -76,6 +78,11 @@ test("gate arguments are strict and preserve legacy profile names", () => {
     () => parseGateArguments(["--cloud"]),
     /unsupported local gate argument/u,
   );
+});
+
+test("legacy planning consumers retain the mode alias", () => {
+  assert.equal(buildPlan("fast").mode, "fast");
+  assert.equal(planForChanges(["example.txt"]).mode, "changed");
 });
 
 test("main pushes select clean release validation without hosted authority", () => {

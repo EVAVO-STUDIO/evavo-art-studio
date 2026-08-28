@@ -1,8 +1,10 @@
 import fs from "node:fs";
 
 import {
+  buildPlan as buildLibraryPlan,
   canonicalProfile,
   parsePrePushUpdates,
+  planForChanges as planForChangesLibrary,
 } from "./local-quality-gate-library.mjs";
 import {
   RUNTIME_CONTRACT_COMMAND,
@@ -16,6 +18,22 @@ import {
 } from "./local-quality-gate-runtime.mjs";
 
 const ZERO_SHA = /^0{40}$/u;
+
+function withLegacyMode(plan) {
+  if (!plan || typeof plan !== "object") return plan;
+  return Object.freeze({
+    ...plan,
+    mode: plan.mode ?? plan.profile,
+  });
+}
+
+export function planForChanges(inputFiles, options = {}) {
+  return withLegacyMode(planForChangesLibrary(inputFiles, options));
+}
+
+export function buildPlan(requestedProfile, options = {}) {
+  return withLegacyMode(buildLibraryPlan(requestedProfile, options));
+}
 
 function rejectMainDeletion(updates) {
   const deletion = updates.find(
