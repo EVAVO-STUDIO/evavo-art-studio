@@ -1,0 +1,57 @@
+{
+  "schema": "evavo.project-art-eva-talk-neutral-local-materialization-workstation-validation.v1",
+  "protocolVersion": "2026-08-28.2",
+  "status": "available-not-executed-by-repository-state",
+  "script": "scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1",
+  "command": [
+    "pwsh",
+    "-NoLogo",
+    "-NoProfile",
+    "-File",
+    "scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1",
+    "-ExpectedHeadSha",
+    "<exact-pr-head-sha>"
+  ],
+  "requiredEnvironment": {
+    "operatingSystem": "windows",
+    "node": "22.14.0",
+    "pnpm": "10.13.1",
+    "cleanWorkingTree": true,
+    "networkRequiredByQueueChecks": false,
+    "githubActionsRequired": false,
+    "vercelRequired": false
+  },
+  "validation": {
+    "syntaxChecks": 12,
+    "staticContractCheck": true,
+    "focusedNodeTests": true,
+    "concurrentWorkerClaimRace": true,
+    "realCliLifecycleExercise": true,
+    "completeRepositoryPnpmCheck": true,
+    "gitDiffCheck": true,
+    "cleanTreeAfterValidation": true
+  },
+  "expectedQueueEvidence": {
+    "packetCount": 8,
+    "imagesPerPacket": 10,
+    "candidateCount": 80,
+    "semanticSelectionTargetFrameCount": 36,
+    "campaignSha256": "e6c4c23eac5d5e6074e334599f19da53ca6a56073857dcd9fc6443ab1f065d74"
+  },
+  "authority": {
+    "networkAccess": false,
+    "providerExecution": false,
+    "paidExecution": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "sourceMutation": false,
+    "repositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "websiteActivation": false,
+    "deployment": false,
+    "forcePush": false
+  }
+}
