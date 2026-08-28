@@ -7,6 +7,7 @@ const require = createRequire(import.meta.url);
 const ts = require("typescript");
 
 const LEGACY_HELPERS = Object.freeze(["readJson", "writeJsonAtomic"]);
+const STRING_WRAPPERS = new Set(["String", "pathToFileURL", "fileURLToPath"]);
 const STANDARD_SCRIPT_KINDS = new Map([
   [".cjs", ts.ScriptKind.JS],
   [".cts", ts.ScriptKind.TS],
@@ -66,25 +67,101 @@ function unwrapStaticExpression(node) {
   return node;
 }
 
-function staticString(input) {
+function isConstVariableDeclaration(node) {
+  return (
+    ts.isVariableDeclaration(node) &&
+    ts.isVariableDeclarationList(node.parent) &&
+    (node.parent.flags & ts.NodeFlags.Const) !== 0
+  );
+}
+
+function symbolInitializer(identifier, context, seenSymbols) {
+  const symbol = context.checker.getSymbolAtLocation(identifier);
+  if (!symbol || seenSymbols.has(symbol)) return undefined;
+  const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+  if (!declaration || !isConstVariableDeclaration(declaration) || !declaration.initializer) {
+    return undefined;
+  }
+  seenSymbols.add(symbol);
+  return { initializer: declaration.initializer, symbol };
+}
+
+function objectPropertyInitializer(node, context, seenSymbols) {
+  if (!ts.isPropertyAccessExpression(node) && !ts.isElementAccessExpression(node)) {
+    return undefined;
+  }
+  let property;
+  if (ts.isPropertyAccessExpression(node)) {
+    property = node.name.text;
+  } else {
+    property = staticString(node.argumentExpression, context, seenSymbols);
+  }
+  if (property === undefined) return undefined;
+
+  const expression = unwrapStaticExpression(node.expression);
+  let objectLiteral;
+  if (ts.isObjectLiteralExpression(expression)) {
+    objectLiteral = expression;
+  } else if (ts.isIdentifier(expression)) {
+    const resolved = symbolInitializer(expression, context, seenSymbols);
+    if (resolved) {
+      const initializer = unwrapStaticExpression(resolved.initializer);
+      if (ts.isObjectLiteralExpression(initializer)) objectLiteral = initializer;
+      seenSymbols.delete(resolved.symbol);
+    }
+  }
+  if (!objectLiteral) return undefined;
+
+  for (const member of objectLiteral.properties) {
+    if (!ts.isPropertyAssignment(member) && !ts.isShorthandPropertyAssignment(member)) {
+      continue;
+    }
+    const name = member.name && ts.isComputedPropertyName(member.name)
+      ? staticString(member.name.expression, context, seenSymbols)
+      : member.name?.text;
+    if (name !== property) continue;
+    if (ts.isPropertyAssignment(member)) return member.initializer;
+    return member.name;
+  }
+  return undefined;
+}
+
+function staticString(input, context, seenSymbols = new Set()) {
   if (!input) return undefined;
   const node = unwrapStaticExpression(input);
-  if (node !== input) return staticString(node);
+  if (node !== input) return staticString(node, context, seenSymbols);
   if (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
     return node.text;
+  }
+  if (ts.isIdentifier(node)) {
+    const resolved = symbolInitializer(node, context, seenSymbols);
+    if (!resolved) return undefined;
+    try {
+      return staticString(resolved.initializer, context, seenSymbols);
+    } finally {
+      seenSymbols.delete(resolved.symbol);
+    }
+  }
+  if (ts.isPropertyAccessExpression(node) && node.name.text === "href") {
+    const resolvedHref = staticString(node.expression, context, seenSymbols);
+    if (resolvedHref !== undefined) return resolvedHref;
+  }
+  const propertyInitializer = objectPropertyInitializer(node, context, seenSymbols);
+  if (propertyInitializer) {
+    return staticString(propertyInitializer, context, seenSymbols);
   }
   if (
     ts.isBinaryExpression(node) &&
     node.operatorToken.kind === ts.SyntaxKind.PlusToken
   ) {
-    const left = staticString(node.left);
-    const right = staticString(node.right);
+    const left = staticString(node.left, context, seenSymbols);
+    const right = staticString(node.right, context, seenSymbols);
     return left === undefined || right === undefined ? undefined : `${left}${right}`;
   }
   if (ts.isTemplateExpression(node)) {
     let output = node.head.text;
     for (const span of node.templateSpans) {
-      const expression = staticString(span.expression);
+      const expression = staticString(span.expression, context, seenSymbols);
       if (expression === undefined) return undefined;
       output += expression;
       output += span.literal.text;
@@ -96,29 +173,46 @@ function staticString(input) {
     ts.isIdentifier(node.expression) &&
     node.expression.text === "URL"
   ) {
-    return staticString(node.arguments?.[0]);
+    return staticString(node.arguments?.[0], context, seenSymbols);
   }
   if (
     ts.isCallExpression(node) &&
     ts.isIdentifier(node.expression) &&
-    ["String", "pathToFileURL", "fileURLToPath"].includes(node.expression.text)
+    STRING_WRAPPERS.has(node.expression.text)
   ) {
-    return staticString(node.arguments[0]);
+    return staticString(node.arguments[0], context, seenSymbols);
   }
   return undefined;
 }
 
-function staticFragments(input) {
+function staticFragments(input, context, seenSymbols = new Set()) {
   if (!input) return [];
   const node = unwrapStaticExpression(input);
-  if (node !== input) return staticFragments(node);
-  const exact = staticString(node);
+  if (node !== input) return staticFragments(node, context, seenSymbols);
+  const exact = staticString(node, context, seenSymbols);
   if (exact !== undefined) return [exact];
+  if (ts.isIdentifier(node)) {
+    const resolved = symbolInitializer(node, context, seenSymbols);
+    if (!resolved) return [];
+    try {
+      return staticFragments(resolved.initializer, context, seenSymbols);
+    } finally {
+      seenSymbols.delete(resolved.symbol);
+    }
+  }
+  if (ts.isPropertyAccessExpression(node) && node.name.text === "href") {
+    const resolvedHref = staticFragments(node.expression, context, seenSymbols);
+    if (resolvedHref.length) return resolvedHref;
+  }
+  const propertyInitializer = objectPropertyInitializer(node, context, seenSymbols);
+  if (propertyInitializer) {
+    return staticFragments(propertyInitializer, context, seenSymbols);
+  }
   if (ts.isTemplateExpression(node)) {
     return [
       node.head.text,
       ...node.templateSpans.flatMap((span) => [
-        ...staticFragments(span.expression),
+        ...staticFragments(span.expression, context, seenSymbols),
         span.literal.text,
       ]),
     ];
@@ -127,30 +221,76 @@ function staticFragments(input) {
     ts.isBinaryExpression(node) &&
     node.operatorToken.kind === ts.SyntaxKind.PlusToken
   ) {
-    return [...staticFragments(node.left), ...staticFragments(node.right)];
+    return [
+      ...staticFragments(node.left, context, seenSymbols),
+      ...staticFragments(node.right, context, seenSymbols),
+    ];
   }
   if (
     ts.isNewExpression(node) &&
     ts.isIdentifier(node.expression) &&
     node.expression.text === "URL"
   ) {
-    return staticFragments(node.arguments?.[0]);
+    return staticFragments(node.arguments?.[0], context, seenSymbols);
   }
   if (
     ts.isCallExpression(node) &&
     ts.isIdentifier(node.expression) &&
-    ["String", "pathToFileURL", "fileURLToPath"].includes(node.expression.text)
+    STRING_WRAPPERS.has(node.expression.text)
   ) {
-    return staticFragments(node.arguments[0]);
+    return staticFragments(node.arguments[0], context, seenSymbols);
   }
   return [];
 }
 
-function expressionTargetsLegacyModule(node) {
-  const exact = staticString(node);
+function expressionTargetsLegacyModule(node, context) {
+  const exact = staticString(node, context);
   if (exact !== undefined) return isLegacyModuleSpecifier(exact);
-  const fragments = staticFragments(node).join("");
+  const fragments = staticFragments(node, context).join("");
   return fragments ? isLegacyModuleSpecifier(fragments) : false;
+}
+
+function isCreateRequireFactory(node, context, seenSymbols = new Set()) {
+  if (!node) return false;
+  const expression = unwrapStaticExpression(node);
+  if (expression !== node) return isCreateRequireFactory(expression, context, seenSymbols);
+  if (ts.isCallExpression(expression)) {
+    if (
+      ts.isIdentifier(expression.expression) &&
+      expression.expression.text === "createRequire"
+    ) {
+      return true;
+    }
+    if (
+      ts.isPropertyAccessExpression(expression.expression) &&
+      expression.expression.name.text === "createRequire"
+    ) {
+      return true;
+    }
+  }
+  if (ts.isIdentifier(expression)) {
+    const resolved = symbolInitializer(expression, context, seenSymbols);
+    if (!resolved) return false;
+    try {
+      return isCreateRequireFactory(resolved.initializer, context, seenSymbols);
+    } finally {
+      seenSymbols.delete(resolved.symbol);
+    }
+  }
+  return false;
+}
+
+function callUsesRequire(node, context) {
+  if (ts.isIdentifier(node.expression) && node.expression.text === "require") {
+    return true;
+  }
+  if (
+    ts.isPropertyAccessExpression(node.expression) &&
+    node.expression.name.text === "require"
+  ) {
+    return true;
+  }
+  return isCreateRequireFactory(node.expression, context);
 }
 
 function scriptKindForLanguage(value, fallback) {
@@ -261,7 +401,54 @@ function namedExportsLegacy(elements, accesses) {
   }
 }
 
-function inspectSourceFile(sourceFile, accesses, mode) {
+function virtualExtension(scriptKind) {
+  if (scriptKind === ts.ScriptKind.TSX) return ".tsx";
+  if (scriptKind === ts.ScriptKind.JSX) return ".jsx";
+  if (scriptKind === ts.ScriptKind.JS) return ".js";
+  return ".ts";
+}
+
+function createAnalysisUnit(source, trackedPath, index, unit) {
+  const fileName = `${trackedPath}.__legacy_scan_${index}${virtualExtension(unit.scriptKind)}`;
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    unit.scriptKind,
+  );
+  const options = {
+    allowJs: true,
+    checkJs: false,
+    jsx: ts.JsxEmit.Preserve,
+    module: ts.ModuleKind.ESNext,
+    noLib: true,
+    noResolve: true,
+    skipLibCheck: true,
+    target: ts.ScriptTarget.Latest,
+  };
+  const host = {
+    fileExists: (candidate) => candidate === fileName,
+    getCanonicalFileName: (candidate) => candidate,
+    getCurrentDirectory: () => "",
+    getDefaultLibFileName: () => "lib.d.ts",
+    getDirectories: () => [],
+    getNewLine: () => "\n",
+    getSourceFile: (candidate) => candidate === fileName ? sourceFile : undefined,
+    readFile: (candidate) => candidate === fileName ? source : undefined,
+    useCaseSensitiveFileNames: () => true,
+    writeFile: () => {},
+  };
+  const program = ts.createProgram([fileName], options, host);
+  return {
+    checker: program.getTypeChecker(),
+    mode: unit.mode,
+    sourceFile: program.getSourceFile(fileName) ?? sourceFile,
+  };
+}
+
+function inspectSourceFile(context, accesses) {
+  const { sourceFile, mode } = context;
   const governed = (node, expression = false) =>
     mode !== "mdx" ||
     (expression
@@ -300,29 +487,15 @@ function inspectSourceFile(sourceFile, accesses, mode) {
       ts.isImportEqualsDeclaration(node) &&
       governed(node) &&
       ts.isExternalModuleReference(node.moduleReference) &&
-      expressionTargetsLegacyModule(node.moduleReference.expression)
+      expressionTargetsLegacyModule(node.moduleReference.expression, context)
     ) {
       accesses.add("require-import");
     } else if (ts.isCallExpression(node) && governed(node, true)) {
       const argument = node.arguments[0];
-      if (argument && expressionTargetsLegacyModule(argument)) {
+      if (argument && expressionTargetsLegacyModule(argument, context)) {
         if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
           accesses.add("dynamic-import");
-        } else if (
-          ts.isIdentifier(node.expression) &&
-          node.expression.text === "require"
-        ) {
-          accesses.add("require-import");
-        } else if (
-          ts.isPropertyAccessExpression(node.expression) &&
-          node.expression.name.text === "require"
-        ) {
-          accesses.add("require-import");
-        } else if (
-          ts.isCallExpression(node.expression) &&
-          ts.isIdentifier(node.expression.expression) &&
-          node.expression.expression.text === "createRequire"
-        ) {
+        } else if (callUsesRequire(node, context)) {
           accesses.add("require-import");
         }
       }
@@ -336,14 +509,8 @@ export function legacyAnimationSourceAccesses(source, trackedPath = "source.ts")
   const accesses = new Set();
   const units = sourceUnits(source, trackedPath);
   for (const [index, unit] of units.entries()) {
-    const sourceFile = ts.createSourceFile(
-      `${trackedPath}#${index}`,
-      unit.source,
-      ts.ScriptTarget.Latest,
-      true,
-      unit.scriptKind,
-    );
-    inspectSourceFile(sourceFile, accesses, unit.mode);
+    const context = createAnalysisUnit(unit.source, trackedPath, index, unit);
+    inspectSourceFile(context, accesses);
   }
   return Object.freeze([...accesses].sort(codePointCompare));
 }
