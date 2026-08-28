@@ -1,0 +1,83 @@
+{
+  "schema": "evavo.project-art-eva-talk-neutral-local-materialization-capability.v1",
+  "protocolVersion": "2026-08-28.1",
+  "characterId": "eva-female",
+  "clipId": "talk-neutral",
+  "campaign": "config/eva-talk-neutral-local-materialization-campaign-v1.json",
+  "implementation": "scripts/project-art/eva-talk-neutral-local-materialization-queue.mjs",
+  "modules": [
+    "scripts/project-art/eva-talk-neutral-local-queue-common.mjs",
+    "scripts/project-art/eva-talk-neutral-local-queue-png.mjs",
+    "scripts/project-art/eva-talk-neutral-local-queue-campaign.mjs",
+    "scripts/project-art/eva-talk-neutral-local-queue-init.mjs",
+    "scripts/project-art/eva-talk-neutral-local-queue-claims.mjs",
+    "scripts/project-art/eva-talk-neutral-local-queue-completion.mjs"
+  ],
+  "cli": "scripts/eva-talk-neutral-local-materialization-queue.mjs",
+  "checker": "scripts/check-eva-talk-neutral-local-materialization-queue.mjs",
+  "tests": [
+    "scripts/test-eva-talk-neutral-local-materialization-queue.mjs",
+    "scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs"
+  ],
+  "documentation": [
+    "docs/EVA_TALK_NEUTRAL_LOCAL_MATERIALIZATION_QUEUE.md",
+    "docs/eva-talk-neutral-local-materialization-operator-checklist.md"
+  ],
+  "queue": {
+    "batchCount": 8,
+    "imagesPerBatch": 10,
+    "candidateCount": 80,
+    "semanticSelectionTargetFrameCount": 36,
+    "atomicSameFilesystemClaim": true,
+    "packetOnlyOrphanRecovery": true,
+    "workerBoundClaims": true,
+    "minimumLeaseSeconds": 60,
+    "maximumLeaseSeconds": 3600,
+    "heartbeatLeaseExtension": true,
+    "expiredClaimRequeueRequiresNoWorkerEvidence": true,
+    "completionReceiptRequired": true,
+    "failureReceiptRequired": true
+  },
+  "outputAdmission": {
+    "exactOutputsPerClaim": 10,
+    "mediaType": "image/png",
+    "width": 1024,
+    "height": 1536,
+    "bitDepth": 8,
+    "colourType": 6,
+    "interlace": 0,
+    "pngSignatureRequired": true,
+    "chunkCrcRequired": true,
+    "idatInflateRequired": true,
+    "scanlineFiltersValidated": true,
+    "exactByteLengthRequired": true,
+    "sha256Required": true,
+    "uniqueOutputBodiesRequired": true,
+    "manifestPreparedFromClaimOutputs": true
+  },
+  "execution": {
+    "localFilesystemOnly": true,
+    "zeroCost": true,
+    "providerCredentialsIncluded": false,
+    "providerExecutionIncluded": false,
+    "networkAccessIncluded": false,
+    "hostedCiRequired": false,
+    "vercelRequired": false
+  },
+  "authority": {
+    "networkAccess": false,
+    "providerExecution": false,
+    "paidExecution": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "sourceMutation": false,
+    "repositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "websiteActivation": false,
+    "deployment": false,
+    "forcePush": false
+  }
+}
