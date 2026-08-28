@@ -2,16 +2,18 @@
 
 ## Purpose
 
-Animation Source Bundle compilation and verification operate on two different trust boundaries:
+Animation Source Bundle compilation and verification operate on separate local trust boundaries:
 
 1. control documents such as compile requests and bundle manifests;
-2. generated JSON such as manifests and verification receipts.
+2. exact source-media observations;
+3. generated JSON such as manifests and verification receipts;
+4. repository code that could attempt to regain the retired compatibility helpers.
 
-Both boundaries are local-first. They do not require GitHub Actions, Vercel, a hosted worker, or an external provider.
+These boundaries are local-first. They do not require GitHub Actions, Vercel, a hosted worker, or an external provider.
 
 ## Stable control-document reads
 
-The CLI no longer treats a request or manifest as ordinary unbounded text. It reads the document through:
+The CLI reads request and manifest documents through:
 
 ```text
 scripts/lib/animation-source-control-document.mjs
@@ -70,19 +72,18 @@ node scripts/animation-source-bundle.mjs verify `
 
 The writer:
 
-- resolves and pins the ordinary parent-directory identity before writing;
-- rechecks that parent identity before and after publication;
 - rejects symbolic-link parents and destinations;
 - rejects hard-linked destinations;
 - refuses to target the request, manifest, or any declared source asset;
-- serializes through an exclusive sibling lock;
+- pins parent-directory realpath and filesystem identity across the operation;
+- serializes cooperating writers through an exclusive sibling lock;
 - writes and synchronizes a private sibling temporary file;
 - publishes a new file without overwriting an existing path;
 - uses atomic rename only for an explicitly requested replacement;
 - never performs delete-first replacement;
-- opens the published destination without following links where supported;
-- verifies the published handle and path retain one identity;
-- verifies the published bytes and length;
+- opens the published path without following links where supported;
+- binds the published path and opened handle to one filesystem identity;
+- verifies the published bytes and length before and after observation;
 - removes temporary and lock files only when their filesystem identity still matches the writer's own file.
 
 The default generated JSON limit is 32 MiB. The hard maximum is 128 MiB.
@@ -90,6 +91,27 @@ The default generated JSON limit is 32 MiB. The hard maximum is 128 MiB.
 ```powershell
 --max-output-bytes 33554432
 ```
+
+## Legacy compatibility confinement
+
+The canonical bundle library still exposes `readJson` and `writeJsonAtomic` only for historical regression compatibility. New production code must not import, re-export, namespace-load, dynamically load, or otherwise regain those helpers.
+
+The local scanner reads only Git-tracked code and covers Astro, JavaScript, JSX, MDX, Svelte, TypeScript, TSX and Vue files. It applies strict UTF-8, NFC and portable-path checks, rejects linked code files, and reads each tracked file twice through one stable open handle.
+
+The syntax-aware resolver follows only safe immutable provenance:
+
+- `const` declarations with an initializer;
+- declarations visible in the same lexical scope or a parent scope;
+- declarations that occur before the governed use;
+- statically concatenated strings and templates;
+- `new URL(...)`, `.href`, `String(...)`, `pathToFileURL(...)` and `fileURLToPath(...)` when their constructors or helpers are the recognised globals or Node imports;
+- named and namespace imports of `createRequire` from `node:module` or `module`;
+- immutable aliases of a recognised `createRequire` factory and the loader it returns;
+- a direct CommonJS `require("node:module")` namespace.
+
+Mutable bindings, function parameters, local shadows, declarations in their temporal dead zone, user-defined `URL`, user-defined `createRequire`, prose, comments, string examples and fenced MDX examples do not inherit authority from an unrelated outer declaration. Explicit test surfaces remain exempt, but a production file cannot evade the scan merely by beginning its basename with `test-`.
+
+The scanner does not execute code, providers, package scripts, GitHub Actions or Vercel. It deterministically reports a violation and makes the local gate fail.
 
 ## Evidence
 
@@ -107,6 +129,8 @@ The control observation records the full path, byte length, SHA-256 digest, BOM 
 
 The output receipt records the full path, byte length, SHA-256 digest, whether a previous destination was replaced, whether the operation was create-only, and whether atomic publication was used.
 
+The legacy-usage report records tracked and scanned file counts, bounded bytes, violations, stable double-read evidence, portable-path collision evidence, and a fixed no-provider/no-hosted-automation authority block.
+
 ## Authority boundary
 
 These controls do not grant:
@@ -119,28 +143,19 @@ These controls do not grant:
 - GitHub Actions execution;
 - Vercel execution.
 
-They only prove that the local control document and emitted JSON were handled through the governed filesystem boundary.
+They only prove that local control documents, source media, emitted JSON, and repository helper access were handled through the governed boundaries.
 
 ## Local verification
 
 ```powershell
 node --check scripts/lib/animation-source-control-document.mjs
 node --check scripts/lib/animation-source-output.mjs
-node --check scripts/animation-source-bundle.mjs
-node --test scripts/test-ci-media-tool-animation-source-control-boundary.mjs
+node --check scripts/lib/animation-source-legacy-access-v2.mjs
+node --test scripts/test-ci-media-tool-animation-source-legacy-v2-*.mjs
+node --test scripts/test-ci-media-tool-animation-source-*.mjs
 node scripts/check-animation-source-bundle.mjs
 pnpm run animation-source:check
+pnpm check
 ```
 
-## Legacy compatibility boundary
-
-The canonical bundle library retains `readJson` and `writeJsonAtomic` only as a narrow compatibility surface for the historical regression contract. New production code must use `readAnimationSourceControlDocument` and `writeAnimationSourceJson`.
-
-The local governance check enumerates Git-tracked JavaScript and TypeScript files and rejects production code that references a legacy helper through `animation-source-bundle.mjs`. Test files may retain compatibility coverage, but production scripts, apps, packages and tools cannot make the old helpers authoritative again.
-
-```powershell
-node --test scripts/test-ci-media-tool-animation-source-legacy-boundary.mjs
-node scripts/check-animation-source-bundle.mjs
-```
-
-The scan is local, bounded, strict-UTF-8, tracked-file-only and rejects symbolic code files. It neither executes providers nor requires GitHub Actions or Vercel.
+The complete repository check remains authoritative on the governed Windows workstation before `main` is updated.
