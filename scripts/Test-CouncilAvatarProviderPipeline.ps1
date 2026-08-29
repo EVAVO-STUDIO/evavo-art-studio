@@ -122,6 +122,7 @@ foreach ($Entry in $RequiredArtFiles.GetEnumerator()) {
 
 $RuntimePackagePath = Join-Path $Runtime 'package.json'
 $WebsitePresentationPath = Join-Path $Website 'src\features\council\avatarPresentation.ts'
+$RuntimeVersion = $null
 if (Require-File $RuntimePackagePath 'runtime-package') {
     $RuntimePackage = Get-Content -LiteralPath $RuntimePackagePath -Raw | ConvertFrom-Json -ErrorAction Stop
     $RuntimeVersion = [string]$RuntimePackage.version
@@ -131,9 +132,6 @@ if (Require-File $RuntimePackagePath 'runtime-package') {
     if ($VersionValid) {
         Add-Check 'runtime-version-floor-041' ($RuntimeVersionParsed -ge [version]'0.41.0') $RuntimeVersion
     }
-}
-else {
-    $RuntimeVersion = $null
 }
 
 if (Require-File $WebsitePresentationPath 'website-council-presentation') {
@@ -165,11 +163,18 @@ if (Require-File $ProviderHandlerPath 'worker-provider-handler') {
 $BuildPassed = $true
 if (-not $SkipBuild) {
     if ($Pnpm) {
-        $Build = Invoke-NativeChecked 'art-provider-worker-build' $Pnpm.Source @('--filter','@evavo/art-artifacts','build','--filter','@evavo/art-providers','build','--filter','@evavo/art-runtime','build','--filter','@evavo/art-studio-worker','build') $Art
+        $Build = Invoke-NativeChecked 'art-provider-worker-build' $Pnpm.Source @(
+            '--filter','@evavo/art-artifacts',
+            '--filter','@evavo/art-providers',
+            '--filter','@evavo/art-runtime',
+            '--filter','@evavo/art-studio-worker',
+            'build'
+        ) $Art
         $BuildPassed = $Build.ok
     }
     else {
         $BuildPassed = $false
+        Add-Check 'art-provider-worker-build' $false 'pnpm is unavailable'
     }
 }
 else {
@@ -180,7 +185,7 @@ if (-not $SkipTests -and $Node -and ($BuildPassed -or $SkipBuild)) {
     [void](Invoke-NativeChecked 'art-council-provider-contract-tests' $Node.Source @('--test','scripts/test-project-art-council-avatar-provider-runtime.mjs','scripts/test-project-art-council-avatar-provider-authorization.mjs','scripts/test-project-art-council-avatar-review-handoff.mjs') $Art)
     [void](Invoke-NativeChecked 'art-council-provider-worker-guard-tests' $Node.Source @('--test','apps/worker/test/council-avatar-provider-authorization.test.mjs') $Art)
 }
-elif (-not $SkipTests) {
+elseif (-not $SkipTests) {
     Add-Check 'art-council-provider-tests-runnable' $false 'Tests require Node and a successful/current Art Studio build.'
 }
 else {
