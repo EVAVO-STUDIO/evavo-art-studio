@@ -12,24 +12,26 @@ test('Council runtime jobs preserve canonical provider contracts but fail closed
   const runtimePackage = compileCouncilAvatarProviderRuntimePackage();
 
   assert.equal(runtimePackage.jobs.length, 2);
-  assert.equal(
-    runtimePackage.executionCapability,
-    COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY,
-  );
+  assert.equal(runtimePackage.executionCapability, COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY);
   assert.equal(runtimePackage.executionPolicy.genericProviderWorkerMayClaim, false);
+  assert.equal(runtimePackage.executionPolicy.normalizedRuntimeSpecsBound, true);
   assert.equal(runtimePackage.providerCallBudget.maximumAttemptsPerJob, 1);
   assert.equal(runtimePackage.providerCallBudget.retriesAuthorizedByThisPackage, 0);
   assert.equal(runtimePackage.providerCallBudget.fallbackAuthorizedByThisPackage, false);
 
   for (const job of runtimePackage.jobs) {
     assert.ok(HEX64.test(job.canonicalContractSha256));
-    assert.ok(HEX64.test(job.runtimeJobSha256));
+    assert.ok(HEX64.test(job.runtimeSubmissionSha256));
+    assert.ok(HEX64.test(job.runtimeSpecSha256));
     assert.equal(job.canonicalContract.executionMode, 'submit-runtime-job');
     assert.equal(job.runtimeJob.queue, 'provider');
     assert.equal(job.runtimeJob.kind, 'art.candidate.generate');
     assert.equal(job.runtimeJob.maximumAttempts, 1);
+    assert.equal(job.normalizedRuntimeSpec.schemaVersion, '1.0');
+    assert.equal(job.normalizedRuntimeSpec.maximumAttempts, 1);
+    assert.ok(job.normalizedRuntimeSpec.id.startsWith('job_'));
     assert.ok(
-      job.runtimeJob.requiredCapabilities.includes(
+      job.normalizedRuntimeSpec.requiredCapabilities.includes(
         COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY,
       ),
     );
@@ -45,21 +47,30 @@ test('Council runtime jobs preserve canonical provider contracts but fail closed
   }
 });
 
-test('Council governed runtime removes canonical automatic retries without mutating canonical contract evidence', () => {
+test('Council governed runtime removes canonical automatic retries and records runtime normalization', () => {
   const runtimePackage = compileCouncilAvatarProviderRuntimePackage();
 
   for (const job of runtimePackage.jobs) {
     assert.equal(job.canonicalContract.runtimeJob.maximumAttempts, 3);
     assert.equal(job.runtimeJob.maximumAttempts, 1);
-    assert.notEqual(job.runtimeJobSha256, job.canonicalContractSha256);
+    assert.equal(job.normalizedRuntimeSpec.maximumAttempts, 1);
+    assert.notEqual(job.runtimeSubmissionSha256, job.canonicalContractSha256);
+    assert.deepEqual(job.runtimeJob.payload, job.canonicalContract.runtimeJob.payload);
     assert.deepEqual(
-      job.runtimeJob.payload,
+      job.normalizedRuntimeSpec.payload,
       job.canonicalContract.runtimeJob.payload,
     );
     assert.deepEqual(
       job.runtimeJob.requiredCapabilityProfile,
       job.canonicalContract.runtimeJob.requiredCapabilityProfile,
     );
+    assert.deepEqual(
+      job.normalizedRuntimeSpec.requiredCapabilityProfile,
+      job.canonicalContract.runtimeJob.requiredCapabilityProfile,
+    );
+    assert.deepEqual(job.normalizedRuntimeSpec.dependencyJobIds, []);
+    assert.deepEqual(job.normalizedRuntimeSpec.inputArtifacts, []);
+    assert.equal(job.normalizedRuntimeSpec.priority, 0);
   }
 });
 
