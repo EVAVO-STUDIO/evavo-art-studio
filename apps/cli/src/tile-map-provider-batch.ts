@@ -18,6 +18,7 @@ export type TileMapProviderRuntimeBatch = {
     candidate_id: string;
     task_id: string;
     visual_family: string;
+    provider_family_id: string;
     output_path: string;
     request_sha256: string;
     prompt_sha256: string;
@@ -66,6 +67,7 @@ export async function compileTileMapProviderRuntimeBatch(
     const candidateId = text(row.candidate_id, `jobs[${index}].candidate_id`);
     const taskId = text(row.task_id, `jobs[${index}].task_id`);
     const visualFamily = text(row.visual_family, `jobs[${index}].visual_family`);
+    const providerFamilyId = providerSafeFamilyId(visualFamily);
     const outputPath = text(row.output_path, `jobs[${index}].output_path`);
     const dimensions = object(row.dimensions, `jobs[${index}].dimensions`);
     const width = positiveInteger(dimensions.width, `jobs[${index}].dimensions.width`);
@@ -114,7 +116,7 @@ export async function compileTileMapProviderRuntimeBatch(
       assetKind: "environment" as const,
       continuityPhase: "independent" as const,
       assetId: taskId,
-      candidateFamilyId: visualFamily,
+      candidateFamilyId: providerFamilyId,
       creativeIntent,
       negativeIntent: mustAvoid.join(" "),
       style: {
@@ -163,6 +165,7 @@ export async function compileTileMapProviderRuntimeBatch(
         candidateId,
         taskId,
         visualFamily,
+        providerFamilyId,
         outputPath,
         sourceCandidateBatchFingerprint: sourceBatchFingerprint,
         sourcePackageFingerprint,
@@ -184,6 +187,7 @@ export async function compileTileMapProviderRuntimeBatch(
       candidate_id: candidateId,
       task_id: taskId,
       visual_family: visualFamily,
+      provider_family_id: providerFamilyId,
       output_path: outputPath,
       request_sha256: contract.requestSha256,
       prompt_sha256: contract.compiledPromptSha256,
@@ -228,6 +232,9 @@ export async function compileTileMapProviderRuntimeBatch(
   };
 }
 
+function providerSafeFamilyId(value: string): string {
+  return `tile-map-family-${sha256(Buffer.from(value, "utf8")).slice(0, 40)}`;
+}
 function parseObject(content: string, label: string): JsonObject {
   try {
     return object(JSON.parse(content) as unknown, label);
