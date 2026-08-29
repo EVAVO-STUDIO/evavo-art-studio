@@ -30,6 +30,7 @@ export type TileMapApprovedSourcesManifest = {
   source_map_fingerprint: string;
   approval_path: string;
   approval_sha256: string;
+  approved_source_root: string;
   map_id: string;
   consumer_adapter: string | null;
   projection: string;
@@ -51,6 +52,7 @@ export type TileMapApprovedSourcesManifest = {
 export async function compileApprovedSourcesManifest(
   sourcePackagePath: string,
   approvalPath: string,
+  approvedSourceRoot?: string,
 ): Promise<TileMapApprovedSourcesManifest> {
   const [packageBytes, approvalBytes] = await Promise.all([
     readFile(sourcePackagePath),
@@ -93,10 +95,12 @@ export async function compileApprovedSourcesManifest(
   const missing = [...packageTasks.keys()].filter((id) => !decisions.has(id));
   if (missing.length) throw failure("EVAVO_TILE_MAP_APPROVAL_MISSING", `approval is missing tasks: ${missing.join(", ")}`);
 
-  const approvalRoot = path.dirname(path.resolve(approvalPath));
+  const approvalRoot = approvedSourceRoot
+    ? path.resolve(approvedSourceRoot)
+    : path.dirname(path.resolve(approvalPath));
   const tasks: ApprovedTask[] = [];
   for (const [taskId, task] of [...packageTasks.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const decision = decisions.get(taskId)!;
+    const approvalDecision = decisions.get(taskId)!;
     const required = positiveInteger(task.required_approved_variants, `${taskId}.required_approved_variants`);
     const taskKind = text(task.task_kind, `${taskId}.task_kind`);
     if (taskKind !== "tile-family" && taskKind !== "feature-family") {
@@ -106,7 +110,7 @@ export async function compileApprovedSourcesManifest(
     const expectedWidth = positiveInteger(dimensions.width, `${taskId}.dimensions.width`);
     const expectedHeight = positiveInteger(dimensions.height, `${taskId}.dimensions.height`);
     const alphaRequired = booleanValue(task.alpha_required, `${taskId}.alpha_required`);
-    const rows = array(decision.approved_sources, `${taskId}.approved_sources`);
+    const rows = array(approvalDecision.approved_sources, `${taskId}.approved_sources`);
     if (rows.length < required) {
       throw failure("EVAVO_TILE_MAP_APPROVAL_COUNT", `${taskId} has ${rows.length} approved sources; requires at least ${required}`);
     }
@@ -124,7 +128,7 @@ export async function compileApprovedSourcesManifest(
       const absolute = path.resolve(approvalRoot, ...requested.split("/"));
       const relative = path.relative(approvalRoot, absolute);
       if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-        throw failure("EVAVO_TILE_MAP_APPROVAL_PATH", `approved source escapes approval root: ${requested}`);
+        throw failure("EVAVO_TILE_MAP_APPROVAL_PATH", `approved source escapes approved source root: ${requested}`);
       }
       const bytes = await readFile(absolute);
       const actual = sha256(bytes);
@@ -185,6 +189,7 @@ export async function compileApprovedSourcesManifest(
     source_map_fingerprint: sourceMapFingerprint,
     approval_path: path.resolve(approvalPath),
     approval_sha256: sha256(approvalBytes),
+    approved_source_root: approvalRoot,
     map_id: text(sourcePackage.map_id, "source package map_id"),
     consumer_adapter: nullableText(sourcePackage.consumer_adapter, "source package consumer_adapter"),
     projection: text(sourcePackage.projection, "source package projection"),
