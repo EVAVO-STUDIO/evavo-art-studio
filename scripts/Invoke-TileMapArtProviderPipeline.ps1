@@ -123,7 +123,7 @@ try {
         Write-Host "Expires:       $ExpiresAtText"
         Write-Host ""
         Write-Host 'Re-run with -ExecuteProvider before expiry to make provider calls.'
-        exit 0
+        return
     }
 
     $ExecutionReceipt = Join-Path $EvidenceRoot '06-provider-execution.receipt.json'
