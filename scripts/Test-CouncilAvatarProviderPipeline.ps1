@@ -107,13 +107,13 @@ $RequiredArtFiles = [ordered]@{
     'provider-readiness' = 'scripts\project-art\council-avatar-provider-readiness.mjs'
     'provider-authorization' = 'scripts\project-art\council-avatar-provider-authorization.mjs'
     'provider-executor' = 'scripts\project-art\council-avatar-provider-executor.mjs'
-    'provider-review-handoff' = 'scripts\project-art\council-avatar-provider-review-handoff.mjs'
+    'review-handoff' = 'scripts\project-art\council-avatar-review-handoff.mjs'
     'provider-readiness-cli' = 'scripts\inspect-project-art-council-avatar-provider-readiness.mjs'
     'provider-execution-cli' = 'scripts\execute-project-art-council-avatar-provider.mjs'
-    'provider-review-handoff-cli' = 'scripts\compile-project-art-council-avatar-review-handoff.mjs'
+    'review-handoff-cli' = 'scripts\compile-project-art-council-avatar-review-handoff.mjs'
     'provider-runtime-test' = 'scripts\test-project-art-council-avatar-provider-runtime.mjs'
     'provider-authorization-test' = 'scripts\test-project-art-council-avatar-provider-authorization.mjs'
-    'provider-review-handoff-test' = 'scripts\test-project-art-council-avatar-review-handoff.mjs'
+    'review-handoff-test' = 'scripts\test-project-art-council-avatar-review-handoff.mjs'
     'worker-provider-authorization-test' = 'apps\worker\test\council-avatar-provider-authorization.test.mjs'
 }
 foreach ($Entry in $RequiredArtFiles.GetEnumerator()) {
@@ -182,7 +182,7 @@ else {
 }
 
 if (-not $SkipTests -and $Node -and ($BuildPassed -or $SkipBuild)) {
-    [void](Invoke-NativeChecked 'art-council-provider-contract-tests' $Node.Source @('--test','scripts/test-project-art-council-avatar-provider-runtime.mjs','scripts/test-project-art-council-avatar-provider-authorization.mjs','scripts/test-project-art-council-avatar-review-handoff.mjs') $Art)
+    [void](Invoke-NativeChecked 'art-council-provider-contract-tests' $Node.Source @('--test','scripts/test-project-art-council-avatar-provider-runtime.mjs','scripts/test-project-art-council-avatar-provider-authorization.mjs','scripts/test-project-art-council-avatar-review-handoff.mjs','scripts/test-council-avatar-provider-pipeline-powershell.mjs','scripts/test-council-avatar-worker-stack-powershell.mjs') $Art)
     [void](Invoke-NativeChecked 'art-council-provider-worker-guard-tests' $Node.Source @('--test','apps/worker/test/council-avatar-provider-authorization.test.mjs') $Art)
 }
 elseif (-not $SkipTests) {
