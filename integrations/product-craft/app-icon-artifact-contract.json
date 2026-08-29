@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "capability": "product-icon-concept",
+  "accepts": {
+    "brief": ["product", "audience", "primaryJob", "tone", "antiReferences", "platforms"],
+    "referenceImages": "optional and rights-cleared"
+  },
+  "produces": {
+    "conceptBoard": "3-5 genuinely different visual territories",
+    "selectedRasterMaster": "2048x2048 or larger layered/raster source",
+    "provenance": ["origin", "promptOrMethod", "sourceHashes", "licence", "humanSelectionNotes"],
+    "handoff": "Vector Studio refinement brief"
+  },
+  "releaseBlocks": [
+    "raw model output used as launcher asset",
+    "letters, product name or wordmark inside launcher art",
+    "generic sparkle, robot head, gradient orb or stock glasses glyph without a product-specific idea",
+    "unverified copyrighted style imitation",
+    "no small-size or mask strategy"
+  ],
+  "authority": "Concept and raster exploration only. Platform export approval belongs to Product Craft after Vector Studio refinement and review."
+}
