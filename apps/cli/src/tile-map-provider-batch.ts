@@ -148,6 +148,9 @@ export async function compileTileMapProviderRuntimeBatch(
         transparency: alphaRequired ? ("required" as const) : ("preferred" as const),
         outputFormat: "png" as const,
       },
+      background: {
+        strategy: alphaRequired ? ("native-alpha" as const) : ("provider-auto" as const),
+      },
       quality: "high" as const,
       candidateCount: 1,
       seed,
