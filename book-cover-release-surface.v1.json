@@ -1,0 +1,45 @@
+{
+  "outputKind": "evavo_book_cover_release_surface",
+  "schemaVersion": 1,
+  "contract": "evavo_book_cover_release_surface_v1",
+  "repository": "EVAVO-STUDIO/evavo-art-studio",
+  "owner": "art_production",
+  "requiredBranch": "main",
+  "requiredFiles": [
+    "packages/contracts/src/book-cover-design-intelligence.ts",
+    "packages/contracts/src/book-cover-commercial-release-v2.ts",
+    "packages/contracts/test/book-cover-commercial-release-v2.test.mjs",
+    "scripts/check-book-cover-commercial-release-v2.mjs"
+  ],
+  "captureRoots": [
+    "packages/contracts/src",
+    "packages/contracts/test",
+    "scripts",
+    "docs",
+    ".github/workflows"
+  ],
+  "includePathFragments": [
+    "book-cover",
+    "bookCover",
+    "book_cover"
+  ],
+  "captureExtensions": [
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".js",
+    ".ps1",
+    ".md",
+    ".json",
+    ".yml",
+    ".yaml"
+  ],
+  "localValidationCommands": [
+    "pnpm --filter @evavo/art-contracts test",
+    "node scripts/check-book-cover-commercial-release-v2.mjs"
+  ],
+  "networkRequiredForDeterministicValidation": false,
+  "paidServiceRequired": false,
+  "githubHostedActionsRequired": false,
+  "vercelBackgroundWorkerRequired": false
+}
