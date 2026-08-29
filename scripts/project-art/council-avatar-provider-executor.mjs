@@ -7,6 +7,10 @@ import {
   RuntimeWorker,
 } from '../../packages/runtime/dist/index.js';
 import {
+  candidateMasteringWorkerCapabilities,
+  createCandidateMasteringHandlers,
+} from '../../apps/worker/dist/mastering-handlers.js';
+import {
   COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY as WORKER_EXECUTION_CAPABILITY,
   createProviderHandlers,
   createProviderRegistryFromEnvironment,
@@ -106,6 +110,109 @@ function createAuthorizer(authorization, runtimePackage, executableJobs) {
   });
 }
 
+async function providerCandidateIds(runtime, artifacts, records) {
+  const ids = [];
+  for (const record of records) {
+    const completed = await runtime.get(record.jobId);
+    for (const artifactId of completed?.outputArtifacts ?? []) {
+      const descriptor = await artifacts.get(artifactId);
+      if (
+        descriptor?.storageClass === 'intermediate' &&
+        descriptor.labels.artifactRole === 'provider-candidate' &&
+        descriptor.labels.approvalState === 'unapproved'
+      ) {
+        ids.push(Object.freeze({ characterId: record.characterId, artifactId }));
+      }
+    }
+  }
+  return Object.freeze(ids);
+}
+
+async function runTechnicalAssurance(runtime, artifacts, candidates, authorizationSha256) {
+  if (!candidates.length) {
+    return Object.freeze({ submitted: 0, claimed: 0, succeeded: 0, failed: 0, jobs: Object.freeze([]) });
+  }
+  const records = [];
+  for (const candidate of candidates) {
+    const job = await runtime.submit({
+      queue: 'media',
+      kind: 'art.candidate.master-alpha',
+      idempotencyKey: `council-avatar:technical-assurance:${candidate.artifactId}`,
+      payload: {
+        candidateArtifactId: candidate.artifactId,
+        backgroundMode: 'native-alpha',
+        targetWidth: 1024,
+        targetHeight: 1536,
+        resampling: 'lanczos3',
+        deliveryProfileId: 'godot-sprite-lossless',
+        requireFakeTransparencyRejection: true,
+        requireMeaningfulAlpha: true,
+        proofBackgrounds: ['#000000', '#ffffff', '#808080', '#00ff00', '#ff00ff'],
+        frameId: `${candidate.characterId}:identity-master`,
+      },
+      inputArtifacts: [candidate.artifactId],
+      requiredCapabilities: [
+        'media.background-recovery',
+        'media.raster',
+        'quality.sprite-frame',
+        'evidence.bundle',
+      ],
+      maximumAttempts: 1,
+      labels: {
+        councilCharacterId: candidate.characterId,
+        assuranceStage: 'identity-master-technical',
+        authorizationSha256,
+      },
+    });
+    records.push(Object.freeze({ ...candidate, jobId: job.id }));
+  }
+
+  const capabilities = candidateMasteringWorkerCapabilities();
+  const worker = new RuntimeWorker({
+    runtime,
+    artifacts,
+    worker: {
+      id: `council-avatar-assurance:${authorizationSha256.slice(0, 16)}`,
+      capabilities,
+      queues: Object.freeze(['media']),
+    },
+    handlers: createCandidateMasteringHandlers(),
+    concurrency: 1,
+  });
+  const run = await worker.runUntilIdle();
+  const jobs = [];
+  for (const record of records) {
+    const completed = await runtime.get(record.jobId);
+    const outputs = [];
+    for (const artifactId of completed?.outputArtifacts ?? []) {
+      const descriptor = await artifacts.get(artifactId);
+      if (!descriptor) continue;
+      outputs.push(Object.freeze({
+        artifactId,
+        artifactRole: descriptor.labels.artifactRole ?? null,
+        approvalState: descriptor.labels.approvalState ?? null,
+        qualityState: descriptor.labels.qualityState ?? null,
+      }));
+    }
+    jobs.push(Object.freeze({
+      characterId: record.characterId,
+      sourceCandidateArtifactId: record.artifactId,
+      jobId: record.jobId,
+      state: completed?.state ?? 'missing',
+      attempts: completed?.attempts?.length ?? 0,
+      failureCode: completed?.failure?.code ?? null,
+      outputs: Object.freeze(outputs),
+    }));
+  }
+  return Object.freeze({
+    submitted: records.length,
+    claimed: run.claimed,
+    succeeded: run.succeeded,
+    failed: run.failed,
+    jobs: Object.freeze(jobs),
+  });
+}
+
 export async function executeAuthorizedCouncilAvatarProviderJobs({
   authorizationPath,
   runtimeRoot,
@@ -154,7 +261,7 @@ export async function executeAuthorizedCouncilAvatarProviderJobs({
     records.push(Object.freeze({ characterId: job.characterId, jobId: record.id }));
   }
 
-  const worker = new RuntimeWorker({
+  const providerWorker = new RuntimeWorker({
     runtime,
     artifacts,
     worker: {
@@ -170,7 +277,15 @@ export async function executeAuthorizedCouncilAvatarProviderJobs({
     concurrency: 1,
   });
 
-  const run = await worker.runUntilIdle();
+  const providerRun = await providerWorker.runUntilIdle();
+  const candidates = await providerCandidateIds(runtime, artifacts, records);
+  const assurance = await runTechnicalAssurance(
+    runtime,
+    artifacts,
+    candidates,
+    authorization.authorizationSha256,
+  );
+
   const jobs = [];
   for (const record of records) {
     const completed = await runtime.get(record.jobId);
@@ -199,7 +314,14 @@ export async function executeAuthorizedCouncilAvatarProviderJobs({
     candidateApprovalEstablished: false,
     candidatePromotionEstablished: false,
     runtimeActivationAllowed: false,
-    worker: Object.freeze({ claimed: run.claimed, succeeded: run.succeeded, failed: run.failed }),
+    provider: Object.freeze({
+      claimed: providerRun.claimed,
+      succeeded: providerRun.succeeded,
+      failed: providerRun.failed,
+      candidateArtifactsFound: candidates.length,
+    }),
+    technicalAssurance: assurance,
+    independentVisualReviewRequired: true,
     jobs: Object.freeze(jobs),
   });
 }
