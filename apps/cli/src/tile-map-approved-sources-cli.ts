@@ -2,23 +2,28 @@
 import { writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 
-import { compileApprovedSourcesManifest } from "./tile-map-approved-sources.js";
+import { compileReviewedApprovedSourcesManifest } from "./tile-map-reviewed-approved-sources.js";
 
 async function main(): Promise<void> {
   const parsed = parseArgs({
     args: process.argv.slice(3),
     options: {
       package: { type: "string", short: "p" },
+      review: { type: "string", short: "r" },
       approval: { type: "string", short: "a" },
       output: { type: "string", short: "o" },
     },
     allowPositionals: false,
     strict: true,
   });
-  if (!parsed.values.package || !parsed.values.approval) {
-    throw new Error("--package and --approval are required");
+  if (!parsed.values.package || !parsed.values.review || !parsed.values.approval) {
+    throw new Error("--package, --review and --approval are required");
   }
-  const result = await compileApprovedSourcesManifest(parsed.values.package, parsed.values.approval);
+  const result = await compileReviewedApprovedSourcesManifest(
+    parsed.values.package,
+    parsed.values.review,
+    parsed.values.approval,
+  );
   const content = `${JSON.stringify(result, null, 2)}\n`;
   if (parsed.values.output) await writeFile(parsed.values.output, content, { encoding: "utf8", flag: "wx" });
   else process.stdout.write(content);
