@@ -4,15 +4,29 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import sharp from "sharp";
 
 import { compileApprovedSourcesManifest } from "../dist/tile-map-approved-sources.js";
 
 const sha = (value) => createHash("sha256").update(value).digest("hex");
 
-async function fixture({ duplicate = false, wrongPackage = false } = {}) {
+async function png(width, height, rgba) {
+  return sharp({
+    create: {
+      width,
+      height,
+      channels: 4,
+      background: rgba,
+    },
+  }).png().toBuffer();
+}
+
+async function fixture({ duplicate = false, wrongPackage = false, size = 16 } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-tile-map-approved-"));
-  const a = Buffer.from("approved-source-a");
-  const b = duplicate ? a : Buffer.from("approved-source-b");
+  const a = await png(size, size, { r: 40, g: 140, b: 70, alpha: 1 });
+  const b = duplicate
+    ? a
+    : await png(size, size, { r: 55, g: 155, b: 80, alpha: 1 });
   await writeFile(path.join(root, "a.png"), a);
   await writeFile(path.join(root, "b.png"), b);
   const packagePayload = {
@@ -72,13 +86,16 @@ async function fixture({ duplicate = false, wrongPackage = false } = {}) {
   return { packagePath, approvalPath, root };
 }
 
-test("exports only exact-hash creatively approved sources for Sprite Studio", async () => {
+test("exports only exact-hash creatively approved PNG sources for Sprite Studio", async () => {
   const input = await fixture();
   const result = await compileApprovedSourcesManifest(input.packagePath, input.approvalPath);
   assert.equal(result.eligible_for_sprite_studio, true);
   assert.equal(result.authority.semantic_authority, "tile-map-studio");
   assert.equal(result.authority.creative_approval_authority, "art-studio");
   assert.equal(result.tasks[0].approved_sources.length, 2);
+  assert.equal(result.tasks[0].approved_sources[0].format, "png");
+  assert.equal(result.tasks[0].approved_sources[0].width, 16);
+  assert.equal(result.tasks[0].approved_sources[0].height, 16);
   assert.notEqual(result.tasks[0].approved_sources[0].sha256, result.tasks[0].approved_sources[1].sha256);
   assert.match(result.manifest_fingerprint, /^[0-9a-f]{64}$/u);
 });
@@ -105,5 +122,25 @@ test("changed approved source bytes invalidate approval", async () => {
   await assert.rejects(
     () => compileApprovedSourcesManifest(input.packagePath, input.approvalPath),
     /approved source hash changed/u,
+  );
+});
+
+test("wrong tile canvas cannot be creatively approved", async () => {
+  const input = await fixture({ size: 17 });
+  await assert.rejects(
+    () => compileApprovedSourcesManifest(input.packagePath, input.approvalPath),
+    /approved tile .* is 17x17; expected 16x16/u,
+  );
+});
+
+test("non-PNG source cannot be approved even when named PNG", async () => {
+  const input = await fixture();
+  const bad = Buffer.from("not-a-png");
+  await writeFile(path.join(input.root, "a.png"), bad);
+  const approval = JSON.parse(await import("node:fs/promises").then(({ readFile }) => readFile(input.approvalPath, "utf8")));
+  approval.tasks[0].approved_sources[0].sha256 = sha(bad);
+  await writeFile(input.approvalPath, JSON.stringify(approval));
+  await assert.rejects(
+    () => compileApprovedSourcesManifest(input.packagePath, input.approvalPath),
   );
 });
