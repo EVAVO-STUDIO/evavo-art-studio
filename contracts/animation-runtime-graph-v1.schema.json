@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.evavo.com/animation/animation-runtime-graph-v1.schema.json",
+  "title": "EVAVO animation runtime graph request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "kind",
+    "id",
+    "revision",
+    "subjectId",
+    "cameraProfileId",
+    "initialStateId",
+    "parameters",
+    "clips",
+    "states",
+    "transitions"
+  ],
+  "properties": {
+    "protocolVersion": { "const": "2026-08-30.1" },
+    "kind": { "const": "evavo.animation-runtime-graph" },
+    "id": { "$ref": "#/$defs/id" },
+    "revision": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+    "subjectId": { "$ref": "#/$defs/id" },
+    "cameraProfileId": { "$ref": "#/$defs/id" },
+    "initialStateId": { "$ref": "#/$defs/id" },
+    "allowUnreachableStates": { "type": "boolean", "default": false },
+    "parameters": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": { "$ref": "#/$defs/parameter" }
+    },
+    "clips": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": { "$ref": "#/$defs/clip" }
+    },
+    "states": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": { "$ref": "#/$defs/state" }
+    },
+    "transitions": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": { "$ref": "#/$defs/transition" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 192,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "defaultValue"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["boolean", "number", "trigger"] },
+        "defaultValue": { "type": ["boolean", "number", "null"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "boolean" } }, "required": ["type"] },
+          "then": { "properties": { "defaultValue": { "type": "boolean" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "number" } }, "required": ["type"] },
+          "then": { "properties": { "defaultValue": { "type": "number" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "trigger" } }, "required": ["type"] },
+          "then": { "properties": { "defaultValue": { "type": "null" } } }
+        }
+      ]
+    },
+    "marker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "frame", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "frame": { "type": "integer", "minimum": 1 },
+        "kind": {
+          "enum": [
+            "left-contact",
+            "right-contact",
+            "takeoff",
+            "landing",
+            "cancel-open",
+            "cancel-close",
+            "hitbox-on",
+            "hitbox-off",
+            "projectile-release",
+            "effect-spawn",
+            "sound",
+            "dialogue",
+            "custom"
+          ]
+        },
+        "payload": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "clip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "animationName",
+        "kind",
+        "direction",
+        "cameraProfileId",
+        "sourcePlanDigest",
+        "frameCount",
+        "framesPerSecond",
+        "frameDurations",
+        "loopMode",
+        "mirrorPolicy",
+        "asymmetricVisualAnchors",
+        "markers"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "animationName": { "$ref": "#/$defs/id" },
+        "kind": {
+          "enum": [
+            "idle",
+            "locomotion",
+            "traversal",
+            "action",
+            "reaction",
+            "death",
+            "dialogue",
+            "emote",
+            "effect",
+            "custom"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "none",
+            "left",
+            "right",
+            "up",
+            "down",
+            "up-left",
+            "up-right",
+            "down-left",
+            "down-right"
+          ]
+        },
+        "cameraProfileId": { "$ref": "#/$defs/id" },
+        "sourcePlanDigest": { "$ref": "#/$defs/digest" },
+        "frameCount": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "framesPerSecond": { "type": "number", "exclusiveMinimum": 0, "maximum": 240 },
+        "frameDurations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10000,
+          "items": { "type": "integer", "minimum": 1, "maximum": 10000 }
+        },
+        "loopMode": { "enum": ["none", "linear", "ping-pong"] },
+        "phaseFamily": { "$ref": "#/$defs/id" },
+        "mirrorPolicy": { "enum": ["forbidden", "safe-horizontal"] },
+        "asymmetricVisualAnchors": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+        },
+        "markers": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": { "$ref": "#/$defs/marker" }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "clipId", "entryFrame", "speedScale", "terminal"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "clipId": { "$ref": "#/$defs/id" },
+        "entryFrame": { "type": "integer", "minimum": 1 },
+        "speedScale": { "type": "number", "exclusiveMinimum": 0, "maximum": 16 },
+        "terminal": { "type": "boolean" }
+      }
+    },
+    "trigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "automatic" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "command"],
+          "properties": {
+            "kind": { "const": "command" },
+            "command": { "$ref": "#/$defs/id" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "parameterId"],
+          "properties": {
+            "kind": { "const": "parameter" },
+            "parameterId": { "$ref": "#/$defs/id" }
+          }
+        }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parameterId", "operator", "value"],
+      "properties": {
+        "parameterId": { "$ref": "#/$defs/id" },
+        "operator": {
+          "enum": [
+            "equals",
+            "not-equals",
+            "greater-than",
+            "greater-than-or-equal",
+            "less-than",
+            "less-than-or-equal"
+          ]
+        },
+        "value": { "type": ["boolean", "number"] }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "fromStateId",
+        "toStateId",
+        "trigger",
+        "priority",
+        "switchMode",
+        "resetTarget",
+        "preserveCyclePhase",
+        "conditions"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "fromStateId": {
+          "anyOf": [
+            { "const": "*" },
+            { "$ref": "#/$defs/id" }
+          ]
+        },
+        "excludedFromStateIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "toStateId": { "$ref": "#/$defs/id" },
+        "trigger": { "$ref": "#/$defs/trigger" },
+        "priority": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "switchMode": { "enum": ["immediate", "synchronized", "at-end", "at-marker"] },
+        "markerId": { "$ref": "#/$defs/id" },
+        "resetTarget": { "type": "boolean" },
+        "preserveCyclePhase": { "type": "boolean" },
+        "conditions": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/condition" }
+        }
+      }
+    }
+  }
+}

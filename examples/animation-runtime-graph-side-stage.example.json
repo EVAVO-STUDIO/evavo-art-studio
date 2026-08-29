@@ -1,0 +1,247 @@
+{
+  "protocolVersion": "2026-08-30.1",
+  "kind": "evavo.animation-runtime-graph",
+  "id": "hero.side-stage.runtime",
+  "revision": 1,
+  "subjectId": "hero",
+  "cameraProfileId": "side-stage-90s",
+  "initialStateId": "idle.right",
+  "parameters": [
+    {
+      "id": "moving",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "id": "running",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "id": "hit",
+      "type": "trigger",
+      "defaultValue": null
+    },
+    {
+      "id": "die",
+      "type": "trigger",
+      "defaultValue": null
+    }
+  ],
+  "clips": [
+    {
+      "id": "clip.idle.right",
+      "animationName": "idle.right",
+      "kind": "idle",
+      "direction": "right",
+      "cameraProfileId": "side-stage-90s",
+      "sourcePlanDigest": "sha256:7397f2da394107ba40c7e8566fdd12bdeae9a056c26b1ef7ab0d9553f97e95b7",
+      "frameCount": 4,
+      "framesPerSecond": 12,
+      "frameDurations": [1, 1, 1, 1],
+      "loopMode": "linear",
+      "mirrorPolicy": "forbidden",
+      "asymmetricVisualAnchors": [],
+      "markers": []
+    },
+    {
+      "id": "clip.walk.right",
+      "animationName": "walk.right",
+      "kind": "locomotion",
+      "direction": "right",
+      "cameraProfileId": "side-stage-90s",
+      "sourcePlanDigest": "sha256:a21728c3e40f6db6f8fc3be193e31b9eb5791b8650c7b1be47c7b7e6bd0d5049",
+      "frameCount": 8,
+      "framesPerSecond": 12,
+      "frameDurations": [1, 1, 1, 1, 1, 1, 1, 1],
+      "loopMode": "linear",
+      "phaseFamily": "locomotion.right",
+      "mirrorPolicy": "forbidden",
+      "asymmetricVisualAnchors": [],
+      "markers": [
+        { "id": "left.contact", "frame": 1, "kind": "left-contact" },
+        { "id": "right.contact", "frame": 5, "kind": "right-contact" }
+      ]
+    },
+    {
+      "id": "clip.run.right",
+      "animationName": "run.right",
+      "kind": "locomotion",
+      "direction": "right",
+      "cameraProfileId": "side-stage-90s",
+      "sourcePlanDigest": "sha256:a4e830d09b77350195409c895a98b74d7dfa33f2e8da3f59a6833979a5ab93b1",
+      "frameCount": 6,
+      "framesPerSecond": 12,
+      "frameDurations": [1, 1, 1, 1, 1, 1],
+      "loopMode": "linear",
+      "phaseFamily": "locomotion.right",
+      "mirrorPolicy": "forbidden",
+      "asymmetricVisualAnchors": [],
+      "markers": [
+        { "id": "left.contact", "frame": 1, "kind": "left-contact" },
+        { "id": "right.contact", "frame": 4, "kind": "right-contact" }
+      ]
+    },
+    {
+      "id": "clip.attack.right",
+      "animationName": "attack.right",
+      "kind": "action",
+      "direction": "right",
+      "cameraProfileId": "side-stage-90s",
+      "sourcePlanDigest": "sha256:c2f2b40d6f9d2f2f69defa0a78c02dcf47cac0f8dfa117f4848c6a7e12ea499c",
+      "frameCount": 7,
+      "framesPerSecond": 12,
+      "frameDurations": [1, 1, 1, 1, 1, 1, 1],
+      "loopMode": "none",
+      "mirrorPolicy": "forbidden",
+      "asymmetricVisualAnchors": ["sword.right-hand"],
+      "markers": [
+        { "id": "attack.cancel.open", "frame": 5, "kind": "cancel-open" },
+        { "id": "attack.hitbox.on", "frame": 3, "kind": "hitbox-on", "payload": "sword.primary" },
+        { "id": "attack.hitbox.off", "frame": 5, "kind": "hitbox-off", "payload": "sword.primary" }
+      ]
+    },
+    {
+      "id": "clip.hit.right",
+      "animationName": "hit.right",
+      "kind": "reaction",
+      "direction": "right",
+      "cameraProfileId": "side-stage-90s",
+      "sourcePlanDigest": "sha256:23ad7747d37cd2deb20380ea43855e8db2d21bed30ffab26a329b9f349c67a56",
+      "frameCount": 4,
+      "framesPerSecond": 12,
+      "frameDurations": [1, 1, 1, 1],
+      "loopMode": "none",
+      "mirrorPolicy": "forbidden",
+      "asymmetricVisualAnchors": [],
+      "markers": []
+    },
+    {
+      "id": "clip.death.right",
+      "animationName": "death.right",
+      "kind": "death",
+      "direction": "right",
+      "cameraProfileId": "side-stage-90s",
+      "sourcePlanDigest": "sha256:fb095153753d9995dad7596fd5b295d5e91dd65056a07ebceb6d9546c22fa0a9",
+      "frameCount": 9,
+      "framesPerSecond": 12,
+      "frameDurations": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+      "loopMode": "none",
+      "mirrorPolicy": "forbidden",
+      "asymmetricVisualAnchors": [],
+      "markers": []
+    }
+  ],
+  "states": [
+    { "id": "idle.right", "clipId": "clip.idle.right", "entryFrame": 1, "speedScale": 1, "terminal": false },
+    { "id": "walk.right", "clipId": "clip.walk.right", "entryFrame": 1, "speedScale": 1, "terminal": false },
+    { "id": "run.right", "clipId": "clip.run.right", "entryFrame": 1, "speedScale": 1, "terminal": false },
+    { "id": "attack.right", "clipId": "clip.attack.right", "entryFrame": 1, "speedScale": 1, "terminal": false },
+    { "id": "hit.right", "clipId": "clip.hit.right", "entryFrame": 1, "speedScale": 1, "terminal": false },
+    { "id": "death.right", "clipId": "clip.death.right", "entryFrame": 1, "speedScale": 1, "terminal": true }
+  ],
+  "transitions": [
+    {
+      "id": "idle.to.walk",
+      "fromStateId": "idle.right",
+      "toStateId": "walk.right",
+      "trigger": { "kind": "parameter", "parameterId": "moving" },
+      "priority": 30,
+      "switchMode": "immediate",
+      "resetTarget": true,
+      "preserveCyclePhase": false,
+      "conditions": []
+    },
+    {
+      "id": "walk.to.idle",
+      "fromStateId": "walk.right",
+      "toStateId": "idle.right",
+      "trigger": { "kind": "automatic" },
+      "priority": 30,
+      "switchMode": "immediate",
+      "resetTarget": true,
+      "preserveCyclePhase": false,
+      "conditions": [{ "parameterId": "moving", "operator": "equals", "value": false }]
+    },
+    {
+      "id": "walk.to.run",
+      "fromStateId": "walk.right",
+      "toStateId": "run.right",
+      "trigger": { "kind": "parameter", "parameterId": "running" },
+      "priority": 20,
+      "switchMode": "synchronized",
+      "resetTarget": false,
+      "preserveCyclePhase": true,
+      "conditions": [{ "parameterId": "moving", "operator": "equals", "value": true }]
+    },
+    {
+      "id": "run.to.walk",
+      "fromStateId": "run.right",
+      "toStateId": "walk.right",
+      "trigger": { "kind": "automatic" },
+      "priority": 20,
+      "switchMode": "synchronized",
+      "resetTarget": false,
+      "preserveCyclePhase": true,
+      "conditions": [{ "parameterId": "running", "operator": "equals", "value": false }]
+    },
+    {
+      "id": "any.to.attack",
+      "fromStateId": "*",
+      "excludedFromStateIds": ["attack.right", "death.right", "hit.right"],
+      "toStateId": "attack.right",
+      "trigger": { "kind": "command", "command": "attack.primary" },
+      "priority": 10,
+      "switchMode": "immediate",
+      "resetTarget": true,
+      "preserveCyclePhase": false,
+      "conditions": []
+    },
+    {
+      "id": "attack.to.idle",
+      "fromStateId": "attack.right",
+      "toStateId": "idle.right",
+      "trigger": { "kind": "automatic" },
+      "priority": 50,
+      "switchMode": "at-end",
+      "resetTarget": true,
+      "preserveCyclePhase": false,
+      "conditions": []
+    },
+    {
+      "id": "any.to.hit",
+      "fromStateId": "*",
+      "excludedFromStateIds": ["death.right", "hit.right"],
+      "toStateId": "hit.right",
+      "trigger": { "kind": "parameter", "parameterId": "hit" },
+      "priority": 1,
+      "switchMode": "immediate",
+      "resetTarget": true,
+      "preserveCyclePhase": false,
+      "conditions": []
+    },
+    {
+      "id": "hit.to.idle",
+      "fromStateId": "hit.right",
+      "toStateId": "idle.right",
+      "trigger": { "kind": "automatic" },
+      "priority": 50,
+      "switchMode": "at-end",
+      "resetTarget": true,
+      "preserveCyclePhase": false,
+      "conditions": []
+    },
+    {
+      "id": "any.to.death",
+      "fromStateId": "*",
+      "excludedFromStateIds": ["death.right"],
+      "toStateId": "death.right",
+      "trigger": { "kind": "parameter", "parameterId": "die" },
+      "priority": 0,
+      "switchMode": "immediate",
+      "resetTarget": true,
+      "preserveCyclePhase": false,
+      "conditions": []
+    }
+  ]
+}

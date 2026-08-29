@@ -16,3 +16,4 @@ export * from "./animation-cel-handoff.js";
 export * from "./animation-pose-control.js";
 export * from "./animation-pose-control-verification.js";
 export * from "./animation-walk-pose-template.js";
+export * from "./animation-runtime-graph.js";
