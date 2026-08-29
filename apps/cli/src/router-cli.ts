@@ -12,6 +12,10 @@ const spritePlanAction = command ? SPRITE_PLAN_COMMANDS[command] : undefined;
 if (spritePlanAction) {
   process.argv[2] = spritePlanAction;
   await import("./sprite-plan-cli.js");
+} else if (command === "tile-map-preprovider") {
+  // One create-only compile path from a Tile Map handoff to the canonical Art
+  // Studio provider runtime contracts. This command never executes a provider.
+  await import("./tile-map-preprovider-pipeline-cli.js");
 } else if (command === "tile-map-handoff") {
   await import("./tile-map-handoff-cli.js");
 } else if (command === "tile-map-source-package") {
