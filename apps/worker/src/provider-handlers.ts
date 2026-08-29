@@ -27,8 +27,10 @@ export const COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY =
   "council-avatar.execution-authorized" as const;
 const RAW_ART_PROVIDER_REQUEST_METADATA_SCHEMA =
   "evavo.raw-art-provider-request-metadata.v2";
-const COUNCIL_AVATAR_PROVIDER_REQUEST_METADATA_SCHEMA =
-  "evavo.project-art-council-avatar-provider-request.v1";
+const COUNCIL_AVATAR_PROVIDER_REQUEST_METADATA_SCHEMAS = new Set([
+  "evavo.project-art-council-avatar-provider-request.v1",
+  "evavo.project-art-council-avatar-direction-master-request.v1",
+]);
 
 export interface ProviderExecutionAuthorizer {
   readonly authorizationSha256: string;
@@ -245,7 +247,8 @@ function governedExecutionContract(
     metadata.schema === RAW_ART_PROVIDER_REQUEST_METADATA_SCHEMA;
   const councilMetadata =
     isJsonObject(metadata) &&
-    metadata.schema === COUNCIL_AVATAR_PROVIDER_REQUEST_METADATA_SCHEMA;
+    typeof metadata.schema === "string" &&
+    COUNCIL_AVATAR_PROVIDER_REQUEST_METADATA_SCHEMAS.has(metadata.schema);
   const rawCapability = job.spec.requiredCapabilities.includes(
     RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
   );
@@ -443,7 +446,7 @@ export function restrictProviderRegistry(
   const missing = [...allowed].filter((adapterId) => !available.has(adapterId));
   if (missing.length) {
     throw new Error(
-      `Provider execution authorization names unavailable adapters: ${missing.join(", ")}`,
+      `RAW_ART provider execution authorization names unavailable adapters: ${missing.join(", ")}`,
     );
   }
   return Object.freeze({
