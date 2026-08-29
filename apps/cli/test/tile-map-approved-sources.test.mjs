@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -33,6 +33,7 @@ async function fixture({ duplicate = false, wrongPackage = false, size = 16 } = 
     schema_version: 1,
     source_plan_sha256: "a".repeat(64),
     source_plan_fingerprint: "b".repeat(64),
+    source_map_fingerprint: "e".repeat(64),
     map_id: "epochbound:bellweather:verdant",
     consumer_adapter: "epochbound",
     production_profile: "snes-topdown-rpg",
@@ -92,6 +93,7 @@ test("exports only exact-hash creatively approved PNG sources for Sprite Studio"
   assert.equal(result.eligible_for_sprite_studio, true);
   assert.equal(result.authority.semantic_authority, "tile-map-studio");
   assert.equal(result.authority.creative_approval_authority, "art-studio");
+  assert.equal(result.source_map_fingerprint, "e".repeat(64));
   assert.equal(result.tasks[0].approved_sources.length, 2);
   assert.equal(result.tasks[0].approved_sources[0].format, "png");
   assert.equal(result.tasks[0].approved_sources[0].width, 16);
@@ -137,7 +139,7 @@ test("non-PNG source cannot be approved even when named PNG", async () => {
   const input = await fixture();
   const bad = Buffer.from("not-a-png");
   await writeFile(path.join(input.root, "a.png"), bad);
-  const approval = JSON.parse(await import("node:fs/promises").then(({ readFile }) => readFile(input.approvalPath, "utf8")));
+  const approval = JSON.parse(await readFile(input.approvalPath, "utf8"));
   approval.tasks[0].approved_sources[0].sha256 = sha(bad);
   await writeFile(input.approvalPath, JSON.stringify(approval));
   await assert.rejects(
