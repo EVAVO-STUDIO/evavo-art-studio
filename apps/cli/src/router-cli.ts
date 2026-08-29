@@ -28,6 +28,10 @@ if (spritePlanAction) {
   // Candidate jobs are deterministic envelopes around provider generation.
   // Provider output remains intermediate-only and all approvals begin false.
   await import("./tile-map-candidate-batch-cli.js");
+} else if (command === "tile-map-candidate-review") {
+  // Provider results enter review only after exact batch/id/path/hash/canvas
+  // validation. The review manifest still has no approval authority.
+  await import("./tile-map-candidate-review-cli.js");
 } else if (command === "tile-map-approved-sources") {
   // Only explicitly approved, exact-hash source files may cross from Art Studio
   // into Sprite Studio mastering. Provider completion is never sufficient.
