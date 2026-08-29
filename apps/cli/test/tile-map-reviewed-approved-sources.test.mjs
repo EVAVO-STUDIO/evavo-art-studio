@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,10 +10,20 @@ import { compileReviewedApprovedSourcesManifest } from "../dist/tile-map-reviewe
 
 const sha = (value) => createHash("sha256").update(value).digest("hex");
 
-async function fixture({ bypass = false, wrongReview = false } = {}) {
+async function fixture({ bypass = false, wrongReview = false, tamperResults = false } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-tile-map-reviewed-approval-"));
-  const bytes = await sharp({ create: { width: 16, height: 16, channels: 4, background: { r: 42, g: 130, b: 70, alpha: 1 } } }).png().toBuffer();
-  await writeFile(path.join(root, "candidate.png"), bytes);
+  const providerRoot = path.join(root, "provider");
+  await mkdir(providerRoot, { recursive: true });
+  const bytes = await sharp({
+    create: {
+      width: 16,
+      height: 16,
+      channels: 4,
+      background: { r: 42, g: 130, b: 70, alpha: 1 },
+    },
+  }).png().toBuffer();
+  await writeFile(path.join(providerRoot, "candidate.png"), bytes);
+
   const sourcePackage = {
     schema_version: 1,
     source_plan_sha256: "a".repeat(64),
@@ -45,12 +55,29 @@ async function fixture({ bypass = false, wrongReview = false } = {}) {
   };
   const packagePath = path.join(root, "source-package.json");
   await writeFile(packagePath, JSON.stringify(sourcePackage));
+
+  const providerResults = {
+    schema_version: 1,
+    source_batch_fingerprint: "f".repeat(64),
+    candidates: [{
+      candidate_id: "candidate-1",
+      path: "candidate.png",
+      sha256: sha(bytes),
+    }],
+  };
+  const providerResultsPath = path.join(providerRoot, "provider-results.json");
+  const providerResultsBytes = Buffer.from(JSON.stringify(providerResults));
+  await writeFile(providerResultsPath, providerResultsBytes);
+
   const review = {
     schema_version: 1,
     source_batch_sha256: "e".repeat(64),
     source_batch_fingerprint: "f".repeat(64),
     source_package_fingerprint: "d".repeat(64),
     source_map_fingerprint: "c".repeat(64),
+    provider_results_path: providerResultsPath,
+    provider_results_sha256: sha(providerResultsBytes),
+    candidate_root: providerRoot,
     map_id: "map",
     projection: "orthogonal",
     candidates: [{
@@ -66,6 +93,7 @@ async function fixture({ bypass = false, wrongReview = false } = {}) {
   };
   const reviewPath = path.join(root, "review.json");
   await writeFile(reviewPath, JSON.stringify(review));
+
   const approved = bypass ? "rejected" : "approved";
   const finalization = {
     schema_version: 1,
@@ -101,6 +129,10 @@ async function fixture({ bypass = false, wrongReview = false } = {}) {
   };
   const finalizationPath = path.join(root, "finalization.json");
   await writeFile(finalizationPath, JSON.stringify(finalization));
+
+  if (tamperResults) {
+    await writeFile(providerResultsPath, JSON.stringify({ ...providerResults, tampered: true }));
+  }
   return { packagePath, reviewPath, finalizationPath };
 }
 
@@ -115,6 +147,8 @@ test("exports only candidates that passed the exact review manifest", async () =
   assert.equal(result.source_review_fingerprint, "1".repeat(64));
   assert.equal(result.review_finalization_fingerprint, "3".repeat(64));
   assert.equal(result.tasks[0].approved_sources[0].sha256.length, 64);
+  assert.match(result.manifest_fingerprint, /^[0-9a-f]{64}$/u);
+  assert.notEqual(result.manifest_fingerprint, result.pre_review_manifest_fingerprint);
 });
 
 test("rejected candidate cannot be manually slipped into approved sources", async () => {
@@ -130,5 +164,13 @@ test("finalization from another review cannot approve candidate bytes", async ()
   await assert.rejects(
     () => compileReviewedApprovedSourcesManifest(input.packagePath, input.reviewPath, input.finalizationPath),
     /does not target the exact review manifest/u,
+  );
+});
+
+test("provider result manifest drift after review blocks approval", async () => {
+  const input = await fixture({ tamperResults: true });
+  await assert.rejects(
+    () => compileReviewedApprovedSourcesManifest(input.packagePath, input.reviewPath, input.finalizationPath),
+    /provider results bytes changed/u,
   );
 });
