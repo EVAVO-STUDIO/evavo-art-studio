@@ -34,11 +34,11 @@
     "@evavo/art-selection": "workspace:*",
     "@evavo/art-sprite-family": "workspace:*",
     "@evavo/art-sprite-planner": "workspace:*",
-    "@evavo/art-sprite-supervisor": "workspace:*",
-    "sharp": "^0.35.3"
+    "@evavo/art-sprite-supervisor": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "sharp": "^0.35.3",
     "typescript": "^5.9.2"
   }
 }
