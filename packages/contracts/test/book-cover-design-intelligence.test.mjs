@@ -27,7 +27,7 @@ function input(overrides = {}) {
     title: "The Law Under the Law",
     seriesTitle: "Dark Age of Sorrows",
     seriesPosition: 1,
-    authorDisplayName: "G. R. Parker",
+    authorDisplayName: "Gregory R. Parker & Gillian R. Parker",
     primaryGenre: "historical",
     audience: "Adult readers of literary historical dark fiction.",
     emotionalPromise: "Institutional pressure, moral dread and a human cost that becomes clearer after the first reading.",
@@ -80,7 +80,7 @@ test("cover design intelligence reads title structure and produces reproducible 
 test("cover art remains text free while typography is an exact Docs Suite handoff", () => {
   const result = compileBookCoverDesignIntelligence(input());
   assert.equal(result.direction.typography.exactTitle, "The Law Under the Law");
-  assert.equal(result.direction.typography.exactAuthorDisplayName, "G. R. Parker");
+  assert.equal(result.direction.typography.exactAuthorDisplayName, "Gregory R. Parker & Gillian R. Parker");
   assert.equal(result.direction.typography.authority, "evavo-docs-suite");
   assert.equal(result.direction.typography.artworkTextPolicy, "text_free");
   assert.match(result.direction.providerInstruction, /Never render title, author, series, blurb, spine copy, logos, labels, price, ISBN or barcode/);
