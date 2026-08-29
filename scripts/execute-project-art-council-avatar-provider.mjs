@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { mkdir, open } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -17,9 +18,9 @@ function usage() {
     '  a non-expired Council avatar provider execution authorization',
     '',
     'Usage:',
-    '  node scripts/execute-project-art-council-avatar-provider.mjs --authorization <authorization.json> --runtime-root <new-dir> --artifact-root <new-dir> [--character-id <council-critic|council-open-reviewer>]',
+    '  node scripts/execute-project-art-council-avatar-provider.mjs --authorization <authorization.json> --runtime-root <new-dir> --artifact-root <new-dir> --output <new-result.json> [--character-id <council-critic|council-open-reviewer>]',
     '',
-    'Both roots must be new paths. The worker is isolated, single-concurrency, one-attempt and restricted to the authorized adapter.',
+    'Both roots and the result file must be new paths. The worker is isolated, single-concurrency, one-attempt and restricted to the authorized adapter.',
     'Generated candidates remain unapproved and are not promoted into Avatar Runtime or the website.',
   ].join('\n');
 }
@@ -28,6 +29,7 @@ const REQUIRED = new Set([
   '--authorization',
   '--runtime-root',
   '--artifact-root',
+  '--output',
 ]);
 const OPTIONAL = new Set(['--character-id']);
 const SUPPORTED = new Set([...REQUIRED, ...OPTIONAL]);
@@ -56,17 +58,46 @@ function parse(argv) {
   return values;
 }
 
+async function writeCreateOnly(filePath, value) {
+  const absolute = path.resolve(filePath);
+  await mkdir(path.dirname(absolute), { recursive: true });
+  const handle = await open(absolute, 'wx', 0o600);
+  try {
+    await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  } finally {
+    await handle.close();
+  }
+  return absolute;
+}
+
 export async function runCouncilAvatarProviderExecutionCli(
   argv = process.argv.slice(2),
 ) {
   const values = parse(argv);
-  return executeAuthorizedCouncilAvatarProviderJobs({
+  const result = await executeAuthorizedCouncilAvatarProviderJobs({
     authorizationPath: values.get('--authorization'),
     runtimeRoot: values.get('--runtime-root'),
     artifactRoot: values.get('--artifact-root'),
     ...(values.get('--character-id')
       ? { characterId: values.get('--character-id') }
       : {}),
+  });
+  const output = await writeCreateOnly(values.get('--output'), result);
+  return Object.freeze({
+    status: result.provider.failed === 0 ? 'completed' : 'completed-with-failures',
+    schema: result.schema,
+    authorizationSha256: result.authorizationSha256,
+    runtimePackageSha256: result.runtimePackageSha256,
+    provider: result.provider,
+    technicalAssurance: Object.freeze({
+      submitted: result.technicalAssurance.submitted,
+      succeeded: result.technicalAssurance.succeeded,
+      failed: result.technicalAssurance.failed,
+    }),
+    candidateApprovalEstablished: false,
+    candidatePromotionEstablished: false,
+    runtimeActivationAllowed: false,
+    output,
   });
 }
 
