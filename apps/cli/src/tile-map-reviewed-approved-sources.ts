@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import {
   compileApprovedSourcesManifest,
@@ -66,6 +67,27 @@ export async function compileReviewedApprovedSourcesManifest(
     throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_DRIFT", "projection differs across source package, review and finalization");
   }
 
+  const providerResultsPath = path.resolve(
+    text(review.provider_results_path, "review.provider_results_path"),
+  );
+  const candidateRoot = path.resolve(text(review.candidate_root, "review.candidate_root"));
+  if (candidateRoot !== path.dirname(providerResultsPath)) {
+    throw failure(
+      "EVAVO_TILE_MAP_REVIEWED_APPROVAL_ROOT",
+      "review candidate_root must equal the provider-results directory",
+    );
+  }
+  const providerResultsBytes = await readFile(providerResultsPath);
+  if (
+    sha256(providerResultsBytes) !==
+    sha256Hex(review.provider_results_sha256, "review.provider_results_sha256")
+  ) {
+    throw failure(
+      "EVAVO_TILE_MAP_REVIEWED_APPROVAL_DRIFT",
+      "provider results bytes changed after candidate review intake",
+    );
+  }
+
   const reviewCandidates = new Map<string, JsonObject>();
   for (const [index, item] of array(review.candidates, "review.candidates").entries()) {
     const candidate = object(item, `review.candidates[${index}]`);
@@ -93,33 +115,53 @@ export async function compileReviewedApprovedSourcesManifest(
 
   const approvedTriples = new Set<string>();
   for (const candidate of finalizedCandidates.values()) {
-    if (candidate.structural === "approved" && candidate.visual === "approved" && candidate.creative === "approved") {
+    if (
+      candidate.structural === "approved" &&
+      candidate.visual === "approved" &&
+      candidate.creative === "approved"
+    ) {
       approvedTriples.add(`${candidate.task_id}\n${candidate.path}\n${candidate.sha256}`);
     }
   }
   for (const [taskIndex, item] of array(finalization.tasks, "finalization.tasks").entries()) {
     const task = object(item, `finalization.tasks[${taskIndex}]`);
     const taskId = text(task.task_id, `finalization.tasks[${taskIndex}].task_id`);
-    for (const [sourceIndex, sourceItem] of array(task.approved_sources, `${taskId}.approved_sources`).entries()) {
+    for (const [sourceIndex, sourceItem] of array(
+      task.approved_sources,
+      `${taskId}.approved_sources`,
+    ).entries()) {
       const source = object(sourceItem, `${taskId}.approved_sources[${sourceIndex}]`);
-      const key = `${taskId}\n${text(source.path, `${taskId}.path`)}\n${sha256Hex(source.sha256, `${taskId}.sha256`)}`;
+      const key = `${taskId}\n${text(source.path, `${taskId}.path`)}\n${sha256Hex(
+        source.sha256,
+        `${taskId}.sha256`,
+      )}`;
       if (!approvedTriples.has(key)) {
-        throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_BYPASS", `${taskId} approved source did not pass all three review gates`);
+        throw failure(
+          "EVAVO_TILE_MAP_REVIEWED_APPROVAL_BYPASS",
+          `${taskId} approved source did not pass all three review gates`,
+        );
       }
     }
   }
 
-  const manifest = await compileApprovedSourcesManifest(sourcePackagePath, finalizationPath);
+  const manifest = await compileApprovedSourcesManifest(
+    sourcePackagePath,
+    finalizationPath,
+    candidateRoot,
+  );
   const { manifest_fingerprint: preReviewFingerprint, ...manifestWithoutFingerprint } = manifest;
   const base = {
     ...manifestWithoutFingerprint,
     pre_review_manifest_fingerprint: preReviewFingerprint,
-    source_review_path: reviewPath,
+    source_review_path: path.resolve(reviewPath),
     source_review_sha256: sha256(reviewBytes),
     source_review_fingerprint: reviewFingerprint,
-    review_finalization_path: finalizationPath,
+    review_finalization_path: path.resolve(finalizationPath),
     review_finalization_sha256: sha256(finalizationBytes),
-    review_finalization_fingerprint: sha256Hex(finalization.finalization_fingerprint, "finalization_fingerprint"),
+    review_finalization_fingerprint: sha256Hex(
+      finalization.finalization_fingerprint,
+      "finalization_fingerprint",
+    ),
   };
   return {
     ...base,
@@ -127,11 +169,50 @@ export async function compileReviewedApprovedSourcesManifest(
   };
 }
 
-function parseObject(content: string, label: string): JsonObject { try { return object(JSON.parse(content) as unknown, label); } catch (error) { if (error instanceof Error && "code" in error) throw error; throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_JSON", `invalid JSON in ${label}`); } }
-function object(value: unknown, path: string): JsonObject { if (!value || typeof value !== "object" || Array.isArray(value)) throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_TYPE", `${path} must be object`); return value as JsonObject; }
-function array(value: unknown, path: string): unknown[] { if (!Array.isArray(value)) throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_TYPE", `${path} must be array`); return value; }
-function text(value: unknown, path: string): string { if (typeof value !== "string" || !value.trim()) throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_TYPE", `${path} must be non-empty string`); return value; }
-function sha256Hex(value: unknown, path: string): string { const result = text(value, path).toLowerCase(); if (!/^[0-9a-f]{64}$/u.test(result)) throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_HASH", `${path} must be SHA-256`); return result; }
-function sha256(value: Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }
-function canonical(value: unknown): string { if (value === null || typeof value !== "object") return JSON.stringify(value); if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`; const entries = Object.entries(value as JsonObject).sort(([a], [b]) => a.localeCompare(b)); return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`; }
-function failure(code: string, message: string): Error & { code: string } { const error = new Error(message) as Error & { code: string }; error.code = code; return error; }
+function parseObject(content: string, label: string): JsonObject {
+  try {
+    return object(JSON.parse(content) as unknown, label);
+  } catch (error) {
+    if (error instanceof Error && "code" in error) throw error;
+    throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_JSON", `invalid JSON in ${label}`);
+  }
+}
+function object(value: unknown, path: string): JsonObject {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_TYPE", `${path} must be object`);
+  }
+  return value as JsonObject;
+}
+function array(value: unknown, path: string): unknown[] {
+  if (!Array.isArray(value)) {
+    throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_TYPE", `${path} must be array`);
+  }
+  return value;
+}
+function text(value: unknown, path: string): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_TYPE", `${path} must be non-empty string`);
+  }
+  return value;
+}
+function sha256Hex(value: unknown, path: string): string {
+  const result = text(value, path).toLowerCase();
+  if (!/^[0-9a-f]{64}$/u.test(result)) {
+    throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_HASH", `${path} must be SHA-256`);
+  }
+  return result;
+}
+function sha256(value: Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  const entries = Object.entries(value as JsonObject).sort(([a], [b]) => a.localeCompare(b));
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
+}
+function failure(code: string, message: string): Error & { code: string } {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
+}
