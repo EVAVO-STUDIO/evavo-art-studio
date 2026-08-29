@@ -122,7 +122,8 @@ try {
         Write-Host "Authorization: $Authorization"
         Write-Host "Expires:       $ExpiresAtText"
         Write-Host ""
-        Write-Host 'Re-run with -ExecuteProvider before expiry to make provider calls.'
+        Write-Host 'To execute this exact authorization before expiry, run:'
+        Write-Host ".\scripts\Resume-TileMapAuthorizedProvider.ps1 -Authorization '$Authorization' -EvidenceRoot '$EvidenceRoot' -Concurrency $Concurrency"
         return
     }
 
