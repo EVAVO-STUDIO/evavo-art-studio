@@ -24,6 +24,10 @@ if (spritePlanAction) {
   // resulting package remains provider-neutral and keeps all generated output
   // blocked until structural, visual and creative approval gates are satisfied.
   await import("./tile-map-source-package-cli.js");
+} else if (command === "tile-map-candidate-batch") {
+  // Candidate jobs are deterministic envelopes around provider generation.
+  // Provider output remains intermediate-only and all approvals begin false.
+  await import("./tile-map-candidate-batch-cli.js");
 } else if (command === "tile-map-approved-sources") {
   // Only explicitly approved, exact-hash source files may cross from Art Studio
   // into Sprite Studio mastering. Provider completion is never sufficient.
