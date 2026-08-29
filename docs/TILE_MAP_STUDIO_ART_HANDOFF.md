@@ -4,8 +4,6 @@ Art Studio accepts governed source-art requirements produced by `evavo-tile-map-
 
 ## 1. Compile the Tile Map handoff
 
-From the Art Studio workspace:
-
 ```powershell
 pnpm art -- tile-map-handoff `
   --input C:\TileMapEvidence\consumer-art-handoffs-003\epochbound-verdant.json `
@@ -14,13 +12,7 @@ pnpm art -- tile-map-handoff `
 
 The input must use Tile Map Studio art-handoff schema v2 and declare Art Studio's role as `source-art-generation-and-creative-approval`.
 
-The plan preserves Tile Map Studio semantic rules and source IDs verbatim. Every family remains `intermediate-only`, `creative_approval_required`, and `blocked-pending-creative-approval`.
-
-## 2. Compile a governed source-creation package
-
-Brand-new tile families do not yet have a source image, so they must not be forced into Art Studio's existing source-driven repair/edit queue using fabricated placeholder files.
-
-Compile the provider-neutral source package instead:
+## 2. Compile the governed source package
 
 ```powershell
 pnpm art -- tile-map-source-package `
@@ -28,62 +20,93 @@ pnpm art -- tile-map-source-package `
   --output C:\ArtEvidence\epochbound-verdant.source-package.json
 ```
 
-Each task contains:
+Brand-new families stay out of source-driven edit/repair queues until a real source exists. Each task carries exact canvas, projection, candidate count, required approved variants, immutable semantic rules, creative direction, alpha requirements and create-only output contracts.
 
-- exact canvas dimensions;
-- projection;
-- required approved variant count;
-- a larger candidate count for creative choice;
-- immutable semantic/topology rules;
-- creative direction notes;
-- create-only candidate/review/approval locations;
-- explicit structural, visual and creative approval gates.
+## 3. Compile provider-neutral candidate jobs
 
-The package assigns authority as follows:
-
-```text
-Tile Map Studio -> semantic authority
-Art Studio      -> source creation and creative approval
-provider        -> candidate generation only
-Sprite Studio   -> lossless mastering and atlas receipt
+```powershell
+pnpm art -- tile-map-candidate-batch `
+  --input C:\ArtEvidence\epochbound-verdant.source-package.json `
+  --output C:\ArtEvidence\epochbound-verdant.candidate-batch.json
 ```
 
-Provider completion cannot promote a candidate.
+The batch expands each family into deterministic candidate jobs. Candidate IDs are derived from the semantic-map fingerprint, task ID and candidate index. Every provider request remains `intermediate-only`, every approval flag begins false, and providers may not alter semantic rules, projection or canvas.
 
-## 3. Review and approve exact source files
+Provider execution happens separately. The provider result manifest must name each planned candidate ID/path and record the exact output SHA-256.
 
-Art Studio review produces a human/creative decision file tied to the exact source-package fingerprint. An approval decision references candidate files using portable forward-slash paths relative to the approval JSON and exact SHA-256 values.
+## 4. Admit provider outputs into review
 
-Then compile the approved-source export:
+```powershell
+pnpm art -- tile-map-candidate-review `
+  --batch C:\ArtEvidence\epochbound-verdant.candidate-batch.json `
+  --results C:\ArtEvidence\epochbound-verdant.provider-results.json `
+  --output C:\ArtEvidence\epochbound-verdant.review.json
+```
+
+Review intake verifies the exact candidate-batch fingerprint, candidate IDs, planned paths, current file hashes, PNG decoding, expected canvas and alpha requirements. Exact duplicate candidate bytes are rejected.
+
+The review manifest is still not approval. Every admitted candidate is explicitly:
+
+```text
+structural_review = pending
+visual_review     = pending
+creative_review   = pending
+promotion_eligible = false
+```
+
+## 5. Finalize structural, visual and creative review
+
+Create a review-decision file tied to the exact review fingerprint, with one decision per candidate:
+
+```text
+structural = approved | rejected
+visual     = approved | rejected
+creative   = approved | rejected
+```
+
+Then compile the finalization:
+
+```powershell
+pnpm art -- tile-map-review-finalize `
+  --review C:\ArtEvidence\epochbound-verdant.review.json `
+  --decisions C:\ArtEvidence\epochbound-verdant.review-decisions.json `
+  --output C:\ArtEvidence\epochbound-verdant.review-finalized.json
+```
+
+Only candidates passing all three gates enter `approved_sources`. Rejected candidates remain in the retained review evidence but are not promotion-eligible.
+
+## 6. Export exact reviewed sources for Sprite Studio
 
 ```powershell
 pnpm art -- tile-map-approved-sources `
   --package C:\ArtEvidence\epochbound-verdant.source-package.json `
-  --approval C:\ArtEvidence\epochbound-verdant.approval.json `
+  --review C:\ArtEvidence\epochbound-verdant.review.json `
+  --approval C:\ArtEvidence\epochbound-verdant.review-finalized.json `
   --output C:\ArtEvidence\epochbound-verdant.approved-sources.json
 ```
 
-The exporter fails if:
+The exporter requires the source package, review and finalization to agree on:
 
-- the approval targets a different source-package fingerprint;
-- the decision is not explicitly `approved`;
-- a required family is missing;
-- fewer than the required number of variants are approved;
-- two approved entries contain identical bytes;
-- a path is absolute, traverses outside the approval directory or uses non-portable separators;
-- an approved file's current bytes no longer match the recorded SHA-256.
+- source-package fingerprint;
+- semantic-map fingerprint;
+- map ID;
+- projection;
+- exact candidate IDs, paths and SHA-256 values;
+- review fingerprint.
 
-Only a successful approved-source manifest is marked `eligible_for_sprite_studio: true`.
+An approved source must correspond to a candidate that passed structural, visual and creative review. Manual insertion of a rejected or unreviewed candidate fails closed.
 
-## 4. Sprite Studio mastering
+It then verifies the actual approved files again: portable relative path, exact SHA-256, real PNG bytes, exact tile canvas or minimum feature canvas, alpha when required, and distinct bytes for distinct required variants.
 
-Sprite Studio receives only the exact creatively approved files. It may trim/normalize/package within its declared lossless mastering contract but cannot change gameplay semantics or claim creative approval.
+The final `manifest_fingerprint` covers the complete reviewed evidence chain. `pre_review_manifest_fingerprint` preserves the lower-level source approval fingerprint for debugging/provenance.
 
-Its manifest and build receipt must retain each source file SHA-256 so Tile Map Studio can prove the atlas frames came from the exact approved Art Studio sources.
+## 7. Sprite Studio mastering
 
-## 5. Tile Map Studio trust return
+Sprite Studio receives only the exact reviewed/creatively approved files. It may trim, normalize and package them only within its declared lossless mastering contract.
 
-Tile Map Studio's production binding command now requires Art Studio approval evidence as well as Sprite Studio package evidence:
+Its manifest and build receipt must retain each source SHA-256 so Tile Map Studio can prove every atlas frame came from the exact approved source family.
+
+## 8. Tile Map Studio trust return
 
 ```powershell
 tile-map-import-sprite-bindings `
@@ -95,31 +118,36 @@ tile-map-import-sprite-bindings `
   --art-approval C:\ArtEvidence\epochbound-verdant.approved-sources.json
 ```
 
-Tile Map Studio verifies the entire Sprite Studio receipt package, exact family mapping bytes, variant/canvas requirements and that every bound Sprite frame's `source_sha256` belongs to the exact Art Studio-approved visual family.
+Tile Map Studio requires reviewed Art Studio evidence, the original semantic-map fingerprint, the complete Sprite Studio receipt package, exact family-mapping bytes, variant/canvas requirements and exact approved source hashes.
 
-A receipted atlas without creative approval is package-trusted but **not production-complete**.
+A valid provider result, successful Art Studio build, valid PNG, receipted Sprite package or technically correct atlas is never enough by itself.
 
-## Authority boundary
+## Authority chain
 
-Art Studio may create, compare, repair, reject and creatively approve visual candidates. It may not reinterpret terrain identity, edge/network signatures, feature placement, collision, navigation or canonical footprints.
-
-A provider success, valid image file, successful build, valid Sprite Studio package or technically correct atlas can never imply creative approval.
+```text
+Tile Map Studio  -> semantic/topology authority
+Art Studio       -> source creation + structural/visual/creative approval
+provider         -> candidate generation only
+Sprite Studio    -> lossless mastering + atlas receipt
+Tile Map Studio  -> final semantic/package trust
+```
 
 ## Evidence chain
 
-The intended evidence chain is:
-
 ```text
-Tile Map semantic map fingerprint
-  -> Tile Map art handoff SHA-256
+semantic map fingerprint
+  -> Tile Map handoff SHA-256
   -> Art Studio production plan fingerprint
-  -> Art Studio source-package fingerprint
-  -> creative approval file SHA-256
-  -> approved-source manifest fingerprint
+  -> source-package fingerprint
+  -> candidate-batch fingerprint
+  -> exact provider candidate hashes
+  -> review fingerprint
+  -> review-finalization fingerprint
+  -> reviewed approved-source manifest fingerprint
   -> exact approved source SHA-256 values
-  -> Sprite Studio source SHA-256 records
-  -> Sprite Studio full-package receipt digest
-  -> Tile Map trusted binding receipt
+  -> Sprite Studio source hashes
+  -> full Sprite Studio package receipt digest
+  -> Tile Map trusted binding
 ```
 
-No atlas coordinate or provider result becomes semantic or creative authority.
+No provider result, atlas coordinate or generated visual ever becomes semantic authority, and no technical success event becomes creative approval.
