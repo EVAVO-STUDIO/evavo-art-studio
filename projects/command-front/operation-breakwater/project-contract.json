@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "projectId": "command-front",
+  "scenarioId": "operation-breakwater",
+  "consumerRepository": "EVAVO-STUDIO/command-front",
+  "consumerManifest": "data/production/operation_breakwater_asset_manifest.json",
+  "consumerDirectionalRequirements": "data/presentation/directional_sprite_requirements.json",
+  "consumerStructureRequirements": "data/presentation/structure_sprite_requirements.json",
+  "unitPlanBundle": "projects/command-front/operation-breakwater/sprite-plan-bundle.json",
+  "structurePlanBundle": "projects/command-front/operation-breakwater/structure-plan-bundle.json",
+  "locks": {
+    "era": "alt-1999",
+    "camera": "fixed-isometric-2d-2.5d",
+    "internalReviewResolution": [640,360],
+    "infantryDirections": 8,
+    "vehicleDirections": 16,
+    "originalDesignsOnly": true,
+    "approvedConsumerMediaOnly": true
+  },
+  "promotionRule": "Generated or mastered media must not be written into Command Front approved catalogs until Art Studio QA and provenance evidence pass and the consumer-side catalog validator accepts the final resources."
+}
