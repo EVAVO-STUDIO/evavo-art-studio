@@ -27,6 +27,7 @@ export type TileMapApprovedSourcesManifest = {
   source_package_path: string;
   source_package_sha256: string;
   source_package_fingerprint: string;
+  source_map_fingerprint: string;
   approval_path: string;
   approval_sha256: string;
   map_id: string;
@@ -61,6 +62,7 @@ export async function compileApprovedSourcesManifest(
     throw failure("EVAVO_TILE_MAP_APPROVAL_PACKAGE", "source package must be governed Tile Map source package schema v1");
   }
   const packageFingerprint = sha256Hex(sourcePackage.package_fingerprint, "source package fingerprint");
+  const sourceMapFingerprint = sha256Hex(sourcePackage.source_map_fingerprint, "source package source_map_fingerprint");
   if (approval.schema_version !== 1) throw failure("EVAVO_TILE_MAP_APPROVAL_SCHEMA", "approval schema_version must be 1");
   if (sha256Hex(approval.source_package_fingerprint, "approval.source_package_fingerprint") !== packageFingerprint) {
     throw failure("EVAVO_TILE_MAP_APPROVAL_DRIFT", "approval does not target this exact source package fingerprint");
@@ -180,6 +182,7 @@ export async function compileApprovedSourcesManifest(
     source_package_path: path.resolve(sourcePackagePath),
     source_package_sha256: sha256(packageBytes),
     source_package_fingerprint: packageFingerprint,
+    source_map_fingerprint: sourceMapFingerprint,
     approval_path: path.resolve(approvalPath),
     approval_sha256: sha256(approvalBytes),
     map_id: text(sourcePackage.map_id, "source package map_id"),
