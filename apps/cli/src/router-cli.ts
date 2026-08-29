@@ -24,6 +24,10 @@ if (spritePlanAction) {
   // resulting package remains provider-neutral and keeps all generated output
   // blocked until structural, visual and creative approval gates are satisfied.
   await import("./tile-map-source-package-cli.js");
+} else if (command === "tile-map-approved-sources") {
+  // Only explicitly approved, exact-hash source files may cross from Art Studio
+  // into Sprite Studio mastering. Provider completion is never sufficient.
+  await import("./tile-map-approved-sources-cli.js");
 } else if (command?.startsWith("repair-")) {
   // Repair commands are intentionally isolated from the general CLI so the
   // immutable repair planner, revision, ranking and promotion protocols remain
