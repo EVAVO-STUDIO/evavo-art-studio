@@ -139,6 +139,19 @@ export function compileBookCoverCommercialReleaseAuthorityV2(
     || source.contract !== BOOK_COVER_COMMERCIAL_RELEASE_CONTRACT_V2
   ) boundaryBlockers.push("Commercial-release V2 input kind, version or contract is invalid.");
 
+  const execution = parseV2Execution(source.execution, "execution", boundaryBlockers);
+  const marketAuthority: Record<string, unknown> = isRecord(source.marketAuthority)
+    ? source.marketAuthority
+    : {};
+  const marketExecution = parseV2Execution(
+    marketAuthority.zeroCostExecution,
+    "marketAuthority.zeroCostExecution",
+    boundaryBlockers,
+  );
+  if (canonical(execution) !== canonical(marketExecution)) {
+    boundaryBlockers.push("Market authority and V2 release execution policies differ.");
+  }
+
   const requiredProofIds = extractRequiredProofIds(source.designIntelligence, boundaryBlockers);
   const requiredArtStageProofIds = requiredProofIds.filter(
     (proofId) => !DOCS_SUITE_POST_COMPOSITION_PROOF_IDS.has(proofId),
@@ -161,30 +174,22 @@ export function compileBookCoverCommercialReleaseAuthorityV2(
     }
   }
 
-  const legacyInput = toLegacyArtStageInput(
-    source,
-    new Set(requiredArtStageProofIds),
-  );
+  const legacyInput = toLegacyArtStageInput(source, new Set(requiredArtStageProofIds));
   const legacyResult = compileLegacyBookCoverCommercialReleaseAuthority(legacyInput);
   const blockers = unique([...legacyResult.blockers, ...boundaryBlockers]).sort();
   const status: BookCoverCommercialReleaseStatus = blockers.length
     ? "blocked"
     : legacyResult.status;
-  const docsSuiteCompositionAuthorized =
-    status === "ready_for_docs_composition";
+  const docsSuiteCompositionAuthorized = status === "ready_for_docs_composition";
   const legacyProof = legacyResult.authority.proofSummary;
   const proofSummary: BookCoverCommercialProofSummaryV2 = {
     requiredProofIds: [...requiredProofIds].sort(),
     requiredArtStageProofIds: [...requiredArtStageProofIds].sort(),
     deferredToDocsSuiteProofIds: [...deferredToDocsSuiteProofIds].sort(),
-    suppliedArtStageProofIds: legacyProof.suppliedProofIds
-      .filter(isKnownProofId)
-      .sort(),
+    suppliedArtStageProofIds: legacyProof.suppliedProofIds.filter(isKnownProofId).sort(),
     passedArtStageProofCount: legacyProof.passedProofCount,
     failedArtStageProofCount: legacyProof.failedProofCount,
-    missingArtStageProofIds: legacyProof.missingProofIds
-      .filter(isKnownProofId)
-      .sort(),
+    missingArtStageProofIds: legacyProof.missingProofIds.filter(isKnownProofId).sort(),
     postCompositionProofsDeferred: true,
   };
   const allowedUse: BookCoverCommercialReleaseAuthorityV2["allowedUse"] =
@@ -210,6 +215,7 @@ export function compileBookCoverCommercialReleaseAuthorityV2(
     status,
     allowedUse,
     proofSummary,
+    execution,
     docsSuiteCompositionAuthorized,
     blockers,
     requiredActions,
@@ -237,7 +243,9 @@ export function validateBookCoverCommercialReleaseAuthorityV2(
   value: unknown,
 ): { valid: boolean; issues: string[] } {
   const issues: string[] = [];
-  if (!isRecord(value)) return { valid: false, issues: ["Commercial-release V2 authority must be one object."] };
+  if (!isRecord(value)) {
+    return { valid: false, issues: ["Commercial-release V2 authority must be one object."] };
+  }
   const authority = value as Partial<BookCoverCommercialReleaseAuthorityV2>;
   if (
     authority.outputKind !== "evavo_art_book_cover_commercial_release_authority"
@@ -245,7 +253,9 @@ export function validateBookCoverCommercialReleaseAuthorityV2(
     || authority.contract !== BOOK_COVER_COMMERCIAL_RELEASE_CONTRACT_V2
     || authority.supersedesContract !== LEGACY_BOOK_COVER_COMMERCIAL_RELEASE_CONTRACT
   ) issues.push("Commercial-release V2 authority identity is invalid.");
-  if (!SHA256.test(String(authority.authorityDigestSha256 ?? ""))) issues.push("Commercial-release V2 authority digest is invalid.");
+  if (!SHA256.test(String(authority.authorityDigestSha256 ?? ""))) {
+    issues.push("Commercial-release V2 authority digest is invalid.");
+  }
   const proof = authority.proofSummary;
   if (!proof) issues.push("Commercial-release V2 proof summary is missing.");
   else {
@@ -256,18 +266,36 @@ export function validateBookCoverCommercialReleaseAuthorityV2(
     const expectedDeferred = required.filter(
       (proofId) => DOCS_SUITE_POST_COMPOSITION_PROOF_IDS.has(proofId),
     ).sort();
-    if (canonical(proof.requiredArtStageProofIds ?? []) !== canonical(expectedArt)) issues.push("Commercial-release V2 Art-stage proof partition is invalid.");
-    if (canonical(proof.deferredToDocsSuiteProofIds ?? []) !== canonical(expectedDeferred)) issues.push("Commercial-release V2 Docs Suite proof partition is invalid.");
-    if (proof.postCompositionProofsDeferred !== true) issues.push("Commercial-release V2 must defer post-composition proofs.");
-    if ((proof.suppliedArtStageProofIds ?? []).some((proofId) => DOCS_SUITE_POST_COMPOSITION_PROOF_IDS.has(proofId))) issues.push("Commercial-release V2 includes premature post-composition proof evidence.");
+    if (canonical(proof.requiredArtStageProofIds ?? []) !== canonical(expectedArt)) {
+      issues.push("Commercial-release V2 Art-stage proof partition is invalid.");
+    }
+    if (canonical(proof.deferredToDocsSuiteProofIds ?? []) !== canonical(expectedDeferred)) {
+      issues.push("Commercial-release V2 Docs Suite proof partition is invalid.");
+    }
+    if (proof.postCompositionProofsDeferred !== true) {
+      issues.push("Commercial-release V2 must defer post-composition proofs.");
+    }
+    if ((proof.suppliedArtStageProofIds ?? []).some(
+      (proofId) => DOCS_SUITE_POST_COMPOSITION_PROOF_IDS.has(proofId),
+    )) issues.push("Commercial-release V2 includes premature post-composition proof evidence.");
   }
   const ready = authority.status === "ready_for_docs_composition";
-  if (authority.docsSuiteCompositionAuthorized !== ready) issues.push("Docs Suite composition authorization differs from V2 authority status.");
+  if (authority.docsSuiteCompositionAuthorized !== ready) {
+    issues.push("Docs Suite composition authorization differs from V2 authority status.");
+  }
   if (ready) {
-    if ((authority.blockers ?? []).length || (authority.requiredActions ?? []).length) issues.push("Ready V2 authority retains blockers or required actions.");
-    if ((proof?.failedArtStageProofCount ?? 1) !== 0) issues.push("Ready V2 authority retains failed Art-stage proofs.");
-    if ((proof?.missingArtStageProofIds ?? ["missing"]).length !== 0) issues.push("Ready V2 authority retains missing Art-stage proofs.");
-    if (authority.allowedUse !== "docs_suite_composition") issues.push("Ready V2 authority has the wrong allowed use.");
+    if ((authority.blockers ?? []).length || (authority.requiredActions ?? []).length) {
+      issues.push("Ready V2 authority retains blockers or required actions.");
+    }
+    if ((proof?.failedArtStageProofCount ?? 1) !== 0) {
+      issues.push("Ready V2 authority retains failed Art-stage proofs.");
+    }
+    if ((proof?.missingArtStageProofIds ?? ["missing"]).length !== 0) {
+      issues.push("Ready V2 authority retains missing Art-stage proofs.");
+    }
+    if (authority.allowedUse !== "docs_suite_composition") {
+      issues.push("Ready V2 authority has the wrong allowed use.");
+    }
   }
   if (
     authority.automaticSelectionAllowed !== false
@@ -277,8 +305,11 @@ export function validateBookCoverCommercialReleaseAuthorityV2(
   if (authority.execution) validateZeroCostExecution(authority.execution, issues);
   else issues.push("Commercial-release V2 zero-cost execution policy is missing.");
   if (SHA256.test(String(authority.authorityDigestSha256 ?? ""))) {
-    const { authorityDigestSha256: _discarded, ...unsigned } = authority as BookCoverCommercialReleaseAuthorityV2;
-    if (sha256(unsigned) !== authority.authorityDigestSha256) issues.push("Commercial-release V2 authority digest differs from its canonical contents.");
+    const { authorityDigestSha256: _discarded, ...unsigned } =
+      authority as BookCoverCommercialReleaseAuthorityV2;
+    if (sha256(unsigned) !== authority.authorityDigestSha256) {
+      issues.push("Commercial-release V2 authority digest differs from its canonical contents.");
+    }
   }
   return { valid: issues.length === 0, issues: unique(issues).sort() };
 }
@@ -291,6 +322,17 @@ function toLegacyArtStageInput(
   cloned.outputKind = "evavo_art_book_cover_commercial_release_input";
   cloned.schemaVersion = 1;
   cloned.contract = LEGACY_BOOK_COVER_COMMERCIAL_RELEASE_CONTRACT;
+  if (isRecord(cloned.execution)) {
+    cloned.execution.localValidationCommand =
+      "node scripts/run-book-cover-commercial-release-local.mjs";
+  }
+  if (
+    isRecord(cloned.marketAuthority)
+    && isRecord(cloned.marketAuthority.zeroCostExecution)
+  ) {
+    cloned.marketAuthority.zeroCostExecution.localValidationCommand =
+      "node scripts/run-book-cover-commercial-release-local.mjs";
+  }
   const design = isRecord(cloned.designIntelligence)
     ? cloned.designIntelligence
     : undefined;
@@ -302,12 +344,14 @@ function toLegacyArtStageInput(
     : undefined;
   if (plan && Array.isArray(plan.requiredProofs)) {
     plan.requiredProofs = plan.requiredProofs.filter(
-      (proof) => isRecord(proof) && artProofIds.has(String(proof.proofId) as BookCoverCommercialProofId),
+      (proof) => isRecord(proof)
+        && artProofIds.has(String(proof.proofId) as BookCoverCommercialProofId),
     );
   }
   if (Array.isArray(cloned.proofResults)) {
     cloned.proofResults = cloned.proofResults.filter(
-      (proof) => isRecord(proof) && artProofIds.has(String(proof.proofId) as BookCoverCommercialProofId),
+      (proof) => isRecord(proof)
+        && artProofIds.has(String(proof.proofId) as BookCoverCommercialProofId),
     );
   }
   return cloned;
@@ -327,8 +371,9 @@ function extractRequiredProofIds(
   const output: BookCoverCommercialProofId[] = [];
   for (const proof of plan.requiredProofs) {
     const proofId = isRecord(proof) ? String(proof.proofId ?? "") : "";
-    if (!isKnownProofId(proofId)) blockers.push(`Design intelligence contains unsupported proof ${proofId || "<missing>"}.`);
-    else output.push(proofId);
+    if (!isKnownProofId(proofId)) {
+      blockers.push(`Design intelligence contains unsupported proof ${proofId || "<missing>"}.`);
+    } else output.push(proofId);
   }
   return unique(output);
 }
@@ -344,16 +389,22 @@ function extractSuppliedProofIds(
   const output: BookCoverCommercialProofId[] = [];
   for (const proof of proofValue) {
     const proofId = isRecord(proof) ? String(proof.proofId ?? "") : "";
-    if (!isKnownProofId(proofId)) blockers.push(`Commercial-release V2 contains unsupported supplied proof ${proofId || "<missing>"}.`);
-    else output.push(proofId);
+    if (!isKnownProofId(proofId)) {
+      blockers.push(`Commercial-release V2 contains unsupported supplied proof ${proofId || "<missing>"}.`);
+    } else output.push(proofId);
   }
-  if (new Set(output).size !== output.length) blockers.push("Commercial-release V2 supplied proof IDs must be unique.");
+  if (new Set(output).size !== output.length) {
+    blockers.push("Commercial-release V2 supplied proof IDs must be unique.");
+  }
   return unique(output);
 }
 
 function omitLegacyAuthorityIdentity(
   authority: BookCoverCommercialReleaseAuthorityV1,
-): Omit<BookCoverCommercialReleaseAuthorityV1, "outputKind" | "schemaVersion" | "contract" | "proofSummary" | "authorityDigestSha256"> {
+): Omit<
+  BookCoverCommercialReleaseAuthorityV1,
+  "outputKind" | "schemaVersion" | "contract" | "proofSummary" | "authorityDigestSha256"
+> {
   const {
     outputKind: _outputKind,
     schemaVersion: _schemaVersion,
@@ -365,11 +416,19 @@ function omitLegacyAuthorityIdentity(
   return rest;
 }
 
-function validateZeroCostExecution(
-  execution: BookCoverZeroCostExecutionV1,
-  issues: string[],
-): void {
-  if (execution.mode !== "local_first_zero_cost") issues.push("Commercial-release V2 execution mode is not local-first.");
+function parseV2Execution(
+  value: unknown,
+  label: string,
+  blockers: string[],
+): BookCoverZeroCostExecutionV1 {
+  const record = isRecord(value) ? value : {};
+  if (!isRecord(value)) blockers.push(`${label} must be one object.`);
+  if (record.mode !== "local_first_zero_cost") {
+    blockers.push(`${label}.mode must be local_first_zero_cost.`);
+  }
+  if (record.localValidationCommand !== BOOK_COVER_COMMERCIAL_RELEASE_LOCAL_COMMAND_V2) {
+    blockers.push(`${label}.localValidationCommand must use the V2 local runner.`);
+  }
   for (const flag of [
     "githubHostedActionsRequired",
     "paidCiRequired",
@@ -379,14 +438,58 @@ function validateZeroCostExecution(
     "requestTimeMarketplaceBrowsingAllowed",
     "networkRequiredForValidation",
     "workflowFilesAuthoritative",
-  ] as const) if (execution[flag] !== false) issues.push(`Commercial-release V2 execution ${flag} must remain false.`);
+  ] as const) {
+    if (record[flag] !== false) blockers.push(`${label}.${flag} must remain false.`);
+  }
+  return {
+    mode: "local_first_zero_cost",
+    localValidationCommand: BOOK_COVER_COMMERCIAL_RELEASE_LOCAL_COMMAND_V2,
+    githubHostedActionsRequired: false,
+    paidCiRequired: false,
+    paidCrawlerRequired: false,
+    paidImageApiRequiredForValidation: false,
+    vercelBackgroundWorkerRequired: false,
+    requestTimeMarketplaceBrowsingAllowed: false,
+    networkRequiredForValidation: false,
+    workflowFilesAuthoritative: false,
+  };
+}
+
+function validateZeroCostExecution(
+  execution: BookCoverZeroCostExecutionV1,
+  issues: string[],
+): void {
+  if (execution.mode !== "local_first_zero_cost") {
+    issues.push("Commercial-release V2 execution mode is not local-first.");
+  }
+  if (execution.localValidationCommand !== BOOK_COVER_COMMERCIAL_RELEASE_LOCAL_COMMAND_V2) {
+    issues.push("Commercial-release V2 must use the V2 local runner.");
+  }
+  for (const flag of [
+    "githubHostedActionsRequired",
+    "paidCiRequired",
+    "paidCrawlerRequired",
+    "paidImageApiRequiredForValidation",
+    "vercelBackgroundWorkerRequired",
+    "requestTimeMarketplaceBrowsingAllowed",
+    "networkRequiredForValidation",
+    "workflowFilesAuthoritative",
+  ] as const) {
+    if (execution[flag] !== false) {
+      issues.push(`Commercial-release V2 execution ${flag} must remain false.`);
+    }
+  }
 }
 
 function isKnownProofId(value: unknown): value is BookCoverCommercialProofId {
-  return typeof value === "string" && KNOWN_PROOF_IDS.has(value as BookCoverCommercialProofId);
+  return typeof value === "string"
+    && KNOWN_PROOF_IDS.has(value as BookCoverCommercialProofId);
 }
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+  return Boolean(value)
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && Object.getPrototypeOf(value) === Object.prototype;
 }
 function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
