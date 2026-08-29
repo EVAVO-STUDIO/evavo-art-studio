@@ -4,6 +4,9 @@ import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
+  compileProviderCandidateRuntimeContract,
+} from '../packages/providers/dist/index.js';
+import {
   LocalRuntimeRepository,
   RUNTIME_PROTOCOL_VERSION,
 } from '../packages/runtime/dist/index.js';
@@ -39,12 +42,29 @@ const timestamp = (value, label) => {
   return value;
 };
 const optionMap = (argv) => {
+  const supported = new Set([
+    '--provider-batch',
+    '--runtime-root',
+    '--artifact-root',
+    '--output',
+    '--allowed-adapters',
+    '--authorized-by',
+    '--reason',
+    '--authorized-at',
+    '--expires-at',
+  ]);
   const values = new Map();
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index];
     const value = argv[index + 1];
-    if (!name?.startsWith('--') || !value || value.startsWith('--') || values.has(name)) {
-      throw new Error('arguments must be unique --name value pairs');
+    if (
+      !name?.startsWith('--') ||
+      !value ||
+      value.startsWith('--') ||
+      values.has(name) ||
+      !supported.has(name)
+    ) {
+      throw new Error('arguments must be unique supported --name value pairs');
     }
     values.set(name, value);
   }
@@ -56,16 +76,92 @@ const required = (values, name) => {
   return value;
 };
 const splitAdapters = (value) => {
-  const items = [...new Set(value.split(',').map((entry) => entry.trim()).filter(Boolean).map((entry) => safeId(entry, 'allowed adapter id')))];
-  if (!items.length || items.length > 16) throw new Error('--allowed-adapters must contain 1 to 16 comma-separated adapter ids');
+  const items = [
+    ...new Set(
+      value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .map((entry) => safeId(entry, 'allowed adapter id')),
+    ),
+  ];
+  if (!items.length || items.length > 16) {
+    throw new Error('--allowed-adapters must contain 1 to 16 comma-separated adapter ids');
+  }
   return items.sort();
 };
 const jsonObject = async (file, label) => {
   const bytes = await readFile(file);
   const value = JSON.parse(bytes.toString('utf8'));
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a JSON object`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a JSON object`);
+  }
   return { path: path.resolve(file), bytes, value };
 };
+const safeHash = (value, label) => {
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/u.test(value)) {
+    throw new Error(`${label} must be SHA-256`);
+  }
+  return value;
+};
+
+function verifyProviderBatch(batch) {
+  const claimed = safeHash(
+    batch.provider_batch_fingerprint,
+    'provider_batch_fingerprint',
+  );
+  const { provider_batch_fingerprint: _fingerprint, ...body } = batch;
+  if (hashObject(body) !== claimed) {
+    throw new Error('provider batch self fingerprint mismatch');
+  }
+  if (!Array.isArray(batch.jobs) || !batch.jobs.length || batch.jobs.length > 100) {
+    throw new Error('provider batch jobs must contain 1 to 100 jobs');
+  }
+  const seen = new Set();
+  for (const [index, entry] of batch.jobs.entries()) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new Error(`jobs[${index}] must be object`);
+    }
+    const candidateId = safeId(entry.candidate_id, `jobs[${index}].candidate_id`);
+    if (seen.has(candidateId)) throw new Error(`duplicate provider candidate ${candidateId}`);
+    seen.add(candidateId);
+    const runtimeJob = entry.runtime_job;
+    if (!runtimeJob || typeof runtimeJob !== 'object' || Array.isArray(runtimeJob)) {
+      throw new Error(`jobs[${index}].runtime_job must be object`);
+    }
+    if (runtimeJob.queue !== 'provider' || typeof runtimeJob.kind !== 'string' || !runtimeJob.kind.startsWith('art.candidate.')) {
+      throw new Error(`jobs[${index}] runtime job is not a provider candidate`);
+    }
+    const contract = compileProviderCandidateRuntimeContract(runtimeJob.payload);
+    if (entry.request_sha256 !== contract.requestSha256) {
+      throw new Error(`jobs[${index}] request SHA-256 drifted from canonical provider contract`);
+    }
+    if (entry.prompt_sha256 !== contract.compiledPromptSha256) {
+      throw new Error(`jobs[${index}] prompt SHA-256 drifted from canonical provider contract`);
+    }
+    if (canonical(runtimeJob) !== canonical(contract.runtimeJob)) {
+      throw new Error(`jobs[${index}] runtime job drifted from canonical provider contract`);
+    }
+    if (entry.runtime_job_sha256 !== hashObject(contract.runtimeJob)) {
+      throw new Error(`jobs[${index}] runtime job SHA-256 is invalid`);
+    }
+    const metadata = contract.request.metadata;
+    if (
+      !metadata ||
+      typeof metadata !== 'object' ||
+      Array.isArray(metadata) ||
+      metadata.schema !== 'evavo.tile-map-provider-metadata.v1' ||
+      metadata.candidateId !== candidateId ||
+      metadata.sourceMapFingerprint !== batch.source_map_fingerprint ||
+      metadata.providerAuthority !== 'candidate-generation-only' ||
+      metadata.reviewRequired !== true ||
+      metadata.approvalAuthority !== false
+    ) {
+      throw new Error(`jobs[${index}] Tile Map provider metadata is invalid`);
+    }
+  }
+  return claimed;
+}
 
 export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(2)) {
   const values = optionMap(argv);
@@ -85,32 +181,39 @@ export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(
   if (!authorizedBy || authorizedBy.length > 256 || !reason || reason.length > 4096) {
     throw new Error('authorized-by/reason are invalid');
   }
-  if (runtimeRoot === artifactRoot) throw new Error('runtime-root and artifact-root must be separate');
+  if (runtimeRoot === artifactRoot) {
+    throw new Error('runtime-root and artifact-root must be separate');
+  }
   await mkdir(runtimeRoot, { recursive: true });
   await mkdir(artifactRoot, { recursive: true });
-  for (const [candidate, label] of [[runtimeRoot, 'runtime-root'], [artifactRoot, 'artifact-root']]) {
+  for (const [candidate, label] of [
+    [runtimeRoot, 'runtime-root'],
+    [artifactRoot, 'artifact-root'],
+  ]) {
     const state = await lstat(candidate);
-    if (!state.isDirectory() || state.isSymbolicLink()) throw new Error(`${label} must be a real non-symbolic directory`);
+    if (!state.isDirectory() || state.isSymbolicLink()) {
+      throw new Error(`${label} must be a real non-symbolic directory`);
+    }
   }
-  const batchRecord = await jsonObject(providerBatchFile, 'Tile Map provider runtime batch');
+
+  const batchRecord = await jsonObject(
+    providerBatchFile,
+    'Tile Map provider runtime batch',
+  );
   const batch = batchRecord.value;
   if (batch.schema_version !== 1 || batch.status !== 'ready-for-provider-runtime') {
     throw new Error('provider batch must be schema v1 and ready-for-provider-runtime');
   }
-  const providerBatchFingerprint = safeHash(batch.provider_batch_fingerprint, 'provider_batch_fingerprint');
-  const sourceMapFingerprint = safeHash(batch.source_map_fingerprint, 'source_map_fingerprint');
-  if (!Array.isArray(batch.jobs) || !batch.jobs.length || batch.jobs.length > 100) {
-    throw new Error('provider batch jobs must contain 1 to 100 jobs');
-  }
+  const providerBatchFingerprint = verifyProviderBatch(batch);
+  const sourceMapFingerprint = safeHash(
+    batch.source_map_fingerprint,
+    'source_map_fingerprint',
+  );
   const queue = `tile-map-provider-${providerBatchFingerprint.slice(0, 20)}`;
+
   const submissions = batch.jobs.map((entry, index) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`jobs[${index}] must be object`);
     const candidateId = safeId(entry.candidate_id, `jobs[${index}].candidate_id`);
     const runtimeJob = entry.runtime_job;
-    if (!runtimeJob || typeof runtimeJob !== 'object' || Array.isArray(runtimeJob)) throw new Error(`jobs[${index}].runtime_job must be object`);
-    if (runtimeJob.queue !== 'provider' || typeof runtimeJob.kind !== 'string' || !runtimeJob.kind.startsWith('art.candidate.')) {
-      throw new Error(`jobs[${index}] runtime job is not a provider candidate`);
-    }
     if (!Array.isArray(runtimeJob.requiredCapabilities) || !runtimeJob.requiredCapabilities.length) {
       throw new Error(`jobs[${index}] runtime job requiredCapabilities missing`);
     }
@@ -119,7 +222,12 @@ export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(
       kind: runtimeJob.kind,
       idempotencyKey: `tile-map-authorized:${candidateId}:${providerBatchFingerprint.slice(0, 16)}`,
       payload: runtimeJob.payload,
-      requiredCapabilities: [...new Set([...runtimeJob.requiredCapabilities, TILE_MAP_PROVIDER_EXECUTION_CAPABILITY])].sort(),
+      requiredCapabilities: [
+        ...new Set([
+          ...runtimeJob.requiredCapabilities,
+          TILE_MAP_PROVIDER_EXECUTION_CAPABILITY,
+        ]),
+      ].sort(),
       ...(Array.isArray(runtimeJob.requiredCapabilityProfile)
         ? { requiredCapabilityProfile: [...runtimeJob.requiredCapabilityProfile] }
         : {}),
@@ -135,8 +243,13 @@ export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(
       },
     };
   });
+
   const runtime = new LocalRuntimeRepository({ root: runtimeRoot });
-  const records = await runtime.submitBatch(submissions, `tile-map-authorize:${authorizedBy}`, new Date(authorizedAt));
+  const records = await runtime.submitBatch(
+    submissions,
+    `tile-map-authorize:${authorizedBy}`,
+    new Date(authorizedAt),
+  );
   const jobs = records.map((record, index) => ({
     candidateId: batch.jobs[index].candidate_id,
     taskId: batch.jobs[index].task_id,
@@ -149,7 +262,10 @@ export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(
     kind: record.spec.kind,
     maximumAttempts: record.spec.maximumAttempts,
   }));
-  if (jobs.some((job) => job.maximumAttempts !== 1)) throw new Error('authorized Tile Map jobs must use maximumAttempts=1');
+  if (jobs.some((job) => job.maximumAttempts !== 1)) {
+    throw new Error('authorized Tile Map jobs must use maximumAttempts=1');
+  }
+
   const base = {
     schema: TILE_MAP_PROVIDER_AUTHORIZATION_SCHEMA,
     status: 'authorized',
@@ -165,8 +281,14 @@ export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(
       documentSha256: providerBatchFingerprint,
     },
     sourceMapFingerprint,
-    runtime: { root: runtimeRoot, rootSha256: sha256(Buffer.from(runtimeRoot, 'utf8')) },
-    artifacts: { root: artifactRoot, rootSha256: sha256(Buffer.from(artifactRoot, 'utf8')) },
+    runtime: {
+      root: runtimeRoot,
+      rootSha256: sha256(Buffer.from(runtimeRoot, 'utf8')),
+    },
+    artifacts: {
+      root: artifactRoot,
+      rootSha256: sha256(Buffer.from(artifactRoot, 'utf8')),
+    },
     execution: {
       requiredCapability: TILE_MAP_PROVIDER_EXECUTION_CAPABILITY,
       queues: [queue],
@@ -188,21 +310,20 @@ export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(
     },
   };
   const authorizationSha256 = hashObject(base);
-  const authorization = { ...base, authorizationSha256, runId: authorizationSha256.slice(0, 20) };
-  await writeFile(output, `${JSON.stringify(authorization, null, 2)}\n`, { flag: 'wx' });
-  return { status: 'authorized', output, runId: authorization.runId, authorizationSha256, jobs: jobs.length, queue };
-}
-
-function safeHash(value, label) {
-  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/u.test(value)) throw new Error(`${label} must be SHA-256`);
-  return value;
-}
-
-if (import.meta.url === `file://${process.argv[1]?.replaceAll('\\', '/')}`) {
-  authorizeTileMapProviderRuntime()
-    .then((result) => process.stdout.write(`${JSON.stringify(result)}\n`))
-    .catch((error) => {
-      process.stderr.write(`${JSON.stringify({ status: 'failed', error: error instanceof Error ? error.message : String(error) })}\n`);
-      process.exitCode = 2;
-    });
+  const authorization = {
+    ...base,
+    authorizationSha256,
+    runId: authorizationSha256.slice(0, 20),
+  };
+  await writeFile(output, `${JSON.stringify(authorization, null, 2)}\n`, {
+    flag: 'wx',
+  });
+  return {
+    status: 'authorized',
+    output,
+    runId: authorization.runId,
+    authorizationSha256,
+    jobs: jobs.length,
+    queue,
+  };
 }
