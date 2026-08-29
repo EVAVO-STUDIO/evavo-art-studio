@@ -5,6 +5,19 @@ import { compileProviderCandidateRuntimeContract } from "@evavo/art-providers";
 
 type JsonObject = Record<string, unknown>;
 
+type TileMapMasteringContract = {
+  source_canvas_policy: "provider-adapter-derived";
+  target_width: number;
+  target_height: number;
+  background_mode: "chroma-key" | "opaque-preserve";
+  matte_colour: "#00ff00" | null;
+  resampling: "lanczos3";
+  delivery_profile_id: "godot-sprite-lossless";
+  require_meaningful_alpha: boolean;
+  require_fake_transparency_rejection: true;
+  approval_authority: false;
+};
+
 export type TileMapProviderRuntimeBatch = {
   schema_version: 1;
   source_candidate_batch_sha256: string;
@@ -20,6 +33,7 @@ export type TileMapProviderRuntimeBatch = {
     visual_family: string;
     provider_family_id: string;
     output_path: string;
+    mastering: TileMapMasteringContract;
     request_sha256: string;
     prompt_sha256: string;
     runtime_job_sha256: string;
@@ -28,6 +42,7 @@ export type TileMapProviderRuntimeBatch = {
   authority: {
     semantic_authority: "tile-map-studio";
     provider_authority: "candidate-generation-only";
+    mastering_authority: "art-studio-deterministic-unapproved";
     review_authority: "art-studio";
     approval_authority: "art-studio-explicit-review-only";
   };
@@ -94,21 +109,40 @@ export async function compileTileMapProviderRuntimeBatch(
         `${candidateId} provider_authority must remain intermediate-only`,
       );
     }
-    const topology = row.topology === null ? null : object(row.topology, `${candidateId}.topology`);
-    const featureKind = row.feature_kind === null ? null : text(row.feature_kind, `${candidateId}.feature_kind`);
-    const seed = Number.parseInt(sha256(Buffer.from(candidateId, "utf8")).slice(0, 8), 16);
+    const topology =
+      row.topology === null
+        ? null
+        : object(row.topology, `${candidateId}.topology`);
+    const featureKind =
+      row.feature_kind === null
+        ? null
+        : text(row.feature_kind, `${candidateId}.feature_kind`);
+    const seed = Number.parseInt(
+      sha256(Buffer.from(candidateId, "utf8")).slice(0, 8),
+      16,
+    );
     const creativeIntent = creativeDirection.join(" ");
+    const mastering = masteringContract(width, height, alphaRequired);
     const mustHave = [
       ...semanticRules,
       `Projection must remain ${projection}.`,
-      `Canvas must remain exactly ${width}x${height}.`,
-      ...(alphaRequired ? ["Preserve a transparent alpha channel where artwork does not occupy the canvas."] : []),
+      `Compose for a final mastered canvas of exactly ${width}x${height} pixels.`,
+      "Retain clean large-scale forms that survive deterministic downsampling to native game resolution.",
+      ...(alphaRequired
+        ? [
+            "Use the declared high-chroma matte only as a removable production background; do not paint green into the asset.",
+          ]
+        : ["Produce a fully opaque asset with no transparency." ]),
     ];
     const mustAvoid = [
       "Do not add text, labels, logos, UI, watermarks, signatures or gameplay symbols not present in the semantic contract.",
       "Do not alter collision, navigation, terrain identity, network connectivity, footprint or semantic edge shape through artwork.",
       "Do not imitate generic AI-art noise, evenly distributed procedural detail or unrelated decorative clutter.",
+      "Do not fake pixel detail by adding high-frequency speckle that collapses at native tile size.",
     ];
+    const providerBackground = alphaRequired
+      ? ({ strategy: "chroma-key" as const, matteColour: "#00ff00" })
+      : ({ strategy: "opaque-source" as const });
     const request = {
       schemaVersion: "1.0" as const,
       requestId: candidateId,
@@ -130,8 +164,9 @@ export async function compileTileMapProviderRuntimeBatch(
         materials: [],
         cameraRules: [`Use the declared ${projection} projection only.`],
         compositionRules: [
-          `Keep the artwork within ${width}x${height} pixels.`,
+          `Compose for deterministic mastering to ${width}x${height} pixels.`,
           "Preserve readable topology and silhouette at native game scale.",
+          "Keep major forms separated and avoid sub-pixel clutter.",
         ],
         eraRules: creativeDirection,
       },
@@ -140,19 +175,20 @@ export async function compileTileMapProviderRuntimeBatch(
         include: semanticSourceIds,
         exclude: mustAvoid,
         framing: [
-          `Exact ${width}x${height} asset canvas.`,
+          `Final mastered asset is exactly ${width}x${height} pixels.`,
+          "Provider source resolution may be larger but must preserve the exact target aspect ratio.",
           featureKind ? `Feature kind: ${featureKind}.` : "Tile family asset.",
         ],
       },
       target: {
         width,
         height,
-        transparency: alphaRequired ? ("required" as const) : ("preferred" as const),
+        transparency: alphaRequired
+          ? ("required" as const)
+          : ("opaque" as const),
         outputFormat: "png" as const,
       },
-      background: {
-        strategy: alphaRequired ? ("native-alpha" as const) : ("provider-auto" as const),
-      },
+      background: providerBackground,
       quality: "high" as const,
       candidateCount: 1,
       seed,
@@ -177,6 +213,7 @@ export async function compileTileMapProviderRuntimeBatch(
         immutableSemanticRules: semanticRules,
         topology,
         featureKind,
+        mastering,
         providerAuthority: "candidate-generation-only",
         reviewRequired: true,
         approvalAuthority: false,
@@ -189,9 +226,12 @@ export async function compileTileMapProviderRuntimeBatch(
       visual_family: visualFamily,
       provider_family_id: providerFamilyId,
       output_path: outputPath,
+      mastering,
       request_sha256: contract.requestSha256,
       prompt_sha256: contract.compiledPromptSha256,
-      runtime_job_sha256: sha256(Buffer.from(canonical(contract.runtimeJob), "utf8")),
+      runtime_job_sha256: sha256(
+        Buffer.from(canonical(contract.runtimeJob), "utf8"),
+      ),
       runtime_job: contract.runtimeJob,
     };
   });
@@ -206,7 +246,11 @@ export async function compileTileMapProviderRuntimeBatch(
     }
     ids.add(job.candidate_id);
   }
-  jobs.sort((a, b) => a.visual_family.localeCompare(b.visual_family) || a.candidate_id.localeCompare(b.candidate_id));
+  jobs.sort(
+    (a, b) =>
+      a.visual_family.localeCompare(b.visual_family) ||
+      a.candidate_id.localeCompare(b.candidate_id),
+  );
 
   const base = {
     schema_version: 1 as const,
@@ -221,6 +265,7 @@ export async function compileTileMapProviderRuntimeBatch(
     authority: {
       semantic_authority: "tile-map-studio" as const,
       provider_authority: "candidate-generation-only" as const,
+      mastering_authority: "art-studio-deterministic-unapproved" as const,
       review_authority: "art-studio" as const,
       approval_authority: "art-studio-explicit-review-only" as const,
     },
@@ -228,7 +273,28 @@ export async function compileTileMapProviderRuntimeBatch(
   };
   return {
     ...base,
-    provider_batch_fingerprint: sha256(Buffer.from(canonical(base), "utf8")),
+    provider_batch_fingerprint: sha256(
+      Buffer.from(canonical(base), "utf8"),
+    ),
+  };
+}
+
+function masteringContract(
+  width: number,
+  height: number,
+  alphaRequired: boolean,
+): TileMapMasteringContract {
+  return {
+    source_canvas_policy: "provider-adapter-derived",
+    target_width: width,
+    target_height: height,
+    background_mode: alphaRequired ? "chroma-key" : "opaque-preserve",
+    matte_colour: alphaRequired ? "#00ff00" : null,
+    resampling: "lanczos3",
+    delivery_profile_id: "godot-sprite-lossless",
+    require_meaningful_alpha: alphaRequired,
+    require_fake_transparency_rejection: true,
+    approval_authority: false,
   };
 }
 
@@ -250,12 +316,17 @@ function object(value: unknown, path: string): JsonObject {
   return value as JsonObject;
 }
 function array(value: unknown, path: string): unknown[] {
-  if (!Array.isArray(value)) throw failure("EVAVO_TILE_MAP_PROVIDER_TYPE", `${path} must be array`);
+  if (!Array.isArray(value)) {
+    throw failure("EVAVO_TILE_MAP_PROVIDER_TYPE", `${path} must be array`);
+  }
   return value;
 }
 function text(value: unknown, path: string): string {
   if (typeof value !== "string" || !value.trim()) {
-    throw failure("EVAVO_TILE_MAP_PROVIDER_TYPE", `${path} must be non-empty string`);
+    throw failure(
+      "EVAVO_TILE_MAP_PROVIDER_TYPE",
+      `${path} must be non-empty string`,
+    );
   }
   return value;
 }
@@ -265,7 +336,10 @@ function nullableText(value: unknown, path: string): string | null {
 }
 function positiveInteger(value: unknown, path: string): number {
   if (!Number.isSafeInteger(value) || (value as number) <= 0) {
-    throw failure("EVAVO_TILE_MAP_PROVIDER_TYPE", `${path} must be positive integer`);
+    throw failure(
+      "EVAVO_TILE_MAP_PROVIDER_TYPE",
+      `${path} must be positive integer`,
+    );
   }
   return value as number;
 }
@@ -276,9 +350,14 @@ function booleanValue(value: unknown, path: string): boolean {
   return value;
 }
 function stringArray(value: unknown, path: string): string[] {
-  const values = array(value, path).map((item, index) => text(item, `${path}[${index}]`));
+  const values = array(value, path).map((item, index) =>
+    text(item, `${path}[${index}]`),
+  );
   if (values.length === 0) {
-    throw failure("EVAVO_TILE_MAP_PROVIDER_TYPE", `${path} must not be empty`);
+    throw failure(
+      "EVAVO_TILE_MAP_PROVIDER_TYPE",
+      `${path} must not be empty`,
+    );
   }
   return values;
 }
@@ -295,8 +374,12 @@ function sha256(value: Uint8Array): string {
 function canonical(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  const entries = Object.entries(value as JsonObject).sort(([a], [b]) => a.localeCompare(b));
-  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
+  const entries = Object.entries(value as JsonObject).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  return `{${entries
+    .map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`)
+    .join(",")}}`;
 }
 function failure(code: string, message: string): Error & { code: string } {
   const error = new Error(message) as Error & { code: string };
