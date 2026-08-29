@@ -38,6 +38,7 @@ export type TileMapSourcePackage = {
   schema_version: 1;
   source_plan_sha256: string;
   source_plan_fingerprint: string;
+  source_map_fingerprint: string;
   map_id: string;
   consumer_adapter: string | null;
   production_profile: string | null;
@@ -101,6 +102,7 @@ export function compileTileMapSourcePackage(
     schema_version: 1 as const,
     source_plan_sha256: sha256Hex(sourcePlanSha256, "source_plan_sha256"),
     source_plan_fingerprint: sha256Hex(raw.plan_fingerprint, "plan_fingerprint"),
+    source_map_fingerprint: sha256Hex(source.source_map_fingerprint, "source.source_map_fingerprint"),
     map_id: text(source.map_id, "source.map_id"),
     consumer_adapter: nullableText(source.consumer_adapter, "source.consumer_adapter"),
     production_profile: nullableText(source.production_profile, "source.production_profile"),
