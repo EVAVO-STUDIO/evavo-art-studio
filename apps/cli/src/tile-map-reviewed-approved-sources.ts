@@ -8,13 +8,18 @@ import {
 
 type JsonObject = Record<string, unknown>;
 
-export type ReviewedTileMapApprovedSourcesManifest = TileMapApprovedSourcesManifest & {
+export type ReviewedTileMapApprovedSourcesManifest = Omit<
+  TileMapApprovedSourcesManifest,
+  "manifest_fingerprint"
+> & {
+  pre_review_manifest_fingerprint: string;
   source_review_path: string;
   source_review_sha256: string;
   source_review_fingerprint: string;
   review_finalization_path: string;
   review_finalization_sha256: string;
   review_finalization_fingerprint: string;
+  manifest_fingerprint: string;
 };
 
 export async function compileReviewedApprovedSourcesManifest(
@@ -48,8 +53,10 @@ export async function compileReviewedApprovedSourcesManifest(
   if (sha256Hex(finalization.source_review_fingerprint, "finalization.source_review_fingerprint") !== reviewFingerprint) {
     throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_DRIFT", "finalization does not target the exact review manifest");
   }
-  if (sha256Hex(review.source_map_fingerprint, "review.source_map_fingerprint") !== sourceMapFingerprint ||
-      sha256Hex(finalization.source_map_fingerprint, "finalization.source_map_fingerprint") !== sourceMapFingerprint) {
+  if (
+    sha256Hex(review.source_map_fingerprint, "review.source_map_fingerprint") !== sourceMapFingerprint ||
+    sha256Hex(finalization.source_map_fingerprint, "finalization.source_map_fingerprint") !== sourceMapFingerprint
+  ) {
     throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_DRIFT", "review/finalization semantic map fingerprint is stale");
   }
   if (review.map_id !== sourcePackage.map_id || finalization.map_id !== sourcePackage.map_id) {
@@ -103,14 +110,20 @@ export async function compileReviewedApprovedSourcesManifest(
   }
 
   const manifest = await compileApprovedSourcesManifest(sourcePackagePath, finalizationPath);
-  return {
-    ...manifest,
+  const { manifest_fingerprint: preReviewFingerprint, ...manifestWithoutFingerprint } = manifest;
+  const base = {
+    ...manifestWithoutFingerprint,
+    pre_review_manifest_fingerprint: preReviewFingerprint,
     source_review_path: reviewPath,
     source_review_sha256: sha256(reviewBytes),
     source_review_fingerprint: reviewFingerprint,
     review_finalization_path: finalizationPath,
     review_finalization_sha256: sha256(finalizationBytes),
     review_finalization_fingerprint: sha256Hex(finalization.finalization_fingerprint, "finalization_fingerprint"),
+  };
+  return {
+    ...base,
+    manifest_fingerprint: sha256(Buffer.from(canonical(base), "utf8")),
   };
 }
 
@@ -120,4 +133,5 @@ function array(value: unknown, path: string): unknown[] { if (!Array.isArray(val
 function text(value: unknown, path: string): string { if (typeof value !== "string" || !value.trim()) throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_TYPE", `${path} must be non-empty string`); return value; }
 function sha256Hex(value: unknown, path: string): string { const result = text(value, path).toLowerCase(); if (!/^[0-9a-f]{64}$/u.test(result)) throw failure("EVAVO_TILE_MAP_REVIEWED_APPROVAL_HASH", `${path} must be SHA-256`); return result; }
 function sha256(value: Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }
+function canonical(value: unknown): string { if (value === null || typeof value !== "object") return JSON.stringify(value); if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`; const entries = Object.entries(value as JsonObject).sort(([a], [b]) => a.localeCompare(b)); return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`; }
 function failure(code: string, message: string): Error & { code: string } { const error = new Error(message) as Error & { code: string }; error.code = code; return error; }
