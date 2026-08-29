@@ -54,6 +54,7 @@ const plan = () => ({
 test("compiles provider-neutral source package with immutable topology rules", () => {
   const result = compileTileMapSourcePackage(plan(), "d".repeat(64));
   assert.equal(result.status, "ready-for-candidate-authoring");
+  assert.equal(result.source_map_fingerprint, "b".repeat(64));
   assert.equal(result.authority.semantic_authority, "tile-map-studio");
   assert.equal(result.authority.creative_authority, "art-studio");
   assert.equal(result.authority.provider_authority, "candidate-generation-only");
