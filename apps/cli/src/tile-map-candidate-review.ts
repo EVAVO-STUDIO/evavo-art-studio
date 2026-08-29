@@ -25,6 +25,7 @@ export type TileMapCandidateReviewManifest = {
   schema_version: 1;
   source_batch_sha256: string;
   source_batch_fingerprint: string;
+  source_package_fingerprint: string;
   source_map_fingerprint: string;
   map_id: string;
   projection: string;
@@ -135,6 +136,7 @@ export async function compileTileMapCandidateReview(
     schema_version: 1 as const,
     source_batch_sha256: sha256(batchBytes),
     source_batch_fingerprint: batchFingerprint,
+    source_package_fingerprint: sha256Hex(batch.source_package_fingerprint, "source_package_fingerprint"),
     source_map_fingerprint: sha256Hex(batch.source_map_fingerprint, "source_map_fingerprint"),
     map_id: text(batch.map_id, "map_id"),
     projection: text(batch.projection, "projection"),
