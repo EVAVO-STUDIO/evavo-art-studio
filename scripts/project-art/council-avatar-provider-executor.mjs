@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { mkdir, readFile, realpath, lstat } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -15,9 +14,7 @@ import {
   providerWorkerCapabilityProfiles,
   restrictProviderRegistry,
 } from '../../apps/worker/dist/provider-handlers.js';
-import {
-  validateCouncilAvatarProviderExecutionAuthorization,
-} from './council-avatar-provider-authorization.mjs';
+import { validateCouncilAvatarProviderExecutionAuthorization } from './council-avatar-provider-authorization.mjs';
 import {
   COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY,
   compileCouncilAvatarProviderRuntimePackage,
@@ -30,19 +27,13 @@ export const COUNCIL_AVATAR_PROVIDER_EXECUTION_RESULT_SCHEMA =
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, canonical(value[key])]),
-    );
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
   }
   return value;
 }
 
-function sha256(value) {
-  return createHash('sha256')
-    .update(JSON.stringify(canonical(value)))
-    .digest('hex');
+function exactJson(left, right) {
+  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
 }
 
 async function readJson(filePath, label) {
@@ -50,9 +41,7 @@ async function readJson(filePath, label) {
   try {
     parsed = JSON.parse(await readFile(filePath, 'utf8'));
   } catch (error) {
-    throw new Error(
-      `${label} could not be read: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`${label} could not be read: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error(`${label} must be a JSON object`);
@@ -75,27 +64,19 @@ async function freshDirectory(value, label) {
 }
 
 function selectedJobs(runtimePackage, authorization, characterId) {
-  const allowed = new Map(
-    authorization.jobs.map((job) => [job.characterId, job]),
-  );
+  const allowed = new Map(authorization.jobs.map((job) => [job.characterId, job]));
   const jobs = runtimePackage.jobs.filter((job) => {
     if (!allowed.has(job.characterId)) return false;
     return characterId ? job.characterId === characterId : true;
   });
   if (!jobs.length) {
-    throw new Error(
-      characterId
-        ? `character ${characterId} is not authorized`
-        : 'authorization contains no executable Council jobs',
-    );
+    throw new Error(characterId ? `character ${characterId} is not authorized` : 'authorization contains no executable Council jobs');
   }
   return Object.freeze(jobs);
 }
 
 function createAuthorizer(authorization, runtimePackage, executableJobs) {
-  const exactJobs = new Map(
-    executableJobs.map((job) => [job.runtimeJob.idempotencyKey, job]),
-  );
+  const exactJobs = new Map(executableJobs.map((job) => [job.normalizedRuntimeSpec.idempotencyKey, job]));
   const adapterId = authorization.adapter.id;
   return Object.freeze({
     authorizationSha256: authorization.authorizationSha256,
@@ -104,27 +85,21 @@ function createAuthorizer(authorization, runtimePackage, executableJobs) {
     requiredCapability: COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY,
     adapterAllowed: (candidateAdapterId) => candidateAdapterId === adapterId,
     assertJobAuthorized(job, request, now = new Date()) {
-      validateCouncilAvatarProviderExecutionAuthorization(authorization, {
-        now,
-        runtimePackage,
-      });
+      validateCouncilAvatarProviderExecutionAuthorization(authorization, { now, runtimePackage });
       const expected = exactJobs.get(job.spec.idempotencyKey);
       if (!expected) throw new Error('runtime job is not included in this execution invocation');
       if (
+        job.specHash !== expected.runtimeSpecSha256 ||
+        !exactJson(job.spec, expected.normalizedRuntimeSpec) ||
         job.spec.maximumAttempts !== 1 ||
-        !job.spec.requiredCapabilities.includes(
-          COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY,
-        ) ||
-        request.requestId !== expected.runtimeJob.payload.requestId ||
+        !job.spec.requiredCapabilities.includes(COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY) ||
+        request.requestId !== expected.normalizedRuntimeSpec.payload.requestId ||
         request.selection.preferredAdapterId !== adapterId ||
         request.selection.preferredModel !== authorization.adapter.model ||
         request.selection.allowFallback !== false ||
-        request.candidateCount !== expected.runtimeJob.payload.candidateCount
+        request.candidateCount !== expected.normalizedRuntimeSpec.payload.candidateCount
       ) {
         throw new Error('Council avatar runtime job authorization binding drift');
-      }
-      if (sha256(job.spec) !== expected.runtimeJobSha256) {
-        throw new Error('Council avatar runtime job hash drift');
       }
       return authorization;
     },
@@ -138,26 +113,15 @@ export async function executeAuthorizedCouncilAvatarProviderJobs({
   characterId,
   environment = process.env,
 } = {}) {
-  if (
-    COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY !==
-    WORKER_EXECUTION_CAPABILITY
-  ) {
+  if (COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY !== WORKER_EXECUTION_CAPABILITY) {
     throw new Error('COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY_DRIFT');
   }
-  const authorizationRecord = await readJson(
-    path.resolve(authorizationPath),
-    'Council avatar provider authorization',
-  );
+  const authorizationRecord = await readJson(path.resolve(authorizationPath), 'Council avatar provider authorization');
   const runtimePackage = compileCouncilAvatarProviderRuntimePackage();
-  const authorization = validateCouncilAvatarProviderExecutionAuthorization(
-    authorizationRecord,
-    { runtimePackage },
-  );
+  const authorization = validateCouncilAvatarProviderExecutionAuthorization(authorizationRecord, { runtimePackage });
   const readiness = await inspectCouncilAvatarProviderReadiness({ environment });
   if (!readiness.readiness.readyForBoundedExecutionAuthorization) {
-    throw new Error(
-      `COUNCIL_AVATAR_PROVIDER_NOT_READY:${readiness.blockers.join(',') || 'unknown'}`,
-    );
+    throw new Error(`COUNCIL_AVATAR_PROVIDER_NOT_READY:${readiness.blockers.join(',') || 'unknown'}`);
   }
   if (
     readiness.runtimePackageSha256 !== runtimePackage.runtimePackageSha256 ||
@@ -167,38 +131,23 @@ export async function executeAuthorizedCouncilAvatarProviderJobs({
     throw new Error('COUNCIL_AVATAR_PROVIDER_EXECUTION_READINESS_DRIFT');
   }
 
-  const executableJobs = selectedJobs(
-    runtimePackage,
-    authorization,
-    characterId?.trim() || null,
-  );
-  const resolvedRuntimeRoot = await freshDirectory(
-    runtimeRoot,
-    'runtimeRoot',
-  );
-  const resolvedArtifactRoot = await freshDirectory(
-    artifactRoot,
-    'artifactRoot',
-  );
-  if (resolvedRuntimeRoot === resolvedArtifactRoot) {
-    throw new Error('runtimeRoot and artifactRoot must be separate');
-  }
+  const executableJobs = selectedJobs(runtimePackage, authorization, characterId?.trim() || null);
+  const resolvedRuntimeRoot = await freshDirectory(runtimeRoot, 'runtimeRoot');
+  const resolvedArtifactRoot = await freshDirectory(artifactRoot, 'artifactRoot');
+  if (resolvedRuntimeRoot === resolvedArtifactRoot) throw new Error('runtimeRoot and artifactRoot must be separate');
 
   const fullRegistry = createProviderRegistryFromEnvironment(environment);
   const registry = restrictProviderRegistry(fullRegistry, [authorization.adapter.id]);
-  const authorizer = createAuthorizer(
-    authorization,
-    runtimePackage,
-    executableJobs,
-  );
+  const authorizer = createAuthorizer(authorization, runtimePackage, executableJobs);
   const runtime = new LocalRuntimeRepository({ root: resolvedRuntimeRoot });
   const artifacts = new LocalArtifactStore({ root: resolvedArtifactRoot });
   const records = [];
   for (const job of executableJobs) {
     const record = await runtime.submit(job.runtimeJob);
     if (
-      record.spec.maximumAttempts !== 1 ||
-      sha256(record.spec) !== job.runtimeJobSha256
+      record.specHash !== job.runtimeSpecSha256 ||
+      !exactJson(record.spec, job.normalizedRuntimeSpec) ||
+      record.spec.maximumAttempts !== 1
     ) {
       throw new Error(`submitted runtime job drifted for ${job.characterId}`);
     }
@@ -225,16 +174,14 @@ export async function executeAuthorizedCouncilAvatarProviderJobs({
   const jobs = [];
   for (const record of records) {
     const completed = await runtime.get(record.jobId);
-    jobs.push(
-      Object.freeze({
-        characterId: record.characterId,
-        jobId: record.jobId,
-        state: completed?.state ?? 'missing',
-        attempts: completed?.attempts?.length ?? 0,
-        outputArtifactIds: Object.freeze([...(completed?.outputArtifacts ?? [])]),
-        failureCode: completed?.failure?.code ?? null,
-      }),
-    );
+    jobs.push(Object.freeze({
+      characterId: record.characterId,
+      jobId: record.jobId,
+      state: completed?.state ?? 'missing',
+      attempts: completed?.attempts?.length ?? 0,
+      outputArtifactIds: Object.freeze([...(completed?.outputArtifacts ?? [])]),
+      failureCode: completed?.failure?.code ?? null,
+    }));
   }
 
   return Object.freeze({
@@ -252,11 +199,7 @@ export async function executeAuthorizedCouncilAvatarProviderJobs({
     candidateApprovalEstablished: false,
     candidatePromotionEstablished: false,
     runtimeActivationAllowed: false,
-    worker: Object.freeze({
-      claimed: run.claimed,
-      succeeded: run.succeeded,
-      failed: run.failed,
-    }),
+    worker: Object.freeze({ claimed: run.claimed, succeeded: run.succeeded, failed: run.failed }),
     jobs: Object.freeze(jobs),
   });
 }
