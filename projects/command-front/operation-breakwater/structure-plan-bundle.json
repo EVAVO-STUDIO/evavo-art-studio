@@ -45,6 +45,13 @@
       "artRules": ["repurposed industrial or civilian shell","improvised barriers","clear infantry production identity","avoid ethnic or religious stereotyping"]
     },
     {
+      "id": "breakwater-vesper-motor-yard",
+      "role": "destructible-prop",
+      "subject": "Vesper improvised vehicle motor yard for technicals and captured armour",
+      "states": ["intact","active","damaged-a","damaged-b","destroyed-rubble"],
+      "artRules": ["repurposed industrial vehicle yard","open service bay and scrap-parts language","field-modified late-90s equipment","clearly distinct from Meridian motor pool","no sci-fi factory styling"]
+    },
+    {
       "id": "neutral-oil-facility",
       "role": "destructible-prop",
       "subject": "civilian 1999 oil processing facility in dusty industrial canal district",
