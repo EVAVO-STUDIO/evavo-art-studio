@@ -18,6 +18,10 @@ if (spritePlanAction) {
   await import("./tile-map-source-package-cli.js");
 } else if (command === "tile-map-candidate-batch") {
   await import("./tile-map-candidate-batch-cli.js");
+} else if (command === "tile-map-provider-batch") {
+  // Candidate envelopes compile through the canonical Art Studio provider
+  // runtime contract. Provider execution remains candidate-generation-only.
+  await import("./tile-map-provider-batch-cli.js");
 } else if (command === "tile-map-candidate-review") {
   await import("./tile-map-candidate-review-cli.js");
 } else if (command === "tile-map-review-finalize") {
