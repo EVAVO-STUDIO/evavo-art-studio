@@ -14,7 +14,11 @@ const files = {
   index: "packages/contracts/src/index.ts",
   package: "package.json",
   docs: "docs/book-creative-direction.md",
-  workflow: ".github/workflows/book-creative-direction.yml",
+  commercialSource: "packages/contracts/src/book-cover-commercial-release.ts",
+  commercialTest: "packages/contracts/test/book-cover-commercial-release.test.mjs",
+  commercialRunner: "scripts/run-book-cover-commercial-release-local.mjs",
+  commercialCheck: "scripts/check-book-cover-commercial-release.mjs",
+  commercialDocs: "docs/book-cover-commercial-release.md",
 };
 const failures = [];
 const sources = {};
@@ -85,6 +89,7 @@ if (!failures.length) {
   ]) expect("test", token);
 
   expect("index", 'export * from "./book-creative-direction.js";');
+  expect("index", 'export * from "./book-cover-commercial-release.js";');
   expect("package", '"book:creative-direction:check": "node scripts/check-book-creative-direction.mjs"');
   expect("package", "pnpm run book:creative-direction:check");
 
@@ -97,19 +102,51 @@ if (!failures.length) {
   ]) expect("docs", token);
 
   for (const token of [
-    '"package.json"',
-    "pnpm install --frozen-lockfile",
-    "check-book-creative-direction.mjs",
-    "@evavo/art-contracts test",
-    "@evavo/art-contracts typecheck",
-    "pnpm check",
-  ]) expect("workflow", token);
+    "evavo_art_book_cover_commercial_release_v1",
+    "ready_for_docs_composition",
+    "localValidationAuthoritative: true",
+    "githubHostedActionsRequired: false",
+    "paidCiRequired: false",
+    "vercelBackgroundWorkerRequired: false",
+    "networkRequiredForValidation: false",
+    "workflowFilesAuthoritative: false",
+  ]) expect("commercialSource", token);
+
+  for (const token of [
+    "blocks paid or workflow-authoritative execution dependencies",
+    "detects authority tampering",
+  ]) expect("commercialTest", token);
+
+  for (const token of [
+    "--input <release-input.json>",
+    "githubHostedActionsUsed: false",
+    "vercelBackgroundWorkerUsed: false",
+    "paidServiceUsed: false",
+  ]) expect("commercialRunner", token);
+
+  for (const token of [
+    "localValidationAuthoritative: true",
+    "githubHostedActionsRequired: false",
+    "workflowFilesAuthoritative: false",
+  ]) expect("commercialCheck", token);
+
+  for (const token of [
+    "Local validation is authoritative",
+    "GitHub Actions are optional wrappers",
+    "Vercel is not a background worker",
+  ]) expect("commercialDocs", token);
 
   for (const token of [
     "automaticSelectionAllowed:true",
     "automaticPromotionAllowed:true",
     "publicationPerformed:true",
   ]) reject("source", token);
+
+  for (const token of [
+    "githubHostedActionsRequired: true",
+    "paidCiRequired: true",
+    "workflowFilesAuthoritative: true",
+  ]) reject("commercialSource", token);
 }
 
 if (failures.length) {
@@ -126,6 +163,12 @@ if (failures.length) {
     historicalPrintProcesses: true,
     publicPackageExported: true,
     permanentRepositoryCheckInstalled: true,
+    localValidationAuthoritative: true,
+    workflowRequired: false,
+    githubHostedActionsRequired: false,
+    paidCiRequired: false,
+    vercelBackgroundWorkerRequired: false,
+    networkRequiredForValidation: false,
     genericProviderShorthandAllowed: false,
     namedCreatorImitationAllowed: false,
     brandedFranchiseTransferAllowed: false,
