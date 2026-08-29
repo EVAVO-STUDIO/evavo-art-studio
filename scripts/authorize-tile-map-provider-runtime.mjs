@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 
 import {
@@ -24,7 +30,10 @@ const canonical = (value) => {
 };
 const hashObject = (value) => sha256(Buffer.from(canonical(value), 'utf8'));
 const safeId = (value, label) => {
-  if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(value)) {
+  if (
+    typeof value !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(value)
+  ) {
     throw new Error(`${label} must use 1 to 128 safe id characters`);
   }
   return value;
@@ -36,7 +45,11 @@ const absolute = (value, label) => {
   return resolved;
 };
 const timestamp = (value, label) => {
-  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value)) || new Date(Date.parse(value)).toISOString() !== value) {
+  if (
+    typeof value !== 'string' ||
+    !Number.isFinite(Date.parse(value)) ||
+    new Date(Date.parse(value)).toISOString() !== value
+  ) {
     throw new Error(`${label} must be a canonical UTC timestamp`);
   }
   return value;
@@ -86,7 +99,9 @@ const splitAdapters = (value) => {
     ),
   ];
   if (!items.length || items.length > 16) {
-    throw new Error('--allowed-adapters must contain 1 to 16 comma-separated adapter ids');
+    throw new Error(
+      '--allowed-adapters must contain 1 to 16 comma-separated adapter ids',
+    );
   }
   return items.sort();
 };
@@ -104,6 +119,37 @@ const safeHash = (value, label) => {
   }
   return value;
 };
+
+function inside(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return (
+    relative === '' ||
+    (!relative.startsWith('..') && !path.isAbsolute(relative))
+  );
+}
+
+async function assertCreateOnlyFileTarget(file, label) {
+  const parent = path.dirname(file);
+  await mkdir(parent, { recursive: true });
+  const parentState = await lstat(parent);
+  if (!parentState.isDirectory() || parentState.isSymbolicLink()) {
+    throw new Error(`${label} parent must be a real non-symbolic directory`);
+  }
+  const existing = await lstat(file).catch(() => null);
+  if (existing) throw new Error(`${label} already exists: ${file}`);
+}
+
+async function assertEmptyRealDirectory(directory, label) {
+  await mkdir(directory, { recursive: true });
+  const state = await lstat(directory);
+  if (!state.isDirectory() || state.isSymbolicLink()) {
+    throw new Error(`${label} must be a real non-symbolic directory`);
+  }
+  const entries = await readdir(directory);
+  if (entries.length !== 0) {
+    throw new Error(`${label} must be empty before authorization: ${directory}`);
+  }
+}
 
 function verifyProviderBatch(batch) {
   const claimed = safeHash(
@@ -123,24 +169,36 @@ function verifyProviderBatch(batch) {
       throw new Error(`jobs[${index}] must be object`);
     }
     const candidateId = safeId(entry.candidate_id, `jobs[${index}].candidate_id`);
-    if (seen.has(candidateId)) throw new Error(`duplicate provider candidate ${candidateId}`);
+    if (seen.has(candidateId)) {
+      throw new Error(`duplicate provider candidate ${candidateId}`);
+    }
     seen.add(candidateId);
     const runtimeJob = entry.runtime_job;
     if (!runtimeJob || typeof runtimeJob !== 'object' || Array.isArray(runtimeJob)) {
       throw new Error(`jobs[${index}].runtime_job must be object`);
     }
-    if (runtimeJob.queue !== 'provider' || typeof runtimeJob.kind !== 'string' || !runtimeJob.kind.startsWith('art.candidate.')) {
+    if (
+      runtimeJob.queue !== 'provider' ||
+      typeof runtimeJob.kind !== 'string' ||
+      !runtimeJob.kind.startsWith('art.candidate.')
+    ) {
       throw new Error(`jobs[${index}] runtime job is not a provider candidate`);
     }
     const contract = compileProviderCandidateRuntimeContract(runtimeJob.payload);
     if (entry.request_sha256 !== contract.requestSha256) {
-      throw new Error(`jobs[${index}] request SHA-256 drifted from canonical provider contract`);
+      throw new Error(
+        `jobs[${index}] request SHA-256 drifted from canonical provider contract`,
+      );
     }
     if (entry.prompt_sha256 !== contract.compiledPromptSha256) {
-      throw new Error(`jobs[${index}] prompt SHA-256 drifted from canonical provider contract`);
+      throw new Error(
+        `jobs[${index}] prompt SHA-256 drifted from canonical provider contract`,
+      );
     }
     if (canonical(runtimeJob) !== canonical(contract.runtimeJob)) {
-      throw new Error(`jobs[${index}] runtime job drifted from canonical provider contract`);
+      throw new Error(
+        `jobs[${index}] runtime job drifted from canonical provider contract`,
+      );
     }
     if (entry.runtime_job_sha256 !== hashObject(contract.runtimeJob)) {
       throw new Error(`jobs[${index}] runtime job SHA-256 is invalid`);
@@ -163,11 +221,22 @@ function verifyProviderBatch(batch) {
   return claimed;
 }
 
-export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(2)) {
+export async function authorizeTileMapProviderRuntime(
+  argv = process.argv.slice(2),
+) {
   const values = optionMap(argv);
-  const providerBatchFile = absolute(required(values, '--provider-batch'), '--provider-batch');
-  const runtimeRoot = absolute(required(values, '--runtime-root'), '--runtime-root');
-  const artifactRoot = absolute(required(values, '--artifact-root'), '--artifact-root');
+  const providerBatchFile = absolute(
+    required(values, '--provider-batch'),
+    '--provider-batch',
+  );
+  const runtimeRoot = absolute(
+    required(values, '--runtime-root'),
+    '--runtime-root',
+  );
+  const artifactRoot = absolute(
+    required(values, '--artifact-root'),
+    '--artifact-root',
+  );
   const output = absolute(required(values, '--output'), '--output');
   const allowedAdapterIds = splitAdapters(required(values, '--allowed-adapters'));
   const authorizedBy = required(values, '--authorized-by').trim();
@@ -178,31 +247,47 @@ export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(
   if (duration <= 0 || duration > 24 * 60 * 60 * 1000) {
     throw new Error('authorization must expire within 24 hours after authorized-at');
   }
-  if (!authorizedBy || authorizedBy.length > 256 || !reason || reason.length > 4096) {
+  if (
+    !authorizedBy ||
+    authorizedBy.length > 256 ||
+    !reason ||
+    reason.length > 4096
+  ) {
     throw new Error('authorized-by/reason are invalid');
   }
-  if (runtimeRoot === artifactRoot) {
-    throw new Error('runtime-root and artifact-root must be separate');
+  if (
+    inside(runtimeRoot, artifactRoot) ||
+    inside(artifactRoot, runtimeRoot)
+  ) {
+    throw new Error('runtime-root and artifact-root must be fully disjoint');
   }
-  await mkdir(runtimeRoot, { recursive: true });
-  await mkdir(artifactRoot, { recursive: true });
-  for (const [candidate, label] of [
-    [runtimeRoot, 'runtime-root'],
-    [artifactRoot, 'artifact-root'],
-  ]) {
-    const state = await lstat(candidate);
-    if (!state.isDirectory() || state.isSymbolicLink()) {
-      throw new Error(`${label} must be a real non-symbolic directory`);
-    }
+  if (
+    inside(runtimeRoot, output) ||
+    inside(artifactRoot, output)
+  ) {
+    throw new Error(
+      'authorization output must remain outside runtime-root and artifact-root',
+    );
   }
+
+  // Prove create-only/isolation conditions before runtime submission so a
+  // failed authorization write can never leave newly submitted orphan jobs.
+  await assertCreateOnlyFileTarget(output, 'authorization output');
+  await assertEmptyRealDirectory(runtimeRoot, 'runtime-root');
+  await assertEmptyRealDirectory(artifactRoot, 'artifact-root');
 
   const batchRecord = await jsonObject(
     providerBatchFile,
     'Tile Map provider runtime batch',
   );
   const batch = batchRecord.value;
-  if (batch.schema_version !== 1 || batch.status !== 'ready-for-provider-runtime') {
-    throw new Error('provider batch must be schema v1 and ready-for-provider-runtime');
+  if (
+    batch.schema_version !== 1 ||
+    batch.status !== 'ready-for-provider-runtime'
+  ) {
+    throw new Error(
+      'provider batch must be schema v1 and ready-for-provider-runtime',
+    );
   }
   const providerBatchFingerprint = verifyProviderBatch(batch);
   const sourceMapFingerprint = safeHash(
@@ -212,15 +297,25 @@ export async function authorizeTileMapProviderRuntime(argv = process.argv.slice(
   const queue = `tile-map-provider-${providerBatchFingerprint.slice(0, 20)}`;
 
   const submissions = batch.jobs.map((entry, index) => {
-    const candidateId = safeId(entry.candidate_id, `jobs[${index}].candidate_id`);
+    const candidateId = safeId(
+      entry.candidate_id,
+      `jobs[${index}].candidate_id`,
+    );
     const runtimeJob = entry.runtime_job;
-    if (!Array.isArray(runtimeJob.requiredCapabilities) || !runtimeJob.requiredCapabilities.length) {
-      throw new Error(`jobs[${index}] runtime job requiredCapabilities missing`);
+    if (
+      !Array.isArray(runtimeJob.requiredCapabilities) ||
+      !runtimeJob.requiredCapabilities.length
+    ) {
+      throw new Error(
+        `jobs[${index}] runtime job requiredCapabilities missing`,
+      );
     }
     return {
       queue,
       kind: runtimeJob.kind,
-      idempotencyKey: `tile-map-authorized:${candidateId}:${providerBatchFingerprint.slice(0, 16)}`,
+      idempotencyKey:
+        `tile-map-authorized:${candidateId}:` +
+        providerBatchFingerprint.slice(0, 16),
       payload: runtimeJob.payload,
       requiredCapabilities: [
         ...new Set([
