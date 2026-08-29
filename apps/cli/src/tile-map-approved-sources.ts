@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 
 type JsonObject = Record<string, unknown>;
 
@@ -8,6 +9,10 @@ type ApprovedSource = {
   path: string;
   sha256: string;
   bytes: number;
+  format: "png";
+  width: number;
+  height: number;
+  has_alpha: boolean;
 };
 
 type ApprovedTask = {
@@ -91,6 +96,14 @@ export async function compileApprovedSourcesManifest(
   for (const [taskId, task] of [...packageTasks.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const decision = decisions.get(taskId)!;
     const required = positiveInteger(task.required_approved_variants, `${taskId}.required_approved_variants`);
+    const taskKind = text(task.task_kind, `${taskId}.task_kind`);
+    if (taskKind !== "tile-family" && taskKind !== "feature-family") {
+      throw failure("EVAVO_TILE_MAP_APPROVAL_TYPE", `${taskId}.task_kind is unsupported`);
+    }
+    const dimensions = object(task.dimensions, `${taskId}.dimensions`);
+    const expectedWidth = positiveInteger(dimensions.width, `${taskId}.dimensions.width`);
+    const expectedHeight = positiveInteger(dimensions.height, `${taskId}.dimensions.height`);
+    const alphaRequired = booleanValue(task.alpha_required, `${taskId}.alpha_required`);
     const rows = array(decision.approved_sources, `${taskId}.approved_sources`);
     if (rows.length < required) {
       throw failure("EVAVO_TILE_MAP_APPROVAL_COUNT", `${taskId} has ${rows.length} approved sources; requires at least ${required}`);
@@ -103,6 +116,9 @@ export async function compileApprovedSourcesManifest(
       const requested = portableRelative(
         text(row.path, `${taskId}.approved_sources[${index}].path`),
       );
+      if (path.posix.extname(requested).toLowerCase() !== ".png") {
+        throw failure("EVAVO_TILE_MAP_APPROVAL_FORMAT", `${taskId} approved source must be lossless PNG: ${requested}`);
+      }
       const absolute = path.resolve(approvalRoot, ...requested.split("/"));
       const relative = path.relative(approvalRoot, absolute);
       if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
@@ -114,9 +130,42 @@ export async function compileApprovedSourcesManifest(
       if (actual !== expected) throw failure("EVAVO_TILE_MAP_APPROVAL_HASH", `approved source hash changed: ${requested}`);
       if (digests.has(actual)) throw failure("EVAVO_TILE_MAP_APPROVAL_DUPLICATE", `${taskId} approved sources contain duplicate image bytes`);
       if (paths.has(requested)) throw failure("EVAVO_TILE_MAP_APPROVAL_DUPLICATE", `${taskId} approved source path repeated: ${requested}`);
+
+      const metadata = await sharp(bytes, { failOn: "error" }).metadata();
+      if (metadata.format !== "png") {
+        throw failure("EVAVO_TILE_MAP_APPROVAL_FORMAT", `${taskId} approved source bytes are not PNG: ${requested}`);
+      }
+      if (!metadata.width || !metadata.height) {
+        throw failure("EVAVO_TILE_MAP_APPROVAL_GEOMETRY", `${taskId} approved source has unknown dimensions: ${requested}`);
+      }
+      if (taskKind === "tile-family") {
+        if (metadata.width !== expectedWidth || metadata.height !== expectedHeight) {
+          throw failure(
+            "EVAVO_TILE_MAP_APPROVAL_GEOMETRY",
+            `${taskId} approved tile ${requested} is ${metadata.width}x${metadata.height}; expected ${expectedWidth}x${expectedHeight}`,
+          );
+        }
+      } else if (metadata.width < expectedWidth || metadata.height < expectedHeight) {
+        throw failure(
+          "EVAVO_TILE_MAP_APPROVAL_GEOMETRY",
+          `${taskId} approved feature ${requested} is smaller than nominal ${expectedWidth}x${expectedHeight}`,
+        );
+      }
+      if (alphaRequired && metadata.hasAlpha !== true) {
+        throw failure("EVAVO_TILE_MAP_APPROVAL_ALPHA", `${taskId} approved source requires alpha: ${requested}`);
+      }
+
       digests.add(actual);
       paths.add(requested);
-      approvedSources.push({ path: requested, sha256: actual, bytes: bytes.length });
+      approvedSources.push({
+        path: requested,
+        sha256: actual,
+        bytes: bytes.length,
+        format: "png",
+        width: metadata.width,
+        height: metadata.height,
+        has_alpha: metadata.hasAlpha === true,
+      });
     }
     tasks.push({
       task_id: taskId,
@@ -176,6 +225,7 @@ function array(value: unknown, path: string): unknown[] { if (!Array.isArray(val
 function text(value: unknown, path: string): string { if (typeof value !== "string" || !value.trim()) throw failure("EVAVO_TILE_MAP_APPROVAL_TYPE", `${path} must be non-empty string`); return value; }
 function nullableText(value: unknown, path: string): string | null { if (value === null || value === undefined) return null; return text(value, path); }
 function positiveInteger(value: unknown, path: string): number { if (!Number.isSafeInteger(value) || (value as number) <= 0) throw failure("EVAVO_TILE_MAP_APPROVAL_TYPE", `${path} must be positive integer`); return value as number; }
+function booleanValue(value: unknown, path: string): boolean { if (typeof value !== "boolean") throw failure("EVAVO_TILE_MAP_APPROVAL_TYPE", `${path} must be boolean`); return value; }
 function timestamp(value: unknown, path: string): string { const result = text(value, path); if (!Number.isFinite(Date.parse(result))) throw failure("EVAVO_TILE_MAP_APPROVAL_TYPE", `${path} must be ISO timestamp`); return result; }
 function sha256Hex(value: unknown, path: string): string { const result = text(value, path).toLowerCase(); if (!/^[0-9a-f]{64}$/u.test(result)) throw failure("EVAVO_TILE_MAP_APPROVAL_HASH", `${path} must be SHA-256`); return result; }
 function sha256(value: Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }
