@@ -23,20 +23,34 @@ import {
 
 export const RAW_ART_PROVIDER_EXECUTION_CAPABILITY =
   "raw-art.execution-authorized" as const;
+export const COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY =
+  "council-avatar.execution-authorized" as const;
 const RAW_ART_PROVIDER_REQUEST_METADATA_SCHEMA =
   "evavo.raw-art-provider-request-metadata.v2";
+const COUNCIL_AVATAR_PROVIDER_REQUEST_METADATA_SCHEMA =
+  "evavo.project-art-council-avatar-provider-request.v1";
 
-export interface RawArtProviderExecutionAuthorizer {
+export interface ProviderExecutionAuthorizer {
   readonly authorizationSha256: string;
   readonly allowedAdapterIds: readonly string[];
   readonly queues: readonly string[];
-  readonly requiredCapability: typeof RAW_ART_PROVIDER_EXECUTION_CAPABILITY;
+  readonly requiredCapability: string;
   adapterAllowed(adapterId: string): boolean;
   assertJobAuthorized(
     job: RuntimeJobRecord,
     request: NormalizedProviderCandidateRequest,
     now?: Date,
   ): unknown;
+}
+
+export interface RawArtProviderExecutionAuthorizer
+  extends ProviderExecutionAuthorizer {
+  readonly requiredCapability: typeof RAW_ART_PROVIDER_EXECUTION_CAPABILITY;
+}
+
+export interface CouncilAvatarProviderExecutionAuthorizer
+  extends ProviderExecutionAuthorizer {
+  readonly requiredCapability: typeof COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY;
 }
 
 const OPERATION_KIND = Object.freeze({
@@ -214,43 +228,80 @@ function isJsonObject(value: unknown): value is JsonObject {
   );
 }
 
-function rawArtRequest(
-  request: NormalizedProviderCandidateRequest,
-): boolean {
-  const metadata = request.metadata;
-  return (
-    isJsonObject(metadata) &&
-    metadata.schema === RAW_ART_PROVIDER_REQUEST_METADATA_SCHEMA
-  );
-}
+type GovernedExecutionContract = Readonly<{
+  capability: string;
+  mismatchCode: string;
+  unauthorizedCode: string;
+  label: string;
+}>;
 
-function requireRawArtExecutionAuthorization(
+function governedExecutionContract(
   job: RuntimeJobRecord,
   request: NormalizedProviderCandidateRequest,
-  authorization: RawArtProviderExecutionAuthorizer | undefined,
-): void {
-  const metadataGoverned = rawArtRequest(request);
-  const capabilityGoverned = job.spec.requiredCapabilities.includes(
+): GovernedExecutionContract | undefined {
+  const metadata = request.metadata;
+  const rawMetadata =
+    isJsonObject(metadata) &&
+    metadata.schema === RAW_ART_PROVIDER_REQUEST_METADATA_SCHEMA;
+  const councilMetadata =
+    isJsonObject(metadata) &&
+    metadata.schema === COUNCIL_AVATAR_PROVIDER_REQUEST_METADATA_SCHEMA;
+  const rawCapability = job.spec.requiredCapabilities.includes(
     RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
   );
-  if (!metadataGoverned && !capabilityGoverned) return;
-  if (!metadataGoverned || !capabilityGoverned) {
+  const councilCapability = job.spec.requiredCapabilities.includes(
+    COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY,
+  );
+
+  if (!rawMetadata && !councilMetadata && !rawCapability && !councilCapability) {
+    return undefined;
+  }
+  if (rawMetadata || rawCapability) {
+    if (!rawMetadata || !rawCapability || councilMetadata || councilCapability) {
+      throw new PermanentRuntimeError(
+        "RAW_ART_PROVIDER_EXECUTION_CONTRACT_MISMATCH",
+        "RAW_ART provider execution metadata and runtime capability must be declared together and may not mix governance domains.",
+      );
+    }
+    return Object.freeze({
+      capability: RAW_ART_PROVIDER_EXECUTION_CAPABILITY,
+      mismatchCode: "RAW_ART_PROVIDER_EXECUTION_CONTRACT_MISMATCH",
+      unauthorizedCode: "RAW_ART_PROVIDER_EXECUTION_UNAUTHORIZED",
+      label: "RAW_ART",
+    });
+  }
+  if (!councilMetadata || !councilCapability) {
     throw new PermanentRuntimeError(
-      "RAW_ART_PROVIDER_EXECUTION_CONTRACT_MISMATCH",
-      "RAW_ART provider execution metadata and runtime capability must be declared together.",
+      "COUNCIL_AVATAR_PROVIDER_EXECUTION_CONTRACT_MISMATCH",
+      "Council avatar provider execution metadata and runtime capability must be declared together.",
     );
   }
-  if (!authorization) {
+  return Object.freeze({
+    capability: COUNCIL_AVATAR_PROVIDER_EXECUTION_CAPABILITY,
+    mismatchCode: "COUNCIL_AVATAR_PROVIDER_EXECUTION_CONTRACT_MISMATCH",
+    unauthorizedCode: "COUNCIL_AVATAR_PROVIDER_EXECUTION_UNAUTHORIZED",
+    label: "Council avatar",
+  });
+}
+
+function requireProviderExecutionAuthorization(
+  job: RuntimeJobRecord,
+  request: NormalizedProviderCandidateRequest,
+  authorization: ProviderExecutionAuthorizer | undefined,
+): void {
+  const governance = governedExecutionContract(job, request);
+  if (!governance) return;
+  if (!authorization || authorization.requiredCapability !== governance.capability) {
     throw new PermanentRuntimeError(
-      "RAW_ART_PROVIDER_EXECUTION_UNAUTHORIZED",
-      "RAW_ART provider jobs require an exact active execution authorization before any provider call.",
+      governance.unauthorizedCode,
+      `${governance.label} provider jobs require an exact active execution authorization before any provider call.`,
     );
   }
   try {
     authorization.assertJobAuthorized(job, request, new Date());
   } catch (error: unknown) {
     throw new PermanentRuntimeError(
-      "RAW_ART_PROVIDER_EXECUTION_UNAUTHORIZED",
+      governance.unauthorizedCode,
       error instanceof Error ? error.message : String(error),
     );
   }
@@ -259,7 +310,7 @@ function requireRawArtExecutionAuthorization(
 function createHandler(
   registry: ProviderRegistryLike,
   kind: (typeof OPERATION_KIND)[keyof typeof OPERATION_KIND],
-  authorization?: RawArtProviderExecutionAuthorizer,
+  authorization?: ProviderExecutionAuthorizer,
 ): RuntimeJobHandler {
   return async (context) => {
     let request: NormalizedProviderCandidateRequest;
@@ -301,7 +352,7 @@ function createHandler(
         "Provider job adapter capability profile does not match its normalized request.",
       );
     }
-    requireRawArtExecutionAuthorization(
+    requireProviderExecutionAuthorization(
       context.job,
       request,
       authorization,
@@ -328,7 +379,7 @@ function createHandler(
 
 export function createProviderHandlers(
   registry: ProviderRegistryLike,
-  authorization?: RawArtProviderExecutionAuthorizer,
+  authorization?: ProviderExecutionAuthorizer,
 ): Readonly<Record<string, RuntimeJobHandler>> {
   return Object.freeze({
     "art.candidate.generate": createHandler(
@@ -392,7 +443,7 @@ export function restrictProviderRegistry(
   const missing = [...allowed].filter((adapterId) => !available.has(adapterId));
   if (missing.length) {
     throw new Error(
-      `RAW_ART provider execution authorization names unavailable adapters: ${missing.join(", ")}`,
+      `Provider execution authorization names unavailable adapters: ${missing.join(", ")}`,
     );
   }
   return Object.freeze({
