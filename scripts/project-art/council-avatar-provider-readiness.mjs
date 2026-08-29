@@ -87,7 +87,7 @@ export async function inspectCouncilAvatarProviderReadiness({
   );
   const requiredCapabilities = new Set(
     runtimePackage.jobs.flatMap(
-      (job) => job.contract.requiredAdapterCapabilities,
+      (job) => job.canonicalContract.requiredAdapterCapabilities,
     ),
   );
   const missingCapabilities = desiredAdapter
@@ -143,11 +143,16 @@ export async function inspectCouncilAvatarProviderReadiness({
       fallbackAuthorized: false,
       retriesAuthorized: 0,
       requiredAdapterCapabilities: Object.freeze([...requiredCapabilities].sort()),
+      executionCapability: runtimePackage.executionCapability,
+      maximumAttemptsPerJob:
+        runtimePackage.providerCallBudget.maximumAttemptsPerJob,
     }),
     environment: sanitizedEnvironmentSummary(environment),
     worker: Object.freeze({
       importReady: workerImportReady,
       providerQueueEligible,
+      genericProviderWorkerMayClaim:
+        runtimePackage.executionPolicy.genericProviderWorkerMayClaim,
       registryErrorClass: registryError
         ? 'provider-registry-initialization-failed'
         : null,
@@ -168,7 +173,7 @@ export async function inspectCouncilAvatarProviderReadiness({
       configuredWithoutSpend
         ? [
             'Create a separate bounded execution authorization for the exact Council identity runtime jobs.',
-            'Perform at most the authorized provider calls through the existing Art Studio worker.',
+            'Run only a dedicated Council avatar worker that holds the exact execution capability.',
             'Do not treat provider success as identity approval or runtime promotion.',
           ]
         : [
