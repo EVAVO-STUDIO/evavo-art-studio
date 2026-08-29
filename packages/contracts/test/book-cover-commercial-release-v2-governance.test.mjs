@@ -87,13 +87,14 @@ test("keeps the public export, local runner and automatic package enforcement in
     readRepositoryFile("scripts/run-book-cover-commercial-release-v2-local.mjs"),
     readPackageFile("package.json"),
   ]);
+  const packageJson = JSON.parse(packageJsonSource);
 
   assert.ok(
     indexSource.includes('export * from "./book-cover-commercial-release-v2.js";'),
     "The public contracts entrypoint must export commercial release V2.",
   );
   assert.ok(
-    packageJsonSource.includes('node --test \\"test/**/*.test.mjs\\"'),
+    packageJson.scripts?.test?.includes('node --test "test/**/*.test.mjs"'),
     "The contracts package test command must automatically include governance tests.",
   );
 
