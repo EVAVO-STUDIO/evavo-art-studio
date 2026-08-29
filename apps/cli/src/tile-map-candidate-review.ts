@@ -27,6 +27,9 @@ export type TileMapCandidateReviewManifest = {
   source_batch_fingerprint: string;
   source_package_fingerprint: string;
   source_map_fingerprint: string;
+  provider_results_path: string;
+  provider_results_sha256: string;
+  candidate_root: string;
   map_id: string;
   projection: string;
   candidates: ReviewCandidate[];
@@ -70,7 +73,8 @@ export async function compileTileMapCandidateReview(
   if (resultRows.length !== jobs.size) {
     throw failure("EVAVO_TILE_MAP_REVIEW_COUNT", `candidate results contain ${resultRows.length} rows; expected ${jobs.size}`);
   }
-  const resultsRoot = path.dirname(path.resolve(resultsPath));
+  const resolvedResultsPath = path.resolve(resultsPath);
+  const resultsRoot = path.dirname(resolvedResultsPath);
   const candidates: ReviewCandidate[] = [];
   const seen = new Set<string>();
   const seenDigests = new Set<string>();
@@ -138,6 +142,9 @@ export async function compileTileMapCandidateReview(
     source_batch_fingerprint: batchFingerprint,
     source_package_fingerprint: sha256Hex(batch.source_package_fingerprint, "source_package_fingerprint"),
     source_map_fingerprint: sha256Hex(batch.source_map_fingerprint, "source_map_fingerprint"),
+    provider_results_path: resolvedResultsPath,
+    provider_results_sha256: sha256(resultsBytes),
+    candidate_root: resultsRoot,
     map_id: text(batch.map_id, "map_id"),
     projection: text(batch.projection, "projection"),
     candidates,
