@@ -58,7 +58,7 @@ function canonicalTimestamp(value, label) {
   if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== text) {
     throw new Error(`${label} must be a canonical UTC timestamp`);
   }
-  return text;
+  return Object.freeze({ text, milliseconds });
 }
 
 function groupCharacterId(groupId) {
@@ -102,6 +102,23 @@ function materializedByHash(handoff) {
     result.set(candidate.contentSha256, candidate);
   }
   return result;
+}
+
+function assertFalseAuthority(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} authority is invalid`);
+  }
+  const entries = Object.entries(value);
+  if (!entries.length || entries.some(([, allowed]) => allowed !== false)) {
+    throw new Error(`${label} must grant no approval, promotion, execution or publication authority`);
+  }
+}
+
+function sameStringSet(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
+  const a = [...new Set(left)].sort();
+  const b = [...new Set(right)].sort();
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 function approvalAuthority() {
@@ -156,11 +173,16 @@ export function compileCouncilAvatarIdentityLockApproval({
     receipt.decisionSha256 !== decisions.decisionSha256 ||
     handoff.reviewId !== plan.reviewId ||
     decisions.reviewId !== plan.reviewId ||
-    receipt.reviewId !== plan.reviewId
+    receipt.reviewId !== plan.reviewId ||
+    receipt.reviewerMode !== decisions.reviewer?.mode ||
+    receipt.reviewedAt !== decisions.reviewer?.reviewedAt ||
+    receipt.itemCount !== decisions.decisions?.length
   ) {
     throw new Error('Council identity approval review provenance drift');
   }
   if (
+    handoff.technicalAssuranceRequired !== true ||
+    handoff.independentVisualReviewRequired !== true ||
     handoff.candidateApprovalPerformed !== false ||
     handoff.candidatePromotionPerformed !== false ||
     handoff.runtimeActivationPerformed !== false ||
@@ -170,26 +192,55 @@ export function compileCouncilAvatarIdentityLockApproval({
   ) {
     throw new Error('Council identity approval input already claims unauthorized authority');
   }
+  assertFalseAuthority(plan.authority, 'Project Art review plan');
+  assertFalseAuthority(receipt.authority, 'Project Art review receipt');
   if (!APPROVER_MODES.has(decisions.reviewer?.mode)) {
     throw new Error('Council identity lock requires a finalized human or hybrid review');
   }
   if (!Array.isArray(handoff.requiredGates) || handoff.requiredGates.length < 1) {
     throw new Error('Council identity review required gates are missing');
   }
+  if (
+    !Array.isArray(handoff.characterIds) ||
+    handoff.characterIds.length < 1 ||
+    handoff.characterIds.some((characterId) => !ALLOWED_CHARACTERS.has(characterId))
+  ) {
+    throw new Error('Council identity handoff character set is invalid');
+  }
+
+  const reviewedAt = canonicalTimestamp(decisions.reviewer.reviewedAt, 'reviewer.reviewedAt');
+  const approvalTime = canonicalTimestamp(approvedAt, 'approvedAt');
+  if (approvalTime.milliseconds < reviewedAt.milliseconds) {
+    throw new Error('Council identity approval cannot predate the finalized review');
+  }
 
   const decisionMap = exactDecisionMap(decisions.decisions ?? []);
   const candidateMap = materializedByHash(handoff);
   const locks = [];
   const observedCharacters = new Set();
+  let reviewedItemCount = 0;
 
   for (const group of plan.groups ?? []) {
     const characterId = groupCharacterId(group.id);
+    if (observedCharacters.has(characterId)) {
+      throw new Error(`duplicate Council identity review group for ${characterId}`);
+    }
     observedCharacters.add(characterId);
-    if (!Array.isArray(group.items) || group.items.length < 2) {
-      throw new Error(`Council identity group ${group.id} must retain at least two reviewed candidates`);
+    if (
+      group.kind !== 'candidate-set' ||
+      !sameStringSet(group.requiredGates, handoff.requiredGates) ||
+      !Array.isArray(group.items) ||
+      group.items.length < 2
+    ) {
+      throw new Error(`Council identity group ${group.id} has invalid candidate-set semantics`);
     }
     const keeps = [];
     for (const item of group.items) {
+      reviewedItemCount += 1;
+      const materialized = candidateMap.get(item.sha256);
+      if (!materialized || materialized.characterId !== characterId) {
+        throw new Error(`Council identity review item ${item.id} is not bound to the materialized handoff lineage`);
+      }
       const decision = decisionMap.get(item.id);
       if (
         !decision ||
@@ -198,12 +249,12 @@ export function compileCouncilAvatarIdentityLockApproval({
       ) {
         throw new Error(`Council identity decision binding drift for ${item.id}`);
       }
-      if (decision.disposition === 'keep') keeps.push({ item, decision });
+      if (decision.disposition === 'keep') keeps.push({ item, decision, materialized });
     }
     if (keeps.length !== 1) {
       throw new Error(`Council identity group ${group.id} requires exactly one kept candidate`);
     }
-    const { item, decision } = keeps[0];
+    const { item, decision, materialized } = keeps[0];
     for (const gate of handoff.requiredGates) {
       if (decision.gates?.[gate] !== 'pass') {
         throw new Error(`Council identity kept candidate ${item.id} must pass required gate ${gate}`);
@@ -214,10 +265,6 @@ export function compileCouncilAvatarIdentityLockApproval({
       (decision.requiredChanges?.length ?? 0) !== 0
     ) {
       throw new Error(`Council identity kept candidate ${item.id} still contains repair requirements`);
-    }
-    const materialized = candidateMap.get(item.sha256);
-    if (!materialized || materialized.characterId !== characterId) {
-      throw new Error(`Council identity kept candidate ${item.id} does not resolve to the mastered artifact lineage`);
     }
     locks.push(Object.freeze({
       characterId,
@@ -235,20 +282,26 @@ export function compileCouncilAvatarIdentityLockApproval({
     }));
   }
 
-  if (locks.length !== observedCharacters.size || locks.length < 1) {
-    throw new Error('Council identity approval did not resolve a unique lock for each reviewed character');
+  if (
+    reviewedItemCount !== decisionMap.size ||
+    reviewedItemCount !== candidateMap.size ||
+    locks.length !== observedCharacters.size ||
+    locks.length < 1 ||
+    !sameStringSet([...observedCharacters], handoff.characterIds)
+  ) {
+    throw new Error('Council identity approval did not bind the complete reviewed candidate/character set');
   }
 
   const body = Object.freeze({
     schema: COUNCIL_AVATAR_IDENTITY_LOCK_APPROVAL_SCHEMA,
     status: 'approved',
-    approvedAt: canonicalTimestamp(approvedAt, 'approvedAt'),
+    approvedAt: approvalTime.text,
     approvedBy: boundedText(approvedBy, 'approvedBy', 256),
     reason: boundedText(reason, 'reason', 8192),
     reviewer: Object.freeze({
       mode: decisions.reviewer.mode,
       id: decisions.reviewer.id,
-      reviewedAt: decisions.reviewer.reviewedAt,
+      reviewedAt: reviewedAt.text,
     }),
     source: Object.freeze({
       handoffSha256: handoff.handoffSha256,
