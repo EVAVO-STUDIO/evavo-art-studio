@@ -6,6 +6,7 @@ import {
   mkdtemp,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import os from "node:os";
@@ -15,11 +16,17 @@ import { fileURLToPath } from "node:url";
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 const checker = "scripts/check-animation-source-contract-lock.mjs";
+const contractSetDigest =
+  "sha256:e8ea163a56364cf8fe40c61e9428f6861c891944f7e31f4ccb793f1a447b9314";
 const lockedPaths = [
   "contracts/animation-source-bundle-v1.lock.json",
   "contracts/animation-source-bundle-v1.schema.json",
   "contracts/fixtures/animation-source-bundle-v1.json",
   "scripts/lib/animation-source-bundle.mjs",
+  "scripts/lib/animation-source-file-observer.mjs",
+  "scripts/lib/animation-source-image-probes.mjs",
+  "scripts/lib/animation-source-observation-common.mjs",
+  "scripts/lib/animation-source-stable-observation.mjs",
 ];
 
 function run(args = []) {
@@ -47,7 +54,7 @@ async function createPeer() {
   return { parent, peer };
 }
 
-test("local animation source contract lock verifies exact bytes", () => {
+test("local animation source operational contract lock verifies stable exact bytes", () => {
   const result = run();
   assert.equal(
     result.status,
@@ -55,15 +62,18 @@ test("local animation source contract lock verifies exact bytes", () => {
     [result.stdout, result.stderr].filter(Boolean).join("\n"),
   );
   const report = JSON.parse(result.stdout);
+  assert.equal(report.contractSetDigest, contractSetDigest);
+  assert.equal(report.localEvidence.length, 7);
   assert.equal(
-    report.contractSetDigest,
-    "sha256:25494dbbf6a511850dd3b43b818cde01e36654666d3672bd8d08d8eb291e8f0b",
+    report.localEvidence.every(
+      (entry) => entry.stableIdentityVerified === true,
+    ),
+    true,
   );
-  assert.equal(report.localEvidence.length, 3);
   assert.equal(report.authority.networkRequired, false);
 });
 
-test("peer verification detects cross-repository byte drift", async () => {
+test("peer verification detects stable verifier byte drift", async () => {
   const { parent, peer } = await createPeer();
   try {
     const matched = run(["--peer", peer, "--require-peer"]);
@@ -72,17 +82,19 @@ test("peer verification detects cross-repository byte drift", async () => {
       0,
       [matched.stdout, matched.stderr].filter(Boolean).join("\n"),
     );
-    assert.equal(JSON.parse(matched.stdout).peer.status, "matched");
+    const report = JSON.parse(matched.stdout);
+    assert.equal(report.peer.status, "matched");
+    assert.equal(report.peer.evidence.length, 7);
 
-    const fixture = path.join(
+    const observer = path.join(
       peer,
-      "contracts",
-      "fixtures",
-      "animation-source-bundle-v1.json",
+      "scripts",
+      "lib",
+      "animation-source-file-observer.mjs",
     );
     await writeFile(
-      fixture,
-      `${await readFile(fixture, "utf8")}\n`,
+      observer,
+      `${await readFile(observer, "utf8")}\n`,
       "utf8",
     );
     const drifted = run(["--peer", peer, "--require-peer"]);
@@ -90,6 +102,35 @@ test("peer verification detects cross-repository byte drift", async () => {
     assert.match(
       drifted.stderr,
       /ANIMATION_SOURCE_CONTRACT_LOCK_FILE_MISMATCH/,
+    );
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+  }
+});
+
+test("peer verification rejects symlink substitution", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("Windows symlink creation may require an elevated local policy.");
+    return;
+  }
+  const { parent, peer } = await createPeer();
+  try {
+    const target = path.join(
+      peer,
+      "scripts",
+      "lib",
+      "animation-source-stable-observation.mjs",
+    );
+    const outside = path.join(parent, "outside-stable-observation.mjs");
+    await cp(target, outside);
+    await rm(target);
+    await symlink(outside, target);
+
+    const result = run(["--peer", peer, "--require-peer"]);
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      /ANIMATION_SOURCE_CONTRACT_LOCK_SYMLINK_FORBIDDEN/,
     );
   } finally {
     await rm(parent, { recursive: true, force: true });

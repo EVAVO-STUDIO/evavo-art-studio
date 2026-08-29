@@ -4,7 +4,7 @@
 
 Art Studio and Cel Animation Studio carry separate copies of the Animation Source Bundle contract because their Node and pnpm toolchains are intentionally independent.
 
-The contract lock prevents those copies from silently drifting.
+The contract lock prevents the producer and consumer from silently drifting at either the schema layer or the operational file-verification layer.
 
 It pins the exact bytes of:
 
@@ -12,6 +12,10 @@ It pins the exact bytes of:
 contracts/animation-source-bundle-v1.schema.json
 contracts/fixtures/animation-source-bundle-v1.json
 scripts/lib/animation-source-bundle.mjs
+scripts/lib/animation-source-file-observer.mjs
+scripts/lib/animation-source-image-probes.mjs
+scripts/lib/animation-source-observation-common.mjs
+scripts/lib/animation-source-stable-observation.mjs
 ```
 
 The lock is:
@@ -23,8 +27,25 @@ contracts/animation-source-bundle-v1.lock.json
 The current contract-set identity is:
 
 ```text
-sha256:25494dbbf6a511850dd3b43b818cde01e36654666d3672bd8d08d8eb291e8f0b
+sha256:e8ea163a56364cf8fe40c61e9428f6861c891944f7e31f4ccb793f1a447b9314
 ```
+
+## Why the runtime modules are locked
+
+Matching JSON Schema bytes are not enough. The studios must also agree on how local media is observed and verified.
+
+The operational lock now covers:
+
+- portable path validation;
+- real-root containment;
+- leaf-symlink rejection;
+- same-handle SHA-256 hashing and image probing;
+- stable file-identity checks;
+- before-and-after source-set observation;
+- PNG, JPEG, GIF and WebP dimension probing;
+- bounded concurrency and cancellation behaviour.
+
+A change to any of those rules is therefore an explicit cross-studio compatibility revision rather than an unnoticed implementation difference.
 
 ## Local verification
 
@@ -35,7 +56,9 @@ Set-Location "C:\GitRepos\evavo-art-studio"
 node scripts/check-animation-source-contract-lock.mjs
 ```
 
-The check does not use GitHub, a network service, Vercel, a provider or a writable automation bot. It reconstructs Git blob identities directly from local bytes and verifies the aggregate contract-set digest.
+The checker reconstructs Git blob identities directly from stable local reads. Each lock and contract file is rejected when it is a symlink, escapes the real repository root, changes during the read, or is replaced before verification completes.
+
+The check does not use GitHub, a network service, Vercel, a provider or a writable automation bot.
 
 ## Cross-studio verification
 
@@ -70,9 +93,13 @@ The command fails when:
 - the schema digest differs from the executable runtime constant;
 - a lock contains unknown fields, missing files or duplicate paths;
 - the aggregate contract-set digest is wrong;
+- a lock or locked file is a symlink;
+- a locked file escapes the real repository root;
+- a locked file changes while it is being read;
+- a locked path is replaced before verification completes;
 - a required peer repository is absent;
 - the peer lock differs;
-- any peer schema, fixture or runtime byte differs.
+- any peer schema, fixture, canonical runtime or stable-verifier byte differs.
 
 It never repairs, copies or rewrites either repository. A contract change must be made deliberately in both studios, validated in both toolchains and committed as an explicit compatibility revision.
 
@@ -84,4 +111,4 @@ Art Studio runs:
 scripts/test-ci-media-tool-animation-source-contract-lock.mjs
 ```
 
-through the existing `scripts/test-ci-media-tool-*.mjs` validation lane. The regression creates a temporary peer repository, proves an exact match, mutates one peer file and confirms that drift is rejected.
+through the existing `scripts/test-ci-media-tool-*.mjs` validation lane. The regression creates a temporary peer repository, proves all seven locked files match, mutates the peer file observer, rejects symlink substitution and confirms that a required missing peer fails closed.
