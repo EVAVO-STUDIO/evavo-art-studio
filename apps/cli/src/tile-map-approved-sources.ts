@@ -100,15 +100,14 @@ export async function compileApprovedSourcesManifest(
     const paths = new Set<string>();
     for (const [index, item] of rows.entries()) {
       const row = object(item, `${taskId}.approved_sources[${index}]`);
-      const requested = text(row.path, `${taskId}.approved_sources[${index}].path`);
-      if (path.isAbsolute(requested)) throw failure("EVAVO_TILE_MAP_APPROVAL_PATH", "approved source paths must be relative to the approval manifest");
-      const normalized = path.normalize(requested);
-      if (normalized !== requested || normalized === ".." || normalized.startsWith(`..${path.sep}`)) {
-        throw failure("EVAVO_TILE_MAP_APPROVAL_PATH", `unsafe approved source path: ${requested}`);
-      }
-      const absolute = path.resolve(approvalRoot, requested);
+      const requested = portableRelative(
+        text(row.path, `${taskId}.approved_sources[${index}].path`),
+      );
+      const absolute = path.resolve(approvalRoot, ...requested.split("/"));
       const relative = path.relative(approvalRoot, absolute);
-      if (relative.startsWith("..") || path.isAbsolute(relative)) throw failure("EVAVO_TILE_MAP_APPROVAL_PATH", `approved source escapes approval root: ${requested}`);
+      if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        throw failure("EVAVO_TILE_MAP_APPROVAL_PATH", `approved source escapes approval root: ${requested}`);
+      }
       const bytes = await readFile(absolute);
       const actual = sha256(bytes);
       const expected = sha256Hex(row.sha256, `${taskId}.approved_sources[${index}].sha256`);
@@ -117,7 +116,7 @@ export async function compileApprovedSourcesManifest(
       if (paths.has(requested)) throw failure("EVAVO_TILE_MAP_APPROVAL_DUPLICATE", `${taskId} approved source path repeated: ${requested}`);
       digests.add(actual);
       paths.add(requested);
-      approvedSources.push({ path: requested.replaceAll("\\", "/"), sha256: actual, bytes: bytes.length });
+      approvedSources.push({ path: requested, sha256: actual, bytes: bytes.length });
     }
     tasks.push({
       task_id: taskId,
@@ -127,7 +126,6 @@ export async function compileApprovedSourcesManifest(
     });
   }
 
-  const source = object(sourcePackage, "source package");
   const base = {
     schema_version: 1 as const,
     source_package_path: path.resolve(sourcePackagePath),
@@ -150,6 +148,22 @@ export async function compileApprovedSourcesManifest(
   return { ...base, manifest_fingerprint: sha256(Buffer.from(canonical(base), "utf8")) };
 }
 
+function portableRelative(value: string): string {
+  if (value.includes("\\") || path.posix.isAbsolute(value)) {
+    throw failure("EVAVO_TILE_MAP_APPROVAL_PATH", `approved source path must be forward-slash relative: ${value}`);
+  }
+  const normalized = path.posix.normalize(value);
+  if (
+    normalized !== value ||
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    normalized.includes("//")
+  ) {
+    throw failure("EVAVO_TILE_MAP_APPROVAL_PATH", `unsafe approved source path: ${value}`);
+  }
+  return normalized;
+}
 function parseObject(content: string, label: string): JsonObject {
   try { return object(JSON.parse(content) as unknown, label); }
   catch (error) { if (error instanceof Error && "code" in error) throw error; throw failure("EVAVO_TILE_MAP_APPROVAL_JSON", `invalid JSON in ${label}`); }
