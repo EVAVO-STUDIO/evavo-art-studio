@@ -19,6 +19,11 @@ if (spritePlanAction) {
   // the governed source-art task plan and cannot infer creative approval from
   // provider or build success.
   await import("./tile-map-handoff-cli.js");
+} else if (command === "tile-map-source-package") {
+  // Source creation begins only after the Tile Map handoff is validated. The
+  // resulting package remains provider-neutral and keeps all generated output
+  // blocked until structural, visual and creative approval gates are satisfied.
+  await import("./tile-map-source-package-cli.js");
 } else if (command?.startsWith("repair-")) {
   // Repair commands are intentionally isolated from the general CLI so the
   // immutable repair planner, revision, ranking and promotion protocols remain
