@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "evavo-animation-production-profile": {
+      "command": "node",
+      "args": ["tools/animation_production_profile_canonical_v1_mcp.mjs"],
+      "env": {
+        "EVAVO_ANIMATION_PROVIDER_EXECUTION": "disabled",
+        "EVAVO_ANIMATION_AUTOMATIC_CREATIVE_APPROVAL": "disabled",
+        "EVAVO_ANIMATION_ARTIFACT_PROMOTION": "disabled",
+        "EVAVO_ANIMATION_RUNTIME_ACTIVATION": "disabled",
+        "EVAVO_ANIMATION_REPOSITORY_MUTATION": "disabled",
+        "EVAVO_ANIMATION_PUBLICATION": "disabled"
+      }
+    },
+    "evavo-animation-sequence-delivery": {
+      "command": "node",
+      "args": ["tools/animation_sequence_delivery_canonical_v1_mcp.mjs"],
+      "env": {
+        "EVAVO_ANIMATION_MEDIA_RESOLUTION": "disabled",
+        "EVAVO_ANIMATION_TRANSCODING": "disabled",
+        "EVAVO_ANIMATION_INTERPOLATION": "disabled",
+        "EVAVO_ANIMATION_RUNTIME_ACTIVATION": "disabled",
+        "EVAVO_ANIMATION_REPOSITORY_MUTATION": "disabled",
+        "EVAVO_ANIMATION_PUBLICATION": "disabled"
+      }
+    }
+  }
+}
