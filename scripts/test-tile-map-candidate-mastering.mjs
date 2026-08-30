@@ -31,13 +31,13 @@ async function writeJson(file, value) {
   return bytes;
 }
 
-async function fixtureProviderPng() {
+async function fixtureProviderPng(width, height) {
   const adapter = new FixtureImageProviderAdapter();
   const request = {
-    requestId: 'mastering-source-fixture',
+    requestId: `mastering-source-fixture-${width}x${height}`,
     seed: 1234,
     candidateCount: 1,
-    target: { width: 64, height: 64, transparency: 'opaque' },
+    target: { width, height, transparency: 'opaque' },
     background: { strategy: 'opaque-source' },
   };
   const result = await adapter.execute(
@@ -56,7 +56,7 @@ async function fixtureProviderPng() {
   return result.outputs[0].bytes;
 }
 
-async function fixture() {
+async function fixture({ sourceWidth = 64, sourceHeight = 64 } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'evavo-tile-mastering-'));
   const runtimeRoot = path.join(root, 'runtime');
   const artifactRoot = path.join(root, 'artifacts');
@@ -68,7 +68,7 @@ async function fixture() {
   const taskId = 'tile-map-tile-grass';
   const visualFamily = 'epochbound:verdant:terrain:grass';
   const requestSha256 = '2'.repeat(64);
-  const sourceBytes = await fixtureProviderPng();
+  const sourceBytes = await fixtureProviderPng(sourceWidth, sourceHeight);
   const source = await artifacts.put(sourceBytes, {
     mediaType: 'image/png',
     storageClass: 'intermediate',
@@ -112,6 +112,7 @@ async function fixture() {
           target_height: 16,
           background_mode: 'opaque-preserve',
           matte_colour: null,
+          matte_selection: null,
           resampling: 'lanczos3',
           delivery_profile_id: 'godot-sprite-lossless',
           require_meaningful_alpha: false,
@@ -247,7 +248,7 @@ async function fixture() {
   };
 }
 
-test('masters a larger provider candidate to exact native tile size and retains unapproved evidence', async () => {
+test('masters a larger same-ratio provider candidate to exact native tile size', async () => {
   const input = await fixture();
   const result = await runTileMapCandidateMastering([
     '--provider-batch',
@@ -268,8 +269,14 @@ test('masters a larger provider candidate to exact native tile size and retains 
     receipt.schema,
     'evavo.tile-map-candidate-mastering-receipt.v1',
   );
+  assert.equal(receipt.authority.aspectRatioPreservation, true);
+  assert.equal(receipt.authority.maximumAspectRatioDrift, 0.02);
   assert.equal(receipt.jobs[0].policy.targetWidth, 16);
   assert.equal(receipt.jobs[0].policy.targetHeight, 16);
+  assert.equal(receipt.jobs[0].policy.matteSelection, null);
+  assert.equal(receipt.jobs[0].sourceGeometry.sourceWidth, 64);
+  assert.equal(receipt.jobs[0].sourceGeometry.sourceHeight, 64);
+  assert.equal(receipt.jobs[0].sourceGeometry.aspectRatioDrift, 0);
   assert.equal(receipt.jobs[0].qualityPassed, true);
   assert.equal(receipt.jobs[0].approvalState, 'unapproved');
 
@@ -307,4 +314,20 @@ test('masters a larger provider candidate to exact native tile size and retains 
   assert.equal(verification.candidates.length, 1);
   assert.equal(verification.candidates[0].target.width, 16);
   assert.equal(verification.candidates[0].target.height, 16);
+});
+
+test('rejects a provider canvas whose ratio would distort the semantic tile', async () => {
+  const input = await fixture({ sourceWidth: 96, sourceHeight: 64 });
+  await assert.rejects(
+    () =>
+      runTileMapCandidateMastering([
+        '--provider-batch',
+        input.providerBatchPath,
+        '--execution-receipt',
+        input.executionPath,
+        '--receipt',
+        input.receiptPath,
+      ]),
+    /provider source aspect ratio 96x64 would distort target 16x16/u,
+  );
 });
