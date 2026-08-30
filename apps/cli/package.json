@@ -7,6 +7,7 @@
     "evavo-art": "./dist/router-cli.js",
     "evavo-art-workspace": "./dist/workspace-writer-cli.js",
     "evavo-art-sprite-plan": "./dist/sprite-plan-cli.js",
+    "evavo-art-tile-map-proof": "./dist/tile-map-candidate-proof-cli.js",
     "evavo-book-art-legacy-readiness-batch": "./dist/legacy-readiness-cli.js"
   },
   "scripts": {
@@ -16,6 +17,7 @@
     "start": "node dist/router-cli.js",
     "start:workspace": "node dist/workspace-writer-cli.js",
     "start:sprite-plan": "node dist/sprite-plan-cli.js",
+    "start:tile-map-proof": "node dist/tile-map-candidate-proof-cli.js",
     "start:legacy-readiness": "node dist/legacy-readiness-cli.js"
   },
   "dependencies": {
