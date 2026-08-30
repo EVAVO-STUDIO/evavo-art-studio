@@ -90,6 +90,10 @@ try {
             --receipt $MasteringReceipt
     }
 
+    Invoke-Checked 'VERIFYING RETAINED CANDIDATE MASTERING' {
+        node .\scripts\verify-tile-map-candidate-mastering.mjs $MasteringReceipt
+    }
+
     Invoke-Checked 'MATERIALIZING VERIFIED MASTERED CANDIDATES FOR REVIEW' {
         node .\scripts\materialize-tile-map-provider-results.mjs `
             --provider-batch $ProviderBatch `
