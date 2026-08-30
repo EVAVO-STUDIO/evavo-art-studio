@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { LocalArtifactStore } from '../packages/artifacts/dist/index.js';
+import { decodeSpriteFrame } from '../packages/quality/dist/index.js';
 import {
   LocalRuntimeRepository,
   RuntimeWorker,
@@ -18,6 +19,9 @@ export const TILE_MAP_MASTERING_CAPABILITY =
   'tile-map.mastering-authorized';
 export const TILE_MAP_MASTERING_RECEIPT_SCHEMA =
   'evavo.tile-map-candidate-mastering-receipt.v1';
+
+const ALLOWED_CHROMA_MATTES = new Set(['#ff00ff', '#00ff00', '#00ffff']);
+const MAXIMUM_ASPECT_RATIO_DRIFT = 0.02;
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const canonical = (value) => {
@@ -192,11 +196,23 @@ function masteringContract(value, candidateId) {
     throw new Error(`${candidateId} mastering background mode is invalid`);
   }
   const matte = value.matte_colour;
-  if (value.background_mode === 'chroma-key' && matte !== '#00ff00') {
-    throw new Error(`${candidateId} chroma-key mastering must use #00ff00`);
+  const matteSelection = value.matte_selection;
+  if (
+    value.background_mode === 'chroma-key' &&
+    (!ALLOWED_CHROMA_MATTES.has(matte) ||
+      matteSelection !== 'semantic-contrast-v1')
+  ) {
+    throw new Error(
+      `${candidateId} chroma-key mastering must use an audited semantic-contrast matte`,
+    );
   }
-  if (value.background_mode === 'opaque-preserve' && matte !== null) {
-    throw new Error(`${candidateId} opaque mastering must not declare a matte`);
+  if (
+    value.background_mode === 'opaque-preserve' &&
+    (matte !== null || matteSelection !== null)
+  ) {
+    throw new Error(
+      `${candidateId} opaque mastering must not declare a matte policy`,
+    );
   }
   if (
     value.resampling !== 'lanczos3' ||
@@ -212,6 +228,7 @@ function masteringContract(value, candidateId) {
     targetHeight: height,
     backgroundMode: value.background_mode,
     ...(matte === null ? {} : { matteColour: matte }),
+    matteSelection,
     resampling: value.resampling,
     deliveryProfileId: value.delivery_profile_id,
     requireMeaningfulAlpha: value.require_meaningful_alpha,
@@ -249,6 +266,34 @@ async function providerCandidateFor(job, planned, artifacts) {
     );
   }
   return descriptor;
+}
+
+async function sourceGeometry(artifacts, descriptor, policy, candidateId) {
+  const sourceBytes = await artifacts.read(descriptor.artifactId);
+  const decoded = await decodeSpriteFrame(sourceBytes, {
+    maximumInputBytes: 128 * 1024 * 1024,
+    maximumPixels: 64 * 1024 * 1024,
+  });
+  const sourceAspectRatio = decoded.width / decoded.height;
+  const targetAspectRatio = policy.targetWidth / policy.targetHeight;
+  const aspectRatioDrift =
+    Math.abs(sourceAspectRatio - targetAspectRatio) / targetAspectRatio;
+  if (
+    !Number.isFinite(aspectRatioDrift) ||
+    aspectRatioDrift > MAXIMUM_ASPECT_RATIO_DRIFT
+  ) {
+    throw new Error(
+      `${candidateId} provider source aspect ratio ${decoded.width}x${decoded.height} would distort target ${policy.targetWidth}x${policy.targetHeight}`,
+    );
+  }
+  return {
+    sourceWidth: decoded.width,
+    sourceHeight: decoded.height,
+    sourceAspectRatio,
+    targetAspectRatio,
+    aspectRatioDrift,
+    maximumAspectRatioDrift: MAXIMUM_ASPECT_RATIO_DRIFT,
+  };
 }
 
 async function descriptorByRole(artifacts, ids, role) {
@@ -363,6 +408,12 @@ export async function runTileMapCandidateMastering(
     }
     const source = await providerCandidateFor(completed, planned, artifacts);
     const policy = masteringContract(planned.mastering, candidateId);
+    const geometry = await sourceGeometry(
+      artifacts,
+      source,
+      policy,
+      candidateId,
+    );
     const requiredCapabilities = [
       'media.raster',
       'quality.sprite-frame',
@@ -379,7 +430,15 @@ export async function runTileMapCandidateMastering(
         `tile-map-master:${candidateId}:` + executionSha256.slice(0, 16),
       payload: {
         candidateArtifactId: source.artifactId,
-        ...policy,
+        targetWidth: policy.targetWidth,
+        targetHeight: policy.targetHeight,
+        backgroundMode: policy.backgroundMode,
+        ...(policy.matteColour ? { matteColour: policy.matteColour } : {}),
+        resampling: policy.resampling,
+        deliveryProfileId: policy.deliveryProfileId,
+        requireMeaningfulAlpha: policy.requireMeaningfulAlpha,
+        requireFakeTransparencyRejection:
+          policy.requireFakeTransparencyRejection,
         frameId: candidateId,
         quality: {
           expectedWidth: policy.targetWidth,
@@ -411,6 +470,7 @@ export async function runTileMapCandidateMastering(
       providerRequestSha256: planned.request_sha256,
       sourceCandidateArtifactId: source.artifactId,
       policy,
+      sourceGeometry: geometry,
     });
   }
 
@@ -514,6 +574,8 @@ export async function runTileMapCandidateMastering(
       proof.blockingProof?.qualityPassed !== true ||
       proof.blockingProof?.meaningfulAlphaPassed !== true ||
       proof.blockingProof?.fakeTransparencyPassed !== true ||
+      proof.geometry?.sourceWidth !== source.sourceGeometry.sourceWidth ||
+      proof.geometry?.sourceHeight !== source.sourceGeometry.sourceHeight ||
       proof.geometry?.targetWidth !== source.policy.targetWidth ||
       proof.geometry?.targetHeight !== source.policy.targetHeight
     ) {
@@ -574,6 +636,8 @@ export async function runTileMapCandidateMastering(
     jobs,
     authority: {
       deterministicMastering: true,
+      aspectRatioPreservation: true,
+      maximumAspectRatioDrift: MAXIMUM_ASPECT_RATIO_DRIFT,
       candidateArtifactCreation: true,
       evidenceArtifactCreation: true,
       providerExecution: false,
