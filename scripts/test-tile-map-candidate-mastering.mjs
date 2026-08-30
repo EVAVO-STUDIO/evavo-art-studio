@@ -38,6 +38,7 @@ async function fixtureProviderPng() {
     seed: 1234,
     candidateCount: 1,
     target: { width: 64, height: 64, transparency: 'opaque' },
+    background: { strategy: 'opaque-source' },
   };
   const result = await adapter.execute(
     {
