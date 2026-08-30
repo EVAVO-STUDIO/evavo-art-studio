@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { LocalArtifactStore } from '../packages/artifacts/dist/index.js';
@@ -183,7 +184,13 @@ async function fixture() {
     },
     sourceMapFingerprint: providerBatch.source_map_fingerprint,
     providerAdapters: [],
-    runResult: { claimed: 1, succeeded: 1, failed: 0, cancelled: 0, paused: 0 },
+    runResult: {
+      claimed: 1,
+      succeeded: 1,
+      failed: 0,
+      cancelled: 0,
+      paused: 0,
+    },
     counts: {
       authorizedRuntimeJobs: 1,
       succeededRuntimeJobs: 1,
@@ -256,14 +263,23 @@ test('masters a larger provider candidate to exact native tile size and retains 
   assert.equal(result.counts.failed, 0);
 
   const receipt = JSON.parse(await readFile(input.receiptPath, 'utf8'));
-  assert.equal(receipt.schema, 'evavo.tile-map-candidate-mastering-receipt.v1');
+  assert.equal(
+    receipt.schema,
+    'evavo.tile-map-candidate-mastering-receipt.v1',
+  );
   assert.equal(receipt.jobs[0].policy.targetWidth, 16);
   assert.equal(receipt.jobs[0].policy.targetHeight, 16);
   assert.equal(receipt.jobs[0].qualityPassed, true);
   assert.equal(receipt.jobs[0].approvalState, 'unapproved');
 
-  const mastered = await input.artifacts.get(receipt.jobs[0].masteredArtifactId);
-  const evidence = await input.artifacts.get(receipt.jobs[0].evidenceArtifactId);
+  const mastered = await input.artifacts.get(
+    receipt.jobs[0].masteredArtifactId,
+  );
+  const evidence = await input.artifacts.get(
+    receipt.jobs[0].evidenceArtifactId,
+  );
+  assert.ok(mastered);
+  assert.ok(evidence);
   assert.equal(mastered.storageClass, 'intermediate');
   assert.equal(mastered.labels.approvalState, 'unapproved');
   assert.equal(mastered.labels.qualityState, 'passed');
@@ -278,11 +294,13 @@ test('masters a larger provider candidate to exact native tile size and retains 
   assert.equal(proof.promotionEligible, true);
   assert.equal(proof.approvalState, 'unapproved');
 
-  const verifier = path.join(
-    path.dirname(new URL(import.meta.url).pathname),
-    'verify-tile-map-candidate-mastering.mjs',
+  const verifier = fileURLToPath(
+    new URL('./verify-tile-map-candidate-mastering.mjs', import.meta.url),
   );
-  const { stdout } = await execFileAsync(process.execPath, [verifier, input.receiptPath]);
+  const { stdout } = await execFileAsync(process.execPath, [
+    verifier,
+    input.receiptPath,
+  ]);
   const verification = JSON.parse(stdout.trim());
   assert.equal(verification.status, 'verified');
   assert.equal(verification.candidates.length, 1);
