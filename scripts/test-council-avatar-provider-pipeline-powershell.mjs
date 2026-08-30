@@ -31,6 +31,7 @@ test('Council avatar provider PowerShell audit keeps provider readiness zero-spe
   assert.match(text, /remoteProviderCallPerformed/u);
   assert.match(text, /paidProviderCallPerformed = \$false/u);
   assert.doesNotMatch(text, /execute-project-art-council-avatar-provider\.mjs[^'\r\n]*&/u);
+  assert.doesNotMatch(text, /execute-project-art-council-avatar-direction-masters\.mjs[^'\r\n]*&/u);
 });
 
 test('Council avatar provider PowerShell audit builds all provider runtime dependencies with pnpm filters before tests', async () => {
@@ -49,4 +50,25 @@ test('Council avatar provider PowerShell audit builds all provider runtime depen
   assert.match(text, /test-project-art-council-avatar-provider-authorization\.mjs/u);
   assert.match(text, /test-project-art-council-avatar-review-handoff\.mjs/u);
   assert.match(text, /council-avatar-provider-authorization\.test\.mjs/u);
+});
+
+test('Council avatar provider PowerShell audit covers the complete direction-master path but grants no animation authority', async () => {
+  const text = await source();
+  for (const marker of [
+    'council-avatar-direction-master-runtime.mjs',
+    'council-avatar-direction-master-readiness.mjs',
+    'council-avatar-direction-master-authorization.mjs',
+    'council-avatar-direction-master-executor.mjs',
+    'council-avatar-direction-master-review-handoff.mjs',
+    'council-avatar-direction-master-approval.mjs',
+    'test-project-art-council-avatar-direction-master-executor.mjs',
+    'test-project-art-council-avatar-direction-master-review-handoff.mjs',
+    'test-project-art-council-avatar-direction-master-approval.mjs',
+  ]) {
+    assert.ok(text.includes(marker), `missing direction pipeline marker ${marker}`);
+  }
+  assert.match(text, /contract = 'evavo\.council-avatar-provider-pipeline-check\.v3'/u);
+  assert.match(text, /animationProductionAuthorized = \$false/u);
+  assert.match(text, /runtimeActivationPerformed = \$false/u);
+  assert.match(text, /websiteActivationPerformed = \$false/u);
 });
