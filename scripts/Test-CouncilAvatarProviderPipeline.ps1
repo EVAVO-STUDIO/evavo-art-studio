@@ -108,12 +108,19 @@ $RequiredArtFiles = [ordered]@{
     'provider-authorization' = 'scripts\project-art\council-avatar-provider-authorization.mjs'
     'provider-executor' = 'scripts\project-art\council-avatar-provider-executor.mjs'
     'review-handoff' = 'scripts\project-art\council-avatar-review-handoff.mjs'
+    'identity-lock-approval' = 'scripts\project-art\council-avatar-identity-lock-approval.mjs'
+    'direction-master-candidates' = 'scripts\project-art\council-avatar-direction-master-candidates.mjs'
     'provider-readiness-cli' = 'scripts\inspect-project-art-council-avatar-provider-readiness.mjs'
     'provider-execution-cli' = 'scripts\execute-project-art-council-avatar-provider.mjs'
     'review-handoff-cli' = 'scripts\compile-project-art-council-avatar-review-handoff.mjs'
+    'identity-lock-approval-cli' = 'scripts\approve-project-art-council-avatar-identity-lock.mjs'
+    'direction-master-cli' = 'scripts\compile-project-art-council-avatar-direction-masters.mjs'
     'provider-runtime-test' = 'scripts\test-project-art-council-avatar-provider-runtime.mjs'
     'provider-authorization-test' = 'scripts\test-project-art-council-avatar-provider-authorization.mjs'
     'review-handoff-test' = 'scripts\test-project-art-council-avatar-review-handoff.mjs'
+    'identity-lock-approval-test' = 'scripts\test-project-art-council-avatar-identity-lock-approval.mjs'
+    'direction-master-test' = 'scripts\test-project-art-council-avatar-direction-master-candidates.mjs'
+    'direction-master-worker-governance-test' = 'scripts\test-project-art-council-avatar-direction-master-worker-governance.mjs'
     'worker-provider-authorization-test' = 'apps\worker\test\council-avatar-provider-authorization.test.mjs'
 }
 foreach ($Entry in $RequiredArtFiles.GetEnumerator()) {
@@ -153,6 +160,8 @@ if (Require-File $ProviderHandlerPath 'worker-provider-handler') {
     $ProviderHandler = Get-Content -LiteralPath $ProviderHandlerPath -Raw
     foreach ($Marker in @(
         'council-avatar.execution-authorized',
+        'evavo.project-art-council-avatar-provider-request.v1',
+        'evavo.project-art-council-avatar-direction-master-request.v1',
         'COUNCIL_AVATAR_PROVIDER_EXECUTION_CONTRACT_MISMATCH',
         'COUNCIL_AVATAR_PROVIDER_EXECUTION_UNAUTHORIZED'
     )) {
@@ -182,7 +191,17 @@ else {
 }
 
 if (-not $SkipTests -and $Node -and ($BuildPassed -or $SkipBuild)) {
-    [void](Invoke-NativeChecked 'art-council-provider-contract-tests' $Node.Source @('--test','scripts/test-project-art-council-avatar-provider-runtime.mjs','scripts/test-project-art-council-avatar-provider-authorization.mjs','scripts/test-project-art-council-avatar-review-handoff.mjs','scripts/test-council-avatar-provider-pipeline-powershell.mjs','scripts/test-council-avatar-worker-stack-powershell.mjs') $Art)
+    [void](Invoke-NativeChecked 'art-council-provider-contract-tests' $Node.Source @(
+        '--test',
+        'scripts/test-project-art-council-avatar-provider-runtime.mjs',
+        'scripts/test-project-art-council-avatar-provider-authorization.mjs',
+        'scripts/test-project-art-council-avatar-review-handoff.mjs',
+        'scripts/test-project-art-council-avatar-identity-lock-approval.mjs',
+        'scripts/test-project-art-council-avatar-direction-master-candidates.mjs',
+        'scripts/test-project-art-council-avatar-direction-master-worker-governance.mjs',
+        'scripts/test-council-avatar-provider-pipeline-powershell.mjs',
+        'scripts/test-council-avatar-worker-stack-powershell.mjs'
+    ) $Art)
     [void](Invoke-NativeChecked 'art-council-provider-worker-guard-tests' $Node.Source @('--test','apps/worker/test/council-avatar-provider-authorization.test.mjs') $Art)
 }
 elseif (-not $SkipTests) {
@@ -230,7 +249,7 @@ else {
 }
 
 $Result = [ordered]@{
-    contract = 'evavo.council-avatar-provider-pipeline-check.v1'
+    contract = 'evavo.council-avatar-provider-pipeline-check.v2'
     ok = ($Failures.Count -eq 0)
     checkedAt = [DateTimeOffset]::UtcNow.ToString('o')
     gitReposRoot = $GitReposRoot
@@ -238,7 +257,8 @@ $Result = [ordered]@{
     providerReadyForBoundedExecutionAuthorization = $ProviderReady
     zeroSpendReadinessOnly = $true
     paidProviderCallPerformed = $false
-    candidateApprovalPerformed = $false
+    identityLockApprovalPathCovered = $true
+    directionMasterPlanPathCovered = $true
     candidatePromotionPerformed = $false
     runtimeActivationPerformed = $false
     websiteActivationPerformed = $false
