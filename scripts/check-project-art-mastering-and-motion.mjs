@@ -16,7 +16,7 @@ const files = {
   persistentDocumentation: 'docs/PERSISTENT_ARTIST_WORKSPACE.md',
   mcp: 'tools/project_art_workspace_mcp.mjs',
   package: 'package.json',
-  workflow: '.github/workflows/project-art-workbench.yml',
+  hostedAutomationPolicy: '.github/workflows/README.md',
 };
 const contents = new Map();
 for (const [label, relative] of Object.entries(files)) {
@@ -182,23 +182,10 @@ requireTokens('package', contents.get('package'), [
   'scripts/test-project-art-mastering-and-motion.mjs',
 ]);
 
-const workflowPaths = [
-  'scripts/check-project-art-mastering-and-motion.mjs',
-  'scripts/test-project-art-mastering-and-motion.mjs',
-  'docs/PROJECT_ART_MASTERING_AND_MOTION.md',
-  'docs/ARTIST_AUTOMATION_CAPABILITY_MAP.md',
-  'docs/TRANSPARENCY_PRODUCTION_STANDARD.md',
-];
-for (const workflowPath of workflowPaths) {
-  assert.equal(count(contents.get('workflow'), `- "${workflowPath}"`), 2, `${workflowPath} must trigger PR and main validation`);
-}
-requireTokens('workflow', contents.get('workflow'), [
-  'Verify persistent Artist Workspace contracts and regressions',
-  'Run professional mastering and keyframed motion adversary',
-  'pnpm run project-art:workspace:persistent:check',
-  'pnpm run project-art:mastering:check',
-  "grep -F 'evavo.project-art-mastering-report.v1' tools/run_project_art_sandbox.py",
-  "grep -F 'evavo.project-art-motion-sequence.v1' tools/run_project_art_sandbox.py",
+requireTokens('hostedAutomationPolicy', contents.get('hostedAutomationPolicy'), [
+  'GitHub Actions intentionally inactive',
+  'node scripts/local-quality-gate.mjs',
+  'ops/github-actions-reference/workflows',
 ]);
 
 forbidTokens('compiler', contents.get('compiler'), [
