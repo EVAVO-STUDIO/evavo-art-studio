@@ -207,6 +207,7 @@ export async function compileCouncilAvatarDirectionMasterExecutionAuthorization(
       exactCanonicalIdentityArtifactRequired: true,
       identityApprovalRecordIsAuthority: true,
       artifactPromotionRequiredBeforeExecution: false,
+      authorizationNotBeforeRequired: true,
       authorizationExpiryRequired: true,
       automaticRetryAllowed: false,
       fallbackAllowed: false,
@@ -236,7 +237,11 @@ export function validateCouncilAvatarDirectionMasterExecutionAuthorization(
   if (!HEX64.test(authorizationSha256 ?? '') || sha256(body) !== authorizationSha256) {
     throw new Error('Council direction-master authorization hash mismatch');
   }
+  const starts = canonicalTimestamp(authorization.authorizedAt, 'authorizedAt');
   const expires = canonicalTimestamp(authorization.expiresAt, 'expiresAt');
+  if (now.getTime() < starts.milliseconds) {
+    throw new Error('Council direction-master execution authorization is not active yet');
+  }
   if (now.getTime() >= expires.milliseconds) {
     throw new Error('Council direction-master execution authorization expired');
   }
@@ -254,7 +259,8 @@ export function validateCouncilAvatarDirectionMasterExecutionAuthorization(
     authorization.executionPolicy?.genericProviderWorkerMayClaim !== false ||
     authorization.executionPolicy?.exactCanonicalIdentityArtifactRequired !== true ||
     authorization.executionPolicy?.identityApprovalRecordIsAuthority !== true ||
-    authorization.executionPolicy?.artifactPromotionRequiredBeforeExecution !== false
+    authorization.executionPolicy?.artifactPromotionRequiredBeforeExecution !== false ||
+    authorization.executionPolicy?.authorizationNotBeforeRequired !== true
   ) {
     throw new Error('Council direction-master execution authorization binding drift');
   }
