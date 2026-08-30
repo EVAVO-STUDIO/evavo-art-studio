@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "projectId": "command-front",
+  "scenarioId": "operation-breakwater",
+  "consumerRepository": "EVAVO-STUDIO/command-front",
+  "consumerRequirements": "data/presentation/sidebar_icon_requirements.json",
+  "consumerCatalog": "data/presentation/sidebar_icon_catalog.json",
+  "approvedConsumerRoot": "res://assets/presentation/sidebar_icons/",
+  "sourceSize": [32, 32],
+  "consumerDisplayMaxWidth": 20,
+  "camera": "iconographic-isometric-or-three-quarter",
+  "visualTarget": "late-1990s military RTS command sidebar, crisp low-resolution silhouette, restrained alt-1999 material language",
+  "globalRules": {
+    "transparentBackground": true,
+    "nearestNeighbourReview": true,
+    "noEmbeddedText": true,
+    "noLettersOrNumbers": true,
+    "noGenericAiBadgeLook": true,
+    "noModernFlatAppIconLook": true,
+    "noGlossyMobileGameRendering": true,
+    "onePrimarySilhouette": true,
+    "strongValueSeparation": true,
+    "readableAt20Pixels": true,
+    "originalDesignsOnly": true,
+    "provenanceRequired": true
+  },
+  "unitIcons": [
+    {"id":"meridian-rifle-team","read":"three-person rifle silhouette, disciplined Meridian kit, immediately infantry not engineer"},
+    {"id":"meridian-combat-engineer","read":"single engineer silhouette with compact field tool/satchel cue, not generic rifle infantry"},
+    {"id":"meridian-m12-ifv","read":"low tracked IFV silhouette with compact autocannon turret, distinct from M90"},
+    {"id":"meridian-m90-mbt","read":"heavy MBT silhouette with long cannon and broad turret mass"},
+    {"id":"vesper-rifle-cell","read":"irregular three-person rifle silhouette with mismatched field kit, distinct from Meridian formation"},
+    {"id":"vesper-rpg-cell","read":"anti-armour cell silhouette with unmistakable shoulder-launched weapon profile"},
+    {"id":"vesper-armed-technical","read":"light pickup/technical profile with bed-mounted weapon silhouette"},
+    {"id":"vesper-captured-tank","read":"older captured tank silhouette with field-modified details, distinct from clean Meridian M90"}
+  ],
+  "constructionIcons": [
+    {"id":"field-barracks","read":"compact deployable barracks compound silhouette, personnel-production read"},
+    {"id":"motor-pool","read":"vehicle maintenance yard silhouette with bay/gantry cue, not a tank icon"},
+    {"id":"field-generator","read":"portable field generator/power unit silhouette, strong cable/radiator mass cue without symbols"},
+    {"id":"sentry-emplacement","read":"fixed defensive gun emplacement silhouette, clearly static and directional"}
+  ],
+  "reviewProofs": [
+    "native-32x32-sheet",
+    "nearest-neighbour-2x-sheet",
+    "20px-in-sidebar-proof",
+    "grayscale-silhouette-proof",
+    "Meridian-vs-Vesper-family-proof",
+    "no-text-no-symbol-proof"
+  ],
+  "delivery": {
+    "format": "PNG RGBA",
+    "oneFilePerIcon": true,
+    "consumerFiltering": "nearest",
+    "atlasOptional": false,
+    "catalogPromotion": "consumer approval only after Art Studio QA/provenance and Command Front validator pass"
+  },
+  "releaseRule": "Do not promote any icon to Command Front's approved sidebar icon catalog unless it remains immediately identifiable at a 20px display width, preserves a transparent background, contains no embedded text, and is visually consistent with the authored unit/structure family rather than a generic AI-generated emblem."
+}
