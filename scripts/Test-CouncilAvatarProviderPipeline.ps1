@@ -122,6 +122,7 @@ $RequiredArtFiles = [ordered]@{
     'direction-master-test' = 'scripts\test-project-art-council-avatar-direction-master-candidates.mjs'
     'direction-master-worker-governance-test' = 'scripts\test-project-art-council-avatar-direction-master-worker-governance.mjs'
     'worker-provider-authorization-test' = 'apps\worker\test\council-avatar-provider-authorization.test.mjs'
+    'worker-direction-master-authorization-test' = 'apps\worker\test\council-avatar-direction-master-authorization.test.mjs'
 }
 foreach ($Entry in $RequiredArtFiles.GetEnumerator()) {
     [void](Require-File (Join-Path $Art $Entry.Value) ("art-{0}" -f $Entry.Key))
@@ -202,7 +203,11 @@ if (-not $SkipTests -and $Node -and ($BuildPassed -or $SkipBuild)) {
         'scripts/test-council-avatar-provider-pipeline-powershell.mjs',
         'scripts/test-council-avatar-worker-stack-powershell.mjs'
     ) $Art)
-    [void](Invoke-NativeChecked 'art-council-provider-worker-guard-tests' $Node.Source @('--test','apps/worker/test/council-avatar-provider-authorization.test.mjs') $Art)
+    [void](Invoke-NativeChecked 'art-council-provider-worker-guard-tests' $Node.Source @(
+        '--test',
+        'apps/worker/test/council-avatar-provider-authorization.test.mjs',
+        'apps/worker/test/council-avatar-direction-master-authorization.test.mjs'
+    ) $Art)
 }
 elseif (-not $SkipTests) {
     Add-Check 'art-council-provider-tests-runnable' $false 'Tests require Node and a successful/current Art Studio build.'
@@ -259,6 +264,7 @@ $Result = [ordered]@{
     paidProviderCallPerformed = $false
     identityLockApprovalPathCovered = $true
     directionMasterPlanPathCovered = $true
+    directionMasterWorkerAuthorizationCovered = $true
     candidatePromotionPerformed = $false
     runtimeActivationPerformed = $false
     websiteActivationPerformed = $false
