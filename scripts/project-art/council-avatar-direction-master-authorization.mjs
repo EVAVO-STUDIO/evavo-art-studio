@@ -90,8 +90,11 @@ async function verifyCanonicalIdentities(runtimePackage, artifactRoot) {
       result.descriptorValid !== true ||
       result.contentValid !== true ||
       descriptor.mediaType !== 'image/png' ||
+      descriptor.storageClass !== 'intermediate' ||
       descriptor.contentSha256 !== identity.expectedContentSha256 ||
-      descriptor.labels.approvalState !== 'approved'
+      descriptor.labels.artifactRole !== 'provider-candidate-alpha-master' ||
+      descriptor.labels.qualityState !== 'passed' ||
+      descriptor.labels.approvalState !== 'unapproved'
     ) {
       throw new Error(`COUNCIL_DIRECTION_CANONICAL_IDENTITY_INVALID:${identity.characterId}`);
     }
@@ -100,7 +103,11 @@ async function verifyCanonicalIdentities(runtimePackage, artifactRoot) {
       artifactId: identity.artifactId,
       contentSha256: descriptor.contentSha256,
       descriptorSha256: descriptor.descriptorSha256,
-      approvalState: descriptor.labels.approvalState,
+      artifactRole: descriptor.labels.artifactRole,
+      qualityState: descriptor.labels.qualityState,
+      artifactApprovalState: descriptor.labels.approvalState,
+      identityLockApprovedBySeparateRecord: true,
+      promotedByAuthorization: false,
     }));
   }
   return Object.freeze(verified.sort((a, b) => a.characterId.localeCompare(b.characterId)));
@@ -198,6 +205,8 @@ export async function compileCouncilAvatarDirectionMasterExecutionAuthorization(
       exactAdapterMatchRequired: true,
       exactModelMatchRequired: true,
       exactCanonicalIdentityArtifactRequired: true,
+      identityApprovalRecordIsAuthority: true,
+      artifactPromotionRequiredBeforeExecution: false,
       authorizationExpiryRequired: true,
       automaticRetryAllowed: false,
       fallbackAllowed: false,
@@ -243,7 +252,9 @@ export function validateCouncilAvatarDirectionMasterExecutionAuthorization(
     authorization.budget?.retriesAuthorized !== 0 ||
     authorization.budget?.fallbackAuthorized !== false ||
     authorization.executionPolicy?.genericProviderWorkerMayClaim !== false ||
-    authorization.executionPolicy?.exactCanonicalIdentityArtifactRequired !== true
+    authorization.executionPolicy?.exactCanonicalIdentityArtifactRequired !== true ||
+    authorization.executionPolicy?.identityApprovalRecordIsAuthority !== true ||
+    authorization.executionPolicy?.artifactPromotionRequiredBeforeExecution !== false
   ) {
     throw new Error('Council direction-master execution authorization binding drift');
   }
