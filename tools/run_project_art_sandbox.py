@@ -1530,6 +1530,137 @@ def _normal_map_from_height(image: Image.Image, operation: dict[str, Any]) -> Im
                 disposable.close()
 
 
+def _alpha_clean(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    """Master alpha deterministically and guarantee canonical transparent pixels."""
+    threshold = governed_integer(operation.get("threshold", 96), "alpha-clean.threshold", 0, 255)
+    binary = operation.get("binary", True)
+    zero_rgb = operation.get("zeroTransparentRgb", True)
+    if not isinstance(binary, bool) or not isinstance(zero_rgb, bool):
+        fail("alpha-clean binary and zeroTransparentRgb must be boolean")
+    output = bytearray(image.convert("RGBA").tobytes())
+    for offset in range(0, len(output), 4):
+        alpha = output[offset + 3]
+        if alpha < threshold:
+            output[offset:offset + 4] = b"\x00\x00\x00\x00"
+        elif binary:
+            output[offset + 3] = 255
+        if zero_rgb and output[offset + 3] == 0:
+            output[offset:offset + 3] = b"\x00\x00\x00"
+    return Image.frombytes("RGBA", image.size, bytes(output))
+
+
+def _chroma_to_alpha(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    """Remove bounded channel-dominant chroma without touching other translucent effects."""
+    channel_name = str(operation.get("channel", "green"))
+    channels = {"red": 0, "green": 1, "blue": 2}
+    if channel_name not in channels:
+        fail("chroma-to-alpha.channel must be red, green or blue")
+    channel = channels[channel_name]
+    minimum = governed_integer(operation.get("minimumChannel", 45), "chroma-to-alpha.minimumChannel", 0, 255)
+    dominance = governed_integer(operation.get("minimumDominance", 15), "chroma-to-alpha.minimumDominance", 0, 255)
+    minimum_alpha = governed_integer(operation.get("minimumAlpha", 1), "chroma-to-alpha.minimumAlpha", 0, 255)
+    maximum_alpha = governed_integer(operation.get("maximumAlpha", 95), "chroma-to-alpha.maximumAlpha", 0, 255)
+    if minimum_alpha > maximum_alpha:
+        fail("chroma-to-alpha minimumAlpha cannot exceed maximumAlpha")
+    output = bytearray(image.convert("RGBA").tobytes())
+    for offset in range(0, len(output), 4):
+        alpha = output[offset + 3]
+        values = output[offset:offset + 3]
+        selected = values[channel]
+        others = [values[index] for index in range(3) if index != channel]
+        if minimum_alpha <= alpha <= maximum_alpha and selected >= minimum and selected - max(others) >= dominance:
+            output[offset:offset + 4] = b"\x00\x00\x00\x00"
+        elif alpha == 0:
+            output[offset:offset + 3] = b"\x00\x00\x00"
+    return Image.frombytes("RGBA", image.size, bytes(output))
+
+
+def _component_prune(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    """Delete disconnected visible islands below an exact bounded pixel area."""
+    minimum_pixels = governed_integer(operation.get("minimumPixels", 2), "component-prune.minimumPixels", 1, 1_000_000)
+    alpha_threshold = governed_integer(operation.get("alphaThreshold", 1), "component-prune.alphaThreshold", 1, 255)
+    width, height = image.size
+    alpha_channel = image.getchannel("A")
+    try:
+        alpha_bytes = alpha_channel.tobytes()
+    finally:
+        alpha_channel.close()
+    visible = bytearray(1 if alpha >= alpha_threshold else 0 for alpha in alpha_bytes)
+    visited = bytearray(width * height)
+    remove = bytearray(width * height)
+    for start in range(width * height):
+        if not visible[start] or visited[start]:
+            continue
+        component: list[int] = []
+        queue = deque([start])
+        visited[start] = 1
+        while queue:
+            current = queue.popleft()
+            component.append(current)
+            x, y = current % width, current // width
+            for next_x, next_y in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if 0 <= next_x < width and 0 <= next_y < height:
+                    index = next_y * width + next_x
+                    if visible[index] and not visited[index]:
+                        visited[index] = 1
+                        queue.append(index)
+        if len(component) < minimum_pixels:
+            for index in component:
+                remove[index] = 1
+    output = bytearray(image.convert("RGBA").tobytes())
+    for index, should_remove in enumerate(remove):
+        offset = index * 4
+        if should_remove:
+            output[offset:offset + 4] = b"\x00\x00\x00\x00"
+        elif output[offset + 3] == 0:
+            output[offset:offset + 3] = b"\x00\x00\x00"
+    return Image.frombytes("RGBA", image.size, bytes(output))
+
+
+def _bounded_rectangle(operation: dict[str, Any], image: Image.Image, label: str) -> tuple[int, int, int, int]:
+    x = governed_integer(operation.get("x"), f"{label}.x", 0, image.width - 1)
+    y = governed_integer(operation.get("y"), f"{label}.y", 0, image.height - 1)
+    width = governed_integer(operation.get("width"), f"{label}.width", 1, image.width)
+    height = governed_integer(operation.get("height"), f"{label}.height", 1, image.height)
+    if x + width > image.width or y + height > image.height:
+        fail(f"{label} rectangle escaped the image")
+    return x, y, width, height
+
+
+def _rect_clear(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    x, y, width, height = _bounded_rectangle(operation, image, "rect-clear")
+    output = image.copy()
+    output.paste((0, 0, 0, 0), (x, y, x + width, y + height))
+    return output
+
+
+def _rect_fill(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    x, y, width, height = _bounded_rectangle(operation, image, "rect-fill")
+    colour = parse_colour(operation["colour"], "rect-fill.colour")
+    output = image.copy()
+    output.paste(colour, (x, y, x + width, y + height))
+    return output
+
+
+def _clone_stamp(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    source_spec = operation.get("source")
+    destination = operation.get("destination")
+    if not isinstance(source_spec, dict) or not isinstance(destination, dict):
+        fail("clone-stamp requires source and destination objects")
+    x, y, width, height = _bounded_rectangle(source_spec, image, "clone-stamp.source")
+    destination_x = governed_integer(destination.get("x"), "clone-stamp.destination.x", 0, image.width - 1)
+    destination_y = governed_integer(destination.get("y"), "clone-stamp.destination.y", 0, image.height - 1)
+    if destination_x + width > image.width or destination_y + height > image.height:
+        fail("clone-stamp destination escaped the image")
+    patch = image.crop((x, y, x + width, y + height))
+    output = image.copy()
+    try:
+        output.alpha_composite(patch, (destination_x, destination_y))
+        return output
+    finally:
+        patch.close()
+
+
 def apply_operation(
     image: Image.Image,
     operation: dict[str, Any],
@@ -1658,6 +1789,18 @@ def apply_operation(
         output.putalpha(alpha)
         alpha.close()
         return output
+    if op == "alpha-clean":
+        return _alpha_clean(image, operation)
+    if op == "chroma-to-alpha":
+        return _chroma_to_alpha(image, operation)
+    if op == "component-prune":
+        return _component_prune(image, operation)
+    if op == "rect-clear":
+        return _rect_clear(image, operation)
+    if op == "rect-fill":
+        return _rect_fill(image, operation)
+    if op == "clone-stamp":
+        return _clone_stamp(image, operation)
     if op == "alpha-premultiply":
         return alpha_premultiply(image, operation)
     if op == "alpha-unpremultiply":
