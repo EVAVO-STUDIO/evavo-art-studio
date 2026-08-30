@@ -5,87 +5,24 @@
   "consumerRepository": "EVAVO-STUDIO/command-front",
   "consumerManifest": "data/production/operation_breakwater_asset_manifest.json",
   "consumerRequirements": "data/presentation/structure_sprite_requirements.json",
+  "bridgeConsumerRequirements": "data/presentation/bridge_asset_requirements.json",
+  "bridgeConsumerCatalog": "data/presentation/bridge_asset_catalog.json",
   "camera": "fixed-isometric-2d-2.5d",
   "gameplayProfile": "strategy",
   "deliveryRoot": "res://assets/presentation/structures/",
+  "bridgeDeliveryRoot": "res://assets/presentation/bridges/",
   "assets": [
-    {
-      "id": "breakwater-meridian-command-post",
-      "role": "destructible-prop",
-      "subject": "Meridian authorised intervention command post",
-      "states": ["intact","active","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["clean modular military field architecture","strong command silhouette","grounded alt-1999","no futuristic holograms","team colour subtle but readable"]
-    },
-    {
-      "id": "breakwater-meridian-field-barracks",
-      "role": "destructible-prop",
-      "subject": "Meridian field barracks and infantry staging building",
-      "states": ["construction","intact","active","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["modular military building","clear entrance and personnel scale","late-90s materials","readable production activity"]
-    },
-    {
-      "id": "breakwater-meridian-motor-pool",
-      "role": "destructible-prop",
-      "subject": "Meridian vehicle motor pool and maintenance structure",
-      "states": ["construction","intact","active","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["wide vehicle bay silhouette","service gantry detail","grounded military maintenance yard","no oversized sci-fi factory language"]
-    },
-    {
-      "id": "breakwater-vesper-command-post",
-      "role": "destructible-prop",
-      "subject": "Vesper adapted command compound using captured and improvised infrastructure",
-      "states": ["intact","active","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["irregular field-modified construction","mixed civilian and military components","antenna and command cues","must contrast Meridian clean modular geometry"]
-    },
-    {
-      "id": "breakwater-vesper-field-barracks",
-      "role": "destructible-prop",
-      "subject": "Vesper militia staging barracks",
-      "states": ["intact","active","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["repurposed industrial or civilian shell","improvised barriers","clear infantry production identity","avoid ethnic or religious stereotyping"]
-    },
-    {
-      "id": "breakwater-vesper-motor-yard",
-      "role": "destructible-prop",
-      "subject": "Vesper improvised vehicle motor yard for technicals and captured armour",
-      "states": ["intact","active","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["repurposed industrial vehicle yard","open service bay and scrap-parts language","field-modified late-90s equipment","clearly distinct from Meridian motor pool","no sci-fi factory styling"]
-    },
-    {
-      "id": "neutral-oil-facility",
-      "role": "destructible-prop",
-      "subject": "civilian 1999 oil processing facility in dusty industrial canal district",
-      "states": ["intact","active","captured","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["pipes tanks pumps and service building","industrial not refinery-megacomplex scale","captured state uses restrained faction marker only","preserve civilian identity"]
-    },
-    {
-      "id": "neutral-comms-tower",
-      "role": "destructible-prop",
-      "subject": "civilian/regional communications tower and equipment compound",
-      "states": ["intact","active","captured","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["late-90s mast and dish equipment","strong vertical silhouette","small equipment hut","captured state readable without repainting whole structure"]
-    },
-    {
-      "id": "neutral-urban-block",
-      "role": "destructible-prop",
-      "subject": "dusty late-20th-century civilian apartment block suitable for infantry garrison",
-      "states": ["intact","occupied","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["clear windows and entrances","civilian architecture","occupied state uses subtle firing-position cues","damage states preserve footprint readability"]
-    },
-    {
-      "id": "neutral-field-clinic",
-      "role": "destructible-prop",
-      "subject": "small civilian field clinic or district medical facility",
-      "states": ["intact","active","captured","occupied","damaged-a","damaged-b","destroyed-rubble"],
-      "artRules": ["recognisable medical/service building without modern glossy hospital aesthetic","clear entrance","captured marker restrained","garrison state readable"]
-    },
-    {
-      "id": "breakwater-main-bridge",
-      "role": "destructible-prop",
-      "subject": "industrial two-lane canal road bridge",
-      "states": ["intact","damaged","destroyed"],
-      "artRules": ["late-20th-century concrete and steel","fits two map tiles","destroyed state visibly removes traversable deck","matches shoreline and road atlas"]
-    }
+    {"id":"breakwater-meridian-command-post","role":"destructible-prop","subject":"Meridian authorised intervention command post","states":["intact","active","damaged-a","damaged-b","destroyed-rubble"],"artRules":["clean modular military field architecture","strong command silhouette","grounded alt-1999","no futuristic holograms","team colour subtle but readable"]},
+    {"id":"breakwater-meridian-field-barracks","role":"destructible-prop","subject":"Meridian field barracks and infantry staging building","states":["construction","intact","active","damaged-a","damaged-b","destroyed-rubble"],"artRules":["modular military building","clear entrance and personnel scale","late-90s materials","readable production activity"]},
+    {"id":"breakwater-meridian-motor-pool","role":"destructible-prop","subject":"Meridian vehicle motor pool and maintenance structure","states":["construction","intact","active","damaged-a","damaged-b","destroyed-rubble"],"artRules":["wide vehicle bay silhouette","service gantry detail","grounded military maintenance yard","no oversized sci-fi factory language"]},
+    {"id":"breakwater-vesper-command-post","role":"destructible-prop","subject":"Vesper adapted command compound using captured and improvised infrastructure","states":["intact","active","damaged-a","damaged-b","destroyed-rubble"],"artRules":["irregular field-modified construction","mixed civilian and military components","antenna and command cues","must contrast Meridian clean modular geometry"]},
+    {"id":"breakwater-vesper-field-barracks","role":"destructible-prop","subject":"Vesper militia staging barracks","states":["intact","active","damaged-a","damaged-b","destroyed-rubble"],"artRules":["repurposed industrial or civilian shell","improvised barriers","clear infantry production identity","avoid ethnic or religious stereotyping"]},
+    {"id":"breakwater-vesper-motor-yard","role":"destructible-prop","subject":"Vesper improvised vehicle motor yard for technicals and captured armour","states":["intact","active","damaged-a","damaged-b","destroyed-rubble"],"artRules":["repurposed industrial vehicle yard","open service bay and scrap-parts language","field-modified late-90s equipment","clearly distinct from Meridian motor pool","no sci-fi factory styling"]},
+    {"id":"neutral-oil-facility","role":"destructible-prop","subject":"civilian 1999 oil processing facility in dusty industrial canal district","states":["intact","active","captured","damaged-a","damaged-b","destroyed-rubble"],"artRules":["pipes tanks pumps and service building","industrial not refinery-megacomplex scale","captured state uses restrained faction marker only","preserve civilian identity"]},
+    {"id":"neutral-comms-tower","role":"destructible-prop","subject":"civilian/regional communications tower and equipment compound","states":["intact","active","captured","damaged-a","damaged-b","destroyed-rubble"],"artRules":["late-90s mast and dish equipment","strong vertical silhouette","small equipment hut","captured state readable without repainting whole structure"]},
+    {"id":"neutral-urban-block","role":"destructible-prop","subject":"dusty late-20th-century civilian apartment block suitable for infantry garrison","states":["intact","occupied","damaged-a","damaged-b","destroyed-rubble"],"artRules":["clear windows and entrances","civilian architecture","occupied state uses subtle firing-position cues","damage states preserve footprint readability"]},
+    {"id":"neutral-field-clinic","role":"destructible-prop","subject":"small civilian field clinic or district medical facility","states":["intact","active","captured","occupied","damaged-a","damaged-b","destroyed-rubble"],"artRules":["recognisable medical/service building without modern glossy hospital aesthetic","clear entrance","captured marker restrained","garrison state readable"]},
+    {"id":"breakwater-main-bridge","role":"destructible-prop","subject":"industrial two-lane canal road bridge","consumerContract":"bridge-media","deliveryRoot":"res://assets/presentation/bridges/breakwater_main/","states":["intact","damaged","destroyed"],"proofs":["640x360-intact-readability","damaged-state-readability","destroyed-state-impassable-readability","water-shore-transition-proof","nearest-neighbour-proof"],"artRules":["late-20th-century concrete and steel","fits two map tiles","destroyed state visibly removes traversable deck","matches shoreline and road atlas","transparent isometric overlay","no gameplay-critical geometry outside authored footprint"]}
   ],
   "commonOutput": {
     "transparentBackground": true,
