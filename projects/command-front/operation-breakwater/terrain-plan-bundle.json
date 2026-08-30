@@ -7,6 +7,14 @@
   "sourceStudio": "EVAVO-STUDIO/evavo-texture-studio",
   "camera": "fixed-isometric-2d-2.5d",
   "internalReviewResolution": [640,360],
+  "runtimeTileContract": {
+    "renderMode": "iso-diamond-transparent",
+    "transparentOutsideDiamond": true,
+    "nearestFiltering": true,
+    "atlasRotation": false,
+    "tileBoundsMustMatchCommandFrontDiamond": true,
+    "noOpaqueBoundingRectangle": true
+  },
   "tileFamilies": [
     {"id":"desert-sand","mastering":["seam cleanup","value grouping","sparse breakup","nearest-neighbour proof"]},
     {"id":"deep-water","mastering":["canal value consistency","animation continuity","shore transition QA"]},
@@ -27,7 +35,8 @@
         "must not resemble a hard road or vehicle-capable crossing",
         "visible bed/silt or restrained depth cue",
         "supports subtle wading disturbance overlay without obscuring units",
-        "transition edges remain seamless against shoreline and deep-water neighbours"
+        "transition edges remain seamless against shoreline and deep-water neighbours",
+        "ford overlay must preserve transparent pixels outside the isometric tile footprint"
       ],
       "proofs": ["640x360 gameplay-scale still","nearest-neighbour 2x preview","deep-vs-shallow comparison","infantry-over-ford readability still"]
     }
@@ -39,7 +48,8 @@
     "overlayAtlas": true,
     "paletteProof": true,
     "nearestNeighbourProof": true,
-    "provenanceRequired": true
+    "provenanceRequired": true,
+    "runtimeRenderMode": "iso-diamond-transparent"
   },
-  "releaseRule": "No terrain or ford media is consumer-approved until the complete tile/transition package remains seamless and readable at Command Front's 640x360 internal review resolution."
+  "releaseRule": "No terrain or ford media is consumer-approved until the complete tile/transition package remains seamless and readable at Command Front's 640x360 internal review resolution and conforms to the transparent isometric runtime tile contract."
 }
