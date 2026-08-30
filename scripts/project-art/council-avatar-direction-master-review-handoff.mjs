@@ -55,6 +55,40 @@ function expectedKey(characterId, viewId) {
   return `${characterId}:${viewId}`;
 }
 
+function executionSettings(execution) {
+  if (
+    !execution?.adapter?.id ||
+    !execution?.adapter?.model ||
+    !Array.isArray(execution.jobs) ||
+    execution.jobs.length < 1 ||
+    !Array.isArray(execution.technicalAssurance?.jobs)
+  ) {
+    throw new Error('Council direction execution settings are incomplete');
+  }
+  const counts = new Map();
+  for (const assurance of execution.technicalAssurance.jobs) {
+    const key = expectedKey(assurance.characterId, assurance.viewId);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const executionKeys = execution.jobs.map((job) => expectedKey(job.characterId, job.viewId));
+  const values = executionKeys.map((key) => counts.get(key) ?? 0);
+  const distinct = new Set(values);
+  if (
+    execution.selectedCharacterId !== null ||
+    execution.selectedViewId !== null ||
+    distinct.size !== 1 ||
+    values[0] < 2 ||
+    values[0] > 4
+  ) {
+    throw new Error('Council direction review requires a complete execution with one consistent candidate count of 2-4 per view');
+  }
+  return Object.freeze({
+    candidateCount: values[0],
+    preferredAdapterId: execution.adapter.id,
+    preferredModel: execution.adapter.model,
+  });
+}
+
 function validateCompleteExecution(execution, runtimePackage) {
   if (
     !execution ||
@@ -90,9 +124,14 @@ function validateCompleteExecution(execution, runtimePackage) {
   return expected;
 }
 
-function passedMasterOutputs(execution, expected) {
+function passedMasterOutputs(execution, expected, candidateCount) {
   const assurance = execution.technicalAssurance;
-  if (!assurance || assurance.failed !== 0 || !Array.isArray(assurance.jobs)) {
+  if (
+    !assurance ||
+    assurance.failed !== 0 ||
+    !Array.isArray(assurance.jobs) ||
+    assurance.jobs.length !== expected.size * candidateCount
+  ) {
     throw new Error('Council direction technical assurance is incomplete');
   }
   const byView = new Map();
@@ -120,8 +159,8 @@ function passedMasterOutputs(execution, expected) {
   }
   for (const key of expected) {
     const values = byView.get(key) ?? [];
-    if (values.length < 2) {
-      throw new Error(`Council direction review requires at least two technically-passed candidates for ${key}`);
+    if (values.length !== candidateCount) {
+      throw new Error(`Council direction review requires exactly ${candidateCount} technically-passed mastered candidates for ${key}`);
     }
   }
   return byView;
@@ -171,6 +210,7 @@ function buildReviewRequest(materialized, approval, runtimePackage) {
     const expectedViews = runtimePackage.jobs
       .filter((job) => job.characterId === characterId)
       .map((job) => job.viewId);
+    const perViewIndex = new Map();
     groups.push(Object.freeze({
       id: `${characterId}-direction-master-candidates`,
       kind: 'candidate-set',
@@ -182,14 +222,18 @@ function buildReviewRequest(materialized, approval, runtimePackage) {
         `Required views: ${expectedViews.join(', ')}.`,
       ].join(' '),
       requiredGates: REQUIRED_GATES,
-      items: Object.freeze(characterItems.map((candidate, index) => Object.freeze({
-        id: `${candidate.characterId}-${candidate.viewId}-candidate-${String(index + 1).padStart(2, '0')}`,
-        role: 'candidate',
-        label: `${viewLabel(candidate.viewId)} · candidate ${index + 1}`,
-        notes: `Direction view ${candidate.viewId}. Approved identity lock ${approval.approvalSha256}. Source provider candidate ${candidate.sourceCandidateArtifactId}. Mastered artifact ${candidate.artifactId}.`,
-        source: candidate.relativePath,
-        expectedSha256: candidate.contentSha256,
-      }))),
+      items: Object.freeze(characterItems.map((candidate) => {
+        const index = (perViewIndex.get(candidate.viewId) ?? 0) + 1;
+        perViewIndex.set(candidate.viewId, index);
+        return Object.freeze({
+          id: `${candidate.characterId}-${candidate.viewId}-candidate-${String(index).padStart(2, '0')}`,
+          role: 'candidate',
+          label: `${viewLabel(candidate.viewId)} · candidate ${index}`,
+          notes: `Direction view ${candidate.viewId}. Approved identity lock ${approval.approvalSha256}. Source provider candidate ${candidate.sourceCandidateArtifactId}. Mastered artifact ${candidate.artifactId}.`,
+          source: candidate.relativePath,
+          expectedSha256: candidate.contentSha256,
+        });
+      })),
     }));
   }
   return Object.freeze({
@@ -217,21 +261,17 @@ export async function compileCouncilAvatarDirectionMasterReviewHandoff({
   compiledAt = new Date().toISOString(),
 } = {}) {
   const [execution, approvalRecord] = await Promise.all([
-    readFile(path.resolve(executionResultPath), 'utf8').then(JSON.parse),
-    readFile(path.resolve(identityApprovalPath), 'utf8').then(JSON.parse),
+    readFile(path.resolve(executionResultPath), 'utf8').then((value) => JSON.parse(value)),
+    readFile(path.resolve(identityApprovalPath), 'utf8').then((value) => JSON.parse(value)),
   ]);
   const approval = validateCouncilAvatarIdentityLockApproval(approvalRecord);
+  const settings = executionSettings(execution);
   const runtimePackage = compileCouncilAvatarDirectionMasterRuntimePackage({
     identityLockApproval: approval,
-    candidateCount: execution.adapter?.id ? execution.technicalAssurance?.jobs?.length > 0 ? undefined : undefined : undefined,
+    ...settings,
   });
-  if (execution.runtimePackageSha256 !== runtimePackage.runtimePackageSha256) {
-    const candidateCounts = new Set((execution.jobs ?? []).map(() => null));
-    void candidateCounts;
-    throw new Error('Council direction review runtime package must be reproduced from the exact execution settings');
-  }
   const expected = validateCompleteExecution(execution, runtimePackage);
-  const passed = passedMasterOutputs(execution, expected);
+  const passed = passedMasterOutputs(execution, expected, settings.candidateCount);
   const resolvedWorkspace = path.resolve(workspaceRoot);
   await mkdir(resolvedWorkspace, { recursive: false, mode: 0o700 });
   const store = new LocalArtifactStore({ root: path.resolve(artifactRoot) });
@@ -257,6 +297,8 @@ export async function compileCouncilAvatarDirectionMasterReviewHandoff({
     identityApprovalSha256: approval.approvalSha256,
     directionMasterPlanSha256: runtimePackage.directionMasterPlanSha256,
     runtimePackageSha256: runtimePackage.runtimePackageSha256,
+    adapter: execution.adapter,
+    candidateCountPerView: settings.candidateCount,
     reviewId: plan.reviewId,
     planSha256: plan.planSha256,
     requestPath,
