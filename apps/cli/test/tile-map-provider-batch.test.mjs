@@ -6,7 +6,10 @@ import test from "node:test";
 
 import { compileTileMapProviderRuntimeBatch } from "../dist/tile-map-provider-batch.js";
 
-async function fixture({ alphaRequired = true, providerAuthority = "intermediate-only" } = {}) {
+async function fixture({
+  alphaRequired = true,
+  providerAuthority = "intermediate-only",
+} = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-tile-map-provider-"));
   const batch = {
     schema_version: 1,
@@ -56,11 +59,15 @@ async function fixture({ alphaRequired = true, providerAuthority = "intermediate
   return input;
 }
 
-test("compiles Tile Map candidate into canonical Art Studio provider runtime job", async () => {
+test("compiles a Tile Map candidate into provider and deterministic mastering contracts", async () => {
   const input = await fixture();
   const result = await compileTileMapProviderRuntimeBatch(input);
   assert.equal(result.status, "ready-for-provider-runtime");
   assert.equal(result.source_map_fingerprint, "3".repeat(64));
+  assert.equal(
+    result.authority.mastering_authority,
+    "art-studio-deterministic-unapproved",
+  );
   assert.equal(result.jobs.length, 1);
   const job = result.jobs[0];
   assert.match(job.request_sha256, /^[0-9a-f]{64}$/u);
@@ -68,24 +75,55 @@ test("compiles Tile Map candidate into canonical Art Studio provider runtime job
   assert.match(job.runtime_job_sha256, /^[0-9a-f]{64}$/u);
   assert.equal(job.runtime_job.queue, "provider");
   assert.equal(job.runtime_job.kind, "art.candidate.generate");
-  assert.equal(job.runtime_job.idempotencyKey, "provider:tile-map-candidate-0123456789abcdefabcd");
+  assert.equal(
+    job.runtime_job.idempotencyKey,
+    "provider:tile-map-candidate-0123456789abcdefabcd",
+  );
   assert.equal(job.runtime_job.payload.target.width, 64);
   assert.equal(job.runtime_job.payload.target.height, 32);
-  assert.equal(job.runtime_job.payload.background.strategy, "native-alpha");
+  assert.equal(job.runtime_job.payload.target.transparency, "required");
+  assert.equal(job.runtime_job.payload.background.strategy, "chroma-key");
+  assert.equal(job.runtime_job.payload.background.matteColour, "#00ff00");
   assert.equal(job.runtime_job.payload.selection.requireSeed, true);
-  assert.equal(job.runtime_job.payload.metadata.sourceMapFingerprint, "3".repeat(64));
+  assert.equal(
+    job.runtime_job.payload.metadata.sourceMapFingerprint,
+    "3".repeat(64),
+  );
   assert.equal(job.runtime_job.payload.metadata.approvalAuthority, false);
   assert.deepEqual(job.runtime_job.payload.metadata.immutableSemanticRules, [
     "Rail topology is simulation-owned.",
     "Preserve east-west edge signature.",
   ]);
+  assert.deepEqual(job.mastering, {
+    source_canvas_policy: "provider-adapter-derived",
+    target_width: 64,
+    target_height: 32,
+    background_mode: "chroma-key",
+    matte_colour: "#00ff00",
+    resampling: "lanczos3",
+    delivery_profile_id: "godot-sprite-lossless",
+    require_meaningful_alpha: true,
+    require_fake_transparency_rejection: true,
+    approval_authority: false,
+  });
+  assert.deepEqual(job.runtime_job.payload.metadata.mastering, job.mastering);
+  assert.match(
+    job.runtime_job.payload.style.compositionRules.join(" "),
+    /deterministic mastering to 64x32 pixels/u,
+  );
 });
 
-test("non-alpha family uses provider-auto rather than implicit chroma key", async () => {
+test("opaque family uses opaque provider source plus exact native mastering", async () => {
   const input = await fixture({ alphaRequired: false });
   const result = await compileTileMapProviderRuntimeBatch(input);
-  assert.equal(result.jobs[0].runtime_job.payload.background.strategy, "provider-auto");
-  assert.equal(result.jobs[0].runtime_job.payload.target.transparency, "preferred");
+  const job = result.jobs[0];
+  assert.equal(job.runtime_job.payload.background.strategy, "opaque-source");
+  assert.equal(job.runtime_job.payload.target.transparency, "opaque");
+  assert.equal(job.mastering.background_mode, "opaque-preserve");
+  assert.equal(job.mastering.matte_colour, null);
+  assert.equal(job.mastering.require_meaningful_alpha, false);
+  assert.equal(job.mastering.target_width, 64);
+  assert.equal(job.mastering.target_height, 32);
 });
 
 test("provider authority cannot be weakened before runtime compilation", async () => {
