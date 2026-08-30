@@ -11,6 +11,20 @@ const REVIEW_RECEIPT_SCHEMA = 'evavo.project-art-review-receipt.v1';
 const APPROVER_MODES = new Set(['human', 'hybrid']);
 const REQUIRED_VIEWS = Object.freeze(['full-body-right', 'full-body-left', 'neutral-bust']);
 const ALLOWED_CHARACTERS = Object.freeze(['council-critic', 'council-open-reviewer']);
+const PROJECT_ART_AUTHORITY_KEYS = Object.freeze([
+  'providerExecution',
+  'runtimeSubmission',
+  'candidateApproval',
+  'candidatePromotion',
+  'sourceMutation',
+  'sourceDeletion',
+  'targetRepositoryMutation',
+  'gitCommit',
+  'gitPush',
+  'deployment',
+  'publication',
+  'forcePush',
+]);
 const HEX64 = /^[a-f0-9]{64}$/u;
 
 function canonical(value) {
@@ -58,10 +72,17 @@ function canonicalTimestamp(value, label) {
   return Object.freeze({ text, milliseconds });
 }
 
-function falseAuthorityPresent(value, label) {
-  if (!value || typeof value !== 'object') throw new Error(`${label} authority is missing`);
-  for (const [key, enabled] of Object.entries(value)) {
-    if (enabled !== false) throw new Error(`${label} contains unauthorized authority ${key}`);
+function requireFalseProjectArtAuthority(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} authority is missing`);
+  }
+  const keys = Object.keys(value);
+  if (
+    keys.length !== PROJECT_ART_AUTHORITY_KEYS.length ||
+    PROJECT_ART_AUTHORITY_KEYS.some((key) => !Object.hasOwn(value, key) || value[key] !== false) ||
+    keys.some((key) => !PROJECT_ART_AUTHORITY_KEYS.includes(key))
+  ) {
+    throw new Error(`${label} must contain the exact explicit all-false Project Art authority contract`);
   }
 }
 
@@ -160,8 +181,8 @@ export function compileCouncilAvatarDirectionMasterApproval({
   ) {
     throw new Error('Council direction approval input already claims unauthorized authority');
   }
-  falseAuthorityPresent(plan.authority, 'Project Art review plan');
-  falseAuthorityPresent(receipt.authority, 'Project Art review receipt');
+  requireFalseProjectArtAuthority(plan.authority, 'Project Art review plan');
+  requireFalseProjectArtAuthority(receipt.authority, 'Project Art review receipt');
   if (!APPROVER_MODES.has(decisions.reviewer?.mode)) {
     throw new Error('Council direction-master approval requires a finalized human or hybrid review');
   }
