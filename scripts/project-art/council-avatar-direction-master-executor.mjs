@@ -1,4 +1,4 @@
-import { lstat, mkdir, pathToFileURL, realpath, readFile } from 'node:fs/promises';
+import { lstat, mkdir, realpath, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { LocalArtifactStore } from '../../packages/artifacts/dist/index.js';
@@ -82,6 +82,22 @@ async function existingDirectory(value, label) {
   const resolved = await realpath(target);
   if (resolved !== target) throw new Error(`${label} must resolve exactly`);
   return resolved;
+}
+
+function runtimeOptionsFromAuthorization(authorization) {
+  const counts = new Set((authorization.jobs ?? []).map((job) => job.candidateCount));
+  if (
+    counts.size !== 1 ||
+    !authorization.adapter?.id ||
+    !authorization.adapter?.model
+  ) {
+    throw new Error('Council direction-master authorization provider settings are incomplete or inconsistent');
+  }
+  return Object.freeze({
+    candidateCount: [...counts][0],
+    preferredAdapterId: authorization.adapter.id,
+    preferredModel: authorization.adapter.model,
+  });
 }
 
 function selectedJobs(runtimePackage, authorization, { characterId, viewId } = {}) {
@@ -265,7 +281,11 @@ export async function executeAuthorizedCouncilAvatarDirectionMasterJobs({
     readJson(authorizationPath, 'Council direction-master authorization'),
     readJson(identityApprovalPath, 'Council identity-lock approval'),
   ]);
-  const runtimePackage = compileCouncilAvatarDirectionMasterRuntimePackage({ identityLockApproval });
+  const runtimeOptions = runtimeOptionsFromAuthorization(authorizationRecord);
+  const runtimePackage = compileCouncilAvatarDirectionMasterRuntimePackage({
+    identityLockApproval,
+    ...runtimeOptions,
+  });
   const authorization = validateCouncilAvatarDirectionMasterExecutionAuthorization(
     authorizationRecord,
     { runtimePackage },
@@ -275,6 +295,7 @@ export async function executeAuthorizedCouncilAvatarDirectionMasterJobs({
     identityLockApproval,
     artifactRoot: resolvedArtifactRoot,
     environment,
+    ...runtimeOptions,
   });
   if (!readiness.readiness.readyForBoundedExecutionAuthorization) {
     throw new Error(`COUNCIL_DIRECTION_PROVIDER_NOT_READY:${readiness.blockers.join(',') || 'unknown'}`);
