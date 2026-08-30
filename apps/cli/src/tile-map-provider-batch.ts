@@ -4,15 +4,13 @@ import { readFile } from "node:fs/promises";
 import { compileProviderCandidateRuntimeContract } from "@evavo/art-providers";
 
 type JsonObject = Record<string, unknown>;
-type ChromaMatte = "#ff00ff" | "#00ff00" | "#00ffff";
 
 type TileMapMasteringContract = {
   source_canvas_policy: "provider-adapter-derived";
   target_width: number;
   target_height: number;
   background_mode: "chroma-key" | "opaque-preserve";
-  matte_colour: ChromaMatte | null;
-  matte_selection: "semantic-contrast-v1" | null;
+  matte_colour: "#00ff00" | null;
   resampling: "lanczos3";
   delivery_profile_id: "godot-sprite-lossless";
   require_meaningful_alpha: boolean;
@@ -52,58 +50,12 @@ export type TileMapProviderRuntimeBatch = {
   provider_batch_fingerprint: string;
 };
 
-const MATTE_POLICIES = Object.freeze([
-  Object.freeze({
-    colour: "#ff00ff" as const,
-    conflicts: Object.freeze([
-      "magenta",
-      "pink",
-      "purple",
-      "violet",
-      "fuchsia",
-      "magic",
-      "portal",
-      "neon",
-    ]),
-  }),
-  Object.freeze({
-    colour: "#00ff00" as const,
-    conflicts: Object.freeze([
-      "green",
-      "grass",
-      "forest",
-      "foliage",
-      "tree",
-      "vegetation",
-      "moss",
-      "swamp",
-    ]),
-  }),
-  Object.freeze({
-    colour: "#00ffff" as const,
-    conflicts: Object.freeze([
-      "cyan",
-      "blue",
-      "water",
-      "sea",
-      "ocean",
-      "river",
-      "ice",
-      "snow",
-      "sky",
-    ]),
-  }),
-]);
-
 export async function compileTileMapProviderRuntimeBatch(
   candidateBatchPath: string,
 ): Promise<TileMapProviderRuntimeBatch> {
   const bytes = await readFile(candidateBatchPath);
   const batch = parseObject(bytes.toString("utf8"), candidateBatchPath);
-  if (
-    batch.schema_version !== 1 ||
-    batch.status !== "ready-for-provider-candidates"
-  ) {
+  if (batch.schema_version !== 1 || batch.status !== "ready-for-provider-candidates") {
     throw failure(
       "EVAVO_TILE_MAP_PROVIDER_BATCH_SCHEMA",
       "candidate batch must be schema v1 and ready-for-provider-candidates",
@@ -129,21 +81,12 @@ export async function compileTileMapProviderRuntimeBatch(
     const row = object(value, `jobs[${index}]`);
     const candidateId = text(row.candidate_id, `jobs[${index}].candidate_id`);
     const taskId = text(row.task_id, `jobs[${index}].task_id`);
-    const visualFamily = text(
-      row.visual_family,
-      `jobs[${index}].visual_family`,
-    );
+    const visualFamily = text(row.visual_family, `jobs[${index}].visual_family`);
     const providerFamilyId = providerSafeFamilyId(visualFamily);
     const outputPath = text(row.output_path, `jobs[${index}].output_path`);
     const dimensions = object(row.dimensions, `jobs[${index}].dimensions`);
-    const width = positiveInteger(
-      dimensions.width,
-      `jobs[${index}].dimensions.width`,
-    );
-    const height = positiveInteger(
-      dimensions.height,
-      `jobs[${index}].dimensions.height`,
-    );
+    const width = positiveInteger(dimensions.width, `jobs[${index}].dimensions.width`);
+    const height = positiveInteger(dimensions.height, `jobs[${index}].dimensions.height`);
     const semanticRules = stringArray(
       row.immutable_semantic_rules,
       `jobs[${index}].immutable_semantic_rules`,
@@ -179,21 +122,7 @@ export async function compileTileMapProviderRuntimeBatch(
       16,
     );
     const creativeIntent = creativeDirection.join(" ");
-    const semanticText = [
-      visualFamily,
-      ...semanticSourceIds,
-      ...semanticRules,
-      ...creativeDirection,
-    ].join(" ");
-    const matteColour = alphaRequired
-      ? chooseSemanticContrastMatte(semanticText)
-      : null;
-    const mastering = masteringContract(
-      width,
-      height,
-      alphaRequired,
-      matteColour,
-    );
+    const mastering = masteringContract(width, height, alphaRequired);
     const mustHave = [
       ...semanticRules,
       `Projection must remain ${projection}.`,
@@ -201,21 +130,18 @@ export async function compileTileMapProviderRuntimeBatch(
       "Retain clean large-scale forms that survive deterministic downsampling to native game resolution.",
       ...(alphaRequired
         ? [
-            `Use ${matteColour} only as the removable production background. Keep this exact colour out of the subject artwork.`,
+            "Use the declared high-chroma matte only as a removable production background; do not paint green into the asset.",
           ]
-        : ["Produce a fully opaque asset with no transparency."]),
+        : ["Produce a fully opaque asset with no transparency." ]),
     ];
     const mustAvoid = [
       "Do not add text, labels, logos, UI, watermarks, signatures or gameplay symbols not present in the semantic contract.",
       "Do not alter collision, navigation, terrain identity, network connectivity, footprint or semantic edge shape through artwork.",
       "Do not imitate generic AI-art noise, evenly distributed procedural detail or unrelated decorative clutter.",
       "Do not fake pixel detail by adding high-frequency speckle that collapses at native tile size.",
-      ...(matteColour
-        ? [`Do not use ${matteColour} anywhere inside the intended subject.`]
-        : []),
     ];
     const providerBackground = alphaRequired
-      ? ({ strategy: "chroma-key" as const, matteColour: matteColour! })
+      ? ({ strategy: "chroma-key" as const, matteColour: "#00ff00" })
       : ({ strategy: "opaque-source" as const });
     const request = {
       schemaVersion: "1.0" as const,
@@ -353,36 +279,17 @@ export async function compileTileMapProviderRuntimeBatch(
   };
 }
 
-function chooseSemanticContrastMatte(textValue: string): ChromaMatte {
-  const normalized = textValue.normalize("NFKD").toLowerCase();
-  let selected = MATTE_POLICIES[0]!;
-  let selectedScore = Number.POSITIVE_INFINITY;
-  for (const policy of MATTE_POLICIES) {
-    const score = policy.conflicts.reduce(
-      (total, keyword) => total + (normalized.includes(keyword) ? 1 : 0),
-      0,
-    );
-    if (score < selectedScore) {
-      selected = policy;
-      selectedScore = score;
-    }
-  }
-  return selected.colour;
-}
-
 function masteringContract(
   width: number,
   height: number,
   alphaRequired: boolean,
-  matteColour: ChromaMatte | null,
 ): TileMapMasteringContract {
   return {
     source_canvas_policy: "provider-adapter-derived",
     target_width: width,
     target_height: height,
     background_mode: alphaRequired ? "chroma-key" : "opaque-preserve",
-    matte_colour: matteColour,
-    matte_selection: alphaRequired ? "semantic-contrast-v1" : null,
+    matte_colour: alphaRequired ? "#00ff00" : null,
     resampling: "lanczos3",
     delivery_profile_id: "godot-sprite-lossless",
     require_meaningful_alpha: alphaRequired,
@@ -402,74 +309,62 @@ function parseObject(content: string, label: string): JsonObject {
     throw failure("EVAVO_TILE_MAP_PROVIDER_JSON", `invalid JSON in ${label}`);
   }
 }
-function object(value: unknown, pathName: string): JsonObject {
+function object(value: unknown, path: string): JsonObject {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw failure(
-      "EVAVO_TILE_MAP_PROVIDER_TYPE",
-      `${pathName} must be object`,
-    );
+    throw failure("EVAVO_TILE_MAP_PROVIDER_TYPE", `${path} must be object`);
   }
   return value as JsonObject;
 }
-function array(value: unknown, pathName: string): unknown[] {
+function array(value: unknown, path: string): unknown[] {
   if (!Array.isArray(value)) {
-    throw failure(
-      "EVAVO_TILE_MAP_PROVIDER_TYPE",
-      `${pathName} must be array`,
-    );
+    throw failure("EVAVO_TILE_MAP_PROVIDER_TYPE", `${path} must be array`);
   }
   return value;
 }
-function text(value: unknown, pathName: string): string {
+function text(value: unknown, path: string): string {
   if (typeof value !== "string" || !value.trim()) {
     throw failure(
       "EVAVO_TILE_MAP_PROVIDER_TYPE",
-      `${pathName} must be non-empty string`,
+      `${path} must be non-empty string`,
     );
   }
   return value;
 }
-function nullableText(value: unknown, pathName: string): string | null {
+function nullableText(value: unknown, path: string): string | null {
   if (value === null || value === undefined) return null;
-  return text(value, pathName);
+  return text(value, path);
 }
-function positiveInteger(value: unknown, pathName: string): number {
+function positiveInteger(value: unknown, path: string): number {
   if (!Number.isSafeInteger(value) || (value as number) <= 0) {
     throw failure(
       "EVAVO_TILE_MAP_PROVIDER_TYPE",
-      `${pathName} must be positive integer`,
+      `${path} must be positive integer`,
     );
   }
   return value as number;
 }
-function booleanValue(value: unknown, pathName: string): boolean {
+function booleanValue(value: unknown, path: string): boolean {
   if (typeof value !== "boolean") {
-    throw failure(
-      "EVAVO_TILE_MAP_PROVIDER_TYPE",
-      `${pathName} must be boolean`,
-    );
+    throw failure("EVAVO_TILE_MAP_PROVIDER_TYPE", `${path} must be boolean`);
   }
   return value;
 }
-function stringArray(value: unknown, pathName: string): string[] {
-  const values = array(value, pathName).map((item, index) =>
-    text(item, `${pathName}[${index}]`),
+function stringArray(value: unknown, path: string): string[] {
+  const values = array(value, path).map((item, index) =>
+    text(item, `${path}[${index}]`),
   );
   if (values.length === 0) {
     throw failure(
       "EVAVO_TILE_MAP_PROVIDER_TYPE",
-      `${pathName} must not be empty`,
+      `${path} must not be empty`,
     );
   }
   return values;
 }
-function sha256Hex(value: unknown, pathName: string): string {
-  const result = text(value, pathName).toLowerCase();
+function sha256Hex(value: unknown, path: string): string {
+  const result = text(value, path).toLowerCase();
   if (!/^[0-9a-f]{64}$/u.test(result)) {
-    throw failure(
-      "EVAVO_TILE_MAP_PROVIDER_HASH",
-      `${pathName} must be SHA-256`,
-    );
+    throw failure("EVAVO_TILE_MAP_PROVIDER_HASH", `${path} must be SHA-256`);
   }
   return result;
 }
