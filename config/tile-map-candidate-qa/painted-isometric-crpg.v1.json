@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "profile": "painted-90s-isometric-crpg",
+  "thresholds": {
+    "minimum_visible_coverage": 0.01,
+    "minimum_transparent_coverage_when_required": 0.005,
+    "maximum_soft_alpha_ratio": 0.35,
+    "maximum_palette_colours": 512,
+    "maximum_palette_colours_blocking": 1024,
+    "minimum_luminance_range": 0.035,
+    "maximum_isolated_pixel_ratio": 0.7,
+    "minimum_seam_score": 0.95,
+    "near_duplicate_mean_error": 0.01,
+    "near_duplicate_changed_pixel_ratio": 0.025,
+    "changed_pixel_threshold": 0.035,
+    "topology_alpha_threshold": 12
+  }
+}
