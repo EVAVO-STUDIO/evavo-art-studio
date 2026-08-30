@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "profile": "mutable-isometric-dungeon",
+  "thresholds": {
+    "minimum_visible_coverage": 0.015,
+    "minimum_transparent_coverage_when_required": 0.01,
+    "maximum_soft_alpha_ratio": 0.01,
+    "maximum_palette_colours": 96,
+    "maximum_palette_colours_blocking": 192,
+    "minimum_luminance_range": 0.05,
+    "maximum_isolated_pixel_ratio": 0.45,
+    "minimum_seam_score": 0.97,
+    "near_duplicate_mean_error": 0.012,
+    "near_duplicate_changed_pixel_ratio": 0.035,
+    "changed_pixel_threshold": 0.045,
+    "topology_alpha_threshold": 20
+  }
+}
