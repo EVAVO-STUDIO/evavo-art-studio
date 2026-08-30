@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "thresholds": {
+    "minimum_visible_coverage": 0.01,
+    "minimum_transparent_coverage_when_required": 0.005,
+    "maximum_soft_alpha_ratio": 0.002,
+    "maximum_palette_colours": 32,
+    "maximum_palette_colours_blocking": 64,
+    "minimum_luminance_range": 0.04,
+    "maximum_isolated_pixel_ratio": 0.45,
+    "minimum_seam_score": 0.96,
+    "near_duplicate_mean_error": 0.015,
+    "near_duplicate_changed_pixel_ratio": 0.04,
+    "changed_pixel_threshold": 0.05,
+    "topology_alpha_threshold": 16
+  }
+}
