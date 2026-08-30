@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "projectId": "command-front",
+  "scenarioId": "operation-breakwater",
+  "consumerRepository": "EVAVO-STUDIO/command-front",
+  "consumerRequirements": "data/presentation/cursor_asset_requirements.json",
+  "consumerCatalog": "data/presentation/cursor_asset_catalog.json",
+  "approvedConsumerRoot": "res://assets/presentation/cursors/",
+  "sourceSize": [32,32],
+  "visualTarget": "late-1990s military RTS command cursors, high-contrast functional glyphs, restrained alt-1999 command-console style",
+  "globalRules": {
+    "transparentBackground": true,
+    "nearestNeighbourReview": true,
+    "noEmbeddedText": true,
+    "noLettersOrNumbers": true,
+    "noModernFlatAppIconLook": true,
+    "noGlossyMobileGameLook": true,
+    "noGenericAiBadgeLook": true,
+    "hotspotAccuracyRequired": true,
+    "readableAtNative32Pixels": true,
+    "originalDesignsOnly": true,
+    "provenanceRequired": true
+  },
+  "cursors": [
+    {"id":"select","intent":"neutral selection/pointer state","hotspot":[3,3]},
+    {"id":"move","intent":"accepted ground movement destination","hotspot":[16,16]},
+    {"id":"attack","intent":"hostile unit/structure or attack-move action","hotspot":[16,16]},
+    {"id":"capture","intent":"engineer capture of neutral infrastructure","hotspot":[16,16]},
+    {"id":"garrison","intent":"infantry entry into friendly/open civilian structure","hotspot":[16,16]},
+    {"id":"repair","intent":"engineer repair/support action","hotspot":[16,16]},
+    {"id":"rally","intent":"producer rally destination placement","hotspot":[16,16]},
+    {"id":"construct","intent":"valid structure placement","hotspot":[16,16]},
+    {"id":"bridge-fire","intent":"Ctrl force-fire against destructible bridge","hotspot":[16,16]},
+    {"id":"demolish","intent":"engineer demolition of cover/wreck","hotspot":[16,16]},
+    {"id":"mine-lay","intent":"engineer mine placement","hotspot":[16,16]},
+    {"id":"mine-clear","intent":"engineer mine-clearance action","hotspot":[16,16]},
+    {"id":"salvage","intent":"engineer salvage of destroyed cover/wreck","hotspot":[16,16]},
+    {"id":"recover","intent":"field recovery of friendly vehicle","hotspot":[16,16]},
+    {"id":"invalid","intent":"armed command cannot be executed at current hover/selection","hotspot":[16,16]}
+  ],
+  "reviewProofs": [
+    "native-32x32-sheet",
+    "nearest-neighbour-2x-sheet",
+    "hotspot-overlay-proof",
+    "all-command-states-side-by-side-proof",
+    "grayscale-readability-proof",
+    "no-text-no-symbol-proof"
+  ],
+  "delivery": {
+    "format":"PNG RGBA",
+    "oneFilePerCursor":true,
+    "consumerFiltering":"nearest",
+    "catalogPromotion":"consumer approval only after Art Studio QA/provenance and Command Front validator pass"
+  },
+  "releaseRule":"Do not promote a cursor until its intent remains unmistakable at native 32x32 scale, the hotspot is correct, transparency is clean, and it cannot be confused with another armed command state."
+}
