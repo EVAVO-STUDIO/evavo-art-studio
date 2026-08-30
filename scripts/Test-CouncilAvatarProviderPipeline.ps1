@@ -58,12 +58,14 @@ function Read-WebsiteProvenance {
     $Source = Get-Content -LiteralPath $Path -Raw
     $Version = [regex]::Match($Source, 'packageVersion\s*:\s*"([^"]+)"')
     $Commit = [regex]::Match($Source, 'commit\s*:\s*"([a-f0-9]{40})"')
-    $Repo = [regex]::Match($Source, 'sourceRepo\s*:\s*"([^"]+)"')
+    $Repo = [regex]::Match($Source, '(?:repository|sourceRepo)\s*:\s*"([^"]+)"')
+    $Presentation = [regex]::Match($Source, 'presentationSource\s*:\s*"([^"]+)"')
     $Status = [regex]::Match($Source, 'productionStatusSource\s*:\s*"([^"]+)"')
     return [ordered]@{
         version = $(if ($Version.Success) { $Version.Groups[1].Value } else { $null })
         commit = $(if ($Commit.Success) { $Commit.Groups[1].Value } else { $null })
         sourceRepo = $(if ($Repo.Success) { $Repo.Groups[1].Value } else { $null })
+        presentationSource = $(if ($Presentation.Success) { $Presentation.Groups[1].Value } else { $null })
         productionStatusSource = $(if ($Status.Success) { $Status.Groups[1].Value } else { $null })
     }
 }
@@ -147,7 +149,8 @@ if (Require-File $WebsitePresentationPath 'website-council-presentation') {
     Add-Check 'website-runtime-provenance-version-present' ([bool]$Provenance.version) ([string]$Provenance.version)
     Add-Check 'website-runtime-provenance-commit-present' ([bool]$Provenance.commit) ([string]$Provenance.commit)
     Add-Check 'website-runtime-provenance-repo' ($Provenance.sourceRepo -eq 'EVAVO-STUDIO/evavo-avatar-runtime') ([string]$Provenance.sourceRepo)
-    Add-Check 'website-runtime-provenance-status-source' ($Provenance.productionStatusSource -eq 'council-spending-route-events-and-voice-playback') ([string]$Provenance.productionStatusSource)
+    Add-Check 'website-runtime-provenance-presentation-source' ($Provenance.presentationSource -eq 'src/council-presentation.js') ([string]$Provenance.presentationSource)
+    Add-Check 'website-runtime-provenance-status-source' ($Provenance.productionStatusSource -eq 'src/council-avatar-production-status.js') ([string]$Provenance.productionStatusSource)
     if ($RuntimeVersion) {
         Add-Check 'website-runtime-version-matches-package' ($Provenance.version -eq $RuntimeVersion) ("website={0}; runtime={1}" -f $Provenance.version, $RuntimeVersion)
     }
