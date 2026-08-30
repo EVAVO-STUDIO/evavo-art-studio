@@ -6,6 +6,7 @@
   "consumerManifest": "data/production/operation_breakwater_asset_manifest.json",
   "consumerDirectionalRequirements": "data/presentation/directional_sprite_requirements.json",
   "consumerStructureRequirements": "data/presentation/structure_sprite_requirements.json",
+  "consumerBridgeRequirements": "data/presentation/bridge_asset_requirements.json",
   "unitPlanBundle": "projects/command-front/operation-breakwater/sprite-plan-bundle.json",
   "structurePlanBundle": "projects/command-front/operation-breakwater/structure-plan-bundle.json",
   "terrainPlanBundle": "projects/command-front/operation-breakwater/terrain-plan-bundle.json",
@@ -15,6 +16,8 @@
     "internalReviewResolution": [640,360],
     "infantryDirections": 8,
     "vehicleDirections": 16,
+    "bridgeStates": ["intact","damaged","destroyed"],
+    "bridgePresentationOnly": true,
     "originalDesignsOnly": true,
     "approvedConsumerMediaOnly": true
   },
