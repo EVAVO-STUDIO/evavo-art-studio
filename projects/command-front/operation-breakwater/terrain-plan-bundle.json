@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "projectId": "command-front",
+  "scenarioId": "operation-breakwater",
+  "consumerRepository": "EVAVO-STUDIO/command-front",
+  "consumerManifest": "data/production/operation_breakwater_asset_manifest.json",
+  "sourceStudio": "EVAVO-STUDIO/evavo-texture-studio",
+  "camera": "fixed-isometric-2d-2.5d",
+  "internalReviewResolution": [640,360],
+  "tileFamilies": [
+    {"id":"desert-sand","mastering":["seam cleanup","value grouping","sparse breakup","nearest-neighbour proof"]},
+    {"id":"deep-water","mastering":["canal value consistency","animation continuity","shore transition QA"]},
+    {"id":"shallow-water","mastering":["depth-value separation","wading readability","deep-water transition QA"]},
+    {"id":"shoreline","mastering":["hard edge readability","deep/shallow transition variants"]},
+    {"id":"road","mastering":["route readability","edge wear","junction variants"]},
+    {"id":"concrete-industrial","mastering":["crack restraint","oil-mark restraint","tile repetition cleanup"]},
+    {"id":"urban-ground","mastering":["paving variation","dust integration","building-footprint readability"]}
+  ],
+  "specialFeatures": [
+    {
+      "id": "breakwater-southern-infantry-ford",
+      "surface": "shallow-water",
+      "consumerTiles": [[11,14],[12,14]],
+      "purpose": "Emergency infantry-only route after main bridge destruction",
+      "requirements": [
+        "readable as shallower than adjacent deep canal water at 640x360",
+        "must not resemble a hard road or vehicle-capable crossing",
+        "visible bed/silt or restrained depth cue",
+        "supports subtle wading disturbance overlay without obscuring units",
+        "transition edges remain seamless against shoreline and deep-water neighbours"
+      ],
+      "proofs": ["640x360 gameplay-scale still","nearest-neighbour 2x preview","deep-vs-shallow comparison","infantry-over-ford readability still"]
+    }
+  ],
+  "overlayFamilies": ["dust","oil-stain","road-wear","rubble","cracks","dock-debris","ford-wading-readability"],
+  "delivery": {
+    "terrainAtlas": true,
+    "transitionAtlas": true,
+    "overlayAtlas": true,
+    "paletteProof": true,
+    "nearestNeighbourProof": true,
+    "provenanceRequired": true
+  },
+  "releaseRule": "No terrain or ford media is consumer-approved until the complete tile/transition package remains seamless and readable at Command Front's 640x360 internal review resolution."
+}
