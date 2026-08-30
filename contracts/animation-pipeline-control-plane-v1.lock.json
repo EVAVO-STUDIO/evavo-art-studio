@@ -1,0 +1,6 @@
+{
+  "schema": "evavo.animation-pipeline-control-plane-lock.v1",
+  "implementationVersion": "1.1.0",
+  "implementationPath": "tools/animation_pipeline_control_plane_v1_1_mcp.mjs",
+  "sha256": "sha256:de4eb6053b233cba55eadc1ffd14520644a9ce353dc50ff2af464148d02bafda"
+}

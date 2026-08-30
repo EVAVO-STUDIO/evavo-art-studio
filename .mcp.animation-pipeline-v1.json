@@ -2,9 +2,7 @@
   "mcpServers": {
     "evavo-animation-pipeline-v1": {
       "command": "node",
-      "args": [
-        "tools/animation_pipeline_control_plane_v1_mcp.mjs"
-      ],
+      "args": ["tools/animation_pipeline_control_plane_v1_1_mcp.mjs"],
       "env": {
         "EVAVO_ANIMATION_PIPELINE_ROLE": "art-studio",
         "EVAVO_ANIMATION_PROVIDER_EXECUTION_ENABLED": "disabled",
