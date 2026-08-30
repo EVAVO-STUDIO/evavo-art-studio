@@ -83,11 +83,54 @@ function deterministicColour(identity: string): readonly [number, number, number
   ] as const;
 }
 
+function hexColour(value: string): readonly [number, number, number] {
+  if (!/^#[0-9a-f]{6}$/iu.test(value)) {
+    throw new ProviderError(
+      "PROVIDER_FIXTURE_MATTE_INVALID",
+      "Fixture provider chroma matte must use #RRGGBB format.",
+      "permanent",
+    );
+  }
+  return [
+    Number.parseInt(value.slice(1, 3), 16),
+    Number.parseInt(value.slice(3, 5), 16),
+    Number.parseInt(value.slice(5, 7), 16),
+  ] as const;
+}
+
+type FixtureBackground = Readonly<{
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
+  mode: "chroma-key" | "native-alpha" | "opaque";
+}>;
+
+function fixtureBackground(
+  request: ResolvedProviderCandidateRequest["request"],
+): FixtureBackground {
+  const strategy = request.background.strategy;
+  if (strategy === "chroma-key") {
+    const [red, green, blue] = hexColour(request.background.matteColour!);
+    return { red, green, blue, alpha: 255, mode: "chroma-key" };
+  }
+  if (strategy === "native-alpha") {
+    return { red: 0, green: 0, blue: 0, alpha: 0, mode: "native-alpha" };
+  }
+  if (
+    strategy === "provider-auto" &&
+    request.target.transparency !== "opaque"
+  ) {
+    return { red: 0, green: 0, blue: 0, alpha: 0, mode: "native-alpha" };
+  }
+  return { red: 18, green: 20, blue: 24, alpha: 255, mode: "opaque" };
+}
+
 function fixturePng(
   width: number,
   height: number,
   identity: string,
-  transparencyRequired: boolean,
+  background: FixtureBackground,
 ): Buffer {
   if (width * height > MAXIMUM_FIXTURE_PIXELS) {
     throw new ProviderError(
@@ -113,14 +156,10 @@ function fixturePng(
         x < accentStartX + accentSize &&
         y >= accentStartY &&
         y < accentStartY + accentSize;
-      raw[pixelOffset] = accent ? red : 0;
-      raw[pixelOffset + 1] = accent ? green : 0;
-      raw[pixelOffset + 2] = accent ? blue : 0;
-      raw[pixelOffset + 3] = transparencyRequired
-        ? accent
-          ? 255
-          : 0
-        : 255;
+      raw[pixelOffset] = accent ? red : background.red;
+      raw[pixelOffset + 1] = accent ? green : background.green;
+      raw[pixelOffset + 2] = accent ? blue : background.blue;
+      raw[pixelOffset + 3] = accent ? 255 : background.alpha;
     }
   }
 
@@ -133,7 +172,10 @@ function fixturePng(
   ihdr[11] = 0;
   ihdr[12] = 0;
 
-  const text = Buffer.from(`EVAVOFixture\0${identity}`, "utf8");
+  const text = Buffer.from(
+    `EVAVOFixture\0${identity};background=${background.mode}`,
+    "utf8",
+  );
   return Buffer.concat([
     PNG_SIGNATURE,
     pngChunk("IHDR", ihdr),
@@ -147,10 +189,10 @@ export const FIXTURE_PROVIDER_DESCRIPTOR: ProviderAdapterDescriptor = Object.fre
   protocolVersion: PROVIDER_PROTOCOL_VERSION,
   id: "fixture-image",
   label: "Deterministic fixture image",
-  version: "1.1.0",
+  version: "1.2.0",
   priority: -10_000,
   capabilities: FIXTURE_CAPABILITIES,
-  models: Object.freeze(["fixture-deterministic-canvas-v2"]),
+  models: Object.freeze(["fixture-background-contract-v3"]),
   maximumCandidates: 8,
   maximumReferenceImages: 16,
   maximumSourceBytes: 32 * 1024 * 1024,
@@ -175,6 +217,7 @@ export class FixtureImageProviderAdapter implements ProviderAdapter {
         "cancelled",
       );
     }
+    const background = fixtureBackground(resolved.request);
     const outputs: ProviderAdapterOutput[] = Array.from(
       { length: resolved.request.candidateCount },
       (_, index) => {
@@ -183,13 +226,15 @@ export class FixtureImageProviderAdapter implements ProviderAdapter {
           String(resolved.request.seed ?? 0),
           String(index + 1),
           `${resolved.request.target.width}x${resolved.request.target.height}`,
+          resolved.request.background.strategy,
+          resolved.request.background.matteColour ?? "none",
         ].join(":");
         return {
           bytes: fixturePng(
             resolved.request.target.width,
             resolved.request.target.height,
             identity,
-            resolved.request.target.transparency === "required",
+            background,
           ),
           mediaType: "image/png" as const,
           fileName: `${resolved.request.candidateFamilyId}-${String(index + 1).padStart(2, "0")}.png`,
@@ -201,6 +246,9 @@ export class FixtureImageProviderAdapter implements ProviderAdapter {
             targetHeight: resolved.request.target.height,
             referenceCount: resolved.references.length,
             deterministicIdentity: identity,
+            backgroundStrategy: resolved.request.background.strategy,
+            matteColour: resolved.request.background.matteColour ?? null,
+            fixtureBackgroundMode: background.mode,
           },
         };
       },
