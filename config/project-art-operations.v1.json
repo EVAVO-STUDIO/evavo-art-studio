@@ -142,6 +142,39 @@
       "deterministic": true
     },
     {
+      "id": "alpha-clean",
+      "kind": "alpha",
+      "deterministic": true
+    },
+    {
+      "id": "chroma-to-alpha",
+      "kind": "alpha",
+      "deterministic": true
+    },
+    {
+      "id": "component-prune",
+      "kind": "alpha",
+      "deterministic": true
+    },
+    {
+      "id": "rect-clear",
+      "kind": "image-surgery",
+      "deterministic": true,
+      "required": ["x", "y", "width", "height"]
+    },
+    {
+      "id": "rect-fill",
+      "kind": "image-surgery",
+      "deterministic": true,
+      "required": ["x", "y", "width", "height", "colour"]
+    },
+    {
+      "id": "clone-stamp",
+      "kind": "image-surgery",
+      "deterministic": true,
+      "required": ["source", "destination"]
+    },
+    {
       "id": "alpha-premultiply",
       "kind": "alpha-association",
       "deterministic": true

@@ -670,6 +670,12 @@ try {
             { op: 'unsharp-mask', radius: 1, percent: 0, threshold: 0 },
             { op: 'alpha-dilate', width: 1 },
             { op: 'alpha-erode', width: 1 },
+            { op: 'alpha-clean', threshold: 96 },
+            { op: 'chroma-to-alpha', channel: 'green', maximumAlpha: 95 },
+            { op: 'component-prune', minimumPixels: 2 },
+            { op: 'rect-fill', x: 0, y: 0, width: 1, height: 1, colour: '#ff0000ff' },
+            { op: 'clone-stamp', source: { x: 0, y: 0, width: 1, height: 1 }, destination: { x: 7, y: 0 } },
+            { op: 'rect-clear', x: 7, y: 0, width: 1, height: 1 },
             { op: 'outline', colour: '#000000ff', width: 1 },
             { op: 'optimize' },
           ],
@@ -776,6 +782,28 @@ try {
     });
     assert.equal(fullPlan.tasks.find((task) => task.id === 'slice-walk').alphaPolicy, 'required');
     assert.equal(fullPlan.tasks.find((task) => task.id === 'assemble-walk').alphaPolicy, 'required');
+    assert.deepEqual(
+      fullPlan.tasks.find((task) => task.id === 'clean-hero').operations.slice(15, 21),
+      [
+        { op: 'alpha-clean', threshold: 96, binary: true, zeroTransparentRgb: true },
+        {
+          op: 'chroma-to-alpha',
+          channel: 'green',
+          maximumAlpha: 95,
+          minimumChannel: 45,
+          minimumDominance: 15,
+          minimumAlpha: 1,
+        },
+        { op: 'component-prune', minimumPixels: 2, alphaThreshold: 1 },
+        { op: 'rect-fill', x: 0, y: 0, width: 1, height: 1, colour: '#ff0000ff' },
+        {
+          op: 'clone-stamp',
+          source: { x: 0, y: 0, width: 1, height: 1 },
+          destination: { x: 7, y: 0 },
+        },
+        { op: 'rect-clear', x: 7, y: 0, width: 1, height: 1 },
+      ],
+    );
     assert.deepEqual(fullPlan.tasks.find((task) => task.id === 'review-walk').preview, {
       contactSheet: true,
       animatedGif: true,

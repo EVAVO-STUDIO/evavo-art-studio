@@ -349,6 +349,74 @@ function normalizedOperation(value, index, registry) {
   if (op === 'alpha-threshold' && parameters.threshold !== undefined) {
     boundedInteger(parameters.threshold, 'alpha-threshold.threshold', 0, 255);
   }
+  if (op === 'alpha-clean') {
+    parameters.threshold = boundedInteger(parameters.threshold ?? 96, 'alpha-clean.threshold', 0, 255);
+    parameters.binary = normalizedBoolean(parameters.binary, 'alpha-clean.binary', true);
+    parameters.zeroTransparentRgb = normalizedBoolean(
+      parameters.zeroTransparentRgb,
+      'alpha-clean.zeroTransparentRgb',
+      true,
+    );
+  }
+  if (op === 'chroma-to-alpha') {
+    parameters.channel = parameters.channel ?? 'green';
+    if (!['red', 'green', 'blue'].includes(parameters.channel)) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'chroma-to-alpha.channel must be red, green or blue.');
+    }
+    parameters.minimumChannel = boundedInteger(
+      parameters.minimumChannel ?? 45,
+      'chroma-to-alpha.minimumChannel',
+      0,
+      255,
+    );
+    parameters.minimumDominance = boundedInteger(
+      parameters.minimumDominance ?? 15,
+      'chroma-to-alpha.minimumDominance',
+      0,
+      255,
+    );
+    parameters.minimumAlpha = boundedInteger(parameters.minimumAlpha ?? 1, 'chroma-to-alpha.minimumAlpha', 0, 255);
+    parameters.maximumAlpha = boundedInteger(parameters.maximumAlpha ?? 95, 'chroma-to-alpha.maximumAlpha', 0, 255);
+    if (parameters.minimumAlpha > parameters.maximumAlpha) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'chroma-to-alpha.minimumAlpha cannot exceed maximumAlpha.');
+    }
+  }
+  if (op === 'component-prune') {
+    parameters.minimumPixels = boundedInteger(
+      parameters.minimumPixels ?? 2,
+      'component-prune.minimumPixels',
+      1,
+      1_000_000,
+    );
+    parameters.alphaThreshold = boundedInteger(
+      parameters.alphaThreshold ?? 1,
+      'component-prune.alphaThreshold',
+      1,
+      255,
+    );
+  }
+  if (['rect-clear', 'rect-fill'].includes(op)) {
+    parameters.x = boundedInteger(parameters.x, `${op}.x`, 0, MAXIMUM_IMAGE_DIMENSION - 1);
+    parameters.y = boundedInteger(parameters.y, `${op}.y`, 0, MAXIMUM_IMAGE_DIMENSION - 1);
+    parameters.width = boundedInteger(parameters.width, `${op}.width`, 1, MAXIMUM_IMAGE_DIMENSION);
+    parameters.height = boundedInteger(parameters.height, `${op}.height`, 1, MAXIMUM_IMAGE_DIMENSION);
+    if (op === 'rect-fill') parameters.colour = normalizedColour(parameters.colour, 'rect-fill.colour', '#00000000');
+  }
+  if (op === 'clone-stamp') {
+    if (!isRecord(parameters.source) || !isRecord(parameters.destination)) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'clone-stamp.source and destination must be objects.');
+    }
+    parameters.source = {
+      x: boundedInteger(parameters.source.x, 'clone-stamp.source.x', 0, MAXIMUM_IMAGE_DIMENSION - 1),
+      y: boundedInteger(parameters.source.y, 'clone-stamp.source.y', 0, MAXIMUM_IMAGE_DIMENSION - 1),
+      width: boundedInteger(parameters.source.width, 'clone-stamp.source.width', 1, MAXIMUM_IMAGE_DIMENSION),
+      height: boundedInteger(parameters.source.height, 'clone-stamp.source.height', 1, MAXIMUM_IMAGE_DIMENSION),
+    };
+    parameters.destination = {
+      x: boundedInteger(parameters.destination.x, 'clone-stamp.destination.x', 0, MAXIMUM_IMAGE_DIMENSION - 1),
+      y: boundedInteger(parameters.destination.y, 'clone-stamp.destination.y', 0, MAXIMUM_IMAGE_DIMENSION - 1),
+    };
+  }
   if (op === 'quantize' && parameters.colours !== undefined) {
     boundedInteger(parameters.colours, 'quantize.colours', 2, 256);
   }
