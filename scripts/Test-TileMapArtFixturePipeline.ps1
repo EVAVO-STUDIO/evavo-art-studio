@@ -45,7 +45,7 @@ try {
         -ArtifactRoot $Artifacts `
         -AllowedAdapters @('fixture-image') `
         -AuthorizedBy 'tile-map-fixture-smoke' `
-        -Reason 'Zero-cost deterministic Tile Map provider execution smoke.' `
+        -Reason 'Zero-cost deterministic Tile Map provider execution and mastering smoke.' `
         -AuthorizationMinutes 60 `
         -Concurrency $Concurrency `
         -ExecuteProvider
@@ -55,8 +55,10 @@ try {
     }
 
     $ExecutionReceipt = Join-Path $Evidence '06-provider-execution.receipt.json'
-    $Review = Join-Path $Evidence '08-candidate-review.json'
-    foreach ($Required in @($ExecutionReceipt, $Review)) {
+    $MasteringReceipt = Join-Path $Evidence '07-candidate-mastering.receipt.json'
+    $ProviderResults = Join-Path $Evidence '08-mastered-provider-results\provider-results.json'
+    $Review = Join-Path $Evidence '09-candidate-review.json'
+    foreach ($Required in @($ExecutionReceipt, $MasteringReceipt, $ProviderResults, $Review)) {
         if (-not (Test-Path -LiteralPath $Required -PathType Leaf)) {
             throw "Expected fixture smoke evidence is missing: $Required"
         }
@@ -67,9 +69,32 @@ try {
         throw "Retained fixture provider execution verification failed with exit code $LASTEXITCODE"
     }
 
+    node .\scripts\verify-tile-map-candidate-mastering.mjs $MasteringReceipt
+    if ($LASTEXITCODE -ne 0) {
+        throw "Retained fixture mastering verification failed with exit code $LASTEXITCODE"
+    }
+
+    $ResultsPayload = Get-Content -LiteralPath $ProviderResults -Raw | ConvertFrom-Json
+    if ($ResultsPayload.schema_version -ne 2) {
+        throw "Fixture provider results must use mastered schema v2."
+    }
+    if (
+        $ResultsPayload.authority.deterministic_mastering_required -ne $true -or
+        $ResultsPayload.authority.mastering_quality_required -ne $true -or
+        $ResultsPayload.authority.approval_authority -ne $false
+    ) {
+        throw 'Fixture provider results weakened mastering/review authority.'
+    }
+
     $ReviewPayload = Get-Content -LiteralPath $Review -Raw | ConvertFrom-Json
     if ($ReviewPayload.status -ne 'awaiting-review') {
         throw "Fixture review must remain awaiting-review; got $($ReviewPayload.status)"
+    }
+    if (
+        $ReviewPayload.authority.deterministic_mastering_required -ne $true -or
+        $ReviewPayload.authority.mastering_quality_required -ne $true
+    ) {
+        throw 'Fixture review does not retain deterministic mastering requirements.'
     }
     if ($ReviewPayload.candidates.Count -lt 1) {
         throw 'Fixture review must contain at least one candidate.'
@@ -83,13 +108,22 @@ try {
         ) {
             throw "Fixture candidate crossed review/approval boundary: $($Candidate.candidate_id)"
         }
+        if (
+            [string]::IsNullOrWhiteSpace([string]$Candidate.source_provider_artifact_id) -or
+            [string]::IsNullOrWhiteSpace([string]$Candidate.mastered_artifact_id) -or
+            [string]::IsNullOrWhiteSpace([string]$Candidate.mastering_evidence_artifact_id)
+        ) {
+            throw "Fixture candidate lost provider/mastering lineage: $($Candidate.candidate_id)"
+        }
     }
 
     Write-Host ""
-    Write-Host 'TILE MAP FIXTURE PROVIDER SMOKE PASSED'
-    Write-Host "Root:       $Root"
-    Write-Host "Candidates: $($ReviewPayload.candidates.Count)"
-    Write-Host "Review:     $Review"
+    Write-Host 'TILE MAP FIXTURE PROVIDER + MASTERING SMOKE PASSED'
+    Write-Host "Root:              $Root"
+    Write-Host "Candidates:        $($ReviewPayload.candidates.Count)"
+    Write-Host "Execution receipt: $ExecutionReceipt"
+    Write-Host "Mastering receipt: $MasteringReceipt"
+    Write-Host "Review:            $Review"
     Write-Host ""
     Write-Host 'Fixture candidates are deterministic test evidence only and remain unapproved.'
 }
