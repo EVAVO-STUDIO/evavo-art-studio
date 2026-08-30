@@ -110,4 +110,6 @@ Output files are create-only. Existing evidence is never overwritten.
 
 The ledger, work orders and receipts are path-free. Absolute paths, filesystem-path fields, URLs, URIs and credential-like fields are rejected. Media is identified by artifact ID, content SHA-256, byte length, media type and dimensions.
 
+The public `animation_frame_work_ledger_v1.mjs` module is a fail-closed identifier guard around the byte-locked internal event-sourcing primitive. Before any result leaves the public API it verifies that generated ledger, batch, work-order and receipt identifiers fit the shared 192-character portable-ID contract. An overlong but otherwise syntactically valid session/profile combination is rejected rather than emitting evidence that later fails schema validation.
+
 The shared source, MCP server, JSON schema and lock are byte-identical between Art Studio and Cel Animation Studio. Repository tests verify those hashes and role boundaries.

@@ -109,6 +109,14 @@ test("runs an approved animation through resumable targeted repair", async () =>
     },
   ];
 
+  await assert.rejects(
+    createAnimationFrameWorkLedger(
+      { profile, sessionId: `session-${"x".repeat(180)}` },
+      new Date("2026-08-30T00:59:00.000Z"),
+    ),
+    /DERIVED_ID_INVALID/,
+  );
+
   let ledger = await createAnimationFrameWorkLedger(
     { profile, sessionId: "harbour-runner-walk-right-session" },
     new Date("2026-08-30T01:00:00.000Z"),
@@ -231,6 +239,9 @@ test("locks the implementation and enforces Art Studio authority", async () => {
   const implementation = readFileSync(
     new URL("tools/animation_frame_work_ledger_v1.mjs", root),
   );
+  const internalImplementation = readFileSync(
+    new URL("tools/animation_frame_work_ledger_v1_internal.mjs", root),
+  );
   const mcp = readFileSync(
     new URL("tools/animation_frame_work_ledger_v1_mcp.mjs", root),
   );
@@ -246,6 +257,10 @@ test("locks the implementation and enforces Art Studio authority", async () => {
   assert.equal(
     lock.implementationSha256,
     `sha256:${createHash("sha256").update(implementation).digest("hex")}`,
+  );
+  assert.equal(
+    lock.internalImplementationSha256,
+    `sha256:${createHash("sha256").update(internalImplementation).digest("hex")}`,
   );
   assert.equal(
     lock.mcpSha256,
