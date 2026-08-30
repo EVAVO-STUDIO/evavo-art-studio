@@ -91,11 +91,12 @@ async function setup() {
   };
   const identityLockApproval = withHash(approvalBody, 'approvalSha256');
   const environment = Object.freeze({ EVAVO_ART_ENABLE_FIXTURE_PROVIDER: 'true' });
+  const now = Date.now();
   const authorization = await compileCouncilAvatarDirectionMasterExecutionAuthorization({
     identityLockApproval,
     artifactRoot,
-    authorizedAt: '2026-08-30T03:10:00.000Z',
-    expiresAt: '2026-08-30T03:40:00.000Z',
+    authorizedAt: new Date(now - 60_000).toISOString(),
+    expiresAt: new Date(now + 20 * 60_000).toISOString(),
     authorizedBy: 'fixture-test',
     reason: 'Authorize fixture direction execution.',
     candidateCount: 1,
