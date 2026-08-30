@@ -321,6 +321,22 @@
       ]
     },
     {
+      "id": "selective-channel-mixer",
+      "kind": "colour",
+      "deterministic": true,
+      "required": [
+        "hueMin",
+        "hueMax",
+        "saturationMin",
+        "saturationMax",
+        "valueMin",
+        "valueMax",
+        "red",
+        "green",
+        "blue"
+      ]
+    },
+    {
       "id": "box-blur",
       "kind": "filter",
       "deterministic": true

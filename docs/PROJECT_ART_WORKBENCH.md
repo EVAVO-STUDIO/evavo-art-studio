@@ -301,6 +301,7 @@ gamma
 hue-shift
 curves
 channel-mixer
+selective-channel-mixer
 box-blur
 median-filter
 motion-blur
@@ -323,6 +324,7 @@ Important behavior:
 - `pixel-resize` always uses nearest-neighbour sampling and can require integer scale factors.
 - `translate` repositions pixels inside the existing canvas without mutating the source.
 - `colour-replace` performs bounded RGB-distance replacement while preserving source alpha by default.
+- `selective-channel-mixer` applies an RGB matrix only inside explicit HSV bounds, including wrapped hue ranges, while preserving alpha and every non-selected pixel.
 - `brightness`, `contrast`, `saturation`, and `sharpness` adjust RGB while retaining the original alpha channel.
 - `gaussian-blur` and `unsharp-mask` provide bounded local filtering without changing alpha.
 - `alpha-erode` and `alpha-dilate` support deterministic matte tightening/expansion for cleanup and mask preparation.

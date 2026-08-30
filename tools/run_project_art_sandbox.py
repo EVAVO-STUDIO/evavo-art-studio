@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import colorsys
 import hashlib
 import json
 import math
@@ -1185,6 +1186,41 @@ def _channel_mixer(image: Image.Image, operation: dict[str, Any]) -> Image.Image
         alpha.close()
 
 
+def _selective_channel_mixer(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    hue_min = float(operation["hueMin"])
+    hue_max = float(operation["hueMax"])
+    saturation_min = float(operation["saturationMin"])
+    saturation_max = float(operation["saturationMax"])
+    value_min = float(operation["valueMin"])
+    value_max = float(operation["valueMax"])
+    if not (0 <= hue_min <= 360 and 0 <= hue_max <= 360):
+        fail("selective-channel-mixer hue bounds must be between 0 and 360")
+    if not (0 <= saturation_min <= saturation_max <= 1):
+        fail("selective-channel-mixer saturation bounds must be ordered between 0 and 1")
+    if not (0 <= value_min <= value_max <= 1):
+        fail("selective-channel-mixer value bounds must be ordered between 0 and 1")
+    rows = [tuple(float(value) for value in operation[name]) for name in ("red", "green", "blue")]
+    offsets = tuple(float(value) for value in operation.get("offsets", [0, 0, 0]))
+    output = image.copy().convert("RGBA")
+    pixels = output.load()
+    for y in range(output.height):
+        for x in range(output.width):
+            red, green, blue, alpha = pixels[x, y]
+            if alpha == 0:
+                continue
+            hue, saturation, value = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
+            hue_degrees = hue * 360
+            hue_selected = hue_min <= hue_degrees <= hue_max if hue_min <= hue_max else hue_degrees >= hue_min or hue_degrees <= hue_max
+            if not (hue_selected and saturation_min <= saturation <= saturation_max and value_min <= value <= value_max):
+                continue
+            channels = (red, green, blue)
+            mixed = []
+            for row, offset in zip(rows, offsets):
+                mixed.append(max(0, min(255, round(sum(row[index] * channels[index] for index in range(3)) + offset))))
+            pixels[x, y] = mixed[0], mixed[1], mixed[2], alpha
+    return output
+
+
 def _motion_blur(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
     radius = float(operation.get("radius", 8))
     samples = int(operation.get("samples", 17))
@@ -1745,6 +1781,8 @@ def apply_operation(
         return _curves(image, operation["channels"])
     if op == "channel-mixer":
         return _channel_mixer(image, operation)
+    if op == "selective-channel-mixer":
+        return _selective_channel_mixer(image, operation)
     if op == "gaussian-blur":
         return _preserve_alpha_filter(image, ImageFilter.GaussianBlur(radius=float(operation.get("radius", 1.0))))
     if op == "box-blur":

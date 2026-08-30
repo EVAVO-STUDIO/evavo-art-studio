@@ -491,6 +491,23 @@ function normalizedOperation(value, index, registry) {
       ? [0, 0, 0]
       : boundedNumberArray(parameters.offsets, 'channel-mixer.offsets', 3, -255, 255);
   }
+  if (op === 'selective-channel-mixer') {
+    parameters.hueMin = boundedNumber(parameters.hueMin, 'selective-channel-mixer.hueMin', 0, 360);
+    parameters.hueMax = boundedNumber(parameters.hueMax, 'selective-channel-mixer.hueMax', 0, 360);
+    parameters.saturationMin = boundedNumber(parameters.saturationMin, 'selective-channel-mixer.saturationMin', 0, 1);
+    parameters.saturationMax = boundedNumber(parameters.saturationMax, 'selective-channel-mixer.saturationMax', 0, 1);
+    parameters.valueMin = boundedNumber(parameters.valueMin, 'selective-channel-mixer.valueMin', 0, 1);
+    parameters.valueMax = boundedNumber(parameters.valueMax, 'selective-channel-mixer.valueMax', 0, 1);
+    if (parameters.saturationMin > parameters.saturationMax || parameters.valueMin > parameters.valueMax) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'selective-channel-mixer ranges must be ordered.');
+    }
+    parameters.red = boundedNumberArray(parameters.red, 'selective-channel-mixer.red', 3, -4, 4);
+    parameters.green = boundedNumberArray(parameters.green, 'selective-channel-mixer.green', 3, -4, 4);
+    parameters.blue = boundedNumberArray(parameters.blue, 'selective-channel-mixer.blue', 3, -4, 4);
+    parameters.offsets = parameters.offsets === undefined
+      ? [0, 0, 0]
+      : boundedNumberArray(parameters.offsets, 'selective-channel-mixer.offsets', 3, -255, 255);
+  }
   if (op === 'box-blur') parameters.radius = boundedNumber(parameters.radius ?? 1, 'box-blur.radius', 0, 256);
   if (op === 'median-filter') {
     parameters.size = boundedInteger(parameters.size ?? 3, 'median-filter.size', 3, 31);

@@ -118,6 +118,7 @@ const expectedOperations = [
   'hue-shift',
   'curves',
   'channel-mixer',
+  'selective-channel-mixer',
   'box-blur',
   'median-filter',
   'motion-blur',

@@ -150,6 +150,7 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
           { op: 'hue-shift', degrees: 12 },
           { op: 'curves', channels: { master: identityCurve } },
           { op: 'channel-mixer', red: [1, 0, 0], green: [0, 1, 0], blue: [0, 0, 1] },
+          { op: 'selective-channel-mixer', hueMin: 0, hueMax: 25, saturationMin: 0.3, saturationMax: 1, valueMin: 0, valueMax: 1, red: [1, 0, 0], green: [0, 1, 0], blue: [0, 0, 1] },
           { op: 'gamma', gamma: 1.05 },
           { op: 'box-blur', radius: 0.2 },
           { op: 'median-filter', size: 3 },
