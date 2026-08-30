@@ -112,16 +112,33 @@ $RequiredArtFiles = [ordered]@{
     'review-handoff' = 'scripts\project-art\council-avatar-review-handoff.mjs'
     'identity-lock-approval' = 'scripts\project-art\council-avatar-identity-lock-approval.mjs'
     'direction-master-candidates' = 'scripts\project-art\council-avatar-direction-master-candidates.mjs'
+    'direction-master-runtime' = 'scripts\project-art\council-avatar-direction-master-runtime.mjs'
+    'direction-master-readiness' = 'scripts\project-art\council-avatar-direction-master-readiness.mjs'
+    'direction-master-authorization' = 'scripts\project-art\council-avatar-direction-master-authorization.mjs'
+    'direction-master-executor' = 'scripts\project-art\council-avatar-direction-master-executor.mjs'
+    'direction-master-review-handoff' = 'scripts\project-art\council-avatar-direction-master-review-handoff.mjs'
+    'direction-master-approval' = 'scripts\project-art\council-avatar-direction-master-approval.mjs'
     'provider-readiness-cli' = 'scripts\inspect-project-art-council-avatar-provider-readiness.mjs'
     'provider-execution-cli' = 'scripts\execute-project-art-council-avatar-provider.mjs'
     'review-handoff-cli' = 'scripts\compile-project-art-council-avatar-review-handoff.mjs'
     'identity-lock-approval-cli' = 'scripts\approve-project-art-council-avatar-identity-lock.mjs'
-    'direction-master-cli' = 'scripts\compile-project-art-council-avatar-direction-masters.mjs'
+    'direction-master-plan-cli' = 'scripts\compile-project-art-council-avatar-direction-masters.mjs'
+    'direction-master-readiness-cli' = 'scripts\inspect-project-art-council-avatar-direction-master-readiness.mjs'
+    'direction-master-authorization-cli' = 'scripts\authorize-project-art-council-avatar-direction-masters.mjs'
+    'direction-master-execution-cli' = 'scripts\execute-project-art-council-avatar-direction-masters.mjs'
+    'direction-master-review-handoff-cli' = 'scripts\compile-project-art-council-avatar-direction-master-review-handoff.mjs'
+    'direction-master-approval-cli' = 'scripts\approve-project-art-council-avatar-direction-masters.mjs'
     'provider-runtime-test' = 'scripts\test-project-art-council-avatar-provider-runtime.mjs'
     'provider-authorization-test' = 'scripts\test-project-art-council-avatar-provider-authorization.mjs'
     'review-handoff-test' = 'scripts\test-project-art-council-avatar-review-handoff.mjs'
     'identity-lock-approval-test' = 'scripts\test-project-art-council-avatar-identity-lock-approval.mjs'
-    'direction-master-test' = 'scripts\test-project-art-council-avatar-direction-master-candidates.mjs'
+    'direction-master-candidates-test' = 'scripts\test-project-art-council-avatar-direction-master-candidates.mjs'
+    'direction-master-runtime-test' = 'scripts\test-project-art-council-avatar-direction-master-runtime.mjs'
+    'direction-master-readiness-test' = 'scripts\test-project-art-council-avatar-direction-master-readiness.mjs'
+    'direction-master-authorization-test' = 'scripts\test-project-art-council-avatar-direction-master-authorization.mjs'
+    'direction-master-executor-test' = 'scripts\test-project-art-council-avatar-direction-master-executor.mjs'
+    'direction-master-review-handoff-test' = 'scripts\test-project-art-council-avatar-direction-master-review-handoff.mjs'
+    'direction-master-approval-test' = 'scripts\test-project-art-council-avatar-direction-master-approval.mjs'
     'direction-master-worker-governance-test' = 'scripts\test-project-art-council-avatar-direction-master-worker-governance.mjs'
     'worker-provider-authorization-test' = 'apps\worker\test\council-avatar-provider-authorization.test.mjs'
     'worker-direction-master-authorization-test' = 'apps\worker\test\council-avatar-direction-master-authorization.test.mjs'
@@ -202,6 +219,12 @@ if (-not $SkipTests -and $Node -and ($BuildPassed -or $SkipBuild)) {
         'scripts/test-project-art-council-avatar-review-handoff.mjs',
         'scripts/test-project-art-council-avatar-identity-lock-approval.mjs',
         'scripts/test-project-art-council-avatar-direction-master-candidates.mjs',
+        'scripts/test-project-art-council-avatar-direction-master-runtime.mjs',
+        'scripts/test-project-art-council-avatar-direction-master-readiness.mjs',
+        'scripts/test-project-art-council-avatar-direction-master-authorization.mjs',
+        'scripts/test-project-art-council-avatar-direction-master-executor.mjs',
+        'scripts/test-project-art-council-avatar-direction-master-review-handoff.mjs',
+        'scripts/test-project-art-council-avatar-direction-master-approval.mjs',
         'scripts/test-project-art-council-avatar-direction-master-worker-governance.mjs',
         'scripts/test-council-avatar-provider-pipeline-powershell.mjs',
         'scripts/test-council-avatar-worker-stack-powershell.mjs'
@@ -257,7 +280,7 @@ else {
 }
 
 $Result = [ordered]@{
-    contract = 'evavo.council-avatar-provider-pipeline-check.v2'
+    contract = 'evavo.council-avatar-provider-pipeline-check.v3'
     ok = ($Failures.Count -eq 0)
     checkedAt = [DateTimeOffset]::UtcNow.ToString('o')
     gitReposRoot = $GitReposRoot
@@ -267,7 +290,14 @@ $Result = [ordered]@{
     paidProviderCallPerformed = $false
     identityLockApprovalPathCovered = $true
     directionMasterPlanPathCovered = $true
+    directionMasterRuntimePathCovered = $true
+    directionMasterReadinessPathCovered = $true
+    directionMasterAuthorizationPathCovered = $true
+    directionMasterExecutionPathCovered = $true
+    directionMasterReviewPathCovered = $true
+    directionMasterApprovalPathCovered = $true
     directionMasterWorkerAuthorizationCovered = $true
+    animationProductionAuthorized = $false
     candidatePromotionPerformed = $false
     runtimeActivationPerformed = $false
     websiteActivationPerformed = $false
