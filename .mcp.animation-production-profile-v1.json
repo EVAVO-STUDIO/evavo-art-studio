@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "evavo-animation-production-profile-v1": {
+      "command": "node",
+      "args": ["tools/animation_production_profile_v1_mcp.mjs"],
+      "env": {
+        "EVAVO_ANIMATION_PROFILE_PROVIDER_EXECUTION": "disabled",
+        "EVAVO_ANIMATION_PROFILE_CREATIVE_APPROVAL": "disabled",
+        "EVAVO_ANIMATION_PROFILE_RUNTIME_ACTIVATION": "disabled",
+        "EVAVO_ANIMATION_PROFILE_REPOSITORY_MUTATION": "disabled",
+        "EVAVO_ANIMATION_PROFILE_PUBLICATION": "disabled"
+      }
+    }
+  }
+}
