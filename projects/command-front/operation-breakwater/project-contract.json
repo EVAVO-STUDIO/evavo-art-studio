@@ -8,6 +8,7 @@
   "consumerStructureRequirements": "data/presentation/structure_sprite_requirements.json",
   "unitPlanBundle": "projects/command-front/operation-breakwater/sprite-plan-bundle.json",
   "structurePlanBundle": "projects/command-front/operation-breakwater/structure-plan-bundle.json",
+  "terrainPlanBundle": "projects/command-front/operation-breakwater/terrain-plan-bundle.json",
   "locks": {
     "era": "alt-1999",
     "camera": "fixed-isometric-2d-2.5d",
