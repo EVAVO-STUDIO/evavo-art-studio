@@ -1,6 +1,18 @@
 # Tile Map Studio art handoff
 
-Art Studio accepts governed source-art requirements produced by `evavo-tile-map-studio` without taking ownership of map semantics, topology, collision, navigation, placement, or gameplay meaning.
+Art Studio accepts governed source-art requirements from `evavo-tile-map-studio` without taking ownership of map semantics, topology, collision, navigation, placement, or gameplay meaning.
+
+The production rule is:
+
+```text
+provider output is a working-resolution candidate
+Art Studio mastering creates the exact native game asset
+review judges the mastered native asset
+creative approval remains explicit
+Sprite Studio packages only approved masters
+```
+
+A provider is not expected to author a final 16×16, 32×32 or 64×32 image directly.
 
 ## 1. Compile the Tile Map handoff
 
@@ -20,7 +32,18 @@ pnpm art -- tile-map-source-package `
   --output C:\ArtEvidence\epochbound-verdant.source-package.json
 ```
 
-Brand-new families stay out of source-driven edit/repair queues until a real source exists. Each task carries exact canvas, projection, candidate count, required approved variants, immutable semantic rules, creative direction, alpha requirements and create-only output contracts.
+Each task carries:
+
+- exact final game dimensions;
+- projection;
+- required approved variant count;
+- a larger candidate pool for creative choice;
+- immutable semantic and topology rules;
+- creative direction;
+- alpha requirements;
+- create-only output contracts.
+
+Brand-new art families remain outside source-driven repair/edit queues until real source art exists.
 
 ## 3. Compile deterministic candidate and provider-runtime jobs
 
@@ -34,21 +57,24 @@ pnpm art -- tile-map-provider-batch `
   --output C:\ArtEvidence\epochbound-verdant.provider-runtime-batch.json
 ```
 
-`tile-map-provider-batch` compiles every candidate through Art Studio's canonical provider request/runtime contract. It therefore inherits the normal provider protocol, capability selection, prompt compilation, deterministic seed, idempotency and evidence requirements rather than creating a Tile Map-specific image API.
+`tile-map-provider-batch` uses Art Studio's canonical provider protocol. It retains normal capability selection, prompt compilation, deterministic seeding, idempotency, adapter-specific source-canvas selection and immutable artifact evidence.
 
-Provider-facing visual-family IDs are deterministic hashed aliases so long semantic family names cannot exceed provider protocol identifier limits. The exact visual-family string remains in metadata and prompts.
+Each job also includes a deterministic mastering contract:
 
-Transparency policy is explicit:
+```text
+source canvas policy: provider-adapter-derived
+final width/height: exact semantic task dimensions
+resampling: lanczos3
+format: lossless PNG
+alpha-required source: explicit #00ff00 production matte
+opaque source: opaque-preserve
+fake transparency rejection: required
+creative approval authority: false
+```
 
-- alpha-required families use `native-alpha`;
-- other families use `provider-auto` with PNG output;
-- implicit chroma-key defaults are not used.
+Provider-facing family IDs are stable hashed aliases. The exact semantic visual-family ID remains in prompts and metadata.
 
-No provider call happens during either compile step.
-
-### One-command pre-provider compile
-
-The same zero-cost compile chain can be produced in one create-only directory:
+### Zero-cost pre-provider compile
 
 ```powershell
 pnpm art -- tile-map-preprovider `
@@ -56,7 +82,7 @@ pnpm art -- tile-map-preprovider `
   --output-root C:\ArtEvidence\epochbound-verdant-preprovider
 ```
 
-It writes:
+This writes:
 
 ```text
 01-art-production-plan.json
@@ -66,19 +92,17 @@ It writes:
 preprovider.receipt.json
 ```
 
-The receipt hashes every stage and reports `ready-for-explicit-provider-authorization`. It never executes a provider.
+No provider call occurs.
 
 ## 4. Explicitly authorize provider execution
 
-Tile Map provider jobs use a separate execution capability:
+Tile Map provider jobs require:
 
 ```text
 tile-map.execution-authorized
 ```
 
-The ordinary Art Studio worker does not advertise this capability, so it cannot accidentally claim Tile Map provider jobs.
-
-Authorization submits the exact compiled jobs onto a fingerprint-isolated queue, forces `maximumAttempts = 1`, binds the source-map/provider-batch fingerprints, limits execution to explicitly named adapter IDs, and expires within at most 24 hours.
+The ordinary Art Studio worker does not advertise this capability.
 
 ```powershell
 node .\scripts\tile-map-provider-authorize.mjs `
@@ -93,18 +117,23 @@ node .\scripts\tile-map-provider-authorize.mjs `
   --expires-at 2026-08-30T01:00:00.000Z
 ```
 
-Before any provider call, validate the authorization and pristine runtime state:
+Authorization:
+
+- binds exact provider-batch and semantic-map fingerprints;
+- uses one fingerprint-isolated queue;
+- allows only explicitly named adapters;
+- forces `maximumAttempts = 1`;
+- expires within 24 hours;
+- grants no approval, promotion, publication or repository-mutation authority.
+
+Validate before execution:
 
 ```powershell
 node .\scripts\validate-tile-map-provider-authorization.mjs `
   C:\ArtEvidence\run\05-provider-authorization.json
 ```
 
-This validates source bytes/fingerprints, runtime protocol, isolated queue, exact job spec hashes, zero attempts/redrives and the dedicated execution capability.
-
 ## 5. Run the isolated provider worker
-
-Only the dedicated worker may claim these authorized jobs:
 
 ```powershell
 node .\scripts\run-authorized-tile-map-provider-worker.mjs `
@@ -114,9 +143,7 @@ node .\scripts\run-authorized-tile-map-provider-worker.mjs `
   --receipt C:\ArtEvidence\run\06-provider-execution.receipt.json
 ```
 
-The worker restricts the provider registry to the authorization's adapter allow-list, rechecks the active authorization for every job, and delegates execution to the normal Art Studio provider handlers only after all Tile Map checks pass.
-
-Provider artifacts are then re-verified. Candidate artifacts must remain:
+Provider candidate artifacts must remain:
 
 ```text
 storageClass = intermediate
@@ -125,25 +152,164 @@ approvalState = unapproved
 finalDeliverable = false
 ```
 
-The execution worker cannot approve, promote, publish or mutate a target repository.
+Re-verify retained execution at any time:
 
-## 6. Materialize immutable candidates for Art Studio review
+```powershell
+node .\scripts\verify-tile-map-provider-execution.mjs `
+  C:\ArtEvidence\run\06-provider-execution.receipt.json
+```
 
-Provider candidates live in the immutable artifact store. Review uses ordinary files at the deterministic candidate paths, so an explicit evidence bridge materializes only verified `provider-candidate` artifacts:
+## 6. Deterministically master provider candidates
+
+Provider candidates are now converted to exact native game assets before review:
+
+```powershell
+node .\scripts\run-tile-map-candidate-mastering.mjs `
+  --provider-batch C:\ArtEvidence\run\04-provider-runtime-batch.json `
+  --execution-receipt C:\ArtEvidence\run\06-provider-execution.receipt.json `
+  --concurrency 1 `
+  --receipt C:\ArtEvidence\run\07-candidate-mastering.receipt.json
+```
+
+This uses Art Studio's existing `art.candidate.master-alpha` runtime handler. It:
+
+- re-verifies provider request and artifact identity;
+- recovers alpha from the explicit production matte when required;
+- rejects accidental transparency for opaque assets;
+- resizes once to the exact native game canvas;
+- keeps lossless PNG output;
+- runs blocking dimensions, alpha, fake-transparency, halo and raster QA;
+- stores the mastered image as an immutable unapproved intermediate;
+- stores separate finalization evidence;
+- writes a self-hashed mastering receipt.
+
+Tile families use `safePadding = 0` because valid roads, coastlines, walls and terrain transitions may intentionally touch declared canvas edges. Tile Map Studio's semantic edge, seam and topology QA owns those boundaries.
+
+Verify retained mastering independently:
+
+```powershell
+node .\scripts\verify-tile-map-candidate-mastering.mjs `
+  C:\ArtEvidence\run\07-candidate-mastering.receipt.json
+```
+
+## 7. Materialize mastered candidates for review
 
 ```powershell
 node .\scripts\materialize-tile-map-provider-results.mjs `
   --provider-batch C:\ArtEvidence\run\04-provider-runtime-batch.json `
   --execution-receipt C:\ArtEvidence\run\06-provider-execution.receipt.json `
+  --mastering-receipt C:\ArtEvidence\run\07-candidate-mastering.receipt.json `
   --artifact-root C:\ArtArtifacts\tile-map-run-001 `
-  --output-root C:\ArtEvidence\run\07-provider-results
+  --output-root C:\ArtEvidence\run\08-mastered-provider-results
 ```
 
-The bridge verifies the execution receipt, authorization, provider-batch fingerprint, artifact descriptors/content hashes and unapproved artifact boundary. It recreates the exact planned candidate paths and writes `provider-results.json` for review intake.
+Only verified `provider-candidate-alpha-master` artifacts with passed quality evidence are materialized. Output is staged then atomically promoted into a new directory.
 
-### Windows-first governed orchestration
+`provider-results.json` schema v2 binds:
 
-The whole compile/authorization path is available as:
+- candidate batch;
+- provider batch;
+- execution receipt;
+- mastering receipt;
+- provider artifact;
+- mastered artifact;
+- mastering evidence artifact;
+- exact planned candidate path;
+- exact mastered file SHA-256;
+- semantic-map fingerprint.
+
+## 8. Admit mastered candidates into review
+
+```powershell
+pnpm art -- tile-map-candidate-review `
+  --batch C:\ArtEvidence\run\03-candidate-batch.json `
+  --results C:\ArtEvidence\run\08-mastered-provider-results\provider-results.json `
+  --output C:\ArtEvidence\run\09-candidate-review.json
+```
+
+Review intake reopens and verifies the complete provider, authorization, execution and mastering chain. It requires native dimensions and exact materialized/mastered hashes.
+
+Every admitted candidate remains:
+
+```text
+structural_review = pending
+visual_review = pending
+creative_review = pending
+promotion_eligible = false
+```
+
+## 9. Finalize structural, visual and creative review
+
+Create one decision per candidate, tied to the exact review fingerprint:
+
+```text
+structural = approved | rejected
+visual = approved | rejected
+creative = approved | rejected
+```
+
+```powershell
+pnpm art -- tile-map-review-finalize `
+  --review C:\ArtEvidence\run\09-candidate-review.json `
+  --decisions C:\ArtEvidence\run\review-decisions.json `
+  --output C:\ArtEvidence\run\10-review-finalized.json
+```
+
+Only candidates passing all three gates enter the approved set.
+
+## 10. Export reviewed sources for Sprite Studio
+
+```powershell
+pnpm art -- tile-map-approved-sources `
+  --package C:\ArtEvidence\run\02-source-package.json `
+  --review C:\ArtEvidence\run\09-candidate-review.json `
+  --approval C:\ArtEvidence\run\10-review-finalized.json `
+  --output C:\ArtEvidence\run\11-approved-sources.json
+```
+
+The exporter re-hashes:
+
+- source package;
+- provider batch;
+- provider execution receipt;
+- mastering receipt;
+- provider-results manifest;
+- candidate review;
+- review finalization;
+- every approved PNG.
+
+It rejects manual insertion of rejected, unreviewed, unmastered or stale-map candidate bytes.
+
+## 11. Sprite Studio packaging
+
+Sprite Studio receives exact Art Studio-approved native files. It may perform its declared deterministic lossless mastering and atlas packaging, but it cannot reinterpret semantic families or grant creative approval.
+
+Its manifest must retain each source SHA-256. Its build receipt must cover every package file.
+
+## 12. Tile Map Studio trust return
+
+```powershell
+tile-map-import-sprite-bindings `
+  C:\TileMapEvidence\epochbound-verdant.handoff.json `
+  C:\SpriteEvidence\terrain\terrain.manifest.json `
+  C:\SpriteEvidence\terrain\build.receipt.json `
+  C:\SpriteEvidence\terrain\family-mapping.json `
+  C:\TileMapEvidence\epochbound-verdant.trusted-bindings.json `
+  --art-approval C:\ArtEvidence\run\11-approved-sources.json
+```
+
+Production completion requires:
+
+```text
+creative_approval_verified = true
+technical_mastering_verified = true
+trust_schema_version = 3
+production_complete = true
+```
+
+## Windows-first orchestration
+
+Authorize without making a provider call:
 
 ```powershell
 .\scripts\Invoke-TileMapArtProviderPipeline.ps1 `
@@ -155,121 +321,40 @@ The whole compile/authorization path is available as:
   -AuthorizedBy 'EVAVO creative production'
 ```
 
-By default this builds the required local packages, compiles the complete pre-provider chain, submits the isolated jobs, writes an authorization and validates it, **but does not make a provider call**.
-
-Add `-ExecuteProvider` only when provider execution is deliberately intended. The script then runs the authorized worker, materializes candidates and creates the pending review manifest. Real provider credentials/configuration remain environment-owned (`OPENAI_API_KEY`, ComfyUI settings, etc.).
-
-## 7. Admit provider outputs into review
+Execute the exact still-active authorization later:
 
 ```powershell
-pnpm art -- tile-map-candidate-review `
-  --batch C:\ArtEvidence\run\03-candidate-batch.json `
-  --results C:\ArtEvidence\run\07-provider-results\provider-results.json `
-  --output C:\ArtEvidence\run\08-candidate-review.json
+.\scripts\Resume-TileMapAuthorizedProvider.ps1 `
+  -Authorization C:\ArtEvidence\epochbound-run-001\05-provider-authorization.json `
+  -EvidenceRoot C:\ArtEvidence\epochbound-run-001 `
+  -Concurrency 1
 ```
 
-Review intake verifies the exact candidate-batch fingerprint, provider-results bytes/root, candidate IDs, planned paths, current file hashes, PNG decoding, expected canvas and alpha requirements. Exact duplicate candidate bytes are rejected.
+Or add `-ExecuteProvider` to the first command for one continuous authorized run.
 
-The review manifest is still not approval. Every admitted candidate is explicitly:
-
-```text
-structural_review = pending
-visual_review     = pending
-creative_review   = pending
-promotion_eligible = false
-```
-
-## 8. Finalize structural, visual and creative review
-
-Create a review-decision file tied to the exact review fingerprint, with one decision per candidate:
-
-```text
-structural = approved | rejected
-visual     = approved | rejected
-creative   = approved | rejected
-```
-
-Then compile the finalization:
+## Zero-cost smoke
 
 ```powershell
-pnpm art -- tile-map-review-finalize `
-  --review C:\ArtEvidence\run\08-candidate-review.json `
-  --decisions C:\ArtEvidence\run\review-decisions.json `
-  --output C:\ArtEvidence\run\09-review-finalized.json
+.\scripts\Test-TileMapArtFixturePipeline.ps1 `
+  -Handoff C:\TileMapEvidence\consumer-art-handoffs-003\epochbound-verdant.json
 ```
 
-Only candidates passing all three gates enter `approved_sources`. Rejected candidates remain in retained review evidence but are not promotion-eligible.
+The deterministic fixture provider now honors the requested background strategy:
 
-## 9. Export exact reviewed sources for Sprite Studio
+- chroma-key produces an opaque requested matte;
+- native-alpha produces transparent borders;
+- opaque-source remains fully opaque.
 
-```powershell
-pnpm art -- tile-map-approved-sources `
-  --package C:\ArtEvidence\run\02-source-package.json `
-  --review C:\ArtEvidence\run\08-candidate-review.json `
-  --approval C:\ArtEvidence\run\09-review-finalized.json `
-  --output C:\ArtEvidence\run\10-approved-sources.json
-```
-
-The exporter requires source package, review and finalization to agree on the source-package fingerprint, semantic-map fingerprint, map ID, projection, exact candidate IDs/paths/SHA-256 values and review fingerprint. It also re-hashes the retained provider-results manifest and reopens candidate files from the exact candidate root captured during review intake.
-
-An approved source must correspond to a candidate that passed structural, visual and creative review. Manual insertion of a rejected or unreviewed candidate fails closed.
-
-Actual approved files are rechecked for portable path, exact SHA-256, real PNG bytes, exact tile canvas or minimum feature canvas, alpha when required, and distinct bytes for distinct required variants.
-
-The final `manifest_fingerprint` covers the complete reviewed evidence chain. `pre_review_manifest_fingerprint` preserves the lower-level source approval fingerprint for debugging/provenance.
-
-## 10. Sprite Studio mastering
-
-Sprite Studio receives only the exact reviewed/creatively approved files. It may trim, normalize and package them only within its declared lossless mastering contract.
-
-Its manifest and build receipt must retain each source SHA-256 so Tile Map Studio can prove every atlas frame came from the exact approved source family.
-
-## 11. Tile Map Studio trust return
-
-```powershell
-tile-map-import-sprite-bindings `
-  C:\TileMapEvidence\epochbound-verdant.handoff.json `
-  C:\SpriteEvidence\terrain\terrain.manifest.json `
-  C:\SpriteEvidence\terrain\build.receipt.json `
-  C:\SpriteEvidence\terrain\family-mapping.json `
-  C:\TileMapEvidence\epochbound-verdant.trusted-bindings.json `
-  --art-approval C:\ArtEvidence\run\10-approved-sources.json
-```
-
-Tile Map Studio requires reviewed Art Studio evidence, the original semantic-map fingerprint, complete Sprite Studio receipt package, exact family-mapping bytes, variant/canvas requirements and exact approved source hashes.
-
-The final trusted binding also retains the Art Studio pre-review, candidate-review and review-finalization fingerprints beside the Sprite package digest.
+It exercises the actual provider, artifact, mastering, QA, materialization and review path without external spend. Fixture candidates are test evidence only and must never be production-approved.
 
 ## Authority chain
 
 ```text
-Tile Map Studio  -> semantic/topology authority
-Art Studio       -> source creation + structural/visual/creative approval
-provider         -> candidate generation only
-Sprite Studio    -> lossless mastering + atlas receipt
-Tile Map Studio  -> final semantic/package trust
+Tile Map Studio -> semantic/topology authority
+provider        -> working-resolution candidate generation only
+Art Studio      -> deterministic native mastering + structural/visual/creative review
+Sprite Studio   -> approved-source lossless packaging + atlas receipt
+Tile Map Studio -> final semantic/package trust
 ```
 
-## Evidence chain
-
-```text
-semantic map fingerprint
-  -> Tile Map handoff SHA-256
-  -> Art Studio production plan fingerprint
-  -> source-package fingerprint
-  -> candidate-batch fingerprint
-  -> provider-runtime-batch fingerprint
-  -> execution authorization fingerprint
-  -> provider execution receipt
-  -> immutable provider candidate artifacts
-  -> provider-results fingerprint
-  -> review fingerprint
-  -> review-finalization fingerprint
-  -> reviewed approved-source manifest fingerprint
-  -> exact approved source SHA-256 values
-  -> Sprite Studio source hashes
-  -> full Sprite Studio package receipt digest
-  -> Tile Map trusted binding
-```
-
-No provider result, atlas coordinate or generated visual ever becomes semantic authority, and no technical success event becomes creative approval.
+No provider result, mastering success, atlas coordinate or build success becomes semantic or creative authority.
