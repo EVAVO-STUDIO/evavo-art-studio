@@ -1,0 +1,667 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.local/contracts/animation-frame-work-ledger-v1.schema.json",
+  "title": "EVAVO Animation Frame Work Ledger V1",
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "artifactId": {
+      "type": "string",
+      "pattern": "^artifact_[0-9a-f]{64}$"
+    },
+    "safeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "authority": {
+      "type": "object",
+      "required": [
+        "providerExecution",
+        "automaticCreativeApproval",
+        "artifactPromotion",
+        "targetRepositoryMutation",
+        "gitCommit",
+        "gitPush",
+        "runtimeActivation",
+        "publication"
+      ],
+      "properties": {
+        "providerExecution": {
+          "const": false
+        },
+        "automaticCreativeApproval": {
+          "const": false
+        },
+        "artifactPromotion": {
+          "const": false
+        },
+        "targetRepositoryMutation": {
+          "const": false
+        },
+        "gitCommit": {
+          "const": false
+        },
+        "gitPush": {
+          "const": false
+        },
+        "runtimeActivation": {
+          "const": false
+        },
+        "publication": {
+          "const": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "artifactId",
+        "contentDigest",
+        "byteLength",
+        "mediaType",
+        "width",
+        "height",
+        "meaningfulAlpha",
+        "providerRequestDigest",
+        "providerResponseDigest",
+        "inspectionEvidenceDigest",
+        "adapterId"
+      ],
+      "properties": {
+        "artifactId": {
+          "$ref": "#/$defs/artifactId"
+        },
+        "contentDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mediaType": {
+          "const": "image/png"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "meaningfulAlpha": {
+          "type": "boolean"
+        },
+        "providerRequestDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "providerResponseDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "inspectionEvidenceDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "adapterId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "modelId": {
+          "$ref": "#/$defs/safeId"
+        }
+      },
+      "additionalProperties": false
+    },
+    "drawingState": {
+      "type": "object",
+      "required": [
+        "drawingId",
+        "ordinal",
+        "generationClass",
+        "status",
+        "attemptCount",
+        "candidates"
+      ],
+      "properties": {
+        "drawingId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "generationClass": {
+          "enum": [
+            "key-pose",
+            "breakdown",
+            "inbetween"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "candidate-ready",
+            "review-required",
+            "repair-required",
+            "accepted"
+          ]
+        },
+        "attemptCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "candidates": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "required": [
+              "workOrderDigest",
+              "receiptDigest",
+              "candidate",
+              "admittedAt"
+            ],
+            "properties": {
+              "workOrderDigest": {
+                "$ref": "#/$defs/digest"
+              },
+              "receiptDigest": {
+                "$ref": "#/$defs/digest"
+              },
+              "candidate": {
+                "$ref": "#/$defs/candidate"
+              },
+              "admittedAt": {
+                "$ref": "#/$defs/timestamp"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": [
+        "kind",
+        "sequence",
+        "priorLedgerDigest",
+        "type",
+        "ownerRole",
+        "payload",
+        "recordedAt",
+        "eventDigest"
+      ],
+      "properties": {
+        "kind": {
+          "const": "evavo.animation-frame-work-ledger-event.v1"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16384
+        },
+        "priorLedgerDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "type": {
+          "enum": [
+            "candidate-batch-admitted",
+            "independent-review-applied"
+          ]
+        },
+        "ownerRole": {
+          "enum": [
+            "art-studio",
+            "cel-animation-studio"
+          ]
+        },
+        "payload": {
+          "type": "object"
+        },
+        "recordedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "eventDigest": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "workOrder": {
+      "type": "object",
+      "required": [
+        "protocolVersion",
+        "kind",
+        "workOrderId",
+        "ledgerId",
+        "ledgerDigest",
+        "profileId",
+        "profileDigest",
+        "drawingId",
+        "drawingOrdinal",
+        "mode",
+        "attempt",
+        "idempotencyKey",
+        "drawing",
+        "immutableLocks",
+        "promptPackage",
+        "references",
+        "repair",
+        "preserveDrawingIds",
+        "expectedOutput",
+        "reviewRequirements",
+        "authority",
+        "workOrderDigest",
+        "issuedAt"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": "2026-08-30.1"
+        },
+        "kind": {
+          "const": "evavo.animation-frame-work-order.v1"
+        },
+        "workOrderId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "ledgerId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "ledgerDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "profileId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "profileDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "drawingId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "drawingOrdinal": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mode": {
+          "enum": [
+            "generate",
+            "repair"
+          ]
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "idempotencyKey": {
+          "$ref": "#/$defs/digest"
+        },
+        "drawing": {
+          "type": "object"
+        },
+        "immutableLocks": {
+          "type": "object"
+        },
+        "promptPackage": {
+          "type": "object",
+          "required": [
+            "positive",
+            "negative",
+            "antiGenericTraits"
+          ],
+          "properties": {
+            "positive": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 65536
+            },
+            "negative": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 65536
+            },
+            "antiGenericTraits": {
+              "type": "array",
+              "minItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "references": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "object"
+          }
+        },
+        "repair": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "preserveDrawingIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/safeId"
+          }
+        },
+        "expectedOutput": {
+          "type": "object"
+        },
+        "reviewRequirements": {
+          "type": "object"
+        },
+        "authority": {
+          "$ref": "#/$defs/authority"
+        },
+        "workOrderDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "issuedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "title": "Animation frame work ledger",
+      "type": "object",
+      "required": [
+        "protocolVersion",
+        "kind",
+        "ledgerId",
+        "sessionId",
+        "profileId",
+        "profileDigest",
+        "drawingOrder",
+        "requestedTargets",
+        "iterationPolicy",
+        "drawingStates",
+        "review",
+        "events",
+        "revision",
+        "authority",
+        "createdAt",
+        "updatedAt",
+        "contentDigest"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": "2026-08-30.1"
+        },
+        "kind": {
+          "const": "evavo.animation-frame-work-ledger.v1"
+        },
+        "ledgerId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "profileId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "profileDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "drawingOrder": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/safeId"
+          }
+        },
+        "requestedTargets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "godot-sprite",
+              "cel-sequence",
+              "video-sequence"
+            ]
+          }
+        },
+        "iterationPolicy": {
+          "type": "object",
+          "required": [
+            "maximumAttemptsPerDrawing",
+            "maximumBatchSize",
+            "maximumReviewCycles",
+            "maximumNoProgressCycles"
+          ],
+          "properties": {
+            "maximumAttemptsPerDrawing": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maximumBatchSize": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "maximumReviewCycles": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maximumNoProgressCycles": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "additionalProperties": false
+        },
+        "drawingStates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/drawingState"
+          }
+        },
+        "review": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16384
+        },
+        "authority": {
+          "$ref": "#/$defs/authority"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "contentDigest": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Animation frame work batch",
+      "type": "object",
+      "required": [
+        "status",
+        "protocolVersion",
+        "kind",
+        "batchId",
+        "ledgerId",
+        "ledgerDigest",
+        "profileId",
+        "profileDigest",
+        "generationBatchId",
+        "mode",
+        "workOrders",
+        "authority",
+        "batchDigest",
+        "issuedAt"
+      ],
+      "properties": {
+        "status": {
+          "const": "work-ready"
+        },
+        "protocolVersion": {
+          "const": "2026-08-30.1"
+        },
+        "kind": {
+          "const": "evavo.animation-frame-work-batch.v1"
+        },
+        "batchId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "ledgerId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "ledgerDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "profileId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "profileDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "generationBatchId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "mode": {
+          "enum": [
+            "generate",
+            "repair"
+          ]
+        },
+        "workOrders": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/workOrder"
+          }
+        },
+        "authority": {
+          "$ref": "#/$defs/authority"
+        },
+        "batchDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "issuedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Animation frame work order",
+      "$ref": "#/$defs/workOrder"
+    },
+    {
+      "title": "Animation frame candidate receipt",
+      "type": "object",
+      "required": [
+        "protocolVersion",
+        "kind",
+        "receiptId",
+        "ledgerId",
+        "ledgerDigest",
+        "profileDigest",
+        "workOrderDigest",
+        "drawingId",
+        "attempt",
+        "candidate",
+        "status",
+        "authority",
+        "receiptDigest",
+        "admittedAt"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": "2026-08-30.1"
+        },
+        "kind": {
+          "const": "evavo.animation-frame-candidate-receipt.v1"
+        },
+        "receiptId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "ledgerId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "ledgerDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "profileDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "workOrderDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "drawingId": {
+          "$ref": "#/$defs/safeId"
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "status": {
+          "const": "candidate-recorded"
+        },
+        "authority": {
+          "$ref": "#/$defs/authority"
+        },
+        "receiptDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "admittedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

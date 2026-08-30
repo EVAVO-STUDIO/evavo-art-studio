@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "evavo-animation-frame-ledger-v1": {
+      "command": "node",
+      "args": [
+        "tools/animation_frame_work_ledger_v1_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ANIMATION_FRAME_LEDGER_ROLE": "art-studio",
+        "EVAVO_ANIMATION_PROVIDER_EXECUTION_ENABLED": "disabled",
+        "EVAVO_ANIMATION_AUTOMATIC_CREATIVE_APPROVAL_ENABLED": "disabled",
+        "EVAVO_ANIMATION_ARTIFACT_PROMOTION_ENABLED": "disabled",
+        "EVAVO_ANIMATION_TARGET_REPOSITORY_MUTATION_ENABLED": "disabled",
+        "EVAVO_ANIMATION_GIT_COMMIT_ENABLED": "disabled",
+        "EVAVO_ANIMATION_GIT_PUSH_ENABLED": "disabled",
+        "EVAVO_ANIMATION_RUNTIME_ACTIVATION_ENABLED": "disabled",
+        "EVAVO_ANIMATION_PUBLICATION_ENABLED": "disabled"
+      }
+    }
+  }
+}

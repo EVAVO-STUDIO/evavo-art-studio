@@ -1,0 +1,10 @@
+{
+  "schema": "evavo.animation-frame-work-ledger-lock.v1",
+  "protocolVersion": "2026-08-30.1",
+  "implementationPath": "tools/animation_frame_work_ledger_v1.mjs",
+  "implementationSha256": "sha256:9dc5a556369b1aa04bf11bf506a910e9a89a34b27cd80aaf3b386769f41ee9d2",
+  "mcpPath": "tools/animation_frame_work_ledger_v1_mcp.mjs",
+  "mcpSha256": "sha256:60fbbf18b0427ed778070b2d27204ac9a1afbea378f27ab3f9e820840f409ee1",
+  "schemaPath": "contracts/animation-frame-work-ledger-v1.schema.json",
+  "schemaSha256": "sha256:2e02ecaf173dfd9c986709b02c5068e4053a7d9c23da21c13b7402fe7de059fa"
+}
