@@ -44,6 +44,25 @@ function Assert-NewOrEmptyDirectory([string]$PathValue, [string]$Label) {
     return $Full
 }
 
+function Test-PathContains([string]$Parent, [string]$Child) {
+    $ParentFull = [System.IO.Path]::GetFullPath($Parent).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $ChildFull = [System.IO.Path]::GetFullPath($Child)
+    if ($ParentFull -eq $ChildFull) {
+        return $true
+    }
+    $Prefix = $ParentFull + [System.IO.Path]::DirectorySeparatorChar
+    return $ChildFull.StartsWith($Prefix, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Assert-DisjointRoots([string]$Left, [string]$LeftLabel, [string]$Right, [string]$RightLabel) {
+    if ((Test-PathContains $Left $Right) -or (Test-PathContains $Right $Left)) {
+        throw "$LeftLabel and $RightLabel must be fully disjoint: '$Left' and '$Right'"
+    }
+}
+
 function Invoke-Checked([string]$Label, [scriptblock]$Action) {
     Write-Host ""
     Write-Host $Label
@@ -61,9 +80,9 @@ if (-not (Test-Path -LiteralPath $Handoff -PathType Leaf)) {
 $EvidenceRoot = Assert-NewOrEmptyDirectory $EvidenceRoot 'EvidenceRoot'
 $RuntimeRoot = Assert-NewOrEmptyDirectory $RuntimeRoot 'RuntimeRoot'
 $ArtifactRoot = Assert-NewOrEmptyDirectory $ArtifactRoot 'ArtifactRoot'
-if ($RuntimeRoot -eq $ArtifactRoot) {
-    throw 'RuntimeRoot and ArtifactRoot must be different directories.'
-}
+Assert-DisjointRoots $EvidenceRoot 'EvidenceRoot' $RuntimeRoot 'RuntimeRoot'
+Assert-DisjointRoots $EvidenceRoot 'EvidenceRoot' $ArtifactRoot 'ArtifactRoot'
+Assert-DisjointRoots $RuntimeRoot 'RuntimeRoot' $ArtifactRoot 'ArtifactRoot'
 if ($AllowedAdapters.Count -lt 1) {
     throw 'At least one AllowedAdapters entry is required.'
 }
@@ -85,9 +104,12 @@ try {
         pnpm art -- tile-map-preprovider --input $Handoff --output-root $EvidenceRoot
     }
 
+    $CandidateBatch = Join-Path $EvidenceRoot '03-candidate-batch.json'
     $ProviderBatch = Join-Path $EvidenceRoot '04-provider-runtime-batch.json'
-    if (-not (Test-Path -LiteralPath $ProviderBatch -PathType Leaf)) {
-        throw "Provider runtime batch was not produced: $ProviderBatch"
+    foreach ($Required in @($CandidateBatch, $ProviderBatch)) {
+        if (-not (Test-Path -LiteralPath $Required -PathType Leaf)) {
+            throw "Pre-provider evidence was not produced: $Required"
+        }
     }
 
     $AuthorizedAt = (Get-Date).ToUniversalTime()
@@ -136,18 +158,31 @@ try {
             --receipt $ExecutionReceipt
     }
 
-    $CandidateRoot = Join-Path $EvidenceRoot '07-provider-results'
-    Invoke-Checked 'MATERIALIZING VERIFIED PROVIDER CANDIDATES FOR REVIEW' {
+    Invoke-Checked 'VERIFYING RETAINED PROVIDER EXECUTION' {
+        node .\scripts\verify-tile-map-provider-execution.mjs $ExecutionReceipt
+    }
+
+    $MasteringReceipt = Join-Path $EvidenceRoot '07-candidate-mastering.receipt.json'
+    Invoke-Checked 'MASTERING PROVIDER CANDIDATES TO EXACT GAME RESOLUTION' {
+        node .\scripts\run-tile-map-candidate-mastering.mjs `
+            --provider-batch $ProviderBatch `
+            --execution-receipt $ExecutionReceipt `
+            --concurrency $Concurrency `
+            --receipt $MasteringReceipt
+    }
+
+    $CandidateRoot = Join-Path $EvidenceRoot '08-mastered-provider-results'
+    Invoke-Checked 'MATERIALIZING VERIFIED MASTERED CANDIDATES FOR REVIEW' {
         node .\scripts\materialize-tile-map-provider-results.mjs `
             --provider-batch $ProviderBatch `
             --execution-receipt $ExecutionReceipt `
+            --mastering-receipt $MasteringReceipt `
             --artifact-root $ArtifactRoot `
             --output-root $CandidateRoot
     }
 
-    $CandidateBatch = Join-Path $EvidenceRoot '03-candidate-batch.json'
     $ProviderResults = Join-Path $CandidateRoot 'provider-results.json'
-    $Review = Join-Path $EvidenceRoot '08-candidate-review.json'
+    $Review = Join-Path $EvidenceRoot '09-candidate-review.json'
     Invoke-Checked 'COMPILING ART STUDIO CANDIDATE REVIEW INTAKE' {
         pnpm art -- tile-map-candidate-review `
             --batch $CandidateBatch `
@@ -156,9 +191,11 @@ try {
     }
 
     Write-Host ""
-    Write-Host 'TILE MAP PROVIDER CANDIDATES READY FOR REVIEW'
-    Write-Host "Review manifest: $Review"
-    Write-Host "Candidate root:  $CandidateRoot"
+    Write-Host 'TILE MAP MASTERED CANDIDATES READY FOR REVIEW'
+    Write-Host "Provider receipt:  $ExecutionReceipt"
+    Write-Host "Mastering receipt: $MasteringReceipt"
+    Write-Host "Review manifest:   $Review"
+    Write-Host "Candidate root:    $CandidateRoot"
     Write-Host ""
     Write-Host 'No candidate has structural, visual or creative approval yet.'
 }
