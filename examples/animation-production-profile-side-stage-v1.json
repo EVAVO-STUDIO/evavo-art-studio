@@ -1,0 +1,82 @@
+{
+  "protocolVersion": "2026-08-30.3",
+  "kind": "evavo.animation-production-profile.request.v1",
+  "id": "harbour-runner-walk-right",
+  "revision": 1,
+  "state": "approved",
+  "title": "Harbour Runner Walk Right",
+  "action": "walk",
+  "direction": "right",
+  "loop": true,
+  "durationSeconds": 0.6666666667,
+  "sourceFramesPerSecond": 24,
+  "playbackFramesPerSecond": 12,
+  "detailLevel": "standard",
+  "mirrorPolicy": "forbidden",
+  "targets": ["godot-sprite", "cel-sequence", "video-sequence"],
+  "subject": {
+    "subjectId": "harbour-runner",
+    "identityLockId": "harbour-runner-model-v3",
+    "identityRevision": 3,
+    "identityReferenceArtifactId": "artifact_1111111111111111111111111111111111111111111111111111111111111111",
+    "directionMasterArtifactId": "artifact_2222222222222222222222222222222222222222222222222222222222222222",
+    "silhouetteAnchors": ["long oilskin coat", "compact shoulder bag", "narrow brim cap"],
+    "costumeAnchors": ["coat belt hangs left", "bag strap crosses right shoulder"],
+    "propAnchors": ["bag stays behind right hip"],
+    "asymmetricVisualAnchors": ["bag strap", "coat belt tail"],
+    "anatomyRule": "Seven and one-half heads with grounded shoulders, stable hands and consistent foot size."
+  },
+  "camera": {
+    "profileId": "side-stage-1990s-adventure",
+    "perspective": "side-stage",
+    "projection": "orthographic",
+    "motion": "locked",
+    "yawDegrees": 90,
+    "pitchDegrees": 0,
+    "rollDegrees": 0,
+    "scale": 1,
+    "groundLineNormalized": 0.875,
+    "movementPlane": "horizontal stage plane",
+    "framing": "full body with eight percent head and foot safety"
+  },
+  "performance": {
+    "intent": "Purposeful dockside walk against a light headwind, alert but not hurried.",
+    "weight": "Grounded heel-to-toe transfer with coat drag after each contact.",
+    "energy": 0.46,
+    "tempo": "Even working cadence with a slightly longer passing hold.",
+    "exaggeration": 0.35,
+    "continuityAnchors": ["root remains on baseline", "coat follows one frame after torso", "bag swing opposes hips"]
+  },
+  "style": {
+    "styleId": "harbour-vga-painted",
+    "styleRevision": 2,
+    "motionStyle": "vga-adventure",
+    "paletteLockId": "harbour-muted-rain-v2",
+    "lineTreatment": "Selective dark contour with painted interior edges and no universal outline.",
+    "shapeLanguage": ["grounded human proportions", "broad coat masses", "clear negative space at hands and feet"],
+    "antiGenericTraits": ["asymmetric coat drag", "specific shoulder-bag inertia", "restrained frame-to-frame facial motion"],
+    "exclusions": ["whole-body breathing scale", "random line jitter", "independent redesign of each frame", "generic cyan-magenta lighting"]
+  },
+  "delivery": {
+    "canvas": { "width": 256, "height": 256 },
+    "alphaRequired": true,
+    "trim": false,
+    "pivot": { "x": 0.5, "y": 0.875 },
+    "textureFiltering": "nearest",
+    "animationName": "walk.right",
+    "atlasGroup": "harbour-runner"
+  },
+  "iteration": {
+    "maximumAttemptsPerDrawing": 4,
+    "maximumReviewCycles": 6,
+    "maximumNoProgressCycles": 2,
+    "maximumBatchSize": 4,
+    "maximumCandidatesPerKey": 4,
+    "maximumCandidatesPerBreakdown": 3,
+    "maximumCandidatesPerInbetween": 2
+  },
+  "events": [
+    { "id": "left.contact", "phase": 0, "kind": "left-contact" },
+    { "id": "right.contact", "phase": 0.5, "kind": "right-contact" }
+  ]
+}
