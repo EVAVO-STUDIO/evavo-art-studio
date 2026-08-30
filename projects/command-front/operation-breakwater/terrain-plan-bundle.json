@@ -13,22 +13,24 @@
     "nearestFiltering": true,
     "atlasRotation": false,
     "tileBoundsMustMatchCommandFrontDiamond": true,
-    "noOpaqueBoundingRectangle": true
+    "noOpaqueBoundingRectangle": true,
+    "variantSelection": "deterministic-tile-hash"
   },
   "tileFamilies": [
-    {"id":"desert-sand","mastering":["seam cleanup","value grouping","sparse breakup","nearest-neighbour proof"]},
-    {"id":"deep-water","mastering":["canal value consistency","animation continuity","shore transition QA"]},
-    {"id":"shallow-water","mastering":["depth-value separation","wading readability","deep-water transition QA"]},
-    {"id":"shoreline","mastering":["hard edge readability","deep/shallow transition variants"]},
-    {"id":"road","mastering":["route readability","edge wear","junction variants"]},
-    {"id":"concrete-industrial","mastering":["crack restraint","oil-mark restraint","tile repetition cleanup"]},
-    {"id":"urban-ground","mastering":["paving variation","dust integration","building-footprint readability"]}
+    {"id":"desert-sand","minimumVariants":4,"mastering":["seam cleanup","value grouping","sparse breakup","nearest-neighbour proof","repetition proof"]},
+    {"id":"deep-water","minimumVariants":3,"mastering":["canal value consistency","animation continuity","shore transition QA","repetition proof"]},
+    {"id":"shallow-water","minimumVariants":3,"mastering":["depth-value separation","wading readability","deep-water transition QA","repetition proof"]},
+    {"id":"shoreline","minimumVariants":4,"mastering":["hard edge readability","deep/shallow transition variants","edge repetition proof"]},
+    {"id":"road","minimumVariants":4,"mastering":["route readability","edge wear","junction variants","repetition proof"]},
+    {"id":"concrete-industrial","minimumVariants":4,"mastering":["crack restraint","oil-mark restraint","tile repetition cleanup"]},
+    {"id":"urban-ground","minimumVariants":4,"mastering":["paving variation","dust integration","building-footprint readability","tile repetition cleanup"]}
   ],
   "specialFeatures": [
     {
       "id": "breakwater-southern-infantry-ford",
       "surface": "shallow-water",
       "consumerTiles": [[11,14],[12,14]],
+      "minimumOverlayVariants": 2,
       "purpose": "Emergency infantry-only route after main bridge destruction",
       "requirements": [
         "readable as shallower than adjacent deep canal water at 640x360",
@@ -38,7 +40,7 @@
         "transition edges remain seamless against shoreline and deep-water neighbours",
         "ford overlay must preserve transparent pixels outside the isometric tile footprint"
       ],
-      "proofs": ["640x360 gameplay-scale still","nearest-neighbour 2x preview","deep-vs-shallow comparison","infantry-over-ford readability still"]
+      "proofs": ["640x360 gameplay-scale still","nearest-neighbour 2x preview","deep-vs-shallow comparison","infantry-over-ford readability still","deterministic-variant-comparison"]
     }
   ],
   "overlayFamilies": ["dust","oil-stain","road-wear","rubble","cracks","dock-debris","ford-wading-readability"],
@@ -48,8 +50,10 @@
     "overlayAtlas": true,
     "paletteProof": true,
     "nearestNeighbourProof": true,
+    "deterministicVariantProof": true,
     "provenanceRequired": true,
-    "runtimeRenderMode": "iso-diamond-transparent"
+    "runtimeRenderMode": "iso-diamond-transparent",
+    "variantSelection": "deterministic-tile-hash"
   },
-  "releaseRule": "No terrain or ford media is consumer-approved until the complete tile/transition package remains seamless and readable at Command Front's 640x360 internal review resolution and conforms to the transparent isometric runtime tile contract."
+  "releaseRule": "No terrain or ford media is consumer-approved until the complete tile/transition package meets minimum variant depth, remains seamless and readable at Command Front's 640x360 internal review resolution, and conforms to the transparent isometric deterministic-variant runtime contract."
 }
