@@ -146,6 +146,7 @@ export async function compileCouncilAvatarProviderExecutionAuthorization({
       exactNormalizedRuntimeSpecHashRequired: true,
       exactAdapterMatchRequired: true,
       exactModelMatchRequired: true,
+      authorizationNotBeforeRequired: true,
       authorizationExpiryRequired: true,
       automaticRetryAllowed: false,
       fallbackAllowed: false,
@@ -168,7 +169,9 @@ export function validateCouncilAvatarProviderExecutionAuthorization(
   }
   const { authorizationSha256, ...body } = authorization;
   if (sha256(body) !== authorizationSha256) throw new Error('Council avatar provider authorization hash mismatch');
+  const starts = canonicalTimestamp(authorization.authorizedAt, 'authorizedAt');
   const expires = canonicalTimestamp(authorization.expiresAt, 'expiresAt');
+  if (now.getTime() < starts.milliseconds) throw new Error('Council avatar provider execution authorization is not active yet');
   if (now.getTime() >= expires.milliseconds) throw new Error('Council avatar provider execution authorization expired');
   if (
     authorization.source?.runtimePackageSha256 !== runtimePackage.runtimePackageSha256 ||
@@ -180,7 +183,8 @@ export function validateCouncilAvatarProviderExecutionAuthorization(
     authorization.budget?.retriesAuthorized !== 0 ||
     authorization.budget?.fallbackAuthorized !== false ||
     authorization.executionPolicy?.genericProviderWorkerMayClaim !== false ||
-    authorization.executionPolicy?.exactNormalizedRuntimeSpecHashRequired !== true
+    authorization.executionPolicy?.exactNormalizedRuntimeSpecHashRequired !== true ||
+    authorization.executionPolicy?.authorizationNotBeforeRequired !== true
   ) {
     throw new Error('Council avatar provider execution authorization binding drift');
   }
