@@ -39,14 +39,30 @@ function descriptorSummary(descriptor) {
   });
 }
 
+function credentialBlocker(adapterId, environment) {
+  if (adapterId === 'openai-gpt-image' && !present(environment, 'OPENAI_API_KEY')) {
+    return 'openai-api-key-not-configured';
+  }
+  if (adapterId.startsWith('comfyui') && !present(environment, 'EVAVO_ART_COMFYUI_CATALOG')) {
+    return 'comfyui-catalog-not-configured';
+  }
+  return null;
+}
+
 export async function inspectCouncilAvatarDirectionMasterReadiness({
   identityLockApproval,
   artifactRoot,
   environment = process.env,
+  candidateCount,
+  preferredAdapterId,
+  preferredModel,
 } = {}) {
   const approval = validateCouncilAvatarIdentityLockApproval(identityLockApproval);
   const runtimePackage = compileCouncilAvatarDirectionMasterRuntimePackage({
     identityLockApproval: approval,
+    ...(candidateCount === undefined ? {} : { candidateCount }),
+    ...(preferredAdapterId === undefined ? {} : { preferredAdapterId }),
+    ...(preferredModel === undefined ? {} : { preferredModel }),
   });
   const store = new LocalArtifactStore({ root: path.resolve(artifactRoot) });
   const identityArtifacts = [];
@@ -117,16 +133,29 @@ export async function inspectCouncilAvatarDirectionMasterReadiness({
       (job) => job.canonicalContract.requiredAdapterCapabilities,
     ),
   );
+  const identityReferenceRequired = requiredCapabilities.has('identity-reference');
+  const identityReferenceReady = Boolean(
+    desiredAdapter?.capabilities.includes('identity-reference'),
+  );
   const missingCapabilities = desiredAdapter
     ? [...requiredCapabilities].filter(
         (capability) => !desiredAdapter.capabilities.includes(capability),
       )
     : [...requiredCapabilities];
-  const adapterCapabilityReady = adapterRegistered && missingCapabilities.length === 0;
+  const adapterCapabilityReady =
+    adapterRegistered &&
+    identityReferenceRequired &&
+    identityReferenceReady &&
+    missingCapabilities.length === 0;
   const providerQueueEligible = descriptors.length > 0;
-  const identityArtifactsReady = identityArtifacts.every((entry) => entry.ready);
+  const identityArtifactsReady = identityArtifacts.length > 0 && identityArtifacts.every((entry) => entry.ready);
+  const providerCredentialBlocker = credentialBlocker(
+    runtimePackage.preferredAdapterId,
+    environment,
+  );
   const configuredWithoutSpend =
     workerImportReady &&
+    !providerCredentialBlocker &&
     adapterRegistered &&
     modelRegistered &&
     adapterCapabilityReady &&
@@ -135,9 +164,11 @@ export async function inspectCouncilAvatarDirectionMasterReadiness({
 
   const blockers = [...artifactBlockers];
   if (!workerImportReady) blockers.push('worker-provider-registry-not-ready');
-  if (!present(environment, 'OPENAI_API_KEY')) blockers.push('openai-api-key-not-configured');
+  if (providerCredentialBlocker) blockers.push(providerCredentialBlocker);
   if (workerImportReady && !adapterRegistered) blockers.push('preferred-adapter-not-registered');
   if (adapterRegistered && !modelRegistered) blockers.push('preferred-model-not-registered');
+  if (!identityReferenceRequired) blockers.push('direction-runtime-identity-reference-not-required');
+  if (adapterRegistered && !identityReferenceReady) blockers.push('identity-reference-capability-missing');
   if (adapterRegistered && !adapterCapabilityReady) blockers.push('required-adapter-capabilities-missing');
   if (workerImportReady && !providerQueueEligible) blockers.push('provider-queue-not-eligible');
 
@@ -151,6 +182,7 @@ export async function inspectCouncilAvatarDirectionMasterReadiness({
     runtimeActivationAllowed: false,
     websiteActivationAllowed: false,
     identityApprovalSha256: approval.approvalSha256,
+    directionMasterPlanSha256: runtimePackage.directionMasterPlanSha256,
     runtimePackageSha256: runtimePackage.runtimePackageSha256,
     artifactRoot: path.resolve(artifactRoot),
     desired: Object.freeze({
@@ -161,16 +193,19 @@ export async function inspectCouncilAvatarDirectionMasterReadiness({
       maximumAttemptsPerJob: 1,
       fallbackAuthorized: false,
       requiredAdapterCapabilities: Object.freeze([...requiredCapabilities].sort()),
+      identityReferenceRequired,
     }),
     environment: Object.freeze({
       openAiApiKeyConfigured: present(environment, 'OPENAI_API_KEY'),
       openAiImageModelConfigured: present(environment, 'EVAVO_ART_OPENAI_IMAGE_MODEL'),
       openAiImageModelsConfigured: present(environment, 'EVAVO_ART_OPENAI_IMAGE_MODELS'),
       customOpenAiBaseUrlConfigured: present(environment, 'EVAVO_ART_OPENAI_BASE_URL'),
+      comfyUiCatalogConfigured: present(environment, 'EVAVO_ART_COMFYUI_CATALOG'),
     }),
     worker: Object.freeze({
       importReady: workerImportReady,
       providerQueueEligible,
+      genericProviderWorkerMayClaim: runtimePackage.executionPolicy.genericProviderWorkerMayClaim,
       registryErrorClass: registryError ? 'provider-registry-initialization-failed' : null,
     }),
     adapters: descriptors,
@@ -179,6 +214,8 @@ export async function inspectCouncilAvatarDirectionMasterReadiness({
       identityArtifactsReady,
       adapterRegistered,
       modelRegistered,
+      identityReferenceRequired,
+      identityReferenceReady,
       adapterCapabilityReady,
       missingCapabilities: Object.freeze(missingCapabilities.sort()),
       configuredWithoutSpend,
@@ -195,7 +232,7 @@ export async function inspectCouncilAvatarDirectionMasterReadiness({
           ]
         : [
             'Restore or verify the exact approved identity artifacts in the execution artifact store.',
-            'Build the Art Studio provider/runtime/worker packages and configure the provider environment.',
+            'Build the Art Studio provider/runtime/worker packages and configure the selected provider environment.',
             'Run this zero-spend direction readiness inspection again before creating execution authorization.',
           ],
     ),
