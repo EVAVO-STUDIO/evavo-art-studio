@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { lstat, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -109,10 +109,14 @@ function verifyProviderBatch(batch) {
     batch.provider_batch_fingerprint,
     'provider_batch_fingerprint',
   );
-  if (hashObject(withoutSeal(batch, 'provider_batch_fingerprint', null)) !== fingerprint) {
+  if (hashObject(withoutSeal(batch, 'provider_batch_fingerprint')) !== fingerprint) {
     throw new Error('provider batch self fingerprint mismatch');
   }
-  if (!Array.isArray(batch.jobs) || batch.jobs.length < 1 || batch.jobs.length > 100) {
+  if (
+    !Array.isArray(batch.jobs) ||
+    batch.jobs.length < 1 ||
+    batch.jobs.length > 100
+  ) {
     throw new Error('provider batch jobs must contain 1 to 100 entries');
   }
   return fingerprint;
@@ -123,7 +127,9 @@ function verifyExecutionReceipt(receipt) {
     receipt.schema !== 'evavo.tile-map-provider-execution-receipt.v1' ||
     receipt.status !== 'succeeded'
   ) {
-    throw new Error('execution receipt must be a successful Tile Map provider receipt');
+    throw new Error(
+      'execution receipt must be a successful Tile Map provider receipt',
+    );
   }
   const digest = hashObject(withoutSeal(receipt, 'executionSha256'));
   if (
@@ -135,17 +141,54 @@ function verifyExecutionReceipt(receipt) {
   return digest;
 }
 
+function verifyAuthorization(authorization) {
+  if (
+    authorization.schema !==
+      'evavo.tile-map-provider-execution-authorization.v1' ||
+    authorization.status !== 'authorized'
+  ) {
+    throw new Error('provider authorization schema/status is invalid');
+  }
+  const digest = hashObject(
+    withoutSeal(authorization, 'authorizationSha256'),
+  );
+  if (
+    authorization.authorizationSha256 !== digest ||
+    authorization.runId !== digest.slice(0, 20)
+  ) {
+    throw new Error('provider authorization self hash mismatch');
+  }
+  return digest;
+}
+
 function masteringContract(value, candidateId) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${candidateId} mastering contract must be an object`);
   }
-  const width = integer(value.target_width, undefined, 1, 8192, `${candidateId}.target_width`);
-  const height = integer(value.target_height, undefined, 1, 8192, `${candidateId}.target_height`);
-  if (!width || !height) throw new Error(`${candidateId} mastering target dimensions are required`);
+  const width = integer(
+    value.target_width,
+    undefined,
+    1,
+    8192,
+    `${candidateId}.target_width`,
+  );
+  const height = integer(
+    value.target_height,
+    undefined,
+    1,
+    8192,
+    `${candidateId}.target_height`,
+  );
+  if (!width || !height) {
+    throw new Error(`${candidateId} mastering target dimensions are required`);
+  }
   if (value.source_canvas_policy !== 'provider-adapter-derived') {
     throw new Error(`${candidateId} mastering source canvas policy is invalid`);
   }
-  if (value.background_mode !== 'chroma-key' && value.background_mode !== 'opaque-preserve') {
+  if (
+    value.background_mode !== 'chroma-key' &&
+    value.background_mode !== 'opaque-preserve'
+  ) {
     throw new Error(`${candidateId} mastering background mode is invalid`);
   }
   const matte = value.matte_colour;
@@ -177,7 +220,7 @@ function masteringContract(value, candidateId) {
   };
 }
 
-async function providerCandidateFor(job, artifacts) {
+async function providerCandidateFor(job, planned, artifacts) {
   const rows = (job.outputArtifacts ?? []).filter(
     (entry) => entry.artifactRole === 'provider-candidate',
   );
@@ -197,10 +240,12 @@ async function providerCandidateFor(job, artifacts) {
     descriptor.storageClass !== 'intermediate' ||
     descriptor.labels.artifactRole !== 'provider-candidate' ||
     descriptor.labels.approvalState !== 'unapproved' ||
-    descriptor.metadata?.finalDeliverable !== false
+    descriptor.labels.providerRequestId !== planned.candidate_id ||
+    descriptor.metadata?.finalDeliverable !== false ||
+    descriptor.metadata?.requestSha256 !== planned.request_sha256
   ) {
     throw new Error(
-      `provider candidate artifact failed immutable/unapproved verification: ${job.candidateId}`,
+      `provider candidate artifact failed immutable/request/unapproved verification: ${job.candidateId}`,
     );
   }
   return descriptor;
@@ -231,32 +276,43 @@ export async function runTileMapCandidateMastering(
     'Tile Map provider execution receipt',
   );
   const receiptPath = path.resolve(required(values, '--receipt'));
-  const existingReceipt = await import('node:fs/promises').then(({ lstat }) =>
-    lstat(receiptPath).catch(() => null),
-  );
-  if (existingReceipt) throw new Error(`mastering receipt already exists: ${receiptPath}`);
+  if (await lstat(receiptPath).catch(() => null)) {
+    throw new Error(`mastering receipt already exists: ${receiptPath}`);
+  }
 
   const batch = providerBatchRecord.value;
   const providerBatchFingerprint = verifyProviderBatch(batch);
   const execution = executionRecord.value;
   const executionSha256 = verifyExecutionReceipt(execution);
-  if (execution.sourceMapFingerprint !== batch.source_map_fingerprint) {
-    throw new Error('provider execution source map fingerprint differs from provider batch');
+  if (
+    execution.sourceMapFingerprint !== batch.source_map_fingerprint ||
+    execution.counts?.succeededRuntimeJobs !== batch.jobs.length ||
+    execution.counts?.failedRuntimeJobs !== 0
+  ) {
+    throw new Error(
+      'provider execution source map/counts differ from provider batch',
+    );
   }
 
   const authorizationRecord = await readJson(
     execution.sourceAuthorization.path,
     'Tile Map provider authorization',
   );
+  const authorizationSha256 = verifyAuthorization(authorizationRecord.value);
   if (
     sha256(authorizationRecord.bytes) !==
       execution.sourceAuthorization.fileSha256 ||
-    authorizationRecord.value.authorizationSha256 !==
+    authorizationSha256 !==
       execution.sourceAuthorization.documentSha256 ||
+    authorizationRecord.value.runId !== execution.sourceAuthorization.runId ||
     authorizationRecord.value.sourceProviderBatch.documentSha256 !==
       providerBatchFingerprint ||
+    authorizationRecord.value.sourceProviderBatch.fileSha256 !==
+      sha256(providerBatchRecord.bytes) ||
     path.resolve(authorizationRecord.value.sourceProviderBatch.path) !==
-      providerBatchRecord.path
+      providerBatchRecord.path ||
+    authorizationRecord.value.sourceMapFingerprint !==
+      batch.source_map_fingerprint
   ) {
     throw new Error('provider authorization/execution source binding is invalid');
   }
@@ -273,12 +329,16 @@ export async function runTileMapCandidateMastering(
       throw new Error('provider execution receipt contains malformed job rows');
     }
     if (completedByCandidate.has(row.candidateId)) {
-      throw new Error(`duplicate provider execution candidate ${row.candidateId}`);
+      throw new Error(
+        `duplicate provider execution candidate ${row.candidateId}`,
+      );
     }
     completedByCandidate.set(row.candidateId, row);
   }
   if (completedByCandidate.size !== batch.jobs.length) {
-    throw new Error('provider execution and provider batch candidate counts differ');
+    throw new Error(
+      'provider execution and provider batch candidate counts differ',
+    );
   }
 
   const queue = `tile-map-mastering-${executionSha256.slice(0, 20)}`;
@@ -290,10 +350,18 @@ export async function runTileMapCandidateMastering(
       `jobs[${index}].candidate_id`,
     );
     const completed = completedByCandidate.get(candidateId);
-    if (!completed || completed.state !== 'succeeded') {
-      throw new Error(`provider candidate did not succeed: ${candidateId}`);
+    if (
+      !completed ||
+      completed.state !== 'succeeded' ||
+      completed.providerRequestSha256 !== planned.request_sha256 ||
+      completed.taskId !== planned.task_id ||
+      completed.visualFamily !== planned.visual_family
+    ) {
+      throw new Error(
+        `provider execution identity did not match provider batch: ${candidateId}`,
+      );
     }
-    const source = await providerCandidateFor(completed, artifacts);
+    const source = await providerCandidateFor(completed, planned, artifacts);
     const policy = masteringContract(planned.mastering, candidateId);
     const requiredCapabilities = [
       'media.raster',
@@ -317,7 +385,9 @@ export async function runTileMapCandidateMastering(
           expectedWidth: policy.targetWidth,
           expectedHeight: policy.targetHeight,
           expectedFormat: 'png',
-          safePadding: policy.backgroundMode === 'chroma-key' ? 1 : 0,
+          // Terrain/network art often must touch declared tile edges. Seam and
+          // topology QA own those boundaries; generic sprite padding must not.
+          safePadding: 0,
           maximumHaloFraction: 0.1,
         },
       },
@@ -338,6 +408,7 @@ export async function runTileMapCandidateMastering(
       taskId: planned.task_id,
       visualFamily: planned.visual_family,
       outputPath: planned.output_path,
+      providerRequestSha256: planned.request_sha256,
       sourceCandidateArtifactId: source.artifactId,
       policy,
     });
@@ -351,7 +422,8 @@ export async function runTileMapCandidateMastering(
     throw new Error('mastering runtime submission count mismatch');
   }
   const workerId = safeId(
-    values.get('--worker-id') ?? `tile-map-mastering:${executionSha256.slice(0, 20)}`,
+    values.get('--worker-id') ??
+      `tile-map-mastering:${executionSha256.slice(0, 20)}`,
     '--worker-id',
   );
   const concurrency = integer(
@@ -383,7 +455,9 @@ export async function runTileMapCandidateMastering(
   for (const [index, record] of submitted.entries()) {
     const current = await runtime.get(record.id);
     if (!current || current.specHash !== record.specHash) {
-      throw new Error(`mastering runtime job disappeared or drifted: ${record.id}`);
+      throw new Error(
+        `mastering runtime job disappeared or drifted: ${record.id}`,
+      );
     }
     const source = lineage[index];
     if (current.state !== 'succeeded') {
@@ -417,6 +491,7 @@ export async function runTileMapCandidateMastering(
       !masteredVerification.contentValid ||
       !evidenceVerification.descriptorValid ||
       !evidenceVerification.contentValid ||
+      mastered.mediaType !== 'image/png' ||
       mastered.storageClass !== 'intermediate' ||
       mastered.labels.approvalState !== 'unapproved' ||
       mastered.labels.qualityState !== 'passed' ||
@@ -424,7 +499,9 @@ export async function runTileMapCandidateMastering(
       mastered.labels.sourceCandidateArtifactId !==
         source.sourceCandidateArtifactId
     ) {
-      throw new Error(`mastered candidate failed immutable quality boundary: ${source.candidateId}`);
+      throw new Error(
+        `mastered candidate failed immutable quality boundary: ${source.candidateId}`,
+      );
     }
     const proof = JSON.parse(
       (await artifacts.read(evidence.artifactId)).toString('utf8'),
@@ -434,10 +511,15 @@ export async function runTileMapCandidateMastering(
       proof.masteredCandidate?.artifactId !== mastered.artifactId ||
       proof.promotionEligible !== true ||
       proof.approvalState !== 'unapproved' ||
+      proof.blockingProof?.qualityPassed !== true ||
+      proof.blockingProof?.meaningfulAlphaPassed !== true ||
+      proof.blockingProof?.fakeTransparencyPassed !== true ||
       proof.geometry?.targetWidth !== source.policy.targetWidth ||
       proof.geometry?.targetHeight !== source.policy.targetHeight
     ) {
-      throw new Error(`mastering evidence contract failed: ${source.candidateId}`);
+      throw new Error(
+        `mastering evidence contract failed: ${source.candidateId}`,
+      );
     }
     succeeded += 1;
     jobs.push({
@@ -511,7 +593,9 @@ export async function runTileMapCandidateMastering(
     flag: 'wx',
   });
   if (failed !== 0) {
-    const error = new Error('one or more Tile Map candidate mastering jobs failed');
+    const error = new Error(
+      'one or more Tile Map candidate mastering jobs failed',
+    );
     error.masteringReceipt = receiptPath;
     throw error;
   }
