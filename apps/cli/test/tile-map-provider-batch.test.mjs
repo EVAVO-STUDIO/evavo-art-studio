@@ -9,8 +9,13 @@ import { compileTileMapProviderRuntimeBatch } from "../dist/tile-map-provider-ba
 async function fixture({
   alphaRequired = true,
   providerAuthority = "intermediate-only",
+  visualFamily = "transport:rail:ew",
+  semanticSourceIds = ["transport:rail:ew"],
+  creativeDirection = ["Late-1990s transport-management pixel art."],
 } = {}) {
-  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-tile-map-provider-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "evavo-tile-map-provider-"),
+  );
   const batch = {
     schema_version: 1,
     source_package_sha256: "1".repeat(64),
@@ -23,18 +28,18 @@ async function fixture({
       {
         candidate_id: "tile-map-candidate-0123456789abcdefabcd",
         task_id: "tile-map-tile-rail-ew",
-        visual_family: "transport:rail:ew",
+        visual_family: visualFamily,
         task_kind: "tile-family",
         candidate_index: 0,
         projection: "isometric",
         dimensions: { width: 64, height: 32 },
         alpha_required: alphaRequired,
-        semantic_source_ids: ["transport:rail:ew"],
+        semantic_source_ids: semanticSourceIds,
         immutable_semantic_rules: [
           "Rail topology is simulation-owned.",
           "Preserve east-west edge signature.",
         ],
-        creative_direction: ["Late-1990s transport-management pixel art."],
+        creative_direction: creativeDirection,
         topology: {
           terrains: ["rail"],
           edge_signatures: ["ew"],
@@ -59,7 +64,7 @@ async function fixture({
   return input;
 }
 
-test("compiles a Tile Map candidate into provider and deterministic mastering contracts", async () => {
+test("compiles provider and deterministic mastering contracts", async () => {
   const input = await fixture();
   const result = await compileTileMapProviderRuntimeBatch(input);
   assert.equal(result.status, "ready-for-provider-runtime");
@@ -83,7 +88,7 @@ test("compiles a Tile Map candidate into provider and deterministic mastering co
   assert.equal(job.runtime_job.payload.target.height, 32);
   assert.equal(job.runtime_job.payload.target.transparency, "required");
   assert.equal(job.runtime_job.payload.background.strategy, "chroma-key");
-  assert.equal(job.runtime_job.payload.background.matteColour, "#00ff00");
+  assert.equal(job.runtime_job.payload.background.matteColour, "#ff00ff");
   assert.equal(job.runtime_job.payload.selection.requireSeed, true);
   assert.equal(
     job.runtime_job.payload.metadata.sourceMapFingerprint,
@@ -99,7 +104,8 @@ test("compiles a Tile Map candidate into provider and deterministic mastering co
     target_width: 64,
     target_height: 32,
     background_mode: "chroma-key",
-    matte_colour: "#00ff00",
+    matte_colour: "#ff00ff",
+    matte_selection: "semantic-contrast-v1",
     resampling: "lanczos3",
     delivery_profile_id: "godot-sprite-lossless",
     require_meaningful_alpha: true,
@@ -111,9 +117,38 @@ test("compiles a Tile Map candidate into provider and deterministic mastering co
     job.runtime_job.payload.style.compositionRules.join(" "),
     /deterministic mastering to 64x32 pixels/u,
   );
+  assert.match(
+    job.runtime_job.payload.style.mustAvoid.join(" "),
+    /Do not use #ff00ff anywhere inside the intended subject/u,
+  );
 });
 
-test("opaque family uses opaque provider source plus exact native mastering", async () => {
+test("semantic matte avoids a conflicting magic/purple palette", async () => {
+  const input = await fixture({
+    visualFamily: "epochbound:ashen:magic:portal",
+    semanticSourceIds: ["magic", "portal", "violet-energy"],
+    creativeDirection: ["Purple and magenta supernatural portal energy."],
+  });
+  const result = await compileTileMapProviderRuntimeBatch(input);
+  const job = result.jobs[0];
+  assert.equal(job.runtime_job.payload.background.matteColour, "#00ff00");
+  assert.equal(job.mastering.matte_colour, "#00ff00");
+  assert.equal(job.mastering.matte_selection, "semantic-contrast-v1");
+});
+
+test("semantic matte avoids foliage green", async () => {
+  const input = await fixture({
+    visualFamily: "epochbound:verdant:landmark:tree",
+    semanticSourceIds: ["tree", "green-foliage"],
+    creativeDirection: ["Lush green forest tree canopy and moss."],
+  });
+  const result = await compileTileMapProviderRuntimeBatch(input);
+  const job = result.jobs[0];
+  assert.notEqual(job.mastering.matte_colour, "#00ff00");
+  assert.equal(job.mastering.matte_colour, "#ff00ff");
+});
+
+test("opaque family uses opaque provider source and no matte policy", async () => {
   const input = await fixture({ alphaRequired: false });
   const result = await compileTileMapProviderRuntimeBatch(input);
   const job = result.jobs[0];
@@ -121,6 +156,7 @@ test("opaque family uses opaque provider source plus exact native mastering", as
   assert.equal(job.runtime_job.payload.target.transparency, "opaque");
   assert.equal(job.mastering.background_mode, "opaque-preserve");
   assert.equal(job.mastering.matte_colour, null);
+  assert.equal(job.mastering.matte_selection, null);
   assert.equal(job.mastering.require_meaningful_alpha, false);
   assert.equal(job.mastering.target_width, 64);
   assert.equal(job.mastering.target_height, 32);
