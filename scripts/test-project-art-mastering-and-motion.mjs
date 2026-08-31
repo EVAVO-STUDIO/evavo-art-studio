@@ -215,7 +215,8 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
         targetPath: 'geometry/safe-cell-repack.png',
         outputFormat: 'png',
         operations: [
-          { op: 'repack-alpha-components', componentCount: 3, cellWidth: 32, cellHeight: 32, minimumPixels: 100, connectivity: 8 },
+          { op: 'matte-colour-to-alpha', matteColour: '#ffffff', distance: 0 },
+          { op: 'repack-alpha-components', componentCount: 3, cellWidth: 32, cellHeight: 32, minimumPixels: 1, connectivity: 8 },
         ],
       },
       {

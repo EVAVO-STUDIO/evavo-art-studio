@@ -784,6 +784,23 @@ def connected_matte_to_alpha(image: Image.Image, operation: dict[str, Any]) -> I
     return rgba
 
 
+def matte_colour_to_alpha(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    """Remove every pixel within an explicitly declared matte-colour distance."""
+    matte = parse_colour(operation["matteColour"], "matte-colour-to-alpha.matteColour", allow_alpha=False)[:3]
+    distance = float(operation.get("distance", 0.0))
+    if not 0 <= distance <= 441:
+        fail("matte-colour-to-alpha.distance must be between 0 and 441")
+    squared_distance = distance * distance
+    output = bytearray(image.convert("RGBA").tobytes())
+    for offset in range(0, len(output), 4):
+        red, green, blue = output[offset], output[offset + 1], output[offset + 2]
+        if (red - matte[0]) ** 2 + (green - matte[1]) ** 2 + (blue - matte[2]) ** 2 <= squared_distance:
+            output[offset:offset + 4] = b"\x00\x00\x00\x00"
+        elif output[offset + 3] == 0:
+            output[offset:offset + 3] = b"\x00\x00\x00"
+    return Image.frombytes("RGBA", image.size, bytes(output))
+
+
 def edge_decontaminate(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
     rgba = image.copy()
     matte = parse_colour(operation["matteColour"], "edge-decontaminate.matteColour", allow_alpha=False)[:3]
@@ -928,6 +945,23 @@ def colour_replace(image: Image.Image, operation: dict[str, Any]) -> Image.Image
                 alpha = current[3] if preserve_alpha else target[3]
                 pixels[x, y] = (target[0], target[1], target[2], alpha)
     return output
+
+
+def matte_colour_to_alpha(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
+    """Remove every pixel within an explicitly declared matte-colour distance."""
+    matte = parse_colour(operation["matteColour"], "matte-colour-to-alpha.matteColour", allow_alpha=False)[:3]
+    distance = float(operation.get("distance", 0.0))
+    if not 0 <= distance <= 441:
+        fail("matte-colour-to-alpha.distance must be between 0 and 441")
+    squared_distance = distance * distance
+    output = bytearray(image.convert("RGBA").tobytes())
+    for offset in range(0, len(output), 4):
+        red, green, blue = output[offset], output[offset + 1], output[offset + 2]
+        if (red - matte[0]) ** 2 + (green - matte[1]) ** 2 + (blue - matte[2]) ** 2 <= squared_distance:
+            output[offset:offset + 4] = b"\x00\x00\x00\x00"
+        elif output[offset + 3] == 0:
+            output[offset:offset + 3] = b"\x00\x00\x00"
+    return Image.frombytes("RGBA", image.size, bytes(output))
 
 
 def translate_image(image: Image.Image, operation: dict[str, Any]) -> Image.Image:
@@ -1931,6 +1965,8 @@ def apply_operation(
         return _alpha_feather(image, float(operation.get("radius", 1)))
     if op == "connected-matte-to-alpha":
         return connected_matte_to_alpha(image, operation)
+    if op == "matte-colour-to-alpha":
+        return matte_colour_to_alpha(image, operation)
     if op == "edge-decontaminate":
         return edge_decontaminate(image, operation)
     if op == "defringe":

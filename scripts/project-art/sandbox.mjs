@@ -398,6 +398,10 @@ function normalizedOperation(value, index, registry) {
       255,
     );
   }
+  if (op === 'matte-colour-to-alpha') {
+    parameters.matteColour = normalizedColour(parameters.matteColour, 'matte-colour-to-alpha.matteColour');
+    parameters.distance = boundedNumber(parameters.distance ?? 0, 'matte-colour-to-alpha.distance', 0, 441);
+  }
   if (op === 'repack-alpha-components') {
     parameters.componentCount = boundedInteger(parameters.componentCount, 'repack-alpha-components.componentCount', 1, 256);
     parameters.cellWidth = boundedInteger(parameters.cellWidth, 'repack-alpha-components.cellWidth', 1, MAXIMUM_IMAGE_DIMENSION);

@@ -203,6 +203,14 @@
       ]
     },
     {
+      "id": "matte-colour-to-alpha",
+      "kind": "alpha",
+      "deterministic": true,
+      "required": [
+        "matteColour"
+      ]
+    },
+    {
       "id": "edge-decontaminate",
       "kind": "alpha",
       "deterministic": true,

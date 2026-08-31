@@ -287,6 +287,7 @@ chroma-to-alpha
 component-prune
 repack-alpha-components
 connected-matte-to-alpha
+matte-colour-to-alpha
 edge-decontaminate
 hidden-rgb-rebuild
 palette-normalize

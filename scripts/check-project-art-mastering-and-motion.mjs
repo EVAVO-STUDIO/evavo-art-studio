@@ -51,6 +51,7 @@ for (const operation of [
   'channel-mixer',
   'selective-channel-mixer',
   'repack-alpha-components',
+  'matte-colour-to-alpha',
   'box-blur',
   'median-filter',
   'motion-blur',
