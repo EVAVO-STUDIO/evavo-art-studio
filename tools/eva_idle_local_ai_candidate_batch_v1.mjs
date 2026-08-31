@@ -20,6 +20,7 @@ const COMPLETION_SCHEMA = "evavo.eva-idle-local-ai-candidate-completion.v1";
 const ADAPTER_SCHEMA = "evavo.animation-ledger-candidate-adapter.v1";
 const SHA = /^sha256:[0-9a-f]{64}$/u;
 const ARTIFACT = /^artifact_[0-9a-f]{64}$/u;
+const JOB_ID = /^[A-Za-z0-9._-]{1,96}$/u;
 const AUTHORITY = Object.freeze({
   providerExecution: false,
   localAiExecution: false,
@@ -60,7 +61,12 @@ function digest(value) {
 }
 function falseAuthority(value, code) {
   const authority = record(value, code);
-  if (Object.values(authority).some((entry) => entry !== false)) fail(code);
+  if (
+    Object.keys(authority).length === 0 ||
+    Object.values(authority).some((entry) => entry !== false)
+  ) {
+    fail(code);
+  }
 }
 function assertSelfDigest(value, code) {
   if (typeof value.contentDigest !== "string" || !SHA.test(value.contentDigest)) {
@@ -132,11 +138,26 @@ function parseCompletion(completionValue, profile, intake, workOrders) {
     completion.profileDigest !== profile.contentDigest ||
     completion.ledgerId !== intake.ledger.ledgerId ||
     completion.ledgerDigest !== intake.ledger.contentDigest ||
+    typeof completion.localComputeJobId !== "string" ||
+    !JOB_ID.test(completion.localComputeJobId) ||
     !completion.ledgerCandidate ||
     !completion.candidateArtifact ||
     !completion.acceptanceBoundary
   ) {
     fail("EVA_IDLE_CANDIDATE_BATCH_COMPLETION_INVALID");
+  }
+  for (const field of [
+    "dispatchDigest",
+    "workOrderDigest",
+    "creativeImagePlanDigest",
+    "submittedAiSpecDigest",
+    "localComputeReceiptDigest",
+    "workerReceiptDigest",
+    "manifestFileDigest",
+  ]) {
+    if (typeof completion[field] !== "string" || !SHA.test(completion[field])) {
+      fail("EVA_IDLE_CANDIDATE_BATCH_COMPLETION_PROVENANCE_INVALID", field);
+    }
   }
   assertSelfDigest(completion, "EVA_IDLE_CANDIDATE_BATCH_COMPLETION");
   falseAuthority(
@@ -207,6 +228,7 @@ function parseCompletion(completionValue, profile, intake, workOrders) {
     !ARTIFACT.test(candidate.artifactId) ||
     typeof candidate.contentDigest !== "string" ||
     !SHA.test(candidate.contentDigest) ||
+    candidate.artifactId !== `artifact_${candidate.contentDigest.slice("sha256:".length)}` ||
     candidate.artifactId !== artifact.artifactId ||
     candidate.contentDigest !== artifact.contentDigest ||
     candidate.byteLength !== artifact.byteLength ||
@@ -358,7 +380,10 @@ export async function applyEvaIdleLocalAiCandidateBatch(
       intake: value.intake,
       completions: value.completions,
     },
-    iso(value.prepared?.preparedAt, "EVA_IDLE_CANDIDATE_APPLICATION_PREPARED_TIME_INVALID"),
+    iso(
+      value.prepared?.preparedAt,
+      "EVA_IDLE_CANDIDATE_APPLICATION_PREPARED_TIME_INVALID",
+    ),
   );
   const prepared = validatePrepared(value.prepared);
   sameValue(
