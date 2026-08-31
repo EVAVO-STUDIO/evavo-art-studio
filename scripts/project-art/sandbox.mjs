@@ -405,6 +405,7 @@ function normalizedOperation(value, index, registry) {
     parameters.minimumPixels = boundedInteger(parameters.minimumPixels ?? 100, 'repack-alpha-components.minimumPixels', 1, 10_000_000);
     parameters.alphaThreshold = boundedInteger(parameters.alphaThreshold ?? 1, 'repack-alpha-components.alphaThreshold', 1, 255);
     parameters.connectivity = boundedInteger(parameters.connectivity ?? 8, 'repack-alpha-components.connectivity', 4, 8);
+    parameters.minimumPadding = boundedInteger(parameters.minimumPadding ?? 1, 'repack-alpha-components.minimumPadding', 1, 1_024);
     if (![4, 8].includes(parameters.connectivity)) {
       fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'repack-alpha-components.connectivity must be 4 or 8.');
     }

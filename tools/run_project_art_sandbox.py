@@ -1665,6 +1665,7 @@ def _repack_alpha_components(
     minimum_pixels = governed_integer(operation.get("minimumPixels", 100), "repack-alpha-components.minimumPixels", 1, 10_000_000)
     alpha_threshold = governed_integer(operation.get("alphaThreshold", 1), "repack-alpha-components.alphaThreshold", 1, 255)
     connectivity = governed_integer(operation.get("connectivity", 8), "repack-alpha-components.connectivity", 4, 8)
+    minimum_padding = governed_integer(operation.get("minimumPadding", 1), "repack-alpha-components.minimumPadding", 1, 1_024)
     if connectivity not in {4, 8}:
         fail("repack-alpha-components.connectivity must be 4 or 8")
     require_pixel_budget(cell_width * component_count, cell_height, "repack-alpha-components output", maximum_pixels)
@@ -1714,15 +1715,15 @@ def _repack_alpha_components(
     try:
         for index, (left, top, right, bottom, _count) in enumerate(components):
             component_width, component_height = right - left, bottom - top
-            if component_width >= cell_width or component_height >= cell_height:
+            if component_width + minimum_padding * 2 > cell_width or component_height + minimum_padding * 2 > cell_height:
                 fail(
                     f"repack-alpha-components component {index} ({component_width}x{component_height}) "
-                    f"does not fit safely inside {cell_width}x{cell_height}"
+                    f"does not fit inside {cell_width}x{cell_height} with {minimum_padding}px safety padding"
                 )
             crop = rgba.crop((left, top, right, bottom))
             try:
                 destination_x = index * cell_width + (cell_width - component_width) // 2
-                destination_y = cell_height - component_height
+                destination_y = cell_height - minimum_padding - component_height
                 output.alpha_composite(crop, (destination_x, destination_y))
             finally:
                 crop.close()

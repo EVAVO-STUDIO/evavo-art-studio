@@ -322,7 +322,7 @@ alpha = image.getchannel('A')
 for index in range(3):
     bounds = alpha.crop((index * 32, 0, (index + 1) * 32, 32)).getbbox()
     assert bounds is not None
-    assert bounds[0] > 0 and bounds[1] > 0 and bounds[2] < 32 and bounds[3] == 32
+    assert bounds[0] > 0 and bounds[1] > 0 and bounds[2] < 32 and bounds[3] < 32
 assert alpha.getpixel((70, 2)) == 0
 `]);
 
