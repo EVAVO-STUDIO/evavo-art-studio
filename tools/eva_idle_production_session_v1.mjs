@@ -5,6 +5,7 @@ import {
   applyAnimationFrameCandidateBatch,
 } from "./animation_frame_work_ledger_v1.mjs";
 import { compileEvaIdleSourceReconciliation } from "./eva_idle_source_reconciliation_v1.mjs";
+import { compileAnimationCandidateProductionHandoff } from "./animation_candidate_production_handoff_v1.mjs";
 
 export const EVA_IDLE_PRODUCTION_SESSION_VERSION =
   "evavo.eva-idle-production-session.v1";
@@ -68,6 +69,7 @@ function batchRouting(batch, reconciliation) {
         route: "unresolved",
         sourceSelection: null,
         candidate: null,
+        productionHandoff: compileAnimationCandidateProductionHandoff({ workOrder }),
       });
     }
     return Object.freeze({
@@ -76,6 +78,7 @@ function batchRouting(batch, reconciliation) {
       route: "reviewed-source-reuse",
       sourceSelection: selection,
       candidate: selection.candidate,
+      productionHandoff: null,
     });
   });
   const reusedWorkOrderCount = workOrders.filter(
