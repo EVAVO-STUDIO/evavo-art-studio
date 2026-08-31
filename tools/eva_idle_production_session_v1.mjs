@@ -5,7 +5,7 @@ import {
   applyAnimationFrameCandidateBatch,
 } from "./animation_frame_work_ledger_v1.mjs";
 import { compileEvaIdleSourceReconciliation } from "./eva_idle_source_reconciliation_v1.mjs";
-import { compileAnimationCandidateProductionHandoff } from "./animation_candidate_production_handoff_v1.mjs";
+import { compileAnimationCandidateProductionHandoffV2 } from "./animation_candidate_production_handoff_v2.mjs";
 
 export const EVA_IDLE_PRODUCTION_SESSION_VERSION =
   "evavo.eva-idle-production-session.v1";
@@ -48,7 +48,17 @@ function reuseMap(reconciliation) {
   );
 }
 
-function batchRouting(batch, reconciliation) {
+function supplementalReferences(value, drawingId) {
+  if (value === undefined) return [];
+  const input = record(value, "EVA_IDLE_SESSION_SUPPLEMENTAL_REFERENCES_INVALID");
+  const references = input[drawingId] ?? [];
+  if (!Array.isArray(references) || references.length > 32) {
+    fail("EVA_IDLE_SESSION_SUPPLEMENTAL_REFERENCES_INVALID", drawingId);
+  }
+  return references;
+}
+
+function batchRouting(batch, reconciliation, supplementalReferencesByDrawing) {
   if (batch.status !== "work-ready") {
     return Object.freeze({
       status: batch.status,
@@ -63,13 +73,21 @@ function batchRouting(batch, reconciliation) {
   const workOrders = batch.workOrders.map((workOrder) => {
     const selection = reused.get(workOrder.drawingId);
     if (!selection) {
+      const supplemental = supplementalReferences(
+        supplementalReferencesByDrawing,
+        workOrder.drawingId,
+      );
       return Object.freeze({
         drawingId: workOrder.drawingId,
         workOrder,
         route: "unresolved",
         sourceSelection: null,
         candidate: null,
-        productionHandoff: compileAnimationCandidateProductionHandoff({ workOrder }),
+        supplementalReferenceCount: supplemental.length,
+        productionHandoff: compileAnimationCandidateProductionHandoffV2({
+          workOrder,
+          supplementalReferences: supplemental,
+        }),
       });
     }
     return Object.freeze({
@@ -78,6 +96,7 @@ function batchRouting(batch, reconciliation) {
       route: "reviewed-source-reuse",
       sourceSelection: selection,
       candidate: selection.candidate,
+      supplementalReferenceCount: 0,
       productionHandoff: null,
     });
   });
@@ -90,6 +109,10 @@ function batchRouting(batch, reconciliation) {
     workOrders: Object.freeze(workOrders),
     reusedWorkOrderCount,
     unresolvedWorkOrderCount: workOrders.length - reusedWorkOrderCount,
+    supplementalReferenceCount: workOrders.reduce(
+      (total, entry) => total + entry.supplementalReferenceCount,
+      0,
+    ),
     allCandidatesReady: reusedWorkOrderCount === workOrders.length,
   });
 }
@@ -115,7 +138,11 @@ export async function compileEvaIdleProductionSession(input, now = new Date()) {
     },
     now,
   );
-  const routing = batchRouting(batch, reconciliation);
+  const routing = batchRouting(
+    batch,
+    reconciliation,
+    value.supplementalReferencesByDrawing,
+  );
   return Object.freeze({
     schema: EVA_IDLE_PRODUCTION_SESSION_VERSION,
     characterId: "eva-female",
