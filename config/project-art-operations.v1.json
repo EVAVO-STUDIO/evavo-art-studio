@@ -157,6 +157,16 @@
       "deterministic": true
     },
     {
+      "id": "repack-alpha-components",
+      "kind": "geometry",
+      "deterministic": true,
+      "required": [
+        "componentCount",
+        "cellWidth",
+        "cellHeight"
+      ]
+    },
+    {
       "id": "rect-clear",
       "kind": "image-surgery",
       "deterministic": true,

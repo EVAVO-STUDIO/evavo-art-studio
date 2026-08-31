@@ -1653,6 +1653,87 @@ def _component_prune(image: Image.Image, operation: dict[str, Any]) -> Image.Ima
     return Image.frombytes("RGBA", image.size, bytes(output))
 
 
+def _repack_alpha_components(
+    image: Image.Image,
+    operation: dict[str, Any],
+    maximum_pixels: int,
+) -> Image.Image:
+    """Pack an exact left-to-right set of visible components into safe equal cells."""
+    component_count = governed_integer(operation.get("componentCount"), "repack-alpha-components.componentCount", 1, 256)
+    cell_width = governed_integer(operation.get("cellWidth"), "repack-alpha-components.cellWidth", 1, 16_384)
+    cell_height = governed_integer(operation.get("cellHeight"), "repack-alpha-components.cellHeight", 1, 16_384)
+    minimum_pixels = governed_integer(operation.get("minimumPixels", 100), "repack-alpha-components.minimumPixels", 1, 10_000_000)
+    alpha_threshold = governed_integer(operation.get("alphaThreshold", 1), "repack-alpha-components.alphaThreshold", 1, 255)
+    connectivity = governed_integer(operation.get("connectivity", 8), "repack-alpha-components.connectivity", 4, 8)
+    if connectivity not in {4, 8}:
+        fail("repack-alpha-components.connectivity must be 4 or 8")
+    require_pixel_budget(cell_width * component_count, cell_height, "repack-alpha-components output", maximum_pixels)
+    rgba = image.convert("RGBA")
+    width, height = rgba.size
+    alpha = rgba.getchannel("A")
+    try:
+        visible = bytearray(1 if value >= alpha_threshold else 0 for value in alpha.tobytes())
+    finally:
+        alpha.close()
+    components: list[tuple[int, int, int, int, int]] = []
+    neighbours = (
+        ((-1, 0), (1, 0), (0, -1), (0, 1))
+        if connectivity == 4
+        else ((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
+    )
+    for start in range(width * height):
+        if not visible[start]:
+            continue
+        queue = deque([start])
+        visible[start] = 0
+        count = 0
+        left = right = start % width
+        top = bottom = start // width
+        while queue:
+            current = queue.popleft()
+            x, y = current % width, current // width
+            count += 1
+            left, right = min(left, x), max(right, x)
+            top, bottom = min(top, y), max(bottom, y)
+            for delta_x, delta_y in neighbours:
+                next_x, next_y = x + delta_x, y + delta_y
+                if 0 <= next_x < width and 0 <= next_y < height:
+                    index = next_y * width + next_x
+                    if visible[index]:
+                        visible[index] = 0
+                        queue.append(index)
+        if count >= minimum_pixels:
+            components.append((left, top, right + 1, bottom + 1, count))
+    components.sort(key=lambda component: (component[0], component[1]))
+    if len(components) != component_count:
+        fail(
+            "repack-alpha-components expected "
+            f"{component_count} components but found {len(components)} at minimumPixels={minimum_pixels}"
+        )
+    output = Image.new("RGBA", (cell_width * component_count, cell_height), (0, 0, 0, 0))
+    try:
+        for index, (left, top, right, bottom, _count) in enumerate(components):
+            component_width, component_height = right - left, bottom - top
+            if component_width >= cell_width or component_height >= cell_height:
+                fail(
+                    f"repack-alpha-components component {index} ({component_width}x{component_height}) "
+                    f"does not fit safely inside {cell_width}x{cell_height}"
+                )
+            crop = rgba.crop((left, top, right, bottom))
+            try:
+                destination_x = index * cell_width + (cell_width - component_width) // 2
+                destination_y = cell_height - component_height
+                output.alpha_composite(crop, (destination_x, destination_y))
+            finally:
+                crop.close()
+        return output
+    except Exception:
+        output.close()
+        raise
+    finally:
+        rgba.close()
+
+
 def _bounded_rectangle(operation: dict[str, Any], image: Image.Image, label: str) -> tuple[int, int, int, int]:
     x = governed_integer(operation.get("x"), f"{label}.x", 0, image.width - 1)
     y = governed_integer(operation.get("y"), f"{label}.y", 0, image.height - 1)
@@ -1833,6 +1914,8 @@ def apply_operation(
         return _chroma_to_alpha(image, operation)
     if op == "component-prune":
         return _component_prune(image, operation)
+    if op == "repack-alpha-components":
+        return _repack_alpha_components(image, operation, maximum_pixels)
     if op == "rect-clear":
         return _rect_clear(image, operation)
     if op == "rect-fill":

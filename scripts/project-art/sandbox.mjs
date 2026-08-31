@@ -283,6 +283,9 @@ function imageOperationDimensions(initial, operations) {
     if (['crop', 'pad-canvas', 'resize', 'pixel-resize'].includes(operation.op)) {
       width = operation.width;
       height = operation.height;
+    } else if (operation.op === 'repack-alpha-components') {
+      width = operation.componentCount * operation.cellWidth;
+      height = operation.cellHeight;
     } else if (['affine-transform', 'perspective-transform'].includes(operation.op) && operation.width !== undefined) {
       width = operation.width;
       height = operation.height;
@@ -393,6 +396,23 @@ function normalizedOperation(value, index, registry) {
       'component-prune.alphaThreshold',
       1,
       255,
+    );
+  }
+  if (op === 'repack-alpha-components') {
+    parameters.componentCount = boundedInteger(parameters.componentCount, 'repack-alpha-components.componentCount', 1, 256);
+    parameters.cellWidth = boundedInteger(parameters.cellWidth, 'repack-alpha-components.cellWidth', 1, MAXIMUM_IMAGE_DIMENSION);
+    parameters.cellHeight = boundedInteger(parameters.cellHeight, 'repack-alpha-components.cellHeight', 1, MAXIMUM_IMAGE_DIMENSION);
+    parameters.minimumPixels = boundedInteger(parameters.minimumPixels ?? 100, 'repack-alpha-components.minimumPixels', 1, 10_000_000);
+    parameters.alphaThreshold = boundedInteger(parameters.alphaThreshold ?? 1, 'repack-alpha-components.alphaThreshold', 1, 255);
+    parameters.connectivity = boundedInteger(parameters.connectivity ?? 8, 'repack-alpha-components.connectivity', 4, 8);
+    if (![4, 8].includes(parameters.connectivity)) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'repack-alpha-components.connectivity must be 4 or 8.');
+    }
+    assertDecodedPixelLimit(
+      parameters.componentCount * parameters.cellWidth,
+      parameters.cellHeight,
+      'repack-alpha-components',
+      registry.maximumDecodedPixels,
     );
   }
   if (['rect-clear', 'rect-fill'].includes(op)) {

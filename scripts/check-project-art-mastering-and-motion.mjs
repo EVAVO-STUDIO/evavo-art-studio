@@ -50,6 +50,7 @@ for (const operation of [
   'curves',
   'channel-mixer',
   'selective-channel-mixer',
+  'repack-alpha-components',
   'box-blur',
   'median-filter',
   'motion-blur',

@@ -102,6 +102,7 @@ await mkdir(workspace, { recursive: true });
 try {
   const source = path.join(workspace, 'source.png');
   const mask = path.join(workspace, 'mask.png');
+  const componentStrip = path.join(workspace, 'component-strip.png');
   const videoFramePattern = path.join(workspace, 'video-frame-%04d.png');
   const fixture = `
 from PIL import Image, ImageDraw
@@ -118,6 +119,13 @@ matte = Image.new('RGBA', (48, 48), (0, 0, 0, 0))
 matte_draw = ImageDraw.Draw(matte)
 matte_draw.ellipse((5, 2, 42, 45), fill=(255, 255, 255, 255))
 matte.save(mask)
+component_strip = Image.new('RGBA', (113, 32), (0, 0, 0, 0))
+component_draw = ImageDraw.Draw(component_strip)
+component_draw.rectangle((3, 4, 12, 19), fill=(220, 60, 70, 255))
+component_draw.rectangle((43, 7, 54, 22), fill=(40, 180, 120, 255))
+component_draw.rectangle((91, 2, 102, 19), fill=(70, 110, 230, 255))
+component_draw.point((70, 2), fill=(255, 255, 255, 255))
+component_strip.save(Path(${JSON.stringify(componentStrip)}))
 for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
     frame = Image.new('RGBA', (48, 32), (0, 0, 0, 0))
     frame_draw = ImageDraw.Draw(frame)
@@ -201,6 +209,16 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
         ],
       },
       {
+        id: 'safe-cell-repack-proof',
+        kind: 'image',
+        source: 'component-strip.png',
+        targetPath: 'geometry/safe-cell-repack.png',
+        outputFormat: 'png',
+        operations: [
+          { op: 'repack-alpha-components', componentCount: 3, cellWidth: 32, cellHeight: 32, minimumPixels: 100, connectivity: 8 },
+        ],
+      },
+      {
         id: 'motion-preview',
         kind: 'motion-sequence',
         sources: [
@@ -252,8 +270,8 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
   ]);
   const plan = JSON.parse(await readFile(planPath, 'utf8'));
   verifyDocumentHash(plan);
-  assert.deepEqual(plan.tasks.map((task) => task.kind), ['image-master', 'image', 'image', 'motion-sequence']);
-  assert.equal(plan.limits.plannedMaximumOutputFiles, 12);
+  assert.deepEqual(plan.tasks.map((task) => task.kind), ['image-master', 'image', 'image', 'image', 'motion-sequence']);
+  assert.equal(plan.limits.plannedMaximumOutputFiles, 13);
 
   command(python.name, [...python.prefix,
     'tools/run_project_art_sandbox.py',
@@ -265,7 +283,7 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
   const receipt = JSON.parse(await readFile(path.join(outputRoot, '_evavo', 'project-art-sandbox-receipt.json'), 'utf8'));
   verifyDocumentHash(receipt);
   assert.equal(receipt.status, 'passed');
-  assert.equal(receipt.tasks.length, 4);
+  assert.equal(receipt.tasks.length, 5);
 
   const masterReport = JSON.parse(await readFile(path.join(outputRoot, 'masters', 'source-master.mastering.json'), 'utf8'));
   verifyDocumentHash(masterReport);
@@ -293,6 +311,19 @@ source = Image.open(${JSON.stringify(source)}).convert('RGBA')
 rim = Image.open(${JSON.stringify(rimLightPath)}).convert('RGBA')
 assert source.getchannel('A').tobytes() == rim.getchannel('A').tobytes()
 assert source.tobytes() != rim.tobytes()
+`]);
+  const repackPath = path.join(outputRoot, 'geometry', 'safe-cell-repack.png');
+  assert.equal((await lstat(repackPath)).isFile(), true);
+  command(python.name, [...python.prefix, '-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(repackPath)}).convert('RGBA')
+assert image.size == (96, 32)
+alpha = image.getchannel('A')
+for index in range(3):
+    bounds = alpha.crop((index * 32, 0, (index + 1) * 32, 32)).getbbox()
+    assert bounds is not None
+    assert bounds[0] > 0 and bounds[1] > 0 and bounds[2] < 32 and bounds[3] == 32
+assert alpha.getpixel((70, 2)) == 0
 `]);
 
   const motionRoot = path.join(outputRoot, 'motion', 'idle-preview');
@@ -446,7 +477,7 @@ ${blockedResult.stderr}`, /PROJECT_ART_MASTERING_PROFILE_FAILED/u);
   await assert.rejects(lstat(blockedOutputRoot));
 
   const tamperedPlan = structuredClone(plan);
-  tamperedPlan.tasks[3].frameCount = 20_001;
+  tamperedPlan.tasks[4].frameCount = 20_001;
   const tamperedPlanPath = path.join(workspace, 'tampered-plan.json');
   await writeFile(tamperedPlanPath, `${JSON.stringify(rehash(tamperedPlan), null, 2)}\n`);
   const tamperedOutputRoot = path.join(workspace, 'tampered-output');

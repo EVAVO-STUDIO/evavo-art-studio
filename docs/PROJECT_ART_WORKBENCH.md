@@ -282,6 +282,10 @@ unsharp-mask
 alpha-erode
 alpha-dilate
 alpha-threshold
+alpha-clean
+chroma-to-alpha
+component-prune
+repack-alpha-components
 connected-matte-to-alpha
 edge-decontaminate
 hidden-rgb-rebuild
