@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "projectId": "command-front",
+  "scenarioId": "operation-breakwater",
+  "consumerRepository": "EVAVO-STUDIO/command-front",
+  "consumerRequirements": "data/presentation/directional_sprite_requirements.json",
+  "unitTypeId": "meridian-combat-engineer",
+  "directions": 8,
+  "requiredStates": ["idle","move","carbine-fire","capture","repair","breach","mine","salvage","hit","death"],
+  "authorityMapping": {
+    "capture": "active capture job in capturing phase",
+    "repair": "structure repairer_unit_ids",
+    "breach": "active structure/cover demolition, breach, or bridge demolition job",
+    "mine": "active mine-clear job or accepted mine-placement presentation event",
+    "salvage": "active salvage job"
+  },
+  "releaseProofs": [
+    "8-direction-action-consistency",
+    "capture-vs-repair-readability",
+    "breach-vs-mine-readability",
+    "salvage-work-readability",
+    "640x360-gameplay-scale-proof",
+    "nearest-neighbour-proof",
+    "transparent-background-proof",
+    "provenance-proof"
+  ],
+  "rules": [
+    "work states must read as active physical tasks rather than generic idle poses",
+    "salvage must read as dismantling/recovery work and remain distinct from structure repair",
+    "breach must cover explosive preparation without resembling ordinary carbine fire",
+    "mine must support both placement and clearance reads without modern EOD-robot imagery",
+    "all action states remain grounded alt-1999 and original-design only"
+  ]
+}
