@@ -1,0 +1,92 @@
+{
+  "schema": "evavo.animation-execution-supervisor-lock.v1",
+  "protocolVersion": "2026-08-31.2",
+  "role": "art-studio",
+  "catalogueDigest": "sha256:bc14ca8af3aae8750e5cf92e271414ed3e33f99754dce5f466366627176a49cf",
+  "files": [
+    {
+      "path": "tools/animation_execution_supervisor_v1_internal.mjs",
+      "sha256": "sha256:0baf8d5ed3f421a4d6046e999091b96f4e30cf8234c764828053e5ab0b2fda65"
+    },
+    {
+      "path": "tools/animation_execution_supervisor_v1_internal.payload.001.txt",
+      "sha256": "sha256:5a96a6cdc0c42c5b3827d914f6500eab654b959387cdc9ad86f6f94e665c3084"
+    },
+    {
+      "path": "tools/animation_execution_supervisor_v1_internal.payload.002.txt",
+      "sha256": "sha256:fb17bd04202911cc0ad526f49b69985cc89f90e1dcb75cfc5faf55170e1362ef"
+    },
+    {
+      "path": "tools/animation_execution_supervisor_v1_internal.payload.003.txt",
+      "sha256": "sha256:9e150a9c904896ad82faa09e61025203cad65edf05e37036e35ccfa1f2a32626"
+    },
+    {
+      "path": "tools/animation_execution_supervisor_v1_internal.payload.004.txt",
+      "sha256": "sha256:1b5f7c18394fe4c05c7bc18e92d5b574fedb26b4ece62a335ccaf0da8d508ab6"
+    },
+    {
+      "path": "tools/animation_execution_supervisor_v1.mjs",
+      "sha256": "sha256:6bdbc17fcee7db041655b4c703e8e440d3ff9a89bae712aaec923d083457fa58"
+    },
+    {
+      "path": "tools/animation_execution_supervisor_v1_mcp.mjs",
+      "sha256": "sha256:625c4aee77d3036937dff0c33d8d81d69739cb83818ccf929659ce167ce89d4e"
+    },
+    {
+      "path": "contracts/animation-execution-supervisor-v1.schema.json",
+      "sha256": "sha256:d5d2fe143c43420f9dc058ab8d8c4239db2f99b09935de048c8437f2bd1584e6"
+    },
+    {
+      "path": "contracts/ANIMATION_EXECUTION_SUPERVISOR_V1.md",
+      "sha256": "sha256:bb15ef3f7f0de246036934d6607c626a336cf97522b44ccc873feacb5f8e0aa2"
+    },
+    {
+      "path": "config/animation-execution-adapter-catalogue-v1.json",
+      "sha256": "sha256:f219970cb0d8b028b5f736683b5c40700c3e2b409003a82bf300a3bc54405140"
+    },
+    {
+      "path": "scripts/build-animation-execution-adapter-catalogue-v1.mjs",
+      "sha256": "sha256:ef42b37f46d5bc39d94373da8435ec5ef7925f8ed7f0a246021b5ae22b3fd8f0"
+    },
+    {
+      "path": "scripts/check-animation-execution-supervisor-v1.mjs",
+      "sha256": "sha256:6f512ccb9fa871cb798debb3bded74138e3c8b5e8dcd760b075af1edb0e3c7d4"
+    },
+    {
+      "path": "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
+      "sha256": "sha256:97bf21e64ca2dbb52a56928fd845feb1335f5a4bb42abecdc8590a88dbd54af5"
+    },
+    {
+      "path": "scripts/test-animation-execution-supervisor-v1.mjs",
+      "sha256": "sha256:d1a968583cc2f0f1f0d164a365bfeb7ac596e67957d56900689aea7fe5551fb3"
+    },
+    {
+      "path": "scripts/test-animation-execution-supervisor-v1.payload.001.txt",
+      "sha256": "sha256:ef5dcb8981ec26dbbd63e9eab23382483c21d5fd9dc460fd39d99e95b3099179"
+    },
+    {
+      "path": "scripts/test-animation-execution-supervisor-v1.payload.002.txt",
+      "sha256": "sha256:5eeb5c0484ec59ce5da5eb2605f6b0f53e7ba1d4d575516413daf2f2eb3d8283"
+    },
+    {
+      "path": "scripts/test-animation-execution-evidence-bridges-v1.mjs",
+      "sha256": "sha256:986411aeb9f5874d4e377386093aa6fdf17e0f066309272a9e22824615d25e94"
+    },
+    {
+      "path": "scripts/animation-execution-adapters/art-provider-bridge-v1.mjs",
+      "sha256": "sha256:112242f11a6cc8340375c0b36f1a38994edad22b60740ba9db90c90f16cca062"
+    },
+    {
+      "path": "scripts/animation-execution-adapters/art-drawing-inspection-bridge-v1.mjs",
+      "sha256": "sha256:1c5c6eeca11bf4796f0a07f953cbea545f4f3c1dca04808509c79141a00cf5a7"
+    },
+    {
+      "path": "scripts/compile-animation-drawing-inspection-evidence-v1.mjs",
+      "sha256": "sha256:f9279152ef12dd9b3282543178af88fcb382f0fe10c32d6853dda86fa542402e"
+    },
+    {
+      "path": ".mcp.animation-execution-supervisor-v1.json",
+      "sha256": "sha256:08c0a84d294052e78e79ca31d845721fc416691714b2fdf9025075969db9a9d6"
+    }
+  ]
+}

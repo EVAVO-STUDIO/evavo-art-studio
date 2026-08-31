@@ -1,0 +1,105 @@
+{
+  "schema": "evavo.animation-execution-adapter-catalogue.v1",
+  "protocolVersion": "2026-08-31.2",
+  "catalogueId": "evavo.animation.local-production.v1",
+  "revision": 1,
+  "adapters": [
+    {
+      "id": "evavo.art.local-frame-provider.v1",
+      "phase": "frame-provider",
+      "ownerRole": "art-studio",
+      "kind": "command",
+      "entrypoint": "scripts/animation-execution-adapters/art-provider-bridge-v1.mjs",
+      "workingDirectory": ".",
+      "implementationSha256": "sha256:112242f11a6cc8340375c0b36f1a38994edad22b60740ba9db90c90f16cca062",
+      "timeoutMs": 900000,
+      "maximumOutputBytes": 1048576,
+      "networkPolicy": "loopback-only",
+      "environmentVariables": [
+        "EVAVO_ANIMATION_ALLOWED_PROVIDER_ADAPTERS",
+        "EVAVO_ART_ARTIFACT_ROOT",
+        "EVAVO_ART_COMFYUI_ALLOW_REMOTE",
+        "EVAVO_ART_COMFYUI_BASE_URL",
+        "EVAVO_ART_COMFYUI_CATALOG",
+        "EVAVO_ART_COMFYUI_CATALOG_ROOT",
+        "EVAVO_ART_COMFYUI_DEDICATED_INSTANCE",
+        "EVAVO_ART_COMFYUI_EXECUTION_TIMEOUT_MS",
+        "EVAVO_ART_COMFYUI_MAX_JSON_BYTES",
+        "EVAVO_ART_COMFYUI_MAX_OUTPUT_BYTES",
+        "EVAVO_ART_COMFYUI_MAX_UPLOAD_BYTES",
+        "EVAVO_ART_COMFYUI_POLL_INTERVAL_MS",
+        "EVAVO_ART_PROVIDER_MAX_RESPONSE_BYTES"
+      ],
+      "capabilities": [
+        "candidate-png-output",
+        "exact-work-order-binding",
+        "local-comfyui-routing",
+        "native-alpha-validation",
+        "provider-evidence-artifact"
+      ],
+      "candidateOnly": true,
+      "enabled": true,
+      "priority": 100,
+      "selector": {}
+    },
+    {
+      "id": "evavo.art.drawing-evidence-consumer.v1",
+      "phase": "drawing-inspector",
+      "ownerRole": "art-studio",
+      "kind": "module",
+      "entrypoint": "scripts/animation-execution-adapters/art-drawing-inspection-bridge-v1.mjs",
+      "workingDirectory": ".",
+      "implementationSha256": "sha256:1c5c6eeca11bf4796f0a07f953cbea545f4f3c1dca04808509c79141a00cf5a7",
+      "exportName": "consumeArtDrawingInspectionEvidence",
+      "timeoutMs": 30000,
+      "maximumOutputBytes": 4194304,
+      "networkPolicy": "disabled",
+      "environmentVariables": [],
+      "capabilities": [
+        "digest-sealed-drawing-evidence",
+        "exact-candidate-lineage",
+        "no-fabricated-visual-scores"
+      ],
+      "candidateOnly": true,
+      "enabled": true,
+      "priority": 100,
+      "selector": {}
+    },
+    {
+      "id": "evavo.cel.independent-sequence-evidence-consumer.v1",
+      "phase": "sequence-reviewer",
+      "ownerRole": "cel-animation-studio",
+      "kind": "module",
+      "entrypoint": "scripts/animation-execution-adapters/cel-sequence-review-bridge-v1.mjs",
+      "workingDirectory": ".",
+      "implementationSha256": "sha256:18c466c4843a43718f239da7ef3cfb770581cf86298b1aa3f1fec42e15440a0d",
+      "exportName": "consumeCelIndependentSequenceEvidence",
+      "timeoutMs": 30000,
+      "maximumOutputBytes": 16777216,
+      "networkPolicy": "disabled",
+      "environmentVariables": [],
+      "capabilities": [
+        "digest-sealed-sequence-evidence",
+        "frame-by-frame-review",
+        "independent-cel-review",
+        "normal-speed-review",
+        "targeted-repair-identification"
+      ],
+      "candidateOnly": true,
+      "enabled": true,
+      "priority": 100,
+      "selector": {}
+    }
+  ],
+  "authority": {
+    "providerExecution": false,
+    "automaticCreativeApproval": false,
+    "artifactPromotion": false,
+    "targetRepositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "runtimeActivation": false,
+    "publication": false
+  },
+  "catalogueDigest": "sha256:bc14ca8af3aae8750e5cf92e271414ed3e33f99754dce5f466366627176a49cf"
+}

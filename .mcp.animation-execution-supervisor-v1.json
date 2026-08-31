@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "evavo-animation-execution-supervisor-v1": {
+      "command": "node",
+      "args": [
+        "scripts/start-animation-execution-supervisor-mcp-v1.mjs"
+      ],
+      "env": {
+        "EVAVO_ANIMATION_EXECUTION_ENABLED": "disabled",
+        "EVAVO_ANIMATION_CREATIVE_APPROVAL_WRITE_ENABLED": "disabled"
+      }
+    }
+  }
+}
