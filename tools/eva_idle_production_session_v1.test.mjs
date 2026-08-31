@@ -98,6 +98,26 @@ test("idle session preserves atomic first batch while routing reusable and unres
   assert.equal(session.nextAction, "route-unresolved-work-orders");
   assert.equal(session.ledger.revision, 0);
   assert.ok(session.ledger.drawingStates.every((state) => state.status === "pending"));
+
+  const reused = session.firstBatch.workOrders.find(
+    (workOrder) => workOrder.route === "reviewed-source-reuse",
+  );
+  const unresolved = session.firstBatch.workOrders.find(
+    (workOrder) => workOrder.route === "unresolved",
+  );
+  assert.ok(reused);
+  assert.equal(reused.productionHandoff, null);
+  assert.ok(unresolved?.productionHandoff);
+  assert.equal(
+    unresolved.productionHandoff.schema,
+    "evavo.animation-candidate-production-handoff.v1",
+  );
+  assert.equal(
+    unresolved.productionHandoff.workOrderDigest,
+    unresolved.workOrder.workOrderDigest,
+  );
+  assert.equal(unresolved.productionHandoff.routePolicy.candidateOnly, true);
+  assert.equal(unresolved.productionHandoff.authority.localExecution, false);
 });
 
 test("idle session can atomically admit an all-reused first key batch and advance to dependent work", async () => {
@@ -118,6 +138,7 @@ test("idle session can atomically admit an all-reused first key batch and advanc
 
   assert.equal(session.firstBatch.allCandidatesReady, true);
   assert.equal(session.nextAction, "apply-reused-candidate-batch");
+  assert.ok(session.firstBatch.workOrders.every((entryValue) => entryValue.productionHandoff === null));
 
   const candidates = session.firstBatch.workOrders.map((entryValue) => ({
     drawingId: entryValue.drawingId,
