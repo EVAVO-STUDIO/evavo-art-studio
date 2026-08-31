@@ -50,7 +50,7 @@
     },
     {
       "path": "scripts/check-animation-execution-supervisor-v1.mjs",
-      "sha256": "sha256:6f512ccb9fa871cb798debb3bded74138e3c8b5e8dcd760b075af1edb0e3c7d4"
+      "sha256": "sha256:2b5c5f75dcc3a32e92467da83f425c6c7b317fab589ad5e0411e1d190a3dff32"
     },
     {
       "path": "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
@@ -73,6 +73,10 @@
       "sha256": "sha256:986411aeb9f5874d4e377386093aa6fdf17e0f066309272a9e22824615d25e94"
     },
     {
+      "path": "scripts/test-animation-execution-art-evidence-v1.mjs",
+      "sha256": "sha256:74ccffc5754d9c98f3bb8e20f789e308cee1d19968a9afe0770b5afdaa11847a"
+    },
+    {
       "path": "scripts/animation-execution-adapters/art-provider-bridge-v1.mjs",
       "sha256": "sha256:112242f11a6cc8340375c0b36f1a38994edad22b60740ba9db90c90f16cca062"
     },
@@ -83,6 +87,10 @@
     {
       "path": "scripts/compile-animation-drawing-inspection-evidence-v1.mjs",
       "sha256": "sha256:f9279152ef12dd9b3282543178af88fcb382f0fe10c32d6853dda86fa542402e"
+    },
+    {
+      "path": "packages/art-direction/test/animation-execution-supervisor.test.mjs",
+      "sha256": "sha256:2c729384c910dfd4667fec6f8c0223fcdad46d216e67be1350378e6a39967fa9"
     },
     {
       "path": ".mcp.animation-execution-supervisor-v1.json",

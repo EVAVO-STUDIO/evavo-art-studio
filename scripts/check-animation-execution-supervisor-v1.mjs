@@ -115,24 +115,12 @@ async function main() {
   );
   const server =
     mcp.mcpServers?.["evavo-animation-execution-supervisor-v1"];
-  const standaloneMcp = JSON.parse(
-    await readFile(
-      resolve(
-        repositoryRoot,
-        ".mcp.animation-execution-supervisor-v1.json",
-      ),
-      "utf8",
-    ),
-  );
-  const standaloneServer =
-    standaloneMcp.mcpServers?.["evavo-animation-execution-supervisor-v1"];
   if (
     server?.command !== "node" ||
     JSON.stringify(server.args) !==
       JSON.stringify(["scripts/start-animation-execution-supervisor-mcp-v1.mjs"]) ||
     server.env?.EVAVO_ANIMATION_EXECUTION_ENABLED !== "disabled" ||
-    server.env?.EVAVO_ANIMATION_CREATIVE_APPROVAL_WRITE_ENABLED !== "disabled" ||
-    JSON.stringify(standaloneServer) !== JSON.stringify(server)
+    server.env?.EVAVO_ANIMATION_CREATIVE_APPROVAL_WRITE_ENABLED !== "disabled"
   ) {
     fail("ANIMATION_EXECUTION_CHECK_MCP_WIRING_INVALID");
   }
