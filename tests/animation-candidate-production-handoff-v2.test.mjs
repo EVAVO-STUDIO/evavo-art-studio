@@ -13,7 +13,8 @@ const artifact = (char) => `artifact_${hex(char)}`;
 function workOrder() {
   return {
     schema: "evavo.animation-frame-work-order.v1",
-    id: "work_idle_inhale_attempt_1",
+    workOrderId: "work_idle_inhale_attempt_1",
+    workOrderDigest: sha("c"),
     ledgerId: "ledger_idle_v1",
     ledgerRevision: 1,
     ledgerDigest: sha("a"),
@@ -24,11 +25,11 @@ function workOrder() {
     attemptId: "eva-idle-primary-inhale-attempt-1",
     idempotencyKey: "eva-idle-primary-inhale-attempt-1",
     mode: "generate",
-    generationClass: "breakdown",
     drawing: {
       ordinal: 2,
       poseId: "inhale",
       role: "breakdown",
+      generationClass: "breakdown",
       phase: "inhale",
       intent: "subtle inhale",
       contactAnchor: "feet",
@@ -85,7 +86,6 @@ function workOrder() {
       runtimeActivation: false,
       publication: false,
     },
-    contentDigest: sha("c"),
   };
 }
 
