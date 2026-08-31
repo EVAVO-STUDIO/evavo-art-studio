@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "projectId": "command-front",
+  "scenarioId": "operation-breakwater",
+  "consumerRepository": "EVAVO-STUDIO/command-front",
+  "consumerRequirements": "data/presentation/directional_sprite_requirements.json",
+  "purpose": "Guarantee every fuelled Breakwater combat vehicle has explicit immobilised and persistent wreck presentation coverage.",
+  "vehicles": [
+    {"unitTypeId":"meridian-m12-ifv","directions":16,"requiredStates":["idle","move","fire","hit","disabled","wreck"],"disabledRead":"immobilised but recoverable vehicle, engine/fuel failure readable without implying destruction","wreckRead":"destroyed persistent salvageable wreck"},
+    {"unitTypeId":"meridian-m90-mbt","directions":16,"requiredStates":["idle","move","fire","hit","disabled","wreck"],"disabledRead":"immobilised but recoverable vehicle, engine/fuel failure readable without implying destruction","wreckRead":"destroyed persistent salvageable wreck"},
+    {"unitTypeId":"vesper-armed-technical","directions":16,"requiredStates":["idle","move","fire","hit","disabled","wreck"],"disabledRead":"wheeled technical visibly immobilised but not destroyed; preserve weapon/crew silhouette","wreckRead":"destroyed persistent salvageable technical wreck"},
+    {"unitTypeId":"vesper-captured-battle-tank","directions":16,"requiredStates":["idle","move","fire","hit","disabled","wreck"],"disabledRead":"immobilised captured armour, recoverable and visually distinct from wreck","wreckRead":"destroyed persistent salvageable wreck"}
+  ],
+  "releaseProofs": [
+    "disabled-vs-wreck-readability-at-640x360",
+    "16-direction-disabled-consistency",
+    "16-direction-wreck-consistency",
+    "nearest-neighbour-proof",
+    "transparent-background-proof",
+    "provenance-proof"
+  ],
+  "rules": [
+    "disabled must never read as destroyed",
+    "wreck must never read as recoverable live armour",
+    "technical disabled state is mandatory because fuel exhaustion uses the same deterministic disabled authority as tracked vehicles",
+    "approved media must preserve the original unit family silhouette and facing"
+  ]
+}
