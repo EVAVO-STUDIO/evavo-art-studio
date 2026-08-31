@@ -103,6 +103,7 @@ try {
   const source = path.join(workspace, 'source.png');
   const mask = path.join(workspace, 'mask.png');
   const componentStrip = path.join(workspace, 'component-strip.png');
+  const componentGrid = path.join(workspace, 'component-grid.png');
   const videoFramePattern = path.join(workspace, 'video-frame-%04d.png');
   const fixture = `
 from PIL import Image, ImageDraw
@@ -126,6 +127,13 @@ component_draw.rectangle((43, 7, 54, 22), fill=(40, 180, 120, 255))
 component_draw.rectangle((91, 2, 102, 19), fill=(70, 110, 230, 255))
 component_draw.point((70, 2), fill=(255, 255, 255, 255))
 component_strip.save(Path(${JSON.stringify(componentStrip)}))
+component_grid = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+component_grid_draw = ImageDraw.Draw(component_grid)
+component_grid_draw.rectangle((4, 4, 15, 15), fill=(220, 40, 40, 255))
+component_grid_draw.rectangle((40, 4, 51, 15), fill=(40, 220, 40, 255))
+component_grid_draw.rectangle((4, 40, 15, 51), fill=(40, 40, 220, 255))
+component_grid_draw.rectangle((40, 40, 51, 51), fill=(220, 220, 40, 255))
+component_grid.save(Path(${JSON.stringify(componentGrid)}))
 for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
     frame = Image.new('RGBA', (48, 32), (0, 0, 0, 0))
     frame_draw = ImageDraw.Draw(frame)
@@ -220,6 +228,16 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
         ],
       },
       {
+        id: 'scanline-cell-repack-proof',
+        kind: 'image',
+        source: 'component-grid.png',
+        targetPath: 'geometry/scanline-cell-repack.png',
+        outputFormat: 'png',
+        operations: [
+          { op: 'repack-alpha-components', componentCount: 4, componentOrder: 'scanline', cellWidth: 20, cellHeight: 20, minimumPixels: 1, connectivity: 8, scaleDownToFit: true, sampling: 'nearest' },
+        ],
+      },
+      {
         id: 'motion-preview',
         kind: 'motion-sequence',
         sources: [
@@ -271,8 +289,8 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
   ]);
   const plan = JSON.parse(await readFile(planPath, 'utf8'));
   verifyDocumentHash(plan);
-  assert.deepEqual(plan.tasks.map((task) => task.kind), ['image-master', 'image', 'image', 'image', 'motion-sequence']);
-  assert.equal(plan.limits.plannedMaximumOutputFiles, 13);
+  assert.deepEqual(plan.tasks.map((task) => task.kind), ['image-master', 'image', 'image', 'image', 'image', 'motion-sequence']);
+  assert.equal(plan.limits.plannedMaximumOutputFiles, 14);
 
   command(python.name, [...python.prefix,
     'tools/run_project_art_sandbox.py',
@@ -284,7 +302,7 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
   const receipt = JSON.parse(await readFile(path.join(outputRoot, '_evavo', 'project-art-sandbox-receipt.json'), 'utf8'));
   verifyDocumentHash(receipt);
   assert.equal(receipt.status, 'passed');
-  assert.equal(receipt.tasks.length, 5);
+  assert.equal(receipt.tasks.length, 6);
 
   const masterReport = JSON.parse(await readFile(path.join(outputRoot, 'masters', 'source-master.mastering.json'), 'utf8'));
   verifyDocumentHash(masterReport);
@@ -325,6 +343,16 @@ for index in range(3):
     assert bounds is not None
     assert bounds[0] > 0 and bounds[1] > 0 and bounds[2] < 32 and bounds[3] < 32
 assert alpha.getpixel((70, 2)) == 0
+`]);
+  const scanlineRepackPath = path.join(outputRoot, 'geometry', 'scanline-cell-repack.png');
+  assert.equal((await lstat(scanlineRepackPath)).isFile(), true);
+  command(python.name, [...python.prefix, '-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(scanlineRepackPath)}).convert('RGBA')
+assert image.size == (80, 20)
+expected = ((220, 40, 40), (40, 220, 40), (40, 40, 220), (220, 220, 40))
+for index, colour in enumerate(expected):
+    assert image.getpixel((index * 20 + 10, 10))[:3] == colour
 `]);
 
   const motionRoot = path.join(outputRoot, 'motion', 'idle-preview');
@@ -478,7 +506,7 @@ ${blockedResult.stderr}`, /PROJECT_ART_MASTERING_PROFILE_FAILED/u);
   await assert.rejects(lstat(blockedOutputRoot));
 
   const tamperedPlan = structuredClone(plan);
-  tamperedPlan.tasks[4].frameCount = 20_001;
+  tamperedPlan.tasks[5].frameCount = 20_001;
   const tamperedPlanPath = path.join(workspace, 'tampered-plan.json');
   await writeFile(tamperedPlanPath, `${JSON.stringify(rehash(tamperedPlan), null, 2)}\n`);
   const tamperedOutputRoot = path.join(workspace, 'tampered-output');

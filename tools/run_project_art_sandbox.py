@@ -1692,7 +1692,7 @@ def _repack_alpha_components(
     operation: dict[str, Any],
     maximum_pixels: int,
 ) -> Image.Image:
-    """Pack an exact left-to-right set of visible components into safe equal cells."""
+    """Pack an exact set of visible components into safe equal cells."""
     component_count = governed_integer(operation.get("componentCount"), "repack-alpha-components.componentCount", 1, 256)
     cell_width = governed_integer(operation.get("cellWidth"), "repack-alpha-components.cellWidth", 1, 16_384)
     cell_height = governed_integer(operation.get("cellHeight"), "repack-alpha-components.cellHeight", 1, 16_384)
@@ -1704,6 +1704,7 @@ def _repack_alpha_components(
     if not isinstance(scale_down_to_fit, bool):
         fail("repack-alpha-components.scaleDownToFit must be boolean")
     sampling_name = str(operation.get("sampling", "lanczos"))
+    component_order = str(operation.get("componentOrder", "left-to-right"))
     sampling_modes = {
         "nearest": Image.Resampling.NEAREST,
         "bilinear": Image.Resampling.BILINEAR,
@@ -1712,6 +1713,8 @@ def _repack_alpha_components(
     }
     if sampling_name not in sampling_modes:
         fail("repack-alpha-components.sampling must be nearest, bilinear, bicubic or lanczos")
+    if component_order not in {"left-to-right", "scanline"}:
+        fail("repack-alpha-components.componentOrder must be left-to-right or scanline")
     if connectivity not in {4, 8}:
         fail("repack-alpha-components.connectivity must be 4 or 8")
     require_pixel_budget(cell_width * component_count, cell_height, "repack-alpha-components output", maximum_pixels)
@@ -1751,7 +1754,13 @@ def _repack_alpha_components(
                         queue.append(index)
         if count >= minimum_pixels:
             components.append((left, top, right + 1, bottom + 1, count))
-    components.sort(key=lambda component: (component[0], component[1]))
+    components.sort(
+        key=(
+            (lambda component: (component[1], component[0]))
+            if component_order == "scanline"
+            else (lambda component: (component[0], component[1]))
+        )
+    )
     if len(components) != component_count:
         fail(
             "repack-alpha-components expected "

@@ -412,8 +412,12 @@ function normalizedOperation(value, index, registry) {
     parameters.minimumPadding = boundedInteger(parameters.minimumPadding ?? 1, 'repack-alpha-components.minimumPadding', 1, 1_024);
     parameters.scaleDownToFit = normalizedBoolean(parameters.scaleDownToFit, 'repack-alpha-components.scaleDownToFit', false);
     parameters.sampling = parameters.sampling ?? 'lanczos';
+    parameters.componentOrder = parameters.componentOrder ?? 'left-to-right';
     if (!['nearest', 'bilinear', 'bicubic', 'lanczos'].includes(parameters.sampling)) {
       fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'repack-alpha-components.sampling must be nearest, bilinear, bicubic or lanczos.');
+    }
+    if (!['left-to-right', 'scanline'].includes(parameters.componentOrder)) {
+      fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'repack-alpha-components.componentOrder must be left-to-right or scanline.');
     }
     if (![4, 8].includes(parameters.connectivity)) {
       fail('PROJECT_ART_SANDBOX_OPERATION_INVALID', 'repack-alpha-components.connectivity must be 4 or 8.');
