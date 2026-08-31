@@ -121,7 +121,7 @@ matte_draw.ellipse((5, 2, 42, 45), fill=(255, 255, 255, 255))
 matte.save(mask)
 component_strip = Image.new('RGBA', (113, 32), (0, 0, 0, 0))
 component_draw = ImageDraw.Draw(component_strip)
-component_draw.rectangle((3, 4, 12, 19), fill=(220, 60, 70, 255))
+component_draw.rectangle((3, 4, 37, 19), fill=(220, 60, 70, 255))
 component_draw.rectangle((43, 7, 54, 22), fill=(40, 180, 120, 255))
 component_draw.rectangle((91, 2, 102, 19), fill=(70, 110, 230, 255))
 component_draw.point((70, 2), fill=(255, 255, 255, 255))
@@ -216,7 +216,7 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
         outputFormat: 'png',
         operations: [
           { op: 'matte-colour-to-alpha', matteColour: '#ffffff', distance: 0 },
-          { op: 'repack-alpha-components', componentCount: 3, cellWidth: 32, cellHeight: 32, minimumPixels: 1, connectivity: 8 },
+          { op: 'repack-alpha-components', componentCount: 3, cellWidth: 32, cellHeight: 32, minimumPixels: 1, connectivity: 8, scaleDownToFit: true, sampling: 'lanczos' },
         ],
       },
       {

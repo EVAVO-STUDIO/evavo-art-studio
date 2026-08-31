@@ -1700,6 +1700,18 @@ def _repack_alpha_components(
     alpha_threshold = governed_integer(operation.get("alphaThreshold", 1), "repack-alpha-components.alphaThreshold", 1, 255)
     connectivity = governed_integer(operation.get("connectivity", 8), "repack-alpha-components.connectivity", 4, 8)
     minimum_padding = governed_integer(operation.get("minimumPadding", 1), "repack-alpha-components.minimumPadding", 1, 1_024)
+    scale_down_to_fit = operation.get("scaleDownToFit", False)
+    if not isinstance(scale_down_to_fit, bool):
+        fail("repack-alpha-components.scaleDownToFit must be boolean")
+    sampling_name = str(operation.get("sampling", "lanczos"))
+    sampling_modes = {
+        "nearest": Image.Resampling.NEAREST,
+        "bilinear": Image.Resampling.BILINEAR,
+        "bicubic": Image.Resampling.BICUBIC,
+        "lanczos": Image.Resampling.LANCZOS,
+    }
+    if sampling_name not in sampling_modes:
+        fail("repack-alpha-components.sampling must be nearest, bilinear, bicubic or lanczos")
     if connectivity not in {4, 8}:
         fail("repack-alpha-components.connectivity must be 4 or 8")
     require_pixel_budget(cell_width * component_count, cell_height, "repack-alpha-components output", maximum_pixels)
@@ -1745,20 +1757,35 @@ def _repack_alpha_components(
             "repack-alpha-components expected "
             f"{component_count} components but found {len(components)} at minimumPixels={minimum_pixels}"
         )
+    maximum_width = max(right - left for left, _top, right, _bottom, _count in components)
+    maximum_height = max(bottom - top for _left, top, _right, bottom, _count in components)
+    available_width = cell_width - minimum_padding * 2
+    available_height = cell_height - minimum_padding * 2
+    uniform_scale = min(1.0, available_width / maximum_width, available_height / maximum_height)
+    if uniform_scale < 1.0 and not scale_down_to_fit:
+        fail(
+            f"repack-alpha-components largest component ({maximum_width}x{maximum_height}) "
+            f"requires uniform scale {uniform_scale:.6f}; set scaleDownToFit explicitly to permit it"
+        )
     output = Image.new("RGBA", (cell_width * component_count, cell_height), (0, 0, 0, 0))
     try:
         for index, (left, top, right, bottom, _count) in enumerate(components):
             component_width, component_height = right - left, bottom - top
-            if component_width + minimum_padding * 2 > cell_width or component_height + minimum_padding * 2 > cell_height:
-                fail(
-                    f"repack-alpha-components component {index} ({component_width}x{component_height}) "
-                    f"does not fit inside {cell_width}x{cell_height} with {minimum_padding}px safety padding"
-                )
             crop = rgba.crop((left, top, right, bottom))
             try:
-                destination_x = index * cell_width + (cell_width - component_width) // 2
-                destination_y = cell_height - minimum_padding - component_height
-                output.alpha_composite(crop, (destination_x, destination_y))
+                mastered = crop
+                if uniform_scale < 1.0:
+                    mastered = crop.resize(
+                        (max(1, round(component_width * uniform_scale)), max(1, round(component_height * uniform_scale))),
+                        sampling_modes[sampling_name],
+                    )
+                try:
+                    destination_x = index * cell_width + (cell_width - mastered.width) // 2
+                    destination_y = cell_height - minimum_padding - mastered.height
+                    output.alpha_composite(mastered, (destination_x, destination_y))
+                finally:
+                    if mastered is not crop:
+                        mastered.close()
             finally:
                 crop.close()
         return output
