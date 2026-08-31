@@ -234,7 +234,7 @@ for index, colour in enumerate(((228, 54, 92, 255), (40, 190, 128, 255))):
         targetPath: 'geometry/scanline-cell-repack.png',
         outputFormat: 'png',
         operations: [
-          { op: 'repack-alpha-components', componentCount: 4, componentOrder: 'scanline', cellWidth: 20, cellHeight: 20, minimumPixels: 1, connectivity: 8, scaleDownToFit: true, sampling: 'nearest' },
+          { op: 'repack-alpha-components', componentCount: 4, componentOrder: 'scanline', componentsPerRow: 2, cellWidth: 20, cellHeight: 20, minimumPixels: 1, connectivity: 8, scaleDownToFit: true, sampling: 'nearest' },
         ],
       },
       {

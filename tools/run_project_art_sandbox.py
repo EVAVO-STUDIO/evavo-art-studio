@@ -1705,6 +1705,14 @@ def _repack_alpha_components(
         fail("repack-alpha-components.scaleDownToFit must be boolean")
     sampling_name = str(operation.get("sampling", "lanczos"))
     component_order = str(operation.get("componentOrder", "left-to-right"))
+    components_per_row = operation.get("componentsPerRow")
+    if components_per_row is not None:
+        components_per_row = governed_integer(
+            components_per_row,
+            "repack-alpha-components.componentsPerRow",
+            1,
+            component_count,
+        )
     sampling_modes = {
         "nearest": Image.Resampling.NEAREST,
         "bilinear": Image.Resampling.BILINEAR,
@@ -1715,6 +1723,8 @@ def _repack_alpha_components(
         fail("repack-alpha-components.sampling must be nearest, bilinear, bicubic or lanczos")
     if component_order not in {"left-to-right", "scanline"}:
         fail("repack-alpha-components.componentOrder must be left-to-right or scanline")
+    if components_per_row is not None and component_order != "scanline":
+        fail("repack-alpha-components.componentsPerRow requires componentOrder scanline")
     if connectivity not in {4, 8}:
         fail("repack-alpha-components.connectivity must be 4 or 8")
     require_pixel_budget(cell_width * component_count, cell_height, "repack-alpha-components output", maximum_pixels)
@@ -1754,13 +1764,20 @@ def _repack_alpha_components(
                         queue.append(index)
         if count >= minimum_pixels:
             components.append((left, top, right + 1, bottom + 1, count))
-    components.sort(
-        key=(
-            (lambda component: (component[1], component[0]))
-            if component_order == "scanline"
-            else (lambda component: (component[0], component[1]))
-        )
-    )
+    if component_order == "scanline":
+        components.sort(key=lambda component: ((component[1] + component[3]) / 2, component[0]))
+        if components_per_row is not None:
+            rows = [
+                components[index:index + components_per_row]
+                for index in range(0, len(components), components_per_row)
+            ]
+            components = [
+                component
+                for row in rows
+                for component in sorted(row, key=lambda item: (item[0], item[1]))
+            ]
+    else:
+        components.sort(key=lambda component: (component[0], component[1]))
     if len(components) != component_count:
         fail(
             "repack-alpha-components expected "
