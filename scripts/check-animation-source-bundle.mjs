@@ -3,14 +3,20 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   ANIMATION_SOURCE_BUNDLE_SCHEMA_SHA256,
   assertAnimationSourceBundle,
 } from "./lib/animation-source-bundle.mjs";
+import {
+  assertAnimationSourceLegacyUsage,
+} from "./lib/animation-source-legacy-boundary.mjs";
 
 const failures = [];
-const read = (path) => readFile(resolve(path), "utf8");
+const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+const read = (path) =>
+  readFile(resolve(repositoryRoot, path), "utf8");
 
 function requireCondition(condition, message) {
   if (!condition) failures.push(message);
@@ -31,9 +37,16 @@ const [
   imageProbes,
   fileObserver,
   stableObservation,
+  controlDocument,
+  outputWriter,
+  legacyBoundary,
   cli,
   stableTest,
+  controlBoundaryTest,
+  cliSafetyTest,
+  legacyBoundaryTest,
   documentation,
+  safetyDocumentation,
 ] = await Promise.all([
   read("contracts/animation-source-bundle-v1.schema.json"),
   read("contracts/fixtures/animation-source-bundle-v1.json"),
@@ -42,9 +55,16 @@ const [
   read("scripts/lib/animation-source-image-probes.mjs"),
   read("scripts/lib/animation-source-file-observer.mjs"),
   read("scripts/lib/animation-source-stable-observation.mjs"),
+  read("scripts/lib/animation-source-control-document.mjs"),
+  read("scripts/lib/animation-source-output.mjs"),
+  read("scripts/lib/animation-source-legacy-boundary.mjs"),
   read("scripts/animation-source-bundle.mjs"),
   read("scripts/test-ci-media-tool-animation-source-stable-observation.mjs"),
+  read("scripts/test-ci-media-tool-animation-source-control-boundary.mjs"),
+  read("scripts/test-ci-media-tool-animation-source-cli-safety.mjs"),
+  read("scripts/test-ci-media-tool-animation-source-legacy-boundary.mjs"),
   read("docs/ANIMATION_SOURCE_BUNDLE.md"),
+  read("docs/ANIMATION_SOURCE_CONTROL_AND_OUTPUT_SAFETY.md"),
 ]);
 
 const schemaDigest = createHash("sha256")
@@ -76,6 +96,7 @@ for (const token of [
 ]) {
   requireIncludes(library, token, "contract library");
 }
+
 const stableBoundary = [
   observationCommon,
   imageProbes,
@@ -99,12 +120,74 @@ for (const token of [
 ]) {
   requireIncludes(stableBoundary, token, "stable observation boundary");
 }
+
+for (const token of [
+  "ANIMATION_SOURCE_CONTROL_DOCUMENT_CHANGED_DURING_READ",
+  "ANIMATION_SOURCE_CONTROL_DOCUMENT_HARDLINK_FORBIDDEN",
+  "ANIMATION_SOURCE_CONTROL_DOCUMENT_TOO_LARGE",
+  'new TextDecoder("utf-8", { fatal: true })',
+  "stableDoubleRead: true",
+  "singleLink: true",
+]) {
+  requireIncludes(controlDocument, token, "control-document boundary");
+}
+
+for (const token of [
+  "ANIMATION_SOURCE_OUTPUT_PROTECTED_PATH_COLLISION",
+  "ANIMATION_SOURCE_OUTPUT_HARDLINK_FORBIDDEN",
+  "ANIMATION_SOURCE_OUTPUT_EXISTS",
+  "ANIMATION_SOURCE_OUTPUT_LOCKED",
+  "ANIMATION_SOURCE_OUTPUT_ATOMIC_REPLACE_UNAVAILABLE",
+  "ANIMATION_SOURCE_OUTPUT_PARENT_CHANGED",
+  "ANIMATION_SOURCE_OUTPUT_PUBLISH_IDENTITY_CHANGED",
+  "await link(temporary, destination)",
+  "await rename(temporary, destination)",
+  "verifyPublished",
+]) {
+  requireIncludes(outputWriter, token, "generated-output boundary");
+}
+requireCondition(
+  !outputWriter.includes("unlink(destination"),
+  "generated-output boundary must never delete the destination before replacement",
+);
+
+for (const token of [
+  "ANIMATION_SOURCE_LEGACY_PRODUCTION_USAGE_FORBIDDEN",
+  "git",
+  "ls-files",
+  "trackedFileCount",
+  "githubActionsRequired: false",
+  "vercelRequired: false",
+]) {
+  requireIncludes(legacyBoundary, token, "legacy compatibility boundary");
+}
+
+try {
+  const legacyUsage =
+    await assertAnimationSourceLegacyUsage(repositoryRoot);
+  requireCondition(
+    legacyUsage.status === "passed",
+    "legacy compatibility boundary did not pass",
+  );
+} catch (error) {
+  failures.push(
+    `legacy compatibility boundary failed: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+  );
+}
+
 for (const token of [
   'commands: ["compile", "verify", "manifest"]',
   "compileAnimationSourceBundleStable",
   "verifyAnimationSourceBundleFilesStable",
+  "readAnimationSourceControlDocument",
+  "writeAnimationSourceJson",
+  '"--replace-output"',
   '"stable-before-after-observation"',
   '"single-handle-sha256"',
+  "controlDocumentEvidence",
+  "outputEvidence",
   "sourceCopyRequired: false",
 ]) {
   requireIncludes(cli, token, "Art Studio CLI");
@@ -117,6 +200,15 @@ requireCondition(
   !cli.includes("verifyAnimationSourceBundleFiles,"),
   "Art Studio CLI must not bypass stable verification",
 );
+requireCondition(
+  !cli.includes("readJson,"),
+  "Art Studio CLI must not use the legacy unbounded control-document reader",
+);
+requireCondition(
+  !cli.includes("writeJsonAtomic,"),
+  "Art Studio CLI must not use the legacy replacement-capable JSON writer",
+);
+
 for (const token of [
   "stable observation binds exact bytes",
   "stable compile rejects a source replacement",
@@ -125,6 +217,50 @@ for (const token of [
 ]) {
   requireIncludes(stableTest, token, "stable observation regression");
 }
+
+for (const token of [
+  "control documents are bounded, digest-bound and BOM aware",
+  "control documents reject symlink and hard-link aliases",
+  "generated JSON is create-only by default",
+  "explicit replacement is atomic",
+  "concurrent create-only writers never overwrite one another",
+  "output destinations reject hard links",
+]) {
+  requireIncludes(
+    controlBoundaryTest,
+    token,
+    "control and output boundary regression",
+  );
+}
+
+for (const token of [
+  "CLI compile and verify emit control and output evidence",
+  "CLI output is create-only unless replacement is explicit",
+  "CLI refuses to overwrite control documents or source media",
+  "CLI rejects ambiguous and unsafe byte-limit options",
+  "CLI rejects meaningless output-only options before reading control documents",
+]) {
+  requireIncludes(
+    cliSafetyTest,
+    token,
+    "CLI safety integration regression",
+  );
+}
+
+for (const token of [
+  "legacy JSON helpers remain compatible only inside non-production boundaries",
+  "production named imports and re-exports of legacy helpers fail closed",
+  "namespace and dynamic legacy access cannot bypass the production scan",
+  "untracked files are outside repository authority",
+  "tracked symbolic code files fail instead of being followed",
+]) {
+  requireIncludes(
+    legacyBoundaryTest,
+    token,
+    "legacy compatibility regression",
+  );
+}
+
 for (const token of [
   "Animation Source Bundle",
   "node scripts/animation-source-bundle.mjs compile",
@@ -137,12 +273,31 @@ for (const token of [
   requireIncludes(documentation, token, "documentation");
 }
 
+for (const token of [
+  "Stable control-document reads",
+  "Collision-safe JSON output",
+  "--replace-output",
+  "create-only by default",
+  "single filesystem link",
+  "GitHub Actions",
+  "Vercel",
+]) {
+  requireIncludes(
+    safetyDocumentation,
+    token,
+    "control and output safety documentation",
+  );
+}
+
 for (const source of [
   library,
   observationCommon,
   imageProbes,
   fileObserver,
   stableObservation,
+  controlDocument,
+  outputWriter,
+  legacyBoundary,
   cli,
 ]) {
   for (const forbidden of [
