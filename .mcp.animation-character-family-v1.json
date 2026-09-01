@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "evavo-animation-character-family-v1": {
+      "command": "node",
+      "args": [
+        "tools/animation_character_family_v1_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_ANIMATION_CHARACTER_FAMILY_ROLE": "art-studio"
+      }
+    }
+  }
+}

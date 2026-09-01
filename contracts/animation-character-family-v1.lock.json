@@ -1,0 +1,38 @@
+{
+  "schema": "evavo.animation-character-family-lock.v1",
+  "protocolVersion": "2026-09-01.2",
+  "files": [
+    {
+      "path": "tools/animation_character_family_v1.mjs",
+      "sha256": "sha256:c737c115c07a8adec1954aad4f4f57329e05efd43c26bf5306665e6bf35a8306"
+    },
+    {
+      "path": "tools/animation_character_family_v1_internal.mjs",
+      "sha256": "sha256:009f6052b57d7f68ed7de73b8c5694c306a42487b973e8c427355ef52dc1ef2f"
+    },
+    {
+      "path": "tools/animation_character_family_v1_mcp.mjs",
+      "sha256": "sha256:7940ff8e6d0d5cb8916a9efbbe81a891fee6acdb2eb77df733a215f352d1632f"
+    },
+    {
+      "path": "contracts/animation-character-family-v1.schema.json",
+      "sha256": "sha256:d9f6a3c9572107555b23e438ffae42f790f3840d1f547c2935018c4de16a2428"
+    },
+    {
+      "path": "docs/ANIMATION_CHARACTER_FAMILY_V1.md",
+      "sha256": "sha256:8cab5138841bf3d3b69c949c4bcaca4a65f6506eb0fb973ba1c6d8e1dac35f52"
+    },
+    {
+      "path": "scripts/check-animation-character-family-v1.mjs",
+      "sha256": "sha256:6fa37dcfbc51c758c042b896bf9ff261c1bfe9d3efea647aa6ff8c0cfb92bbbd"
+    },
+    {
+      "path": "scripts/test-animation-character-family-v1.mjs",
+      "sha256": "sha256:74a66b651bbcdda904402db4160bcbf7d36f647b293243dd7492c1aa94559cc9"
+    },
+    {
+      "path": "scripts/test-animation-character-family-v1-mcp.mjs",
+      "sha256": "sha256:cfd1f45d3d8b0bffc2e64b63e4bdab5c88a39d79e3b98f3d071a756150c4fae5"
+    }
+  ]
+}
