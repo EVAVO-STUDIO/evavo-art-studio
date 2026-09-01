@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "evavo-animation-character-family-campaign-preflight-v1": {
+      "command": "node",
+      "args": [
+        "tools/animation_character_family_campaign_preflight_v1.mjs",
+        "mcp"
+      ],
+      "env": {
+        "EVAVO_ANIMATION_CHARACTER_FAMILY_PREFLIGHT_READ_ENABLED": "disabled"
+      }
+    }
+  }
+}
