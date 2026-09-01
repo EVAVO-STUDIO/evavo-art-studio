@@ -13,7 +13,8 @@ const DEFAULT_MAXIMUM_INPUT_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAXIMUM_PIXELS = 8_294_400;
 const UNREACHED = 255;
 const CHECKER_TILE_SIZES = Object.freeze([
-  2, 3, 4, 6, 8, 10, 12, 16, 20, 22, 23, 24, 26, 28, 32, 48, 64, 96, 128,
+  2, 3, 4, 6, 8, 10, 12, 16, 20, 22, 23, 24, 25, 26, 27, 28, 30, 32, 48, 64,
+  96, 128,
 ]);
 
 type Colour = Readonly<{ r: number; g: number; b: number }>;
@@ -600,7 +601,7 @@ export function detectPaintedTransparencyCheckerboard(
         // tiles, fits both parity classes tightly and owns most of the border.
         (best.separation >= 10 &&
           best.rmse <= 4 &&
-          best.fitFraction >= 0.82 &&
+          best.fitFraction >= 0.8 &&
           best.coverageFraction >= 0.5 &&
           width / best.tileSize >= 8 &&
           height / best.tileSize >= 8)),
