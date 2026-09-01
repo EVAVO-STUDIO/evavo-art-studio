@@ -63,6 +63,7 @@ function execute(command, args, options = {}) {
     shell: false,
     timeout: options.timeout ?? 300_000,
     maxBuffer: 64 * 1024 * 1024,
+    input: options.input,
     env: {
       ...process.env,
       PYTHONUTF8: "1",
@@ -209,6 +210,19 @@ const q = runJson(["inspect", "--face", uiFace, "--codepoint", "U+0071"]);
 assert.notDeepEqual(g.glyph.bitmap, q.glyph.bitmap);
 assert.equal(g.glyph.yOffset < 10, true);
 assert.equal(q.glyph.height >= 7, true);
+
+stage("checking deterministic sealed gzip masters");
+const sealedFaceA = path.join(workspace, "sealed-face-a.json.gz");
+const sealedFaceB = path.join(workspace, "sealed-face-b.json.gz");
+const uiFaceDocument = await readSourceJson(uiFace);
+const sealInput = `${JSON.stringify(uiFaceDocument)}\n`;
+run(python, [tool, "seal-face", "--output", sealedFaceA], { input: sealInput });
+run(python, [tool, "seal-face", "--output", sealedFaceB], { input: sealInput });
+const sealedBytesA = await readFile(sealedFaceA);
+const sealedBytesB = await readFile(sealedFaceB);
+assert.deepEqual(sealedBytesA.subarray(0, 2), Buffer.from([0x1f, 0x8b]));
+assert.deepEqual(sealedBytesA, sealedBytesB);
+assert.equal(runJson(["audit", "--face", sealedFaceA]).status, "passed");
 
 stage("checking optional fontTools backend");
 const fontToolsProbe = execute(python, [
