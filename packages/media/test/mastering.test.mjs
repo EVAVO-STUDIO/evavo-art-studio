@@ -374,6 +374,29 @@ test("background recovery removes a subtle resampled provider checkerboard with 
   assert.deepEqual(pixel(decoded, 100, 120), [72, 31, 18, 255]);
 });
 
+test("background recovery removes an eight-level resampled 46.75px white provider checkerboard", async () => {
+  const width = 470;
+  const height = 423;
+  const candidate = await raster(width, height, 4, (x, y) => {
+    if (x >= 132 && x <= 337 && y >= 104 && y <= 350) {
+      return [104, 55, 27, 255];
+    }
+    const parity =
+      (Math.floor((x + 1) / 46.75) + Math.floor((y + 1) / 46.75)) % 2;
+    const noise = (x * 5 + y * 7) % 2;
+    const value = parity ? 245 + noise : 253 + noise;
+    return [value, value, value, 255];
+  });
+  const result = await recoverBackgroundAlpha(candidate);
+  assert.equal(result.evidence.strategy, "checkerboard-recovery");
+  assert.equal(result.evidence.classification.checkerboard.detected, true);
+  assert.ok(result.evidence.classification.checkerboard.colourSeparation >= 8);
+  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
+  const decoded = await rgba(result.png);
+  assert.deepEqual(pixel(decoded, 0, 0), [0, 0, 0, 0]);
+  assert.deepEqual(pixel(decoded, 235, 211), [104, 55, 27, 255]);
+});
+
 test("background recovery defeats a transparent-rim bypass around a visible painted grid", async () => {
   const candidate = await raster(128, 128, 4, (x, y) => {
     if (x === 0 || y === 0 || x === 127 || y === 127) {

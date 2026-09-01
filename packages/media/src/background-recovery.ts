@@ -13,7 +13,8 @@ const DEFAULT_MAXIMUM_INPUT_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAXIMUM_PIXELS = 8_294_400;
 const UNREACHED = 255;
 const CHECKER_TILE_SIZES = Object.freeze([
-  2, 3, 4, 6, 8, 10, 12, 16, 20, 22, 23, 24, 26, 28, 32, 48, 64, 96, 128,
+  2, 3, 4, 6, 8, 10, 12, 16, 20, 22, 23, 24, 26, 28, 32, 46, 46.5, 46.75,
+  47, 47.25, 47.5, 48, 49, 50, 64, 96, 128,
 ]);
 
 type Colour = Readonly<{ r: number; g: number; b: number }>;
@@ -577,9 +578,11 @@ export function detectPaintedTransparencyCheckerboard(
     if (width / tileSize < 4 || height / tileSize < 4) continue;
     const phases = [
       0,
+      1,
       Math.floor(tileSize / 4),
       Math.floor(tileSize / 2),
       Math.floor((tileSize * 3) / 4),
+      tileSize - 1,
     ];
     for (const phaseX of [...new Set(phases)]) {
       for (const phaseY of [...new Set(phases)]) {
@@ -598,7 +601,7 @@ export function detectPaintedTransparencyCheckerboard(
         // Image providers also paint low-contrast white/light-grey grids. A
         // weak colour delta is still decisive when it repeats across many
         // tiles, fits both parity classes tightly and owns most of the border.
-        (best.separation >= 10 &&
+        (best.separation >= 8 &&
           best.rmse <= 4 &&
           best.fitFraction >= 0.82 &&
           best.coverageFraction >= 0.5 &&
