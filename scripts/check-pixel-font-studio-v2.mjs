@@ -292,6 +292,19 @@ for (const face of validation.faces) {
   assert.deepEqual(face.ttf.unexpected, []);
 }
 
+// PNGs are binary evidence. On Windows, writing through a text-mode file
+// descriptor expands LF bytes to CRLF and silently corrupts the PNG signature.
+// Check the emitted bytes directly so the studio can never regress to producing
+// atlases that validate in memory but fail in Godot and image editors.
+const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+for (const face of buildResult.faces) {
+  for (const filename of [`${face.faceId}.png`, `${face.faceId}.grid.png`]) {
+    const relative = path.join("fonts", face.faceId, filename);
+    const signature = (await readFile(path.join(buildA, relative))).subarray(0, 8);
+    assert.deepEqual(signature, pngSignature, `${relative} must have an exact PNG signature`);
+  }
+}
+
 stage("building family B and comparing exact bytes");
 runJson(["build", "--master", family, "--output", buildB]);
 const reproducibility = runJson(["compare", "--first", buildA, "--second", buildB]);
@@ -364,8 +377,12 @@ const mcpValidate = await callTool(
   { policy: readOnly },
 );
 assert.equal(mcpValidate.status, "passed");
+const outsideAllowedRoots =
+  process.platform === "win32"
+    ? path.join(process.env.SystemRoot || "C:\\Windows", "win.ini")
+    : "/etc/passwd";
 await assert.rejects(
-  callTool("evavo_pixel_font_v2_audit", { facePath: "/etc/passwd" }, { policy: readOnly }),
+  callTool("evavo_pixel_font_v2_audit", { facePath: outsideAllowedRoots }, { policy: readOnly }),
   /outside EVAVO_PIXEL_FONT_ALLOWED_ROOTS/u,
 );
 

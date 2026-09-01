@@ -213,7 +213,10 @@ def load_json(path: Path, label: str) -> tuple[Any, bytes]:
 
 def write_create_only(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    # Windows otherwise opens this descriptor in text mode and expands every LF
+    # byte to CRLF. That corrupts PNG signatures, compressed masters and font
+    # binaries even though the in-memory payload is correct.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
     fd = os.open(path, flags, 0o644)
     try:
         offset = 0
