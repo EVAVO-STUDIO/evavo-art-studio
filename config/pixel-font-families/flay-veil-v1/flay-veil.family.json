@@ -1,0 +1,55 @@
+{
+  "schema": "evavo.pixel-font-family-master.v2",
+  "familyId": "flay-veil-90s",
+  "displayName": "FLAY Veil 90s Pixel Family",
+  "version": "1.0.0",
+  "godot": {
+    "targetVersion": "4.6.2",
+    "resourceBasePath": "assets/game/ui/fonts/flay_veil",
+    "textureFilter": "nearest",
+    "integerScaleOnly": true,
+    "subpixelPositioning": false,
+    "mipmaps": false,
+    "systemFallback": false
+  },
+  "output": {
+    "includeTtf": true,
+    "includeSpecimens": true,
+    "atlasMaximumEdge": 2048,
+    "atlasPadding": 1,
+    "ttfPixelUnits": 64,
+    "includeBdf": true,
+    "includeAtlasJson": true,
+    "includeGridSheet": true
+  },
+  "license": {
+    "copyright": "Copyright 2026 EVAVO Studio. All rights reserved.",
+    "text": "Proprietary EVAVO Studio game typeface. Licensed for use in EVAVO Studio projects and authorised deliverables.",
+    "url": "https://evavo.com.au"
+  },
+  "faces": [
+    { "role": "ui", "master": "Flay_UI.face.json.gz" },
+    { "role": "text", "master": "Flay_Menu.face.json.gz" },
+    { "role": "display", "master": "Flay_Display.face.json.gz" }
+  ],
+  "specimens": [
+    {
+      "faceId": "Flay_UI",
+      "width": 320,
+      "height": 200,
+      "lines": ["FLAY  //  CELLBLOCK ZERO", "HEALTH 087   ARMOR 035", "SHELLS 08/028   KEYS 2/3", "SECTOR SECURED   04:37", "GET READY!   GO!"]
+    },
+    {
+      "faceId": "Flay_Menu",
+      "width": 320,
+      "height": 200,
+      "lines": ["NEW GAME", "MULTIPLAYER", "OPTIONS", "CREDITS", "QUIT"]
+    },
+    {
+      "faceId": "Flay_Display",
+      "width": 320,
+      "height": 200,
+      "lines": ["CAMPAIGN", "COMPLETE", "YOU HAVE BEEN", "FLAYED"]
+    }
+  ]
+}

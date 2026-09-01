@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import io
 import json
 import math
 import os
@@ -227,7 +228,13 @@ def write_create_only(path: Path, data: bytes) -> None:
 
 
 def write_json_create_only(path: Path, value: Any) -> None:
-    write_create_only(path, canonical_json_bytes(value))
+    payload = canonical_json_bytes(value)
+    if path.suffix.lower() == ".gz":
+        buffer = io.BytesIO()
+        with gzip.GzipFile(filename="", mode="wb", fileobj=buffer, mtime=0) as stream:
+            stream.write(payload)
+        payload = buffer.getvalue()
+    write_create_only(path, payload)
 
 
 def safe_id(value: Any, label: str) -> str:
