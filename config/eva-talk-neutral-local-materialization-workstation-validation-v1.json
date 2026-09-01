@@ -1,0 +1,92 @@
+{
+  "schema": "evavo.project-art-eva-talk-neutral-local-materialization-workstation-validation.v1",
+  "protocolVersion": "2026-08-28.2",
+  "status": "available-not-executed-by-repository-state",
+  "script": "scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1",
+  "command": [
+    "pwsh",
+    "-NoLogo",
+    "-NoProfile",
+    "-File",
+    "scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1",
+    "-ExpectedHeadSha",
+    "<exact-pr-head-sha>",
+    "-ExpectedMainSha",
+    "<exact-origin-main-sha>"
+  ],
+  "requiredEnvironment": {
+    "operatingSystem": "windows",
+    "powershell": "pwsh",
+    "node": "22.14.0",
+    "pnpm": "10.13.1",
+    "repositoryOrigin": "EVAVO-STUDIO/evavo-art-studio",
+    "cleanWorkingTree": true,
+    "originMainPresent": true,
+    "networkRequiredByQueueChecks": false,
+    "githubActionsRequired": false,
+    "vercelRequired": false
+  },
+  "validation": {
+    "syntaxChecks": 12,
+    "staticContractCheck": true,
+    "focusedNodeTests": true,
+    "concurrentWorkerClaimRace": true,
+    "realCliLifecycleExercise": true,
+    "completeRepositoryPnpmCheck": true,
+    "toolchainVersionCheck": true,
+    "repositoryIdentityCheck": true,
+    "exactHeadCheck": true,
+    "exactOriginMainCheck": true,
+    "mainAncestorOfHeadCheck": true,
+    "exactChangedFileSetCheck": true,
+    "diffRangeCheck": true,
+    "cleanTreeAfterValidation": true
+  },
+  "expectedChangeEvidence": {
+    "changedFileCount": 19,
+    "changedFiles": [
+      ".gitattributes",
+      "config/eva-talk-neutral-local-materialization-campaign-v1.json",
+      "config/eva-talk-neutral-local-materialization-capability-v1.json",
+      "config/eva-talk-neutral-local-materialization-workstation-validation-v1.json",
+      "docs/EVA_TALK_NEUTRAL_LOCAL_MATERIALIZATION_QUEUE.md",
+      "docs/eva-talk-neutral-local-materialization-operator-checklist.md",
+      "scripts/Invoke-EvaTalkNeutralLocalQueueValidation.ps1",
+      "scripts/check-eva-talk-neutral-local-materialization-queue.mjs",
+      "scripts/eva-talk-neutral-local-materialization-queue.mjs",
+      "scripts/project-art/eva-talk-neutral-local-materialization-queue.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-campaign.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-claims.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-common.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-completion.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-init.mjs",
+      "scripts/project-art/eva-talk-neutral-local-queue-png.mjs",
+      "scripts/test-eva-talk-neutral-local-materialization-queue-cli.mjs",
+      "scripts/test-eva-talk-neutral-local-materialization-queue.mjs",
+      "scripts/test-eva-talk-neutral-local-materialization-workstation-validation.mjs"
+    ]
+  },
+  "expectedQueueEvidence": {
+    "packetCount": 8,
+    "imagesPerPacket": 10,
+    "candidateCount": 80,
+    "semanticSelectionTargetFrameCount": 36,
+    "campaignSha256": "e6c4c23eac5d5e6074e334599f19da53ca6a56073857dcd9fc6443ab1f065d74"
+  },
+  "authority": {
+    "networkAccess": false,
+    "providerExecution": false,
+    "paidExecution": false,
+    "candidateApproval": false,
+    "candidatePromotion": false,
+    "sourceMutation": false,
+    "repositoryMutation": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "publication": false,
+    "runtimeActivation": false,
+    "websiteActivation": false,
+    "deployment": false,
+    "forcePush": false
+  }
+}
