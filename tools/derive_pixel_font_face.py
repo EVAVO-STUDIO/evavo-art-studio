@@ -15,6 +15,27 @@ import json
 from pathlib import Path
 
 
+def parse_codepoint_ranges(value: str) -> list[tuple[int, int]]:
+    ranges: list[tuple[int, int]] = []
+    for token in value.split(","):
+        token = token.strip().upper()
+        if not token:
+            continue
+        parts = token.split("-", 1)
+        start = int(parts[0].removeprefix("U+"), 16)
+        end = int(parts[-1].removeprefix("U+"), 16)
+        if start > end or start < 0 or end > 0x10FFFF:
+            raise argparse.ArgumentTypeError(f"invalid Unicode range: {token}")
+        ranges.append((start, end))
+    if not ranges:
+        raise argparse.ArgumentTypeError("at least one Unicode range is required")
+    return ranges
+
+
+def is_selected(codepoint: int, ranges: list[tuple[int, int]] | None) -> bool:
+    return ranges is None or any(start <= codepoint <= end for start, end in ranges)
+
+
 def load(path: Path) -> dict:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8") as stream:
@@ -46,6 +67,11 @@ def main() -> None:
     parser.add_argument("--scale-x", type=int, default=1)
     parser.add_argument("--scale-y", type=int, default=1)
     parser.add_argument("--weight", type=int, default=0)
+    parser.add_argument(
+        "--codepoint-ranges",
+        type=parse_codepoint_ranges,
+        help="Optional comma-separated inclusive ranges such as U+0020-U+007E.",
+    )
     args = parser.parse_args()
     if args.scale_x < 1 or args.scale_y < 1 or args.weight < 0:
         parser.error("scale values must be positive and weight must be non-negative")
@@ -55,7 +81,10 @@ def main() -> None:
     document["faceId"] = args.face_id
     document["displayName"] = args.display_name
     sx, sy, weight = args.scale_x, args.scale_y, args.weight
+    selected_ranges = args.codepoint_ranges
     for glyph in document["glyphs"]:
+        if not is_selected(glyph["codepoint"], selected_ranges):
+            continue
         glyph["bitmap"] = scale_bitmap(glyph["bitmap"], sx, sy, weight)
         glyph["width"] = glyph["width"] * sx + weight
         glyph["height"] *= sy
@@ -65,7 +94,8 @@ def main() -> None:
     metrics = document["metrics"]
     for key in ("ascent", "descent", "baseline", "lineHeight", "capHeight", "xHeight"):
         metrics[key] *= sy
-    metrics["spaceAdvance"] = metrics["spaceAdvance"] * sx + weight
+    if is_selected(0x20, selected_ranges):
+        metrics["spaceAdvance"] = metrics["spaceAdvance"] * sx + weight
     for pair in document.get("kerning", []):
         pair["amount"] *= sx
 
