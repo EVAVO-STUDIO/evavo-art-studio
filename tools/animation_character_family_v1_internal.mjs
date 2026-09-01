@@ -8,6 +8,9 @@ const SOURCE_SHA256 = "sha256:c8f7b0830ad2c875b683b98f0466a303cdf60731cff797bdf0
 const payloadNames = Object.freeze([
   "animation_character_family_v1_internal.source.part001.b64",
   "animation_character_family_v1_internal.source.part002.b64",
+  "animation_character_family_v1_internal.source.part003.b64",
+  "animation_character_family_v1_internal.source.part004.b64",
+  "animation_character_family_v1_internal.source.part005.b64",
 ]);
 const encoded = payloadNames
   .map((name) => readFileSync(new URL(`./${name}`, import.meta.url), "utf8").trim())
