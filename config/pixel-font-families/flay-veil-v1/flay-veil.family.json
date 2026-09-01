@@ -2,7 +2,7 @@
   "schema": "evavo.pixel-font-family-master.v2",
   "familyId": "flay-veil-90s",
   "displayName": "FLAY Veil 90s Pixel Family",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "godot": {
     "targetVersion": "4.6.2",
     "resourceBasePath": "assets/game/ui/fonts/flay_veil",
@@ -35,20 +35,20 @@
   "specimens": [
     {
       "faceId": "Flay_UI",
-      "width": 320,
-      "height": 200,
-      "lines": ["FLAY  //  CELLBLOCK ZERO", "HEALTH 087   ARMOR 035", "SHELLS 08/028   KEYS 2/3", "SECTOR SECURED   04:37", "GET READY!   GO!"]
+      "width": 640,
+      "height": 360,
+      "lines": ["FLAY // CELLBLOCK ZERO", "HEALTH 087  ARMOR 035", "SHELLS 08/028  KEYS 2/3", "SECTOR SECURED  04:37", "GET READY!  GO!"]
     },
     {
       "faceId": "Flay_Menu",
-      "width": 320,
-      "height": 200,
+      "width": 640,
+      "height": 360,
       "lines": ["NEW GAME", "MULTIPLAYER", "OPTIONS", "CREDITS", "QUIT"]
     },
     {
       "faceId": "Flay_Display",
-      "width": 320,
-      "height": 200,
+      "width": 640,
+      "height": 360,
       "lines": ["CAMPAIGN", "COMPLETE", "YOU HAVE BEEN", "FLAYED"]
     }
   ]

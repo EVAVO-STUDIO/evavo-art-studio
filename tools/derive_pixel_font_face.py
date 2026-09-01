@@ -57,6 +57,63 @@ def scale_bitmap(rows: list[str], scale_x: int, scale_y: int, weight: int) -> li
     return ["".join("#" if cell else "." for cell in row) for row in target]
 
 
+def chamfer_bitmap(rows: list[str], passes: int) -> list[str]:
+    """Cut isolated convex corners without thinning straight stems.
+
+    Enlarging a compact bitmap face with nearest-neighbour cells preserves its
+    metrics, but leaves conspicuous square stair-steps.  A conservative convex
+    corner cut restores the single-pixel diagonals used by higher-detail DOS
+    and mid-1990s bitmap lettering.  Each pass uses an immutable snapshot so
+    the result is deterministic and rotationally symmetric.
+    """
+    source = [[cell == "#" for cell in row] for row in rows]
+    if not source or not source[0]:
+        return rows
+    height, width = len(source), len(source[0])
+    for _ in range(passes):
+        before = [row[:] for row in source]
+
+        def horizontal_run(x: int, y: int) -> int:
+            left_edge = x
+            right_edge = x
+            while left_edge > 0 and before[y][left_edge - 1]:
+                left_edge -= 1
+            while right_edge + 1 < width and before[y][right_edge + 1]:
+                right_edge += 1
+            return right_edge - left_edge + 1
+
+        def vertical_run(x: int, y: int) -> int:
+            top_edge = y
+            bottom_edge = y
+            while top_edge > 0 and before[top_edge - 1][x]:
+                top_edge -= 1
+            while bottom_edge + 1 < height and before[bottom_edge + 1][x]:
+                bottom_edge += 1
+            return bottom_edge - top_edge + 1
+
+        for y in range(height):
+            for x in range(width):
+                if not before[y][x]:
+                    continue
+                up = y > 0 and before[y - 1][x]
+                down = y + 1 < height and before[y + 1][x]
+                left = x > 0 and before[y][x - 1]
+                right = x + 1 < width and before[y][x + 1]
+                # Only remove a pixel at a convex exterior corner.  Requiring
+                # an inward diagonal prevents damage to one-pixel punctuation,
+                # terminals, counters and deliberately square line caps.
+                has_body = horizontal_run(x, y) >= 3 and vertical_run(x, y) >= 3
+                cut = has_body and (
+                    (not up and not left and right and down and before[y + 1][x + 1])
+                    or (not up and not right and left and down and before[y + 1][x - 1])
+                    or (not down and not left and right and up and before[y - 1][x + 1])
+                    or (not down and not right and left and up and before[y - 1][x - 1])
+                )
+                if cut:
+                    source[y][x] = False
+    return ["".join("#" if cell else "." for cell in row) for row in source]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
@@ -68,13 +125,20 @@ def main() -> None:
     parser.add_argument("--scale-y", type=int, default=1)
     parser.add_argument("--weight", type=int, default=0)
     parser.add_argument(
+        "--chamfer-corners",
+        type=int,
+        default=0,
+        metavar="PASSES",
+        help="Cut convex bitmap corners after scaling to create deliberate pixel diagonals.",
+    )
+    parser.add_argument(
         "--codepoint-ranges",
         type=parse_codepoint_ranges,
         help="Optional comma-separated inclusive ranges such as U+0020-U+007E.",
     )
     args = parser.parse_args()
-    if args.scale_x < 1 or args.scale_y < 1 or args.weight < 0:
-        parser.error("scale values must be positive and weight must be non-negative")
+    if args.scale_x < 1 or args.scale_y < 1 or args.weight < 0 or args.chamfer_corners < 0:
+        parser.error("scale values must be positive; weight and chamfer passes must be non-negative")
 
     document = load(Path(args.input))
     document["familyId"] = args.family_id
@@ -85,7 +149,9 @@ def main() -> None:
     for glyph in document["glyphs"]:
         if not is_selected(glyph["codepoint"], selected_ranges):
             continue
-        glyph["bitmap"] = scale_bitmap(glyph["bitmap"], sx, sy, weight)
+        glyph["bitmap"] = chamfer_bitmap(
+            scale_bitmap(glyph["bitmap"], sx, sy, weight), args.chamfer_corners
+        )
         glyph["width"] = glyph["width"] * sx + weight
         glyph["height"] *= sy
         glyph["xOffset"] *= sx

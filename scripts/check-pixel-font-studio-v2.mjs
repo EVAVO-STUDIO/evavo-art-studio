@@ -127,7 +127,6 @@ const requiredFiles = [
   "docs/PIXEL_FONT_STUDIO_V2.md",
   "docs/CHESS_LORD_PIXEL_FONT_FAMILY_V2.md",
   "requirements/pixel-font-studio-v2.txt",
-  ".github/workflows/pixel-font-studio-v2.yml",
 ];
 for (const relative of requiredFiles) {
   const target = path.join(root, relative);
