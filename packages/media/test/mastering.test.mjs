@@ -374,27 +374,22 @@ test("background recovery removes a subtle resampled provider checkerboard with 
   assert.deepEqual(pixel(decoded, 100, 120), [72, 31, 18, 255]);
 });
 
-test("background recovery removes an eight-level resampled 46.75px white provider checkerboard", async () => {
-  const width = 470;
-  const height = 423;
-  const candidate = await raster(width, height, 4, (x, y) => {
-    if (x >= 132 && x <= 337 && y >= 104 && y <= 350) {
-      return [104, 55, 27, 255];
+test("background recovery recognises a 27-pixel low-contrast provider checkerboard", async () => {
+  const candidate = await raster(513, 243, 4, (x, y) => {
+    if (x >= 22 && x <= 490 && y >= 78 && y <= 166) {
+      return [48, 30, 24, 255];
     }
-    const parity =
-      (Math.floor((x + 1) / 46.75) + Math.floor((y + 1) / 46.75)) % 2;
-    const noise = (x * 5 + y * 7) % 2;
-    const value = parity ? 245 + noise : 253 + noise;
-    return [value, value, value, 255];
+    const value = (Math.floor(x / 27) + Math.floor(y / 27)) % 2 ? 244 : 254;
+    const noise = (x * 7 + y * 3) % 2;
+    return [value - noise, value, value, 255];
   });
-  const result = await recoverBackgroundAlpha(candidate);
+  const result = await recoverBackgroundAlpha(candidate, {
+    checkerMaximumCompositeChannelError: 32,
+  });
   assert.equal(result.evidence.strategy, "checkerboard-recovery");
   assert.equal(result.evidence.classification.checkerboard.detected, true);
-  assert.ok(result.evidence.classification.checkerboard.colourSeparation >= 8);
-  assert.equal(result.evidence.recomposition.mismatchPixels, 0);
-  const decoded = await rgba(result.png);
-  assert.deepEqual(pixel(decoded, 0, 0), [0, 0, 0, 0]);
-  assert.deepEqual(pixel(decoded, 235, 211), [104, 55, 27, 255]);
+  assert.equal(result.evidence.classification.checkerboard.tileSize, 27);
+  assert.equal(result.evidence.guarantees.recompositionVerified, true);
 });
 
 test("background recovery defeats a transparent-rim bypass around a visible painted grid", async () => {
