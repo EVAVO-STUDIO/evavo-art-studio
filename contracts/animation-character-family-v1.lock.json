@@ -8,7 +8,7 @@
     },
     {
       "path": "tools/animation_character_family_v1_internal.mjs",
-      "sha256": "sha256:009f6052b57d7f68ed7de73b8c5694c306a42487b973e8c427355ef52dc1ef2f"
+      "sha256": "sha256:972157a59910c7263d164aa70312f291794c360733c3eabfb1a06d05cb1bf38e"
     },
     {
       "path": "tools/animation_character_family_v1_mcp.mjs",
@@ -17,10 +17,6 @@
     {
       "path": "contracts/animation-character-family-v1.schema.json",
       "sha256": "sha256:d9f6a3c9572107555b23e438ffae42f790f3840d1f547c2935018c4de16a2428"
-    },
-    {
-      "path": "docs/ANIMATION_CHARACTER_FAMILY_V1.md",
-      "sha256": "sha256:8cab5138841bf3d3b69c949c4bcaca4a65f6506eb0fb973ba1c6d8e1dac35f52"
     },
     {
       "path": "scripts/check-animation-character-family-v1.mjs",
@@ -33,6 +29,10 @@
     {
       "path": "scripts/test-animation-character-family-v1-mcp.mjs",
       "sha256": "sha256:cfd1f45d3d8b0bffc2e64b63e4bdab5c88a39d79e3b98f3d071a756150c4fae5"
+    },
+    {
+      "path": ".mcp.animation-character-family-v1.json",
+      "sha256": "sha256:c1e5af3b4af0a81d8ddb22f388a3dc7917cd64c7d5055ff9b0056b2da396013b"
     }
   ]
 }
