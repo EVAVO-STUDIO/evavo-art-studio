@@ -41,6 +41,7 @@ Do not infer subject, canon, quality, sequence order, provenance or intended use
 - If automatic recovery removes legitimate detail or retains background, use separate disjoint protect and remove masks. Review the result over black, white, grey, green and magenta solid plates plus the alpha-mask proof; never use a checkerboard proof because it can hide the exact failure being tested.
 - If a natural or overlapping background is ambiguous, do not widen colour thresholds until it passes. Use a pinned, hash-recorded semantic segmentation profile to create a soft-mask candidate, combine it with definite border/protect/remove evidence, then run deterministic edge cleanup and the same hostile proofs. A model mask is never approved alpha by itself.
 - Do not weaken thresholds to make an ambiguous candidate pass. Preserve the evidence, correct the source or masks, rerun mastering, and require admission again.
+- A declared low-chroma matte may be mastered only through the explicit CLI `--allow-low-chroma-matte` opt-in, never inference. Retain the immutable provider source, declare the exact matte, require border-connected extraction, recomposition validation, decoded sprite QA and a hostile solid-matte proof before slicing or publication.
 
 ## Multi-image and motion context
 

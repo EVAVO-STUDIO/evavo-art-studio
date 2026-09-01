@@ -1380,7 +1380,9 @@ function chromaOptions(
 ): ChromaKeyExtractionOptions {
   return {
     matteColour,
-    ...(inferred ? { allowLowChromaMatte: true } : {}),
+    ...(inferred || options.allowLowChromaMatte === true
+      ? { allowLowChromaMatte: true }
+      : {}),
     ...(options.connectionDistance === undefined
       ? inferred
         ? { connectionDistance: 96 }

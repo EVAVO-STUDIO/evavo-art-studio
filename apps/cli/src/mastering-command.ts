@@ -34,6 +34,7 @@ export interface MasteringCommandValues {
   readonly "checker-minimum-border-fraction"?: string;
   readonly "checker-maximum-composite-channel-error"?: string;
   readonly "suppress-chroma-spill"?: boolean;
+  readonly "allow-low-chroma-matte"?: boolean;
 }
 
 export type MasteringCommandResult =
@@ -138,6 +139,9 @@ function recoveryOptions(
   );
   return {
     ...(matteColour === undefined ? {} : { matteColour }),
+    ...(values["allow-low-chroma-matte"] === true
+      ? { allowLowChromaMatte: true }
+      : {}),
     ...(connectionDistance === undefined ? {} : { connectionDistance }),
     ...(opaqueSeedDistance === undefined ? {} : { opaqueSeedDistance }),
     ...(edgeSearchRadius === undefined ? {} : { edgeSearchRadius }),
