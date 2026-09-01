@@ -74,7 +74,7 @@ Usage:
   evavo-art quality-frame --input frame.png --expectations frame-quality.json [--output report.json]
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
   evavo-art inspect-alpha --input candidate.png [--matte #00ff00]
-  evavo-art master-alpha --input candidate.png --output candidate.alpha.png [--matte #00ff00] [--protect-mask keep.png] [--remove-mask erase.png] [--suppress-chroma-spill] [--proof candidate.alpha.proof.png] [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json] [--maximum-composite-channel-error 8]
+  evavo-art master-alpha --input candidate.png --output candidate.alpha.png [--matte #00ff00] [--allow-low-chroma-matte] [--protect-mask keep.png] [--remove-mask erase.png] [--suppress-chroma-spill] [--proof candidate.alpha.proof.png] [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json] [--maximum-composite-channel-error 8]
   evavo-art atlas-build --manifest atlas.json --output-dir generated [--godot-project C:\\GitRepos\\game] [--godot-executable C:\\Path\\Godot_v4.6.2.exe]
 
   evavo-art provider-protocol [--output provider-protocol.json]
@@ -169,6 +169,7 @@ async function main(): Promise<void> {
       "checker-minimum-border-fraction": { type: "string" },
       "checker-maximum-composite-channel-error": { type: "string" },
       "suppress-chroma-spill": { type: "boolean" },
+      "allow-low-chroma-matte": { type: "boolean" },
       manifest: { type: "string", short: "m" },
       descriptor: { type: "string", short: "d" },
       "output-dir": { type: "string" },
