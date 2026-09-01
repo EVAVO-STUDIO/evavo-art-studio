@@ -1,0 +1,54 @@
+{
+  "schema": "evavo.animation-character-family-campaign-adapters.v1",
+  "protocolVersion": "2026-09-01.1",
+  "manifestId": "example.complete-character.adapters",
+  "campaignId": "example.complete-character.campaign",
+  "familyPlanDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "adapters": [
+    {
+      "adapterId": "example.art.production",
+      "ownerRole": "art-studio",
+      "taskKinds": [
+        "produce-clip",
+        "repair-clip",
+        "repair-transition",
+        "repair-family"
+      ],
+      "kind": "command",
+      "enabled": false,
+      "rootId": "art-studio",
+      "workingDirectory": ".",
+      "entrypoint": "scripts/replace-with-reviewed-art-campaign-adapter.mjs",
+      "command": [
+        "node",
+        "scripts/replace-with-reviewed-art-campaign-adapter.mjs"
+      ],
+      "timeoutMs": 900000,
+      "maximumOutputBytes": 4194304,
+      "environmentVariables": [
+        "EVAVO_ANIMATION_EXECUTION_ENABLED"
+      ],
+      "environmentPolicy": "required"
+    },
+    {
+      "adapterId": "example.cel.review",
+      "ownerRole": "cel-animation-studio",
+      "taskKinds": [
+        "review-family"
+      ],
+      "kind": "command",
+      "enabled": false,
+      "rootId": "cel-animation-studio",
+      "workingDirectory": ".",
+      "entrypoint": "scripts/replace-with-reviewed-cel-family-review-adapter.mjs",
+      "command": [
+        "node",
+        "scripts/replace-with-reviewed-cel-family-review-adapter.mjs"
+      ],
+      "timeoutMs": 900000,
+      "maximumOutputBytes": 16777216,
+      "environmentVariables": [],
+      "environmentPolicy": "optional"
+    }
+  ]
+}
