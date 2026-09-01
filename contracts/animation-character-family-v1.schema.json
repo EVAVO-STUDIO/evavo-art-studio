@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.evavo.com.au/animation/animation-character-family-v1.schema.json",
+  "title": "EVAVO Animation Character Family V1",
+  "description": "Interoperability envelope. The content-addressed JavaScript compiler performs canonical deep validation.",
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/plan" },
+    { "$ref": "#/$defs/clipEvidence" },
+    { "$ref": "#/$defs/status" },
+    { "$ref": "#/$defs/reviewInput" },
+    { "$ref": "#/$defs/reviewAssessment" },
+    { "$ref": "#/$defs/reviewReceipt" },
+    { "$ref": "#/$defs/runtimePlan" }
+  ],
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$" },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providerExecution", "automaticCreativeApproval", "creativeApproval", "artifactPromotion", "targetRepositoryMutation", "gitCommit", "gitPush", "runtimeActivation", "publication", "deployment"],
+      "properties": {
+        "providerExecution": { "const": false },
+        "automaticCreativeApproval": { "const": false },
+        "creativeApproval": { "const": false },
+        "artifactPromotion": { "const": false },
+        "targetRepositoryMutation": { "const": false },
+        "gitCommit": { "const": false },
+        "gitPush": { "const": false },
+        "runtimeActivation": { "const": false },
+        "publication": { "const": false },
+        "deployment": { "const": false }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": ["schema", "protocolVersion", "familyId", "revision", "projectId", "subject", "style", "camera", "delivery", "coverage", "timing", "requestDigest"],
+      "properties": {
+        "schema": { "const": "evavo.animation-character-family.request.v1" },
+        "protocolVersion": { "const": "2026-09-01.2" },
+        "requestDigest": { "$ref": "#/$defs/digest" },
+        "authority": { "$ref": "#/$defs/authority" }
+      },
+      "additionalProperties": true
+    },
+    "plan": {
+      "type": "object",
+      "required": ["schema", "protocolVersion", "familyId", "requestDigest", "slots", "transitions", "reviewRequirements", "planDigest"],
+      "properties": {
+        "schema": { "const": "evavo.animation-character-family.plan.v1" },
+        "protocolVersion": { "const": "2026-09-01.2" },
+        "planDigest": { "$ref": "#/$defs/digest" },
+        "authority": { "$ref": "#/$defs/authority" }
+      },
+      "additionalProperties": true
+    },
+    "clipEvidence": {
+      "type": "object",
+      "required": ["schema", "protocolVersion", "familyId", "planDigest", "slotId", "action", "variant", "direction", "sequenceDeliveryId", "sequenceDeliveryDigest", "creativeApprovalId", "creativeApprovalDigest", "clipDigest"],
+      "properties": {
+        "schema": { "const": "evavo.animation-character-family.clip-evidence.v1" },
+        "protocolVersion": { "const": "2026-09-01.2" },
+        "clipDigest": { "$ref": "#/$defs/digest" },
+        "authority": { "$ref": "#/$defs/authority" }
+      },
+      "additionalProperties": true
+    },
+    "status": {
+      "type": "object",
+      "required": ["schema", "protocolVersion", "familyId", "planDigest", "state", "summary", "nextWork", "statusDigest"],
+      "properties": {
+        "schema": { "const": "evavo.animation-character-family.status.v1" },
+        "protocolVersion": { "const": "2026-09-01.2" },
+        "statusDigest": { "$ref": "#/$defs/digest" },
+        "authority": { "$ref": "#/$defs/authority" }
+      },
+      "additionalProperties": true
+    },
+    "reviewInput": {
+      "type": "object",
+      "required": ["schema", "protocolVersion", "familyId", "planDigest", "clipDigests", "checks", "reviewInputDigest"],
+      "properties": {
+        "schema": { "const": "evavo.animation-character-family.review-input.v1" },
+        "protocolVersion": { "const": "2026-09-01.2" },
+        "reviewInputDigest": { "$ref": "#/$defs/digest" },
+        "authority": { "$ref": "#/$defs/authority" }
+      },
+      "additionalProperties": true
+    },
+    "reviewAssessment": {
+      "type": "object",
+      "required": ["schema", "protocolVersion", "status", "checks", "findings", "assessmentDigest"],
+      "properties": {
+        "schema": { "const": "evavo.animation-character-family.review-assessment.v1" },
+        "protocolVersion": { "const": "2026-09-01.2" },
+        "assessmentDigest": { "$ref": "#/$defs/digest" },
+        "authority": { "$ref": "#/$defs/authority" }
+      },
+      "additionalProperties": true
+    },
+    "reviewReceipt": {
+      "type": "object",
+      "required": ["schema", "protocolVersion", "familyId", "planDigest", "reviewInputDigest", "assessmentDigest", "status", "reviewReceiptDigest"],
+      "properties": {
+        "schema": { "const": "evavo.animation-character-family.review-receipt.v1" },
+        "protocolVersion": { "const": "2026-09-01.2" },
+        "reviewReceiptDigest": { "$ref": "#/$defs/digest" },
+        "authority": { "$ref": "#/$defs/authority" }
+      },
+      "additionalProperties": true
+    },
+    "runtimePlan": {
+      "type": "object",
+      "required": ["schema", "protocolVersion", "familyId", "planDigest", "reviewReceiptDigest", "states", "groups", "transitions", "targets", "runtimePlanDigest"],
+      "properties": {
+        "schema": { "const": "evavo.animation-character-family.runtime-plan.v1" },
+        "protocolVersion": { "const": "2026-09-01.2" },
+        "runtimePlanDigest": { "$ref": "#/$defs/digest" },
+        "authority": { "$ref": "#/$defs/authority" }
+      },
+      "additionalProperties": true
+    }
+  }
+}
