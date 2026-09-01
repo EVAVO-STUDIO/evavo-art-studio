@@ -2,7 +2,7 @@
   "schema": "evavo.pixel-font-family-master.v2",
   "familyId": "flay-veil-90s",
   "displayName": "FLAY Veil 90s Pixel Family",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "godot": {
     "targetVersion": "4.6.2",
     "resourceBasePath": "assets/game/ui/fonts/flay_veil",
