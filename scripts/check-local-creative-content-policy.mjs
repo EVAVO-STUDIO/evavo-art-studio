@@ -7,7 +7,7 @@ assert.equal(policy.schemaVersion, 1);
 assert.equal(policy.kind, "evavo-local-creative-content-policy-v1");
 assert.equal(policy.consumer, "art-studio");
 assert.equal(policy.mode, "local-owner-controlled");
-for (const key of ["matureThemes", "adultSuggestive", "adultEroticNonExplicit", "revealingButNonExplicitAdultCharacterDesign"]) assert.equal(policy.creativeEnvelope[key], true);
+for (const key of ["matureThemes", "adultSuggestive", "adultEroticNonExplicit", "adultArtisticNudity", "adultNudePinup", "adultFigureArt", "revealingButNonExplicitAdultCharacterDesign"]) assert.equal(policy.creativeEnvelope[key], true);
 for (const key of ["sexualContentInvolvingMinors", "sexualizedDepictionOfMinors", "nonConsensualSexualContent", "illegalSexualContent", "realPersonSexualDeepfakeWithoutConsent"]) assert.equal(policy.hardBoundaries[key], false);
 assert.equal(policy.providerIndependence.hostedProviderPolicyDefinesEvavoPolicy, false);
 assert.equal(policy.providerIndependence.hostedProviderRefusalIsUniversalCreativeDecision, false);
