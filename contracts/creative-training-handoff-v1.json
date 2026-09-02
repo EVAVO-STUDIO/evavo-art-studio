@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-creative-training-handoff-v1",
+  "producer": "art-studio",
+  "trainingAuthority": "EVAVO-STUDIO/evavo-model-lab",
+  "executionAuthority": "EVAVO-STUDIO/evavo-local-compute",
+  "datasetContract": "evavo-creative-training-dataset-v1",
+  "acceptedSpecialisations": ["style","character-identity","costume","expression","sprite-style","environment-style","image-edit","project-specialist"],
+  "sourceEvidence": ["creative-output-manifest", "authored-source", "approved-reference-pack"],
+  "preferredMethods": ["lora", "adapter"],
+  "workstationPreference": "small-base-or-low-rank-training-first",
+  "largerHardwareRoute": "burst",
+  "authority": {"producerExecutesTraining":false,"producerActivatesAdapter":false,"automaticPromotion":false}
+}
