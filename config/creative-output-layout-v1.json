@@ -5,6 +5,7 @@
   "rootEnvironmentVariable": "EVAVO_CREATIVE_OUTPUT_ROOT",
   "defaultRoot": "%LOCALAPPDATA%/EVAVO/Creative/art-studio",
   "directories": [
+    "renders/candidates",
     "renders/stills",
     "renders/sprites",
     "renders/animation-frames",
