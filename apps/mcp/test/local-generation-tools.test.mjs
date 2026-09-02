@@ -11,6 +11,7 @@ const REQUIRED_LOCAL_GENERATION_TOOLS = Object.freeze([
   "local_generation_doctor",
   "run_local_generation_campaign",
   "run_shipped_local_generation_campaign",
+  "run_lorna_strip_poker_acceptance",
   "list_local_generation_outputs",
   "get_local_generation_image",
 ]);
