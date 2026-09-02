@@ -1,5 +1,19 @@
 {
   "mcpServers": {
+    "evavo-art-studio": {
+      "command": "node",
+      "args": [
+        "apps/mcp/dist/index.js"
+      ],
+      "env": {
+        "EVAVO_ART_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads",
+        "EVAVO_ART_ARTIFACT_ROOT": "%LOCALAPPDATA%\\EVAVO\\ArtStudio\\artifacts",
+        "EVAVO_ART_RUNTIME_ROOT": "%LOCALAPPDATA%\\EVAVO\\ArtStudio\\runtime",
+        "EVAVO_ART_ALLOW_WRITES": "true",
+        "EVAVO_ART_LOCAL_GENERATION_MCP_ALLOW_EXECUTION": "true",
+        "EVAVO_LOCAL_COMPUTE_ROOT": "C:\\GitRepos\\evavo-local-compute"
+      }
+    },
     "evavo-local-agent-executor": {
       "command": "node",
       "args": [
