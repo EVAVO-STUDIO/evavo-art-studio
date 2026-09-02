@@ -8,6 +8,7 @@ const output = await load("contracts/creative-output-manifest-v1.json");
 const training = await load("contracts/creative-training-handoff-v1.json");
 const control = await load("contracts/creative-control-handoff-v1.json");
 const layout = await load("config/creative-output-layout-v1.json");
+const quality = await load("config/local-image-quality-routes-v1.json");
 
 assert.equal(job.kind, "evavo-creative-production-job-v1");
 for (const style of ["photorealistic","realistic","cinematic","anime","cel","painterly","pixel-art","retro","pinup","project-defined"]) assert.ok(job.styleProfiles.includes(style));
@@ -34,5 +35,16 @@ assert.equal(layout.kind, "evavo-creative-output-layout-v1");
 for (const directory of ["renders/candidates","renders/sprites","exports/game","training/datasets","training/adapters","scratch"]) assert.ok(layout.directories.includes(directory));
 assert.equal(layout.policy.outputsInGitByDefault, false);
 assert.equal(layout.policy.overwriteExistingFiles, false);
+
+assert.equal(quality.kind, "evavo-art-local-image-quality-routes-v1");
+const routeIds = new Set(quality.routes.map((route) => route.id));
+for (const routeId of ["workstation-default","realism-challenger","large-image-challenger"]) assert.ok(routeIds.has(routeId));
+assert.equal(quality.styleSpecialisation.strategy, "base-model-plus-reviewed-style-adapter-and-reference-pack");
+assert.equal(quality.styleSpecialisation.adapterAuthority, "EVAVO-STUDIO/evavo-model-lab");
+for (const style of ["photorealistic","cinematic","anime","manga","cel","painterly","pixel-art","retro","historical-illustration","horror","pinup","project-defined"]) assert.ok(quality.styleSpecialisation.styleFamilies.includes(style));
+for (const signal of ["depth","lineart","pose","normals","segmentation","matting","multi-reference"]) assert.ok(quality.controlSurfaces.signals.includes(signal));
+for (const stage of ["generate-candidate-set","targeted-edit-or-inpaint","alpha-or-matting-when-required","upscale-or-target-size-mastering","native-size-review","export-with-output-manifest"]) assert.ok(quality.qualityChain.includes(stage));
+assert.equal(quality.authority.executesModels, false);
+assert.equal(quality.authority.automaticCreativeApproval, false);
 
 console.log("Art Studio shared creative production contracts passed.");
