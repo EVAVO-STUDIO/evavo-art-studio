@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-creative-control-handoff-v1",
+  "producer": "art-studio",
+  "controlAuthority": "EVAVO-STUDIO/evavo-local-compute",
+  "profileKind": "evavo-comfyui-creative-control-profile-v1",
+  "acceptedControls": ["depth", "lineart", "pose", "normals", "segmentation", "matting", "multi-reference"],
+  "preferredCombinations": ["character-locked", "style-redraw", "cel-production", "cinematic-relight"],
+  "artifactRequirements": ["role", "sha256", "bytes", "dimensions", "sourceManifestId"],
+  "rules": {
+    "referencesRemainOrdered": true,
+    "controlArtifactsReusableAcrossCandidates": true,
+    "controlDoesNotReplaceCreativeReview": true,
+    "arbitraryNodeInstallationFromJob": false
+  },
+  "authority": {"executesWorkflow":false,"installsNodes":false,"automaticApproval":false}
+}
