@@ -7,11 +7,13 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SCHEMA = 'evavo.local-generation-campaign.v1';
+export const LOCAL_GENERATION_CAMPAIGN_SCHEMA = 'evavo.local-generation-campaign.v1';
 const ALLOWED_CONTENT = new Set(['general', 'mature-nonexplicit']);
 const ASSET_KINDS = new Set(['sprite-frame', 'sprite-layer', 'environment', 'effect', 'ui', 'illustration', 'print']);
 const PHASES = new Set(['identity-master', 'direction-master', 'key-pose', 'in-between', 'repair', 'independent']);
+const TRANSPARENCY = new Set(['required', 'preferred', 'opaque']);
 const FORMATS = new Set(['png', 'webp', 'jpeg']);
+const REQUIRED_GENERATE_CAPABILITIES = Object.freeze(['generate', 'seed', 'custom-size', 'candidate-count']);
 
 function fail(message) { throw new Error(message); }
 function object(value, label) {
@@ -21,6 +23,9 @@ function object(value, label) {
 function text(value, label, max = 32000) {
   if (typeof value !== 'string' || !value.trim() || value.trim() !== value || value.length > max || value.includes('\0')) fail(`${label} is invalid`);
   return value;
+}
+function optionalText(value, label, max = 32000) {
+  return value === undefined || value === null ? null : text(value, label, max);
 }
 function safeId(value, label) {
   const result = text(value, label, 128);
@@ -60,6 +65,15 @@ function defaultOutputRoot() {
   const base = process.env.LOCALAPPDATA?.trim();
   return base ? path.join(base, 'EVAVO', 'ArtStudio', 'campaigns') : path.join(ROOT, '.art-studio', 'local-campaigns');
 }
+function defaultCatalogPath() {
+  const configured = process.env.EVAVO_ART_COMFYUI_CATALOG?.trim();
+  if (configured) return path.resolve(configured);
+  if (process.platform === 'win32') return path.resolve('C:\\EVAVO\\comfyui\\catalog.json');
+  return path.join(ROOT, '.art-studio', 'comfyui', 'catalog.json');
+}
+function defaultBaseUrl() {
+  return process.env.EVAVO_ART_COMFYUI_BASE_URL?.trim() || 'http://127.0.0.1:8188';
+}
 function pnpmExecutable() { return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'; }
 async function run(command, args, options = {}) {
   await new Promise((resolve, reject) => {
@@ -78,22 +92,31 @@ async function writeJson(file, value) {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
 }
-function validateManifest(input) {
+function assertLoopbackBaseUrl(value) {
+  const baseUrl = new URL(value);
+  if (baseUrl.protocol !== 'http:' || !['127.0.0.1', 'localhost', '::1'].includes(baseUrl.hostname)) {
+    fail('local generation campaigns require a loopback HTTP ComfyUI endpoint');
+  }
+  if (baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) fail('provider.baseUrl may not contain credentials, query strings or fragments');
+  return baseUrl.toString().replace(/\/$/u, '');
+}
+
+export function validateLocalGenerationCampaign(input, environment = process.env) {
   const manifest = object(input, 'manifest');
-  if (manifest.schema !== SCHEMA) fail(`manifest.schema must be ${SCHEMA}`);
+  if (manifest.schema !== LOCAL_GENERATION_CAMPAIGN_SCHEMA) fail(`manifest.schema must be ${LOCAL_GENERATION_CAMPAIGN_SCHEMA}`);
   const campaignId = safeId(manifest.campaignId, 'campaignId');
   const contentClass = text(manifest.contentClass, 'contentClass', 64);
   if (!ALLOWED_CONTENT.has(contentClass)) fail('contentClass must be general or mature-nonexplicit');
+  const subject = object(manifest.subject ?? {}, 'subject');
   if (contentClass === 'mature-nonexplicit') {
-    const subject = object(manifest.subject, 'subject');
     boundedInteger(subject.minimumAge, 'subject.minimumAge', 18, 130);
-    if (subject.minimumAge < 18) fail('mature-nonexplicit campaigns require an unambiguously adult subject');
   }
-  const provider = object(manifest.provider, 'provider');
-  const baseUrl = new URL(text(provider.baseUrl ?? 'http://127.0.0.1:8188', 'provider.baseUrl', 2048));
-  if (baseUrl.protocol !== 'http:' || !['127.0.0.1', 'localhost', '::1'].includes(baseUrl.hostname)) fail('local campaign provider.baseUrl must be loopback HTTP');
-  const catalogPath = path.resolve(text(provider.catalogPath, 'provider.catalogPath', 4096));
-  const requestedAdapterId = provider.adapterId === undefined ? null : text(provider.adapterId, 'provider.adapterId', 256);
+  const provider = object(manifest.provider ?? {}, 'provider');
+  const configuredBaseUrl = provider.baseUrl ?? environment.EVAVO_ART_COMFYUI_BASE_URL ?? defaultBaseUrl();
+  const baseUrl = assertLoopbackBaseUrl(text(configuredBaseUrl, 'provider.baseUrl', 2048));
+  const configuredCatalog = provider.catalogPath ?? environment.EVAVO_ART_COMFYUI_CATALOG ?? defaultCatalogPath();
+  const catalogPath = path.resolve(text(configuredCatalog, 'provider.catalogPath', 4096));
+  const requestedAdapterId = optionalText(provider.adapterId, 'provider.adapterId', 256);
   if (requestedAdapterId && !requestedAdapterId.startsWith('comfyui:')) fail('provider.adapterId must be a comfyui: adapter');
   const defaults = object(manifest.defaults ?? {}, 'defaults');
   const scenes = manifest.scenes;
@@ -108,20 +131,25 @@ function validateManifest(input) {
     const target = object(scene.target ?? defaults.target ?? {}, `scenes[${index}].target`);
     const width = boundedInteger(target.width ?? 1024, `scenes[${index}].target.width`, 64, 4096);
     const height = boundedInteger(target.height ?? 1024, `scenes[${index}].target.height`, 64, 4096);
+    const transparency = target.transparency ?? 'opaque';
+    if (!TRANSPARENCY.has(transparency)) fail(`scenes[${index}].target.transparency is unsupported`);
     const outputFormat = target.outputFormat ?? 'png';
     if (!FORMATS.has(outputFormat)) fail(`scenes[${index}].target.outputFormat is unsupported`);
     const candidateCount = boundedInteger(scene.candidateCount ?? defaults.candidateCount ?? 4, `scenes[${index}].candidateCount`, 1, 16);
     const seed = boundedInteger(scene.seed ?? defaults.seed ?? (100000 + index), `scenes[${index}].seed`, 0, 2147483647);
     const style = object(scene.style ?? manifest.style ?? {}, `scenes[${index}].style`);
+    const adapterId = optionalText(scene.adapterId, `scenes[${index}].adapterId`, 256) ?? requestedAdapterId;
+    if (adapterId && !adapterId.startsWith('comfyui:')) fail(`scenes[${index}].adapterId must be a comfyui: adapter`);
     return {
       id,
+      adapterId,
       assetKind,
       continuityPhase,
       creativeIntent: text(scene.prompt, `scenes[${index}].prompt`),
-      negativeIntent: scene.negativePrompt === undefined ? undefined : text(scene.negativePrompt, `scenes[${index}].negativePrompt`),
+      negativeIntent: optionalText(scene.negativePrompt, `scenes[${index}].negativePrompt`),
       candidateCount,
       seed,
-      target: { width, height, transparency: target.transparency ?? 'opaque', outputFormat },
+      target: { width, height, transparency, outputFormat },
       style: {
         styleName: text(style.styleName ?? 'Project art direction', `scenes[${index}].style.styleName`, 512),
         intent: text(style.intent ?? 'Follow the supplied project art direction consistently.', `scenes[${index}].style.intent`, 4096),
@@ -136,9 +164,9 @@ function validateManifest(input) {
         eraRules: list(style.eraRules, `scenes[${index}].style.eraRules`),
       },
       shot: {
-        subject: text(scene.subject ?? manifest.subject?.description ?? 'Primary subject described by the creative intent.', `scenes[${index}].subject`, 4096),
-        action: scene.action === undefined ? undefined : text(scene.action, `scenes[${index}].action`, 4096),
-        direction: scene.direction === undefined ? undefined : text(scene.direction, `scenes[${index}].direction`, 2048),
+        subject: text(scene.subject ?? subject.description ?? 'Primary subject described by the creative intent.', `scenes[${index}].subject`, 4096),
+        ...(scene.action === undefined ? {} : { action: text(scene.action, `scenes[${index}].action`, 4096) }),
+        ...(scene.direction === undefined ? {} : { direction: text(scene.direction, `scenes[${index}].direction`, 2048) }),
         include: list(scene.include, `scenes[${index}].include`),
         exclude: list(scene.exclude, `scenes[${index}].exclude`),
         separateAssets: list(scene.separateAssets, `scenes[${index}].separateAssets`),
@@ -147,32 +175,43 @@ function validateManifest(input) {
     };
   });
   if (new Set(normalizedScenes.map((scene) => scene.id)).size !== normalizedScenes.length) fail('scene IDs must be unique');
-  return { campaignId, contentClass, provider: { baseUrl: baseUrl.toString().replace(/\/$/u, ''), catalogPath, requestedAdapterId }, scenes: normalizedScenes, source: manifest };
+  return Object.freeze({ campaignId, contentClass, provider: { baseUrl, catalogPath }, scenes: Object.freeze(normalizedScenes), source: manifest });
 }
-function selectProfile(catalog, requestedAdapterId, scenes) {
+
+function routeScene(catalog, scene) {
   object(catalog, 'ComfyUI catalog');
   if (!Array.isArray(catalog.profiles) || !catalog.profiles.length) fail('ComfyUI catalog contains no profiles');
   const candidates = catalog.profiles.filter((profile) => {
     if (!profile || typeof profile !== 'object') return false;
     const adapterId = `comfyui:${profile.profileId}`;
-    if (requestedAdapterId && adapterId !== requestedAdapterId) return false;
+    if (scene.adapterId && adapterId !== scene.adapterId) return false;
     if (!Array.isArray(profile.operations) || !profile.operations.includes('generate')) return false;
-    if (!Array.isArray(profile.assetKinds)) return false;
-    return scenes.every((scene) => profile.assetKinds.includes(scene.assetKind));
+    if (!Array.isArray(profile.assetKinds) || !profile.assetKinds.includes(scene.assetKind)) return false;
+    if (!Array.isArray(profile.continuityPhases) || !profile.continuityPhases.includes(scene.continuityPhase)) return false;
+    if (!Array.isArray(profile.capabilities) || !REQUIRED_GENERATE_CAPABILITIES.every((capability) => profile.capabilities.includes(capability))) return false;
+    if (profile.limits?.maximumCandidates !== undefined && profile.limits.maximumCandidates < scene.candidateCount) return false;
+    return true;
   }).sort((a, b) => Number(b.priority ?? 0) - Number(a.priority ?? 0));
-  if (!candidates.length) fail('no reviewed local ComfyUI profile supports every requested scene asset kind');
+  if (!candidates.length) fail(`no reviewed local ComfyUI profile can execute scene ${scene.id} (${scene.assetKind}/${scene.continuityPhase}, ${scene.candidateCount} candidates)`);
   const profile = candidates[0];
-  return { profile, adapterId: `comfyui:${profile.profileId}`, modelId: text(profile.modelId, 'profile.modelId', 512) };
+  return Object.freeze({
+    sceneId: scene.id,
+    profileId: safeId(profile.profileId, `profile for ${scene.id}`),
+    adapterId: `comfyui:${profile.profileId}`,
+    modelId: text(profile.modelId, `modelId for ${scene.id}`, 512),
+    profileSha256: optionalText(profile.profileSha256, `profileSha256 for ${scene.id}`, 128),
+  });
 }
-function runtimeJob(campaign, scene, adapterId, modelId, runId) {
+
+function runtimeJob(campaign, scene, route, runId) {
   const request = {
     schemaVersion: '1.0', operation: 'generate', assetKind: scene.assetKind, continuityPhase: scene.continuityPhase,
     assetId: `${campaign.campaignId}-${scene.id}`, candidateFamilyId: `${campaign.campaignId}-${scene.id}`, frameId: scene.id,
     creativeIntent: scene.creativeIntent, ...(scene.negativeIntent ? { negativeIntent: scene.negativeIntent } : {}),
     style: scene.style, shot: scene.shot, target: scene.target, sourceCanvas: { width: scene.target.width, height: scene.target.height },
-    background: { strategy: scene.target.transparency === 'opaque' ? 'provider-auto' : 'chroma-key', ...(scene.target.transparency === 'opaque' ? {} : { matteColour: '#00ff00' }) },
+    background: scene.target.transparency === 'opaque' ? { strategy: 'provider-auto' } : { strategy: 'chroma-key', matteColour: '#00ff00' },
     quality: 'high', candidateCount: scene.candidateCount, seed: scene.seed, references: [],
-    selection: { preferredAdapterId: adapterId, preferredModel: modelId, allowedAdapterIds: [adapterId], allowFallback: false, requireSeed: true },
+    selection: { preferredAdapterId: route.adapterId, preferredModel: route.modelId, allowedAdapterIds: [route.adapterId], allowFallback: false, requireSeed: true },
     metadata: { campaignId: campaign.campaignId, sceneId: scene.id, contentClass: campaign.contentClass, localOnly: true, approvalRequired: true, runId },
   };
   return {
@@ -181,10 +220,11 @@ function runtimeJob(campaign, scene, adapterId, modelId, runId) {
     requiredCapabilities: ['provider.generate', 'provider.candidate-store', 'evidence.bundle'], inputArtifacts: [], priority: 10,
     maximumAttempts: 2, retryPolicy: { baseDelayMs: 5000, maximumDelayMs: 60000, multiplier: 2, jitterFraction: 0.1 },
     leaseDurationMs: 300000, timeoutMs: 1800000,
-    labels: { campaign: campaign.campaignId, scene: scene.id, provider: adapterId, contentClass: campaign.contentClass },
-    requiredCapabilityProfile: ['candidate-count', 'custom-size', 'generate', 'seed'],
+    labels: { campaign: campaign.campaignId, scene: scene.id, provider: route.adapterId, contentClass: campaign.contentClass },
+    requiredCapabilityProfile: REQUIRED_GENERATE_CAPABILITIES,
   };
 }
+
 async function probeComfy(baseUrl) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
@@ -195,17 +235,19 @@ async function probeComfy(baseUrl) {
     fail(`local ComfyUI is not reachable at ${baseUrl}: ${error instanceof Error ? error.message : String(error)}`);
   } finally { clearTimeout(timer); }
 }
-async function main(argv = process.argv.slice(2)) {
+
+export async function runLocalGenerationCampaign(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   const manifestPath = path.resolve(args.get('--manifest') ?? path.join(ROOT, 'examples', 'local-generation-campaign.lorna.json'));
   const actor = args.get('--actor') ?? process.env.EVAVO_ART_ACTOR ?? 'local-generation-campaign';
-  const campaign = validateManifest(await readJson(manifestPath, 'campaign manifest'));
+  const campaign = validateLocalGenerationCampaign(await readJson(manifestPath, 'campaign manifest'));
   const catalog = await readJson(campaign.provider.catalogPath, 'ComfyUI catalog');
-  const { profile, adapterId, modelId } = selectProfile(catalog, campaign.provider.requestedAdapterId, campaign.scenes);
+  const routes = campaign.scenes.map((scene) => routeScene(catalog, scene));
   await probeComfy(campaign.provider.baseUrl);
 
-  const runFingerprint = sha256(Buffer.from(canonical({ campaign: campaign.source, adapterId, modelId, at: new Date().toISOString() }), 'utf8'));
-  const runId = `${new Date().toISOString().replace(/[:.]/gu, '-')}-${runFingerprint.slice(0, 12)}`;
+  const now = new Date().toISOString();
+  const runFingerprint = sha256(Buffer.from(canonical({ campaign: campaign.source, routes, at: now }), 'utf8'));
+  const runId = `${now.replace(/[:.]/gu, '-')}-${runFingerprint.slice(0, 12)}`;
   const outputRoot = path.resolve(args.get('--output-root') ?? defaultOutputRoot(), campaign.campaignId, runId);
   const jobsDir = path.join(outputRoot, 'jobs');
   const outputsDir = path.join(outputRoot, 'outputs');
@@ -214,8 +256,10 @@ async function main(argv = process.argv.slice(2)) {
   await mkdir(jobsDir, { recursive: true });
   await mkdir(outputsDir, { recursive: true });
   await copyFile(manifestPath, path.join(outputRoot, 'manifest.input.json'));
+  await writeJson(path.join(outputRoot, 'routes.json'), routes);
 
-  const jobs = campaign.scenes.map((scene) => runtimeJob(campaign, scene, adapterId, modelId, runId));
+  const routeByScene = new Map(routes.map((route) => [route.sceneId, route]));
+  const jobs = campaign.scenes.map((scene) => runtimeJob(campaign, scene, routeByScene.get(scene.id), runId));
   const jobsPath = path.join(jobsDir, 'runtime-jobs.json');
   await writeJson(jobsPath, jobs);
   const env = {
@@ -258,22 +302,32 @@ async function main(argv = process.argv.slice(2)) {
     }
   }
   const failed = records.filter((record) => ['failed', 'dead-letter', 'blocked', 'cancelled'].includes(record.state));
+  const missingScenes = campaign.scenes.filter((scene) => !materialized.some((candidate) => candidate.sceneId === scene.id)).map((scene) => scene.id);
   const receipt = {
-    schema: 'evavo.local-generation-campaign-receipt.v1', status: failed.length ? 'failed' : 'succeeded', campaignId: campaign.campaignId,
-    runId, completedAt: new Date().toISOString(), contentClass: campaign.contentClass,
-    provider: { adapterId, modelId, profileId: profile.profileId, baseUrl: campaign.provider.baseUrl, catalogPath: campaign.provider.catalogPath, localOnly: true, fallbackAllowed: false },
+    schema: 'evavo.local-generation-campaign-receipt.v1',
+    status: failed.length || missingScenes.length ? 'failed' : 'succeeded',
+    campaignId: campaign.campaignId,
+    runId,
+    completedAt: new Date().toISOString(),
+    contentClass: campaign.contentClass,
+    provider: { baseUrl: campaign.provider.baseUrl, catalogPath: campaign.provider.catalogPath, localOnly: true, fallbackAllowed: false, routes },
     paths: { runRoot: outputRoot, outputs: outputsDir, runtime: runtimeRoot, artifacts: artifactRoot },
-    counts: { requestedScenes: campaign.scenes.length, runtimeJobs: records.length, materializedCandidates: materialized.length, failedJobs: failed.length },
+    counts: { requestedScenes: campaign.scenes.length, runtimeJobs: records.length, materializedCandidates: materialized.length, failedJobs: failed.length, missingScenes: missingScenes.length },
     candidates: materialized,
+    missingScenes,
     failedJobs: failed.map((record) => ({ id: record.id, state: record.state, failure: record.failure ?? null })),
     authority: { candidateApproval: false, candidatePromotion: false, publication: false, targetRepositoryMutation: false },
   };
   await writeJson(path.join(outputRoot, 'receipt.json'), receipt);
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
-  if (failed.length) process.exitCode = 2;
+  if (receipt.status !== 'succeeded') process.exitCode = 2;
+  return receipt;
 }
 
-main().catch((error) => {
-  process.stderr.write(`${JSON.stringify({ status: 'failed', error: error instanceof Error ? error.message : String(error) })}\n`);
-  process.exitCode = 2;
-});
+const directlyInvoked = process.argv[1] ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
+if (directlyInvoked) {
+  runLocalGenerationCampaign().catch((error) => {
+    process.stderr.write(`${JSON.stringify({ status: 'failed', error: error instanceof Error ? error.message : String(error) })}\n`);
+    process.exitCode = 2;
+  });
+}
