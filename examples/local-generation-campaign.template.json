@@ -1,0 +1,45 @@
+{
+  "schema": "evavo.local-generation-campaign.v1",
+  "campaignId": "replace-me",
+  "contentClass": "general",
+  "subject": {
+    "description": "Describe the persistent subject or project identity here."
+  },
+  "provider": {
+    "baseUrl": "http://127.0.0.1:8188",
+    "catalogPath": "C:\\EVAVO\\comfyui\\catalog.json"
+  },
+  "defaults": {
+    "assetKind": "illustration",
+    "continuityPhase": "independent",
+    "candidateCount": 4,
+    "seed": 100000,
+    "target": {
+      "width": 1024,
+      "height": 1024,
+      "transparency": "opaque",
+      "outputFormat": "png"
+    }
+  },
+  "style": {
+    "styleName": "Project art direction",
+    "intent": "Describe the reusable visual direction.",
+    "mustHave": ["stable project identity"],
+    "mustAvoid": ["generic AI rendering", "text", "watermark"],
+    "identityLocks": [],
+    "cameraRules": [],
+    "compositionRules": []
+  },
+  "scenes": [
+    {
+      "id": "scene-01",
+      "prompt": "Describe the image to generate.",
+      "negativePrompt": "Describe unwanted visual outcomes.",
+      "subject": "Describe the subject in this scene.",
+      "action": "Describe the action or pose.",
+      "include": [],
+      "exclude": [],
+      "framing": []
+    }
+  ]
+}
