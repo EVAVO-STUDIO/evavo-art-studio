@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-creative-output-layout-v1",
+  "studio": "art-studio",
+  "rootEnvironmentVariable": "EVAVO_CREATIVE_OUTPUT_ROOT",
+  "defaultRoot": "%LOCALAPPDATA%/EVAVO/Creative/art-studio",
+  "directories": [
+    "renders/stills",
+    "renders/sprites",
+    "renders/animation-frames",
+    "renders/reference",
+    "renders/proofs",
+    "exports/masters",
+    "exports/game",
+    "exports/web",
+    "exports/print",
+    "exports/atlases",
+    "training/datasets",
+    "training/adapters",
+    "training/evaluations",
+    "training/manifests",
+    "scratch"
+  ],
+  "policy": {
+    "outputsInGitByDefault": false,
+    "modelWeightsInGit": false,
+    "createDirectoriesOnly": true,
+    "overwriteExistingFiles": false
+  }
+}
