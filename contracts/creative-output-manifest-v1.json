@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-creative-output-manifest-v1",
+  "purpose": "Record enough immutable evidence to review, reproduce, compare, deliver or later build a governed training dataset from generated creative media.",
+  "requiredFields": [
+    "manifestId",
+    "jobId",
+    "studio",
+    "operation",
+    "styleProfile",
+    "qualityLane",
+    "createdAt",
+    "model",
+    "workflow",
+    "references",
+    "generation",
+    "artifact",
+    "outputClass",
+    "reviewState",
+    "authority"
+  ],
+  "model": {
+    "required": ["family", "revision", "artifactSha256"],
+    "adapters": "ordered-array-of-exact-id-revision-and-sha256"
+  },
+  "workflow": {
+    "workflowSha256RequiredWhenApplicable": true,
+    "runtimeRevisionRequired": true,
+    "customNodeInventoryDigestRequiredWhenApplicable": true
+  },
+  "references": {
+    "ordered": true,
+    "eachBinds": ["role", "artifactSha256", "bytes"]
+  },
+  "generation": {
+    "record": ["seed", "width", "height", "frameRate", "frameCount", "durationMs", "samplerOrScheduler", "steps", "guidance", "promptDigest"],
+    "nullableWhenNotApplicable": true
+  },
+  "artifact": {
+    "record": ["relativePath", "mediaType", "bytes", "sha256"],
+    "createOnly": true
+  },
+  "reviewStates": ["candidate", "review-required", "approved", "rejected", "superseded"],
+  "trainingEligibility": {
+    "default": false,
+    "requiresSeparateDatasetAdmission": true,
+    "requiresRightsAndConsentEvidence": true,
+    "requiresExactSourceManifest": true
+  },
+  "authority": {
+    "manifestIsCreativeApproval": false,
+    "manifestIsTrainingAdmission": false,
+    "manifestIsPublicationAuthority": false
+  }
+}
