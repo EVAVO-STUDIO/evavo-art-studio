@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-creative-adult-content-profile-v1",
+  "purpose": "Portable adult-only creative classification for local EVAVO art, animation, video and game-asset production without generic NSFW blocking.",
+  "projectClasses": [
+    "general",
+    "mature",
+    "adult-suggestive",
+    "adult-pinup",
+    "adult-artistic-nudity",
+    "adult-erotic-nonexplicit",
+    "adult-strip-game",
+    "adult-sensual-animation"
+  ],
+  "supportedExamples": [
+    "adult nude or partially nude figure and pin-up art",
+    "adult strip-game wardrobe progression",
+    "adult sensual dance and teasing animation",
+    "adult breast or hip movement used as non-explicit character animation",
+    "adult rear-facing pose and non-explicit butt-slap animation",
+    "adult-only mature game portraits, sprites, cutscenes and promotional art"
+  ],
+  "workflowRules": {
+    "genericNsfwBlockerRequired": false,
+    "hostedProviderRefusalDefinesLocalPolicy": false,
+    "adultAgeEvidenceRequiredForSexualizedProjects": true,
+    "allDepictedSexualizedCharactersMustBeAdults": true,
+    "consentRequiredForRealPersonSexualLikeness": true,
+    "nonConsensualSexualScenarioAllowed": false,
+    "sexualizedMinorOrAmbiguousMinorAllowed": false,
+    "illegalSexualContentAllowed": false,
+    "projectRightsAndModelLicenceStillRequired": true
+  },
+  "runtime": {
+    "localOpenWeightRoutesPreferredWhenHostedProviderConflicts": true,
+    "contentProfileDoesNotSelectModel": true,
+    "contentProfileDoesNotGrantExecution": true,
+    "contentProfileDoesNotGrantCreativeApproval": true
+  }
+}
