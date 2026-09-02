@@ -24,14 +24,15 @@
   },
   "style": {
     "styleName": "Gritty 1990s cinematic action-game illustration",
-    "intent": "Dark, hand-authored mature action-game bonus-scene artwork with stable character identity, strong silhouettes, grounded adult anatomy, restrained cinematic lighting and increasing sensuality across a ten-image strip-poker sequence.",
+    "intent": "Dark, hand-authored mature action-game bonus-scene artwork with stable character identity, strong silhouettes, grounded adult anatomy, restrained cinematic lighting and increasing sensuality across a ten-image strip-poker sequence. Later clothing stages deliberately test minimal opaque physical coverage rather than relying only on censorship by pose.",
     "mustHave": [
       "clearly adult mature facial features",
       "stable Lorna identity across every scene",
       "athletic curvy adult action-hero anatomy",
       "dark cinematic 1990s game atmosphere",
       "strong readable silhouette",
-      "progressive visual continuity across all ten stages"
+      "progressive visual continuity across all ten stages",
+      "later stages test tiny opaque nipple pasties or tassels and extremely minimal opaque lower coverage while remaining non-explicit"
     ],
     "mustAvoid": [
       "childlike or teenage appearance",
@@ -56,7 +57,8 @@
     ],
     "compositionRules": [
       "single clearly adult character",
-      "intimate anatomy remains non-explicit through clothing, pose, framing, hair, arms, bedding, props or shadow"
+      "intimate anatomy remains non-explicit through tiny opaque garments or pasties, pose, framing, hair, arms, bedding, props or shadow",
+      "minimal coverage stages should expose substantial normal breast, torso, hip and buttock contour while keeping nipples, areolae and genital anatomy covered"
     ]
   },
   "scenes": [
@@ -92,49 +94,49 @@
       "exclude": ["visible nipples", "visible genitalia", "sexual activity"]
     },
     {
-      "id": "04-topless-rear-table",
+      "id": "04-pasties-and-thong-standing",
       "seed": 187103,
-      "prompt": "The same clearly adult 28-year-old Lorna has lost the micro-top. Rear three-quarter view beside the poker table: bare shoulders, full bare back, waist and side torso visible, with the natural side contour of her breasts visible from behind but no nipple or areola visible because of camera angle, hair and arm placement. She still wears the minimal opaque thong bottom and oversized combat boots. Looking back over her shoulder with a confident teasing expression. Dark cinematic industrial game-room lighting.",
-      "negativePrompt": "minor, teenager, visible nipple, visible areola, frontal exposed breasts, genital exposure, explicit sex, masturbation, penetration, anatomical close-up, text, watermark",
-      "subject": "The same clearly adult Lorna, topless from behind but non-explicit.",
-      "action": "Looking back over her shoulder after removing the top.",
-      "include": ["bare back", "bare shoulders", "side breast contour", "minimal thong", "combat boots", "poker table"],
-      "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity"]
+      "prompt": "The same clearly adult 28-year-old Lorna after losing the micro-top, standing beside the poker table. She now wears only two tiny opaque black leather nipple pasties with short decorative tassels, an extremely minimal opaque black micro-thong that fully covers genital anatomy, and oversized rugged combat boots. Most of each breast is naturally visible around the tiny opaque pasties, including strong cleavage, upper-breast, sideboob and underboob contour, while nipples and areolae remain completely covered. Her waist, abdomen, hips and legs are bare. Confident teasing expression, gritty cinematic game-room lighting, full-body mature pin-up composition rather than an anatomical close-up.",
+      "negativePrompt": "minor, teenager, youthful face, uncovered nipple, visible areola, displaced pastie, transparent pastie, exposed genitalia, visible genital opening, explicit sexual activity, masturbation, penetration, anatomical close-up, text, watermark",
+      "subject": "The same clearly adult Lorna in tiny opaque pasties, micro-thong and combat boots.",
+      "action": "Standing confidently after removing the micro-top.",
+      "include": ["tiny opaque nipple pasties", "short decorative tassels", "extremely minimal opaque micro-thong", "cleavage", "upper-breast contour", "sideboob", "underboob", "bare abdomen", "bare hips", "combat boots", "poker table"],
+      "exclude": ["visible nipples", "visible areolae", "visible genital anatomy", "sexual activity"]
     },
     {
-      "id": "05-topless-seated-covered",
+      "id": "05-pasties-seated-table",
       "seed": 187104,
-      "prompt": "The same clearly adult Lorna seated sideways on the edge of the poker table after another loss, topless but non-explicit. One forearm and her long dark hair naturally cover the nipple and areola area while generous cleavage, upper-breast contour, sideboob, bare shoulders, back and waist remain visible. She still wears the tiny opaque thong bottom and combat boots. Mature pin-up composition, confident grin, cards scattered beside her, cinematic game-art lighting.",
-      "negativePrompt": "minor, teen, visible nipple, visible areola, genital exposure, explicit sexual activity, frontal explicit nudity, anatomical close-up, text, watermark",
-      "subject": "The same clearly adult Lorna in a topless strategically covered composition.",
-      "action": "Sitting on the poker table and reacting to the next lost round.",
-      "include": ["cleavage", "upper-breast contour", "sideboob", "bare shoulders", "cards", "combat boots"],
-      "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity"]
+      "prompt": "The same clearly adult Lorna seated sideways on the edge of the poker table after another lost hand. She wears the same two tiny opaque black nipple pasties with short tassels and an extremely minimal opaque micro-thong, with oversized combat boots still on. The composition deliberately shows substantial normal breast contour around the small opaque pasties, deep cleavage, sideboob and underboob, plus bare shoulders, back, waist, abdomen, hips and legs. The micro-thong is extremely narrow but fully covers all genital anatomy. Mature confident grin, cards scattered beside her, cinematic 1990s action-game bonus-art styling.",
+      "negativePrompt": "minor, teen, uncovered nipple, visible areola, pastie slipping, transparent pastie, genital exposure, visible genital detail, explicit sexual activity, masturbation, penetration, spread-leg explicit pose, anatomical close-up, text, watermark",
+      "subject": "The same clearly adult Lorna in the minimal opaque pasties-and-micro-thong stage.",
+      "action": "Sitting on the poker table and reacting to another lost round.",
+      "include": ["tiny opaque nipple pasties", "short tassels", "deep cleavage", "sideboob", "underboob", "extremely minimal opaque micro-thong", "bare waist", "bare hips", "cards", "combat boots"],
+      "exclude": ["visible nipples", "visible areolae", "visible genital anatomy", "sexual activity"]
     },
     {
-      "id": "06-final-bottom-stage",
+      "id": "06-final-minimal-coverage-stage",
       "seed": 187105,
-      "prompt": "The same clearly adult 28-year-old Lorna standing beside the poker table at the final clothing stage. She is topless with breasts strategically covered by crossed forearms and long hair, allowing pronounced cleavage, sideboob and underboob contour without visible nipples or areolae. She wears only the extremely minimal opaque black thong bottom and oversized combat boots. Confident, competitive mature expression, dark industrial bonus-scene atmosphere.",
-      "negativePrompt": "minor, youth, nipple, areola, genital exposure, explicit sex, spread pose, pornographic close-up, identity drift, text, watermark",
-      "subject": "The same clearly adult Lorna at the final covered clothing stage.",
+      "prompt": "The same clearly adult 28-year-old Lorna at the final physically covered strip-poker stage. She stands beside the table wearing only two very small opaque black nipple pasties with subtle tassels, an ultra-minimal opaque black front-and-rear micro-thong coverage panel connected by narrow straps, and oversized combat boots. The opaque pieces are intentionally as small as practical while still completely covering nipple and areola areas and all genital anatomy. Most of her breasts, cleavage, sideboob and underboob are visible, together with bare shoulders, back, abdomen, waist, hips, upper buttock contour and legs. Confident competitive mature expression, full-body cinematic game bonus art, no sexual act.",
+      "negativePrompt": "minor, youth, uncovered nipple, visible areola, misplaced pastie, transparent clothing, exposed genitalia, visible genital opening, explicit sex, spread pose, masturbation, penetration, pornographic anatomical close-up, identity drift, text, watermark",
+      "subject": "The same clearly adult Lorna at the strongest minimally covered non-explicit clothing stage.",
       "action": "Standing after losing the next-to-last round.",
-      "include": ["cleavage", "sideboob", "underboob contour", "minimal opaque thong", "combat boots"],
-      "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity"]
+      "include": ["two tiny opaque nipple pasties", "subtle tassels", "ultra-minimal opaque front-and-rear coverage panel", "deep cleavage", "sideboob", "underboob", "bare abdomen", "bare hips", "upper buttock contour", "combat boots"],
+      "exclude": ["visible nipples", "visible areolae", "visible genital anatomy", "sexual activity"]
     },
     {
       "id": "07-implied-nude-standing-rear",
       "seed": 187106,
-      "prompt": "The same clearly adult Lorna after losing the final clothing round. Mature implied-nude standing rear three-quarter composition beside the poker table: bare shoulders, back, waist, hips, buttocks contour and legs visible. Her long hair, turned torso, one arm and deep shadow fully obscure nipples and the front of the pelvis; no genital detail is visible. Discarded micro-bikini lies on the table and the combat boots are on the floor. Sensual adult action-game bonus art, not explicit sexual activity.",
+      "prompt": "The same clearly adult Lorna after losing the final clothing round. Mature implied-nude standing rear three-quarter composition beside the poker table: bare shoulders, back, waist, hips, buttocks contour and legs visible. Her long hair, turned torso, one arm and deep shadow fully obscure nipples and the front of the pelvis; no genital detail is visible. The tiny discarded pasties, micro-thong and combat boots are visible nearby to make the strip-poker progression clear. Sensual adult action-game bonus art, not explicit sexual activity.",
       "negativePrompt": "minor, teen, visible nipple, visible areola, visible vulva, genital detail, explicit sex, masturbation, penetration, spread legs, anatomical close-up, text, watermark",
       "subject": "The same clearly adult Lorna, strongly implied nude from a rear three-quarter angle.",
       "action": "Looking back after losing the final clothing round.",
-      "include": ["bare back", "bare waist", "bare hips", "buttocks contour", "bare legs", "discarded outfit"],
+      "include": ["bare back", "bare waist", "bare hips", "buttocks contour", "bare legs", "discarded pasties", "discarded micro-thong", "discarded combat boots"],
       "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity"]
     },
     {
       "id": "08-implied-nude-chair",
       "seed": 187107,
-      "prompt": "The same clearly adult 28-year-old Lorna in an implied fully nude bonus-scene pose sitting sideways in a heavy chair near the poker table. Her crossed thigh, forearm, long hair and camera angle completely hide genital anatomy and nipple/areola detail while showing bare shoulders, extensive cleavage, upper-breast contour, sideboob, bare waist, hips and long legs. She looks calmly amused after the game. Discarded outfit and boots nearby. Dark moody cinematic 1990s action-game art.",
+      "prompt": "The same clearly adult 28-year-old Lorna in an implied fully nude bonus-scene pose sitting sideways in a heavy chair near the poker table. Her crossed thigh, forearm, long hair and camera angle completely hide genital anatomy and nipple/areola detail while showing bare shoulders, extensive cleavage, upper-breast contour, sideboob, bare waist, hips and long legs. She looks calmly amused after the game. Discarded tiny pasties, micro-thong and boots nearby. Dark moody cinematic 1990s action-game art.",
       "negativePrompt": "minor, teenager, visible nipple, visible areola, genitalia, explicit sexual activity, masturbation, penetration, spread-leg explicit pose, anatomical close-up, text, watermark",
       "subject": "The same clearly adult Lorna in a strategically covered implied-nude chair pose.",
       "action": "Relaxing in the chair after the game.",
@@ -144,7 +146,7 @@
     {
       "id": "09-bedroom-edge",
       "seed": 187108,
-      "prompt": "The same clearly adult Lorna in the dark bedroom bonus sequence, sitting on the edge of the bed and strongly implied to be nude. A rumpled dark sheet crosses her lap while one arm and long hair strategically cover the nipple and areola area. Bare shoulders, deep cleavage, upper-breast contour, sideboob, bare back, waist, hips and legs are visible. She looks toward camera with a confident mischievous expression. Her discarded micro-bikini and combat boots are beside the bed. Moody cinematic action-game illustration.",
+      "prompt": "The same clearly adult Lorna in the dark bedroom bonus sequence, sitting on the edge of the bed and strongly implied to be nude. A rumpled dark sheet crosses her lap while one arm and long hair strategically cover the nipple and areola area. Bare shoulders, deep cleavage, upper-breast contour, sideboob, bare back, waist, hips and legs are visible. She looks toward camera with a confident mischievous expression. Her discarded tiny pasties, micro-thong and combat boots are beside the bed. Moody cinematic action-game illustration.",
       "negativePrompt": "minor, youthful face, visible nipple, visible areola, visible genitalia, explicit sex, masturbation, penetration, pornographic anatomical close-up, text, logo, watermark",
       "subject": "The same clearly adult Lorna in a strategically covered bedroom composition.",
       "action": "Sitting on the bed after the strip-poker game.",
@@ -154,11 +156,11 @@
     {
       "id": "10-bedroom-finale",
       "seed": 187109,
-      "prompt": "Final mature bonus-scene illustration of the same clearly adult 28-year-old Lorna posed forward on a bed in a rear three-quarter composition. She is strongly implied to be fully nude. Bare back, shoulders, waist, hips, buttocks contour, thighs and legs are visible; the turned camera angle, her long hair, arm position and rumpled bedding obscure nipple/areola detail and all genital anatomy. She looks back toward camera with a confident mischievous expression. Discarded black micro-bikini and oversized combat boots sit beside the bed. Moody practical lighting, deep shadow and restrained rim light, gritty mature 1990s action-game bonus-art aesthetic.",
+      "prompt": "Final mature bonus-scene illustration of the same clearly adult 28-year-old Lorna posed forward on a bed in a rear three-quarter composition. She is strongly implied to be fully nude. Bare back, shoulders, waist, hips, buttocks contour, thighs and legs are visible; the turned camera angle, her long hair, arm position and rumpled bedding obscure nipple/areola detail and all genital anatomy. She looks back toward camera with a confident mischievous expression. Discarded tiny black pasties, micro-thong and oversized combat boots sit beside the bed. Moody practical lighting, deep shadow and restrained rim light, gritty mature 1990s action-game bonus-art aesthetic.",
       "negativePrompt": "minor, teen, youthful face, visible nipple, visible areola, exposed genitalia, explicit sexual activity, penetration, masturbation, explicit spread pose, pornographic anatomical close-up, text, logo, watermark",
       "subject": "The same clearly adult Lorna in the final implied-nude non-explicit bedroom composition.",
       "action": "Posed forward on the bed and looking back toward camera.",
-      "include": ["bare back", "shoulders", "waist", "hips", "buttocks contour", "thighs", "legs", "rumpled bedding", "discarded outfit and boots"],
+      "include": ["bare back", "shoulders", "waist", "hips", "buttocks contour", "thighs", "legs", "rumpled bedding", "discarded tiny pasties", "discarded micro-thong", "discarded boots"],
       "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity", "explicit anatomical detail"],
       "framing": ["rear three-quarter view", "strategic non-explicit coverage", "cinematic game bonus scene"]
     }
