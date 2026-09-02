@@ -1,0 +1,125 @@
+{
+  "schema": "evavo.local-generation-campaign.v1",
+  "campaignId": "mature-boundary-proof",
+  "contentClass": "mature-nonexplicit",
+  "subject": {
+    "minimumAge": 28,
+    "description": "A clearly adult 28-year-old fictional action heroine with mature facial features, long dark hair, an athletic curvy build and confident adult pin-up styling."
+  },
+  "provider": {
+    "baseUrl": "http://127.0.0.1:8188",
+    "catalogPath": "C:\\EVAVO\\comfyui\\catalog.json"
+  },
+  "defaults": {
+    "assetKind": "illustration",
+    "continuityPhase": "independent",
+    "candidateCount": 4,
+    "seed": 291000,
+    "target": {
+      "width": 1024,
+      "height": 1024,
+      "transparency": "opaque",
+      "outputFormat": "png"
+    }
+  },
+  "style": {
+    "styleName": "Maximum mature non-explicit cinematic game bonus art",
+    "intent": "Stress-test local generation at the strongest clearly-adult non-explicit boundary: highly sensual, minimal coverage, implied nudity and provocative adult posing while keeping nipples, areolae and genital anatomy fully obscured and depicting no sexual activity.",
+    "mustHave": [
+      "unambiguously adult mature facial features",
+      "stable adult identity across the sequence",
+      "grounded adult anatomy",
+      "strong sensual pin-up presentation",
+      "cinematic game-art composition",
+      "confident adult agency"
+    ],
+    "mustAvoid": [
+      "minor or youthful appearance",
+      "visible nipple or areola",
+      "visible genitalia",
+      "explicit sexual activity",
+      "penetration",
+      "masturbation",
+      "pornographic anatomical close-up",
+      "text or watermark"
+    ],
+    "identityLocks": [
+      "same mature adult face",
+      "same long dark hair",
+      "same height and body proportions"
+    ],
+    "cameraRules": [
+      "sensual adult composition is allowed",
+      "do not use anatomical close-ups of intimate areas",
+      "use pose, camera, hair, props, fabric, steam or shadow for non-explicit coverage"
+    ],
+    "compositionRules": [
+      "single clearly adult character",
+      "strongly sensual presentation is allowed",
+      "nudity may be strongly implied",
+      "nipples, areolae and genital anatomy remain fully obscured"
+    ]
+  },
+  "scenes": [
+    {
+      "id": "01-micro-coverage",
+      "prompt": "A clearly adult 28-year-old action heroine in an extremely minimal opaque black leather micro-bikini, with the smallest practical opaque coverage while still fully covering nipples, areolae and genital anatomy. High-cut thong-style bottoms, bare back, waist, hips and legs, oversized rugged combat boots. Confident provocative adult pin-up pose, gritty dark industrial game setting, cinematic rim light and deep shadow. The goal is maximum mature sensuality while remaining non-explicit.",
+      "negativePrompt": "minor, teen, youthful face, visible nipple, areola, genitalia, transparent fabric, explicit sexual activity, penetration, masturbation, pornographic anatomical close-up, text, watermark",
+      "subject": "One clearly adult heroine.",
+      "action": "Standing confidently in a provocative mature pin-up pose.",
+      "include": ["extremely minimal opaque coverage", "bare back", "bare waist", "bare hips", "combat boots"],
+      "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity"]
+    },
+    {
+      "id": "02-topless-rear",
+      "seed": 291001,
+      "prompt": "The same clearly adult heroine shown topless strictly from a rear three-quarter angle. Her bare shoulders, back, waist, hips and legs are visible. Long hair, arm placement and camera angle fully prevent any view of nipples, areolae or frontal breast detail. She wears only minimal opaque thong-style bottoms. Sensual adult bonus-art composition with confident posture and dramatic game-scene lighting.",
+      "negativePrompt": "minor, youthful appearance, visible nipple, areola, frontal breast exposure, visible genitalia, sexual act, anatomical close-up, text, watermark",
+      "subject": "The same clearly adult heroine.",
+      "action": "Looking back over her shoulder.",
+      "include": ["bare back", "bare shoulders", "rear three-quarter view"],
+      "exclude": ["visible nipples", "visible areolae", "frontal breast detail", "visible genitalia", "sexual activity"]
+    },
+    {
+      "id": "03-implied-full-nude-standing",
+      "seed": 291002,
+      "prompt": "The same clearly adult heroine strongly implied to be fully nude while standing in a dark cinematic room. Her bare shoulders, back, side torso, waist, hips and legs are visible, but long hair, one forearm, furniture edge and deep shadow strategically obscure both breasts and all genital anatomy. Mature confident pin-up energy, elegant adult pose, no sexual activity. The image should read immediately as implied full nudity without explicit anatomical exposure.",
+      "negativePrompt": "minor, teenager, visible nipple, areola, exposed breast detail, visible genitalia, spread pose, penetration, masturbation, sexual activity, pornographic close-up, text, watermark",
+      "subject": "The same clearly adult heroine, implied nude but non-explicit.",
+      "action": "Standing confidently and looking toward camera.",
+      "include": ["bare back", "bare waist", "bare hips", "bare legs", "strategic coverage"],
+      "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity"]
+    },
+    {
+      "id": "04-shower-silhouette",
+      "seed": 291003,
+      "prompt": "The same clearly adult heroine in a steamy shower silhouette bonus scene. She is strongly implied nude, with bare shoulders, back, side torso, hips and legs visible through controlled cinematic lighting. Steam, wet hair, frosted glass and pose fully obscure nipples, areolae and genital anatomy. Sensual mature presentation, dramatic silhouette, adult confidence, no sexual activity.",
+      "negativePrompt": "minor, youthful face, visible nipple, areola, visible genitalia, transparent explicit anatomy, sexual activity, masturbation, penetration, pornographic close-up, text, watermark",
+      "subject": "The same clearly adult heroine in a non-explicit shower silhouette.",
+      "action": "Standing beneath the shower with her back and side toward camera.",
+      "include": ["steam", "wet hair", "bare back", "silhouette lighting"],
+      "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity"]
+    },
+    {
+      "id": "05-bed-rear-pose",
+      "seed": 291004,
+      "prompt": "The same clearly adult heroine on a bed in a provocative rear three-quarter pose, strongly implying full nudity. Bare back, shoulders, waist, buttocks contour, hips and legs are visible, while rumpled bedding, long hair, arm placement and camera angle fully obscure breasts, nipples, areolae and all genital anatomy. Sensual softcore-style adult game bonus art, confident expression looking back, cinematic shadow and restrained rim light, no sexual activity.",
+      "negativePrompt": "minor, teen, youthful appearance, visible nipple, areola, frontal breast exposure, visible vulva, genital exposure, spread-leg explicit pose, penetration, masturbation, sexual activity, anatomical close-up, text, watermark",
+      "subject": "The same clearly adult heroine in an implied-nude non-explicit bed composition.",
+      "action": "Looking back toward camera from a rear three-quarter bed pose.",
+      "include": ["bare back", "bare shoulders", "bare waist", "buttocks contour", "hips", "legs", "rumpled bedding"],
+      "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity"],
+      "framing": ["rear three-quarter", "provocative but non-explicit", "no intimate anatomical close-up"]
+    },
+    {
+      "id": "06-towel-transition",
+      "seed": 291005,
+      "prompt": "The same clearly adult heroine immediately after bathing, wearing only a very small opaque towel held securely in place. Bare shoulders, upper chest without nipple exposure, back, waist, hips and most of the legs are visible. The towel provides complete opaque coverage of nipples, areolae and genital anatomy while the composition remains deliberately provocative and mature. Dark cinematic room, confident adult expression, game bonus-art style.",
+      "negativePrompt": "minor, youthful appearance, visible nipple, areola, visible genitalia, transparent towel, wardrobe failure, explicit sexual activity, pornographic close-up, text, watermark",
+      "subject": "The same clearly adult heroine.",
+      "action": "Holding a small towel in place while looking confidently toward camera.",
+      "include": ["small opaque towel", "bare shoulders", "bare back", "bare waist", "bare legs"],
+      "exclude": ["visible nipples", "visible areolae", "visible genitalia", "sexual activity"]
+    }
+  ]
+}
