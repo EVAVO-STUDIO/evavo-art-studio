@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
@@ -9,6 +9,8 @@ import * as z from "zod/v4";
 
 const MAXIMUM_CAPTURE_BYTES = 2 * 1024 * 1024;
 const MAXIMUM_CAMPAIGN_BYTES = 512 * 1024;
+const MAXIMUM_IMAGE_BYTES = 32 * 1024 * 1024;
+const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
@@ -59,6 +61,35 @@ function requestRoot(): string {
     return path.join(localAppData, "EVAVO", "ArtStudio", "agent-requests");
   }
   return path.resolve(".art-studio", "agent-requests");
+}
+
+function campaignOutputRoot(): string {
+  const configured = process.env.EVAVO_ART_LOCAL_GENERATION_OUTPUT_ROOT?.trim();
+  if (configured) return path.resolve(configured);
+  const localAppData = process.env.LOCALAPPDATA?.trim();
+  if (localAppData) {
+    return path.join(localAppData, "EVAVO", "ArtStudio", "campaigns");
+  }
+  return path.resolve(".art-studio", "local-campaigns");
+}
+
+function safeSegment(value: string, label: string): string {
+  if (!SAFE_SEGMENT.test(value)) throw new Error(`${label} must be a safe identifier.`);
+  return value;
+}
+
+function inside(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+async function realPathWithin(root: string, candidate: string, label: string): Promise<string> {
+  const canonicalRoot = await realpath(root);
+  const canonicalCandidate = await realpath(candidate);
+  if (!inside(canonicalRoot, canonicalCandidate)) {
+    throw new Error(`${label} resolves outside the local generation campaign root.`);
+  }
+  return canonicalCandidate;
 }
 
 function campaignBytes(campaign: unknown): Buffer {
@@ -154,6 +185,14 @@ function extractReceipt(stdout: string): unknown | null {
   return null;
 }
 
+function imageMimeType(filePath: string): "image/png" | "image/webp" | "image/jpeg" {
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === ".png") return "image/png";
+  if (extension === ".webp") return "image/webp";
+  if (extension === ".jpg" || extension === ".jpeg") return "image/jpeg";
+  throw new Error("Only PNG, WebP and JPEG campaign outputs can be returned as images.");
+}
+
 export function registerLocalGenerationTools(server: McpServer): void {
   server.registerTool(
     "local_generation_campaign_capabilities",
@@ -186,8 +225,11 @@ export function registerLocalGenerationTools(server: McpServer): void {
           "route each scene to a reviewed local profile",
           "execute durable Art Studio provider jobs",
           "materialize viewable candidate images",
+          "list local campaign outputs",
+          "return selected generated images through MCP",
           "return exact receipt and output paths",
         ],
+        outputRoot: campaignOutputRoot(),
         matureContent: "clearly-adult mature-nonexplicit only",
         explicitPornographyBypass: false,
       }),
@@ -236,10 +278,95 @@ export function registerLocalGenerationTools(server: McpServer): void {
           status: "completed",
           manifestPath,
           receipt,
+          outputRoot: campaignOutputRoot(),
           stderrTail: execution.stderr.trim() || null,
         });
       } catch (error: unknown) {
         return toolError("LOCAL_GENERATION_EXECUTION_FAILED", error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_local_generation_outputs",
+    {
+      description:
+        "List completed local Art Studio generation runs and viewable image outputs for one campaign. This tool is read-only and only traverses the configured campaign output root.",
+      inputSchema: z.object({
+        campaignId: z.string().min(1).max(128),
+        runId: z.string().min(1).max(128).optional(),
+      }),
+    },
+    async ({ campaignId, runId }) => {
+      try {
+        const root = campaignOutputRoot();
+        const campaign = safeSegment(campaignId, "campaignId");
+        const campaignPath = await realPathWithin(root, path.join(root, campaign), "campaignId");
+        const runNames = runId
+          ? [safeSegment(runId, "runId")]
+          : (await readdir(campaignPath, { withFileTypes: true }))
+              .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink())
+              .map((entry) => entry.name)
+              .sort()
+              .reverse();
+        const runs = [];
+        for (const name of runNames.slice(0, 50)) {
+          const runPath = await realPathWithin(root, path.join(campaignPath, name), "runId");
+          const outputsPath = path.join(runPath, "outputs");
+          let outputEntries;
+          try {
+            const canonicalOutputs = await realPathWithin(root, outputsPath, "outputs");
+            outputEntries = (await readdir(canonicalOutputs, { withFileTypes: true }))
+              .filter((entry) => entry.isFile() && !entry.isSymbolicLink())
+              .map((entry) => entry.name)
+              .filter((name) => /\.(?:png|webp|jpe?g)$/iu.test(name))
+              .sort()
+              .map((name) => path.join(canonicalOutputs, name));
+          } catch {
+            outputEntries = [];
+          }
+          runs.push({
+            runId: name,
+            runPath,
+            receiptPath: path.join(runPath, "receipt.json"),
+            outputs: outputEntries,
+          });
+        }
+        return textResult({ campaignId: campaign, campaignPath, runs });
+      } catch (error: unknown) {
+        return toolError("LOCAL_GENERATION_OUTPUT_LIST_FAILED", error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_local_generation_image",
+    {
+      description:
+        "Return one generated PNG, WebP or JPEG from the local Art Studio campaign output root as MCP image content so an agent can visually inspect the actual local render.",
+      inputSchema: z.object({ imagePath: z.string().min(1).max(4096) }),
+    },
+    async ({ imagePath }) => {
+      try {
+        const root = campaignOutputRoot();
+        const resolved = await realPathWithin(root, path.resolve(imagePath), "imagePath");
+        const info = await stat(resolved);
+        if (!info.isFile() || info.size < 1 || info.size > MAXIMUM_IMAGE_BYTES) {
+          throw new Error(`Generated image must contain 1 to ${MAXIMUM_IMAGE_BYTES} bytes.`);
+        }
+        const mimeType = imageMimeType(resolved);
+        const bytes = await readFile(resolved);
+        return {
+          content: [
+            { type: "image" as const, data: bytes.toString("base64"), mimeType },
+            {
+              type: "text" as const,
+              text: JSON.stringify({ imagePath: resolved, sizeBytes: bytes.length, mimeType }),
+            },
+          ],
+        };
+      } catch (error: unknown) {
+        return toolError("LOCAL_GENERATION_IMAGE_READ_FAILED", error);
       }
     },
   );
