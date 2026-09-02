@@ -3,7 +3,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { validateLocalGenerationCampaign } from "./run-local-generation-campaign.mjs";
 
@@ -166,7 +166,7 @@ async function main() {
   const campaign = validateLocalGenerationCampaign(manifest, process.env);
 
   const providerModulePath = path.join(ROOT, "packages", "providers", "dist", "index.js");
-  const providers = await import(providerModulePath);
+  const providers = await import(pathToFileURL(providerModulePath).href);
   if (typeof providers.loadComfyUIWorkflowCatalogFromFile !== "function") {
     fail("built Art Studio provider package does not export loadComfyUIWorkflowCatalogFromFile");
   }
