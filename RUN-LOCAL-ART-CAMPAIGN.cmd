@@ -26,6 +26,16 @@ if errorlevel 1 (
   exit /b 4
 )
 
+call pnpm.cmd --filter @evavo/art-media build
+if errorlevel 1 (
+  echo EVAVO_ART_CAMPAIGN_BLOCKER: Art Studio media dependency build failed. 1>&2
+  exit /b 5
+)
+call pnpm.cmd --filter @evavo/art-artifacts build
+if errorlevel 1 (
+  echo EVAVO_ART_CAMPAIGN_BLOCKER: Art Studio artifact dependency build failed. 1>&2
+  exit /b 5
+)
 call pnpm.cmd --filter @evavo/art-providers build
 if errorlevel 1 (
   echo EVAVO_ART_CAMPAIGN_BLOCKER: Art Studio provider build failed. 1>&2
