@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "evavo.comfyui-workflow-catalog-draft.v1",
+  "catalogId": "evavo-local-sdxl",
+  "catalogVersion": "1.0.0",
+  "profiles": [
+    {
+      "profileId": "sdxl-base-local",
+      "label": "SDXL Base 1.0 local generation",
+      "description": "Pinned local-only SDXL Base 1.0 workflow for deterministic EVAVO image and sprite candidate generation through a dedicated loopback ComfyUI instance.",
+      "version": "1.0.0",
+      "priority": 100,
+      "operations": ["generate"],
+      "assetKinds": ["sprite-frame", "sprite-layer", "environment", "effect", "ui", "illustration", "print"],
+      "continuityPhases": ["identity-master", "direction-master", "key-pose", "in-between", "repair", "independent"],
+      "capabilities": ["generate", "seed", "custom-size", "candidate-count", "cancellation"],
+      "modelId": "sdxl-base-1.0",
+      "workflow": {
+        "1": {
+          "class_type": "CheckpointLoaderSimple",
+          "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}
+        },
+        "2": {
+          "class_type": "CLIPTextEncode",
+          "inputs": {"text": "positive", "clip": ["1", 1]}
+        },
+        "3": {
+          "class_type": "CLIPTextEncode",
+          "inputs": {"text": "negative", "clip": ["1", 1]}
+        },
+        "4": {
+          "class_type": "EmptyLatentImage",
+          "inputs": {"width": 1024, "height": 1024, "batch_size": 1}
+        },
+        "5": {
+          "class_type": "KSampler",
+          "inputs": {
+            "seed": 1,
+            "steps": 30,
+            "cfg": 7.0,
+            "sampler_name": "dpmpp_2m",
+            "scheduler": "karras",
+            "denoise": 1.0,
+            "model": ["1", 0],
+            "positive": ["2", 0],
+            "negative": ["3", 0],
+            "latent_image": ["4", 0]
+          }
+        },
+        "6": {
+          "class_type": "VAEDecode",
+          "inputs": {"samples": ["5", 0], "vae": ["1", 2]}
+        },
+        "7": {
+          "class_type": "SaveImage",
+          "inputs": {"filename_prefix": "evavo", "images": ["6", 0]}
+        }
+      },
+      "bindings": {
+        "positivePrompt": {"nodeId": "2", "input": "text"},
+        "negativePrompt": {"nodeId": "3", "input": "text"},
+        "width": {"nodeId": "4", "input": "width"},
+        "height": {"nodeId": "4", "input": "height"},
+        "candidateCount": {"nodeId": "4", "input": "batch_size"},
+        "seed": {"nodeId": "5", "input": "seed"},
+        "filenamePrefix": {"nodeId": "7", "input": "filename_prefix"},
+        "referenceImages": []
+      },
+      "outputNodeIds": ["7"],
+      "modelInventory": [
+        {
+          "id": "sdxl-base-1.0",
+          "kind": "checkpoint",
+          "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
+        }
+      ],
+      "runtimeInventory": [
+        {
+          "id": "comfyui",
+          "version": "2026.09.02",
+          "sha256": "7db50f99cd9c2a7f854bb871428410d00b6771ed7de9da809320aba76824564f"
+        }
+      ],
+      "limits": {
+        "maximumCandidates": 8,
+        "maximumReferenceImages": 0,
+        "maximumSourceBytes": 67108864
+      }
+    }
+  ]
+}
