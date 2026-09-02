@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "kind": "evavo-art-local-image-quality-routes-v1",
-  "revision": "2026-09-02.1",
-  "purpose": "Route local image and sprite work by quality, style, control and workstation fit rather than forcing one checkpoint to solve every production task.",
+  "revision": "2026-09-02.2",
+  "purpose": "Route local image and sprite work by quality, style, control, adult content profile and workstation fit rather than forcing one checkpoint to solve every production task.",
   "routes": [
     {
       "id": "workstation-default",
@@ -10,7 +10,7 @@
       "operations": ["text-to-image", "image-edit", "image-reference", "multi-reference"],
       "styles": ["any", "photorealistic", "realistic", "cinematic", "illustration", "graphic", "painterly", "cel", "anime", "retro", "pinup", "project-defined"],
       "requiresPhysicalAdmission": true,
-      "preferredFor": ["iteration", "controlled-edits", "sprites", "boards", "character-reference", "style-adapter-inference"]
+      "preferredFor": ["iteration", "controlled-edits", "sprites", "boards", "character-reference", "style-adapter-inference", "adult-pinup", "adult-artistic-nudity", "adult-strip-game-states"]
     },
     {
       "id": "realism-challenger",
@@ -18,7 +18,7 @@
       "operations": ["text-to-image", "image-reference"],
       "styles": ["photorealistic", "realistic", "cinematic", "painterly", "project-defined"],
       "requiresPhysicalAdmission": true,
-      "preferredFor": ["realism-benchmark", "portrait-quality", "material-quality"]
+      "preferredFor": ["realism-benchmark", "portrait-quality", "material-quality", "adult-anatomy-quality", "adult-skin-and-body-detail"]
     },
     {
       "id": "large-image-challenger",
@@ -27,6 +27,26 @@
       "styles": ["any", "realistic", "cinematic", "graphic", "historical-illustration", "project-defined"],
       "requiresLargerNode": true,
       "preferredFor": ["prompt-understanding", "world-knowledge", "text-rendering", "complex-scenes"]
+    }
+  ],
+  "adultQualityProfiles": [
+    {
+      "contentProfile": "adult-pinup",
+      "preferredRouteOrder": ["workstation-default", "realism-challenger", "large-image-challenger"],
+      "requiredControls": ["multi-reference", "pose"],
+      "requiredReview": ["adult-age-evidence", "identity", "anatomy", "hands", "body-proportions", "pose", "style-fidelity"]
+    },
+    {
+      "contentProfile": "adult-artistic-nudity",
+      "preferredRouteOrder": ["realism-challenger", "workstation-default", "large-image-challenger"],
+      "requiredControls": ["multi-reference", "pose", "segmentation"],
+      "requiredReview": ["adult-age-evidence", "identity", "adult-anatomy", "hands", "body-proportions", "skin-and-material-quality", "pose", "reference-adherence"]
+    },
+    {
+      "contentProfile": "adult-strip-game",
+      "preferredRouteOrder": ["workstation-default", "realism-challenger"],
+      "requiredControls": ["multi-reference", "pose", "segmentation"],
+      "requiredReview": ["adult-age-evidence", "identity-across-wardrobe-states", "body-proportion-consistency", "pose-registration", "alpha-quality", "game-readability"]
     }
   ],
   "styleSpecialisation": {
