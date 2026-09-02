@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-art-local-image-quality-routes-v1",
+  "revision": "2026-09-02.1",
+  "purpose": "Route local image and sprite work by quality, style, control and workstation fit rather than forcing one checkpoint to solve every production task.",
+  "routes": [
+    {
+      "id": "workstation-default",
+      "modelProfileId": "flux2-klein-4b",
+      "operations": ["text-to-image", "image-edit", "image-reference", "multi-reference"],
+      "styles": ["any", "photorealistic", "realistic", "cinematic", "illustration", "graphic", "painterly", "cel", "anime", "retro", "pinup", "project-defined"],
+      "requiresPhysicalAdmission": true,
+      "preferredFor": ["iteration", "controlled-edits", "sprites", "boards", "character-reference", "style-adapter-inference"]
+    },
+    {
+      "id": "realism-challenger",
+      "modelProfileId": "z-image",
+      "operations": ["text-to-image", "image-reference"],
+      "styles": ["photorealistic", "realistic", "cinematic", "painterly", "project-defined"],
+      "requiresPhysicalAdmission": true,
+      "preferredFor": ["realism-benchmark", "portrait-quality", "material-quality"]
+    },
+    {
+      "id": "large-image-challenger",
+      "modelProfileId": "qwen-image",
+      "operations": ["text-to-image", "image-edit", "image-reference"],
+      "styles": ["any", "realistic", "cinematic", "graphic", "historical-illustration", "project-defined"],
+      "requiresLargerNode": true,
+      "preferredFor": ["prompt-understanding", "world-knowledge", "text-rendering", "complex-scenes"]
+    }
+  ],
+  "styleSpecialisation": {
+    "strategy": "base-model-plus-reviewed-style-adapter-and-reference-pack",
+    "adapterAuthority": "EVAVO-STUDIO/evavo-model-lab",
+    "preferredMethods": ["lora", "adapter"],
+    "styleFamilies": [
+      "photorealistic",
+      "cinematic",
+      "anime",
+      "manga",
+      "cel",
+      "western-animation",
+      "painterly",
+      "illustration",
+      "comic",
+      "graphic",
+      "pixel-art",
+      "retro",
+      "historical-illustration",
+      "fantasy",
+      "dark-fantasy",
+      "horror",
+      "science-fiction",
+      "pinup",
+      "3d-rendered",
+      "mixed-media",
+      "project-defined"
+    ],
+    "stackMultipleAdapters": "benchmark-and-review-required",
+    "exactAdapterRevisionRequired": true
+  },
+  "controlSurfaces": {
+    "profileKind": "evavo-comfyui-creative-control-profile-v1",
+    "signals": ["depth", "lineart", "pose", "normals", "segmentation", "matting", "multi-reference"],
+    "preferredCharacterControl": ["multi-reference", "pose", "segmentation"],
+    "preferredStyleRedrawControl": ["multi-reference", "lineart", "depth"]
+  },
+  "qualityChain": [
+    "compile-exact-job",
+    "generate-candidate-set",
+    "rank-and-review-candidates",
+    "targeted-edit-or-inpaint",
+    "alpha-or-matting-when-required",
+    "edge-and-halo-mastering",
+    "upscale-or-target-size-mastering",
+    "native-size-review",
+    "creative-approval",
+    "export-with-output-manifest"
+  ],
+  "specialists": [
+    {"profileId": "sam2.1-hiera-small", "purpose": ["segmentation", "video-mask-evidence"]},
+    {"profileId": "birefnet-dynamic", "purpose": ["matting", "alpha-extraction"]},
+    {"profileId": "birefnet-hr-matting", "purpose": ["fine-edge-matting"]},
+    {"profileId": "rtmpose", "purpose": ["pose-evidence", "conditioning"]},
+    {"profileId": "realesrgan-x4plus", "purpose": ["upscale"]},
+    {"profileId": "realesrgan-animevideov3", "purpose": ["cel-and-animation-upscale"]}
+  ],
+  "authority": {
+    "catalogueOnly": true,
+    "downloadsModels": false,
+    "executesModels": false,
+    "automaticCreativeApproval": false,
+    "automaticPromotion": false
+  }
+}
