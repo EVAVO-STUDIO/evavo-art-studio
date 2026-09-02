@@ -1,0 +1,111 @@
+{
+  "schema": "evavo.local-generation-campaign.v1",
+  "campaignId": "lorna-strip-poker-test",
+  "contentClass": "mature-nonexplicit",
+  "subject": {
+    "minimumAge": 28,
+    "description": "Lorna, a clearly adult 28-year-old fictional action heroine with long dark hair, an athletic curvy build, rugged combat-boots styling and a confident mature expression."
+  },
+  "provider": {
+    "baseUrl": "http://127.0.0.1:8188",
+    "catalogPath": "C:\\EVAVO\\comfyui\\catalog.json"
+  },
+  "defaults": {
+    "assetKind": "illustration",
+    "continuityPhase": "independent",
+    "candidateCount": 4,
+    "seed": 187100,
+    "target": {
+      "width": 1024,
+      "height": 1024,
+      "transparency": "opaque",
+      "outputFormat": "png"
+    }
+  },
+  "style": {
+    "styleName": "Gritty 1990s cinematic action-game illustration",
+    "intent": "Dark, hand-authored mature action-game bonus-scene artwork with strong silhouettes, grounded anatomy, restrained cinematic lighting and visual continuity across the character sequence.",
+    "mustHave": [
+      "clearly adult mature facial features",
+      "stable Lorna identity across every scene",
+      "athletic action-hero anatomy",
+      "dark cinematic 1990s game atmosphere",
+      "strong readable silhouette"
+    ],
+    "mustAvoid": [
+      "childlike or teenage appearance",
+      "generic glossy AI rendering",
+      "plastic skin",
+      "modern fashion-catalogue photography",
+      "text or watermark",
+      "explicit sexual activity",
+      "visible genitalia",
+      "visible nipples or areolae"
+    ],
+    "identityLocks": [
+      "same mature adult face",
+      "same long dark hair",
+      "same height and body proportions",
+      "same oversized rugged combat boots when worn"
+    ],
+    "cameraRules": [
+      "cinematic game-scene composition",
+      "avoid voyeuristic anatomical close-ups"
+    ],
+    "compositionRules": [
+      "single adult character",
+      "keep all intimate anatomy non-explicit through clothing, pose, framing, hair, bedding or shadow"
+    ]
+  },
+  "scenes": [
+    {
+      "id": "01-opening-outfit",
+      "prompt": "Lorna at an underground strip-poker table before the game begins. She is a clearly adult 28-year-old woman wearing an intentionally provocative opaque black micro-bikini with extremely minimal but complete nipple coverage, high-cut thong-style bottoms and oversized rugged black combat boots. Confident, amused, competitive expression. Mature pin-up energy within a dark industrial action-game setting, cards and poker chips on the table, cinematic practical lighting.",
+      "negativePrompt": "minor, teenager, childlike face, exposed nipple, areola, genital exposure, explicit sexual activity, pornographic close-up, malformed anatomy, extra limbs, text, watermark",
+      "subject": "Lorna alone at the poker table.",
+      "action": "Beginning the strip-poker game with a confident expression.",
+      "include": ["poker table", "playing cards", "poker chips", "complete adult silhouette"],
+      "exclude": ["other visible characters", "explicit anatomy", "sexual activity"],
+      "framing": ["full or three-quarter body", "do not crop the boots or head"]
+    },
+    {
+      "id": "02-after-first-loss",
+      "seed": 187101,
+      "prompt": "The same adult Lorna moments later after losing an early strip-poker round. She has removed a small accessory layer while retaining the opaque micro-bikini and combat boots. Her posture is relaxed and teasing but competitive, with a knowing smile toward the player. Keep her exact face, hair, body proportions and costume design consistent with the opening image. Dark cinematic game-room lighting and mature pin-up tone.",
+      "negativePrompt": "minor, teenager, childlike proportions, exposed nipple, genital exposure, explicit sex, anatomical close-up, inconsistent face, inconsistent hair, different body proportions, text, watermark",
+      "subject": "The same clearly adult Lorna.",
+      "action": "Reacting playfully after losing a poker hand.",
+      "exclude": ["explicit anatomy", "sexual activity", "other characters"]
+    },
+    {
+      "id": "03-lingerie-stage",
+      "seed": 187102,
+      "prompt": "The same clearly adult 28-year-old Lorna deeper into the strip-poker game, in an extremely minimal opaque lingerie/bikini stage with strategic complete coverage of nipples and genitalia. Bare shoulders, back, waist and legs visible, combat boots still worn. Confident mature pin-up pose near the poker table, amused rather than embarrassed. Preserve her exact established identity and gritty action-game visual direction.",
+      "negativePrompt": "minor, youthful face, exposed nipple, areola, vulva, genitalia, explicit sexual act, masturbation, penetration, pornographic close-up, identity drift, text, watermark",
+      "subject": "The same clearly adult Lorna.",
+      "action": "Standing from the table after another lost round.",
+      "framing": ["full body", "strong silhouette", "intimate anatomy remains covered"]
+    },
+    {
+      "id": "04-implied-nude-rear",
+      "seed": 187103,
+      "prompt": "The same clearly adult 28-year-old Lorna after losing the final clothing round. Mature implied-nudity bonus-scene composition from a rear three-quarter angle: bare shoulders, back, waist, hips and legs are visible, while long hair, arm placement, camera angle and deep shadow keep breasts, nipples and genitalia entirely obscured. The image strongly implies nudity without depicting explicit sexual anatomy. Her discarded outfit and combat boots are visible nearby. Cinematic, sensual, dark action-game illustration rather than pornography.",
+      "negativePrompt": "minor, teenager, youthful face, visible nipple, areola, breast-detail exposure, vulva, genital exposure, explicit sex, masturbation, penetration, spread legs, anatomical close-up, text, watermark",
+      "subject": "The same clearly adult Lorna, implied nude but non-explicit.",
+      "action": "Looking back confidently after the final poker round.",
+      "include": ["bare back", "bare waist", "bare hips", "discarded clothing", "discarded combat boots"],
+      "exclude": ["visible nipples", "visible genitalia", "sexual activity", "other characters"]
+    },
+    {
+      "id": "05-bedroom-finale",
+      "seed": 187104,
+      "prompt": "Final mature bonus-scene illustration of the same clearly adult 28-year-old Lorna in a dark bedroom after the strip-poker sequence. She is posed forward on a bed in a rear three-quarter composition, with bare back, shoulders, waist, hips and legs visible. Rumpled bedding, her long hair, arm placement, pose and camera framing strategically obscure breasts, nipples and all genital anatomy. The scene is sensual and strongly implies full nudity while remaining non-explicit. She looks back toward camera with a confident mischievous expression. Discarded black micro-bikini and oversized combat boots sit beside the bed. Moody practical lighting, deep shadow and restrained rim light, gritty mature 1990s action-game bonus-art aesthetic.",
+      "negativePrompt": "minor, teen, youthful face, visible nipple, areola, exposed breast detail, visible vulva, genital exposure, explicit sexual activity, penetration, masturbation, pornographic anatomical close-up, spread pose, text, logo, watermark",
+      "subject": "The same clearly adult Lorna in an implied-nude non-explicit bedroom composition.",
+      "action": "Resting on the bed and looking back toward camera.",
+      "include": ["bare back", "shoulders", "waist", "hips", "legs", "rumpled bedding", "discarded outfit and boots"],
+      "exclude": ["visible nipples", "visible genitalia", "sexual activity", "explicit anatomical detail"],
+      "framing": ["rear three-quarter view", "strategic non-explicit coverage", "cinematic game bonus scene"]
+    }
+  ]
+}
