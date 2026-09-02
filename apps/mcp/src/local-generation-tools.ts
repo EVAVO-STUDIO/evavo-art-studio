@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
@@ -11,6 +12,11 @@ const MAXIMUM_CAPTURE_BYTES = 2 * 1024 * 1024;
 const MAXIMUM_CAMPAIGN_BYTES = 512 * 1024;
 const MAXIMUM_IMAGE_BYTES = 32 * 1024 * 1024;
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const SHIPPED_EXAMPLES = Object.freeze({
+  "lorna-strip-poker-test": "local-generation-campaign.lorna.json",
+});
+
+type ShippedExampleId = keyof typeof SHIPPED_EXAMPLES;
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
@@ -40,6 +46,10 @@ function executionEnabled(): boolean {
     process.env.EVAVO_ART_ALLOW_WRITES === "true" &&
     process.env.EVAVO_ART_LOCAL_GENERATION_MCP_ALLOW_EXECUTION === "true"
   );
+}
+
+function artStudioRoot(): string {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 }
 
 function localComputeRoot(): string {
@@ -73,6 +83,36 @@ function campaignOutputRoot(): string {
   return path.resolve(".art-studio", "local-campaigns");
 }
 
+function defaultCatalogPath(): string {
+  const configured = process.env.EVAVO_ART_COMFYUI_CATALOG?.trim();
+  if (configured) return path.resolve(configured);
+  if (process.platform === "win32") return path.resolve("C:\\EVAVO\\comfyui\\catalog.json");
+  return path.join(artStudioRoot(), ".art-studio", "comfyui", "catalog.json");
+}
+
+function defaultComfyBaseUrl(): string {
+  return process.env.EVAVO_ART_COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
+}
+
+function loopbackBaseUrl(value: string): string {
+  const parsed = new URL(value);
+  if (
+    parsed.protocol !== "http:" ||
+    !["127.0.0.1", "localhost", "::1"].includes(parsed.hostname) ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new Error("ComfyUI base URL must be an unauthenticated loopback HTTP endpoint.");
+  }
+  return parsed.toString().replace(/\/$/u, "");
+}
+
+function shippedExamplePath(exampleId: ShippedExampleId): string {
+  return path.join(artStudioRoot(), "examples", SHIPPED_EXAMPLES[exampleId]);
+}
+
 function safeSegment(value: string, label: string): string {
   if (!SAFE_SEGMENT.test(value)) throw new Error(`${label} must be a safe identifier.`);
   return value;
@@ -90,6 +130,64 @@ async function realPathWithin(root: string, candidate: string, label: string): P
     throw new Error(`${label} resolves outside the local generation campaign root.`);
   }
   return canonicalCandidate;
+}
+
+async function regularFileEvidence(filePath: string): Promise<{
+  readonly path: string;
+  readonly exists: boolean;
+  readonly regularFile: boolean;
+  readonly sizeBytes: number | null;
+}> {
+  try {
+    const info = await stat(filePath);
+    return {
+      path: filePath,
+      exists: true,
+      regularFile: info.isFile(),
+      sizeBytes: info.isFile() ? info.size : null,
+    };
+  } catch {
+    return { path: filePath, exists: false, regularFile: false, sizeBytes: null };
+  }
+}
+
+async function directoryEvidence(directoryPath: string): Promise<{
+  readonly path: string;
+  readonly exists: boolean;
+  readonly directory: boolean;
+}> {
+  try {
+    const info = await stat(directoryPath);
+    return { path: directoryPath, exists: true, directory: info.isDirectory() };
+  } catch {
+    return { path: directoryPath, exists: false, directory: false };
+  }
+}
+
+async function comfyEvidence(baseUrl: string): Promise<{
+  readonly baseUrl: string;
+  readonly reachable: boolean;
+  readonly status: number | null;
+  readonly error: string | null;
+}> {
+  try {
+    const response = await fetch(`${baseUrl}/system_stats`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    return {
+      baseUrl,
+      reachable: response.ok,
+      status: response.status,
+      error: response.ok ? null : `HTTP ${response.status}`,
+    };
+  } catch (error: unknown) {
+    return {
+      baseUrl,
+      reachable: false,
+      status: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function campaignBytes(campaign: unknown): Buffer {
@@ -121,6 +219,7 @@ async function invokeLocalCompute(manifestPath: string): Promise<{
     localComputeRoot(),
     "RUN-EVAVO-ART-CAMPAIGN-CURRENT.ps1",
   );
+  await access(bridge);
   const child = spawn(
     "powershell.exe",
     [
@@ -185,6 +284,49 @@ function extractReceipt(stdout: string): unknown | null {
   return null;
 }
 
+async function executeCampaign(campaign: unknown): Promise<{
+  readonly status: "completed";
+  readonly manifestPath: string;
+  readonly receipt: unknown;
+  readonly outputRoot: string;
+  readonly stderrTail: string | null;
+}> {
+  if (!executionEnabled()) {
+    throw new Error(
+      "Local generation requires EVAVO_ART_ALLOW_WRITES=true and EVAVO_ART_LOCAL_GENERATION_MCP_ALLOW_EXECUTION=true in the trusted local MCP process.",
+    );
+  }
+  const bytes = campaignBytes(campaign);
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const root = requestRoot();
+  await mkdir(root, { recursive: true });
+  const manifestPath = path.join(root, `campaign-${digest}.json`);
+  try {
+    await writeFile(manifestPath, bytes, { flag: "wx" });
+  } catch (error: unknown) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String(error.code)
+        : "";
+    if (code !== "EEXIST") throw error;
+  }
+
+  const execution = await invokeLocalCompute(manifestPath);
+  const receipt = extractReceipt(execution.stdout);
+  if (!receipt) {
+    throw new Error(
+      "Local generation completed without a parseable Art Studio campaign receipt.",
+    );
+  }
+  return {
+    status: "completed",
+    manifestPath,
+    receipt,
+    outputRoot: campaignOutputRoot(),
+    stderrTail: execution.stderr.trim() || null,
+  };
+}
+
 function imageMimeType(filePath: string): "image/png" | "image/webp" | "image/jpeg" {
   const extension = path.extname(filePath).toLowerCase();
   if (extension === ".png") return "image/png";
@@ -203,7 +345,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
     },
     async () =>
       textResult({
-        schema: "evavo.local-generation-agent-capabilities.v1",
+        schema: "evavo.local-generation-agent-capabilities.v2",
         executionEnabled: executionEnabled(),
         localOnly: true,
         hostedFallback: false,
@@ -217,8 +359,10 @@ export function registerLocalGenerationTools(server: McpServer): void {
           "illustration",
           "print",
         ],
+        shippedExamples: Object.keys(SHIPPED_EXAMPLES),
         agentWorkflow: [
-          "submit campaign object",
+          "run local_generation_doctor",
+          "submit campaign object or shipped example",
           "persist bounded local request",
           "bootstrap Local Compute",
           "ensure headless loopback ComfyUI",
@@ -236,6 +380,65 @@ export function registerLocalGenerationTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "local_generation_doctor",
+    {
+      description:
+        "Read-only readiness check for the local Art Studio generation path. Verifies execution flags, Local Compute bridge files, shipped example, catalog path, output root and current loopback ComfyUI health without starting a generation campaign.",
+      inputSchema: z.object({}),
+    },
+    async () => {
+      try {
+        const computeRoot = localComputeRoot();
+        const bridge = path.join(computeRoot, "RUN-EVAVO-ART-CAMPAIGN-CURRENT.ps1");
+        const ensureComfy = path.join(computeRoot, "ENSURE-EVAVO-COMFYUI-CURRENT.ps1");
+        const example = shippedExamplePath("lorna-strip-poker-test");
+        const catalog = defaultCatalogPath();
+        const baseUrl = loopbackBaseUrl(defaultComfyBaseUrl());
+        const [bridgeEvidence, ensureEvidence, exampleEvidence, catalogEvidence, outputEvidence, comfy] = await Promise.all([
+          regularFileEvidence(bridge),
+          regularFileEvidence(ensureComfy),
+          regularFileEvidence(example),
+          regularFileEvidence(catalog),
+          directoryEvidence(campaignOutputRoot()),
+          comfyEvidence(baseUrl),
+        ]);
+        const readyWithoutStartingComfy = Boolean(
+          executionEnabled() &&
+          bridgeEvidence.regularFile &&
+          ensureEvidence.regularFile &&
+          exampleEvidence.regularFile &&
+          catalogEvidence.regularFile &&
+          comfy.reachable,
+        );
+        const bootstrapReady = Boolean(
+          executionEnabled() &&
+          bridgeEvidence.regularFile &&
+          ensureEvidence.regularFile &&
+          exampleEvidence.regularFile,
+        );
+        return textResult({
+          schema: "evavo.local-generation-doctor.v1",
+          readyWithoutStartingComfy,
+          bootstrapReady,
+          executionEnabled: executionEnabled(),
+          localComputeRoot: computeRoot,
+          bridge: bridgeEvidence,
+          ensureComfy: ensureEvidence,
+          shippedLornaCampaign: exampleEvidence,
+          catalog: catalogEvidence,
+          outputRoot: outputEvidence,
+          comfy,
+          note: comfy.reachable
+            ? "ComfyUI is already reachable on the configured loopback endpoint."
+            : "ComfyUI is not currently reachable; the campaign runner will attempt the reviewed headless Local Compute bootstrap before generation.",
+        });
+      } catch (error: unknown) {
+        return toolError("LOCAL_GENERATION_DOCTOR_FAILED", error);
+      }
+    },
+  );
+
+  server.registerTool(
     "run_local_generation_campaign",
     {
       description:
@@ -243,46 +446,39 @@ export function registerLocalGenerationTools(server: McpServer): void {
       inputSchema: z.object({ campaign: z.unknown() }),
     },
     async ({ campaign }) => {
-      if (!executionEnabled()) {
-        return toolError(
-          "LOCAL_GENERATION_EXECUTION_DISABLED",
-          new Error(
-            "Local generation requires EVAVO_ART_ALLOW_WRITES=true and EVAVO_ART_LOCAL_GENERATION_MCP_ALLOW_EXECUTION=true in the trusted local MCP process.",
-          ),
-        );
-      }
       try {
-        const bytes = campaignBytes(campaign);
-        const digest = createHash("sha256").update(bytes).digest("hex");
-        const root = requestRoot();
-        await mkdir(root, { recursive: true });
-        const manifestPath = path.join(root, `campaign-${digest}.json`);
-        try {
-          await writeFile(manifestPath, bytes, { flag: "wx" });
-        } catch (error: unknown) {
-          const code =
-            error && typeof error === "object" && "code" in error
-              ? String(error.code)
-              : "";
-          if (code !== "EEXIST") throw error;
-        }
-
-        const execution = await invokeLocalCompute(manifestPath);
-        const receipt = extractReceipt(execution.stdout);
-        if (!receipt) {
-          throw new Error(
-            "Local generation completed without a parseable Art Studio campaign receipt.",
-          );
-        }
-        return textResult({
-          status: "completed",
-          manifestPath,
-          receipt,
-          outputRoot: campaignOutputRoot(),
-          stderrTail: execution.stderr.trim() || null,
-        });
+        return textResult(await executeCampaign(campaign));
       } catch (error: unknown) {
         return toolError("LOCAL_GENERATION_EXECUTION_FAILED", error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "run_shipped_local_generation_campaign",
+    {
+      description:
+        "Run a reviewed image-generation campaign shipped with Art Studio. Use lorna-strip-poker-test for the ten-frame clearly-adult mature non-explicit local generation acceptance sequence.",
+      inputSchema: z.object({
+        exampleId: z.literal("lorna-strip-poker-test"),
+      }),
+    },
+    async ({ exampleId }) => {
+      try {
+        const filePath = shippedExamplePath(exampleId);
+        const bytes = await readFile(filePath);
+        if (bytes.length < 1 || bytes.length > MAXIMUM_CAMPAIGN_BYTES) {
+          throw new Error(`Shipped campaign must contain 1 to ${MAXIMUM_CAMPAIGN_BYTES} bytes.`);
+        }
+        const campaign = JSON.parse(bytes.toString("utf8")) as unknown;
+        const result = await executeCampaign(campaign);
+        return textResult({
+          ...result,
+          exampleId,
+          shippedManifestPath: filePath,
+        });
+      } catch (error: unknown) {
+        return toolError("SHIPPED_LOCAL_GENERATION_EXECUTION_FAILED", error);
       }
     },
   );
@@ -313,7 +509,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
         for (const name of runNames.slice(0, 50)) {
           const runPath = await realPathWithin(root, path.join(campaignPath, name), "runId");
           const outputsPath = path.join(runPath, "outputs");
-          let outputEntries;
+          let outputEntries: string[];
           try {
             const canonicalOutputs = await realPathWithin(root, outputsPath, "outputs");
             outputEntries = (await readdir(canonicalOutputs, { withFileTypes: true }))
