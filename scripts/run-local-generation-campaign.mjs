@@ -13,7 +13,6 @@ const ASSET_KINDS = new Set(['sprite-frame', 'sprite-layer', 'environment', 'eff
 const PHASES = new Set(['identity-master', 'direction-master', 'key-pose', 'in-between', 'repair', 'independent']);
 const TRANSPARENCY = new Set(['required', 'preferred', 'opaque']);
 const FORMATS = new Set(['png', 'webp', 'jpeg']);
-const REQUIRED_GENERATE_CAPABILITIES = Object.freeze(['generate', 'seed', 'custom-size', 'candidate-count']);
 
 function fail(message) { throw new Error(message); }
 function object(value, label) {
@@ -75,6 +74,11 @@ function defaultBaseUrl() {
   return process.env.EVAVO_ART_COMFYUI_BASE_URL?.trim() || 'http://127.0.0.1:8188';
 }
 function pnpmExecutable() { return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'; }
+function requiredCapabilityProfile(scene) {
+  const required = new Set(['generate', 'cancellation', 'seed', 'custom-size']);
+  if (scene.candidateCount > 1) required.add('candidate-count');
+  return Object.freeze([...required].sort());
+}
 async function run(command, args, options = {}) {
   await new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd: ROOT, env: options.env ?? process.env, stdio: options.stdio ?? 'inherit', windowsHide: true });
@@ -181,6 +185,7 @@ export function validateLocalGenerationCampaign(input, environment = process.env
 function routeScene(catalog, scene) {
   object(catalog, 'ComfyUI catalog');
   if (!Array.isArray(catalog.profiles) || !catalog.profiles.length) fail('ComfyUI catalog contains no profiles');
+  const requiredCapabilities = requiredCapabilityProfile(scene);
   const candidates = catalog.profiles.filter((profile) => {
     if (!profile || typeof profile !== 'object') return false;
     const adapterId = `comfyui:${profile.profileId}`;
@@ -188,11 +193,11 @@ function routeScene(catalog, scene) {
     if (!Array.isArray(profile.operations) || !profile.operations.includes('generate')) return false;
     if (!Array.isArray(profile.assetKinds) || !profile.assetKinds.includes(scene.assetKind)) return false;
     if (!Array.isArray(profile.continuityPhases) || !profile.continuityPhases.includes(scene.continuityPhase)) return false;
-    if (!Array.isArray(profile.capabilities) || !REQUIRED_GENERATE_CAPABILITIES.every((capability) => profile.capabilities.includes(capability))) return false;
+    if (!Array.isArray(profile.capabilities) || !requiredCapabilities.every((capability) => profile.capabilities.includes(capability))) return false;
     if (profile.limits?.maximumCandidates !== undefined && profile.limits.maximumCandidates < scene.candidateCount) return false;
     return true;
   }).sort((a, b) => Number(b.priority ?? 0) - Number(a.priority ?? 0));
-  if (!candidates.length) fail(`no reviewed local ComfyUI profile can execute scene ${scene.id} (${scene.assetKind}/${scene.continuityPhase}, ${scene.candidateCount} candidates)`);
+  if (!candidates.length) fail(`no reviewed local ComfyUI profile can execute scene ${scene.id} (${scene.assetKind}/${scene.continuityPhase}, ${scene.candidateCount} candidates, capabilities ${requiredCapabilities.join(',')})`);
   const profile = candidates[0];
   return Object.freeze({
     sceneId: scene.id,
@@ -200,6 +205,7 @@ function routeScene(catalog, scene) {
     adapterId: `comfyui:${profile.profileId}`,
     modelId: text(profile.modelId, `modelId for ${scene.id}`, 512),
     profileSha256: optionalText(profile.profileSha256, `profileSha256 for ${scene.id}`, 128),
+    requiredCapabilities,
   });
 }
 
@@ -221,7 +227,7 @@ function runtimeJob(campaign, scene, route, runId) {
     maximumAttempts: 2, retryPolicy: { baseDelayMs: 5000, maximumDelayMs: 60000, multiplier: 2, jitterFraction: 0.1 },
     leaseDurationMs: 300000, timeoutMs: 1800000,
     labels: { campaign: campaign.campaignId, scene: scene.id, provider: route.adapterId, contentClass: campaign.contentClass },
-    requiredCapabilityProfile: REQUIRED_GENERATE_CAPABILITIES,
+    requiredCapabilityProfile: route.requiredCapabilities,
   };
 }
 
