@@ -12,6 +12,7 @@ import { registerArtDirectionTools } from "./art-direction-tools.js";
 import { registerArtProductionTools } from "./art-production-tools.js";
 import { registerLayeredGodotTools } from "./layered-godot-tools.js";
 import { registerLocalGenerationTools } from "./local-generation-tools.js";
+import { registerLornaLocalAcceptanceTool } from "./lorna-local-acceptance-tool.js";
 import { registerSelectionTools } from "./selection-tools.js";
 
 const textResult = (value: unknown) => ({
@@ -45,6 +46,7 @@ export function registerProviderTools(server: McpServer): void {
   registerArtProductionTools(server);
   registerLayeredGodotTools(server);
   registerLocalGenerationTools(server);
+  registerLornaLocalAcceptanceTool(server);
   registerSelectionTools(server);
 
   server.registerTool(
