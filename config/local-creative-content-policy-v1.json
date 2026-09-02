@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-local-creative-content-policy-v1",
+  "consumer": "art-studio",
+  "mode": "local-owner-controlled",
+  "purpose": "Keep EVAVO creative policy independent from arbitrary hosted-provider refusal rules while retaining explicit legal, consent, age and release boundaries.",
+  "creativeEnvelope": {
+    "general": true,
+    "matureThemes": true,
+    "adultSuggestive": true,
+    "adultEroticNonExplicit": true,
+    "revealingButNonExplicitAdultCharacterDesign": true,
+    "swimwearAndLingerieLikeAdultCostumeDesign": true,
+    "stylizedPinupNonExplicit": true,
+    "violenceAndHorrorSubjectToProjectRights": true
+  },
+  "hardBoundaries": {
+    "sexualContentInvolvingMinors": false,
+    "sexualizedDepictionOfMinors": false,
+    "nonConsensualSexualContent": false,
+    "illegalSexualContent": false,
+    "realPersonSexualDeepfakeWithoutConsent": false
+  },
+  "providerIndependence": {
+    "hostedProviderPolicyDefinesEvavoPolicy": false,
+    "hostedProviderRefusalIsUniversalCreativeDecision": false,
+    "localOpenWeightAndOfflineRoutesMayBePreferred": true,
+    "exactModelLicenceAndRightsStillRequired": true,
+    "providerSpecificTermsStillApplyWhenThatProviderIsUsed": true
+  },
+  "execution": {
+    "localFirst": true,
+    "offlineCapablePreferred": true,
+    "arbitraryModelDownloadFromCreativeRequest": false,
+    "exactModelRevisionRequired": true,
+    "physicalWorkstationReceiptRequired": true,
+    "candidateOutputRequiresCreativeReview": true
+  },
+  "authority": {
+    "policyDocumentOnly": true,
+    "modelDownload": false,
+    "modelExecution": false,
+    "automaticCreativeApproval": false,
+    "publication": false,
+    "clientRelease": false
+  }
+}
