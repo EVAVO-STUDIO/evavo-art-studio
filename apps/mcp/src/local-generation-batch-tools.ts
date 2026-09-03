@@ -114,11 +114,11 @@ export function registerLocalGenerationBatchTools(server: McpServer): void {
       conditioningTruth: {
         promptOnly: "identity/style/continuity language and seed strategy",
         workflowBaked: "reviewed quality-specific KSampler settings",
-        artifactConditioned: "requires real artifact IDs plus reviewed reference bindings; explicit inputs fail closed until the V2 runtime bridge is enabled",
+        artifactConditioned: "typed artifact IDs and staged shot dependencies execute through the durable V1 artifact-reference bridge when the reviewed profile advertises the required reference capabilities and limits; unsupported profiles fail closed before GPU startup",
         loraConditioned: "requires reviewed LoRA inventory and loader support; unsupported requests fail closed",
       },
       qa: ["exact-output-count", "file-exists", "non-zero-bytes", "image-signature", "dimensions", "unique-sha256"],
-      retries: "shot-selective with deterministic seed bump",
+      retries: "shot-selective with deterministic seed bump; dependency stages only advance after their source stage passes QA and exposes valid provider artifact IDs",
       metadataPerImage: true,
       managedComfyUiLifecycle: true,
       machineBinding: "execution manifest forces the owned loopback endpoint/catalog and derives the reviewed quality adapter unless explicitly pinned",
@@ -127,14 +127,14 @@ export function registerLocalGenerationBatchTools(server: McpServer): void {
       canonicalBaseUrl: "http://127.0.0.1:8192",
       canonicalCatalog: process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "EVAVO", "AI", "ComfyUI", "catalog.json") : null,
       executionEnabled: executionEnabled(),
-      note: "Quality-specific reviewed workflow profiles bake KSampler steps/CFG/sampler/scheduler/denoise into executable ComfyUI workflows. The managed entry audits prompts before GPU startup and refuses advanced conditioning requests that the selected reviewed workflow/runtime bridge cannot truthfully execute.",
+      note: "Quality-specific reviewed workflow profiles bake KSampler steps/CFG/sampler/scheduler/denoise into executable ComfyUI workflows. The managed entry audits prompts and reference/model capabilities before GPU startup. Reference-capable workflows can use staged V2 artifact handoff; workflows without those reviewed capabilities remain fail-closed.",
     }),
   );
 
   server.registerTool(
     "run_local_generation_batch",
     {
-      description: "Execute one generic v2 local Art Studio image campaign end-to-end. The managed entrypoint audits prompt/shot quality, binds the reviewed local quality adapter and catalog, validates requested model/LoRA/reference capabilities, starts an isolated true-core ComfyUI service, runs arbitrary-size chunked generation with selective QA retries, and shuts the owned service down afterward. Requires the trusted local-generation execution profile.",
+      description: "Execute one generic v2 local Art Studio image campaign end-to-end. The managed entrypoint audits prompt/shot quality, binds the reviewed local quality adapter and catalog, validates requested model/LoRA/reference capabilities, starts an isolated true-core ComfyUI service, runs arbitrary-size generation in dependency-safe stages with selective QA retries and real provider artifact handoff where supported, and shuts the owned service down afterward. Requires the trusted local-generation execution profile.",
       inputSchema: z.object({ campaign: z.unknown() }),
     },
     async ({ campaign }) => {
