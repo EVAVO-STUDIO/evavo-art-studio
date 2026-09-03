@@ -1,0 +1,40 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "example-sprite-family",
+  "contentClass": "general",
+  "batch_size": 6,
+  "generation_mode": "sprite",
+  "consistency_mode": "strict",
+  "quality_profile": "sprite_sheet_clean",
+  "character": {
+    "id": "example-hero",
+    "description": "A distinct game hero with a stable face, silhouette and proportions",
+    "face": "specific recognizable face geometry",
+    "hair": "stable hairstyle",
+    "build": "stable game-character proportions",
+    "costume": "single locked costume construction",
+    "palette": ["dark neutral", "single accent colour"],
+    "signatureDetails": ["one unique silhouette detail", "one recurring costume detail"]
+  },
+  "style": {
+    "name": "clean-game-sprite-source",
+    "description": "Game-production sprite source art with clean silhouette, fixed character scale and minimal visual noise",
+    "medium": "clean digital game art",
+    "lighting": "stable neutral lighting",
+    "mustHave": ["repeatable scale", "clear limb separation", "stable costume geometry"],
+    "mustAvoid": ["camera drift", "generic AI character redesign", "cropped extremities", "busy scenery"]
+  },
+  "continuity_locks": ["same face", "same body proportions", "same costume construction", "same character scale in frame"],
+  "seed_strategy": { "base": 51000, "stride": 1 },
+  "output_rules": { "exactCount": true, "requireUniqueHashes": true, "requireNonZeroBytes": true, "requireDimensions": true, "writeImageMetadata": true },
+  "retry_rules": { "maxShotAttempts": 3, "retryMissing": true, "retryInvalidFile": true, "retryDimensionMismatch": true, "retryDuplicate": true, "seedBump": 997 },
+  "provider": { "baseUrl": "http://127.0.0.1:8192", "adapterId": "comfyui:sdxl-base-local" },
+  "shots": [
+    { "id": "idle-front", "description": "neutral idle front pose", "pose": "balanced neutral idle", "camera": "fixed eye-level front", "framing": "full body, fixed scale" },
+    { "id": "idle-side", "description": "neutral idle side pose", "pose": "balanced neutral idle side", "camera": "fixed eye-level side", "framing": "full body, same scale" },
+    { "id": "walk-contact", "description": "walk cycle contact pose", "pose": "clear walk contact", "camera": "fixed side", "framing": "full body, same scale" },
+    { "id": "walk-passing", "description": "walk cycle passing pose", "pose": "clear passing position", "camera": "fixed side", "framing": "full body, same scale" },
+    { "id": "action-start", "description": "action anticipation pose", "pose": "readable anticipation", "camera": "fixed side", "framing": "full body, same scale" },
+    { "id": "action-hit", "description": "action impact pose", "pose": "readable impact silhouette", "camera": "fixed side", "framing": "full body, same scale" }
+  ]
+}
