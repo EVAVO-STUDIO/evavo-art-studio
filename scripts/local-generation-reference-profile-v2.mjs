@@ -7,6 +7,7 @@ import { REFERENCE_CAPABILITY_REQUIREMENTS, REFERENCE_ROLES } from './local-gene
 const ROLE_SET = new Set(REFERENCE_ROLES);
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const SAFE_FOLDER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 
 function fail(message) { throw new Error(message); }
 function object(value, label) {
@@ -25,6 +26,10 @@ function integer(value, label, min, max) {
   if (!Number.isInteger(value) || value < min || value > max) fail(`${label} must be an integer between ${min} and ${max}`);
   return value;
 }
+function digest(value, label) {
+  if (typeof value !== 'string' || !SHA256.test(value)) fail(`${label} must be lowercase SHA-256`);
+  return value;
+}
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
 function canonical(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -40,7 +45,7 @@ function binding(raw, workflow, label) {
   if (!node.inputs || typeof node.inputs !== 'object' || Array.isArray(node.inputs) || !(input in node.inputs)) fail(`${label} references missing workflow input ${nodeId}.${input}`);
   return Object.freeze({ nodeId, input });
 }
-function inventory(value, label) {
+function modelInventory(value, label) {
   if (value == null) return Object.freeze([]);
   if (!Array.isArray(value) || value.length > 128) fail(`${label} must contain at most 128 entries`);
   const seen = new Set();
@@ -49,14 +54,46 @@ function inventory(value, label) {
     const result = Object.freeze({
       id: id(entry.id, `${label}[${index}].id`),
       kind: id(entry.kind, `${label}[${index}].kind`),
-      sha256: typeof entry.sha256 === 'string' && /^[a-f0-9]{64}$/u.test(entry.sha256) ? entry.sha256 : fail(`${label}[${index}].sha256 must be lowercase SHA-256`),
-      ...(entry.version === undefined ? {} : { version: id(entry.version, `${label}[${index}].version`) }),
+      sha256: digest(entry.sha256, `${label}[${index}].sha256`),
     });
     const key = `${result.kind}:${result.id}`;
     if (seen.has(key)) fail(`${label} contains duplicate ${key}`);
     seen.add(key);
     return result;
   }));
+}
+function runtimeInventory(value, label) {
+  if (value == null) return Object.freeze([]);
+  if (!Array.isArray(value) || value.length > 128) fail(`${label} must contain at most 128 entries`);
+  const seen = new Set();
+  return Object.freeze(value.map((raw, index) => {
+    const entry = object(raw, `${label}[${index}]`);
+    const result = Object.freeze({
+      id: id(entry.id, `${label}[${index}].id`),
+      version: id(entry.version, `${label}[${index}].version`),
+      sha256: digest(entry.sha256, `${label}[${index}].sha256`),
+    });
+    if (seen.has(result.id)) fail(`${label} contains duplicate ${result.id}`);
+    seen.add(result.id);
+    return result;
+  }));
+}
+function ensureUniqueModelInventory(entries) {
+  const seen = new Set();
+  for (const entry of entries) {
+    const key = `${entry.kind}:${entry.id}`;
+    if (seen.has(key)) fail(`combined model inventory contains duplicate ${key}`);
+    seen.add(key);
+  }
+  return entries;
+}
+function ensureUniqueRuntimeInventory(entries) {
+  const seen = new Set();
+  for (const entry of entries) {
+    if (seen.has(entry.id)) fail(`combined runtime inventory contains duplicate ${entry.id}`);
+    seen.add(entry.id);
+  }
+  return entries;
 }
 
 export function compileReferenceProfileDraft(baseProfileRaw, specificationRaw) {
@@ -114,19 +151,14 @@ export function compileReferenceProfileDraft(baseProfileRaw, specificationRaw) {
     binding(value, workflow, `referenceProfile.bindings.${name}`);
   }
 
-  const modelInventory = [...inventory(base.modelInventory ?? [], 'baseProfile.modelInventory'), ...inventory(spec.modelInventoryAdditions ?? [], 'referenceProfile.modelInventoryAdditions')];
-  const runtimeInventory = [...inventory(base.runtimeInventory ?? [], 'baseProfile.runtimeInventory'), ...inventory(spec.runtimeInventoryAdditions ?? [], 'referenceProfile.runtimeInventoryAdditions')];
-  const uniqueInventory = (entries, label) => {
-    const seen = new Set();
-    for (const entry of entries) {
-      const key = `${entry.kind}:${entry.id}`;
-      if (seen.has(key)) fail(`${label} contains duplicate ${key}`);
-      seen.add(key);
-    }
-    return entries;
-  };
-  uniqueInventory(modelInventory, 'combined model inventory');
-  uniqueInventory(runtimeInventory, 'combined runtime inventory');
+  const models = ensureUniqueModelInventory([
+    ...modelInventory(base.modelInventory ?? [], 'baseProfile.modelInventory'),
+    ...modelInventory(spec.modelInventoryAdditions ?? [], 'referenceProfile.modelInventoryAdditions'),
+  ]);
+  const runtimes = ensureUniqueRuntimeInventory([
+    ...runtimeInventory(base.runtimeInventory ?? [], 'baseProfile.runtimeInventory'),
+    ...runtimeInventory(spec.runtimeInventoryAdditions ?? [], 'referenceProfile.runtimeInventoryAdditions'),
+  ]);
 
   const maximumReferenceImages = integer(spec.maximumReferenceImages ?? referenceImages.length, 'referenceProfile.maximumReferenceImages', referenceImages.length, 128);
   const result = {
@@ -143,8 +175,8 @@ export function compileReferenceProfileDraft(baseProfileRaw, specificationRaw) {
     workflow,
     bindings,
     outputNodeIds: spec.outputNodeIds ?? base.outputNodeIds,
-    modelInventory,
-    runtimeInventory,
+    modelInventory: models,
+    runtimeInventory: runtimes,
     limits: {
       ...(base.limits ?? {}),
       ...(spec.limits ?? {}),
