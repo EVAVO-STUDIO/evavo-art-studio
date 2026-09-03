@@ -9,6 +9,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const required = [
   'scripts/local-generation-batch-v2.mjs',
   'scripts/run-local-generation-batch.mjs',
+  'scripts/local-generation-batch-state-v2.mjs',
+  'scripts/local-generation-batch-state-v2.test.mjs',
   'scripts/run-local-generation-campaign.mjs',
   'scripts/local-generation-v1-reference-bridge.test.mjs',
   'scripts/test-local-generation-batch-v2.mjs',
@@ -49,6 +51,8 @@ for (const relative of required) {
 for (const relative of [
   'scripts/local-generation-batch-v2.mjs',
   'scripts/run-local-generation-batch.mjs',
+  'scripts/local-generation-batch-state-v2.mjs',
+  'scripts/local-generation-batch-state-v2.test.mjs',
   'scripts/run-local-generation-campaign.mjs',
   'scripts/local-generation-v1-reference-bridge.test.mjs',
   'scripts/test-local-generation-batch-v2.mjs',
@@ -68,6 +72,8 @@ for (const relative of [
 
 const compiler = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-v2.mjs'), 'utf8');
 const runner = fs.readFileSync(path.join(root, 'scripts/run-local-generation-batch.mjs'), 'utf8');
+const resumeState = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-state-v2.mjs'), 'utf8');
+const resumeStateTest = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-state-v2.test.mjs'), 'utf8');
 const v1Runner = fs.readFileSync(path.join(root, 'scripts/run-local-generation-campaign.mjs'), 'utf8');
 const v1ReferenceTest = fs.readFileSync(path.join(root, 'scripts/local-generation-v1-reference-bridge.test.mjs'), 'utf8');
 const aggregateRunner = fs.readFileSync(path.join(root, 'scripts/test-local-generation-batch-v2.mjs'), 'utf8');
@@ -101,6 +107,16 @@ for (const token of [
 ]) assert.equal(runner.includes(token), true, `runner lost ${token}`);
 
 for (const token of [
+  'evavo.local-generation-batch-state.v2', 'deterministicRunKey', 'manifestFingerprint', 'planFingerprint',
+  'checkpointBatchState', 'hydrateBatchState', 'readBatchState', 'writeBatchStateAtomic',
+  'completedStageCount', 'artifactResults', 'frameResults', 'atomic write verification failed',
+]) assert.equal(resumeState.includes(token), true, `resume state contract lost ${token}`);
+for (const token of [
+  'checkpoint round-trip preserves accepted frame results', 'resume refuses manifest, plan, or reference graph drift',
+  'state validation rejects malformed provider artifact IDs', 'deterministic run key binds both authored manifest and compiled plan',
+]) assert.equal(resumeStateTest.includes(token), true, `resume state test lost ${token}`);
+
+for (const token of [
   'PROVIDER_REFERENCE_CAPABILITY_REQUIREMENTS', 'maximumReferenceImages',
   'references: scene.references', 'inputArtifacts: [...new Set(scene.references.map((reference) => reference.artifactId))]',
   'continuity-locked sprite work requires canonical-identity', 'in-between work requires previous-key-pose and next-key-pose',
@@ -110,8 +126,8 @@ for (const token of [
   'job.payload.references', 'job.inputArtifacts', 'canonical-identity', 'previous-key-pose and next-key-pose',
 ]) assert.equal(v1ReferenceTest.includes(token), true, `V1 reference bridge test lost ${token}`);
 for (const token of [
-  'local-generation-v1-reference-bridge.test.mjs', 'check-local-generation-batch-v2.mjs',
-  'evavo.local-generation-batch-v2-contract-receipt.v1', 'includesDurableV1ReferenceBridge',
+  'local-generation-batch-state-v2.test.mjs', 'local-generation-v1-reference-bridge.test.mjs', 'check-local-generation-batch-v2.mjs',
+  'evavo.local-generation-batch-v2-contract-receipt.v1', 'includesDurableV1ReferenceBridge', 'includesDurableResumeState',
 ]) assert.equal(aggregateRunner.includes(token), true, `aggregate V2 contract runner lost ${token}`);
 
 for (const token of ['sqlite:///:memory:', '--disable-all-custom-nodes', '--disable-api-nodes', 'CheckpointLoaderSimple', 'KSampler', 'portFree', 'stopProcess']) {
