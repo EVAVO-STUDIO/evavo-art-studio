@@ -5,6 +5,21 @@ export const REFERENCE_ROLES = Object.freeze([
   'base-image', 'mask', 'pose-control', 'edge-control', 'depth-control',
   'palette-reference', 'line-reference', 'material-reference', 'layer-context',
 ]);
+export const REFERENCE_CAPABILITY_REQUIREMENTS = Object.freeze({
+  'canonical-identity': 'identity-reference',
+  'direction-master': 'direction-reference',
+  'previous-key-pose': 'temporal-reference',
+  'next-key-pose': 'temporal-reference',
+  'base-image': null,
+  mask: null,
+  'pose-control': 'pose-control',
+  'edge-control': 'edge-control',
+  'depth-control': 'depth-control',
+  'palette-reference': 'palette-reference',
+  'line-reference': 'line-reference',
+  'material-reference': 'material-reference',
+  'layer-context': 'layer-context-reference',
+});
 const ROLES = new Set(REFERENCE_ROLES);
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/u;
 
@@ -60,6 +75,48 @@ export function normalizeReferenceInputs(value, label = 'reference_inputs') {
     keys.add(key);
   }
   return Object.freeze(result);
+}
+
+export function requiredReferenceCapabilities(referenceInputs) {
+  const references = normalizeReferenceInputs(referenceInputs);
+  const required = new Set();
+  if (references.length) required.add('reference-images');
+  if (references.length > 1) required.add('multiple-reference-images');
+  for (const reference of references) {
+    if (!reference.required) continue;
+    const capability = REFERENCE_CAPABILITY_REQUIREMENTS[reference.role];
+    if (capability) required.add(capability);
+  }
+  if (references.some((reference) => reference.role === 'mask')) required.add('mask');
+  return Object.freeze([...required].sort());
+}
+
+export function validateProviderReferenceInputs(referenceInputs, profile, options = {}) {
+  const label = options.label ?? 'reference_inputs';
+  const references = normalizeReferenceInputs(referenceInputs, label);
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) fail(`${label} requires a reviewed provider profile`);
+  const maximumReferenceImages = profile.limits?.maximumReferenceImages;
+  if (references.length && (!Number.isInteger(maximumReferenceImages) || maximumReferenceImages < references.length)) {
+    fail(`${label} requests ${references.length} reference image(s), but reviewed profile ${profile.profileId ?? 'unknown'} allows ${String(maximumReferenceImages ?? 0)}`);
+  }
+  if (options.operation === 'generate' && references.some((reference) => reference.role === 'mask')) {
+    fail(`${label} may not contain mask because local generation V1 only supports generate operations`);
+  }
+  const required = requiredReferenceCapabilities(references);
+  const capabilities = new Set(Array.isArray(profile.capabilities) ? profile.capabilities : []);
+  const missing = required.filter((capability) => !capabilities.has(capability));
+  if (missing.length) fail(`${label} requires provider capabilities not advertised by ${profile.profileId ?? 'unknown'}: ${missing.join(', ')}`);
+
+  const lockedSprite = ['sprite-frame', 'sprite-layer'].includes(options.assetKind) && !['independent', 'identity-master', 'direction-master'].includes(options.continuityPhase);
+  if (lockedSprite && !references.some((reference) => reference.role === 'canonical-identity' && reference.required)) {
+    fail(`${label} continuity-locked sprite work requires canonical-identity as a required reference`);
+  }
+  if (options.continuityPhase === 'in-between') {
+    const previous = references.some((reference) => reference.role === 'previous-key-pose' && reference.required);
+    const next = references.some((reference) => reference.role === 'next-key-pose' && reference.required);
+    if (!previous || !next) fail(`${label} in-between work requires previous-key-pose and next-key-pose as required references`);
+  }
+  return Object.freeze({ references, requiredCapabilities: required });
 }
 
 export function buildReferenceGraph(frames) {
