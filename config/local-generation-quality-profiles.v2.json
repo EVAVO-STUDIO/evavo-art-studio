@@ -1,0 +1,11 @@
+{
+  "schema": "evavo.local-generation-quality-profiles.v2",
+  "profiles": {
+    "portrait_high_quality": {"width":1024,"height":1024,"steps":36,"cfg":6.0,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":true,"outputFormat":"png"},
+    "sprite_sheet_clean": {"width":1024,"height":1024,"steps":30,"cfg":5.5,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":false,"outputFormat":"png"},
+    "concept_art_painterly": {"width":1344,"height":768,"steps":34,"cfg":5.8,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":false,"outputFormat":"png"},
+    "comic_inked": {"width":1024,"height":1024,"steps":32,"cfg":6.0,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":false,"outputFormat":"png"},
+    "cinematic_stills": {"width":1344,"height":768,"steps":36,"cfg":5.5,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":true,"outputFormat":"png"},
+    "product_mockups": {"width":1024,"height":1024,"steps":32,"cfg":5.5,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":false,"outputFormat":"png"}
+  }
+}
