@@ -6,7 +6,10 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const INVENTORY_SCHEMA = 'evavo.local-generation-physical-model-inventory.v1';
+import { digestRuntimeTree } from './local-generation-runtime-tree-digest.mjs';
+
+const MODEL_INVENTORY_SCHEMA = 'evavo.local-generation-physical-model-inventory.v1';
+const RUNTIME_INVENTORY_SCHEMA = 'evavo.local-generation-physical-runtime-inventory.v1';
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
 const SHA256 = /^[a-f0-9]{64}$/u;
 
@@ -18,7 +21,7 @@ function parseArgs(argv) {
     if (!key?.startsWith('--') || value == null || value.startsWith('--') || args.has(key)) fail('arguments must be unique --name value pairs');
     args.set(key, value);
   }
-  for (const key of args.keys()) if (!['--catalog', '--profile', '--base-url', '--model-inventory'].includes(key)) fail(`unsupported argument ${key}`);
+  for (const key of args.keys()) if (!['--catalog', '--profile', '--base-url', '--model-inventory', '--runtime-inventory'].includes(key)) fail(`unsupported argument ${key}`);
   return args;
 }
 async function json(file, label) {
@@ -73,7 +76,7 @@ function assertReferenceProfile(profile) {
 async function verifyModels(profile, inventoryPath) {
   if (!inventoryPath) return { performed: false, verified: [], missing: (profile.modelInventory ?? []).map((item) => item.id) };
   const inventory = await json(inventoryPath, 'physical model inventory');
-  if (inventory?.schema !== INVENTORY_SCHEMA || !Array.isArray(inventory.entries)) fail(`physical model inventory must use ${INVENTORY_SCHEMA}`);
+  if (inventory?.schema !== MODEL_INVENTORY_SCHEMA || !Array.isArray(inventory.entries)) fail(`physical model inventory must use ${MODEL_INVENTORY_SCHEMA}`);
   const byId = new Map(inventory.entries.map((entry) => [entry?.id, entry]));
   const verified = [];
   for (const expected of profile.modelInventory ?? []) {
@@ -90,8 +93,28 @@ async function verifyModels(profile, inventoryPath) {
   }
   return { performed: true, verified, missing: [] };
 }
+async function verifyRuntimes(profile, inventoryPath) {
+  if (!inventoryPath) return { performed: false, verified: [], missing: (profile.runtimeInventory ?? []).map((item) => item.id) };
+  const inventory = await json(inventoryPath, 'physical runtime inventory');
+  if (inventory?.schema !== RUNTIME_INVENTORY_SCHEMA || !Array.isArray(inventory.entries)) fail(`physical runtime inventory must use ${RUNTIME_INVENTORY_SCHEMA}`);
+  const byId = new Map(inventory.entries.map((entry) => [entry?.id, entry]));
+  const verified = [];
+  for (const expected of profile.runtimeInventory ?? []) {
+    if (typeof expected?.id !== 'string' || typeof expected.version !== 'string' || typeof expected.sha256 !== 'string' || !SHA256.test(expected.sha256)) {
+      fail(`profile runtime inventory contains invalid entry ${String(expected?.id)}`);
+    }
+    const physical = byId.get(expected.id);
+    if (!physical || physical.version !== expected.version || physical.sha256 !== expected.sha256 || typeof physical.path !== 'string') {
+      fail(`physical runtime inventory does not bind ${expected.id}@${expected.version} to the reviewed SHA-256`);
+    }
+    const digest = await digestRuntimeTree(physical.path);
+    if (digest.sha256 !== expected.sha256) fail(`physical runtime ${expected.id} SHA-256 mismatch`);
+    verified.push({ id: expected.id, version: expected.version, path: digest.root, sha256: digest.sha256, fileCount: digest.fileCount });
+  }
+  return { performed: true, verified, missing: [] };
+}
 
-export async function preflightReferenceProfile({ catalog, profileId, baseUrl, modelInventoryPath = null }) {
+export async function preflightReferenceProfile({ catalog, profileId, baseUrl, modelInventoryPath = null, runtimeInventoryPath = null }) {
   if (!catalog || !Array.isArray(catalog.profiles)) fail('catalog must contain profiles');
   const profile = catalog.profiles.find((candidate) => candidate?.profileId === profileId);
   if (!profile) fail(`profile ${profileId} not found in catalog`);
@@ -103,6 +126,7 @@ export async function preflightReferenceProfile({ catalog, profileId, baseUrl, m
   const missingClasses = requiredClasses.filter((classType) => !runtimeClasses.has(classType));
   if (missingClasses.length) fail(`live ComfyUI is missing required node classes for ${profileId}: ${missingClasses.join(', ')}`);
   const models = await verifyModels(profile, modelInventoryPath);
+  const runtimes = await verifyRuntimes(profile, runtimeInventoryPath);
   return Object.freeze({
     schema: 'evavo.comfyui-reference-profile-preflight.v1',
     ok: true,
@@ -115,6 +139,7 @@ export async function preflightReferenceProfile({ catalog, profileId, baseUrl, m
     runtimeNodeClassCount: runtimeClasses.size,
     requiredNodeClasses: requiredClasses,
     models,
+    runtimes,
   });
 }
 
@@ -127,6 +152,7 @@ async function main() {
     profileId,
     baseUrl,
     modelInventoryPath: args.get('--model-inventory') ?? null,
+    runtimeInventoryPath: args.get('--runtime-inventory') ?? null,
   });
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
