@@ -7,6 +7,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawn } from 'node:child_process';
 
+import { deriveManagedRuntimePolicy } from './local-generation-managed-runtime-policy-v2.mjs';
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REQUIRED_NODES = Object.freeze([
   'CheckpointLoaderSimple',
@@ -34,9 +36,10 @@ sys.argv = comfy_args
 import comfy.options
 comfy.options.enable_args_parsing()
 import nodes
-async def evavo_skip_builtin_extra_nodes():
-    return []
-nodes.init_builtin_extra_nodes = evavo_skip_builtin_extra_nodes
+if os.environ.get("EVAVO_COMFYUI_SKIP_BUILTIN_EXTRAS", "1") == "1":
+    async def evavo_skip_builtin_extra_nodes():
+        return []
+    nodes.init_builtin_extra_nodes = evavo_skip_builtin_extra_nodes
 runpy.run_path(str(main_py), run_name="__main__")
 `;
 
@@ -72,6 +75,10 @@ async function existsFile(file) {
   try { const stat = await import('node:fs/promises').then(({ stat }) => stat(file)); return stat.isFile(); }
   catch { return false; }
 }
+async function readJson(file, label) {
+  try { return JSON.parse(await readFile(path.resolve(file), 'utf8')); }
+  catch (error) { fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
+}
 function sha256Text(value) { return createHash('sha256').update(value, 'utf8').digest('hex'); }
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 async function portFree(port) {
@@ -100,7 +107,22 @@ async function stopProcess(child) {
   ]);
   if (child.exitCode === null) child.kill('SIGKILL');
 }
-async function startComfy({ port, runtime }) {
+async function runtimePolicyForManifest(manifest, runtime) {
+  const selectionPath = path.join(path.dirname(path.resolve(manifest)), 'provider-selection.json');
+  let selection;
+  if (await existsFile(selectionPath)) {
+    selection = await readJson(selectionPath, 'provider selection');
+  } else {
+    const document = await readJson(manifest, 'managed batch manifest');
+    const adapterId = document.provider?.adapterId;
+    const hasReferenceInputs = Array.isArray(document.shots) && document.shots.some((shot) => (shot?.reference_inputs ?? shot?.referenceInputs)?.length > 0);
+    if (hasReferenceInputs) fail('managed reference batches require provider-selection.json from the governed entry preflight');
+    selection = { adapterId, referenceAdapterIds: [] };
+  }
+  const catalog = await readJson(runtime.catalog, 'physical ComfyUI catalog');
+  return deriveManagedRuntimePolicy(selection, catalog);
+}
+async function startComfy({ port, runtime, policy }) {
   if (process.platform !== 'win32') fail('managed local Art Studio batch execution currently requires the EVAVO Windows workstation');
   for (const [file, label] of [[runtime.python, 'ComfyUI Python'], [runtime.main, 'ComfyUI main.py'], [runtime.catalog, 'ComfyUI catalog']]) {
     if (!(await existsFile(file))) fail(`${label} is missing: ${file}`);
@@ -108,18 +130,18 @@ async function startComfy({ port, runtime }) {
   if (!(await portFree(port))) fail(`loopback port ${port} is already in use; refusing to mix ComfyUI provenance`);
   const logRoot = path.join(localAppData(), 'EVAVO', 'AI', 'logs', 'comfyui-batch-v2');
   await mkdir(logRoot, { recursive: true });
-  const bootstrap = path.join(logRoot, 'evavo-comfyui-true-core-bootstrap.py');
+  const bootstrap = path.join(logRoot, 'evavo-comfyui-managed-bootstrap.py');
   const bootstrapSha = sha256Text(BOOTSTRAP_SOURCE);
   await writeFile(bootstrap, BOOTSTRAP_SOURCE, 'utf8');
   const observedBootstrapSha = createHash('sha256').update(await readFile(bootstrap)).digest('hex');
-  if (observedBootstrapSha !== bootstrapSha) fail('true-core bootstrap write/readback hash mismatch');
+  if (observedBootstrapSha !== bootstrapSha) fail('managed bootstrap write/readback hash mismatch');
   const stamp = new Date().toISOString().replace(/[:.]/gu, '-');
   const stdoutPath = path.join(logRoot, `batch-${stamp}.out.log`);
   const stderrPath = path.join(logRoot, `batch-${stamp}.err.log`);
   const { open } = await import('node:fs/promises');
   const stdout = await open(stdoutPath, 'w');
   const stderr = await open(stderrPath, 'w');
-  const child = spawn(runtime.python, [
+  const comfyArgs = [
     bootstrap,
     runtime.main,
     '--listen', '127.0.0.1',
@@ -127,10 +149,16 @@ async function startComfy({ port, runtime }) {
     '--database-url', 'sqlite:///:memory:',
     '--disable-auto-launch',
     '--disable-all-custom-nodes',
-    '--disable-api-nodes',
-  ], {
+  ];
+  if (policy.customNodeFolders.length > 0) comfyArgs.push('--whitelist-custom-nodes', ...policy.customNodeFolders);
+  comfyArgs.push('--disable-api-nodes');
+  const child = spawn(runtime.python, comfyArgs, {
     cwd: runtime.comfyRoot,
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    env: {
+      ...process.env,
+      PYTHONUNBUFFERED: '1',
+      EVAVO_COMFYUI_SKIP_BUILTIN_EXTRAS: policy.loadBuiltinExtras ? '0' : '1',
+    },
     stdio: ['ignore', stdout.fd, stderr.fd],
     windowsHide: true,
     shell: false,
@@ -149,12 +177,13 @@ async function startComfy({ port, runtime }) {
     }
     if (!ready) {
       const [out, err] = await Promise.all([readFile(stdoutPath, 'utf8').catch(() => ''), readFile(stderrPath, 'utf8').catch(() => '')]);
-      fail(`true-core ComfyUI did not become ready; exit=${child.exitCode}; stdout=${out.slice(-6000)}; stderr=${err.slice(-6000)}`);
+      fail(`managed ComfyUI (${policy.mode}) did not become ready; exit=${child.exitCode}; stdout=${out.slice(-6000)}; stderr=${err.slice(-6000)}`);
     }
     const objectInfo = await fetchJson(`http://127.0.0.1:${port}/object_info`, 15_000);
-    const missing = REQUIRED_NODES.filter((node) => !objectInfo || typeof objectInfo !== 'object' || !(node in objectInfo));
-    if (missing.length) fail(`true-core ComfyUI is missing required nodes: ${missing.join(', ')}`);
-    return Object.freeze({ child, stdout, stderr, stdoutPath, stderrPath, bootstrapSha, startupMs: Date.now() - startedAt });
+    const requiredNodes = [...new Set([...REQUIRED_NODES, ...policy.requiredNodeClasses])].sort();
+    const missing = requiredNodes.filter((node) => !objectInfo || typeof objectInfo !== 'object' || !(node in objectInfo));
+    if (missing.length) fail(`managed ComfyUI (${policy.mode}) is missing required reviewed nodes: ${missing.join(', ')}`);
+    return Object.freeze({ child, stdout, stderr, stdoutPath, stderrPath, bootstrapSha, startupMs: Date.now() - startedAt, requiredNodes });
   } catch (error) {
     await stopProcess(child);
     await Promise.all([stdout.close().catch(() => {}), stderr.close().catch(() => {})]);
@@ -193,10 +222,25 @@ export async function runManagedLocalArtBatch(argv = process.argv.slice(2)) {
   const port = Number(args.get('--port') ?? DEFAULT_PORT);
   if (!Number.isInteger(port) || port < 1024 || port > 65535) fail('--port must be an integer between 1024 and 65535');
   const runtime = comfyRuntime();
-  const service = await startComfy({ port, runtime });
+  const policy = await runtimePolicyForManifest(manifest, runtime);
+  const service = await startComfy({ port, runtime, policy });
   try {
     await runBatch({ manifest, outputRoot: args.get('--output-root') ?? null, actor: args.get('--actor') ?? 'managed-local-art-batch-v2', port, runtime });
-    process.stderr.write(`${JSON.stringify({ kind: 'evavo.managed-local-art-batch.v2', ok: true, port, catalogPath: runtime.catalog, startupMs: service.startupMs, bootstrapSha256: service.bootstrapSha, localOnly: true, hostedFallback: false })}\n`);
+    process.stderr.write(`${JSON.stringify({
+      kind: 'evavo.managed-local-art-batch.v2',
+      ok: true,
+      port,
+      catalogPath: runtime.catalog,
+      startupMs: service.startupMs,
+      bootstrapSha256: service.bootstrapSha,
+      runtimeMode: policy.mode,
+      selectedProfileIds: policy.selectedProfileIds,
+      customNodeFolders: policy.customNodeFolders,
+      loadBuiltinExtras: policy.loadBuiltinExtras,
+      requiredNodeClasses: service.requiredNodes,
+      localOnly: true,
+      hostedFallback: false,
+    })}\n`);
   } finally {
     await stopProcess(service.child);
     await Promise.all([service.stdout.close().catch(() => {}), service.stderr.close().catch(() => {})]);
