@@ -8,6 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const nodeTests = [
   'scripts/local-generation-batch-v2.test.mjs',
   'scripts/local-generation-batch-audit-v2.test.mjs',
+  'scripts/local-generation-batch-state-v2.test.mjs',
   'scripts/compile-comfyui-quality-profile-draft.test.mjs',
   'scripts/compile-comfyui-reference-pack-draft.test.mjs',
   'scripts/compile-comfyui-ipadapter-reference-packs.test.mjs',
@@ -50,6 +51,7 @@ process.stdout.write(`${JSON.stringify({
   managedRuntimePolicySourceContract: 'scripts/check-local-generation-managed-runtime-policy-v2.mjs',
   ipAdapterReferencePackSourceContract: 'scripts/check-local-generation-ipadapter-reference-packs.mjs',
   includesDurableV1ReferenceBridge: true,
+  includesDurableResumeState: true,
   includesReferencePackCompiler: true,
   includesIpAdapterReferencePackCompiler: true,
   includesLiveReferenceProfilePreflight: true,
