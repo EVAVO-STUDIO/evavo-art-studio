@@ -14,6 +14,12 @@
     "LoadImage",
     "REPLACE_WITH_REVIEWED_REFERENCE_APPLY_NODE"
   ],
+  "runtimePolicy": {
+    "loadBuiltinExtras": true,
+    "customNodeFolders": [
+      "REPLACE_WITH_REVIEWED_CUSTOM_NODE_FOLDER"
+    ]
+  },
   "workflow": {
     "addNodes": {
       "900": {
