@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -8,6 +9,9 @@ import {
   prepareReferenceExecutionPlan,
   recordAcceptedArtifactResults,
 } from './local-generation-reference-execution-v2.mjs';
+import {
+  validateProviderReferenceInputs,
+} from './local-generation-reference-graph-v2.mjs';
 
 const artifactA = `artifact_${'a'.repeat(64)}`;
 const artifactB = `artifact_${'b'.repeat(64)}`;
@@ -31,6 +35,14 @@ function basePlan(mode = 'independent') {
         shot: {},
       },
     ],
+  };
+}
+
+function profile({ maximumReferenceImages = 4, capabilities = [] } = {}) {
+  return {
+    profileId: 'reference-test-profile',
+    capabilities,
+    limits: { maximumReferenceImages },
   };
 }
 
@@ -66,6 +78,17 @@ test('resolved provider references are attached to matching V1 scenes only', () 
   const attached = attachProviderReferencesToLegacyManifest(manifest, stageFrames);
   assert.equal(attached.scenes[0].references, undefined);
   assert.deepEqual(attached.scenes[1].references, stageFrames[0].providerReferences);
+});
+
+test('no-reference stages preserve the legacy scene contract exactly', () => {
+  const manifest = { scenes: [{ id: 'one', prompt: 'one' }, { id: 'two', prompt: 'two' }] };
+  const attached = attachProviderReferencesToLegacyManifest(manifest, [
+    { id: 'one', providerReferences: [] },
+    { id: 'two', providerReferences: [] },
+  ]);
+  assert.deepEqual(attached, manifest);
+  assert.equal(Object.hasOwn(attached.scenes[0], 'references'), false);
+  assert.equal(Object.hasOwn(attached.scenes[1], 'references'), false);
 });
 
 test('required downstream artifact must exist before the stage executes', () => {
@@ -137,4 +160,50 @@ test('optional unresolved source artifact references are omitted instead of inve
   const artifacts = new Map([['anchor', [artifactA]]]);
   const stageTwo = framesForReferenceStage(plan, ['follow'], artifacts);
   assert.deepEqual(stageTwo[0].providerReferences, []);
+});
+
+test('reviewed profile maximumReferenceImages is a hard pre-execution limit', () => {
+  const refs = [
+    { artifactId: artifactA, role: 'canonical-identity', required: true },
+    { artifactId: artifactB, role: 'palette-reference', required: false },
+  ];
+  assert.throws(
+    () => validateProviderReferenceInputs(refs, profile({
+      maximumReferenceImages: 1,
+      capabilities: ['reference-images', 'multiple-reference-images', 'identity-reference'],
+    }), { operation: 'generate' }),
+    /requests 2 reference image\(s\).*allows 1/u,
+  );
+});
+
+test('reference semantic rules fail closed before provider execution', () => {
+  const capable = profile({
+    maximumReferenceImages: 4,
+    capabilities: ['reference-images', 'multiple-reference-images', 'identity-reference', 'temporal-reference', 'mask'],
+  });
+  assert.throws(
+    () => validateProviderReferenceInputs([{ artifactId: artifactA, role: 'mask', required: true }], capable, { operation: 'generate' }),
+    /may not contain mask/u,
+  );
+  assert.throws(
+    () => validateProviderReferenceInputs([{ artifactId: artifactA, role: 'previous-key-pose', required: true }], capable, {
+      operation: 'generate', assetKind: 'sprite-frame', continuityPhase: 'in-between',
+    }),
+    /canonical-identity/u,
+  );
+  assert.throws(
+    () => validateProviderReferenceInputs([
+      { artifactId: artifactA, role: 'canonical-identity', required: true },
+      { artifactId: artifactB, role: 'previous-key-pose', required: true },
+    ], capable, { operation: 'generate', assetKind: 'illustration', continuityPhase: 'in-between' }),
+    /previous-key-pose and next-key-pose/u,
+  );
+});
+
+test('V1 durable job builder consumes resolved artifact references instead of dropping them', async () => {
+  const source = await readFile(new URL('./run-local-generation-campaign.mjs', import.meta.url), 'utf8');
+  assert.match(source, /profile\.limits\.maximumReferenceImages < scene\.references\.length/u);
+  assert.match(source, /inputArtifacts:\s*Object\.freeze\(\[\.\.\.new Set\(references\.map\(\(reference\) => reference\.artifactId\)\)\]\)/u);
+  assert.match(source, /references,\s*\n\s*provider:/u);
+  assert.match(source, /requiredCapabilityProfile:\s*Object\.freeze\(\[\.\.\.route\.requiredCapabilities\]\)/u);
 });
