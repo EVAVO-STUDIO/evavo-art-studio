@@ -19,6 +19,8 @@ const files = {
   commercialRunner: "scripts/run-book-cover-commercial-release-local.mjs",
   commercialCheck: "scripts/check-book-cover-commercial-release.mjs",
   commercialDocs: "docs/book-cover-commercial-release.md",
+  manuscriptAuthoritySource: "packages/contracts/src/book-cover-manuscript-authority.ts",
+  manuscriptAuthorityTest: "packages/contracts/test/book-cover-manuscript-authority.test.mjs",
 };
 const failures = [];
 const sources = {};
@@ -90,6 +92,7 @@ if (!failures.length) {
 
   expect("index", 'export * from "./book-creative-direction.js";');
   expect("index", 'export * from "./book-cover-commercial-release.js";');
+  expect("index", 'export * from "./book-cover-manuscript-authority.js";');
   expect("package", '"book:creative-direction:check": "node scripts/check-book-creative-direction.mjs"');
   expect("package", "pnpm run book:creative-direction:check");
 
@@ -137,6 +140,27 @@ if (!failures.length) {
   ]) expect("commercialDocs", token);
 
   for (const token of [
+    "evavo_art_book_cover_manuscript_authority_v1",
+    "compileBookCoverManuscriptAuthority",
+    "validateBookCoverManuscriptAuthority",
+    "exactManuscriptBindingRequired",
+    "exactCanonBindingRequired",
+    "endingSpoilersExcluded",
+    "automaticCanonInferenceAllowed",
+    "automaticSpoilerEscalationAllowed",
+    "sourceExcerptSha256",
+    "canonFactIds",
+  ]) expect("manuscriptAuthoritySource", token);
+
+  for (const token of [
+    "compiles exact manuscript and canon bound cover authority",
+    "rejects ending spoilers even when marked approved",
+    "rejects evidence above the human-approved spoiler ceiling",
+    "rejects evidence without exact source locations or canon facts",
+    "detects authority tampering after compilation",
+  ]) expect("manuscriptAuthorityTest", token);
+
+  for (const token of [
     "automaticSelectionAllowed:true",
     "automaticPromotionAllowed:true",
     "publicationPerformed:true",
@@ -159,6 +183,9 @@ if (failures.length) {
     ok: true,
     contract: "evavo_art_book_creative_direction_v1",
     evidenceBoundSubjects: true,
+    exactManuscriptCoverAuthorityRequired: true,
+    exactCanonCoverAuthorityRequired: true,
+    endingSpoilersExcludedFromCoverAuthority: true,
     genreAwareComposition: true,
     historicalPrintProcesses: true,
     publicPackageExported: true,
