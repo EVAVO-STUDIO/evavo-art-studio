@@ -225,7 +225,9 @@ python tools/recover_painted_checkerboard.py `
   --input .\candidate.png `
   --output .\candidate.alpha.png `
   --proof .\candidate.alpha.proof.png `
-  --evidence .\candidate.alpha.evidence.json
+  --evidence .\candidate.alpha.evidence.json `
+  --protect-mask .\keep.png `
+  --remove-mask .\erase.png
 ```
 
 The fallback is create-only and never mutates the provider source. Its proof
@@ -233,6 +235,11 @@ uses black, white, grey, green and magenta plates plus an alpha-mask tile, not
 a checkerboard. It is intentionally limited to confidently separable painted
 checkerboards or explicitly declared flat mattes; ambiguous natural
 backgrounds still require the governed segmentation/mask path.
+
+The fallback accepts same-canvas alpha-painted or grayscale protect/remove
+masks for pixel-level correction. Protect restores immutable source colour and
+coverage; remove reduces coverage, including soft grayscale edges. Strongly
+overlapping intent fails closed, and mask use is recorded in the evidence.
 
 ## Sheet and atlas admission
 

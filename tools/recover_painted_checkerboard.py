@@ -78,6 +78,8 @@ def recover(
     min_visible_island: int = 0,
     remove_all_matte: bool = False,
     despill: str | None = None,
+    protect_mask: Image.Image | None = None,
+    remove_mask: Image.Image | None = None,
 ) -> tuple[Image.Image, dict[str, object]]:
     rgb = image.convert("RGB")
     width, height = rgb.size
@@ -201,6 +203,36 @@ def recover(
                 data[base] = neutral
                 data[base + 2] = neutral
                 despilled_pixels += 1
+    guided_protected = 0
+    guided_removed = 0
+    conflicting_guidance = 0
+    protect_values = mask_strengths(protect_mask, (width, height), "protect") if protect_mask else None
+    remove_values = mask_strengths(remove_mask, (width, height), "remove") if remove_mask else None
+    if protect_values is not None or remove_values is not None:
+        source_data = rgb.tobytes()
+        for index in range(width * height):
+            protect = protect_values[index] if protect_values is not None else 0
+            remove = remove_values[index] if remove_values is not None else 0
+            if protect > 32 and remove > 32:
+                conflicting_guidance += 1
+                continue
+            base = index * 4
+            if protect:
+                data[base:base + 3] = source_data[index * 3:index * 3 + 3]
+                before = data[base + 3]
+                data[base + 3] = max(before, protect)
+                if data[base + 3] != before:
+                    guided_protected += 1
+            if remove:
+                before = data[base + 3]
+                data[base + 3] = round(before * (255 - remove) / 255)
+                if data[base + 3] != before:
+                    guided_removed += 1
+        if conflicting_guidance:
+            raise ValueError(
+                f"protect and remove masks strongly overlap at {conflicting_guidance} pixels"
+            )
+
     output = Image.frombytes("RGBA", (width, height), bytes(data))
     visible = width * height - removed_count
     if not removed_count or not visible:
@@ -222,12 +254,31 @@ def recover(
         "enclosed_matte_removed_pixels": enclosed_matte_removed,
         "despill": despill,
         "despilled_pixels": despilled_pixels,
+        "artist_guidance": {
+            "protect_mask_supplied": protect_mask is not None,
+            "remove_mask_supplied": remove_mask is not None,
+            "protected_pixels": guided_protected,
+            "removed_or_softened_pixels": guided_removed,
+            "strong_overlap_pixels": conflicting_guidance,
+        },
         "removed_pixels": removed_count,
         "visible_pixels": visible,
         "transparent_fraction": removed_count / (width * height),
         "source_mutated": False,
     }
     return output, evidence
+
+
+def mask_strengths(mask: Image.Image, size: tuple[int, int], label: str) -> bytes:
+    """Decode alpha-painted or grayscale artist guidance without resizing it."""
+    if mask.size != size:
+        raise ValueError(f"{label} mask dimensions must match the source canvas")
+    if "A" in mask.getbands() or mask.mode in {"LA", "PA"} or "transparency" in mask.info:
+        alpha = mask.convert("RGBA").getchannel("A")
+        extrema = alpha.getextrema()
+        if extrema != (255, 255):
+            return alpha.tobytes()
+    return mask.convert("L").tobytes()
 
 
 def create_hostile_background_proof(image: Image.Image) -> Image.Image:
@@ -281,6 +332,8 @@ def main() -> None:
         "--despill", choices=("auto", "green", "magenta"),
         help="neutralize residual chroma on visible antialiased edge pixels",
     )
+    parser.add_argument("--protect-mask", type=Path, help="alpha or grayscale mask that restores subject pixels")
+    parser.add_argument("--remove-mask", type=Path, help="alpha or grayscale mask that removes or softens pixels")
     args = parser.parse_args()
     evidence_path = args.evidence or args.output.with_suffix(".evidence.json")
     destinations = [args.output, evidence_path, *([args.proof] if args.proof else [])]
@@ -299,10 +352,15 @@ def main() -> None:
             matte = tuple(int(value[index:index + 2], 16) for index in (0, 2, 4))
         except ValueError as exc:
             raise SystemExit("--matte must use #RRGGBB") from exc
+    protected_inputs = [path.resolve() for path in (args.protect_mask, args.remove_mask) if path]
+    if any(path in resolved_destinations for path in protected_inputs):
+        raise SystemExit("artist masks must be distinct from output, evidence and proof")
     output, evidence = recover(
         Image.open(args.input), args.border_band, args.threshold,
         args.fringe_threshold, args.fringe_passes, matte, args.min_visible_island,
         args.remove_all_matte, args.despill,
+        Image.open(args.protect_mask) if args.protect_mask else None,
+        Image.open(args.remove_mask) if args.remove_mask else None,
     )
     try:
         evidence["transparency_admission"] = validate_recovered_output(output)
