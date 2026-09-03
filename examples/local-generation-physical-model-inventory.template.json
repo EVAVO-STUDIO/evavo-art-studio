@@ -1,0 +1,10 @@
+{
+  "schema": "evavo.local-generation-physical-model-inventory.v1",
+  "entries": [
+    {
+      "id": "REPLACE_WITH_REVIEWED_MODEL_ID",
+      "path": "C:\\REPLACE\\WITH\\EXACT\\LOCAL\\MODEL\\FILE.safetensors",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}
