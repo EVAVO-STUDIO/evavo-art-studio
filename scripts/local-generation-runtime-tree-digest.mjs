@@ -8,12 +8,13 @@ const EXCLUDED_FILES = new Set(['.DS_Store', 'Thumbs.db']);
 const EXCLUDED_EXTENSIONS = new Set(['.pyc', '.pyo']);
 
 function fail(message) { throw new Error(message); }
+function compareText(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function posixRelative(root, file) { return path.relative(root, file).split(path.sep).join('/'); }
 function excludedFile(name) { return EXCLUDED_FILES.has(name) || EXCLUDED_EXTENSIONS.has(path.extname(name).toLowerCase()); }
 
 async function collectFiles(root, current, output) {
   const entries = await readdir(current, { withFileTypes: true });
-  entries.sort((left, right) => left.name.localeCompare(right.name, 'en'));
+  entries.sort((left, right) => compareText(left.name, right.name));
   for (const entry of entries) {
     if (entry.isSymbolicLink()) fail(`runtime tree may not contain symlink ${posixRelative(root, path.join(current, entry.name))}`);
     const candidate = path.join(current, entry.name);
@@ -35,7 +36,7 @@ export async function digestRuntimeTree(rootPath) {
   const root = await realpath(candidate);
   const files = [];
   await collectFiles(root, root, files);
-  files.sort((left, right) => posixRelative(root, left).localeCompare(posixRelative(root, right), 'en'));
+  files.sort((left, right) => compareText(posixRelative(root, left), posixRelative(root, right)));
   const digest = createHash('sha256');
   const entries = [];
   for (const file of files) {
