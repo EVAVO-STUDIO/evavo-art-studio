@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.studio/schemas/comfyui-runtime-profile-registry.v1.schema.json",
+  "title": "EVAVO ComfyUI Runtime Profile Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "profiles"],
+  "properties": {
+    "schema": { "const": "evavo.comfyui-runtime-profile-registry.v1" },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["profileId", "profileSha256", "runtimeInventorySha256", "packId", "packVersion", "customNodeFolders", "disableAllCustomNodes", "disableApiNodes", "skipBuiltinExtras"],
+        "properties": {
+          "profileId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+          "profileSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "runtimeInventorySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "packId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+          "packVersion": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+          "customNodeFolders": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" }
+          },
+          "disableAllCustomNodes": { "const": true },
+          "disableApiNodes": { "const": true },
+          "skipBuiltinExtras": { "const": true }
+        }
+      }
+    }
+  }
+}
