@@ -79,8 +79,7 @@
   },
   "provider": {
     "baseUrl": "http://127.0.0.1:8192",
-    "catalogPath": "C:\\Users\\User\\AppData\\Local\\EVAVO\\AI\\ComfyUI\\catalog.json",
-    "adapterId": "comfyui:sdxl-base-local"
+    "adapterId": "comfyui:sdxl-base-local-cinematic_stills"
   },
   "shots": [
     {
