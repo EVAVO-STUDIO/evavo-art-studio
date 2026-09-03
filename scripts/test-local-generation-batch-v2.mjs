@@ -37,6 +37,7 @@ function run(args, label) {
 run(['--test', ...nodeTests], 'local generation V2 Node contracts');
 run(['scripts/check-local-generation-batch-v2.mjs'], 'local generation V2 source contract');
 run(['scripts/check-local-generation-reference-pack.mjs'], 'local generation reference pack source contract');
+run(['scripts/check-local-generation-managed-runtime-policy-v2.mjs'], 'managed local generation runtime policy source contract');
 
 process.stdout.write(`${JSON.stringify({
   schema: 'evavo.local-generation-batch-v2-contract-receipt.v1',
@@ -44,6 +45,7 @@ process.stdout.write(`${JSON.stringify({
   testFiles: nodeTests,
   sourceContract: 'scripts/check-local-generation-batch-v2.mjs',
   referencePackSourceContract: 'scripts/check-local-generation-reference-pack.mjs',
+  managedRuntimePolicySourceContract: 'scripts/check-local-generation-managed-runtime-policy-v2.mjs',
   includesDurableV1ReferenceBridge: true,
   includesReferencePackCompiler: true,
   includesLiveReferenceProfilePreflight: true,
