@@ -1,0 +1,67 @@
+{
+  "schema": "evavo.local-generation-reference-pack.v1",
+  "packId": "example-reference-pack",
+  "version": "1.0.0",
+  "profileSuffix": "reference_pack",
+  "label": "Example reviewed reference pack",
+  "description": "Template only. Replace node classes, wiring, inventories and hashes with a physically reviewed local reference implementation before commissioning.",
+  "capabilities": [
+    "reference-images",
+    "identity-reference"
+  ],
+  "maximumReferenceImages": 1,
+  "requiredNodeClasses": [
+    "LoadImage",
+    "REPLACE_WITH_REVIEWED_REFERENCE_APPLY_NODE"
+  ],
+  "workflow": {
+    "addNodes": {
+      "900": {
+        "class_type": "LoadImage",
+        "inputs": {
+          "image": "identity-reference.png"
+        }
+      },
+      "901": {
+        "class_type": "REPLACE_WITH_REVIEWED_REFERENCE_APPLY_NODE",
+        "inputs": {
+          "model": ["1", 0],
+          "image": ["900", 0],
+          "strength": 0.8
+        }
+      }
+    },
+    "setInputs": [
+      {
+        "nodeId": "4",
+        "input": "model",
+        "value": ["901", 0]
+      }
+    ]
+  },
+  "referenceBindings": [
+    {
+      "role": "canonical-identity",
+      "nodeId": "900",
+      "input": "image",
+      "strength": {
+        "nodeId": "901",
+        "input": "strength"
+      }
+    }
+  ],
+  "modelInventory": [
+    {
+      "id": "REPLACE_WITH_REVIEWED_REFERENCE_MODEL",
+      "kind": "reference-model",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "runtimeInventory": [
+    {
+      "id": "REPLACE_WITH_REVIEWED_REFERENCE_RUNTIME",
+      "version": "REPLACE_WITH_PINNED_VERSION",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}
