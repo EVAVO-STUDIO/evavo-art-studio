@@ -92,3 +92,49 @@ test('sequential-anchor mode creates a real automatic dependency after authored 
   assert.deepEqual(plan.referenceGraph.stages, [['anchor'], ['follow']]);
   assert.equal(plan.frames[1].shot.referenceInputs[0].role, 'canonical-identity');
 });
+
+test('multi-candidate source references select the requested accepted provider artifact deterministically', () => {
+  const plan = prepareReferenceExecutionPlan({
+    mode: 'independent',
+    source: {
+      shots: [
+        { id: 'anchor' },
+        { id: 'follow', reference_inputs: [{ sourceShotId: 'anchor', candidateIndex: 1, role: 'canonical-identity', required: true }] },
+      ],
+    },
+    frames: [
+      { id: 'anchor', ordinal: 1, candidateCount: 2, shot: {} },
+      { id: 'follow', ordinal: 2, candidateCount: 1, shot: {} },
+    ],
+  });
+  const artifacts = new Map();
+  const stageOne = framesForReferenceStage(plan, ['anchor'], artifacts);
+  recordAcceptedArtifactResults(stageOne, new Map([['anchor', {
+    candidates: [
+      { artifactId: artifactA, qa: { ok: true } },
+      { artifactId: artifactB, qa: { ok: true } },
+    ],
+  }]]), artifacts);
+  const stageTwo = framesForReferenceStage(plan, ['follow'], artifacts);
+  assert.equal(stageTwo[0].providerReferences.length, 1);
+  assert.equal(stageTwo[0].providerReferences[0].artifactId, artifactB);
+});
+
+test('optional unresolved source artifact references are omitted instead of inventing conditioning', () => {
+  const plan = prepareReferenceExecutionPlan({
+    mode: 'independent',
+    source: {
+      shots: [
+        { id: 'anchor' },
+        { id: 'follow', reference_inputs: [{ sourceShotId: 'anchor', candidateIndex: 1, role: 'palette-reference', strength: 0.5, required: false }] },
+      ],
+    },
+    frames: [
+      { id: 'anchor', ordinal: 1, candidateCount: 1, shot: {} },
+      { id: 'follow', ordinal: 2, candidateCount: 1, shot: {} },
+    ],
+  });
+  const artifacts = new Map([['anchor', [artifactA]]]);
+  const stageTwo = framesForReferenceStage(plan, ['follow'], artifacts);
+  assert.deepEqual(stageTwo[0].providerReferences, []);
+});
