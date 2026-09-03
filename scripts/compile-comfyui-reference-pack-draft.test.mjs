@@ -56,6 +56,10 @@ function pack(overrides = {}) {
     capabilities: ['reference-images', 'identity-reference'],
     maximumReferenceImages: 1,
     requiredNodeClasses: ['LoadImage', 'SyntheticReferenceModelApply'],
+    runtimePolicy: {
+      loadBuiltinExtras: true,
+      customNodeFolders: ['ComfyUI-SyntheticReference'],
+    },
     workflow: {
       addNodes: {
         '100': { class_type: 'LoadImage', inputs: { image: 'identity.png' } },
@@ -84,7 +88,30 @@ test('reference pack compiler creates an isolated reference-capable reviewed pro
   assert.equal(profile.limits.maximumReferenceImages, 1);
   assert.equal(profile.modelInventory.some((item) => item.id === 'synthetic-reference-model'), true);
   assert.equal(profile.runtimeInventory.some((item) => item.id === 'synthetic-reference-runtime'), true);
+  assert.deepEqual(profile.runtimePolicy, {
+    loadBuiltinExtras: true,
+    customNodeFolders: ['ComfyUI-SyntheticReference'],
+  });
   assert.equal(result.profiles[0].workflow['4'].inputs.model[0], '1', 'base workflow must remain unchanged');
+});
+
+test('reference runtime policy is normalized and validated', () => {
+  const defaultPolicy = compileReferencePackedDraft(baseDraft(), pack({ runtimePolicy: undefined }), 'sdxl-base-local-cinematic_stills')
+    .profiles.find((candidate) => candidate.profileId.endsWith('-identity_ref')).runtimePolicy;
+  assert.deepEqual(defaultPolicy, { loadBuiltinExtras: true, customNodeFolders: [] });
+
+  assert.throws(
+    () => compileReferencePackedDraft(baseDraft(), pack({ runtimePolicy: { customNodeFolders: ['bad folder'] } })),
+    /customNodeFolders\[0\] is invalid/u,
+  );
+  assert.throws(
+    () => compileReferencePackedDraft(baseDraft(), pack({ runtimePolicy: { loadBuiltinExtras: 'yes' } })),
+    /loadBuiltinExtras must be a boolean/u,
+  );
+  assert.throws(
+    () => compileReferencePackedDraft(baseDraft(), pack({ runtimePolicy: { customNodeFolders: ['A', 'A'] } })),
+    /contains duplicates/u,
+  );
 });
 
 test('reference pack compiler fails closed on workflow collisions and missing required classes', () => {
