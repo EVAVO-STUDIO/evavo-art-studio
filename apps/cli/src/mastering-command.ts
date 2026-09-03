@@ -5,6 +5,7 @@ import {
   applyAlphaGuidance,
   atomicWriteFile,
   createTransparencyProofSheet,
+  normalizeAlphaCanvas,
   recoverBackgroundAlpha,
   suppressChromaSpill,
   type BackgroundAlphaRecoveryOptions,
@@ -39,6 +40,8 @@ export interface MasteringCommandValues {
   readonly "checker-maximum-composite-channel-error"?: string;
   readonly "suppress-chroma-spill"?: boolean;
   readonly "allow-low-chroma-matte"?: boolean;
+  readonly padding?: string;
+  readonly "alpha-threshold"?: string;
 }
 
 export type MasteringCommandResult =
@@ -178,9 +181,23 @@ export async function handleMasteringCommand(
   if (
     command !== "master-alpha" &&
     command !== "master-alpha-folder" &&
+    command !== "normalize-alpha-canvas" &&
     command !== "inspect-alpha"
   ) {
     return { handled: false };
+  }
+  if (command === "normalize-alpha-canvas") {
+    const inputPath = path.resolve(required(values.input, "--input"));
+    const outputPath = path.resolve(required(values.output, "--output"));
+    if ((await canonicalPathIdentity(inputPath)) === (await canonicalPathIdentity(outputPath))) {
+      throw new Error("Alpha-canvas normalization is non-destructive: output must differ from input.");
+    }
+    const padding = optionalNumber(values.padding, "--padding") ?? 8;
+    const alphaThreshold = optionalNumber(values["alpha-threshold"], "--alpha-threshold") ?? 0;
+    const result = await normalizeAlphaCanvas(await readFile(inputPath), padding, alphaThreshold);
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await atomicWriteFile(outputPath, result.png);
+    return { handled: true, value: { schemaVersion: "1.0", command, inputPath, outputPath, ...result.evidence } };
   }
   if (command === "master-alpha-folder") {
     const inputRoot = path.resolve(required(values["input-dir"], "--input-dir"));
