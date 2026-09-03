@@ -11,6 +11,7 @@ import {
 
 const artifactA = `artifact_${'a'.repeat(64)}`;
 const artifactB = `artifact_${'b'.repeat(64)}`;
+const artifactC = `artifact_${'c'.repeat(64)}`;
 
 function manifest(references) {
   return {
@@ -48,14 +49,22 @@ function profile({ maximumReferenceImages = 4, capabilities }) {
     profileId: 'reference-capable-test',
     priority: 100,
     operations: ['generate'],
-    assetKinds: ['illustration'],
-    continuityPhases: ['independent'],
+    assetKinds: ['illustration', 'sprite-frame', 'sprite-layer'],
+    continuityPhases: ['independent', 'key-pose', 'in-between'],
     capabilities,
     limits: { maximumCandidates: 4, maximumReferenceImages },
     modelId: 'test-model',
     profileSha256: 'c'.repeat(64),
   };
 }
+
+const fullReferenceCapabilities = [
+  'generate', 'cancellation', 'seed', 'custom-size',
+  'reference-images', 'multiple-reference-images',
+  'identity-reference', 'direction-reference', 'temporal-reference',
+  'pose-control', 'edge-control', 'depth-control',
+  'palette-reference', 'line-reference', 'material-reference', 'layer-context-reference',
+];
 
 test('V1 bridge derives reference capabilities and routes only to a capable reviewed profile', () => {
   const campaign = validateLocalGenerationCampaign(manifest([
@@ -86,6 +95,15 @@ test('V1 bridge derives reference capabilities and routes only to a capable revi
   assert.equal(route.adapterId, 'comfyui:reference-capable-test');
 });
 
+test('optional reference roles require reference transport but not role-specific conditioning capability', () => {
+  const campaign = validateLocalGenerationCampaign(manifest([
+    { artifactId: artifactA, role: 'pose-control', required: false },
+  ]));
+  const capabilities = requiredCapabilityProfile(campaign.scenes[0]);
+  assert.equal(capabilities.includes('reference-images'), true);
+  assert.equal(capabilities.includes('pose-control'), false);
+});
+
 test('V1 runtime job carries the same typed references and unique artifact IDs into durable runtime inputs', () => {
   const campaign = validateLocalGenerationCampaign(manifest([
     { artifactId: artifactA, role: 'canonical-identity', strength: 0.9, required: true, note: 'identity anchor' },
@@ -95,10 +113,7 @@ test('V1 runtime job carries the same typed references and unique artifact IDs i
   const scene = campaign.scenes[0];
   const route = routeScene({ profiles: [profile({
     maximumReferenceImages: 3,
-    capabilities: [
-      'generate', 'cancellation', 'seed', 'custom-size',
-      'reference-images', 'multiple-reference-images', 'identity-reference',
-    ],
+    capabilities: fullReferenceCapabilities,
   })] }, scene);
   const job = runtimeJob(campaign, scene, route, 'run_reference_bridge');
 
@@ -107,6 +122,17 @@ test('V1 runtime job carries the same typed references and unique artifact IDs i
   assert.equal(job.payload.metadata.referenceCount, 3);
   assert.equal(job.payload.selection.allowFallback, false);
   assert.deepEqual(job.requiredCapabilityProfile, route.requiredCapabilities);
+});
+
+test('routing rejects a reviewed profile whose reference image limit is smaller than the scene', () => {
+  const campaign = validateLocalGenerationCampaign(manifest([
+    { artifactId: artifactA, role: 'base-image', required: false },
+    { artifactId: artifactB, role: 'palette-reference', required: false },
+  ]));
+  assert.throws(
+    () => routeScene({ profiles: [profile({ maximumReferenceImages: 1, capabilities: fullReferenceCapabilities })] }, campaign.scenes[0]),
+    /no reviewed local ComfyUI profile/u,
+  );
 });
 
 test('V1 bridge keeps semantic generation reference rules fail-closed', () => {
@@ -120,7 +146,42 @@ test('V1 bridge keeps semantic generation reference rules fail-closed', () => {
   sprite.defaults.continuityPhase = 'key-pose';
   assert.throws(() => validateLocalGenerationCampaign(sprite), /canonical-identity/u);
 
+  const validSprite = manifest([{ artifactId: artifactA, role: 'canonical-identity', required: true }]);
+  validSprite.defaults.assetKind = 'sprite-frame';
+  validSprite.defaults.continuityPhase = 'key-pose';
+  assert.equal(validateLocalGenerationCampaign(validSprite).scenes[0].references[0].role, 'canonical-identity');
+
   const inbetween = manifest([{ artifactId: artifactA, role: 'previous-key-pose' }]);
   inbetween.defaults.continuityPhase = 'in-between';
   assert.throws(() => validateLocalGenerationCampaign(inbetween), /previous-key-pose and next-key-pose/u);
+
+  const validInbetween = manifest([
+    { artifactId: artifactA, role: 'previous-key-pose', required: true },
+    { artifactId: artifactC, role: 'next-key-pose', required: true },
+  ]);
+  validInbetween.defaults.continuityPhase = 'in-between';
+  assert.equal(validateLocalGenerationCampaign(validInbetween).scenes[0].references.length, 2);
+});
+
+test('reference syntax validation rejects malformed IDs, duplicates, and over-capacity scenes', () => {
+  assert.throws(
+    () => validateLocalGenerationCampaign(manifest([{ artifactId: 'artifact_bad', role: 'base-image' }])),
+    /artifact_<sha256>/u,
+  );
+
+  assert.throws(
+    () => validateLocalGenerationCampaign(manifest([
+      { artifactId: artifactA, role: 'base-image' },
+      { artifactId: artifactA, role: 'base-image' },
+    ])),
+    /duplicate base-image reference/u,
+  );
+
+  assert.throws(
+    () => validateLocalGenerationCampaign(manifest(Array.from({ length: 17 }, (_, index) => ({
+      artifactId: `artifact_${index.toString(16).padStart(64, '0')}`,
+      role: 'base-image',
+    })))),
+    /at most 16 references/u,
+  );
 });
