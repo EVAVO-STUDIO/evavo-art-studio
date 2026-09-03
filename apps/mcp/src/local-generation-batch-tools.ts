@@ -97,7 +97,7 @@ export function registerLocalGenerationBatchTools(server: McpServer): void {
   server.registerTool(
     "local_generation_batch_capabilities",
     {
-      description: "Describe the generic data-driven local image batch system: arbitrary shot counts, structured prompt layers, quality profiles, consistency modes, selective retries, QA and per-image reproducibility metadata. Does not generate images.",
+      description: "Describe the generic data-driven local image batch system: arbitrary shot counts, structured prompt layers, quality profiles, pre-GPU prompt auditing, consistency modes, selective retries, QA and per-image reproducibility metadata. Does not generate images.",
       inputSchema: z.object({}),
     },
     async () => textResult({
@@ -109,7 +109,14 @@ export function registerLocalGenerationBatchTools(server: McpServer): void {
       consistencyModes: ["strict", "balanced", "loose"],
       qualityProfiles: ["portrait_high_quality", "sprite_sheet_clean", "concept_art_painterly", "comic_inked", "cinematic_stills", "product_mockups"],
       promptLayers: ["identity", "style", "quality", "continuity", "shot", "negative"],
+      preGenerationAudit: ["generic-ai-filler", "low-shot-specificity", "weak-shot-layer", "duplicate-shot-prompt", "identity-layer-drift", "style-layer-drift", "campaign-prompt-collapse", "prompt-length"],
       referenceRoles: ["canonical-identity", "direction-master", "previous-key-pose", "next-key-pose", "base-image", "mask", "pose-control", "edge-control", "depth-control", "palette-reference", "line-reference", "material-reference", "layer-context"],
+      conditioningTruth: {
+        promptOnly: "identity/style/continuity language and seed strategy",
+        workflowBaked: "reviewed quality-specific KSampler settings",
+        artifactConditioned: "requires real artifact IDs plus reviewed reference bindings; explicit inputs fail closed until the V2 runtime bridge is enabled",
+        loraConditioned: "requires reviewed LoRA inventory and loader support; unsupported requests fail closed",
+      },
       qa: ["exact-output-count", "file-exists", "non-zero-bytes", "image-signature", "dimensions", "unique-sha256"],
       retries: "shot-selective with deterministic seed bump",
       metadataPerImage: true,
@@ -120,14 +127,14 @@ export function registerLocalGenerationBatchTools(server: McpServer): void {
       canonicalBaseUrl: "http://127.0.0.1:8192",
       canonicalCatalog: process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "EVAVO", "AI", "ComfyUI", "catalog.json") : null,
       executionEnabled: executionEnabled(),
-      note: "Quality-specific reviewed workflow profiles bake KSampler steps/CFG/sampler/scheduler/denoise into executable ComfyUI workflows. Dynamic fields are never claimed active unless the selected profile binds or bakes them. Real image references require reviewed reference bindings/capabilities and provider artifact IDs.",
+      note: "Quality-specific reviewed workflow profiles bake KSampler steps/CFG/sampler/scheduler/denoise into executable ComfyUI workflows. The managed entry audits prompts before GPU startup and refuses advanced conditioning requests that the selected reviewed workflow/runtime bridge cannot truthfully execute.",
     }),
   );
 
   server.registerTool(
     "run_local_generation_batch",
     {
-      description: "Execute one generic v2 local Art Studio image campaign end-to-end. The managed entrypoint binds the reviewed local quality adapter and catalog, starts an isolated true-core ComfyUI service, runs arbitrary-size chunked generation with selective QA retries, and shuts the owned service down afterward. Requires the trusted local-generation execution profile.",
+      description: "Execute one generic v2 local Art Studio image campaign end-to-end. The managed entrypoint audits prompt/shot quality, binds the reviewed local quality adapter and catalog, validates requested model/LoRA/reference capabilities, starts an isolated true-core ComfyUI service, runs arbitrary-size chunked generation with selective QA retries, and shuts the owned service down afterward. Requires the trusted local-generation execution profile.",
       inputSchema: z.object({ campaign: z.unknown() }),
     },
     async ({ campaign }) => {
