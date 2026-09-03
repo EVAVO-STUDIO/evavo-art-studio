@@ -11,6 +11,7 @@ const required = [
   'scripts/run-local-generation-batch.mjs',
   'scripts/run-local-generation-campaign.mjs',
   'scripts/local-generation-v1-reference-bridge.test.mjs',
+  'scripts/test-local-generation-batch-v2.mjs',
   'scripts/run-local-art-batch-managed.mjs',
   'scripts/run-local-art-batch-entry.mjs',
   'scripts/local-generation-batch-v2.test.mjs',
@@ -31,6 +32,7 @@ const required = [
   'examples/local-generation-batch.template.json',
   'examples/local-generation-batch.sprite-family.json',
   'RUN-LOCAL-ART-BATCH.cmd',
+  'CHECK-LOCAL-ART-BATCH.cmd',
   'docs/LOCAL_GENERATION_BATCH_V2.md',
   'docs/LOCAL_GENERATION_QUALITY_AND_CONTINUITY.md',
   'apps/mcp/src/local-generation-batch-tools.ts',
@@ -49,6 +51,7 @@ for (const relative of [
   'scripts/run-local-generation-batch.mjs',
   'scripts/run-local-generation-campaign.mjs',
   'scripts/local-generation-v1-reference-bridge.test.mjs',
+  'scripts/test-local-generation-batch-v2.mjs',
   'scripts/run-local-art-batch-managed.mjs',
   'scripts/run-local-art-batch-entry.mjs',
   'scripts/local-generation-batch-audit-v2.mjs',
@@ -67,10 +70,12 @@ const compiler = fs.readFileSync(path.join(root, 'scripts/local-generation-batch
 const runner = fs.readFileSync(path.join(root, 'scripts/run-local-generation-batch.mjs'), 'utf8');
 const v1Runner = fs.readFileSync(path.join(root, 'scripts/run-local-generation-campaign.mjs'), 'utf8');
 const v1ReferenceTest = fs.readFileSync(path.join(root, 'scripts/local-generation-v1-reference-bridge.test.mjs'), 'utf8');
+const aggregateRunner = fs.readFileSync(path.join(root, 'scripts/test-local-generation-batch-v2.mjs'), 'utf8');
 const managed = fs.readFileSync(path.join(root, 'scripts/run-local-art-batch-managed.mjs'), 'utf8');
 const entry = fs.readFileSync(path.join(root, 'scripts/run-local-art-batch-entry.mjs'), 'utf8');
 const audit = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-audit-v2.mjs'), 'utf8');
 const cmd = fs.readFileSync(path.join(root, 'RUN-LOCAL-ART-BATCH.cmd'), 'utf8');
+const checkCmd = fs.readFileSync(path.join(root, 'CHECK-LOCAL-ART-BATCH.cmd'), 'utf8');
 const mcp = fs.readFileSync(path.join(root, 'apps/mcp/src/local-generation-batch-tools.ts'), 'utf8');
 const docs = fs.readFileSync(path.join(root, 'docs/LOCAL_GENERATION_BATCH_V2.md'), 'utf8');
 const continuityDocs = fs.readFileSync(path.join(root, 'docs/LOCAL_GENERATION_QUALITY_AND_CONTINUITY.md'), 'utf8');
@@ -104,6 +109,10 @@ for (const token of [
   'requiredCapabilityProfile', 'routeScene', 'runtimeJob', 'maximumReferenceImages',
   'job.payload.references', 'job.inputArtifacts', 'canonical-identity', 'previous-key-pose and next-key-pose',
 ]) assert.equal(v1ReferenceTest.includes(token), true, `V1 reference bridge test lost ${token}`);
+for (const token of [
+  'local-generation-v1-reference-bridge.test.mjs', 'check-local-generation-batch-v2.mjs',
+  'evavo.local-generation-batch-v2-contract-receipt.v1', 'includesDurableV1ReferenceBridge',
+]) assert.equal(aggregateRunner.includes(token), true, `aggregate V2 contract runner lost ${token}`);
 
 for (const token of ['sqlite:///:memory:', '--disable-all-custom-nodes', '--disable-api-nodes', 'CheckpointLoaderSimple', 'KSampler', 'portFree', 'stopProcess']) {
   assert.equal(managed.includes(token), true, `managed launcher lost ${token}`);
@@ -117,6 +126,8 @@ for (const token of ['generic-ai-filler', 'low-shot-specificity', 'duplicate-sho
   assert.equal(audit.includes(token), true, `prompt audit lost ${token}`);
 }
 assert.equal(cmd.includes('run-local-art-batch-entry.mjs'), true, 'CMD launcher no longer uses managed entrypoint');
+assert.equal(checkCmd.includes('test-local-generation-batch-v2.mjs'), true, 'Windows batch checker no longer uses aggregate V2 contract runner');
+assert.equal(checkCmd.includes('EVAVO_LOCAL_ART_BATCH_V2_CONTRACTS_OK'), true, 'Windows batch checker lost success marker');
 
 for (const token of ['local_generation_batch_capabilities', 'run_local_generation_batch', 'managedComfyUiLifecycle', 'run-local-art-batch-entry.mjs']) {
   assert.equal(mcp.includes(token), true, `MCP lost ${token}`);
