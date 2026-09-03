@@ -13,5 +13,5 @@ if errorlevel 1 (
   exit /b 2
 )
 
-node "%ROOT%scripts\run-local-art-batch-managed.mjs" --manifest "%MANIFEST%"
+node "%ROOT%scripts\run-local-art-batch-entry.mjs" --manifest "%MANIFEST%"
 exit /b %ERRORLEVEL%
