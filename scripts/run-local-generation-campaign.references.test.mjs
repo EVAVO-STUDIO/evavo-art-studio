@@ -160,3 +160,12 @@ test('routing rejects a reference-capable profile with an undeclared reference-i
   assert.throws(() => routeScene({ profiles: [profile] }, scene), /no reviewed local ComfyUI profile/u);
 });
 
+test('sprite direction-master may establish the master without a prior canonical identity reference', () => {
+  const input = campaign([]);
+  input.scenes[0].assetKind = 'sprite-frame';
+  input.scenes[0].continuityPhase = 'direction-master';
+  const scene = validateLocalGenerationCampaign(input, {}).scenes[0];
+  assert.equal(scene.continuityPhase, 'direction-master');
+  assert.deepEqual(scene.references, []);
+});
+
