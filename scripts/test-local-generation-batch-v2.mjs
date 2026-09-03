@@ -11,6 +11,7 @@ const nodeTests = [
   'scripts/compile-comfyui-quality-profile-draft.test.mjs',
   'scripts/compile-comfyui-reference-pack-draft.test.mjs',
   'scripts/preflight-comfyui-reference-profile.test.mjs',
+  'scripts/local-generation-managed-runtime-policy-v2.test.mjs',
   'scripts/local-generation-reference-graph-v2.test.mjs',
   'scripts/local-generation-reference-execution-v2.test.mjs',
   'scripts/local-generation-model-plan-v2.test.mjs',
@@ -46,4 +47,5 @@ process.stdout.write(`${JSON.stringify({
   includesDurableV1ReferenceBridge: true,
   includesReferencePackCompiler: true,
   includesLiveReferenceProfilePreflight: true,
+  includesSelectiveManagedReferenceRuntime: true,
 })}\n`);
