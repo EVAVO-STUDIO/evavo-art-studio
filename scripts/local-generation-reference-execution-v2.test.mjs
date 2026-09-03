@@ -26,24 +26,14 @@ function basePlan(mode = 'independent') {
       ],
     },
     frames: [
-      {
-        id: 'anchor', ordinal: 1, candidateCount: 1,
-        shot: {},
-      },
-      {
-        id: 'follow', ordinal: 2, candidateCount: 1,
-        shot: {},
-      },
+      { id: 'anchor', ordinal: 1, candidateCount: 1, shot: {} },
+      { id: 'follow', ordinal: 2, candidateCount: 1, shot: {} },
     ],
   };
 }
 
 function profile({ maximumReferenceImages = 4, capabilities = [] } = {}) {
-  return {
-    profileId: 'reference-test-profile',
-    capabilities,
-    limits: { maximumReferenceImages },
-  };
+  return { profileId: 'reference-test-profile', capabilities, limits: { maximumReferenceImages } };
 }
 
 test('rehydrates authored source-shot references and resolves accepted artifact IDs', () => {
@@ -63,10 +53,7 @@ test('external artifacts resolve without an upstream generation stage', () => {
   const plan = prepareReferenceExecutionPlan({
     mode: 'independent',
     source: { shots: [{ id: 'external', reference_inputs: [{ artifactId: artifactB, role: 'palette-reference', strength: 0.6, required: false }] }] },
-    frames: [{
-      id: 'external', ordinal: 1, candidateCount: 1,
-      shot: {},
-    }],
+    frames: [{ id: 'external', ordinal: 1, candidateCount: 1, shot: {} }],
   });
   const frames = framesForReferenceStage(plan, plan.referenceGraph.stages[0], new Map());
   assert.deepEqual(frames[0].providerReferences, [{ artifactId: artifactB, role: 'palette-reference', strength: 0.6, required: false }]);
@@ -203,7 +190,7 @@ test('reference semantic rules fail closed before provider execution', () => {
 test('V1 durable job builder consumes resolved artifact references instead of dropping them', async () => {
   const source = await readFile(new URL('./run-local-generation-campaign.mjs', import.meta.url), 'utf8');
   assert.match(source, /profile\.limits\.maximumReferenceImages < scene\.references\.length/u);
-  assert.match(source, /inputArtifacts:\s*Object\.freeze\(\[\.\.\.new Set\(references\.map\(\(reference\) => reference\.artifactId\)\)\]\)/u);
-  assert.match(source, /references,\s*\n\s*provider:/u);
-  assert.match(source, /requiredCapabilityProfile:\s*Object\.freeze\(\[\.\.\.route\.requiredCapabilities\]\)/u);
+  assert.match(source, /inputArtifacts:\s*\[\.\.\.new Set\(scene\.references\.map\(\(reference\) => reference\.artifactId\)\)\]/u);
+  assert.match(source, /references:\s*scene\.references/u);
+  assert.match(source, /requiredCapabilityProfile:\s*route\.requiredCapabilities/u);
 });
