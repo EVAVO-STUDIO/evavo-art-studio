@@ -19,6 +19,7 @@ export * from "./book-illustration-intelligence.js";
 export * from "./book-production.js";
 export * from "./book-production-profile.js";
 export * from "./book-production-docs-release.js";
+export * from "./book-production-docs-release-v2.js";
 export * from "./book-production-legacy-illustration-plan.js";
 export * from "./book-production-legacy-compat.js";
 export * from "./book-production-legacy-state-import-safe.js";
