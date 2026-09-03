@@ -4,6 +4,7 @@ import { createReadStream } from 'node:fs';
 import { lstat, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 const INVENTORY_SCHEMA = 'evavo.local-generation-physical-model-inventory.v1';
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
@@ -130,5 +131,5 @@ async function main() {
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
-const direct = process.argv[1] ? path.resolve(process.argv[1]) === new URL(import.meta.url).pathname.replace(/^\/(?:[A-Za-z]:)/u, (value) => value.slice(1)) : false;
+const direct = process.argv[1] ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
 if (direct) main().catch((error) => { process.stderr.write(`${JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) })}\n`); process.exitCode = 2; });
