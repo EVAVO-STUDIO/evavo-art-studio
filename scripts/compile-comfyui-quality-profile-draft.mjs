@@ -2,6 +2,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 const QUALITY_SCHEMA = 'evavo.local-generation-quality-profiles.v2';
 
@@ -68,10 +69,11 @@ async function main() {
   const input = args.get('--input'); const output = args.get('--output');
   if (!input || !output) fail('--input and --output are required');
   const profilesPath = args.get('--profiles') ?? path.resolve('config/local-generation-quality-profiles.v2.json');
-  const result = compileQualityProfiledDraft(await json(input, 'ComfyUI catalog draft'), await json(profilesPath, 'quality profiles'), args.get('--base-profile') ?? null);
+  const profileDocument = await json(profilesPath, 'quality profiles');
+  const result = compileQualityProfiledDraft(await json(input, 'ComfyUI catalog draft'), profileDocument, args.get('--base-profile') ?? null);
   await writeFile(path.resolve(output), `${JSON.stringify(result, null, 2)}\n`, { encoding: 'utf8' });
-  process.stdout.write(`${JSON.stringify({ ok: true, output: path.resolve(output), generatedProfiles: Object.keys((await json(profilesPath, 'quality profiles')).profiles) })}\n`);
+  process.stdout.write(`${JSON.stringify({ ok: true, output: path.resolve(output), generatedProfiles: Object.keys(profileDocument.profiles) })}\n`);
 }
 
-const invoked = process.argv[1] ? path.resolve(process.argv[1]) === new URL(import.meta.url).pathname : false;
+const invoked = process.argv[1] ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
 if (invoked) main().catch((error) => { process.stderr.write(`${JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) })}\n`); process.exitCode = 2; });
