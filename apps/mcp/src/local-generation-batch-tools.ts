@@ -44,7 +44,7 @@ function canonicalLocalEnvironment(): NodeJS.ProcessEnv {
     env.EVAVO_ART_COMFYUI_CATALOG ??= path.join(local, "EVAVO", "AI", "ComfyUI", "catalog.json");
     env.EVAVO_ART_COMFYUI_CATALOG_ROOT ??= path.dirname(env.EVAVO_ART_COMFYUI_CATALOG);
   }
-  env.EVAVO_ART_COMFYUI_BASE_URL ??= "http://127.0.0.1:8192";
+  env.EVAVO_ART_COMFYUI_BASE_URL = "http://127.0.0.1:8192";
   env.EVAVO_ART_COMFYUI_ALLOW_REMOTE = "false";
   env.EVAVO_ART_COMFYUI_DEDICATED_INSTANCE = "true";
   return env;
@@ -63,7 +63,7 @@ function appendBounded(current: Buffer, chunk: Buffer): Buffer {
 
 async function executeBatch(manifestPath: string): Promise<{ stdout: string; stderr: string }> {
   const root = artStudioRoot();
-  const runner = path.join(root, "scripts", "run-local-generation-batch.mjs");
+  const runner = path.join(root, "scripts", "run-local-art-batch-entry.mjs");
   const child = spawn(process.execPath, [runner, "--manifest", manifestPath, "--actor", "art-studio-mcp-batch-v2"], {
     cwd: root,
     env: canonicalLocalEnvironment(),
@@ -77,7 +77,7 @@ async function executeBatch(manifestPath: string): Promise<{ stdout: string; std
   child.stderr.on("data", (chunk: Buffer) => { stderr = appendBounded(stderr, Buffer.from(chunk)); });
   await new Promise<void>((resolve, reject) => {
     child.once("error", reject);
-    child.once("exit", (code) => code === 0 ? resolve() : reject(new Error(`local generation batch exited ${String(code)}: ${stderr.toString("utf8").trim()}`)));
+    child.once("exit", (code) => code === 0 ? resolve() : reject(new Error(`managed local generation batch exited ${String(code)}: ${stderr.toString("utf8").trim()}`)));
   });
   return { stdout: stdout.toString("utf8"), stderr: stderr.toString("utf8") };
 }
@@ -113,19 +113,21 @@ export function registerLocalGenerationBatchTools(server: McpServer): void {
       qa: ["exact-output-count", "file-exists", "non-zero-bytes", "image-signature", "dimensions", "unique-sha256"],
       retries: "shot-selective with deterministic seed bump",
       metadataPerImage: true,
+      managedComfyUiLifecycle: true,
+      machineBinding: "execution manifest forces the owned loopback endpoint/catalog and derives the reviewed quality adapter unless explicitly pinned",
       localOnly: true,
       hostedFallback: false,
       canonicalBaseUrl: "http://127.0.0.1:8192",
       canonicalCatalog: process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "EVAVO", "AI", "ComfyUI", "catalog.json") : null,
       executionEnabled: executionEnabled(),
-      note: "Quality-specific reviewed workflow profiles can bake KSampler steps/CFG/sampler/scheduler/denoise into executable ComfyUI workflows. Dynamic fields are never claimed active unless the selected profile binds or bakes them. Real image references require reviewed reference bindings/capabilities and provider artifact IDs.",
+      note: "Quality-specific reviewed workflow profiles bake KSampler steps/CFG/sampler/scheduler/denoise into executable ComfyUI workflows. Dynamic fields are never claimed active unless the selected profile binds or bakes them. Real image references require reviewed reference bindings/capabilities and provider artifact IDs.",
     }),
   );
 
   server.registerTool(
     "run_local_generation_batch",
     {
-      description: "Execute one generic v2 local Art Studio image campaign end-to-end. Supports arbitrary shot counts, chunking, selective QA retries and consolidated per-image metadata. Requires the trusted local-generation execution profile.",
+      description: "Execute one generic v2 local Art Studio image campaign end-to-end. The managed entrypoint binds the reviewed local quality adapter and catalog, starts an isolated true-core ComfyUI service, runs arbitrary-size chunked generation with selective QA retries, and shuts the owned service down afterward. Requires the trusted local-generation execution profile.",
       inputSchema: z.object({ campaign: z.unknown() }),
     },
     async ({ campaign }) => {
