@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.studio/schemas/local-generation-reference-pack.v1.schema.json",
+  "title": "EVAVO Local Generation Reference Pack v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "packId", "version", "profileSuffix", "capabilities", "maximumReferenceImages", "workflow", "referenceBindings"],
+  "properties": {
+    "schema": { "const": "evavo.local-generation-reference-pack.v1" },
+    "packId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "label": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "description": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "profileSuffix": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+    },
+    "maximumReferenceImages": { "type": "integer", "minimum": 1, "maximum": 16 },
+    "requiredNodeClasses": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["addNodes", "setInputs"],
+      "properties": {
+        "addNodes": {
+          "type": "object",
+          "maxProperties": 256,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["class_type", "inputs"],
+            "properties": {
+              "class_type": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+              "inputs": { "type": "object" },
+              "_meta": {}
+            }
+          }
+        },
+        "setInputs": {
+          "type": "array",
+          "maxItems": 512,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nodeId", "input", "value"],
+            "properties": {
+              "nodeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+              "input": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+              "value": {}
+            }
+          }
+        }
+      }
+    },
+    "referenceBindings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "nodeId", "input"],
+        "properties": {
+          "role": { "enum": ["canonical-identity", "direction-master", "previous-key-pose", "next-key-pose", "base-image", "mask", "pose-control", "edge-control", "depth-control", "palette-reference", "line-reference", "material-reference", "layer-context"] },
+          "nodeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+          "input": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+          "strength": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nodeId", "input"],
+            "properties": {
+              "nodeId": { "type": "string" },
+              "input": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "modelInventory": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "sha256"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "runtimeInventory": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version", "sha256"],
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}
