@@ -37,6 +37,19 @@ function requestRoot(): string {
   return local ? path.join(local, "EVAVO", "ArtStudio", "agent-requests", "batch-v2") : path.resolve(".art-studio", "agent-requests", "batch-v2");
 }
 
+function canonicalLocalEnvironment(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  const local = process.env.LOCALAPPDATA?.trim();
+  if (local) {
+    env.EVAVO_ART_COMFYUI_CATALOG ??= path.join(local, "EVAVO", "AI", "ComfyUI", "catalog.json");
+    env.EVAVO_ART_COMFYUI_CATALOG_ROOT ??= path.dirname(env.EVAVO_ART_COMFYUI_CATALOG);
+  }
+  env.EVAVO_ART_COMFYUI_BASE_URL ??= "http://127.0.0.1:8192";
+  env.EVAVO_ART_COMFYUI_ALLOW_REMOTE = "false";
+  env.EVAVO_ART_COMFYUI_DEDICATED_INSTANCE = "true";
+  return env;
+}
+
 function manifestBytes(value: unknown): Buffer {
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
   if (bytes.length < 1 || bytes.length > MAXIMUM_BATCH_MANIFEST_BYTES) throw new Error(`batch manifest must contain 1 to ${MAXIMUM_BATCH_MANIFEST_BYTES} bytes`);
@@ -53,7 +66,7 @@ async function executeBatch(manifestPath: string): Promise<{ stdout: string; std
   const runner = path.join(root, "scripts", "run-local-generation-batch.mjs");
   const child = spawn(process.execPath, [runner, "--manifest", manifestPath, "--actor", "art-studio-mcp-batch-v2"], {
     cwd: root,
-    env: process.env,
+    env: canonicalLocalEnvironment(),
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
     shell: false,
@@ -96,13 +109,16 @@ export function registerLocalGenerationBatchTools(server: McpServer): void {
       consistencyModes: ["strict", "balanced", "loose"],
       qualityProfiles: ["portrait_high_quality", "sprite_sheet_clean", "concept_art_painterly", "comic_inked", "cinematic_stills", "product_mockups"],
       promptLayers: ["identity", "style", "quality", "continuity", "shot", "negative"],
+      referenceRoles: ["canonical-identity", "direction-master", "previous-key-pose", "next-key-pose", "base-image", "mask", "pose-control", "edge-control", "depth-control", "palette-reference", "line-reference", "material-reference", "layer-context"],
       qa: ["exact-output-count", "file-exists", "non-zero-bytes", "image-signature", "dimensions", "unique-sha256"],
       retries: "shot-selective with deterministic seed bump",
       metadataPerImage: true,
       localOnly: true,
       hostedFallback: false,
+      canonicalBaseUrl: "http://127.0.0.1:8192",
+      canonicalCatalog: process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "EVAVO", "AI", "ComfyUI", "catalog.json") : null,
       executionEnabled: executionEnabled(),
-      note: "Sampling fields are preserved in v2 metadata; only bindings explicitly supported by the selected reviewed ComfyUI profile are active at provider runtime.",
+      note: "Quality-specific reviewed workflow profiles can bake KSampler steps/CFG/sampler/scheduler/denoise into executable ComfyUI workflows. Dynamic fields are never claimed active unless the selected profile binds or bakes them. Real image references require reviewed reference bindings/capabilities and provider artifact IDs.",
     }),
   );
 
