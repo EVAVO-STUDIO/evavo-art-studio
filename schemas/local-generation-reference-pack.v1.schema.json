@@ -30,6 +30,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "loadBuiltinExtras": { "type": "boolean" },
         "customNodeFolders": {
           "type": "array",
           "maxItems": 16,
