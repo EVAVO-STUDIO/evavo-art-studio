@@ -4,7 +4,6 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA = 'evavo.local-generation-ipadapter-runtime.v1';
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const SAFE_FOLDER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
@@ -85,28 +84,30 @@ export function compileIpAdapterReferencePacks(raw) {
     version: runtime.version,
     profileSuffix: `reference-${role}`,
     label: `IP-Adapter ${role}`,
-    description: `Reviewed IP-Adapter conditioning pack for ${role}.`,
+    description: `Reviewed IP-Adapter Plus conditioning pack for ${role}.`,
     capabilities: Object.freeze(['reference-images', ROLE_CAPABILITY[role]]),
     maximumReferenceImages: 1,
-    requiredNodeClasses: Object.freeze(['LoadImage', 'IPAdapterModelLoader', 'CLIPVisionLoader', 'IPAdapterAdvanced']),
+    requiredNodeClasses: Object.freeze(['LoadImage', 'IPAdapterUnifiedLoader', 'IPAdapterAdvanced']),
     runtimePolicy: Object.freeze({
-      loadBuiltinExtras: true,
+      loadBuiltinExtras: false,
       customNodeFolders: Object.freeze([runtime.customNodeFolder]),
     }),
     workflow: Object.freeze({
       addNodes: Object.freeze({
-        '900': Object.freeze({ class_type: 'IPAdapterModelLoader', inputs: Object.freeze({ ipadapter_file: runtime.ipAdapterModel.fileName }) }),
-        '901': Object.freeze({ class_type: 'CLIPVisionLoader', inputs: Object.freeze({ clip_name: runtime.clipVisionModel.fileName }) }),
-        '902': Object.freeze({ class_type: 'LoadImage', inputs: Object.freeze({ image: 'evavo-reference.png' }) }),
-        '903': Object.freeze({
-          class_type: 'IPAdapterAdvanced',
+        '900': Object.freeze({
+          class_type: 'IPAdapterUnifiedLoader',
           inputs: Object.freeze({
             model: Object.freeze([runtime.baseModelNodeId, 0]),
-            ipadapter: Object.freeze(['900', 0]),
-            image: Object.freeze(['902', 0]),
-            image_negative: null,
-            attn_mask: null,
-            clip_vision: Object.freeze(['901', 0]),
+            preset: 'PLUS (high strength)',
+          }),
+        }),
+        '901': Object.freeze({ class_type: 'LoadImage', inputs: Object.freeze({ image: 'evavo-reference.png' }) }),
+        '902': Object.freeze({
+          class_type: 'IPAdapterAdvanced',
+          inputs: Object.freeze({
+            model: Object.freeze(['900', 0]),
+            ipadapter: Object.freeze(['900', 1]),
+            image: Object.freeze(['901', 0]),
             weight: runtime.weight,
             weight_type: runtime.weightType,
             combine_embeds: runtime.combineEmbeds,
@@ -117,15 +118,15 @@ export function compileIpAdapterReferencePacks(raw) {
         }),
       }),
       setInputs: Object.freeze([
-        Object.freeze({ nodeId: runtime.samplerNodeId, input: 'model', value: Object.freeze(['903', 0]) }),
+        Object.freeze({ nodeId: runtime.samplerNodeId, input: 'model', value: Object.freeze(['902', 0]) }),
       ]),
     }),
     referenceBindings: Object.freeze([
       Object.freeze({
         role,
-        nodeId: '902',
+        nodeId: '901',
         input: 'image',
-        strength: Object.freeze({ nodeId: '903', input: 'weight' }),
+        strength: Object.freeze({ nodeId: '902', input: 'weight' }),
       }),
     ]),
     modelInventory: Object.freeze([
