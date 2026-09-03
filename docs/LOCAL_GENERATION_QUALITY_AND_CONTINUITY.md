@@ -67,7 +67,9 @@ Art Studio reference roles include:
 - `material-reference`
 - `layer-context`
 
-A reference in prose is not artifact-conditioned. A shot-to-shot dependency is not artifact-conditioned until the prior accepted candidate becomes a real provider artifact ID and the selected reviewed workflow advertises the matching reference capability/binding.
+A reference in prose is not artifact-conditioned. V2 now executes real reference dependencies stage-by-stage: a source shot must complete QA, expose a valid provider `artifact_<sha256>` ID, and only then can a dependent stage resolve that ID into the durable V1 `scene.references` / runtime `request.references` contract. The selected reviewed workflow must still advertise the required reference capability and reference-image limit. If it does not, the managed entry fails before GPU startup.
+
+The physically commissioned core-SDXL quality profiles should therefore be described as artifact-conditioned only if their current reviewed catalog entries actually advertise and bind the required reference capabilities. The existence of the V2/V1 bridge by itself is not evidence that a specific workflow consumed an image reference.
 
 ## Consistency modes
 
@@ -75,7 +77,7 @@ A reference in prose is not artifact-conditioned. A shot-to-shot dependency is n
 
 Use for sprites, turnarounds, card families, UI portraits and sequences where identity drift is unacceptable.
 
-Strict mode uses stable prompt layers, deterministic related seeds, continuity locks and staged dependency planning. If artifact-conditioned reference capability is available, strict mode should prefer real anchor/reference bindings. If it is not available, Art Studio must report that the run used prompt/seed consistency only.
+Strict mode uses stable prompt layers, deterministic related seeds, continuity locks and staged dependency planning. If artifact-conditioned reference capability is available, strict mode can use real anchor/reference bindings. If it is not available, Art Studio must report that the run used prompt/seed consistency only.
 
 ### balanced
 
@@ -87,9 +89,23 @@ Use for exploration and concept breadth. Loose mode should not be presented as i
 
 ## Reference DAG
 
-The V2 reference graph is a real dependency graph, not prompt decoration. It validates shot dependencies, rejects cycles/missing sources, topologically stages execution and can resolve accepted prior shots to artifact IDs.
+The V2 reference graph is a real dependency graph, not prompt decoration. It validates shot dependencies, rejects cycles/missing sources, topologically stages execution and resolves accepted prior shots to provider artifact IDs.
 
-Execution must fail closed when a required reference role is unsupported by the reviewed provider profile. It must never silently drop a required reference and claim equivalent consistency.
+Execution uses the following handoff:
+
+1. hydrate authored `reference_inputs` / `referenceInputs` from the source manifest;
+2. add automatic anchor dependencies where the generation mode requires them;
+3. validate every effective reference against the selected reviewed provider profile before ComfyUI startup;
+4. execute only the current topological stage;
+5. run physical image QA for that stage;
+6. record accepted provider artifact IDs;
+7. resolve downstream shot references against those accepted IDs;
+8. attach the resolved references to the V1 scene/runtime request;
+9. advance only when the source stage is accepted.
+
+A sequential anchor uses a required `canonical-identity` reference. A sprite anchor uses the same accepted anchor artifact in both required `canonical-identity` and `direction-master` roles so locked sprite frames satisfy both identity and direction continuity contracts.
+
+Execution must fail closed when a required reference role is unsupported, a profile's `maximumReferenceImages` is too small, a required upstream artifact is unavailable, or V1 generation semantics reject the role. It must never silently drop a required reference and claim equivalent consistency.
 
 ## Model and LoRA plan
 
@@ -149,10 +165,11 @@ The normal one-command and MCP paths use the managed true-core ComfyUI lifecycle
 1. create a machine-bound execution manifest while preserving the authored campaign;
 2. bind the canonical local catalog and owned loopback port;
 3. derive the correct reviewed quality adapter when one was not explicitly pinned;
-4. start an isolated true-core ComfyUI process with an in-memory SQLite database;
-5. verify required core generation nodes;
-6. run the V2 batch;
-7. stop only the ComfyUI process owned by that invocation.
+4. audit prompts, model/LoRA requirements and all effective reference dependencies before GPU startup;
+5. start an isolated true-core ComfyUI process with an in-memory SQLite database;
+6. verify required core generation nodes;
+7. run the V2 batch in dependency-safe stages, resolving provider artifact IDs between stages where supported;
+8. stop only the ComfyUI process owned by that invocation.
 
 Hosted fallback remains disabled.
 
@@ -163,7 +180,7 @@ When reporting a result, use the strongest accurate term only:
 - **prompt-only** when only prompts/seed strategy were used;
 - **workflow-baked** when a reviewed quality workflow supplied the setting;
 - **dynamically bound** when a typed runtime binding supplied the setting;
-- **artifact-conditioned** when a real provider artifact reference was consumed;
+- **artifact-conditioned** when a real provider artifact reference was consumed by the reviewed workflow;
 - **LoRA-conditioned** only when a reviewed LoRA loader/profile actually executed.
 
 Never upgrade one class into another in prose just because the intended artistic result looked similar.
