@@ -27,6 +27,20 @@ function hydrateAuthoredReferenceInputs(plan) {
   }));
 }
 
+export function referenceAdapterId(baseAdapterId, references) {
+  if (!references?.length) return baseAdapterId ?? null;
+  if (references.length !== 1) {
+    fail('automatic quality-matched reference routing currently supports exactly one resolved reference per scene');
+  }
+  if (typeof baseAdapterId !== 'string' || !baseAdapterId.startsWith('comfyui:')) {
+    fail('automatic reference routing requires a comfyui: base adapter ID');
+  }
+  if (baseAdapterId.includes('-reference-')) return baseAdapterId;
+  const role = references[0]?.role;
+  if (typeof role !== 'string' || !role) fail('resolved reference is missing its role');
+  return `${baseAdapterId}-reference-${role}`;
+}
+
 export function prepareReferenceExecutionPlan(plan) {
   if (!plan || !Array.isArray(plan.frames)) fail('reference execution requires a compiled batch plan');
   const hydrated = hydrateAuthoredReferenceInputs(plan);
@@ -55,12 +69,16 @@ export function framesForReferenceStage(executionPlan, stageIds, artifactResults
 
 export function attachProviderReferencesToLegacyManifest(manifest, stageFrames) {
   if (!manifest || !Array.isArray(manifest.scenes)) fail('legacy manifest must contain scenes');
-  const referencesByShotId = new Map(stageFrames.map((frame) => [frame.id, frame.providerReferences ?? []]));
+  const framesByShotId = new Map(stageFrames.map((frame) => [frame.id, frame]));
+  const baseAdapterId = manifest.provider?.adapterId ?? null;
   return {
     ...manifest,
     scenes: manifest.scenes.map((scene) => {
-      const references = referencesByShotId.get(scene.id) ?? [];
-      return references.length ? { ...scene, references } : scene;
+      const frame = framesByShotId.get(scene.id);
+      const references = frame?.providerReferences ?? [];
+      if (!references.length) return scene;
+      const adapterId = referenceAdapterId(scene.adapterId ?? baseAdapterId, references);
+      return { ...scene, adapterId, references };
     }),
   };
 }
