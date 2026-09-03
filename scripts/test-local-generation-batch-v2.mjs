@@ -9,6 +9,7 @@ const nodeTests = [
   'scripts/local-generation-batch-v2.test.mjs',
   'scripts/local-generation-batch-audit-v2.test.mjs',
   'scripts/compile-comfyui-quality-profile-draft.test.mjs',
+  'scripts/compile-comfyui-reference-pack-draft.test.mjs',
   'scripts/local-generation-reference-graph-v2.test.mjs',
   'scripts/local-generation-reference-execution-v2.test.mjs',
   'scripts/local-generation-model-plan-v2.test.mjs',
@@ -40,4 +41,5 @@ process.stdout.write(`${JSON.stringify({
   testFiles: nodeTests,
   sourceContract: 'scripts/check-local-generation-batch-v2.mjs',
   includesDurableV1ReferenceBridge: true,
+  includesReferencePackCompiler: true,
 })}\n`);
