@@ -10,7 +10,7 @@ import {
   validateComfyUIWorkflowCatalog,
 } from '../packages/providers/dist/index.js';
 
-const DRAFT_SCHEMA = 'evavo.comfyui-workflow-catalog.draft.v1';
+const DRAFT_SCHEMA = 'evavo.comfyui-workflow-catalog-draft.v1';
 const DEFAULT_ROLES = Object.freeze([
   'base-image',
   'canonical-identity',
@@ -29,7 +29,6 @@ function fail(message) { throw new Error(message); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function safeSuffix(role) { return role.replace(/[^a-z0-9]+/gu, '-').replace(/^-|-$/gu, ''); }
 function unique(values) { return [...new Set(values)].sort(); }
-function isRecord(value) { return Boolean(value) && typeof value === 'object' && !Array.isArray(value); }
 
 function parseArgs(argv) {
   const result = new Map();
