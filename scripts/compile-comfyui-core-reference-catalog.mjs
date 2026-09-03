@@ -13,15 +13,15 @@ import {
 const DRAFT_SCHEMA = 'evavo.comfyui-workflow-catalog-draft.v1';
 const DEFAULT_ROLES = Object.freeze([
   'base-image',
-  'canonical-identity',
   'direction-master',
   'previous-key-pose',
+  'next-key-pose',
 ]);
 const ROLE_CAPABILITY = Object.freeze({
   'base-image': null,
-  'canonical-identity': 'identity-reference',
   'direction-master': 'direction-reference',
   'previous-key-pose': 'temporal-reference',
+  'next-key-pose': 'temporal-reference',
 });
 const MAXIMUM_BYTES = 16 * 1024 * 1024;
 
@@ -72,6 +72,7 @@ function draftProfile(profile) {
     modelInventory: profile.modelInventory,
     runtimeInventory: profile.runtimeInventory,
     limits: profile.limits,
+    ...(profile.runtimePolicy === undefined ? {} : { runtimePolicy: profile.runtimePolicy }),
   };
 }
 
@@ -103,6 +104,7 @@ function bindingValue(profile, name, fallback) {
 function makeReferenceProfile(base, role) {
   if (!base.operations.includes('generate')) fail(`${base.profileId} does not support generate`);
   if (base.bindings?.referenceImages?.length) fail(`${base.profileId} already contains reference-image bindings`);
+  if (!(role in ROLE_CAPABILITY)) fail(`${role} is not an honest core img2img reference role`);
 
   const next = clone(draftProfile(base));
   const [checkpointId] = uniqueNode(next.workflow, 'CheckpointLoaderSimple', base.profileId);
@@ -156,7 +158,7 @@ function makeReferenceProfile(base, role) {
   next.limits = { ...next.limits, maximumCandidates: 1, maximumReferenceImages: 1 };
   next.profileId = `${base.profileId}-reference-${safeSuffix(role)}`;
   next.label = `${base.label} — core ${role} reference`;
-  next.description = `${base.description} Core-only single-image img2img conditioning for ${role}; whole-image latent conditioning, not IP-Adapter or ControlNet feature isolation.`;
+  next.description = `${base.description} Core-only single-image img2img latent conditioning for ${role}; whole-image latent guidance only. It is not IP-Adapter identity conditioning, ControlNet pose/edge/depth conditioning, or feature isolation.`;
   next.version = `${base.version}-reference-${safeSuffix(role)}`;
   next.priority = base.priority - 10;
   return next;
@@ -187,7 +189,7 @@ export function compileCoreReferenceCatalog(input, options = {}) {
   const draft = {
     schemaVersion: DRAFT_SCHEMA,
     catalogId: catalog.catalogId,
-    catalogVersion: `${catalog.catalogVersion}-core-reference-v1`,
+    catalogVersion: `${catalog.catalogVersion}-core-reference-v2`,
     profiles: [
       ...catalog.profiles.map(draftProfile),
       ...additions,
@@ -205,12 +207,13 @@ async function main() {
   const compiled = compileCoreReferenceCatalog(parsed, { roles: args.roles });
   await writeFile(args.output, `${JSON.stringify(compiled, null, 2)}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
   process.stdout.write(`${JSON.stringify({
-    schema: 'evavo.comfyui-core-reference-catalog-compile.v1',
+    schema: 'evavo.comfyui-core-reference-catalog-compile.v2',
     ok: true,
     catalogId: compiled.catalogId,
     catalogVersion: compiled.catalogVersion,
     catalogSha256: compiled.catalogSha256,
     profileCount: compiled.profiles.length,
+    semanticBoundary: 'core img2img only; canonical identity is reserved for reviewed identity conditioning',
     referenceProfiles: compiled.profiles
       .filter((profile) => profile.profileId.includes('-reference-'))
       .map((profile) => ({
@@ -227,6 +230,6 @@ async function main() {
 
 const directlyInvoked = process.argv[1] ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
 if (directlyInvoked) main().catch((error) => {
-  process.stderr.write(`${JSON.stringify({ schema: 'evavo.comfyui-core-reference-catalog-compile.v1', ok: false, error: error instanceof Error ? error.message : String(error) })}\n`);
+  process.stderr.write(`${JSON.stringify({ schema: 'evavo.comfyui-core-reference-catalog-compile.v2', ok: false, error: error instanceof Error ? error.message : String(error) })}\n`);
   process.exitCode = 2;
 });
