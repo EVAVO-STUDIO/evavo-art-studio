@@ -118,6 +118,29 @@ export function hydrateBatchState(state) {
   };
 }
 
+export function invalidateRecoveredExecutionFromStage(referencePlan, frameResults, artifactResults, attempts, firstInvalidStageIndex) {
+  if (!Number.isInteger(firstInvalidStageIndex) || firstInvalidStageIndex < 0 || firstInvalidStageIndex >= referencePlan.referenceGraph.stages.length) {
+    fail('firstInvalidStageIndex is outside the reference stage graph');
+  }
+  const invalidShotIds = new Set();
+  for (let index = firstInvalidStageIndex; index < referencePlan.referenceGraph.stages.length; index += 1) {
+    for (const shotId of referencePlan.referenceGraph.stages[index]) invalidShotIds.add(shotId);
+  }
+  for (const shotId of invalidShotIds) {
+    frameResults.delete(shotId);
+    artifactResults.delete(shotId);
+  }
+  const firstInvalidStageNumber = firstInvalidStageIndex + 1;
+  for (let index = attempts.length - 1; index >= 0; index -= 1) {
+    if (Number(attempts[index]?.stage) >= firstInvalidStageNumber) attempts.splice(index, 1);
+  }
+  return Object.freeze({
+    firstInvalidStageIndex,
+    invalidShotIds: Object.freeze([...invalidShotIds]),
+    remainingAttemptCount: attempts.length,
+  });
+}
+
 export function checkpointBatchState(state, { frameResults, artifactResults, attempts, completedStageCount, status = 'running', failure = null }) {
   const next = clone(state);
   next.updatedAt = new Date().toISOString();
