@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -6,6 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "tools/recover_painted_checkerboard.py"
+sys.path.insert(0, str(MODULE_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("recover_painted_checkerboard", MODULE_PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader
@@ -29,6 +31,9 @@ class PaintedCheckerboardRecoveryTest(unittest.TestCase):
         self.assertEqual(255, alpha.getpixel((45, 35)))
         self.assertGreater(evidence["transparent_fraction"], 0.5)
         self.assertEqual(0, evidence["fringe_removed_pixels"])
+        admission = MODULE.validate_recovered_output(result)
+        self.assertTrue(admission["passed"])
+        self.assertTrue(admission["guarantees"]["paintedGridNeverAcceptedAsAlpha"])
 
     def test_removes_declared_black_matte_without_erasing_black_interior(self) -> None:
         image = Image.new("RGB", (64, 64), (0, 0, 0))

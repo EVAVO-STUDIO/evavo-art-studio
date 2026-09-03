@@ -16,6 +16,11 @@ from pathlib import Path
 
 from PIL import Image
 
+try:
+    from transparency_guard import inspect_transparency
+except ModuleNotFoundError:  # Imported as tools.recover_painted_checkerboard in tests.
+    from tools.transparency_guard import inspect_transparency
+
 
 PROOF_BACKGROUNDS = (
     (0, 0, 0),
@@ -239,6 +244,17 @@ def create_hostile_background_proof(image: Image.Image) -> Image.Image:
     return proof
 
 
+def validate_recovered_output(image: Image.Image) -> dict[str, object]:
+    """Fail closed unless the repaired image now satisfies true-alpha admission."""
+    admission = inspect_transparency(image, policy="required", encoded_has_alpha=True)
+    if not admission["passed"]:
+        raise ValueError(
+            "recovered output failed transparency admission: "
+            + ", ".join(admission["blockers"])
+        )
+    return admission
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=Path)
@@ -288,6 +304,10 @@ def main() -> None:
         args.fringe_threshold, args.fringe_passes, matte, args.min_visible_island,
         args.remove_all_matte, args.despill,
     )
+    try:
+        evidence["transparency_admission"] = validate_recovered_output(output)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     args.output.parent.mkdir(parents=True, exist_ok=True)
     output.save(args.output, optimize=True)
     evidence["source_sha256"] = sha256(source).hexdigest()
