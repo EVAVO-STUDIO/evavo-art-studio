@@ -94,7 +94,7 @@ for (const token of ['Do not claim that a profile value affected provider pixels
 for (const token of ['canonical-identity', 'previous-key-pose', 'pose-control']) {
   assert.equal(referenceGraph.includes(token), true, `reference graph lost ${token}`);
 }
-for (const token of ['lora', 'modelPlanSha256', 'reviewed']) {
+for (const token of ['loras', "createHash('sha256')", 'reviewed provider profile']) {
   assert.equal(modelPlan.toLowerCase().includes(token.toLowerCase()), true, `model plan lost ${token}`);
 }
 for (const token of ['KSampler', 'sampler_name', 'scheduler', 'denoise', 'safeVersion']) {
