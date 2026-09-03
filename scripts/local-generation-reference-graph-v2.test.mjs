@@ -6,10 +6,16 @@ import {
   automaticAnchorReferences,
   buildReferenceGraph,
   normalizeReferenceInputs,
+  requiredReferenceCapabilities,
   resolveProviderReferences,
+  validateProviderReferenceInputs,
 } from './local-generation-reference-graph-v2.mjs';
 
 const artifact = `artifact_${'a'.repeat(64)}`;
+
+function profile(capabilities, maximumReferenceImages = 4) {
+  return { profileId: 'test-profile', capabilities, limits: { maximumReferenceImages } };
+}
 
 test('normalizes real artifact and shot references', () => {
   const refs = normalizeReferenceInputs([
@@ -56,4 +62,49 @@ test('automatic sequential-anchor and sprite modes create real shot dependencies
   assert.equal(sequential[1].shot.referenceInputs[0].role, 'canonical-identity');
   const sprite = automaticAnchorReferences({ mode: 'sprite', frames: [{ id: 'a', shot: {} }, { id: 'b', shot: {} }] });
   assert.equal(sprite[1].shot.referenceInputs[0].role, 'direction-master');
+});
+
+test('derives the same required reference capabilities as V1 routing', () => {
+  const capabilities = requiredReferenceCapabilities([
+    { artifactId: artifact, role: 'canonical-identity', required: true },
+    { sourceShotId: 'anchor', role: 'palette-reference', required: false },
+  ]);
+  assert.deepEqual(capabilities, ['identity-reference', 'multiple-reference-images', 'reference-images']);
+});
+
+test('provider preflight rejects insufficient reference limits and missing role capabilities', () => {
+  const refs = [{ artifactId: artifact, role: 'canonical-identity', required: true }];
+  assert.throws(
+    () => validateProviderReferenceInputs(refs, profile(['reference-images', 'identity-reference'], 0)),
+    /allows 0/u,
+  );
+  assert.throws(
+    () => validateProviderReferenceInputs(refs, profile(['reference-images'], 1)),
+    /identity-reference/u,
+  );
+  assert.doesNotThrow(
+    () => validateProviderReferenceInputs(refs, profile(['reference-images', 'identity-reference'], 1)),
+  );
+});
+
+test('provider preflight mirrors V1 generation semantic reference requirements', () => {
+  assert.throws(
+    () => validateProviderReferenceInputs([{ artifactId: artifact, role: 'mask' }], profile(['reference-images', 'mask'], 1), { operation: 'generate' }),
+    /may not contain mask/u,
+  );
+  assert.throws(
+    () => validateProviderReferenceInputs([{ artifactId: artifact, role: 'direction-master' }], profile(['reference-images', 'direction-reference'], 1), { operation: 'generate', assetKind: 'sprite-frame', continuityPhase: 'key-pose' }),
+    /canonical-identity/u,
+  );
+  const prior = `artifact_${'b'.repeat(64)}`;
+  assert.throws(
+    () => validateProviderReferenceInputs([{ artifactId: artifact, role: 'previous-key-pose' }], profile(['reference-images', 'temporal-reference'], 2), { operation: 'generate', assetKind: 'illustration', continuityPhase: 'in-between' }),
+    /previous-key-pose and next-key-pose/u,
+  );
+  assert.doesNotThrow(
+    () => validateProviderReferenceInputs([
+      { artifactId: artifact, role: 'previous-key-pose' },
+      { artifactId: prior, role: 'next-key-pose' },
+    ], profile(['reference-images', 'multiple-reference-images', 'temporal-reference'], 2), { operation: 'generate', assetKind: 'illustration', continuityPhase: 'in-between' }),
+  );
 });
