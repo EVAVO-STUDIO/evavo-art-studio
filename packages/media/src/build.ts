@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 
 import {
   BackgroundAlphaRecoveryError,
@@ -57,7 +57,7 @@ async function decodeSourceFrame(
   alphaPolicy: SpriteAtlasTransparencyPolicy,
 ): Promise<Readonly<{ frame: DecodedAtlasSourceFrame; admission: FrameTransparencyAdmission }>> {
   const input = await readBoundedFile(inputPath, maximumInputBytes);
-  let metadata: sharp.Metadata;
+  let metadata: Metadata;
   try {
     metadata = await sharp(input, {
       failOn: "error",

@@ -20,3 +20,13 @@ test("router exposes the immutable targeted-repair protocol", () => {
     ),
   );
 });
+
+test("router ignores pnpm's leading argument separator", () => {
+  const result = spawnSync(process.execPath, [router, "--", "repair-protocol"], {
+    encoding: "utf8",
+    shell: false,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.schemaVersion, "1.0");
+});

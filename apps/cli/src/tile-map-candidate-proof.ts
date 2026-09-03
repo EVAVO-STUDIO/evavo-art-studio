@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
+import sharp, { type OverlayOptions } from "sharp";
 
 type JsonObject = Record<string, unknown>;
 
@@ -255,7 +255,7 @@ async function renderFamilyProof(
   const canvasWidth = columns * cellWidth;
   const canvasHeight = rows * cellHeight;
   const checker = checkerboard(canvasWidth, canvasHeight, 8);
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
   const placements: JsonObject[] = [];
 
   for (const [index, candidate] of candidates.entries()) {

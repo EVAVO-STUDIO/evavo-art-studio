@@ -6,6 +6,13 @@ const SPRITE_PLAN_COMMANDS: Readonly<Record<string, string>> = {
   "sprite-plan-compile": "compile",
 };
 
+// pnpm preserves the conventional argument separator when a parent script
+// already ends in `--` (for example `pnpm art -- master-alpha ...`).  Treat it
+// as transport syntax rather than forwarding it to the command parser.
+while (process.argv[2] === "--") {
+  process.argv.splice(2, 1);
+}
+
 const command = process.argv[2];
 const spritePlanAction = command ? SPRITE_PLAN_COMMANDS[command] : undefined;
 
@@ -21,7 +28,7 @@ if (spritePlanAction) {
 } else if (command === "tile-map-provider-batch") {
   await import("./tile-map-provider-batch-cli.js");
 } else if (command === "tile-map-preprovider") {
-  await import("./tile-map-preprovider-cli.js");
+  await import("./tile-map-preprovider-pipeline-cli.js");
 } else if (command === "tile-map-candidate-review") {
   await import("./tile-map-candidate-review-cli.js");
 } else if (command === "tile-map-candidate-qa") {

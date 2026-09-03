@@ -543,10 +543,10 @@ function interiorDifference(
       const a = premultipliedPixel(left.rgba, offset);
       const b = premultipliedPixel(right.rgba, offset);
       const pixelError =
-        (Math.abs(a[0] - b[0]) +
-          Math.abs(a[1] - b[1]) +
-          Math.abs(a[2] - b[2]) +
-          Math.abs(a[3] - b[3])) /
+        (Math.abs(a[0]! - b[0]!) +
+          Math.abs(a[1]! - b[1]!) +
+          Math.abs(a[2]! - b[2]!) +
+          Math.abs(a[3]! - b[3]!)) /
         4;
       error += pixelError;
       if (pixelError > policy.changed_sample_threshold) changed += 1;

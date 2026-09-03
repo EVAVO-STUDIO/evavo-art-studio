@@ -52,6 +52,38 @@ test("chroma spill suppression removes a green provider fringe without changing 
   assert.deepEqual([...output.subarray(12, 16)], [232, 158, 108, 255]);
 });
 
+test("chroma spill suppression removes both channels of a magenta provider fringe", async () => {
+  const candidate = await raster(3, 1, (x) => {
+    if (x === 0) return [220, 12, 218, 128];
+    if (x === 1) return [72, 38, 70, 255];
+    return [178, 132, 96, 255];
+  });
+  const result = await suppressChromaSpill(candidate, {
+    matteColour: "#ff00ff",
+  });
+  const output = await pixels(result.png);
+  assert.ok(output[3] < 80, "strong magenta spill becomes a soft edge");
+  assert.ok(output[0] <= output[1]);
+  assert.ok(output[2] <= output[1]);
+  assert.ok(output[4] <= output[5]);
+  assert.ok(output[6] <= output[5]);
+  assert.deepEqual([...output.subarray(8, 12)], [178, 132, 96, 255]);
+});
+
+test("chroma spill suppression recognises an uneven inferred magenta key", async () => {
+  const candidate = await raster(2, 1, (x) =>
+    x === 0 ? [220, 12, 199, 128] : [178, 132, 96, 255],
+  );
+  const result = await suppressChromaSpill(candidate, {
+    matteColour: "#fd00e4",
+    allowInferredMatte: true,
+  });
+  const output = await pixels(result.png);
+  assert.ok(output[0] <= output[1]);
+  assert.ok(output[2] <= output[1]);
+  assert.deepEqual([...output.subarray(4, 8)], [178, 132, 96, 255]);
+});
+
 test("chroma spill suppression rejects grey and malformed mattes", async () => {
   const candidate = await raster(1, 1, () => [20, 30, 20, 255]);
   await assert.rejects(

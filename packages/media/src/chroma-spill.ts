@@ -149,12 +149,19 @@ export async function suppressChromaSpill(
     .raw()
     .toBuffer({ resolveWithObject: true });
   const data = Buffer.from(decoded.data);
+  const matteMaximum = Math.max(...matte.channels);
+  const matteMinimum = Math.min(...matte.channels);
+  const keyChannels = ([0, 1, 2] as const).filter(
+    (channel) =>
+      matteMaximum - matte.channels[channel] <= 64 &&
+      matte.channels[channel] - matteMinimum >= 140,
+  );
   const others = ([0, 1, 2] as const).filter(
-    (channel) => channel !== matte.dominant,
+    (channel) => !keyChannels.includes(channel),
   );
   const matteRange = Math.max(
     1,
-    matte.channels[matte.dominant] -
+    Math.min(...keyChannels.map((channel) => matte.channels[channel])) -
       Math.max(...others.map((channel) => matte.channels[channel])),
   );
   let inspectedPixels = 0;
@@ -173,17 +180,18 @@ export async function suppressChromaSpill(
       number,
     ];
     if (existingAlpha > 0) inspectedPixels += 1;
+    const neutralLevel = Math.max(
+      ...others.map((channel) => channels[channel]),
+    );
     const rawSpill = Math.max(
       0,
-      channels[matte.dominant] -
-        Math.max(...others.map((channel) => channels[channel])),
+      Math.min(...keyChannels.map((channel) => channels[channel])) -
+        neutralLevel,
     );
     if (existingAlpha <= 0) {
       if (rawSpill <= 0) continue;
       maximumHiddenRgbSpill = Math.max(maximumHiddenRgbSpill, rawSpill);
-      channels[matte.dominant] = Math.max(
-        ...others.map((channel) => channels[channel]),
-      );
+      for (const channel of keyChannels) channels[channel] = neutralLevel;
       data[offset] = channels[0];
       data[offset + 1] = channels[1];
       data[offset + 2] = channels[2];
@@ -210,10 +218,12 @@ export async function suppressChromaSpill(
         (channels[channel] - matte.channels[channel] * (1 - alpha)) / alpha,
       );
     }
-    channels[matte.dominant] = Math.min(
-      channels[matte.dominant],
-      Math.max(...others.map((channel) => channels[channel])),
+    const postUnmixNeutralLevel = Math.max(
+      ...others.map((channel) => channels[channel]),
     );
+    for (const channel of keyChannels) {
+      channels[channel] = Math.min(channels[channel], postUnmixNeutralLevel);
+    }
     data[offset] = channels[0];
     data[offset + 1] = channels[1];
     data[offset + 2] = channels[2];
