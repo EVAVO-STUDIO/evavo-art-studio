@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { constants as fsConstants } from 'node:fs';
-import { access, copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { spawn } from 'node:child_process';
@@ -15,6 +15,12 @@ import {
   imageMetadata,
   validateLocalGenerationBatch,
 } from './local-generation-batch-v2.mjs';
+import {
+  attachProviderReferencesToLegacyManifest,
+  framesForReferenceStage,
+  prepareReferenceExecutionPlan,
+  recordAcceptedArtifactResults,
+} from './local-generation-reference-execution-v2.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LEGACY_RUNNER = path.join(ROOT, 'scripts', 'run-local-generation-campaign.mjs');
@@ -114,23 +120,33 @@ async function qaCandidate(file, expected, outputRules) {
   return { ok: codes.length === 0, codes, bytes: bytes.length, sha256: sha256Bytes(bytes), dimensions: info };
 }
 
-function framesNeedingRetry(plan, frameResults) {
-  const retry = [];
+function framesNeedingRetry(plan, frameResults, targetFrames = plan.frames) {
+  const targetIds = new Set(targetFrames.map((frame) => frame.id));
+  const reasonsById = new Map(targetFrames.map((frame) => [frame.id, []]));
   const seenHashes = new Map();
+
   for (const frame of plan.frames) {
     const result = frameResults.get(frame.id);
-    const expectedCandidates = frame.candidateCount;
-    const reasons = [];
-    if (!result || result.candidates.length < expectedCandidates) reasons.push('missing-candidates');
+    if (targetIds.has(frame.id) && (!result || result.candidates.length < frame.candidateCount)) {
+      reasonsById.get(frame.id).push('missing-candidates');
+    }
     for (const candidate of result?.candidates ?? []) {
-      if (!candidate.qa.ok) reasons.push(...candidate.qa.codes);
+      if (targetIds.has(frame.id) && !candidate.qa.ok) reasonsById.get(frame.id).push(...candidate.qa.codes);
       if (plan.outputRules.requireUniqueHashes && candidate.qa.sha256) {
         const prior = seenHashes.get(candidate.qa.sha256);
-        if (prior && prior !== frame.id) reasons.push('duplicate-hash');
-        else seenHashes.set(candidate.qa.sha256, frame.id);
+        if (prior && prior !== frame.id) {
+          if (targetIds.has(frame.id)) reasonsById.get(frame.id).push('duplicate-hash');
+          else if (targetIds.has(prior)) reasonsById.get(prior).push('duplicate-hash');
+        } else {
+          seenHashes.set(candidate.qa.sha256, frame.id);
+        }
       }
     }
-    const uniqueReasons = [...new Set(reasons)];
+  }
+
+  const retry = [];
+  for (const frame of targetFrames) {
+    const uniqueReasons = [...new Set(reasonsById.get(frame.id) ?? [])];
     const allowed = uniqueReasons.some((reason) =>
       (reason === 'missing-candidates' && plan.retryRules.retryMissing) ||
       (['missing-file', 'not-file', 'zero-bytes', 'invalid-image-signature', 'dimensions-unavailable'].includes(reason) && plan.retryRules.retryInvalidFile) ||
@@ -141,16 +157,17 @@ function framesNeedingRetry(plan, frameResults) {
   return retry;
 }
 
-async function runLegacyAttempt({ plan, frames, attempt, actor, stagingRoot }) {
-  const attemptRoot = path.join(stagingRoot, `attempt-${String(attempt).padStart(2, '0')}`);
+async function runLegacyAttempt({ plan, frames, attempt, actor, stagingRoot, stageIndex }) {
+  const attemptRoot = path.join(stagingRoot, `stage-${String(stageIndex + 1).padStart(3, '0')}`, `attempt-${String(attempt).padStart(2, '0')}`);
   await mkdir(attemptRoot, { recursive: true });
   const manifests = [];
   const receipts = [];
   const chunks = chunkFrames(frames);
   for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
     const chunk = chunks[chunkIndex];
-    const manifest = compileLegacyManifest(plan, chunk, attempt);
-    const chunkCampaignId = `${plan.campaignId}-a${attempt}-c${String(chunkIndex + 1).padStart(2, '0')}`;
+    let manifest = compileLegacyManifest(plan, chunk, attempt);
+    manifest = attachProviderReferencesToLegacyManifest(manifest, chunk);
+    const chunkCampaignId = `${plan.campaignId}-s${String(stageIndex + 1).padStart(3, '0')}-a${attempt}-c${String(chunkIndex + 1).padStart(2, '0')}`;
     manifest.campaignId = chunkCampaignId;
     const manifestPath = path.join(attemptRoot, `chunk-${String(chunkIndex + 1).padStart(3, '0')}.json`);
     await writeJson(manifestPath, manifest);
@@ -158,13 +175,13 @@ async function runLegacyAttempt({ plan, frames, attempt, actor, stagingRoot }) {
     const childOutputRoot = path.join(attemptRoot, 'legacy-runs');
     const execution = await runCaptured(process.execPath, [LEGACY_RUNNER, '--manifest', manifestPath, '--output-root', childOutputRoot, '--actor', actor]);
     const receipt = receiptFromStdout(execution.stdout);
-    if (!receipt) fail(`legacy chunk ${chunkIndex + 1} returned no campaign receipt; exit=${execution.code}; stderr=${execution.stderr.slice(-6000)}`);
+    if (!receipt) fail(`legacy stage ${stageIndex + 1} chunk ${chunkIndex + 1} returned no campaign receipt; exit=${execution.code}; stderr=${execution.stderr.slice(-6000)}`);
     receipts.push(receipt);
   }
-  return { attempt, manifests, receipts };
+  return { stage: stageIndex + 1, attempt, manifests, receipts };
 }
 
-async function collectAttempt(plan, attemptResult, frameResults) {
+async function collectAttempt(plan, attemptResult, frameResults, frames) {
   const routesByShot = new Map();
   const candidatesByShot = new Map();
   for (const receipt of attemptResult.receipts) {
@@ -175,7 +192,7 @@ async function collectAttempt(plan, attemptResult, frameResults) {
       candidatesByShot.set(candidate.sceneId, list);
     }
   }
-  for (const frame of plan.frames) {
+  for (const frame of frames) {
     if (!candidatesByShot.has(frame.id)) continue;
     const expected = {
       width: frame.shot.target?.width ?? plan.quality.width,
@@ -187,7 +204,7 @@ async function collectAttempt(plan, attemptResult, frameResults) {
       const qa = await qaCandidate(source, expected, plan.outputRules);
       evaluated.push({ ...candidate, source, qa, route: routesByShot.get(frame.id) ?? null });
     }
-    frameResults.set(frame.id, { attempt: attemptResult.attempt, candidates: evaluated, route: routesByShot.get(frame.id) ?? null });
+    frameResults.set(frame.id, { attempt: attemptResult.attempt, stage: attemptResult.stage, candidates: evaluated, route: routesByShot.get(frame.id) ?? null });
   }
 }
 
@@ -218,7 +235,7 @@ async function materializeAccepted(plan, frameResults, finalRoot) {
       });
       const metadataPath = path.join(metadataDir, `${fileName}.json`);
       if (plan.outputRules.writeImageMetadata) await writeJson(metadataPath, metadata, true);
-      result.push({ shotId: frame.id, fileName, path: target, metadataPath: plan.outputRules.writeImageMetadata ? metadataPath : null, sha256: candidate.qa.sha256, bytes: candidate.qa.bytes, dimensions: candidate.qa.dimensions, attempt: frameResult.attempt });
+      result.push({ shotId: frame.id, fileName, path: target, metadataPath: plan.outputRules.writeImageMetadata ? metadataPath : null, sha256: candidate.qa.sha256, bytes: candidate.qa.bytes, dimensions: candidate.qa.dimensions, attempt: frameResult.attempt, stage: frameResult.stage });
     }
   }
   return result;
@@ -229,8 +246,9 @@ export async function runLocalGenerationBatch(argv = process.argv.slice(2)) {
   const manifestPath = path.resolve(args.get('--manifest') ?? path.join(ROOT, 'examples', 'local-generation-batch.template.json'));
   const sourceManifest = await readJson(manifestPath, 'batch manifest');
   if (sourceManifest.schema !== LOCAL_GENERATION_BATCH_SCHEMA) fail(`batch manifest must use ${LOCAL_GENERATION_BATCH_SCHEMA}`);
-  const validated = validateLocalGenerationBatch(sourceManifest);
+  validateLocalGenerationBatch(sourceManifest);
   const plan = compileBatchPlan(sourceManifest);
+  const referencePlan = prepareReferenceExecutionPlan(plan);
   const actor = args.get('--actor') ?? process.env.EVAVO_ART_ACTOR ?? 'local-generation-batch-v2';
   const startedAt = new Date().toISOString();
   const runId = `${startedAt.replace(/[:.]/gu, '-')}-${sha256Bytes(Buffer.from(JSON.stringify(sourceManifest))).slice(0, 12)}`;
@@ -241,34 +259,60 @@ export async function runLocalGenerationBatch(argv = process.argv.slice(2)) {
   await writeJson(path.join(finalRoot, 'plan.json'), {
     schema: 'evavo.local-generation-batch-plan.v2', campaignId: plan.campaignId, batchSize: plan.batchSize,
     generationMode: plan.mode, consistencyMode: plan.consistencyMode, qualityProfile: plan.qualityProfile,
-    frames: plan.frames.map((frame) => ({ ordinal: frame.ordinal, id: frame.id, prompt: frame.prompt, seed: frame.seed, candidateCount: frame.candidateCount, continuityPhase: frame.continuityPhase, quality: frame.quality, references: frame.references })),
+    referenceInputCount: referencePlan.referenceInputCount,
+    referenceStages: referencePlan.referenceGraph.stages,
+    frames: referencePlan.frames.map((frame) => ({
+      ordinal: frame.ordinal, id: frame.id, prompt: frame.prompt, seed: frame.seed, candidateCount: frame.candidateCount,
+      continuityPhase: frame.continuityPhase, quality: frame.quality, references: frame.references,
+      referenceInputs: frame.shot?.referenceInputs ?? [],
+    })),
   }, true);
 
   const frameResults = new Map();
+  const artifactResults = new Map();
   const attempts = [];
-  let pending = [...plan.frames];
-  for (let attempt = 1; attempt <= plan.retryRules.maxShotAttempts && pending.length; attempt += 1) {
-    const attemptResult = await runLegacyAttempt({ plan, frames: pending, attempt, actor, stagingRoot });
-    attempts.push(attemptResult);
-    await collectAttempt(plan, attemptResult, frameResults);
-    const retry = framesNeedingRetry(plan, frameResults);
-    const retryIds = new Set(retry.map((item) => item.frame.id));
-    pending = plan.frames.filter((frame) => retryIds.has(frame.id));
-    await writeJson(path.join(finalRoot, `qa-attempt-${String(attempt).padStart(2, '0')}.json`), {
-      schema: 'evavo.local-generation-batch-qa-attempt.v2', attempt,
-      retry: retry.map((item) => ({ shotId: item.frame.id, reasons: item.reasons })),
-      completedShotIds: plan.frames.filter((frame) => frameResults.has(frame.id) && !retryIds.has(frame.id)).map((frame) => frame.id),
-    });
+  let stageFailure = null;
+
+  for (let stageIndex = 0; stageIndex < referencePlan.referenceGraph.stages.length; stageIndex += 1) {
+    const stageIds = referencePlan.referenceGraph.stages[stageIndex];
+    const stageFrames = framesForReferenceStage(referencePlan, stageIds, artifactResults);
+    let pending = [...stageFrames];
+
+    for (let attempt = 1; attempt <= plan.retryRules.maxShotAttempts && pending.length; attempt += 1) {
+      const attemptResult = await runLegacyAttempt({ plan, frames: pending, attempt, actor, stagingRoot, stageIndex });
+      attempts.push(attemptResult);
+      await collectAttempt(plan, attemptResult, frameResults, pending);
+      const retry = framesNeedingRetry(plan, frameResults, stageFrames);
+      const retryIds = new Set(retry.map((item) => item.frame.id));
+      pending = stageFrames.filter((frame) => retryIds.has(frame.id));
+      await writeJson(path.join(finalRoot, `qa-stage-${String(stageIndex + 1).padStart(3, '0')}-attempt-${String(attempt).padStart(2, '0')}.json`), {
+        schema: 'evavo.local-generation-batch-qa-attempt.v2', stage: stageIndex + 1, attempt,
+        retry: retry.map((item) => ({ shotId: item.frame.id, reasons: item.reasons })),
+        completedShotIds: stageFrames.filter((frame) => frameResults.has(frame.id) && !retryIds.has(frame.id)).map((frame) => frame.id),
+      });
+    }
+
+    const remaining = framesNeedingRetry(plan, frameResults, stageFrames);
+    const missing = stageFrames.filter((frame) => !frameResults.has(frame.id)).map((frame) => frame.id);
+    if (remaining.length || missing.length) {
+      stageFailure = {
+        stage: stageIndex + 1,
+        remaining: remaining.map((item) => ({ shotId: item.frame.id, reasons: item.reasons })),
+        missing,
+      };
+      break;
+    }
+    recordAcceptedArtifactResults(stageFrames, frameResults, artifactResults);
   }
 
-  const remaining = framesNeedingRetry(plan, frameResults);
+  const remaining = framesNeedingRetry(plan, frameResults, plan.frames);
   const missing = plan.frames.filter((frame) => !frameResults.has(frame.id)).map((frame) => frame.id);
   let outputs = [];
   let status = 'succeeded';
-  let failure = null;
-  if (remaining.length || missing.length) {
+  let failure = stageFailure;
+  if (stageFailure || remaining.length || missing.length) {
     status = 'failed';
-    failure = { remaining: remaining.map((item) => ({ shotId: item.frame.id, reasons: item.reasons })), missing };
+    failure ??= { remaining: remaining.map((item) => ({ shotId: item.frame.id, reasons: item.reasons })), missing };
   } else {
     outputs = await materializeAccepted(plan, frameResults, finalRoot);
     const expectedImages = plan.frames.reduce((sum, frame) => sum + frame.candidateCount, 0);
@@ -283,7 +327,16 @@ export async function runLocalGenerationBatch(argv = process.argv.slice(2)) {
     expectedImages: plan.frames.reduce((sum, frame) => sum + frame.candidateCount, 0), actualImages: outputs.length,
     generationMode: plan.mode, consistencyMode: plan.consistencyMode, qualityProfile: plan.qualityProfile,
     retryRules: plan.retryRules, outputRules: plan.outputRules,
-    attempts: attempts.map((attempt) => ({ attempt: attempt.attempt, chunks: attempt.receipts.length, childCampaignIds: attempt.receipts.map((receipt) => receipt.campaignId), childRunIds: attempt.receipts.map((receipt) => receipt.runId) })),
+    referenceExecution: {
+      referenceInputCount: referencePlan.referenceInputCount,
+      stages: referencePlan.referenceGraph.stages,
+      resolvedArtifactCandidatesByShot: Object.fromEntries([...artifactResults.entries()]),
+    },
+    attempts: attempts.map((attempt) => ({
+      stage: attempt.stage, attempt: attempt.attempt, chunks: attempt.receipts.length,
+      childCampaignIds: attempt.receipts.map((receipt) => receipt.campaignId),
+      childRunIds: attempt.receipts.map((receipt) => receipt.runId),
+    })),
     outputs,
     failure,
     localOnly: true,
