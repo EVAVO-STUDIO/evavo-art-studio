@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.local/contracts/local-generation-batch-v2.schema.json",
+  "title": "EVAVO Local Generation Batch V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "campaignId", "batch_size", "character", "style", "shots"],
+  "properties": {
+    "schema": { "const": "evavo.local-generation-batch.v2" },
+    "campaignId": { "$ref": "#/$defs/safeId" },
+    "contentClass": { "enum": ["general", "mature-nonexplicit"] },
+    "batch_size": { "type": "integer", "minimum": 1, "maximum": 2000 },
+    "generation_mode": { "enum": ["independent", "sequential-anchor", "paired", "repair", "variation", "sprite"] },
+    "consistency_mode": { "enum": ["strict", "balanced", "loose"] },
+    "quality_profile": { "enum": ["portrait_high_quality", "sprite_sheet_clean", "concept_art_painterly", "comic_inked", "cinematic_stills", "product_mockups"] },
+    "quality_overrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer", "minimum": 64, "maximum": 4096 },
+        "height": { "type": "integer", "minimum": 64, "maximum": 4096 },
+        "steps": { "type": "integer", "minimum": 1, "maximum": 150 },
+        "cfg": { "type": "number", "minimum": 0, "maximum": 30 },
+        "sampler": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "scheduler": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "denoise": { "type": "number", "minimum": 0, "maximum": 1 },
+        "hiresScale": { "type": "number", "minimum": 1, "maximum": 4 },
+        "faceDetailPass": { "type": "boolean" },
+        "outputFormat": { "enum": ["png", "jpeg", "webp"] }
+      }
+    },
+    "character": { "$ref": "#/$defs/character" },
+    "style": { "$ref": "#/$defs/style" },
+    "continuity_locks": { "$ref": "#/$defs/stringArray" },
+    "quality_prompt": { "$ref": "#/$defs/stringArray" },
+    "negative": { "$ref": "#/$defs/stringArray" },
+    "seed_strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "stride": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+      }
+    },
+    "output_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exactCount": { "type": "boolean" },
+        "requireUniqueHashes": { "type": "boolean" },
+        "requireNonZeroBytes": { "type": "boolean" },
+        "requireDimensions": { "type": "boolean" },
+        "writeImageMetadata": { "type": "boolean" },
+        "preserveAttempts": { "type": "boolean" }
+      }
+    },
+    "retry_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxShotAttempts": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "retryMissing": { "type": "boolean" },
+        "retryInvalidFile": { "type": "boolean" },
+        "retryDimensionMismatch": { "type": "boolean" },
+        "retryDuplicate": { "type": "boolean" },
+        "seedBump": { "type": "integer", "minimum": 1, "maximum": 10000000 }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseUrl": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "catalogPath": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "adapterId": { "type": "string", "pattern": "^comfyui:" }
+      }
+    },
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2000,
+      "items": { "$ref": "#/$defs/shot" }
+    }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "safeText": { "type": "string", "minLength": 1, "maxLength": 12000 },
+    "stringArray": { "type": "array", "maxItems": 128, "items": { "type": "string", "minLength": 1, "maxLength": 2048 } },
+    "character": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "$ref": "#/$defs/safeId" },
+        "minimumAge": { "type": "integer", "minimum": 18, "maximum": 130 },
+        "description": { "$ref": "#/$defs/safeText" },
+        "face": { "$ref": "#/$defs/safeText" },
+        "hair": { "$ref": "#/$defs/safeText" },
+        "build": { "$ref": "#/$defs/safeText" },
+        "costume": { "$ref": "#/$defs/safeText" },
+        "palette": { "$ref": "#/$defs/stringArray" },
+        "signatureDetails": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "description": { "$ref": "#/$defs/safeText" },
+        "medium": { "$ref": "#/$defs/safeText" },
+        "period": { "$ref": "#/$defs/safeText" },
+        "lighting": { "$ref": "#/$defs/safeText" },
+        "palette": { "$ref": "#/$defs/stringArray" },
+        "materials": { "$ref": "#/$defs/stringArray" },
+        "lineTreatment": { "$ref": "#/$defs/stringArray" },
+        "mustHave": { "$ref": "#/$defs/stringArray" },
+        "mustAvoid": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer", "minimum": 64, "maximum": 4096 },
+        "height": { "type": "integer", "minimum": 64, "maximum": 4096 },
+        "transparency": { "enum": ["opaque", "preferred", "required"] },
+        "outputFormat": { "enum": ["png", "jpeg", "webp"] }
+      }
+    },
+    "shot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "$ref": "#/$defs/safeId" },
+        "description": { "$ref": "#/$defs/safeText" },
+        "prompt": { "$ref": "#/$defs/safeText" },
+        "pose": { "$ref": "#/$defs/safeText" },
+        "camera": { "$ref": "#/$defs/safeText" },
+        "expression": { "$ref": "#/$defs/safeText" },
+        "outfitState": { "$ref": "#/$defs/safeText" },
+        "background": { "$ref": "#/$defs/safeText" },
+        "framing": { "$ref": "#/$defs/safeText" },
+        "mustInclude": { "$ref": "#/$defs/stringArray" },
+        "mustAvoid": { "$ref": "#/$defs/stringArray" },
+        "continuityLocks": { "$ref": "#/$defs/stringArray" },
+        "references": { "$ref": "#/$defs/stringArray" },
+        "seed": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "candidateCount": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "assetKind": { "enum": ["sprite-frame", "sprite-layer", "environment", "effect", "ui", "illustration", "print"] },
+        "continuityPhase": { "enum": ["identity-master", "direction-master", "key-pose", "in-between", "repair", "independent"] },
+        "target": { "$ref": "#/$defs/target" },
+        "tags": { "$ref": "#/$defs/stringArray" }
+      }
+    }
+  }
+}
