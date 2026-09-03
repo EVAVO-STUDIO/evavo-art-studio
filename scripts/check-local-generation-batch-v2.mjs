@@ -20,6 +20,8 @@ const required = [
   'scripts/compile-comfyui-quality-catalog.mjs',
   'scripts/local-generation-reference-graph-v2.mjs',
   'scripts/local-generation-reference-graph-v2.test.mjs',
+  'scripts/local-generation-reference-execution-v2.mjs',
+  'scripts/local-generation-reference-execution-v2.test.mjs',
   'scripts/local-generation-model-plan-v2.mjs',
   'scripts/local-generation-model-plan-v2.test.mjs',
   'schemas/local-generation-batch.v2.schema.json',
@@ -50,6 +52,7 @@ for (const relative of [
   'scripts/decompile-comfyui-workflow-catalog.mjs',
   'scripts/compile-comfyui-quality-catalog.mjs',
   'scripts/local-generation-reference-graph-v2.mjs',
+  'scripts/local-generation-reference-execution-v2.mjs',
   'scripts/local-generation-model-plan-v2.mjs',
 ]) {
   const check = spawnSync(process.execPath, ['--check', path.join(root, relative)], { cwd: root, encoding: 'utf8', shell: false, windowsHide: true });
@@ -66,6 +69,7 @@ const mcp = fs.readFileSync(path.join(root, 'apps/mcp/src/local-generation-batch
 const docs = fs.readFileSync(path.join(root, 'docs/LOCAL_GENERATION_BATCH_V2.md'), 'utf8');
 const continuityDocs = fs.readFileSync(path.join(root, 'docs/LOCAL_GENERATION_QUALITY_AND_CONTINUITY.md'), 'utf8');
 const referenceGraph = fs.readFileSync(path.join(root, 'scripts/local-generation-reference-graph-v2.mjs'), 'utf8');
+const referenceExecution = fs.readFileSync(path.join(root, 'scripts/local-generation-reference-execution-v2.mjs'), 'utf8');
 const modelPlan = fs.readFileSync(path.join(root, 'scripts/local-generation-model-plan-v2.mjs'), 'utf8');
 const qualityCompiler = fs.readFileSync(path.join(root, 'scripts/compile-comfyui-quality-profile-draft.mjs'), 'utf8');
 const qualityCatalogCompiler = fs.readFileSync(path.join(root, 'scripts/compile-comfyui-quality-catalog.mjs'), 'utf8');
@@ -78,15 +82,20 @@ for (const token of [
   'sequential-anchor', 'paired', 'repair', 'variation', 'sprite', 'promptSha256', 'negativePromptSha256',
 ]) assert.equal(compiler.includes(token), true, `compiler lost ${token}`);
 
-for (const token of ['framesNeedingRetry', 'duplicate-hash', 'dimension-mismatch', 'qaCandidate', 'materializeAccepted', 'evavo.local-generation-batch-receipt.v2', 'metadata', 'webpDimensions']) {
-  assert.equal(runner.includes(token), true, `runner lost ${token}`);
-}
+for (const token of [
+  'framesNeedingRetry', 'duplicate-hash', 'dimension-mismatch', 'qaCandidate', 'materializeAccepted',
+  'evavo.local-generation-batch-receipt.v2', 'metadata', 'webpDimensions',
+  'prepareReferenceExecutionPlan', 'framesForReferenceStage', 'recordAcceptedArtifactResults',
+  'attachProviderReferencesToLegacyManifest', 'referenceExecution', 'resolvedArtifactCandidatesByShot',
+]) assert.equal(runner.includes(token), true, `runner lost ${token}`);
 for (const token of ['sqlite:///:memory:', '--disable-all-custom-nodes', '--disable-api-nodes', 'CheckpointLoaderSimple', 'KSampler', 'portFree', 'stopProcess']) {
   assert.equal(managed.includes(token), true, `managed launcher lost ${token}`);
 }
-for (const token of ['manifest.source.json', 'manifest.execution.json', 'prompt-plan-audit.json', 'provider-selection.json', 'qualityAdapter', 'catalogPath', 'adapterId', 'run-local-art-batch-managed.mjs']) {
-  assert.equal(entry.includes(token), true, `managed entry lost ${token}`);
-}
+for (const token of [
+  'manifest.source.json', 'manifest.execution.json', 'prompt-plan-audit.json', 'provider-selection.json',
+  'qualityAdapter', 'catalogPath', 'adapterId', 'run-local-art-batch-managed.mjs',
+  'prepareReferenceExecutionPlan', 'validateProviderReferenceInputs', 'referenceExecutionBridge',
+]) assert.equal(entry.includes(token), true, `managed entry lost ${token}`);
 for (const token of ['generic-ai-filler', 'low-shot-specificity', 'duplicate-shot-prompt', 'identity-layer-drift', 'campaign-prompt-collapse']) {
   assert.equal(audit.includes(token), true, `prompt audit lost ${token}`);
 }
@@ -98,9 +107,14 @@ for (const token of ['local_generation_batch_capabilities', 'run_local_generatio
 for (const token of ['Do not claim that a profile value affected provider pixels', 'Reference and anchor evidence', '2,000 shots']) {
   assert.equal(docs.includes(token), true, `docs lost ${token}`);
 }
-for (const token of ['canonical-identity', 'previous-key-pose', 'pose-control']) {
-  assert.equal(referenceGraph.includes(token), true, `reference graph lost ${token}`);
-}
+for (const token of [
+  'canonical-identity', 'previous-key-pose', 'pose-control', 'maximumReferenceImages',
+  'requiredReferenceCapabilities', 'validateProviderReferenceInputs', 'direction-reference', 'layer-context-reference',
+]) assert.equal(referenceGraph.includes(token), true, `reference graph lost ${token}`);
+for (const token of [
+  'hydrateAuthoredReferenceInputs', 'automaticAnchorReferences', 'resolveProviderReferences',
+  'attachProviderReferencesToLegacyManifest', 'recordAcceptedArtifactResults', 'ARTIFACT_ID',
+]) assert.equal(referenceExecution.includes(token), true, `reference execution bridge lost ${token}`);
 for (const token of ['loras', "createHash('sha256')", 'reviewed provider profile']) {
   assert.equal(modelPlan.toLowerCase().includes(token.toLowerCase()), true, `model plan lost ${token}`);
 }
