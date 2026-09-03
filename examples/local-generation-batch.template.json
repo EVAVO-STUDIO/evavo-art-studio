@@ -1,0 +1,124 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "example-character-sequence",
+  "contentClass": "general",
+  "batch_size": 4,
+  "generation_mode": "sequential-anchor",
+  "consistency_mode": "strict",
+  "quality_profile": "cinematic_stills",
+  "quality_overrides": {
+    "width": 1024,
+    "height": 1024,
+    "steps": 36,
+    "cfg": 5.5,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "denoise": 1,
+    "outputFormat": "png"
+  },
+  "character": {
+    "id": "example-character",
+    "description": "A clearly designed recurring game character with a distinctive face, silhouette and physical proportions",
+    "face": "specific facial geometry that must remain recognizably identical across the sequence",
+    "hair": "distinctive hairstyle with stable length, shape and colour",
+    "build": "stable body proportions and silhouette across every shot",
+    "costume": "the campaign default costume unless a shot explicitly changes it",
+    "palette": ["campaign-defined primary colour", "campaign-defined secondary colour"],
+    "signatureDetails": ["preserve character-defining details", "do not redesign the subject between shots"]
+  },
+  "style": {
+    "name": "project-production-art",
+    "description": "Specific authored game production art with intentional composition, physical materials and coherent art direction rather than generic AI illustration",
+    "medium": "campaign-defined production illustration",
+    "period": "follow the project's actual visual world and era",
+    "lighting": "motivated scene lighting with readable forms and purposeful contrast",
+    "palette": ["coherent project palette"],
+    "materials": ["physically coherent materials", "specific surface wear where appropriate"],
+    "lineTreatment": ["controlled edges", "intentional detail hierarchy"],
+    "mustHave": ["specific design choices", "clear focal hierarchy", "natural anatomy", "credible scene construction"],
+    "mustAvoid": ["generic AI look", "random decorative clutter", "plastic skin", "melted anatomy", "meaningless micro-detail", "stock-photo composition"]
+  },
+  "continuity_locks": [
+    "keep face geometry stable",
+    "keep hair design stable",
+    "keep body proportions stable",
+    "keep recurring costume construction stable unless the shot explicitly changes it",
+    "do not silently redesign props or environment anchors"
+  ],
+  "quality_prompt": [
+    "production-ready authored composition",
+    "specific rather than generic design",
+    "strong silhouette and readable gesture"
+  ],
+  "negative": [
+    "AI-generated text artifacts",
+    "duplicate limbs",
+    "extra fingers",
+    "unmotivated glow",
+    "generic influencer face"
+  ],
+  "seed_strategy": {
+    "base": 187100,
+    "stride": 1
+  },
+  "output_rules": {
+    "exactCount": true,
+    "requireUniqueHashes": true,
+    "requireNonZeroBytes": true,
+    "requireDimensions": true,
+    "writeImageMetadata": true,
+    "preserveAttempts": false
+  },
+  "retry_rules": {
+    "maxShotAttempts": 3,
+    "retryMissing": true,
+    "retryInvalidFile": true,
+    "retryDimensionMismatch": true,
+    "retryDuplicate": true,
+    "seedBump": 1009
+  },
+  "provider": {
+    "baseUrl": "http://127.0.0.1:8192",
+    "catalogPath": "C:\\Users\\User\\AppData\\Local\\EVAVO\\AI\\ComfyUI\\catalog.json",
+    "adapterId": "comfyui:sdxl-base-local"
+  },
+  "shots": [
+    {
+      "id": "001-anchor-front",
+      "description": "Primary identity anchor image establishing the definitive character design",
+      "pose": "relaxed standing pose with clear readable silhouette",
+      "camera": "eye-level three-quarter portrait with natural perspective",
+      "expression": "neutral confident expression",
+      "background": "simple project-appropriate environment with minimal distractions",
+      "framing": "full figure with comfortable margins",
+      "continuityLocks": ["this shot establishes the identity anchor for later shots"]
+    },
+    {
+      "id": "002-standing-side",
+      "description": "Same character seen from a controlled side angle",
+      "pose": "standing side pose preserving the same proportions",
+      "camera": "eye-level side view",
+      "expression": "same personality, subtly attentive",
+      "background": "same environment family as the anchor",
+      "framing": "full figure with the same scale as the anchor"
+    },
+    {
+      "id": "003-seated",
+      "description": "Same character seated naturally without changing identity or costume construction",
+      "pose": "natural seated pose with believable weight distribution",
+      "camera": "eye-level medium-full shot",
+      "expression": "relaxed",
+      "background": "same environment family",
+      "framing": "character remains the clear focal point"
+    },
+    {
+      "id": "004-action",
+      "description": "Same character performing a project-specific action while retaining the established identity",
+      "pose": "dynamic readable action pose with correct anatomy",
+      "camera": "slightly wider cinematic angle",
+      "expression": "focused",
+      "background": "same world and visual language",
+      "framing": "leave clear action space in the direction of movement"
+    }
+  ]
+}
