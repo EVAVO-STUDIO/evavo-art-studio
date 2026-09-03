@@ -9,6 +9,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const required = [
   'scripts/local-generation-batch-v2.mjs',
   'scripts/run-local-generation-batch.mjs',
+  'scripts/run-local-generation-campaign.mjs',
+  'scripts/local-generation-v1-reference-bridge.test.mjs',
   'scripts/run-local-art-batch-managed.mjs',
   'scripts/run-local-art-batch-entry.mjs',
   'scripts/local-generation-batch-v2.test.mjs',
@@ -45,6 +47,8 @@ for (const relative of required) {
 for (const relative of [
   'scripts/local-generation-batch-v2.mjs',
   'scripts/run-local-generation-batch.mjs',
+  'scripts/run-local-generation-campaign.mjs',
+  'scripts/local-generation-v1-reference-bridge.test.mjs',
   'scripts/run-local-art-batch-managed.mjs',
   'scripts/run-local-art-batch-entry.mjs',
   'scripts/local-generation-batch-audit-v2.mjs',
@@ -61,6 +65,8 @@ for (const relative of [
 
 const compiler = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-v2.mjs'), 'utf8');
 const runner = fs.readFileSync(path.join(root, 'scripts/run-local-generation-batch.mjs'), 'utf8');
+const v1Runner = fs.readFileSync(path.join(root, 'scripts/run-local-generation-campaign.mjs'), 'utf8');
+const v1ReferenceTest = fs.readFileSync(path.join(root, 'scripts/local-generation-v1-reference-bridge.test.mjs'), 'utf8');
 const managed = fs.readFileSync(path.join(root, 'scripts/run-local-art-batch-managed.mjs'), 'utf8');
 const entry = fs.readFileSync(path.join(root, 'scripts/run-local-art-batch-entry.mjs'), 'utf8');
 const audit = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-audit-v2.mjs'), 'utf8');
@@ -88,6 +94,17 @@ for (const token of [
   'prepareReferenceExecutionPlan', 'framesForReferenceStage', 'recordAcceptedArtifactResults',
   'attachProviderReferencesToLegacyManifest', 'referenceExecution', 'resolvedArtifactCandidatesByShot',
 ]) assert.equal(runner.includes(token), true, `runner lost ${token}`);
+
+for (const token of [
+  'PROVIDER_REFERENCE_CAPABILITY_REQUIREMENTS', 'maximumReferenceImages',
+  'references: scene.references', 'inputArtifacts: [...new Set(scene.references.map((reference) => reference.artifactId))]',
+  'continuity-locked sprite work requires canonical-identity', 'in-between work requires previous-key-pose and next-key-pose',
+]) assert.equal(v1Runner.includes(token), true, `V1 reference bridge lost ${token}`);
+for (const token of [
+  'requiredCapabilityProfile', 'routeScene', 'runtimeJob', 'maximumReferenceImages',
+  'job.payload.references', 'job.inputArtifacts', 'canonical-identity', 'previous-key-pose and next-key-pose',
+]) assert.equal(v1ReferenceTest.includes(token), true, `V1 reference bridge test lost ${token}`);
+
 for (const token of ['sqlite:///:memory:', '--disable-all-custom-nodes', '--disable-api-nodes', 'CheckpointLoaderSimple', 'KSampler', 'portFree', 'stopProcess']) {
   assert.equal(managed.includes(token), true, `managed launcher lost ${token}`);
 }
