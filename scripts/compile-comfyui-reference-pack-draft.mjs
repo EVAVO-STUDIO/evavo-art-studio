@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const PACK_SCHEMA = 'evavo.local-generation-reference-pack.v1';
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const SAFE_CUSTOM_NODE_FOLDER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const REFERENCE_ROLES = new Set([
   'canonical-identity', 'direction-master', 'previous-key-pose', 'next-key-pose',
@@ -48,6 +49,19 @@ function inventory(value, label, runtime = false) {
   });
   uniqueBy(result, 'id', label);
   return result;
+}
+function runtimePolicy(value) {
+  const policy = value == null ? {} : object(value, 'runtimePolicy');
+  const loadBuiltinExtras = policy.loadBuiltinExtras === undefined ? true : policy.loadBuiltinExtras;
+  if (typeof loadBuiltinExtras !== 'boolean') fail('runtimePolicy.loadBuiltinExtras must be a boolean');
+  const customNodeFolders = policy.customNodeFolders ?? [];
+  if (!Array.isArray(customNodeFolders) || customNodeFolders.length > 16) fail('runtimePolicy.customNodeFolders must contain at most 16 entries');
+  const normalized = customNodeFolders.map((folder, index) => {
+    if (typeof folder !== 'string' || !SAFE_CUSTOM_NODE_FOLDER.test(folder)) fail(`runtimePolicy.customNodeFolders[${index}] is invalid`);
+    return folder;
+  });
+  if (new Set(normalized).size !== normalized.length) fail('runtimePolicy.customNodeFolders contains duplicates');
+  return Object.freeze({ loadBuiltinExtras, customNodeFolders: Object.freeze(normalized) });
 }
 function validatePack(raw) {
   const pack = object(raw, 'reference pack');
@@ -101,6 +115,7 @@ function validatePack(raw) {
     label: typeof pack.label === 'string' && pack.label.trim() ? pack.label.trim() : packId,
     description: typeof pack.description === 'string' && pack.description.trim() ? pack.description.trim() : `Reviewed reference pack ${packId}.`,
     addNodes, setInputs, referenceBindings: bindings, requiredNodeClasses: classes,
+    runtimePolicy: runtimePolicy(pack.runtimePolicy),
     modelInventory: inventory(pack.modelInventory, 'modelInventory', false),
     runtimeInventory: inventory(pack.runtimeInventory, 'runtimeInventory', true),
   };
@@ -156,6 +171,7 @@ export function compileReferencePackedDraft(draftRaw, packRaw, baseProfileId = n
   next.capabilities = [...new Set([...(base.capabilities ?? []), ...pack.capabilities])];
   next.modelInventory = mergeInventory(base.modelInventory, pack.modelInventory, 'modelInventory');
   next.runtimeInventory = mergeInventory(base.runtimeInventory, pack.runtimeInventory, 'runtimeInventory');
+  next.runtimePolicy = clone(pack.runtimePolicy);
   next.limits = { ...(base.limits ?? {}), maximumReferenceImages: pack.maximumReferenceImages };
   delete next.profileSha256;
   delete next.workflowSha256;
