@@ -60,8 +60,15 @@ test('automatic sequential-anchor and sprite modes create real shot dependencies
   const sequential = automaticAnchorReferences({ mode: 'sequential-anchor', frames: [{ id: 'a', shot: {} }, { id: 'b', shot: {} }] });
   assert.equal(sequential[1].shot.referenceInputs[0].sourceShotId, 'a');
   assert.equal(sequential[1].shot.referenceInputs[0].role, 'canonical-identity');
+  assert.equal(sequential[1].shot.referenceInputs.length, 1);
+
   const sprite = automaticAnchorReferences({ mode: 'sprite', frames: [{ id: 'a', shot: {} }, { id: 'b', shot: {} }] });
-  assert.equal(sprite[1].shot.referenceInputs[0].role, 'direction-master');
+  assert.deepEqual(sprite[1].shot.referenceInputs.map((reference) => reference.role), ['canonical-identity', 'direction-master']);
+  assert.equal(sprite[1].shot.referenceInputs.every((reference) => reference.sourceShotId === 'a'), true);
+  assert.equal(sprite[1].shot.referenceInputs.every((reference) => reference.required === true), true);
+  assert.deepEqual(requiredReferenceCapabilities(sprite[1].shot.referenceInputs), [
+    'direction-reference', 'identity-reference', 'multiple-reference-images', 'reference-images',
+  ]);
 });
 
 test('derives the same required reference capabilities as V1 routing', () => {
