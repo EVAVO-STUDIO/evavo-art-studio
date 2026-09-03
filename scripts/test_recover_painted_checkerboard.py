@@ -66,6 +66,18 @@ class PaintedCheckerboardRecoveryTest(unittest.TestCase):
         self.assertEqual((100, 50, 25), proof.getpixel((0, 0)))
         self.assertEqual((128, 128, 128), proof.getpixel((4, 2)))
 
+    def test_magenta_despill_caps_both_contaminated_channels(self) -> None:
+        image = Image.new("RGB", (7, 7), (255, 0, 255))
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((1, 1, 5, 5), fill=(80, 70, 60))
+        image.putpixel((3, 3), (240, 20, 235))
+        result, evidence = MODULE.recover(
+            image, threshold=2, fringe_threshold=2, fringe_passes=1,
+            matte_colour=(255, 0, 255), despill="magenta",
+        )
+        self.assertEqual((20, 20, 20, 255), result.getpixel((3, 3)))
+        self.assertEqual(1, evidence["despilled_pixels"])
+
 
 if __name__ == "__main__":
     unittest.main()

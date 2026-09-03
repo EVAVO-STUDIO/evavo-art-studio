@@ -189,7 +189,10 @@ def recover(
                 data[base + 1] = max(r, b)
                 despilled_pixels += 1
             elif despill == "magenta" and r > g + 8 and b > g + 8:
-                neutral = max(g, min(r, b))
+                # Magenta spill raises red and blue together. Cap both to the
+                # uncontaminated green channel, mirroring the green-spill
+                # branch's cap to the strongest unaffected channel.
+                neutral = g
                 data[base] = neutral
                 data[base + 2] = neutral
                 despilled_pixels += 1
