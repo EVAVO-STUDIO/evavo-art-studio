@@ -29,6 +29,17 @@ async function json(file, label) {
   try { return JSON.parse(await readFile(path.resolve(file), 'utf8')); }
   catch (error) { fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
 }
+function validateRuntimePolicy(profile) {
+  const policy = profile.runtimePolicy;
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy)) fail(`compiled profile ${profile.profileId} has no reviewed runtimePolicy`);
+  if (typeof policy.loadBuiltinExtras !== 'boolean') fail(`compiled profile ${profile.profileId} has invalid runtimePolicy.loadBuiltinExtras`);
+  if (!Array.isArray(policy.customNodeFolders) || policy.customNodeFolders.length > 16) fail(`compiled profile ${profile.profileId} has invalid runtimePolicy.customNodeFolders`);
+  if (policy.customNodeFolders.some((folder) => typeof folder !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(folder))) {
+    fail(`compiled profile ${profile.profileId} has unsafe custom node folder policy`);
+  }
+  if (new Set(policy.customNodeFolders).size !== policy.customNodeFolders.length) fail(`compiled profile ${profile.profileId} has duplicate custom node folder policy`);
+  return Object.freeze({ loadBuiltinExtras: policy.loadBuiltinExtras, customNodeFolders: Object.freeze([...policy.customNodeFolders]) });
+}
 
 export async function compileReferenceCatalog({ input, pack, baseProfile, output }) {
   const inputPath = path.resolve(input);
@@ -52,6 +63,7 @@ export async function compileReferenceCatalog({ input, pack, baseProfile, output
     if (!profile) fail(`compiled reference catalog is missing ${expectedProfileId}`);
     if (!profile.capabilities?.includes('reference-images') || !profile.bindings?.referenceImages?.length) fail(`compiled profile ${expectedProfileId} is not reference-capable`);
     if (!Number.isInteger(profile.limits?.maximumReferenceImages) || profile.limits.maximumReferenceImages < profile.bindings.referenceImages.length) fail(`compiled profile ${expectedProfileId} has invalid reference limits`);
+    const runtimePolicy = validateRuntimePolicy(profile);
     await copyFile(compiled, outputPath);
     return Object.freeze({
       output: outputPath,
@@ -61,6 +73,7 @@ export async function compileReferenceCatalog({ input, pack, baseProfile, output
       catalogSha256: catalog.catalogSha256 ?? null,
       referenceRoles: profile.bindings.referenceImages.map((binding) => binding.role),
       maximumReferenceImages: profile.limits.maximumReferenceImages,
+      runtimePolicy,
       profileCount: catalog.profiles.length,
     });
   } finally {
