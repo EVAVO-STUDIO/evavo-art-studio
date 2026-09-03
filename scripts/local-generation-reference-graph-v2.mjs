@@ -179,15 +179,19 @@ export function resolveProviderReferences(frame, artifactResults) {
 export function automaticAnchorReferences(plan) {
   if (!['sequential-anchor', 'sprite'].includes(plan.mode) || plan.frames.length < 2) return plan.frames;
   const anchor = plan.frames[0];
-  const roleName = plan.mode === 'sprite' ? 'direction-master' : 'canonical-identity';
   return Object.freeze(plan.frames.map((frame, index) => {
     if (index === 0 || frame.shot?.referenceInputs?.length) return frame;
+    const referenceInputs = plan.mode === 'sprite'
+      ? Object.freeze([
+          Object.freeze({ kind: 'shot', sourceShotId: anchor.id, candidateIndex: 0, role: 'canonical-identity', strength: 1, required: true, note: 'automatic v2 sprite identity anchor dependency' }),
+          Object.freeze({ kind: 'shot', sourceShotId: anchor.id, candidateIndex: 0, role: 'direction-master', strength: 1, required: true, note: 'automatic v2 sprite direction anchor dependency' }),
+        ])
+      : Object.freeze([
+          Object.freeze({ kind: 'shot', sourceShotId: anchor.id, candidateIndex: 0, role: 'canonical-identity', strength: 1, required: true, note: 'automatic v2 anchor dependency' }),
+        ]);
     return Object.freeze({
       ...frame,
-      shot: Object.freeze({
-        ...frame.shot,
-        referenceInputs: Object.freeze([{ kind: 'shot', sourceShotId: anchor.id, candidateIndex: 0, role: roleName, strength: 1, required: true, note: 'automatic v2 anchor dependency' }]),
-      }),
+      shot: Object.freeze({ ...frame.shot, referenceInputs }),
     });
   }));
 }
