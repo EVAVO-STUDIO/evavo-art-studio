@@ -1,84 +1,52 @@
 # Local Generation Batch V2
 
-`evavo.local-generation-batch.v2` is the generic, data-driven local image production layer for Art Studio. It exists to prevent project-specific batch logic and one-off prompt strings from becoming the production architecture.
+`evavo.local-generation-batch.v2` is the generic, data-driven local image production layer for Art Studio. It exists so project-specific shot counts, characters and prompt strings never become the execution architecture.
 
-## Design goals
+## Core contract
 
-The v2 layer supports one image or large production sets with the same contract. A campaign declares its shot count, shot list, character/design identity, art direction, quality profile, consistency mode, output rules and retry rules. The orchestrator compiles those declarations into the existing reviewed local-provider runtime instead of bypassing provider governance.
+The same system handles one image or large production sets. The current campaign ceiling is **2,000 shots** and provider execution is transparently chunked into groups of at most 100 shots.
 
-The current maximum is 2,000 shots per campaign. Provider execution is transparently chunked into groups of at most 100 shots so large campaigns do not require a single oversized durable runtime submission.
+A campaign declares:
 
-## Campaign schema
-
-Required top-level fields are:
-
-- `schema: "evavo.local-generation-batch.v2"`
-- `campaignId`
 - `batch_size`
+- `shots[]`
 - `character`
 - `style`
-- `shots[]`
-
-Important optional controls are:
-
-- `contentClass`
-- `generation_mode`
-- `consistency_mode`
 - `quality_profile`
-- `quality_overrides`
-- `continuity_locks`
-- `quality_prompt`
-- `negative`
-- `seed_strategy`
+- `consistency_mode`
+- `generation_mode`
 - `output_rules`
 - `retry_rules`
-- `provider`
+- optional provider/model/reference plans
 
-`shots.length` must equal `batch_size`. This is deliberate: the manifest is an explicit production plan, not an instruction to silently invent an unspecified number of frames.
+`shots.length` must equal `batch_size`. The system never silently invents missing frames.
 
-## Shot contract
+The formal schema is `schemas/local-generation-batch.v2.schema.json`.
 
-Each shot can define:
+## Shot planning
 
-- `id`
-- `description`
-- `pose`
-- `camera`
-- `expression`
-- `outfitState`
-- `background`
-- `framing`
-- `mustInclude[]`
-- `mustAvoid[]`
-- `continuityLocks[]`
-- `references[]`
-- `seed`
-- `candidateCount`
-- `assetKind`
-- `continuityPhase`
-- `target`
-- `tags[]`
+Each shot can independently define pose/action, camera, expression, outfit state, background, framing, required details, exclusions, continuity locks, seed/candidate overrides, output target and reference inputs.
 
-This makes the shot list the source of truth. A vague campaign-wide prompt is not treated as an adequate replacement for a shot plan.
+This makes a structured shot list the production source of truth instead of a single vague campaign prompt.
 
 ## Prompt assembly
 
-Prompts are assembled deterministically from separate layers:
+Prompts are built deterministically from separate layers:
 
 1. **Identity** — face, hair, proportions, costume, palette and signature details.
-2. **Style** — medium, period, lighting, palette, materials and line treatment.
-3. **Quality** — reusable quality-profile direction and campaign quality additions.
-4. **Continuity** — strict/balanced/loose rules plus campaign and per-shot locks.
-5. **Shot** — pose, camera, expression, outfit state, background, framing and required content.
-6. **Negative** — global, quality-profile and shot-specific exclusions.
+2. **Style** — medium, period, lighting, palette, materials and edge/line treatment.
+3. **Quality** — reusable profile direction plus campaign quality additions.
+4. **Continuity** — strict/balanced/loose rules plus campaign and shot locks.
+5. **Shot** — pose, camera, expression, outfit, environment and framing.
+6. **Negative** — global, profile and shot-specific exclusions.
 
-Every assembled positive and negative prompt receives a SHA-256 in per-image metadata. Stable prompt layers are intentionally repeated across frames; only shot-specific layers should drift during a strict sequence.
+Every positive and negative prompt receives a SHA-256 in per-image metadata. Stable prompt layers deliberately repeat across a strict sequence; only declared shot layers should vary.
 
-The built-in profiles contain explicit anti-generic guidance. Their purpose is not to stuff aesthetic buzzwords into prompts. They enforce concrete production-art concerns such as silhouette, material separation, motivated lighting, stable proportions, meaningful composition and rejection of generic stock/AI visual habits.
+The profile guidance is intentionally concrete. It emphasizes authored silhouette, facial geometry, material separation, motivated lighting, believable anatomy, intentional composition and environmental construction while rejecting generic stock/AI visual habits, plastic surfaces and meaningless micro-detail.
 
 ## Quality profiles
 
-Built-in profiles:
+Data-driven profiles live in `config/local-generation-quality-profiles.v2.json`:
 
 - `portrait_high_quality`
 - `sprite_sheet_clean`
@@ -87,74 +55,146 @@ Built-in profiles:
 - `cinematic_stills`
 - `product_mockups`
 
-Profiles record resolution, steps, CFG, sampler, scheduler, denoise, hires scale, detail-pass intent and output format as reproducibility settings.
+They define resolution, steps, CFG, sampler, scheduler, denoise, hires/detail intent and output format.
 
-### Provider-binding rule
+### Executable sampling settings
 
-Do not claim that a profile value affected provider pixels unless the selected reviewed provider profile exposes a binding for that value.
+Do not claim that a profile value affected provider pixels unless the selected reviewed provider profile exposes or bakes that value.
 
-At the time v2 was introduced, the ComfyUI adapter has typed workflow bindings for positive prompt, negative prompt, width, height, seed, candidate count, filename prefix and reference images. Sampling controls such as steps, CFG, sampler, scheduler and denoise are preserved in v2 metadata and quality planning but are not silently injected through arbitrary metadata. They must be added as first-class typed provider bindings before Art Studio reports them as active runtime controls.
+Art Studio now supports a **workflow-baked** path for the standard local quality profiles:
 
-This fail-honest rule is intentional. Reproducibility metadata is not allowed to masquerade as execution evidence.
+1. `decompile-comfyui-workflow-catalog.mjs` reconstructs a safe draft from a reviewed compiled catalog while removing only computed integrity fields.
+2. `compile-comfyui-quality-profile-draft.mjs` clones the reviewed base workflow and writes profile-specific `KSampler`/`KSamplerAdvanced` values for `steps`, `cfg`, `sampler_name`, `scheduler` and `denoise`.
+3. `compile-comfyui-workflow-catalog.mjs` recompiles and re-hashes every resulting profile.
+4. `compile-comfyui-quality-catalog.mjs` performs the complete pipeline and can atomically replace a physical catalog while preserving a backup.
+
+The canonical physical catalog can therefore expose reviewed adapters such as:
+
+- `comfyui:sdxl-base-local-portrait_high_quality`
+- `comfyui:sdxl-base-local-sprite_sheet_clean`
+- `comfyui:sdxl-base-local-concept_art_painterly`
+- `comfyui:sdxl-base-local-comic_inked`
+- `comfyui:sdxl-base-local-cinematic_stills`
+- `comfyui:sdxl-base-local-product_mockups`
+
+The managed entry compiler derives the adapter from `quality_profile` when the campaign has not explicitly pinned another reviewed adapter.
+
+Dynamic arbitrary sampler fields are still not smuggled through metadata. A runtime value is only reported as pixel-affecting when it is typed/bound or baked into the reviewed workflow.
 
 ## Consistency modes
 
 `strict`
 
-- related deterministic seeds by default
+- deterministic related seeds by default
 - identity locks repeated in every prompt
-- only shot-declared changes are intended to vary
-- suitable for sprite families, character sequences, UI portraits and card sets
+- only explicitly declared changes should vary
+- appropriate for sprite families, character sequences, UI portraits and card sets
 
 `balanced`
 
-- preserves recognizable identity and design language
-- allows wider pose/camera variation
-- useful for ordinary narrative illustration sets
+- preserves recognizable identity and primary design language
+- allows wider camera/pose variation
 
 `loose`
 
-- preserves campaign concept rather than exact identity geometry
-- uses independent continuity phase by default
-- useful for moodboards and exploration
+- preserves campaign concept rather than exact geometry
+- uses independent continuity by default
 
 ## Generation modes
 
-`independent` — each shot is independently generated.
+- `independent` — shots are generated independently.
+- `sequential-anchor` — the first shot is the identity master; later shots are key poses.
+- `paired` — defaults to two candidates per shot.
+- `variation` — defaults to four candidates per shot.
+- `repair` — targeted repair/regeneration phase.
+- `sprite` — establishes a direction master followed by repeatable key poses.
 
-`sequential-anchor` — the first shot is planned as the identity master; later shots are key poses.
+## Reference and anchor evidence
 
-`paired` — defaults to two candidates per shot.
+The generic reference graph is implemented in `local-generation-reference-graph-v2.mjs`.
 
-`variation` — defaults to four candidates per shot.
+It understands real provider reference roles including:
 
-`repair` — uses repair continuity phase for targeted regeneration.
+- `canonical-identity`
+- `direction-master`
+- `previous-key-pose`
+- `next-key-pose`
+- `base-image`
+- `pose-control`
+- `edge-control`
+- `depth-control`
+- palette/line/material/layer references
 
-`sprite` — establishes a direction master followed by key poses with repeatable framing intent.
+It can model external artifact references and shot-to-shot dependencies, topologically stage them, detect cycles/missing sources and resolve a completed source shot to a provider artifact ID.
 
-### Reference and anchor evidence
+A textual reference is **prompt-only** planning metadata. A provider artifact dependency is **artifact-conditioned** only when the selected reviewed workflow advertises the required reference capability and contains the matching binding. Art Studio fails closed instead of claiming image-reference consistency when the workflow cannot actually consume the image.
 
-The v2 shot schema records `references[]`, but a string reference is not automatically evidence that a provider consumed an image. Real pixel-level identity/reference chaining requires provider artifact references and a reviewed ComfyUI profile with `reference-images`/role-specific capability plus declared reference bindings. Until that is present, Art Studio must treat reference strings as planning metadata only.
+## Model and LoRA plans
 
-This distinction prevents false claims of character consistency. Prompt locking and seed strategy can improve consistency, but they are not equivalent to an actual image-reference pipeline.
+`local-generation-model-plan-v2.mjs` describes the reviewed base model plus ordered LoRA IDs/strengths and hashes the plan for reproducibility.
+
+A LoRA is not considered executable merely because a manifest names it. The selected reviewed profile must inventory the LoRA and include an appropriate LoRA loader workflow node. Otherwise the plan remains non-executable and fails closed.
 
 ## QA and selective retry
 
-The generic orchestrator validates generated files after each attempt:
+After each attempt the orchestrator validates:
 
-- expected candidate count per shot
-- file exists and is a regular image file
+- expected candidate count
+- file existence and regular-file status
 - non-zero bytes
-- PNG/JPEG/WebP signature
-- expected image dimensions where available
+- PNG/JPEG/WebP signatures
+- dimensions where required
 - SHA-256
-- duplicate hashes across accepted shots
+- duplicate hashes across accepted outputs
 
-Only affected shots are placed into the next attempt. Retry seeds use the original deterministic seed plus `retry_rules.seedBump * (attempt - 1)`.
+Only affected shots are retried. Retry seeds remain deterministic using `seedBump`; a weak frame does not force a 120-image campaign to rerun.
 
-The whole batch is not rerun because one frame failed.
+## Reproducibility metadata
 
-Default retry ceiling is three attempts per shot and can be configured from one to eight.
+Each accepted image can retain:
+
+- positive/negative prompt
+- all prompt layers and hashes
+- seed
+- model/provider route
+- quality profile and settings
+- candidate count
+- reference plan
+- retry attempt
+- provider artifact/content hash
+- dimensions/file hash
+- QA result
+
+## Managed one-command execution
+
+The normal entrypoint is:
+
+```cmd
+RUN-LOCAL-ART-BATCH.cmd C:\path\to\campaign.json
+```
+
+The command no longer assumes ComfyUI is already open.
+
+`run-local-art-batch-entry.mjs` preserves the creative source manifest and writes a separate machine-bound execution manifest. The execution copy forces the owned loopback endpoint/catalog and derives the reviewed quality adapter when one is not explicitly pinned.
+
+`run-local-art-batch-managed.mjs` then:
+
+1. verifies the local ComfyUI Python/runtime/catalog,
+2. refuses to reuse an already occupied port,
+3. writes and hash-verifies the EVAVO true-core bootstrap,
+4. starts ComfyUI on loopback with `sqlite:///:memory:`, custom/API nodes disabled and optional built-in extras skipped,
+5. verifies the required core generation nodes,
+6. runs the V2 batch,
+7. shuts down only the ComfyUI process it owns.
+
+The default managed endpoint is `127.0.0.1:8192` and the canonical catalog is `%LOCALAPPDATA%\EVAVO\AI\ComfyUI\catalog.json`.
+
+Trusted local agents use the same path through:
+
+- `local_generation_batch_capabilities`
+- `run_local_generation_batch`
+
+There is no second, weaker MCP execution path.
 
 ## Output structure
 
@@ -162,64 +202,22 @@ By default:
 
 `%LOCALAPPDATA%\EVAVO\ArtStudio\batches\<campaignId>\<runId>\`
 
-contains:
+contains the source/plan, QA attempts, receipt, final outputs, per-image metadata and staging evidence.
 
-- `manifest.input.json`
-- `plan.json`
-- `qa-attempt-XX.json`
-- `receipt.json`
-- `outputs\`
-- `metadata\`
-- `staging\`
+Managed execution manifests are separately retained under:
 
-Accepted output names are ordinal and deterministic, for example:
+`%LOCALAPPDATA%\EVAVO\ArtStudio\agent-requests\managed-batch-v2\`
 
-`0001-anchor-front-candidate-01.png`
+so machine binding never mutates the authored campaign file.
 
-Every accepted image can have a sibling metadata JSON containing:
+## Regression contract
 
-- prompt
-- negative prompt
-- prompt layers
-- prompt hashes
-- seed
-- quality profile
-- width/height
-- steps/CFG/sampler/scheduler/denoise planning values
-- candidate count
-- source references
-- retry attempt
-- provider route
-- provider artifact/content hash
-- QA result
+`check-local-generation-batch-v2.mjs` requires the compiler, orchestrator, formal schema, data profiles, quality workflow compiler/decompiler, reference DAG, model/LoRA plan, generic examples, managed lifecycle and MCP tools. It also syntax-checks the executable Node modules.
 
-## One-command execution
-
-From the Art Studio repository:
-
-```cmd
-RUN-LOCAL-ART-BATCH.cmd C:\path\to\campaign.json
-```
-
-If no manifest is supplied it uses `examples/local-generation-batch.template.json`.
-
-The same runtime is exposed to trusted local agents through:
-
-- `local_generation_batch_capabilities`
-- `run_local_generation_batch`
-
-## Regression test
-
-Run:
-
-```cmd
-node --test scripts\local-generation-batch-v2.test.mjs
-```
-
-The contract suite covers a 120-shot campaign, provider chunking, deterministic strict seeds, sequential anchor phases, paired/variation candidate counts, layered prompts, anti-generic guidance, reproducibility metadata and fail-closed manifest validation.
+Focused tests cover large-batch chunking, deterministic consistency, generation modes, quality KSampler rewriting, reference-DAG resolution/cycle rejection, model/LoRA fail-closed behavior and reproducibility metadata.
 
 ## Architecture rule
 
-No character, game, campaign, genre or output count belongs in the generic engine.
+No character, game, genre, campaign or fixed output count belongs in the generic engine.
 
-Project data belongs in campaign manifests. Provider-specific executable details belong in reviewed provider profiles. The batch engine owns planning, deterministic compilation, chunking, QA, retry, metadata and consolidated receipts.
+Project decisions belong in campaign data. Pixel-affecting provider behavior belongs in reviewed provider workflows/bindings. The generic engine owns planning, deterministic compilation, machine binding, managed local runtime lifecycle, chunking, QA, retry, metadata and receipts.
