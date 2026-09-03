@@ -49,13 +49,22 @@
         "strength": { "$ref": "#/$defs/binding" }
       }
     },
-    "inventoryEntry": {
+    "modelInventoryEntry": {
       "type": "object",
       "required": ["id", "kind", "sha256"],
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/safeId" },
         "kind": { "$ref": "#/$defs/safeId" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "runtimeInventoryEntry": {
+      "type": "object",
+      "required": ["id", "version", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/safeId" },
         "version": { "$ref": "#/$defs/safeId" },
         "sha256": { "$ref": "#/$defs/sha256" }
       }
@@ -93,8 +102,8 @@
           "items": { "$ref": "#/$defs/referenceBinding" }
         },
         "outputNodeIds": { "type": "array", "items": { "$ref": "#/$defs/safeId" } },
-        "modelInventoryAdditions": { "type": "array", "items": { "$ref": "#/$defs/inventoryEntry" } },
-        "runtimeInventoryAdditions": { "type": "array", "items": { "$ref": "#/$defs/inventoryEntry" } },
+        "modelInventoryAdditions": { "type": "array", "items": { "$ref": "#/$defs/modelInventoryEntry" } },
+        "runtimeInventoryAdditions": { "type": "array", "items": { "$ref": "#/$defs/runtimeInventoryEntry" } },
         "maximumReferenceImages": { "type": "integer", "minimum": 1, "maximum": 128 },
         "limits": { "type": "object" },
         "runtimePolicy": {
