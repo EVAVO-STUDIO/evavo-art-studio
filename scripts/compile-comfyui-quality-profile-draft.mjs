@@ -25,6 +25,11 @@ function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function samplingNodes(workflow) {
   return Object.entries(workflow ?? {}).filter(([, node]) => node?.class_type === 'KSampler' || node?.class_type === 'KSamplerAdvanced');
 }
+function safeVersion(value) {
+  const result = String(value).replace(/[^A-Za-z0-9._:-]+/gu, '-').replace(/^-+|-+$/gu, '');
+  if (!result) fail('version normalized to an empty identifier');
+  return result;
+}
 function applySampling(profile, qualityName, quality) {
   const next = clone(profile);
   const nodes = samplingNodes(next.workflow);
@@ -40,7 +45,7 @@ function applySampling(profile, qualityName, quality) {
   next.profileId = `${profile.profileId}-${qualityName}`;
   next.label = `${profile.label} · ${qualityName}`;
   next.description = `${profile.description} Quality profile ${qualityName}: steps=${quality.steps}, cfg=${quality.cfg}, sampler=${quality.sampler}, scheduler=${quality.scheduler}, denoise=${quality.denoise}.`;
-  next.version = `${profile.version}+quality.${qualityName}`;
+  next.version = safeVersion(`${profile.version}-quality.${qualityName}`);
   next.priority = Number(profile.priority ?? 0) + 10;
   delete next.profileSha256;
   delete next.workflowSha256;
@@ -59,7 +64,7 @@ export function compileQualityProfiledDraft(draft, qualityDocument, baseProfileI
   const generated = Object.entries(qualityDocument.profiles).map(([name, quality]) => applySampling(base, name, quality));
   return {
     ...clone(draft),
-    catalogVersion: `${draft.catalogVersion ?? '1'}+quality-v2`,
+    catalogVersion: safeVersion(`${draft.catalogVersion ?? '1'}-quality-v2`),
     profiles: [...draft.profiles.filter((profile) => !generated.some((candidate) => candidate.profileId === profile.profileId)), ...generated],
   };
 }
