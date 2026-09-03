@@ -140,6 +140,7 @@
       "oneOf": [{"required": ["artifactId"]}, {"required": ["sourceShotId"]}],
       "additionalProperties": false
     },
+    "referenceList": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/reference"}},
     "shot": {
       "type": "object",
       "required": ["id"],
@@ -157,7 +158,8 @@
         "mustAvoid": {"$ref": "#/$defs/stringList"},
         "continuityLocks": {"$ref": "#/$defs/stringList"},
         "references": {"$ref": "#/$defs/stringList"},
-        "referenceInputs": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/reference"}},
+        "reference_inputs": {"$ref": "#/$defs/referenceList"},
+        "referenceInputs": {"$ref": "#/$defs/referenceList"},
         "seed": {"type": "integer", "minimum": 0, "maximum": 2147483647},
         "candidateCount": {"type": "integer", "minimum": 1, "maximum": 16},
         "assetKind": {"enum": ["sprite-frame", "sprite-layer", "environment", "effect", "ui", "illustration", "print"]},
