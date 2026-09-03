@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.local/schemas/local-generation-reference-profile.v2.schema.json",
+  "title": "EVAVO Local Generation Reference Profile V2",
+  "type": "object",
+  "required": ["schema", "profiles"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "evavo.local-generation-reference-profiles.v2" },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/profile" }
+    }
+  },
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "binding": {
+      "type": "object",
+      "required": ["nodeId", "input"],
+      "additionalProperties": false,
+      "properties": {
+        "nodeId": { "$ref": "#/$defs/safeId" },
+        "input": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "referenceBinding": {
+      "type": "object",
+      "required": ["role", "nodeId", "input"],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "canonical-identity", "direction-master", "previous-key-pose", "next-key-pose",
+            "base-image", "mask", "pose-control", "edge-control", "depth-control",
+            "palette-reference", "line-reference", "material-reference", "layer-context"
+          ]
+        },
+        "nodeId": { "$ref": "#/$defs/safeId" },
+        "input": { "$ref": "#/$defs/safeId" },
+        "strength": { "$ref": "#/$defs/binding" }
+      }
+    },
+    "inventoryEntry": {
+      "type": "object",
+      "required": ["id", "kind", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/safeId" },
+        "kind": { "$ref": "#/$defs/safeId" },
+        "version": { "$ref": "#/$defs/safeId" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": [
+        "baseProfileId", "profileId", "workflow", "referenceImages", "runtimePolicy"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "baseProfileId": { "$ref": "#/$defs/safeId" },
+        "profileId": { "$ref": "#/$defs/safeId" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "version": { "$ref": "#/$defs/safeId" },
+        "priority": { "type": "integer", "minimum": -10000, "maximum": 10000 },
+        "operations": { "type": "array", "items": { "enum": ["generate", "edit", "inpaint"] } },
+        "assetKinds": {
+          "type": "array",
+          "items": { "enum": ["sprite-frame", "sprite-layer", "environment", "effect", "ui", "illustration", "print"] }
+        },
+        "continuityPhases": {
+          "type": "array",
+          "items": { "enum": ["identity-master", "direction-master", "key-pose", "in-between", "repair", "independent"] }
+        },
+        "additionalCapabilities": { "type": "array", "items": { "$ref": "#/$defs/safeId" } },
+        "modelId": { "$ref": "#/$defs/safeId" },
+        "workflow": { "type": "object", "minProperties": 1 },
+        "bindings": { "type": "object" },
+        "referenceImages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/referenceBinding" }
+        },
+        "outputNodeIds": { "type": "array", "items": { "$ref": "#/$defs/safeId" } },
+        "modelInventoryAdditions": { "type": "array", "items": { "$ref": "#/$defs/inventoryEntry" } },
+        "runtimeInventoryAdditions": { "type": "array", "items": { "$ref": "#/$defs/inventoryEntry" } },
+        "maximumReferenceImages": { "type": "integer", "minimum": 1, "maximum": 128 },
+        "limits": { "type": "object" },
+        "runtimePolicy": {
+          "type": "object",
+          "required": ["customNodeFolders"],
+          "additionalProperties": false,
+          "properties": {
+            "loadBuiltinExtras": { "type": "boolean", "default": false },
+            "customNodeFolders": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
