@@ -1,4 +1,4 @@
-import { mkdir, readFile, realpath } from "node:fs/promises";
+import { mkdir, readFile, readdir, realpath } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -16,7 +16,11 @@ import {
 
 export interface MasteringCommandValues {
   readonly input?: string;
+  readonly "input-dir"?: string;
   readonly output?: string;
+  readonly "output-dir"?: string;
+  readonly "evidence-dir"?: string;
+  readonly "proof-dir"?: string;
   readonly evidence?: string;
   readonly expectations?: string;
   readonly matte?: string;
@@ -171,8 +175,106 @@ export async function handleMasteringCommand(
   command: string,
   values: MasteringCommandValues,
 ): Promise<MasteringCommandResult> {
-  if (command !== "master-alpha" && command !== "inspect-alpha") {
+  if (
+    command !== "master-alpha" &&
+    command !== "master-alpha-folder" &&
+    command !== "inspect-alpha"
+  ) {
     return { handled: false };
+  }
+  if (command === "master-alpha-folder") {
+    const inputRoot = path.resolve(required(values["input-dir"], "--input-dir"));
+    const outputRoot = path.resolve(required(values["output-dir"], "--output-dir"));
+    const evidenceRoot = path.resolve(
+      values["evidence-dir"]?.trim() || `${outputRoot}.evidence`,
+    );
+    const proofRoot = values["proof-dir"]?.trim()
+      ? path.resolve(values["proof-dir"])
+      : undefined;
+    const identities = await Promise.all(
+      [inputRoot, outputRoot, evidenceRoot, ...(proofRoot ? [proofRoot] : [])].map(
+        canonicalPathIdentity,
+      ),
+    );
+    if (new Set(identities).size !== identities.length) {
+      throw new Error(
+        "Folder alpha mastering is non-destructive: input, output, evidence and proof roots must be distinct.",
+      );
+    }
+    const normalizedInputPrefix = `${identities[0]}${path.sep}`;
+    if (identities.slice(1).some((identity) => identity.startsWith(normalizedInputPrefix))) {
+      throw new Error(
+        "Folder alpha mastering cannot write output, evidence or proofs inside the input tree.",
+      );
+    }
+    const entries = await readdir(inputRoot, {
+      recursive: true,
+      withFileTypes: true,
+    });
+    const relativeInputs = entries
+      .filter(
+        (entry) =>
+          entry.isFile() && /\.(png|webp|jpe?g)$/i.test(entry.name),
+      )
+      .map((entry) =>
+        path.relative(inputRoot, path.join(entry.parentPath, entry.name)),
+      )
+      .sort((left, right) => left.localeCompare(right, "en"));
+    if (relativeInputs.length === 0) {
+      throw new Error("--input-dir contains no supported PNG, WebP or JPEG images.");
+    }
+    const relativeOutputs = relativeInputs.map((relativeInput) =>
+      relativeInput.replace(/\.[^.]+$/, ".png"),
+    );
+    if (new Set(relativeOutputs.map((value) => value.toLowerCase())).size !== relativeOutputs.length) {
+      throw new Error(
+        "Folder alpha mastering found source names that would collide after PNG conversion.",
+      );
+    }
+    const results: unknown[] = [];
+    let failed = 0;
+    const {
+      "input-dir": _inputDir,
+      "output-dir": _outputDir,
+      "evidence-dir": _evidenceDir,
+      "proof-dir": _proofDir,
+      proof: _singleProof,
+      input: _singleInput,
+      output: _singleOutput,
+      evidence: _singleEvidence,
+      ...sharedValues
+    } = values;
+    for (const relativeInput of relativeInputs) {
+      const relativePng = relativeInput.replace(/\.[^.]+$/, ".png");
+      const result = await handleMasteringCommand("master-alpha", {
+        ...sharedValues,
+        input: path.join(inputRoot, relativeInput),
+        output: path.join(outputRoot, relativePng),
+        evidence: path.join(evidenceRoot, `${relativePng}.json`),
+        ...(proofRoot
+          ? { proof: path.join(proofRoot, relativePng) }
+          : {}),
+      });
+      if (result.handled && result.exitCode) failed += 1;
+      results.push({ relativeInput, relativeOutput: relativePng, result });
+    }
+    return {
+      handled: true,
+      value: {
+        schemaVersion: "1.0",
+        command,
+        inputRoot,
+        outputRoot,
+        evidenceRoot,
+        proofRoot: proofRoot ?? null,
+        processed: results.length,
+        failed,
+        approvalState: "unapproved",
+        promotionEligible: failed === 0,
+        results,
+      },
+      ...(failed === 0 ? {} : { exitCode: 3 }),
+    };
   }
   const inputPath = path.resolve(required(values.input, "--input"));
   const matteColour = values.matte?.trim() || undefined;

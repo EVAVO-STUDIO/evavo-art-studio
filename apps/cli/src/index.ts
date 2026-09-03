@@ -75,6 +75,7 @@ Usage:
   evavo-art quality-sequence --manifest sequence.json [--output report.json]
   evavo-art inspect-alpha --input candidate.png [--matte #00ff00]
   evavo-art master-alpha --input candidate.png --output candidate.alpha.png [--matte #00ff00] [--allow-low-chroma-matte] [--protect-mask keep.png] [--remove-mask erase.png] [--suppress-chroma-spill] [--proof candidate.alpha.proof.png] [--evidence candidate.alpha.evidence.json] [--expectations frame-quality.json] [--maximum-composite-channel-error 8]
+  evavo-art master-alpha-folder --input-dir raw-frames --output-dir mastered-frames [--evidence-dir alpha-evidence] [--proof-dir alpha-proofs] [master-alpha options]
   evavo-art atlas-build --manifest atlas.json --output-dir generated [--godot-project C:\\GitRepos\\game] [--godot-executable C:\\Path\\Godot_v4.6.2.exe]
 
   evavo-art provider-protocol [--output provider-protocol.json]
@@ -150,6 +151,7 @@ async function main(): Promise<void> {
     args: process.argv.slice(3),
     options: {
       input: { type: "string", short: "i" },
+      "input-dir": { type: "string" },
       output: { type: "string", short: "o" },
       repo: { type: "string", short: "r" },
       expectations: { type: "string", short: "e" },
@@ -173,6 +175,8 @@ async function main(): Promise<void> {
       manifest: { type: "string", short: "m" },
       descriptor: { type: "string", short: "d" },
       "output-dir": { type: "string" },
+      "evidence-dir": { type: "string" },
+      "proof-dir": { type: "string" },
       "godot-project": { type: "string" },
       "godot-executable": { type: "string" },
       "runtime-root": { type: "string" },

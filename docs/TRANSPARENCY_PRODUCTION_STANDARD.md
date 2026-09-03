@@ -95,6 +95,14 @@ pnpm art -- master-alpha `
 
 The Project Art sandbox supplies additional deterministic artist controls, including alpha erode/dilate, feather, threshold, defringe, edge decontamination, hidden-RGB rebuild, curves, masks, compositing and pixel-safe transforms. Those operations never replace the final transparency admission gate.
 
+For a sprite family or mixed RAW_ART folder, use `master-alpha-folder` rather
+than scripting repeated one-off extraction. It sorts supported images
+deterministically, preserves their relative family paths, converts mastered
+outputs to PNG, and writes per-frame evidence plus optional hostile-background
+proofs into distinct roots. It refuses output roots inside the source tree and
+refuses filename collisions introduced by PNG conversion. One failed frame
+fails the command; every output remains unapproved pending visual review.
+
 ## Uneven generated sprite grids
 
 Run `master-alpha` and transparency admission before segmentation. The create-only

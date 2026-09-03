@@ -79,6 +79,17 @@ pnpm art -- master-alpha `
   --evidence .\candidate.alpha.evidence.json `
   --expectations .\frame-quality.json
 
+# Salvage a complete sprite/image folder with the same fail-closed mastering.
+# Relative paths are preserved; outputs, evidence and optional hostile proofs
+# are written to separate roots and remain unapproved until artist review.
+pnpm art -- master-alpha-folder `
+  --input-dir .\raw-frames `
+  --output-dir .\mastered-frames `
+  --evidence-dir .\alpha-evidence `
+  --proof-dir .\alpha-proofs `
+  --matte "#ff00ff" `
+  --suppress-chroma-spill
+
 # Validate and compile ranking or promotion without executing a worker:
 pnpm art -- selection-protocol
 pnpm art -- selection-validate `

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   access,
+  mkdir,
   mkdtemp,
   readFile,
   readdir,
@@ -107,6 +108,59 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
   assert.ok(proof.extraction.output.transparentPixels > 0);
   assert.ok(proof.extraction.output.partialPixels > 0);
   assert.equal(proof.quality.passed, true);
+});
+
+test("CLI masters a nested image folder without flattening sprite families", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-master-folder-cli-"));
+  const inputRoot = path.join(root, "raw");
+  const outputRoot = path.join(root, "mastered");
+  const evidenceRoot = path.join(root, "evidence");
+  const proofRoot = path.join(root, "proofs");
+  const expectations = path.join(root, "frame-quality.json");
+  await mkdir(path.join(inputRoot, "idle"), { recursive: true });
+  await mkdir(path.join(inputRoot, "attack"), { recursive: true });
+  await writeFile(path.join(inputRoot, "idle", "frame-01.png"), CHROMA_CANDIDATE);
+  await writeFile(path.join(inputRoot, "attack", "frame-01.png"), CHROMA_CANDIDATE);
+  await writeFile(
+    expectations,
+    JSON.stringify({
+      safePadding: 1,
+      maximumHaloFraction: 1,
+      maximumUnexpectedTransparentRgbFraction: 1,
+    }),
+  );
+  const result = spawnSync(
+    process.execPath,
+    [
+      "dist/index.js",
+      "master-alpha-folder",
+      "--input-dir",
+      inputRoot,
+      "--output-dir",
+      outputRoot,
+      "--evidence-dir",
+      evidenceRoot,
+      "--proof-dir",
+      proofRoot,
+      "--expectations",
+      expectations,
+    ],
+    { cwd, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const summary = JSON.parse(result.stdout);
+  assert.equal(summary.processed, 2);
+  assert.equal(summary.failed, 0);
+  assert.equal(summary.promotionEligible, true);
+  assert.deepEqual(
+    summary.results.map((entry) => entry.relativeInput),
+    [path.join("attack", "frame-01.png"), path.join("idle", "frame-01.png")],
+  );
+  for (const family of ["attack", "idle"]) {
+    await access(path.join(outputRoot, family, "frame-01.png"));
+    await access(path.join(evidenceRoot, family, "frame-01.png.json"));
+    await access(path.join(proofRoot, family, "frame-01.png"));
+  }
 });
 
 test("CLI carries a classifier-proven provider matte into spill suppression", async () => {
