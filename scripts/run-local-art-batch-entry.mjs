@@ -9,7 +9,8 @@ import { spawn } from 'node:child_process';
 import { auditBatchPlan } from './local-generation-batch-audit-v2.mjs';
 import { compileBatchPlan } from './local-generation-batch-v2.mjs';
 import { assertModelPlanExecutable, normalizeModelPlan } from './local-generation-model-plan-v2.mjs';
-import { buildReferenceGraph, normalizeReferenceInputs } from './local-generation-reference-graph-v2.mjs';
+import { prepareReferenceExecutionPlan } from './local-generation-reference-execution-v2.mjs';
+import { validateProviderReferenceInputs } from './local-generation-reference-graph-v2.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BATCH_SCHEMA = 'evavo.local-generation-batch.v2';
@@ -46,21 +47,32 @@ async function json(file, label) {
   try { return JSON.parse(await readFile(file, 'utf8')); }
   catch (error) { fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
 }
-function explicitReferenceInputs(source) {
-  const frames = (source.shots ?? []).map((shot, index) => ({
-    id: shot.id ?? `shot-${index + 1}`,
-    shot: { referenceInputs: normalizeReferenceInputs(shot.reference_inputs ?? shot.referenceInputs, `shots[${index}].reference_inputs`) },
-  }));
-  const count = frames.reduce((sum, frame) => sum + frame.shot.referenceInputs.length, 0);
-  if (count) buildReferenceGraph(frames);
-  return Object.freeze({ count, frames: Object.freeze(frames) });
-}
 function providerProfile(catalog, adapterId) {
   if (!catalog || !Array.isArray(catalog.profiles)) fail('ComfyUI catalog has no profiles');
   const profileId = adapterId.startsWith('comfyui:') ? adapterId.slice('comfyui:'.length) : adapterId;
   const profile = catalog.profiles.find((candidate) => candidate?.profileId === profileId);
   if (!profile) fail(`reviewed provider profile ${profileId} is not present in the physical catalog`);
   return profile;
+}
+function validateReferencePlan(referencePlan, profile) {
+  let referenceInputCount = 0;
+  for (const frame of referencePlan.frames) {
+    const referenceInputs = frame.shot?.referenceInputs ?? [];
+    referenceInputCount += referenceInputs.length;
+    if (!referenceInputs.length) continue;
+    const assetKind = frame.shot?.assetKind ?? (referencePlan.mode === 'sprite' ? 'sprite-frame' : 'illustration');
+    validateProviderReferenceInputs(referenceInputs, profile, {
+      label: `shot ${frame.id} reference_inputs`,
+      operation: 'generate',
+      assetKind,
+      continuityPhase: frame.continuityPhase,
+    });
+  }
+  return Object.freeze({
+    referenceInputCount,
+    stages: referencePlan.referenceGraph.stages,
+    hasDependencies: referencePlan.referenceGraph.hasDependencies,
+  });
 }
 async function prepareManifest(sourcePath, port) {
   const source = await json(sourcePath, 'batch manifest');
@@ -88,14 +100,8 @@ async function prepareManifest(sourcePath, port) {
     assertModelPlanExecutable(modelPlan, profile);
   }
 
-  const references = explicitReferenceInputs(bound);
-  if (references.count) {
-    const capabilities = new Set(profile.capabilities ?? []);
-    if (!capabilities.has('reference-images')) {
-      fail(`campaign contains ${references.count} explicit artifact-conditioned reference input(s), but reviewed adapter ${bound.provider.adapterId} does not advertise reference-images capability`);
-    }
-    fail('artifact-conditioned reference inputs validated successfully, but the V2-to-runtime reference execution bridge is not enabled yet; refusing to silently drop references');
-  }
+  const referencePlan = prepareReferenceExecutionPlan(plan);
+  const referencePreflight = validateReferencePlan(referencePlan, profile);
 
   const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`, 'utf8');
   const boundBytes = Buffer.from(`${JSON.stringify(bound, null, 2)}\n`, 'utf8');
@@ -120,12 +126,17 @@ async function prepareManifest(sourcePath, port) {
     catalogPath: bound.provider.catalogPath,
     catalogSha256: catalog.catalogSha256 ?? null,
     promptAuditScore: audit.score,
-    referenceInputCount: references.count,
+    referenceInputCount: referencePreflight.referenceInputCount,
+    referenceStages: referencePreflight.stages,
+    referenceDependencies: referencePreflight.hasDependencies,
+    referenceExecutionBridge: 'v2-staged-to-v1-runtime',
   }, null, 2)}\n`, 'utf8');
   return Object.freeze({
     original, execution, auditPath, providerPath, fingerprint,
     adapterId: bound.provider.adapterId, catalogPath: bound.provider.catalogPath, baseUrl: bound.provider.baseUrl,
     auditScore: audit.score, auditWarnings: audit.counts.warnings, profileId: profile.profileId,
+    referenceInputCount: referencePreflight.referenceInputCount,
+    referenceStages: referencePreflight.stages,
   });
 }
 async function runManaged(args, manifest, port) {
@@ -165,6 +176,7 @@ export async function runLocalArtBatchEntry(argv = process.argv.slice(2)) {
     auditScore: manifest.auditScore, auditWarnings: manifest.auditWarnings,
     adapterId: manifest.adapterId, profileId: manifest.profileId,
     catalogPath: manifest.catalogPath, baseUrl: manifest.baseUrl,
+    referenceInputCount: manifest.referenceInputCount, referenceStages: manifest.referenceStages,
   })}\n`);
   await runManaged(args, manifest, port);
 }
