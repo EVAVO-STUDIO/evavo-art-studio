@@ -1,0 +1,31 @@
+{
+  "schema": "evavo.local-generation-ipadapter-runtime.v1",
+  "runtimeId": "comfyui-ipadapter-plus",
+  "version": "REPLACE_WITH_PINNED_COMMIT_OR_RELEASE",
+  "customNodeFolder": "ComfyUI_IPAdapter_plus",
+  "runtimeSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "ipAdapterModel": {
+    "id": "sdxl-ipadapter-model",
+    "fileName": "REPLACE_WITH_REVIEWED_SDXL_IPADAPTER_MODEL.safetensors",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "clipVisionModel": {
+    "id": "sdxl-ipadapter-clip-vision",
+    "fileName": "REPLACE_WITH_REVIEWED_CLIP_VISION_MODEL.safetensors",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "roles": [
+    "canonical-identity",
+    "direction-master",
+    "palette-reference",
+    "material-reference"
+  ],
+  "weight": 0.8,
+  "weightType": "linear",
+  "combineEmbeds": "concat",
+  "startAt": 0,
+  "endAt": 1,
+  "embedsScaling": "V only",
+  "baseModelNodeId": "1",
+  "samplerNodeId": "4"
+}
