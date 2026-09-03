@@ -18,6 +18,7 @@
   },
   "character": {
     "id": "lorna",
+    "minimumAge": 28,
     "description": "Lorna is a clearly adult 28-year-old fictional action heroine with a mature face, long dark hair, athletic curvy build, strong adult proportions and a confident competitive presence.",
     "face": "same mature adult facial geometry in every shot; defined cheekbones, strong brows, adult eyes and jaw, never youthful or doll-like",
     "hair": "same long dark hair, stable length, volume and parting throughout",
@@ -78,106 +79,15 @@
     "adapterId": "comfyui:sdxl-base-local-cinematic_stills"
   },
   "shots": [
-    {
-      "id": "01-opening-outfit",
-      "description": "Opening strip-poker game image establishing Lorna and the underground industrial poker room.",
-      "pose": "standing or leaning naturally at the poker table with shoulders back and an easy competitive stance",
-      "camera": "eye-level full or three-quarter figure cinematic game-scene view",
-      "expression": "confident amused competitive smile",
-      "outfitState": "extremely minimal but fully opaque black leather micro-bikini, high-cut thong-style bottoms, wrist straps and oversized rugged black combat boots; strong cleavage with nipples and areolae completely covered",
-      "background": "dark industrial underground poker room with aged felt table, cards, chips and motivated practical lights",
-      "framing": "show head, body and boots with comfortable margins; no anatomical close-up",
-      "continuityLocks": ["this shot establishes definitive face, hair, proportions, boots, poker table and room lighting"]
-    },
-    {
-      "id": "02-boots-and-bikini",
-      "description": "Same Lorna after an early lost hand, with accessories removed but identity and room unchanged.",
-      "pose": "leaning casually against the same poker table with relaxed adult body language",
-      "camera": "eye-level three-quarter full figure at the same visual scale",
-      "expression": "knowing playful smile",
-      "outfitState": "same extremely minimal opaque black leather micro-bikini and identical combat boots, with outer straps removed; strong cleavage and side breast contour while nipples and areolae remain covered",
-      "background": "same underground poker room, table, cards, chips and practical lighting",
-      "framing": "full or medium-full figure, no anatomy crop"
-    },
-    {
-      "id": "03-micro-top-stage",
-      "description": "Lorna deeper into the game holding her losing cards beside the same table.",
-      "pose": "standing beside the table holding cards with a defiant relaxed stance",
-      "camera": "eye-level full figure with mild cinematic three-quarter angle",
-      "expression": "amused and defiant",
-      "outfitState": "tiny opaque black leather micro-top fully covering nipples and areolae, minimal matching thong bottom and identical rugged combat boots; cleavage, side and lower breast contour visible without nipple exposure",
-      "background": "same poker room with consistent table geometry and lighting",
-      "framing": "full figure, strong readable silhouette"
-    },
-    {
-      "id": "04-pasties-and-thong-standing",
-      "description": "Strongest first minimal-coverage stage after Lorna removes the micro-top.",
-      "pose": "standing confidently beside the poker table with one hand near the table edge",
-      "camera": "eye-level full figure mature game bonus-art composition",
-      "expression": "confident teasing competitive look",
-      "outfitState": "two tiny opaque black leather nipple pasties with short decorative tassels, extremely minimal opaque black micro-thong fully covering genital anatomy, and identical oversized combat boots; substantial normal breast contour, cleavage, side and lower breast contour visible around the opaque coverage",
-      "background": "same industrial poker room and practical lighting",
-      "framing": "full body, no anatomical close-up, intimate areas remain fully non-explicit"
-    },
-    {
-      "id": "05-pasties-seated-table",
-      "description": "Lorna seated sideways on the poker-table edge after another lost hand.",
-      "pose": "natural seated side pose with believable weight on the table edge, legs positioned non-explicitly",
-      "camera": "eye-level medium-full to full figure",
-      "expression": "mature confident grin",
-      "outfitState": "same tiny opaque nipple pasties with short tassels, extremely minimal opaque micro-thong and identical combat boots; deep cleavage and side/lower breast contour visible while nipples, areolae and genital anatomy stay covered",
-      "background": "same poker table with scattered cards and same industrial room",
-      "framing": "readable whole pose; no spread-leg or anatomical close-up"
-    },
-    {
-      "id": "06-final-minimal-coverage-stage",
-      "description": "Final physically covered strip-poker stage with intentionally tiny but opaque coverage.",
-      "pose": "standing naturally beside the table after losing the next-to-last round",
-      "camera": "eye-level full-body cinematic game illustration",
-      "expression": "confident competitive mature expression",
-      "outfitState": "two very small opaque black nipple pasties with subtle tassels, ultra-minimal opaque front-and-rear micro-thong coverage panel connected by narrow straps, and identical combat boots; opaque pieces completely cover nipple, areola and genital anatomy",
-      "background": "same poker room with restrained practical lighting",
-      "framing": "full figure, readable silhouette, non-explicit intimate coverage"
-    },
-    {
-      "id": "07-implied-nude-standing-rear",
-      "description": "After the final clothing round, Lorna is strongly implied nude from a rear three-quarter angle without explicit anatomy.",
-      "pose": "standing rear three-quarter beside the poker table, torso naturally turned and one arm positioned for non-explicit coverage",
-      "camera": "rear three-quarter full figure",
-      "expression": "looking back with calm confident amusement",
-      "outfitState": "implied nude; long hair, turned torso, arm and deep shadow obscure nipple/areola detail and front pelvis; discarded pasties, micro-thong and boots visible nearby",
-      "background": "same poker room, cards and table making the game progression clear",
-      "framing": "bare back, waist, hips, buttock contour and legs may be visible; no genital detail or anatomical close-up"
-    },
-    {
-      "id": "08-implied-nude-chair",
-      "description": "Post-game chair pose in the same room, strongly implied nude but strategically non-explicit.",
-      "pose": "sitting sideways in a heavy chair with crossed thigh, forearm and hair providing natural coverage",
-      "camera": "eye-level medium-full side three-quarter",
-      "expression": "calm amused mature expression",
-      "outfitState": "implied nude; crossed thigh, forearm, long hair and camera angle hide genital anatomy and nipple/areola detail; discarded outfit and boots nearby",
-      "background": "same dark poker room with table receding behind",
-      "framing": "bare shoulders, cleavage, side breast contour, waist, hips and legs visible without explicit anatomy"
-    },
-    {
-      "id": "09-bedroom-edge",
-      "description": "Bedroom bonus-scene transition after the poker game with the same Lorna identity.",
-      "pose": "sitting naturally on the bed edge with a rumpled dark sheet across her lap and one arm positioned for coverage",
-      "camera": "eye-level medium-full cinematic bedroom composition",
-      "expression": "confident mischievous look toward camera",
-      "outfitState": "strongly implied nude; sheet, arm and long hair obscure genital anatomy and nipple/areola detail; discarded tiny pasties, micro-thong and boots beside bed",
-      "background": "dark lived-in bedroom with practical warm light, rumpled bedding and restrained action-game atmosphere",
-      "framing": "bare shoulders, cleavage, side breast contour, back, waist, hips and legs visible; no explicit anatomy"
-    },
-    {
-      "id": "10-bedroom-finale",
-      "description": "Final mature bonus-scene illustration preserving the exact established Lorna identity.",
-      "pose": "posed forward naturally on the bed in a rear three-quarter position, looking back",
-      "camera": "rear three-quarter medium-full to full figure with restrained cinematic perspective",
-      "expression": "confident mischievous mature expression",
-      "outfitState": "strongly implied nude; turned angle, long hair, arm position and rumpled bedding obscure nipple/areola detail and all genital anatomy; discarded tiny pasties, micro-thong and boots remain visible",
-      "background": "same dark bedroom established in shot 09 with practical light, deep shadow and restrained rim light",
-      "framing": "bare back, shoulders, waist, hips, buttock contour, thighs and legs may be visible; no explicit anatomical detail"
-    }
+    {"id":"01-opening-outfit","description":"Opening strip-poker game image establishing Lorna and the underground industrial poker room.","pose":"standing or leaning naturally at the poker table with shoulders back and an easy competitive stance","camera":"eye-level full or three-quarter figure cinematic game-scene view","expression":"confident amused competitive smile","outfitState":"extremely minimal but fully opaque black leather micro-bikini, high-cut thong-style bottoms, wrist straps and oversized rugged black combat boots; strong cleavage with nipples and areolae completely covered","background":"dark industrial underground poker room with aged felt table, cards, chips and motivated practical lights","framing":"show head, body and boots with comfortable margins; no anatomical close-up","continuityLocks":["this shot establishes definitive face, hair, proportions, boots, poker table and room lighting"]},
+    {"id":"02-boots-and-bikini","description":"Same Lorna after an early lost hand, with accessories removed but identity and room unchanged.","pose":"leaning casually against the same poker table with relaxed adult body language","camera":"eye-level three-quarter full figure at the same visual scale","expression":"knowing playful smile","outfitState":"same extremely minimal opaque black leather micro-bikini and identical combat boots, with outer straps removed; strong cleavage and side breast contour while nipples and areolae remain covered","background":"same underground poker room, table, cards, chips and practical lighting","framing":"full or medium-full figure, no anatomy crop"},
+    {"id":"03-micro-top-stage","description":"Lorna deeper into the game holding her losing cards beside the same table.","pose":"standing beside the table holding cards with a defiant relaxed stance","camera":"eye-level full figure with mild cinematic three-quarter angle","expression":"amused and defiant","outfitState":"tiny opaque black leather micro-top fully covering nipples and areolae, minimal matching thong bottom and identical rugged combat boots; cleavage, side and lower breast contour visible without nipple exposure","background":"same poker room with consistent table geometry and lighting","framing":"full figure, strong readable silhouette"},
+    {"id":"04-pasties-and-thong-standing","description":"Strongest first minimal-coverage stage after Lorna removes the micro-top.","pose":"standing confidently beside the poker table with one hand near the table edge","camera":"eye-level full figure mature game bonus-art composition","expression":"confident teasing competitive look","outfitState":"two tiny opaque black leather nipple pasties with short decorative tassels, extremely minimal opaque black micro-thong fully covering genital anatomy, and identical oversized combat boots; substantial normal breast contour, cleavage, side and lower breast contour visible around the opaque coverage","background":"same industrial poker room and practical lighting","framing":"full body, no anatomical close-up, intimate areas remain fully non-explicit"},
+    {"id":"05-pasties-seated-table","description":"Lorna seated sideways on the poker-table edge after another lost hand.","pose":"natural seated side pose with believable weight on the table edge, legs positioned non-explicitly","camera":"eye-level medium-full to full figure","expression":"mature confident grin","outfitState":"same tiny opaque nipple pasties with short tassels, extremely minimal opaque micro-thong and identical combat boots; deep cleavage and side/lower breast contour visible while nipples, areolae and genital anatomy stay covered","background":"same poker table with scattered cards and same industrial room","framing":"readable whole pose; no spread-leg or anatomical close-up"},
+    {"id":"06-final-minimal-coverage-stage","description":"Final physically covered strip-poker stage with intentionally tiny but opaque coverage.","pose":"standing naturally beside the table after losing the next-to-last round","camera":"eye-level full-body cinematic game illustration","expression":"confident competitive mature expression","outfitState":"two very small opaque black nipple pasties with subtle tassels, ultra-minimal opaque front-and-rear micro-thong coverage panel connected by narrow straps, and identical combat boots; opaque pieces completely cover nipple, areola and genital anatomy","background":"same poker room with restrained practical lighting","framing":"full figure, readable silhouette, non-explicit intimate coverage"},
+    {"id":"07-implied-nude-standing-rear","description":"After the final clothing round, Lorna is strongly implied nude from a rear three-quarter angle without explicit anatomy.","pose":"standing rear three-quarter beside the poker table, torso naturally turned and one arm positioned for non-explicit coverage","camera":"rear three-quarter full figure","expression":"looking back with calm confident amusement","outfitState":"implied nude; long hair, turned torso, arm and deep shadow obscure nipple/areola detail and front pelvis; discarded pasties, micro-thong and boots visible nearby","background":"same poker room, cards and table making the game progression clear","framing":"bare back, waist, hips, buttock contour and legs may be visible; no genital detail or anatomical close-up"},
+    {"id":"08-implied-nude-chair","description":"Post-game chair pose in the same room, strongly implied nude but strategically non-explicit.","pose":"sitting sideways in a heavy chair with crossed thigh, forearm and hair providing natural coverage","camera":"eye-level medium-full side three-quarter","expression":"calm amused mature expression","outfitState":"implied nude; crossed thigh, forearm, long hair and camera angle hide genital anatomy and nipple/areola detail; discarded outfit and boots nearby","background":"same dark poker room with table receding behind","framing":"bare shoulders, cleavage, side breast contour, waist, hips and legs visible without explicit anatomy"},
+    {"id":"09-bedroom-edge","description":"Bedroom bonus-scene transition after the poker game with the same Lorna identity.","pose":"sitting naturally on the bed edge with a rumpled dark sheet across her lap and one arm positioned for coverage","camera":"eye-level medium-full cinematic bedroom composition","expression":"confident mischievous look toward camera","outfitState":"strongly implied nude; sheet, arm and long hair obscure genital anatomy and nipple/areola detail; discarded tiny pasties, micro-thong and boots beside bed","background":"dark lived-in bedroom with practical warm light, rumpled bedding and restrained action-game atmosphere","framing":"bare shoulders, cleavage, side breast contour, back, waist, hips and legs visible; no explicit anatomy"},
+    {"id":"10-bedroom-finale","description":"Final mature bonus-scene illustration preserving the exact established Lorna identity.","pose":"posed forward naturally on the bed in a rear three-quarter position, looking back","camera":"rear three-quarter medium-full to full figure with restrained cinematic perspective","expression":"confident mischievous mature expression","outfitState":"strongly implied nude; turned angle, long hair, arm position and rumpled bedding obscure nipple/areola detail and all genital anatomy; discarded tiny pasties, micro-thong and boots remain visible","background":"same dark bedroom established in shot 09 with practical light, deep shadow and restrained rim light","framing":"bare back, shoulders, waist, hips, buttock contour, thighs and legs may be visible; no explicit anatomical detail"}
   ]
 }
