@@ -21,6 +21,8 @@ const files = {
   commercialDocs: "docs/book-cover-commercial-release.md",
   manuscriptAuthoritySource: "packages/contracts/src/book-cover-manuscript-authority.ts",
   manuscriptAuthorityTest: "packages/contracts/test/book-cover-manuscript-authority.test.mjs",
+  validationReceiptSource: "packages/contracts/src/book-cover-cross-repo-validation-receipt.ts",
+  validationReceiptTest: "packages/contracts/test/book-cover-cross-repo-validation-receipt.test.mjs",
 };
 const failures = [];
 const sources = {};
@@ -93,6 +95,7 @@ if (!failures.length) {
   expect("index", 'export * from "./book-creative-direction.js";');
   expect("index", 'export * from "./book-cover-commercial-release.js";');
   expect("index", 'export * from "./book-cover-manuscript-authority.js";');
+  expect("index", 'export * from "./book-cover-cross-repo-validation-receipt.js";');
   expect("package", '"book:creative-direction:check": "node scripts/check-book-creative-direction.mjs"');
   expect("package", "pnpm run book:creative-direction:check");
 
@@ -161,6 +164,21 @@ if (!failures.length) {
   ]) expect("manuscriptAuthorityTest", token);
 
   for (const token of [
+    "evavo_art_book_cover_cross_repo_validation_receipt_v1",
+    "compileBookCoverCrossRepoValidationReceipt",
+    "validateBookCoverCrossRepoValidationReceipt",
+    "validateBookCoverCommercialReleaseAuthorityV2",
+    "validateBookCoverManuscriptAuthority",
+    "automaticPromotionAllowed: false",
+    "publicationAllowed: false",
+  ]) expect("validationReceiptSource", token);
+
+  for (const token of [
+    "emits a receipt only after both exact Art authorities validate",
+    "receipt validation detects post-validation tampering",
+  ]) expect("validationReceiptTest", token);
+
+  for (const token of [
     "automaticSelectionAllowed:true",
     "automaticPromotionAllowed:true",
     "publicationPerformed:true",
@@ -185,6 +203,7 @@ if (failures.length) {
     evidenceBoundSubjects: true,
     exactManuscriptCoverAuthorityRequired: true,
     exactCanonCoverAuthorityRequired: true,
+    crossRepoAuthorityValidationReceiptRequired: true,
     endingSpoilersExcludedFromCoverAuthority: true,
     genreAwareComposition: true,
     historicalPrintProcesses: true,
