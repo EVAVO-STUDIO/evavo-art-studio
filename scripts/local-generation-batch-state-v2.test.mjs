@@ -11,6 +11,7 @@ import {
   createBatchState,
   deterministicRunKey,
   hydrateBatchState,
+  invalidateRecoveredExecutionFromStage,
   manifestFingerprint,
   planFingerprint,
   readBatchState,
@@ -121,6 +122,31 @@ test('checkpoint round-trip preserves accepted frame results, artifacts, attempt
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('invalidating an upstream stage removes dependent results, artifacts, and stale retry history', () => {
+  const refs = { referenceGraph: { stages: [['anchor'], ['follow'], ['final']] } };
+  const frameResults = new Map([
+    ['anchor', acceptedResult(artifactA)],
+    ['follow', acceptedResult(artifactB)],
+    ['final', acceptedResult(artifactA)],
+  ]);
+  const artifactResults = new Map([
+    ['anchor', [artifactA]],
+    ['follow', [artifactB]],
+    ['final', [artifactA]],
+  ]);
+  const attempts = [
+    { stage: 1, attempt: 1 },
+    { stage: 2, attempt: 1 },
+    { stage: 2, attempt: 2 },
+    { stage: 3, attempt: 1 },
+  ];
+  const result = invalidateRecoveredExecutionFromStage(refs, frameResults, artifactResults, attempts, 1);
+  assert.deepEqual(result.invalidShotIds, ['follow', 'final']);
+  assert.deepEqual([...frameResults.keys()], ['anchor']);
+  assert.deepEqual([...artifactResults.keys()], ['anchor']);
+  assert.deepEqual(attempts, [{ stage: 1, attempt: 1 }]);
 });
 
 test('resume refuses manifest, plan, or reference graph drift', () => {
