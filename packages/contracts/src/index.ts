@@ -26,6 +26,7 @@ export * from "./book-production-legacy-state-import-safe.js";
 export * from "./book-production-legacy-state-batch-safe.js";
 export * from "./book-production-promotion-adapter.js";
 export * from "./constants.js";
+export * from "./factual-visual-authority.js";
 export * from "./models.js";
 export * from "./soundtrack-artwork-brief.js";
 export * from "./sprite-models.js";
