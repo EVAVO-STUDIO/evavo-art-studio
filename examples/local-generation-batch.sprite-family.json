@@ -1,0 +1,68 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "example-sprite-family",
+  "contentClass": "general",
+  "batch_size": 8,
+  "generation_mode": "sprite",
+  "consistency_mode": "strict",
+  "quality_profile": "sprite_sheet_clean",
+  "character": {
+    "id": "example-sprite-character",
+    "description": "A recurring game character with a distinctive readable silhouette and stable proportions designed for a coherent sprite family",
+    "face": "specific facial geometry preserved between poses",
+    "hair": "stable hairstyle with the same outline and length",
+    "build": "fixed character proportions and limb lengths",
+    "costume": "the exact same construction, seams, footwear and accessories in every frame",
+    "palette": ["project primary", "project secondary", "project accent"],
+    "signatureDetails": ["preserve silhouette-defining details", "preserve prop scale", "do not redesign the costume"]
+  },
+  "style": {
+    "name": "project-sprite-production",
+    "description": "Authored game-ready sprite source art with repeatable geometry, clean readable poses and disciplined project-specific art direction",
+    "medium": "game sprite source illustration",
+    "lighting": "simple stable lighting that preserves form readability across the family",
+    "palette": ["locked project palette"],
+    "materials": ["stable material appearance across every frame"],
+    "lineTreatment": ["consistent edge treatment", "clean silhouette separation"],
+    "mustHave": ["repeatable scale", "consistent anatomy", "stable costume construction", "readable gesture"],
+    "mustAvoid": ["generic AI character redesign", "camera drift", "proportion drift", "cropped limbs", "random accessories", "busy background"]
+  },
+  "continuity_locks": [
+    "same face geometry in every frame",
+    "same hair silhouette in every frame",
+    "same body proportions in every frame",
+    "same costume construction in every frame",
+    "same character scale and camera distance unless explicitly overridden"
+  ],
+  "seed_strategy": {"base": 481200, "stride": 1},
+  "output_rules": {
+    "exactCount": true,
+    "requireUniqueHashes": true,
+    "requireNonZeroBytes": true,
+    "requireDimensions": true,
+    "writeImageMetadata": true,
+    "preserveAttempts": false
+  },
+  "retry_rules": {
+    "maxShotAttempts": 3,
+    "retryMissing": true,
+    "retryInvalidFile": true,
+    "retryDimensionMismatch": true,
+    "retryDuplicate": true,
+    "seedBump": 1009
+  },
+  "provider": {
+    "baseUrl": "http://127.0.0.1:8192",
+    "adapterId": "comfyui:sdxl-base-local-sprite_sheet_clean"
+  },
+  "shots": [
+    {"id":"001-direction-master","description":"Definitive direction master establishing the sprite character scale and design","pose":"neutral standing pose","camera":"fixed eye-level orthographic-feeling game presentation","expression":"neutral","background":"plain unobtrusive production background","framing":"full figure centred with fixed margins"},
+    {"id":"002-idle-a","description":"Idle pose A for the same character","pose":"relaxed idle stance with subtle weight shift","camera":"same camera and scale as direction master","expression":"neutral attentive","background":"same production background","framing":"same full-figure margins"},
+    {"id":"003-idle-b","description":"Idle pose B for the same character","pose":"second subtle idle stance without changing proportions","camera":"same camera and scale as direction master","expression":"neutral attentive","background":"same production background","framing":"same full-figure margins"},
+    {"id":"004-walk-contact","description":"Walk-cycle contact pose","pose":"clear contact pose with readable feet and limb separation","camera":"same camera and scale as direction master","expression":"focused neutral","background":"same production background","framing":"same full-figure margins"},
+    {"id":"005-walk-passing","description":"Walk-cycle passing pose","pose":"clear passing pose preserving limb lengths and costume","camera":"same camera and scale as direction master","expression":"focused neutral","background":"same production background","framing":"same full-figure margins"},
+    {"id":"006-action-ready","description":"Action-ready pose","pose":"readable anticipatory action stance with balanced silhouette","camera":"same camera and scale as direction master","expression":"focused","background":"same production background","framing":"same full-figure margins"},
+    {"id":"007-action-main","description":"Primary action pose","pose":"strong action gesture with correct anatomy and no camera drift","camera":"same camera and scale as direction master","expression":"determined","background":"same production background","framing":"same full-figure margins"},
+    {"id":"008-recovery","description":"Recovery pose returning from the action","pose":"stable recovery stance preserving character construction","camera":"same camera and scale as direction master","expression":"focused easing to neutral","background":"same production background","framing":"same full-figure margins"}
+  ]
+}
