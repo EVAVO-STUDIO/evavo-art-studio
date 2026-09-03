@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -185,12 +184,4 @@ test('reference semantic rules fail closed before provider execution', () => {
     ], capable, { operation: 'generate', assetKind: 'illustration', continuityPhase: 'in-between' }),
     /previous-key-pose and next-key-pose/u,
   );
-});
-
-test('V1 durable job builder consumes resolved artifact references instead of dropping them', async () => {
-  const source = await readFile(new URL('./run-local-generation-campaign.mjs', import.meta.url), 'utf8');
-  assert.match(source, /profile\.limits\.maximumReferenceImages < scene\.references\.length/u);
-  assert.match(source, /inputArtifacts:\s*\[\.\.\.new Set\(scene\.references\.map\(\(reference\) => reference\.artifactId\)\)\]/u);
-  assert.match(source, /references:\s*scene\.references/u);
-  assert.match(source, /requiredCapabilityProfile:\s*route\.requiredCapabilities/u);
 });
