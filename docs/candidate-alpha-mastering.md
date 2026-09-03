@@ -214,6 +214,26 @@ Protect and remove masks provide bounded artist correction after automatic recov
 
 The CLI refuses to overwrite the source or either artist mask. It writes atomically, emits JSON on stdout and exits with code `3` when blocking sprite QA fails. The PNG, proof and evidence remain available for diagnosis and are still marked unapproved.
 
+### Dependency-light painted-checkerboard fallback
+
+When the Node/Sharp runtime cannot load on a supported workstation, the
+dependency-light recovery tool can master a confidently detected painted
+checkerboard without discarding the provider candidate:
+
+```powershell
+python tools/recover_painted_checkerboard.py `
+  --input .\candidate.png `
+  --output .\candidate.alpha.png `
+  --proof .\candidate.alpha.proof.png `
+  --evidence .\candidate.alpha.evidence.json
+```
+
+The fallback is create-only and never mutates the provider source. Its proof
+uses black, white, grey, green and magenta plates plus an alpha-mask tile, not
+a checkerboard. It is intentionally limited to confidently separable painted
+checkerboards or explicitly declared flat mattes; ambiguous natural
+backgrounds still require the governed segmentation/mask path.
+
 ## Sheet and atlas admission
 
 Background recovery is not optional merely because the next step is a sprite sheet or atlas. Both atlas builders and the Project Art sheet slicer/assembler inspect decoded pixels before trim, slice or pack. Their default `alphaPolicy` is `required`: meaningful native alpha, a completely transparent canvas edge and no detected painted grid or matte. `preferred` supports mixed opaque/transparent inventories but still rejects detected fake backgrounds. `opaque` is reserved for intentionally opaque art and still rejects painted transparency grids. Per-frame admission evidence is retained in the output manifest or atlas evidence.

@@ -17,6 +17,15 @@ from pathlib import Path
 from PIL import Image
 
 
+PROOF_BACKGROUNDS = (
+    (0, 0, 0),
+    (255, 255, 255),
+    (127, 127, 127),
+    (0, 255, 0),
+    (255, 0, 255),
+)
+
+
 def distance_sq(a: tuple[int, int, int], b: tuple[int, int, int]) -> int:
     return sum((a[index] - b[index]) ** 2 for index in range(3))
 
@@ -213,11 +222,29 @@ def recover(
     return output, evidence
 
 
+def create_hostile_background_proof(image: Image.Image) -> Image.Image:
+    """Composite an RGBA master over five hostile plates plus its alpha mask."""
+    rgba = image.convert("RGBA")
+    width, height = rgba.size
+    proof = Image.new("RGB", (width * 3, height * 2))
+    for index, colour in enumerate(PROOF_BACKGROUNDS):
+        plate = Image.new("RGBA", rgba.size, (*colour, 255))
+        composite = Image.alpha_composite(plate, rgba).convert("RGB")
+        proof.paste(composite, ((index % 3) * width, (index // 3) * height))
+    alpha = rgba.getchannel("A").convert("RGB")
+    proof.paste(alpha, (width * 2, height))
+    return proof
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--evidence", type=Path)
+    parser.add_argument(
+        "--proof", type=Path,
+        help="write a black/white/grey/green/magenta plus alpha-mask proof sheet",
+    )
     parser.add_argument("--border-band", type=int, default=24)
     parser.add_argument("--threshold", type=int, default=22)
     parser.add_argument("--fringe-threshold", type=int, default=42)
@@ -236,8 +263,13 @@ def main() -> None:
         help="neutralize residual chroma on visible antialiased edge pixels",
     )
     args = parser.parse_args()
-    if args.input.resolve() == args.output.resolve() or args.output.exists():
-        raise SystemExit("output must be a new path separate from the immutable source")
+    evidence_path = args.evidence or args.output.with_suffix(".evidence.json")
+    destinations = [args.output, evidence_path, *([args.proof] if args.proof else [])]
+    resolved_destinations = [path.resolve() for path in destinations]
+    if args.input.resolve() in resolved_destinations or len(set(resolved_destinations)) != len(resolved_destinations):
+        raise SystemExit("output, evidence and proof must be distinct from the immutable source and each other")
+    if any(path.exists() for path in destinations):
+        raise SystemExit("output, evidence and proof must use new paths")
     source = args.input.read_bytes()
     matte = None
     if args.matte:
@@ -257,9 +289,18 @@ def main() -> None:
     output.save(args.output, optimize=True)
     evidence["source_sha256"] = sha256(source).hexdigest()
     evidence["output_sha256"] = sha256(args.output.read_bytes()).hexdigest()
-    evidence_path = args.evidence or args.output.with_suffix(".evidence.json")
-    if evidence_path.exists():
-        raise SystemExit("evidence output already exists")
+    if args.proof:
+        args.proof.parent.mkdir(parents=True, exist_ok=True)
+        proof = create_hostile_background_proof(output)
+        proof.save(args.proof, optimize=True)
+        evidence["hostile_background_proof"] = {
+            "path": str(args.proof),
+            "layout": "3x2:black,white,grey,green,magenta,alpha-mask",
+            "backgrounds": ["#000000", "#ffffff", "#7f7f7f", "#00ff00", "#ff00ff"],
+            "sha256": sha256(args.proof.read_bytes()).hexdigest(),
+        }
+    else:
+        evidence["hostile_background_proof"] = None
     evidence_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(evidence, separators=(",", ":")))
 

@@ -58,6 +58,14 @@ class PaintedCheckerboardRecoveryTest(unittest.TestCase):
         self.assertEqual(255, alpha.getpixel((30, 30)))
         self.assertEqual(4, evidence["island_removed_pixels"])
 
+    def test_builds_six_tile_hostile_background_proof(self) -> None:
+        image = Image.new("RGBA", (2, 2), (200, 100, 50, 128))
+        proof = MODULE.create_hostile_background_proof(image)
+        self.assertEqual((6, 4), proof.size)
+        self.assertEqual("RGB", proof.mode)
+        self.assertEqual((100, 50, 25), proof.getpixel((0, 0)))
+        self.assertEqual((128, 128, 128), proof.getpixel((4, 2)))
+
 
 if __name__ == "__main__":
     unittest.main()
