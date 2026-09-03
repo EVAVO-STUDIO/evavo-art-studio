@@ -61,7 +61,7 @@ They define resolution, steps, CFG, sampler, scheduler, denoise, hires/detail in
 
 Do not claim that a profile value affected provider pixels unless the selected reviewed provider profile exposes or bakes that value.
 
-Art Studio now supports a **workflow-baked** path for the standard local quality profiles:
+Art Studio supports a **workflow-baked** path for the standard local quality profiles:
 
 1. `decompile-comfyui-workflow-catalog.mjs` reconstructs a safe draft from a reviewed compiled catalog while removing only computed integrity fields.
 2. `compile-comfyui-quality-profile-draft.mjs` clones the reviewed base workflow and writes profile-specific `KSampler`/`KSamplerAdvanced` values for `steps`, `cfg`, `sampler_name`, `scheduler` and `denoise`.
@@ -149,6 +149,29 @@ After each attempt the orchestrator validates:
 
 Only affected shots are retried. Retry seeds remain deterministic using `seedBump`; a weak frame does not force a 120-image campaign to rerun.
 
+## Durable resume and crash recovery
+
+Large local campaigns are **idempotent and resumable by default**.
+
+`local-generation-batch-state-v2.mjs` binds durable state to canonical SHA-256 fingerprints of both the authored manifest and the compiled execution plan. The dependency-stage graph is also recorded and must match on resume.
+
+The production runner uses `--resume auto` by default. For the same manifest and compiled plan it reuses the deterministic run key and `<runRoot>\state.json` rather than creating another timestamped duplicate run.
+
+Recovery rules are deliberately fail-closed:
+
+- every persisted accepted candidate is re-QA'd from its retained file before it is trusted;
+- a missing, corrupt, dimension-invalid or otherwise no-longer-accepted upstream result invalidates that stage and every dependent downstream stage;
+- completed valid stages are not regenerated;
+- partially completed stages continue from the next unused deterministic retry attempt;
+- accepted provider artifact IDs are restored so downstream reference-conditioned stages keep their real dependency inputs;
+- final output materialization is idempotent: an existing output is reused only when its SHA-256 matches the accepted candidate;
+- manifest, compiled-plan or reference-graph drift refuses resume instead of mixing two different campaigns;
+- state writes use a temporary file plus atomic rename and post-write verification.
+
+Use `--resume never` only when an intentional new physical run is required even though the manifest/plan fingerprint is unchanged. In normal managed `.cmd` and MCP execution, automatic resume is the safe default.
+
+Changing a seed, shot, quality profile, consistency plan, provider/model plan or other execution-affecting campaign data changes the fingerprint naturally and therefore creates a different resumable run identity.
+
 ## Reproducibility metadata
 
 Each accepted image can retain:
@@ -202,7 +225,7 @@ By default:
 
 `%LOCALAPPDATA%\EVAVO\ArtStudio\batches\<campaignId>\<runId>\`
 
-contains the source/plan, QA attempts, receipt, final outputs, per-image metadata and staging evidence.
+contains the source/plan, durable `state.json`, QA attempts, receipt, final outputs, per-image metadata and staging evidence.
 
 Managed execution manifests are separately retained under:
 
@@ -212,12 +235,12 @@ so machine binding never mutates the authored campaign file.
 
 ## Regression contract
 
-`check-local-generation-batch-v2.mjs` requires the compiler, orchestrator, formal schema, data profiles, quality workflow compiler/decompiler, reference DAG, model/LoRA plan, generic examples, managed lifecycle and MCP tools. It also syntax-checks the executable Node modules.
+`check-local-generation-batch-v2.mjs` requires the compiler, orchestrator, formal schema, data profiles, quality workflow compiler/decompiler, reference DAG, model/LoRA plan, resumable state contract/tests, generic examples, managed lifecycle and MCP tools. It also syntax-checks the executable Node modules.
 
-Focused tests cover large-batch chunking, deterministic consistency, generation modes, quality KSampler rewriting, reference-DAG resolution/cycle rejection, model/LoRA fail-closed behavior and reproducibility metadata.
+Focused tests cover large-batch chunking, deterministic consistency, generation modes, quality KSampler rewriting, reference-DAG resolution/cycle rejection, model/LoRA fail-closed behavior, durable resume-state integrity and reproducibility metadata.
 
 ## Architecture rule
 
 No character, game, genre, campaign or fixed output count belongs in the generic engine.
 
-Project decisions belong in campaign data. Pixel-affecting provider behavior belongs in reviewed provider workflows/bindings. The generic engine owns planning, deterministic compilation, machine binding, managed local runtime lifecycle, chunking, QA, retry, metadata and receipts.
+Project decisions belong in campaign data. Pixel-affecting provider behavior belongs in reviewed provider workflows/bindings. The generic engine owns planning, deterministic compilation, machine binding, managed local runtime lifecycle, chunking, QA, retry, durable recovery, metadata and receipts.
