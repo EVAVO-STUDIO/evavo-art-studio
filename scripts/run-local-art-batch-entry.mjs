@@ -9,7 +9,7 @@ import { spawn } from 'node:child_process';
 import { auditBatchPlan } from './local-generation-batch-audit-v2.mjs';
 import { compileBatchPlan } from './local-generation-batch-v2.mjs';
 import { assertModelPlanExecutable, normalizeModelPlan } from './local-generation-model-plan-v2.mjs';
-import { prepareReferenceExecutionPlan } from './local-generation-reference-execution-v2.mjs';
+import { prepareReferenceExecutionPlan, referenceAdapterId } from './local-generation-reference-execution-v2.mjs';
 import { validateProviderReferenceInputs } from './local-generation-reference-graph-v2.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -54,12 +54,16 @@ function providerProfile(catalog, adapterId) {
   if (!profile) fail(`reviewed provider profile ${profileId} is not present in the physical catalog`);
   return profile;
 }
-function validateReferencePlan(referencePlan, profile) {
+function validateReferencePlan(referencePlan, catalog, baseAdapterId) {
   let referenceInputCount = 0;
+  const adapterIds = new Set([baseAdapterId]);
   for (const frame of referencePlan.frames) {
     const referenceInputs = frame.shot?.referenceInputs ?? [];
     referenceInputCount += referenceInputs.length;
     if (!referenceInputs.length) continue;
+    const adapterId = referenceAdapterId(baseAdapterId, referenceInputs);
+    adapterIds.add(adapterId);
+    const profile = providerProfile(catalog, adapterId);
     const assetKind = frame.shot?.assetKind ?? (referencePlan.mode === 'sprite' ? 'sprite-frame' : 'illustration');
     validateProviderReferenceInputs(referenceInputs, profile, {
       label: `shot ${frame.id} reference_inputs`,
@@ -72,6 +76,7 @@ function validateReferencePlan(referencePlan, profile) {
     referenceInputCount,
     stages: referencePlan.referenceGraph.stages,
     hasDependencies: referencePlan.referenceGraph.hasDependencies,
+    adapterIds: Object.freeze([...adapterIds].sort()),
   });
 }
 async function prepareManifest(sourcePath, port) {
@@ -94,14 +99,14 @@ async function prepareManifest(sourcePath, port) {
   };
 
   const catalog = await json(bound.provider.catalogPath, 'physical ComfyUI catalog');
-  const profile = providerProfile(catalog, bound.provider.adapterId);
+  const baseProfile = providerProfile(catalog, bound.provider.adapterId);
   const modelPlan = normalizeModelPlan(bound.model_plan ?? bound.modelPlan ?? {});
   if (modelPlan.modelId || modelPlan.modelProfile || modelPlan.loras.length) {
-    assertModelPlanExecutable(modelPlan, profile);
+    assertModelPlanExecutable(modelPlan, baseProfile);
   }
 
   const referencePlan = prepareReferenceExecutionPlan(plan);
-  const referencePreflight = validateReferencePlan(referencePlan, profile);
+  const referencePreflight = validateReferencePlan(referencePlan, catalog, bound.provider.adapterId);
 
   const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`, 'utf8');
   const boundBytes = Buffer.from(`${JSON.stringify(bound, null, 2)}\n`, 'utf8');
@@ -118,10 +123,10 @@ async function prepareManifest(sourcePath, port) {
   await writeFile(providerPath, `${JSON.stringify({
     schema: 'evavo.local-generation-provider-selection.v2',
     adapterId: bound.provider.adapterId,
-    profileId: profile.profileId,
-    profileSha256: profile.profileSha256 ?? null,
-    workflowSha256: profile.workflowSha256 ?? null,
-    modelId: profile.modelId ?? null,
+    profileId: baseProfile.profileId,
+    profileSha256: baseProfile.profileSha256 ?? null,
+    workflowSha256: baseProfile.workflowSha256 ?? null,
+    modelId: baseProfile.modelId ?? null,
     modelPlanSha256: modelPlan.sha256,
     catalogPath: bound.provider.catalogPath,
     catalogSha256: catalog.catalogSha256 ?? null,
@@ -129,14 +134,16 @@ async function prepareManifest(sourcePath, port) {
     referenceInputCount: referencePreflight.referenceInputCount,
     referenceStages: referencePreflight.stages,
     referenceDependencies: referencePreflight.hasDependencies,
+    referenceAdapterIds: referencePreflight.adapterIds,
     referenceExecutionBridge: 'v2-staged-to-v1-runtime',
   }, null, 2)}\n`, 'utf8');
   return Object.freeze({
     original, execution, auditPath, providerPath, fingerprint,
     adapterId: bound.provider.adapterId, catalogPath: bound.provider.catalogPath, baseUrl: bound.provider.baseUrl,
-    auditScore: audit.score, auditWarnings: audit.counts.warnings, profileId: profile.profileId,
+    auditScore: audit.score, auditWarnings: audit.counts.warnings, profileId: baseProfile.profileId,
     referenceInputCount: referencePreflight.referenceInputCount,
     referenceStages: referencePreflight.stages,
+    referenceAdapterIds: referencePreflight.adapterIds,
   });
 }
 async function runManaged(args, manifest, port) {
@@ -177,6 +184,7 @@ export async function runLocalArtBatchEntry(argv = process.argv.slice(2)) {
     adapterId: manifest.adapterId, profileId: manifest.profileId,
     catalogPath: manifest.catalogPath, baseUrl: manifest.baseUrl,
     referenceInputCount: manifest.referenceInputCount, referenceStages: manifest.referenceStages,
+    referenceAdapterIds: manifest.referenceAdapterIds,
   })}\n`);
   await runManaged(args, manifest, port);
 }
