@@ -81,7 +81,16 @@ function requiredCapabilityProfile(scene) {
 }
 async function run(command, args, options = {}) {
   await new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: ROOT, env: options.env ?? process.env, stdio: options.stdio ?? 'inherit', windowsHide: true });
+    const windowsCommandShim = process.platform === 'win32' && /\.cmd$/iu.test(command);
+    const executable = windowsCommandShim ? (process.env.ComSpec?.trim() || 'cmd.exe') : command;
+    const executableArgs = windowsCommandShim ? ['/d', '/s', '/c', command, ...args] : args;
+    const child = spawn(executable, executableArgs, {
+      cwd: ROOT,
+      env: options.env ?? process.env,
+      stdio: options.stdio ?? 'inherit',
+      windowsHide: true,
+      shell: false,
+    });
     child.once('error', reject);
     child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`${command} ${args.join(' ')} exited ${code}`)));
   });
