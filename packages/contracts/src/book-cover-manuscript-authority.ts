@@ -50,8 +50,10 @@ export interface BookCoverManuscriptAuthorityInputV1 {
   approvedByKind: "human";
 }
 
-export interface BookCoverManuscriptAuthorityV1
-  extends BookCoverManuscriptAuthorityInputV1 {
+export type BookCoverManuscriptAuthorityV1 = Omit<
+  BookCoverManuscriptAuthorityInputV1,
+  "outputKind"
+> & {
   outputKind: "evavo_art_book_cover_manuscript_authority";
   evidenceIds: string[];
   blockedEvidenceIds: string[];
@@ -61,7 +63,7 @@ export interface BookCoverManuscriptAuthorityV1
   automaticCanonInferenceAllowed: false;
   automaticSpoilerEscalationAllowed: false;
   authorityFingerprint: string;
-}
+};
 
 export interface BookCoverManuscriptAuthorityValidationV1 {
   valid: boolean;
@@ -72,8 +74,14 @@ const SHA256 = /^(?:sha256:)?[a-f0-9]{64}$/;
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const SPOILER_RANK = { none: 0, minor: 1, major: 2, ending: 3 } as const;
 
+type SpoilerLevel = keyof typeof SPOILER_RANK;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isSpoilerLevel(value: unknown): value is SpoilerLevel {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(SPOILER_RANK, value);
 }
 
 function text(value: unknown, label: string, issues: string[]): string {
@@ -91,6 +99,7 @@ function digest(value: unknown, label: string, issues: string[]): string {
 }
 
 function canonical(value: unknown): string {
+  if (value === undefined) return "undefined";
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (isRecord(value)) {
     return `{${Object.keys(value)
@@ -177,16 +186,25 @@ export function compileBookCoverManuscriptAuthority(
       ? item.canonFactIds.filter((entry): entry is string => typeof entry === "string" && !!entry.trim())
       : [];
     if (!canonFactIds.length) issues.push(`Cover evidence ${evidenceId} is not bound to approved canon facts.`);
-    const spoiler = item.spoilerLevel as keyof typeof SPOILER_RANK;
-    if (!(spoiler in SPOILER_RANK)) issues.push(`Cover evidence ${evidenceId} has an invalid spoiler level.`);
-    if (spoiler === "ending") {
+
+    const spoilerValue = item.spoilerLevel;
+    if (!isSpoilerLevel(spoilerValue)) {
+      issues.push(`Cover evidence ${evidenceId} has an invalid spoiler level.`);
+    } else if (spoilerValue === "ending") {
       blockedEvidenceIds.push(evidenceId);
       issues.push(`Cover evidence ${evidenceId} exposes an ending spoiler and cannot be approved for cover use.`);
-    } else if (ceiling && spoiler in SPOILER_RANK && SPOILER_RANK[spoiler] > SPOILER_RANK[ceiling]) {
+    } else if (
+      ceiling &&
+      (ceiling === "none" || ceiling === "minor" || ceiling === "major") &&
+      SPOILER_RANK[spoilerValue] > SPOILER_RANK[ceiling]
+    ) {
       blockedEvidenceIds.push(evidenceId);
       issues.push(`Cover evidence ${evidenceId} exceeds the approved spoiler ceiling ${ceiling}.`);
     }
-    if (item.approvedForCoverUse !== true) blockedEvidenceIds.push(evidenceId);
+    if (item.approvedForCoverUse !== true) {
+      blockedEvidenceIds.push(evidenceId);
+      issues.push(`Cover evidence ${evidenceId} is not approved for cover use.`);
+    }
   }
 
   if (issues.length) {
