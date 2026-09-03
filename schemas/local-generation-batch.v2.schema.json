@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.studio/schemas/local-generation-batch.v2.schema.json",
+  "title": "EVAVO Local Generation Batch V2",
+  "type": "object",
+  "required": ["schema", "campaignId", "batch_size", "character", "style", "shots"],
+  "properties": {
+    "schema": {"const": "evavo.local-generation-batch.v2"},
+    "campaignId": {"$ref": "#/$defs/safeId"},
+    "contentClass": {"enum": ["general", "mature-nonexplicit"]},
+    "batch_size": {"type": "integer", "minimum": 1, "maximum": 2000},
+    "generation_mode": {"enum": ["independent", "sequential-anchor", "paired", "repair", "variation", "sprite"]},
+    "consistency_mode": {"enum": ["strict", "balanced", "loose"]},
+    "quality_profile": {"enum": ["portrait_high_quality", "sprite_sheet_clean", "concept_art_painterly", "comic_inked", "cinematic_stills", "product_mockups"]},
+    "quality_overrides": {"$ref": "#/$defs/quality"},
+    "character": {
+      "type": "object",
+      "required": ["id", "description"],
+      "properties": {
+        "id": {"$ref": "#/$defs/safeId"},
+        "minimumAge": {"type": "integer", "minimum": 18, "maximum": 130},
+        "description": {"$ref": "#/$defs/text"},
+        "face": {"$ref": "#/$defs/text"},
+        "hair": {"$ref": "#/$defs/text"},
+        "build": {"$ref": "#/$defs/text"},
+        "costume": {"$ref": "#/$defs/text"},
+        "palette": {"$ref": "#/$defs/stringList"},
+        "signatureDetails": {"$ref": "#/$defs/stringList"}
+      },
+      "additionalProperties": true
+    },
+    "style": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"$ref": "#/$defs/text"},
+        "medium": {"$ref": "#/$defs/text"},
+        "period": {"$ref": "#/$defs/text"},
+        "lighting": {"$ref": "#/$defs/text"},
+        "palette": {"$ref": "#/$defs/stringList"},
+        "materials": {"$ref": "#/$defs/stringList"},
+        "lineTreatment": {"$ref": "#/$defs/stringList"},
+        "mustHave": {"$ref": "#/$defs/stringList"},
+        "mustAvoid": {"$ref": "#/$defs/stringList"}
+      },
+      "additionalProperties": true
+    },
+    "continuity_locks": {"$ref": "#/$defs/stringList"},
+    "quality_prompt": {"$ref": "#/$defs/stringList"},
+    "negative": {"$ref": "#/$defs/stringList"},
+    "seed_strategy": {
+      "type": "object",
+      "properties": {
+        "base": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "stride": {"type": "integer", "minimum": 1, "maximum": 1000000}
+      },
+      "additionalProperties": false
+    },
+    "output_rules": {
+      "type": "object",
+      "properties": {
+        "exactCount": {"type": "boolean"},
+        "requireUniqueHashes": {"type": "boolean"},
+        "requireNonZeroBytes": {"type": "boolean"},
+        "requireDimensions": {"type": "boolean"},
+        "writeImageMetadata": {"type": "boolean"},
+        "preserveAttempts": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "retry_rules": {
+      "type": "object",
+      "properties": {
+        "maxShotAttempts": {"type": "integer", "minimum": 1, "maximum": 8},
+        "retryMissing": {"type": "boolean"},
+        "retryInvalidFile": {"type": "boolean"},
+        "retryDimensionMismatch": {"type": "boolean"},
+        "retryDuplicate": {"type": "boolean"},
+        "seedBump": {"type": "integer", "minimum": 1, "maximum": 10000000}
+      },
+      "additionalProperties": false
+    },
+    "provider": {
+      "type": "object",
+      "properties": {
+        "baseUrl": {"type": "string", "pattern": "^http://(?:127\\.0\\.0\\.1|localhost|\\[::1\\])(?::[0-9]+)?$"},
+        "catalogPath": {"type": "string", "minLength": 1},
+        "adapterId": {"type": "string", "pattern": "^comfyui:"}
+      },
+      "additionalProperties": true
+    },
+    "model_plan": {"type": "object", "additionalProperties": true},
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2000,
+      "items": {"$ref": "#/$defs/shot"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"contentClass": {"const": "mature-nonexplicit"}}, "required": ["contentClass"]},
+      "then": {"properties": {"character": {"required": ["minimumAge"]}}}
+    }
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "safeId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "text": {"type": "string", "minLength": 1, "maxLength": 12000},
+    "stringList": {"type": "array", "maxItems": 128, "items": {"type": "string", "minLength": 1, "maxLength": 2048}},
+    "quality": {
+      "type": "object",
+      "properties": {
+        "width": {"type": "integer", "minimum": 64, "maximum": 4096},
+        "height": {"type": "integer", "minimum": 64, "maximum": 4096},
+        "steps": {"type": "integer", "minimum": 1, "maximum": 150},
+        "cfg": {"type": "number", "minimum": 0, "maximum": 30},
+        "sampler": {"type": "string", "minLength": 1},
+        "scheduler": {"type": "string", "minLength": 1},
+        "denoise": {"type": "number", "minimum": 0, "maximum": 1},
+        "hiresScale": {"type": "number", "minimum": 1, "maximum": 4},
+        "faceDetailPass": {"type": "boolean"},
+        "outputFormat": {"enum": ["png", "jpeg", "webp"]}
+      },
+      "additionalProperties": true
+    },
+    "reference": {
+      "type": "object",
+      "properties": {
+        "artifactId": {"type": "string", "pattern": "^artifact_[a-f0-9]{64}$"},
+        "sourceShotId": {"$ref": "#/$defs/safeId"},
+        "candidateIndex": {"type": "integer", "minimum": 0, "maximum": 15},
+        "role": {"enum": ["canonical-identity", "direction-master", "previous-key-pose", "next-key-pose", "base-image", "mask", "pose-control", "edge-control", "depth-control", "palette-reference", "line-reference", "material-reference", "layer-context"]},
+        "strength": {"type": "number", "minimum": 0, "maximum": 2},
+        "required": {"type": "boolean"},
+        "note": {"type": "string", "maxLength": 512}
+      },
+      "required": ["role"],
+      "oneOf": [{"required": ["artifactId"]}, {"required": ["sourceShotId"]}],
+      "additionalProperties": false
+    },
+    "shot": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/safeId"},
+        "description": {"$ref": "#/$defs/text"},
+        "prompt": {"$ref": "#/$defs/text"},
+        "pose": {"$ref": "#/$defs/text"},
+        "camera": {"$ref": "#/$defs/text"},
+        "expression": {"$ref": "#/$defs/text"},
+        "outfitState": {"$ref": "#/$defs/text"},
+        "background": {"$ref": "#/$defs/text"},
+        "framing": {"$ref": "#/$defs/text"},
+        "mustInclude": {"$ref": "#/$defs/stringList"},
+        "mustAvoid": {"$ref": "#/$defs/stringList"},
+        "continuityLocks": {"$ref": "#/$defs/stringList"},
+        "references": {"$ref": "#/$defs/stringList"},
+        "referenceInputs": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/reference"}},
+        "seed": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "candidateCount": {"type": "integer", "minimum": 1, "maximum": 16},
+        "assetKind": {"enum": ["sprite-frame", "sprite-layer", "environment", "effect", "ui", "illustration", "print"]},
+        "continuityPhase": {"enum": ["identity-master", "direction-master", "key-pose", "in-between", "repair", "independent"]},
+        "target": {
+          "type": "object",
+          "properties": {
+            "width": {"type": "integer", "minimum": 64, "maximum": 4096},
+            "height": {"type": "integer", "minimum": 64, "maximum": 4096},
+            "transparency": {"enum": ["opaque", "preferred", "required"]},
+            "outputFormat": {"enum": ["png", "jpeg", "webp"]}
+          },
+          "additionalProperties": false
+        },
+        "tags": {"$ref": "#/$defs/stringList"}
+      },
+      "anyOf": [{"required": ["description"]}, {"required": ["prompt"]}],
+      "additionalProperties": true
+    }
+  }
+}
