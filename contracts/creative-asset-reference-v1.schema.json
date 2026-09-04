@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.local/contracts/creative-asset-reference-v1.schema.json",
+  "title": "EVAVO Creative Asset Reference v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "assetUri", "payloadUri", "receiptUri", "sha256", "category", "roles", "license", "licenseUrl"],
+  "properties": {
+    "contractVersion": {"const": "evavo_creative_asset_reference_v1"},
+    "assetUri": {"type": "string", "pattern": "^bee://primary/EVAVO/Assets/library/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/[a-f0-9]{64}$"},
+    "payloadUri": {"type": "string", "pattern": "^bee://primary/EVAVO/Assets/library/.+/payload$"},
+    "receiptUri": {"type": "string", "pattern": "^bee://primary/EVAVO/Assets/library/.+/receipt\\.json$"},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "category": {"type": "string", "minLength": 1, "maxLength": 128},
+    "roles": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}},
+    "license": {"type": "string", "minLength": 1, "maxLength": 256},
+    "licenseUrl": {"type": "string", "pattern": "^https://"}
+  },
+  "allOf": [{"description": "Reference imagery, decals, masks, PBR inputs and generated derivatives preserve exact logical source identity and licence evidence."}]
+}
