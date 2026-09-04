@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-studio-artifact-output-profile-v1",
+  "studio": "EVAVO-STUDIO/evavo-art-studio",
+  "sharedContract": "EVAVO-STUDIO/evavo-development-studio:config/creative-artifact-fabric-v1.json",
+  "artifactKinds": ["image", "animation", "texture-reference", "sprite", "atlas"],
+  "localArtifactRoot": "%LOCALAPPDATA%\\EVAVO\\ArtStudio\\artifacts",
+  "canonicalMasterRoles": ["source-master", "working-master", "approved-export"],
+  "previewRoles": ["thumbnail", "solid-background-review", "contact-view", "loop-preview"],
+  "storagePreference": ["local-workspace", "beestation", "evavo-storage", "google-drive-on-request"],
+  "rules": {
+    "createNewByDefault": true,
+    "sha256Required": true,
+    "preserveProviderSource": true,
+    "previewNeverReplacesMaster": true,
+    "generationEndsReviewRequired": true,
+    "returnLogicalUriWhenMirrored": true
+  }
+}
