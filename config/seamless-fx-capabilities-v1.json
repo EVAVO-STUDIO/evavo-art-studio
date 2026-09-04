@@ -1,0 +1,33 @@
+{
+  "schema": "evavo_seamless_fx_capabilities_v1",
+  "studio": "evavo-art-studio",
+  "authority": "FX source art, sprite cleanup, alpha mastering, frame repair, atlas packing, authored overlays and image-sequence finishing",
+  "localFirst": true,
+  "looping": {
+    "supported": true,
+    "methods": ["authored-frame-cycle", "neighbour-conditioned-sequence", "loop-aware-motion-sequence", "final-to-first-review-preview"],
+    "requiredQa": ["alpha-boundary-stability", "silhouette-continuity", "centroid-continuity", "palette-continuity", "frame-registration", "first-last-transition-review"]
+  },
+  "styles": ["realistic", "stylized", "cel-fx", "pixel", "engraved-dither", "hand-painted-game-vfx"],
+  "families": [
+    "smoke-cards", "fire-cards", "dust-cards", "rain-sprites", "snow-sprites", "hail-sprites", "lightning-frames",
+    "explosion-frames", "spark-frames", "embers", "ash", "muzzle-flash-frames", "steam-cards", "fog-cards",
+    "splash-frames", "raindrop-frames", "drip-frames", "foam-frames", "wave-overlays", "shore-breaker-overlays"
+  ],
+  "outputs": ["rgba-png-sequence", "sprite-sheet", "atlas", "individual-lossless-frames", "mask-sequence", "normal-sequence", "proof-sheet", "godot-spriteframes-source"],
+  "quality": {
+    "requiresTrueAlpha": true,
+    "rejectPaintedCheckerboard": true,
+    "requiresHaloCheck": true,
+    "requiresFrameOrderAndDurationCheck": true,
+    "requiresLoopTransitionCheck": true,
+    "candidateOnlyUntilApproved": true
+  },
+  "handoffs": {
+    "particle-studio": "master procedural raster outputs and sprite/atlas sources",
+    "cel-animation-studio": "finish authored FX drawings without changing timing intent",
+    "evavo-video-studio": "supply clean frame sequences and repaired alpha",
+    "atmosphere-studio": "supply masks, cards, overlays and protected-geometry art",
+    "evavo-texture-studio": "exchange authored masks, palettes and material-source images"
+  }
+}
