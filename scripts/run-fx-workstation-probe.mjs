@@ -108,7 +108,8 @@ for (const request of requests) {
 }
 
 const withoutDigest = {
-  format: 'evavo.fx-art-workstation-probe/v2',
+  format: 'evavo.fx-art-workstation-probe/v1',
+  rasterEvidenceVersion: 2,
   studio: 'evavo-art-studio',
   processorId: 'sharp-exact-canvas-runtime',
   outputs,
@@ -126,4 +127,4 @@ const manifest = {
 };
 const manifestPath = path.join(out, 'manifest.json');
 fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
-process.stdout.write(`${JSON.stringify({ ok: true, output: out, outputs: outputs.length, format: manifest.format, processorId: manifest.processorId, manifestSha256: manifest.manifestSha256 })}\n`);
+process.stdout.write(`${JSON.stringify({ ok: true, output: out, outputs: outputs.length, format: manifest.format, rasterEvidenceVersion: manifest.rasterEvidenceVersion, processorId: manifest.processorId, manifestSha256: manifest.manifestSha256 })}\n`);
