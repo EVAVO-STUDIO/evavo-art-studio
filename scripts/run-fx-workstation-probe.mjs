@@ -15,8 +15,13 @@ if (fs.existsSync(out)) throw new Error(`FX art probe output must not exist: ${o
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.mkdirSync(out, { recursive: false });
 
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const build = spawnSync(npm, ['--workspace', '@evavo/art-media', 'run', 'build', '--silent'], { cwd: process.cwd(), encoding: 'utf8', shell: false });
+const isWindows = process.platform === 'win32';
+const npm = isWindows ? 'npm.cmd' : 'npm';
+const build = spawnSync(npm, ['--workspace', '@evavo/art-media', 'run', 'build', '--silent'], {
+  cwd: process.cwd(),
+  encoding: 'utf8',
+  shell: isWindows,
+});
 if (build.status !== 0) throw new Error(`FX art probe media build failed: ${build.stderr || build.stdout}`);
 const mediaPath = path.resolve('packages/media/dist/index.js');
 if (!fs.existsSync(mediaPath)) throw new Error('FX art probe media runtime missing after build');
@@ -27,9 +32,9 @@ const requests = [
   { id: 'probe-plaster-bullet-hole', kind: 'bullet-hole', substrate: 'plaster', seed: 4101, amount: 0.62 },
   { id: 'probe-blood-splatter', kind: 'splatter', substrate: 'stone', seed: 4102, amount: 0.72, viscosity: 0.58, directionDegrees: 28 },
 ];
-
 const digestFile = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const outputs = [];
+
 for (const request of requests) {
   const candidate = compileFxDecalSvgCandidate(request);
   if (candidate.authority !== 'candidate_vector_mask_only') throw new Error(`${request.id}: authority mismatch`);
@@ -62,6 +67,7 @@ for (const request of requests) {
   if (raster.evidence.outputWidth !== 1024 || raster.evidence.outputHeight !== 1024) throw new Error(`${request.id}: exact canvas mismatch`);
   fs.writeFileSync(pngPath, raster.png, { flag: 'wx' });
   fs.writeFileSync(proofPath, raster.transparencyProofPng, { flag: 'wx' });
+
   const alphaEvidence = {
     format: 'evavo.fx-residue-alpha-evidence/v1',
     candidateSha256: candidate.candidateSha256,
@@ -77,9 +83,9 @@ for (const request of requests) {
     },
   };
   fs.writeFileSync(evidencePath, `${JSON.stringify(alphaEvidence, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
-
   if (digestFile(pngPath) !== raster.evidence.pngSha256) throw new Error(`${request.id}: PNG SHA mismatch`);
   if (digestFile(proofPath) !== raster.evidence.proofSha256) throw new Error(`${request.id}: proof SHA mismatch`);
+
   outputs.push({
     id: request.id,
     kind: request.kind,
@@ -121,10 +127,7 @@ const withoutDigest = {
     publicationGranted: false,
   },
 };
-const manifest = {
-  ...withoutDigest,
-  manifestSha256: crypto.createHash('sha256').update(JSON.stringify(withoutDigest)).digest('hex'),
-};
+const manifest = { ...withoutDigest, manifestSha256: crypto.createHash('sha256').update(JSON.stringify(withoutDigest)).digest('hex') };
 const manifestPath = path.join(out, 'manifest.json');
 fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
 process.stdout.write(`${JSON.stringify({ ok: true, output: out, outputs: outputs.length, format: manifest.format, rasterEvidenceVersion: manifest.rasterEvidenceVersion, processorId: manifest.processorId, manifestSha256: manifest.manifestSha256 })}\n`);
