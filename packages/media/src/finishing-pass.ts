@@ -1,4 +1,4 @@
-import sharp, { type FitEnum, type Position } from "sharp";
+import sharp, { type ResizeOptions } from "sharp";
 
 export type RasterFinishFormat = "png" | "webp" | "avif" | "jpeg";
 
@@ -19,8 +19,8 @@ export interface RasterFinishSpec {
   readonly resize?: Readonly<{
     width?: number;
     height?: number;
-    fit?: keyof FitEnum;
-    position?: Position;
+    fit?: ResizeOptions["fit"];
+    position?: ResizeOptions["position"];
     withoutEnlargement?: boolean;
   }>;
   readonly padding?: Readonly<{
