@@ -33,6 +33,7 @@ for (const requiredFile of [
   'scripts/fx-decal-svg-candidate.mjs','scripts/test-fx-decal-svg-candidate.mjs','scripts/test-ci-media-tool-fx-decal-svg.mjs',
   'scripts/compile-fx-residue-mastering-plan.mjs','scripts/test-ci-media-tool-fx-residue-mastering.mjs',
   'scripts/fx-reviewed-residue-mask-handoff.mjs','scripts/test-ci-media-tool-fx-reviewed-residue-mask.mjs',
+  'scripts/compile-fx-reviewed-residue-from-raster.mjs','scripts/test-ci-media-tool-fx-reviewed-residue-from-raster.mjs',
   'packages/media/src/fx-residue-raster.ts','packages/media/test/fx-residue-raster.test.mjs',
   'scripts/run-fx-workstation-probe.mjs','scripts/test-ci-media-tool-fx-residue-raster-probe.mjs','scripts/test-ci-media-tool-fx-residue-raster-exec.mjs',
 ]) if (!fs.existsSync(path.resolve(requiredFile))) fail(`missing residue receiver/compiler: ${requiredFile}`);
@@ -50,12 +51,16 @@ for (const token of ['evavo.fx-art-workstation-probe/v1','rasterEvidenceVersion:
 const executableTest = fs.readFileSync(path.resolve('scripts/test-ci-media-tool-fx-residue-raster-exec.mjs'), 'utf8');
 for (const token of ['@evavo/art-media','rasterizeFxResidueSvgCandidate','sharp-exact-canvas-runtime','meaningfulTransparency','89504e470d0a1a0a']) if (!executableTest.includes(token)) fail(`FX residue executable regression missing required token: ${token}`);
 const reviewedMaskSource = fs.readFileSync(path.resolve('scripts/fx-reviewed-residue-mask-handoff.mjs'), 'utf8');
-for (const token of ['evavo.fx-reviewed-residue-mask-handoff/v1','independently-reviewed','meaningfulTransparency','paintedCheckerboardDetected','edgeReviewPassed','substrateIntegrationReviewPassed','evavo-texture-studio','mayApproveTextureMaterial: false']) if (!reviewedMaskSource.includes(token)) fail(`reviewed residue mask boundary missing required token: ${token}`);
+for (const token of ['evavo.fx-reviewed-residue-mask-handoff/v1','evavo.fx-residue-alpha-evidence/v1','compileReviewedResidueMaskHandoffFromRasterEvidence','independently-reviewed','meaningfulTransparency','paintedCheckerboardDetected','edgeReviewPassed','substrateIntegrationReviewPassed','evavo-texture-studio','mayApproveTextureMaterial: false']) if (!reviewedMaskSource.includes(token)) fail(`reviewed residue mask boundary missing required token: ${token}`);
+const reviewedRasterCli = fs.readFileSync(path.resolve('scripts/compile-fx-reviewed-residue-from-raster.mjs'), 'utf8');
+for (const token of ['evavo.fx-reviewed-residue-from-raster-request/v1','compileReviewedResidueFromRasterRequest','requestDirectory','resolveInside','output already exists','compileReviewedResidueMaskHandoffFromRasterEvidence']) if (!reviewedRasterCli.includes(token)) fail(`reviewed residue raster CLI missing required token: ${token}`);
+const reviewedRasterTest = fs.readFileSync(path.resolve('scripts/test-ci-media-tool-fx-reviewed-residue-from-raster.mjs'), 'utf8');
+for (const token of ['request resolves raster evidence relative to request directory','reviewStatus: \'independently-reviewed\'','rasterEvidencePath: \'../alpha.json\'','PNG digest does not match']) if (!reviewedRasterTest.includes(token)) fail(`reviewed residue raster regression missing required token: ${token}`);
 
 console.log(JSON.stringify({
   ok: true, studio: data.studio, families: data.families.length, residues: residueIds.size,
   residueWorkOrderReceiver: true, deterministicVectorResidueCandidates: true, residueTrueAlphaMastering: true,
   executableSharpResidueRaster: true, normalMediaToolSharpRegression: true, hostileBackgroundTransparencyProof: true,
-  workstationResidueRasterEvidence: true, reviewedResidueMaskHandoff: true, creativeApprovalStillSeparate: true,
-  outputs: data.outputs.length
+  workstationResidueRasterEvidence: true, reviewedResidueMaskHandoff: true, reviewedRasterEvidenceCompiler: true,
+  reviewRequestRelativePathSafety: true, creativeApprovalStillSeparate: true, outputs: data.outputs.length
 }));
