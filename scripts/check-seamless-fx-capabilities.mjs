@@ -14,4 +14,22 @@ nonEmpty(data.looping.requiredQa, 'looping.requiredQa');
 nonEmpty(data.styles, 'styles');
 nonEmpty(data.families, 'families');
 nonEmpty(data.outputs, 'outputs');
-console.log(JSON.stringify({ ok: true, studio: data.studio, families: data.families.length, outputs: data.outputs.length }));
+
+const requiredFamilies = [
+  'bullet-hole-decals','impact-mark-decals','glass-crack-decals','blood-splatter-decals','food-splatter-decals','mud-splatter-decals',
+  'grease-stains','drink-spills','damp-stains','soot-stains','scorch-marks','rust-streaks','puddle-decals','wet-edge-overlays',
+  'candle-flame-frames','lantern-flame-frames','light-flicker-masks','rain-crown-frames','puddle-ripple-frames','rain-splash-frames',
+];
+for (const family of requiredFamilies) {
+  if (!data.families.includes(family)) fail(`missing required family: ${family}`);
+}
+
+const residueCatalogue = JSON.parse(fs.readFileSync(path.resolve('config/fx-decal-residue-catalogue-v1.json'), 'utf8'));
+if (residueCatalogue.schema !== 'evavo_fx_decal_residue_catalogue_v1') fail('unexpected residue catalogue schema');
+if (!Array.isArray(residueCatalogue.entries) || residueCatalogue.entries.length < 12) fail('expected broad residue catalogue coverage');
+const residueIds = new Set(residueCatalogue.entries.map((entry) => entry.id));
+for (const residue of ['bullet-hole-wood','bullet-hole-plaster','bullet-hole-metal','bullet-hole-glass','blood-splatter-fresh','food-sauce-splatter','mud-splatter','scorch-mark']) {
+  if (!residueIds.has(residue)) fail(`missing required residue: ${residue}`);
+}
+
+console.log(JSON.stringify({ ok: true, studio: data.studio, families: data.families.length, residues: residueIds.size, outputs: data.outputs.length }));
