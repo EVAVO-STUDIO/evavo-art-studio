@@ -39,6 +39,8 @@ for (const requiredFile of [
   'scripts/fx-decal-svg-candidate.mjs',
   'scripts/test-fx-decal-svg-candidate.mjs',
   'scripts/test-ci-media-tool-fx-decal-svg.mjs',
+  'scripts/compile-fx-residue-mastering-plan.mjs',
+  'scripts/test-ci-media-tool-fx-residue-mastering.mjs',
 ]) {
   if (!fs.existsSync(path.resolve(requiredFile))) fail(`missing residue receiver/compiler: ${requiredFile}`);
 }
@@ -67,6 +69,19 @@ for (const token of [
 ]) {
   if (!vectorSource.includes(token)) fail(`FX decal vector generator missing required token: ${token}`);
 }
+const masteringSource = fs.readFileSync(path.resolve('scripts/compile-fx-residue-mastering-plan.mjs'), 'utf8');
+for (const token of [
+  'evavo.fx-residue-mastering-plan/v1',
+  'sharp-exact-canvas-runtime',
+  'meaningfulTransparencyRequired',
+  'sourceOverwriteAllowed: false',
+  'lossyIntermediateAllowed: false',
+  'rejectPaintedCheckerboard: true',
+  'saturated-green',
+  'mayApproveCreativeResult: false',
+]) {
+  if (!masteringSource.includes(token)) fail(`FX residue mastering path missing required token: ${token}`);
+}
 
 console.log(JSON.stringify({
   ok: true,
@@ -75,5 +90,6 @@ console.log(JSON.stringify({
   residues: residueIds.size,
   residueWorkOrderReceiver: true,
   deterministicVectorResidueCandidates: true,
+  residueTrueAlphaMastering: true,
   outputs: data.outputs.length
 }));
