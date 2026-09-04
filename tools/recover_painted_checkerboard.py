@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""Recover real alpha from a confidently painted two-colour checkerboard.
+"""Recover real alpha from a confidently painted checkerboard or declared matte.
 
 This is a dependency-light repair path for provider previews that baked a
 transparency grid.  It estimates the two matte colours from a clean border,
 removes only matte-like pixels connected to the canvas edge, and writes a
 separate RGBA working copy.  It never mutates the source.
+
+For a painted checkerboard, omit --matte and request --proof-dir.  For an
+opaque chroma matte, declare its exact colour with --matte.  Neutral black,
+white, or grey mattes additionally require --allow-low-chroma-matte because
+they can collide with legitimate sprite values.  Every successful run now
+requires meaningful alpha, a fully transparent canvas edge, and can emit
+hostile solid-background proofs plus an alpha-mask proof for visual review.
 """
 from __future__ import annotations
 
@@ -17,8 +24,65 @@ from pathlib import Path
 from PIL import Image
 
 
+PROOF_PLATES = {
+    "black": (0, 0, 0, 255),
+    "white": (255, 255, 255, 255),
+    "grey": (127, 127, 127, 255),
+    "green": (0, 255, 0, 255),
+    "magenta": (255, 0, 255, 255),
+}
+
+
 def distance_sq(a: tuple[int, int, int], b: tuple[int, int, int]) -> int:
     return sum((a[index] - b[index]) ** 2 for index in range(3))
+
+
+def is_low_chroma(colour: tuple[int, int, int]) -> bool:
+    """Return true for neutral mattes that can collide with real sprite values."""
+    return max(colour) - min(colour) < 48
+
+
+def validate_alpha(image: Image.Image) -> dict[str, object]:
+    rgba = image.convert("RGBA")
+    alpha = rgba.getchannel("A")
+    histogram = alpha.histogram()
+    pixels = rgba.width * rgba.height
+    transparent = sum(histogram[:255])
+    opaque = histogram[255]
+    edge_alpha = []
+    edge_alpha.extend(alpha.crop((0, 0, rgba.width, 1)).get_flattened_data())
+    edge_alpha.extend(alpha.crop((0, rgba.height - 1, rgba.width, rgba.height)).get_flattened_data())
+    edge_alpha.extend(alpha.crop((0, 1, 1, rgba.height - 1)).get_flattened_data())
+    edge_alpha.extend(alpha.crop((rgba.width - 1, 1, rgba.width, rgba.height - 1)).get_flattened_data())
+    if transparent == 0 or opaque == 0:
+        raise ValueError("output must contain both transparent and opaque pixels")
+    if any(edge_alpha):
+        raise ValueError("output canvas edge is not fully transparent")
+    return {
+        "meaningful_alpha": True,
+        "transparent_pixels": transparent,
+        "opaque_pixels": opaque,
+        "transparent_fraction": transparent / pixels,
+        "canvas_edge_fully_transparent": True,
+    }
+
+
+def write_proofs(image: Image.Image, proof_dir: Path) -> list[str]:
+    if proof_dir.exists():
+        raise ValueError("proof directory must be create-only")
+    proof_dir.mkdir(parents=True)
+    rgba = image.convert("RGBA")
+    names: list[str] = []
+    for name, colour in PROOF_PLATES.items():
+        destination = proof_dir / f"plate-{name}.png"
+        plate = Image.new("RGBA", rgba.size, colour)
+        plate.alpha_composite(rgba)
+        plate.convert("RGB").save(destination, optimize=True)
+        names.append(destination.name)
+    alpha_destination = proof_dir / "alpha-mask.png"
+    rgba.getchannel("A").save(alpha_destination, optimize=True)
+    names.append(alpha_destination.name)
+    return names
 
 
 def border_pixels(image: Image.Image, band: int) -> list[tuple[int, int, int]]:
@@ -224,6 +288,14 @@ def main() -> None:
     parser.add_argument("--fringe-passes", type=int, default=3)
     parser.add_argument("--matte", help="optional declared matte as #RRGGBB")
     parser.add_argument(
+        "--allow-low-chroma-matte", action="store_true",
+        help="explicitly authorize a neutral matte such as black, white, or grey",
+    )
+    parser.add_argument(
+        "--proof-dir", type=Path,
+        help="create black/white/grey/green/magenta and alpha-mask review proofs",
+    )
+    parser.add_argument(
         "--min-visible-island", type=int, default=0,
         help="remove disconnected visible components smaller than this pixel count",
     )
@@ -248,13 +320,20 @@ def main() -> None:
             matte = tuple(int(value[index:index + 2], 16) for index in (0, 2, 4))
         except ValueError as exc:
             raise SystemExit("--matte must use #RRGGBB") from exc
+        if is_low_chroma(matte) and not args.allow_low_chroma_matte:
+            raise SystemExit(
+                "low-chroma mattes require --allow-low-chroma-matte because they can remove real sprite values"
+            )
     output, evidence = recover(
         Image.open(args.input), args.border_band, args.threshold,
         args.fringe_threshold, args.fringe_passes, matte, args.min_visible_island,
         args.remove_all_matte, args.despill,
     )
+    evidence["alpha_validation"] = validate_alpha(output)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     output.save(args.output, optimize=True)
+    if args.proof_dir:
+        evidence["proof_files"] = write_proofs(output, args.proof_dir)
     evidence["source_sha256"] = sha256(source).hexdigest()
     evidence["output_sha256"] = sha256(args.output.read_bytes()).hexdigest()
     evidence_path = args.evidence or args.output.with_suffix(".evidence.json")
