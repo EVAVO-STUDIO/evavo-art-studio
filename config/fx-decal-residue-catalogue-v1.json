@@ -1,0 +1,24 @@
+{
+  "schema": "evavo_fx_decal_residue_catalogue_v1",
+  "families": {
+    "impact": ["bullet-hole", "bullet-graze", "impact-mark", "surface-chip", "crack", "scorch-mark", "soot-mark"],
+    "organicSplatter": ["blood-splatter", "blood-stain", "blood-smear", "blood-pool"],
+    "foodSplatter": ["sauce-splatter", "grease-splatter", "food-stain", "drink-spill", "oil-stain"],
+    "environmentalResidue": ["mud-splatter", "dirt-stain", "damp-stain", "water-stain", "salt-stain", "mould-stain", "rust-streak", "runoff-streak"]
+  },
+  "substrates": ["wood", "plaster", "brick", "stone", "concrete", "painted-metal", "bare-metal", "glass", "fabric", "paper", "earth", "asphalt", "tile", "ceramic"],
+  "requiredVariants": ["fresh", "settled", "aged"],
+  "impactMaterialRules": {
+    "wood": ["splintering", "fibre-tear", "small-chip-halo"],
+    "plaster": ["powder-edge", "radial-chip", "dust-residue"],
+    "brick": ["granular-chip", "mortar-dust", "shallow-crater"],
+    "metal": ["bright-edge", "deformation", "optional-soot"],
+    "glass": ["radial-crack", "missing-chip", "shard-source-boundary"]
+  },
+  "quality": ["true-alpha-when-decal", "no-painted-checkerboard", "substrate-plausibility", "gravity-direction", "scale-consistency", "edge-fringe-check", "gloss-state-consistency"],
+  "handoffs": {
+    "particle-studio": "burst droplets, chips, sparks and impact debris",
+    "evavo-texture-studio": "wetness, roughness, stain spread and substrate material response",
+    "atmosphere-studio": "scene placement, runoff and wet-environment integration"
+  }
+}
