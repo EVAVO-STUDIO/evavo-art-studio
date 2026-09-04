@@ -34,6 +34,7 @@ test("finishes a transparent object with trim padding resize and webp export", a
 
   const result = await finishRasterAsset(source, {
     trim: { threshold: 1, padding: 4 },
+    guard: { minRetainedAreaRatio: 0.1, maxAspectRatioDrift: 2 },
     normalize: true,
     sharpen: { sigma: 1 },
     resize: { width: 80, fit: "inside", withoutEnlargement: false },
@@ -46,6 +47,9 @@ test("finishes a transparent object with trim padding resize and webp export", a
   assert.equal(result.evidence.format, "webp");
   assert.ok(result.evidence.operations.includes("ensure-alpha"));
   assert.ok(result.evidence.operations.some((entry) => entry.startsWith("trim:")));
+  assert.ok(result.evidence.operations.includes("cleanup-geometry-verified"));
+  assert.ok((result.evidence.retainedAreaRatio ?? 0) >= 0.1);
+  assert.ok((result.evidence.aspectRatioDrift ?? Infinity) <= 2);
   assert.ok(result.evidence.operations.includes("resize"));
   assert.ok(result.evidence.operations.includes("pad"));
   assert.ok(result.buffer.byteLength > 0);
@@ -93,5 +97,43 @@ test("applies an external alpha matte and rejects mismatched masks", async () =>
   await assert.rejects(
     () => finishRasterAsset(source, { mask: badMask }),
     /mask dimensions must exactly match/i,
+  );
+});
+
+test("rejects destructive trim geometry before promotion", async () => {
+  const source = await sharp({
+    create: {
+      width: 100,
+      height: 100,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([
+      {
+        input: await sharp({
+          create: {
+            width: 80,
+            height: 5,
+            channels: 4,
+            background: { r: 255, g: 36, b: 78, alpha: 1 },
+          },
+        })
+          .png()
+          .toBuffer(),
+        left: 10,
+        top: 48,
+      },
+    ])
+    .png()
+    .toBuffer();
+
+  await assert.rejects(
+    () =>
+      finishRasterAsset(source, {
+        trim: { threshold: 1 },
+        guard: { minRetainedAreaRatio: 0.2, maxAspectRatioDrift: 2.5 },
+      }),
+    /retained .* minimum|aspect ratio/i,
   );
 });
