@@ -31,6 +31,10 @@ export interface RasterFinishSpec {
     background?: string;
   }>;
   readonly flatten?: Readonly<{ background: string }>;
+  readonly guard?: Readonly<{
+    minRetainedAreaRatio?: number;
+    maxAspectRatioDrift?: number;
+  }>;
   readonly format?: RasterFinishFormat;
   readonly quality?: number;
 }
@@ -41,6 +45,10 @@ export interface RasterFinishResult {
     sourceWidth: number;
     sourceHeight: number;
     sourceHasAlpha: boolean;
+    cleanupWidth?: number;
+    cleanupHeight?: number;
+    retainedAreaRatio?: number;
+    aspectRatioDrift?: number;
     outputWidth: number;
     outputHeight: number;
     outputHasAlpha: boolean;
@@ -82,6 +90,12 @@ function outputFormat(spec: RasterFinishSpec): RasterFinishFormat {
   return spec.format ?? "png";
 }
 
+function ratioDrift(sourceWidth: number, sourceHeight: number, width: number, height: number): number {
+  const sourceRatio = sourceWidth / sourceHeight;
+  const resultRatio = width / height;
+  return Math.max(sourceRatio / resultRatio, resultRatio / sourceRatio);
+}
+
 /**
  * A deterministic final-art pass for raster assets. It intentionally accepts a
  * matte/mask from any upstream segmentation provider so background removal is
@@ -119,6 +133,42 @@ export async function finishRasterAsset(
     const threshold = finiteRange(spec.trim.threshold, "trim.threshold", 0, 255) ?? 10;
     image = image.trim({ threshold });
     operations.push(`trim:${threshold}`);
+  }
+
+  let cleanupWidth: number | undefined;
+  let cleanupHeight: number | undefined;
+  let retainedAreaRatio: number | undefined;
+  let aspectRatioDrift: number | undefined;
+  if (spec.mask || spec.trim || spec.guard) {
+    const cleanup = await image.clone().png().toBuffer({ resolveWithObject: true });
+    cleanupWidth = cleanup.info.width;
+    cleanupHeight = cleanup.info.height;
+    retainedAreaRatio = (cleanupWidth * cleanupHeight) / (source.width * source.height);
+    aspectRatioDrift = ratioDrift(source.width, source.height, cleanupWidth, cleanupHeight);
+
+    const minimumArea = finiteRange(
+      spec.guard?.minRetainedAreaRatio,
+      "guard.minRetainedAreaRatio",
+      0.01,
+      1,
+    );
+    const maximumDrift = finiteRange(
+      spec.guard?.maxAspectRatioDrift,
+      "guard.maxAspectRatioDrift",
+      1,
+      100,
+    );
+    if (minimumArea !== undefined && retainedAreaRatio < minimumArea) {
+      throw new Error(
+        `Raster finishing cleanup retained ${(retainedAreaRatio * 100).toFixed(1)}% of source area; minimum is ${(minimumArea * 100).toFixed(1)}%.`,
+      );
+    }
+    if (maximumDrift !== undefined && aspectRatioDrift > maximumDrift) {
+      throw new Error(
+        `Raster finishing cleanup changed aspect ratio by ${aspectRatioDrift.toFixed(2)}x; maximum drift is ${maximumDrift.toFixed(2)}x.`,
+      );
+    }
+    operations.push("cleanup-geometry-verified");
   }
 
   if (spec.modulate) {
@@ -210,6 +260,10 @@ export async function finishRasterAsset(
       sourceWidth: source.width,
       sourceHeight: source.height,
       sourceHasAlpha: source.hasAlpha ?? false,
+      ...(cleanupWidth === undefined ? {} : { cleanupWidth }),
+      ...(cleanupHeight === undefined ? {} : { cleanupHeight }),
+      ...(retainedAreaRatio === undefined ? {} : { retainedAreaRatio }),
+      ...(aspectRatioDrift === undefined ? {} : { aspectRatioDrift }),
       outputWidth: finished.info.width,
       outputHeight: finished.info.height,
       outputHasAlpha: finished.info.channels === 4,
