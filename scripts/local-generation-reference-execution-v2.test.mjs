@@ -89,6 +89,37 @@ test('accepted stage refuses to record missing or malformed provider artifact ID
   assert.throws(() => recordAcceptedArtifactResults(frames, new Map([['one', { candidates: [{ artifactId: 'artifact_bad', qa: { ok: true } }] }]]), new Map()), /valid provider artifact ID/u);
 });
 
+test('failed-QA candidates can never become downstream reference artifacts', () => {
+  const plan = prepareReferenceExecutionPlan({ mode: 'independent', source: { shots: [{ id: 'one' }] }, frames: [{ id: 'one', ordinal: 1, candidateCount: 1, shot: {} }] });
+  const frames = framesForReferenceStage(plan, ['one'], new Map());
+  const artifactResults = new Map();
+  assert.throws(
+    () => recordAcceptedArtifactResults(frames, new Map([['one', { candidates: [{ artifactId: artifactA, qa: { ok: false, codes: ['dimension-mismatch'] } }] }]]), artifactResults),
+    /candidate 0 did not pass QA/u,
+  );
+  assert.equal(artifactResults.has('one'), false);
+});
+
+test('multi-candidate anchors are not persisted partially when any required candidate is unusable', () => {
+  const plan = prepareReferenceExecutionPlan({
+    mode: 'independent',
+    source: { shots: [{ id: 'anchor' }] },
+    frames: [{ id: 'anchor', ordinal: 1, candidateCount: 2, shot: {} }],
+  });
+  const frames = framesForReferenceStage(plan, ['anchor'], new Map());
+  const artifactResults = new Map();
+  assert.throws(
+    () => recordAcceptedArtifactResults(frames, new Map([['anchor', {
+      candidates: [
+        { artifactId: artifactA, qa: { ok: true } },
+        { artifactId: artifactB, qa: { ok: false, codes: ['duplicate-hash'] } },
+      ],
+    }]]), artifactResults),
+    /candidate 1 did not pass QA/u,
+  );
+  assert.equal(artifactResults.has('anchor'), false);
+});
+
 test('sequential-anchor mode creates a real automatic dependency after authored refs are hydrated', () => {
   const plan = prepareReferenceExecutionPlan({
     mode: 'sequential-anchor',
