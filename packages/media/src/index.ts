@@ -11,6 +11,7 @@ export * from "./background-recovery.js";
 export * from "./alpha-guidance.js";
 export * from "./alpha-canvas.js";
 export * from "./transparency-proof.js";
+export * from "./fx-residue-raster.js";
 export * from "./chroma-spill.js";
 export * from "./aseprite-interchange.js";
 export * from "./aseprite-interchange-result.js";
