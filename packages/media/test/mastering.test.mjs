@@ -10,6 +10,7 @@ import {
   RasterPreflightError,
   applyAlphaGuidance,
   createTransparencyProofSheet,
+  checkerCompositeMismatchAccepted,
   detectPaintedTransparencyCheckerboard,
   extractChromaKeyAlpha,
   preflightInpaintMask,
@@ -390,6 +391,13 @@ test("background recovery recognises a 27-pixel low-contrast provider checkerboa
   assert.equal(result.evidence.classification.checkerboard.detected, true);
   assert.equal(result.evidence.classification.checkerboard.tileSize, 27);
   assert.equal(result.evidence.guarantees.recompositionVerified, true);
+  assert.equal(result.evidence.recomposition.maximumAllowedMismatchFraction, 0);
+});
+
+test("checkerboard recovery can admit only a tiny explicit fraction of recomposition outliers", () => {
+  assert.equal(checkerCompositeMismatchAccepted(78, 1_000_000, 0.0001), true);
+  assert.equal(checkerCompositeMismatchAccepted(78, 1_000_000, 0.00001), false);
+  assert.equal(checkerCompositeMismatchAccepted(0, 0, 0), true);
 });
 
 test("background recovery defeats a transparent-rim bypass around a visible painted grid", async () => {

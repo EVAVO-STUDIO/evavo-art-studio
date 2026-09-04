@@ -81,6 +81,8 @@ test("CLI writes a deterministic unapproved alpha master and evidence", async ()
       "8",
       "--bleed-radius",
       "2",
+      "--checker-maximum-composite-mismatch-fraction",
+      "0.0001",
       "--suppress-chroma-spill",
     ],
     { cwd, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },

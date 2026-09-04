@@ -25,6 +25,30 @@ export type BackgroundAlphaRecoveryStrategy =
   | "inferred-high-chroma-key"
   | "checkerboard-recovery";
 
+export function checkerCompositeMismatchAccepted(
+  mismatchPixels: number,
+  checkedPixels: number,
+  maximumMismatchFraction: number,
+): boolean {
+  if (
+    !Number.isInteger(mismatchPixels) ||
+    !Number.isInteger(checkedPixels) ||
+    mismatchPixels < 0 ||
+    checkedPixels < 0 ||
+    mismatchPixels > checkedPixels ||
+    !Number.isFinite(maximumMismatchFraction) ||
+    maximumMismatchFraction < 0 ||
+    maximumMismatchFraction > 0.001
+  ) {
+    throw new BackgroundAlphaRecoveryError(
+      "BACKGROUND_RECOVERY_OPTIONS_INVALID",
+      "Checker recomposition mismatch counts/fraction are outside their safe bounds.",
+    );
+  }
+  if (checkedPixels === 0) return mismatchPixels === 0;
+  return mismatchPixels / checkedPixels <= maximumMismatchFraction;
+}
+
 export type BackgroundAlphaRecoveryOptions = Readonly<
   Omit<ChromaKeyExtractionOptions, "matteColour"> & {
     readonly matteColour?: string;
@@ -36,6 +60,7 @@ export type BackgroundAlphaRecoveryOptions = Readonly<
     readonly checkerForegroundSeedDistance?: number;
     readonly checkerMinimumBorderFraction?: number;
     readonly checkerMaximumCompositeChannelError?: number;
+    readonly checkerMaximumCompositeMismatchFraction?: number;
     readonly maximumCompositeChannelError?: number;
   }
 >;
@@ -106,6 +131,7 @@ export interface BackgroundAlphaRecoveryEvidence {
     mismatchPixels: number;
     maximumObservedChannelError: number;
     maximumAllowedChannelError: number;
+    readonly maximumAllowedMismatchFraction?: number;
   }>;
   readonly providerHaloRepair?: ChromaKeyExtractionEvidence["providerHaloRepair"];
   readonly guarantees: Readonly<{
@@ -1062,6 +1088,13 @@ async function recoverCheckerboard(
     32,
     "checkerMaximumCompositeChannelError",
   );
+  const maximumCompositeMismatchFraction = boundedNumber(
+    options.checkerMaximumCompositeMismatchFraction,
+    0,
+    0,
+    0.001,
+    "checkerMaximumCompositeMismatchFraction",
+  );
   const pixels = source.width * source.height;
   const connectionSquared = connectionDistance ** 2;
   const foregroundSquared = foregroundSeedDistance ** 2;
@@ -1303,10 +1336,17 @@ async function recoverCheckerboard(
     }
     if (pixelMismatch) compositeMismatchPixels += 1;
   }
-  if (compositeMismatchPixels) {
+  const compositeMismatchFraction = checkedCompositePixels
+    ? compositeMismatchPixels / checkedCompositePixels
+    : 0;
+  if (!checkerCompositeMismatchAccepted(
+    compositeMismatchPixels,
+    checkedCompositePixels,
+    maximumCompositeMismatchFraction,
+  )) {
     throw new BackgroundAlphaRecoveryError(
       "BACKGROUND_RECOVERY_CHECKERBOARD_COMPOSITE_DRIFT",
-      `${compositeMismatchPixels} recovered pixels exceeded the recomposition tolerance; maximum observed channel error was ${maximumObservedCompositeChannelError}.`,
+      `${compositeMismatchPixels} recovered pixels exceeded the recomposition tolerance (${compositeMismatchFraction.toFixed(8)} of checked pixels; allowed ${maximumCompositeMismatchFraction.toFixed(8)}); maximum observed channel error was ${maximumObservedCompositeChannelError}.`,
     );
   }
   const transparentBleedPixels = applyTransparentBleed(
@@ -1358,6 +1398,7 @@ async function recoverCheckerboard(
         mismatchPixels: compositeMismatchPixels,
         maximumObservedChannelError: maximumObservedCompositeChannelError,
         maximumAllowedChannelError: maximumCompositeChannelError,
+        maximumAllowedMismatchFraction: maximumCompositeMismatchFraction,
       },
       guarantees: {
         realAlpha: true,

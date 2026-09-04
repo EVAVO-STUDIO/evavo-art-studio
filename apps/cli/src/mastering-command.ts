@@ -38,6 +38,7 @@ export interface MasteringCommandValues {
   readonly "checker-foreground-seed-distance"?: string;
   readonly "checker-minimum-border-fraction"?: string;
   readonly "checker-maximum-composite-channel-error"?: string;
+  readonly "checker-maximum-composite-mismatch-fraction"?: string;
   readonly "suppress-chroma-spill"?: boolean;
   readonly "allow-low-chroma-matte"?: boolean;
   readonly padding?: string;
@@ -144,6 +145,10 @@ function recoveryOptions(
     values["checker-maximum-composite-channel-error"],
     "--checker-maximum-composite-channel-error",
   );
+  const checkerMaximumCompositeMismatchFraction = optionalNumber(
+    values["checker-maximum-composite-mismatch-fraction"],
+    "--checker-maximum-composite-mismatch-fraction",
+  );
   return {
     ...(matteColour === undefined ? {} : { matteColour }),
     ...(values["allow-low-chroma-matte"] === true
@@ -171,6 +176,9 @@ function recoveryOptions(
     ...(checkerMaximumCompositeChannelError === undefined
       ? {}
       : { checkerMaximumCompositeChannelError }),
+    ...(checkerMaximumCompositeMismatchFraction === undefined
+      ? {}
+      : { checkerMaximumCompositeMismatchFraction }),
   };
 }
 

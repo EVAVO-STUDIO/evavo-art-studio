@@ -264,6 +264,10 @@ function extractionOptions(
     payload.checkerMaximumCompositeChannelError,
     "checkerMaximumCompositeChannelError",
   );
+  const checkerMaximumCompositeMismatchFraction = optionalNumber(
+    payload.checkerMaximumCompositeMismatchFraction,
+    "checkerMaximumCompositeMismatchFraction",
+  );
   return {
     matteColour,
     allowLowChromaMatte: black,
@@ -288,6 +292,9 @@ function extractionOptions(
     ...(checkerMaximumCompositeChannelError === undefined
       ? {}
       : { checkerMaximumCompositeChannelError }),
+    ...(checkerMaximumCompositeMismatchFraction === undefined
+      ? {}
+      : { checkerMaximumCompositeMismatchFraction }),
   };
 }
 

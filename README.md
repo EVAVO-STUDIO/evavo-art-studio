@@ -79,6 +79,15 @@ pnpm art -- master-alpha `
   --evidence .\candidate.alpha.evidence.json `
   --expectations .\frame-quality.json
 
+# For rare resampled painted grids, a reviewed job may admit only a tiny,
+# evidence-recorded fraction of recomposition outliers while retaining the
+# strict per-pixel channel-error cap and the default zero-outlier policy:
+pnpm art -- master-alpha `
+  --input .\candidate.png `
+  --output .\candidate.alpha.png `
+  --evidence .\candidate.alpha.evidence.json `
+  --checker-maximum-composite-mismatch-fraction 0.0001
+
 # Salvage a complete sprite/image folder with the same fail-closed mastering.
 # Relative paths are preserved; outputs, evidence and optional hostile proofs
 # are written to separate roots and remain unapproved until artist review.
