@@ -1,11 +1,89 @@
 {
   "schema": "evavo.local-generation-quality-profiles.v2",
   "profiles": {
-    "portrait_high_quality": {"width":1024,"height":1024,"steps":36,"cfg":6.0,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":true,"outputFormat":"png"},
-    "sprite_sheet_clean": {"width":1024,"height":1024,"steps":30,"cfg":5.5,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":false,"outputFormat":"png"},
-    "concept_art_painterly": {"width":1344,"height":768,"steps":34,"cfg":5.8,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":false,"outputFormat":"png"},
-    "comic_inked": {"width":1024,"height":1024,"steps":32,"cfg":6.0,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":false,"outputFormat":"png"},
-    "cinematic_stills": {"width":1344,"height":768,"steps":36,"cfg":5.5,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":true,"outputFormat":"png"},
-    "product_mockups": {"width":1024,"height":1024,"steps":32,"cfg":5.5,"sampler":"dpmpp_2m","scheduler":"karras","denoise":1.0,"hiresScale":1.0,"faceDetailPass":false,"outputFormat":"png"}
+    "portrait_high_quality": {
+      "width": 1024,
+      "height": 1024,
+      "steps": 36,
+      "cfg": 6.0,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "hiresScale": 1.0,
+      "faceDetailPass": true,
+      "outputFormat": "png",
+      "prompt": ["high-end character portrait", "specific facial structure", "natural skin texture", "intentional lighting", "clean anatomy"],
+      "negative": ["generic stock portrait", "waxy skin", "beauty-filter face", "plastic texture", "repetitive AI facial features"]
+    },
+    "sprite_sheet_clean": {
+      "width": 1024,
+      "height": 1024,
+      "steps": 30,
+      "cfg": 5.5,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "hiresScale": 1.0,
+      "faceDetailPass": false,
+      "outputFormat": "png",
+      "prompt": ["game-ready sprite source", "clean silhouette", "repeatable proportions", "stable framing", "readable pose"],
+      "negative": ["cropped limbs", "camera drift", "pose ambiguity", "inconsistent proportions", "busy background"]
+    },
+    "concept_art_painterly": {
+      "width": 1344,
+      "height": 768,
+      "steps": 34,
+      "cfg": 5.8,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "hiresScale": 1.0,
+      "faceDetailPass": false,
+      "outputFormat": "png",
+      "prompt": ["specific production concept art", "intentional shape language", "material separation", "designed lighting", "controlled painterly detail"],
+      "negative": ["generic fantasy concept art", "random clutter", "muddy values", "AI texture soup", "meaningless micro-detail"]
+    },
+    "comic_inked": {
+      "width": 1024,
+      "height": 1024,
+      "steps": 32,
+      "cfg": 6.0,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "hiresScale": 1.0,
+      "faceDetailPass": false,
+      "outputFormat": "png",
+      "prompt": ["purposeful ink hierarchy", "clean silhouettes", "controlled line weight", "specific panel composition", "readable expression"],
+      "negative": ["random hatch noise", "melted linework", "generic manga face", "illegible anatomy", "visual clutter"]
+    },
+    "cinematic_stills": {
+      "width": 1344,
+      "height": 768,
+      "steps": 36,
+      "cfg": 5.5,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "hiresScale": 1.0,
+      "faceDetailPass": true,
+      "outputFormat": "png",
+      "prompt": ["cinematic production still", "motivated practical lighting", "specific lens language", "physical set detail", "naturalistic texture"],
+      "negative": ["generic cinematic AI image", "teal-orange preset", "floating props", "overprocessed HDR", "plastic surfaces"]
+    },
+    "product_mockups": {
+      "width": 1024,
+      "height": 1024,
+      "steps": 32,
+      "cfg": 5.5,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "hiresScale": 1.0,
+      "faceDetailPass": false,
+      "outputFormat": "png",
+      "prompt": ["production-ready product visualization", "accurate object geometry", "material realism", "controlled studio lighting", "clean presentation"],
+      "negative": ["warped branding", "impossible geometry", "random text", "generic ecommerce render", "floating object parts"]
+    }
   }
 }
