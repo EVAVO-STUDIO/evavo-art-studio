@@ -66,6 +66,32 @@ const fullReferenceCapabilities = [
   'palette-reference', 'line-reference', 'material-reference', 'layer-context-reference',
 ];
 
+test('ordinary generation without references preserves the baseline capability and runtime-input contract', () => {
+  const campaign = validateLocalGenerationCampaign(manifest([]));
+  const scene = campaign.scenes[0];
+  assert.deepEqual(requiredCapabilityProfile(scene), [
+    'cancellation',
+    'custom-size',
+    'generate',
+    'seed',
+  ]);
+
+  const route = routeScene({ profiles: [profile({
+    maximumReferenceImages: 0,
+    capabilities: ['generate', 'cancellation', 'seed', 'custom-size'],
+  })] }, scene);
+  const job = runtimeJob(campaign, scene, route, 'run_no_reference_baseline');
+  assert.deepEqual(job.inputArtifacts, []);
+  assert.deepEqual(job.payload.references, []);
+  assert.equal(job.payload.metadata.referenceCount, 0);
+  assert.deepEqual(job.requiredCapabilityProfile, [
+    'cancellation',
+    'custom-size',
+    'generate',
+    'seed',
+  ]);
+});
+
 test('V1 bridge derives reference capabilities and routes only to a capable reviewed profile', () => {
   const campaign = validateLocalGenerationCampaign(manifest([
     { artifactId: artifactA, role: 'canonical-identity', strength: 0.85, required: true },
@@ -91,6 +117,36 @@ test('V1 bridge derives reference capabilities and routes only to a capable revi
   const route = routeScene({ profiles: [profile({
     maximumReferenceImages: 1,
     capabilities: ['generate', 'cancellation', 'seed', 'custom-size', 'reference-images', 'identity-reference'],
+  })] }, scene);
+  assert.equal(route.adapterId, 'comfyui:reference-capable-test');
+});
+
+test('multiple references require multiple-reference-images transport capability', () => {
+  const campaign = validateLocalGenerationCampaign(manifest([
+    { artifactId: artifactA, role: 'canonical-identity', required: true },
+    { artifactId: artifactB, role: 'palette-reference', required: false },
+  ]));
+  const scene = campaign.scenes[0];
+  const capabilities = requiredCapabilityProfile(scene);
+  assert.equal(capabilities.includes('reference-images'), true);
+  assert.equal(capabilities.includes('multiple-reference-images'), true);
+  assert.equal(capabilities.includes('identity-reference'), true);
+  assert.equal(capabilities.includes('palette-reference'), false);
+
+  assert.throws(
+    () => routeScene({ profiles: [profile({
+      maximumReferenceImages: 2,
+      capabilities: ['generate', 'cancellation', 'seed', 'custom-size', 'reference-images', 'identity-reference'],
+    })] }, scene),
+    /no reviewed local ComfyUI profile/u,
+  );
+
+  const route = routeScene({ profiles: [profile({
+    maximumReferenceImages: 2,
+    capabilities: [
+      'generate', 'cancellation', 'seed', 'custom-size',
+      'reference-images', 'multiple-reference-images', 'identity-reference',
+    ],
   })] }, scene);
   assert.equal(route.adapterId, 'comfyui:reference-capable-test');
 });
