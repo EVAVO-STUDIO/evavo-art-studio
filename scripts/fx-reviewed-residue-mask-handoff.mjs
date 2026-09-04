@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
 export const FX_REVIEWED_RESIDUE_MASK_HANDOFF_FORMAT = 'evavo.fx-reviewed-residue-mask-handoff/v1';
+export const FX_RESIDUE_ALPHA_EVIDENCE_FORMAT = 'evavo.fx-residue-alpha-evidence/v1';
 
 function stable(value) {
   if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
@@ -57,6 +58,40 @@ export function compileReviewedResidueMaskHandoff(input) {
   return { ...withoutDigest, handoffSha256: digest(withoutDigest) };
 }
 
+export function compileReviewedResidueMaskHandoffFromRasterEvidence(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) fail('reviewed raster input must be object');
+  const evidence = input.rasterEvidence;
+  if (!evidence || evidence.format !== FX_RESIDUE_ALPHA_EVIDENCE_FORMAT) fail('generated raster alpha evidence format mismatch');
+  if (evidence.processorId !== 'sharp-exact-canvas-runtime') fail('generated raster processor mismatch');
+  if (!isSha(evidence.candidateSha256) || !isSha(evidence.masteringPlanSha256) || !isSha(evidence.pngSha256) || !isSha(evidence.proofSha256)) fail('generated raster lineage digest missing');
+  if (evidence.outputWidth !== 1024 || evidence.outputHeight !== 1024 || evidence.alphaMode !== 'straight') fail('generated raster exact canvas/alpha mismatch');
+  if (evidence.meaningfulTransparency !== true || evidence.paintedCheckerboardDetected !== false) fail('generated raster alpha evidence invalid');
+  if (evidence.authority?.generatedRasterCandidateOnly !== true || evidence.authority?.independentCreativeReviewStillRequired !== true) fail('generated raster authority boundary invalid');
+  if (evidence.authority?.mayApproveCreativeResult !== false || evidence.authority?.mayApproveTextureMaterial !== false || evidence.authority?.publication !== false) fail('generated raster authority escalation detected');
+  if (input.vectorCandidateSha256 !== evidence.candidateSha256) fail('vector candidate does not match raster evidence');
+  if (input.masteringPlanSha256 !== evidence.masteringPlanSha256) fail('mastering plan does not match raster evidence');
+  if (input.pngSha256 !== evidence.pngSha256) fail('PNG digest does not match raster evidence');
+  if (!isSha(input.reviewEvidenceSha256)) fail('independent review evidence digest invalid');
+
+  return compileReviewedResidueMaskHandoff({
+    sourceResidueHandoffSha256: input.sourceResidueHandoffSha256,
+    vectorCandidateSha256: input.vectorCandidateSha256,
+    masteringPlanSha256: input.masteringPlanSha256,
+    pngSha256: input.pngSha256,
+    reviewEvidenceSha256: input.reviewEvidenceSha256,
+    reviewStatus: input.reviewStatus,
+    pngPath: input.pngPath,
+    width: evidence.outputWidth,
+    height: evidence.outputHeight,
+    alphaAnalysis: {
+      meaningfulTransparency: evidence.meaningfulTransparency,
+      paintedCheckerboardDetected: evidence.paintedCheckerboardDetected,
+    },
+    edgeReview: input.edgeReview,
+    substrateIntegrationReview: input.substrateIntegrationReview,
+  });
+}
+
 export function validateReviewedResidueMaskHandoff(value) {
   if (!value || value.format !== FX_REVIEWED_RESIDUE_MASK_HANDOFF_FORMAT) fail('format mismatch');
   if (!isSha(value.handoffSha256)) fail('handoffSha256 missing');
@@ -65,6 +100,7 @@ export function validateReviewedResidueMaskHandoff(value) {
   if (value.authority !== 'reviewed_mask_evidence_only') fail('authority mismatch');
   if (value.receiver?.studio !== 'evavo-texture-studio') fail('receiver mismatch');
   if (value.review?.status !== 'independently-reviewed') fail('review evidence missing');
-  if (value.png?.meaningfulTransparency !== true || value.png?.paintedCheckerboardDetected !== false) fail('alpha evidence invalid');
+  if (value.review?.edgeReviewPassed !== true || value.review?.substrateIntegrationReviewPassed !== true) fail('review completeness missing');
+  if (value.png?.alphaMode !== 'straight' || value.png?.meaningfulTransparency !== true || value.png?.paintedCheckerboardDetected !== false) fail('alpha evidence invalid');
   return structuredClone(value);
 }
