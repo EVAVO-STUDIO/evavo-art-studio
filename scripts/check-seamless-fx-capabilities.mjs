@@ -41,6 +41,8 @@ for (const requiredFile of [
   'scripts/test-ci-media-tool-fx-decal-svg.mjs',
   'scripts/compile-fx-residue-mastering-plan.mjs',
   'scripts/test-ci-media-tool-fx-residue-mastering.mjs',
+  'scripts/fx-reviewed-residue-mask-handoff.mjs',
+  'scripts/test-ci-media-tool-fx-reviewed-residue-mask.mjs',
 ]) {
   if (!fs.existsSync(path.resolve(requiredFile))) fail(`missing residue receiver/compiler: ${requiredFile}`);
 }
@@ -82,6 +84,19 @@ for (const token of [
 ]) {
   if (!masteringSource.includes(token)) fail(`FX residue mastering path missing required token: ${token}`);
 }
+const reviewedMaskSource = fs.readFileSync(path.resolve('scripts/fx-reviewed-residue-mask-handoff.mjs'), 'utf8');
+for (const token of [
+  'evavo.fx-reviewed-residue-mask-handoff/v1',
+  'independently-reviewed',
+  'meaningfulTransparency',
+  'paintedCheckerboardDetected',
+  'edgeReviewPassed',
+  'substrateIntegrationReviewPassed',
+  'evavo-texture-studio',
+  'mayApproveTextureMaterial: false',
+]) {
+  if (!reviewedMaskSource.includes(token)) fail(`reviewed residue mask boundary missing required token: ${token}`);
+}
 
 console.log(JSON.stringify({
   ok: true,
@@ -91,5 +106,6 @@ console.log(JSON.stringify({
   residueWorkOrderReceiver: true,
   deterministicVectorResidueCandidates: true,
   residueTrueAlphaMastering: true,
+  reviewedResidueMaskHandoff: true,
   outputs: data.outputs.length
 }));
