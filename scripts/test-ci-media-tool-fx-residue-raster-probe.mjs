@@ -8,25 +8,13 @@ const index = fs.readFileSync('packages/media/src/index.ts', 'utf8');
 
 test('FX residue probe uses the approved Sharp true-alpha media path', () => {
   for (const token of [
-    'rasterizeFxResidueSvgCandidate',
-    'sharp-exact-canvas-runtime',
-    'normalizeAlphaCanvas',
-    'createTransparencyProofSheet',
-    'meaningfulTransparency',
-    'paintedCheckerboardDetected',
-    'transparentPixels',
-    'partialAlphaPixels',
-    'proofSha256',
+    'rasterizeFxResidueSvgCandidate','sharp-exact-canvas-runtime','normalizeAlphaCanvas','createTransparencyProofSheet',
+    'meaningfulTransparency','paintedCheckerboardDetected','transparentPixels','partialAlphaPixels','proofSha256',
   ]) assert.ok(media.includes(token), `media residue raster missing ${token}`);
   assert.ok(index.includes('./fx-residue-raster.js'));
   for (const token of [
-    "'evavo.fx-art-workstation-probe/v2'",
-    "'evavo.fx-residue-alpha-evidence/v1'",
-    "'sharp-exact-canvas-runtime'",
-    'masteringPlanSha256',
-    'transparencyProofSha256',
-    'trueAlphaRasterExecutionProven: true',
-    'creativeApprovalGranted: false',
-    'independentCreativeReviewStillRequired: true',
+    "'evavo.fx-art-workstation-probe/v1'",'rasterEvidenceVersion: 2',"'evavo.fx-residue-alpha-evidence/v1'",
+    "'sharp-exact-canvas-runtime'",'masteringPlanSha256','transparencyProofSha256','trueAlphaRasterExecutionProven: true',
+    'creativeApprovalGranted: false','independentCreativeReviewStillRequired: true',
   ]) assert.ok(probe.includes(token), `workstation probe missing ${token}`);
 });
