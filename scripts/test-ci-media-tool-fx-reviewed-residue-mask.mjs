@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { compileReviewedResidueMaskHandoff, validateReviewedResidueMaskHandoff } from './fx-reviewed-residue-mask-handoff.mjs';
+import {
+  compileReviewedResidueMaskHandoff,
+  compileReviewedResidueMaskHandoffFromRasterEvidence,
+  validateReviewedResidueMaskHandoff,
+} from './fx-reviewed-residue-mask-handoff.mjs';
 
 const fixture = {
   sourceResidueHandoffSha256: '1'.repeat(64),
@@ -27,11 +31,51 @@ assert.match(handoff.handoffSha256, /^[a-f0-9]{64}$/);
 assert.deepEqual(validateReviewedResidueMaskHandoff(handoff), handoff);
 assert.deepEqual(compileReviewedResidueMaskHandoff(fixture), handoff);
 
+const rasterEvidence = {
+  format: 'evavo.fx-residue-alpha-evidence/v1',
+  candidateSha256: fixture.vectorCandidateSha256,
+  masteringPlanSha256: fixture.masteringPlanSha256,
+  processorId: 'sharp-exact-canvas-runtime',
+  outputWidth: 1024,
+  outputHeight: 1024,
+  alphaMode: 'straight',
+  transparentPixels: 800000,
+  opaquePixels: 150000,
+  partialAlphaPixels: 98576,
+  visiblePixels: 248576,
+  meaningfulTransparency: true,
+  paintedCheckerboardDetected: false,
+  pngSha256: fixture.pngSha256,
+  proofSha256: '6'.repeat(64),
+  authority: {
+    generatedRasterCandidateOnly: true,
+    independentCreativeReviewStillRequired: true,
+    substrateIntegrationReviewStillRequired: true,
+    mayApproveCreativeResult: false,
+    mayApproveTextureMaterial: false,
+    publication: false,
+  },
+};
+const fromRaster = compileReviewedResidueMaskHandoffFromRasterEvidence({
+  ...fixture,
+  rasterEvidence,
+});
+assert.equal(fromRaster.png.sha256, fixture.pngSha256);
+assert.equal(fromRaster.review.evidenceSha256, fixture.reviewEvidenceSha256);
+assert.equal(fromRaster.receiver.studio, 'evavo-texture-studio');
+assert.deepEqual(validateReviewedResidueMaskHandoff(fromRaster), fromRaster);
+
 assert.throws(() => compileReviewedResidueMaskHandoff({ ...fixture, reviewStatus: 'candidate' }));
 assert.throws(() => compileReviewedResidueMaskHandoff({ ...fixture, alphaAnalysis: { meaningfulTransparency: false, paintedCheckerboardDetected: false } }));
 assert.throws(() => compileReviewedResidueMaskHandoff({ ...fixture, edgeReview: { passed: false } }));
+assert.throws(() => compileReviewedResidueMaskHandoffFromRasterEvidence({ ...fixture, rasterEvidence, reviewStatus: 'candidate' }), /independent review/);
+assert.throws(() => compileReviewedResidueMaskHandoffFromRasterEvidence({ ...fixture, pngSha256: '7'.repeat(64), rasterEvidence }), /PNG digest does not match/);
+assert.throws(() => compileReviewedResidueMaskHandoffFromRasterEvidence({ ...fixture, vectorCandidateSha256: '8'.repeat(64), rasterEvidence }), /vector candidate does not match/);
+const escalated = structuredClone(rasterEvidence);
+escalated.authority.mayApproveCreativeResult = true;
+assert.throws(() => compileReviewedResidueMaskHandoffFromRasterEvidence({ ...fixture, rasterEvidence: escalated }), /authority escalation/);
 const tampered = structuredClone(handoff);
-tampered.png.sha256 = '6'.repeat(64);
+tampered.png.sha256 = '9'.repeat(64);
 assert.throws(() => validateReviewedResidueMaskHandoff(tampered));
 
 console.log('EVAVO reviewed residue mask handoff regression passed');
