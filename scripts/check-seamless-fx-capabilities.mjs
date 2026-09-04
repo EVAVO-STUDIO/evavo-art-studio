@@ -36,6 +36,9 @@ for (const requiredFile of [
   'scripts/fx-residue-art-work-order-lib.mjs',
   'scripts/compile-fx-residue-art-work-order.mjs',
   'scripts/check-fx-residue-art-work-order.mjs',
+  'scripts/fx-decal-svg-candidate.mjs',
+  'scripts/test-fx-decal-svg-candidate.mjs',
+  'scripts/test-ci-media-tool-fx-decal-svg.mjs',
 ]) {
   if (!fs.existsSync(path.resolve(requiredFile))) fail(`missing residue receiver/compiler: ${requiredFile}`);
 }
@@ -49,6 +52,21 @@ for (const token of [
 ]) {
   if (!workOrderSource.includes(token)) fail(`residue compiler missing required token: ${token}`);
 }
+const vectorSource = fs.readFileSync(path.resolve('scripts/fx-decal-svg-candidate.mjs'), 'utf8');
+for (const token of [
+  'evavo.fx-decal-svg-candidate/v1',
+  'bullet-hole',
+  'splatter',
+  'stain',
+  'puddle',
+  'candidate_vector_mask_only',
+  'trueAlphaRequired',
+  'rasterizeThroughExistingArtStudioProcessing',
+  'textureMaterialResponseRemainsTextureStudioAuthority',
+  'transientBurstRemainsParticleStudioAuthority',
+]) {
+  if (!vectorSource.includes(token)) fail(`FX decal vector generator missing required token: ${token}`);
+}
 
 console.log(JSON.stringify({
   ok: true,
@@ -56,5 +74,6 @@ console.log(JSON.stringify({
   families: data.families.length,
   residues: residueIds.size,
   residueWorkOrderReceiver: true,
+  deterministicVectorResidueCandidates: true,
   outputs: data.outputs.length
 }));
