@@ -11,6 +11,10 @@ const required = [
   'scripts/run-local-generation-batch.mjs',
   'scripts/local-generation-batch-state-v2.mjs',
   'scripts/local-generation-batch-state-v2.test.mjs',
+  'scripts/local-generation-batch-recovery-v2.mjs',
+  'scripts/local-generation-batch-recovery-v2.test.mjs',
+  'scripts/local-generation-batch-qa-policy-v2.mjs',
+  'scripts/local-generation-batch-qa-policy-v2.test.mjs',
   'scripts/run-local-generation-campaign.mjs',
   'scripts/local-generation-v1-reference-bridge.test.mjs',
   'scripts/test-local-generation-batch-v2.mjs',
@@ -53,6 +57,10 @@ for (const relative of [
   'scripts/run-local-generation-batch.mjs',
   'scripts/local-generation-batch-state-v2.mjs',
   'scripts/local-generation-batch-state-v2.test.mjs',
+  'scripts/local-generation-batch-recovery-v2.mjs',
+  'scripts/local-generation-batch-recovery-v2.test.mjs',
+  'scripts/local-generation-batch-qa-policy-v2.mjs',
+  'scripts/local-generation-batch-qa-policy-v2.test.mjs',
   'scripts/run-local-generation-campaign.mjs',
   'scripts/local-generation-v1-reference-bridge.test.mjs',
   'scripts/test-local-generation-batch-v2.mjs',
@@ -74,6 +82,10 @@ const compiler = fs.readFileSync(path.join(root, 'scripts/local-generation-batch
 const runner = fs.readFileSync(path.join(root, 'scripts/run-local-generation-batch.mjs'), 'utf8');
 const resumeState = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-state-v2.mjs'), 'utf8');
 const resumeStateTest = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-state-v2.test.mjs'), 'utf8');
+const recovery = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-recovery-v2.mjs'), 'utf8');
+const recoveryTest = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-recovery-v2.test.mjs'), 'utf8');
+const qaPolicy = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-qa-policy-v2.mjs'), 'utf8');
+const qaPolicyTest = fs.readFileSync(path.join(root, 'scripts/local-generation-batch-qa-policy-v2.test.mjs'), 'utf8');
 const v1Runner = fs.readFileSync(path.join(root, 'scripts/run-local-generation-campaign.mjs'), 'utf8');
 const v1ReferenceTest = fs.readFileSync(path.join(root, 'scripts/local-generation-v1-reference-bridge.test.mjs'), 'utf8');
 const aggregateRunner = fs.readFileSync(path.join(root, 'scripts/test-local-generation-batch-v2.mjs'), 'utf8');
@@ -115,6 +127,21 @@ for (const token of [
   'checkpoint round-trip preserves accepted frame results', 'resume refuses manifest, plan, or reference graph drift',
   'state validation rejects malformed provider artifact IDs', 'deterministic run key binds both authored manifest and compiled plan',
 ]) assert.equal(resumeStateTest.includes(token), true, `resume state test lost ${token}`);
+for (const token of [
+  'recoveryStatePath', 'recoverBatchExecution', 'firstInvalidRecoveredStage', 'source SHA-256 differs',
+  'invalidateRecoveredExecutionFromStage',
+]) assert.equal(recovery.includes(token), true, `batch recovery contract lost ${token}`);
+for (const token of [
+  'fully valid recovered stages preserve accepted artifact IDs', 'recovery invalidates a tampered upstream artifact',
+  'a stale downstream file invalidates only that stage', 'recovery validation refuses failed QA',
+]) assert.equal(recoveryTest.includes(token), true, `batch recovery test lost ${token}`);
+for (const token of ['frameProblems', 'retryableFrameProblems', 'retryAllowedForReason', 'duplicate-hash', 'dimension-mismatch']) {
+  assert.equal(qaPolicy.includes(token), true, `QA policy lost ${token}`);
+}
+for (const token of [
+  'non-retryable QA failures remain terminal frame problems', 'retry policy selects only problems',
+  'duplicate hashes are reported across already accepted', 'unknown QA failure codes fail closed',
+]) assert.equal(qaPolicyTest.includes(token), true, `QA policy test lost ${token}`);
 
 for (const token of [
   'PROVIDER_REFERENCE_CAPABILITY_REQUIREMENTS', 'maximumReferenceImages',
@@ -124,10 +151,13 @@ for (const token of [
 for (const token of [
   'requiredCapabilityProfile', 'routeScene', 'runtimeJob', 'maximumReferenceImages',
   'job.payload.references', 'job.inputArtifacts', 'canonical-identity', 'previous-key-pose and next-key-pose',
+  'multiple-reference-images', 'ordinary generation without references preserves the baseline capability',
 ]) assert.equal(v1ReferenceTest.includes(token), true, `V1 reference bridge test lost ${token}`);
 for (const token of [
-  'local-generation-batch-state-v2.test.mjs', 'local-generation-v1-reference-bridge.test.mjs', 'check-local-generation-batch-v2.mjs',
-  'evavo.local-generation-batch-v2-contract-receipt.v1', 'includesDurableV1ReferenceBridge', 'includesDurableResumeState',
+  'local-generation-batch-state-v2.test.mjs', 'local-generation-batch-recovery-v2.test.mjs',
+  'local-generation-batch-qa-policy-v2.test.mjs', 'local-generation-v1-reference-bridge.test.mjs', 'check-local-generation-batch-v2.mjs',
+  'evavo.local-generation-batch-v2-contract-receipt.v1', 'includesDurableV1ReferenceBridge',
+  'includesDurableResumeStateModule', 'includesRecoveredArtifactRevalidation', 'includesExplicitQaFailurePolicy', 'includesDurableResumeExecution',
 ]) assert.equal(aggregateRunner.includes(token), true, `aggregate V2 contract runner lost ${token}`);
 
 for (const token of ['sqlite:///:memory:', '--disable-all-custom-nodes', '--disable-api-nodes', 'CheckpointLoaderSimple', 'KSampler', 'portFree', 'stopProcess']) {
