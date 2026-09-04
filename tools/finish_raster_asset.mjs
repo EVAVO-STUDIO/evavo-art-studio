@@ -5,10 +5,16 @@ import path from "node:path";
 
 import { finishRasterAsset } from "../packages/media/dist/index.js";
 
+const SAFE_CLEANUP_GUARD = Object.freeze({
+  minRetainedAreaRatio: 0.2,
+  maxAspectRatioDrift: 2.5,
+});
+
 const PRESETS = Object.freeze({
   "transparent-object": Object.freeze({
     ensureAlpha: true,
     trim: { threshold: 8, padding: 24 },
+    guard: SAFE_CLEANUP_GUARD,
     normalize: true,
     sharpen: { sigma: 1 },
     format: "png",
@@ -16,6 +22,7 @@ const PRESETS = Object.freeze({
   "web-support": Object.freeze({
     ensureAlpha: true,
     trim: { threshold: 8, padding: 32 },
+    guard: SAFE_CLEANUP_GUARD,
     normalize: true,
     sharpen: { sigma: 1 },
     resize: { width: 1400, fit: "inside", withoutEnlargement: true },
@@ -33,6 +40,7 @@ const PRESETS = Object.freeze({
   "motion-layer": Object.freeze({
     ensureAlpha: true,
     trim: { threshold: 4, padding: 16 },
+    guard: SAFE_CLEANUP_GUARD,
     sharpen: { sigma: 0.7 },
     format: "png",
   }),
@@ -84,6 +92,9 @@ function mergeSpec(base, overrides) {
       : {}),
     ...(base.padding || overrides.padding
       ? { padding: { ...(base.padding ?? {}), ...(overrides.padding ?? {}) } }
+      : {}),
+    ...(base.guard || overrides.guard
+      ? { guard: { ...(base.guard ?? {}), ...(overrides.guard ?? {}) } }
       : {}),
   };
 }
