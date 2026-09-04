@@ -32,4 +32,29 @@ for (const residue of ['bullet-hole-wood','bullet-hole-plaster','bullet-hole-met
   if (!residueIds.has(residue)) fail(`missing required residue: ${residue}`);
 }
 
-console.log(JSON.stringify({ ok: true, studio: data.studio, families: data.families.length, residues: residueIds.size, outputs: data.outputs.length }));
+for (const requiredFile of [
+  'scripts/fx-residue-art-work-order-lib.mjs',
+  'scripts/compile-fx-residue-art-work-order.mjs',
+  'scripts/check-fx-residue-art-work-order.mjs',
+]) {
+  if (!fs.existsSync(path.resolve(requiredFile))) fail(`missing residue receiver/compiler: ${requiredFile}`);
+}
+const workOrderSource = fs.readFileSync(path.resolve('scripts/fx-residue-art-work-order-lib.mjs'), 'utf8');
+for (const token of [
+  'evavo.fx-residue-handoff/v1',
+  'candidate_instruction_only',
+  'true-alpha-png',
+  'materialResponseRemainsTextureStudioAuthority',
+  'handoffSha256 mismatch',
+]) {
+  if (!workOrderSource.includes(token)) fail(`residue compiler missing required token: ${token}`);
+}
+
+console.log(JSON.stringify({
+  ok: true,
+  studio: data.studio,
+  families: data.families.length,
+  residues: residueIds.size,
+  residueWorkOrderReceiver: true,
+  outputs: data.outputs.length
+}));
