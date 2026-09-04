@@ -1,0 +1,21 @@
+{
+  "schema": "evavo_fx_residue_receiver_v1",
+  "studio": "evavo-art-studio",
+  "acceptsFormat": "evavo.fx-residue-handoff/v1",
+  "authority": "candidate-art-only",
+  "acceptedSourceStudios": ["particle-studio"],
+  "supportedResidueFamilies": [
+    "bullet-hole-wood", "bullet-hole-plaster", "bullet-hole-metal", "bullet-hole-glass",
+    "impact-mark-brick", "impact-mark-stone", "impact-mark-soil", "impact-mark-generic",
+    "blood-splatter", "food-splatter", "grease-stain", "mud-splatter", "water-splash-residue", "paint-splatter"
+  ],
+  "requiredEvidence": [
+    "sourceSha256", "handoffSha256", "residueFamily", "surfaceFamily", "requiredQa"
+  ],
+  "requiredQa": [
+    "true-alpha", "material-match", "scale-plausibility", "edge-integration", "no-floating-residue", "source-event-lineage"
+  ],
+  "forbidden": [
+    "automatic-creative-approval", "automatic-scene-mutation", "unverified-source-substitution", "painted-checkerboard-alpha"
+  ]
+}
