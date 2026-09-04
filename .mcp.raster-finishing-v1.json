@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "evavo-raster-finishing-v1": {
+      "command": "node",
+      "args": ["tools/raster_finishing_mcp.mjs"],
+      "env": {
+        "EVAVO_RASTER_FINISH_ALLOWED_ROOTS": "C:\\GitRepos;C:\\EVAVO;D:\\EVAVO",
+        "EVAVO_RASTER_FINISH_ALLOW_WRITES": "true"
+      }
+    }
+  }
+}
