@@ -7,6 +7,9 @@ import {
   compileTopHatV3ProviderPlan,
   inspectTopHatV3ProviderPlan,
 } from './project-art/top-hat-v3-animation-provider-plan.mjs';
+import {
+  assertTopHatV3GenerationPlanContract,
+} from './project-art/top-hat-v3-suite-contract.mjs';
 
 function fail(code, detail = code) {
   const error = new Error(`${code}:${detail}`);
@@ -105,8 +108,10 @@ const options = {
   layerCandidateCount: positiveInteger(args.layerCandidateCount, 'layerCandidateCount'),
 };
 
+const generationPlan = await readJson(generationPlanPath);
+const suiteContract = assertTopHatV3GenerationPlanContract(generationPlan);
 const compiled = compileTopHatV3ProviderPlan({
-  generationPlan: await readJson(generationPlanPath),
+  generationPlan,
   bindings: bindingsPath ? await readJson(bindingsPath) : {},
   options,
 });
@@ -126,6 +131,9 @@ console.log(
     totalJobs: readiness.totalJobs,
     readyJobs: readiness.readyJobs,
     blockedJobs: readiness.blockedJobs,
+    signatureClipId: suiteContract.signatureClipId,
+    signatureClipFrames: suiteContract.signatureClipFrames,
+    signatureClipFps: suiteContract.signatureClipFps,
     localFirst: readiness.localFirst,
     continuityFirst: readiness.continuityFirst,
     executionPerformed: false,
