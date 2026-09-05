@@ -5,6 +5,8 @@ import path from "node:path";
 import readline from "node:readline";
 
 import {
+  getImageReviewProfile,
+  listImageReviewProfiles,
   reviewExistingImageEdit,
   reviewExistingImageQuality,
 } from "../packages/media/dist/index.js";
@@ -14,7 +16,7 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-existing-image-review";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const ALLOW_WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -40,32 +42,53 @@ function identity(filePath) {
   return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
-function qualitySpec(args) {
+function resolveProfile(args) {
+  return typeof args.profile === "string" ? getImageReviewProfile(args.profile) : null;
+}
+
+function qualitySpec(args, profile) {
   return {
-    ...(typeof args.minimumSharpness === "number" ? { minimumSharpness: args.minimumSharpness } : {}),
-    ...(typeof args.minimumLumaStdDev === "number" ? { minimumLumaStdDev: args.minimumLumaStdDev } : {}),
-    ...(typeof args.maximumTransparentRgbContaminationRatio === "number" ? { maximumTransparentRgbContaminationRatio: args.maximumTransparentRgbContaminationRatio } : {}),
-    ...(typeof args.maximumEdgeHaloRiskRatio === "number" ? { maximumEdgeHaloRiskRatio: args.maximumEdgeHaloRiskRatio } : {}),
-    ...(typeof args.maximumPinholeRatio === "number" ? { maximumPinholeRatio: args.maximumPinholeRatio } : {}),
-    ...(typeof args.maximumBlockinessRatio === "number" ? { maximumBlockinessRatio: args.maximumBlockinessRatio } : {}),
+    minimumSharpness: typeof args.minimumSharpness === "number" ? args.minimumSharpness : profile?.minimumSharpness,
+    minimumLumaStdDev: typeof args.minimumLumaStdDev === "number" ? args.minimumLumaStdDev : profile?.minimumLumaStdDev,
+    maximumTransparentRgbContaminationRatio:
+      typeof args.maximumTransparentRgbContaminationRatio === "number"
+        ? args.maximumTransparentRgbContaminationRatio
+        : profile?.maximumTransparentRgbContaminationRatio,
+    maximumEdgeHaloRiskRatio:
+      typeof args.maximumEdgeHaloRiskRatio === "number"
+        ? args.maximumEdgeHaloRiskRatio
+        : profile?.maximumEdgeHaloRiskRatio,
+    maximumPinholeRatio:
+      typeof args.maximumPinholeRatio === "number" ? args.maximumPinholeRatio : profile?.maximumPinholeRatio,
+    maximumBlockinessRatio:
+      typeof args.maximumBlockinessRatio === "number" ? args.maximumBlockinessRatio : profile?.maximumBlockinessRatio,
   };
+}
+
+function compactUndefined(record) {
+  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined));
 }
 
 async function reviewQuality(args) {
   if (typeof args.inputPath !== "string") throw new Error("inputPath is required.");
   const inputPath = await assertAllowed(args.inputPath);
-  const evidence = await reviewExistingImageQuality(await readFile(inputPath), qualitySpec(args));
+  const profile = resolveProfile(args);
+  const evidence = await reviewExistingImageQuality(
+    await readFile(inputPath),
+    compactUndefined(qualitySpec(args, profile)),
+  );
   return Object.freeze({
     ok: true,
     inputPath,
+    profile: profile?.name ?? null,
     evidence,
     visualReviewRequired: true,
-    reviewChecklist: [
+    reviewChecklist: Object.freeze([
+      ...(profile?.visualChecks ?? []),
       "Inspect at intended runtime size and at 100% pixel scale.",
       "Check whether the image looks genuinely polished rather than merely passing technical thresholds.",
-      "Inspect edges, transparency, text, logos, faces, hands, repeated texture and generated-looking defects where relevant.",
       "Reject soft, blurry, haloed, blocky, overprocessed or semantically poor imagery even when the numeric score passes.",
-    ],
+    ]),
   });
 }
 
@@ -83,22 +106,39 @@ async function reviewEdit(args) {
     throw new Error("Source, edited image and all review outputs must use distinct paths.");
   }
 
+  const profile = resolveProfile(args);
   const review = await reviewExistingImageEdit(
     await readFile(sourcePath),
     await readFile(editedPath),
-    {
-      ...qualitySpec(args),
-      ...(typeof args.maximumChangedPixelRatio === "number" ? { maximumChangedPixelRatio: args.maximumChangedPixelRatio } : {}),
-      ...(typeof args.maximumSharpnessRegressionRatio === "number" ? { maximumSharpnessRegressionRatio: args.maximumSharpnessRegressionRatio } : {}),
-      ...(typeof args.maximumHaloRegression === "number" ? { maximumHaloRegression: args.maximumHaloRegression } : {}),
-      ...(typeof args.maximumPinholeRegression === "number" ? { maximumPinholeRegression: args.maximumPinholeRegression } : {}),
-      preserveOpaqueRgb: args.preserveOpaqueRgb !== false,
-    },
+    compactUndefined({
+      ...qualitySpec(args, profile),
+      maximumChangedPixelRatio:
+        typeof args.maximumChangedPixelRatio === "number"
+          ? args.maximumChangedPixelRatio
+          : profile?.maximumChangedPixelRatio,
+      maximumSharpnessRegressionRatio:
+        typeof args.maximumSharpnessRegressionRatio === "number"
+          ? args.maximumSharpnessRegressionRatio
+          : profile?.maximumSharpnessRegressionRatio,
+      maximumHaloRegression:
+        typeof args.maximumHaloRegression === "number"
+          ? args.maximumHaloRegression
+          : profile?.maximumHaloRegression,
+      maximumPinholeRegression:
+        typeof args.maximumPinholeRegression === "number"
+          ? args.maximumPinholeRegression
+          : profile?.maximumPinholeRegression,
+      preserveOpaqueRgb:
+        typeof args.preserveOpaqueRgb === "boolean"
+          ? args.preserveOpaqueRgb
+          : profile?.preserveOpaqueRgb ?? true,
+    }),
   );
 
   const receipt = Object.freeze({
-    schemaVersion: "1.0",
+    schemaVersion: "1.1",
     operation: "evavo-review-existing-image-edit",
+    profile: profile?.name ?? null,
     approvalState: review.evidence.approvedForPromotion ? "technical-pass-visual-review-required" : "rejected-or-needs-review",
     sourceImmutable: true,
     sourcePath,
@@ -108,14 +148,15 @@ async function reviewEdit(args) {
     receiptPath,
     evidence: review.evidence,
     visualReviewRequired: true,
-    reviewChecklist: [
+    reviewChecklist: Object.freeze([
+      ...(profile?.visualChecks ?? []),
       "Compare source and edited proof panels on both white and black hostile backgrounds.",
       "Inspect the exact difference map and confirm every changed region is intended.",
       "Inspect at 100%, 200% and 400% for halos, stair-stepping, oversharpening, blur, smearing, blockiness and local texture discontinuity.",
-      "Check typography, logos, UI, faces, hands and other identity-critical forms for accidental alteration.",
+      "Check typography, logos, UI, faces, hands and other identity-critical forms for accidental alteration where relevant.",
       "Check intended runtime scale separately: a technically clean edit can still look weak, cheap, blurry or obviously generated.",
       "Promotion requires semantic/visual approval even when approvedForPromotion is true; numeric QA is a gate, not final art direction.",
-    ],
+    ]),
   });
 
   for (const filePath of [proofPath, diffPath, receiptPath]) await mkdir(path.dirname(filePath), { recursive: true });
@@ -130,13 +171,29 @@ async function reviewEdit(args) {
     proofPath,
     diffPath,
     receiptPath,
+    profile: profile?.name ?? null,
     evidence: review.evidence,
     approvalState: receipt.approvalState,
+    visualReviewChecklist: receipt.reviewChecklist,
     bytesReturned: false,
   });
 }
 
 const qualityProperties = Object.freeze({
+  profile: {
+    type: "string",
+    enum: [
+      "logo-transparent",
+      "web-hero",
+      "ui-screenshot",
+      "product-cutout",
+      "photo",
+      "cel-animation-frame",
+      "pixel-art",
+      "texture",
+      "illustration",
+    ],
+  },
   minimumSharpness: { type: "number", minimum: 0, maximum: 255 },
   minimumLumaStdDev: { type: "number", minimum: 0, maximum: 128 },
   maximumTransparentRgbContaminationRatio: { type: "number", minimum: 0, maximum: 1 },
@@ -152,8 +209,13 @@ const tools = Object.freeze([
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
+    name: "evavo_list_image_review_profiles",
+    description: "List asset-type-aware image review profiles and their visual-review requirements so agents do not judge logos, web heroes, screenshots, photography, cel art and pixel art by the same rules.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  }),
+  Object.freeze({
     name: "evavo_review_existing_image_quality",
-    description: "Read-only technical quality audit for an existing raster. Measures blur/softness, contrast, clipping, dirty transparent RGB, edge halo risk, alpha pinholes and JPEG-style blockiness. This never substitutes for visual art-direction review.",
+    description: "Read-only technical quality audit for an existing raster, optionally using an asset-type-aware profile. Measures blur/softness, contrast, clipping, dirty transparent RGB, edge halo risk, alpha pinholes and JPEG-style blockiness. Numeric QA never substitutes for visual art-direction review.",
     inputSchema: {
       type: "object",
       properties: {
@@ -166,7 +228,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_review_existing_image_edit",
-    description: "Compare source vs edited artwork with regression detection, source/edited hostile-background proof sheet and exact pixel difference proof. Detects sharpness loss, new halos, pinholes, transparent-RGB contamination, blockiness, collateral opaque changes and excessive edit surface. Final visual approval is still required.",
+    description: "Compare source vs edited artwork with asset-type-aware regression detection, hostile-background proof sheet and exact pixel difference proof. Detects sharpness loss, new halos, pinholes, transparent-RGB contamination, blockiness, collateral changes and excessive edit surface. Final visual approval is mandatory.",
     inputSchema: {
       type: "object",
       properties: {
@@ -191,11 +253,14 @@ const tools = Object.freeze([
 
 function capabilities() {
   return Object.freeze({
-    contract: "evavo_existing_image_review_v1",
+    contract: "evavo_existing_image_review_v1_1",
     mode: "existing-image-quality-and-retouch-review",
     sourceMutation: false,
     allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
+    reviewProfiles: listImageReviewProfiles().map((profile) => profile.name),
     checks: [
+      "asset-type-aware-thresholds",
+      "asset-type-aware-visual-checklists",
       "softness-and-sharpness",
       "detail-energy",
       "exposure-and-contrast",
@@ -216,6 +281,9 @@ function capabilities() {
 
 async function callTool(name, args) {
   if (name === "evavo_existing_image_review_capabilities") return capabilities();
+  if (name === "evavo_list_image_review_profiles") {
+    return Object.freeze({ ok: true, profiles: listImageReviewProfiles(), visualReviewRequired: true });
+  }
   if (name === "evavo_review_existing_image_quality") return reviewQuality(args ?? {});
   if (name === "evavo_review_existing_image_edit") return reviewEdit(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
