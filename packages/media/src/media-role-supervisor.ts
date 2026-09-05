@@ -1,9 +1,12 @@
-export type MediaSlotRole =
-  | "detail-hero"
-  | "detail-support"
-  | "catalogue-tile"
-  | "social-seo"
-  | "motion-layer";
+export const MEDIA_SLOT_ROLES = Object.freeze([
+  "detail-hero",
+  "detail-support",
+  "catalogue-tile",
+  "social-seo",
+  "motion-layer",
+] as const);
+
+export type MediaSlotRole = (typeof MEDIA_SLOT_ROLES)[number];
 
 export interface MediaAssetCandidate {
   readonly id: string;
@@ -72,6 +75,12 @@ const CATALOGUE_ONLY_TOKENS = [
   "work index catalogue presentation art only",
 ] as const;
 
+function optionalString(value: unknown, label: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") throw new Error(`${label} must be a string when provided.`);
+  return value;
+}
+
 function text(candidate: MediaAssetCandidate): string {
   return [
     candidate.id,
@@ -118,7 +127,8 @@ function scoreAspect(actual: number | undefined, target: number | undefined): nu
 }
 
 function validateCandidate(candidate: MediaAssetCandidate): void {
-  if (!candidate.id?.trim()) throw new Error("Media candidate id is required.");
+  if (!candidate || typeof candidate !== "object") throw new Error("Media candidate must be an object.");
+  if (typeof candidate.id !== "string" || !candidate.id.trim()) throw new Error("Media candidate id is required.");
   for (const [label, value] of [
     ["width", candidate.width],
     ["height", candidate.height],
@@ -128,7 +138,66 @@ function validateCandidate(candidate: MediaAssetCandidate): void {
       throw new Error(`Media candidate ${label} must be a non-negative finite number.`);
     }
   }
+  if (candidate.tags !== undefined && (!Array.isArray(candidate.tags) || candidate.tags.some((tag) => typeof tag !== "string"))) {
+    throw new Error("Media candidate tags must be an array of strings.");
+  }
+  optionalString(candidate.format, "Media candidate format");
+  optionalString(candidate.status, "Media candidate status");
+  optionalString(candidate.assetRole, "Media candidate assetRole");
+  optionalString(candidate.usage, "Media candidate usage");
+  if (candidate.hasAlpha !== undefined && typeof candidate.hasAlpha !== "boolean") {
+    throw new Error("Media candidate hasAlpha must be boolean when provided.");
+  }
+  if (candidate.sharedWithCatalogue !== undefined && typeof candidate.sharedWithCatalogue !== "boolean") {
+    throw new Error("Media candidate sharedWithCatalogue must be boolean when provided.");
+  }
+  if (candidate.lockedCatalogueSource !== undefined && typeof candidate.lockedCatalogueSource !== "boolean") {
+    throw new Error("Media candidate lockedCatalogueSource must be boolean when provided.");
+  }
   boundedRatio(candidate.predominantWhiteRatio);
+}
+
+function validateRequest(request: MediaRoleRequest): void {
+  if (!request || typeof request !== "object") throw new Error("Media role request is required.");
+  if (!MEDIA_SLOT_ROLES.includes(request.role)) {
+    throw new Error(`Unknown media slot role ${JSON.stringify(request.role)}.`);
+  }
+  for (const [label, value] of [
+    ["targetAspectRatio", request.targetAspectRatio],
+    ["minimumWidth", request.minimumWidth],
+    ["minimumHeight", request.minimumHeight],
+  ] as const) {
+    if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {
+      throw new Error(`${label} must be a positive finite number when provided.`);
+    }
+  }
+  for (const [label, value] of [
+    ["transparentPreferred", request.transparentPreferred],
+    ["allowSharedCatalogueSource", request.allowSharedCatalogueSource],
+  ] as const) {
+    if (value !== undefined && typeof value !== "boolean") {
+      throw new Error(`${label} must be boolean when provided.`);
+    }
+  }
+}
+
+function applyMinimumDimensions(
+  candidate: MediaAssetCandidate,
+  minimumWidth: number,
+  minimumHeight: number,
+  label: string,
+  warnings: string[],
+): number {
+  let penalty = 0;
+  if (!finitePositive(candidate.width) || candidate.width < minimumWidth) {
+    penalty -= 15;
+    warnings.push(`${label} source width should be at least ${minimumWidth}px`);
+  }
+  if (!finitePositive(candidate.height) || candidate.height < minimumHeight) {
+    penalty -= 12;
+    warnings.push(`${label} source height should be at least ${minimumHeight}px`);
+  }
+  return penalty;
 }
 
 export function evaluateMediaCandidate(
@@ -136,6 +205,7 @@ export function evaluateMediaCandidate(
   request: MediaRoleRequest,
 ): MediaCandidateDecision {
   validateCandidate(candidate);
+  validateRequest(request);
   const role = request.role;
   const search = text(candidate);
   const reasons: string[] = [];
@@ -184,10 +254,16 @@ export function evaluateMediaCandidate(
       reasons.push("support/secondary object needs a dedicated wide hero derivative");
     }
     const minimumWidth = request.minimumWidth ?? 1200;
+    const minimumHeight = request.minimumHeight ?? 630;
     if (!finitePositive(candidate.width) || candidate.width < minimumWidth) {
       score -= 30;
       needsDerivative = true;
       reasons.push(`hero source width should be at least ${minimumWidth}px`);
+    }
+    if (!finitePositive(candidate.height) || candidate.height < minimumHeight) {
+      score -= 18;
+      needsDerivative = true;
+      reasons.push(`hero source height should be at least ${minimumHeight}px`);
     }
     if (actualAspect !== undefined && actualAspect < 1.35) {
       score -= 24;
@@ -225,11 +301,13 @@ export function evaluateMediaCandidate(
         warnings.push("support slot prefers transparency but asset is not known to have alpha");
       }
     }
-    const minWidth = request.minimumWidth ?? 600;
-    if (finitePositive(candidate.width) && candidate.width < minWidth) {
-      score -= 12;
-      warnings.push(`support source is narrower than ${minWidth}px`);
-    }
+    score += applyMinimumDimensions(
+      candidate,
+      request.minimumWidth ?? 600,
+      request.minimumHeight ?? 400,
+      "support",
+      warnings,
+    );
     if (whiteRatio !== undefined && whiteRatio > 0.45) {
       needsFinish = true;
       score -= 25;
@@ -244,7 +322,6 @@ export function evaluateMediaCandidate(
       reasons.push("asset is an approved/shared catalogue source");
     }
     if (candidateNamed && productionApproved) warnings.push("candidate-like public ID is historical naming; trust approved metadata rather than filename alone");
-    if (hasAny(search, ARCHIVE_TOKENS)) hardReject = true;
   }
 
   if (role === "social-seo") {
@@ -258,11 +335,17 @@ export function evaluateMediaCandidate(
       needsDerivative = true;
       reasons.push("support art is not the canonical social/SEO identity");
     }
-    const minWidth = request.minimumWidth ?? 1200;
-    if (!finitePositive(candidate.width) || candidate.width < minWidth) {
+    const minimumWidth = request.minimumWidth ?? 1200;
+    const minimumHeight = request.minimumHeight ?? 630;
+    if (!finitePositive(candidate.width) || candidate.width < minimumWidth) {
       score -= 25;
       needsDerivative = true;
-      reasons.push(`social/SEO source width should be at least ${minWidth}px`);
+      reasons.push(`social/SEO source width should be at least ${minimumWidth}px`);
+    }
+    if (!finitePositive(candidate.height) || candidate.height < minimumHeight) {
+      score -= 15;
+      needsDerivative = true;
+      reasons.push(`social/SEO source height should be at least ${minimumHeight}px`);
     }
     score += scoreAspect(actualAspect, request.targetAspectRatio ?? 1200 / 630);
     if (heroLike) score += 12;
@@ -282,6 +365,15 @@ export function evaluateMediaCandidate(
       needsFinish = true;
       warnings.push("JPEG cannot preserve transparency for a reusable motion layer");
     }
+    if (request.minimumWidth !== undefined || request.minimumHeight !== undefined) {
+      score += applyMinimumDimensions(
+        candidate,
+        request.minimumWidth ?? 1,
+        request.minimumHeight ?? 1,
+        "motion-layer",
+        warnings,
+      );
+    }
   }
 
   if (
@@ -294,8 +386,8 @@ export function evaluateMediaCandidate(
     warnings.push("source is shared with the catalogue; derive detail media instead of overwriting the shared asset");
   }
   if (candidate.lockedCatalogueSource === true && role !== "catalogue-tile") {
-    needsDerivative = true;
-    warnings.push("catalogue source is locked; any finishing must create a separate derivative");
+    warnings.push("catalogue source is locked; it may be reused unchanged when explicitly approved, but any pixel change must create a separate derivative");
+    if (request.allowSharedCatalogueSource !== true) needsDerivative = true;
   }
 
   if (finitePositive(candidate.bytes) && candidate.bytes > 2_000_000) {
@@ -326,6 +418,7 @@ export function rankMediaCandidates(
   candidates: readonly MediaAssetCandidate[],
   request: MediaRoleRequest,
 ): readonly MediaCandidateDecision[] {
+  validateRequest(request);
   if (!Array.isArray(candidates) || candidates.length === 0) {
     throw new Error("At least one media candidate is required.");
   }
