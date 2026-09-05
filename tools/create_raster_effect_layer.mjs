@@ -3,7 +3,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { createRasterEffectLayer } from "../packages/media/dist/index.js";
+import {
+  RASTER_EFFECT_PRESETS,
+  createRasterEffectLayer,
+  getRasterEffectPreset,
+} from "../packages/media/dist/index.js";
 
 function parseArgs(argv) {
   const args = {};
@@ -32,21 +36,8 @@ function numeric(value, label, { integer = false } = {}) {
   return parsed;
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (typeof args.input !== "string" || typeof args.output !== "string" || typeof args.kind !== "string") {
-    throw new Error(
-      "Usage: node tools/create_raster_effect_layer.mjs --input <image> --output <png> --kind drop-shadow|outer-glow [--color <css-color>] [--opacity <0..1>] [--blur <sigma>] [--spread <px>] [--offset-x <px>] [--offset-y <px>] [--padding <px>] [--print-evidence]",
-    );
-  }
-  if (args.kind !== "drop-shadow" && args.kind !== "outer-glow") {
-    throw new Error("--kind must be drop-shadow or outer-glow.");
-  }
-
-  const inputPath = path.resolve(args.input);
-  const outputPath = path.resolve(args.output);
-  const spec = {
-    kind: args.kind,
+function explicitOverrides(args) {
+  return {
     ...(typeof args.color === "string" ? { color: args.color } : {}),
     ...(args.opacity === undefined ? {} : { opacity: numeric(args.opacity, "--opacity") }),
     ...(args.blur === undefined ? {} : { blurSigma: numeric(args.blur, "--blur") }),
@@ -55,7 +46,41 @@ async function main() {
     ...(args["offset-y"] === undefined ? {} : { offsetY: numeric(args["offset-y"], "--offset-y", { integer: true }) }),
     ...(args.padding === undefined ? {} : { padding: numeric(args.padding, "--padding", { integer: true }) }),
   };
+}
 
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (typeof args.input !== "string" || typeof args.output !== "string") {
+    throw new Error(
+      "Usage: node tools/create_raster_effect_layer.mjs --input <image> --output <png> (--preset <name> | --kind drop-shadow|outer-glow) [--color <css-color>] [--opacity <0..1>] [--blur <sigma>] [--spread <px>] [--offset-x <px>] [--offset-y <px>] [--padding <px>] [--print-evidence]",
+    );
+  }
+  if (args.preset !== undefined && args.kind !== undefined) {
+    throw new Error("Choose either --preset or --kind, not both.");
+  }
+
+  const overrides = explicitOverrides(args);
+  let presetName = null;
+  let spec;
+  if (typeof args.preset === "string") {
+    if (!Object.hasOwn(RASTER_EFFECT_PRESETS, args.preset)) {
+      throw new Error(
+        `Unknown --preset ${JSON.stringify(args.preset)}. Available presets: ${Object.keys(RASTER_EFFECT_PRESETS).join(", ")}.`,
+      );
+    }
+    presetName = args.preset;
+    spec = getRasterEffectPreset(args.preset, overrides);
+  } else {
+    if (args.kind !== "drop-shadow" && args.kind !== "outer-glow") {
+      throw new Error(
+        `Provide --preset or --kind drop-shadow|outer-glow. Available presets: ${Object.keys(RASTER_EFFECT_PRESETS).join(", ")}.`,
+      );
+    }
+    spec = { kind: args.kind, ...overrides };
+  }
+
+  const inputPath = path.resolve(args.input);
+  const outputPath = path.resolve(args.output);
   const result = await createRasterEffectLayer(await readFile(inputPath), spec);
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, result.buffer);
@@ -64,6 +89,7 @@ async function main() {
     ok: true,
     inputPath,
     outputPath,
+    preset: presetName,
     evidence: result.evidence,
   };
   if (args.printEvidence) process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
