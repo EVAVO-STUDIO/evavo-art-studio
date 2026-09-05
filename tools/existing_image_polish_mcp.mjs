@@ -5,6 +5,7 @@ import path from "node:path";
 import readline from "node:readline";
 
 import {
+  applyLocalizedRasterEdit,
   createExistingImageDifferenceProof,
   createTransparencyProofSheet,
   polishExistingRasterPreservingArtwork,
@@ -15,7 +16,7 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-existing-image-polish";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const ALLOW_WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -150,6 +151,97 @@ async function polish(args) {
   });
 }
 
+async function localizedEdit(args) {
+  assertWriteAdmission(args);
+  for (const key of ["sourcePath", "candidatePath", "maskPath", "outputPath"]) {
+    if (typeof args[key] !== "string") throw new Error(`${key} is required.`);
+  }
+  const sourcePath = await assertAllowed(args.sourcePath);
+  const candidatePath = await assertAllowed(args.candidatePath);
+  const maskPath = await assertAllowed(args.maskPath);
+  const outputPath = await assertAllowed(args.outputPath, { output: true });
+  if (new Set([sourcePath, candidatePath, maskPath, outputPath].map(identity)).size !== 4) {
+    throw new Error("Localized editing is non-destructive: source, candidate, mask and output paths must be distinct.");
+  }
+  const { proofPath, diffPath, receiptPath } = await resolveDistinctOutputs(args, outputPath);
+  const source = await readFile(sourcePath);
+  const result = await applyLocalizedRasterEdit(
+    source,
+    await readFile(candidatePath),
+    await readFile(maskPath),
+    {
+      ...(Number.isInteger(args.featherRadius) ? { featherRadius: args.featherRadius } : {}),
+      ...(Number.isInteger(args.maskThreshold) ? { maskThreshold: args.maskThreshold } : {}),
+      preserveOutsideMask: true,
+      preserveOpaqueOutsideMask: true,
+    },
+  );
+  const maximumMaskCoverageRatio = typeof args.maximumMaskCoverageRatio === "number"
+    ? args.maximumMaskCoverageRatio
+    : 0.25;
+  if (result.evidence.maskCoverageRatio > maximumMaskCoverageRatio) {
+    throw new Error(
+      `Localized edit mask covers ${(result.evidence.maskCoverageRatio * 100).toFixed(2)}% of the image; maximum allowed is ${(maximumMaskCoverageRatio * 100).toFixed(2)}%.`,
+    );
+  }
+  const diff = await createExistingImageDifferenceProof(source, result.buffer, {
+    maximumChangedPixelRatio: maximumMaskCoverageRatio,
+  });
+  const proof = await createTransparencyProofSheet(result.buffer, {
+    backgrounds: Array.isArray(args.backgrounds)
+      ? args.backgrounds
+      : ["#000000", "#ffffff", "#808080", "#00ff00", "#ff00ff", "#ff244e"],
+    maximumPreviewDimension: Number.isInteger(args.maximumPreviewDimension)
+      ? args.maximumPreviewDimension
+      : 1024,
+  });
+  const receipt = Object.freeze({
+    schemaVersion: "1.0",
+    operation: "evavo-apply-localized-existing-image-edit",
+    approvalState: "unapproved",
+    sourceImmutable: true,
+    sourcePath,
+    candidatePath,
+    maskPath,
+    outputPath,
+    proofPath,
+    diffPath,
+    receiptPath,
+    maximumMaskCoverageRatio,
+    localizedEdit: result.evidence,
+    differenceProof: diff.evidence,
+    transparencyProof: proof.evidence,
+    reviewRequired: [
+      "Confirm the mask covers only the intended defect or repair area.",
+      "Inspect the source-vs-output difference map and ensure all changes stay inside the authorized region.",
+      "Inspect feathered boundaries at 100%, 400% and intended runtime scale.",
+      "Confirm logos, typography and unrelated image regions remain unchanged.",
+      "Only promote the result after approval.",
+    ],
+  });
+  for (const filePath of [outputPath, proofPath, diffPath, receiptPath]) {
+    await mkdir(path.dirname(filePath), { recursive: true });
+  }
+  await writeFile(outputPath, result.buffer, { flag: "wx" });
+  await writeFile(proofPath, proof.png, { flag: "wx" });
+  await writeFile(diffPath, diff.proofPng, { flag: "wx" });
+  await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx" });
+  return Object.freeze({
+    ok: true,
+    sourcePath,
+    candidatePath,
+    maskPath,
+    outputPath,
+    proofPath,
+    diffPath,
+    receiptPath,
+    approvalState: "unapproved",
+    localizedEdit: result.evidence,
+    differenceProof: diff.evidence,
+    bytesReturned: false,
+  });
+}
+
 async function compare(args) {
   assertWriteAdmission(args);
   if (typeof args.sourcePath !== "string" || typeof args.editedPath !== "string" || typeof args.diffPath !== "string") {
@@ -214,6 +306,36 @@ const tools = Object.freeze([
     },
   }),
   Object.freeze({
+    name: "evavo_apply_localized_existing_image_edit",
+    description: "Apply a candidate repair ONLY inside an explicit same-size mask. Pixels outside the authorized mask are copied from the source, not trusted from the candidate. Supports feathered boundaries, maximum mask coverage, exact source-vs-output difference proof and hostile-background QA. Designed for healing, retouching, inpainting, logo cleanup and defect repair without collateral changes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourcePath: { type: "string", minLength: 1 },
+        candidatePath: { type: "string", minLength: 1 },
+        maskPath: { type: "string", minLength: 1 },
+        outputPath: { type: "string", minLength: 1 },
+        proofPath: { type: "string", minLength: 1 },
+        diffPath: { type: "string", minLength: 1 },
+        receiptPath: { type: "string", minLength: 1 },
+        featherRadius: { type: "integer", minimum: 0, maximum: 32 },
+        maskThreshold: { type: "integer", minimum: 0, maximum: 255 },
+        maximumMaskCoverageRatio: { type: "number", minimum: 0.000001, maximum: 1 },
+        backgrounds: {
+          type: "array",
+          minItems: 1,
+          maxItems: 16,
+          uniqueItems: true,
+          items: { type: "string", pattern: "^#[0-9A-Fa-f]{6}$" },
+        },
+        maximumPreviewDimension: { type: "integer", minimum: 32, maximum: 2048 },
+        confirmLocalWrite: { type: "boolean", const: true },
+      },
+      required: ["sourcePath", "candidatePath", "maskPath", "outputPath", "confirmLocalWrite"],
+      additionalProperties: false,
+    },
+  }),
+  Object.freeze({
     name: "evavo_compare_existing_image_edit",
     description: "Create an exact preservation difference map between a source image and an edited candidate. Red marks RGB changes, blue marks alpha changes and magenta marks both. Useful before accepting any retouch, cleanup, inpaint, upscale or cloud replacement.",
     inputSchema: {
@@ -235,7 +357,7 @@ const tools = Object.freeze([
 
 function capabilities() {
   return Object.freeze({
-    contract: "evavo_existing_image_polish_v1_1",
+    contract: "evavo_existing_image_polish_v1_2",
     mode: "existing-image-preservation-first",
     regeneration: false,
     sourceOverwrite: false,
@@ -246,6 +368,12 @@ function capabilities() {
       "semi-transparent-fringe-decontamination",
       "fully-opaque-rgb-preservation-gate",
       "maximum-change-surface-gate",
+      "mask-locked-localized-edit",
+      "outside-mask-byte-preservation",
+      "candidate-dimension-lock",
+      "mask-dimension-lock",
+      "feathered-local-repair",
+      "maximum-mask-coverage-gate",
       "exact-rgb-alpha-difference-map",
       "change-bounding-box",
       "black-white-grey-green-magenta-cherry-red-proof",
@@ -258,6 +386,9 @@ function capabilities() {
       "sprite and UI silhouette cleanup",
       "existing web image finishing",
       "matte contamination cleanup",
+      "healing and spot repair",
+      "mask-controlled retouching",
+      "provider-generated inpaint containment",
       "retouch candidate verification",
       "upscale candidate verification",
       "pre-Cloudinary replacement QA",
@@ -268,6 +399,7 @@ function capabilities() {
 async function callTool(name, args) {
   if (name === "evavo_existing_image_polish_capabilities") return capabilities();
   if (name === "evavo_polish_existing_image") return polish(args ?? {});
+  if (name === "evavo_apply_localized_existing_image_edit") return localizedEdit(args ?? {});
   if (name === "evavo_compare_existing_image_edit") return compare(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
