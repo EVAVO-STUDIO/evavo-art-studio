@@ -135,6 +135,78 @@ function candidateFamilyId(kind, plan, job) {
   })}`;
 }
 
+function validateMotionTimeline(clip, required) {
+  const timeline = clip.motionTimeline;
+  if (timeline === undefined) {
+    if (required) fail('TOP_HAT_V3_PROVIDER_MOTION_TIMELINE_REQUIRED', clip.clipId);
+    return null; // Existing v1 plans remain readable; new exports require action anchors.
+  }
+  if (timeline?.schema !== 'evavo_top_hat_v3_motion_timeline_v1' ||
+      !Array.isArray(timeline.keyPoses) || timeline.keyPoses.length < 3 ||
+      timeline.keyPoses.length > 16 ||
+      timeline.authoredKeyPoseCount !== timeline.keyPoses.length ||
+      timeline.cyclePeriodFrames !== (clip.loopMode === 'loop' ? clip.targetFrames : null) ||
+      !Number.isFinite(timeline.durationMs) ||
+      Math.abs(timeline.durationMs - clip.targetFrames * 1000 / clip.fps) > 0.00001) {
+    fail('TOP_HAT_V3_PROVIDER_MOTION_TIMELINE_INVALID', clip.clipId);
+  }
+  const byOrdinal = new Map();
+  const labels = new Set();
+  let previous = -1;
+  for (const pose of timeline.keyPoses) {
+    if (!Number.isSafeInteger(pose?.ordinal) || pose.ordinal <= previous ||
+        pose.ordinal >= clip.targetFrames || typeof pose.label !== 'string' ||
+        !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(pose.label) || labels.has(pose.label) ||
+        typeof pose.direction !== 'string' || !pose.direction.trim() ||
+        pose.direction.length > 1024 || pose.direction.includes('\0')) {
+      fail('TOP_HAT_V3_PROVIDER_MOTION_KEY_POSE_INVALID', clip.clipId);
+    }
+    previous = pose.ordinal;
+    labels.add(pose.label);
+    byOrdinal.set(pose.ordinal, pose);
+  }
+  const first = clip.waves?.[0]?.jobs;
+  if (!byOrdinal.has(0) || !byOrdinal.has(clip.targetFrames - 1) ||
+      !Array.isArray(first) || first.length !== byOrdinal.size ||
+      first.some((job) => !byOrdinal.has(job.ordinal))) {
+    fail('TOP_HAT_V3_PROVIDER_MOTION_ANCHOR_COVERAGE_INVALID', clip.clipId);
+  }
+  return byOrdinal;
+}
+
+function validateMotionFrame(clip, job, byOrdinal) {
+  if (!byOrdinal) {
+    if (['authoredDirection', 'keyPoseLabel', 'motionPhase', 'timestampMs', 'layerOwnership']
+      .some((key) => job[key] !== undefined)) {
+      fail('TOP_HAT_V3_PROVIDER_MOTION_TIMELINE_REQUIRED', clip.clipId);
+    }
+    return;
+  }
+  const expectedOwnership = clip.clipId.startsWith('blink-')
+    ? 'eyelid-test-body-pose-no-independent-eye-overlay'
+    : clip.clipId === 'sleep' || clip.clipId === 'wake'
+      ? 'state-specific-eyes-neutral-mouth-underlay'
+      : 'body-motion-neutral-mouth-underlay';
+  const pose = byOrdinal.get(job.ordinal);
+  const expectedRole = job.ordinal === 0 ? 'opening-anchor'
+    : job.ordinal === clip.targetFrames - 1 ? 'closing-anchor'
+      : pose ? 'performance-anchor' : 'continuity-inbetween';
+  if (job.role !== expectedRole || job.keyPoseLabel !== (pose?.label ?? null) ||
+      typeof job.authoredDirection !== 'string' || !job.authoredDirection.trim() ||
+      job.authoredDirection.length > 1024 || job.authoredDirection.includes('\0') ||
+      (pose && job.authoredDirection !== pose.direction) ||
+      typeof job.performance !== 'string' || !job.performance.trim() ||
+      job.performance.length > 2048 ||
+      !Number.isFinite(job.motionPhase) ||
+      Math.abs(job.motionPhase - job.ordinal / (clip.loopMode === 'loop'
+        ? clip.targetFrames : clip.targetFrames - 1)) > 0.000001 ||
+      !Number.isFinite(job.timestampMs) ||
+      Math.abs(job.timestampMs - job.ordinal * 1000 / clip.fps) > 0.00001 ||
+      job.layerOwnership !== expectedOwnership) {
+    fail('TOP_HAT_V3_PROVIDER_MOTION_FRAME_INVALID', job.jobId);
+  }
+}
+
 function validateGenerationJobs(plan) {
   if (!Array.isArray(plan.phases) || plan.phases.length > 8) {
     fail('TOP_HAT_V3_PROVIDER_PHASES_MISSING');
@@ -183,6 +255,7 @@ function validateGenerationJobs(plan) {
   }
   for (const job of layers) checkJob(job);
   for (const clip of clips) {
+    const motionKeyPoses = validateMotionTimeline(clip, plan.strategy.authoredActionAnchorsRequired === true);
     if (!Array.isArray(clip.waves) || clip.waves.length < 1 ||
         clip.waves.length > clip.targetFrames) {
       fail('TOP_HAT_V3_PROVIDER_WAVES_INVALID', clip.clipId);
@@ -205,8 +278,12 @@ function validateGenerationJobs(plan) {
           fail('TOP_HAT_V3_PROVIDER_FRAME_INVALID', job.jobId);
         }
         ordinals.add(ordinal);
+        validateMotionFrame(clip, job, motionKeyPoses);
         if (index === 0) {
-          if (!['opening-anchor', 'closing-anchor'].includes(job.role)) {
+          const expectedRole = ordinal === 0 ? 'opening-anchor'
+            : ordinal === clip.targetFrames - 1 ? 'closing-anchor' : 'performance-anchor';
+          if (job.role !== expectedRole ||
+              (job.role === 'performance-anchor' && !motionKeyPoses?.has(ordinal))) {
             fail('TOP_HAT_V3_PROVIDER_ANCHOR_INVALID', job.jobId);
           }
         } else if (job.role !== 'continuity-inbetween' ||
@@ -498,6 +575,18 @@ function foundationRequest(plan, job, bindings, options) {
   return freeze({ jobId: job.jobId, kind: 'foundation-pose', blockers: freeze(blockers), request });
 }
 
+function bodyStyle(identityLocks, clipId) {
+  const style = baseStyle(identityLocks);
+  if (clipId !== 'hat-tip') return style;
+  return freeze({
+    ...style,
+    mustHave: freeze(style.mustHave.map((rule) =>
+      rule === 'same exact top-hat crown brim band angle and scale'
+        ? 'same exact top-hat crown brim band geometry and scale; only the authored rigid hat-tip rotation is allowed'
+        : rule)),
+  });
+}
+
 function bodyRequest(plan, clip, wave, job, bindings, options) {
   const blockers = [];
   const identity = identityReferences(plan, bindings, blockers);
@@ -538,14 +627,21 @@ function bodyRequest(plan, clip, wave, job, bindings, options) {
           job.role === 'continuity-inbetween'
             ? 'Interpolate the restrained character performance between the supplied approved temporal anchors. Do not invent a new pose family.'
             : `Create the ${job.role} for this clip while preserving the exact animation identity master.`,
+          job.performance ?? '',
+          job.authoredDirection ?? '',
+          ...(job.motionPhase === undefined ? [] : [
+            `Motion sample phase ${job.motionPhase}; frame time ${job.timestampMs} ms.`,
+          ]),
+          'Authored action anchors define the actual gesture or expression; do not replace them with neutral endpoint interpolation.',
           'Keep the body performance independent from mouth-viseme timing.',
+
         ].join(' '),
         negativeIntent:
           'No identity drift, hat drift, anatomy drift, wardrobe drift, framing drift, independent redraw, baked mouth viseme, background, shadow, halo, crop or trim.',
-        style: baseStyle(identity.identityLocks),
+        style: bodyStyle(identity.identityLocks, clip.clipId),
         shot: freeze({
           subject: `Top Hat Man ${clip.clipId}`,
-          action: `${job.role} at phase ${job.phase}`,
+          action: `${job.role} at phase ${job.phase}. ${job.authoredDirection ?? ''}`,
           direction:
             job.role === 'continuity-inbetween'
               ? 'Stay strictly inside the motion interval defined by the approved previous and next key poses.'
@@ -578,6 +674,14 @@ function bodyRequest(plan, clip, wave, job, bindings, options) {
           ordinal: job.ordinal,
           phase: job.phase,
           frameRole: job.role,
+          ...(job.authoredDirection === undefined ? {} : {
+            authoredDirection: job.authoredDirection,
+            keyPoseLabel: job.keyPoseLabel,
+            motionPhase: job.motionPhase,
+            timestampMs: job.timestampMs,
+            layerOwnership: job.layerOwnership,
+            motionTimelineSchema: clip.motionTimeline.schema,
+          }),
           targetPath: job.targetPath,
           approvedTemporalAnchorJobIds: freeze(anchorJobIds),
           approvalRequiredBeforeDependentWaves: true,
