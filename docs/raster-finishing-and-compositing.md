@@ -1,6 +1,6 @@
 # Raster finishing and compositing
 
-EVAVO Art Studio treats final-art cleanup, reusable effect layers and multi-layer composition as separate governed operations.
+EVAVO Art Studio treats final-art cleanup, transparency proofing, reusable effect layers and multi-layer composition as separate governed operations.
 
 ## Choose the smallest correct operation
 
@@ -111,7 +111,26 @@ Supported deterministic effect layers:
 
 Both effects are derived from the source alpha. The source image is never rewritten by the effect generator.
 
-CLI:
+Reviewed production presets:
+
+- `product-soft-shadow` — restrained depth for contained product/support objects
+- `product-lift-shadow` — stronger lift for floating objects on dark presentation surfaces
+- `signal-cherry-glow` — restrained EVAVO cherry signal/accent glow
+- `motion-cherry-glow` — softer wider glow intended to remain independently animatable
+
+Preset names preserve their semantic kind. A glow preset cannot be silently converted into a shadow through overrides.
+
+CLI with preset:
+
+```text
+node tools/create_raster_effect_layer.mjs \
+  --input layers/subject.png \
+  --output layers/subject-shadow.png \
+  --preset product-soft-shadow \
+  --print-evidence
+```
+
+Granular CLI:
 
 ```text
 node tools/create_raster_effect_layer.mjs \
@@ -170,6 +189,42 @@ Effect generation fails closed when:
 
 Shadows and glows remain separate transparent layers so agents can revise, remove, reorder or animate them without damaging the source subject.
 
+## Transparency proofing
+
+Do not judge transparency from a checkerboard screenshot, a white preview pane or a metadata tag alone. Use the governed transparency proof.
+
+The proof sheet renders the same source over:
+
+- black
+- white
+- neutral grey
+- bright green
+- magenta
+- a dedicated greyscale alpha-mask tile
+
+It also records SHA-256 hashes for the source and generated proof. The source image is never modified.
+
+CLI:
+
+```text
+node tools/create_transparency_proof.mjs \
+  --input layers/subject.png \
+  --output review/subject-transparency-proof.png \
+  --print-evidence
+```
+
+MCP:
+
+```text
+evavo_create_transparency_proof
+```
+
+Use this after background removal, logo cleanup, matte refinement, transparent WebP/PNG delivery optimization or any finishing pass where a white halo, fringe, accidental matte or lost alpha would be costly.
+
+For pixel-art or hard-edged assets, the proof can use nearest-neighbour preview scaling. For ordinary art, the default Lanczos preview is appropriate.
+
+A proof is diagnostic evidence, not permission to overwrite a canonical/source asset. Fix the derivative first, re-run the proof, then promote only after the result passes review.
+
 ## Segmentation and background removal
 
 Neither deterministic pass pretends to perform semantic segmentation. A matte may come from:
@@ -219,7 +274,7 @@ Both MCP servers are local-first and fail closed:
 - MCP returns receipts and paths, not image bytes
 - source files are not overwritten unless the caller explicitly selects the same allowed output path
 
-Raster finishing uses:
+Raster finishing and transparency proofing use:
 
 ```text
 EVAVO_RASTER_FINISH_ALLOWED_ROOTS
