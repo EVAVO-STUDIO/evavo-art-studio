@@ -9,6 +9,7 @@ import { composeRasterLayers } from "../packages/media/dist/index.js";
 const SERVER_NAME = "evavo-raster-compositing";
 const SERVER_VERSION = "1.0.0";
 const PROTOCOL_VERSION = "2025-03-26";
+const MAX_LAYERS = 256;
 
 function allowedRoots() {
   return (process.env.EVAVO_RASTER_COMPOSE_ALLOWED_ROOTS ?? "")
@@ -31,6 +32,17 @@ async function assertAllowed(filePath, { output = false } = {}) {
 async function materializeSpec(spec) {
   if (!spec || typeof spec !== "object" || Array.isArray(spec) || !Array.isArray(spec.layers)) {
     throw new Error("spec.layers is required.");
+  }
+  if (spec.layers.length > MAX_LAYERS) {
+    throw new Error(`Raster compositing supports at most ${MAX_LAYERS} layers per job.`);
+  }
+  if (spec.canvas !== undefined) {
+    if (!spec.canvas || typeof spec.canvas !== "object" || Array.isArray(spec.canvas)) {
+      throw new Error("spec.canvas must be an object when provided.");
+    }
+    if (!Number.isInteger(spec.canvas.width) || !Number.isInteger(spec.canvas.height)) {
+      throw new Error("spec.canvas requires integer width and height.");
+    }
   }
 
   const layers = [];
@@ -109,11 +121,21 @@ const tools = Object.freeze([
         spec: {
           type: "object",
           properties: {
-            canvas: { type: "object" },
+            canvas: {
+              type: "object",
+              properties: {
+                width: { type: "integer", minimum: 1, maximum: 32768 },
+                height: { type: "integer", minimum: 1, maximum: 32768 },
+                background: { type: "string", minLength: 1 },
+              },
+              required: ["width", "height"],
+              additionalProperties: false,
+            },
             baseFit: { type: "string" },
             basePosition: { type: "string" },
             layers: {
               type: "array",
+              maxItems: MAX_LAYERS,
               items: {
                 type: "object",
                 properties: {
@@ -122,11 +144,21 @@ const tools = Object.freeze([
                   name: { type: "string" },
                   opacity: { type: "number", minimum: 0, maximum: 1 },
                   blend: { type: "string" },
-                  left: { type: "integer" },
-                  top: { type: "integer" },
+                  left: { type: "integer", minimum: 0, maximum: 32768 },
+                  top: { type: "integer", minimum: 0, maximum: 32768 },
                   gravity: { type: "string" },
-                  rotate: { type: "number" },
-                  resize: { type: "object" },
+                  rotate: { type: "number", minimum: -3600, maximum: 3600 },
+                  resize: {
+                    type: "object",
+                    properties: {
+                      width: { type: "integer", minimum: 1, maximum: 32768 },
+                      height: { type: "integer", minimum: 1, maximum: 32768 },
+                      fit: { type: "string" },
+                      position: { type: "string" },
+                      withoutEnlargement: { type: "boolean" },
+                    },
+                    additionalProperties: false,
+                  },
                 },
                 required: ["inputPath"],
                 additionalProperties: false,
@@ -150,6 +182,7 @@ async function callTool(name, args) {
   if (name === "evavo_raster_compositing_capabilities") {
     return Object.freeze({
       contract: "evavo_raster_compositing_v1",
+      maxLayers: MAX_LAYERS,
       operations: [
         "ordered-layers",
         "resize",
@@ -159,6 +192,7 @@ async function callTool(name, args) {
         "blend-mode",
         "left-top-placement",
         "gravity-placement",
+        "canvas-bounds-validation",
         "transparent-canvas",
         "fit-base-to-canvas",
         "png",
