@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 
 import {
+  providerRequestSha256,
+  validateProviderCandidateRequest,
+} from '../../packages/providers/dist/index.js';
+import {
   inspectTopHatV3ProviderSchedule,
 } from './top-hat-v3-provider-scheduler.mjs';
 import {
@@ -89,15 +93,16 @@ export function compileTopHatV3ProviderDispatch(input = {}) {
       if (!entry.dispatchEligible || !entry.request) {
         fail('TOP_HAT_V3_DISPATCH_JOB_NOT_ELIGIBLE', entry.jobId);
       }
-      const requestAdapters = requestAdapterIds(entry.request);
+      const request = validateProviderCandidateRequest(entry.request);
+      const requestAdapters = requestAdapterIds(request);
       if (requestAdapters.some((adapterId) => !allowed.has(adapterId))) {
         fail('TOP_HAT_V3_DISPATCH_ADAPTER_SCOPE_VIOLATION', entry.jobId);
       }
-      const requestSha256 = sha256Document(entry.request);
+      const requestSha256 = providerRequestSha256(request);
       return freeze({
         jobId: entry.jobId,
         requestSha256,
-        request: entry.request,
+        request,
         providerCallBudget: 1,
         allowedAdapterIds: freeze([...requestAdapters]),
         candidateApprovalAuthorized: false,
