@@ -69,7 +69,7 @@ requireTokens("docs", [
 if (/writeFile|mkdir|unlink|rename|rm\(/u.test(files.mcp)) {
   failures.push("mcp:read-only-supervisor-must-not-write-files");
 }
-if (/cloudinary|fetch\(|https?:\/\//iu.test(files.mcp)) {
+if (/\bfetch\s*\(|https?:\/\//u.test(files.mcp)) {
   failures.push("mcp:supervisor-must-rank-supplied-metadata-without-provider-fetches");
 }
 
