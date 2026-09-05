@@ -15,6 +15,11 @@
   },
   "summary": "Canonical governed image, sprite, illustration, animation-asset, mastering, provider-adapter and game-art delivery foundation.",
   "defaultBranch": "main",
+  "providerPosture": {
+    "observedRepositoryVisibility": "public",
+    "trackedSourceMustRemainPublicSafe": true,
+    "visibilityIntentReviewRequired": true
+  },
   "authority": {
     "readOnly": [
       "inspect-project-art-needs",
@@ -38,7 +43,8 @@
       "treat-provider-candidate-as-master",
       "discard-rights-or-lineage-evidence",
       "overwrite-approved-artifact-without-compare-and-swap",
-      "claim-local-or-provider-execution-without-persisted-receipt"
+      "claim-local-or-provider-execution-without-persisted-receipt",
+      "store-private-provider-secrets-in-tracked-source"
     ]
   },
   "integrations": [
