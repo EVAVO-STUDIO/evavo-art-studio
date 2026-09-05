@@ -4,14 +4,17 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 
-import { finishRasterAsset } from "../packages/media/dist/index.js";
+import {
+  createTransparencyProofSheet,
+  finishRasterAsset,
+} from "../packages/media/dist/index.js";
 import {
   assertAllowedLocalPath,
   configuredLocalRootCount,
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-raster-finishing";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_RASTER_FINISH_ALLOWED_ROOTS";
 
@@ -29,6 +32,18 @@ const assertAllowed = (filePath, { output = false } = {}) =>
     label: "raster finishing",
   });
 
+function requireWriteAdmission(args) {
+  if (process.env.EVAVO_RASTER_FINISH_ALLOW_WRITES !== "true") {
+    throw new Error("Raster finishing writes are disabled. Set EVAVO_RASTER_FINISH_ALLOW_WRITES=true.");
+  }
+  if (args.confirmLocalWrite !== true) {
+    throw new Error("confirmLocalWrite=true is required for this exact call.");
+  }
+  if (typeof args.inputPath !== "string" || typeof args.outputPath !== "string") {
+    throw new Error("inputPath and outputPath are required.");
+  }
+}
+
 function mergeSpec(base, overrides) {
   return {
     ...base,
@@ -42,13 +57,7 @@ function mergeSpec(base, overrides) {
 }
 
 async function finish(args) {
-  if (process.env.EVAVO_RASTER_FINISH_ALLOW_WRITES !== "true") {
-    throw new Error("Raster finishing writes are disabled. Set EVAVO_RASTER_FINISH_ALLOW_WRITES=true.");
-  }
-  if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required for this exact call.");
-  if (typeof args.inputPath !== "string" || typeof args.outputPath !== "string") {
-    throw new Error("inputPath and outputPath are required.");
-  }
+  requireWriteAdmission(args);
   const presetName = typeof args.preset === "string" ? args.preset : "web-support";
   const preset = PRESETS[presetName];
   if (!preset) throw new Error(`Unknown raster finishing preset ${JSON.stringify(presetName)}.`);
@@ -73,10 +82,32 @@ async function finish(args) {
   });
 }
 
+async function transparencyProof(args) {
+  requireWriteAdmission(args);
+  const inputPath = await assertAllowed(args.inputPath);
+  const outputPath = await assertAllowed(args.outputPath, { output: true });
+  const result = await createTransparencyProofSheet(await readFile(inputPath), {
+    ...(Array.isArray(args.backgrounds) ? { backgrounds: args.backgrounds } : {}),
+    ...(args.nearest === true ? { nearest: true } : {}),
+    ...(Number.isInteger(args.maximumPreviewDimension)
+      ? { maximumPreviewDimension: args.maximumPreviewDimension }
+      : {}),
+  });
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, result.png);
+  return Object.freeze({
+    ok: true,
+    inputPath,
+    outputPath,
+    evidence: result.evidence,
+    bytesReturned: false,
+  });
+}
+
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_raster_finishing_capabilities",
-    description: "Describe local raster finishing presets and supported operations without reading or writing image bytes.",
+    description: "Describe local raster finishing, transparency-proof presets and supported operations without reading or writing image bytes.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
@@ -96,6 +127,29 @@ const tools = Object.freeze([
       additionalProperties: false,
     },
   }),
+  Object.freeze({
+    name: "evavo_create_transparency_proof",
+    description: "Create a local PNG transparency proof sheet showing the source over black, white, grey, bright green, magenta and an explicit alpha-mask tile. The tool is diagnostic only and does not modify the source image.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        inputPath: { type: "string", minLength: 1 },
+        outputPath: { type: "string", minLength: 1 },
+        backgrounds: {
+          type: "array",
+          minItems: 1,
+          maxItems: 16,
+          uniqueItems: true,
+          items: { type: "string", pattern: "^#[0-9A-Fa-f]{6}$" },
+        },
+        nearest: { type: "boolean" },
+        maximumPreviewDimension: { type: "integer", minimum: 32, maximum: 2048 },
+        confirmLocalWrite: { type: "boolean", const: true },
+      },
+      required: ["inputPath", "outputPath", "confirmLocalWrite"],
+      additionalProperties: false,
+    },
+  }),
 ]);
 
 async function callTool(name, args) {
@@ -103,15 +157,35 @@ async function callTool(name, args) {
     return Object.freeze({
       contract: "evavo_raster_finishing_v1",
       presets: Object.keys(PRESETS),
-      operations: ["alpha-mask", "ensure-alpha", "trim", "transparent-padding", "modulate", "normalize", "gamma", "blur", "sharpen", "resize", "flatten", "png", "webp", "avif", "jpeg"],
+      operations: [
+        "alpha-mask",
+        "ensure-alpha",
+        "trim",
+        "transparent-padding",
+        "modulate",
+        "normalize",
+        "gamma",
+        "blur",
+        "sharpen",
+        "resize",
+        "flatten",
+        "transparency-proof-black-white-grey-green-magenta-alpha-mask",
+        "png",
+        "webp",
+        "avif",
+        "jpeg",
+      ],
       segmentation: "provider-agnostic; pass a same-size alpha mask from Cloudinary AI, local segmentation, ComfyUI or another approved provider",
+      transparencyProof: "diagnostic proof writes a separate PNG sheet over multiple solid backgrounds plus an explicit alpha mask and SHA evidence; source pixels are not modified",
       motionBridge: "use motion-layer to prepare transparent PNG layers for the existing animation and compositing pipelines",
       pathPolicy: "input and prospective output paths are canonicalized through existing ancestors so symlink escapes fail closed",
       writesEnabled: process.env.EVAVO_RASTER_FINISH_ALLOW_WRITES === "true",
       allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
+      bytesReturned: false,
     });
   }
   if (name === "evavo_finish_raster_asset") return finish(args ?? {});
+  if (name === "evavo_create_transparency_proof") return transparencyProof(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
 
@@ -126,7 +200,16 @@ function result(value, isError = false) {
 async function dispatch(request) {
   if (request?.jsonrpc !== "2.0") return { jsonrpc: "2.0", id: request?.id ?? null, error: { code: -32600, message: "Invalid Request" } };
   if (request.method === "initialize") {
-    return { jsonrpc: "2.0", id: request.id, result: { protocolVersion: PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: SERVER_NAME, version: SERVER_VERSION }, instructions: "Raster finishing is local-first. Writes require a canonical allowed root, the write environment gate and exact per-call confirmation." } };
+    return {
+      jsonrpc: "2.0",
+      id: request.id,
+      result: {
+        protocolVersion: PROTOCOL_VERSION,
+        capabilities: { tools: { listChanged: false } },
+        serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
+        instructions: "Raster finishing and transparency proofs are local-first. Writes require a canonical allowed root, the write environment gate and exact per-call confirmation.",
+      },
+    };
   }
   if (request.method === "ping") return { jsonrpc: "2.0", id: request.id, result: {} };
   if (request.method === "tools/list") return { jsonrpc: "2.0", id: request.id, result: { tools } };
@@ -134,7 +217,14 @@ async function dispatch(request) {
     try {
       return { jsonrpc: "2.0", id: request.id, result: result(await callTool(request.params?.name, request.params?.arguments)) };
     } catch (error) {
-      return { jsonrpc: "2.0", id: request.id, result: result({ code: "RASTER_FINISH_FAILED", message: error instanceof Error ? error.message : String(error) }, true) };
+      return {
+        jsonrpc: "2.0",
+        id: request.id,
+        result: result(
+          { code: "RASTER_FINISH_FAILED", message: error instanceof Error ? error.message : String(error) },
+          true,
+        ),
+      };
     }
   }
   if (request.method?.startsWith("notifications/")) return null;
