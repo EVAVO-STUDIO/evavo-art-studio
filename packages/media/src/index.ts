@@ -19,6 +19,7 @@ export * from "./pose-control-render.js";
 export * from "./finishing-pass.js";
 export * from "./preservation-polish.js";
 export * from "./existing-image-diff.js";
+export * from "./existing-image-quality-review.js";
 export * from "./localized-edit.js";
 export * from "./edit-mask.js";
 export * from "./work-header-quality.js";
