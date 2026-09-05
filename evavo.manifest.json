@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "evavo.repo-manifest.v1",
+  "identity": {
+    "key": "evavo-art-studio",
+    "name": "EVAVO Art Studio",
+    "owner": "EVAVO-STUDIO",
+    "category": "art-production-foundation",
+    "status": "active"
+  },
+  "runtime": {
+    "language": "typescript",
+    "shape": "pnpm-monorepo-with-local-workers",
+    "localFirst": true,
+    "requiresPaidHostedControlPlane": false
+  },
+  "summary": "Canonical governed image, sprite, illustration, animation-asset, mastering, provider-adapter and game-art delivery foundation.",
+  "defaultBranch": "main",
+  "authority": {
+    "readOnly": [
+      "inspect-project-art-needs",
+      "compile-provider-neutral-request",
+      "run-deterministic-image-and-sequence-qa",
+      "inspect-artifact-provenance-and-rights",
+      "compare-and-rank-candidates"
+    ],
+    "reversible": [
+      "create-unapproved-provider-candidate",
+      "create-alpha-mastering-intermediate",
+      "create-working-copy-and-version",
+      "create-atlas-or-godot-delivery-candidate"
+    ],
+    "consequential": [
+      "execute-reviewed-provider-generation",
+      "promote-exact-reviewed-artifact"
+    ],
+    "neverImplicit": [
+      "self-approve-provider-output",
+      "treat-provider-candidate-as-master",
+      "discard-rights-or-lineage-evidence",
+      "overwrite-approved-artifact-without-compare-and-swap",
+      "claim-local-or-provider-execution-without-persisted-receipt"
+    ]
+  },
+  "integrations": [
+    "presentation-studio",
+    "brandcraft-studio",
+    "cel-animation-studio",
+    "evavo-loop-studio",
+    "evavo-video-studio",
+    "evavo-docs-suite",
+    "GodotGameFoundationKit",
+    "super-admin-ai-agent"
+  ],
+  "reviewedAt": "2026-09-05"
+}
