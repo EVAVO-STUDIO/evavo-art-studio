@@ -4,6 +4,9 @@ import {
   TOP_HAT_V3_PROVIDER_PLAN_SCHEMA,
   inspectTopHatV3ProviderPlan,
 } from './top-hat-v3-animation-provider-plan.mjs';
+import {
+  inspectTopHatV3ApprovedFrameLedger,
+} from './top-hat-v3-approved-frame-ledger.mjs';
 
 export const TOP_HAT_V3_PROVIDER_SCHEDULE_SCHEMA =
   'evavo.project-art-top-hat-v3-provider-schedule.v1';
@@ -47,6 +50,20 @@ function approvedSet(value = []) {
     fail('TOP_HAT_V3_PROVIDER_SCHEDULER_APPROVALS_INVALID');
   }
   return new Set(value);
+}
+
+function approvedFromLedger(ledgerInput, providerPlan) {
+  if (ledgerInput === null || ledgerInput === undefined) {
+    return Object.freeze({ ids: new Set(), ledgerSha256: null });
+  }
+  const readiness = inspectTopHatV3ApprovedFrameLedger(ledgerInput);
+  if (readiness.generationPlanSha256 !== providerPlan.generationPlanSha256) {
+    fail('TOP_HAT_V3_PROVIDER_SCHEDULER_LEDGER_PLAN_MISMATCH');
+  }
+  return Object.freeze({
+    ids: new Set(readiness.approvedJobIds),
+    ledgerSha256: readiness.ledgerSha256,
+  });
 }
 
 function successfulSet(value = []) {
@@ -174,7 +191,23 @@ export function compileTopHatV3ProviderSchedule(input = {}) {
     fail('TOP_HAT_V3_PROVIDER_SCHEDULER_PLAN_SCHEMA_INVALID');
   }
   inspectTopHatV3ProviderPlan(providerPlan);
-  const approved = approvedSet(input.approvedJobIds ?? []);
+
+  const ledgerApproval = approvedFromLedger(input.approvedLedger, providerPlan);
+  const explicitApproved = approvedSet(input.approvedJobIds ?? []);
+  if (ledgerApproval.ledgerSha256 !== null && explicitApproved.size > 0) {
+    for (const id of explicitApproved) {
+      if (!ledgerApproval.ids.has(id)) {
+        fail('TOP_HAT_V3_PROVIDER_SCHEDULER_EXPLICIT_APPROVAL_OUTSIDE_LEDGER', id);
+      }
+    }
+  }
+  const approved = ledgerApproval.ledgerSha256 === null
+    ? explicitApproved
+    : ledgerApproval.ids;
+  const approvalSource = ledgerApproval.ledgerSha256 === null
+    ? 'explicit-job-id-list'
+    : 'sealed-approved-frame-ledger';
+
   const successful = successfulSet(input.successfulProviderJobIds ?? []);
   const maximumJobs = input.maximumJobs ?? 8;
   if (!Number.isSafeInteger(maximumJobs) || maximumJobs < 1 || maximumJobs > 64) {
@@ -212,6 +245,11 @@ export function compileTopHatV3ProviderSchedule(input = {}) {
     characterId: 'top-hat-man',
     generationPlanSha256: providerPlan.generationPlanSha256,
     providerPlanSha256: providerPlan.providerPlanSha256,
+    approvals: freeze({
+      source: approvalSource,
+      approvedFrameLedgerSha256: ledgerApproval.ledgerSha256,
+      approvedJobCount: approved.size,
+    }),
     state: freeze({
       foundationApproved,
       approvedJobs: approved.size,
@@ -231,6 +269,7 @@ export function compileTopHatV3ProviderSchedule(input = {}) {
       foundationApprovalRequiredBeforeBody: true,
       previousWaveApprovalRequiredBeforeNextWave: true,
       providerSuccessDoesNotEqualApproval: true,
+      sealedApprovalLedgerPreferred: true,
       blockedRequestsNeverDispatch: true,
       maximumConcurrentDispatches: maximumJobs,
       automaticApproval: false,
@@ -253,6 +292,7 @@ export function inspectTopHatV3ProviderSchedule(value) {
     schedule.policy?.foundationApprovalRequiredBeforeBody !== true ||
     schedule.policy?.previousWaveApprovalRequiredBeforeNextWave !== true ||
     schedule.policy?.providerSuccessDoesNotEqualApproval !== true ||
+    schedule.policy?.sealedApprovalLedgerPreferred !== true ||
     schedule.policy?.automaticApproval !== false ||
     schedule.policy?.automaticRuntimeActivation !== false ||
     !SHA256.test(schedule.scheduleSha256 ?? '')
@@ -267,6 +307,8 @@ export function inspectTopHatV3ProviderSchedule(value) {
     schema: 'evavo.project-art-top-hat-v3-provider-schedule-readiness.v1',
     characterId: 'top-hat-man',
     scheduleSha256,
+    approvalSource: schedule.approvals.source,
+    approvedFrameLedgerSha256: schedule.approvals.approvedFrameLedgerSha256,
     foundationApproved: schedule.state.foundationApproved,
     approvedJobs: schedule.state.approvedJobs,
     successfulProviderJobs: schedule.state.successfulProviderJobs,
