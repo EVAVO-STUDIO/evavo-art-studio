@@ -1,6 +1,6 @@
 # Raster finishing and compositing
 
-EVAVO Art Studio treats final-art cleanup and multi-layer composition as separate governed operations.
+EVAVO Art Studio treats final-art cleanup, reusable effect layers and multi-layer composition as separate governed operations.
 
 ## Choose the smallest correct operation
 
@@ -100,6 +100,76 @@ The compositing pass fails closed before libvips rendering when geometry is ambi
 
 If intentional clipping is needed later, add it as an explicit crop/clip operation rather than relying on accidental out-of-bounds composite behaviour.
 
+## Drop shadows and outer glows
+
+Use **raster effect layers** when an approved transparent object needs presentation depth without baking that appearance into the source pixels.
+
+Supported deterministic effect layers:
+
+- `drop-shadow`
+- `outer-glow`
+
+Both effects are derived from the source alpha. The source image is never rewritten by the effect generator.
+
+CLI:
+
+```text
+node tools/create_raster_effect_layer.mjs \
+  --input layers/subject.png \
+  --output layers/subject-shadow.png \
+  --kind drop-shadow \
+  --opacity 0.45 \
+  --blur 12 \
+  --spread 1 \
+  --offset-x 10 \
+  --offset-y 14 \
+  --print-evidence
+```
+
+MCP:
+
+```text
+evavo_create_raster_effect_layer
+```
+
+The effect receipt returns:
+
+- padded output dimensions
+- `subjectAnchorLeft`
+- `subjectAnchorTop`
+- effect colour
+- opacity
+- blur sigma
+- spread
+- offset
+- padding
+- operation history
+
+The anchor is important. The effect layer is larger than the original subject because it includes safe transparent breathing room for blur and offset. To rebuild a finished object plate, use the effect layer as the base canvas and place the original subject at the returned subject anchor.
+
+Example logical order:
+
+```text
+finished subject
+  -> create drop-shadow layer
+  -> compose shadow as base
+  -> place original subject at subjectAnchorLeft / subjectAnchorTop
+  -> optional additional glow or signal layer
+  -> export final plate
+```
+
+Outer glow forces zero positional offset. Glow expansion comes from spread and blur, not hidden translation.
+
+Effect generation fails closed when:
+
+- opacity is outside 0 through 1
+- spread exceeds the bounded range
+- requested padding is too small for blur/spread/offset
+- output dimensions exceed the image limit
+- output pixel count exceeds the effect memory budget
+
+Shadows and glows remain separate transparent layers so agents can revise, remove, reorder or animate them without damaging the source subject.
+
 ## Segmentation and background removal
 
 Neither deterministic pass pretends to perform semantic segmentation. A matte may come from:
@@ -132,6 +202,8 @@ When replacing a secondary-only public ID for delivery optimization, preserve th
 
 Use the `motion-layer` finishing preset for transparent PNG layers that will be animated later. Ordered compositing can assemble still keyframes or intermediate plates, while timing, alpha sequences, sprite sheets, video encoding and loop validation remain responsibilities of the existing animation/video pipeline.
 
+A shadow or glow created as a separate transparent layer can be animated independently later. This is preferable to baking a glow into the subject when the intended final use includes pulsing, flicker, reveal, UI feedback or atmospheric motion.
+
 A future motion-compositing layer may build on the same contracts rather than duplicating alpha, mask and layer semantics.
 
 ## Local write safety
@@ -141,6 +213,9 @@ Both MCP servers are local-first and fail closed:
 - configured allowed roots are required
 - writes require an environment gate
 - every write call requires explicit `confirmLocalWrite=true`
+- input paths are canonicalized through `realpath`
+- prospective output directories are canonicalized through their nearest existing ancestor
+- symlink or junction escapes outside an allowed root are rejected
 - MCP returns receipts and paths, not image bytes
 - source files are not overwritten unless the caller explicitly selects the same allowed output path
 
@@ -151,7 +226,7 @@ EVAVO_RASTER_FINISH_ALLOWED_ROOTS
 EVAVO_RASTER_FINISH_ALLOW_WRITES=true
 ```
 
-Raster compositing uses:
+Raster compositing and effect-layer generation use:
 
 ```text
 EVAVO_RASTER_COMPOSE_ALLOWED_ROOTS
