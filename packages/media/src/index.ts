@@ -29,6 +29,7 @@ export * from "./enhancement-review-bridge.js";
 export * from "./localized-edit.js";
 export * from "./edit-mask.js";
 export * from "./work-header-quality.js";
+export * from "./work-page-media-review.js";
 export * from "./compositing-pass.js";
 export * from "./effect-layer.js";
 export * from "./effect-presets.js";
