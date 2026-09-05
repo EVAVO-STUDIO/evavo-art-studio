@@ -19,4 +19,5 @@ export * from "./pose-control-render.js";
 export * from "./finishing-pass.js";
 export * from "./compositing-pass.js";
 export * from "./effect-layer.js";
+export * from "./effect-presets.js";
 export { atomicWriteFile } from "./files.js";
