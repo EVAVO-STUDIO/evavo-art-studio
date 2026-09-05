@@ -3,6 +3,9 @@ import { createHash } from 'node:crypto';
 import {
   inspectTopHatV3ApprovedFrameLedger,
 } from './top-hat-v3-approved-frame-ledger.mjs';
+import {
+  assertTopHatV3GenerationPlanContract,
+} from './top-hat-v3-suite-contract.mjs';
 
 export const TOP_HAT_V3_FAMILY_RELEASE_PLAN_SCHEMA =
   'evavo.project-art-top-hat-v3-family-release-plan.v1';
@@ -88,22 +91,14 @@ function publicIdFor(job) {
 
 export function compileTopHatV3FamilyReleasePlan(input = {}) {
   const generationPlan = record(input.generationPlan, 'generationPlan');
+  const suiteContract = assertTopHatV3GenerationPlanContract(generationPlan);
   const ledger = record(input.approvedLedger, 'approvedLedger');
   const ledgerReadiness = inspectTopHatV3ApprovedFrameLedger(ledger);
   const preparedAt = timestamp(
     input.preparedAt ?? new Date().toISOString(),
     'preparedAt',
   );
-  if (
-    generationPlan.schema !== 'evavo_top_hat_v3_generation_plan_v1' ||
-    generationPlan.characterId !== 'top-hat-man' ||
-    !SHA256.test(generationPlan.planSha256 ?? '') ||
-    generationPlan.counts?.foundationPoses !== 6 ||
-    generationPlan.counts?.bodyFrames !== 732 ||
-    generationPlan.counts?.registeredLayers !== 17 ||
-    generationPlan.counts?.clips !== 25 ||
-    generationPlan.counts?.totalArtwork !== 755
-  ) {
+  if (!SHA256.test(generationPlan.planSha256 ?? '')) {
     fail('TOP_HAT_V3_RELEASE_GENERATION_PLAN_INVALID');
   }
   if (ledgerReadiness.generationPlanSha256 !== generationPlan.planSha256) {
@@ -111,18 +106,18 @@ export function compileTopHatV3FamilyReleasePlan(input = {}) {
   }
   const jobs = expectedJobs(generationPlan);
   if (
-    jobs.foundation.length !== 6 ||
-    jobs.layers.length !== 17 ||
-    jobs.body.length !== 732 ||
-    jobs.all.length !== 755
+    jobs.foundation.length !== suiteContract.foundationPoseCount ||
+    jobs.layers.length !== suiteContract.registeredLayerCount ||
+    jobs.body.length !== suiteContract.bodyFrameCount ||
+    jobs.all.length !== suiteContract.totalArtworkCount
   ) {
     fail('TOP_HAT_V3_RELEASE_JOB_COUNT_INVALID');
   }
   const expectedIds = new Set(jobs.all.map((job) => job.jobId));
   const approvedIds = new Set(ledger.approvedJobIds);
   if (
-    approvedIds.size !== 755 ||
-    expectedIds.size !== 755 ||
+    approvedIds.size !== suiteContract.totalArtworkCount ||
+    expectedIds.size !== suiteContract.totalArtworkCount ||
     [...expectedIds].some((jobId) => !approvedIds.has(jobId))
   ) {
     fail('TOP_HAT_V3_RELEASE_FAMILY_INCOMPLETE');
@@ -162,7 +157,10 @@ export function compileTopHatV3FamilyReleasePlan(input = {}) {
       });
     }),
   );
-  if (new Set(assets.map((asset) => asset.cloudinary.publicId)).size !== 755) {
+  if (
+    new Set(assets.map((asset) => asset.cloudinary.publicId)).size !==
+    suiteContract.totalArtworkCount
+  ) {
     fail('TOP_HAT_V3_RELEASE_CLOUDINARY_PUBLIC_ID_COLLISION');
   }
 
@@ -172,18 +170,24 @@ export function compileTopHatV3FamilyReleasePlan(input = {}) {
     preparedAt,
     generationPlanSha256: generationPlan.planSha256,
     approvedFrameLedgerSha256: ledgerReadiness.ledgerSha256,
+    signatureClip: freeze({
+      id: suiteContract.signatureClipId,
+      frames: suiteContract.signatureClipFrames,
+      fps: suiteContract.signatureClipFps,
+    }),
     counts: freeze({
-      foundationPoses: 6,
-      bodyFrames: 732,
-      registeredLayers: 17,
-      clips: 25,
-      totalAssets: 755,
+      foundationPoses: suiteContract.foundationPoseCount,
+      bodyFrames: suiteContract.bodyFrameCount,
+      registeredLayers: suiteContract.registeredLayerCount,
+      clips: suiteContract.clipCount,
+      totalAssets: suiteContract.totalArtworkCount,
       uniqueCandidateHashes: candidateHashes.size,
-      uniqueCloudinaryPublicIds: 755,
+      uniqueCloudinaryPublicIds: suiteContract.totalArtworkCount,
     }),
     assets,
     policy: freeze({
       completeFamilyRequired: true,
+      signatureHatTipRequired: true,
       duplicateCandidateBytesForbidden: true,
       allAssetsHumanApproved: true,
       createOnlyCloudinaryUpload: true,
@@ -237,10 +241,14 @@ export function inspectTopHatV3FamilyReleasePlan(value) {
   if (
     plan.schema !== TOP_HAT_V3_FAMILY_RELEASE_PLAN_SCHEMA ||
     plan.characterId !== 'top-hat-man' ||
+    plan.signatureClip?.id !== 'hat-tip' ||
+    plan.signatureClip?.frames !== 28 ||
+    plan.signatureClip?.fps !== 30 ||
     plan.counts?.totalAssets !== 755 ||
     plan.counts?.uniqueCandidateHashes !== 755 ||
     plan.counts?.uniqueCloudinaryPublicIds !== 755 ||
     plan.policy?.completeFamilyRequired !== true ||
+    plan.policy?.signatureHatTipRequired !== true ||
     plan.policy?.runtimeActivationAllowed !== false ||
     !SHA256.test(releasePlanSha256 ?? '') ||
     sha256Document(body) !== releasePlanSha256
@@ -253,6 +261,7 @@ export function inspectTopHatV3FamilyReleasePlan(value) {
     releasePlanSha256,
     assetCount: plan.counts.totalAssets,
     completeFamily: true,
+    signatureHatTipPresent: true,
     cloudinaryUploadPlanningReady: true,
     networkExecutionPerformed: false,
     runtimeActivationAllowed: false,
