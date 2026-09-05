@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "evavo-media-role-supervisor-v1": {
+      "command": "node",
+      "args": ["tools/media_role_supervisor_mcp.mjs"]
+    }
+  }
+}
