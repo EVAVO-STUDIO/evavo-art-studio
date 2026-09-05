@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type OverlayOptions } from "sharp";
 
 export type HeaderQualityGrade = "pass" | "warn" | "fail";
 
@@ -74,7 +74,6 @@ function cropRetainedRatio(sourceRatio: number, targetRatio: number): number {
 }
 
 function effectiveUpscale(sourceWidth: number, sourceHeight: number, targetWidth: number, targetHeight: number): number {
-  // Cover fit must scale until both target axes are covered.
   return Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
 }
 
@@ -254,7 +253,7 @@ export async function reviewWorkHeaderImage(
   const gap = 16;
   const proofHeight = tileMeta.reduce((sum, item) => sum + (item.height ?? 0), 0) + gap * (tiles.length - 1);
   let top = 0;
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
   for (let i = 0; i < tiles.length; i += 1) {
     composites.push({ input: tiles[i], left: 0, top });
     top += (tileMeta[i]!.height ?? 0) + gap;
