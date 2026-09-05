@@ -187,15 +187,46 @@ for (const [executable, prefix] of pythonCandidates) {
 if (!compiled && !errors.some((error) => error.startsWith('Python syntax'))) {
   errors.push('No approved Python 3 executable was available for syntax validation');
 }
-const nodeSyntax = spawnSync(process.execPath, ['--check', 'tools/process_image_with_sharp.mjs'], {
-  cwd: root,
-  encoding: 'utf8',
-  shell: false,
-  windowsHide: true,
-});
-if (nodeSyntax.status !== 0) {
-  errors.push(`Sharp exact-canvas syntax validation failed: ${nodeSyntax.stderr || nodeSyntax.stdout}`);
-}
+
+const runNodeCheck = (label, args) => {
+  const result = spawnSync(process.execPath, args, {
+    cwd: root,
+    encoding: 'utf8',
+    shell: false,
+    windowsHide: true,
+  });
+  if (result.status !== 0) {
+    errors.push(`${label} failed: ${result.stderr || result.stdout || `exit ${result.status}`}`);
+  }
+};
+
+runNodeCheck('Sharp exact-canvas syntax validation', [
+  '--check',
+  'tools/process_image_with_sharp.mjs',
+]);
+runNodeCheck('Raster finishing MCP syntax validation', [
+  '--check',
+  'tools/raster_finishing_mcp.mjs',
+]);
+runNodeCheck('Raster compositing CLI syntax validation', [
+  '--check',
+  'tools/compose_raster_layers.mjs',
+]);
+runNodeCheck('Raster compositing MCP syntax validation', [
+  '--check',
+  'tools/raster_compositing_mcp.mjs',
+]);
+runNodeCheck('Raster compositing source contract', [
+  'scripts/check-raster-compositing-contract.mjs',
+]);
+runNodeCheck('Local media path-policy adversarial tests', [
+  '--test',
+  'scripts/test-local-path-policy.mjs',
+]);
+
 for (const error of errors) console.log(`  - ${error}`);
 if (errors.length) process.exit(1);
 console.log('EVAVO image processing recipes passed');
+console.log('- raster finishing/compositing MCP syntax is valid');
+console.log('- raster compositing contract remains governed');
+console.log('- canonical local path policy rejects symlink/junction escapes');
