@@ -19,6 +19,7 @@ export * from "./pose-control-render.js";
 export * from "./finishing-pass.js";
 export * from "./preservation-polish.js";
 export * from "./existing-image-diff.js";
+export * from "./localized-edit.js";
 export * from "./compositing-pass.js";
 export * from "./effect-layer.js";
 export * from "./effect-presets.js";
