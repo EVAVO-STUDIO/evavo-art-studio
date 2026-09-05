@@ -4,14 +4,17 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 
-import { composeRasterLayers } from "../packages/media/dist/index.js";
+import {
+  composeRasterLayers,
+  createRasterEffectLayer,
+} from "../packages/media/dist/index.js";
 import {
   assertAllowedLocalPath,
   configuredLocalRootCount,
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-raster-compositing";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const MAX_LAYERS = 256;
 const ALLOWED_ROOTS_ENV = "EVAVO_RASTER_COMPOSE_ALLOWED_ROOTS";
@@ -68,14 +71,20 @@ async function materializeSpec(spec) {
   return { ...spec, layers };
 }
 
-async function compose(args) {
+function requireWriteAdmission(args) {
   if (process.env.EVAVO_RASTER_COMPOSE_ALLOW_WRITES !== "true") {
     throw new Error("Raster compositing writes are disabled. Set EVAVO_RASTER_COMPOSE_ALLOW_WRITES=true.");
   }
-  if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required for this exact call.");
+  if (args.confirmLocalWrite !== true) {
+    throw new Error("confirmLocalWrite=true is required for this exact call.");
+  }
   if (typeof args.outputPath !== "string" || !args.outputPath) {
     throw new Error("outputPath is required.");
   }
+}
+
+async function compose(args) {
+  requireWriteAdmission(args);
 
   const outputPath = await assertAllowed(args.outputPath, { output: true });
   const base =
@@ -98,10 +107,51 @@ async function compose(args) {
   });
 }
 
+async function createEffect(args) {
+  requireWriteAdmission(args);
+  if (typeof args.inputPath !== "string" || !args.inputPath) {
+    throw new Error("inputPath is required.");
+  }
+  if (!args.spec || typeof args.spec !== "object" || Array.isArray(args.spec)) {
+    throw new Error("spec is required.");
+  }
+
+  const inputPath = await assertAllowed(args.inputPath);
+  const outputPath = await assertAllowed(args.outputPath, { output: true });
+  const result = await createRasterEffectLayer(await readFile(inputPath), args.spec);
+
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, result.buffer);
+
+  return Object.freeze({
+    ok: true,
+    inputPath,
+    outputPath,
+    evidence: result.evidence,
+    bytesReturned: false,
+  });
+}
+
+const effectSchema = Object.freeze({
+  type: "object",
+  properties: {
+    kind: { type: "string", enum: ["drop-shadow", "outer-glow"] },
+    color: { type: "string", minLength: 1 },
+    opacity: { type: "number", minimum: 0, maximum: 1 },
+    blurSigma: { type: "number", minimum: 0, maximum: 100 },
+    spread: { type: "integer", minimum: 0, maximum: 256 },
+    offsetX: { type: "integer", minimum: -4096, maximum: 4096 },
+    offsetY: { type: "integer", minimum: -4096, maximum: 4096 },
+    padding: { type: "integer", minimum: 0, maximum: 8192 },
+  },
+  required: ["kind"],
+  additionalProperties: false,
+});
+
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_raster_compositing_capabilities",
-    description: "Describe the local ordered-layer raster compositing contract without reading or writing image bytes.",
+    description: "Describe the local ordered-layer raster compositing and effect-layer contract without reading or writing image bytes.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
@@ -170,6 +220,21 @@ const tools = Object.freeze([
       additionalProperties: false,
     },
   }),
+  Object.freeze({
+    name: "evavo_create_raster_effect_layer",
+    description: "Create a separate transparent drop-shadow or outer-glow PNG layer from an existing raster alpha channel. The receipt includes subject anchor coordinates so the effect can be aligned behind the subject during composition.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        inputPath: { type: "string", minLength: 1 },
+        outputPath: { type: "string", minLength: 1 },
+        spec: effectSchema,
+        confirmLocalWrite: { type: "boolean", const: true },
+      },
+      required: ["inputPath", "outputPath", "spec", "confirmLocalWrite"],
+      additionalProperties: false,
+    },
+  }),
 ]);
 
 async function callTool(name, args) {
@@ -189,12 +254,15 @@ async function callTool(name, args) {
         "canvas-bounds-validation",
         "transparent-canvas",
         "fit-base-to-canvas",
+        "drop-shadow-effect-layer",
+        "outer-glow-effect-layer",
         "png",
         "webp",
         "avif",
         "jpeg",
       ],
       masks: "provider-agnostic; pass local mattes from segmentation, Cloudinary, ComfyUI or another approved source",
+      effects: "shadow and glow are separate transparent layers with subject-anchor evidence; compose them behind the source rather than mutating source pixels",
       pathPolicy: "input and prospective output paths are canonicalized through existing ancestors so symlink escapes fail closed",
       writesEnabled: process.env.EVAVO_RASTER_COMPOSE_ALLOW_WRITES === "true",
       allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
@@ -202,6 +270,7 @@ async function callTool(name, args) {
     });
   }
   if (name === "evavo_compose_raster_layers") return compose(args ?? {});
+  if (name === "evavo_create_raster_effect_layer") return createEffect(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
 
@@ -223,7 +292,7 @@ async function dispatch(request) {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-        instructions: "Raster compositing is local-first. Writes require a canonical allowed root, the write environment gate and exact per-call confirmation.",
+        instructions: "Raster compositing and effect layers are local-first. Writes require a canonical allowed root, the write environment gate and exact per-call confirmation.",
       },
     };
   }
