@@ -65,12 +65,12 @@ A composition JSON file references local files rather than embedding image bytes
   "layers": [
     {
       "name": "subject",
-      "inputPath": "C:/EVAVO/staging/subject.png",
+      "inputPath": "layers/subject.png",
       "gravity": "centre"
     },
     {
       "name": "signal-glow",
-      "inputPath": "C:/EVAVO/staging/glow.png",
+      "inputPath": "layers/glow.png",
       "blend": "screen",
       "opacity": 0.65,
       "left": 980,
@@ -81,6 +81,24 @@ A composition JSON file references local files rather than embedding image bytes
   "quality": 92
 }
 ```
+
+Relative `inputPath` and `maskPath` values in CLI recipes resolve beside the JSON spec file. Absolute paths remain supported. This means a recipe folder can move as a unit without depending on the shell working directory.
+
+### Composition geometry rules
+
+The compositing pass fails closed before libvips rendering when geometry is ambiguous or outside the requested canvas:
+
+- a job may contain at most 256 layers
+- a declared canvas must provide both width and height
+- canvas and resize dimensions are bounded to 1 through 32768 pixels
+- exact coordinates are non-negative integers
+- exact placement must provide both `left` and `top`
+- a layer cannot combine exact coordinates with gravity placement
+- the transformed layer must fit inside the canvas
+- exact placement plus transformed dimensions must remain inside the canvas bounds
+- external masks must exactly match the transformed layer dimensions
+
+If intentional clipping is needed later, add it as an explicit crop/clip operation rather than relying on accidental out-of-bounds composite behaviour.
 
 ## Segmentation and background removal
 
@@ -107,6 +125,8 @@ When website or product art has more than one role, preserve the source-of-truth
 - archived original/provenance source
 
 Do not overwrite a shared catalogue/canonical asset merely to improve one page. Create or promote a detail-specific derivative instead, or replace only a secondary-only public ID after preserving the original under an archive/provenance ID.
+
+When replacing a secondary-only public ID for delivery optimization, preserve the reviewed original first, keep rollback metadata on both assets, and retain the stable public ID for the active derivative so page code and structured data do not drift unnecessarily.
 
 ## Motion bridge
 
