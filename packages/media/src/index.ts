@@ -17,4 +17,5 @@ export * from "./aseprite-interchange.js";
 export * from "./aseprite-interchange-result.js";
 export * from "./pose-control-render.js";
 export * from "./finishing-pass.js";
+export * from "./compositing-pass.js";
 export { atomicWriteFile } from "./files.js";
