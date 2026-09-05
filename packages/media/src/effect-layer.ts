@@ -34,6 +34,8 @@ export interface RasterEffectResult {
   }>;
 }
 
+const MAX_EFFECT_PIXELS = 32 * 1024 * 1024;
+
 function finiteRange(
   value: number | undefined,
   label: string,
@@ -115,6 +117,11 @@ export async function createRasterEffectLayer(
   if (outputWidth > 32768 || outputHeight > 32768) {
     throw new Error("Raster effect output dimensions exceed the 32768 pixel safety limit.");
   }
+  if (outputWidth * outputHeight > MAX_EFFECT_PIXELS) {
+    throw new Error(
+      `Raster effect output exceeds the ${MAX_EFFECT_PIXELS} pixel safety budget.`,
+    );
+  }
 
   const anchorLeft = padding;
   const anchorTop = padding;
@@ -129,19 +136,24 @@ export async function createRasterEffectLayer(
     throw new Error("Raster effect offset exceeds the padded output canvas.");
   }
 
-  const operations: string[] = ["extract-source-alpha", "create-padded-effect-canvas"];
+  const operations: string[] = [
+    "materialize-shifted-alpha-source",
+    "extract-source-alpha",
+    "create-padded-effect-canvas",
+  ];
   const sourcePng = await sharp(encoded, { failOn: "error" }).ensureAlpha().png().toBuffer();
-  let mask = sharp({
+  const shifted = await sharp({
     create: {
       width: outputWidth,
       height: outputHeight,
       channels: 4,
-      background: "#00000000",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
     },
   })
     .composite([{ input: sourcePng, left: effectLeft, top: effectTop, blend: "over" }])
-    .ensureAlpha()
-    .extractChannel(3);
+    .png()
+    .toBuffer();
+  let mask = sharp(shifted, { failOn: "error" }).extractChannel(3);
 
   if (spread > 0) {
     mask = mask.dilate(spread);
