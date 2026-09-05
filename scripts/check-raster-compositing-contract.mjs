@@ -8,9 +8,12 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "u
 
 const files = Object.freeze({
   compositing: read("packages/media/src/compositing-pass.ts"),
+  effects: read("packages/media/src/effect-layer.ts"),
   index: read("packages/media/src/index.ts"),
   tests: read("packages/media/test/compositing-pass.test.mjs"),
+  effectTests: read("packages/media/test/effect-layer.test.mjs"),
   cli: read("tools/compose_raster_layers.mjs"),
+  effectCli: read("tools/create_raster_effect_layer.mjs"),
   mcp: read("tools/raster_compositing_mcp.mjs"),
   finishingMcp: read("tools/raster_finishing_mcp.mjs"),
   pathPolicy: read("tools/lib/local_path_policy.mjs"),
@@ -44,13 +47,35 @@ requireTokens("compositing", [
   "fit-base-to-canvas",
   "encode:",
 ]);
-requireTokens("index", ['export * from "./compositing-pass.js";']);
+requireTokens("effects", [
+  "export async function createRasterEffectLayer",
+  'RasterEffectKind = "drop-shadow" | "outer-glow"',
+  "materialize-shifted-alpha-source",
+  "extract-source-alpha",
+  "create-padded-effect-canvas",
+  "subjectAnchorLeft",
+  "subjectAnchorTop",
+  "MAX_EFFECT_PIXELS",
+  "minimum safe padding",
+  "colorize:",
+]);
+requireTokens("index", [
+  'export * from "./compositing-pass.js";',
+  'export * from "./effect-layer.js";',
+]);
 requireTokens("tests", [
   "composites ordered layers with resize opacity blend and exact placement",
   "creates a transparent canvas and applies a transformed alpha mask",
   "rejects mismatched transformed masks and ambiguous positioning",
   "rejects negative coordinates, oversized layers and out-of-bounds placement",
   "rejects incomplete canvases and unbounded layer stacks",
+]);
+requireTokens("effectTests", [
+  "creates a padded drop-shadow layer with deterministic anchor evidence",
+  "creates an outer glow with zero offset and meaningful transparent falloff",
+  "rejects unsafe padding and invalid effect ranges before rendering",
+  "alphaRange",
+  "nonOpaque",
 ]);
 requireTokens("cli", [
   "composeRasterLayers",
@@ -60,9 +85,21 @@ requireTokens("cli", [
   "at most ${MAX_LAYERS} layers",
   "canvas requires integer width and height",
 ]);
+requireTokens("effectCli", [
+  "createRasterEffectLayer",
+  "--kind drop-shadow|outer-glow",
+  "--offset-x <px>",
+  "--padding <px>",
+  "--print-evidence",
+]);
 requireTokens("mcp", [
   "evavo_raster_compositing_capabilities",
   "evavo_compose_raster_layers",
+  "evavo_create_raster_effect_layer",
+  "createRasterEffectLayer",
+  "drop-shadow-effect-layer",
+  "outer-glow-effect-layer",
+  "subject anchor coordinates",
   "EVAVO_RASTER_COMPOSE_ALLOWED_ROOTS",
   "EVAVO_RASTER_COMPOSE_ALLOW_WRITES",
   'from "./lib/local_path_policy.mjs"',
@@ -129,6 +166,9 @@ if (/integer between -32768 and 32768/u.test(files.compositing)) {
 if (!files.pathPolicy.includes("canonicalizeProspectivePath(path.dirname(resolved))")) {
   failures.push("path-policy:prospective-output-canonicalization-missing");
 }
+if (/\.composite\([^;]+\)\s*\.ensureAlpha\(\)\s*\.extractChannel\(3\)/su.test(files.effects)) {
+  failures.push("effects:lazy-composite-alpha-regression-restored");
+}
 
 if (failures.length) {
   console.error("Raster compositing contract failed:\n");
@@ -139,12 +179,15 @@ if (failures.length) {
 console.log("raster_compositing_contract_passed");
 console.log("- ordered local layer composition remains exported from @evavo/art-media");
 console.log("- resize, rotate, mask, opacity, blend and placement evidence remain explicit");
+console.log("- drop-shadow and outer-glow remain separate alpha-derived layers with subject-anchor evidence");
+console.log("- effect alpha is materialized before extraction so lazy composite pipelines cannot produce empty masks");
+console.log("- effect padding, pixel budget, opacity, spread and offset boundaries fail closed");
 console.log("- canvas bounds, non-negative placement and the 256-layer ceiling fail closed before libvips composite work");
 console.log("- CLI recipes resolve relative layer paths beside the spec file and cap layer materialization");
-console.log("- MCP schema mirrors canvas, coordinate and layer-count admission rules before file reads");
+console.log("- MCP schema mirrors canvas, coordinate, effect and layer-count admission rules before file reads");
 console.log("- raster finishing and compositing share the same canonical symlink-safe local path policy");
 console.log("- prospective output directories are checked through their nearest existing realpath ancestor");
 console.log("- symlink and junction escapes are covered by adversarial local path tests");
 console.log("- CLI and MCP surfaces remain file/path based and never return image bytes");
 console.log("- local MCP writes remain root-scoped, environment-gated and per-call confirmed");
-console.log("- agent documentation keeps finishing, compositing, segmentation and catalogue roles separate");
+console.log("- agent documentation keeps finishing, effects, compositing, segmentation and catalogue roles separate");
