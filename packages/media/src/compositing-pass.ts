@@ -2,6 +2,7 @@ import sharp, {
   type OverlayOptions,
   type ResizeOptions,
 } from "sharp";
+import { applyRasterMatte } from "./raster-matte.js";
 
 export type RasterCompositeFormat = "png" | "webp" | "avif" | "jpeg";
 
@@ -143,9 +144,7 @@ async function prepareLayer(
         `Composite layer ${index} mask dimensions must exactly match the transformed layer.`,
       );
     }
-    const mask = await sharp(layer.mask).ensureAlpha().extractChannel(3).png().toBuffer();
-    prepared = await sharp(prepared.data)
-      .composite([{ input: mask, blend: "dest-in" }])
+    prepared = await sharp(await applyRasterMatte(prepared.data, layer.mask))
       .png()
       .toBuffer({ resolveWithObject: true });
     operations.push("apply-alpha-mask");
@@ -219,6 +218,7 @@ export async function composeRasterLayers(
   let canvasHeight: number;
   let composition: sharp.Sharp;
   const operations: string[] = [];
+  const overlays: OverlayOptions[] = [];
 
   if (spec.canvas) {
     const requestedWidth = positiveInteger(spec.canvas.width, "canvas.width");
@@ -251,7 +251,7 @@ export async function composeRasterLayers(
         })
         .png()
         .toBuffer();
-      composition = composition.composite([{ input: fittedBase, blend: "over" }]);
+      overlays.push({ input: fittedBase, blend: "over" });
       operations.push("fit-base-to-canvas");
     }
   } else {
@@ -312,7 +312,7 @@ export async function composeRasterLayers(
           gravity: layer.gravity ?? "centre",
           blend: prepared.blend,
         };
-    composition = composition.composite([overlay]);
+    overlays.push(overlay);
     operations.push(`composite-layer:${index}`);
     layerEvidence.push({
       index,
@@ -326,6 +326,14 @@ export async function composeRasterLayers(
       operations: Object.freeze([...prepared.operations]),
     });
   }
+
+  // Sharp replaces its pending overlay list on each composite() call. Submit
+  // the entire ordered stack once, including the fitted base when present.
+  if (overlays.length > 0) composition = composition.composite(overlays);
+  // Materialize before flatten/encode: flattening a pending pipeline flattens
+  // its input rather than the completed stack, which breaks translucent layers.
+  composition = sharp(await composition.png().toBuffer(), { failOn: "error" });
+  operations.push("materialize-ordered-composition");
 
   const format = spec.format ?? "png";
   const quality = finiteRange(spec.quality, "quality", 1, 100);
