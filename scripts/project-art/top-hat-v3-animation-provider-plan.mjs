@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto';
+import {
+  assertTopHatV3GenerationPlanContract,
+} from './top-hat-v3-suite-contract.mjs';
 
 export const TOP_HAT_V3_PROVIDER_PLAN_SCHEMA =
   'evavo.project-art-top-hat-v3-provider-plan.v1';
@@ -11,6 +14,15 @@ const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[a-z0-9][a-z0-9._:-]{0,191}$/u;
 const freeze = Object.freeze;
+const PROVIDER_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const UINT32_RANGE = 4_294_967_296;
+const MASTER_SHA256 =
+  '92cb290246a7629024dcb7768f4119f6a139d9c9f59e3d0545563e1f5b35575a';
+const FOUNDATION_POSES = freeze([
+  'blink-closed', 'listening-attentive', 'thinking-reflective',
+  'speech-neutral', 'presentation-open', 'presentation-emphasis',
+]);
+const PRESENTATION_OPEN_JOB = 'top-hat-man-foundation-presentation-open';
 
 function fail(code, detail = code) {
   const error = new Error(`${code}:${detail}`);
@@ -68,6 +80,155 @@ function stringArray(value, label) {
   return freeze([...value]);
 }
 
+function providerId(value, label) {
+  if (typeof value !== 'string' || !PROVIDER_ID.test(value)) {
+    fail('TOP_HAT_V3_PROVIDER_OPTION_ID_INVALID', label);
+  }
+  return value;
+}
+
+function normalizedOptions(value) {
+  const options = record(value, 'options');
+  const allowed = options.allowedAdapterIds;
+  if (!Array.isArray(allowed) || allowed.length < 1 || allowed.length > 32) {
+    fail('TOP_HAT_V3_PROVIDER_ADAPTER_REQUIRED');
+  }
+  const allowedAdapterIds = freeze([...new Set(
+    allowed.map((id) => providerId(id, 'allowedAdapterIds')),
+  )]);
+  const preferredAdapterId = options.preferredAdapterId == null ? null
+    : providerId(options.preferredAdapterId, 'preferredAdapterId');
+  if (preferredAdapterId && !allowedAdapterIds.includes(preferredAdapterId)) {
+    fail('TOP_HAT_V3_PROVIDER_ADAPTER_SCOPE_INVALID', preferredAdapterId);
+  }
+  const result = {
+    ...options,
+    allowedAdapterIds,
+    preferredAdapterId,
+    preferredModel: options.preferredModel == null ? null
+      : providerId(options.preferredModel, 'preferredModel'),
+    seed: options.seed ?? null,
+  };
+  if (result.seed !== null && (
+    !Number.isSafeInteger(result.seed) || result.seed < 0 || result.seed >= UINT32_RANGE
+  )) {
+    fail('TOP_HAT_V3_PROVIDER_OPTION_SEED_INVALID');
+  }
+  for (const [key, fallback] of Object.entries({
+    foundationCandidateCount: 3, anchorCandidateCount: 2,
+    inbetweenCandidateCount: 1, layerCandidateCount: 2,
+  })) {
+    const count = options[key] ?? fallback;
+    if (!Number.isSafeInteger(count) || count < 1 || count > 8) {
+      fail('TOP_HAT_V3_PROVIDER_OPTION_CANDIDATE_COUNT_INVALID', key);
+    }
+    result[key] = count;
+  }
+  return freeze(result);
+}
+
+function candidateFamilyId(kind, plan, job) {
+  // Full source identifiers remain in metadata. A full digest makes the wire ID
+  // bounded without truncating the source identity or causing prefix collisions.
+  return `top-hat-v3-${kind}:${sha256Document({
+    generationPlanSha256: plan.planSha256, jobId: job.jobId, kind,
+  })}`;
+}
+
+function validateGenerationJobs(plan) {
+  if (!Array.isArray(plan.phases) || plan.phases.length > 8) {
+    fail('TOP_HAT_V3_PROVIDER_PHASES_MISSING');
+  }
+  const phases = new Map();
+  for (const phase of plan.phases) {
+    if (!phase || typeof phase.id !== 'string' || phases.has(phase.id)) {
+      fail('TOP_HAT_V3_PROVIDER_PHASES_INVALID');
+    }
+    phases.set(phase.id, phase);
+  }
+  const foundations = phases.get('foundation')?.jobs;
+  const layers = phases.get('registered-layers')?.jobs;
+  const clips = phases.get('body-clips')?.clips;
+  if (!Array.isArray(foundations) || foundations.length !== 6 ||
+      !Array.isArray(layers) || layers.length !== 17 || !Array.isArray(clips)) {
+    fail('TOP_HAT_V3_PROVIDER_JOB_COUNTS_INVALID');
+  }
+  const ids = new Set();
+  const paths = new Set();
+  function checkJob(job) {
+    record(job, 'job');
+    providerId(job.jobId, 'job.jobId');
+    if (ids.has(job.jobId)) fail('TOP_HAT_V3_PROVIDER_JOB_DUPLICATE', job.jobId);
+    ids.add(job.jobId);
+    const target = job.targetPath;
+    if (typeof target !== 'string' || target.length > 512 ||
+        !target.startsWith(`${plan.targetRoot}/`) || !target.endsWith('.png') ||
+        /[\\:\u0000-\u001f\u007f]/u.test(target) ||
+        target.split('/').some((part) => ['', '.', '..'].includes(part)) ||
+        paths.has(target.toLowerCase())) {
+      fail('TOP_HAT_V3_PROVIDER_TARGET_INVALID', job.jobId);
+    }
+    paths.add(target.toLowerCase());
+  }
+  const slots = new Set();
+  for (const job of foundations) {
+    checkJob(job);
+    if (!FOUNDATION_POSES.includes(job.poseSlotId) || slots.has(job.poseSlotId) ||
+        job.jobId !== `top-hat-man-foundation-${job.poseSlotId}` ||
+        typeof job.performance !== 'string' || !job.performance.trim() ||
+        job.performance.length > 2048) {
+      fail('TOP_HAT_V3_PROVIDER_FOUNDATION_INVALID', job.jobId);
+    }
+    slots.add(job.poseSlotId);
+  }
+  for (const job of layers) checkJob(job);
+  for (const clip of clips) {
+    if (!Array.isArray(clip.waves) || clip.waves.length < 1 ||
+        clip.waves.length > clip.targetFrames) {
+      fail('TOP_HAT_V3_PROVIDER_WAVES_INVALID', clip.clipId);
+    }
+    const prior = new Map();
+    const ordinals = new Set();
+    for (const [index, wave] of clip.waves.entries()) {
+      if (wave.waveIndex !== index || !Array.isArray(wave.jobs) ||
+          wave.jobs.length === 0 || wave.jobs.length > clip.targetFrames) {
+        fail('TOP_HAT_V3_PROVIDER_WAVE_INVALID', clip.clipId);
+      }
+      for (const job of wave.jobs) {
+        checkJob(job);
+        const ordinal = job.ordinal;
+        if (!Number.isSafeInteger(ordinal) || ordinal < 0 || ordinal >= clip.targetFrames ||
+            ordinals.has(ordinal) || job.jobId !==
+              `top-hat-man-${clip.clipId}-${String(ordinal + 1).padStart(3, '0')}` ||
+            !Number.isFinite(job.phase) ||
+            Math.abs(job.phase - ordinal / (clip.targetFrames - 1)) > 0.000001) {
+          fail('TOP_HAT_V3_PROVIDER_FRAME_INVALID', job.jobId);
+        }
+        ordinals.add(ordinal);
+        if (index === 0) {
+          if (!['opening-anchor', 'closing-anchor'].includes(job.role)) {
+            fail('TOP_HAT_V3_PROVIDER_ANCHOR_INVALID', job.jobId);
+          }
+        } else if (job.role !== 'continuity-inbetween' ||
+            job.requirePreviousApprovedReference !== true ||
+            job.requireNextApprovedReference !== true ||
+            !prior.has(job.leftApprovedAnchorJobId) ||
+            !prior.has(job.rightApprovedAnchorJobId) ||
+            prior.get(job.leftApprovedAnchorJobId) >= ordinal ||
+            prior.get(job.rightApprovedAnchorJobId) <= ordinal) {
+          fail('TOP_HAT_V3_PROVIDER_BRACKET_INVALID', job.jobId);
+        }
+      }
+      // Jobs in this wave cannot be references for one another.
+      for (const job of wave.jobs) prior.set(job.jobId, job.ordinal);
+    }
+    if (ordinals.size !== clip.targetFrames) {
+      fail('TOP_HAT_V3_PROVIDER_FRAME_COUNT_INVALID', clip.clipId);
+    }
+  }
+  if (ids.size !== 755) fail('TOP_HAT_V3_PROVIDER_JOB_COUNTS_INVALID');
+}
+
 function generationPlan(value) {
   const plan = record(value, 'generationPlan');
   if (
@@ -88,6 +249,16 @@ function generationPlan(value) {
   ) {
     fail('TOP_HAT_V3_PROVIDER_GENERATION_PLAN_INVALID');
   }
+  const { planSha256, ...body } = plan;
+  if (sha256Document(body) !== planSha256) {
+    fail('TOP_HAT_V3_PROVIDER_GENERATION_PLAN_HASH_INVALID');
+  }
+  assertTopHatV3GenerationPlanContract(plan);
+  const master = plan.identity?.animationIdentityMaster?.asset;
+  if (master?.sha256 !== MASTER_SHA256 || master.width !== 1024 || master.height !== 1536) {
+    fail('TOP_HAT_V3_PROVIDER_MASTER_PIN_MISMATCH');
+  }
+  validateGenerationJobs(plan);
   return plan;
 }
 
@@ -117,6 +288,10 @@ function requiredApprovedBinding(bindings, key, blockers) {
   }
   if (!binding.approved) {
     blockers.push(`reference-not-approved:${key}`);
+    return null;
+  }
+  if (key.startsWith('job:') && binding.sourceJobId !== key.slice(4)) {
+    blockers.push(`reference-source-job-mismatch:${key}`);
     return null;
   }
   return binding;
@@ -208,6 +383,9 @@ function identityReferences(plan, bindings, blockers) {
   const canonical = requiredApprovedBinding(bindings, 'identity:canonical', blockers);
   const master = requiredApprovedBinding(bindings, 'identity:animation-master', blockers);
   const references = [];
+  if (master && master.sha256 !== plan.identity.animationIdentityMaster.asset.sha256) {
+    fail('TOP_HAT_V3_PROVIDER_MASTER_BINDING_MISMATCH');
+  }
   if (master) {
     references.push(
       providerReference(
@@ -234,9 +412,40 @@ function identityReferences(plan, bindings, blockers) {
   return { references, identityLocks };
 }
 
+function layerStyle(identityLocks, layer) {
+  const style = baseStyle(identityLocks);
+  return freeze({
+    ...style,
+    intent: `Produce only an isolated registered ${layer} layer in the existing illustration style.`,
+    mustHave: freeze([
+      `one isolated ${layer} layer only`,
+      'exact canonical facial identity and feature placement',
+      'full 1024 x 1536 registration canvas without trimming',
+      'real straight-alpha transparency outside the requested facial feature',
+    ]),
+    mustAvoid: freeze([
+      'full-body output', 'wardrobe or hat pixels', 'extra facial features',
+      'face redesign', 'unregistered crop', 'background', 'shadow', 'halo',
+      'painted checkerboard',
+    ]),
+    compositionRules: freeze([
+      'Position the requested facial layer at its exact master coordinates.',
+      'All other canvas pixels must remain transparent; do not output the body.',
+    ]),
+  });
+}
+
 function foundationRequest(plan, job, bindings, options) {
   const blockers = [];
   const identity = identityReferences(plan, bindings, blockers);
+  const dependencyIds = job.poseSlotId === 'presentation-emphasis' ? [PRESENTATION_OPEN_JOB] : [];
+  for (const dependencyId of dependencyIds) {
+    const dependency = requiredApprovedBinding(bindings, `job:${dependencyId}`, blockers);
+    if (dependency) identity.references.push(providerReference(
+      dependency, 'previous-key-pose',
+      'Continue the exact approved presentation-open hand pose into its restrained emphasis apex.',
+    ));
+  }
   const request = blockers.length
     ? null
     : freeze({
@@ -245,7 +454,7 @@ function foundationRequest(plan, job, bindings, options) {
         assetKind: 'sprite-frame',
         continuityPhase: 'key-pose',
         assetId: `top-hat-man:${job.jobId}`,
-        candidateFamilyId: `top-hat-v3-foundation:${plan.planSha256}:${job.jobId}`,
+        candidateFamilyId: candidateFamilyId('foundation', plan, job),
         creativeIntent: [
           `Create the exact Top Hat Man foundation pose ${job.poseSlotId}.`,
           job.performance,
@@ -279,6 +488,7 @@ function foundationRequest(plan, job, bindings, options) {
           productionPhase: 'foundation',
           jobId: job.jobId,
           poseSlotId: job.poseSlotId,
+          foundationDependencyJobIds: freeze(dependencyIds),
           targetPath: job.targetPath,
           approvalRequiredBeforeDependents: true,
           automaticPromotion: false,
@@ -320,7 +530,7 @@ function bodyRequest(plan, clip, wave, job, bindings, options) {
         assetKind: 'sprite-frame',
         continuityPhase: job.role === 'continuity-inbetween' ? 'in-between' : 'key-pose',
         assetId: `top-hat-man:${job.jobId}`,
-        candidateFamilyId: `top-hat-v3-body:${plan.planSha256}:${job.jobId}`,
+        candidateFamilyId: candidateFamilyId('body', plan, job),
         frameId: job.jobId,
         creativeIntent: [
           `Create Top Hat Man ${clip.clipId} animation frame ${job.ordinal + 1} of ${clip.targetFrames}.`,
@@ -353,7 +563,7 @@ function bodyRequest(plan, clip, wave, job, bindings, options) {
           job.role === 'continuity-inbetween'
             ? options.inbetweenCandidateCount ?? 1
             : options.anchorCandidateCount ?? 2,
-        ...(Number.isSafeInteger(options.seed) ? { seed: options.seed + job.ordinal } : {}),
+        ...(Number.isSafeInteger(options.seed) ? { seed: (options.seed + job.ordinal) % UINT32_RANGE } : {}),
         references: freeze(references),
         selection: baseSelection(options),
         metadata: freeze({
@@ -396,16 +606,16 @@ function layerRequest(plan, job, bindings, options) {
         assetKind: 'sprite-layer',
         continuityPhase: 'key-pose',
         assetId: `top-hat-man:${job.jobId}`,
-        candidateFamilyId: `top-hat-v3-layer:${plan.planSha256}:${job.jobId}`,
+        candidateFamilyId: candidateFamilyId('layer', plan, job),
         layerId: job.jobId,
         creativeIntent:
-          `Create only the registered ${job.layer} layer ${job.pose ?? job.energy ?? job.jobId}. Preserve exact facial identity and registration. Do not move or repaint the full body.`,
+          `Create only the registered ${job.layer} layer ${job.pose ?? job.jobId}, ${job.energy ?? 'neutral'} energy. Preserve exact facial identity and registration. Output only this isolated facial feature; every other pixel must be transparent.`,
         negativeIntent:
           'No body movement, face redesign, hat changes, unregistered crop, background, shadow, halo or full-character replacement.',
-        style: baseStyle(identity.identityLocks),
+        style: layerStyle(identity.identityLocks, job.layer),
         shot: freeze({
           subject: `Top Hat Man registered ${job.layer} layer`,
-          action: String(job.pose ?? job.energy ?? 'registered pose'),
+          action: `${job.pose ?? 'registered pose'} with ${job.energy ?? 'neutral'} energy`,
           direction: 'Registered face layer only; body registration may not change.',
           include: freeze(['exact face registration', 'real alpha']),
           exclude: freeze(['body redraw', 'hat redraw', 'background']),
@@ -441,7 +651,7 @@ function layerRequest(plan, job, bindings, options) {
 export function compileTopHatV3ProviderPlan(input = {}) {
   const plan = generationPlan(input.generationPlan);
   const bindings = bindingMap(input.bindings ?? {});
-  const options = record(input.options ?? {}, 'options');
+  const options = normalizedOptions(input.options ?? {});
   const foundationPhase = plan.phases.find((phase) => phase.id === 'foundation');
   const layersPhase = plan.phases.find((phase) => phase.id === 'registered-layers');
   const bodyPhase = plan.phases.find((phase) => phase.id === 'body-clips');
