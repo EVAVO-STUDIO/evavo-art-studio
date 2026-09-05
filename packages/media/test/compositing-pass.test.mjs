@@ -131,3 +131,56 @@ test("rejects mismatched transformed masks and ambiguous positioning", async () 
     /cannot combine explicit coordinates with gravity/i,
   );
 });
+
+test("rejects negative coordinates, oversized layers and out-of-bounds placement", async () => {
+  const layer = await solid(20, 20, { r: 255, g: 36, b: 78, alpha: 1 });
+
+  await assert.rejects(
+    () =>
+      composeRasterLayers(null, {
+        canvas: { width: 64, height: 64 },
+        layers: [{ input: layer, left: -1, top: 0 }],
+      }),
+    /integer from 0 through 32768/i,
+  );
+
+  await assert.rejects(
+    () =>
+      composeRasterLayers(null, {
+        canvas: { width: 16, height: 16 },
+        layers: [{ input: layer, gravity: "centre" }],
+      }),
+    /exceeds canvas/i,
+  );
+
+  await assert.rejects(
+    () =>
+      composeRasterLayers(null, {
+        canvas: { width: 32, height: 32 },
+        layers: [{ input: layer, left: 20, top: 20 }],
+      }),
+    /placement exceeds canvas bounds/i,
+  );
+});
+
+test("rejects incomplete canvases and unbounded layer stacks", async () => {
+  const layer = await solid(1, 1, { r: 255, g: 36, b: 78, alpha: 1 });
+
+  await assert.rejects(
+    () =>
+      composeRasterLayers(null, {
+        canvas: { width: 32 },
+        layers: [],
+      }),
+    /canvas requires both width and height|canvas\.height/i,
+  );
+
+  await assert.rejects(
+    () =>
+      composeRasterLayers(null, {
+        canvas: { width: 32, height: 32 },
+        layers: Array.from({ length: 257 }, () => ({ input: layer })),
+      }),
+    /at most 256 layers/i,
+  );
+});
