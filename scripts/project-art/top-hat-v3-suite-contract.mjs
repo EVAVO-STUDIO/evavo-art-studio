@@ -71,20 +71,25 @@ export function assertTopHatV3GenerationPlanContract(plan) {
   if (clips.length !== TOP_HAT_V3_CLIPS.length) {
     fail('TOP_HAT_V3_SUITE_CLIP_COUNT_INVALID');
   }
-  for (let index = 0; index < TOP_HAT_V3_CLIPS.length; index += 1) {
-    const expected = TOP_HAT_V3_CLIPS[index];
-    const actual = clips[index];
+  // Runtime generation plans are sorted by production priority, not catalogue
+  // order. Match exact unique IDs without changing that execution order.
+  const byId = new Map();
+  for (const actual of clips) {
+    if (!actual || typeof actual.clipId !== 'string' || byId.has(actual.clipId)) {
+      fail('TOP_HAT_V3_SUITE_CLIP_DUPLICATE');
+    }
+    byId.set(actual.clipId, actual);
+  }
+  for (const expected of TOP_HAT_V3_CLIPS) {
+    const actual = byId.get(expected.id);
     if (
-      actual?.clipId !== expected.id ||
-      actual?.targetFrames !== expected.frames ||
-      actual?.fps !== expected.fps ||
-      actual?.loopMode !== expected.loopMode
+      !actual ||
+      actual.targetFrames !== expected.frames ||
+      actual.fps !== expected.fps ||
+      actual.loopMode !== expected.loopMode
     ) {
       fail('TOP_HAT_V3_SUITE_CLIP_MISMATCH', expected.id);
     }
-  }
-  if (clips.at(-1)?.clipId !== 'hat-tip') {
-    fail('TOP_HAT_V3_SUITE_SIGNATURE_CLIP_MISSING');
   }
   return Object.freeze({
     schema: TOP_HAT_V3_SUITE_CONTRACT_SCHEMA,
