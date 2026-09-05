@@ -5,6 +5,8 @@ import path from "node:path";
 
 import { composeRasterLayers } from "../packages/media/dist/index.js";
 
+const MAX_LAYERS = 256;
+
 function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
@@ -23,13 +25,29 @@ function parseArgs(argv) {
   return args;
 }
 
+function resolveFrom(baseDir, filePath) {
+  return path.isAbsolute(filePath) ? path.normalize(filePath) : path.resolve(baseDir, filePath);
+}
+
 async function materializeSpec(specPath) {
   const parsed = JSON.parse(await readFile(specPath, "utf8"));
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("Composite spec must be a JSON object.");
   }
   if (!Array.isArray(parsed.layers)) throw new Error("Composite spec requires a layers array.");
+  if (parsed.layers.length > MAX_LAYERS) {
+    throw new Error(`Composite spec supports at most ${MAX_LAYERS} layers.`);
+  }
+  if (parsed.canvas !== undefined) {
+    if (!parsed.canvas || typeof parsed.canvas !== "object" || Array.isArray(parsed.canvas)) {
+      throw new Error("Composite spec canvas must be an object when provided.");
+    }
+    if (!Number.isInteger(parsed.canvas.width) || !Number.isInteger(parsed.canvas.height)) {
+      throw new Error("Composite spec canvas requires integer width and height.");
+    }
+  }
 
+  const baseDir = path.dirname(specPath);
   const layers = [];
   for (let index = 0; index < parsed.layers.length; index += 1) {
     const layer = parsed.layers[index];
@@ -39,15 +57,21 @@ async function materializeSpec(specPath) {
     if (typeof layer.inputPath !== "string" || !layer.inputPath) {
       throw new Error(`layers[${index}].inputPath is required.`);
     }
-    layers.push({
+    const inputPath = resolveFrom(baseDir, layer.inputPath);
+    const prepared = {
       ...layer,
-      input: await readFile(layer.inputPath),
-      ...(typeof layer.maskPath === "string" && layer.maskPath
-        ? { mask: await readFile(layer.maskPath) }
-        : {}),
-      inputPath: undefined,
-      maskPath: undefined,
-    });
+      input: await readFile(inputPath),
+    };
+    delete prepared.inputPath;
+
+    if (layer.maskPath !== undefined) {
+      if (typeof layer.maskPath !== "string" || !layer.maskPath) {
+        throw new Error(`layers[${index}].maskPath must be a non-empty string.`);
+      }
+      prepared.mask = await readFile(resolveFrom(baseDir, layer.maskPath));
+      delete prepared.maskPath;
+    }
+    layers.push(prepared);
   }
 
   return {
@@ -78,6 +102,7 @@ async function main() {
     specPath,
     basePath: typeof args.base === "string" ? path.resolve(args.base) : null,
     outputPath,
+    layerCount: spec.layers.length,
     evidence: result.evidence,
   };
   if (args.printEvidence) process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
