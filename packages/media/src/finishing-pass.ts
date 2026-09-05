@@ -1,4 +1,5 @@
 import sharp, { type ResizeOptions } from "sharp";
+import { applyRasterMatte } from "./raster-matte.js";
 
 export type RasterFinishFormat = "png" | "webp" | "avif" | "jpeg";
 
@@ -124,9 +125,8 @@ export async function finishRasterAsset(
     if (maskMeta.width !== source.width || maskMeta.height !== source.height) {
       throw new Error("Raster finishing mask dimensions must exactly match the source image.");
     }
-    const mask = await sharp(spec.mask).ensureAlpha().extractChannel(3).png().toBuffer();
-    image = image.composite([{ input: mask, blend: "dest-in" }]);
-    operations.push("apply-alpha-mask");
+    image = sharp(await applyRasterMatte(encoded, spec.mask), { failOn: "error" });
+    operations.push("apply-alpha-mask", "materialize-masked-source");
   }
 
   if (spec.trim) {
@@ -168,6 +168,8 @@ export async function finishRasterAsset(
         `Raster finishing cleanup changed aspect ratio by ${aspectRatioDrift.toFixed(2)}x; maximum drift is ${maximumDrift.toFixed(2)}x.`,
       );
     }
+    // Reuse the verified pixels; do not let Sharp reorder cleanup with resize.
+    image = sharp(cleanup.data, { failOn: "error" });
     operations.push("cleanup-geometry-verified");
   }
 
