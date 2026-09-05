@@ -33,7 +33,8 @@ requireTokens("source", [
   "catalogue-only artwork cannot own a detail-page hero",
   "support/secondary object needs a dedicated wide hero derivative",
   "shared with the catalogue; derive detail media instead of overwriting",
-  "production metadata identifies",
+  "candidateNamed",
+  "productionApproved",
   "predominantly white field",
   "at most 500 candidates",
 ]);
