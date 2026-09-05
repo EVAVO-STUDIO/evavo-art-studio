@@ -5,6 +5,7 @@ import path from "node:path";
 import readline from "node:readline";
 
 import {
+  createExistingImageDifferenceProof,
   createTransparencyProofSheet,
   polishExistingRasterPreservingArtwork,
 } from "../packages/media/dist/index.js";
@@ -14,7 +15,7 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-existing-image-polish";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const ALLOW_WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -40,6 +41,25 @@ function identity(filePath) {
   return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
+async function resolveDistinctOutputs(args, outputPath) {
+  const proofPath = await assertAllowed(
+    typeof args.proofPath === "string" ? args.proofPath : `${outputPath}.proof.png`,
+    { output: true },
+  );
+  const diffPath = await assertAllowed(
+    typeof args.diffPath === "string" ? args.diffPath : `${outputPath}.diff.png`,
+    { output: true },
+  );
+  const receiptPath = await assertAllowed(
+    typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`,
+    { output: true },
+  );
+  if (new Set([outputPath, proofPath, diffPath, receiptPath].map(identity)).size !== 4) {
+    throw new Error("outputPath, proofPath, diffPath and receiptPath must be distinct.");
+  }
+  return { proofPath, diffPath, receiptPath };
+}
+
 async function polish(args) {
   assertWriteAdmission(args);
   if (typeof args.inputPath !== "string" || typeof args.outputPath !== "string") {
@@ -50,17 +70,7 @@ async function polish(args) {
   if (identity(inputPath) === identity(outputPath)) {
     throw new Error("Preservation polish is non-destructive: outputPath must differ from inputPath.");
   }
-  const proofPath = await assertAllowed(
-    typeof args.proofPath === "string" ? args.proofPath : `${outputPath}.proof.png`,
-    { output: true },
-  );
-  const receiptPath = await assertAllowed(
-    typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`,
-    { output: true },
-  );
-  if (new Set([outputPath, proofPath, receiptPath].map(identity)).size !== 3) {
-    throw new Error("outputPath, proofPath and receiptPath must be distinct.");
-  }
+  const { proofPath, diffPath, receiptPath } = await resolveDistinctOutputs(args, outputPath);
 
   const source = await readFile(inputPath);
   const result = await polishExistingRasterPreservingArtwork(source, {
@@ -72,6 +82,22 @@ async function polish(args) {
     ...(Number.isInteger(args.donorAlphaThreshold) ? { donorAlphaThreshold: args.donorAlphaThreshold } : {}),
     preserveOpaqueRgb: true,
   });
+
+  const maximumChangedPixelRatio = typeof args.maximumChangedPixelRatio === "number"
+    ? args.maximumChangedPixelRatio
+    : 0.35;
+  const diff = await createExistingImageDifferenceProof(source, result.buffer, {
+    maximumChangedPixelRatio,
+  });
+  if (!diff.evidence.withinMaximumChangedPixelRatio) {
+    throw new Error(
+      `Preservation polish changed ${(diff.evidence.changedPixelRatio * 100).toFixed(2)}% of pixels; maximum allowed is ${(maximumChangedPixelRatio * 100).toFixed(2)}%.`,
+    );
+  }
+  if (diff.evidence.opaqueRgbChangedPixels !== 0) {
+    throw new Error(`Preservation diff found ${diff.evidence.opaqueRgbChangedPixels} changed opaque RGB pixels; refusing output.`);
+  }
+
   const proof = await createTransparencyProofSheet(result.buffer, {
     backgrounds: Array.isArray(args.backgrounds)
       ? args.backgrounds
@@ -81,29 +107,33 @@ async function polish(args) {
       : 1024,
   });
   const receipt = Object.freeze({
-    schemaVersion: "1.0",
+    schemaVersion: "1.1",
     operation: "evavo-polish-existing-image-preserving-artwork",
     approvalState: "unapproved",
     sourceImmutable: true,
     inputPath,
     outputPath,
     proofPath,
+    diffPath,
     receiptPath,
     evidence: result.evidence,
+    differenceProof: diff.evidence,
     transparencyProof: proof.evidence,
     reviewRequired: [
       "Compare the finished asset against the source at 100% and 400% zoom.",
+      "Inspect the exact difference map: red is RGB change, blue is alpha change, magenta is both.",
       "Inspect the full silhouette over black, white, grey, green, magenta and EVAVO cherry red.",
       "Confirm logos, typography, internal artwork and fully opaque pixels are unchanged.",
       "Only promote or overwrite a delivery/cloud asset after human or governed-agent approval.",
     ],
   });
 
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await mkdir(path.dirname(proofPath), { recursive: true });
-  await mkdir(path.dirname(receiptPath), { recursive: true });
+  for (const filePath of [outputPath, proofPath, diffPath, receiptPath]) {
+    await mkdir(path.dirname(filePath), { recursive: true });
+  }
   await writeFile(outputPath, result.buffer, { flag: "wx" });
   await writeFile(proofPath, proof.png, { flag: "wx" });
+  await writeFile(diffPath, diff.proofPng, { flag: "wx" });
   await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx" });
 
   return Object.freeze({
@@ -111,11 +141,38 @@ async function polish(args) {
     inputPath,
     outputPath,
     proofPath,
+    diffPath,
     receiptPath,
     approvalState: "unapproved",
     evidence: result.evidence,
+    differenceProof: diff.evidence,
     bytesReturned: false,
   });
+}
+
+async function compare(args) {
+  assertWriteAdmission(args);
+  if (typeof args.sourcePath !== "string" || typeof args.editedPath !== "string" || typeof args.diffPath !== "string") {
+    throw new Error("sourcePath, editedPath and diffPath are required.");
+  }
+  const sourcePath = await assertAllowed(args.sourcePath);
+  const editedPath = await assertAllowed(args.editedPath);
+  const diffPath = await assertAllowed(args.diffPath, { output: true });
+  if (new Set([sourcePath, editedPath, diffPath].map(identity)).size !== 3) {
+    throw new Error("Difference proof is non-destructive and diffPath must be distinct from both inputs.");
+  }
+  const diff = await createExistingImageDifferenceProof(
+    await readFile(sourcePath),
+    await readFile(editedPath),
+    {
+      ...(Number.isInteger(args.channelThreshold) ? { channelThreshold: args.channelThreshold } : {}),
+      ...(Number.isInteger(args.alphaThreshold) ? { alphaThreshold: args.alphaThreshold } : {}),
+      ...(typeof args.maximumChangedPixelRatio === "number" ? { maximumChangedPixelRatio: args.maximumChangedPixelRatio } : {}),
+    },
+  );
+  await mkdir(path.dirname(diffPath), { recursive: true });
+  await writeFile(diffPath, diff.proofPng, { flag: "wx" });
+  return Object.freeze({ ok: true, sourcePath, editedPath, diffPath, evidence: diff.evidence, bytesReturned: false });
 }
 
 const tools = Object.freeze([
@@ -126,13 +183,14 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_polish_existing_image",
-    description: "Conservatively polish an EXISTING raster asset. Keeps fully opaque artwork immutable, clears dirty RGB in transparent pixels, removes semi-transparent matte/halo contamination using nearby trusted source colour, performs bounded alpha cleanup, and emits a hostile-background proof plus an unapproved receipt. Never overwrites the source.",
+    description: "Conservatively polish an EXISTING raster asset. Keeps fully opaque artwork immutable, clears dirty RGB in transparent pixels, removes semi-transparent matte/halo contamination using nearby trusted source colour, performs bounded alpha cleanup, and emits hostile-background + exact pixel-difference proofs and an unapproved receipt. Never overwrites the source.",
     inputSchema: {
       type: "object",
       properties: {
         inputPath: { type: "string", minLength: 1 },
         outputPath: { type: "string", minLength: 1 },
         proofPath: { type: "string", minLength: 1 },
+        diffPath: { type: "string", minLength: 1 },
         receiptPath: { type: "string", minLength: 1 },
         transparentAlphaCutoff: { type: "integer", minimum: 0, maximum: 32 },
         opaqueAlphaCutoff: { type: "integer", minimum: 223, maximum: 255 },
@@ -140,6 +198,7 @@ const tools = Object.freeze([
         decontaminateFringe: { type: "boolean" },
         fringeRadius: { type: "integer", minimum: 1, maximum: 8 },
         donorAlphaThreshold: { type: "integer", minimum: 128, maximum: 255 },
+        maximumChangedPixelRatio: { type: "number", minimum: 0, maximum: 1 },
         backgrounds: {
           type: "array",
           minItems: 1,
@@ -154,11 +213,29 @@ const tools = Object.freeze([
       additionalProperties: false,
     },
   }),
+  Object.freeze({
+    name: "evavo_compare_existing_image_edit",
+    description: "Create an exact preservation difference map between a source image and an edited candidate. Red marks RGB changes, blue marks alpha changes and magenta marks both. Useful before accepting any retouch, cleanup, inpaint, upscale or cloud replacement.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourcePath: { type: "string", minLength: 1 },
+        editedPath: { type: "string", minLength: 1 },
+        diffPath: { type: "string", minLength: 1 },
+        channelThreshold: { type: "integer", minimum: 0, maximum: 255 },
+        alphaThreshold: { type: "integer", minimum: 0, maximum: 255 },
+        maximumChangedPixelRatio: { type: "number", minimum: 0, maximum: 1 },
+        confirmLocalWrite: { type: "boolean", const: true },
+      },
+      required: ["sourcePath", "editedPath", "diffPath", "confirmLocalWrite"],
+      additionalProperties: false,
+    },
+  }),
 ]);
 
 function capabilities() {
   return Object.freeze({
-    contract: "evavo_existing_image_polish_v1",
+    contract: "evavo_existing_image_polish_v1_1",
     mode: "existing-image-preservation-first",
     regeneration: false,
     sourceOverwrite: false,
@@ -168,6 +245,9 @@ function capabilities() {
       "transparent-rgb-cleanup",
       "semi-transparent-fringe-decontamination",
       "fully-opaque-rgb-preservation-gate",
+      "maximum-change-surface-gate",
+      "exact-rgb-alpha-difference-map",
+      "change-bounding-box",
       "black-white-grey-green-magenta-cherry-red-proof",
       "alpha-mask-proof",
       "unapproved-receipt",
@@ -178,6 +258,8 @@ function capabilities() {
       "sprite and UI silhouette cleanup",
       "existing web image finishing",
       "matte contamination cleanup",
+      "retouch candidate verification",
+      "upscale candidate verification",
       "pre-Cloudinary replacement QA",
     ],
   });
@@ -186,6 +268,7 @@ function capabilities() {
 async function callTool(name, args) {
   if (name === "evavo_existing_image_polish_capabilities") return capabilities();
   if (name === "evavo_polish_existing_image") return polish(args ?? {});
+  if (name === "evavo_compare_existing_image_edit") return compare(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
 
