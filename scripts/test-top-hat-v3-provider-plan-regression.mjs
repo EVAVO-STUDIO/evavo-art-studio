@@ -392,3 +392,5 @@ for (const flags of [['--seed', 'invalid'], ['--seed'], ['--seed', '1', '--seed'
     });
   });
 }
+
+export { fixture as createTopHatV3ContractTestFixture, seal as sealTopHatV3ContractTestPlan };
