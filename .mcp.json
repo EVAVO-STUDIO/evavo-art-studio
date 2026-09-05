@@ -34,6 +34,16 @@
         "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
       }
     },
+    "evavo-work-header-review-v1": {
+      "command": "node",
+      "args": [
+        "tools/work_header_review_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
+        "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
+      }
+    },
     "evavo-local-agent-executor": {
       "command": "node",
       "args": [
