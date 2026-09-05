@@ -212,11 +212,15 @@ runNodeCheck('Raster compositing CLI syntax validation', [
   '--check',
   'tools/compose_raster_layers.mjs',
 ]);
+runNodeCheck('Raster effect CLI syntax validation', [
+  '--check',
+  'tools/create_raster_effect_layer.mjs',
+]);
 runNodeCheck('Raster compositing MCP syntax validation', [
   '--check',
   'tools/raster_compositing_mcp.mjs',
 ]);
-runNodeCheck('Raster compositing source contract', [
+runNodeCheck('Raster compositing and effect source contract', [
   'scripts/check-raster-compositing-contract.mjs',
 ]);
 runNodeCheck('Local media path-policy adversarial tests', [
@@ -227,6 +231,6 @@ runNodeCheck('Local media path-policy adversarial tests', [
 for (const error of errors) console.log(`  - ${error}`);
 if (errors.length) process.exit(1);
 console.log('EVAVO image processing recipes passed');
-console.log('- raster finishing/compositing MCP syntax is valid');
-console.log('- raster compositing contract remains governed');
+console.log('- raster finishing/compositing/effect tool syntax is valid');
+console.log('- raster compositing and effect-layer contract remains governed');
 console.log('- canonical local path policy rejects symlink/junction escapes');
