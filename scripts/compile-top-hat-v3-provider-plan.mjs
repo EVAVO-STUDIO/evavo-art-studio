@@ -31,9 +31,15 @@ function parseArgs(argv) {
     inbetweenCandidateCount: 1,
     layerCandidateCount: 2,
   };
+  const seen = new Set();
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const next = argv[index + 1];
+    if (typeof next !== 'string' || !next || next.startsWith('--') ||
+        (seen.has(flag) && flag !== '--allowed-adapter')) {
+      fail('TOP_HAT_V3_PROVIDER_CLI_ARGUMENT_INVALID', flag);
+    }
+    seen.add(flag);
     if (flag === '--generation-plan') args.generationPlan = next;
     else if (flag === '--bindings') args.bindings = next;
     else if (flag === '--output') args.output = next;
@@ -57,7 +63,7 @@ function parseArgs(argv) {
   return args;
 }
 
-function positiveInteger(value, label, maximum = 16) {
+function positiveInteger(value, label, maximum = 8) {
   if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
     fail('TOP_HAT_V3_PROVIDER_CLI_INTEGER_INVALID', label);
   }
@@ -101,7 +107,7 @@ const options = {
   allowedAdapterIds: args.allowedAdapterIds,
   preferredAdapterId: args.preferredAdapterId,
   preferredModel: args.preferredModel,
-  seed: Number.isSafeInteger(args.seed) ? args.seed : null,
+  seed: args.seed,
   foundationCandidateCount: positiveInteger(args.foundationCandidateCount, 'foundationCandidateCount'),
   anchorCandidateCount: positiveInteger(args.anchorCandidateCount, 'anchorCandidateCount'),
   inbetweenCandidateCount: positiveInteger(args.inbetweenCandidateCount, 'inbetweenCandidateCount'),
