@@ -1,33 +1,27 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 
 import { composeRasterLayers } from "../packages/media/dist/index.js";
+import {
+  assertAllowedLocalPath,
+  configuredLocalRootCount,
+} from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-raster-compositing";
 const SERVER_VERSION = "1.0.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const MAX_LAYERS = 256;
+const ALLOWED_ROOTS_ENV = "EVAVO_RASTER_COMPOSE_ALLOWED_ROOTS";
 
-function allowedRoots() {
-  return (process.env.EVAVO_RASTER_COMPOSE_ALLOWED_ROOTS ?? "")
-    .split(path.delimiter)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => path.resolve(entry));
-}
-
-async function assertAllowed(filePath, { output = false } = {}) {
-  const resolved = path.resolve(filePath);
-  const roots = allowedRoots();
-  if (roots.length === 0) throw new Error("EVAVO_RASTER_COMPOSE_ALLOWED_ROOTS is not configured.");
-  const comparable = output ? path.dirname(resolved) : await realpath(resolved);
-  const allowed = roots.some((root) => comparable === root || comparable.startsWith(`${root}${path.sep}`));
-  if (!allowed) throw new Error(`Path is outside configured raster compositing roots: ${resolved}`);
-  return resolved;
-}
+const assertAllowed = (filePath, { output = false } = {}) =>
+  assertAllowedLocalPath(filePath, {
+    envName: ALLOWED_ROOTS_ENV,
+    output,
+    label: "raster compositing",
+  });
 
 async function materializeSpec(spec) {
   if (!spec || typeof spec !== "object" || Array.isArray(spec) || !Array.isArray(spec.layers)) {
@@ -201,8 +195,9 @@ async function callTool(name, args) {
         "jpeg",
       ],
       masks: "provider-agnostic; pass local mattes from segmentation, Cloudinary, ComfyUI or another approved source",
+      pathPolicy: "input and prospective output paths are canonicalized through existing ancestors so symlink escapes fail closed",
       writesEnabled: process.env.EVAVO_RASTER_COMPOSE_ALLOW_WRITES === "true",
-      allowedRootCount: allowedRoots().length,
+      allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
       bytesReturned: false,
     });
   }
@@ -228,7 +223,7 @@ async function dispatch(request) {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-        instructions: "Raster compositing is local-first. Writes require an allowed root, the write environment gate and exact per-call confirmation.",
+        instructions: "Raster compositing is local-first. Writes require a canonical allowed root, the write environment gate and exact per-call confirmation.",
       },
     };
   }
