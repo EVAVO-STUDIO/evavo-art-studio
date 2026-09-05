@@ -24,6 +24,16 @@
         "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
       }
     },
+    "evavo-existing-image-review-v1": {
+      "command": "node",
+      "args": [
+        "tools/existing_image_review_mcp.mjs"
+      ],
+      "env": {
+        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
+        "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
+      }
+    },
     "evavo-existing-image-edit-mask-v1": {
       "command": "node",
       "args": [
