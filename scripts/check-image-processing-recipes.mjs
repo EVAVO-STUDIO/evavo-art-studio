@@ -224,8 +224,19 @@ runNodeCheck('Raster compositing MCP syntax validation', [
   '--check',
   'tools/raster_compositing_mcp.mjs',
 ]);
+runNodeCheck('Media role ranking CLI syntax validation', [
+  '--check',
+  'tools/rank_media_candidates.mjs',
+]);
+runNodeCheck('Media role supervisor MCP syntax validation', [
+  '--check',
+  'tools/media_role_supervisor_mcp.mjs',
+]);
 runNodeCheck('Raster finishing/compositing/effect/proof source contract', [
   'scripts/check-raster-compositing-contract.mjs',
+]);
+runNodeCheck('Media role supervisor source contract', [
+  'scripts/check-media-role-supervisor-contract.mjs',
 ]);
 runNodeCheck('Local media path-policy adversarial tests', [
   '--test',
@@ -236,5 +247,6 @@ for (const error of errors) console.log(`  - ${error}`);
 if (errors.length) process.exit(1);
 console.log('EVAVO image processing recipes passed');
 console.log('- raster finishing/compositing/effect/transparency-proof tool syntax is valid');
+console.log('- media role ranking CLI/MCP syntax and read-only contract are valid');
 console.log('- raster media contract remains governed');
 console.log('- canonical local path policy rejects symlink/junction escapes');
