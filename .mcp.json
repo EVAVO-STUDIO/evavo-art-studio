@@ -19,6 +19,13 @@
         "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"
       }
     },
+    "evavo-enhancement-review-bridge-v1": {
+      "command": "node",
+      "args": ["tools/enhancement_review_bridge_mcp.mjs"],
+      "env": {
+        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"
+      }
+    },
     "evavo-existing-image-polish-v1": {
       "command": "node",
       "args": ["tools/existing_image_polish_mcp.mjs"],
