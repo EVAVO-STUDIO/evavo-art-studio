@@ -33,6 +33,23 @@ async function transparentSubject() {
     .toBuffer();
 }
 
+async function alphaRange(encoded) {
+  const decoded = await sharp(encoded).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  assert.equal(decoded.info.channels, 4);
+  let minimum = 255;
+  let maximum = 0;
+  let nonZero = 0;
+  let nonOpaque = 0;
+  for (let index = 3; index < decoded.data.length; index += 4) {
+    const alpha = decoded.data[index];
+    minimum = Math.min(minimum, alpha);
+    maximum = Math.max(maximum, alpha);
+    if (alpha > 0) nonZero += 1;
+    if (alpha > 0 && alpha < 255) nonOpaque += 1;
+  }
+  return { minimum, maximum, nonZero, nonOpaque };
+}
+
 test("creates a padded drop-shadow layer with deterministic anchor evidence", async () => {
   const subject = await transparentSubject();
   const result = await createRasterEffectLayer(subject, {
@@ -54,6 +71,7 @@ test("creates a padded drop-shadow layer with deterministic anchor evidence", as
   assert.ok(result.evidence.padding >= 35);
   assert.equal(result.evidence.subjectAnchorLeft, result.evidence.padding);
   assert.equal(result.evidence.subjectAnchorTop, result.evidence.padding);
+  assert.ok(result.evidence.operations.includes("materialize-shifted-alpha-source"));
   assert.ok(result.evidence.operations.includes("extract-source-alpha"));
   assert.ok(result.evidence.operations.includes("spread:2"));
   assert.ok(result.evidence.operations.includes("blur:8"));
@@ -65,12 +83,14 @@ test("creates a padded drop-shadow layer with deterministic anchor evidence", as
   assert.equal(metadata.width, result.evidence.outputWidth);
   assert.equal(metadata.height, result.evidence.outputHeight);
 
-  const alpha = await sharp(result.buffer).ensureAlpha().extractChannel(3).stats();
-  assert.ok(alpha.channels[0].max > 0);
-  assert.ok(alpha.channels[0].min < alpha.channels[0].max);
+  const alpha = await alphaRange(result.buffer);
+  assert.equal(alpha.minimum, 0);
+  assert.ok(alpha.maximum > 0);
+  assert.ok(alpha.nonZero > 0);
+  assert.ok(alpha.nonOpaque > 0);
 });
 
-test("creates an outer glow with zero offset and keeps a separate transparent effect layer", async () => {
+test("creates an outer glow with zero offset and meaningful transparent falloff", async () => {
   const subject = await transparentSubject();
   const result = await createRasterEffectLayer(subject, {
     kind: "outer-glow",
@@ -93,6 +113,11 @@ test("creates an outer glow with zero offset and keeps a separate transparent ef
   assert.equal(metadata.hasAlpha, true);
   assert.ok((metadata.width ?? 0) > 80);
   assert.ok((metadata.height ?? 0) > 60);
+  const alpha = await alphaRange(result.buffer);
+  assert.equal(alpha.minimum, 0);
+  assert.ok(alpha.maximum > 0);
+  assert.ok(alpha.nonZero > 0);
+  assert.ok(alpha.nonOpaque > 0);
 });
 
 test("rejects unsafe padding and invalid effect ranges before rendering", async () => {
