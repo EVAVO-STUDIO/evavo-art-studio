@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import sharp from "sharp";
-import { createRasterEffectLayer } from "../dist/index.js";
+import {
+  composeRasterLayers,
+  createRasterEffectLayer,
+} from "../dist/index.js";
 
 async function transparentSubject() {
   return sharp({
@@ -88,6 +91,44 @@ test("creates a padded drop-shadow layer with deterministic anchor evidence", as
   assert.ok(alpha.maximum > 0);
   assert.ok(alpha.nonZero > 0);
   assert.ok(alpha.nonOpaque > 0);
+});
+
+test("composes a generated shadow behind its subject using returned anchor evidence", async () => {
+  const subject = await transparentSubject();
+  const shadow = await createRasterEffectLayer(subject, {
+    kind: "drop-shadow",
+    blurSigma: 6,
+    spread: 1,
+    offsetX: 6,
+    offsetY: 7,
+    opacity: 0.45,
+  });
+
+  const finished = await composeRasterLayers(shadow.buffer, {
+    layers: [
+      {
+        name: "subject",
+        input: subject,
+        left: shadow.evidence.subjectAnchorLeft,
+        top: shadow.evidence.subjectAnchorTop,
+      },
+    ],
+    format: "png",
+  });
+
+  assert.equal(finished.evidence.canvasWidth, shadow.evidence.outputWidth);
+  assert.equal(finished.evidence.canvasHeight, shadow.evidence.outputHeight);
+  assert.equal(
+    finished.evidence.layers[0].placement,
+    `left:${shadow.evidence.subjectAnchorLeft},top:${shadow.evidence.subjectAnchorTop}`,
+  );
+  const raw = await sharp(finished.buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const subjectPixel =
+    ((shadow.evidence.subjectAnchorTop + 18) * raw.info.width +
+      (shadow.evidence.subjectAnchorLeft + 22)) *
+    4;
+  assert.ok(raw.data[subjectPixel] > 200);
+  assert.ok(raw.data[subjectPixel + 3] > 200);
 });
 
 test("creates an outer glow with zero offset and meaningful transparent falloff", async () => {
