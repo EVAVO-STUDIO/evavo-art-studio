@@ -12,6 +12,9 @@ const files = Object.freeze({
   tests: read("packages/media/test/compositing-pass.test.mjs"),
   cli: read("tools/compose_raster_layers.mjs"),
   mcp: read("tools/raster_compositing_mcp.mjs"),
+  finishingMcp: read("tools/raster_finishing_mcp.mjs"),
+  pathPolicy: read("tools/lib/local_path_policy.mjs"),
+  pathTests: read("scripts/test-local-path-policy.mjs"),
   config: read(".mcp.raster-compositing-v1.json"),
   docs: read("docs/raster-finishing-and-compositing.md"),
 });
@@ -62,12 +65,40 @@ requireTokens("mcp", [
   "evavo_compose_raster_layers",
   "EVAVO_RASTER_COMPOSE_ALLOWED_ROOTS",
   "EVAVO_RASTER_COMPOSE_ALLOW_WRITES",
+  'from "./lib/local_path_policy.mjs"',
+  "assertAllowedLocalPath",
+  "configuredLocalRootCount",
   "confirmLocalWrite=true is required",
   "maxItems: MAX_LAYERS",
   'required: ["width", "height"]',
   "minimum: 0, maximum: 32768",
   "canvas-bounds-validation",
+  "symlink escapes fail closed",
   "bytesReturned: false",
+]);
+requireTokens("finishingMcp", [
+  'from "./lib/local_path_policy.mjs"',
+  "assertAllowedLocalPath",
+  "configuredLocalRootCount",
+  "EVAVO_RASTER_FINISH_ALLOWED_ROOTS",
+  "symlink escapes fail closed",
+  "confirmLocalWrite=true is required",
+]);
+requireTokens("pathPolicy", [
+  "export async function canonicalizeProspectivePath",
+  "export async function assertAllowedLocalPath",
+  "export function configuredLocalRootCount",
+  "await realpath(cursor)",
+  "path.relative(root, candidate)",
+  "not-yet-created suffix",
+  "Path is outside configured",
+]);
+requireTokens("pathTests", [
+  "allows real inputs and prospective nested outputs inside a configured root",
+  "rejects real inputs and prospective outputs outside configured roots",
+  "rejects input and output paths that escape through an existing symlink ancestor",
+  "fails closed when no allowed roots are configured",
+  "process.platform === \"win32\" ? \"junction\" : \"dir\"",
 ]);
 requireTokens("config", [
   "evavo-raster-compositing-v1",
@@ -86,14 +117,17 @@ requireTokens("docs", [
 if (/return\s+result\.buffer/u.test(files.mcp) || /bytesReturned:\s*true/u.test(files.mcp)) {
   failures.push("mcp:raw-image-bytes-must-not-be-returned");
 }
-if (!files.mcp.includes("Path is outside configured raster compositing roots")) {
-  failures.push("mcp:allowed-root-fail-closed-message-missing");
+if (/return\s+result\.buffer/u.test(files.finishingMcp) || /bytesReturned:\s*true/u.test(files.finishingMcp)) {
+  failures.push("finishing-mcp:raw-image-bytes-must-not-be-returned");
 }
 if (!files.compositing.includes("provider-agnostic")) {
   failures.push("compositing:provider-agnostic-mask-contract-missing");
 }
 if (/integer between -32768 and 32768/u.test(files.compositing)) {
   failures.push("compositing:negative-coordinate-contract-restored");
+}
+if (!files.pathPolicy.includes("canonicalizeProspectivePath(path.dirname(resolved))")) {
+  failures.push("path-policy:prospective-output-canonicalization-missing");
 }
 
 if (failures.length) {
@@ -108,6 +142,9 @@ console.log("- resize, rotate, mask, opacity, blend and placement evidence remai
 console.log("- canvas bounds, non-negative placement and the 256-layer ceiling fail closed before libvips composite work");
 console.log("- CLI recipes resolve relative layer paths beside the spec file and cap layer materialization");
 console.log("- MCP schema mirrors canvas, coordinate and layer-count admission rules before file reads");
+console.log("- raster finishing and compositing share the same canonical symlink-safe local path policy");
+console.log("- prospective output directories are checked through their nearest existing realpath ancestor");
+console.log("- symlink and junction escapes are covered by adversarial local path tests");
 console.log("- CLI and MCP surfaces remain file/path based and never return image bytes");
 console.log("- local MCP writes remain root-scoped, environment-gated and per-call confirmed");
 console.log("- agent documentation keeps finishing, compositing, segmentation and catalogue roles separate");
