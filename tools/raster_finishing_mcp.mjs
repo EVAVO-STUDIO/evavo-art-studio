@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 
 import {
+  applyAlphaGuidance,
   createTransparencyProofSheet,
   finishRasterAsset,
+  recoverBackgroundAlpha,
 } from "../packages/media/dist/index.js";
 import {
   assertAllowedLocalPath,
@@ -41,6 +43,38 @@ function requireWriteAdmission(args) {
   }
   if (typeof args.inputPath !== "string" || typeof args.outputPath !== "string") {
     throw new Error("inputPath and outputPath are required.");
+  }
+}
+
+function pathIdentity(filePath) {
+  const resolved = path.resolve(filePath);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function assertDistinctPaths(sourcePaths, outputPaths) {
+  const sources = new Set(sourcePaths.map(pathIdentity));
+  const outputs = outputPaths.map(pathIdentity);
+  if (outputs.some((candidate) => sources.has(candidate))) {
+    throw new Error("Transparent mastering is non-destructive: outputs must differ from the source and masks.");
+  }
+  if (new Set(outputs).size !== outputs.length) {
+    throw new Error("Transparent mastering output, proof and receipt paths must be distinct.");
+  }
+}
+
+async function createOnly(filePath, contents) {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, contents, { flag: "wx" });
+}
+
+async function assertCreateOnlyTargets(filePaths) {
+  for (const filePath of filePaths) {
+    try {
+      await access(filePath);
+    } catch {
+      continue;
+    }
+    throw new Error(`Create-only output already exists: ${filePath}`);
   }
 }
 
@@ -104,6 +138,107 @@ async function transparencyProof(args) {
   });
 }
 
+async function masterTransparent(args) {
+  if (process.env.EVAVO_RASTER_FINISH_ALLOW_WRITES !== "true") {
+    throw new Error("Raster finishing writes are disabled. Set EVAVO_RASTER_FINISH_ALLOW_WRITES=true.");
+  }
+  if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required for this exact call.");
+  if (typeof args.inputPath !== "string" || typeof args.outputPath !== "string") {
+    throw new Error("inputPath and outputPath are required.");
+  }
+  const inputPath = await assertAllowed(args.inputPath);
+  const outputPath = await assertAllowed(args.outputPath, { output: true });
+  const proofPath = await assertAllowed(
+    typeof args.proofPath === "string" ? args.proofPath : `${outputPath}.proof.png`,
+    { output: true },
+  );
+  const receiptPath = await assertAllowed(
+    typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`,
+    { output: true },
+  );
+  const protectMaskPath = typeof args.protectMaskPath === "string"
+    ? await assertAllowed(args.protectMaskPath)
+    : undefined;
+  const removeMaskPath = typeof args.removeMaskPath === "string"
+    ? await assertAllowed(args.removeMaskPath)
+    : undefined;
+  assertDistinctPaths(
+    [inputPath, ...(protectMaskPath ? [protectMaskPath] : []), ...(removeMaskPath ? [removeMaskPath] : [])],
+    [outputPath, proofPath, receiptPath],
+  );
+  await assertCreateOnlyTargets([outputPath, proofPath, receiptPath]);
+
+  const source = await readFile(inputPath);
+  const recovered = await recoverBackgroundAlpha(source, {
+    ...(typeof args.matteColour === "string" ? { matteColour: args.matteColour } : {}),
+    allowCheckerboardRecovery: true,
+    allowHighChromaInference: args.allowHighChromaInference !== false,
+  });
+  const guided = protectMaskPath || removeMaskPath
+    ? await applyAlphaGuidance(recovered.png, source, {
+        ...(protectMaskPath ? { protectMask: await readFile(protectMaskPath) } : {}),
+        ...(removeMaskPath ? { removeMask: await readFile(removeMaskPath) } : {}),
+      })
+    : null;
+  const transparentInput = guided?.png ?? recovered.png;
+  const presetName = typeof args.preset === "string" ? args.preset : "transparent-object";
+  const preset = PRESETS[presetName];
+  if (!preset || preset.format !== "png") {
+    throw new Error("Transparent mastering requires a PNG finishing preset.");
+  }
+  const overrides = args.spec && typeof args.spec === "object" && !Array.isArray(args.spec) ? args.spec : {};
+  const finished = await finishRasterAsset(transparentInput, mergeSpec(preset, overrides));
+  if (!finished.evidence.outputHasAlpha || finished.evidence.format !== "png") {
+    throw new Error("Transparent mastering must produce an alpha-bearing PNG.");
+  }
+  const finalAdmission = await recoverBackgroundAlpha(finished.buffer, {
+    allowCheckerboardRecovery: false,
+    allowHighChromaInference: false,
+  });
+  if (finalAdmission.evidence.strategy !== "native-alpha-preserved") {
+    throw new Error("Transparent mastering output did not pass meaningful native-alpha admission.");
+  }
+  const proof = await createTransparencyProofSheet(finished.buffer, {
+    nearest: args.pixelArt === true,
+  });
+  const receipt = Object.freeze({
+    schemaVersion: "1.0",
+    operation: "evavo-master-transparent-asset",
+    approvalState: "unapproved",
+    inputPath,
+    outputPath,
+    proofPath,
+    receiptPath,
+    recovery: recovered.evidence,
+    guidance: guided?.evidence ?? null,
+    finishing: finished.evidence,
+    finalAdmission: finalAdmission.evidence,
+    transparencyProof: proof.evidence,
+    reviewRequired: [
+      "Inspect the full-resolution silhouette, holes, thin parts and semi-transparent effects.",
+      "Inspect the proof over black, white, grey, green and magenta plus its alpha mask.",
+      "Approve at intended runtime scale before sprite slicing or atlas packing.",
+    ],
+  });
+  await createOnly(outputPath, finished.buffer);
+  try {
+    await createOnly(proofPath, proof.png);
+    await createOnly(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  } catch (error) {
+    throw new Error(`Transparent pixels were mastered, but the evidence set could not be completed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return Object.freeze({
+    ok: true,
+    outputPath,
+    proofPath,
+    receiptPath,
+    recoveryStrategy: recovered.evidence.strategy,
+    artistGuidanceApplied: guided !== null,
+    approvalState: "unapproved",
+    bytesReturned: false,
+  });
+}
+
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_raster_finishing_capabilities",
@@ -150,6 +285,29 @@ const tools = Object.freeze([
       additionalProperties: false,
     },
   }),
+  Object.freeze({
+    name: "evavo_master_transparent_asset",
+    description: "Safely turn a local image with native alpha, a painted checkerboard or a proven flat matte into a real transparent sprite PNG. Uses border-connected recovery, optional separate protect/remove masks, edge cleanup, create-only outputs, hostile-background proof plates and a receipt. Ambiguous natural backgrounds fail closed.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        inputPath: { type: "string", minLength: 1 },
+        outputPath: { type: "string", minLength: 1 },
+        proofPath: { type: "string", minLength: 1 },
+        receiptPath: { type: "string", minLength: 1 },
+        matteColour: { type: "string", pattern: "^#[0-9A-Fa-f]{6}$" },
+        protectMaskPath: { type: "string", minLength: 1 },
+        removeMaskPath: { type: "string", minLength: 1 },
+        allowHighChromaInference: { type: "boolean" },
+        pixelArt: { type: "boolean" },
+        preset: { type: "string", enum: ["transparent-object", "motion-layer"] },
+        spec: { type: "object" },
+        confirmLocalWrite: { type: "boolean", const: true },
+      },
+      required: ["inputPath", "outputPath", "confirmLocalWrite"],
+      additionalProperties: false,
+    },
+  }),
 ]);
 
 async function callTool(name, args) {
@@ -158,6 +316,13 @@ async function callTool(name, args) {
       contract: "evavo_raster_finishing_v1",
       presets: Object.keys(PRESETS),
       operations: [
+        "native-alpha-preservation",
+        "painted-checkerboard-recovery",
+        "border-connected-matte-recovery",
+        "edge-decontamination",
+        "protect-mask",
+        "remove-mask",
+        "hostile-background-proof",
         "alpha-mask",
         "ensure-alpha",
         "trim",
@@ -186,6 +351,7 @@ async function callTool(name, args) {
   }
   if (name === "evavo_finish_raster_asset") return finish(args ?? {});
   if (name === "evavo_create_transparency_proof") return transparencyProof(args ?? {});
+  if (name === "evavo_master_transparent_asset") return masterTransparent(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
 

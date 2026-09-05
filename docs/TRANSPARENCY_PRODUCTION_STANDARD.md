@@ -82,6 +82,13 @@ Automatic evidence stays authoritative, but an artist can refine the recovered s
 
 Masks may use alpha-painted strokes or opaque grayscale. They must match the source dimensions. Strong protect/remove overlap is rejected because contradictory intent is unsafe. Unmasked alpha is unchanged, fully removed pixels are canonicalized, and bounded transparent RGB bleed is rebuilt.
 
+For ordinary local sprite finishing, the raster-finishing MCP exposes
+`evavo_master_transparent_asset`. It combines classification/recovery, optional
+separate protect and remove masks, guarded PNG finishing, hostile-background
+proof generation and a JSON receipt. The source and masks are immutable inputs;
+the output, proof and receipt are distinct create-only files. The resulting
+asset remains `unapproved` until the proof and runtime-scale sprite are reviewed.
+
 ```powershell
 pnpm art -- master-alpha `
   --input .\candidate.png `
