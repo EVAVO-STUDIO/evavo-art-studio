@@ -17,6 +17,7 @@ export * from "./aseprite-interchange.js";
 export * from "./aseprite-interchange-result.js";
 export * from "./pose-control-render.js";
 export * from "./finishing-pass.js";
+export * from "./preservation-polish.js";
 export * from "./compositing-pass.js";
 export * from "./effect-layer.js";
 export * from "./effect-presets.js";
