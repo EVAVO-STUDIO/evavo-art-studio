@@ -22,6 +22,7 @@ export * from "./existing-image-diff.js";
 export * from "./existing-image-quality-review.js";
 export * from "./existing-image-inspection-proof.js";
 export * from "./image-review-profiles.js";
+export * from "./image-similarity.js";
 export * from "./localized-edit.js";
 export * from "./edit-mask.js";
 export * from "./work-header-quality.js";
