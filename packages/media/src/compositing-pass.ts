@@ -80,10 +80,10 @@ function finiteRange(
   return value;
 }
 
-function integerCoordinate(value: number | undefined, label: string): number | undefined {
+function canvasCoordinate(value: number | undefined, label: string): number | undefined {
   if (value === undefined) return undefined;
-  if (!Number.isInteger(value) || Math.abs(value) > 32768) {
-    throw new Error(`${label} must be an integer between -32768 and 32768.`);
+  if (!Number.isInteger(value) || value < 0 || value > 32768) {
+    throw new Error(`${label} must be an integer from 0 through 32768.`);
   }
   return value;
 }
@@ -170,8 +170,8 @@ async function prepareLayer(
     operations.push(`opacity:${opacity}`);
   }
 
-  const left = integerCoordinate(layer.left, `layers[${index}].left`);
-  const top = integerCoordinate(layer.top, `layers[${index}].top`);
+  const left = canvasCoordinate(layer.left, `layers[${index}].left`);
+  const top = canvasCoordinate(layer.top, `layers[${index}].top`);
   if ((left === undefined) !== (top === undefined)) {
     throw new Error(`Composite layer ${index} must provide both left and top, or neither.`);
   }
@@ -211,6 +211,9 @@ export async function composeRasterLayers(
   if (!spec || !Array.isArray(spec.layers)) {
     throw new Error("Raster compositing requires a layers array.");
   }
+  if (spec.layers.length > 256) {
+    throw new Error("Raster compositing supports at most 256 layers per job.");
+  }
 
   let canvasWidth: number;
   let canvasHeight: number;
@@ -218,8 +221,13 @@ export async function composeRasterLayers(
   const operations: string[] = [];
 
   if (spec.canvas) {
-    canvasWidth = positiveInteger(spec.canvas.width, "canvas.width")!;
-    canvasHeight = positiveInteger(spec.canvas.height, "canvas.height")!;
+    const requestedWidth = positiveInteger(spec.canvas.width, "canvas.width");
+    const requestedHeight = positiveInteger(spec.canvas.height, "canvas.height");
+    if (requestedWidth === undefined || requestedHeight === undefined) {
+      throw new Error("Raster compositing canvas requires both width and height.");
+    }
+    canvasWidth = requestedWidth;
+    canvasHeight = requestedHeight;
     composition = sharp({
       create: {
         width: canvasWidth,
@@ -275,7 +283,23 @@ export async function composeRasterLayers(
   for (let index = 0; index < spec.layers.length; index += 1) {
     const layer = spec.layers[index]!;
     const prepared = await prepareLayer(layer, index);
+    if (prepared.width > canvasWidth || prepared.height > canvasHeight) {
+      throw new Error(
+        `Composite layer ${index} (${prepared.width}x${prepared.height}) exceeds canvas ${canvasWidth}x${canvasHeight}. Resize the layer or enlarge the canvas.`,
+      );
+    }
+
     const explicit = prepared.placement.startsWith("left:");
+    if (explicit) {
+      const left = layer.left!;
+      const top = layer.top!;
+      if (left + prepared.width > canvasWidth || top + prepared.height > canvasHeight) {
+        throw new Error(
+          `Composite layer ${index} placement exceeds canvas bounds. Layer ${prepared.width}x${prepared.height} at left=${left}, top=${top} must fit inside ${canvasWidth}x${canvasHeight}.`,
+        );
+      }
+    }
+
     const overlay: OverlayOptions = explicit
       ? {
           input: prepared.buffer,
