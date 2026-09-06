@@ -4,12 +4,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 
-import { detectExistingImageDefects } from "../packages/media/dist/index.js";
+import { detectExistingImageDefects, segmentDefectMaskRegions } from "../packages/media/dist/index.js";
 import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-existing-image-defect-detection";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const ALLOW_WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -51,9 +51,14 @@ async function detect(args) {
     ...(Number.isInteger(args.maskPadding) ? { maskPadding: args.maskPadding } : {}),
     ...(typeof args.maximumMaskCoverageRatio === "number" ? { maximumMaskCoverageRatio: args.maximumMaskCoverageRatio } : {}),
   });
+  const regions = await segmentDefectMaskRegions(result.maskPng, {
+    ...(Number.isInteger(args.minimumRegionPixelCount) ? { minimumPixelCount: args.minimumRegionPixelCount } : {}),
+    ...(Number.isInteger(args.maximumRegions) ? { maximumRegions: args.maximumRegions } : {}),
+    ...(Number.isInteger(args.regionMergeGap) ? { mergeGap: args.regionMergeGap } : {}),
+  });
 
   const receipt = Object.freeze({
-    schemaVersion: "1.1",
+    schemaVersion: "1.2",
     operation: "evavo-detect-existing-image-defects",
     sourceMutation: false,
     approvalState: "proposal-only",
@@ -63,9 +68,11 @@ async function detect(args) {
     receiptPath,
     profile: args.profile ?? null,
     evidence: result.evidence,
-    rule: "This tool proposes defect regions only. It never authorizes automatic destructive repair. Review the overlay and mask before applying polish or localized repair.",
+    regions,
+    rule: "This tool proposes defect regions only. It never authorizes automatic destructive repair. Review the overlay, ranked regions and mask before applying polish or localized repair.",
     reviewRequired: [
-      "Inspect the red overlay and confirm highlighted regions are genuine defects rather than intended antialiasing, texture or pixel-art structure.",
+      "Inspect the red overlay and ranked regions; confirm highlights are genuine defects rather than intended antialiasing, texture or pixel-art structure.",
+      "Review the highest-ranked connected regions first instead of relying on one union bounding box across unrelated defects.",
       "Transparent RGB is edge-aware by default; logo-transparent and product-cutout profiles deliberately use strict whole-canvas hidden-RGB review.",
       "Halo risk uses donor colour distance so dark/black and chromatic matte fringes are reviewed as well as bright/white halos.",
       "Reject any mask that includes important typography, logos, face details, UI text or intentional pixel-art edges without explicit review.",
@@ -80,18 +87,18 @@ async function detect(args) {
     { path: receiptPath, data: receiptPayload, encoding: "utf8" },
   ]);
 
-  return Object.freeze({ ok: true, inputPath, maskPath, overlayPath, receiptPath, evidence: result.evidence, approvalState: "proposal-only", bytesReturned: false });
+  return Object.freeze({ ok: true, inputPath, maskPath, overlayPath, receiptPath, evidence: result.evidence, regions, approvalState: "proposal-only", bytesReturned: false });
 }
 
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_existing_image_defect_detection_capabilities",
-    description: "Describe profile-aware automatic defect-region proposals for existing raster artwork without changing the source.",
+    description: "Describe profile-aware defect proposals with ranked connected review regions for existing raster artwork.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
     name: "evavo_detect_existing_image_defects",
-    description: "Detect suspicious existing-image defects and emit a rollback-safe create-only repair-mask proposal, red overlay and receipt. Uses profile-aware hidden-RGB policy, donor colour-distance matte-fringe detection, alpha pinhole/speck checks and hard alpha-discontinuity checks.",
+    description: "Detect suspicious existing-image defects and emit a rollback-safe mask, overlay and receipt with ranked connected defect regions. Uses profile-aware hidden-RGB policy, donor colour-distance matte-fringe detection and alpha defect checks.",
     inputSchema: {
       type: "object",
       properties: {
@@ -105,6 +112,9 @@ const tools = Object.freeze([
         stairStepMinimumTransitions: { type: "integer", minimum: 2, maximum: 4 },
         maskPadding: { type: "integer", minimum: 0, maximum: 24 },
         maximumMaskCoverageRatio: { type: "number", minimum: 0, maximum: 1 },
+        minimumRegionPixelCount: { type: "integer", minimum: 1, maximum: 1000000 },
+        maximumRegions: { type: "integer", minimum: 1, maximum: 128 },
+        regionMergeGap: { type: "integer", minimum: 0, maximum: 64 },
         confirmLocalWrite: { type: "boolean", const: true },
       },
       required: ["inputPath", "maskPath", "overlayPath", "receiptPath", "confirmLocalWrite"],
@@ -115,7 +125,7 @@ const tools = Object.freeze([
 
 function capabilities() {
   return Object.freeze({
-    contract: "evavo_existing_image_defect_detection_v1_1",
+    contract: "evavo_existing_image_defect_detection_v1_2",
     serverVersion: SERVER_VERSION,
     sourceMutation: false,
     allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
@@ -123,9 +133,11 @@ function capabilities() {
     edgeAwareTransparentRgbDefault: true,
     strictTransparentProfiles: ["logo-transparent", "product-cutout"],
     donorColourDistanceHaloDetection: true,
+    rankedConnectedDefectRegions: true,
+    regionMergeAndNoiseFiltering: true,
     rollbackSafeCreateOnlyOutputBundle: true,
     detects: ["transparent-rgb-contamination", "edge-halo-risk", "alpha-pinhole", "isolated-alpha-speck", "hard-alpha-stair-step"],
-    outputs: ["repair-mask-proposal", "red-defect-overlay", "proposal-only-receipt"],
+    outputs: ["repair-mask-proposal", "red-defect-overlay", "ranked-region-evidence", "proposal-only-receipt"],
     automaticRepairAllowed: false,
   });
 }
