@@ -28,6 +28,8 @@ export interface WorkHeaderCandidateReviewResult {
       minimumCropRetainedRatio: number;
       maximumUpscaleRatio: number;
     }> | null;
+    supportImageSha256: string | null;
+    tileImageSha256: string | null;
     candidates: readonly Readonly<{
       id: string;
       imageSha256: string;
@@ -50,6 +52,7 @@ export interface WorkHeaderCandidateReviewResult {
     visualCritiqueRequired: true;
     currentHeaderBaselineRequiredForReplacement: true;
     critiqueHashBindingRequired: true;
+    surroundingMediaHashBindingRequired: true;
     visualCritiqueDimensions: readonly string[];
   }>;
 }
@@ -138,13 +141,7 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
   if (currentHeaderReview && spec.currentHeader) {
     panels.push(await candidatePanel("current-header", currentHeaderReview.proofPng, currentHeaderReview.evidence.score, currentHeaderReview.evidence.grade, currentHeaderReview.evidence.issues, true));
   }
-  panels.push(...await Promise.all(reviewed.map((item) => candidatePanel(
-    item.evidence.id,
-    item.header.proofPng,
-    item.evidence.technicalScore,
-    item.evidence.technicalGrade,
-    item.evidence.technicalIssues,
-  ))));
+  panels.push(...await Promise.all(reviewed.map((item) => candidatePanel(item.evidence.id, item.header.proofPng, item.evidence.technicalScore, item.evidence.technicalGrade, item.evidence.technicalIssues))));
 
   const panelMeta = await Promise.all(panels.map((panel) => sharp(panel).metadata()));
   const gap = 18;
@@ -175,6 +172,8 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
     proofPng,
     evidence: Object.freeze({
       currentHeader: currentHeaderReview && spec.currentHeader ? baselineEvidence(currentHeaderReview, spec.currentHeader) : null,
+      supportImageSha256: spec.supportImage ? sha256(spec.supportImage) : null,
+      tileImageSha256: spec.tileImage ? sha256(spec.tileImage) : null,
       candidates: Object.freeze(reviewed.map((item) => item.evidence)),
       technicalShortlist: Object.freeze(technicalShortlist),
       creativeWinner: null,
@@ -182,6 +181,7 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
       visualCritiqueRequired: true,
       currentHeaderBaselineRequiredForReplacement: true,
       critiqueHashBindingRequired: true,
+      surroundingMediaHashBindingRequired: true,
       visualCritiqueDimensions: Object.freeze([
         "semantic relevance to the actual case study/project",
         "focal-point strength and immediate readability",
