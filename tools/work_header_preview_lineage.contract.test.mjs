@@ -40,18 +40,23 @@ test("preview admission verifier rejects stale browser metadata, artifact or rem
   ]) assert.ok(source.includes(token), `missing preview reverification token: ${token}`);
 });
 
-test("page render recomputes preview admission before using immutable candidate artifact", async () => {
+test("page render carries responsive browser metadata through approval", async () => {
   const source = await read("./work_header_page_render_review_mcp.mjs");
   for (const token of [
-    'SERVER_VERSION = "1.7.0"',
+    'SERVER_VERSION = "1.8.0"',
     "admitWorkHeaderCandidatePreviewManifest",
+    "browserResponseMetadataRequiredFromAdmission: true",
+    "browserResponseMetadataPersistedInPageReceipt: true",
+    "browserResponseMetadataReverifiedBeforeApprovalPacket: true",
+    "browserResponseBodyIdentityVerified: true",
+    "browserResponseMetadataBound: true",
+    "browserResponseBindings",
+    "page-render Chrome response metadata drifted from the reverified preview admission",
     "immutablePreviewCandidateArtifactRequired: true",
-    "immutablePreviewCandidateArtifactReverifiedBeforePageReview: true",
     "currentRemoteCandidateMustMatchImmutableArtifact: true",
     "selectedLocalCandidateMustMatchPreviewedResponseBytes: true",
     "exactPreviewedCandidateBytesMatchedSelectedCandidate: true",
-    "Selected local candidate bytes do not match immutable candidate bytes preserved by the website preview.",
     "pageRenderProofSha256AndLengthBinding: true",
     "rollbackSafePageReviewEvidenceBundle: true",
-  ]) assert.ok(source.includes(token), `missing page-render immutable-artifact token: ${token}`);
+  ]) assert.ok(source.includes(token), `missing page-render browser-lineage token: ${token}`);
 });
