@@ -63,3 +63,25 @@ test("rejects Work header manifests that omit page-context review", () => {
     /page-context review/u,
   );
 });
+
+test("rejects Work header manifests with a weaker review profile", () => {
+  assert.throws(
+    () => admitEnhancementStudioReviewManifest(manifest({ art_studio_review_profile: "illustration" })),
+    /requires Art Studio profile web-hero/u,
+  );
+});
+
+test("rejects enhancement candidates smaller than the immutable source", () => {
+  assert.throws(
+    () => admitEnhancementStudioReviewManifest(manifest({ candidate_width: 640, candidate_height: 360 })),
+    /cannot be smaller than the immutable source/u,
+  );
+});
+
+test("rejects Work header manifests missing the intended-use reviewer", () => {
+  const tools = manifest().mandatory_art_studio_tools.filter((tool) => tool !== "evavo_review_image_for_intended_use");
+  assert.throws(
+    () => admitEnhancementStudioReviewManifest(manifest({ mandatory_art_studio_tools: tools })),
+    /must require evavo_review_image_for_intended_use/u,
+  );
+});
