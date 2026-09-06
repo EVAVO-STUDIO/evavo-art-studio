@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import type { ImageReviewProfileName } from "./image-review-profiles.js";
 
-export const IMAGE_ARTIFACT_SIGNALS_CONTRACT = "evavo.image-artifact-signals.v1" as const;
+export const IMAGE_ARTIFACT_SIGNALS_CONTRACT = "evavo.image-artifact-signals.v1_1" as const;
 
 export interface ImageArtifactSignalSpec {
   readonly profile?: ImageReviewProfileName;
@@ -20,6 +20,10 @@ export interface ImageArtifactSignals {
   readonly posterizationRisk: boolean;
   readonly nearestNeighbourUpscaleRisk: boolean;
   readonly nearestNeighbourPairAgreement: number;
+  readonly horizontalPairAgreement: number;
+  readonly verticalPairAgreement: number;
+  readonly horizontalPhaseSeparation: number;
+  readonly verticalPhaseSeparation: number;
   readonly warnings: readonly string[];
 }
 
@@ -36,6 +40,7 @@ function integer(value: number | undefined, fallback: number, min: number, max: 
 }
 
 const luma = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+const ratio = (matches: number, count: number) => count ? matches / count : 0;
 
 /** Advisory artifact signals. They never authorize rejection without profile/context review. */
 export async function detectImageArtifactSignals(encoded: Buffer, spec: ImageArtifactSignalSpec = {}): Promise<ImageArtifactSignals> {
@@ -53,8 +58,12 @@ export async function detectImageArtifactSignals(encoded: Buffer, spec: ImageArt
   let lumaSq = 0;
   let horizontalPairMatches = 0;
   let horizontalPairCount = 0;
+  let horizontalCrossPairMatches = 0;
+  let horizontalCrossPairCount = 0;
   let verticalPairMatches = 0;
   let verticalPairCount = 0;
+  let verticalCrossPairMatches = 0;
+  let verticalCrossPairCount = 0;
 
   const index = (x: number, y: number) => (y * width + x) * 4;
   const sampleLuma = (x: number, y: number) => {
@@ -62,7 +71,7 @@ export async function detectImageArtifactSignals(encoded: Buffer, spec: ImageArt
     return luma(raw[i]!, raw[i + 1]!, raw[i + 2]!);
   };
   const visible = (x: number, y: number) => raw[index(x, y) + 3]! >= 128;
-  const sameRgb = (x1: number, y1: number, x2: number, y2: number) => {
+  const sameRgba = (x1: number, y1: number, x2: number, y2: number) => {
     const a = index(x1, y1);
     const b = index(x2, y2);
     return raw[a] === raw[b] && raw[a + 1] === raw[b + 1] && raw[a + 2] === raw[b + 2] && raw[a + 3] === raw[b + 3];
@@ -93,13 +102,26 @@ export async function detectImageArtifactSignals(encoded: Buffer, spec: ImageArt
         if (edgeSpan >= contrastThreshold && Math.abs(lum - neighbourMean) >= contrastThreshold * 0.55 && (lum < Math.min(top, bottom) || lum > Math.max(top, bottom))) ringingCandidatePixels += 1;
       }
 
-      if (x % 2 === 1 && visible(x - 1, y)) {
-        horizontalPairCount += 1;
-        if (sameRgb(x - 1, y, x, y)) horizontalPairMatches += 1;
+      // True 2x nearest-neighbour scaling creates a strong phase pattern:
+      // (0,1), (2,3), ... agree frequently while cross-pair (1,2), (3,4), ...
+      // boundaries agree much less. Large flat areas instead agree on both phases.
+      if (x > 0 && visible(x - 1, y)) {
+        if (x % 2 === 1) {
+          horizontalPairCount += 1;
+          if (sameRgba(x - 1, y, x, y)) horizontalPairMatches += 1;
+        } else {
+          horizontalCrossPairCount += 1;
+          if (sameRgba(x - 1, y, x, y)) horizontalCrossPairMatches += 1;
+        }
       }
-      if (y % 2 === 1 && visible(x, y - 1)) {
-        verticalPairCount += 1;
-        if (sameRgb(x, y - 1, x, y)) verticalPairMatches += 1;
+      if (y > 0 && visible(x, y - 1)) {
+        if (y % 2 === 1) {
+          verticalPairCount += 1;
+          if (sameRgba(x, y - 1, x, y)) verticalPairMatches += 1;
+        } else {
+          verticalCrossPairCount += 1;
+          if (sameRgba(x, y - 1, x, y)) verticalCrossPairMatches += 1;
+        }
       }
     }
   }
@@ -108,17 +130,26 @@ export async function detectImageArtifactSignals(encoded: Buffer, spec: ImageArt
   const mean = visiblePixels ? lumaSum / visiblePixels : 0;
   const stdDev = visiblePixels ? Math.sqrt(Math.max(0, lumaSq / visiblePixels - mean * mean)) : 0;
   const ringingRiskRatio = visiblePixels ? ringingCandidatePixels / visiblePixels : 0;
-  const pairAgreement = Math.max(
-    horizontalPairCount ? horizontalPairMatches / horizontalPairCount : 0,
-    verticalPairCount ? verticalPairMatches / verticalPairCount : 0,
-  );
+  const horizontalPairAgreement = ratio(horizontalPairMatches, horizontalPairCount);
+  const verticalPairAgreement = ratio(verticalPairMatches, verticalPairCount);
+  const horizontalCrossAgreement = ratio(horizontalCrossPairMatches, horizontalCrossPairCount);
+  const verticalCrossAgreement = ratio(verticalCrossPairMatches, verticalCrossPairCount);
+  const horizontalPhaseSeparation = Math.max(0, horizontalPairAgreement - horizontalCrossAgreement);
+  const verticalPhaseSeparation = Math.max(0, verticalPairAgreement - verticalCrossAgreement);
+  const pairAgreement = Math.sqrt(horizontalPairAgreement * verticalPairAgreement);
   const photographicProfile = spec.profile === "photo" || spec.profile === "web-hero" || spec.profile === "ui-screenshot";
   const posterizationRisk = photographicProfile && visiblePixels >= minimumPosterizationPixels && stdDev >= 15 && occupiedLumaBins < 56;
-  const nearestNeighbourUpscaleRisk = photographicProfile && width >= 128 && height >= 128 && pairAgreement > 0.82;
+  const nearestNeighbourUpscaleRisk = photographicProfile
+    && width >= 128
+    && height >= 128
+    && horizontalPairAgreement > 0.84
+    && verticalPairAgreement > 0.84
+    && horizontalPhaseSeparation > 0.24
+    && verticalPhaseSeparation > 0.24;
   const warnings: string[] = [];
   if (ringingRiskRatio > 0.012 && spec.profile !== "pixel-art") warnings.push(`ringing-or-oversharpen-risk:${(ringingRiskRatio * 100).toFixed(3)}%`);
   if (posterizationRisk) warnings.push(`posterization-risk:${occupiedLumaBins}-luma-bins`);
-  if (nearestNeighbourUpscaleRisk) warnings.push(`nearest-neighbour-upscale-fingerprint:${pairAgreement.toFixed(3)}`);
+  if (nearestNeighbourUpscaleRisk) warnings.push(`nearest-neighbour-upscale-fingerprint:${pairAgreement.toFixed(3)}:phase=${horizontalPhaseSeparation.toFixed(3)},${verticalPhaseSeparation.toFixed(3)}`);
 
   return Object.freeze({
     contract: IMAGE_ARTIFACT_SIGNALS_CONTRACT,
@@ -131,6 +162,10 @@ export async function detectImageArtifactSignals(encoded: Buffer, spec: ImageArt
     posterizationRisk,
     nearestNeighbourUpscaleRisk,
     nearestNeighbourPairAgreement: pairAgreement,
+    horizontalPairAgreement,
+    verticalPairAgreement,
+    horizontalPhaseSeparation,
+    verticalPhaseSeparation,
     warnings: Object.freeze(warnings),
   });
 }
