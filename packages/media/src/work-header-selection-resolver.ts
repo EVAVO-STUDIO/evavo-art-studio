@@ -21,6 +21,7 @@ export interface WorkHeaderSelectionResolverResult {
   readonly candidateReviewEvidenceSha256: string;
   readonly recommendation: "retain-current" | "no-acceptable-candidate" | "candidate-recommended" | "needs-current-baseline" | "needs-review-brief";
   readonly recommendedCandidateId: string | null;
+  readonly recommendedCandidateSha256: string | null;
   readonly eligibleCandidateIds: readonly string[];
   readonly rejectedCandidateIds: readonly string[];
   readonly reasons: readonly string[];
@@ -82,7 +83,7 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   if (requireCurrentHeaderBaseline && !spec.currentHeaderCritique) reasons.push("current-header-visual-baseline-required-before-replacement-recommendation");
   if (requireCurrentHeaderBaseline && currentTechnicalScore === null) reasons.push("current-header-technical-baseline-required-before-replacement-recommendation");
 
-  const eligible: Array<{ id: string; score: number; technicalScore: number }> = [];
+  const eligible: Array<{ id: string; sha256: string; score: number; technicalScore: number }> = [];
   const rejected = new Set<string>();
   for (const candidate of spec.candidateReview.candidates) {
     const critique = critiquesById.get(candidate.id);
@@ -96,7 +97,7 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
       reasons.push(`candidate-technically-worse-than-current:${candidate.id}:${candidate.technicalScore}<${currentTechnicalScore - maximumTechnicalDeficitToCurrent}`);
       continue;
     }
-    eligible.push({ id: candidate.id, score: critique.visualScore, technicalScore: candidate.technicalScore });
+    eligible.push({ id: candidate.id, sha256: candidate.imageSha256, score: critique.visualScore, technicalScore: candidate.technicalScore });
   }
 
   eligible.sort((a, b) => b.score - a.score || b.technicalScore - a.technicalScore || a.id.localeCompare(b.id));
@@ -116,22 +117,22 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   };
 
   if (requireSemanticBrief && !semanticBriefProvided) {
-    return Object.freeze({ ...base, recommendation: "needs-review-brief" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
+    return Object.freeze({ ...base, recommendation: "needs-review-brief" as const, recommendedCandidateId: null, recommendedCandidateSha256: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
   }
   if (requireCurrentHeaderBaseline && !currentBaselineComplete) {
-    return Object.freeze({ ...base, recommendation: "needs-current-baseline" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: false });
+    return Object.freeze({ ...base, recommendation: "needs-current-baseline" as const, recommendedCandidateId: null, recommendedCandidateSha256: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: false });
   }
   if (eligible.length === 0) {
     reasons.push("no-candidate-cleared-technical-and-visual-selection-gates");
-    return Object.freeze({ ...base, recommendation: currentBaselineComplete ? "retain-current" as const : "no-acceptable-candidate" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze([]), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
+    return Object.freeze({ ...base, recommendation: currentBaselineComplete ? "retain-current" as const : "no-acceptable-candidate" as const, recommendedCandidateId: null, recommendedCandidateSha256: null, eligibleCandidateIds: Object.freeze([]), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
   }
 
   const best = eligible[0]!;
   if (currentVisualScore !== null && best.score < currentVisualScore + minimumAdvantageOverCurrent) {
     reasons.push(`best-candidate-does-not-beat-current-by-required-margin:${best.score}<${currentVisualScore + minimumAdvantageOverCurrent}`);
-    return Object.freeze({ ...base, recommendation: "retain-current" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
+    return Object.freeze({ ...base, recommendation: "retain-current" as const, recommendedCandidateId: null, recommendedCandidateSha256: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
   }
 
   reasons.push(`candidate-proves-material-comparative-advantage:${best.id}`);
-  return Object.freeze({ ...base, recommendation: "candidate-recommended" as const, recommendedCandidateId: best.id, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
+  return Object.freeze({ ...base, recommendation: "candidate-recommended" as const, recommendedCandidateId: best.id, recommendedCandidateSha256: best.sha256, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
 }
