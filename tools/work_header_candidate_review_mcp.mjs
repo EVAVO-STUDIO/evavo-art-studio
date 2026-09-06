@@ -11,7 +11,7 @@ import {
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-candidate-review";
-const SERVER_VERSION = "1.2.0";
+const SERVER_VERSION = "1.3.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -26,6 +26,25 @@ const writesEnabled = () => ["1", "true", "yes", "on"].includes(String(process.e
 async function optionalBuffer(path) {
   if (!path) return undefined;
   return readFile(await allowed(path, false));
+}
+
+async function readCandidateReviewReceipt(path) {
+  const resolved = await allowed(path, false);
+  const value = JSON.parse(await readFile(resolved, "utf8"));
+  if (value.contract !== "evavo.work-header-candidate-review.v1" || !value.evidence) {
+    throw new Error("candidateReviewReceiptPath must point to an evavo.work-header-candidate-review.v1 receipt.");
+  }
+  return { path: resolved, value };
+}
+
+function hashForCritique(evidence, candidateId) {
+  if (candidateId === "current-header") {
+    if (!evidence.currentHeader?.imageSha256) throw new Error("Candidate review has no current-header hash baseline.");
+    return evidence.currentHeader.imageSha256;
+  }
+  const candidate = evidence.candidates?.find((item) => item.id === candidateId);
+  if (!candidate?.imageSha256) throw new Error(`Candidate review has no hash-bound candidate ${JSON.stringify(candidateId)}.`);
+  return candidate.imageSha256;
 }
 
 async function compareCandidates(args) {
@@ -60,19 +79,28 @@ async function compareCandidates(args) {
     creativeWinner: null,
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
-    nextRequiredAction: "A human or vision-capable agent must inspect the board, critique the current header and shortlisted candidates, then run the conservative selection resolver.",
+    nextRequiredAction: "A human or vision-capable agent must inspect the board, critique the current header and shortlisted candidates against this exact hash-bound receipt, then run the conservative selection resolver.",
   }, null, 2)}\n`, { flag: "wx" });
   return { ok: true, proofPath, receiptPath, evidence: result.evidence };
 }
 
 async function recordCritique(args) {
+  if (typeof args.candidateReviewReceiptPath !== "string") throw new Error("candidateReviewReceiptPath is required.");
   if (typeof args.receiptPath !== "string") throw new Error("receiptPath is required.");
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required.");
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
-  const result = judgeWorkHeaderVisualCritique(args.critique ?? {});
+  if (!args.critique || typeof args.critique.candidateId !== "string") throw new Error("critique.candidateId is required.");
+
+  const board = await readCandidateReviewReceipt(args.candidateReviewReceiptPath);
+  const candidateSha256 = hashForCritique(board.value.evidence, args.critique.candidateId);
+  const result = judgeWorkHeaderVisualCritique({
+    ...args.critique,
+    candidateSha256,
+  });
   const receiptPath = await allowed(args.receiptPath, true);
   await writeFile(receiptPath, `${JSON.stringify({
     ...result,
+    candidateReviewReceiptPath: board.path,
     approvalState: "unapproved",
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
@@ -87,16 +115,13 @@ async function resolveSelection(args) {
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required.");
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
 
-  const candidateReviewReceiptPath = await allowed(args.candidateReviewReceiptPath, false);
-  const candidateReviewReceipt = JSON.parse(await readFile(candidateReviewReceiptPath, "utf8"));
-  if (candidateReviewReceipt.contract !== "evavo.work-header-candidate-review.v1" || !candidateReviewReceipt.evidence) {
-    throw new Error("candidateReviewReceiptPath must point to an evavo.work-header-candidate-review.v1 receipt.");
-  }
+  const board = await readCandidateReviewReceipt(args.candidateReviewReceiptPath);
   const critiques = [];
   for (const path of args.critiqueReceiptPaths) {
     const resolved = await allowed(path, false);
     const value = JSON.parse(await readFile(resolved, "utf8"));
     if (value.contract !== "evavo.work-header-visual-critique.v1") throw new Error(`Critique receipt ${resolved} has an unsupported contract.`);
+    if (value.candidateReviewReceiptPath !== board.path) throw new Error(`Critique receipt ${resolved} is not bound to this candidate review receipt.`);
     critiques.push(value);
   }
   let currentHeaderCritique;
@@ -104,11 +129,12 @@ async function resolveSelection(args) {
     const resolved = await allowed(args.currentHeaderCritiqueReceiptPath, false);
     const value = JSON.parse(await readFile(resolved, "utf8"));
     if (value.contract !== "evavo.work-header-visual-critique.v1") throw new Error("currentHeaderCritiqueReceiptPath must point to an evavo.work-header-visual-critique.v1 receipt.");
+    if (value.candidateReviewReceiptPath !== board.path) throw new Error("Current-header critique is not bound to this candidate review receipt.");
     currentHeaderCritique = value;
   }
 
   const result = resolveWorkHeaderSelection({
-    candidateReview: candidateReviewReceipt.evidence,
+    candidateReview: board.value.evidence,
     critiques,
     currentHeaderCritique,
     minimumVisualScore: args.minimumVisualScore,
@@ -120,6 +146,7 @@ async function resolveSelection(args) {
   const receiptPath = await allowed(args.receiptPath, true);
   await writeFile(receiptPath, `${JSON.stringify({
     ...result,
+    candidateReviewReceiptPath: board.path,
     approvalState: "unapproved",
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
@@ -131,12 +158,12 @@ async function resolveSelection(args) {
 const tools = [
   {
     name: "evavo_work_header_candidate_review_capabilities",
-    description: "Describe comparative Work-header candidate review, explicit visual critique, and conservative retain-current selection policy.",
+    description: "Describe comparative Work-header candidate review, hash-bound visual critique, and conservative retain-current selection policy.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_compare_work_header_candidates",
-    description: "Create a side-by-side responsive crop board for multiple Work-header candidates plus the current header baseline, technically shortlist them, and deliberately refuse to choose a creative winner automatically.",
+    description: "Create a side-by-side responsive crop board for multiple Work-header candidates plus the current header baseline. All candidate/current image hashes are recorded and no creative winner is selected automatically.",
     inputSchema: {
       type: "object",
       properties: {
@@ -162,21 +189,22 @@ const tools = [
   },
   {
     name: "evavo_record_work_header_visual_critique",
-    description: "Record explicit human/vision judgement for one Work-header image after inspecting the proof board. Use candidateId=current-header when critiquing the baseline. Generic, AI-looking, blurry/cheap, damaged-text/logo and failed-mobile-crop flags are hard disqualifiers.",
+    description: "Record visual judgement for one image from an exact candidate-review receipt. The tool binds the critique to that image SHA-256 automatically, preventing stale critique reuse. Use candidateId=current-header for the baseline.",
     inputSchema: {
       type: "object",
       properties: {
+        candidateReviewReceiptPath: { type: "string" },
         critique: { type: "object" },
         receiptPath: { type: "string" },
         confirmLocalWrite: { type: "boolean" },
       },
-      required: ["critique", "receiptPath", "confirmLocalWrite"],
+      required: ["candidateReviewReceiptPath", "critique", "receiptPath", "confirmLocalWrite"],
       additionalProperties: false,
     },
   },
   {
     name: "evavo_resolve_work_header_selection",
-    description: "Resolve technical evidence plus explicit visual critiques into a conservative recommendation. Defaults to retaining the current header unless a candidate proves a material visual advantage without becoming materially technically worse. Never mutates the website or Cloudinary.",
+    description: "Resolve one exact candidate-review receipt plus critiques bound to that same receipt into a conservative recommendation. Retains the current header unless a candidate proves material visual and technical advantage. Never mutates the website or Cloudinary.",
     inputSchema: {
       type: "object",
       properties: {
@@ -204,6 +232,9 @@ function capabilities() {
     writesEnabled: writesEnabled(),
     comparativeResponsiveProofBoard: true,
     currentHeaderTechnicalBaselineInProofBoard: true,
+    candidateAndCurrentImageSha256Evidence: true,
+    visualCritiqueHashBindingRequired: true,
+    critiqueReceiptMustMatchCandidateReviewReceipt: true,
     technicalShortlistingOnly: true,
     explicitVisualCritiqueRequired: true,
     conservativeSelectionResolverAvailable: true,
