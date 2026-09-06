@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import readline from "node:readline";
 
 import {
@@ -10,6 +10,7 @@ import {
   prepareWorkHeaderApprovalPacket,
   reviewWorkHeaderPageRender,
 } from "../packages/media/dist/index.js";
+import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-page-render-review";
@@ -172,8 +173,7 @@ async function runPageReview(args) {
     currentMobile: { path: preview.screenshots.currentMobile.path, sha256: preview.screenshots.currentMobile.sha256 },
     candidateMobile: { path: preview.screenshots.candidateMobile.path, sha256: preview.screenshots.candidateMobile.sha256 },
   };
-  await writeFile(proofPath, result.proofPng, { flag: "wx" });
-  await writeFile(receiptPath, `${JSON.stringify({
+  const pageReceipt = {
     contract: "evavo.work-header-page-render-review.v2",
     selectionReceiptPath: selection.path,
     selectionReceiptSha256: selection.sha256,
@@ -192,7 +192,11 @@ async function runPageReview(args) {
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
     websiteMutationAllowed: false,
-  }, null, 2)}\n`, { flag: "wx" });
+  };
+  await writeCreateOnlyBundle([
+    { path: proofPath, data: result.proofPng },
+    { path: receiptPath, data: `${JSON.stringify(pageReceipt, null, 2)}\n`, encoding: "utf8" },
+  ]);
   return { ok: true, proofPath, receiptPath, previewAdmissionReceiptPath: preview.path, evidence: result.evidence };
 }
 
@@ -230,7 +234,7 @@ async function runApprovalPacket(args) {
   if (page.value.selectionReceiptSha256 !== selection.sha256 || page.value.selectionReceiptPath !== selection.path) throw new Error("Page-render receipt was created for a different selection receipt.");
   const packet = prepareWorkHeaderApprovalPacket({ selection: selection.value, pageRender: page.value.evidence });
   const receiptPath = await allowed(args.receiptPath, true);
-  await writeFile(receiptPath, `${JSON.stringify({
+  const approvalReceipt = {
     ...packet,
     selectionReceiptPath: selection.path,
     selectionReceiptSha256: selection.sha256,
@@ -247,7 +251,8 @@ async function runApprovalPacket(args) {
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
     websiteMutationAllowed: false,
-  }, null, 2)}\n`, { flag: "wx" });
+  };
+  await writeCreateOnlyBundle([{ path: receiptPath, data: `${JSON.stringify(approvalReceipt, null, 2)}\n`, encoding: "utf8" }]);
   return { ok: true, receiptPath, packet };
 }
 
@@ -288,6 +293,8 @@ function capabilities() {
     previewAdmissionReceiptReverifiedBeforePageReview: true,
     previewAdmissionReceiptReverifiedBeforeApprovalPacket: true,
     rawCallerScreenshotPathsAccepted: false,
+    rollbackSafePageReviewEvidenceBundle: true,
+    rollbackSafeApprovalReceiptWrite: true,
     candidateReviewLineageReverified: true,
     selectionLineageReverified: true,
     currentPageQualityBaselineRequired: true,
