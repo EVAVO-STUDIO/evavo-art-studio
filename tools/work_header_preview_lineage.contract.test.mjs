@@ -33,14 +33,18 @@ test("preview admission verifier rejects stale artifact or remote source", async
   ]) assert.ok(source.includes(token), `missing preview reverification token: ${token}`);
 });
 
-test("page render still requires exact local candidate to equal previewed bytes", async () => {
+test("page render re-verifies immutable preview candidate artifact", async () => {
   const source = await read("./work_header_page_render_review_mcp.mjs");
   for (const token of [
-    'SERVER_VERSION = "1.6.0"',
+    'SERVER_VERSION = "1.7.0"',
+    "immutablePreviewCandidateArtifactRequired: true",
+    "immutablePreviewCandidateArtifactReverifiedBeforePageReview: true",
+    "currentRemoteCandidateMustMatchImmutableArtifact: true",
     "selectedLocalCandidateMustMatchPreviewedResponseBytes: true",
     "exactPreviewedCandidateBytesMatchedSelectedCandidate: true",
-    "Selected local candidate bytes do not match the exact candidate bytes previewed by the website.",
+    "Selected local candidate bytes do not match immutable candidate bytes preserved by the website preview.",
+    "immutablePreviewCandidateArtifact",
     "pageRenderProofSha256AndLengthBinding: true",
     "rollbackSafePageReviewEvidenceBundle: true",
-  ]) assert.ok(source.includes(token), `missing page-render exact-byte token: ${token}`);
+  ]) assert.ok(source.includes(token), `missing page-render immutable-artifact token: ${token}`);
 });
