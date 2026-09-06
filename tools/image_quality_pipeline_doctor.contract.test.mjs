@@ -4,11 +4,11 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers preservation review finishing and fail-closed enhancement admission", async () => {
+test("image quality doctor covers preservation review finishing and re-verifiable enhancement admission", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_6"',
-    'SERVER_VERSION = "1.6.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_7"',
+    'SERVER_VERSION = "1.7.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -45,20 +45,21 @@ test("MCP configuration exposes quality doctor durable review finishing plan and
   ]) assert.ok(config.includes(token), `missing MCP registration token: ${token}`);
 });
 
-test("doctor verifies enhancement schema digest geometry and authority boundaries", async () => {
+test("doctor verifies enhancement schema geometry proof binding and stale evidence rejection", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
     "contracts/art-studio-enhancement-review-v1.schema.json",
     "evavo.enhancement-art-review.v1",
     '"schema_sha256"',
-    '"durable_image_review_session_required"',
-    '"publication_allowed"',
-    '"cloud_overwrite_allowed"',
     "candidateAspectRatioRelativeDrift",
     "ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT",
     "admitEnhancementStudioReviewManifest(manifest)",
     "manifestAdmissionBeforeManifestPathReads: true",
     "exactManifestSchemaDigestRequired: true",
+    "proofSha256AndLengthBound: true",
+    "enhancementReviewSessionReverificationAvailable: true",
+    "evavo_verify_enhancement_review_session",
+    "staleManifestSourceCandidateOrProofEvidenceRejected: true",
   ]) assert.ok(source.includes(token), `missing enhancement-schema/session doctor token: ${token}`);
 });
 
