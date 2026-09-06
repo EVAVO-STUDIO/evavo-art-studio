@@ -5,6 +5,13 @@ import { resolveWorkHeaderSelection } from "../dist/index.js";
 
 function candidateReview(overrides = {}) {
   return {
+    currentHeader: {
+      technicalScore: 90,
+      technicalGrade: "pass",
+      technicalIssues: [],
+      minimumCropRetainedRatio: 0.74,
+      maximumUpscaleRatio: 1,
+    },
     candidates: [
       {
         id: "a",
@@ -41,6 +48,7 @@ function candidateReview(overrides = {}) {
     creativeWinner: null,
     finalSelectionAllowed: false,
     visualCritiqueRequired: true,
+    currentHeaderBaselineRequiredForReplacement: true,
     visualCritiqueDimensions: ["semantic relevance"],
     ...overrides,
   };
@@ -64,17 +72,18 @@ function critique(candidateId, visualScore, overrides = {}) {
   };
 }
 
-test("requires a current-header baseline by default before recommending replacement", () => {
+test("requires both current-header technical and visual baselines by default", () => {
   const result = resolveWorkHeaderSelection({
-    candidateReview: candidateReview(),
+    candidateReview: candidateReview({ currentHeader: null }),
     critiques: [critique("a", 91), critique("b", 86)],
   });
   assert.equal(result.recommendation, "needs-current-baseline");
   assert.equal(result.recommendedCandidateId, null);
+  assert.equal(result.currentHeaderTechnicalScore, null);
   assert.equal(result.automaticWebsiteMutationAllowed, false);
 });
 
-test("retains current header when best candidate does not beat it by required margin", () => {
+test("retains current header when best candidate does not beat it by required visual margin", () => {
   const result = resolveWorkHeaderSelection({
     candidateReview: candidateReview(),
     critiques: [critique("a", 90), critique("b", 86)],
@@ -94,8 +103,22 @@ test("recommends candidate only after material comparative advantage", () => {
   });
   assert.equal(result.recommendation, "candidate-recommended");
   assert.equal(result.recommendedCandidateId, "a");
+  assert.equal(result.currentHeaderTechnicalScore, 90);
   assert.equal(result.finalHumanApprovalRequired, true);
   assert.equal(result.automaticPublicationAllowed, false);
+});
+
+test("rejects candidate that is materially technically worse than the current header", () => {
+  const review = candidateReview();
+  review.candidates[0].technicalScore = 82;
+  const result = resolveWorkHeaderSelection({
+    candidateReview: review,
+    critiques: [critique("a", 98), critique("b", 86)],
+    currentHeaderCritique: critique("current", 80),
+    maximumTechnicalDeficitToCurrent: 3,
+  });
+  assert.ok(result.rejectedCandidateIds.includes("a"));
+  assert.ok(result.reasons.some((reason) => reason.startsWith("candidate-technically-worse-than-current:a")));
 });
 
 test("rejects near-duplicate support imagery even when visually strong", () => {
