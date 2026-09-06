@@ -1,21 +1,23 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import readline from "node:readline";
 
 import { admitWorkHeaderCandidatePreviewManifest } from "../packages/media/dist/index.js";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-preview-admission";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
-const allowed = (path) => assertAllowedLocalPath(path, { envName: ROOTS_ENV, output: false, label: "work header preview admission" });
+const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
+const allowed = (path, output = false) => assertAllowedLocalPath(path, { envName: ROOTS_ENV, output, label: "work header preview admission" });
+const writesEnabled = () => ["1", "true", "yes", "on"].includes(String(process.env[WRITES_ENV] ?? "").toLowerCase());
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
 async function readBound(path) {
-  const resolved = await allowed(path);
+  const resolved = await allowed(path, false);
   const bytes = await readFile(resolved);
   return { path: resolved, bytes, sha256: sha256(bytes) };
 }
@@ -27,7 +29,11 @@ function captureByProfile(manifest, profile) {
 }
 
 async function admit(args) {
-  if (typeof args.manifestPath !== "string") throw new Error("manifestPath is required.");
+  if (typeof args.manifestPath !== "string" || typeof args.receiptPath !== "string") throw new Error("manifestPath and receiptPath are required.");
+  if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required.");
+  if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
+
+  const receiptPath = await allowed(args.receiptPath, true);
   const manifestFile = await readBound(args.manifestPath);
   const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
   const desktop = captureByProfile(manifest, "desktop");
@@ -46,38 +52,46 @@ async function admit(args) {
     currentMobile: currentMobile.bytes,
     candidateMobile: candidateMobile.bytes,
   });
-
-  return {
-    ok: true,
+  const screenshotBindings = {
+    currentDesktop: { path: currentDesktop.path, sha256: currentDesktop.sha256, bytes: currentDesktop.bytes.length },
+    candidateDesktop: { path: candidateDesktop.path, sha256: candidateDesktop.sha256, bytes: candidateDesktop.bytes.length },
+    currentMobile: { path: currentMobile.path, sha256: currentMobile.sha256, bytes: currentMobile.bytes.length },
+    candidateMobile: { path: candidateMobile.path, sha256: candidateMobile.sha256, bytes: candidateMobile.bytes.length },
+  };
+  const receipt = {
+    contract: "evavo.work-header-preview-admission.v1",
+    previewContract: manifest.contract,
     manifestPath: manifestFile.path,
     manifestSha256: manifestFile.sha256,
     admission,
-    verifiedScreenshotBindings: {
-      currentDesktop: { path: currentDesktop.path, sha256: currentDesktop.sha256 },
-      candidateDesktop: { path: candidateDesktop.path, sha256: candidateDesktop.sha256 },
-      currentMobile: { path: currentMobile.path, sha256: currentMobile.sha256 },
-      candidateMobile: { path: candidateMobile.path, sha256: candidateMobile.sha256 },
-    },
-    nextRequiredAction: "Use only this exact admitted preview evidence for candidate page-render review; any manifest or screenshot byte change requires a fresh admission.",
+    screenshotBindings,
+    approvalState: "unapproved",
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
     websiteMutationAllowed: false,
+    nextRequiredAction: "Use this exact admission receipt for candidate page-render review. Any manifest or screenshot byte change requires a fresh admission.",
   };
+  await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+  return { ok: true, receiptPath, receiptSha256: sha256(Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8")), admission, screenshotBindings };
 }
 
 const tools = [
   {
     name: "evavo_work_header_preview_admission_capabilities",
-    description: "Describe read-only admission of next-website Work-header candidate preview v3 evidence into Art Studio.",
+    description: "Describe durable, source-bound admission of next-website Work-header candidate preview v3 evidence into Art Studio.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_admit_work_header_candidate_preview",
-    description: "Re-read a next-website candidate-preview v3 manifest and all desktop/mobile screenshots, verify source identity, screenshot SHA-256/length, responsive consistency and non-destructive boundaries, then admit it only as review evidence.",
+    description: "Re-read candidate-preview v3 evidence, reverify source identity and all screenshots, then write a create-only admission receipt required by page-render review.",
     inputSchema: {
       type: "object",
-      properties: { manifestPath: { type: "string" } },
-      required: ["manifestPath"],
+      properties: {
+        manifestPath: { type: "string" },
+        receiptPath: { type: "string" },
+        confirmLocalWrite: { type: "boolean" },
+      },
+      required: ["manifestPath", "receiptPath", "confirmLocalWrite"],
       additionalProperties: false,
     },
   },
@@ -86,8 +100,12 @@ const tools = [
 function capabilities() {
   return {
     contract: "evavo.work-header-preview-admission.v1",
+    serverVersion: SERVER_VERSION,
     acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v3",
+    durableAdmissionReceiptAvailable: true,
+    createOnlyReceiptWrite: true,
     manifestSha256Bound: true,
+    screenshotPathSha256AndLengthBound: true,
     screenshotSha256Reverification: true,
     responsiveCandidateSourceIdentityRequired: true,
     candidateRenderDifferenceRequired: true,
@@ -97,6 +115,7 @@ function capabilities() {
     cloudOverwriteAllowed: false,
     websiteMutationAllowed: false,
     allowedRootCount: configuredLocalRootCount(ROOTS_ENV),
+    writesEnabled: writesEnabled(),
   };
 }
 
