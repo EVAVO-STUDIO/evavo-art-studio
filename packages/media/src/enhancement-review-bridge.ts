@@ -3,15 +3,7 @@ import type { ImageReviewProfileName } from "./image-review-profiles.js";
 export const ENHANCEMENT_ART_REVIEW_CONTRACT = "evavo.enhancement-art-review.v1" as const;
 
 const REVIEW_PROFILES = new Set<ImageReviewProfileName>([
-  "logo-transparent",
-  "web-hero",
-  "ui-screenshot",
-  "product-cutout",
-  "photo",
-  "cel-animation-frame",
-  "pixel-art",
-  "texture",
-  "illustration",
+  "logo-transparent", "web-hero", "ui-screenshot", "product-cutout", "photo", "cel-animation-frame", "pixel-art", "texture", "illustration",
 ]);
 
 export interface EnhancementStudioReviewManifest {
@@ -37,6 +29,7 @@ export interface EnhancementStudioReviewManifest {
   readonly page_context_review_required: boolean;
   readonly comparative_candidate_review_required?: boolean;
   readonly current_header_baseline_required?: boolean;
+  readonly semantic_review_brief_required?: boolean;
   readonly publication_allowed: boolean;
   readonly cloud_overwrite_allowed: boolean;
   readonly automatic_creative_approval: boolean;
@@ -52,6 +45,7 @@ export interface AdmittedEnhancementStudioReview {
   readonly pageContextReviewRequired: boolean;
   readonly comparativeCandidateReviewRequired: boolean;
   readonly currentHeaderBaselineRequired: boolean;
+  readonly semanticReviewBriefRequired: boolean;
   readonly requiredTools: readonly string[];
   readonly visualChecks: readonly string[];
   readonly publicationAllowed: false;
@@ -60,24 +54,11 @@ export interface AdmittedEnhancementStudioReview {
 }
 
 const ROLE_MAP: Readonly<Record<string, AdmittedEnhancementStudioReview["intendedRole"]>> = Object.freeze({
-  "work-header": "work-header",
-  "support-image": "support-image",
-  "catalogue-tile": "tile",
-  logo: "logo",
-  ui: "ui",
-  photo: "photo",
-  sprite: "sprite",
-  illustration: "illustration",
-  texture: "texture",
+  "work-header": "work-header", "support-image": "support-image", "catalogue-tile": "tile", logo: "logo", ui: "ui", photo: "photo", sprite: "sprite", illustration: "illustration", texture: "texture",
 });
 
 const REQUIRED_ROLE_PROFILE: Readonly<Partial<Record<AdmittedEnhancementStudioReview["intendedRole"], ImageReviewProfileName>>> = Object.freeze({
-  "work-header": "web-hero",
-  logo: "logo-transparent",
-  ui: "ui-screenshot",
-  photo: "photo",
-  sprite: "pixel-art",
-  texture: "texture",
+  "work-header": "web-hero", logo: "logo-transparent", ui: "ui-screenshot", photo: "photo", sprite: "pixel-art", texture: "texture",
 });
 
 function sha(value: unknown, label: string): string {
@@ -128,6 +109,7 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
   if (role === "work-header") {
     if (value.comparative_candidate_review_required !== true) throw new Error("Work-header enhancement candidates must require comparative candidate review.");
     if (value.current_header_baseline_required !== true) throw new Error("Work-header enhancement candidates must require current-header baseline review before replacement recommendation.");
+    if (value.semantic_review_brief_required !== true) throw new Error("Work-header enhancement candidates must require a semantic project review brief before replacement recommendation.");
     for (const tool of [
       "evavo_review_work_header_image",
       "evavo_review_image_for_intended_use",
@@ -149,6 +131,7 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
     pageContextReviewRequired: value.page_context_review_required === true,
     comparativeCandidateReviewRequired: value.comparative_candidate_review_required === true,
     currentHeaderBaselineRequired: value.current_header_baseline_required === true,
+    semanticReviewBriefRequired: value.semantic_review_brief_required === true,
     requiredTools,
     visualChecks,
     publicationAllowed: false,
