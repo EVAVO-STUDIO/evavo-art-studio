@@ -12,6 +12,7 @@ export interface EnhancementReviewSessionSpec {
   readonly manifest: EnhancementStudioReviewManifest;
   readonly source: Buffer;
   readonly candidate: Buffer;
+  readonly header?: Buffer;
   readonly support?: Buffer;
   readonly tile?: Buffer;
   readonly desktopScreenshot?: Buffer;
@@ -69,7 +70,7 @@ async function sourceSpaceCandidate(source: Buffer, candidate: Buffer): Promise<
  * Runs the full Art Studio receiving review for an Enhancement Studio candidate.
  * It verifies the source-bound manifest, inspects the candidate at native size,
  * projects enlarged candidates back to source space for regression evidence, and
- * optionally judges actual Work-page context. No technical outcome can publish.
+ * judges actual Work-page context when the candidate is website media.
  */
 export async function reviewEnhancementStudioCandidate(
   spec: EnhancementReviewSessionSpec,
@@ -86,6 +87,7 @@ export async function reviewEnhancementStudioCandidate(
   if (!sourceDimensionsVerified || !candidateDimensionsVerified) throw new Error("Enhancement Studio manifest dimensions do not match physical image dimensions.");
 
   const compareAgainst = [
+    ...(spec.header ? [{ id: "current-header", image: spec.header }] : []),
     ...(spec.support ? [{ id: "support-image", image: spec.support }] : []),
     ...(spec.tile ? [{ id: "work-tile", image: spec.tile }] : []),
   ];
@@ -118,6 +120,28 @@ export async function reviewEnhancementStudioCandidate(
       });
       pageContextReview = page.evidence;
       pageProofPng = page.proofPng;
+    } else if (admitted.intendedRole === "support-image" && spec.header) {
+      const page = await createWorkPageMediaReviewBundle({
+        pageSlug: "enhancement-review",
+        header: spec.header,
+        support: spec.candidate,
+        tile: spec.tile,
+        desktopScreenshot: spec.desktopScreenshot,
+        mobileScreenshot: spec.mobileScreenshot,
+      });
+      pageContextReview = page.evidence;
+      pageProofPng = page.proofPng;
+    } else if (admitted.intendedRole === "tile" && spec.header) {
+      const page = await createWorkPageMediaReviewBundle({
+        pageSlug: "enhancement-review",
+        header: spec.header,
+        support: spec.support,
+        tile: spec.candidate,
+        desktopScreenshot: spec.desktopScreenshot,
+        mobileScreenshot: spec.mobileScreenshot,
+      });
+      pageContextReview = page.evidence;
+      pageProofPng = page.proofPng;
     }
   }
 
@@ -132,9 +156,10 @@ export async function reviewEnhancementStudioCandidate(
     ...(pageContextReview?.warnings ?? []).map((item) => `page:${item}`),
   ];
 
-  if (admitted.pageContextReviewRequired && admitted.intendedRole === "work-header") {
+  if (admitted.pageContextReviewRequired) {
     if (!spec.desktopScreenshot) warnings.push("desktop-page-context-missing");
     if (!spec.mobileScreenshot) warnings.push("mobile-page-context-missing");
+    if (admitted.intendedRole !== "work-header" && !spec.header) warnings.push("current-header-missing-for-page-media-context-review");
   }
   if (admitted.learnedCandidate) warnings.push("learned-enhancement-requires-invented-detail-and-texture-hallucination-review");
 
