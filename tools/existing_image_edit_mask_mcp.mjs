@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
-import sharp from "../packages/media/node_modules/sharp/lib/index.js";
 
-import { createEditMask } from "../packages/media/dist/index.js";
+import { createEditMask, readRasterImageDimensions } from "../packages/media/dist/index.js";
+import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-existing-image-edit-mask";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const ALLOW_WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -28,28 +28,27 @@ function admit(args) {
 
 async function createMask(args) {
   admit(args);
-  if (typeof args.sourcePath !== "string" || typeof args.outputPath !== "string") {
-    throw new Error("sourcePath and outputPath are required.");
-  }
+  if (typeof args.sourcePath !== "string" || typeof args.outputPath !== "string") throw new Error("sourcePath and outputPath are required.");
   if (!Array.isArray(args.regions)) throw new Error("regions is required.");
   const sourcePath = await assertAllowed(args.sourcePath);
   const outputPath = await assertAllowed(args.outputPath, { output: true });
   if (path.resolve(sourcePath) === path.resolve(outputPath)) throw new Error("Mask output must differ from the source image.");
-  const meta = await sharp(await readFile(sourcePath)).metadata();
-  if (!meta.width || !meta.height) throw new Error("Source image has no dimensions.");
+
+  const sourceBytes = await readFile(sourcePath);
+  const meta = await readRasterImageDimensions(sourceBytes);
+  if (meta.pages !== 1) throw new Error("Localized edit-mask authoring requires a single-frame raster source.");
   const result = await createEditMask(meta.width, meta.height, args.regions);
   const maximumCoverageRatio = typeof args.maximumCoverageRatio === "number" ? args.maximumCoverageRatio : 0.25;
+  if (!Number.isFinite(maximumCoverageRatio) || maximumCoverageRatio <= 0 || maximumCoverageRatio > 1) throw new Error("maximumCoverageRatio must be greater than 0 and no more than 1.");
   if (result.evidence.coverageRatio > maximumCoverageRatio) {
-    throw new Error(
-      `Edit mask covers ${(result.evidence.coverageRatio * 100).toFixed(2)}% of the image; maximum allowed is ${(maximumCoverageRatio * 100).toFixed(2)}%.`,
-    );
+    throw new Error(`Edit mask covers ${(result.evidence.coverageRatio * 100).toFixed(2)}% of the image; maximum allowed is ${(maximumCoverageRatio * 100).toFixed(2)}%.`);
   }
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, result.png, { flag: "wx" });
+  await writeCreateOnlyBundle([{ path: outputPath, data: result.png }]);
   return Object.freeze({
     ok: true,
     sourcePath,
     outputPath,
+    sourceDimensions: { width: meta.width, height: meta.height },
     maximumCoverageRatio,
     evidence: result.evidence,
     bytesReturned: false,
@@ -64,7 +63,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_create_existing_image_edit_mask",
-    description: "Create a same-size monochrome repair mask from bounded rectangle/ellipse regions on an existing image. Supports per-region padding and a maximum total coverage gate so agents can authorize only the defect area before retouching or inpainting.",
+    description: "Create a same-size monochrome repair mask from bounded rectangle/ellipse regions on an existing image. Uses package-owned dimension decoding, per-region padding and a maximum total coverage gate, then writes the mask create-only.",
     inputSchema: {
       type: "object",
       properties: {
@@ -99,8 +98,12 @@ const tools = Object.freeze([
 
 function capabilities() {
   return Object.freeze({
-    contract: "evavo_existing_image_edit_mask_v1",
+    contract: "evavo_existing_image_edit_mask_v1_1",
+    serverVersion: SERVER_VERSION,
     sourceOverwrite: false,
+    packageOwnedDimensionReader: true,
+    fragilePackageNodeModulesImportRemoved: true,
+    createOnlyOutputWrite: true,
     allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
     shapes: ["rectangle", "ellipse"],
     operations: ["same-size-mask", "bounded-region-validation", "padding", "mask-union", "maximum-coverage-gate"]
