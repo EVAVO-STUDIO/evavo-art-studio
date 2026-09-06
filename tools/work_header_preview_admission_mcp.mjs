@@ -9,10 +9,11 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-preview-admission";
-const SERVER_VERSION = "1.3.0";
+const SERVER_VERSION = "1.4.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
+const MAX_CANDIDATE_BYTES = 80 * 1024 * 1024;
 const allowed = (filePath, output = false) => assertAllowedLocalPath(filePath, { envName: ROOTS_ENV, output, label: "work header preview admission" });
 const writesEnabled = () => ["1", "true", "yes", "on"].includes(String(process.env[WRITES_ENV] ?? "").toLowerCase());
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
@@ -22,6 +23,24 @@ async function readBound(filePath) {
   const bytes = await readFile(resolved);
   if (!bytes.length) throw new Error(`Evidence file is empty: ${resolved}`);
   return { path: resolved, bytes, sha256: sha256(bytes), byteLength: bytes.length };
+}
+
+async function fetchCandidateContent(url) {
+  if (typeof url !== "string" || !/^https?:\/\//u.test(url)) throw new Error("Preview candidate URL is invalid.");
+  const response = await fetch(url, {
+    method: "GET",
+    redirect: "follow",
+    cache: "no-store",
+    headers: { "cache-control": "no-cache", pragma: "no-cache", accept: "image/*,*/*;q=0.1" },
+  });
+  if (!response.ok) throw new Error(`Preview candidate byte reverification failed with HTTP ${response.status}.`);
+  const contentType = String(response.headers.get("content-type") ?? "").toLowerCase();
+  if (!contentType.startsWith("image/")) throw new Error("Preview candidate byte reverification returned non-image content.");
+  const advertisedLength = Number(response.headers.get("content-length") ?? 0);
+  if (Number.isFinite(advertisedLength) && advertisedLength > MAX_CANDIDATE_BYTES) throw new Error("Preview candidate is too large for governed byte reverification.");
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (!bytes.length || bytes.length > MAX_CANDIDATE_BYTES) throw new Error("Preview candidate bytes are empty or exceed the governed review limit.");
+  return Object.freeze({ bytes, sha256: sha256(bytes), byteLength: bytes.length, contentType });
 }
 
 function captureByProfile(manifest, profile) {
@@ -59,12 +78,13 @@ async function readAndVerifyScreenshots(manifest, receiptBindings = null) {
   return files;
 }
 
-function buffersFrom(files) {
+function buffersFrom(files, candidateContent) {
   return {
     currentDesktop: files.currentDesktop.bytes,
     candidateDesktop: files.candidateDesktop.bytes,
     currentMobile: files.currentMobile.bytes,
     candidateMobile: files.candidateMobile.bytes,
+    candidateContent: candidateContent.bytes,
   };
 }
 
@@ -74,6 +94,8 @@ function assertAdmissionEquivalent(expected, current) {
     "candidateId",
     "candidateSrc",
     "candidateSourceUrlSha256",
+    "candidateContentSha256",
+    "candidateContentByteLength",
     "naturalWidth",
     "naturalHeight",
   ]) {
@@ -81,6 +103,7 @@ function assertAdmissionEquivalent(expected, current) {
   }
   for (const key of [
     "screenshotHashesVerified",
+    "candidateContentBytesVerified",
     "responsiveSourceIdentityVerified",
     "browserOnlyPreviewVerified",
     "candidateRenderDifferenceVerified",
@@ -116,7 +139,11 @@ async function verifyReceipt(receiptPath) {
   }
   const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
   const screenshots = await readAndVerifyScreenshots(manifest, value.screenshotBindings ?? {});
-  const readmission = admitWorkHeaderCandidatePreviewManifest(manifest, buffersFrom(screenshots));
+  const candidateContent = await fetchCandidateContent(manifest.candidateSrc);
+  if (!value.candidateContentBinding || candidateContent.sha256 !== value.candidateContentBinding.sha256 || candidateContent.byteLength !== value.candidateContentBinding.byteLength) {
+    throw new Error("Preview candidate response bytes changed after Art Studio admission.");
+  }
+  const readmission = admitWorkHeaderCandidatePreviewManifest(manifest, buffersFrom(screenshots, candidateContent));
   assertAdmissionEquivalent(value.admission, readmission);
 
   return Object.freeze({
@@ -127,7 +154,9 @@ async function verifyReceipt(receiptPath) {
     manifestPath: manifestFile.path,
     manifestSha256: manifestFile.sha256,
     manifestByteLength: manifestFile.byteLength,
-    manifestAndScreenshotBindingsVerified: true,
+    candidateContentSha256: candidateContent.sha256,
+    candidateContentByteLength: candidateContent.byteLength,
+    manifestScreenshotAndCandidateBindingsVerified: true,
     atomicPreviewEvidenceBundleVerified: true,
     admissionRecomputedAndMatched: true,
     route: readmission.route,
@@ -149,9 +178,11 @@ async function admit(args) {
   const manifestFile = await readBound(args.manifestPath);
   const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
   const screenshots = await readAndVerifyScreenshots(manifest);
-  const admission = admitWorkHeaderCandidatePreviewManifest(manifest, buffersFrom(screenshots));
-  if (admission.atomicEvidenceBundleVerified !== true) throw new Error("Candidate preview did not prove one rollback-safe atomic evidence bundle.");
+  const candidateContent = await fetchCandidateContent(manifest.candidateSrc);
+  const admission = admitWorkHeaderCandidatePreviewManifest(manifest, buffersFrom(screenshots, candidateContent));
+  if (admission.atomicEvidenceBundleVerified !== true || admission.candidateContentBytesVerified !== true) throw new Error("Candidate preview did not prove one rollback-safe atomic bundle bound to exact candidate bytes.");
   const screenshotBindings = Object.fromEntries(Object.entries(screenshots).map(([label, file]) => [label, { path: file.path, sha256: file.sha256, bytes: file.byteLength }]));
+  const candidateContentBinding = { url: manifest.candidateSrc, sha256: candidateContent.sha256, byteLength: candidateContent.byteLength, contentType: candidateContent.contentType };
   const receipt = {
     contract: "evavo.work-header-preview-admission.v1",
     previewContract: manifest.contract,
@@ -160,27 +191,29 @@ async function admit(args) {
     manifestByteLength: manifestFile.byteLength,
     admission,
     screenshotBindings,
+    candidateContentBinding,
     atomicPreviewEvidenceBundleVerified: true,
+    exactCandidateResponseBytesVerified: true,
     approvalState: "unapproved",
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
     websiteMutationAllowed: false,
-    nextRequiredAction: "Reverify this exact admission receipt before candidate page-render review. Any manifest or screenshot byte change requires a fresh admission.",
+    nextRequiredAction: "Reverify this exact admission receipt before candidate page-render review. Any manifest, screenshot or candidate response byte change requires a fresh admission.",
   };
   const payload = `${JSON.stringify(receipt, null, 2)}\n`;
   await writeCreateOnlyBundle([{ path: receiptPath, data: payload, encoding: "utf8" }]);
-  return { ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), admission, screenshotBindings, atomicPreviewEvidenceBundleVerified: true };
+  return { ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), admission, screenshotBindings, candidateContentBinding, atomicPreviewEvidenceBundleVerified: true, exactCandidateResponseBytesVerified: true };
 }
 
 const tools = [
   {
     name: "evavo_work_header_preview_admission_capabilities",
-    description: "Describe durable and re-verifiable admission of rollback-safe next-website Work-header candidate preview v4 evidence into Art Studio.",
+    description: "Describe durable and re-verifiable admission of exact-byte-bound next-website Work-header candidate preview v5 evidence into Art Studio.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_admit_work_header_candidate_preview",
-    description: "Re-read candidate-preview v4 evidence, require one create-only rollback-safe screenshot+manifest bundle, reverify source identity and all screenshots, then write a create-only admission receipt required by page-render review.",
+    description: "Re-read candidate-preview v5 evidence, re-fetch and SHA-bind the exact candidate response bytes, require one create-only rollback-safe screenshot+manifest bundle, then write a create-only admission receipt required by page-render review.",
     inputSchema: {
       type: "object",
       properties: { manifestPath: { type: "string" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } },
@@ -190,7 +223,7 @@ const tools = [
   },
   {
     name: "evavo_verify_work_header_preview_admission",
-    description: "Read-only reverification of a Work-header preview-admission receipt against its exact manifest bytes, all four screenshot SHA-256/length bindings, preview v4 atomic-bundle evidence and recomputed Art Studio admission invariants.",
+    description: "Read-only reverification of a Work-header preview-admission receipt against exact manifest bytes, all four screenshot SHA-256/length bindings, current candidate response SHA-256/length, preview v5 atomic-bundle evidence and recomputed Art Studio admission invariants.",
     inputSchema: {
       type: "object",
       properties: { receiptPath: { type: "string", minLength: 1 } },
@@ -204,11 +237,15 @@ function capabilities() {
   return {
     contract: "evavo.work-header-preview-admission.v1",
     serverVersion: SERVER_VERSION,
-    acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v4",
+    acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v5",
     atomicPreviewEvidenceBundleRequired: true,
+    exactCandidateResponseBytesRequired: true,
+    candidateContentSha256AndLengthBound: true,
+    candidateContentRefetchedDuringAdmission: true,
+    candidateContentRefetchedDuringReverification: true,
     durableAdmissionReceiptAvailable: true,
     previewAdmissionReverificationAvailable: true,
-    staleManifestOrScreenshotEvidenceRejected: true,
+    staleManifestScreenshotOrCandidateEvidenceRejected: true,
     admissionRecomputedDuringReverification: true,
     createOnlyReceiptWrite: true,
     rollbackSafeReceiptWrite: true,
