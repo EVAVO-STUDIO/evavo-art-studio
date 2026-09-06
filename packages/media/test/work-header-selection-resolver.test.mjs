@@ -3,9 +3,14 @@ import test from "node:test";
 
 import { resolveWorkHeaderSelection } from "../dist/index.js";
 
+const HASH_CURRENT = "c".repeat(64);
+const HASH_A = "a".repeat(64);
+const HASH_B = "b".repeat(64);
+
 function candidateReview(overrides = {}) {
   return {
     currentHeader: {
+      imageSha256: HASH_CURRENT,
       technicalScore: 90,
       technicalGrade: "pass",
       technicalIssues: [],
@@ -15,6 +20,7 @@ function candidateReview(overrides = {}) {
     candidates: [
       {
         id: "a",
+        imageSha256: HASH_A,
         provenance: "cloudinary:a",
         technicalScore: 91,
         technicalGrade: "pass",
@@ -30,6 +36,7 @@ function candidateReview(overrides = {}) {
       },
       {
         id: "b",
+        imageSha256: HASH_B,
         provenance: "cloudinary:b",
         technicalScore: 88,
         technicalGrade: "pass",
@@ -49,15 +56,17 @@ function candidateReview(overrides = {}) {
     finalSelectionAllowed: false,
     visualCritiqueRequired: true,
     currentHeaderBaselineRequiredForReplacement: true,
+    critiqueHashBindingRequired: true,
     visualCritiqueDimensions: ["semantic relevance"],
     ...overrides,
   };
 }
 
-function critique(candidateId, visualScore, overrides = {}) {
+function critique(candidateId, visualScore, candidateSha256, overrides = {}) {
   return {
     contract: "evavo.work-header-visual-critique.v1",
     candidateId,
+    candidateSha256,
     visualScore,
     disqualifiers: [],
     weaknesses: [],
@@ -65,6 +74,7 @@ function critique(candidateId, visualScore, overrides = {}) {
     verdict: "visual-shortlist",
     eligibleForFinalSelection: true,
     humanOrVisionReviewPerformed: true,
+    exactImageHashBound: true,
     automaticPublicationAllowed: false,
     automaticCloudOverwriteAllowed: false,
     finalSelectionStillRequiresComparativeReview: true,
@@ -75,19 +85,20 @@ function critique(candidateId, visualScore, overrides = {}) {
 test("requires both current-header technical and visual baselines by default", () => {
   const result = resolveWorkHeaderSelection({
     candidateReview: candidateReview({ currentHeader: null }),
-    critiques: [critique("a", 91), critique("b", 86)],
+    critiques: [critique("a", 91, HASH_A), critique("b", 86, HASH_B)],
   });
   assert.equal(result.recommendation, "needs-current-baseline");
   assert.equal(result.recommendedCandidateId, null);
   assert.equal(result.currentHeaderTechnicalScore, null);
+  assert.equal(result.critiqueHashBindingVerified, true);
   assert.equal(result.automaticWebsiteMutationAllowed, false);
 });
 
 test("retains current header when best candidate does not beat it by required visual margin", () => {
   const result = resolveWorkHeaderSelection({
     candidateReview: candidateReview(),
-    critiques: [critique("a", 90), critique("b", 86)],
-    currentHeaderCritique: critique("current", 87),
+    critiques: [critique("a", 90, HASH_A), critique("b", 86, HASH_B)],
+    currentHeaderCritique: critique("current-header", 87, HASH_CURRENT),
     minimumAdvantageOverCurrent: 5,
   });
   assert.equal(result.recommendation, "retain-current");
@@ -97,8 +108,8 @@ test("retains current header when best candidate does not beat it by required vi
 test("recommends candidate only after material comparative advantage", () => {
   const result = resolveWorkHeaderSelection({
     candidateReview: candidateReview(),
-    critiques: [critique("a", 94), critique("b", 86)],
-    currentHeaderCritique: critique("current", 86),
+    critiques: [critique("a", 94, HASH_A), critique("b", 86, HASH_B)],
+    currentHeaderCritique: critique("current-header", 86, HASH_CURRENT),
     minimumAdvantageOverCurrent: 5,
   });
   assert.equal(result.recommendation, "candidate-recommended");
@@ -113,8 +124,8 @@ test("rejects candidate that is materially technically worse than the current he
   review.candidates[0].technicalScore = 82;
   const result = resolveWorkHeaderSelection({
     candidateReview: review,
-    critiques: [critique("a", 98), critique("b", 86)],
-    currentHeaderCritique: critique("current", 80),
+    critiques: [critique("a", 98, HASH_A), critique("b", 86, HASH_B)],
+    currentHeaderCritique: critique("current-header", 80, HASH_CURRENT),
     maximumTechnicalDeficitToCurrent: 3,
   });
   assert.ok(result.rejectedCandidateIds.includes("a"));
@@ -126,9 +137,20 @@ test("rejects near-duplicate support imagery even when visually strong", () => {
   review.candidates[0].nearDuplicateOfSupport = true;
   const result = resolveWorkHeaderSelection({
     candidateReview: review,
-    critiques: [critique("a", 96), critique("b", 83)],
-    currentHeaderCritique: critique("current", 80),
+    critiques: [critique("a", 96, HASH_A), critique("b", 83, HASH_B)],
+    currentHeaderCritique: critique("current-header", 80, HASH_CURRENT),
   });
   assert.notEqual(result.recommendedCandidateId, "a");
   assert.ok(result.rejectedCandidateIds.includes("a"));
+});
+
+test("rejects stale visual critique bound to different candidate bytes", () => {
+  assert.throws(
+    () => resolveWorkHeaderSelection({
+      candidateReview: candidateReview(),
+      critiques: [critique("a", 96, "d".repeat(64))],
+      currentHeaderCritique: critique("current-header", 80, HASH_CURRENT),
+    }),
+    /Critique hash mismatch/u,
+  );
 });
