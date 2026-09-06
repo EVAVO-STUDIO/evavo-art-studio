@@ -8,9 +8,11 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-publication-preparation";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const CONTRACT = "evavo.work-header-publication-preparation.v1";
+const SCHEMA_SHA256 = "57fb248558c3945c4845904c3f22daa65c4c32b0ef8a85af14af28e3fbdf6a5b";
+const SCHEMA_URL = new URL("../contracts/work-header-publication-preparation-v1.schema.json", import.meta.url);
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
 const TARGET_KINDS = new Set(["website-header-source-update", "cloudinary-stable-id-replacement"]);
@@ -20,6 +22,13 @@ const allowed = (p, output = false) => assertAllowedLocalPath(p, { envName: ROOT
 const writesEnabled = () => ["1", "true", "yes", "on"].includes(String(process.env[WRITES_ENV] ?? "").toLowerCase());
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 const canonical = (value) => JSON.stringify(value);
+
+async function assertCurrentSchemaDigest() {
+  const bytes = await readFile(SCHEMA_URL);
+  const current = sha256(bytes);
+  if (current !== SCHEMA_SHA256) throw new Error(`Publication-preparation schema bytes drifted from the governed SHA-256 (${current}).`);
+  return Object.freeze({ sha256: current, byteLength: bytes.length });
+}
 
 async function bound(filePath) {
   const resolved = await allowed(filePath, false);
@@ -130,6 +139,7 @@ function preparationIdentity(review, targetKind, targetIdentifier) {
 }
 
 async function preparePublication(args) {
+  await assertCurrentSchemaDigest();
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required to create a publication-preparation receipt.");
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
   if (!TARGET_KINDS.has(args.targetKind)) throw new Error("targetKind must be website-header-source-update or cloudinary-stable-id-replacement.");
@@ -141,6 +151,7 @@ async function preparePublication(args) {
   const identity = preparationIdentity(review, args.targetKind, targetIdentifier);
   const receipt = {
     contract: CONTRACT,
+    schemaSha256: SCHEMA_SHA256,
     preparationState: "prepared-unexecuted",
     targetKind: args.targetKind,
     targetIdentifier,
@@ -166,13 +177,14 @@ async function preparePublication(args) {
   const receiptPath = await allowed(args.receiptPath, true);
   const payload = `${JSON.stringify(receipt, null, 2)}\n`;
   await writeCreateOnlyBundle([{ path: receiptPath, data: payload, encoding: "utf8" }]);
-  return Object.freeze({ ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), route: review.route, candidateId: review.candidateId, candidateSha256: review.candidateSha256, targetKind: args.targetKind, targetIdentifier, preparationState: receipt.preparationState, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  return Object.freeze({ ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), schemaSha256: SCHEMA_SHA256, route: review.route, candidateId: review.candidateId, candidateSha256: review.candidateSha256, targetKind: args.targetKind, targetIdentifier, preparationState: receipt.preparationState, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
 async function verifyPreparation(receiptPath) {
+  await assertCurrentSchemaDigest();
   const preparationFile = await bound(receiptPath);
   const value = JSON.parse(preparationFile.bytes.toString("utf8"));
-  if (value.contract !== CONTRACT || value.preparationState !== "prepared-unexecuted" || !TARGET_KINDS.has(value.targetKind)) throw new Error("Publication-preparation receipt contract/state is invalid.");
+  if (value.contract !== CONTRACT || value.schemaSha256 !== SCHEMA_SHA256 || value.preparationState !== "prepared-unexecuted" || !TARGET_KINDS.has(value.targetKind)) throw new Error("Publication-preparation receipt contract/schema/state is invalid or stale.");
   assertNoMutationAuthority(value, "Publication-preparation receipt");
   if (value.executionAllowed !== false || value.backupRequiredBeforeExecution !== true || value.rollbackEvidenceRequiredBeforeExecution !== true || value.approvalDecisionReverifiedBeforePreparation !== true || value.explicitReviewerApprovalRequiredAndVerified !== true || value.fullReceiptLineageVerified !== true || value.browserResponseMetadataVerified !== true || value.candidateBytesVerified !== true) throw new Error("Publication-preparation receipt lacks required non-executing verified state.");
   boundedText(value.targetIdentifier, "targetIdentifier", MAX_TARGET_IDENTIFIER);
@@ -185,17 +197,17 @@ async function verifyPreparation(receiptPath) {
   if (canonical(identity) !== canonical(expected)) throw new Error("Publication preparation is bound to stale or changed approval/candidate lineage.");
   if (value.stableUrlOrPublicIdPreservationRequired !== (value.targetKind === "cloudinary-stable-id-replacement")) throw new Error("Publication-preparation stable-public-ID requirement is inconsistent.");
   if (value.sourceCodeBackupOrRevertPointRequired !== (value.targetKind === "website-header-source-update")) throw new Error("Publication-preparation website rollback requirement is inconsistent.");
-  return Object.freeze({ ok: true, receiptPath: preparationFile.path, receiptSha256: preparationFile.sha256, receiptByteLength: preparationFile.byteLength, route: review.route, candidateId: review.candidateId, candidateSha256: review.candidateSha256, candidateByteLength: review.candidateByteLength, targetKind: value.targetKind, targetIdentifier: value.targetIdentifier, approvalDecisionReverifiedAndMatched: true, fullReceiptLineageVerified: true, backupRequiredBeforeExecution: true, rollbackEvidenceRequiredBeforeExecution: true, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  return Object.freeze({ ok: true, receiptPath: preparationFile.path, receiptSha256: preparationFile.sha256, receiptByteLength: preparationFile.byteLength, schemaSha256: SCHEMA_SHA256, schemaDigestVerified: true, route: review.route, candidateId: review.candidateId, candidateSha256: review.candidateSha256, candidateByteLength: review.candidateByteLength, targetKind: value.targetKind, targetIdentifier: value.targetIdentifier, approvalDecisionReverifiedAndMatched: true, fullReceiptLineageVerified: true, backupRequiredBeforeExecution: true, rollbackEvidenceRequiredBeforeExecution: true, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
 const tools = [
-  { name: "evavo_work_header_publication_preparation_capabilities", description: "Describe the non-executing Work-header publication-preparation stage that consumes only an explicit approved reviewer decision and requires backup/rollback before any later mutation.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_prepare_work_header_publication", description: "Create a review-only publication-preparation receipt after fully re-verifying the explicit approved decision, exact candidate bytes and complete receipt/browser lineage. It never mutates website source or Cloudinary.", inputSchema: { type: "object", properties: { approvalDecisionReceiptPath: { type: "string", minLength: 1 }, receiptPath: { type: "string", minLength: 1 }, targetKind: { type: "string", enum: ["website-header-source-update", "cloudinary-stable-id-replacement"] }, targetIdentifier: { type: "string", minLength: 1, maxLength: MAX_TARGET_IDENTIFIER }, preparationNote: { type: "string", minLength: 1, maxLength: MAX_NOTE }, confirmLocalWrite: { type: "boolean" } }, required: ["approvalDecisionReceiptPath", "receiptPath", "targetKind", "targetIdentifier", "preparationNote", "confirmLocalWrite"], additionalProperties: false } },
-  { name: "evavo_verify_work_header_publication_preparation", description: "Read-only reverification of a Work-header publication-preparation receipt against the exact approved decision, candidate bytes and complete downstream evidence lineage.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
+  { name: "evavo_work_header_publication_preparation_capabilities", description: "Describe the schema-bound non-executing Work-header publication-preparation stage that consumes only an explicit approved reviewer decision and requires backup/rollback before any later mutation.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_prepare_work_header_publication", description: "Create a schema-bound review-only publication-preparation receipt after fully re-verifying the explicit approved decision, exact candidate bytes and complete receipt/browser lineage. It never mutates website source or Cloudinary.", inputSchema: { type: "object", properties: { approvalDecisionReceiptPath: { type: "string", minLength: 1 }, receiptPath: { type: "string", minLength: 1 }, targetKind: { type: "string", enum: ["website-header-source-update", "cloudinary-stable-id-replacement"] }, targetIdentifier: { type: "string", minLength: 1, maxLength: MAX_TARGET_IDENTIFIER }, preparationNote: { type: "string", minLength: 1, maxLength: MAX_NOTE }, confirmLocalWrite: { type: "boolean" } }, required: ["approvalDecisionReceiptPath", "receiptPath", "targetKind", "targetIdentifier", "preparationNote", "confirmLocalWrite"], additionalProperties: false } },
+  { name: "evavo_verify_work_header_publication_preparation", description: "Read-only reverification of a Work-header publication-preparation receipt against the exact physical schema bytes, approved decision, candidate bytes and complete downstream evidence lineage.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
 ];
 
 function capabilities() {
-  return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, explicitApprovedDecisionRequired: true, approvalDecisionReverificationRequired: true, fullReceiptLineageRequired: true, exactCandidateBytesRequired: true, responsiveBrowserResponseMetadataRequired: true, backupRequiredBeforeExecution: true, rollbackEvidenceRequiredBeforeExecution: true, stableUrlOrPublicIdPreservationRequiredForCloudinary: true, sourceCodeBackupOrRevertPointRequiredForWebsite: true, createOnlyPreparationReceipt: true, rollbackSafePreparationReceiptWrite: true, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() });
+  return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaPath: "contracts/work-header-publication-preparation-v1.schema.json", schemaSha256: SCHEMA_SHA256, physicalSchemaDigestRequired: true, receiptSchemaDigestRequired: true, explicitApprovedDecisionRequired: true, approvalDecisionReverificationRequired: true, fullReceiptLineageRequired: true, exactCandidateBytesRequired: true, responsiveBrowserResponseMetadataRequired: true, backupRequiredBeforeExecution: true, rollbackEvidenceRequiredBeforeExecution: true, stableUrlOrPublicIdPreservationRequiredForCloudinary: true, sourceCodeBackupOrRevertPointRequiredForWebsite: true, createOnlyPreparationReceipt: true, rollbackSafePreparationReceiptWrite: true, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() });
 }
 
 async function callTool(name, args) {
