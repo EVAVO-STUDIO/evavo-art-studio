@@ -43,12 +43,16 @@ async function base(overrides = {}) {
   };
 }
 
-test("page-render review binds desktop and mobile screenshot hashes", async () => {
+test("page-render review binds screenshot hashes and comparable viewport geometry", async () => {
   const result = await reviewWorkHeaderPageRender(await base());
   assert.equal(result.evidence.verdict, "page-shortlist");
   assert.match(result.evidence.currentDesktopSha256, /^[0-9a-f]{64}$/u);
   assert.match(result.evidence.candidateMobileSha256, /^[0-9a-f]{64}$/u);
   assert.equal(result.evidence.exactScreenshotHashesBound, true);
+  assert.equal(result.evidence.comparableViewportGeometryVerified, true);
+  assert.equal(result.evidence.candidateRenderDifferenceVerified, true);
+  assert.equal(result.evidence.desktopViewport.dimensionsMatch, true);
+  assert.equal(result.evidence.mobileViewport.dimensionsMatch, true);
   assert.equal(result.evidence.automaticWebsiteMutationAllowed, false);
   assert.ok(result.proofPng.length > 0);
 });
@@ -63,4 +67,21 @@ test("page-render review rejects a candidate explicitly judged worse than curren
   const result = await reviewWorkHeaderPageRender(await base({ candidateLooksWorseThanCurrent: true }));
   assert.equal(result.evidence.verdict, "reject");
   assert.ok(result.evidence.disqualifiers.includes("candidate-looks-worse-than-current-page"));
+});
+
+test("page-render review rejects mismatched desktop comparison viewport", async () => {
+  const candidateDesktop = await screenshot(1366, 768, 9);
+  const result = await reviewWorkHeaderPageRender(await base({ candidateDesktop }));
+  assert.equal(result.evidence.comparableViewportGeometryVerified, false);
+  assert.ok(result.evidence.disqualifiers.includes("desktop-current-candidate-viewport-mismatch"));
+  assert.equal(result.evidence.verdict, "reject");
+});
+
+test("page-render review rejects an unchanged candidate render on mobile", async () => {
+  const input = await base();
+  input.candidateMobile = Buffer.from(input.currentMobile);
+  const result = await reviewWorkHeaderPageRender(input);
+  assert.equal(result.evidence.candidateRenderDifferenceVerified, false);
+  assert.ok(result.evidence.disqualifiers.includes("mobile-candidate-render-identical-to-current"));
+  assert.equal(result.evidence.verdict, "reject");
 });
