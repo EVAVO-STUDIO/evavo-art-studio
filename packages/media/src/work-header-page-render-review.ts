@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import sharp, { type OverlayOptions } from "sharp";
 
 export const WORK_HEADER_PAGE_RENDER_REVIEW_CONTRACT = "evavo.work-header-page-render-review.v2" as const;
+const MAX_SCREENSHOT_BYTES = 40 * 1024 * 1024;
+const MAX_NOTES = 24;
+const MAX_NOTE_CHARACTERS = 500;
+const MAX_NOTES_CHARACTERS = 4_000;
 
 export interface WorkHeaderPageRenderReviewSpec {
   readonly pageSlug: string;
@@ -88,6 +92,11 @@ function bounded(value: unknown, fallback: number, min: number, max: number, lab
   return Number(value);
 }
 
+function flag(value: unknown, label: string): boolean {
+  if (typeof value !== "boolean") throw new Error(`${label} must be boolean.`);
+  return value;
+}
+
 function hash(value: string, label: string): string {
   if (!/^[0-9a-f]{64}$/u.test(value)) throw new Error(`${label} must be a lowercase SHA-256 hex digest.`);
   return value;
@@ -97,6 +106,20 @@ function text(value: string, label: string, maximum: number): string {
   const cleaned = String(value ?? "").trim();
   if (!cleaned || cleaned.length > maximum) throw new Error(`${label} must contain 1-${maximum} characters.`);
   return cleaned;
+}
+
+function reviewNotes(value: unknown): readonly string[] {
+  if (!Array.isArray(value) || value.length > MAX_NOTES) throw new Error(`notes must be an array with at most ${MAX_NOTES} entries.`);
+  let total = 0;
+  const notes = value.map((note, index) => {
+    if (typeof note !== "string") throw new Error(`notes[${index}] must be a string.`);
+    const cleaned = note.trim();
+    if (!cleaned || cleaned.length > MAX_NOTE_CHARACTERS) throw new Error(`notes[${index}] must contain 1-${MAX_NOTE_CHARACTERS} characters.`);
+    total += cleaned.length;
+    if (total > MAX_NOTES_CHARACTERS) throw new Error(`notes exceed the ${MAX_NOTES_CHARACTERS}-character review limit.`);
+    return cleaned;
+  });
+  return Object.freeze(notes);
 }
 
 function safe(value: string): string {
@@ -119,13 +142,20 @@ async function panel(image: Buffer, label: string, width: number): Promise<Buffe
 
 export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderReviewSpec): Promise<WorkHeaderPageRenderReviewResult> {
   const pageSlug = text(spec.pageSlug, "pageSlug", 240);
+  if (!/^\/work\/[a-z0-9-]+$/u.test(pageSlug)) throw new Error("pageSlug must be a canonical Work detail route under /work/.");
   const pageTitle = text(spec.pageTitle, "pageTitle", 200);
   const candidateId = text(spec.candidateId, "candidateId", 160);
   const candidateSha256 = hash(spec.candidateSha256, "candidateSha256");
   for (const [label, image] of [["currentDesktop", spec.currentDesktop], ["candidateDesktop", spec.candidateDesktop], ["currentMobile", spec.currentMobile], ["candidateMobile", spec.candidateMobile]] as const) {
     if (!Buffer.isBuffer(image) || image.length === 0) throw new Error(`${label} screenshot is required.`);
+    if (image.length > MAX_SCREENSHOT_BYTES) throw new Error(`${label} screenshot exceeds the ${MAX_SCREENSHOT_BYTES}-byte review limit.`);
   }
-  if (!Array.isArray(spec.notes) || spec.notes.some((note) => typeof note !== "string" || !note.trim())) throw new Error("notes must be an array of non-empty strings.");
+  reviewNotes(spec.notes);
+  const titleObscured = flag(spec.titleObscured, "titleObscured");
+  const textContrastFailure = flag(spec.textContrastFailure, "textContrastFailure");
+  const importantSubjectCropped = flag(spec.importantSubjectCropped, "importantSubjectCropped");
+  const layoutOverflowOrBreakage = flag(spec.layoutOverflowOrBreakage, "layoutOverflowOrBreakage");
+  const candidateLooksWorseThanCurrent = flag(spec.candidateLooksWorseThanCurrent, "candidateLooksWorseThanCurrent");
 
   const [currentDesktopMeta, candidateDesktopMeta, currentMobileMeta, candidateMobileMeta] = await Promise.all([
     dimensions(spec.currentDesktop, "currentDesktop"),
@@ -161,11 +191,11 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
   if (!desktopScreenshotsDiffer) disqualifiers.push("desktop-candidate-render-identical-to-current");
   if (!mobileScreenshotsDiffer) disqualifiers.push("mobile-candidate-render-identical-to-current");
   if (!materialPageQualityAdvantageVerified) disqualifiers.push("candidate-page-lacks-material-advantage-over-current");
-  if (spec.titleObscured) disqualifiers.push("title-obscured");
-  if (spec.textContrastFailure) disqualifiers.push("text-contrast-failure");
-  if (spec.importantSubjectCropped) disqualifiers.push("important-subject-cropped");
-  if (spec.layoutOverflowOrBreakage) disqualifiers.push("layout-overflow-or-breakage");
-  if (spec.candidateLooksWorseThanCurrent) disqualifiers.push("candidate-looks-worse-than-current-page");
+  if (titleObscured) disqualifiers.push("title-obscured");
+  if (textContrastFailure) disqualifiers.push("text-contrast-failure");
+  if (importantSubjectCropped) disqualifiers.push("important-subject-cropped");
+  if (layoutOverflowOrBreakage) disqualifiers.push("layout-overflow-or-breakage");
+  if (candidateLooksWorseThanCurrent) disqualifiers.push("candidate-looks-worse-than-current-page");
 
   const weighted = values[0]! * 1.25 + values[1]! * 1.15 + values[2]! * 1.15 + values[3]! * 1.25 + values[4]! * 1.35;
   const visualScore = Math.round((weighted / (5 * (1.25 + 1.15 + 1.15 + 1.25 + 1.35))) * 100);
