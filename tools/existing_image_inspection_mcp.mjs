@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 
 import { createExistingImageEditInspectionProof } from "../packages/media/dist/index.js";
+import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-existing-image-inspection";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const ALLOW_WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -25,24 +26,15 @@ function identity(filePath) {
 }
 
 async function inspect(args) {
-  if (process.env[ALLOW_WRITES_ENV] !== "true" || args.confirmLocalWrite !== true) {
-    throw new Error("Inspection proof output requires enabled local writes and confirmLocalWrite=true.");
-  }
-  for (const key of ["sourcePath", "editedPath", "proofPath"]) {
-    if (typeof args[key] !== "string") throw new Error(`${key} is required.`);
-  }
+  if (process.env[ALLOW_WRITES_ENV] !== "true" || args.confirmLocalWrite !== true) throw new Error("Inspection proof output requires enabled local writes and confirmLocalWrite=true.");
+  for (const key of ["sourcePath", "editedPath", "proofPath"]) if (typeof args[key] !== "string") throw new Error(`${key} is required.`);
   const sourcePath = await assertAllowed(args.sourcePath);
   const editedPath = await assertAllowed(args.editedPath);
   const proofPath = await assertAllowed(args.proofPath, { output: true });
-  if (new Set([sourcePath, editedPath, proofPath].map(identity)).size !== 3) {
-    throw new Error("Source, edited and proof paths must be distinct.");
-  }
-  const result = await createExistingImageEditInspectionProof(
-    await readFile(sourcePath),
-    await readFile(editedPath),
-  );
-  await mkdir(path.dirname(proofPath), { recursive: true });
-  await writeFile(proofPath, result.png, { flag: "wx" });
+  if (new Set([sourcePath, editedPath, proofPath].map(identity)).size !== 3) throw new Error("Source, edited and proof paths must be distinct.");
+
+  const result = await createExistingImageEditInspectionProof(await readFile(sourcePath), await readFile(editedPath));
+  await writeCreateOnlyBundle([{ path: proofPath, data: result.png }]);
   return Object.freeze({
     ok: true,
     sourcePath,
@@ -52,9 +44,10 @@ async function inspect(args) {
     visualReviewRequired: true,
     reviewInstructions: [
       "Compare source and edited at runtime composition scale on white and black backgrounds.",
-      "Inspect the automatically isolated changed-region zoom for blur, smearing, ringing, stair-stepping, edge contamination and texture discontinuity.",
+      "Inspect each ranked connected change region separately, beginning with region-01, rather than relying on one large union crop.",
+      "At every region zoom, check for blur, smearing, ringing, stair-stepping, edge contamination, invented detail and texture discontinuity.",
       "Inspect source and edited alpha channels for holes, jagged edges, halos and lost silhouette detail.",
-      "Reject the edit if it looks worse even when the change is technically contained.",
+      "Reject the edit if it looks worse even when every changed pixel is technically contained.",
     ],
     bytesReturned: false,
   });
@@ -63,12 +56,12 @@ async function inspect(args) {
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_existing_image_inspection_capabilities",
-    description: "Describe multi-scale proof generation for visual inspection of existing-image edits.",
+    description: "Describe multi-scale, connected-region proof generation for visual inspection of existing-image edits.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
     name: "evavo_create_existing_image_inspection_proof",
-    description: "Create an eight-panel source-vs-edit visual QA sheet: white runtime composition, black hostile background, pixel-preserving zoom around the exact changed region, and source/edited alpha channels. Intended for vision-agent or human retouch review before promotion.",
+    description: "Create a dynamic source-vs-edit QA sheet containing white and black runtime comparisons, source/edited alpha channels and pixel-preserving zoom pairs for the top connected edit regions. Intended for vision-agent or human retouch review before promotion.",
     inputSchema: {
       type: "object",
       properties: {
@@ -85,18 +78,22 @@ const tools = Object.freeze([
 
 function capabilities() {
   return Object.freeze({
-    contract: "evavo_existing_image_inspection_v1",
+    contract: "evavo_existing_image_inspection_v1_1",
+    serverVersion: SERVER_VERSION,
     allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
-    panels: [
+    sourceMutation: false,
+    rollbackSafeCreateOnlyProofWrite: true,
+    connectedChangeRegionSegmentation: true,
+    maximumRankedRegionPairs: 3,
+    basePanels: [
       "source-white-runtime",
       "edited-white-runtime",
       "source-black-hostile",
       "edited-black-hostile",
-      "source-changed-region-pixel-zoom",
-      "edited-changed-region-pixel-zoom",
       "source-alpha-channel",
       "edited-alpha-channel",
     ],
+    dynamicPanels: ["source-region-N-pixel-zoom", "edited-region-N-pixel-zoom"],
   });
 }
 
