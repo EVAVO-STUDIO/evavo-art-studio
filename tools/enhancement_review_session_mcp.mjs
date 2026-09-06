@@ -7,7 +7,7 @@ import { reviewEnhancementStudioCandidate } from "../packages/media/dist/index.j
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-enhancement-review-session";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -88,7 +88,7 @@ const tools = [
   },
   {
     name: "evavo_review_enhancement_candidate_end_to_end",
-    description: "Verify a source-bound Enhancement Studio manifest, review the candidate at native size and source space, optionally review actual Work-page context, and create proof/receipt artifacts. Never grants publication or Cloudinary overwrite authority.",
+    description: "Verify a source-bound Enhancement Studio candidate, prove material technical benefit, review native/source-space quality and page context, and create review artifacts. Missing responsive page context remains incomplete; learned candidates without proven benefit are rejected. Never grants publication or Cloudinary overwrite authority.",
     inputSchema: {
       type: "object",
       properties: {
@@ -116,6 +116,9 @@ function capabilities() {
     verifiesDimensions: true,
     nativeCandidateReview: true,
     sourceSpaceRegressionReview: true,
+    materialTechnicalBenefitGate: true,
+    learnedNoBenefitRejection: true,
+    responsivePageContextCompletionGate: true,
     workHeaderContextReview: true,
     supportImageContextReview: true,
     tileContextReview: true,
