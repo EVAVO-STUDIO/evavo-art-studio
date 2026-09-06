@@ -4,11 +4,11 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers approval-packet reverification", async () => {
+test("image quality doctor covers fail-closed page review and approval-packet reverification", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_16"',
-    'SERVER_VERSION = "1.16.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_17"',
+    'SERVER_VERSION = "1.17.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -17,6 +17,7 @@ test("image quality doctor covers approval-packet reverification", async () => {
     'id: "enhancement-session"',
     'id: "work-preview-core-v7"',
     'id: "work-preview-mcp-v170"',
+    'id: "work-page-review-input-safety"',
     'id: "work-page-review-v200"',
     'id: "durable-review"',
     'id: "safe-bundle"',
@@ -24,6 +25,20 @@ test("image quality doctor covers approval-packet reverification", async () => {
     "runtimeExecutionPerformed: false",
     "sourceMutationPerformed: false",
   ]) assert.ok(source.includes(token), `missing doctor contract token: ${token}`);
+});
+
+test("doctor requires bounded literal Work page review inputs", async () => {
+  const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
+  for (const token of [
+    "MAX_SCREENSHOT_BYTES",
+    "MAX_NOTES = 24",
+    "MAX_NOTE_CHARACTERS = 500",
+    "MAX_NOTES_CHARACTERS = 4_000",
+    "pageSlug must be a canonical Work detail route under /work/.",
+    "must be boolean.",
+    "notes exceed the",
+    "pageReviewInputSafetyChecked: true",
+  ]) assert.ok(source.includes(token), `missing page-input safety token: ${token}`);
 });
 
 test("doctor requires read-only approval packet verification and recomputation", async () => {
