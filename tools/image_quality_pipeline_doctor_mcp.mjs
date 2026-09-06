@@ -6,7 +6,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "evavo-image-quality-pipeline-doctor";
-const SERVER_VERSION = "1.3.0";
+const SERVER_VERSION = "1.4.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -17,10 +17,12 @@ const CHECKS = Object.freeze([
   Object.freeze({ id: "finishing-plan-core", file: "packages/media/src/existing-image-finishing-plan.ts", tokens: ["planExistingImageFinishing", "smallest preservation-first next", "automaticRepairAllowed: false", "preservation-polish", "localized-repair", "manual-review"] }),
   Object.freeze({ id: "artifact-signals", file: "packages/media/src/image-artifact-signals.ts", tokens: ["evavo.image-artifact-signals.v1_1", "ringingRiskRatio", "posterizationRisk", "horizontalPhaseSeparation", "verticalPhaseSeparation", "nearestNeighbourUpscaleRisk", "pixel-art"] }),
   Object.freeze({ id: "unified-orchestrator", file: "packages/media/src/image-review-orchestrator.ts", tokens: ["strictTransparentRgb", "detectExistingImageDefects", "segmentDefectMaskRegions", "detectImageArtifactSignals", "probable-nearest-neighbour-upscale-of-non-pixel-art", "pass-to-visual-review"] }),
+  Object.freeze({ id: "enhancement-review-schema", file: "contracts/art-studio-enhancement-review-v1.schema.json", tokens: ["evavo.enhancement-art-review.v1", "durable_image_review_session_required", "candidate_preview_admission_required", '"publication_allowed": { "const": false }', '"cloud_overwrite_allowed": { "const": false }', '"additionalProperties": false'] }),
+  Object.freeze({ id: "enhancement-review-admission", file: "packages/media/src/enhancement-review-bridge.ts", tokens: ["durable_image_review_session_required", "candidateAspectRatioRelativeDrift", "maximumAspectRatioRelativeDrift", "publicationAllowed: false", "cloudOverwriteAllowed: false"] }),
   Object.freeze({ id: "binary-edit-mask", file: "packages/media/src/existing-image-diff.ts", tokens: ["changeMaskPng", "binary", "opaqueRgbChangedPixels", "alphaChangedPixels"] }),
   Object.freeze({ id: "multi-region-inspection", file: "packages/media/src/existing-image-inspection-proof.ts", tokens: ["changeRegions", "maximumRegions: 3", "source-region-01", "segmentDefectMaskRegions"] }),
   Object.freeze({ id: "safe-output-bundle", file: "tools/lib/create_only_bundle.mjs", tokens: ["writeCreateOnlyBundle", "rollback", "link", "preflight"] }),
-  Object.freeze({ id: "durable-review-session", file: "tools/image_review_session_mcp.mjs", tokens: ["evavo.image-review-session.v1", "sourceSha256AndLengthBound: true", "comparisonSha256AndLengthBound: true", "staleEvidenceVerification: true", "createOnlyReceiptWrite: true", "publicationAllowed: false"] }),
+  Object.freeze({ id: "durable-review-session", file: "tools/image_review_session_mcp.mjs", tokens: ["evavo.image-review-session.v1_1", "sourceSha256AndLengthBound: true", "comparisonSha256AndLengthBound: true", "staleEvidenceVerification: true", "createOnlyReceiptWrite: true", "publicationAllowed: false"] }),
   Object.freeze({ id: "review-mcp-profile-policy", file: "tools/existing_image_review_mcp.mjs", tokens: ["profileTransparentRgbMode", "strictWholeCanvasTransparentRgbProfiles", "rollbackSafeReviewOutputBundle: true", 'SERVER_VERSION = "1.2.0"'] }),
   Object.freeze({ id: "defect-mcp-source-bound", file: "tools/existing_image_defect_detection_mcp.mjs", tokens: ["sourceSha256AndLengthBound: true", "maskSha256AndLengthBound: true", "overlaySha256AndLengthBound: true", "writeCreateOnlyBundle", 'SERVER_VERSION = "1.3.0"'] }),
   Object.freeze({ id: "finishing-plan-mcp", file: "tools/existing_image_finishing_plan_mcp.mjs", tokens: ["exactSourceMaskOverlayBindingRequired: true", "staleDefectEvidenceRejected: true", "smallestPreservationFirstOperationPreferred: true", "automaticRepairAllowed: false", "evavo_verify_existing_image_finishing_plan"] }),
@@ -44,7 +46,7 @@ async function inspect() {
   }
   const blockers = checks.filter((check) => !check.ok).map((check) => check.id);
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_3",
+    contract: "evavo.image-quality-pipeline-doctor.v1_4",
     ready: blockers.length === 0,
     blockerCount: blockers.length,
     blockers,
@@ -54,16 +56,16 @@ async function inspect() {
     publicationAllowed: false,
     nextAction: blockers.length
       ? "Repair the failing contract surfaces before relying on automated image review/finishing planning."
-      : "Static quality and preservation-planning contracts are aligned; runtime tests and mandatory visual confirmation remain separate requirements.",
+      : "Static quality, preservation-planning and enhancement-handoff contracts are aligned; cross-repo schema federation, runtime tests and mandatory visual confirmation remain separate requirements.",
   });
 }
 
 const tools = Object.freeze([
-  Object.freeze({ name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only static doctor for EVAVO image review, defect, evidence and preservation-finishing tooling.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
-  Object.freeze({ name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect alpha-aware QA, artifact signals, exact-byte-bound defect evidence, durable review sessions, preservation-first finishing plans and rollback-safe outputs. Read-only; does not execute image processing.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
+  Object.freeze({ name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only static doctor for EVAVO image review, defect, evidence, preservation-finishing and enhancement-handoff tooling.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
+  Object.freeze({ name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect alpha-aware QA, artifact signals, exact-byte-bound defect evidence, durable review sessions, preservation-first finishing plans, enhancement review schema/admission and rollback-safe outputs. Read-only; does not execute image processing.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
 ]);
 function capabilities() {
-  return Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_3", serverVersion: SERVER_VERSION, readOnly: true, sourceMutationPerformed: false, runtimeExecutionPerformed: false, publicationAllowed: false, checkCount: CHECKS.length });
+  return Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_4", serverVersion: SERVER_VERSION, readOnly: true, sourceMutationPerformed: false, runtimeExecutionPerformed: false, publicationAllowed: false, checkCount: CHECKS.length });
 }
 async function callTool(name) {
   if (name === "evavo_image_quality_pipeline_doctor_capabilities") return capabilities();
