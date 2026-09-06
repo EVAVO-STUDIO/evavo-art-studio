@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 export const WORK_HEADER_PREVIEW_ADMISSION_CONTRACT = "evavo.work-header-preview-admission.v1" as const;
-export const WORK_HEADER_PREVIEW_CAPTURE_CONTRACT = "evavo.work-header-candidate-preview-capture.v4" as const;
+export const WORK_HEADER_PREVIEW_CAPTURE_CONTRACT = "evavo.work-header-candidate-preview-capture.v5" as const;
 
 export interface WorkHeaderPreviewScreenshotBinding {
   readonly path: string;
@@ -35,11 +35,20 @@ export interface WorkHeaderCandidatePreviewManifest {
     naturalWidth: number;
     naturalHeight: number;
     naturalDimensionsStableAcrossProfiles: boolean;
+    contentSha256: string;
+    contentByteLength: number;
+    contentType: string;
+    fetchedFinalUrl: string;
+    contentStableAcrossCapture: boolean;
+    etag?: string | null;
+    lastModified?: string | null;
   }>;
   readonly captures: readonly WorkHeaderPreviewCapture[];
   readonly pageRenderReviewInput: Readonly<{
     pageSlug: string;
     candidateId: string;
+    candidateContentSha256: string;
+    candidateContentByteLength: number;
     currentDesktopPath: string;
     candidateDesktopPath: string;
     currentMobilePath: string;
@@ -62,6 +71,7 @@ export interface WorkHeaderPreviewAdmissionBuffers {
   readonly candidateDesktop: Buffer;
   readonly currentMobile: Buffer;
   readonly candidateMobile: Buffer;
+  readonly candidateContent: Buffer;
 }
 
 export interface WorkHeaderPreviewAdmissionResult {
@@ -70,9 +80,12 @@ export interface WorkHeaderPreviewAdmissionResult {
   readonly candidateId: string;
   readonly candidateSrc: string;
   readonly candidateSourceUrlSha256: string;
+  readonly candidateContentSha256: string;
+  readonly candidateContentByteLength: number;
   readonly naturalWidth: number;
   readonly naturalHeight: number;
   readonly screenshotHashesVerified: boolean;
+  readonly candidateContentBytesVerified: boolean;
   readonly responsiveSourceIdentityVerified: boolean;
   readonly browserOnlyPreviewVerified: boolean;
   readonly atomicEvidenceBundleVerified: boolean;
@@ -131,6 +144,11 @@ export function admitWorkHeaderCandidatePreviewManifest(
   if (source.resolvedSrcStableAcrossProfiles !== true || source.naturalDimensionsStableAcrossProfiles !== true) throw new Error("Work-header preview candidate source/dimensions are not stable across responsive profiles.");
   if (!Number.isInteger(source.naturalWidth) || source.naturalWidth < 1 || !Number.isInteger(source.naturalHeight) || source.naturalHeight < 1) throw new Error("Work-header preview candidate natural dimensions are invalid.");
   if (source.resolvedUrlDesktop !== manifest.candidateSrc || source.resolvedUrlMobile !== manifest.candidateSrc) throw new Error("Work-header preview resolved URL does not match requested candidate source on every profile.");
+  if (!/^[0-9a-f]{64}$/u.test(source.contentSha256) || !Number.isInteger(source.contentByteLength) || source.contentByteLength < 1) throw new Error("Work-header preview candidate response-byte binding is malformed.");
+  if (!source.contentType?.toLowerCase().startsWith("image/") || !/^https?:\/\//u.test(source.fetchedFinalUrl)) throw new Error("Work-header preview candidate fetch provenance is invalid.");
+  if (source.contentStableAcrossCapture !== true) throw new Error("Work-header preview candidate bytes were not proven stable across browser capture.");
+  if (!Buffer.isBuffer(buffers.candidateContent) || buffers.candidateContent.length < 1) throw new Error("Work-header preview candidate response bytes are required for admission.");
+  if (sha256(buffers.candidateContent) !== source.contentSha256 || buffers.candidateContent.length !== source.contentByteLength) throw new Error("Work-header preview candidate response bytes changed after capture.");
 
   const desktop = captureByProfile(manifest, "desktop");
   const mobile = captureByProfile(manifest, "mobile");
@@ -155,6 +173,8 @@ export function admitWorkHeaderCandidatePreviewManifest(
     "candidateResolvedSrcMatchesRequested",
     "candidateResolvedSrcStableAcrossProfiles",
     "candidateNaturalDimensionsStableAcrossProfiles",
+    "candidateContentSha256AndLengthBound",
+    "candidateContentStableAcrossCapture",
     "atomicEvidenceBundlePublished",
   ]) {
     if (integrity[key] !== true) throw new Error(`Work-header preview integrity flag ${key} is not verified.`);
@@ -162,6 +182,7 @@ export function admitWorkHeaderCandidatePreviewManifest(
 
   const input = manifest.pageRenderReviewInput;
   if (!input || input.pageSlug !== manifest.route || input.candidateId !== manifest.candidateId) throw new Error("Work-header page-render input identity does not match preview manifest.");
+  if (input.candidateContentSha256 !== source.contentSha256 || input.candidateContentByteLength !== source.contentByteLength) throw new Error("Work-header page-render input candidate-byte binding does not match preview candidate source evidence.");
   if (input.currentDesktopPath !== desktop.currentScreenshot.path || input.candidateDesktopPath !== desktop.candidateScreenshot.path || input.currentMobilePath !== mobile.currentScreenshot.path || input.candidateMobilePath !== mobile.candidateScreenshot.path) {
     throw new Error("Work-header page-render input paths do not match preview screenshot evidence.");
   }
@@ -172,9 +193,12 @@ export function admitWorkHeaderCandidatePreviewManifest(
     candidateId: manifest.candidateId,
     candidateSrc: manifest.candidateSrc,
     candidateSourceUrlSha256: source.requestedUrlSha256,
+    candidateContentSha256: source.contentSha256,
+    candidateContentByteLength: source.contentByteLength,
     naturalWidth: source.naturalWidth,
     naturalHeight: source.naturalHeight,
     screenshotHashesVerified: true,
+    candidateContentBytesVerified: true,
     responsiveSourceIdentityVerified: true,
     browserOnlyPreviewVerified: true,
     atomicEvidenceBundleVerified: true,
