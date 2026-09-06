@@ -96,3 +96,14 @@ test("work header review carries page-context requirement and page proof", async
   assert.ok(result.pageProofPng);
   assert.equal(result.evidence.publicationAllowed, false);
 });
+
+test("support image review uses current header for page relationship QA", async () => {
+  const source = await makePng(900, 1200, [100, 70, 50, 255]);
+  const candidate = await makePng(900, 1200, [102, 72, 52, 255]);
+  const header = await makePng(1600, 900, [30, 50, 80, 255]);
+  const m = manifest(source, candidate, 900, 1200, "support-image", "illustration");
+  const result = await reviewEnhancementStudioCandidate({ manifest: m, source, candidate, header });
+  assert.ok(result.evidence.pageContextReview);
+  assert.ok(result.pageProofPng);
+  assert.equal(result.evidence.cloudOverwriteAllowed, false);
+});
