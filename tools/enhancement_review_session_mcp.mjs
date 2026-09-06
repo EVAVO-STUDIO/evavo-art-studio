@@ -7,7 +7,7 @@ import { reviewEnhancementStudioCandidate } from "../packages/media/dist/index.j
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-enhancement-review-session";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -40,6 +40,7 @@ async function runReview(args) {
     manifest,
     source: await readFile(sourcePath),
     candidate: await readFile(candidatePath),
+    header: await optionalBuffer(args.headerPath),
     support: await optionalBuffer(args.supportPath),
     tile: await optionalBuffer(args.tilePath),
     desktopScreenshot: await optionalBuffer(args.desktopScreenshotPath),
@@ -93,6 +94,7 @@ const tools = [
       properties: {
         manifestPath: { type: "string", minLength: 1 },
         outputPrefix: { type: "string", minLength: 1 },
+        headerPath: { type: "string" },
         supportPath: { type: "string" },
         tilePath: { type: "string" },
         desktopScreenshotPath: { type: "string" },
@@ -114,7 +116,9 @@ function capabilities() {
     verifiesDimensions: true,
     nativeCandidateReview: true,
     sourceSpaceRegressionReview: true,
-    workPageContextReview: true,
+    workHeaderContextReview: true,
+    supportImageContextReview: true,
+    tileContextReview: true,
     createOnlyProofs: true,
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
