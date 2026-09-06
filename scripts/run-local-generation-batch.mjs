@@ -24,6 +24,7 @@ import {
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LEGACY_RUNNER = path.join(ROOT, 'scripts', 'run-local-generation-campaign.mjs');
+const HEX64 = /^[0-9a-f]{64}$/u;
 
 function fail(message) { throw new Error(message); }
 function sha256Bytes(value) { return createHash('sha256').update(value).digest('hex'); }
@@ -46,6 +47,14 @@ async function readJson(file, label) {
   let value;
   try { value = JSON.parse(await readFile(path.resolve(file), 'utf8')); } catch (error) { fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
   return value;
+}
+async function readJsonWithBytes(file, label) {
+  const source = path.resolve(file);
+  let bytes;
+  try { bytes = await readFile(source); } catch (error) { fail(`${label} is unreadable: ${error instanceof Error ? error.message : String(error)}`); }
+  try {
+    return Object.freeze({ value: JSON.parse(bytes.toString('utf8')), bytes, sha256: sha256Bytes(bytes) });
+  } catch (error) { fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
 }
 async function writeJson(file, value, exclusive = false) {
   await mkdir(path.dirname(file), { recursive: true });
@@ -244,8 +253,16 @@ async function materializeAccepted(plan, frameResults, finalRoot) {
 export async function runLocalGenerationBatch(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   const manifestPath = path.resolve(args.get('--manifest') ?? path.join(ROOT, 'examples', 'local-generation-batch.template.json'));
-  const sourceManifest = await readJson(manifestPath, 'batch manifest');
+  const manifestInput = await readJsonWithBytes(manifestPath, 'batch manifest');
+  const sourceManifest = manifestInput.value;
   if (sourceManifest.schema !== LOCAL_GENERATION_BATCH_SCHEMA) fail(`batch manifest must use ${LOCAL_GENERATION_BATCH_SCHEMA}`);
+  const provenance = sourceManifest.evavoProvenance && typeof sourceManifest.evavoProvenance === 'object' && !Array.isArray(sourceManifest.evavoProvenance)
+    ? sourceManifest.evavoProvenance
+    : null;
+  const sourceManifestSha256 = provenance?.sourceManifestSha256 == null ? null : String(provenance.sourceManifestSha256).toLowerCase();
+  const sourceManifestByteLength = provenance?.sourceManifestByteLength ?? null;
+  if (sourceManifestSha256 != null && !HEX64.test(sourceManifestSha256)) fail('evavoProvenance.sourceManifestSha256 must be lowercase SHA-256');
+  if (sourceManifestByteLength != null && (!Number.isInteger(sourceManifestByteLength) || sourceManifestByteLength < 1)) fail('evavoProvenance.sourceManifestByteLength must be a positive integer');
   validateLocalGenerationBatch(sourceManifest);
   const plan = compileBatchPlan(sourceManifest);
   const referencePlan = prepareReferenceExecutionPlan(plan);
@@ -326,6 +343,12 @@ export async function runLocalGenerationBatch(argv = process.argv.slice(2)) {
     startedAt, completedAt: new Date().toISOString(), batchSize: plan.batchSize,
     expectedImages: plan.frames.reduce((sum, frame) => sum + frame.candidateCount, 0), actualImages: outputs.length,
     generationMode: plan.mode, consistencyMode: plan.consistencyMode, qualityProfile: plan.qualityProfile,
+    manifestProvenance: {
+      sourceManifestSha256,
+      sourceManifestByteLength,
+      executionManifestSha256: manifestInput.sha256,
+      governedEntry: provenance?.governedEntry ?? null,
+    },
     retryRules: plan.retryRules, outputRules: plan.outputRules,
     referenceExecution: {
       referenceInputCount: referencePlan.referenceInputCount,
