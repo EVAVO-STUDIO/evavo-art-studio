@@ -15,11 +15,14 @@ function fixture() {
   };
   const candidateSrc = "https://res.cloudinary.com/dntogqtey/image/upload/v1/example.png";
   const candidateSha = sha(buffers.candidateContent);
-  const response = () => ({ url: candidateSrc, status: 200, mimeType: "image/png", sha256: candidateSha, byteLength: buffers.candidateContent.length });
+  const response = (protocol) => ({
+    url: candidateSrc, status: 200, mimeType: "image/png", sha256: candidateSha, byteLength: buffers.candidateContent.length,
+    protocol, fromDiskCache: false, fromServiceWorker: false, encodedDataLength: buffers.candidateContent.length + 128, bodyBase64EncodedByCdp: true,
+  });
   const capture = (profile, currentPath, candidatePath, currentBuffer, candidateBuffer) => ({
     profile, candidateRenderChanged: true, titleTextStable: true, subtitleTextStable: true,
     candidateResolvedSrc: candidateSrc, candidateResolvedSrcMatchesRequested: true,
-    candidateHeader: { naturalWidth: 1600, naturalHeight: 900 }, browserCandidateResponse: response(),
+    candidateHeader: { naturalWidth: 1600, naturalHeight: 900 }, browserCandidateResponse: response(profile === "desktop" ? "h2" : "h3"),
     currentScreenshot: { path: currentPath, sha256: sha(currentBuffer), bytes: currentBuffer.length },
     candidateScreenshot: { path: candidatePath, sha256: sha(candidateBuffer), bytes: candidateBuffer.length },
   });
@@ -66,6 +69,11 @@ test("admits preview only when browser-loaded bytes equal immutable candidate by
   const { manifest, buffers } = fixture();
   const result = admitWorkHeaderCandidatePreviewManifest(manifest, buffers);
   assert.equal(result.browserResponseBodyIdentityVerified, true);
+  assert.equal(result.browserResponseMetadataBound, true);
+  assert.equal(result.browserResponseBindings.desktop.protocol, "h2");
+  assert.equal(result.browserResponseBindings.mobile.protocol, "h3");
+  assert.equal(result.browserResponseBindings.desktop.sha256, manifest.candidateSource.contentSha256);
+  assert.equal(result.browserResponseBindings.mobile.byteLength, buffers.candidateContent.length);
   assert.equal(result.immutableCandidateContentArtifactVerified, true);
   assert.equal(result.candidateContentSha256, manifest.candidateSource.contentSha256);
   assert.equal(result.publicationAllowed, false);
@@ -81,6 +89,22 @@ test("rejects browser response summary drift", () => {
   const { manifest, buffers } = fixture();
   manifest.browserCandidateResponseIdentity.mobileByteLength += 1;
   assert.throws(() => admitWorkHeaderCandidatePreviewManifest(manifest, buffers), /browser response-body identity/u);
+});
+
+test("rejects invalid Chrome response metadata", () => {
+  const { manifest, buffers } = fixture();
+  manifest.captures[0].browserCandidateResponse.encodedDataLength = -1;
+  assert.throws(() => admitWorkHeaderCandidatePreviewManifest(manifest, buffers), /encoded response length is invalid/u);
+});
+
+test("normalizes cache and service-worker delivery metadata without changing byte authority", () => {
+  const { manifest, buffers } = fixture();
+  manifest.captures[0].browserCandidateResponse.fromDiskCache = true;
+  manifest.captures[1].browserCandidateResponse.fromServiceWorker = true;
+  const result = admitWorkHeaderCandidatePreviewManifest(manifest, buffers);
+  assert.equal(result.browserResponseBindings.desktop.fromDiskCache, true);
+  assert.equal(result.browserResponseBindings.mobile.fromServiceWorker, true);
+  assert.equal(result.browserResponseBodyIdentityVerified, true);
 });
 
 test("rejects immutable candidate artifact drift", () => {
