@@ -15,192 +15,85 @@
     "evavo-image-review-orchestrator-v1": {
       "command": "node",
       "args": ["tools/image_review_orchestrator_mcp.mjs"],
-      "env": {
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"
-      }
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
     },
     "evavo-image-review-session-v1": {
       "command": "node",
       "args": ["tools/image_review_session_mcp.mjs"],
-      "env": {
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
-      }
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
     },
-    "evavo-image-quality-pipeline-doctor-v1": {
-      "command": "node",
-      "args": ["tools/image_quality_pipeline_doctor_mcp.mjs"],
-      "env": {}
-    },
+    "evavo-image-quality-pipeline-doctor-v1": {"command": "node", "args": ["tools/image_quality_pipeline_doctor_mcp.mjs"], "env": {}},
     "evavo-enhancement-review-bridge-v1": {
-      "command": "node",
-      "args": ["tools/enhancement_review_bridge_mcp.mjs"],
-      "env": {
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"
-      }
+      "command": "node", "args": ["tools/enhancement_review_bridge_mcp.mjs"],
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
     },
     "evavo-enhancement-review-session-v1": {
-      "command": "node",
-      "args": ["tools/enhancement_review_session_mcp.mjs"],
-      "env": {
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/enhancement_review_session_mcp.mjs"],
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
     },
     "evavo-work-page-media-review-v1": {
-      "command": "node",
-      "args": ["tools/work_page_media_review_mcp.mjs"],
-      "env": {
-        "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/work_page_media_review_mcp.mjs"],
+      "env": {"EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"}
     },
     "evavo-work-header-candidate-review-v1": {
-      "command": "node",
-      "args": ["tools/work_header_candidate_review_mcp.mjs"],
-      "env": {
-        "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/work_header_candidate_review_mcp.mjs"],
+      "env": {"EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"}
     },
     "evavo-work-header-preview-admission-v1": {
-      "command": "node",
-      "args": ["tools/work_header_preview_admission_mcp.mjs"],
-      "env": {
-        "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"
-      }
+      "command": "node", "args": ["tools/work_header_preview_admission_mcp.mjs"],
+      "env": {"EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
     },
     "evavo-work-header-page-render-review-v1": {
-      "command": "node",
-      "args": ["tools/work_header_page_render_review_mcp.mjs"],
-      "env": {
-        "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/work_header_page_render_review_mcp.mjs"],
+      "env": {"EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"}
     },
     "evavo-existing-image-polish-v1": {
-      "command": "node",
-      "args": ["tools/existing_image_polish_mcp.mjs"],
-      "env": {
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/existing_image_polish_mcp.mjs"],
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
     },
     "evavo-existing-image-review-v1": {
-      "command": "node",
-      "args": ["tools/existing_image_review_mcp.mjs"],
-      "env": {
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/existing_image_review_mcp.mjs"],
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
     },
     "evavo-existing-image-inspection-v1": {
-      "command": "node",
-      "args": ["tools/existing_image_inspection_mcp.mjs"],
-      "env": {
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/existing_image_inspection_mcp.mjs"],
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
     },
     "evavo-existing-image-defect-detection-v1": {
-      "command": "node",
-      "args": ["tools/existing_image_defect_detection_mcp.mjs"],
-      "env": {
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/existing_image_defect_detection_mcp.mjs"],
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
+    },
+    "evavo-existing-image-finishing-plan-v1": {
+      "command": "node", "args": ["tools/existing_image_finishing_plan_mcp.mjs"],
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
     },
     "evavo-existing-image-edit-mask-v1": {
-      "command": "node",
-      "args": ["tools/existing_image_edit_mask_mcp.mjs"],
-      "env": {
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/existing_image_edit_mask_mcp.mjs"],
+      "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
     },
     "evavo-work-header-review-v1": {
-      "command": "node",
-      "args": ["tools/work_header_review_mcp.mjs"],
-      "env": {
-        "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
-        "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
-      }
+      "command": "node", "args": ["tools/work_header_review_mcp.mjs"],
+      "env": {"EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"}
     },
-    "evavo-local-agent-executor": {
-      "command": "node",
-      "args": ["../evavo-github-mcp/control-plane/local-agent-executor-mcp.mjs"],
-      "env": {"EVAVO_LOCAL_AGENT_MCP_ROLE": "art-studio"}
-    },
+    "evavo-local-agent-executor": {"command": "node", "args": ["../evavo-github-mcp/control-plane/local-agent-executor-mcp.mjs"], "env": {"EVAVO_LOCAL_AGENT_MCP_ROLE": "art-studio"}},
     "evavo-local-execution": {
       "command": "../evavo-local-compute/.venv/Scripts/python.exe",
       "args": ["../evavo-local-compute/scripts/local-execution-mcp.py"],
       "env": {
-        "EVAVO_LOCAL_EXECUTION_PREPARE_ENABLED": "enabled",
-        "EVAVO_LOCAL_EXECUTION_MCP_ENABLED": "enabled",
-        "EVAVO_LOCAL_EXECUTION_ENABLED": "enabled",
-        "EVAVO_LOCAL_NETWORK_ENABLED": "enabled",
-        "EVAVO_LOCAL_SCRIPT_EXECUTION_ENABLED": "enabled",
-        "EVAVO_LOCAL_REPOSITORY_CODE_ENABLED": "enabled",
-        "EVAVO_LOCAL_FILESYSTEM_WRITE_ENABLED": "enabled",
-        "EVAVO_LOCAL_GIT_MUTATION_ENABLED": "disabled",
-        "EVAVO_LOCAL_CONTAINER_ENABLED": "enabled",
-        "EVAVO_LOCAL_ARCHIVE_ENABLED": "enabled",
-        "EVAVO_LOCAL_EXECUTION_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads",
-        "EVAVO_COMPUTE_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads"
+        "EVAVO_LOCAL_EXECUTION_PREPARE_ENABLED": "enabled", "EVAVO_LOCAL_EXECUTION_MCP_ENABLED": "enabled", "EVAVO_LOCAL_EXECUTION_ENABLED": "enabled", "EVAVO_LOCAL_NETWORK_ENABLED": "enabled", "EVAVO_LOCAL_SCRIPT_EXECUTION_ENABLED": "enabled", "EVAVO_LOCAL_REPOSITORY_CODE_ENABLED": "enabled", "EVAVO_LOCAL_FILESYSTEM_WRITE_ENABLED": "enabled", "EVAVO_LOCAL_GIT_MUTATION_ENABLED": "disabled", "EVAVO_LOCAL_CONTAINER_ENABLED": "enabled", "EVAVO_LOCAL_ARCHIVE_ENABLED": "enabled", "EVAVO_LOCAL_EXECUTION_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads", "EVAVO_COMPUTE_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads"
       }
     },
-    "evavo-local-ai": {
-      "command": "../evavo-local-compute/.venv/Scripts/evavo-local-ai-mcp.exe",
-      "args": [],
-      "env": {"EVAVO_GIT_WORKSPACE": "C:\\GitRepos"}
-    },
-    "evavo-local-capability-fabric": {
-      "command": "node",
-      "args": ["../evavo-development-studio/scripts/local-capability-fabric-mcp.mjs"],
-      "env": {"EVAVO_CAPABILITY_REPOSITORY": "EVAVO-STUDIO/evavo-art-studio"}
-    },
+    "evavo-local-ai": {"command": "../evavo-local-compute/.venv/Scripts/evavo-local-ai-mcp.exe", "args": [], "env": {"EVAVO_GIT_WORKSPACE": "C:\\GitRepos"}},
+    "evavo-local-capability-fabric": {"command": "node", "args": ["../evavo-development-studio/scripts/local-capability-fabric-mcp.mjs"], "env": {"EVAVO_CAPABILITY_REPOSITORY": "EVAVO-STUDIO/evavo-art-studio"}},
     "evavo-animation-pipeline-v1": {
-      "command": "node",
-      "args": ["tools/animation_pipeline_control_plane_v1_1_mcp.mjs"],
-      "env": {
-        "EVAVO_ANIMATION_PIPELINE_ROLE": "art-studio",
-        "EVAVO_ANIMATION_PROVIDER_EXECUTION_ENABLED": "disabled",
-        "EVAVO_ANIMATION_AUTOMATIC_CREATIVE_APPROVAL_ENABLED": "disabled",
-        "EVAVO_ANIMATION_ARTIFACT_PROMOTION_ENABLED": "disabled",
-        "EVAVO_ANIMATION_TARGET_REPOSITORY_MUTATION_ENABLED": "disabled",
-        "EVAVO_ANIMATION_GIT_COMMIT_ENABLED": "disabled",
-        "EVAVO_ANIMATION_GIT_PUSH_ENABLED": "disabled",
-        "EVAVO_ANIMATION_RUNTIME_ACTIVATION_ENABLED": "disabled",
-        "EVAVO_ANIMATION_PUBLICATION_ENABLED": "disabled"
-      }
+      "command": "node", "args": ["tools/animation_pipeline_control_plane_v1_1_mcp.mjs"],
+      "env": {"EVAVO_ANIMATION_PIPELINE_ROLE": "art-studio", "EVAVO_ANIMATION_PROVIDER_EXECUTION_ENABLED": "disabled", "EVAVO_ANIMATION_AUTOMATIC_CREATIVE_APPROVAL_ENABLED": "disabled", "EVAVO_ANIMATION_ARTIFACT_PROMOTION_ENABLED": "disabled", "EVAVO_ANIMATION_TARGET_REPOSITORY_MUTATION_ENABLED": "disabled", "EVAVO_ANIMATION_GIT_COMMIT_ENABLED": "disabled", "EVAVO_ANIMATION_GIT_PUSH_ENABLED": "disabled", "EVAVO_ANIMATION_RUNTIME_ACTIVATION_ENABLED": "disabled", "EVAVO_ANIMATION_PUBLICATION_ENABLED": "disabled"}
     },
     "evavo-animation-frame-ledger-v1": {
-      "command": "node",
-      "args": ["tools/animation_frame_work_ledger_v1_mcp.mjs"],
-      "env": {
-        "EVAVO_ANIMATION_FRAME_LEDGER_ROLE": "art-studio",
-        "EVAVO_ANIMATION_PROVIDER_EXECUTION_ENABLED": "disabled",
-        "EVAVO_ANIMATION_AUTOMATIC_CREATIVE_APPROVAL_ENABLED": "disabled",
-        "EVAVO_ANIMATION_ARTIFACT_PROMOTION_ENABLED": "disabled",
-        "EVAVO_ANIMATION_TARGET_REPOSITORY_MUTATION_ENABLED": "disabled",
-        "EVAVO_ANIMATION_GIT_COMMIT_ENABLED": "disabled",
-        "EVAVO_ANIMATION_GIT_PUSH_ENABLED": "disabled",
-        "EVAVO_ANIMATION_RUNTIME_ACTIVATION_ENABLED": "disabled",
-        "EVAVO_ANIMATION_PUBLICATION_ENABLED": "disabled"
-      }
+      "command": "node", "args": ["tools/animation_frame_work_ledger_v1_mcp.mjs"],
+      "env": {"EVAVO_ANIMATION_FRAME_LEDGER_ROLE": "art-studio", "EVAVO_ANIMATION_PROVIDER_EXECUTION_ENABLED": "disabled", "EVAVO_ANIMATION_AUTOMATIC_CREATIVE_APPROVAL_ENABLED": "disabled", "EVAVO_ANIMATION_ARTIFACT_PROMOTION_ENABLED": "disabled", "EVAVO_ANIMATION_TARGET_REPOSITORY_MUTATION_ENABLED": "disabled", "EVAVO_ANIMATION_GIT_COMMIT_ENABLED": "disabled", "EVAVO_ANIMATION_GIT_PUSH_ENABLED": "disabled", "EVAVO_ANIMATION_RUNTIME_ACTIVATION_ENABLED": "disabled", "EVAVO_ANIMATION_PUBLICATION_ENABLED": "disabled"}
     },
-    "evavo-animation-execution-supervisor-v1": {
-      "command": "node",
-      "args": ["scripts/start-animation-execution-supervisor-mcp-v1.mjs"],
-      "env": {
-        "EVAVO_ANIMATION_EXECUTION_ENABLED": "disabled",
-        "EVAVO_ANIMATION_CREATIVE_APPROVAL_WRITE_ENABLED": "disabled"
-      }
-    },
-    "evavo-animation-character-family-v1": {
-      "command": "node",
-      "args": ["tools/animation_character_family_v1_mcp.mjs"],
-      "env": {"EVAVO_ANIMATION_CHARACTER_FAMILY_ROLE": "art-studio"}
-    }
+    "evavo-animation-execution-supervisor-v1": {"command": "node", "args": ["scripts/start-animation-execution-supervisor-mcp-v1.mjs"], "env": {"EVAVO_ANIMATION_EXECUTION_ENABLED": "disabled", "EVAVO_ANIMATION_CREATIVE_APPROVAL_WRITE_ENABLED": "disabled"}},
+    "evavo-animation-character-family-v1": {"command": "node", "args": ["tools/animation_character_family_v1_mcp.mjs"], "env": {"EVAVO_ANIMATION_CHARACTER_FAMILY_ROLE": "art-studio"}}
   }
 }
