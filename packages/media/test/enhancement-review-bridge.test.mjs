@@ -27,10 +27,11 @@ function manifest(overrides = {}) {
       "evavo_compare_work_header_candidates",
       "evavo_record_work_header_visual_critique",
       "evavo_resolve_work_header_selection",
+      "evavo_admit_work_header_candidate_preview",
       "evavo_review_work_header_candidate_page_render",
       "evavo_prepare_work_header_approval_packet",
     ],
-    mandatory_visual_checks: ["inspect source vs candidate", "compare responsive page renders", "retain current unless replacement proves material advantage"],
+    mandatory_visual_checks: ["inspect source vs candidate", "admit exact browser preview evidence", "compare responsive page renders", "retain current unless replacement proves material advantage"],
     approval_state: "unapproved",
     source_immutable: true,
     candidate_is_review_only: true,
@@ -39,6 +40,7 @@ function manifest(overrides = {}) {
     comparative_candidate_review_required: true,
     current_header_baseline_required: true,
     semantic_review_brief_required: true,
+    candidate_preview_admission_required: true,
     candidate_page_render_review_required: true,
     approval_packet_required: true,
     publication_allowed: false,
@@ -49,10 +51,11 @@ function manifest(overrides = {}) {
   };
 }
 
-test("admits Work header enhancement only with complete review boundary", () => {
+test("admits Work header enhancement only with complete preview/page review boundary", () => {
   const admitted = admitEnhancementStudioReviewManifest(manifest());
   assert.equal(admitted.profile, "web-hero");
   assert.equal(admitted.semanticReviewBriefRequired, true);
+  assert.equal(admitted.candidatePreviewAdmissionRequired, true);
   assert.equal(admitted.candidatePageRenderReviewRequired, true);
   assert.equal(admitted.approvalPacketRequired, true);
   assert.equal(admitted.publicationAllowed, false);
@@ -64,12 +67,21 @@ test("rejects publication authority", () => {
   assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ publication_allowed: true })), /forbidden publication\/approval authority/u);
 });
 
+test("rejects missing candidate preview admission", () => {
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ candidate_preview_admission_required: false })), /source-bound browser candidate-preview admission/u);
+});
+
 test("rejects missing candidate page-render review", () => {
   assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ candidate_page_render_review_required: false })), /candidate-specific desktop\/mobile page-render review/u);
 });
 
 test("rejects missing approval packet boundary", () => {
   assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ approval_packet_required: false })), /pre-approval packet/u);
+});
+
+test("rejects missing preview admission tool", () => {
+  const tools = manifest().mandatory_art_studio_tools.filter((tool) => tool !== "evavo_admit_work_header_candidate_preview");
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ mandatory_art_studio_tools: tools })), /must require evavo_admit_work_header_candidate_preview/u);
 });
 
 test("rejects missing page-render review tool", () => {
