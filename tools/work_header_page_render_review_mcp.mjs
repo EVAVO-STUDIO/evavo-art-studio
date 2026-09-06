@@ -4,14 +4,11 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import readline from "node:readline";
 
-import {
-  prepareWorkHeaderApprovalPacket,
-  reviewWorkHeaderPageRender,
-} from "../packages/media/dist/index.js";
+import { prepareWorkHeaderApprovalPacket, reviewWorkHeaderPageRender } from "../packages/media/dist/index.js";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-page-render-review";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -26,20 +23,20 @@ async function bound(path) {
 }
 
 async function runPageReview(args) {
-  for (const name of ["currentDesktopPath", "candidateDesktopPath", "currentMobilePath", "candidateMobilePath", "receiptPath", "proofPath"]) {
+  for (const name of ["candidateImagePath", "currentDesktopPath", "candidateDesktopPath", "currentMobilePath", "candidateMobilePath", "receiptPath", "proofPath"]) {
     if (typeof args[name] !== "string") throw new Error(`${name} is required.`);
   }
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required.");
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
 
-  const [currentDesktop, candidateDesktop, currentMobile, candidateMobile] = await Promise.all([
-    bound(args.currentDesktopPath), bound(args.candidateDesktopPath), bound(args.currentMobilePath), bound(args.candidateMobilePath),
+  const [candidateImage, currentDesktop, candidateDesktop, currentMobile, candidateMobile] = await Promise.all([
+    bound(args.candidateImagePath), bound(args.currentDesktopPath), bound(args.candidateDesktopPath), bound(args.currentMobilePath), bound(args.candidateMobilePath),
   ]);
   const result = await reviewWorkHeaderPageRender({
     pageSlug: args.pageSlug,
     pageTitle: args.pageTitle,
     candidateId: args.candidateId,
-    candidateSha256: args.candidateSha256,
+    candidateSha256: candidateImage.sha256,
     currentDesktop: currentDesktop.bytes,
     candidateDesktop: candidateDesktop.bytes,
     currentMobile: currentMobile.bytes,
@@ -59,6 +56,7 @@ async function runPageReview(args) {
   const proofPath = await allowed(args.proofPath, true);
   const receiptPath = await allowed(args.receiptPath, true);
   const sourceBindings = {
+    candidateImage: { path: candidateImage.path, sha256: candidateImage.sha256 },
     currentDesktop: { path: currentDesktop.path, sha256: currentDesktop.sha256 },
     candidateDesktop: { path: candidateDesktop.path, sha256: candidateDesktop.sha256 },
     currentMobile: { path: currentMobile.path, sha256: currentMobile.sha256 },
@@ -73,6 +71,7 @@ async function runPageReview(args) {
     evidence: result.evidence,
     approvalState: "unapproved",
     publicationAllowed: false,
+    cloudOverwriteAllowed: false,
     websiteMutationAllowed: false,
   }, null, 2)}\n`, { flag: "wx" });
   return { ok: true, proofPath, receiptPath, evidence: result.evidence };
@@ -84,9 +83,14 @@ async function verifyPageReceipt(path) {
   if (value.contract !== "evavo.work-header-page-render-review.v1" || !value.evidence) throw new Error("Page render receipt contract is invalid.");
   const proof = await bound(value.proofPath);
   if (proof.sha256 !== value.proofSha256) throw new Error("Page-render proof bytes changed after review.");
-  for (const [label, binding] of Object.entries(value.sourceBindings ?? {})) {
+  const bindings = value.sourceBindings ?? {};
+  for (const [label, binding] of Object.entries(bindings)) {
     const current = await bound(binding.path);
-    if (current.sha256 !== binding.sha256) throw new Error(`${label} screenshot bytes changed after page-render review.`);
+    if (current.sha256 !== binding.sha256) throw new Error(`${label} bytes changed after page-render review.`);
+  }
+  if (!bindings.candidateImage || bindings.candidateImage.sha256 !== value.evidence.candidateSha256) throw new Error("Page-render candidate-image binding does not match reviewed candidate SHA-256.");
+  if (bindings.currentDesktop?.sha256 !== value.evidence.currentDesktopSha256 || bindings.candidateDesktop?.sha256 !== value.evidence.candidateDesktopSha256 || bindings.currentMobile?.sha256 !== value.evidence.currentMobileSha256 || bindings.candidateMobile?.sha256 !== value.evidence.candidateMobileSha256) {
+    throw new Error("Page-render screenshot source bindings do not match review evidence.");
   }
   return { path: receipt.path, sha256: receipt.sha256, value };
 }
@@ -121,28 +125,28 @@ async function runApprovalPacket(args) {
 const tools = [
   {
     name: "evavo_work_header_page_render_review_capabilities",
-    description: "Describe candidate-specific current-vs-proposed desktop/mobile page review and pre-approval packet preparation.",
+    description: "Describe exact-candidate current-vs-proposed desktop/mobile Work-page review and review-only approval-packet preparation.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_review_work_header_candidate_page_render",
-    description: "Compare actual current and candidate Work-page renders on desktop and mobile. Binds screenshot hashes, rejects obscured titles, broken contrast/crops/layout and candidates that look worse than current.",
+    description: "Review actual current and candidate Work-page renders on desktop and mobile. Derives the candidate SHA from the candidate image file and binds it with all screenshot hashes.",
     inputSchema: {
       type: "object",
       properties: {
-        pageSlug: { type: "string" }, pageTitle: { type: "string" }, candidateId: { type: "string" }, candidateSha256: { type: "string" },
+        pageSlug: { type: "string" }, pageTitle: { type: "string" }, candidateId: { type: "string" }, candidateImagePath: { type: "string" },
         currentDesktopPath: { type: "string" }, candidateDesktopPath: { type: "string" }, currentMobilePath: { type: "string" }, candidateMobilePath: { type: "string" },
         titleLegibility: { type: "number", minimum: 0, maximum: 5 }, focalPointQuality: { type: "number", minimum: 0, maximum: 5 }, hierarchyQuality: { type: "number", minimum: 0, maximum: 5 }, responsiveConsistency: { type: "number", minimum: 0, maximum: 5 }, overallPageQuality: { type: "number", minimum: 0, maximum: 5 },
         titleObscured: { type: "boolean" }, textContrastFailure: { type: "boolean" }, importantSubjectCropped: { type: "boolean" }, layoutOverflowOrBreakage: { type: "boolean" }, candidateLooksWorseThanCurrent: { type: "boolean" }, notes: { type: "array", items: { type: "string" } },
         proofPath: { type: "string" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" },
       },
-      required: ["pageSlug", "pageTitle", "candidateId", "candidateSha256", "currentDesktopPath", "candidateDesktopPath", "currentMobilePath", "candidateMobilePath", "titleLegibility", "focalPointQuality", "hierarchyQuality", "responsiveConsistency", "overallPageQuality", "proofPath", "receiptPath", "confirmLocalWrite"],
+      required: ["pageSlug", "pageTitle", "candidateId", "candidateImagePath", "currentDesktopPath", "candidateDesktopPath", "currentMobilePath", "candidateMobilePath", "titleLegibility", "focalPointQuality", "hierarchyQuality", "responsiveConsistency", "overallPageQuality", "proofPath", "receiptPath", "confirmLocalWrite"],
       additionalProperties: false,
     },
   },
   {
     name: "evavo_prepare_work_header_approval_packet",
-    description: "Reverify the selection and candidate-specific page-render evidence and prepare a review-only packet for explicit approval. Does not approve, mutate the website, publish or overwrite Cloudinary.",
+    description: "Reverify selection, exact candidate bytes, proof and page-render screenshots, then prepare a review-only packet for explicit approval. Does not approve, publish, mutate website or overwrite Cloudinary.",
     inputSchema: { type: "object", properties: { selectionReceiptPath: { type: "string" }, pageRenderReceiptPath: { type: "string" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } }, required: ["selectionReceiptPath", "pageRenderReceiptPath", "receiptPath", "confirmLocalWrite"], additionalProperties: false },
   },
 ];
@@ -150,6 +154,8 @@ const tools = [
 function capabilities() {
   return {
     contract: "evavo.work-header-page-render-review.v1",
+    exactCandidateImageSha256Binding: true,
+    candidateImageReverifiedBeforeApprovalPacket: true,
     currentVsCandidateDesktopReview: true,
     currentVsCandidateMobileReview: true,
     screenshotSha256Binding: true,
