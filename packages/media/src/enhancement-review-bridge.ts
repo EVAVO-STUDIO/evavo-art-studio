@@ -26,6 +26,7 @@ export interface EnhancementStudioReviewManifest {
   readonly source_immutable: boolean;
   readonly candidate_is_review_only: boolean;
   readonly art_studio_visual_review_required: boolean;
+  readonly durable_image_review_session_required?: boolean;
   readonly page_context_review_required: boolean;
   readonly comparative_candidate_review_required?: boolean;
   readonly current_header_baseline_required?: boolean;
@@ -45,6 +46,7 @@ export interface AdmittedEnhancementStudioReview {
   readonly sourceSha256: string;
   readonly candidateSha256: string;
   readonly learnedCandidate: boolean;
+  readonly durableImageReviewSessionRequired: true;
   readonly pageContextReviewRequired: boolean;
   readonly comparativeCandidateReviewRequired: boolean;
   readonly currentHeaderBaselineRequired: boolean;
@@ -87,6 +89,7 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
   if (value.contract !== ENHANCEMENT_ART_REVIEW_CONTRACT) throw new Error(`Unsupported Enhancement Studio review contract ${JSON.stringify(value.contract)}.`);
   if (value.source_immutable !== true || value.candidate_is_review_only !== true) throw new Error("Enhancement Studio manifest must preserve immutable-source and review-candidate boundaries.");
   if (value.art_studio_visual_review_required !== true) throw new Error("Enhancement Studio candidate cannot bypass Art Studio visual review.");
+  if (value.durable_image_review_session_required !== true) throw new Error("Enhancement Studio candidates must require a durable source-bound Art Studio image-review session before downstream use.");
   if (value.publication_allowed !== false || value.cloud_overwrite_allowed !== false || value.automatic_creative_approval !== false || value.automatic_release_approval !== false) throw new Error("Enhancement Studio manifest attempted to carry forbidden publication/approval authority.");
   if (value.approval_state !== "unapproved") throw new Error("Enhancement Studio candidates must enter Art Studio in the unapproved state.");
 
@@ -107,7 +110,13 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
   const visualChecks = strings(value.mandatory_visual_checks, "mandatory_visual_checks");
   if (visualChecks.length < 1) throw new Error("Enhancement Studio review manifest must include visual review checks.");
 
-  for (const tool of ["evavo_review_existing_image_quality", "evavo_review_existing_image_edit", "evavo_create_existing_image_inspection_proof"]) {
+  for (const tool of [
+    "evavo_create_image_review_session",
+    "evavo_verify_image_review_session",
+    "evavo_review_existing_image_quality",
+    "evavo_review_existing_image_edit",
+    "evavo_create_existing_image_inspection_proof",
+  ]) {
     if (!requiredTools.includes(tool)) throw new Error(`Enhancement Studio review manifest omitted required Art Studio tool ${tool}.`);
   }
   if (role === "work-header") {
@@ -138,6 +147,7 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
     sourceSha256: sha(value.source_sha256, "source_sha256"),
     candidateSha256: sha(value.candidate_sha256, "candidate_sha256"),
     learnedCandidate: value.learned_candidate === true,
+    durableImageReviewSessionRequired: true,
     pageContextReviewRequired: value.page_context_review_required === true,
     comparativeCandidateReviewRequired: value.comparative_candidate_review_required === true,
     currentHeaderBaselineRequired: value.current_header_baseline_required === true,
