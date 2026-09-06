@@ -33,6 +33,7 @@ async function base(overrides = {}) {
     hierarchyQuality: 4.4,
     responsiveConsistency: 4.5,
     overallPageQuality: 4.5,
+    currentPageQuality: 4.0,
     titleObscured: false,
     textContrastFailure: false,
     importantSubjectCropped: false,
@@ -43,18 +44,41 @@ async function base(overrides = {}) {
   };
 }
 
-test("page-render review binds screenshot hashes and comparable viewport geometry", async () => {
+test("page-render review binds screenshot hashes and proves page-quality advantage", async () => {
   const result = await reviewWorkHeaderPageRender(await base());
+  assert.equal(result.contract, "evavo.work-header-page-render-review.v2");
   assert.equal(result.evidence.verdict, "page-shortlist");
   assert.match(result.evidence.currentDesktopSha256, /^[0-9a-f]{64}$/u);
   assert.match(result.evidence.candidateMobileSha256, /^[0-9a-f]{64}$/u);
   assert.equal(result.evidence.exactScreenshotHashesBound, true);
   assert.equal(result.evidence.comparableViewportGeometryVerified, true);
   assert.equal(result.evidence.candidateRenderDifferenceVerified, true);
+  assert.equal(result.evidence.materialPageQualityAdvantageVerified, true);
+  assert.equal(result.evidence.pageQualityAdvantage, 0.5);
   assert.equal(result.evidence.desktopViewport.dimensionsMatch, true);
   assert.equal(result.evidence.mobileViewport.dimensionsMatch, true);
   assert.equal(result.evidence.automaticWebsiteMutationAllowed, false);
   assert.ok(result.proofPng.length > 0);
+});
+
+test("page-render review rejects a candidate that is merely acceptable but not materially better", async () => {
+  const result = await reviewWorkHeaderPageRender(await base({
+    currentPageQuality: 4.4,
+    overallPageQuality: 4.5,
+  }));
+  assert.equal(result.evidence.materialPageQualityAdvantageVerified, false);
+  assert.ok(result.evidence.disqualifiers.includes("candidate-page-lacks-material-advantage-over-current"));
+  assert.equal(result.evidence.verdict, "reject");
+});
+
+test("minimum page-quality advantage is configurable but bounded", async () => {
+  const result = await reviewWorkHeaderPageRender(await base({
+    currentPageQuality: 4.2,
+    overallPageQuality: 4.5,
+    minimumPageQualityAdvantage: 0.2,
+  }));
+  assert.equal(result.evidence.materialPageQualityAdvantageVerified, true);
+  assert.equal(result.evidence.minimumPageQualityAdvantage, 0.2);
 });
 
 test("page-render review hard rejects a mobile subject crop failure", async () => {
