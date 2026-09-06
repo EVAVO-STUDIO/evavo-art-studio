@@ -4,11 +4,11 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers exact Chrome Work preview and full receipt lineage", async () => {
+test("image quality doctor covers approval-packet reverification", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_15"',
-    'SERVER_VERSION = "1.15.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_16"',
+    'SERVER_VERSION = "1.16.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -17,7 +17,7 @@ test("image quality doctor covers exact Chrome Work preview and full receipt lin
     'id: "enhancement-session"',
     'id: "work-preview-core-v7"',
     'id: "work-preview-mcp-v170"',
-    'id: "work-page-review-v190"',
+    'id: "work-page-review-v200"',
     'id: "durable-review"',
     'id: "safe-bundle"',
     'id: "mcp-registration"',
@@ -26,22 +26,23 @@ test("image quality doctor covers exact Chrome Work preview and full receipt lin
   ]) assert.ok(source.includes(token), `missing doctor contract token: ${token}`);
 });
 
-test("doctor verifies full page-review receipt lineage before approval", async () => {
+test("doctor requires read-only approval packet verification and recomputation", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'SERVER_VERSION = "1.9.0"',
+    'SERVER_VERSION = "2.0.0"',
     "selectionReceiptShaAndLengthBound: true",
     "candidateReviewReceiptShaAndLengthBound: true",
     "previewAdmissionReceiptShaAndLengthBound: true",
     "previewManifestShaAndLengthBound: true",
     "pageSourceBindingsShaAndLengthReverified: true",
     "fullReceiptLineageVerifiedBeforeApprovalPacket: true",
-    "fullReceiptLineageVerified: true",
-    "browserResponseMetadataPersistedInPageReceipt: true",
-    "browserResponseMetadataReverifiedBeforeApprovalPacket: true",
-    "selectedLocalCandidateMustMatchPreviewedResponseBytes: true",
-    "fullPageReviewReceiptLineageChecked: true",
-  ]) assert.ok(source.includes(token), `missing full receipt lineage token: ${token}`);
+    "approvalPacketReverificationAvailable: true",
+    "approvalPacketCoreRecomputedDuringVerification: true",
+    "staleApprovalPacketLineageRejected: true",
+    "evavo_verify_work_header_approval_packet",
+    "approvalPacketRecomputedAndMatched: true",
+    "approvalPacketReverificationChecked: true",
+  ]) assert.ok(source.includes(token), `missing approval verification token: ${token}`);
 });
 
 test("MCP configuration exposes hardened image-review chain", async () => {
