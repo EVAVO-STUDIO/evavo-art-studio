@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { createExistingImageDifferenceProof } from "./existing-image-diff.js";
+import { segmentDefectMaskRegions, type DefectRegionComponent } from "./defect-region-components.js";
 
 export interface ExistingImageInspectionProofResult {
   readonly png: Buffer;
@@ -9,18 +10,13 @@ export interface ExistingImageInspectionProofResult {
     changedPixelRatio: number;
     changeBounds: Readonly<{ left: number; top: number; right: number; bottom: number }> | null;
     inspectionBounds: Readonly<{ left: number; top: number; width: number; height: number }>;
+    changeRegions: readonly DefectRegionComponent[];
     panels: readonly string[];
   }>;
 }
 
 function escapeXml(value: string): string {
-  return value.replace(/[<>&"']/g, (char) => ({
-    "<": "&lt;",
-    ">": "&gt;",
-    "&": "&amp;",
-    '"': "&quot;",
-    "'": "&apos;",
-  })[char]!);
+  return value.replace(/[<>&"']/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[char]!);
 }
 
 async function label(width: number, text: string): Promise<Buffer> {
@@ -29,67 +25,37 @@ async function label(width: number, text: string): Promise<Buffer> {
 }
 
 async function panel(encoded: Buffer, text: string, background: string, width = 560, height = 360): Promise<Buffer> {
-  const image = await sharp(encoded, { failOn: "error" })
-    .resize({ width, height, fit: "contain", background })
-    .flatten({ background })
-    .png()
-    .toBuffer();
+  const image = await sharp(encoded, { failOn: "error" }).resize({ width, height, fit: "contain", background }).flatten({ background }).png().toBuffer();
   return sharp({ create: { width, height: height + 40, channels: 4, background: "#080808" } })
-    .composite([{ input: image, left: 0, top: 0 }, { input: await label(width, text), left: 0, top: height }])
-    .png()
-    .toBuffer();
+    .composite([{ input: image, left: 0, top: 0 }, { input: await label(width, text), left: 0, top: height }]).png().toBuffer();
 }
 
-async function cropPanel(
-  encoded: Buffer,
-  bounds: { left: number; top: number; width: number; height: number },
-  text: string,
-  background: string,
-  width = 560,
-  height = 360,
-): Promise<Buffer> {
-  const crop = await sharp(encoded, { failOn: "error" })
-    .extract(bounds)
-    .resize({ width, height, fit: "contain", kernel: sharp.kernel.nearest, background })
-    .flatten({ background })
-    .png()
-    .toBuffer();
+async function cropPanel(encoded: Buffer, bounds: { left: number; top: number; width: number; height: number }, text: string, background: string, width = 560, height = 360): Promise<Buffer> {
+  const crop = await sharp(encoded, { failOn: "error" }).extract(bounds).resize({ width, height, fit: "contain", kernel: sharp.kernel.nearest, background }).flatten({ background }).png().toBuffer();
   return sharp({ create: { width, height: height + 40, channels: 4, background: "#080808" } })
-    .composite([{ input: crop, left: 0, top: 0 }, { input: await label(width, text), left: 0, top: height }])
-    .png()
-    .toBuffer();
+    .composite([{ input: crop, left: 0, top: 0 }, { input: await label(width, text), left: 0, top: height }]).png().toBuffer();
 }
 
 async function alphaPanel(encoded: Buffer, text: string, width = 560, height = 360): Promise<Buffer> {
-  const alpha = await sharp(encoded, { failOn: "error" })
-    .ensureAlpha()
-    .extractChannel(3)
-    .resize({ width, height, fit: "contain", kernel: sharp.kernel.nearest, background: "#000000" })
-    .png()
-    .toBuffer();
+  const alpha = await sharp(encoded, { failOn: "error" }).ensureAlpha().extractChannel(3).resize({ width, height, fit: "contain", kernel: sharp.kernel.nearest, background: "#000000" }).png().toBuffer();
   return sharp({ create: { width, height: height + 40, channels: 4, background: "#080808" } })
-    .composite([{ input: alpha, left: 0, top: 0 }, { input: await label(width, text), left: 0, top: height }])
-    .png()
-    .toBuffer();
+    .composite([{ input: alpha, left: 0, top: 0 }, { input: await label(width, text), left: 0, top: height }]).png().toBuffer();
 }
 
-/**
- * Creates a proof sheet designed for actual retouch review rather than just
- * bookkeeping: full-image hostile backgrounds, pixel-preserving zooms around
- * the changed region, and alpha-channel inspection are shown together.
- */
-export async function createExistingImageEditInspectionProof(
-  sourceEncoded: Buffer,
-  editedEncoded: Buffer,
-): Promise<ExistingImageInspectionProofResult> {
+function paddedRegionBounds(region: DefectRegionComponent, imageWidth: number, imageHeight: number, padding = 18) {
+  const left = Math.max(0, region.bounds.left - padding);
+  const top = Math.max(0, region.bounds.top - padding);
+  const right = Math.min(imageWidth - 1, region.bounds.right + padding);
+  const bottom = Math.min(imageHeight - 1, region.bounds.bottom + padding);
+  return { left, top, width: right - left + 1, height: bottom - top + 1 };
+}
+
+/** Creates hostile-background, alpha and top connected change-region proof panels. */
+export async function createExistingImageEditInspectionProof(sourceEncoded: Buffer, editedEncoded: Buffer): Promise<ExistingImageInspectionProofResult> {
   const sourceMeta = await sharp(sourceEncoded, { failOn: "error" }).metadata();
   const editedMeta = await sharp(editedEncoded, { failOn: "error" }).metadata();
-  if (!sourceMeta.width || !sourceMeta.height || !editedMeta.width || !editedMeta.height) {
-    throw new Error("Inspection proof inputs must have dimensions.");
-  }
-  if (sourceMeta.width !== editedMeta.width || sourceMeta.height !== editedMeta.height) {
-    throw new Error("Inspection proof requires source and edited images with identical dimensions.");
-  }
+  if (!sourceMeta.width || !sourceMeta.height || !editedMeta.width || !editedMeta.height) throw new Error("Inspection proof inputs must have dimensions.");
+  if (sourceMeta.width !== editedMeta.width || sourceMeta.height !== editedMeta.height) throw new Error("Inspection proof requires source and edited images with identical dimensions.");
 
   const diff = await createExistingImageDifferenceProof(sourceEncoded, editedEncoded);
   const changed = diff.evidence.changeBounds;
@@ -103,31 +69,42 @@ export async function createExistingImageEditInspectionProof(
       }
     : { left: 0, top: 0, width: sourceMeta.width, height: sourceMeta.height };
 
-  const panels = await Promise.all([
-    panel(sourceEncoded, "SOURCE • white background • runtime composition", "#ffffff"),
-    panel(editedEncoded, "EDITED • white background • runtime composition", "#ffffff"),
-    panel(sourceEncoded, "SOURCE • black hostile background", "#000000"),
-    panel(editedEncoded, "EDITED • black hostile background", "#000000"),
-    cropPanel(sourceEncoded, inspectionBounds, "SOURCE • changed-region pixel zoom", "#777777"),
-    cropPanel(editedEncoded, inspectionBounds, "EDITED • changed-region pixel zoom", "#777777"),
-    alphaPanel(sourceEncoded, "SOURCE • alpha channel"),
-    alphaPanel(editedEncoded, "EDITED • alpha channel"),
-  ]);
+  const segmented = await segmentDefectMaskRegions(diff.changeMaskPng, { minimumPixelCount: 1, maximumRegions: 3, mergeGap: 2 });
+  const changeRegions = segmented.regions;
+  const panelInputs: Array<{ buffer: Promise<Buffer>; id: string }> = [
+    { buffer: panel(sourceEncoded, "SOURCE • white background • runtime composition", "#ffffff"), id: "source-white-runtime" },
+    { buffer: panel(editedEncoded, "EDITED • white background • runtime composition", "#ffffff"), id: "edited-white-runtime" },
+    { buffer: panel(sourceEncoded, "SOURCE • black hostile background", "#000000"), id: "source-black-hostile" },
+    { buffer: panel(editedEncoded, "EDITED • black hostile background", "#000000"), id: "edited-black-hostile" },
+    { buffer: alphaPanel(sourceEncoded, "SOURCE • alpha channel"), id: "source-alpha-channel" },
+    { buffer: alphaPanel(editedEncoded, "EDITED • alpha channel"), id: "edited-alpha-channel" },
+  ];
 
+  for (const region of changeRegions) {
+    const bounds = paddedRegionBounds(region, sourceMeta.width, sourceMeta.height);
+    const summary = `${region.id} • ${region.pixelCount}px • ${(region.pixelRatio * 100).toFixed(3)}%`;
+    panelInputs.push(
+      { buffer: cropPanel(sourceEncoded, bounds, `SOURCE • ${summary}`, "#777777"), id: `source-${region.id}-pixel-zoom` },
+      { buffer: cropPanel(editedEncoded, bounds, `EDITED • ${summary}`, "#777777"), id: `edited-${region.id}-pixel-zoom` },
+    );
+  }
+
+  if (changeRegions.length === 0) {
+    panelInputs.push(
+      { buffer: cropPanel(sourceEncoded, inspectionBounds, "SOURCE • no pixel changes detected", "#777777"), id: "source-no-change-pixel-zoom" },
+      { buffer: cropPanel(editedEncoded, inspectionBounds, "EDITED • no pixel changes detected", "#777777"), id: "edited-no-change-pixel-zoom" },
+    );
+  }
+
+  const panels = await Promise.all(panelInputs.map((entry) => entry.buffer));
   const panelWidth = 560;
   const panelHeight = 400;
   const gap = 14;
+  const rows = Math.ceil(panels.length / 2);
   const sheetWidth = panelWidth * 2 + gap;
-  const sheetHeight = panelHeight * 4 + gap * 3;
-  const overlays = panels.map((input, index) => ({
-    input,
-    left: (index % 2) * (panelWidth + gap),
-    top: Math.floor(index / 2) * (panelHeight + gap),
-  }));
-  const png = await sharp({ create: { width: sheetWidth, height: sheetHeight, channels: 4, background: "#151515" } })
-    .composite(overlays)
-    .png()
-    .toBuffer();
+  const sheetHeight = panelHeight * rows + gap * Math.max(0, rows - 1);
+  const overlays = panels.map((input, index) => ({ input, left: (index % 2) * (panelWidth + gap), top: Math.floor(index / 2) * (panelHeight + gap) }));
+  const png = await sharp({ create: { width: sheetWidth, height: sheetHeight, channels: 4, background: "#151515" } }).composite(overlays).png().toBuffer();
 
   return {
     png,
@@ -137,16 +114,8 @@ export async function createExistingImageEditInspectionProof(
       changedPixelRatio: diff.evidence.changedPixelRatio,
       changeBounds: diff.evidence.changeBounds,
       inspectionBounds: Object.freeze(inspectionBounds),
-      panels: Object.freeze([
-        "source-white-runtime",
-        "edited-white-runtime",
-        "source-black-hostile",
-        "edited-black-hostile",
-        "source-changed-region-pixel-zoom",
-        "edited-changed-region-pixel-zoom",
-        "source-alpha-channel",
-        "edited-alpha-channel",
-      ]),
+      changeRegions: Object.freeze(changeRegions),
+      panels: Object.freeze(panelInputs.map((entry) => entry.id)),
     }),
   };
 }
