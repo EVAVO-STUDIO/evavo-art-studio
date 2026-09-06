@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { admitEnhancementStudioReviewManifest } from "../dist/index.js";
+import { admitEnhancementStudioReviewManifest, ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256 } from "../dist/index.js";
 
 function manifest(overrides = {}) {
   return {
     contract: "evavo.enhancement-art-review.v1",
+    schema_sha256: ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256,
     source_path: "C:/EVAVO/source.png",
     source_sha256: "a".repeat(64),
     source_width: 800,
@@ -54,9 +55,10 @@ function manifest(overrides = {}) {
   };
 }
 
-test("admits Work header enhancement only with durable review plus complete preview/page boundary", () => {
+test("admits Work header enhancement only with exact shared schema and complete review boundary", () => {
   const admitted = admitEnhancementStudioReviewManifest(manifest());
   assert.equal(admitted.profile, "web-hero");
+  assert.equal(admitted.schemaSha256, ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256);
   assert.equal(admitted.candidateAspectRatioRelativeDrift, 0);
   assert.equal(admitted.durableImageReviewSessionRequired, true);
   assert.equal(admitted.semanticReviewBriefRequired, true);
@@ -68,15 +70,16 @@ test("admits Work header enhancement only with durable review plus complete prev
   assert.equal(admitted.finalApprovalRequired, true);
 });
 
+test("rejects stale shared schema digest", () => {
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ schema_sha256: "0".repeat(64) })), /stale or different shared review schema SHA-256/u);
+});
+
 test("rejects candidate dimensions smaller than immutable source", () => {
   assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ candidate_width: 799, candidate_height: 900 })), /cannot be smaller/u);
 });
 
 test("rejects material aspect-ratio drift even when candidate is larger", () => {
-  assert.throws(
-    () => admitEnhancementStudioReviewManifest(manifest({ candidate_width: 1600, candidate_height: 1000 })),
-    /aspect ratio drift .* exceeds preservation limit/u,
-  );
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ candidate_width: 1600, candidate_height: 1000 })), /aspect ratio drift .* exceeds preservation limit/u);
 });
 
 test("allows tiny upscale rounding drift inside preservation limit", () => {
