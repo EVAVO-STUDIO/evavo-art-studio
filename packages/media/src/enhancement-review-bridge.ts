@@ -1,6 +1,7 @@
 import type { ImageReviewProfileName } from "./image-review-profiles.js";
 
 export const ENHANCEMENT_ART_REVIEW_CONTRACT = "evavo.enhancement-art-review.v1" as const;
+export const ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT = 0.0025 as const;
 
 const REVIEW_PROFILES = new Set<ImageReviewProfileName>([
   "logo-transparent", "web-hero", "ui-screenshot", "product-cutout", "photo", "cel-animation-frame", "pixel-art", "texture", "illustration",
@@ -45,6 +46,7 @@ export interface AdmittedEnhancementStudioReview {
   readonly intendedRole: "work-header" | "support-image" | "tile" | "logo" | "ui" | "photo" | "sprite" | "illustration" | "texture";
   readonly sourceSha256: string;
   readonly candidateSha256: string;
+  readonly candidateAspectRatioRelativeDrift: number;
   readonly learnedCandidate: boolean;
   readonly durableImageReviewSessionRequired: true;
   readonly pageContextReviewRequired: boolean;
@@ -84,6 +86,12 @@ function strings(value: unknown, label: string): readonly string[] {
   return Object.freeze([...new Set(value)]);
 }
 
+function relativeAspectRatioDrift(sourceWidth: number, sourceHeight: number, candidateWidth: number, candidateHeight: number): number {
+  const sourceAspect = sourceWidth / sourceHeight;
+  const candidateAspect = candidateWidth / candidateHeight;
+  return Math.abs(candidateAspect - sourceAspect) / sourceAspect;
+}
+
 export function admitEnhancementStudioReviewManifest(value: EnhancementStudioReviewManifest): AdmittedEnhancementStudioReview {
   if (!value || typeof value !== "object") throw new Error("Enhancement Studio review manifest is required.");
   if (value.contract !== ENHANCEMENT_ART_REVIEW_CONTRACT) throw new Error(`Unsupported Enhancement Studio review contract ${JSON.stringify(value.contract)}.`);
@@ -105,6 +113,10 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
   const candidateWidth = positiveInteger(value.candidate_width, "candidate_width");
   const candidateHeight = positiveInteger(value.candidate_height, "candidate_height");
   if (candidateWidth < sourceWidth || candidateHeight < sourceHeight) throw new Error("Enhancement Studio candidate dimensions cannot be smaller than the immutable source dimensions.");
+  const candidateAspectRatioRelativeDrift = relativeAspectRatioDrift(sourceWidth, sourceHeight, candidateWidth, candidateHeight);
+  if (candidateAspectRatioRelativeDrift > ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT) {
+    throw new Error(`Enhancement Studio candidate aspect ratio drift ${candidateAspectRatioRelativeDrift.toFixed(6)} exceeds preservation limit ${ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT}.`);
+  }
 
   const requiredTools = strings(value.mandatory_art_studio_tools, "mandatory_art_studio_tools");
   const visualChecks = strings(value.mandatory_visual_checks, "mandatory_visual_checks");
@@ -146,6 +158,7 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
     intendedRole: role,
     sourceSha256: sha(value.source_sha256, "source_sha256"),
     candidateSha256: sha(value.candidate_sha256, "candidate_sha256"),
+    candidateAspectRatioRelativeDrift,
     learnedCandidate: value.learned_candidate === true,
     durableImageReviewSessionRequired: true,
     pageContextReviewRequired: value.page_context_review_required === true,
