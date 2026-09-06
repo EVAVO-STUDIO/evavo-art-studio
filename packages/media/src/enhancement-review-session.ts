@@ -4,6 +4,7 @@ import {
   admitEnhancementStudioReviewManifest,
   type EnhancementStudioReviewManifest,
 } from "./enhancement-review-bridge.js";
+import { reviewEnhancementLocalDetailRisk } from "./enhancement-local-detail-risk.js";
 import { orchestrateImageReview } from "./image-review-orchestrator.js";
 import { reviewExistingImageEdit } from "./existing-image-quality-review.js";
 import { createWorkPageMediaReviewBundle } from "./work-page-media-review.js";
@@ -32,6 +33,7 @@ export interface EnhancementReviewSessionResult {
     candidateDimensionsVerified: boolean;
     nativeCandidateReview: Awaited<ReturnType<typeof orchestrateImageReview>>;
     sourceSpaceEditReview: Awaited<ReturnType<typeof reviewExistingImageEdit>>["evidence"];
+    localDetailRisk: Awaited<ReturnType<typeof reviewEnhancementLocalDetailRisk>> | null;
     pageContextReview: Awaited<ReturnType<typeof createWorkPageMediaReviewBundle>>["evidence"] | null;
     materialTechnicalBenefitFound: boolean;
     currentHeaderBaselineComplete: boolean;
@@ -103,6 +105,10 @@ export async function reviewEnhancementStudioCandidate(
     maximumPinholeRegression: 0.00003,
   });
 
+  const localDetailRisk = admitted.learnedCandidate
+    ? await reviewEnhancementLocalDetailRisk(spec.source, spec.candidate)
+    : null;
+
   let pageContextReview: Awaited<ReturnType<typeof createWorkPageMediaReviewBundle>>["evidence"] | null = null;
   let pageProofPng: Buffer | undefined;
   if (admitted.pageContextReviewRequired) {
@@ -153,6 +159,22 @@ export async function reviewEnhancementStudioCandidate(
     ...(pageContextReview?.warnings ?? []).map((item) => `page:${item}`),
   ];
 
+  if (localDetailRisk) {
+    if (localDetailRisk.highDetailPatchFraction >= 0.20) {
+      blockers.push(`art-studio-local-invented-detail-risk:${localDetailRisk.highDetailPatchFraction.toFixed(3)}`);
+    } else if (localDetailRisk.highDetailPatchFraction >= 0.08) {
+      warnings.push(`art-studio-local-detail-spike-review:${localDetailRisk.highDetailPatchFraction.toFixed(3)}`);
+    }
+    if (localDetailRisk.lowDetailPatchFraction >= 0.30) {
+      blockers.push(`art-studio-local-oversmoothing-risk:${localDetailRisk.lowDetailPatchFraction.toFixed(3)}`);
+    } else if (localDetailRisk.lowDetailPatchFraction >= 0.15) {
+      warnings.push(`art-studio-local-detail-loss-review:${localDetailRisk.lowDetailPatchFraction.toFixed(3)}`);
+    }
+    if (localDetailRisk.maximumDetailRatio > 5) {
+      warnings.push(`art-studio-extreme-local-detail-ratio:${localDetailRisk.maximumDetailRatio.toFixed(2)}x`);
+    }
+  }
+
   const materialTechnicalBenefitFound = sourceSpaceEdit.evidence.improvements.length > 0 ||
     sourceSpaceEdit.evidence.edited.score >= sourceSpaceEdit.evidence.source.score + 3;
   if (!materialTechnicalBenefitFound) {
@@ -200,6 +222,7 @@ export async function reviewEnhancementStudioCandidate(
       candidateDimensionsVerified,
       nativeCandidateReview,
       sourceSpaceEditReview: sourceSpaceEdit.evidence,
+      localDetailRisk,
       pageContextReview,
       materialTechnicalBenefitFound,
       currentHeaderBaselineComplete,
