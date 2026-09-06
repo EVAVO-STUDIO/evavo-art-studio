@@ -19,6 +19,8 @@ function manifest(overrides = {}) {
     intended_role: "work-header",
     learned_candidate: true,
     mandatory_art_studio_tools: [
+      "evavo_create_image_review_session",
+      "evavo_verify_image_review_session",
       "evavo_review_existing_image_quality",
       "evavo_review_existing_image_edit",
       "evavo_create_existing_image_inspection_proof",
@@ -31,11 +33,12 @@ function manifest(overrides = {}) {
       "evavo_review_work_header_candidate_page_render",
       "evavo_prepare_work_header_approval_packet",
     ],
-    mandatory_visual_checks: ["inspect source vs candidate", "admit exact browser preview evidence", "compare responsive page renders", "retain current unless replacement proves material advantage"],
+    mandatory_visual_checks: ["create durable source-bound review receipt", "inspect ranked defect/artifact evidence", "inspect source vs candidate", "admit exact browser preview evidence", "compare responsive page renders", "retain current unless replacement proves material advantage"],
     approval_state: "unapproved",
     source_immutable: true,
     candidate_is_review_only: true,
     art_studio_visual_review_required: true,
+    durable_image_review_session_required: true,
     page_context_review_required: true,
     comparative_candidate_review_required: true,
     current_header_baseline_required: true,
@@ -51,9 +54,10 @@ function manifest(overrides = {}) {
   };
 }
 
-test("admits Work header enhancement only with complete preview/page review boundary", () => {
+test("admits Work header enhancement only with durable review plus complete preview/page boundary", () => {
   const admitted = admitEnhancementStudioReviewManifest(manifest());
   assert.equal(admitted.profile, "web-hero");
+  assert.equal(admitted.durableImageReviewSessionRequired, true);
   assert.equal(admitted.semanticReviewBriefRequired, true);
   assert.equal(admitted.candidatePreviewAdmissionRequired, true);
   assert.equal(admitted.candidatePageRenderReviewRequired, true);
@@ -65,6 +69,20 @@ test("admits Work header enhancement only with complete preview/page review boun
 
 test("rejects publication authority", () => {
   assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ publication_allowed: true })), /forbidden publication\/approval authority/u);
+});
+
+test("rejects missing durable image review session requirement", () => {
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ durable_image_review_session_required: false })), /durable source-bound Art Studio image-review session/u);
+});
+
+test("rejects missing durable review-session tool", () => {
+  const tools = manifest().mandatory_art_studio_tools.filter((tool) => tool !== "evavo_create_image_review_session");
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ mandatory_art_studio_tools: tools })), /omitted required Art Studio tool evavo_create_image_review_session/u);
+});
+
+test("rejects missing review-session verifier tool", () => {
+  const tools = manifest().mandatory_art_studio_tools.filter((tool) => tool !== "evavo_verify_image_review_session");
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ mandatory_art_studio_tools: tools })), /omitted required Art Studio tool evavo_verify_image_review_session/u);
 });
 
 test("rejects missing candidate preview admission", () => {
