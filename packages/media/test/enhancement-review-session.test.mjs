@@ -8,10 +8,7 @@ import { reviewEnhancementStudioCandidate } from "../dist/index.js";
 async function makePng(width, height, pixel) {
   const raw = Buffer.alloc(width * height * 4);
   for (let i = 0; i < raw.length; i += 4) {
-    raw[i] = pixel[0];
-    raw[i + 1] = pixel[1];
-    raw[i + 2] = pixel[2];
-    raw[i + 3] = pixel[3];
+    raw[i] = pixel[0]; raw[i + 1] = pixel[1]; raw[i + 2] = pixel[2]; raw[i + 3] = pixel[3];
   }
   return sharp(raw, { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
@@ -33,6 +30,7 @@ async function makePatternPng(width, height) {
 const sha = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
 function manifest(source, candidate, width, height, role = "illustration", profile = "illustration", learned = false) {
+  const workHeader = role === "work-header";
   return {
     contract: "evavo.enhancement-art-review.v1",
     source_path: "/source.png",
@@ -51,14 +49,20 @@ function manifest(source, candidate, width, height, role = "illustration", profi
       "evavo_review_existing_image_quality",
       "evavo_review_existing_image_edit",
       "evavo_create_existing_image_inspection_proof",
-      ...(role === "work-header" ? ["evavo_review_work_header_image", "evavo_review_image_for_intended_use"] : []),
+      ...(workHeader ? [
+        "evavo_review_work_header_image",
+        "evavo_review_image_for_intended_use",
+        "evavo_compare_work_header_candidates",
+        "evavo_record_work_header_visual_critique",
+      ] : []),
     ],
-    mandatory_visual_checks: ["review candidate visually"],
+    mandatory_visual_checks: ["review candidate visually", ...(workHeader ? ["compare viable candidates side-by-side"] : [])],
     approval_state: "unapproved",
     source_immutable: true,
     candidate_is_review_only: true,
     art_studio_visual_review_required: true,
     page_context_review_required: ["work-header", "support-image", "catalogue-tile"].includes(role),
+    comparative_candidate_review_required: workHeader,
     publication_allowed: false,
     cloud_overwrite_allowed: false,
     automatic_creative_approval: false,
@@ -84,10 +88,7 @@ test("rejects candidate bytes that do not match manifest", async () => {
   const source = await makePng(64, 64, [10, 20, 30, 255]);
   const candidate = await makePng(64, 64, [11, 21, 31, 255]);
   const wrong = await makePng(64, 64, [99, 99, 99, 255]);
-  await assert.rejects(
-    () => reviewEnhancementStudioCandidate({ manifest: manifest(source, candidate, 64, 64), source, candidate: wrong }),
-    /candidate bytes do not match/i,
-  );
+  await assert.rejects(() => reviewEnhancementStudioCandidate({ manifest: manifest(source, candidate, 64, 64), source, candidate: wrong }), /candidate bytes do not match/i);
 });
 
 test("work header review carries page-context requirement and page proof", async () => {
