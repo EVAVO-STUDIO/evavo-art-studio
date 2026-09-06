@@ -1,0 +1,60 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "evavo-smoke-cel-animation-v1",
+  "contentClass": "general",
+  "batch_size": 1,
+  "generation_mode": "sequential-anchor",
+  "consistency_mode": "strict",
+  "quality_profile": "cinematic_stills",
+  "quality_overrides": {
+    "width": 1024,
+    "height": 1024,
+    "steps": 32,
+    "cfg": 5.5,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "denoise": 1,
+    "outputFormat": "png"
+  },
+  "character": {
+    "id": "cel-effects-smoke-anchor",
+    "description": "A hand-drawn effects animation test focused on a compact smoke-and-sparks burst, with no character required",
+    "face": "not applicable",
+    "hair": "not applicable",
+    "build": "clear layered smoke silhouette with readable outer contour",
+    "costume": "not applicable",
+    "palette": ["warm amber sparks", "cool blue-grey smoke", "painted shadow tones"],
+    "signatureDetails": ["hand-painted cel shapes", "purposeful line boil", "layered smoke puffs", "drawn spark accents"]
+  },
+  "style": {
+    "name": "late-1980s-early-1990s-hand-painted-cel-effects",
+    "description": "Original hand-drawn cel-animation effects art with painted acetate-era shading, graphic smoke shapes, restrained airbrush bloom, inked contours and photographed-cel texture; evoke the craft and production qualities of late-1980s and early-1990s theatrical science-fiction animation without copying any specific film, studio, character or shot",
+    "medium": "inked animation drawing with hand-painted cel colour and photographed-film texture",
+    "period": "late 1980s to early 1990s animation production aesthetics",
+    "lighting": "brief warm internal flash fading into cooler painted smoke volumes",
+    "palette": ["smoky blue grey", "charcoal", "warm amber", "restrained orange-white flash"],
+    "materials": ["painted cel opacity", "dry-brush smoke edge", "subtle analog film grain"],
+    "lineTreatment": ["confident ink contours", "selective broken edges", "no vector-perfect gradients"],
+    "mustHave": ["clearly illustrated rather than simulated particles", "readable hand-shaped smoke masses", "2D painted lighting", "original composition"],
+    "mustAvoid": ["3D particle render", "volumetric CGI smoke", "photoreal explosion", "modern game-engine VFX", "generic AI gloss", "specific copyrighted characters or compositions"]
+  },
+  "continuity_locks": ["keep the effect entirely 2D and hand-drawn in appearance", "preserve painted-cel edge treatment"],
+  "quality_prompt": ["production-ready original cel-animation effects keyframe", "strong graphic silhouette", "specific hand-painted decisions", "clean readable effect layering"],
+  "negative": ["3D render", "CGI particles", "photoreal smoke", "modern lens flare", "AI-generated text artifacts", "watermark", "logo"],
+  "seed_strategy": {"base": 90620261, "stride": 1},
+  "output_rules": {"exactCount": true, "requireUniqueHashes": true, "requireNonZeroBytes": true, "requireDimensions": true, "writeImageMetadata": true, "preserveAttempts": false},
+  "retry_rules": {"maxShotAttempts": 2, "retryMissing": true, "retryInvalidFile": true, "retryDimensionMismatch": true, "retryDuplicate": true, "seedBump": 1009},
+  "provider": {"baseUrl": "http://127.0.0.1:8192", "adapterId": "comfyui:sdxl-base-local-cinematic_stills"},
+  "shots": [
+    {
+      "id": "001-cel-effects-anchor",
+      "description": "A single original hand-painted 2D effects keyframe: a compact ground-level smoke burst with a few glowing sparks and a fading inner flash, designed as animation production art rather than a particle simulation",
+      "pose": "asymmetric layered smoke puffs expanding outward with directional energy",
+      "camera": "straight-on effects plate, no perspective-heavy environment",
+      "expression": "not applicable",
+      "background": "simple dark neutral animation-stage background that clearly separates the drawn effect",
+      "framing": "effect centered with generous clean margin",
+      "continuityLocks": ["one effect only", "no character", "no text"]
+    }
+  ]
+}
