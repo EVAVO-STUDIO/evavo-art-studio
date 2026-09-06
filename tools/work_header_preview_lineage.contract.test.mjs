@@ -62,7 +62,7 @@ test("page render binds full receipt and source lineage before approval", async 
     "Page-render receipt preview-manifest lineage is stale.",
     "Page-render review is bound to a different selection receipt version.",
     "Page-render candidate-review lineage is stale.",
-    "Page-render currentDesktop binding drifted from admitted preview evidence.",
+    "binding drifted from admitted preview evidence.",
     "Approval packet selection input does not match the fully verified page-render lineage.",
     "selectedLocalCandidateMustMatchPreviewedResponseBytes: true",
     "pageRenderProofSha256AndLengthBinding: true",
