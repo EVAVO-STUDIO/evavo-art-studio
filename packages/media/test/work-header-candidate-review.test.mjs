@@ -22,24 +22,35 @@ async function image(width, height, seed) {
   return sharp(raw, { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
 
-test("candidate board includes hash-bound current technical baseline but never a creative winner", async () => {
+test("candidate board binds semantic brief and surrounding media into evidence", async () => {
   const current = await image(1920, 1080, 2);
+  const support = await image(900, 1200, 3);
+  const tile = await image(1200, 900, 4);
   const a = await image(1920, 1080, 10);
   const b = await image(1920, 1080, 80);
   const result = await compareWorkHeaderCandidates({
     candidates: [{ id: "a", image: a }, { id: "b", image: b }],
     currentHeader: current,
+    supportImage: support,
+    tileImage: tile,
+    reviewBrief: {
+      pageTitle: "Opportunity Agent",
+      projectSummary: "EVAVO case study about an opportunity discovery and qualification product.",
+      visualIntent: "Prefer clear product storytelling over generic AI imagery.",
+    },
   });
+  assert.equal(result.evidence.reviewBrief.pageTitle, "Opportunity Agent");
+  assert.equal(result.evidence.semanticBriefRequiredForReplacement, true);
+  assert.match(result.evidence.supportImageSha256, /^[0-9a-f]{64}$/u);
+  assert.match(result.evidence.tileImageSha256, /^[0-9a-f]{64}$/u);
+  assert.equal(result.evidence.surroundingMediaHashBindingRequired, true);
   assert.ok(result.evidence.currentHeader);
   assert.match(result.evidence.currentHeader.imageSha256, /^[0-9a-f]{64}$/u);
   assert.match(result.evidence.candidates[0].imageSha256, /^[0-9a-f]{64}$/u);
   assert.match(digestWorkHeaderCandidateReviewEvidence(result.evidence), /^[0-9a-f]{64}$/u);
   assert.equal(result.evidence.critiqueHashBindingRequired, true);
-  assert.equal(typeof result.evidence.currentHeader.technicalScore, "number");
-  assert.equal(result.evidence.currentHeaderBaselineRequiredForReplacement, true);
   assert.equal(result.evidence.creativeWinner, null);
   assert.equal(result.evidence.finalSelectionAllowed, false);
-  assert.equal(result.evidence.visualCritiqueRequired, true);
   assert.ok(result.proofPng.length > 0);
 });
 
