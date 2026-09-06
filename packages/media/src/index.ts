@@ -26,6 +26,7 @@ export * from "./image-review-profiles.js";
 export * from "./image-similarity.js";
 export * from "./image-review-orchestrator.js";
 export * from "./enhancement-review-bridge.js";
+export * from "./enhancement-local-detail-risk.js";
 export * from "./enhancement-review-session.js";
 export * from "./localized-edit.js";
 export * from "./edit-mask.js";
