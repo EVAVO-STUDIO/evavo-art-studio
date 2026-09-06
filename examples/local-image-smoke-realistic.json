@@ -1,0 +1,59 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "local-smoke-realistic-v1",
+  "contentClass": "general",
+  "batch_size": 1,
+  "generation_mode": "independent",
+  "consistency_mode": "strict",
+  "quality_profile": "cinematic_stills",
+  "quality_overrides": {
+    "width": 1024,
+    "height": 1024,
+    "steps": 36,
+    "cfg": 5.5,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "denoise": 1,
+    "outputFormat": "png"
+  },
+  "character": {
+    "id": "realistic-workshop-subject",
+    "description": "An adult industrial designer working alone in a small fabrication workshop, used to validate naturalistic photographic rendering",
+    "face": "natural adult facial proportions with ordinary asymmetry and realistic skin texture",
+    "hair": "short practical hair with natural flyaways",
+    "build": "average adult proportions",
+    "costume": "simple work shirt, dark trousers and practical closed shoes without branding",
+    "palette": ["charcoal", "off-white", "worn timber", "warm tungsten"],
+    "signatureDetails": ["natural hands", "believable posture", "unforced candid expression"]
+  },
+  "style": {
+    "name": "naturalistic-cinematic-photography",
+    "description": "Convincing documentary-cinematic photography with restrained colour, natural lens behaviour, believable skin and materials, and no glossy AI-advertising finish",
+    "medium": "full-frame photographic still",
+    "period": "contemporary but visually timeless small workshop",
+    "lighting": "soft overcast window light mixed with one warm practical lamp",
+    "palette": ["neutral workshop greys", "warm timber", "subtle skin tones", "restrained amber practical light"],
+    "materials": ["unfinished timber", "brushed metal", "paper sketches", "cotton clothing", "concrete floor"],
+    "lineTreatment": ["natural optical edges", "realistic depth cues", "fine but not oversharpened texture"],
+    "mustHave": ["believable anatomy", "natural hands", "credible workshop clutter", "motivated practical lighting", "realistic material response", "subtle lens perspective"],
+    "mustAvoid": ["plastic skin", "beauty retouching", "HDR halo", "over-sharpening", "commercial stock-photo pose", "impossible reflections", "text", "watermark"]
+  },
+  "continuity_locks": ["keep materials physically coherent", "keep lighting motivated and naturalistic"],
+  "quality_prompt": ["convincing documentary photography", "specific physical scene construction", "natural anatomy", "restrained cinematic composition"],
+  "negative": ["plastic skin", "CGI", "3D render", "HDR", "oversaturated", "stock photo", "text", "watermark", "extra fingers", "warped tools", "duplicate objects"],
+  "seed_strategy": {"base": 905300, "stride": 1},
+  "output_rules": {"exactCount": true, "requireUniqueHashes": true, "requireNonZeroBytes": true, "requireDimensions": true, "writeImageMetadata": true, "preserveAttempts": false},
+  "retry_rules": {"maxShotAttempts": 3, "retryMissing": true, "retryInvalidFile": true, "retryDimensionMismatch": true, "retryDuplicate": true, "seedBump": 1009},
+  "provider": {"baseUrl": "http://127.0.0.1:8192", "adapterId": "comfyui:sdxl-base-local-cinematic_stills"},
+  "shots": [
+    {
+      "id": "001-workshop-candid",
+      "description": "Candid moment of the designer leaning over a workbench inspecting a small physical prototype beside hand sketches and ordinary tools, with a rain-softened window in the background",
+      "pose": "natural standing lean with one hand resting on the bench and the other holding the small prototype",
+      "camera": "eye-level 50mm-equivalent documentary perspective from several metres away",
+      "expression": "quiet concentration rather than smiling at camera",
+      "background": "small believable fabrication workshop with shelves, timber offcuts, metal tools, paper drawings and a rain-softened window",
+      "framing": "waist-up to three-quarter environmental portrait with balanced negative space and no aggressive depth-of-field blur"
+    }
+  ]
+}
