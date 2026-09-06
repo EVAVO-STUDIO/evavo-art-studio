@@ -140,6 +140,7 @@ function styleBlock(style) {
   if (style.palette?.length) parts.push(`palette: ${style.palette.join(', ')}`);
   if (style.materials?.length) parts.push(`materials: ${style.materials.join(', ')}`);
   if (style.lineTreatment?.length) parts.push(`line/edge treatment: ${style.lineTreatment.join(', ')}`);
+  if (style.mustHave?.length) parts.push(`required visual directives: ${style.mustHave.join(', ')}`);
   return parts.join('. ');
 }
 
