@@ -34,6 +34,7 @@ export * from "./work-header-candidate-review.js";
 export * from "./work-header-review-lineage.js";
 export * from "./work-header-visual-critique.js";
 export * from "./work-header-selection-resolver.js";
+export * from "./work-header-page-render-review.js";
 export * from "./work-page-media-review.js";
 export * from "./compositing-pass.js";
 export * from "./effect-layer.js";
