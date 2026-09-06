@@ -19,6 +19,11 @@
         "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"
       }
     },
+    "evavo-image-quality-pipeline-doctor-v1": {
+      "command": "node",
+      "args": ["tools/image_quality_pipeline_doctor_mcp.mjs"],
+      "env": {}
+    },
     "evavo-enhancement-review-bridge-v1": {
       "command": "node",
       "args": ["tools/enhancement_review_bridge_mcp.mjs"],
