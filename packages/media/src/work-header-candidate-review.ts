@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import sharp, { type OverlayOptions } from "sharp";
 import { reviewWorkHeaderImage } from "./work-header-quality.js";
 import { compareImageSimilarity } from "./image-similarity.js";
@@ -20,6 +21,7 @@ export interface WorkHeaderCandidateReviewResult {
   readonly proofPng: Buffer;
   readonly evidence: Readonly<{
     currentHeader: Readonly<{
+      imageSha256: string;
       technicalScore: number;
       technicalGrade: "pass" | "warn" | "fail";
       technicalIssues: readonly string[];
@@ -28,6 +30,7 @@ export interface WorkHeaderCandidateReviewResult {
     }> | null;
     candidates: readonly Readonly<{
       id: string;
+      imageSha256: string;
       provenance: string | null;
       technicalScore: number;
       technicalGrade: "pass" | "warn" | "fail";
@@ -46,8 +49,13 @@ export interface WorkHeaderCandidateReviewResult {
     finalSelectionAllowed: false;
     visualCritiqueRequired: true;
     currentHeaderBaselineRequiredForReplacement: true;
+    critiqueHashBindingRequired: true;
     visualCritiqueDimensions: readonly string[];
   }>;
+}
+
+function sha256(buffer: Buffer): string {
+  return createHash("sha256").update(buffer).digest("hex");
 }
 
 function safeLabel(value: string): string {
@@ -70,8 +78,9 @@ async function candidatePanel(id: string, proof: Buffer, score: number, grade: s
     .toBuffer();
 }
 
-function baselineEvidence(header: Awaited<ReturnType<typeof reviewWorkHeaderImage>>) {
+function baselineEvidence(header: Awaited<ReturnType<typeof reviewWorkHeaderImage>>, image: Buffer) {
   return Object.freeze({
+    imageSha256: sha256(image),
     technicalScore: header.evidence.score,
     technicalGrade: header.evidence.grade,
     technicalIssues: header.evidence.issues,
@@ -103,6 +112,7 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
       header,
       evidence: Object.freeze({
         id: candidate.id,
+        imageSha256: sha256(candidate.image),
         provenance: candidate.provenance ?? null,
         technicalScore: header.evidence.score,
         technicalGrade: header.evidence.grade,
@@ -125,7 +135,7 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
     .map((item) => item.evidence.id);
 
   const panels: Buffer[] = [];
-  if (currentHeaderReview) {
+  if (currentHeaderReview && spec.currentHeader) {
     panels.push(await candidatePanel("current-header", currentHeaderReview.proofPng, currentHeaderReview.evidence.score, currentHeaderReview.evidence.grade, currentHeaderReview.evidence.issues, true));
   }
   panels.push(...await Promise.all(reviewed.map((item) => candidatePanel(
@@ -164,13 +174,14 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
   return {
     proofPng,
     evidence: Object.freeze({
-      currentHeader: currentHeaderReview ? baselineEvidence(currentHeaderReview) : null,
+      currentHeader: currentHeaderReview && spec.currentHeader ? baselineEvidence(currentHeaderReview, spec.currentHeader) : null,
       candidates: Object.freeze(reviewed.map((item) => item.evidence)),
       technicalShortlist: Object.freeze(technicalShortlist),
       creativeWinner: null,
       finalSelectionAllowed: false,
       visualCritiqueRequired: true,
       currentHeaderBaselineRequiredForReplacement: true,
+      critiqueHashBindingRequired: true,
       visualCritiqueDimensions: Object.freeze([
         "semantic relevance to the actual case study/project",
         "focal-point strength and immediate readability",
