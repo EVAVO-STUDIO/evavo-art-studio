@@ -4,18 +4,21 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers the preservation and review chain", async () => {
+test("image quality doctor covers preservation review and finishing planning", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_2"',
-    'SERVER_VERSION = "1.2.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_3"',
+    'SERVER_VERSION = "1.3.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
+    'id: "finishing-plan-core"',
     'id: "artifact-signals"',
     'id: "unified-orchestrator"',
     'id: "durable-review-session"',
     'id: "review-mcp-profile-policy"',
+    'id: "defect-mcp-source-bound"',
+    'id: "finishing-plan-mcp"',
     'id: "safe-output-bundle"',
     'id: "edit-mask-no-private-sharp"',
     'id: "page-review-atomic"',
@@ -25,21 +28,31 @@ test("image quality doctor covers the preservation and review chain", async () =
   ]) assert.ok(source.includes(token), `missing doctor contract token: ${token}`);
 });
 
-test("MCP configuration exposes the quality doctor and durable review session", async () => {
+test("MCP configuration exposes quality doctor durable review and finishing plan", async () => {
   const config = await read("../.mcp.json");
-  assert.ok(config.includes('"evavo-image-quality-pipeline-doctor-v1"'));
-  assert.ok(config.includes('"tools/image_quality_pipeline_doctor_mcp.mjs"'));
-  assert.ok(config.includes('"evavo-image-review-session-v1"'));
-  assert.ok(config.includes('"tools/image_review_session_mcp.mjs"'));
+  for (const token of [
+    '"evavo-image-quality-pipeline-doctor-v1"',
+    '"tools/image_quality_pipeline_doctor_mcp.mjs"',
+    '"evavo-image-review-session-v1"',
+    '"tools/image_review_session_mcp.mjs"',
+    '"evavo-existing-image-finishing-plan-v1"',
+    '"tools/existing_image_finishing_plan_mcp.mjs"',
+  ]) assert.ok(config.includes(token), `missing MCP registration token: ${token}`);
 });
 
-test("doctor verifies profile-aware existing-image review output safety", async () => {
+test("doctor verifies profile-aware review and source-bound finishing evidence", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
     "profileTransparentRgbMode",
     "strictWholeCanvasTransparentRgbProfiles",
     "rollbackSafeReviewOutputBundle: true",
-  ]) assert.ok(source.includes(token), `missing existing-image-review doctor token: ${token}`);
+    "sourceSha256AndLengthBound: true",
+    "maskSha256AndLengthBound: true",
+    "overlaySha256AndLengthBound: true",
+    "exactSourceMaskOverlayBindingRequired: true",
+    "staleDefectEvidenceRejected: true",
+    "smallestPreservationFirstOperationPreferred: true",
+  ]) assert.ok(source.includes(token), `missing resilient finishing token: ${token}`);
 });
 
 test("doctor verifies phase-aware upscale evidence and immutable review receipts", async () => {
